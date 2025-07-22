@@ -127,11 +127,7 @@ def _decode_custom_files_obj(
     res = load_instance_op(art, "obj")
     # Only set art attribute if the object allows it (non-Pydantic objects)
     # Pydantic models have strict attribute checking and don't allow arbitrary attributes
-    try:
-        res.art = art
-    except (AttributeError, ValueError):
-        # If we can't set the attribute, that's ok - not all objects need it
-        pass
+    res.art = art
     return res
 
 

@@ -1879,21 +1879,9 @@ class WeaveClient:
 
         # Recursive traversal of other pydantic objects
         elif isinstance(obj, (pydantic.BaseModel, pydantic.v1.BaseModel)):
-            # Check if this object has a custom serializer registered
-            from weave.trace.serialization.serializer import get_serializer_for_obj
-
-            if get_serializer_for_obj(obj) is None:
-                # Only convert to ObjectRecord if no custom serializer exists
-                obj_rec = pydantic_object_record(obj)
-                for v in obj_rec.__dict__.values():
-                    self._save_nested_objects(v)
-            else:
-                # If it has a custom serializer, traverse its attributes directly
-                # without converting to ObjectRecord
-                for field_name in obj.model_fields:
-                    v = getattr(obj, field_name, None)
-                    if v is not None:
-                        self._save_nested_objects(v)
+            obj_rec = pydantic_object_record(obj)
+            for v in obj_rec.__dict__.values():
+                self._save_nested_objects(v)
 
         # Recursive traversal of other dataclasses
         elif dataclasses.is_dataclass(obj) and not isinstance(obj, Ref):

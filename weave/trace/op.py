@@ -303,6 +303,7 @@ def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedI
         for param_name, value in inputs_with_defaults.items():
             # Check if we found an annotation which requires substitution
             parsed = parsed_annotations.get(param_name)
+            logger.warning(parsed)
             # We don't need to do anything with this if a special annotation is not found
             if not parsed:
                 to_weave_inputs[param_name] = value

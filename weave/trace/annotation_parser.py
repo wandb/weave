@@ -10,25 +10,22 @@ logger = logging.getLogger(__name__)
 
 CONTENT_CLASS_NAME = "weave.type_wrappers.Content.content.Content"
 
-# Content annotation with a format specifier
-# Example: "typing.Annotated[typing.Union[str, bytes], weave.type_wrappers.Content.Content.Content[typing.Literal['mp3']]]"
+# Content annotation with a nested Literal type
+# Example: "typing.Annotated[str, <class 'my_app.Content[key=Literal['user_id']]'>]"
 # Explanation:
-# - r"typing\.Annotated\[": Matches the literal "typing.Annotated["
-# - r"(.+?)": Group 1. Captures the base type (non-greedy match for any characters).
-#            This allows capturing complex types like `typing.Union[str, bytes]`.
-# - r",\s*": Matches a comma followed by optional whitespace (this comma separates base_type from the Content annotation).
-# - fr"{re.escape(content_class_name)}\[": Matches the content class name followed by "[".
-# - r"typing\.Literal\[": Matches "typing.Literal[".
-# - r"['\"](.+?)['\"]": Group 2. Captures any literal (non-greedy).
-# - r"\]\]": Matches the two closing square brackets for Literal and Content.
-# - r"\]": Matches the final closing square bracket for Annotated.
+# - r"typing\.Annotated\[": Matches the literal "typing.Annotated[".
+# - r"(.+?),\s*": Group 1. Captures the base type (e.g., "str") and the following comma.
+# - rf"<class '{re.escape(CONTENT_CLASS_NAME)}\[": Matches the start of the metadata class string.
+# - r"[^\]]*Literal\[['\"](.+?)['\"]\]": Matches any character except ']' until it finds a Literal, then captures its string content as Group 2.
+# - r"\]'>": Matches the closing characters for the metadata class representation (e.g., "]'>").
+# - r"\]": Matches the final closing bracket of the Annotated type.
 
 PATTERN_WITH_TYPE_HINT = re.compile(
     r"typing\.Annotated\["
     r"(.+?),\s*"  # Group 1: Base type (non-greedy)
-    rf"{re.escape(CONTENT_CLASS_NAME)}\["
-    r"typing\.Literal\[['\"](.+?)['\"]\]"  # Group 2: Any literal, non-greedy
-    r"\]"  # Closing bracket for Content[...]
+    rf"<class '{re.escape(CONTENT_CLASS_NAME)}\["
+    r"[^\]]*Literal\[['\"](.+?)['\"]\]"  # Group 2: Any literal, non-greedy
+    r"\]'>"  # Closing bracket for Content[...] and class
     r"\]"  # Closing bracket for Annotated[...]
 )
 
@@ -130,9 +127,10 @@ def parse_content_annotation(
     """
     Parses an content type annotation string.
 
-    The function expects the string to be one of two forms:
+    The function expects the string to be one of three forms:
     1. typing.Annotated[SomeType, weave.type_wrappers.Content.content.Content[typing.Literal['format']]]
     2. typing.Annotated[SomeType, <class 'weave.type_wrappers.Content.content.Content'>]
+    3. typing.Annotated[SomeType, <class 'weave.type_wrappers.Content.content.Content[Literal['format']]'>]
 
     It extracts the base type (which can be complex, like typing.Union),
     confirms the Content class, and identifies the content format.
@@ -141,9 +139,13 @@ def parse_content_annotation(
         annotation_string: The string representation of the type annotation.
 
     Returns:
-        ContentAnnotation | ContentAnnotationWithExtention | ContentAnnotationWithMimetype | None
+        ContentAnnotation | None
     """
     # Try matching the pattern with format first (it's more specific)
+    logger.warning(annotation_string)
+    
+    # Try the class with type hint pattern first
+    # Fall back to the original patterns
     return try_parse_annotation_with_hint(
         annotation_string
     ) or try_parse_annotation_without_hint(annotation_string)
