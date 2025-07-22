@@ -282,7 +282,7 @@ def run_benchmark(
 
         except KeyboardInterrupt:
             console.print("\n[dim]👋 Goodbye![/dim]")
-            raise typer.Exit(0)
+            raise typer.Exit(0) from None
 
     # Run the selected benchmark
     console.print()
