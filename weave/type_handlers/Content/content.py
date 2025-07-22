@@ -8,7 +8,7 @@ import logging
 from weave.trace.serialization import serializer
 from weave.trace.serialization.custom_objs import MemTraceFilesArtifact
 from weave.type_wrappers import Content
-from weave.type_wrappers.Content.content_types import (
+from weave.type_wrappers.Content.content import (
     ResolvedContentArgs,
     ResolvedContentArgsWithoutData,
 )
