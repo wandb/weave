@@ -12,7 +12,7 @@ import inspect
 from functools import wraps
 from typing import Any, Optional
 
-import weave.wandb_thin as wandb
+import weave.compat.wandb.wandb_thin as wandb
 
 wandb_termlog = wandb.termlog
 patched = False

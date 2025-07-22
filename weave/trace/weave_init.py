@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 
+from weave.compat import wandb
 from weave.trace import (
     autopatch,
     init_message,
@@ -33,9 +34,7 @@ _current_inited_client: InitializedClient | None = None
 
 
 def get_username() -> str | None:
-    from weave.wandb_interface import wandb_api
-
-    api = wandb_api.get_wandb_api_sync()
+    api = wandb.Api()
     try:
         return api.username()
     except AttributeError:
@@ -46,11 +45,9 @@ class WeaveWandbAuthenticationException(Exception): ...
 
 
 def get_entity_project_from_project_name(project_name: str) -> tuple[str, str]:
-    from weave.wandb_interface import wandb_api
-
     fields = project_name.split("/")
     if len(fields) == 1:
-        api = wandb_api.get_wandb_api_sync()
+        api = wandb.Api()
         entity_name = api.default_entity_name()
         if entity_name is None:
             raise WeaveWandbAuthenticationException(
@@ -83,8 +80,10 @@ Args:
 
 def init_weave(
     project_name: str,
+    *,
     ensure_project_exists: bool = True,
     autopatch_settings: autopatch.AutopatchSettings | None = None,
+    host: str | None = None,
 ) -> InitializedClient:
     global _current_inited_client
     if _current_inited_client is not None:
@@ -100,22 +99,23 @@ def init_weave(
             _current_inited_client.client.finish()
             _current_inited_client.reset()
 
-    from weave.wandb_interface import wandb_api  # type: ignore
+    from weave.wandb_interface import (
+        wandb_context as wandb_context_module,  # type: ignore
+    )
 
     # Must init to read ensure we've read auth from the environment, in
     # case we're on a new thread.
-    wandb_api.init()
-    wandb_context = wandb_api.get_wandb_api_context()
+    wandb_context_module.init()
+    wandb_context = wandb_context_module.get_wandb_api_context()
     if wandb_context is None:
-        import wandb
-
         logger.info(
             "Please login to Weights & Biases (https://wandb.ai/) to continue..."
         )
         wandb_termlog_patch.ensure_patched()
-        wandb.login(anonymous="never", force=True)  # type: ignore
-        wandb_api.init()
-        wandb_context = wandb_api.get_wandb_api_context()
+        wandb.login(anonymous="never", force=True, host=host)  # type: ignore
+
+        wandb_context_module.init()
+        wandb_context = wandb_context_module.get_wandb_api_context()
 
     entity_name, project_name = get_entity_project_from_project_name(project_name)
     wandb_run_id = weave_client.safe_current_wb_run_id()
