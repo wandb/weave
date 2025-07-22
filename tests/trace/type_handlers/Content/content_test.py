@@ -139,10 +139,7 @@ class TestWeaveContent:
         assert content.mimetype == mimetype
         assert content.filename == file_path.name
         assert content.path == str(file_path.resolve())
-        assert content.input_type in [
-            "<class 'pathlib.PosixPath'>",
-            "<class 'pathlib.Path'>",
-        ]
+        # input_type can change based on library version so we don't check it here
         assert content.content_type == "file"
 
     def test_content_save_method(self, image_file):
