@@ -8,12 +8,12 @@ import subprocess
 import sys
 import uuid
 from pathlib import Path
-from typing import Annotated, Any, Generic, Self, Literal, TypedDict, Union
+from typing import Annotated, Any, Generic, Literal, Self, TypedDict
 
 from pydantic import BaseModel, Field
 from typing_extensions import TypeVar
-from .utils import default_filename, get_mime_and_extension, is_valid_b64, is_valid_path
 
+from .utils import default_filename, get_mime_and_extension, is_valid_b64, is_valid_path
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +50,8 @@ class ResolvedContentArgsWithoutData(TypedDict):
 class ResolvedContentArgs(ResolvedContentArgsWithoutData):
     # Required Fields
     data: bytes
+
+
 # Dummy typevar to allow for passing mimetype/extension through annotated content
 # e.x. Content["pdf"] or Content["application/pdf"]
 T = TypeVar("T", bound=str)
@@ -73,7 +75,7 @@ class Content(BaseModel, Generic[T]):
     input_type: str
 
     extra: Annotated[
-        dict[str, "Any"] | None,
+        dict[str, Any] | None,
         Field(
             description="Extra metadata to associate with the content",
             examples=[{"number of cats": 1}],
@@ -89,7 +91,7 @@ class Content(BaseModel, Generic[T]):
         /,
         encoding: str = "utf-8",
         mimetype: str | None = None,
-        metadata: dict[str, "Any"] | None = None,
+        metadata: dict[str, Any] | None = None,
     ):
         """Initializes Content from a local file path."""
         path_obj = Path(path)
@@ -132,7 +134,7 @@ class Content(BaseModel, Generic[T]):
         /,
         extension: str | None = None,
         mimetype: str | None = None,
-        metadata: dict[str, "Any"] | None = None,
+        metadata: dict[str, Any] | None = None,
         encoding: str = "utf-8",
     ) -> Self:
         """Initializes Content from raw bytes."""
@@ -169,7 +171,7 @@ class Content(BaseModel, Generic[T]):
         /,
         extension: str | None = None,
         mimetype: str | None = None,
-        metadata: dict[str, "Any"] | None = None,
+        metadata: dict[str, Any] | None = None,
         encoding: str = "utf-8",
     ) -> Self:
         """Initializes Content from a string of text."""
@@ -207,7 +209,7 @@ class Content(BaseModel, Generic[T]):
         /,
         extension: str | None = None,
         mimetype: str | None = None,
-        metadata: dict[str, "Any"] | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> Self:
         """Initializes Content from a base64 encoded string or bytes."""
         input_type = str(type(b64_data))
@@ -251,7 +253,7 @@ class Content(BaseModel, Generic[T]):
         /,
         encoding: str = "utf-8",
         mimetype: str | None = None,
-        metadata: dict[str, "Any"] | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> Self:
         """Initializes Content from a local file path."""
         # This classmethod delegates to the main constructor

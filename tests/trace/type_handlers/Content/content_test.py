@@ -139,7 +139,10 @@ class TestWeaveContent:
         assert content.mimetype == mimetype
         assert content.filename == file_path.name
         assert content.path == str(file_path.resolve())
-        assert content.input_type in ["<class 'pathlib.PosixPath'>", "<class 'pathlib.Path'>"]
+        assert content.input_type in [
+            "<class 'pathlib.PosixPath'>",
+            "<class 'pathlib.Path'>",
+        ]
         assert content.content_type == "file"
 
     def test_content_save_method(self, image_file):
@@ -207,13 +210,15 @@ class TestWeaveContent:
         assert content.data.decode("utf-8") == text_data
 
         # Test with different encoding
-        content_utf16 = Content.from_bytes(text_data.encode("utf-16"), extension="txt", encoding="utf-16")
+        content_utf16 = Content.from_bytes(
+            text_data.encode("utf-16"), extension="txt", encoding="utf-16"
+        )
         assert content_utf16.data.decode("utf-16") == text_data
 
     def test_content_from_text(self):
         """Test creating Content from text string."""
         text_data = "Hello, this is a test file!\nWith multiple lines."
-        
+
         # Test Content.from_text()
         content = Content.from_text(text_data, extension="txt")
         assert content is not None
@@ -223,7 +228,7 @@ class TestWeaveContent:
         assert content.encoding == "utf-8"
         assert content.input_type == "<class 'str'>"
         assert content.content_type == "text"
-        
+
         # Test with custom encoding
         content2 = Content.from_text(text_data, extension=".txt", encoding="utf-16")
         assert content2.data == text_data.encode("utf-16")
@@ -288,70 +293,67 @@ class TestWeaveContent:
         content2 = Content.from_bytes(file_bytes, extension="txt", encoding="latin-1")
         assert content2.encoding == "latin-1"
 
-    # The following tests did not rely on the parameterized files,
-    # but are updated to use fixtures for consistency where applicable.
+    def test_content_save_and_retrieve(self, image_file, client: WeaveClient):
+        """Test publishing and retrieving Content objects."""
+        content = Content.from_path(image_file)
 
-    # def test_content_save_and_retrieve(self, image_file, client: WeaveClient):
-    #     """Test publishing and retrieving Content objects."""
-    #     content = Content.from_path(image_file)
-    #
-    #     # Publish the content
-    #     ref = weave.publish(content, name=f"test_content_{content.extension}")
-    #     assert ref is not None
-    #
-    #     # Retrieve and verify
-    #     retrieved = ref.get()
-    #     assert isinstance(retrieved, Content)
-    #     assert retrieved.data == content.data
-    #     assert retrieved.extension == content.extension
-    #     assert retrieved.mimetype == content.mimetype
-    #     assert retrieved.size == content.size
-    #
-    # def test_content_in_dataset(
-    #     self, image_file, audio_file, video_file, pdf_file, client: WeaveClient
-    # ):
-    #     """Test Content objects as dataset values."""
-    #     rows = []
-    #     original_files = {}
-    #
-    #     # Use fixtures to create content and store original data for verification
-    #     for file_path in [image_file, audio_file, video_file, pdf_file]:
-    #         content = Content.from_path(file_path)
-    #         rows.append(
-    #             {
-    #                 "name": file_path.name,
-    #                 "content": content,
-    #                 "expected_mimetype": content.mimetype,
-    #             }
-    #         )
-    #         original_files[file_path.name] = file_path.read_bytes()
-    #
-    #     # Create and publish dataset
-    #     dataset = Dataset(rows=Table(rows))
-    #     ref = weave.publish(dataset, name="test_content_dataset")
-    #
-    #     # Retrieve and verify
-    #     retrieved_dataset = ref.get()
-    #     assert len(retrieved_dataset.rows) == len(rows)
-    #
-    #     for row in retrieved_dataset.rows:
-    #         assert isinstance(row["content"], Content)
-    #         assert row["content"].mimetype == row["expected_mimetype"]
-    #         # Verify data integrity
-    #         original_data = original_files[row["name"]]
-    #         assert row["content"].data == original_data
-    #
-    # def test_content_postprocessing(self, client: WeaveClient):
-    #     """Test that Content postprocessing works correctly in ops."""
-    #
-    #     @weave.op
-    #     def create_content_from_bytes(data: bytes, hint: str) -> Content:
-    #         return Content.from_bytes(data, extension=hint)
-    #
-    #     test_data = b"Test content for postprocessing"
-    #     result = create_content_from_bytes(test_data, "txt")
-    #
-    #     assert isinstance(result, Content)
-    #     assert result.data == test_data
-    #     assert result.extension == "txt"
-    #     assert result.mimetype == "text/plain"  # Simplified in mock
+        # Publish the content
+        ref = weave.publish(content, name=f"test_content_{content.extension}")
+        assert ref is not None
+
+        # Retrieve and verify
+        retrieved = ref.get()
+        assert isinstance(retrieved, Content)
+        assert retrieved.data == content.data
+        assert retrieved.extension == content.extension
+        assert retrieved.mimetype == content.mimetype
+        assert retrieved.size == content.size
+
+    def test_content_in_dataset(
+        self, image_file, audio_file, video_file, pdf_file, client: WeaveClient
+    ):
+        """Test Content objects as dataset values."""
+        rows = []
+        original_files = {}
+
+        # Use fixtures to create content and store original data for verification
+        for file_path in [image_file, audio_file, video_file, pdf_file]:
+            content = Content.from_path(file_path)
+            rows.append(
+                {
+                    "name": file_path.name,
+                    "content": content,
+                    "expected_mimetype": content.mimetype,
+                }
+            )
+            original_files[file_path.name] = file_path.read_bytes()
+
+        # Create and publish dataset
+        dataset = Dataset(rows=Table(rows))
+        ref = weave.publish(dataset, name="test_content_dataset")
+
+        # Retrieve and verify
+        retrieved_dataset = ref.get()
+        assert len(retrieved_dataset.rows) == len(rows)
+
+        for row in retrieved_dataset.rows:
+            assert isinstance(row["content"], Content)
+            assert row["content"].mimetype == row["expected_mimetype"]
+            # Verify data integrity
+            original_data = original_files[row["name"]]
+            assert row["content"].data == original_data
+
+    def test_content_postprocessing(self, client: WeaveClient):
+        """Test that Content postprocessing works correctly in ops."""
+
+        @weave.op
+        def create_content_from_bytes(data: bytes, hint: str) -> Content:
+            return Content.from_bytes(data, extension=hint)
+
+        test_data = b"Test content for postprocessing"
+        result = create_content_from_bytes(test_data, "txt")
+
+        assert isinstance(result, Content)
+        assert result.data == test_data
+        assert result.extension == ".txt"
+        assert result.mimetype == "text/plain"  # Simplified in mock

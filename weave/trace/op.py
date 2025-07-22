@@ -40,6 +40,8 @@ from typing_extensions import ParamSpec
 from weave.trace import box, settings
 from weave.trace.annotation_parser import (
     ContentAnnotation,
+    ContentAnnotationWithExtention,
+    ContentAnnotationWithMimetype,
     parse_content_annotation,
     parse_from_signature,
 )
@@ -307,8 +309,12 @@ def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedI
             if not parsed:
                 to_weave_inputs[param_name] = value
                 continue
+            elif isinstance(parsed, ContentAnnotationWithMimetype):
+                to_weave_inputs[param_name] = Content._from_guess(value, mimetype=parsed.mimetype)
+            elif isinstance(parsed, ContentAnnotationWithExtention):
+                to_weave_inputs[param_name] = Content._from_guess(value, extension=parsed.extension)
             elif isinstance(parsed, ContentAnnotation):
-                to_weave_inputs[param_name] = Content(value, parsed.type_hint)
+                to_weave_inputs[param_name] = Content._from_guess(value)
     else:
         to_weave_inputs = inputs_with_defaults
 
