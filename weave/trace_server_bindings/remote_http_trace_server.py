@@ -252,14 +252,14 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             data=req.model_dump_json(by_alias=True).encode("utf-8"),
             stream=stream,
         )
-        if r.status_code == 500:
+        if r.status_code != 200:
             reason_val = r.text
             try:
                 reason_val = json.dumps(json.loads(reason_val), indent=2)
             except json.JSONDecodeError:
                 reason_val = f"Reason: {reason_val}"
             raise requests.HTTPError(
-                f"500 Server Error: Internal Server Error for url: {url}. {reason_val}",
+                f"{r.status_code} Error for url {url}: {reason_val}",
                 response=r,
             )
         r.raise_for_status()
