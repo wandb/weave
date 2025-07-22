@@ -49,10 +49,8 @@ def to_json(
     if isinstance(obj, TableRef):
         return obj.uri()
     elif isinstance(obj, ObjectRef):
-        logging.warning("Obj Ref")
         return obj.uri()
     elif isinstance(obj, ObjectRecord):
-        logging.warning("Obj Record")
         res = {"_type": obj._class_name}
         for k, v in obj.__dict__.items():
             if k == "ref":
