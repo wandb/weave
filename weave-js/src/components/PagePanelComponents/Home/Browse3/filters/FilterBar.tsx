@@ -35,6 +35,12 @@ import {VariableChildrenDisplay} from './VariableChildrenDisplayer';
 
 export const FILTER_INPUT_DEBOUNCE_MS = 1000;
 
+export type FieldOption = {
+  readonly value: string;
+  readonly label: string;
+  readonly description?: string;
+};
+
 type FilterBarProps = {
   entity: string;
   project: string;
@@ -43,9 +49,9 @@ type FilterBarProps = {
   columnInfo: ColumnInfo;
   selectedCalls: string[];
   clearSelectedCalls: () => void;
-
   width: number;
   height: number;
+  isGrouped?: boolean;
 };
 
 const isFilterIncomplete = (filter: GridFilterItem): boolean => {
@@ -66,6 +72,7 @@ export const FilterBar = ({
   selectedCalls,
   clearSelectedCalls,
   width,
+  isGrouped = false,
 }: FilterBarProps) => {
   const refBar = useRef<HTMLDivElement>(null);
   const refLabel = useRef<HTMLDivElement>(null);
@@ -173,15 +180,19 @@ export const FilterBar = ({
       });
     }
   }
-  (options[0] as GroupedOption).options.unshift({
-    value: 'id',
-    label: 'Call ID',
-  });
-  (options[0] as GroupedOption).options.push({
-    value: MONITORED_FILTER_VALUE,
-    label: 'Monitored',
-    description: 'Find all calls scored by a particular monitor',
-  });
+
+  if (!isGrouped) {
+    // Add the default filters if the calls are not grouped
+    (options[0] as GroupedOption).options.push({
+      value: 'id',
+      label: 'Call ID',
+    });
+    (options[0] as GroupedOption).options.push({
+      value: MONITORED_FILTER_VALUE,
+      label: 'Monitored',
+      description: 'Find all calls scored by a particular monitor',
+    });
+  }
 
   const onRemoveAll = () => {
     // Check if there's only one filter and it's a datetime filter
@@ -191,6 +202,7 @@ export const FilterBar = ({
     ) {
       setFilterToDelete(localFilterModel.items[0].id);
       setShowDeleteWarning(true);
+      setAnchorEl(null); // Close popover to avoid focus trap conflicts
       return;
     }
 
@@ -275,6 +287,7 @@ export const FilterBar = ({
       if (isFirstDatetimeFilter) {
         setFilterToDelete(filterId);
         setShowDeleteWarning(true);
+        setAnchorEl(null); // Close popover to avoid focus trap conflicts
         return;
       }
 
@@ -312,6 +325,7 @@ export const FilterBar = ({
   const handleCancelDelete = useCallback(() => {
     setShowDeleteWarning(false);
     setFilterToDelete(null);
+    setAnchorEl(refBar.current); // Reopen popover after cancel
   }, []);
 
   const onSetSelected = useCallback(() => {

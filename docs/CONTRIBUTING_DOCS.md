@@ -22,10 +22,9 @@ Set up your environment to build and serve the Weave documentation locally:
     ```bash
     npm install --global yarn
     ```
-4. Set up your Python environment:
+4. Set up your Python environment, including the docs dependencies:
     ```bash
-    pip install -r requirements.dev.txt
-    pip install -e .
+    pip install -e ".[docs]"
     ```
 5. Install Playwright:
     ```bash
@@ -148,10 +147,10 @@ When moving a page from one location to another e.g. moving from `https://weave-
 - Script: `docs/scripts/generate_notebooks.py`
 - Converts `.ipynb` files from `docs/notebooks` to Markdown in `docs/reference/gen_notebooks`.
 
-You can convert a single notebook:
+You can convert a single notebook by running the below while in the `weave/docs` directory:
 
 ```bash
-python docs/scripts/generate_notebooks.py path/to/your_notebook.ipynb
+python scripts/generate_notebooks.py path/to/your_notebook.ipynb
 ```
 
 To add Docusaurus metadata to a notebook, include:

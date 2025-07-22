@@ -15,7 +15,15 @@ PY313_INCOMPATIBLE_SHARDS = [
     "notdiamond",
     "crewai",
 ]
-PY39_INCOMPATIBLE_SHARDS = ["crewai", "google_genai", "mcp", "smolagents", "dspy"]
+PY39_INCOMPATIBLE_SHARDS = [
+    "crewai",
+    "google_genai",
+    "mcp",
+    "smolagents",
+    "dspy",
+    "autogen_tests",
+]
+NUM_TRACE_SERVER_SHARDS = 4
 
 
 @nox.session
@@ -35,6 +43,9 @@ def lint(session):
         session.run("pre-commit", "run", "--hook-stage=pre-push", "--all-files")
 
 
+trace_server_shards = [f"trace{i}" for i in range(1, NUM_TRACE_SERVER_SHARDS + 1)]
+
+
 @nox.session(python=SUPPORTED_PYTHON_VERSIONS)
 @nox.parametrize(
     "shard",
@@ -45,7 +56,6 @@ def lint(session):
         # For example,
         #   nox -e "tests-3.12(shard='custom')" -- test_your_thing.py
         "custom",
-        "trace",
         "flow",
         "trace_server",
         "trace_server_bindings",
@@ -73,6 +83,11 @@ def lint(session):
         "huggingface",
         "smolagents",
         "mcp",
+        "verdict",
+        "autogen_tests",
+        "trace",
+        *trace_server_shards,
+        "trace_no_server",
     ],
 )
 def tests(session, shard):
@@ -122,12 +137,15 @@ def tests(session, shard):
     default_test_dirs = [f"integrations/{shard}/"]
     test_dirs_dict = {
         "custom": [],
-        "trace": ["trace/"],
         "flow": ["flow/"],
         "trace_server": ["trace_server/"],
         "trace_server_bindings": ["trace_server_bindings"],
         "mistral": ["integrations/mistral/"],
         "scorers": ["scorers/"],
+        "autogen_tests": ["integrations/autogen/"],
+        "trace": ["trace/"],
+        **{shard: ["trace/"] for shard in trace_server_shards},
+        "trace_no_server": ["trace/"],
     }
 
     test_dirs = test_dirs_dict.get(shard, default_test_dirs)
@@ -136,13 +154,32 @@ def tests(session, shard):
     if shard == "llamaindex":
         session.posargs.insert(0, "-n4")
 
-    session.run(
+    # Add sharding logic for trace1, trace2, trace3
+    pytest_args = [
         "pytest",
         "--durations=20",
         "--strict-markers",
         "--cov=weave",
         "--cov-report=html",
         "--cov-branch",
+    ]
+
+    # Handle trace sharding: run every 3rd test starting at different offsets
+    if shard in trace_server_shards:
+        shard_id = int(shard[-1]) - 1
+        pytest_args.extend(
+            [
+                f"--shard-id={shard_id}",
+                f"--num-shards={NUM_TRACE_SERVER_SHARDS}",
+                "-m trace_server",
+            ]
+        )
+
+    if shard == "trace_no_server":
+        pytest_args.extend(["-m", "not trace_server"])
+
+    session.run(
+        *pytest_args,
         *session.posargs,
         *test_dirs,
         env=env,

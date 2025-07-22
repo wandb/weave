@@ -221,7 +221,7 @@ class ScoreLogger(BaseModel):
 
     def finish(self) -> None:
         if self._has_finished:
-            logger.warn("(NO-OP): Already called finish, returning.")
+            logger.warning("(NO-OP): Already called finish, returning.")
             return
 
         scores = self._captured_scores
@@ -439,9 +439,10 @@ class EvaluationLogger(BaseModel):
                 "model": self.model,
             },
             attributes=IMPERATIVE_EVAL_MARKER,
+            use_stack=False,  # Don't push to global stack to prevent nesting
         )
-        assert self._evaluate_call is not None
-        call_context.push_call(self._evaluate_call)
+        if self._evaluate_call is None:
+            raise RuntimeError("Evaluation call does not exist, something went wrong!")
 
     def _cleanup_predictions(self) -> None:
         if self._is_finalized:
@@ -463,9 +464,10 @@ class EvaluationLogger(BaseModel):
 
         self._cleanup_predictions()
 
-        assert (
-            self._evaluate_call is not None
-        ), "Evaluation call should exist for finalization"
+        if self._evaluate_call is None:
+            raise RuntimeError(
+                "Evaluation call should exist for finalization, something went wrong!"
+            )
 
         # Finish the evaluation call
         wc = require_weave_client()
@@ -478,13 +480,6 @@ class EvaluationLogger(BaseModel):
                 "Failed to finish evaluation call during finalization.", exc_info=True
             )
 
-        # Pop the call regardless of finish success
-        try:
-            call_context.pop_call(self._evaluate_call.id)
-        except Exception:
-            # If popping fails (e.g., context already unwound), log and ignore
-            logger.warning("Failed to pop evaluation call from context.", exc_info=True)
-
         self._is_finalized = True
 
     def log_prediction(self, inputs: dict, output: Any) -> ScoreLogger:
@@ -492,31 +487,34 @@ class EvaluationLogger(BaseModel):
 
         The reference can be used to log scores which are attached to the specific
         prediction instance."""
-        # Make the prediction call
-        with _set_current_output(output):
-            with weave.attributes(IMPERATIVE_EVAL_MARKER):
-                _, predict_and_score_call = (
-                    self._pseudo_evaluation.predict_and_score.call(
-                        self._pseudo_evaluation,
-                        self.model,
-                        inputs,
-                        __require_explicit_finish=True,
-                    )
-                )
-
-        # Get the predict_call from the context variable
-        predict_call = current_predict_call.get()
-        if predict_call is None:
-            raise ValueError("predict_call should not be None")
-
+        # Use set_call_stack to temporarily set the evaluation as the parent
         assert self._evaluate_call is not None
-        pred = ScoreLogger(
-            predict_and_score_call=predict_and_score_call,
-            evaluate_call=self._evaluate_call,
-            predict_call=predict_call,
-        )
-        self._accumulated_predictions.append(pred)
-        return pred
+
+        with call_context.set_call_stack([self._evaluate_call]):
+            # Make the prediction call
+            with _set_current_output(output):
+                with weave.attributes(IMPERATIVE_EVAL_MARKER):
+                    _, predict_and_score_call = (
+                        self._pseudo_evaluation.predict_and_score.call(
+                            self._pseudo_evaluation,
+                            self.model,
+                            inputs,
+                            __require_explicit_finish=True,
+                        )
+                    )
+
+            # Get the predict_call from the context variable
+            predict_call = current_predict_call.get()
+            if predict_call is None:
+                raise ValueError("predict_call should not be None")
+
+            pred = ScoreLogger(
+                predict_and_score_call=predict_and_score_call,
+                evaluate_call=self._evaluate_call,
+                predict_call=predict_call,
+            )
+            self._accumulated_predictions.append(pred)
+            return pred
 
     def log_summary(
         self,
@@ -529,7 +527,7 @@ class EvaluationLogger(BaseModel):
         the evaluation, meaning no more predictions or scores can be logged.
         """
         if self._is_finalized:
-            logger.warn("(NO-OP): Evaluation already finalized, cannot log summary.")
+            logger.warning("(NO-OP): Evaluation already finalized, cannot log summary.")
             return
 
         if summary is None:
@@ -548,19 +546,22 @@ class EvaluationLogger(BaseModel):
         if summary_data:
             final_summary = summary_data
         if summary is not None:
-            final_summary = {**final_summary, **summary}
+            final_summary = {**final_summary, "output": summary}
 
         # Call the summarize op
-        assert (
-            self._evaluate_call is not None
-        ), "Evaluation call should exist for summary"
-        try:
-            with _set_current_summary(final_summary):
-                with weave.attributes(IMPERATIVE_EVAL_MARKER):
-                    self._pseudo_evaluation.summarize()
-        except Exception:
-            logger.error("Error during execution of summarize op.", exc_info=True)
-            # Even if summarize fails, try to finalize with the calculated summary
+        assert self._evaluate_call is not None, (
+            "Evaluation call should exist for summary"
+        )
+
+        # Use set_call_stack to temporarily set the evaluation as the parent
+        with call_context.set_call_stack([self._evaluate_call]):
+            try:
+                with _set_current_summary(final_summary):
+                    with weave.attributes(IMPERATIVE_EVAL_MARKER):
+                        self._pseudo_evaluation.summarize()
+            except Exception:
+                logger.error("Error during execution of summarize op.", exc_info=True)
+                # Even if summarize fails, try to finalize with the calculated summary
 
         self._finalize_evaluation(output=final_summary)
 

@@ -39,6 +39,9 @@ import {
   TableCreateRes,
   TableUpdateReq,
   TableUpdateRes,
+  ThreadSchema,
+  ThreadsQueryReq,
+  ThreadsQueryRes,
   TraceCallReadReq,
   TraceCallReadRes,
   TraceCallSchema,
@@ -484,6 +487,68 @@ export class DirectTraceServerClient {
       '/project/stats',
       req
     );
+  }
+
+  public async threadsStreamQuery(
+    req: ThreadsQueryReq
+  ): Promise<ThreadsQueryRes> {
+    try {
+      let content = await this.makeRequest<ThreadsQueryReq, string>(
+        '/threads/stream_query',
+        req,
+        'text'
+      );
+
+      // `content` is jsonl string, we need to parse it.
+      if (!content) {
+        return {threads: []};
+      }
+
+      if (content.endsWith('\n')) {
+        content = content.slice(0, -1);
+      }
+
+      if (content === '') {
+        return {threads: []};
+      }
+
+      const threads: ThreadSchema[] = [];
+      const lines = content.split('\n');
+
+      for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+        const line = lines[lineIndex];
+        try {
+          threads.push(JSON.parse(line));
+        } catch (err) {
+          if (lineIndex === lines.length - 1 && lineIndex > 0) {
+            // This is a very special case where the last line is not a
+            // complete json object. This can happen if the stream is
+            // terminated early. Instead of just failing, we can make a
+            // new request to the server to resume the stream from the
+            // last line. This should only occur projects with massive
+            // thread data.
+            const newReq = {...req};
+            const origOffset = req.offset || 0;
+            newReq.offset = origOffset + lineIndex;
+            console.debug(
+              `Early stream termination, performing a new request resuming from ${newReq.offset}`
+            );
+
+            const innerRes = await this.threadsStreamQuery(newReq);
+            threads.push(...innerRes.threads);
+            return {threads};
+          } else {
+            console.error(
+              `Error parsing line ${lineIndex} of ${lines.length}: ${line}`
+            );
+          }
+        }
+      }
+
+      return {threads};
+    } catch (err) {
+      throw err;
+    }
   }
 
   private makeRequest = async <QT, ST>(

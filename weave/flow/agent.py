@@ -20,7 +20,7 @@ class Agent(Object):
     system_message: str
     tools: list[Any] = Field(default_factory=list)
 
-    @weave.op()
+    @weave.op
     def step(self, state: AgentState) -> AgentState:
         """Run a step of the agent.
 

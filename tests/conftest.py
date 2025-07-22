@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 
 import weave
 from tests.trace.util import DummyTestException
-from tests.trace_server.conftest import *  # noqa: F401
+from tests.trace_server.conftest import *
 from tests.trace_server.conftest import TEST_ENTITY, get_trace_server_flag
 from weave.trace import autopatch, weave_client, weave_init
 from weave.trace.context.call_context import set_call_stack
@@ -175,6 +175,14 @@ class ThrowingServer(tsi.TraceServerInterface):
     def feedback_purge(self, req: tsi.FeedbackPurgeReq) -> tsi.FeedbackPurgeRes:
         raise DummyTestException("FAILURE - feedback_purge, req:", req)
 
+    def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
+        raise DummyTestException("FAILURE - evaluate_model, req:", req)
+
+    def evaluation_status(
+        self, req: tsi.EvaluationStatusReq
+    ) -> tsi.EvaluationStatusRes:
+        raise DummyTestException("FAILURE - evaluation_status, req:", req)
+
 
 @pytest.fixture
 def client_with_throwing_server(client):
@@ -223,7 +231,7 @@ class InMemoryWeaveLogCollector(logging.Handler):
             )
             # Exclude legacy
             and not record.name.startswith("weave.weave_server")
-            and not "legacy" in record.name
+            and "legacy" not in record.name
         ]
 
     def get_error_logs(self):
@@ -322,11 +330,11 @@ def make_server_recorder(server: tsi.TraceServerInterface):  # type: ignore
     class ServerRecorder(type(server)):  # type: ignore
         attribute_access_log: list[str]
 
-        def __init__(self, server: tsi.TraceServerInterface):  # noqa: N804, type: ignore
+        def __init__(self, server: tsi.TraceServerInterface):
             self.server = server
             self.attribute_access_log = []
 
-        def __getattribute__(self, name):  # noqa: N804
+        def __getattribute__(self, name):
             self_server = super().__getattribute__("server")
             access_log = super().__getattribute__("attribute_access_log")
             if name == "server":

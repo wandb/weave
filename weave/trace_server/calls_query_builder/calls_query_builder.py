@@ -414,6 +414,7 @@ class HardCodedFilter(BaseModel):
                 self.filter.trace_roots_only is not None,
                 self.filter.wb_user_ids,
                 self.filter.wb_run_ids,
+                self.filter.turn_ids,
             ]
         )
 
@@ -620,7 +621,7 @@ class CallsQuery(BaseModel):
 
         # Important: We must always filter out calls that have not been started
         # This can occur when there is an out of order call part insertion or worse,
-        # when such occurance happens and the client terminates early.
+        # when such occurrence happens and the client terminates early.
         # Additionally: This condition is also REQUIRED for proper functioning
         # when using pre-group by (WHERE) optimizations
         self.add_condition(

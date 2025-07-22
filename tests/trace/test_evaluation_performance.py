@@ -87,11 +87,11 @@ def build_evaluation():
         },
     ]
 
-    @weave.op()
+    @weave.op
     def predict(question: str):
         return "I don't know"
 
-    @weave.op()
+    @weave.op
     def score(question: str, expected: str, output: str):
         return output == expected
 
@@ -143,7 +143,7 @@ async def test_evaluation_performance(client: WeaveClient):
         }
     )
 
-    calls = client.calls()
+    calls = client.get_calls()
     objects = client._objects()
 
     assert (

@@ -1,4 +1,5 @@
 import _, {isArray, isObject, mapValues} from 'lodash';
+import memize from 'memize';
 
 import {hexToId} from '../util/digest';
 import {has} from '../util/has';
@@ -195,6 +196,7 @@ const filePrefixToMediaType = (prefix: string): MediaType | null => {
   } else if (prefix === 'partitioned-table') {
     return {type: 'partitioned-table', columnTypes: {}};
   }
+
   return null;
 };
 
@@ -383,6 +385,12 @@ export function isAssignableTo(type: Type, toType: Type): boolean {
           keyType === undefined
         ) {
           continue;
+        }
+        if (
+          (toType.notRequiredKeys ?? []).includes(key) &&
+          !(type.notRequiredKeys ?? []).includes(key)
+        ) {
+          return false;
         }
         if (keyType === undefined || !isAssignableTo(keyType, toKeyType)) {
           return false;
@@ -666,6 +674,57 @@ export function isNullable(t: Type): boolean {
   return isUnion(t) && t.members.findIndex(m => m === 'none') !== -1;
 }
 
+// Fast type hashing function for typedDict deduplication
+function getTypedDictKey(type: Type): string {
+  // Simple types can be used directly as keys
+  if (isSimpleTypeShape(type)) {
+    return type;
+  }
+
+  // For complex types, create a canonical string representation
+  // This is much faster than deep equality checks
+  if (isTypedDict(type)) {
+    const keys = Object.keys(type.propertyTypes).sort();
+    const props = keys
+      .map(k => `${k}:${getTypedDictKey(type.propertyTypes[k]!)}`)
+      .join(',');
+    const notRequired = type.notRequiredKeys
+      ? `,notRequired:[${type.notRequiredKeys.sort().join(',')}]`
+      : '';
+    return `typedDict:{${props}${notRequired}}`;
+  }
+
+  // For nested types within typedDict properties
+  if (isTaggedValue(type)) {
+    return `tagged:${getTypedDictKey(type.tag)}:${getTypedDictKey(type.value)}`;
+  }
+
+  if (type.type === 'list') {
+    return `list:${getTypedDictKey(type.objectType)}:${type.minLength ?? ''}:${
+      type.maxLength ?? ''
+    }`;
+  }
+
+  if (type.type === 'dict') {
+    return `dict:${getTypedDictKey(type.objectType)}`;
+  }
+
+  if (type.type === 'union') {
+    const memberKeys = type.members.map(m => getTypedDictKey(m)).sort();
+    return `union:[${memberKeys.join(',')}]`;
+  }
+
+  if (type.type === 'function') {
+    const inputs = Object.entries(type.inputTypes)
+      .map(([k, v]) => `${k}:${getTypedDictKey(v)}`)
+      .join(',');
+    return `function:{${inputs}}:${getTypedDictKey(type.outputType)}`;
+  }
+
+  // For other types, use JSON stringification as fallback
+  return JSON.stringify(type);
+}
+
 export function union(members: Type[]): Type {
   if (members.length === 0) {
     return 'invalid';
@@ -682,12 +741,36 @@ export function union(members: Type[]): Type {
       allMembers.push(mem);
     }
   }
-  const uniqMembers = _.uniqWith(
-    allMembers,
-    (a, b) =>
-      _.isEqual(a, b) ||
-      (a && b && isAssignableTo(a, b) && isAssignableTo(b, a))
-  );
+
+  // Deduplicate while preserving order
+  const uniqMembers: Type[] = [];
+  const seenTypedDictKeys = new Set<string>();
+  const seenOtherTypes: Type[] = [];
+
+  for (const member of allMembers) {
+    if (isTypedDict(member) || isTaggedValue(member)) {
+      // Use fast key-based deduplication for typedDicts
+      const key = getTypedDictKey(member);
+      if (!seenTypedDictKeys.has(key)) {
+        seenTypedDictKeys.add(key);
+        uniqMembers.push(member);
+      }
+    } else {
+      // Use original comparison logic for other types
+      const isDuplicate = seenOtherTypes.some(
+        seen =>
+          _.isEqual(seen, member) ||
+          (seen &&
+            member &&
+            isAssignableTo(seen, member) &&
+            isAssignableTo(member, seen))
+      );
+      if (!isDuplicate) {
+        seenOtherTypes.push(member);
+        uniqMembers.push(member);
+      }
+    }
+  }
 
   // Split TaggedValue members out.
   const nonTaggedMembers: Type[] = [];
@@ -1164,62 +1247,64 @@ export const nullableTaggableValue = (type: Type): Type => {
   );
 };
 
-export const typedDictPropertyTypes = (type: Type): {[key: string]: Type} => {
-  type = nullableTaggableValue(type);
-  if (isUnion(type)) {
-    // TODO: (tim) make this nicer code. This makes a union out of the "union" of keys
-    return type.members.reduce<{[key: string]: any}>((prev, curr, ndx) => {
-      const unwrappedCurr = nullableTaggableValue(curr);
-      if (!isTypedDict(unwrappedCurr) && unwrappedCurr !== 'none') {
-        throw new Error(
-          'typedDictPropertyTypes: incoming union type contains non-dict'
-        );
-      }
-      let newVal: {[key: string]: any} = {};
-      if (ndx === 0) {
-        newVal =
-          unwrappedCurr !== 'none' ? unwrappedCurr.propertyTypes ?? {} : {};
-      } else {
-        for (const existingProp in prev) {
-          if (prev[existingProp] != null) {
-            const prevProp = prev[existingProp];
-            if (
-              unwrappedCurr !== 'none' &&
-              unwrappedCurr.propertyTypes[existingProp]
-            ) {
-              const currProp = unwrappedCurr.propertyTypes[existingProp];
-              if (currProp) {
-                newVal[existingProp] = union([prevProp, currProp]);
+export const typedDictPropertyTypes = memize(
+  (type: Type): {[key: string]: Type} => {
+    type = nullableTaggableValue(type);
+    if (isUnion(type)) {
+      // TODO: (tim) make this nicer code. This makes a union out of the "union" of keys
+      return type.members.reduce<{[key: string]: any}>((prev, curr, ndx) => {
+        const unwrappedCurr = nullableTaggableValue(curr);
+        if (!isTypedDict(unwrappedCurr) && unwrappedCurr !== 'none') {
+          throw new Error(
+            'typedDictPropertyTypes: incoming union type contains non-dict'
+          );
+        }
+        let newVal: {[key: string]: any} = {};
+        if (ndx === 0) {
+          newVal =
+            unwrappedCurr !== 'none' ? unwrappedCurr.propertyTypes ?? {} : {};
+        } else {
+          for (const existingProp in prev) {
+            if (prev[existingProp] != null) {
+              const prevProp = prev[existingProp];
+              if (
+                unwrappedCurr !== 'none' &&
+                unwrappedCurr.propertyTypes[existingProp]
+              ) {
+                const currProp = unwrappedCurr.propertyTypes[existingProp];
+                if (currProp) {
+                  newVal[existingProp] = union([prevProp, currProp]);
+                } else {
+                  newVal[existingProp] = union([prevProp, 'none']);
+                }
               } else {
                 newVal[existingProp] = union([prevProp, 'none']);
               }
             } else {
-              newVal[existingProp] = union([prevProp, 'none']);
+              newVal[existingProp] = prev[existingProp];
             }
-          } else {
-            newVal[existingProp] = prev[existingProp];
           }
-        }
 
-        if (unwrappedCurr !== 'none') {
-          for (const newProp in unwrappedCurr.propertyTypes) {
-            if (unwrappedCurr.propertyTypes[newProp]) {
-              const currProp = unwrappedCurr.propertyTypes[newProp];
-              if (currProp != null && prev[newProp] == null) {
-                newVal[newProp] = union([currProp, 'none']);
+          if (unwrappedCurr !== 'none') {
+            for (const newProp in unwrappedCurr.propertyTypes) {
+              if (unwrappedCurr.propertyTypes[newProp]) {
+                const currProp = unwrappedCurr.propertyTypes[newProp];
+                if (currProp != null && prev[newProp] == null) {
+                  newVal[newProp] = union([currProp, 'none']);
+                }
               }
             }
           }
         }
-      }
-      return newVal;
-    }, {});
+        return newVal;
+      }, {});
+    }
+    if (!isTypedDict(type)) {
+      throw new Error('typedDictPropertyTypes: expected a typed dict');
+    }
+    return type.propertyTypes as {[key: string]: Type};
   }
-  if (!isTypedDict(type)) {
-    throw new Error('typedDictPropertyTypes: expected a typed dict');
-  }
-  return type.propertyTypes as {[key: string]: Type};
-};
+);
 
 export const objectTypeAttrTypes = (
   type: ObjectType

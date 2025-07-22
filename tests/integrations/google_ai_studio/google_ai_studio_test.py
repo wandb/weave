@@ -19,7 +19,8 @@ def assert_correct_output_shape(output: dict):
     assert "candidates" in output
     assert isinstance(output["candidates"], list)
     for candidate in output["candidates"]:
-        assert isinstance(parts := candidate["content"]["parts"], list)
+        parts = candidate["content"]["parts"]
+        assert isinstance(parts, list)
         for part in parts:
             assert isinstance(part["text"], str)
 
@@ -90,7 +91,7 @@ def test_content_generation(client):
     model = genai.GenerativeModel("gemini-1.5-flash")
     model.generate_content("What is the capital of France?")
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
 
     call = calls[0]
@@ -117,7 +118,7 @@ def test_content_generation_stream(client):
     chunks = [chunk.text for chunk in response]
     assert len(chunks) > 1
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
 
     call = calls[0]
@@ -144,7 +145,7 @@ async def test_content_generation_async(client):
 
     _ = await model.generate_content_async("What is the capital of France?")
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
 
     call = calls[0]
@@ -172,7 +173,7 @@ def test_send_message(client):
         "Generate and run code for the calculation, and make sure you get all 50."
     )
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     # `send_message` is using `GenerativeModel.generate_content under the hood
     # which we're already patching. Hence, we have 2 calls here.
     assert len(calls) == 2
@@ -215,7 +216,7 @@ def test_send_message_stream(client):
     chunks = [r.text for r in response]
     assert len(chunks) > 1
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     # `send_message` is using `GenerativeModel.generate_content under the hood
     # which we're already patching. Hence, we have 2 calls here.
     assert len(calls) == 2
@@ -254,7 +255,7 @@ async def test_send_message_async(client):
         "Generate and run code for the calculation, and make sure you get all 50."
     )
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     # `send_message` is using `GenerativeModel.generate_content under the hood
     # which we're already patching. Hence, we have 2 calls here.
     assert len(calls) == 2

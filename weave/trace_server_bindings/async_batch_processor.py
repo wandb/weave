@@ -258,13 +258,15 @@ class AsyncBatchProcessor(Generic[T]):
                 self.health_check_thread = start_thread(self._health_check)
                 logger.info("Health check thread successfully revived")
             except Exception as e:
-                logger.exception(f"Failed to revive health check thread: {e}")
+                logger.exception("Failed to revive health check thread")
                 sentry_sdk.capture_exception(e)
 
     def _health_check(self) -> None:
         """Health check thread that monitors and revives the processing thread if it dies."""
         while self.is_accepting_new_work():
-            time.sleep(HEALTH_CHECK_INTERVAL)
+            # wait HEALTH_CHECK_INTERVAL unless we are shutting down
+            if self.stop_accepting_work_event.wait(timeout=HEALTH_CHECK_INTERVAL):
+                break
 
             # If we're shutting down, don't revive
             if self.stop_accepting_work_event.is_set():
@@ -278,7 +280,7 @@ class AsyncBatchProcessor(Generic[T]):
                     self.processing_thread = start_thread(self._process_batches)
                     logger.info("Processing thread successfully revived")
                 except Exception as e:
-                    logger.exception(f"Failed to revive processing thread: {e}")
+                    logger.exception("Failed to revive processing thread")
                     sentry_sdk.capture_exception(e)
 
 

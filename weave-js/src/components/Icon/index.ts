@@ -180,6 +180,8 @@ export {
   IconPencilEdit,
   IconPhoto,
   IconPin,
+  IconPinToLeft,
+  IconPinToLeftFilled,
   IconPinToRight,
   IconPlay,
   IconPlotly,

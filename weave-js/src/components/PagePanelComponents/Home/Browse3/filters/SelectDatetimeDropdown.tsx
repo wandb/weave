@@ -65,6 +65,7 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLUListElement>(null);
   const debounceTimeoutRef = useRef<NodeJS.Timeout>();
+  const suggestionClickedRef = useRef<boolean>(false);
 
   // Format and set input value whenever the value prop changes
   useEffect(() => {
@@ -242,9 +243,18 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
       setSelectedSuggestion(suggestionValue);
       setDropdownVisible(false);
       setIsInvalid(false);
+
+      // Set flag to prevent blur handler from reverting the value
+      suggestionClickedRef.current = true;
+
       if (inputRef.current) {
         inputRef.current.blur();
       }
+
+      // Reset flag after a short delay
+      setTimeout(() => {
+        suggestionClickedRef.current = false;
+      }, 100);
     },
     [parseAndUpdateDate]
   );
@@ -326,7 +336,8 @@ export const SelectDatetimeDropdown: React.FC<SelectDatetimeDropdownProps> = ({
               setIsInputFocused(false);
 
               // When user leaves the input, immediately parse what they've typed
-              if (inputValue !== value) {
+              // Skip parsing if a suggestion was just clicked to prevent race condition
+              if (inputValue !== value && !suggestionClickedRef.current) {
                 parseAndUpdateDate(inputValue, true);
               }
             }}
