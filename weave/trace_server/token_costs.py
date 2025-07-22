@@ -3,7 +3,9 @@ import re
 from datetime import datetime
 
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.clickhouse_schema import SelectableCHCallSchema
+from weave.trace_server.clickhouse_trace_server.clickhouse_schema import (
+    SelectableCHCallSchema,
+)
 from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.orm import (
     Column,

@@ -3,7 +3,9 @@ import pytest
 from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     TestOnlyUserInjectingExternalTraceServer,
 )
-from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
+from weave.trace_server.clickhouse_trace_server.clickhouse_trace_server_batched import (
+    ClickHouseTraceServer,
+)
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 
 
