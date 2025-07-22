@@ -934,7 +934,6 @@ def test_trace_call_sort_with_mixed_types(client):
         )
 
         for i, call in enumerate(inner_res.calls):
-            print(i, "CALL", call.inputs)
             assert call.inputs["in_val"].get("prim") == seq[i]
 
 

@@ -25,12 +25,6 @@ class InvalidRequest(Error):
     pass
 
 
-class InsertTooLarge(Error):
-    """Raised when a single insert is too large."""
-
-    pass
-
-
 class QueryMemoryLimitExceeded(Error):
     """Raised when a query memory limit is exceeded."""
 
@@ -43,6 +37,18 @@ class InvalidFieldError(Error):
     pass
 
 
+class NotFoundError(Error):
+    """Raised when a general not found error occurs."""
+
+    pass
+
+
+class InsertTooLarge(Error):
+    """Raised when a single insert is too large."""
+
+    pass
+
+
 class MissingLLMApiKeyError(Error):
     """Raised when a LLM API key is missing for completion."""
 
@@ -51,18 +57,16 @@ class MissingLLMApiKeyError(Error):
         super().__init__(message)
 
 
-class NotFoundError(Error):
-    """Raised when a general not found error occurs."""
-
-    pass
-
-
 class ObjectDeletedError(Error):
     """Raised when an object has been deleted."""
 
     def __init__(self, message: str, deleted_at: datetime.datetime):
         self.deleted_at = deleted_at
         super().__init__(message)
+
+
+# Global registry instance
+_error_registry: Optional["ErrorRegistry"] = None
 
 
 # Error Registry System
@@ -131,32 +135,23 @@ class ErrorRegistry:
 
     def _setup_common_errors(self) -> None:
         """Register common/standard library errors that don't depend on domain-specific modules."""
-        # Our own error types (413)
-        self.register(InsertTooLarge, 413, self._format_insert_too_large)
+        # Our own error types
         self.register(RequestTooLarge, 413, lambda exc: {"reason": "Request too large"})
-
-        # Our own error types (502)
+        self.register(InvalidRequest, 400, self._default_json_formatter)
+        self.register(InsertTooLarge, 413, self._format_insert_too_large)
         self.register(
             QueryMemoryLimitExceeded,
             502,
             lambda exc: {"reason": "Query memory limit exceeded"},
         )
-
-        # Our own error types (400)
-        self.register(MissingLLMApiKeyError, 400, self._format_missing_llm_api_key)
-
-        # Our own error types (403)
         self.register(InvalidFieldError, 403, self._default_json_formatter)
-
-        # Our own error types (404)
+        self.register(MissingLLMApiKeyError, 400, self._format_missing_llm_api_key)
         self.register(NotFoundError, 404, self._default_json_formatter)
         self.register(ObjectDeletedError, 404, self._format_object_deleted_error)
 
         # Standard library exceptions
         self.register(ValueError, 400, self._default_json_formatter)
 
-        # Third-party library exceptions that are commonly used
-        # Timeout errors (504)
         self.register(
             requests.exceptions.ReadTimeout, 504, lambda exc: {"reason": "Read timeout"}
         )
@@ -181,13 +176,30 @@ class ErrorRegistry:
         # GraphQL transport errors (403)
         self.register(TransportQueryError, 403, self._format_transport_query_error)
 
-    def _format_insert_too_large(self, exc: Exception) -> dict[str, Any]:
-        """Format InsertTooLarge exception."""
+    def _format_error_to_json(self, exc: Exception) -> dict[str, Any]:
+        """Helper to format exception as JSON or fallback to reason field."""
         exc_str = str(exc)
         try:
             return json.loads(exc_str)
         except json.JSONDecodeError:
             return {"reason": exc_str}
+
+    def _format_error_to_json_with_extra(
+        self, exc: Exception, extra_fields: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Helper to format exception as JSON or fallback to reason, always adding extra fields."""
+        exc_str = str(exc)
+        try:
+            result = json.loads(exc_str)
+        except json.JSONDecodeError:
+            result = {"reason": exc_str}
+
+        result.update(extra_fields)
+        return result
+
+    def _format_insert_too_large(self, exc: Exception) -> dict[str, Any]:
+        """Format InsertTooLarge exception."""
+        return self._format_error_to_json(exc)
 
     def _format_transport_query_error(self, exc: Exception) -> dict[str, Any]:
         """Format TransportQueryError with special permission logic."""
@@ -207,22 +219,18 @@ class ErrorRegistry:
     def _format_missing_llm_api_key(self, exc: Exception) -> dict[str, Any]:
         """Format MissingLLMApiKeyError with api_key field."""
         if isinstance(exc, MissingLLMApiKeyError):
-            return {"reason": str(exc), "api_key": exc.api_key_name}
-        return {"reason": str(exc)}
+            return self._format_error_to_json_with_extra(
+                exc, {"api_key": exc.api_key_name}
+            )
+        return self._format_error_to_json(exc)
 
     def _format_object_deleted_error(self, exc: Exception) -> dict[str, Any]:
         """Format ObjectDeletedError with deleted_at timestamp."""
-        exc_str = str(exc)
-        try:
-            return json.loads(exc_str)
-        except json.JSONDecodeError:
-            if isinstance(exc, ObjectDeletedError):
-                return {"reason": exc_str, "deleted_at": exc.deleted_at.isoformat()}
-            return {"reason": exc_str}
-
-
-# Global registry instance
-_error_registry: Optional[ErrorRegistry] = None
+        if isinstance(exc, ObjectDeletedError):
+            return self._format_error_to_json_with_extra(
+                exc, {"deleted_at": exc.deleted_at.isoformat()}
+            )
+        return self._format_error_to_json(exc)
 
 
 def get_error_registry() -> ErrorRegistry:
