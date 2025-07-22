@@ -11,6 +11,7 @@ import uuid
 import pydantic
 import pytest
 import requests
+from pydantic import ValidationError
 
 import weave
 import weave.trace_server.trace_server_interface as tsi
@@ -264,6 +265,58 @@ def test_pydantic(client):
     assert weave_isinstance(val2, A)
     assert weave_isinstance(val2, pydantic.BaseModel)
     assert not weave_isinstance(val2, int)
+
+
+def test_filter_sort_by_query_validation(client):
+    # Test invalid types
+    with pytest.raises(TypeError):
+        client.get_calls(filter="not a filter")
+    with pytest.raises(TypeError):
+        client.get_calls(filter=1)
+    with pytest.raises(TypeError):
+        client.get_calls(filter=["not a filter"])
+
+    # Test invalid field names - these should fail with pydantic validation error
+    with pytest.raises(ValueError, match="Extra inputs are not permitted"):
+        client.get_calls(filter={"op_name": ["should be op_names"]})
+    with pytest.raises(ValueError, match="Extra inputs are not permitted"):
+        client.get_calls(filter={"call_id": ["should be call_ids"]})
+    with pytest.raises(ValueError, match="Extra inputs are not permitted"):
+        client.get_calls(filter={"invalid_field": "invalid_value"})
+
+    # Test that valid fields work
+    client.get_calls(filter={"op_names": ["some_op"]})
+    client.get_calls(filter={"call_ids": ["some_call_id"]})
+    client.get_calls(filter={"trace_ids": ["some_trace_id"]})
+
+    # now order_by
+    with pytest.raises(ValidationError):
+        client.get_calls(sort_by="not a sort_by")
+    with pytest.raises(ValidationError):
+        client.get_calls(sort_by=1)
+    with pytest.raises(TypeError):
+        client.get_calls(sort_by=["not a sort_by"])
+
+    # test valid
+    client.get_calls(sort_by=[tsi.SortBy(field="started_at", direction="desc")])
+
+    # now query like filter
+    with pytest.raises(TypeError):
+        client.get_calls(query="not a query")
+    with pytest.raises(TypeError):
+        client.get_calls(query=1)
+    with pytest.raises(TypeError):
+        client.get_calls(query=["not a query"])
+
+    with pytest.raises(
+        ValidationError, match="8 validation errors for WeaveClient.get_calls"
+    ):
+        client.get_calls(query={"$expr": {"$invalid_field": "invalid_value"}})
+
+    # test valid
+    client.get_calls(
+        query={"$expr": {"$eq": [{"$getField": "op_name"}, {"$literal": "predict"}]}}
+    )
 
 
 def test_call_create(client):
