@@ -143,7 +143,6 @@ def parse_content_annotation(
         ContentAnnotation | None
     """
     # Try matching the pattern with format first (it's more specific)
-    logger.warning(annotation_string)
 
     # Try the class with type hint pattern first
     # Fall back to the original patterns
