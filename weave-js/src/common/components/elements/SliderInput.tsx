@@ -138,9 +138,18 @@ const SliderInput: React.FC<SliderInputProps> = React.memo(
         if (isEmpty(keyboardBindings) || isFormField(document.activeElement)) {
           return;
         }
-        const eventKey = event.key;
-        const operation = (keyboardBindings ?? {})[eventKey];
+
+        // Build the key combination string based on modifiers
+        const modifiers = [];
+        if (event.metaKey) modifiers.push('Meta');
+        if (event.ctrlKey) modifiers.push('Control');
+
+        const keyCombo = [...modifiers, event.key].join('+');
+        const operation = (keyboardBindings ?? {})[keyCombo];
+
         if (operation && operation in keyboardOperations) {
+          event.preventDefault();
+          event.stopPropagation();
           const handler = keyboardOperations[operation];
           return handler(event);
         }

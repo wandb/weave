@@ -94,7 +94,7 @@ def test_op_versioning_importfrom(client):
 
 
 def test_op_versioning_lotsofstuff():
-    @weave.op()
+    @weave.op
     def versioned_op_lotsofstuff(a: int) -> float:
         j = [x + 1 for x in range(a)]
         k = (y - 3 for y in j)
@@ -106,7 +106,7 @@ def test_op_versioning_inline_import(client):
 
 
 def test_op_versioning_inline_func_decl():
-    @weave.op()
+    @weave.op
     def versioned_op_inline_func_decl(a: int) -> float:
         def inner_func(x):
             if x == 0:
@@ -130,7 +130,7 @@ def versioned_op_closure_constant(a: int) -> float:
 def test_op_versioning_closure_constant(client):
     x = 10
 
-    @weave.op()
+    @weave.op
     def versioned_op_closure_constant(a: int) -> float:
         return a + x
 
@@ -159,7 +159,7 @@ def versioned_op_closure_constant(a: int) -> float:
 def test_op_versioning_closure_dict_simple(client):
     x = {"a": 5, "b": 10}
 
-    @weave.op()
+    @weave.op
     def versioned_op_closure_constant(a: int) -> float:
         return a + x["a"]
 
@@ -190,7 +190,7 @@ def versioned_op_closure_constant(a: int) -> float:
 def test_op_versioning_closure_dict_np(client):
     x = {"a": 5, "b": np.array([1, 2, 3])}
 
-    @weave.op()
+    @weave.op
     def versioned_op_closure_constant(a: int) -> float:
         return a + x["b"].mean() + x["a"]
 
@@ -226,19 +226,19 @@ def pony(v: int):
 
 @pytest.mark.skip("failing in ci, due to some kind of /tmp file slowness?")
 def test_op_versioning_closure_dict_ops(client):
-    @weave.op()
+    @weave.op
     def cat(v: int):
         print("hello from cat()")
         return v + 1
 
-    @weave.op()
+    @weave.op
     def dog(v: int):
         print("hello from dog()")
         return v - 1
 
     x = {"a": cat, "b": dog, "c": dog}
 
-    @weave.op()
+    @weave.op
     def pony(v: int):
         v = x["a"](v)
         v = x["b"](v)
@@ -281,19 +281,19 @@ def pony(v: int):
 
 @pytest.mark.skip("custom objs not working with new weave_client")
 def test_op_versioning_mixed(client):
-    @weave.op()
+    @weave.op
     def cat(v: int):
         print("hello from cat()")
         return v + 1
 
-    @weave.op()
+    @weave.op
     def dog(v: int):
         print("hello from dog()")
         return v - 1
 
     x = {"a": cat, "b": np.array([1, 2, 3])}
 
-    @weave.op()
+    @weave.op
     def pony(v: int):
         v = dog(v)
         v = x["a"](v) + x["b"].mean()
@@ -316,7 +316,7 @@ def test_op_versioning_mixed(client):
 
 def test_op_versioning_exception():
     # Just ensure this doesn't raise by running it.
-    @weave.op()
+    @weave.op
     def versioned_op_exception(a: int) -> float:
         try:
             x = 1 / 0
@@ -327,11 +327,11 @@ def test_op_versioning_exception():
 
 
 def test_op_versioning_2ops(client):
-    @weave.op()
+    @weave.op
     def dog():
         print("hello from dog()")
 
-    @weave.op()
+    @weave.op
     def cat():
         print("hello from cat()")
         dog()
@@ -362,7 +362,7 @@ def test_op_return_typeddict_annotation(
     class SomeDict(typing.TypedDict):
         val: int
 
-    @weave.op()
+    @weave.op
     def some_d(v: int) -> SomeDict:
         return SomeDict(val=v)
 
@@ -404,7 +404,7 @@ def test_op_return_return_custom_class(
         def __init__(self, val):
             self.val = val
 
-    @weave.op()
+    @weave.op
     def some_d(v: int):
         return MyCoolClass(v)
 
@@ -434,7 +434,7 @@ def some_d(v: int):
 def test_op_nested_function(
     client,
 ):
-    @weave.op()
+    @weave.op
     def some_d(v: int):
         def internal_fn(x):
             return x + 3
@@ -455,7 +455,7 @@ def test_op_nested_function(
 
 
 def test_op_basic_execution(client):
-    @weave.op()
+    @weave.op
     def adder(v: int) -> int:
         return v + 1
 
@@ -495,7 +495,7 @@ def some_d(v):
 
 
 def test_op_no_repeats(client):
-    @weave.op()
+    @weave.op
     def some_d(v):
         a = SomeOtherClass()
         b = SomeClass()
@@ -534,7 +534,7 @@ def test_op_instance(client):
     # We want to make sure this secret value is not saved in the code
     instance = MyClass("sk-1234567890qwertyuiop")
 
-    @weave.op()
+    @weave.op
     def t(text: str):
         print(instance._version)
         return text

@@ -18,28 +18,28 @@ expected_eval_result = {
 
 
 class EvalModel(Model):
-    @weave.op()
+    @weave.op
     async def predict(self, input) -> str:
         return eval(input)
 
 
-@weave.op()
+@weave.op
 def score_oldstyle(model_output, target):
     return model_output == target
 
 
-@weave.op()
+@weave.op
 def score_newstyle(output, target):
     return output == target
 
 
-@weave.op()
+@weave.op
 def example_to_model_input(example):
     return {"input": example["input"]}
 
 
 def test_evaluate_callable_as_model(client):
-    @weave.op()
+    @weave.op
     async def model_predict(input) -> str:
         return eval(input)
 
@@ -52,7 +52,7 @@ def test_evaluate_callable_as_model(client):
 
 
 def test_predict_can_receive_other_params(client):
-    @weave.op()
+    @weave.op
     async def model_predict(input, target) -> str:
         return eval(input) + target
 
@@ -71,11 +71,11 @@ def test_predict_can_receive_other_params(client):
 
 
 def test_can_preprocess_model_input(client):
-    @weave.op()
+    @weave.op
     async def model_predict(x) -> str:
         return eval(x)
 
-    @weave.op()
+    @weave.op
     def preprocess(example):
         return {"x": example["input"]}
 
@@ -115,7 +115,7 @@ def test_evaluate_both_styles(client):
 
 def test_evaluate_other_model_method_names():
     class EvalModel(Model):
-        @weave.op()
+        @weave.op
         async def infer(self, input) -> str:
             return eval(input)
 
@@ -130,7 +130,7 @@ def test_evaluate_other_model_method_names():
 
 def test_score_as_class(client):
     class MyScorerOldstyle(weave.Scorer):
-        @weave.op()
+        @weave.op
         def score(self, model_output, target):
             return model_output == target
 
@@ -151,12 +151,12 @@ def test_score_as_class(client):
 
 def test_score_with_custom_summarize(client):
     class MyScorerOldstyle(weave.Scorer):
-        @weave.op()
+        @weave.op
         def summarize(self, score_rows):
             assert list(score_rows) == [True, False]
             return {"awesome": 3}
 
-        @weave.op()
+        @weave.op
         def score(self, model_output, target):
             return model_output == target
 
@@ -181,7 +181,7 @@ def test_multiclass_f1_score(client):
         scorers=[MultiTaskBinaryClassificationF1(class_names=["a", "b"])],
     )
 
-    @weave.op()
+    @weave.op
     def return_pred(pred):
         return pred
 

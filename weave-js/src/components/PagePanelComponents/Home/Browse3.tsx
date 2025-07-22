@@ -237,6 +237,7 @@ const MainPeekingLayout: FC = () => {
 
   // State to track whether the user is currently dragging the drawer resize handle
   const [isDragging, setIsDragging] = useState(false);
+  const [previousUrl, setPreviousUrl] = useState<string | undefined>(undefined);
 
   // Callback function to handle the end of dragging
   const handleDragEnd = useCallback(() => {
@@ -321,7 +322,12 @@ const MainPeekingLayout: FC = () => {
                 }}
               />
               {peekLocation && (
-                <WeaveflowPeekContext.Provider value={{isPeeking: true}}>
+                <WeaveflowPeekContext.Provider
+                  value={{
+                    isPeeking: true,
+                    previousUrl,
+                    setPreviousUrl,
+                  }}>
                   <SimplePageLayoutContext.Provider
                     value={{
                       headerSuffix: (
