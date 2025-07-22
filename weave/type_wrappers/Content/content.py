@@ -8,7 +8,7 @@ import subprocess
 import sys
 import uuid
 from pathlib import Path
-from typing import Annotated, Any, Generic, Literal, TypedDict
+from typing import Annotated, Any, Generic, Literal, TypedDict, Union
 
 from pydantic import BaseModel, Field
 from typing_extensions import TypeVar, Self
@@ -17,15 +17,13 @@ from .utils import default_filename, get_mime_and_extension, is_valid_b64, is_va
 
 logger = logging.getLogger(__name__)
 
-# MetadataKeysType = str
-# MetadataValueType = Union[str, int, bytes, list["MetadataValueType"], dict[str, "MetadataValueType"]]
-# MetadataType = TypeVar('MetadataType', bound=dict[MetadataKeysType, "MetadataValueType"])
-# str = str
-# Any = Union[str, int, bytes, list["Any"], dict[str, "Any"]]
-# MetadataType = TypeVar('MetadataType', bound=dict[str, "Any"])
+# Dummy typevar to allow for passing mimetype/extension through annotated content
+# e.x. Content["pdf"] or Content["application/pdf"]
+T = TypeVar("T", bound=str)
 
-ContentType = Literal["bytes", "text", "base64", "file", "url"]
-ValidContentInputs = bytes | str | Path
+ContentType = Literal["bytes", "text", "base64", "file"]
+
+ValidContentInputs = Union[bytes, str, Path]
 
 
 # This is what is saved to the 'metadata.json' file by serialization layer
@@ -50,12 +48,6 @@ class ResolvedContentArgsWithoutData(TypedDict):
 class ResolvedContentArgs(ResolvedContentArgsWithoutData):
     # Required Fields
     data: bytes
-
-
-# Dummy typevar to allow for passing mimetype/extension through annotated content
-# e.x. Content["pdf"] or Content["application/pdf"]
-T = TypeVar("T", bound=str)
-
 
 class Content(BaseModel, Generic[T]):
     """
