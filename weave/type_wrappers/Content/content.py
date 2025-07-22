@@ -8,26 +8,54 @@ import subprocess
 import sys
 import uuid
 from pathlib import Path
-from typing import Annotated, Generic, Self
+from typing import Annotated, Any, Generic, Self, Literal, TypedDict, Union
 
-from .content_types import (
-    ContentType,
-    MetadataType,
-    ResolvedContentArgs,
-    ValidContentInputs,
-)
 from pydantic import BaseModel, Field
 from typing_extensions import TypeVar
 from .utils import default_filename, get_mime_and_extension, is_valid_b64, is_valid_path
 
+
 logger = logging.getLogger(__name__)
 
+# MetadataKeysType = str
+# MetadataValueType = Union[str, int, bytes, list["MetadataValueType"], dict[str, "MetadataValueType"]]
+# MetadataType = TypeVar('MetadataType', bound=dict[MetadataKeysType, "MetadataValueType"])
+# str = str
+# Any = Union[str, int, bytes, list["Any"], dict[str, "Any"]]
+# MetadataType = TypeVar('MetadataType', bound=dict[str, "Any"])
+
+ContentType = Literal["bytes", "text", "base64", "file", "url"]
+ValidContentInputs = bytes | str | Path
+
+
+# This is what is saved to the 'metadata.json' file by serialization layer
+# It is used to 'restore' an existing content object
+class ResolvedContentArgsWithoutData(TypedDict):
+    # Required Fields
+    id: str
+    size: int
+    mimetype: str
+    digest: str
+    filename: str
+    content_type: Literal["bytes", "text", "base64", "file", "url"]
+    input_type: str
+
+    # Optional Fields
+    extra: dict[str, Any] | None
+    path: str | None
+    extension: str | None
+    encoding: str | None
+
+
+class ResolvedContentArgs(ResolvedContentArgsWithoutData):
+    # Required Fields
+    data: bytes
 # Dummy typevar to allow for passing mimetype/extension through annotated content
 # e.x. Content["pdf"] or Content["application/pdf"]
 T = TypeVar("T", bound=str)
 
 
-class Content(Generic[T], BaseModel):
+class Content(BaseModel, Generic[T]):
     """
     A class to represent content from various sources, resolving them
     to a unified byte-oriented representation with associated metadata.
@@ -41,11 +69,11 @@ class Content(Generic[T], BaseModel):
     mimetype: str
     digest: str
     filename: str
-    content_type: ContentType
+    content_type: Literal["bytes", "text", "base64", "file", "url"]
     input_type: str
 
     extra: Annotated[
-        MetadataType | None,
+        dict[str, "Any"] | None,
         Field(
             description="Extra metadata to associate with the content",
             examples=[{"number of cats": 1}],
@@ -61,7 +89,7 @@ class Content(Generic[T], BaseModel):
         /,
         encoding: str = "utf-8",
         mimetype: str | None = None,
-        metadata: MetadataType | None = None,
+        metadata: dict[str, "Any"] | None = None,
     ):
         """Initializes Content from a local file path."""
         path_obj = Path(path)
@@ -104,7 +132,7 @@ class Content(Generic[T], BaseModel):
         /,
         extension: str | None = None,
         mimetype: str | None = None,
-        metadata: MetadataType | None = None,
+        metadata: dict[str, "Any"] | None = None,
         encoding: str = "utf-8",
     ) -> Self:
         """Initializes Content from raw bytes."""
@@ -141,7 +169,7 @@ class Content(Generic[T], BaseModel):
         /,
         extension: str | None = None,
         mimetype: str | None = None,
-        metadata: MetadataType | None = None,
+        metadata: dict[str, "Any"] | None = None,
         encoding: str = "utf-8",
     ) -> Self:
         """Initializes Content from a string of text."""
@@ -179,9 +207,10 @@ class Content(Generic[T], BaseModel):
         /,
         extension: str | None = None,
         mimetype: str | None = None,
-        metadata: MetadataType | None = None,
+        metadata: dict[str, "Any"] | None = None,
     ) -> Self:
         """Initializes Content from a base64 encoded string or bytes."""
+        input_type = str(type(b64_data))
         if isinstance(b64_data, str):
             b64_data = b64_data.encode("ascii")
         try:
@@ -206,7 +235,7 @@ class Content(Generic[T], BaseModel):
             "digest": digest,
             "filename": filename,
             "content_type": "base64",
-            "input_type": str(type(b64_data)),
+            "input_type": input_type,
             "extra": metadata,
             "path": None,
             "extension": extension,
@@ -222,7 +251,7 @@ class Content(Generic[T], BaseModel):
         /,
         encoding: str = "utf-8",
         mimetype: str | None = None,
-        metadata: MetadataType | None = None,
+        metadata: dict[str, "Any"] | None = None,
     ) -> Self:
         """Initializes Content from a local file path."""
         # This classmethod delegates to the main constructor
@@ -231,7 +260,7 @@ class Content(Generic[T], BaseModel):
     @classmethod
     def _from_guess(
         cls: type[Self],
-        input: ValidContentInputs,
+        input: bytes | str | Path,
         /,
         extension: str | None = None,
         mimetype: str | None = None,

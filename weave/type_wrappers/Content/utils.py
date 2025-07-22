@@ -98,6 +98,8 @@ def get_mime_and_extension(
     filename: str | None,
     buffer: bytes | None,
 ) -> tuple[str, str]:
+    if extension is not None:
+        extension = f".{extension.lstrip('.')}"
     if mimetype and extension:
         return mimetype, extension
     elif mimetype and not extension:

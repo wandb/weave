@@ -47,10 +47,10 @@ def audio_file(tmp_path_factory) -> Path:
 
 # New parameterization list using fixture names
 MEDIA_TEST_PARAMS = [
-    ("image_file", "png", "image/png"),
-    ("audio_file", "wav", "audio/x-wav"),
-    ("video_file", "mp4", "video/mp4"),
-    ("pdf_file", "pdf", "application/pdf"),
+    ("image_file", ".png", "image/png"),
+    ("audio_file", ".wav", "audio/x-wav"),
+    ("video_file", ".mp4", "video/mp4"),
+    ("pdf_file", ".pdf", "application/pdf"),
 ]
 
 
@@ -217,7 +217,7 @@ class TestWeaveContent:
         # Test Content.from_text()
         content = Content.from_text(text_data, extension="txt")
         assert content is not None
-        assert content.extension == "txt"
+        assert content.extension == ".txt"
         assert content.mimetype == "text/plain"
         assert content.data == text_data.encode("utf-8")
         assert content.encoding == "utf-8"
@@ -225,7 +225,7 @@ class TestWeaveContent:
         assert content.content_type == "text"
         
         # Test with custom encoding
-        content2 = Content.from_text(text_data, extension="txt", encoding="utf-16")
+        content2 = Content.from_text(text_data, extension=".txt", encoding="utf-16")
         assert content2.data == text_data.encode("utf-16")
         assert content2.encoding == "utf-16"
 
@@ -233,14 +233,14 @@ class TestWeaveContent:
         """Test Content extra metadata property."""
         metadata = {"test": "value", "author": "test_user"}
         content = Content.from_path(image_file, metadata=metadata)
-        
+
         # Check that metadata was stored in extra field
         assert content.extra == metadata
-        
+
         # Check other fields are accessible
         assert content.size > 0
         assert content.filename == "file.png"
-        assert content.extension == "png"
+        assert content.extension == ".png"
         assert content.mimetype == "image/png"
         assert content.encoding == "utf-8"
         assert content.path == str(image_file.resolve())
@@ -252,17 +252,17 @@ class TestWeaveContent:
 
         # Test with extension without dot
         content1 = Content.from_bytes(file_bytes, extension="png")
-        assert content1.extension == "png"
+        assert content1.extension == ".png"
         assert content1.mimetype == "image/png"
 
         # Test with extension with dot
         content2 = Content.from_bytes(file_bytes, extension=".png")
-        assert content2.extension == "png"
+        assert content2.extension == ".png"
         assert content2.mimetype == "image/png"
 
         # Test with mimetype
         content3 = Content.from_bytes(file_bytes, mimetype="image/png")
-        assert content3.extension == "png"
+        assert content3.extension == ".png"
         assert content3.mimetype == "image/png"
 
     def test_content_error_handling(self):
