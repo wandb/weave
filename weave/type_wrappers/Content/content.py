@@ -10,7 +10,7 @@ import uuid
 from pathlib import Path
 from typing import Annotated, Generic, Self
 
-from content_types import (
+from .content_types import (
     ContentType,
     MetadataType,
     ResolvedContentArgs,
@@ -18,7 +18,7 @@ from content_types import (
 )
 from pydantic import BaseModel, Field
 from typing_extensions import TypeVar
-from utils import default_filename, get_mime_and_extension, is_valid_b64, is_valid_path
+from .utils import default_filename, get_mime_and_extension, is_valid_b64, is_valid_path
 
 logger = logging.getLogger(__name__)
 

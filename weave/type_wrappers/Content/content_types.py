@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Literal, TypedDict
 
 MetadataKeysType = str | int
+
 MetadataValueType = (
     MetadataKeysType
     | list["MetadataValueType"]
