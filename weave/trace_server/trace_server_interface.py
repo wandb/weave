@@ -363,6 +363,8 @@ class CompletionsCreateRes(BaseModel):
 
 
 class CallsFilter(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     op_names: Optional[list[str]] = None
     input_refs: Optional[list[str]] = None
     output_refs: Optional[list[str]] = None
@@ -377,6 +379,8 @@ class CallsFilter(BaseModel):
 
 
 class SortBy(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     # Field should be a key of `CallSchema`. For dictionary fields
     # (`attributes`, `inputs`, `outputs`, `summary`), the field can be
     # dot-separated.

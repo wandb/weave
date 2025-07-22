@@ -4342,7 +4342,7 @@ def test_calls_query_stats_with_limit(client):
     # test limit and filter, should use limit but not special optimization
     assert calls_stats(limit=1, filter={"trace_roots_only": True}).count == 1
     # test filter, should not use special optimization
-    assert calls_stats(filter={"trace_id": trace_id}).count == 2
+    assert calls_stats(filter={"trace_ids": [trace_id]}).count == 2
 
     with pytest.raises(ValueError):
         calls_stats(limit=-1)
