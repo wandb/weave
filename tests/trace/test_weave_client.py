@@ -784,11 +784,13 @@ def test_dataset_calls(client):
         weave.Dataset(rows=[{"doc": "xx", "label": "c"}, {"doc": "yy", "label": "d"}]),
         "my-dataset",
     )
+    op_name = ""
     for row in ref.rows:
         call = client.create_call("x", {"a": row["doc"]})
+        op_name = call.op_name
         client.finish_call(call, None)
 
-    calls = list(client.get_calls(filter={"op_names": ["x"]}))
+    calls = list(client.get_calls(filter={"op_names": [op_name]}))
     assert calls[0].inputs["a"] == "xx"
     assert calls[1].inputs["a"] == "yy"
 
