@@ -85,7 +85,7 @@ class ErrorRegistry:
 
     def __init__(self) -> None:
         self._definitions: dict[type, ErrorDefinition] = {}
-        self._setup_builtin_errors()
+        self._setup_common_errors()
 
     def register(
         self,
@@ -129,27 +129,33 @@ class ErrorRegistry:
         except json.JSONDecodeError:
             return {"reason": exc_str}
 
-    def _setup_builtin_errors(self) -> None:
-        """Register all built-in error handlers."""
-        # Import here to avoid circular imports
-        from src import id_converters as idc
-
-        from weave.trace_server import clickhouse_trace_server_batched as cts
-        from weave.trace_server.trace_server_converter import InvalidExternalRef
-
-        # InsertTooLarge (413)
+    def _setup_common_errors(self) -> None:
+        """Register common/standard library errors that don't depend on domain-specific modules."""
+        # Our own error types (413)
         self.register(InsertTooLarge, 413, self._format_insert_too_large)
-
-        # RequestTooLarge (413)
         self.register(RequestTooLarge, 413, lambda exc: {"reason": "Request too large"})
 
-        # QueryMemoryLimitExceeded (502)
+        # Our own error types (502)
         self.register(
             QueryMemoryLimitExceeded,
             502,
             lambda exc: {"reason": "Query memory limit exceeded"},
         )
 
+        # Our own error types (400)
+        self.register(MissingLLMApiKeyError, 400, self._format_missing_llm_api_key)
+
+        # Our own error types (403)
+        self.register(InvalidFieldError, 403, self._default_json_formatter)
+
+        # Our own error types (404)
+        self.register(NotFoundError, 404, self._default_json_formatter)
+        self.register(ObjectDeletedError, 404, self._format_object_deleted_error)
+
+        # Standard library exceptions
+        self.register(ValueError, 400, self._default_json_formatter)
+
+        # Third-party library exceptions that are commonly used
         # Timeout errors (504)
         self.register(
             requests.exceptions.ReadTimeout, 504, lambda exc: {"reason": "Read timeout"}
@@ -172,19 +178,8 @@ class ErrorRegistry:
             lambda exc: {"reason": "Temporary backend error"},
         )
 
-        # Client errors (400)
-        self.register(ValueError, 400, self._default_json_formatter)
-        self.register(InvalidExternalRef, 400, self._default_json_formatter)
-        self.register(MissingLLMApiKeyError, 400, self._format_missing_llm_api_key)
-
-        # Permission errors (403)
-        self.register(InvalidFieldError, 403, self._default_json_formatter)
+        # GraphQL transport errors (403)
         self.register(TransportQueryError, 403, self._format_transport_query_error)
-
-        # Not found errors (404)
-        self.register(cts.NotFoundError, 404, self._default_json_formatter)
-        self.register(idc.ProjectNotFound, 404, self._default_json_formatter)
-        self.register(ObjectDeletedError, 404, self._format_object_deleted_error)
 
     def _format_insert_too_large(self, exc: Exception) -> dict[str, Any]:
         """Format InsertTooLarge exception."""

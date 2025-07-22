@@ -317,7 +317,9 @@ def simple_line_call_bootstrap() -> OpCallSpec:
     @weave.op
     def multiplier(
         a: Number, b
-    ) -> int:  # intentionally deviant in returning plain int - so that we have a different type
+    ) -> (
+        int
+    ):  # intentionally deviant in returning plain int - so that we have a different type
         return a.value * b
 
     @weave.op
@@ -934,6 +936,7 @@ def test_trace_call_sort_with_mixed_types(client):
         )
 
         for i, call in enumerate(inner_res.calls):
+            print(i, "CALL", call.inputs)
             assert call.inputs["in_val"].get("prim") == seq[i]
 
 
@@ -2536,9 +2539,9 @@ def test_read_call_start_with_cost(client):
         pass
     elif isinstance(summary, dict):
         # Check that the costs object was NOT added
-        assert COST_OBJECT_NAME not in summary.get("weave", {}), (
-            f"Did not expect '{COST_OBJECT_NAME}' key in summary['weave'] when initial summary was null/empty"
-        )
+        assert COST_OBJECT_NAME not in summary.get(
+            "weave", {}
+        ), f"Did not expect '{COST_OBJECT_NAME}' key in summary['weave'] when initial summary was null/empty"
     else:
         pytest.fail(f"summary_dump was not None or dict: {type(summary)} {summary}")
 
@@ -3322,7 +3325,9 @@ def test_large_keys_are_stripped_call(client, caplog, monkeypatch):
         # no need to strip in sqlite
         return
 
-    original_insert_call_batch = weave.trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer._insert_call_batch
+    original_insert_call_batch = (
+        weave.trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer._insert_call_batch
+    )
 
     # Patch _insert_call_batch to raise InsertTooLarge
     def mock_insert_call_batch(self, batch):
