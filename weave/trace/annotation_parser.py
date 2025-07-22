@@ -52,6 +52,7 @@ class ContentAnnotation(BaseModel):
     extension: str | None = None
     mimetype: str | None = None
 
+
 def try_parse_annotation_with_hint(annotation_string: str) -> ContentAnnotation | None:
     """
     The function expects the string to be of the form:
@@ -143,7 +144,7 @@ def parse_content_annotation(
     """
     # Try matching the pattern with format first (it's more specific)
     logger.warning(annotation_string)
-    
+
     # Try the class with type hint pattern first
     # Fall back to the original patterns
     return try_parse_annotation_with_hint(
