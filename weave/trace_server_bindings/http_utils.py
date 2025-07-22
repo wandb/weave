@@ -51,13 +51,20 @@ def handle_response_error(response: requests.Response, url: str) -> None:
     if 200 <= response.status_code < 300:
         return
 
-    # Try to extract error message from JSON response
-    error_message = None
+    # Get the default HTTP error message
+    default_message = None
+    try:
+        response.raise_for_status()
+    except requests.HTTPError as e:
+        default_message = str(e)
+
+    # Try to extract custom error message from JSON response
+    extracted_message = None
     try:
         error_data = response.json()
         if isinstance(error_data, dict):
             # Common error message fields
-            error_message = (
+            extracted_message = (
                 error_data.get("message")
                 or error_data.get("error")
                 or error_data.get("detail")
@@ -66,10 +73,13 @@ def handle_response_error(response: requests.Response, url: str) -> None:
     except (json.JSONDecodeError, ValueError):
         pass
 
-    # Use extracted message or fallback to simple default
-    if error_message:
-        message = f"{response.status_code} Error for url {url}: {error_message}"
+    # Combine messages
+    if default_message and extracted_message:
+        message = f"{default_message}:\n{extracted_message}"
+    elif default_message:
+        message = default_message
     else:
+        # Fallback if something goes wrong
         message = f"{response.status_code} Error for url {url}: Request failed"
 
     raise requests.HTTPError(message, response=response)
