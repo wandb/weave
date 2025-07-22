@@ -25,12 +25,26 @@ class InvalidRequest(Error):
     pass
 
 
+# Clickhouse errors
 class QueryMemoryLimitExceeded(Error):
     """Raised when a query memory limit is exceeded."""
 
     pass
 
 
+class NoCommonType(Error):
+    """Raised when a query has no common type."""
+
+    pass
+
+
+class InsertTooLarge(Error):
+    """Raised when a single insert is too large."""
+
+    pass
+
+
+# User error
 class InvalidFieldError(Error):
     """Raised when a field is invalid."""
 
@@ -39,12 +53,6 @@ class InvalidFieldError(Error):
 
 class NotFoundError(Error):
     """Raised when a general not found error occurs."""
-
-    pass
-
-
-class InsertTooLarge(Error):
-    """Raised when a single insert is too large."""
 
     pass
 
@@ -139,11 +147,8 @@ class ErrorRegistry:
         self.register(RequestTooLarge, 413, lambda exc: {"reason": "Request too large"})
         self.register(InvalidRequest, 400, self._default_json_formatter)
         self.register(InsertTooLarge, 413, self._format_insert_too_large)
-        self.register(
-            QueryMemoryLimitExceeded,
-            502,
-            lambda exc: {"reason": "Query memory limit exceeded"},
-        )
+        self.register(NoCommonType, 400, self._default_json_formatter)
+        self.register(QueryMemoryLimitExceeded, 502, self._default_json_formatter)
         self.register(InvalidFieldError, 403, self._default_json_formatter)
         self.register(MissingLLMApiKeyError, 400, self._format_missing_llm_api_key)
         self.register(NotFoundError, 404, self._default_json_formatter)
@@ -260,3 +265,29 @@ def error_handler(
         return exception_class
 
     return decorator
+
+
+def handle_clickhouse_query_error(e: Exception) -> None:
+    """
+    Handle common ClickHouse query errors by raising appropriate custom exceptions.
+
+    Args:
+        e: The original exception from ClickHouse
+
+    Raises:
+        QueryMemoryLimitExceeded: When the query exceeds memory limits
+        NoCommonType: When there's a type mismatch in the query
+        Exception: Re-raises the original exception if no known pattern matches
+    """
+    error_str = str(e)
+
+    if "MEMORY_LIMIT_EXCEEDED" in error_str:
+        raise QueryMemoryLimitExceeded("Query memory limit exceeded") from e
+    if "NO_COMMON_TYPE" in error_str:
+        raise NoCommonType(
+            "No common type between data types in query. "
+            "This can occur when comparing integers to strings without using the $convert operation"
+        ) from e
+
+    # Re-raise the original exception if no known pattern matches
+    raise
