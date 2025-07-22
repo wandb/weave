@@ -463,6 +463,13 @@ def map_to_refs(obj: Any) -> Any:
         # above with `_get_direct_ref`
         return _remove_empty_ref(obj.map_values(map_to_refs))
     elif isinstance(obj, (pydantic.BaseModel, pydantic.v1.BaseModel)):
+        # Check if this object has a custom serializer registered
+        from weave.trace.serialization.serializer import get_serializer_for_obj
+
+        if get_serializer_for_obj(obj) is not None:
+            # If it has a custom serializer, don't convert to ObjectRecord
+            # Let the serialization layer handle it
+            return obj
         obj_record = pydantic_object_record(obj)
         # Here, we expect ref to be empty since it would have short circuited
         # above with `_get_direct_ref`
@@ -2024,9 +2031,21 @@ class WeaveClient:
 
         # Recursive traversal of other pydantic objects
         elif isinstance(obj, (pydantic.BaseModel, pydantic.v1.BaseModel)):
-            obj_rec = pydantic_object_record(obj)
-            for v in obj_rec.__dict__.values():
-                self._save_nested_objects(v)
+            # Check if this object has a custom serializer registered
+            from weave.trace.serialization.serializer import get_serializer_for_obj
+
+            if get_serializer_for_obj(obj) is None:
+                # Only convert to ObjectRecord if no custom serializer exists
+                obj_rec = pydantic_object_record(obj)
+                for v in obj_rec.__dict__.values():
+                    self._save_nested_objects(v)
+            else:
+                # If it has a custom serializer, traverse its attributes directly
+                # without converting to ObjectRecord
+                for field_name in obj.model_fields:
+                    v = getattr(obj, field_name, None)
+                    if v is not None:
+                        self._save_nested_objects(v)
 
         # Recursive traversal of other dataclasses
         elif dataclasses.is_dataclass(obj) and not isinstance(obj, Ref):
