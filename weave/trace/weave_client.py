@@ -329,6 +329,7 @@ def _make_calls_iterator(
     include_costs: bool = False,
     include_feedback: bool = False,
     columns: list[str] | None = None,
+    expand_columns: list[str] | None = None,
     page_size: int = DEFAULT_CALLS_PAGE_SIZE,
 ) -> CallsIter:
     def fetch_func(offset: int, limit: int) -> list[CallSchema]:
@@ -350,6 +351,7 @@ def _make_calls_iterator(
                     query=query,
                     sort_by=sort_by,
                     columns=columns,
+                    expand_columns=expand_columns,
                 )
             )
         )
@@ -361,7 +363,12 @@ def _make_calls_iterator(
 
     def size_func() -> int:
         response = server.calls_query_stats(
-            CallsQueryStatsReq(project_id=project_id, filter=filter, query=query)
+            CallsQueryStatsReq(
+                project_id=project_id,
+                filter=filter,
+                query=query,
+                expand_columns=expand_columns,
+            )
         )
         if limit_override is not None:
             offset = offset_override or 0
@@ -1085,6 +1092,7 @@ class WeaveClient:
         include_costs: bool = False,
         include_feedback: bool = False,
         columns: list[str] | None = None,
+        expand_columns: list[str] | None = None,
         scored_by: str | list[str] | None = None,
         page_size: int = DEFAULT_CALLS_PAGE_SIZE,
     ) -> CallsIter:
@@ -1140,6 +1148,7 @@ class WeaveClient:
             include_costs=include_costs,
             include_feedback=include_feedback,
             columns=columns,
+            expand_columns=expand_columns,
             page_size=page_size,
         )
 
