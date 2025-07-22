@@ -19,6 +19,8 @@ def test_publish_round_trip_query_object(client) -> None:
     ref = weave.publish(query)
     res = client.server.refs_read_batch(RefsReadBatchReq(refs=[ref.uri()]))
 
+    # remove the extra python class information that round tripping generates
+    # specifically: _type, _class_name, _bases
     clean = {"$expr": res.vals[0]["$expr"]}
     query_2 = Query.model_validate(clean)
     assert query_2 == query
