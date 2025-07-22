@@ -1,3 +1,9 @@
+"""Compatibility layer for wandb.
+
+This allows weave to work even if the wandb library is not installed.  If wandb
+is available, we use that.  Otherwise, we reimplement a minimal subset of the
+wandb API required by weave."""
+
 # mypy: disable-error-code="assignment"
 
 try:
