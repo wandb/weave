@@ -43,7 +43,7 @@ def _ensure_project_exists(entity_name: str, project_name: str) -> dict[str, str
     api = wandb.Api()
 
     # Check if the project already exists
-    project = api.project(entity=entity_name, name=project_name)
+    project = api.project(entity_name, project_name)
     if project is not None:
         return _format_project_result(project)
 

@@ -100,7 +100,7 @@ def init_weave(
             _current_inited_client.reset()
 
     from weave.wandb_interface import (
-        wandb_context as wandb_context_module,  # type: ignore
+        context as wandb_context_module,  # type: ignore
     )
 
     # Must init to read ensure we've read auth from the environment, in

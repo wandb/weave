@@ -9,7 +9,7 @@ from weave.chat.types.models import (
     ModelsResponseSuccess,
 )
 from weave.trace_server.constants import INFERENCE_HOST
-from weave.wandb_interface.wandb_context import get_wandb_api_context
+from weave.wandb_interface.context import get_wandb_api_context
 
 if TYPE_CHECKING:
     from weave.trace.weave_client import WeaveClient

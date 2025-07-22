@@ -15,7 +15,7 @@ from gql.transport.requests import RequestsHTTPTransport
 from requests.auth import HTTPBasicAuth
 
 from weave.trace import env
-from weave.wandb_interface.wandb_context import get_wandb_api_context
+from weave.wandb_interface.context import get_wandb_api_context
 
 logger = logging.getLogger(__name__)
 
