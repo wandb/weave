@@ -1,3 +1,7 @@
+"""Weave Benchmark Runner
+
+A typer app for selecting and running benchmarks from the benchmarks/ directory.
+"""
 #!/usr/bin/env -S uv run --script
 # /// script
 # dependencies = [
@@ -5,12 +9,6 @@
 #     "typer",
 # ]
 # ///
-
-"""
-Weave Benchmark Runner
-
-A rich CLI app for selecting and running benchmarks from the benchmarks/ directory.
-"""
 
 import subprocess
 from pathlib import Path
