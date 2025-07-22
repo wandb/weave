@@ -1,3 +1,5 @@
+# mypy: disable-error-code="assignment"
+
 try:
     WANDB_AVAILABLE = True
     from wandb import login, termerror, termlog, termwarn
@@ -6,20 +8,10 @@ try:
     from wandb.util import app_url
 except (ImportError, ModuleNotFoundError):
     WANDB_AVAILABLE = False
-    from weave.compat.wandb.wandb_thin import (  # type: ignore[assignment]
-        login,
-        termerror,
-        termlog,
-        termwarn,
-    )
-    from weave.compat.wandb.wandb_thin.errors import (  # type: ignore[assignment]
-        AuthenticationError,
-        CommError,
-    )
-    from weave.compat.wandb.wandb_thin.internal_api import (
-        logger as wandb_logger,  # type: ignore[assignment]
-    )
-    from weave.compat.wandb.wandb_thin.util import app_url  # type: ignore[assignment]
+    from weave.compat.wandb.wandb_thin import login, termerror, termlog, termwarn
+    from weave.compat.wandb.wandb_thin.errors import AuthenticationError, CommError
+    from weave.compat.wandb.wandb_thin.internal_api import logger as wandb_logger
+    from weave.compat.wandb.wandb_thin.util import app_url
 
 from weave.compat.wandb.wandb_thin import Api, ApiAsync
 
