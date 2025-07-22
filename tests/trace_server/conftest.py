@@ -2,7 +2,7 @@ from typing import Callable
 
 import pytest
 
-from tests.trace_server.conftest_lib.clickhouse_server import *  # noqa: F401
+from tests.trace_server.conftest_lib.clickhouse_server import *
 from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     TestOnlyUserInjectingExternalTraceServer,
     externalize_trace_server,

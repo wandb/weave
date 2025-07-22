@@ -14,7 +14,7 @@ import time
 from collections import defaultdict
 from collections.abc import Iterator, Sequence
 from concurrent.futures import Future
-from functools import lru_cache
+from functools import cached_property, lru_cache
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -31,6 +31,8 @@ import pydantic
 from requests import HTTPError
 
 from weave import version
+from weave.chat.chat import Chat
+from weave.chat.inference_models import InferenceModels
 from weave.trace import trace_sentry, urls
 from weave.trace.casting import CallsFilterLike, QueryLike, SortByLike
 from weave.trace.concurrent.futures import FutureExecutor
@@ -141,6 +143,7 @@ from weave.trace_server.trace_server_interface import (
 
 if TYPE_CHECKING:
     import pandas as pd
+    import wandb
 
     from weave.flow.scorer import ApplyScorerResult, Scorer
 
@@ -442,7 +445,7 @@ def _get_direct_ref(obj: Any) -> Ref | None:
 
 def _remove_empty_ref(obj: ObjectRecord) -> ObjectRecord:
     if hasattr(obj, "ref"):
-        if obj.ref != None:
+        if obj.ref is not None:
             raise ValueError(f"Unexpected ref in object record: {obj}")
         else:
             del obj.__dict__["ref"]
@@ -969,7 +972,7 @@ class WeaveClient:
         # the underlying implementation of the specific server to get the call processor.
         # The `RemoteHTTPTraceServer` contains a call processor and we use that to control
         # some client-side flushing mechanics. We should move this to the interface layer. However,
-        # we don't really want the server-side implementaitons to need to define no-ops as that is
+        # we don't really want the server-side implementations to need to define no-ops as that is
         # even uglier. So we are using this "hasattr" check to avoid forcing the server-side implementations
         # to define no-ops.
         if hasattr(self.server, "get_call_processor"):
@@ -993,7 +996,7 @@ class WeaveClient:
         # Adding a second comment line for developers that is not a docstring:
         # Save an object to the weave server and return a deserialized version of it.
 
-        # Note: This is sort of a weird method becuase:
+        # Note: This is sort of a weird method because:
         # 1. It returns a deserialized version of the object (which will often not pass type-checks)
         # 2. It is slow (because it re-downloads the object from the weave server)
         # 3. It explicitly filters out non ObjectRefs, which seems like a useless constraint.
@@ -1104,7 +1107,7 @@ class WeaveClient:
             `include_feedback`: If True, includes feedback in `summary.weave.feedback`.
             `columns`: List of fields to return per call. Reducing this can significantly improve performance.
                     (Some fields like `id`, `trace_id`, `op_name`, and `started_at` are always included.)
-            `scored_by`: Filter by one or more scorers (name or ref URI). Multiple scorers are ANDed.
+            `scored_by`: Filter by one or more scorers (name or ref URI). Multiple scorers are AND-ed.
             `page_size`: Number of calls fetched per page. Tune this for performance in large queries.
 
         Returns:
@@ -1322,8 +1325,8 @@ class WeaveClient:
         started_at = datetime.datetime.now(tz=datetime.timezone.utc)
         project_id = self._project_id()
 
-        _should_print_call_link = should_print_call_link()
-        _current_call = call_context.get_current_call()
+        should_print_call_link_ = should_print_call_link()
+        current_call = call_context.get_current_call()
 
         def send_start_call() -> bool:
             maybe_redacted_inputs_with_refs = inputs_with_refs
@@ -1365,8 +1368,8 @@ class WeaveClient:
 
         def on_complete(f: Future) -> None:
             try:
-                root_call_did_not_error = f.result() and not _current_call
-                if root_call_did_not_error and _should_print_call_link:
+                root_call_did_not_error = f.result() and not current_call
+                if root_call_did_not_error and should_print_call_link_:
                     print_call_link(call)
             except Exception:
                 pass
@@ -2062,7 +2065,7 @@ class WeaveClient:
                 return val
             # Check if existing ref is to current project, if not,
             # remove the ref and recreate it in the current project
-            if val.project == self.project:
+            if val.project == self.project and val.entity == self.entity:
                 return val
             val = orig_val
 
@@ -2248,6 +2251,14 @@ class WeaveClient:
 
         self.send_file_cache.put(req, res)
         return res
+
+    @cached_property
+    def inference_models(self) -> InferenceModels:
+        return InferenceModels(self)
+
+    @cached_property
+    def chat(self) -> Chat:
+        return Chat(self)
 
     @property
     def num_outstanding_jobs(self) -> int:
@@ -2476,33 +2487,41 @@ def get_parallelism_settings() -> tuple[int | None, int | None]:
     return parallelism_main, parallelism_fastlane
 
 
-def safe_current_wb_run_id() -> str | None:
+def _safe_get_wandb_run() -> wandb.sdk.wandb_run.Run | None:
+    # Check if wandb is installed.  This will pass even if wandb is not installed
+    # if there is a wandb directory in the user's current directory, so the
+    # second check is required.
     try:
         import wandb
-
-        wandb_run = wandb.run
-        if wandb_run is None:
-            return None
-    except ImportError:
+    except (ImportError, ModuleNotFoundError):
         return None
-    else:
-        return f"{wandb_run.entity}/{wandb_run.project}/{wandb_run.id}"
+
+    # If a wandb directory exists, but wandb is installed, `wandb.run` will raise
+    # AttributeError.  This is an artifact of how python handles imports.
+    try:
+        wandb_run = wandb.run
+    except AttributeError:
+        return None
+
+    return wandb_run
+
+
+def safe_current_wb_run_id() -> str | None:
+    wandb_run = _safe_get_wandb_run()
+    if wandb_run is None:
+        return None
+
+    return f"{wandb_run.entity}/{wandb_run.project}/{wandb_run.id}"
 
 
 def safe_current_wb_run_step() -> int | None:
-    try:
-        import wandb
-
-        wandb_run = wandb.run
-        if wandb_run is None:
-            return None
-    except ImportError:
+    wandb_run = _safe_get_wandb_run()
+    if wandb_run is None:
         return None
-    else:
-        try:
-            return int(wandb_run.step)
-        except Exception:
-            return None
+    try:
+        return int(wandb_run.step)
+    except Exception:
+        return None
 
 
 def check_wandb_run_matches(

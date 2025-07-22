@@ -228,7 +228,7 @@ def _collection_and_alias_id_mapping_to_uri(
             # never uploaded, so the client id doesn't exist in the W&B server.
 
             collection = None
-            logging.warn(
+            logging.warning(
                 f"Artifact collection with client id {client_collection_id} not present in W&B server."
             )
 
@@ -1208,7 +1208,7 @@ class WeaveWBArtifactByIDURI(uris.WeaveURI):
 
 
 # This is a wrapper around an artifact that acts like a list of files.
-# It fetchs a file from the manifest on __getItem__ and can return a count without fetching all files
+# It fetches a file from the manifest on __getItem__ and can return a count without fetching all files
 @dataclasses.dataclass
 class FilesystemArtifactFileIterator(list[artifact_fs.FilesystemArtifactFile]):
     data: list[str]

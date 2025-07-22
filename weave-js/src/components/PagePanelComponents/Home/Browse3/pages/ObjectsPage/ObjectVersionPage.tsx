@@ -288,10 +288,6 @@ const ObjectVersionPageInner: React.FC<{
               </div>
             </div>
             <div className="block">
-              <p className="text-moon-500">Version</p>
-              <p>{objectVersionIndex}</p>
-            </div>
-            <div className="block">
               <p className="text-moon-500">Last updated</p>
               <p>
                 <Timestamp value={createdAtMs / 1000} format="relative" />
@@ -352,32 +348,6 @@ const ObjectVersionPageInner: React.FC<{
           </div>
         </Tailwind>
       }
-      // menuItems={[
-      //   {
-      //     label: 'Open in Board',
-      //     onClick: () => {
-      //       onMakeBoard();
-      //     },
-      //   },
-      //   {
-      //     label: '(Under Construction) Compare',
-      //     onClick: () => {
-      //       console.log('(Under Construction) Compare');
-      //     },
-      //   },
-      //   {
-      //     label: '(Under Construction) Process with Function',
-      //     onClick: () => {
-      //       console.log('(Under Construction) Process with Function');
-      //     },
-      //   },
-      //   {
-      //     label: '(Coming Soon) Add to Hub',
-      //     onClick: () => {
-      //       console.log('(Under Construction) Add to Hub');
-      //     },
-      //   },
-      // ]}
       tabs={[
         ...(showPromptTab
           ? [

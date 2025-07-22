@@ -484,7 +484,7 @@ def cost_query(
     return raw_sql
 
 
-# This is a temporary workaround for the issue of clickhouse not allowing the use of parametes in row_number() over function
+# This is a temporary workaround for the issue of clickhouse not allowing the use of parameters in row_number() over function
 # Use a parameter when this is fixed
 # This checks that a project_id is a valid base64 encoded string, that follows the pattern "ProjectInternalId: <number>"
 def is_project_id_sql_injection_safe(project_id: str) -> None:

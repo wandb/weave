@@ -9,7 +9,7 @@ import {ErrorBoundary} from '../../../../../ErrorBoundary';
 import {Tailwind} from '../../../../../Tailwind';
 import {TableRowSelectionContext} from '../../../TableRowSelectionContext';
 import {TraceNavigator} from '../../components/TraceNavigator/TraceNavigator';
-import {WeaveflowPeekContext} from '../../context';
+import {useBackNavigation, WeaveflowPeekContext} from '../../context';
 import {FeedbackGrid} from '../../feedback/FeedbackGrid';
 import {ScorerFeedbackGrid} from '../../feedback/ScorerFeedbackGrid';
 import {FeedbackSidebar} from '../../feedback/StructuredFeedback/FeedbackSidebar';
@@ -24,6 +24,8 @@ import {
   SimplePageLayoutWithHeader,
 } from '../common/SimplePageLayout';
 import {CompareEvaluationsPageContent} from '../CompareEvaluationsPage/CompareEvaluationsPage';
+import {DocumentView} from '../DocumentView/DocumentView';
+import {callHasDocuments, parseCall} from '../DocumentView/parser';
 import {useWFHooks} from '../wfReactInterface/context';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CallChat} from './CallChat';
@@ -70,8 +72,10 @@ export const CallPage: FC<CallPageProps> = props => {
     // in null response (bug on server side). As a result, the summary
     // will not show costs. FIXME (This results in a second query in
     // CallSummary.tsx)
+    // This flag and the below storage flag can cause long query times
+    // defer loading to the summary component
     // includeCosts: true,
-    includeTotalStorageSize: true,
+    // includeTotalStorageSize: true,
     refetchOnRename: true,
   });
 
@@ -178,6 +182,20 @@ const useCallTabs = (call: CallSchema) => {
                   </Tailwind>
                 </ScrollableTabContent>
               </>
+            ),
+          },
+        ]
+      : []),
+    ...(call.traceCall && callHasDocuments(call.traceCall)
+      ? [
+          {
+            label: 'Documents',
+            content: (
+              <ScrollableTabContent>
+                <Tailwind>
+                  {call.traceCall && <DocumentView data={parseCall(call)} />}
+                </Tailwind>
+              </ScrollableTabContent>
             ),
           },
         ]
@@ -293,10 +311,15 @@ const CallPageInnerVertical: FC<CallPageInnerProps> = ({
   );
 
   const {rowIdsConfigured} = useContext(TableRowSelectionContext);
-  const {isPeeking} = useContext(WeaveflowPeekContext);
+  const {isPeeking, previousUrl} = useContext(WeaveflowPeekContext);
   const showPaginationControls = isPeeking && rowIdsConfigured;
 
   const callTabs = useCallTabs(focusedCall);
+  const backNavigation = useBackNavigation();
+
+  const handleBackClick = useCallback(() => {
+    backNavigation();
+  }, [backNavigation]);
 
   const setRootCallIdForPagination = useCallback(
     (callId: string) => {
@@ -316,12 +339,23 @@ const CallPageInnerVertical: FC<CallPageInnerProps> = ({
             justifyContent: 'space-between',
             alignItems: 'center',
           }}>
-          {showPaginationControls && (
-            <PaginationControls
-              callId={rootCallId}
-              setRootCallId={setRootCallIdForPagination}
-            />
-          )}
+          <Box sx={{display: 'flex', alignItems: 'center'}}>
+            {isPeeking && previousUrl && (
+              <Button
+                icon="back"
+                tooltip="Go back"
+                variant="ghost"
+                onClick={handleBackClick}
+                className="mr-4"
+              />
+            )}
+            {showPaginationControls && (
+              <PaginationControls
+                callId={rootCallId}
+                setRootCallId={setRootCallIdForPagination}
+              />
+            )}
+          </Box>
           <Box sx={{marginLeft: showPaginationControls ? 0 : 'auto'}}>
             <Button
               icon="layout-tabs"

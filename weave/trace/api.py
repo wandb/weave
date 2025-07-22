@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import sys
+import warnings
 from collections.abc import Iterator
 from typing import Any, Union, cast
 
@@ -72,6 +74,13 @@ def init(
         A Weave client.
     """
     configure_logger()
+
+    if sys.version_info < (3, 10):
+        warnings.warn(
+            "Python 3.9 will reach end of life in October 2025, after which weave will drop support for it.  Please upgrade to Python 3.10 or later!",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
     parse_and_apply_settings(settings)
 
@@ -187,7 +196,7 @@ def ref(location: str) -> ObjectRef:
     Returns:
         A weave Ref to the object.
     """
-    if not "://" in location:
+    if "://" not in location:
         client = weave_client_context.get_weave_client()
         if not client:
             raise ValueError("Call weave.init() first, or pass a fully qualified uri")

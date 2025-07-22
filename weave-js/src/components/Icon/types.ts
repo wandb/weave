@@ -179,6 +179,8 @@ export const IconNames = {
   PencilEdit: 'pencil-edit',
   Photo: 'photo',
   Pin: 'pin',
+  PinToLeft: 'pin-to-left',
+  PinToLeftFilled: 'pin-to-left-filled',
   PinToRight: 'pin-to-right',
   Play: 'play',
   Plotly: 'plotly',

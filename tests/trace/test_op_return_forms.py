@@ -6,7 +6,7 @@ from weave.trace_server import trace_server_interface as tsi
 
 
 def test_op_return_sync_empty(client):
-    @weave.op()
+    @weave.op
     def fn():
         return
 
@@ -27,7 +27,7 @@ def test_op_return_sync_empty(client):
 
 @pytest.mark.asyncio
 async def test_op_return_async_empty(client):
-    @weave.op()
+    @weave.op
     async def fn():
         return
 
@@ -47,7 +47,7 @@ async def test_op_return_async_empty(client):
 
 
 def test_op_return_sync_obj(client):
-    @weave.op()
+    @weave.op
     def fn():
         return 1
 
@@ -68,7 +68,7 @@ def test_op_return_sync_obj(client):
 
 @pytest.mark.asyncio
 async def test_op_return_async_obj(client):
-    @weave.op()
+    @weave.op
     async def fn():
         return 1
 
@@ -478,7 +478,7 @@ def test_op_return_sync_generator_exception(client):
     assert res.calls[0].op_name == obj_ref.uri()
     assert res.calls[0].inputs == {}
     assert res.calls[0].output == list(range(9, 4, -1))
-    assert res.calls[0].exception != None
+    assert res.calls[0].exception is not None
 
 
 @pytest.mark.asyncio
@@ -509,7 +509,7 @@ async def test_op_return_async_generator_exception(client):
     assert res.calls[0].op_name == obj_ref.uri()
     assert res.calls[0].inputs == {}
     assert res.calls[0].output == list(range(9, 4, -1))
-    assert res.calls[0].exception != None
+    assert res.calls[0].exception is not None
 
 
 def test_op_return_sync_iterator_exception(client):
@@ -548,7 +548,7 @@ def test_op_return_sync_iterator_exception(client):
     assert res.calls[0].op_name == obj_ref.uri()
     assert res.calls[0].inputs == {}
     assert res.calls[0].output == list(range(9, 4, -1))
-    assert res.calls[0].exception != None
+    assert res.calls[0].exception is not None
 
 
 @pytest.mark.asyncio
@@ -588,4 +588,4 @@ async def test_op_return_async_iterator_exception(client):
     assert res.calls[0].op_name == obj_ref.uri()
     assert res.calls[0].inputs == {}
     assert res.calls[0].output == list(range(9, 4, -1))
-    assert res.calls[0].exception != None
+    assert res.calls[0].exception is not None

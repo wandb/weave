@@ -58,6 +58,7 @@ import {PlaygroundPage} from './Browse3/pages/PlaygroundPage/PlaygroundPage';
 import {ScorersPage} from './Browse3/pages/ScorersPage/ScorersPage';
 import {TablePage} from './Browse3/pages/TablePage';
 import {TablesPage} from './Browse3/pages/TablesPage';
+import {ThreadDetailPage} from './Browse3/pages/ThreadDetailPage/ThreadDetailPage';
 import {ThreadsPageLoadView} from './Browse3/pages/ThreadsPage/ThreadsPageLoadView';
 import {useURLSearchParamsDict} from './Browse3/pages/util';
 import {
@@ -236,6 +237,7 @@ const MainPeekingLayout: FC = () => {
 
   // State to track whether the user is currently dragging the drawer resize handle
   const [isDragging, setIsDragging] = useState(false);
+  const [previousUrl, setPreviousUrl] = useState<string | undefined>(undefined);
 
   // Callback function to handle the end of dragging
   const handleDragEnd = useCallback(() => {
@@ -320,7 +322,12 @@ const MainPeekingLayout: FC = () => {
                 }}
               />
               {peekLocation && (
-                <WeaveflowPeekContext.Provider value={{isPeeking: true}}>
+                <WeaveflowPeekContext.Provider
+                  value={{
+                    isPeeking: true,
+                    previousUrl,
+                    setPreviousUrl,
+                  }}>
                   <SimplePageLayoutContext.Provider
                     value={{
                       headerSuffix: (
@@ -420,6 +427,9 @@ const Browse3ProjectRoot: FC<{
         </Route>
         <Route path={`${projectRoot}/:tab(evaluations|traces|calls)`}>
           <CallsPageBinding />
+        </Route>
+        <Route path={`${projectRoot}/threads/:itemName`}>
+          <ThreadDetailPageBinding />
         </Route>
         <Route path={`${projectRoot}/threads`}>
           <ThreadsPageBinding />
@@ -1024,4 +1034,9 @@ const PlaygroundPageBinding = () => {
 const ThreadsPageBinding = () => {
   const query = useURLSearchParamsDict();
   return <ThreadsPageLoadView view={query.view} />;
+};
+
+const ThreadDetailPageBinding = () => {
+  const params = useParamsDecoded<Browse3TabItemParams>();
+  return <ThreadDetailPage threadId={params.itemName} />;
 };

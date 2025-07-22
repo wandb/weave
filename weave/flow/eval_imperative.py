@@ -221,7 +221,7 @@ class ScoreLogger(BaseModel):
 
     def finish(self) -> None:
         if self._has_finished:
-            logger.warn("(NO-OP): Already called finish, returning.")
+            logger.warning("(NO-OP): Already called finish, returning.")
             return
 
         scores = self._captured_scores
@@ -527,7 +527,7 @@ class EvaluationLogger(BaseModel):
         the evaluation, meaning no more predictions or scores can be logged.
         """
         if self._is_finalized:
-            logger.warn("(NO-OP): Evaluation already finalized, cannot log summary.")
+            logger.warning("(NO-OP): Evaluation already finalized, cannot log summary.")
             return
 
         if summary is None:
@@ -546,12 +546,12 @@ class EvaluationLogger(BaseModel):
         if summary_data:
             final_summary = summary_data
         if summary is not None:
-            final_summary = {**final_summary, **summary}
+            final_summary = {**final_summary, "output": summary}
 
         # Call the summarize op
-        assert (
-            self._evaluate_call is not None
-        ), "Evaluation call should exist for summary"
+        assert self._evaluate_call is not None, (
+            "Evaluation call should exist for summary"
+        )
 
         # Use set_call_stack to temporarily set the evaluation as the parent
         with call_context.set_call_stack([self._evaluate_call]):
