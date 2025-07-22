@@ -19,9 +19,11 @@ def log_dropped_call_batch(
     dropped_end_ids = []
     for item in batch:
         # Use string comparison to avoid circular imports
-        if hasattr(item, "mode") and item.mode == "start":
+        if hasattr(item, "req") and hasattr(item.req, "start"):
+            # For start items, access the start request
             dropped_start_ids.append(item.req.start.id)
-        elif hasattr(item, "mode") and item.mode == "end":
+        elif hasattr(item, "req") and hasattr(item.req, "end"):
+            # For end items, access the end request
             dropped_end_ids.append(item.req.end.id)
     if dropped_start_ids:
         logger.error(f"dropped call start ids: {dropped_start_ids}")
