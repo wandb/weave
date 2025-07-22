@@ -52,15 +52,8 @@ class ContentAnnotation(BaseModel):
     base_type: str
     content_class: str
     raw_annotation: str
-
-
-class ContentAnnotationWithExtention(ContentAnnotation):
-    extension: str
-
-
-class ContentAnnotationWithMimetype(ContentAnnotation):
-    mimetype: str
-
+    extension: str | None = None
+    mimetype: str | None = None
 
 def try_parse_annotation_with_hint(annotation_string: str) -> ContentAnnotation | None:
     """
@@ -85,7 +78,7 @@ def try_parse_annotation_with_hint(annotation_string: str) -> ContentAnnotation 
 
     if type_hint.find("/") > -1:
         # We know it's a Mimetype if there's a '/'
-        return ContentAnnotationWithMimetype(
+        return ContentAnnotation(
             base_type=base_type,
             content_class=CONTENT_CLASS_NAME,
             mimetype=type_hint,
@@ -96,7 +89,7 @@ def try_parse_annotation_with_hint(annotation_string: str) -> ContentAnnotation 
     elif type_hint.find(".") != 0:
         type_hint = f".{type_hint}"
 
-    return ContentAnnotationWithExtention(
+    return ContentAnnotation(
         base_type=base_type,
         content_class=CONTENT_CLASS_NAME,
         extension=type_hint,
