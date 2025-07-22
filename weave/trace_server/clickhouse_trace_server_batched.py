@@ -202,7 +202,8 @@ DEFAULT_MAX_MEMORY_USAGE = 16 * 1024 * 1024 * 1024  # 16 GiB
 # https://clickhouse.com/docs/operations/settings/settings#max_execution_time
 DEFAULT_MAX_EXECUTION_TIME = 60 * 1  # 1 minute
 CLICKHOUSE_DEFAULT_QUERY_SETTINGS = {
-    "max_memory_usage": DEFAULT_MAX_MEMORY_USAGE,
+    "max_memory_usage": wf_env.wf_clickhouse_max_memory_usage()
+    or DEFAULT_MAX_MEMORY_USAGE,
     "max_execution_time": wf_env.wf_clickhouse_max_execution_time()
     or DEFAULT_MAX_EXECUTION_TIME,
     "function_json_value_return_type_allow_complex": "1",
@@ -477,13 +478,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             cq.set_offset(req.offset)
 
         pb = ParamBuilder()
-        sql = cq.as_sql(pb)
-        params = pb.get_params()
-
-        if not req.include_costs and not req.include_storage_size:
-            print(_format_clickhouse_sql_for_debug(sql, params))
-
-        raw_res = self._query_stream(sql, params)
+        raw_res = self._query_stream(
+            cq.as_sql(pb),
+            pb.get_params(),
+        )
 
         select_columns = [c.field for c in cq.select_fields]
         expand_columns = req.expand_columns or []
@@ -2404,34 +2402,6 @@ def _num_bytes(data: Any) -> int:
         return len(str(data).encode("utf-8"))
     except Exception:
         return 0
-
-
-def _format_clickhouse_sql_for_debug(sql: str, params: dict[str, Any]) -> str:
-    """
-    Format ClickHouse SQL with parameters for debug printing.
-
-    ClickHouse uses format like {param_name:Type} but Python's format()
-    interprets :Type as a format specifier, causing errors.
-    This function safely replaces ClickHouse parameters with their values.
-    """
-    import re
-
-    formatted_sql = sql
-    # Pattern matches {param_name:Type} format used by ClickHouse
-    pattern = r"\{([^}]+):[^}]+\}"
-
-    def replace_param(match):
-        param_name = match.group(1)
-        if param_name in params:
-            value = params[param_name]
-            if isinstance(value, str):
-                return f"'{value}'"
-            else:
-                return str(value)
-        return match.group(0)  # Return original if param not found
-
-    formatted_sql = re.sub(pattern, replace_param, formatted_sql)
-    return formatted_sql
 
 
 def _dict_value_to_dump(
