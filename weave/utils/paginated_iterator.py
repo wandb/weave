@@ -1,3 +1,7 @@
+"""Utility class for iterating over data with pagination."""
+
+from __future__ import annotations
+
 from collections.abc import Iterator
 from functools import lru_cache
 from typing import TYPE_CHECKING, Callable, Generic, Protocol, overload
@@ -49,9 +53,9 @@ class PaginatedIterator(Generic[T, R]):
         return self.fetch_func(index * self.page_size, self.page_size)
 
     @overload
-    def _get_one(self: "PaginatedIterator[T, T]", index: int) -> T: ...
+    def _get_one(self: PaginatedIterator[T, T], index: int) -> T: ...
     @overload
-    def _get_one(self: "PaginatedIterator[T, R]", index: int) -> R: ...
+    def _get_one(self: PaginatedIterator[T, R], index: int) -> R: ...
     def _get_one(self, index: int) -> T | R:
         if index < 0:
             raise IndexError("Negative indexing not supported")
@@ -75,9 +79,9 @@ class PaginatedIterator(Generic[T, R]):
         return res
 
     @overload
-    def _get_slice(self: "PaginatedIterator[T, T]", key: slice) -> Iterator[T]: ...
+    def _get_slice(self: PaginatedIterator[T, T], key: slice) -> Iterator[T]: ...
     @overload
-    def _get_slice(self: "PaginatedIterator[T, R]", key: slice) -> Iterator[R]: ...
+    def _get_slice(self: PaginatedIterator[T, R], key: slice) -> Iterator[R]: ...
     def _get_slice(self, key: slice) -> Iterator[T] | Iterator[R]:
         if (start := key.start or 0) < 0:
             raise ValueError("Negative start not supported")
@@ -105,22 +109,22 @@ class PaginatedIterator(Generic[T, R]):
             i += step
 
     @overload
-    def __getitem__(self: "PaginatedIterator[T, T]", key: int) -> T: ...
+    def __getitem__(self: PaginatedIterator[T, T], key: int) -> T: ...
     @overload
-    def __getitem__(self: "PaginatedIterator[T, R]", key: int) -> R: ...
+    def __getitem__(self: PaginatedIterator[T, R], key: int) -> R: ...
     @overload
-    def __getitem__(self: "PaginatedIterator[T, T]", key: slice) -> list[T]: ...
+    def __getitem__(self: PaginatedIterator[T, T], key: slice) -> list[T]: ...
     @overload
-    def __getitem__(self: "PaginatedIterator[T, R]", key: slice) -> list[R]: ...
+    def __getitem__(self: PaginatedIterator[T, R], key: slice) -> list[R]: ...
     def __getitem__(self, key: slice | int) -> T | R | list[T] | list[R]:
         if isinstance(key, slice):
             return list(self._get_slice(key))
         return self._get_one(key)
 
     @overload
-    def __iter__(self: "PaginatedIterator[T, T]") -> Iterator[T]: ...
+    def __iter__(self: PaginatedIterator[T, T]) -> Iterator[T]: ...
     @overload
-    def __iter__(self: "PaginatedIterator[T, R]") -> Iterator[R]: ...
+    def __iter__(self: PaginatedIterator[T, R]) -> Iterator[R]: ...
     def __iter__(self) -> Iterator[T] | Iterator[R]:
         return self._get_slice(slice(0, None, 1))
 
@@ -131,7 +135,7 @@ class PaginatedIterator(Generic[T, R]):
             raise TypeError("This iterator does not support len()")
         return self.size_func()
 
-    def to_pandas(self) -> "pd.DataFrame":
+    def to_pandas(self) -> pd.DataFrame:
         """Convert the iterator's contents to a pandas DataFrame.
 
         Returns:
