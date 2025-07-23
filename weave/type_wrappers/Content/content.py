@@ -8,10 +8,10 @@ import subprocess
 import sys
 import uuid
 from pathlib import Path
-from typing import Annotated, Any, Generic, Literal, NotRequired, TypedDict, Union
+from typing import Annotated, Any, Generic, Literal, TypedDict, Union
 
 from pydantic import BaseModel, Field
-from typing_extensions import Self, TypeVar
+from typing_extensions import Self, TypeVar, NotRequired
 
 from .utils import (
     default_filename,
