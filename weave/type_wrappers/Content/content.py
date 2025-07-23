@@ -35,7 +35,7 @@ class ResolvedContentArgsWithoutData(TypedDict):
     mimetype: str
     digest: str
     filename: str
-    content_type: Literal["bytes", "text", "base64", "file", "url"]
+    content_type: ContentType
     input_type: str
 
     # Optional Fields
