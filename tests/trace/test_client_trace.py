@@ -868,18 +868,32 @@ def test_trace_call_query_timings(client):
 
     num_calls = 100
 
-    # Create calls with controlled timing using datetime mock
+    # Create calls with controlled timing - mock only datetime.datetime.now()
+    call_index = 0
+
+    def mock_now(*args, **kwargs):
+        nonlocal call_index
+        # Each create_call increments the index once at the start
+        # Return the appropriate time based on which call we're processing
+        if call_index <= num_calls - 3:  # calls 0-97 get 'now'
+            return now
+        elif call_index == num_calls - 2:  # call 98 gets 'later'
+            return later
+        else:  # call 99 gets 'even_later'
+            return even_later
+
     with mock.patch(
         "weave.trace.weave_client.datetime.datetime"
     ) as mock_datetime_class:
-        # Set up the mock to return specific times for each call
-        times = [now] * int(num_calls - 2) + [later] + [even_later]
-        mock_datetime_class.now.side_effect = times
-        # Keep other datetime functionality working
+        # Mock only the .now() method, keep everything else as-is
+        mock_datetime_class.now = mock.Mock(side_effect=mock_now)
+        # Preserve other datetime functionality
         mock_datetime_class.side_effect = lambda *args, **kw: datetime.datetime(
             *args, **kw
         )
+
         for i in range(num_calls):
+            call_index = i
             client.create_call("y", {"a": i})
 
     def query_server():
