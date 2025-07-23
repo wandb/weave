@@ -861,6 +861,66 @@ def test_trace_call_query_offset(client):
         assert len(inner_res.calls) == exp_count
 
 
+def test_trace_call_query_timings(client):
+    now = datetime.datetime(2025, 1, 1, 12, 0, 0, tzinfo=datetime.timezone.utc)
+    later = now + datetime.timedelta(seconds=1)
+    even_later = later + datetime.timedelta(seconds=1)
+
+    num_calls = 100
+
+    # Create calls with controlled timing using datetime mock
+    with mock.patch(
+        "weave.trace.weave_client.datetime.datetime"
+    ) as mock_datetime_class:
+        # Set up the mock to return specific times for each call
+        times = [now] * int(num_calls - 2) + [later] + [even_later]
+        mock_datetime_class.now.side_effect = times
+        # Keep other datetime functionality working
+        mock_datetime_class.side_effect = lambda *args, **kw: datetime.datetime(
+            *args, **kw
+        )
+        for i in range(num_calls):
+            client.create_call("y", {"a": i})
+
+    def query_server():
+        result = get_client_trace_server(client).calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client),
+                sort_by=[tsi.SortBy(field="started_at", direction="desc")],
+            )
+        )
+        return list(result)
+
+    def query_client(page_size):
+        res = client.get_calls(
+            sort_by=[tsi.SortBy(field="started_at", direction="desc")],
+            page_size=page_size,
+        )
+        return list(res)
+
+    # get all calls, sorted by started_at
+    res = query_server()
+    assert len(res) == num_calls
+    assert res[0].started_at == even_later
+    assert res[1].started_at == later
+    for c in res[2:]:
+        assert c.started_at == now
+
+    ids = [c.id for c in res]
+
+    # indeterminite ordering should always default to the same thing
+    for _i in range(5):
+        tres = query_server()
+        tids = [c.id for c in tres]
+        assert tids == ids
+
+    # page_size 10 to test ordering within pages
+    for _i in range(3):
+        tres = query_client(page_size=10)
+        tids = [c.id for c in tres]
+        assert tids == ids
+
+
 def test_trace_call_sort(client):
     @weave.op
     def basic_op(in_val: dict, delay) -> dict:
