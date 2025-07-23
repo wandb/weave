@@ -1,14 +1,14 @@
 import pytest
 
-from tests.scorers.test_utils import TINY_MODEL_PATHS
 from weave.scorers.coherence_scorer import WeaveCoherenceScorerV1
+from weave.scorers.default_models import MODEL_PATHS
 
 
 @pytest.fixture
 def weave_coherence_scorer():
     """Fixture to return a WeaveCoherenceScorer instance."""
     scorer = WeaveCoherenceScorerV1(
-        model_name_or_path=TINY_MODEL_PATHS["coherence_scorer"],
+        model_name_or_path=MODEL_PATHS["coherence_scorer"],
         device="cpu",
     )
     return scorer
@@ -21,7 +21,7 @@ def test_score_messages(weave_coherence_scorer):
     result = weave_coherence_scorer._score_messages(query, output)
     # Check that the pydantic model has the expected attributes.
     assert result.metadata is not None
-    assert result.metadata["coherence_label"] == "A Little Incoherent"
+    assert result.metadata["coherence_label"] == "Perfectly Coherent"
 
 
 @pytest.mark.asyncio
@@ -35,9 +35,21 @@ async def test_score_with_chat_history(weave_coherence_scorer):
         {"role": "assistant", "content": "Hi"},
     ]
     # Call score using the new argument names.
-    result = weave_coherence_scorer.score(query, output, chat_history=chat_history)
+    result = weave_coherence_scorer.score(
+        query=query, output=output, chat_history=chat_history
+    )
     assert result.metadata is not None
-    assert result.metadata["coherence_label"] == "A Little Incoherent"
+    assert result.metadata["coherence_label"] == "Perfectly Coherent"
+
+
+@pytest.mark.asyncio
+async def test_incoherent_response(weave_coherence_scorer):
+    """Test  with incoherent response"""
+    query = "This is a test prompt."
+    output = "The grass moon ducks by they"
+    # Call score with the context parameter.
+    result = weave_coherence_scorer.score(query=query, output=output)
+    assert not result.passed
 
 
 @pytest.mark.asyncio
@@ -47,6 +59,6 @@ async def test_score_with_context(weave_coherence_scorer):
     output = "This is a coherent response."
     context = "This is additional context."
     # Call score with the context parameter.
-    result = weave_coherence_scorer.score(query, output, context=context)
+    result = weave_coherence_scorer.score(query=query, output=output, context=context)
     assert result.metadata is not None
-    assert result.metadata["coherence_label"] == "A Little Incoherent"
+    assert result.metadata["coherence_label"] == "Perfectly Coherent"

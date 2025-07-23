@@ -41,6 +41,9 @@ export type Model = {
 
   status: ModelStatus;
 
+  // This controls whether we show a "New" badge for the model.
+  isNew?: boolean;
+
   // id used in Weave's playground - this is inconsistently scoped py provider currently.
   // The inference service expects the model string to be consistent with the Hugging Face
   // identifier. However, these values are not necessarily the same. For example, the
@@ -118,6 +121,8 @@ export type InferenceBillingInfo = {
   billingPeriodStart: Date;
   billingPeriodEnd: Date;
   usage: number;
+
+  inferenceFreeLimit?: number;
   inferenceSafetyLimit: number;
 
   formatAsDollar: (value: number) => string;
@@ -130,7 +135,7 @@ export type InferenceBillingInfo = {
 // information and methods.
 export type InferenceContextType = {
   isLoggedIn: boolean;
-  isCatalogEnabled?: boolean; // Viewer can see model catalog page
+  isCatalogEnabled: boolean; // Viewer can see model catalog page
   isInferenceEnabled: boolean; // Viewer can call inference service
   availabilityMessage: string;
   playgroundEntity: string;

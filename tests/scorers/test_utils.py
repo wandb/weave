@@ -6,9 +6,14 @@ import torch
 from pydantic import BaseModel
 from torch import Tensor
 
-from weave.scorers.utils import download_model, stringify
+from weave.scorers.utils import (
+    download_model_from_huggingface_hub,
+    download_model_from_wandb,
+    load_local_model_weights,
+    stringify,
+)
 
-# Model paths for various scorers
+# Model paths for various scorers (W&B artifacts)
 TINY_MODEL_PATHS = {
     "fluency_scorer": "c-metrics/weave-scorers/fluency_scorer_tiny:latest",
     "hallucination_scorer": "c-metrics/weave-scorers/hallucination_hhem_scorer_tiny:latest",
@@ -16,7 +21,11 @@ TINY_MODEL_PATHS = {
     "toxicity_scorer": "c-metrics/weave-scorers/toxicity_scorer_tiny:latest",
     "bias_scorer": "c-metrics/weave-scorers/bias_scorer_tiny:latest",
     "relevance_scorer": "c-metrics/weave-scorers/relevance_scorer_tiny:latest",
-    "llamaguard_scorer": "c-metrics/weave-scorers/llamaguard_scorer_tiny:latest",
+}
+
+# Hugging Face Hub model paths for testing
+TINY_HF_MODEL_PATHS = {
+    "bias_scorer": "morgan/TinyTestWeaveBiasScorerV1",
 }
 
 
@@ -111,11 +120,40 @@ def test_generate_context_and_output():
 
 
 def test_download_model_default_env_var():
-    tiny_model_path = download_model(TINY_MODEL_PATHS["bias_scorer"])
+    tiny_model_path = download_model_from_wandb(TINY_MODEL_PATHS["bias_scorer"])
     assert tiny_model_path.exists()
 
 
 def test_download_model_custom_env_var():
     os.environ["WEAVE_SCORERS_DIR"] = "/tmp/weave-scorers"
-    tiny_model_path = download_model(TINY_MODEL_PATHS["bias_scorer"])
+    tiny_model_path = download_model_from_wandb(TINY_MODEL_PATHS["bias_scorer"])
     assert tiny_model_path.exists()
+
+
+def test_download_model_from_huggingface_hub():
+    """Test downloading a model from Hugging Face Hub."""
+    tiny_model_path = download_model_from_huggingface_hub(
+        TINY_HF_MODEL_PATHS["bias_scorer"]
+    )
+    assert os.path.exists(tiny_model_path)
+    assert os.path.isdir(tiny_model_path)
+
+
+def test_load_hf_model_weights_with_default():
+    """Test load_local_model_weights function with HF Hub default model."""
+    # Test with empty model_name_or_path and HF Hub default_model
+    result_path = load_local_model_weights(
+        default_model=TINY_HF_MODEL_PATHS["bias_scorer"]
+    )
+    assert os.path.exists(result_path)
+    assert os.path.isdir(result_path)
+
+
+def test_load_hf_model_weights_with_wandb_artifact():
+    """Test load_local_model_weights function with W&B artifact path (backward compatibility)."""
+    # Test with W&B artifact path (should still work)
+    result_path = load_local_model_weights(
+        model_name_or_path=TINY_MODEL_PATHS["bias_scorer"]
+    )
+    assert os.path.exists(result_path)
+    assert os.path.isdir(result_path)

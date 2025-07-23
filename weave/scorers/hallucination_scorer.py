@@ -7,7 +7,7 @@ import weave
 from weave.flow.scorer import WeaveScorerResult
 from weave.scorers.default_models import OPENAI_DEFAULT_MODEL
 from weave.scorers.scorer_types import HuggingFacePipelineScorer, LLMScorer
-from weave.scorers.utils import MODEL_PATHS, load_hf_model_weights, stringify
+from weave.scorers.utils import MODEL_PATHS, load_local_model_weights, stringify
 
 logger = logging.getLogger(__name__)
 
@@ -225,7 +225,7 @@ class WeaveHallucinationScorerV1(HuggingFacePipelineScorer):
     def load_pipeline(self) -> None:
         from transformers import pipeline
 
-        self._local_model_path = load_hf_model_weights(
+        self._local_model_path = load_local_model_weights(
             self.model_name_or_path, MODEL_PATHS["hallucination_scorer"]
         )
 
@@ -239,9 +239,9 @@ class WeaveHallucinationScorerV1(HuggingFacePipelineScorer):
     def _predict(
         self, query: str, context: Union[str, list[str]], output: str
     ) -> float:
-        assert (
-            self._pipeline is not None
-        ), "Pipeline not loaded, check your `model_name_or_path`"
+        assert self._pipeline is not None, (
+            "Pipeline not loaded, check your `model_name_or_path`"
+        )
         tokenizer = self._pipeline.tokenizer
         context_str = "\n\n".join(context) if isinstance(context, list) else context
         inps = query + "\n\n" + context_str
