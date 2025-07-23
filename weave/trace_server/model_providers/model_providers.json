@@ -515,6 +515,10 @@
     "litellm_provider": "azure",
     "api_key_name": "AZURE_API_KEY"
   },
+  "azure/o3-deep-research": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
   "azure/o4-mini": {
     "litellm_provider": "azure",
     "api_key_name": "AZURE_API_KEY"
@@ -1019,6 +1023,10 @@
     "litellm_provider": "azure_ai",
     "api_key_name": "AZURE_API_KEY"
   },
+  "azure_ai/cohere-rerank-v3.5": {
+    "litellm_provider": "azure_ai",
+    "api_key_name": "AZURE_API_KEY"
+  },
   "azure_ai/cohere-rerank-v3-multilingual": {
     "litellm_provider": "azure_ai",
     "api_key_name": "AZURE_API_KEY"
@@ -1038,10 +1046,6 @@
   "azure_ai/embed-v-4-0": {
     "litellm_provider": "azure_ai",
     "api_key_name": "AZURE_API_KEY"
-  },
-  "claude-instant-1": {
-    "litellm_provider": "anthropic",
-    "api_key_name": "ANTHROPIC_API_KEY"
   },
   "mistral/mistral-tiny": {
     "litellm_provider": "mistral",
@@ -1136,6 +1140,14 @@
     "api_key_name": "MISTRAL_API_KEY"
   },
   "mistral/devstral-small-2505": {
+    "litellm_provider": "mistral",
+    "api_key_name": "MISTRAL_API_KEY"
+  },
+  "mistral/devstral-small-2507": {
+    "litellm_provider": "mistral",
+    "api_key_name": "MISTRAL_API_KEY"
+  },
+  "mistral/devstral-medium-2507": {
     "litellm_provider": "mistral",
     "api_key_name": "MISTRAL_API_KEY"
   },
@@ -1251,6 +1263,18 @@
     "litellm_provider": "xai",
     "api_key_name": "XAI_API_KEY"
   },
+  "xai/grok-4": {
+    "litellm_provider": "xai",
+    "api_key_name": "XAI_API_KEY"
+  },
+  "xai/grok-4-0709": {
+    "litellm_provider": "xai",
+    "api_key_name": "XAI_API_KEY"
+  },
+  "xai/grok-4-latest": {
+    "litellm_provider": "xai",
+    "api_key_name": "XAI_API_KEY"
+  },
   "deepseek/deepseek-coder": {
     "litellm_provider": "deepseek",
     "api_key_name": "DEEPSEEK_API_KEY"
@@ -1355,6 +1379,10 @@
     "litellm_provider": "groq",
     "api_key_name": "GROQ_API_KEY"
   },
+  "groq/moonshotai-kimi-k2-instruct": {
+    "litellm_provider": "groq",
+    "api_key_name": "GROQ_API_KEY"
+  },
   "groq/playai-tts": {
     "litellm_provider": "groq",
     "api_key_name": "GROQ_API_KEY"
@@ -1370,10 +1398,6 @@
   "groq/distil-whisper-large-v3-en": {
     "litellm_provider": "groq",
     "api_key_name": "GROQ_API_KEY"
-  },
-  "claude-instant-1.2": {
-    "litellm_provider": "anthropic",
-    "api_key_name": "ANTHROPIC_API_KEY"
   },
   "claude-2": {
     "litellm_provider": "anthropic",
@@ -1677,6 +1701,14 @@
   },
   "mistral.mistral-small-2402-v1:0": {
     "litellm_provider": "bedrock",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "eu.mistral.pixtral-large-2502-v1:0": {
+    "litellm_provider": "bedrock_converse",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "us.mistral.pixtral-large-2502-v1:0": {
+    "litellm_provider": "bedrock_converse",
     "api_key_name": "BEDROCK_API_KEY"
   },
   "bedrock/us-west-2/mistral.mixtral-8x7b-instruct-v0:1": {

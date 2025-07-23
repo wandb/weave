@@ -82,11 +82,54 @@ export const useScorers = (
     let mounted = true;
     client.readBatch({refs: [evaluationObjectRef]}).then(res => {
       if (mounted) {
-        setScorers(
-          (res.vals[0].scorers ?? [])
-            .map((scorer: string) => parseRefMaybe(scorer)?.artifactName)
-            .filter(Boolean) as string[]
-        );
+        const scorers = (res.vals[0].scorers ?? [])
+          .map((scorer: string) => parseRefMaybe(scorer)?.artifactName)
+          .filter(Boolean) as string[];
+
+        // Regular eval; populate scorers from the scorers field
+        if (scorers.length > 0) {
+          setScorers(scorers);
+          return;
+        }
+
+        // Imperative eval; populate scorers using the eval's output key
+        client
+          .callsStreamQuery({
+            project_id: projectIdFromParts({entity, project}),
+            filter: {
+              op_names: [
+                opVersionKeyToRefUri({
+                  entity,
+                  project,
+                  opId: EVALUATE_OP_NAME_POST_PYDANTIC,
+                  versionHash: ALL_VALUE,
+                }),
+              ],
+              input_refs: [evaluationObjectRef],
+            },
+            limit: 1,
+          })
+          .then(evalCallsRes => {
+            if (mounted && evalCallsRes.calls.length > 0) {
+              const output = evalCallsRes.calls[0].output ?? {};
+              if (typeof output === 'object' && output != null) {
+                // Extract scorer names from the output keys
+                const outputObj = output as Record<string, any>;
+                const extractedScorers = Object.keys(outputObj).filter(
+                  key =>
+                    // Filter out any non-scorer keys if needed
+                    key !== '_result' && typeof outputObj[key] === 'object'
+                );
+                setScorers(extractedScorers);
+              }
+            }
+          })
+          .catch(err => {
+            console.error(
+              'Failed to fetch evaluation calls for scorer extraction:',
+              err
+            );
+          });
       }
     });
 

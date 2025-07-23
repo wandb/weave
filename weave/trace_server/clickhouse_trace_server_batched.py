@@ -370,10 +370,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             )
         )
         try:
-            _call = next(res)
+            call = next(res)
         except StopIteration:
-            _call = None
-        return tsi.CallReadRes(call=_call)
+            call = None
+        return tsi.CallReadRes(call=call)
 
     def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
         stream = self.calls_query_stream(req)
@@ -458,6 +458,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 "summary_dump",
             ]
 
+        if req.expand_columns is not None:
+            cq.set_expand_columns(req.expand_columns)
         for col in columns:
             cq.add_field(col)
         if req.filter is not None:
@@ -477,10 +479,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             cq.set_offset(req.offset)
 
         pb = ParamBuilder()
-        raw_res = self._query_stream(
-            cq.as_sql(pb),
-            pb.get_params(),
-        )
+        raw_res = self._query_stream(cq.as_sql(pb), pb.get_params())
 
         select_columns = [c.field for c in cq.select_fields]
         expand_columns = req.expand_columns or []
@@ -503,7 +502,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         for batch in batch_processor.make_batches(raw_res):
             call_dicts = [row_to_call_schema_dict(row) for row in batch]
-            if expand_columns:
+            if expand_columns and req.return_expanded_column_values:
                 self._expand_call_refs(
                     req.project_id, call_dicts, expand_columns, ref_cache
                 )
@@ -546,7 +545,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 if not isinstance(ref, ri.InternalObjectRef):
                     continue
 
-                refs_to_resolve[(i, col)] = ref
+                refs_to_resolve[i, col] = ref
         return refs_to_resolve
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._expand_call_refs")
@@ -2186,7 +2185,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         object_values: dict[tuple[str, str], Any] = {}
         for row in query_result:
             (object_id, digest, val_dump) = row
-            object_values[(object_id, digest)] = val_dump
+            object_values[object_id, digest] = val_dump
 
         # update the val_dump for each object
         for obj in metadata_result:
@@ -2598,7 +2597,7 @@ def _process_parameters(
 
 
 def get_type(val: Any) -> str:
-    if val == None:
+    if val is None:
         return "none"
     elif isinstance(val, dict):
         if "_type" in val:
