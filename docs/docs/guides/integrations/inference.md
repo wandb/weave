@@ -21,15 +21,15 @@ Using Weave, you can trace, evaluate, monitor, and iterate on your W&B Inference
 
 | Model                      | Model ID (for API usage)                  | Type(s)      | Context Window | Parameters                  | Description                                                                                                                    |
 | -------------------------- | ----------------------------------------- | ------------ | -------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| Qwen Qwen3 235B A22B       | Qwen/Qwen3-235B-A22B-Instruct-2507        | Text         | 262K           | 22B - 235B (Active - Total) | Efficient multilingual, Mixture-of-Experts, instruction-tuned model, optimized for logical reasoning.                          |
-| Qwen Qwen3 Coder 480B A35B | Qwen/Qwen3-Coder-480B-A35B-Instruct       | Text         | 262K           | 35B - 480B (Active - Total) | Mixture-of-Experts model optimized for agentic coding tasks such as function calling, tooling use, and long-context reasoning. |
+| Qwen3 235B A22B-2507       | Qwen/Qwen3-235B-A22B-Instruct-2507        | Text         | 262K           | 22B - 235B (Active - Total) | Efficient multilingual, Mixture-of-Experts, instruction-tuned model, optimized for logical reasoning.                          |
+| Qwen3 Coder 480B A35B | Qwen/Qwen3-Coder-480B-A35B-Instruct       | Text         | 262K           | 35B - 480B (Active - Total) | Mixture-of-Experts model optimized for agentic coding tasks such as function calling, tooling use, and long-context reasoning. |
 | MoonshotAI Kimi K2         | moonshotai/Kimi-K2-Instruct               | Text         | 128K           | 32B - 1T (Active - Total)   | Mixture-of-Experts model optimized for complex tool use, reasoning, and code synthesis.                                        |
 | DeepSeek R1-0528           | deepseek-ai/DeepSeek-R1-0528              | Text         | 161K           | 37B - 680B (Active - Total) | Optimized for precise reasoning tasks including complex coding, math, and structured document analysis.                        |
 | DeepSeek V3-0324           | deepseek-ai/DeepSeek-V3-0324              | Text         | 161K           | 37B - 680B (Active - Total) | Robust Mixture-of-Experts model tailored for high-complexity language processing and comprehensive document analysis.          |
-| Llama 3.1 8B               | meta-llama/Llama-3.1-8B-Instruct          | Text         | 128K           | 8B (Total)                  | Efficient conversational model optimized for responsive multilingual chatbot interactions.                                     |
-| Llama 3.3 70B              | meta-llama/Llama-3.3-70B-Instruct         | Text         | 128K           | 70B (Total)                 | Multilingual model excelling in conversational tasks, detailed instruction-following, and coding.                              |
-| Llama 4 Scout              | meta-llama/Llama-4-Scout-17B-16E-Instruct | Text, Vision | 64K            | 17B - 109B (Active - Total) | Multimodal model integrating text and image understanding, ideal for visual tasks and combined analysis.                       |
-| Phi 4 Mini                 | microsoft/Phi-4-mini-instruct             | Text         | 128K           | 3.8B (Active - Total)       | Compact, efficient model ideal for fast responses in resource-constrained environments.                                        |
+| Meta Llama 3.1 8B               | meta-llama/Llama-3.1-8B-Instruct          | Text         | 128K           | 8B (Total)                  | Efficient conversational model optimized for responsive multilingual chatbot interactions.                                     |
+| Meta Llama 3.3 70B              | meta-llama/Llama-3.3-70B-Instruct         | Text         | 128K           | 70B (Total)                 | Multilingual model excelling in conversational tasks, detailed instruction-following, and coding.                              |
+| Meta Llama 4 Scout              | meta-llama/Llama-4-Scout-17B-16E-Instruct | Text, Vision | 64K            | 17B - 109B (Active - Total) | Multimodal model integrating text and image understanding, ideal for visual tasks and combined analysis.                       |
+| Microsoft Phi 4 Mini 3.8B                | microsoft/Phi-4-mini-instruct             | Text         | 128K           | 3.8B (Active - Total)       | Compact, efficient model ideal for fast responses in resource-constrained environments.                                        |
 
 This guide provides the following information:
 
@@ -115,6 +115,9 @@ To create a chat completion, you will need:
   - `deepseek-ai/DeepSeek-R1-0528`
   - `meta-llama/Llama-4-Scout-17B-16E-Instruct`
   - `microsoft/Phi-4-mini-instruct`
+  - `moonshotai/Kimi-K2-Instruct`
+  - `Qwen/Qwen3-235B-A22B-Instruct-2507`
+  - `Qwen/Qwen3-Coder-480B-A35B-Instruct`
 
 <Tabs groupId="programming-language" queryString>
   <TabItem value="bash" label="Bash" default>
@@ -378,7 +381,7 @@ Navigate to [https://wandb.ai/inference](https://wandb.ai/inference).
 1. Navigate to your W&B account at [https://wandb.ai/](https://wandb.ai/).
 2. From the left sidebar, select **Inference**. A page with available models and model information displays.
 
-![The Inference tab](imgs/inference-ui.png)
+![Using an Inference model in the Playground](imgs/inference-playground-single.png)
 
 #### From the Playground tab
 
