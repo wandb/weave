@@ -8,7 +8,7 @@ import subprocess
 import sys
 import uuid
 from pathlib import Path
-from typing import Annotated, Any, Generic, Literal, TypedDict, Union
+from typing import Annotated, Any, Generic, Literal, NotRequired, TypedDict, Union
 
 from pydantic import BaseModel, Field
 from typing_extensions import Self, TypeVar
@@ -25,7 +25,6 @@ ContentType = Literal["bytes", "text", "base64", "file"]
 
 ValidContentInputs = Union[bytes, str, Path]
 
-
 # This is what is saved to the 'metadata.json' file by serialization layer
 # It is used to 'restore' an existing content object
 class ResolvedContentArgsWithoutData(TypedDict):
@@ -38,12 +37,11 @@ class ResolvedContentArgsWithoutData(TypedDict):
     content_type: ContentType
     input_type: str
 
-    # Optional Fields
-    extra: dict[str, Any] | None
-    path: str | None
-    extension: str | None
-    encoding: str | None
-
+    # Optional fields - can be ommited or None
+    extra: NotRequired[dict[str, Any] | None]
+    path: NotRequired[str | None]
+    extension: NotRequired[str | None]
+    encoding: NotRequired[str | None]
 
 class ResolvedContentArgs(ResolvedContentArgsWithoutData):
     # Required Fields
@@ -78,6 +76,13 @@ class Content(BaseModel, Generic[T]):
     path: str | None = None
     extension: str | None = None
 
+    _last_saved_path: Annotated[
+        str | None,
+        Field(description="Last path the file was saved to"),
+    ] = Field(None, exclude=True)
+    # Not p
+    _last_saved_path: str | None = None
+
     def __init__(
         self,
         path: str | Path,
@@ -102,6 +107,8 @@ class Content(BaseModel, Generic[T]):
             filename=file_name,
             buffer=data,
         )
+
+
 
         # We gather all the resolved arguments...
         resolved_args: ResolvedContentArgs = {
@@ -322,7 +329,7 @@ class Content(BaseModel, Generic[T]):
                   The destination path can be a file or a directory.
                   If dest has no file extension (e.g. .txt), destination will be considered a directory.
         """
-        path = Path(dest) if isinstance(dest, str) else dest
+        path = Path(dest)
 
         if (path.exists() and path.is_dir()) or not path.suffix:
             path = path.joinpath(self.filename)
