@@ -1340,7 +1340,7 @@ class WeaveClient:
     @trace_sentry.global_trace_sentry.watch()
     def delete_call(self, call: Call) -> None:
         self.server.calls_delete(
-            CallsDeleteReq(
+            tsi.CallsDeleteReq(
                 project_id=self._project_id(),
                 call_ids=[call.id],
             )
