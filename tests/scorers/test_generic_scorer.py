@@ -11,7 +11,6 @@ def test_skips_kwargs_parameter_with_column_map():
     parameters to skip: if arg in ("output", "model_output", "kwargs")
     """
 
-    # Create a Scorer with column_map to trigger the code path where the change was made
     class TestScorer(Scorer):
         column_map: dict = {"input_text": "question", "target": "answer"}
 
@@ -21,29 +20,24 @@ def test_skips_kwargs_parameter_with_column_map():
             return {"score": len(input_text) - len(target)}
 
     scorer = TestScorer()
-
-    # Test data - using the mapped column names
     example = {
         "question": "Hello world",  # Maps to input_text
         "answer": "Hello",  # Maps to target
-        "kwargs": {"some": "value"},  # This should be skipped
-        "extra_field": "ignored",  # This should also not appear
+        "kwargs": {"some": "value"},  # Should be skipped
+        "extra_field": "ignored",  # Should be skipped
     }
     model_output = "some output"
 
-    # Call the function
     _, score_args = prepare_scorer_op_args(scorer, example, model_output)
 
-    # Verify that kwargs is not in the score_args
-    assert "kwargs" not in score_args
-
-    # Verify that the expected arguments are included with mapped values
+    # Should be mapped
     assert "input_text" in score_args
     assert "target" in score_args
     assert score_args["input_text"] == "Hello world"  # From the mapped "question"
     assert score_args["target"] == "Hello"  # From the mapped "answer"
 
-    # Verify that extra_field is not included (not in scorer signature)
+    # Should be skipped
+    assert "kwargs" not in score_args
     assert "extra_field" not in score_args
 
     # Verify that output is included (added separately for model output)
@@ -73,13 +67,13 @@ def test_skips_output_and_model_output_parameters():
         scorer_with_output_params, example, model_output
     )
 
-    # Verify that output and model_output are not in score_args
-    assert "output" not in score_args
-    assert "model_output" not in score_args
-
-    # Verify that input_text is included
+    # Should be mapped
     assert "input_text" in score_args
     assert score_args["input_text"] == "Hello world"
+
+    # Should be skipped
+    assert "output" not in score_args
+    assert "model_output" not in score_args
 
 
 def test_all_skipped_parameters_together():
@@ -106,13 +100,13 @@ def test_all_skipped_parameters_together():
 
     _, score_args = prepare_scorer_op_args(comprehensive_scorer, example, model_output)
 
-    # Verify all skipped parameters are absent
-    assert "output" not in score_args
-    assert "model_output" not in score_args
-    assert "kwargs" not in score_args
-
-    # Verify expected parameters are present
+    # Should be mapped
     assert "input_text" in score_args
     assert "target" in score_args
     assert score_args["input_text"] == "test input"
     assert score_args["target"] == "test target"
+
+    # Should be skipped
+    assert "output" not in score_args
+    assert "model_output" not in score_args
+    assert "kwargs" not in score_args
