@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 from typing import Callable, TypedDict
 
 import pytest
@@ -491,3 +492,106 @@ def test_evaluation_no_auto_summarize_with_custom_dict(client):
         "else": 2,
         "output": {"something": 1, "else": 2},
     }
+
+
+def test_evaluation_logger_model_inference_method_handling(client):
+    """Test that EvaluationLogger correctly handles models with and without inference methods.
+
+    This test validates the fix where EvaluationLogger only adds a predict method
+    if the model doesn't already have an inference method.
+    """
+
+    class GeneratedModelWithoutInferenceMethod(Model): ...
+
+    class UserModelWithInferenceMethod(Model):
+        @weave.op
+        def predict(self, text: str, value: int, multiplier: int = 2, **kwargs) -> str:
+            return f"{text}_processed_{value * multiplier}"
+
+    model_generated = GeneratedModelWithoutInferenceMethod()
+    model_user = UserModelWithInferenceMethod()
+
+    # Capture the original method and its signature
+    original_predict = model_user.predict
+    original_signature = inspect.signature(original_predict)
+
+    # 1. For generated models, we should patch on a new predict method
+    ev1 = EvaluationLogger(model=model_generated)
+    infer_method = ev1.model.get_infer_method()
+    assert infer_method is not None
+    assert infer_method.__name__ == "predict"
+
+    # 2a. For user models, we should keep the existing inference method
+    ev2 = EvaluationLogger(model=model_user)
+    assert ev2.model.predict is original_predict
+    assert ev2.model.get_infer_method() is original_predict
+    assert inspect.signature(ev2.model.predict) == original_signature
+
+    # 2b. And the original method should still work with its original signature
+    result = ev2.model.predict("test", value=100, multiplier=3)
+    assert result == "test_processed_300"
+
+    # Verify both cases work for basic prediction logging
+    pred1 = ev1.log_prediction(
+        inputs={"text": "value"},
+        output="result1",
+    )
+    pred1.finish()
+    ev1.finish()
+
+    pred2 = ev2.log_prediction(
+        inputs={"text": "test", "value": 100, "multiplier": 3},
+        output="test_processed_300",
+    )
+    pred2.finish()
+    ev2.finish()
+
+
+def test_evaluation_logger_model_with_different_inference_method_names(client):
+    """Test that EvaluationLogger handles models with different inference method names."""
+    import inspect
+
+    # Test with 'infer' method
+    class ModelWithInfer(Model):
+        @weave.op
+        def infer(self, special_param: str, count: int = 1) -> str:
+            return f"infer_result_{special_param}_{count}"
+
+    # Test with 'forward' method
+    class ModelWithForward(Model):
+        @weave.op
+        def forward(self, data: list, transform: bool = True) -> str:
+            return f"forward_result_{len(data)}_{transform}"
+
+    # Test with 'invoke' method
+    class ModelWithInvoke(Model):
+        @weave.op
+        def invoke(self, query: dict, **options) -> str:
+            return f"invoke_result_{query.get('type', 'default')}"
+
+    models = [ModelWithInfer(), ModelWithForward(), ModelWithInvoke()]
+
+    for model in models:
+        # Verify the model has an inference method
+        infer_method = model.get_infer_method()
+        assert infer_method is not None
+
+        # Capture the original method and signature
+        original_signature = inspect.signature(infer_method)
+
+        # Create evaluation logger - should preserve the existing method
+        ev = EvaluationLogger(model=model)
+
+        # The original inference method should be preserved (not replaced with predict)
+        assert ev.model.get_infer_method() is infer_method
+
+        # The signature should be completely unchanged
+        final_signature = inspect.signature(ev.model.get_infer_method())
+        assert final_signature == original_signature
+
+        # Test that basic logging works
+        pred = ev.log_prediction(
+            inputs={"value": "test"}, output=f"result_from_{infer_method.__name__}"
+        )
+        pred.finish()
+        ev.finish()
