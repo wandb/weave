@@ -394,11 +394,6 @@ class EvaluationLogger(BaseModel):
             assert isinstance(self.model, Model)
             self.model.get_infer_method()
         except MissingInferenceMethodError:
-            has_infer_method = False
-        else:
-            has_infer_method = True
-
-        if not has_infer_method:
 
             @weave.op(name="Model.predict", enable_code_capture=False)
             def predict(self: Model, inputs: dict) -> Any:
