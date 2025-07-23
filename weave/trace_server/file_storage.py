@@ -132,10 +132,8 @@ def store_in_bucket(
         target_file_storage_uri = client.base_uri.with_path(path)
         client.store(target_file_storage_uri, data)
     except Exception as e:
-        logger.exception(
-            "Failed to store file at %s: %s", target_file_storage_uri, str(e)
-        )
-        raise FileStorageWriteError(f"Failed to store file at {path}: {str(e)}") from e
+        logger.exception("Failed to store file at %s", target_file_storage_uri)
+        raise FileStorageWriteError(f"Failed to store file at {path}: {e!s}") from e
     return target_file_storage_uri
 
 
@@ -146,13 +144,13 @@ def read_from_bucket(
     try:
         return client.read(file_storage_uri)
     except Exception as e:
-        logger.exception("Failed to read file from %s: %s", file_storage_uri, str(e))
+        logger.exception("Failed to read file from %s", file_storage_uri)
         raise FileStorageReadError(
-            f"Failed to read file from {file_storage_uri}: {str(e)}"
+            f"Failed to read file from {file_storage_uri}: {e!s}"
         ) from e
 
 
-### Everything below here is interal
+### Everything below here is internal
 
 
 def key_for_project_digest(project_id: str, digest: str) -> str:

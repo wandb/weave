@@ -1,18 +1,29 @@
 default_stages: [pre-push]
 
 repos:
+  - repo: https://github.com/Instagram/Fixit
+    rev: v2.1.0
+    hooks:
+      - id: fixit-fix
+        exclude: "(weave_query|weave-js)"
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.4.8
+    rev: v0.12.3
     hooks:
       # Run the linter.
-      - id: ruff
+      - id: ruff-check
         types_or: [python, pyi, jupyter]
         args: [--fix, --exit-non-zero-on-fix, --config=pyproject.toml]
       # Run the formatter.
       - id: ruff-format
+        args: [--config=pyproject.toml]
         types_or: [python, pyi, jupyter]
+  - repo: https://github.com/RobertCraigie/pyright-python
+    rev: v1.1.387
+    hooks:
+      - id: pyright
+        additional_dependencies: [".[tests]"]
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: "v1.10.0"
+    rev: "v1.17.0"
     hooks:
       - id: mypy
         additional_dependencies:
@@ -20,13 +31,33 @@ repos:
         # Note: You have to update pyproject.toml[tool.mypy] too!
         args: ["--config-file=pyproject.toml"]
         exclude: (.*pyi$)|(weave_query)|(tests)|(examples)
-  - repo: https://github.com/RobertCraigie/pyright-python
-    rev: v1.1.387
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
     hooks:
-      - id: pyright
-        additional_dependencies: [".[tests]"]
-
-  # This is legacy Weave when we were building a notebook product - should be removed
+      # https://github.com/pre-commit/pre-commit-hooks?tab=readme-ov-file#check-added-large-files
+      - id: check-added-large-files
+        args: ["--maxkb=2048"]
+      # https://github.com/pre-commit/pre-commit-hooks?tab=readme-ov-file#check-json
+      - id: check-json
+        exclude: (.*pyi$)|(weave_query)|(tests)|(examples)
+      # https://github.com/pre-commit/pre-commit-hooks?tab=readme-ov-file#check-yaml
+      - id: check-yaml
+      # https://github.com/pre-commit/pre-commit-hooks?tab=readme-ov-file#detect-private-key
+      - id: detect-private-key
+      # https://github.com/pre-commit/pre-commit-hooks?tab=readme-ov-file#debug-statements
+      - id: debug-statements
+  - repo: https://github.com/crate-ci/typos
+    rev: v1.34.0
+    hooks:
+      - id: typos
+        # Excluding extra things to make initial reviews easier, starting with `examples``
+        exclude: "(weave_query|weave-js|cassettes|examples|tests|tools|docs)"
+  - repo: https://github.com/oxipng/oxipng
+    rev: v9.1.5
+    hooks:
+      - id: oxipng
+        args: ["-o", "2", "--strip", "safe", "--alpha"]
+        exclude: (weave_query|weave-js)
   - repo: local
     hooks:
       - id: jupyter-nb-clear-output

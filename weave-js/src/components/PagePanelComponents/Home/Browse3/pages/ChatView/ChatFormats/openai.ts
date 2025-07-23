@@ -145,11 +145,21 @@ export const normalizeOAIResponsesRequest = (request: any): ChatRequest => {
   const input = request['input'];
   const messages = _.isString(input)
     ? [{role: 'user', content: input}]
-    : input.map((msg: ResponseUserMessage | OpenAIResponseMessage) => {
+    : input.flatMap((msg: ResponseUserMessage | OpenAIResponseMessage) => {
         if ('type' in msg) {
-          return responseMessageToMessage(msg);
+          const result = responseMessageToMessage(msg);
+          return result ? [result] : [];
         }
-        return msg;
+        // Handle input messages with content array containing input_text
+        if ('content' in msg && Array.isArray(msg.content)) {
+          return msg.content
+            .filter((c: any) => c.type === 'input_text' && c.text)
+            .map((c: any) => ({
+              role: msg.role,
+              content: c.text,
+            }));
+        }
+        return [msg];
       });
 
   if ('instructions' in request) {

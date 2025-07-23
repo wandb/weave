@@ -152,7 +152,7 @@ def ensure_clickhouse_db_process_running(
                 )
 
         except Exception as e:
-            pytest.fail(f"Failed to start ClickHouse server process: {str(e)}")
+            pytest.fail(f"Failed to start ClickHouse server process: {e!s}")
 
     def cleanup():
         if (

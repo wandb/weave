@@ -548,7 +548,7 @@ class Grid:
 
         height = get_terminal_height()
         if self.num_rows < height:
-            print(self.to_rich_table_str())  # noqa: T201
+            print(self.to_rich_table_str())
             return
 
         height -= 2  # Adjust for pagination and navigation instructions
