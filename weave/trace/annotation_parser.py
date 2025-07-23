@@ -14,21 +14,22 @@ CONTENT_CLASS_NAME = "weave.type_wrappers.Content.content.Content"
 # Example: "typing.Annotated[str, weave.type_handlers.Content.content.Content[Literal['pdf']]'>]"
 PATTERN_WITH_TYPE_HINT = re.compile(
     r"(?:\w+(?:\.\w+)*\.)?Annotated\["  # Optional module prefix for Annotated
-    r"(.+?),\s*"                      # Group 1: Base type (non-greedy)
+    r"(.+?),\s*"  # Group 1: Base type (non-greedy)
     rf"<class '{re.escape(CONTENT_CLASS_NAME)}\["
     r"[^\]]*Literal\[['\"](.+?)['\"]\]"  # Group 2: Any literal, non-greedy
-    r"\]'>"                          # Closing bracket for Content[...] and class
-    r"\]"                            # Closing bracket for Annotated[...]
+    r"\]'>"  # Closing bracket for Content[...] and class
+    r"\]"  # Closing bracket for Annotated[...]
 )
 
 # Content annotation without a format specifier
 # Example: typing.Annotated[SomePathLikeType, <class 'weave.type_handlers.Content.content.Content'>]"
 PATTERN_WITHOUT_TYPE_HINT = re.compile(
     r"(?:\w+(?:\.\w+)*\.)?Annotated\["  # Optional module prefix for Annotated
-    r"(.+?),\s*"                      # Group 1: Base type (non-greedy)
+    r"(.+?),\s*"  # Group 1: Base type (non-greedy)
     rf"<class '{re.escape(CONTENT_CLASS_NAME)}'>"
-    r"\]"                            # Closing bracket for Annotated[...]
+    r"\]"  # Closing bracket for Annotated[...]
 )
+
 
 class ContentAnnotation(BaseModel):
     base_type: str
