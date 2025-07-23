@@ -402,8 +402,6 @@ Once you've [selected a model using one of the access options](#access-the-infer
 - [Save and reuse a model with custom settings](../tools/playground.md#saved-models)
 - [Compare multiple models](#compare-multiple-models)
 
-![Using an Inference model in the Playground](imgs/inference-playground-single.png)
-
 ### Compare multiple models
 
 You can compare multiple Inference models in the Playground. The Compare view can be accessed from two different locations:
