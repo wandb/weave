@@ -157,7 +157,12 @@ class Content(BaseModel, Generic[T]):
         digest = hashlib.sha256(data).hexdigest()
         size = len(data)
         mimetype, extension = get_mime_and_extension(
-            mimetype=mimetype, extension=extension, filename=None, buffer=data
+            mimetype=mimetype,
+            extension=extension,
+            filename=None,
+            buffer=data,
+            default_mimetype="text/plain",
+            default_extension=".txt"
         )
         filename = default_filename(
             extension=extension, mimetype=mimetype, digest=digest

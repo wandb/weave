@@ -7,6 +7,8 @@ from io import BytesIO
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from puremagic import PureError
+
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
@@ -24,6 +26,7 @@ except (ImportError, ModuleNotFoundError) as e:
 # If the data is smaller than 2048 just use the entire thing
 MIME_DETECTION_BUFFER_SIZE = 2048
 
+mimetypes.add_type('text/markdown', '.md')
 
 def full_name(obj: Any) -> str:
     cls = obj.__class__
@@ -80,7 +83,10 @@ def guess_from_buffer(buffer: bytes) -> str | None:
     if not MAGIC_LIB_AVAILABLE:
         return None
 
-    match = puremagic.magic_stream(BytesIO(buffer))[0]
+    try:
+        match = puremagic.magic_stream(BytesIO(buffer))[0]
+    except PureError:
+        return None
     return match.mime_type
 
 
@@ -105,6 +111,8 @@ def get_mime_and_extension(
     extension: str | None,
     filename: str | None,
     buffer: bytes | None,
+    default_mimetype: str = "application/octet-stream",
+    default_extension: str = "",
 ) -> tuple[str, str]:
     if extension is not None:
         extension = f".{extension.lstrip('.')}"
@@ -112,6 +120,9 @@ def get_mime_and_extension(
         return mimetype, extension
     elif mimetype and not extension:
         return mimetype, get_extension_from_mimetype(mimetype)
+    elif extension and not mimetype:
+        if guessed := guess_from_extension(extension):
+            return guessed, extension
 
     if filename is not None:
         mimetype = guess_from_filename(filename)
@@ -136,4 +147,4 @@ def get_mime_and_extension(
         if idx != -1:
             extension = filename[idx:]
 
-    return "application/octet-stream", ""
+    return default_mimetype, default_extension
