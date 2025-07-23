@@ -92,7 +92,7 @@ class Content(BaseModel, Generic[T]):
         str | None, Field(description="Last path the file was saved to")
     ] = None
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         """
         Direct initialization is disabled.
         Please use a classmethod like `Content.from_path()` to create an instance.
