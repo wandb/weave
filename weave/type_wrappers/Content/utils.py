@@ -25,7 +25,7 @@ except (ImportError, ModuleNotFoundError) as e:
 MIME_DETECTION_BUFFER_SIZE = 2048
 
 
-def full_name(obj: Any):
+def full_name(obj: Any) -> str:
     cls = obj.__class__
     module = cls.__module__
     if module == "builtins":

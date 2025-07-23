@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import logging
 
 from weave.trace.serialization import serializer
 from weave.trace.serialization.custom_objs import MemTraceFilesArtifact
@@ -12,8 +11,6 @@ from weave.type_wrappers.Content.content import (
     ResolvedContentArgs,
     ResolvedContentArgsWithoutData,
 )
-
-logger = logging.getLogger(__name__)
 
 
 def save(obj: Content, artifact: MemTraceFilesArtifact, name: str) -> None:
