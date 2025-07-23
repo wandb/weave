@@ -501,28 +501,30 @@ def test_evaluation_logger_model_inference_method_handling(client):
     if the model doesn't already have an inference method.
     """
 
-    class GeneratedModelWithoutInferenceMethod(Model): ...
-
     class UserModelWithInferenceMethod(Model):
         @weave.op
         def predict(self, text: str, value: int, multiplier: int = 2, **kwargs) -> str:
             return f"{text}_processed_{value * multiplier}"
 
-    model_generated = GeneratedModelWithoutInferenceMethod()
-    model_user = UserModelWithInferenceMethod()
+    user_defined_model = UserModelWithInferenceMethod()
 
     # Capture the original method and its signature
-    original_predict = model_user.predict
+    original_predict = user_defined_model.predict
     original_signature = inspect.signature(original_predict)
 
-    # 1. For generated models, we should patch on a new predict method
-    ev1 = EvaluationLogger(model=model_generated)
+    # 1a. For generated models, we should patch on a new predict method
+    ev1 = EvaluationLogger()
     infer_method = ev1.model.get_infer_method()
     assert infer_method is not None
     assert infer_method.__name__ == "predict"
 
+    # 1b. And logging should work
+    pred1 = ev1.log_prediction(inputs={"text": "value"}, output="result1")
+    pred1.finish()
+    ev1.finish()
+
     # 2a. For user models, we should keep the existing inference method
-    ev2 = EvaluationLogger(model=model_user)
+    ev2 = EvaluationLogger(model=user_defined_model)
     assert ev2.model.predict is original_predict
     assert ev2.model.get_infer_method() is original_predict
     assert inspect.signature(ev2.model.predict) == original_signature
@@ -531,14 +533,7 @@ def test_evaluation_logger_model_inference_method_handling(client):
     result = ev2.model.predict("test", value=100, multiplier=3)
     assert result == "test_processed_300"
 
-    # Verify both cases work for basic prediction logging
-    pred1 = ev1.log_prediction(
-        inputs={"text": "value"},
-        output="result1",
-    )
-    pred1.finish()
-    ev1.finish()
-
+    # 2c. And logging should work
     pred2 = ev2.log_prediction(
         inputs={"text": "test", "value": 100, "multiplier": 3},
         output="test_processed_300",
