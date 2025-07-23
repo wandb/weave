@@ -391,6 +391,7 @@ class EvaluationLogger(BaseModel):
         # --- Setup the model object ---
         # Only modify the predict method if the model doesn't already have one
         try:
+            assert isinstance(self.model, Model)
             self.model.get_infer_method()
         except MissingInferenceMethodError:
             has_infer_method = False
