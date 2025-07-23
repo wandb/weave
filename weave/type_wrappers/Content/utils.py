@@ -49,7 +49,7 @@ def is_valid_path(input: str | Path) -> bool:
         input = Path(input)
     try:
         return input.exists() and input.is_file()
-    except Exception as _:
+    except Exception:
         return False
 
 
