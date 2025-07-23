@@ -91,7 +91,7 @@ def json_dump_field_as_sql(
         if extra_path:
             param_name = pb.add_param(quote_json_path_parts(extra_path))
             path_str = param_slot(param_name, "String")
-        val = f"JSON_VALUE({root_field_sanitized}, {path_str})"
+        val = f"coalesce(nullIf(JSON_VALUE({root_field_sanitized}, {path_str}), 'null'), '')"
         return clickhouse_cast(val, cast)
     else:
         # Note: ClickHouse has limitations in distinguishing between null, non-existent, empty string, and "null".
