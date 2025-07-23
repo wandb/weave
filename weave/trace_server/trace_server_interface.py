@@ -1145,6 +1145,9 @@ class EvaluateModelReq(BaseModel):
     evaluation_ref: str
     model_ref: str
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    # Fixes the following warning:
+    # UserWarning: Field "model_ref" has conflict with protected namespace "model_".
+    model_config = ConfigDict(protected_namespaces=())
 
 
 class EvaluateModelRes(BaseModel):
