@@ -158,6 +158,9 @@ To create a chat completion, you will need:
     # deepseek-ai/DeepSeek-R1-0528
     # meta-llama/Llama-4-Scout-17B-16E-Instruct
     # microsoft/Phi-4-mini-instruct
+    # moonshotai/Kimi-K2-Instruct
+    # Qwen/Qwen3-235B-A22B-Instruct-2507
+    # Qwen/Qwen3-Coder-480B-A35B-Instruct
 
     response = client.chat.completions.create(
         model="<model-id>",
