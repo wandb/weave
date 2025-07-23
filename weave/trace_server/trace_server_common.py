@@ -32,6 +32,7 @@ def make_feedback_query_req(
     feedback_query_req = tsi.FeedbackQueryReq(
         project_id=project_id,
         fields=[
+            "id",
             "feedback_type",
             "weave_ref",
             "payload",

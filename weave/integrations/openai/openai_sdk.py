@@ -90,11 +90,11 @@ def openai_on_finish_post_processor(value: ChatCompletionChunk | None) -> dict |
         if tool_calls is None:
             return tool_calls
 
-        _tool_calls = []
+        tool_calls_ = []
         if isinstance(tool_calls, list):
             for tool_call in tool_calls:
                 assert isinstance(tool_call, ChoiceDeltaToolCall)
-                _tool_calls.append(
+                tool_calls_.append(
                     ChatCompletionMessageToolCall(
                         id=tool_call.id,
                         type=tool_call.type,
@@ -104,7 +104,7 @@ def openai_on_finish_post_processor(value: ChatCompletionChunk | None) -> dict |
                         ),
                     )
                 )
-        return _tool_calls
+        return tool_calls_
 
     dump = None
     if isinstance(value, ChatCompletionChunk):

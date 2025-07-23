@@ -19,14 +19,17 @@ To learn more, see the [pricing page](https://wandb.ai/site/pricing/) and [W&B I
 
 Using Weave, you can trace, evaluate, monitor, and iterate on your W&B Inference-powered applications.
 
-| Model            | Model ID (for API usage)                                     | Type(s)       | Context Window | Parameters                  | Description                                                                 |
-|------------------|-----------------------------------------------|---------------|----------------|-----------------------------|-----------------------------------------------------------------------------|
-| DeepSeek R1-0528 | deepseek-ai/DeepSeek-R1-0528                  | Text          | 161K           | 37B - 680B (Active - Total) | Optimized for precise reasoning tasks including complex coding, math, and structured document analysis. |
-| DeepSeek V3-0324 | deepseek-ai/DeepSeek-V3-0324                  | Text          | 161K           | 37B - 680B (Active - Total) | Robust Mixture-of-Experts model tailored for high-complexity language processing and comprehensive document analysis. |
-| Llama 3.1 8B     | meta-llama/Llama-3.1-8B-Instruct              | Text          | 128K           | 8B (Total)                  | Efficient conversational model optimized for responsive multilingual chatbot interactions. |
-| Llama 3.3 70B    | meta-llama/Llama-3.3-70B-Instruct             | Text          | 128K           | 70B (Total)                 | Multilingual model excelling in conversational tasks, detailed instruction-following, and coding. |
-| Llama 4 Scout    | meta-llama/Llama-4-Scout-17B-16E-Instruct     | Text, Vision  | 64K            | 17B - 109B (Active - Total) | Multimodal model integrating text and image understanding, ideal for visual tasks and combined analysis. |
-| Phi 4 Mini       | microsoft/Phi-4-mini-instruct                | Text          | 128K           | 3.8B (Active - Total)       | Compact, efficient model ideal for fast responses in resource-constrained environments. |
+| Model                      | Model ID (for API usage)                  | Type(s)      | Context Window | Parameters                  | Description                                                                                                                    |
+| -------------------------- | ----------------------------------------- | ------------ | -------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Qwen Qwen3 235B A22B       | Qwen/Qwen3-235B-A22B-Instruct-2507        | Text         | 262K           | 22B - 235B (Active - Total) | Efficient multilingual, Mixture-of-Experts, instruction-tuned model, optimized for logical reasoning.                          |
+| Qwen Qwen3 Coder 480B A35B | Qwen/Qwen3-Coder-480B-A35B-Instruct       | Text         | 262K           | 35B - 480B (Active - Total) | Mixture-of-Experts model optimized for agentic coding tasks such as function calling, tooling use, and long-context reasoning. |
+| MoonshotAI Kimi K2         | moonshotai/Kimi-K2-Instruct               | Text         | 128K           | 32B - 1T (Active - Total)   | Mixture-of-Experts model optimized for complex tool use, reasoning, and code synthesis.                                        |
+| DeepSeek R1-0528           | deepseek-ai/DeepSeek-R1-0528              | Text         | 161K           | 37B - 680B (Active - Total) | Optimized for precise reasoning tasks including complex coding, math, and structured document analysis.                        |
+| DeepSeek V3-0324           | deepseek-ai/DeepSeek-V3-0324              | Text         | 161K           | 37B - 680B (Active - Total) | Robust Mixture-of-Experts model tailored for high-complexity language processing and comprehensive document analysis.          |
+| Llama 3.1 8B               | meta-llama/Llama-3.1-8B-Instruct          | Text         | 128K           | 8B (Total)                  | Efficient conversational model optimized for responsive multilingual chatbot interactions.                                     |
+| Llama 3.3 70B              | meta-llama/Llama-3.3-70B-Instruct         | Text         | 128K           | 70B (Total)                 | Multilingual model excelling in conversational tasks, detailed instruction-following, and coding.                              |
+| Llama 4 Scout              | meta-llama/Llama-4-Scout-17B-16E-Instruct | Text, Vision | 64K            | 17B - 109B (Active - Total) | Multimodal model integrating text and image understanding, ideal for visual tasks and combined analysis.                       |
+| Phi 4 Mini                 | microsoft/Phi-4-mini-instruct             | Text         | 128K           | 3.8B (Active - Total)       | Compact, efficient model ideal for fast responses in resource-constrained environments.                                        |
 
 This guide provides the following information:
 
@@ -35,8 +38,8 @@ This guide provides the following information:
 - [API specification](#api-specification)
   - [Endpoint](#endpoint)
   - [Available methods](#available-methods)
-      - [Chat completions](#chat-completions)
-      - [List supported models](#list-supported-models)
+    - [Chat completions](#chat-completions)
+    - [List supported models](#list-supported-models)
 - [Usage examples](#usage-examples)
 - [UI](#ui)
   - [Access the Inference service](#access-the-inference-service)
@@ -52,7 +55,7 @@ The following prerequisites are required to access the W&B Inference service via
 
 1. A W&B account. Sign up [here](https://app.wandb.ai/login?signup=true&_gl=1*1yze8dp*_ga*ODIxMjU5MTk3LjE3NDk0OTE2NDM.*_ga_GMYDGNGKDT*czE3NDk4NDYxMzgkbzEyJGcwJHQxNzQ5ODQ2MTM4JGo2MCRsMCRoMA..*_ga_JH1SJHJQXJ*czE3NDk4NDU2NTMkbzI1JGcxJHQxNzQ5ODQ2MTQ2JGo0NyRsMCRoMA..*_gcl_au*MTE4ODk1MzY1OC4xNzQ5NDkxNjQzLjk1ODA2MjQwNC4xNzQ5NTgyMTUzLjE3NDk1ODIxNTM.).
 2. A W&B API key. Get your API key at [https://wandb.ai/authorize](https://wandb.ai/authorize).
-3. A W&B project. 
+3. A W&B project.
 4. If you are using the Inference service via Python, see [Additional prerequisites for using the API via Python](#additional-prerequisites-for-using-the-api-via-python).
 
 ### Additional prerequisites for using the API via Python
@@ -64,14 +67,14 @@ pip install openai weave
 ```
 
 :::note
-The `weave` library is only required if you'll be using Weave to trace your LLM applications. For information on getting started with Weave, see the [Weave Quickstart](../../quickstart.md). 
+The `weave` library is only required if you'll be using Weave to trace your LLM applications. For information on getting started with Weave, see the [Weave Quickstart](../../quickstart.md).
 
 For usage examples demonstrating how to use the W&B Inference service with Weave, see the [API usage examples](#usage-examples).
 :::
 
 ## API specification
 
-The following section provides API specification information and API usage examples. 
+The following section provides API specification information and API usage examples.
 
 - [Endpoint](#endpoint)
 - [Available methods](#available-methods)
@@ -163,6 +166,7 @@ To create a chat completion, you will need:
 
     print(response.choices[0].message.content)
     ```
+
   </TabItem>
 </Tabs>
 
@@ -194,6 +198,7 @@ Use the API to query all currently available models and their IDs. This is usefu
     for model in response.data:
         print(model.id)
     ```
+
   </TabItem>
 </Tabs>
 
@@ -202,7 +207,7 @@ Use the API to query all currently available models and their IDs. This is usefu
 This section provides several examples demonstrating how to use W&B Inference with Weave:
 
 - [Basic example: Trace Llama 3.1 8B with Weave](#basic-example-trace-llama-31-8b-with-weave)
-- [Advanced example: Use Weave Evaluations and Leaderboards with the inference service](#advanced-example-use-weave-evaluations-and-leaderboards-with-the-inference-service) 
+- [Advanced example: Use Weave Evaluations and Leaderboards with the inference service](#advanced-example-use-weave-evaluations-and-leaderboards-with-the-inference-service)
 
 ### Basic example: Trace Llama 3.1 8B with Weave
 
@@ -390,7 +395,7 @@ Navigate to [https://wandb.ai/inference](https://wandb.ai/inference).
 Once you've [selected a model using one of the access options](#access-the-inference-service), you can try the model in Playground. The following actions are available:
 
 - [Customize model settings and parameters](../tools/playground.md#customize-settings)
-- [Add, retry, edit, and delete messages](../tools/playground.md#message-controls) 
+- [Add, retry, edit, and delete messages](../tools/playground.md#message-controls)
 - [Save and reuse a model with custom settings](../tools/playground.md#saved-models)
 - [Compare multiple models](#compare-multiple-models)
 
@@ -403,12 +408,12 @@ You can compare multiple Inference models in the Playground. The Compare view ca
 - [Access the Compare view from the Inference tab ](#access-the-compare-view-from-the-inference-tab)
 - [Access the Compare view from the Playground tab](#access-the-compare-view-from-the-playground-tab)
 
-#### Access the Compare view from the Inference tab 
+#### Access the Compare view from the Inference tab
 
 1. From the left sidebar, select **Inference**. A page with available models and model information displays.
 2. To select models for comparison, click anywhere on a model card (except for the model name). The border of the model card is highlighted in blue to indicate the selection.
 3. Repeat step 2 for each model you want to compare.
-4. In any of the selected cards, click the **Compare N models in the Playground** button (`N` is the number of models you are comparing. For example, when 3 models are selected, the button displays as **Compare 3 models in the Playground**). The comparison view opens. 
+4. In any of the selected cards, click the **Compare N models in the Playground** button (`N` is the number of models you are comparing. For example, when 3 models are selected, the button displays as **Compare 3 models in the Playground**). The comparison view opens.
 
 Now, you can compare models in the Playground, and use any of the features described in [Try a model in the Playground](#try-a-model-in-the-playground).
 
@@ -421,7 +426,7 @@ Now, you can compare models in the Playground, and use any of the features descr
 3. From the dropdown, select **Compare**. The **Inference** tab displays.
 4. To select models for comparison, click anywhere on a model card (except for the model name). The border of the model card is highlighted in blue to indicate the selection.
 5. Repeat step 4 for each model you want to compare.
-6. In any of the selected cards, click the **Compare N models in the Playground** button (`N` is the number of models you are comparing. For example, when 3 models are selected, the button displays as **Compare 3 models in the Playground**). The comparison view opens. 
+6. In any of the selected cards, click the **Compare N models in the Playground** button (`N` is the number of models you are comparing. For example, when 3 models are selected, the button displays as **Compare 3 models in the Playground**). The comparison view opens.
 
 Now, you can compare models in the Playground, and use any of the features described in [Try a model in the Playground](#try-a-model-in-the-playground).
 
@@ -431,6 +436,7 @@ Organization admins can track current Inference credit balance, usage history, a
 
 1. In the W&B UI, navigate to the W&B **Billing** page.
 2. In the bottom righthand corner, the Inference billing information card is displayed. From here, you can:
+
 - Click the **View usage** button in the Inference billing information card to view your usage over time.
 - If you're on a paid plan, view your upcoming inference charges.
 
@@ -438,7 +444,7 @@ Organization admins can track current Inference credit balance, usage history, a
 Visit the [Inference pricing page for a breakdown of per-model pricing](https://wandb.ai/site/pricing/inference)
 :::
 
-## Usage information and limits 
+## Usage information and limits
 
 The following section describes important usage information and limits. Familiarize yourself with this information before using the service.
 
@@ -454,7 +460,7 @@ To ensure fair usage and stable performance, the W&B Inference API enforces rate
 - Ensure access for all users
 - Manage infrastructure load effectively
 
-If a rate limit is exceeded, the API will return a `429 Concurrency limit reached for requests` response. To resolve this error, reduce the number of concurrent requests. 
+If a rate limit is exceeded, the API will return a `429 Concurrency limit reached for requests` response. To resolve this error, reduce the number of concurrent requests.
 
 ### Pricing
 
@@ -462,11 +468,11 @@ For model pricing information, visit [https://wandb.ai/site/pricing/inference](h
 
 ## API errors
 
-| Error Code | Message                                                                     | Cause                                           | Solution                                                                               |
-| ---------- | --------------------------------------------------------------------------- | ----------------------------------------------- | -------------------------------------------------------------------------------------- |
-| 401        | Invalid Authentication                                                      | Invalid authentication credentials or your W&B project entity and/or name are incorrect.              | Ensure the correct API key is being used and/or that your W&B project name and entity are correct.                                              |
-| 403        | Country, region, or territory not supported                                 | Accessing the API from an unsupported location. | Please see [Geographic restrictions](#geographic-restrictions)                                       |
-| 429        | Concurrency limit reached for requests                                      | Too many concurrent requests.                   | Reduce the number of concurrent requests.               |
-| 429        | You exceeded your current quota, please check your plan and billing details | Out of credits or reached monthly spending cap. | Purchase more credits or increase your limits.                       |
-| 500        | The server had an error while processing your request                       | Internal server error.                          | Retry after a brief wait and contact support if it persists. |
-| 503        | The engine is currently overloaded, please try again later                  | Server is experiencing high traffic.            | Retry your request after a short delay.                                                |
+| Error Code | Message                                                                     | Cause                                                                                    | Solution                                                                                           |
+| ---------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| 401        | Invalid Authentication                                                      | Invalid authentication credentials or your W&B project entity and/or name are incorrect. | Ensure the correct API key is being used and/or that your W&B project name and entity are correct. |
+| 403        | Country, region, or territory not supported                                 | Accessing the API from an unsupported location.                                          | Please see [Geographic restrictions](#geographic-restrictions)                                     |
+| 429        | Concurrency limit reached for requests                                      | Too many concurrent requests.                                                            | Reduce the number of concurrent requests.                                                          |
+| 429        | You exceeded your current quota, please check your plan and billing details | Out of credits or reached monthly spending cap.                                          | Purchase more credits or increase your limits.                                                     |
+| 500        | The server had an error while processing your request                       | Internal server error.                                                                   | Retry after a brief wait and contact support if it persists.                                       |
+| 503        | The engine is currently overloaded, please try again later                  | Server is experiencing high traffic.                                                     | Retry your request after a short delay.                                                            |

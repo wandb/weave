@@ -5,7 +5,7 @@ from openai import OpenAI
 import weave
 
 
-@weave.op()
+@weave.op
 def extract_fruit(sentence: str) -> dict:
     client = OpenAI()
 

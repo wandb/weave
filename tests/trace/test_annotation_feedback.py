@@ -470,7 +470,7 @@ def test_annotation_feedback_sdk(client):
     ref = weave.publish(number_spec, "number spec")
     assert ref
 
-    @weave.op()
+    @weave.op
     def do_call():
         return 3
 

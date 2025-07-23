@@ -39,7 +39,7 @@ class Scorer(Object):
     def score(self, *, output: Any, **kwargs: Any) -> Any:
         raise NotImplementedError
 
-    @weave.op()
+    @weave.op
     def summarize(self, score_rows: list) -> Optional[dict]:
         return auto_summarize(score_rows)
 
@@ -305,7 +305,7 @@ def preparer_scorer_op_args(
 
         # Build arguments dictionary using column mapping
         for arg in score_arg_names:
-            if arg == "output" or arg == "model_output":
+            if arg in ("output", "model_output", "kwargs"):
                 continue
             if arg in example:
                 score_args[arg] = example[arg]

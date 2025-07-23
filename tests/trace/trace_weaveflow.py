@@ -9,12 +9,12 @@ import weave
 weave.init("weave_memo_5")
 
 
-@weave.type()
+@weave.type
 class CustomObject:
     a: int
 
 
-@weave.op()
+@weave.op
 def custom_object_adder(a: CustomObject, b: CustomObject) -> CustomObject:
     print("hello")
     return CustomObject(a.a + b.a)
