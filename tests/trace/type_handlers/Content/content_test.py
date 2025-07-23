@@ -131,8 +131,8 @@ class TestWeaveContent:
         """Test creating Content from pathlib.Path object."""
         file_path = request.getfixturevalue(fixture_name)
 
-        # Test Content() with Path object
-        content = Content(file_path)
+        # Test Content.from_path() with Path object
+        content = Content.from_path(file_path)
         assert content is not None
         assert content.extension == extension
         assert content.mimetype == mimetype

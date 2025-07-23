@@ -3,18 +3,15 @@ from __future__ import annotations
 import base64
 import logging
 import mimetypes
-from io import BytesIO
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
-
-from puremagic import PureError
 
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    import puremagic
+    from polyfile.magic import MagicMatcher
 try:
-    import puremagic
+    from polyfile.magic import MagicMatcher
 
     MAGIC_LIB_AVAILABLE = True
 except (ImportError, ModuleNotFoundError) as e:
@@ -26,6 +23,7 @@ except (ImportError, ModuleNotFoundError) as e:
 # If the data is smaller than 2048 just use the entire thing
 MIME_DETECTION_BUFFER_SIZE = 2048
 
+# Mimetypes is missing text/markdown
 mimetypes.add_type("text/markdown", ".md")
 
 
@@ -84,11 +82,9 @@ def guess_from_buffer(buffer: bytes) -> str | None:
     if not MAGIC_LIB_AVAILABLE:
         return None
 
-    try:
-        match = puremagic.magic_stream(BytesIO(buffer))[0]
-    except PureError:
-        return None
-    return match.mime_type
+    if res := next(MagicMatcher.DEFAULT_INSTANCE.match(buffer)).mimetypes[0]:
+        return res
+    return None
 
 
 def guess_from_filename(filename: str) -> str | None:
@@ -119,8 +115,12 @@ def get_mime_and_extension(
         extension = f".{extension.lstrip('.')}"
     if mimetype and extension:
         return mimetype, extension
-    elif mimetype and not extension:
-        return mimetype, get_extension_from_mimetype(mimetype)
+    elif (
+        mimetype
+        and not extension
+        and (guessed := get_extension_from_mimetype(mimetype))
+    ):
+        return mimetype, guessed
     elif extension and not mimetype and (guessed := guess_from_extension(extension)):
         return guessed, extension
 
@@ -135,12 +135,13 @@ def get_mime_and_extension(
         return mimetype, extension
     elif mimetype and not extension:
         return mimetype, get_extension_from_mimetype(mimetype)
+
     elif not MAGIC_LIB_AVAILABLE:
         logger.warning(
             "Failed to determine MIME type from file extension and cannot infer from data\n"
-            "MIME type detection from raw data requires the puremagic library\n"
-            "Install it by running: `pip install puremagic`\n"
-            "See: https://pypi.org/project/puremagic for detailed instructions"
+            "MIME type detection from raw data requires the polyfile library\n"
+            "Install it by running: `pip install polyfile `\n"
+            "See: https://pypi.org/project/polyfile for detailed instructions"
         )
     if filename is not None:
         idx = filename.rfind(".")
