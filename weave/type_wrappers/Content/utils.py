@@ -26,7 +26,8 @@ except (ImportError, ModuleNotFoundError) as e:
 # If the data is smaller than 2048 just use the entire thing
 MIME_DETECTION_BUFFER_SIZE = 2048
 
-mimetypes.add_type('text/markdown', '.md')
+mimetypes.add_type("text/markdown", ".md")
+
 
 def full_name(obj: Any) -> str:
     cls = obj.__class__
@@ -120,9 +121,8 @@ def get_mime_and_extension(
         return mimetype, extension
     elif mimetype and not extension:
         return mimetype, get_extension_from_mimetype(mimetype)
-    elif extension and not mimetype:
-        if guessed := guess_from_extension(extension):
-            return guessed, extension
+    elif extension and not mimetype and (guessed := guess_from_extension(extension)):
+        return guessed, extension
 
     if filename is not None:
         mimetype = guess_from_filename(filename)

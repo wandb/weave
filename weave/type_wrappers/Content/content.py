@@ -92,7 +92,7 @@ class Content(BaseModel, Generic[T]):
         str | None, Field(description="Last path the file was saved to")
     ] = None
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         """
         Direct initialization is disabled.
         Please use a classmethod like `Content.from_path()` to create an instance.
@@ -133,7 +133,7 @@ class Content(BaseModel, Generic[T]):
             "content_type": "bytes",
             "input_type": full_name(data),
             "extension": extension,
-            "encoding": encoding or "utf-8",
+            "encoding": encoding,
         }
 
         if metadata:
@@ -162,8 +162,9 @@ class Content(BaseModel, Generic[T]):
             filename=None,
             buffer=data,
             default_mimetype="text/plain",
-            default_extension=".txt"
+            default_extension=".txt",
         )
+
         filename = default_filename(
             extension=extension, mimetype=mimetype, digest=digest
         )
@@ -232,7 +233,6 @@ class Content(BaseModel, Generic[T]):
 
         # Use model_construct to bypass our custom __init__
         return cls.model_construct(**resolved_args)
-
 
     @classmethod
     def from_path(
