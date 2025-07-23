@@ -61,7 +61,11 @@ class Content(BaseModel, Generic[T]):
     A class to represent content from various sources, resolving them
     to a unified byte-oriented representation with associated metadata.
 
-    The default constructor initializes content from a file path.
+    This class must be instantiated using one of its classmethods:
+    - from_path()
+    - from_bytes()
+    - from_text()
+    - from_base64()
     """
 
     id: str
@@ -88,50 +92,16 @@ class Content(BaseModel, Generic[T]):
         str | None, Field(description="Last path the file was saved to")
     ] = None
 
-    def __init__(
-        self,
-        path: str | Path,
-        /,
-        encoding: str = "utf-8",
-        mimetype: str | None = None,
-        metadata: dict[str, Any] | None = None,
-    ):
-        """Initializes Content from a local file path."""
-        path_obj = Path(path)
-        if not is_valid_path(path_obj):
-            raise FileNotFoundError(f"File not found at path: {path_obj}")
-
-        data = path_obj.read_bytes()
-        file_name = path_obj.name
-        file_size = path_obj.stat().st_size
-        digest = hashlib.sha256(data).hexdigest()
-
-        mimetype, extension = get_mime_and_extension(
-            mimetype=mimetype,
-            extension=path_obj.suffix,
-            filename=file_name,
-            buffer=data,
+    def __init__(self, *args, **kwargs):
+        """
+        Direct initialization is disabled.
+        Please use a classmethod like `Content.from_path()` to create an instance.
+        """
+        raise NotImplementedError(
+            "Content objects cannot be initialized directly."
+            "For best results use a classmethod: from_path, from_bytes, from_text, or from_base64."
+            "If you must accept arbitrary inputs, Content._from_guess infers which method to use."
         )
-
-        # We gather all the resolved arguments...
-        resolved_args: ResolvedContentArgs = {
-            "id": uuid.uuid4().hex,
-            "data": data,
-            "size": file_size,
-            "mimetype": mimetype,
-            "digest": digest,
-            "filename": file_name,
-            "content_type": "file",
-            "input_type": full_name(path),
-            "path": str(path_obj.resolve()),
-            "extension": extension,
-            "encoding": encoding,
-        }
-
-        if metadata:
-            resolved_args["extra"] = metadata
-
-        super().__init__(**resolved_args)
 
     @classmethod
     def from_bytes(
