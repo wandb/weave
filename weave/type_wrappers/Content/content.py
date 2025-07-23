@@ -38,10 +38,10 @@ class ResolvedContentArgsWithoutData(TypedDict):
     input_type: str
 
     # Optional fields - can be ommited or None
-    extra: NotRequired[dict[str, Any] | None]
-    path: NotRequired[str | None]
-    extension: NotRequired[str | None]
-    encoding: NotRequired[str | None]
+    extra: NotRequired[dict[str, Any]]
+    path: NotRequired[str]
+    extension: NotRequired[str]
+    encoding: NotRequired[str]
 
 class ResolvedContentArgs(ResolvedContentArgsWithoutData):
     # Required Fields
@@ -120,11 +120,14 @@ class Content(BaseModel, Generic[T]):
             "filename": file_name,
             "content_type": "file",
             "input_type": str(type(path)),
-            "extra": metadata,
             "path": str(path_obj.resolve()),
             "extension": extension,
             "encoding": encoding,
         }
+
+        if metadata:
+            resolved_args["extra"] = metadata
+
         super().__init__(**resolved_args)
 
     @classmethod
@@ -157,10 +160,13 @@ class Content(BaseModel, Generic[T]):
             "content_type": "bytes",
             "input_type": str(type(data)),
             "extra": metadata or {},
-            "path": None,
             "extension": extension,
             "encoding": encoding or "utf-8",
         }
+
+        if metadata:
+            resolved_args["extra"] = metadata
+
         # Use model_construct to bypass our custom __init__
         return cls.model_construct(**resolved_args)
 
@@ -194,11 +200,13 @@ class Content(BaseModel, Generic[T]):
             "filename": filename,
             "content_type": "text",
             "input_type": str(type(text)),
-            "extra": metadata,
-            "path": None,
             "extension": extension,
             "encoding": encoding,
         }
+
+        if metadata:
+            resolved_args["extra"] = metadata
+
         # Use model_construct to bypass our custom __init__
         return cls.model_construct(**resolved_args)
 
@@ -238,11 +246,13 @@ class Content(BaseModel, Generic[T]):
             "filename": filename,
             "content_type": "base64",
             "input_type": input_type,
-            "extra": metadata,
-            "path": None,
             "extension": extension,
             "encoding": "base64",
         }
+
+        if metadata:
+            resolved_args["extra"] = metadata
+
         # Use model_construct to bypass our custom __init__
         return cls.model_construct(**resolved_args)
 
