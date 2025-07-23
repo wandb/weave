@@ -102,7 +102,7 @@ async def test_similarity_scorer_eval2(similarity_scorer):
     def model(input):
         return "The person's favorite cheese is cheddar."
 
-    similarity_scorer.column_map = {"target": "input", "output": "other_col"}
+    similarity_scorer.column_map = {"target": "other_col"}
 
     evaluation = weave.Evaluation(
         dataset=dataset,

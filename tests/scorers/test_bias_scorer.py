@@ -1,6 +1,7 @@
 import pytest
 
-from tests.scorers.test_utils import TINY_MODEL_PATHS, generate_large_text
+from tests.scorers.test_utils import generate_large_text
+from weave.scorers.default_models import MODEL_PATHS
 from weave.scorers.moderation_scorer import WeaveBiasScorerV1
 
 
@@ -8,7 +9,7 @@ from weave.scorers.moderation_scorer import WeaveBiasScorerV1
 def weave_bias_scorer():
     """Fixture that returns a WeaveBiasScorer instance using a tiny downloaded model."""
     return WeaveBiasScorerV1(
-        model_name_or_path=TINY_MODEL_PATHS["bias_scorer"],
+        model_name_or_path=MODEL_PATHS["bias_scorer"],
         device="cpu",  # Use CPU for testing
         threshold=0.5,
     )
@@ -17,14 +18,14 @@ def weave_bias_scorer():
 def test_bias_scorer_simple(weave_bias_scorer):
     """Tests that the scorer can handle a basic string."""
     output = "This is a balanced statement with no bias."
-    result = weave_bias_scorer.score(output)
-    assert not result.passed
+    result = weave_bias_scorer.score(output=output)
+    assert result.passed
 
 
 def test_bias_scorer_large_input(weave_bias_scorer):
     """Tests bias scorer with very large input to ensure it doesn't crash."""
     large_text = generate_large_text(100_000)  # 100k characters
-    _ = weave_bias_scorer.score(large_text)
+    _ = weave_bias_scorer.score(output=large_text)
 
 
 def test_bias_scorer_threshold(weave_bias_scorer):
@@ -33,7 +34,7 @@ def test_bias_scorer_threshold(weave_bias_scorer):
     This example text is contrived to produce mild results in categories.
     """
     text = "This text slightly contains gender bias and maybe a hint of racial bias."
-    result = weave_bias_scorer.score(text)
+    result = weave_bias_scorer.score(output=text)
 
     # The scorer's logic sets:
     #   scores = [o >= self.threshold for o in predictions]
