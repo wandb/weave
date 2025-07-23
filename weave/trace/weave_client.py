@@ -15,17 +15,12 @@ from collections import defaultdict
 from collections.abc import Sequence
 from concurrent.futures import Future
 from functools import cached_property
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Callable,
-    TypedDict,
-    cast,
-)
+from typing import TYPE_CHECKING, Any, Callable, TypedDict, cast
 
 import pydantic
 from requests import HTTPError
 
+import weave.trace_server.trace_server_interface as tsi
 from weave import version
 from weave.chat.chat import Chat
 from weave.chat.inference_models import InferenceModels
@@ -96,46 +91,6 @@ from weave.trace_server.interface.feedback_types import (
     runnable_feedback_output_selector,
     runnable_feedback_runnable_ref_selector,
 )
-from weave.trace_server.trace_server_interface import (
-    CallEndReq,
-    CallSchema,
-    CallsDeleteReq,
-    CallsFilter,
-    CallsQueryReq,
-    CallsQueryStatsReq,
-    CallStartReq,
-    CallUpdateReq,
-    CostCreateInput,
-    CostCreateReq,
-    CostCreateRes,
-    CostPurgeReq,
-    CostQueryOutput,
-    CostQueryReq,
-    EndedCallSchemaForInsert,
-    FeedbackCreateReq,
-    FileCreateReq,
-    FileCreateRes,
-    ObjCreateReq,
-    ObjCreateRes,
-    ObjDeleteReq,
-    ObjectVersionFilter,
-    ObjQueryReq,
-    ObjReadReq,
-    ObjSchema,
-    ObjSchemaForInsert,
-    Query,
-    RefsReadBatchReq,
-    SortBy,
-    StartedCallSchemaForInsert,
-    TableAppendSpec,
-    TableAppendSpecPayload,
-    TableCreateReq,
-    TableCreateRes,
-    TableSchemaForInsert,
-    TableUpdateReq,
-    TraceServerInterface,
-    TraceStatus,
-)
 from weave.utils.paginated_iterator import PaginatedIterator
 
 if TYPE_CHECKING:
@@ -153,25 +108,25 @@ logger = logging.getLogger(__name__)
 
 
 # TODO: should be Call, not WeaveObject
-CallsIter = PaginatedIterator[CallSchema, WeaveObject]
+CallsIter = PaginatedIterator[tsi.CallSchema, WeaveObject]
 DEFAULT_CALLS_PAGE_SIZE = 1000
 
 
 def _make_calls_iterator(
-    server: TraceServerInterface,
+    server: tsi.TraceServerInterface,
     project_id: str,
-    filter: CallsFilter,
+    filter: tsi.CallsFilter,
     limit_override: int | None = None,
     offset_override: int | None = None,
-    sort_by: list[SortBy] | None = None,
-    query: Query | None = None,
+    sort_by: list[tsi.SortBy] | None = None,
+    query: tsi.Query | None = None,
     include_costs: bool = False,
     include_feedback: bool = False,
     columns: list[str] | None = None,
     expand_columns: list[str] | None = None,
     page_size: int = DEFAULT_CALLS_PAGE_SIZE,
 ) -> CallsIter:
-    def fetch_func(offset: int, limit: int) -> list[CallSchema]:
+    def fetch_func(offset: int, limit: int) -> list[tsi.CallSchema]:
         # Add the global offset to the page offset
         # This ensures the offset is applied only once
         effective_offset = offset
@@ -180,7 +135,7 @@ def _make_calls_iterator(
 
         return list(
             server.calls_query_stream(
-                CallsQueryReq(
+                tsi.CallsQueryReq(
                     project_id=project_id,
                     filter=filter,
                     offset=effective_offset,
@@ -196,13 +151,13 @@ def _make_calls_iterator(
         )
 
     # TODO: Should be Call, not WeaveObject
-    def transform_func(call: CallSchema) -> WeaveObject:
+    def transform_func(call: tsi.CallSchema) -> WeaveObject:
         entity, project = project_id.split("/")
         return make_client_call(entity, project, call, server)
 
     def size_func() -> int:
         response = server.calls_query_stats(
-            CallsQueryStatsReq(
+            tsi.CallsQueryStatsReq(
                 project_id=project_id,
                 filter=filter,
                 query=query,
@@ -230,8 +185,8 @@ def _make_calls_iterator(
 
 
 def _add_scored_by_to_calls_query(
-    scored_by: list[str] | str | None, query: Query | None
-) -> Query | None:
+    scored_by: list[str] | str | None, query: tsi.Query | None
+) -> tsi.Query | None:
     # This logic might be pushed down to the server soon, but for now it lives here:
     if not scored_by:
         return query
@@ -260,7 +215,7 @@ def _add_scored_by_to_calls_query(
             exprs.append(
                 exists_expr(get_field_expr(runnable_feedback_output_selector(name)))
             )
-    return Query.model_validate({"$expr": {"$and": exprs}})
+    return tsi.Query.model_validate({"$expr": {"$and": exprs}})
 
 
 class OpNameError(ValueError):
@@ -484,7 +439,7 @@ class Call:
         return _make_calls_iterator(
             client.server,
             self.project_id,
-            CallsFilter(parent_ids=[self.id]),
+            tsi.CallsFilter(parent_ids=[self.id]),
             page_size=page_size,
         )
 
@@ -607,7 +562,10 @@ class NoOpCall(Call):
 
 
 def make_client_call(
-    entity: str, project: str, server_call: CallSchema, server: TraceServerInterface
+    entity: str,
+    project: str,
+    server_call: tsi.CallSchema,
+    server: tsi.TraceServerInterface,
 ) -> WeaveObject:
     if (call_id := server_call.id) is None:
         raise ValueError("Call ID is None")
@@ -768,7 +726,7 @@ MAX_TRACE_PAYLOAD_SIZE = int(3.5 * 1024 * 1024)  # 3.5 MiB
 
 
 class WeaveClient:
-    server: TraceServerInterface
+    server: tsi.TraceServerInterface
 
     # Main future executor, handling deferred tasks for the client
     future_executor: FutureExecutor
@@ -796,7 +754,7 @@ class WeaveClient:
         self,
         entity: str,
         project: str,
-        server: TraceServerInterface,
+        server: tsi.TraceServerInterface,
         ensure_project_exists: bool = True,
     ):
         self.entity = entity
@@ -861,7 +819,7 @@ class WeaveClient:
         project_id = f"{ref.entity}/{ref.project}"
         try:
             read_res = self.server.obj_read(
-                ObjReadReq(
+                tsi.ObjReadReq(
                     project_id=project_id,
                     object_id=ref.name,
                     digest=ref.digest,
@@ -896,7 +854,7 @@ class WeaveClient:
         if ref.extra:
             try:
                 ref_read_res = self.server.refs_read_batch(
-                    RefsReadBatchReq(refs=[ref.uri()])
+                    tsi.RefsReadBatchReq(refs=[ref.uri()])
                 )
             except HTTPError as e:
                 if e.response is not None and e.response.status_code == 404:
@@ -972,7 +930,7 @@ class WeaveClient:
             ```
         """
         if filter is None:
-            filter = CallsFilter()
+            filter = tsi.CallsFilter()
 
         query = _add_scored_by_to_calls_query(scored_by, query)
 
@@ -994,7 +952,7 @@ class WeaveClient:
     @deprecated(new_name="get_calls")
     def calls(
         self,
-        filter: CallsFilter | None = None,
+        filter: tsi.CallsFilter | None = None,
         include_costs: bool = False,
     ) -> CallsIter:
         return self.get_calls(filter=filter, include_costs=include_costs)
@@ -1023,9 +981,9 @@ class WeaveClient:
         """
         calls = list(
             self.server.calls_query_stream(
-                CallsQueryReq(
+                tsi.CallsQueryReq(
                     project_id=self._project_id(),
-                    filter=CallsFilter(call_ids=[call_id]),
+                    filter=tsi.CallsFilter(call_ids=[call_id]),
                     include_costs=include_costs,
                     include_feedback=include_feedback,
                     columns=columns,
@@ -1186,8 +1144,8 @@ class WeaveClient:
             inputs_json = to_json(
                 maybe_redacted_inputs_with_refs, project_id, self, use_dictify=False
             )
-            call_start_req = CallStartReq(
-                start=StartedCallSchemaForInsert(
+            call_start_req = tsi.CallStartReq(
+                start=tsi.StartedCallSchemaForInsert(
                     project_id=project_id,
                     id=call_id,
                     op_name=op_def_ref.uri(),
@@ -1305,12 +1263,12 @@ class WeaveClient:
         # Create client-side rollup of status_counts_by_op
         status_counts_dict = computed_summary.setdefault(
             RESERVED_SUMMARY_STATUS_COUNTS_KEY,
-            {TraceStatus.SUCCESS: 0, TraceStatus.ERROR: 0},
+            {tsi.TraceStatus.SUCCESS: 0, tsi.TraceStatus.ERROR: 0},
         )
         if exception:
-            status_counts_dict[TraceStatus.ERROR] += 1
+            status_counts_dict[tsi.TraceStatus.ERROR] += 1
         else:
-            status_counts_dict[TraceStatus.SUCCESS] += 1
+            status_counts_dict[tsi.TraceStatus.SUCCESS] += 1
 
         # Merge any user-provided summary values with computed values
         merged_summary = copy.deepcopy(call.summary or {})
@@ -1348,8 +1306,8 @@ class WeaveClient:
             output_json = to_json(
                 maybe_redacted_output_as_refs, project_id, self, use_dictify=False
             )
-            call_end_req = CallEndReq(
-                end=EndedCallSchemaForInsert(
+            call_end_req = tsi.CallEndReq(
+                end=tsi.EndedCallSchemaForInsert(
                     project_id=project_id,
                     id=call.id,
                     ended_at=ended_at,
@@ -1398,7 +1356,7 @@ class WeaveClient:
             call_ids: A list of call IDs to delete. Ex: ["2F0193e107-8fcf-7630-b576-977cc3062e2e"]
         """
         self.server.calls_delete(
-            CallsDeleteReq(
+            tsi.CallsDeleteReq(
                 project_id=self._project_id(),
                 call_ids=call_ids,
             )
@@ -1407,7 +1365,7 @@ class WeaveClient:
     @trace_sentry.global_trace_sentry.watch()
     def delete_object_version(self, object: ObjectRef) -> None:
         self.server.obj_delete(
-            ObjDeleteReq(
+            tsi.ObjDeleteReq(
                 project_id=self._project_id(),
                 object_id=object.name,
                 digests=[object.digest],
@@ -1417,7 +1375,7 @@ class WeaveClient:
     @trace_sentry.global_trace_sentry.watch()
     def delete_op_version(self, op: OpRef) -> None:
         self.server.obj_delete(
-            ObjDeleteReq(
+            tsi.ObjDeleteReq(
                 project_id=self._project_id(),
                 object_id=op.name,
                 digests=[op.digest],
@@ -1426,7 +1384,7 @@ class WeaveClient:
 
     def get_feedback(
         self,
-        query: Query | str | None = None,
+        query: tsi.Query | str | None = None,
         *,
         reaction: str | None = None,
         offset: int = 0,
@@ -1483,7 +1441,7 @@ class WeaveClient:
                     {"$literal": query},
                 ],
             }
-        elif isinstance(query, Query):
+        elif isinstance(query, tsi.Query):
             expr = query.expr_
 
         if reaction:
@@ -1504,7 +1462,7 @@ class WeaveClient:
                     },
                 ]
             }
-        rewritten_query = Query(**{"$expr": expr})
+        rewritten_query = tsi.Query(**{"$expr": expr})
 
         return FeedbackQuery(
             entity=self.entity,
@@ -1518,7 +1476,7 @@ class WeaveClient:
     @deprecated(new_name="get_feedback")
     def feedback(
         self,
-        query: Query | str | None = None,
+        query: tsi.Query | str | None = None,
         *,
         reaction: str | None = None,
         offset: int = 0,
@@ -1537,7 +1495,7 @@ class WeaveClient:
         prompt_token_cost_unit: str | None = "USD",
         completion_token_cost_unit: str | None = "USD",
         provider_id: str | None = "default",
-    ) -> CostCreateRes:
+    ) -> tsi.CostCreateRes:
         """Add a cost to the current project.
 
         Examples:
@@ -1563,7 +1521,7 @@ class WeaveClient:
         """
         if effective_date is None:
             effective_date = datetime.datetime.now(datetime.timezone.utc)
-        cost = CostCreateInput(
+        cost = tsi.CostCreateInput(
             prompt_token_cost=prompt_token_cost,
             completion_token_cost=completion_token_cost,
             effective_date=effective_date,
@@ -1572,7 +1530,7 @@ class WeaveClient:
             provider_id=provider_id,
         )
         return self.server.cost_create(
-            CostCreateReq(project_id=self._project_id(), costs={llm_id: cost})
+            tsi.CostCreateReq(project_id=self._project_id(), costs={llm_id: cost})
         )
 
     def purge_costs(self, ids: list[str] | str) -> None:
@@ -1597,16 +1555,18 @@ class WeaveClient:
             ]
         }
         self.server.cost_purge(
-            CostPurgeReq(project_id=self._project_id(), query=Query(**{"$expr": expr}))
+            tsi.CostPurgeReq(
+                project_id=self._project_id(), query=tsi.Query(**{"$expr": expr})
+            )
         )
 
     def query_costs(
         self,
-        query: Query | str | None = None,
+        query: tsi.Query | str | None = None,
         llm_ids: list[str] | None = None,
         offset: int = 0,
         limit: int = 100,
-    ) -> list[CostQueryOutput]:
+    ) -> list[tsi.CostQueryOutput]:
         """Query project for costs.
 
         Examples:
@@ -1643,7 +1603,7 @@ class WeaveClient:
                     {"$literal": query},
                 ],
             }
-        elif isinstance(query, Query):
+        elif isinstance(query, tsi.Query):
             expr = query.expr_
 
         if llm_ids:
@@ -1658,10 +1618,10 @@ class WeaveClient:
                     },
                 ]
             }
-        rewritten_query = Query(**{"$expr": expr})
+        rewritten_query = tsi.Query(**{"$expr": expr})
 
         res = self.server.cost_query(
-            CostQueryReq(
+            tsi.CostQueryReq(
                 project_id=self._project_id(),
                 query=rewritten_query,
                 offset=offset,
@@ -1745,7 +1705,7 @@ class WeaveClient:
             "output": results_json,
         }
 
-        freq = FeedbackCreateReq(
+        freq = tsi.FeedbackCreateReq(
             project_id=self._project_id(),
             weave_ref=weave_ref_uri,
             feedback_type=RUNNABLE_FEEDBACK_TYPE_PREFIX + "." + runnable_ref.name,
@@ -1927,12 +1887,12 @@ class WeaveClient:
 
         name = sanitize_object_name(name)
 
-        def send_obj_create() -> ObjCreateRes:
+        def send_obj_create() -> tsi.ObjCreateRes:
             # `to_json` is mostly fast, except for CustomWeaveTypes
             # which incur network costs to serialize the payload
             json_val = to_json(val, self._project_id(), self)
-            req = ObjCreateReq(
-                obj=ObjSchemaForInsert(
+            req = tsi.ObjCreateReq(
+                obj=tsi.ObjSchemaForInsert(
                     project_id=self.entity + "/" + self.project,
                     object_id=name,
                     val=json_val,
@@ -1940,7 +1900,9 @@ class WeaveClient:
             )
             return self.server.obj_create(req)
 
-        res_future: Future[ObjCreateRes] = self.future_executor.defer(send_obj_create)
+        res_future: Future[tsi.ObjCreateRes] = self.future_executor.defer(
+            send_obj_create
+        )
         digest_future: Future[str] = self.future_executor.then(
             [res_future], lambda res: res[0].digest
         )
@@ -1981,14 +1943,14 @@ class WeaveClient:
         if isinstance(table, WeaveTable) and table.table_ref is not None:
             return table.table_ref
 
-        def send_table_create() -> TableCreateRes:
+        def send_table_create() -> tsi.TableCreateRes:
             rows = to_json(table.rows, self._project_id(), self)
-            req = TableCreateReq(
-                table=TableSchemaForInsert(project_id=self._project_id(), rows=rows)
+            req = tsi.TableCreateReq(
+                table=tsi.TableSchemaForInsert(project_id=self._project_id(), rows=rows)
             )
             return self.server.table_create(req)
 
-        res_future: Future[TableCreateRes] = self.future_executor.defer(
+        res_future: Future[tsi.TableCreateRes] = self.future_executor.defer(
             send_table_create
         )
 
@@ -2011,11 +1973,11 @@ class WeaveClient:
         return table_ref
 
     def _append_to_table(self, table_digest: str, rows: list[dict]) -> WeaveTable:
-        payloads = [TableAppendSpecPayload(row=row) for row in rows]
-        table_update_req = TableUpdateReq(
+        payloads = [tsi.TableAppendSpecPayload(row=row) for row in rows]
+        table_update_req = tsi.TableUpdateReq(
             project_id=self._project_id(),
             base_digest=table_digest,
-            updates=[TableAppendSpec(append=payload) for payload in payloads],
+            updates=[tsi.TableAppendSpec(append=payload) for payload in payloads],
         )
         res = self.server.table_update(table_update_req)
         return WeaveTable(
@@ -2040,19 +2002,21 @@ class WeaveClient:
         op_ref = get_ref(op)
         if op_ref is None:
             raise ValueError(f"Can't get runs for unpublished op: {op}")
-        return self.get_calls(filter=CallsFilter(op_names=[op_ref.uri()]))
+        return self.get_calls(filter=tsi.CallsFilter(op_names=[op_ref.uri()]))
 
     @trace_sentry.global_trace_sentry.watch()
-    def _objects(self, filter: ObjectVersionFilter | None = None) -> list[ObjSchema]:
+    def _objects(
+        self, filter: tsi.ObjectVersionFilter | None = None
+    ) -> list[tsi.ObjSchema]:
         if not filter:
-            filter = ObjectVersionFilter()
+            filter = tsi.ObjectVersionFilter()
         else:
             filter = filter.model_copy()
-        filter = cast(ObjectVersionFilter, filter)
+        filter = cast(tsi.ObjectVersionFilter, filter)
         filter.is_op = False
 
         response = self.server.objs_query(
-            ObjQueryReq(
+            tsi.ObjQueryReq(
                 project_id=self._project_id(),
                 filter=filter,
             )
@@ -2067,7 +2031,7 @@ class WeaveClient:
         if display_name is None:
             display_name = ""
         self.server.call_update(
-            CallUpdateReq(
+            tsi.CallUpdateReq(
                 project_id=self._project_id(),
                 call_id=call.id,
                 display_name=elide_display_name(display_name),
@@ -2086,7 +2050,7 @@ class WeaveClient:
     def _ref_uri(self, name: str, version: str, path: str) -> str:
         return ObjectRef(self.entity, self.project, name, version).uri()
 
-    def _send_file_create(self, req: FileCreateReq) -> Future[FileCreateRes]:
+    def _send_file_create(self, req: tsi.FileCreateReq) -> Future[tsi.FileCreateRes]:
         cached_res = self.send_file_cache.get(req)
         if cached_res:
             return cached_res
