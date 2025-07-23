@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import configparser
 import logging
+import os
+from pathlib import Path
 from typing import Literal
 
 import click
@@ -31,7 +34,7 @@ def login(
 
 def _login(host: str | None = None) -> None:
     if host is None:
-        host = "api.wandb.ai"
+        host = _get_default_host()
     else:
         host = _parse_wandb_host(host)
 
@@ -91,3 +94,61 @@ def _parse_wandb_host(host: str) -> str:
         host = host[:-1]
 
     return host
+
+
+def _get_default_host() -> str:
+    """
+    Get the default wandb host, checking WANDB_BASE_URL environment variable first,
+    then settings file, then falling back to api.wandb.ai.
+
+    This mimics the behavior of the real wandb library to ensure consistency.
+    """
+    # Check environment variable first
+    env_base_url = os.getenv("WANDB_BASE_URL")
+    if env_base_url:
+        env_base_url = env_base_url.rstrip("/")
+        # Parse out just the hostname from the URL
+        if env_base_url.startswith(("http://", "https://")):
+            env_base_url = env_base_url.split("://", 1)[1]
+        return env_base_url
+
+    # Check settings file
+    settings_host = _get_host_from_settings()
+    if settings_host:
+        return settings_host
+
+    # Default fallback
+    return "api.wandb.ai"
+
+
+def _get_host_from_settings() -> str | None:
+    """
+    Get the host from wandb settings file.
+
+    This checks ~/.config/wandb/settings for a base_url setting.
+    """
+    try:
+        default_config_dir = Path.home() / ".config" / "wandb"
+        config_dir = os.environ.get("WANDB_CONFIG_DIR", str(default_config_dir))
+        settings_path = Path(config_dir) / "settings"
+
+        if not settings_path.exists():
+            return None
+
+        settings = configparser.ConfigParser()
+        settings.read(str(settings_path))
+
+        if settings.has_section("default") and settings.has_option(
+            "default", "base_url"
+        ):
+            base_url = settings.get("default", "base_url")
+            # Parse out just the hostname from the URL
+            if base_url.startswith(("http://", "https://")):
+                base_url = base_url.split("://", 1)[1]
+            return base_url.rstrip("/")
+
+    except Exception:
+        # Silently ignore errors reading settings file
+        pass
+
+    return None
