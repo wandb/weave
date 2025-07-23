@@ -939,25 +939,29 @@ class CallsQuery(BaseModel):
         storage_size_sql = ""
         if self.include_storage_size:
             storage_size_sql = f"""
-            LEFT JOIN (SELECT
-                id,
-                sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) as storage_size_bytes
-            FROM calls_merged_stats
-            WHERE project_id = {param_slot(project_param, "String")}
-            GROUP BY id) as {STORAGE_SIZE_TABLE_NAME}
-            on calls_merged.id = {STORAGE_SIZE_TABLE_NAME}.id
+            LEFT JOIN (
+                SELECT
+                    id,
+                    sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) AS storage_size_bytes
+                FROM calls_merged_stats
+                WHERE project_id = {param_slot(project_param, "String")}
+                GROUP BY id
+            ) AS {STORAGE_SIZE_TABLE_NAME}
+            ON calls_merged.id = {STORAGE_SIZE_TABLE_NAME}.id
             """
 
         total_storage_size_sql = ""
         if self.include_total_storage_size:
             total_storage_size_sql = f"""
-            LEFT JOIN (SELECT
-                trace_id,
-                sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) as total_storage_size_bytes
-            FROM calls_merged_stats
-            WHERE project_id = {param_slot(project_param, "String")}
-            GROUP BY trace_id) as {ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME}
-            on calls_merged.trace_id = {ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME}.trace_id
+            LEFT JOIN (
+                SELECT
+                    trace_id,
+                    sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) AS total_storage_size_bytes
+                FROM calls_merged_stats
+                WHERE project_id = {param_slot(project_param, "String")}
+                GROUP BY trace_id
+            ) AS {ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME}
+            ON calls_merged.trace_id = {ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME}.trace_id
             """
 
         # Add JOINs for object reference ordering
@@ -1603,7 +1607,7 @@ def optimized_project_contains_call_query(
         )
         THEN 1
         ELSE 0
-        END as has_any
+        END AS has_any
     """,
         logger,
     )
