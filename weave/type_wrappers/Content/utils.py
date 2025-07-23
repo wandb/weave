@@ -5,7 +5,7 @@ import logging
 import mimetypes
 from io import BytesIO
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +24,13 @@ except (ImportError, ModuleNotFoundError) as e:
 # If the data is smaller than 2048 just use the entire thing
 MIME_DETECTION_BUFFER_SIZE = 2048
 
+
+def full_name(obj: Any):
+    cls = obj.__class__
+    module = cls.__module__
+    if module == 'builtins':
+        return cls.__qualname__ # avoid outputs like 'builtins.str'
+    return f"{module}.{cls.__qualname__}"
 
 def is_valid_b64(input: str | bytes) -> bool:
     # Normalize to bytes

@@ -72,7 +72,7 @@ class TestWeaveContent:
         assert content.size > 0
         assert isinstance(content.data, bytes)
         assert content.path == str(file_path.resolve())
-        assert content.input_type == "<class 'str'>"
+        assert content.input_type == "str"
         assert content.content_type == "file"
 
     @pytest.mark.parametrize(
@@ -92,7 +92,7 @@ class TestWeaveContent:
         assert content.mimetype == mimetype
         assert content.size == len(file_bytes)
         assert content.data == file_bytes
-        assert content.input_type == "<class 'bytes'>"
+        assert content.input_type == "bytes"
         assert content.content_type == "bytes"
 
         # Test with mimetype
@@ -119,7 +119,7 @@ class TestWeaveContent:
         assert content.mimetype == mimetype
         assert content.data == file_bytes
         assert content.encoding == "base64"
-        assert content.input_type == "<class 'str'>"
+        assert content.input_type == "str"
         assert content.content_type == "base64"
 
     @pytest.mark.parametrize(
@@ -138,7 +138,6 @@ class TestWeaveContent:
         assert content.mimetype == mimetype
         assert content.filename == file_path.name
         assert content.path == str(file_path.resolve())
-        # input_type can change based on library version so we don't check it here
         assert content.content_type == "file"
 
     def test_content_save_method(self, image_file):
@@ -222,7 +221,7 @@ class TestWeaveContent:
         assert content.mimetype == "text/plain"
         assert content.data == text_data.encode("utf-8")
         assert content.encoding == "utf-8"
-        assert content.input_type == "<class 'str'>"
+        assert content.input_type == "str"
         assert content.content_type == "text"
 
         # Test with custom encoding

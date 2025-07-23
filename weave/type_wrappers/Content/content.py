@@ -13,7 +13,7 @@ from typing import Annotated, Any, Generic, Literal, NotRequired, TypedDict, Uni
 from pydantic import BaseModel, Field
 from typing_extensions import Self, TypeVar
 
-from .utils import default_filename, get_mime_and_extension, is_valid_b64, is_valid_path
+from .utils import default_filename, get_mime_and_extension, is_valid_b64, is_valid_path, full_name
 
 logger = logging.getLogger(__name__)
 
@@ -80,8 +80,7 @@ class Content(BaseModel, Generic[T]):
 
     _last_saved_path: Annotated[
         str | None,
-        Field(description="Last path the file was saved to"),
-    ] = Field(None, exclude=True)
+        Field(description="Last path the file was saved to")] = None
 
     def __init__(
         self,
@@ -117,7 +116,7 @@ class Content(BaseModel, Generic[T]):
             "digest": digest,
             "filename": file_name,
             "content_type": "file",
-            "input_type": str(type(path)),
+            "input_type": full_name(path),
             "path": str(path_obj.resolve()),
             "extension": extension,
             "encoding": encoding,
@@ -156,7 +155,7 @@ class Content(BaseModel, Generic[T]):
             "digest": digest,
             "filename": filename,
             "content_type": "bytes",
-            "input_type": str(type(data)),
+            "input_type": full_name(data),
             "extra": metadata or {},
             "extension": extension,
             "encoding": encoding or "utf-8",
@@ -197,7 +196,7 @@ class Content(BaseModel, Generic[T]):
             "digest": digest,
             "filename": filename,
             "content_type": "text",
-            "input_type": str(type(text)),
+            "input_type": full_name(text),
             "extension": extension,
             "encoding": encoding,
         }
@@ -218,7 +217,7 @@ class Content(BaseModel, Generic[T]):
         metadata: dict[str, Any] | None = None,
     ) -> Self:
         """Initializes Content from a base64 encoded string or bytes."""
-        input_type = str(type(b64_data))
+        input_type = full_name(b64_data)
         if isinstance(b64_data, str):
             b64_data = b64_data.encode("ascii")
         try:

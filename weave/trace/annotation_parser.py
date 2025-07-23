@@ -3,12 +3,13 @@ from __future__ import annotations
 import logging
 import re
 from inspect import Signature
+from weave.type_wrappers import Content
 
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
-CONTENT_CLASS_NAME = "weave.type_wrappers.Content.content.Content"
+CONTENT_CLASS_NAME = f"{Content.__module__}.{Content.__qualname__}"
 
 # Content annotation with a nested Literal type
 # Example: "typing.Annotated[str, weave.type_handlers.Content.content.Content[Literal['pdf']]'>]"
