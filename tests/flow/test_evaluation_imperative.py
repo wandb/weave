@@ -549,21 +549,17 @@ def test_evaluation_logger_model_inference_method_handling(client):
 
 def test_evaluation_logger_model_with_different_inference_method_names(client):
     """Test that EvaluationLogger handles models with different inference method names."""
-    import inspect
 
-    # Test with 'infer' method
     class ModelWithInfer(Model):
         @weave.op
         def infer(self, special_param: str, count: int = 1) -> str:
             return f"infer_result_{special_param}_{count}"
 
-    # Test with 'forward' method
     class ModelWithForward(Model):
         @weave.op
         def forward(self, data: list, transform: bool = True) -> str:
             return f"forward_result_{len(data)}_{transform}"
 
-    # Test with 'invoke' method
     class ModelWithInvoke(Model):
         @weave.op
         def invoke(self, query: dict, **options) -> str:
@@ -572,26 +568,19 @@ def test_evaluation_logger_model_with_different_inference_method_names(client):
     models = [ModelWithInfer(), ModelWithForward(), ModelWithInvoke()]
 
     for model in models:
-        # Verify the model has an inference method
         infer_method = model.get_infer_method()
-        assert infer_method is not None
-
-        # Capture the original method and signature
         original_signature = inspect.signature(infer_method)
 
-        # Create evaluation logger - should preserve the existing method
         ev = EvaluationLogger(model=model)
 
-        # The original inference method should be preserved (not replaced with predict)
+        # The inference method and signatures should be the same
         assert ev.model.get_infer_method() is infer_method
-
-        # The signature should be completely unchanged
-        final_signature = inspect.signature(ev.model.get_infer_method())
-        assert final_signature == original_signature
+        assert inspect.signature(ev.model.get_infer_method()) == original_signature
 
         # Test that basic logging works
         pred = ev.log_prediction(
-            inputs={"value": "test"}, output=f"result_from_{infer_method.__name__}"
+            inputs={"value": "test"},
+            output=f"result_from_{infer_method.__name__}",
         )
         pred.finish()
         ev.finish()
