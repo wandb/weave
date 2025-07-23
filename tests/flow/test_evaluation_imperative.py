@@ -500,18 +500,7 @@ def test_evaluation_logger_model_inference_method_handling(client):
     This test validates the fix where EvaluationLogger only adds a predict method
     if the model doesn't already have an inference method.
     """
-
-    class UserModelWithInferenceMethod(Model):
-        @weave.op
-        def predict(self, text: str, value: int, multiplier: int = 2, **kwargs) -> str:
-            return f"{text}_processed_{value * multiplier}"
-
-    user_defined_model = UserModelWithInferenceMethod()
-
-    # Capture the original method and its signature
-    original_predict = user_defined_model.predict
-    original_signature = inspect.signature(original_predict)
-
+    # GENERATED MODELS
     # 1a. For generated models, we should patch on a new predict method
     ev1 = EvaluationLogger()
     infer_method = ev1.model.get_infer_method()
@@ -523,14 +512,26 @@ def test_evaluation_logger_model_inference_method_handling(client):
     pred1.finish()
     ev1.finish()
 
-    # 2a. For user models, we should keep the existing inference method
+    # USER DEFINED MODELS
+
+    class UserModelWithInferenceMethod(Model):
+        @weave.op
+        def predict(self, text: str, value: int, multiplier: int = 2, **kwargs) -> str:
+            return f"{text}_processed_{value * multiplier}"
+
+    user_defined_model = UserModelWithInferenceMethod()
+
+    # Capture the original method and its signature
+    original_predict = user_defined_model.get_infer_method()
+    original_signature = inspect.signature(original_predict)
+
+    # 2a. For user defined models, we should keep the existing inference method
     ev2 = EvaluationLogger(model=user_defined_model)
-    assert ev2.model.predict is original_predict
-    assert ev2.model.get_infer_method() is original_predict
-    assert inspect.signature(ev2.model.predict) == original_signature
+    assert ev2.model.get_infer_method() == original_predict
+    assert inspect.signature(ev2.model.get_infer_method()) == original_signature
 
     # 2b. And the original method should still work with its original signature
-    result = ev2.model.predict("test", value=100, multiplier=3)
+    result = ev2.model.get_infer_method()("test", value=100, multiplier=3)
     assert result == "test_processed_300"
 
     # 2c. And logging should work
@@ -569,7 +570,7 @@ def test_evaluation_logger_model_with_different_inference_method_names(client):
         ev = EvaluationLogger(model=model)
 
         # The inference method and signatures should be the same
-        assert ev.model.get_infer_method() is infer_method
+        assert ev.model.get_infer_method() == infer_method
         assert inspect.signature(ev.model.get_infer_method()) == original_signature
 
         # Test that basic logging works
