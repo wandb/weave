@@ -471,8 +471,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if req.sort_by is not None:
             for sort_by in req.sort_by:
                 cq.add_order(sort_by.field, sort_by.direction)
+            # If the only sort field is "started_at", add "id" as secondary sort for consistency
+            if len(req.sort_by) == 1 and req.sort_by[0].field == "started_at":
+                cq.add_order("id", "asc")
         else:
+            # Default sorting: started_at with id as secondary sort for consistency
             cq.add_order("started_at", "asc")
+            cq.add_order("id", "asc")
         if req.limit is not None:
             cq.set_limit(req.limit)
         if req.offset is not None:
