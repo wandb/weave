@@ -1111,6 +1111,11 @@ class ThreadsQueryFilter(BaseModel):
         description="Only include threads with last_updated before this timestamp",
         examples=["2024-12-31T23:59:59Z"],
     )
+    thread_id: Optional[str] = Field(
+        default=None,
+        description="Only include threads with this specific thread_id",
+        examples=["my_thread_id"],
+    )
 
 
 class ThreadsQueryReq(BaseModel):

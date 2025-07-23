@@ -5062,6 +5062,51 @@ def test_threads_query_endpoint(client):
     # Should include our threads since they're before this future time
     assert len(before_filter_res) >= 3
 
+    # Test thread_id filtering
+    # Test filtering by specific thread_id
+    for test_thread_id in thread_ids:
+        thread_id_filter_res = list(
+            client.server.threads_query_stream(
+                tsi.ThreadsQueryReq(
+                    project_id=get_client_project_id(client),
+                    filter=tsi.ThreadsQueryFilter(thread_id=test_thread_id),
+                )
+            )
+        )
+        # Should find exactly one thread with the specified thread_id
+        assert len(thread_id_filter_res) == 1
+        assert thread_id_filter_res[0].thread_id == test_thread_id
+
+    # Test filtering by non-existent thread_id
+    nonexistent_filter_res = list(
+        client.server.threads_query_stream(
+            tsi.ThreadsQueryReq(
+                project_id=get_client_project_id(client),
+                filter=tsi.ThreadsQueryFilter(thread_id="nonexistent_thread_id"),
+            )
+        )
+    )
+    assert len(nonexistent_filter_res) == 0
+
+    # Test combining thread_id filter with other filters
+    combo_thread_filter_res = list(
+        client.server.threads_query_stream(
+            tsi.ThreadsQueryReq(
+                project_id=get_client_project_id(client),
+                limit=1,
+                sort_by=[tsi.SortBy(field="turn_count", direction="desc")],
+                filter=tsi.ThreadsQueryFilter(
+                    thread_id="analytics_thread",
+                    after_datetime=middle_time,
+                ),
+            )
+        )
+    )
+    # Should find at most 1 thread matching the specific thread_id and time filter
+    assert len(combo_thread_filter_res) <= 1
+    if len(combo_thread_filter_res) == 1:
+        assert combo_thread_filter_res[0].thread_id == "analytics_thread"
+
     # Test combination of parameters
     combo_res = list(
         client.server.threads_query_stream(
