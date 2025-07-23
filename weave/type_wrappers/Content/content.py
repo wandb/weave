@@ -44,7 +44,7 @@ class ResolvedContentArgsWithoutData(TypedDict):
     content_type: ContentType
     input_type: str
 
-    # Optional fields - can be omitted or None
+    # Optional fields - can be omitted
     extra: NotRequired[dict[str, Any]]
     path: NotRequired[str]
     extension: NotRequired[str]
