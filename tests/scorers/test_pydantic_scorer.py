@@ -27,4 +27,4 @@ def user_scorer():
     ],
 )
 def test_pydantic_scorer(user_scorer, input_data, expected_result):
-    assert user_scorer.score(input_data) == expected_result
+    assert user_scorer.score(output=input_data) == expected_result

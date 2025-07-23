@@ -24,7 +24,7 @@ simplifications:
 
 import typing
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 # Operations: all operations have the form of a single property
 # with the name of the operation suffixed with an underscore.
@@ -319,6 +319,8 @@ ContainsOperation.model_rebuild()
 
 
 class Query(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     # Here, we use `expr_` to match the MongoDB query language's "aggregation" operator syntax.
     # This is certainly a subset of the full MongoDB query language, but it is a good starting point.
     # https://www.mongodb.com/docs/manual/reference/operator/query/expr/#mongodb-query-op.-expr

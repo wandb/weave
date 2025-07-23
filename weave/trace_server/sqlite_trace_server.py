@@ -1648,7 +1648,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
 
 def get_type(val: Any) -> str:
-    if val == None:
+    if val is None:
         return "none"
     elif isinstance(val, dict):
         if "_type" in val:
