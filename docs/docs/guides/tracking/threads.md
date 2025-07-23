@@ -38,11 +38,11 @@ A _Thread_ is a logical grouping of related calls that share a common conversati
 
 ### Turn
 
-A _Turn_ is a high-level operation within a Thread. Turns are top-level calls where `call.id == turn_id`. Each Turn:
+A _Turn_ is a high-level operation within a Thread, displayed in the UI as individual rows in a thread view. Each Turn:
 
 - Represents one logical step in a conversation or workflow
-- Is directly associated with a Thread
-- May contain nested implementation details (these are not counted as turns)
+- Turns are the direct children of a thread context and are 
+- May include nested lower-level calls (not shown in thread-level stats).
 
 ### Call
 
@@ -53,11 +53,11 @@ A _Call_ is any `@weave.op`-decorated function execution in your application.
 
 ### Trace
 
-A _Trace_ shows the full call stack of a single operation, including nested calls. Threads are built on top of traces by grouping a specific type of call (turns) that share the same `thread_id`. For more information on Traces, see the [Tracing overview](tracing.mdx).
+A _Trace_ captures the full call stack for a single operation. Threads group traces together that are part of the same logical conversation or session. In other words, a thread is made up of multiple turns, each representing one part in the conversation. For more information on Traces, see the [Tracing overview](tracing.mdx).
 
 ## UI overview
 
-In the Weave sidebar, select **Threads** (located below **Scorers** and above **More**) to access the [Threads list view](#threads-list-view). 
+In the Weave sidebar, select **Threads** to access the [Threads list view](#threads-list-view). 
 
 ![The Threads icon in the Weave sidebar](imgs/threads-sidebar.png)
 
@@ -72,46 +72,27 @@ In the Weave sidebar, select **Threads** (located below **Scorers** and above **
 ### Threads detail drawer
 
 - Click any row to open the detail drawer for that row
-- Shows all turns within a thread, ordered by execution
+- Shows all turns within a thread. 
+- Turns are listed in the order they started (based on their start time, not by duration or end time).
 - Includes call-level metadata (latency, inputs, outputs)
 - Optionally shows message content or structured data if logged
+- To view the full execution of a turn, you can open it from the thread detail drawer. This lets you drill into all nested operations that occurred during that specific turn.
 
 ![The Threads drawer view](imgs/threads-drawer.png)
 
-## Programmatic usage
+## SDK usage
 
-### API specification
+Each example in this section demonstrates a different strategy for organizing turns and threads in your application. For most examples, you should provide your own LLM call or system behavior inside the stub functions.
 
-Endpoint: `POST /threads/query`
+- To track a session or conversation, use the `weave.thread()` context manager.
+- Decorate logical operations with `@weave.op` to track them as turns or nested calls.
+- If you pass a `thread_id`, Weave uses it to group all operations in that block under the same thread. If you omit the `thread_id`, Weave auto-generates a unique one for you.
 
-#### Request schema
+The return value from `weave.thread()` is a `ThreadContext` object with a `thread_id` property, which you can log, reuse, or pass to other systems.
 
-```python
-class ThreadsQueryReq:
-    project_id: str
-    limit: Optional[int] = None
-    offset: Optional[int] = None
-    sort_by: Optional[list[SortBy]] = None  # Supported fields: thread_id, turn_count, start_time, last_updated
-    sortable_datetime_after: Optional[datetime] = None   # Filter threads by granule optimization
-    sortable_datetime_before: Optional[datetime] = None  # Filter threads by granule optimization
-```
+Nested `weave.thread()` contexts always start a new thread unless the same `thread_id` is reused. Ending a child context does not interrupt or overwrite the parent context. This allows for forked thread structures or layered thread orchestration, depending on your app logic.
 
-#### Response schema
-
-```python
-class ThreadSchema:
-    thread_id: str           # Unique identifier for the thread
-    turn_count: int          # Number of turn calls in this thread
-    start_time: datetime     # Earliest start time of turn calls in this thread
-    last_updated: datetime   # Latest end time of turn calls in this thread
-
-class ThreadsQueryRes:
-    threads: List[ThreadSchema]
-```
-
-### Basic examples
-
-#### Query recent active threads
+### Query recent active threads
 
 This example fetches the 50 most recently updated threads. Replace `my-project` with your actual project ID.
 
@@ -127,7 +108,7 @@ for thread in response.threads:
     print(f"Thread {thread.thread_id}: {thread.turn_count} turns, last active {thread.last_updated}")
 ```
 
-#### Query threads by activity level
+### Query threads by activity level
 
 This example fetches the 20 most active threads, ordered by number of turns.
 
@@ -140,7 +121,7 @@ response = client.threads_query(ThreadsQueryReq(
 ))
 ```
 
-#### Query recent threads only
+### Query recent threads only
 
 This example returns threads that started in the past 24 hours. You can change the time window by adjusting the value of `days` in `timedelta`.
 
@@ -156,14 +137,7 @@ response = client.threads_query(ThreadsQueryReq(
 ))
 ```
 
-### Advanced examples
-
-Each example in this section demonstrates a different strategy for organizing turns and threads in your application. For most examples, you should provide your own LLM call or system behavior inside the stub functions.
-
-- Use `weave.thread()` to create or resume a thread.
-- Decorate logical operations with `@weave.op` to track them as turns or nested calls.
-
-#### Manual agent loop implementation 
+### Manual agent loop implementation 
 
 This example shows how to manually define a conversational agent using `@weave.op` decorators and `weave.thread()` context management. Each call to `process_user_message` creates a new turn in the thread. You can use this pattern when building your own agent loop and want full control over how context and nesting are handled.
 
@@ -236,58 +210,7 @@ with weave.thread(session_id) as thread_ctx:
     agent.process_user_message("Can you summarize what we discussed?") # Turn 2 in this session
 ```
 
-#### OpenAI integration 
-
-This example shows how to use Threads with the OpenAI Agents SDK. It demonstrates how Weave automatically tracks conversational turns by patching the `Runner.run()` method.
-
-Threads are tracked when you provide a `group_id` (e.g., `session_456`), which is used as the `thread_id`. 
-
-```python 
-import asyncio
-from agents import Agent, Runner
-
-# Create specialized agents for different support scenarios
-billing_agent = Agent(
-    name="Billing Specialist",
-    handoff_description="Handles billing, payments, and subscription questions",
-    instructions="You are a billing specialist. Help customers with billing questions, "
-                "payment issues, and subscription management. Be clear about charges and policies.",
-)
-
-technical_agent = Agent(
-    name="Technical Support",
-    handoff_description="Handles technical issues and troubleshooting",
-    instructions="You are a technical support specialist. Help customers troubleshoot "
-                "technical issues, provide setup guidance, and resolve product problems.",
-)
-
-# Triage agent that routes to specialists
-triage_agent = Agent(
-    name="Customer Support Triage",
-    instructions="You determine which specialist agent to use based on the customer's question. "
-                "Route billing/payment questions to billing, technical issues to technical support.",
-    handoffs=[billing_agent, technical_agent]
-)
-
-async def main():
-
-    # Multiple customer requests
-    customer_requests = [
-        "My app keeps crashing, what should I do?",
-        "How do I cancel my subscription?",
-        "I need help setting up my account"
-    ]
-
-    for question in customer_requests:
-        result = await Runner.run(triage_agent, question)
-        print(f"Response: {result.final_output}")
-
-# Run the examples
-if __name__ == "__main__":
-    asyncio.run(main())
-```
-
-#### Manual agent with unbalanced call depth 
+### Manual agent with unbalanced call depth 
 
 This example demonstrates that turns can be defined at different depths in the call stack depending on how thread context is applied. The sample uses two providers (OpenAI and Anthropic), each with a different call depth before reaching the turn boundary.
 
@@ -418,7 +341,7 @@ if __name__ == "__main__":
 # - Supporting operations in call chain tracked as nested calls, not turns
 ```
 
-#### Nested threads 
+### Nested threads 
 
 This example illustrates how to structure complex applications using multiple coordinated threads.
 
@@ -566,4 +489,35 @@ order_result = handle_order_request(
 # - No parameter drilling of thread IDs
 # - Independent monitoring of app/infra/logic layers
 # - Global coordination through thread context
+```
+
+## API specification
+
+## Endpoint
+
+Endpoint: `POST /threads/query`
+
+### Request schema
+
+```python
+class ThreadsQueryReq:
+    project_id: str
+    limit: Optional[int] = None
+    offset: Optional[int] = None
+    sort_by: Optional[list[SortBy]] = None  # Supported fields: thread_id, turn_count, start_time, last_updated
+    sortable_datetime_after: Optional[datetime] = None   # Filter threads by granule optimization
+    sortable_datetime_before: Optional[datetime] = None  # Filter threads by granule optimization
+```
+
+### Response schema
+
+```python
+class ThreadSchema:
+    thread_id: str           # Unique identifier for the thread
+    turn_count: int          # Number of turn calls in this thread
+    start_time: datetime     # Earliest start time of turn calls in this thread
+    last_updated: datetime   # Latest end time of turn calls in this thread
+
+class ThreadsQueryRes:
+    threads: List[ThreadSchema]
 ```
