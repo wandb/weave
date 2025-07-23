@@ -13,7 +13,13 @@ from typing import Annotated, Any, Generic, Literal, NotRequired, TypedDict, Uni
 from pydantic import BaseModel, Field
 from typing_extensions import Self, TypeVar
 
-from .utils import default_filename, get_mime_and_extension, is_valid_b64, is_valid_path, full_name
+from .utils import (
+    default_filename,
+    full_name,
+    get_mime_and_extension,
+    is_valid_b64,
+    is_valid_path,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -79,8 +85,8 @@ class Content(BaseModel, Generic[T]):
     extension: str | None = None
 
     _last_saved_path: Annotated[
-        str | None,
-        Field(description="Last path the file was saved to")] = None
+        str | None, Field(description="Last path the file was saved to")
+    ] = None
 
     def __init__(
         self,

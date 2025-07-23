@@ -3,9 +3,10 @@ from __future__ import annotations
 import logging
 import re
 from inspect import Signature
-from weave.type_wrappers import Content
 
 from pydantic import BaseModel
+
+from weave.type_wrappers import Content
 
 logger = logging.getLogger(__name__)
 
