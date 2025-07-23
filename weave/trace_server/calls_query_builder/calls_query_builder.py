@@ -931,7 +931,7 @@ class CallsQuery(BaseModel):
         if needs_feedback:
             feedback_join_sql = f"""
             LEFT JOIN (
-                SELECT * FROM feedback WHERE project_id = {param_slot(project_param, "String")}
+                SELECT * FROM feedback WHERE feedback.project_id = {param_slot(project_param, "String")}
             ) AS feedback ON (
                 feedback.weave_ref = concat('weave-trace-internal:///', {param_slot(project_param, "String")}, '/call/', calls_merged.id))
             """
