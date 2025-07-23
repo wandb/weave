@@ -150,37 +150,33 @@ class ReplaceFileWithContentRule(LintRule):
 
     def visit_Call(self, node: libcst.Call) -> None:
         """Visit a Call node and check if it's a `File` instantiation."""
-        try:
-            # Get all possible fully qualified names for the function being called.
-            q_names = self.get_metadata(QualifiedNameProvider, node.func)
+        # Get all possible fully qualified names for the function being called.
+        q_names = self.get_metadata(QualifiedNameProvider, node.func)
 
-            # Safely handle cases where metadata cannot be resolved.
-            if not isinstance(q_names, Collection):
-                return
+        # Safely handle cases where metadata cannot be resolved.
+        if not isinstance(q_names, Collection):
+            return
 
-            # Check if any of the names match the deprecated class we want to replace.
-            is_deprecated_file = any(
-                name.name == "weave.type_handlers.File.File" for name in q_names
+        # Check if any of the names match the deprecated class we want to replace.
+        is_deprecated_file = any(
+            name.name == "weave.type_handlers.File.File" for name in q_names
+        )
+
+        if is_deprecated_file:
+            # Construct the new function call: `Content.from_path(...)`
+            # 1. Create the base object: `Content`
+            # 2. Create the attribute to access: `.from_path`
+            new_func = libcst.Attribute(
+                value=libcst.Name("Content"), attr=libcst.Name("from_path")
             )
 
-            if is_deprecated_file:
-                # Construct the new function call: `Content.from_path(...)`
-                # 1. Create the base object: `Content`
-                # 2. Create the attribute to access: `.from_path`
-                new_func = libcst.Attribute(
-                    value=libcst.Name("Content"), attr=libcst.Name("from_path")
-                )
+            # 3. Create the new Call node, replacing the function but keeping args.
+            replacement_node = node.with_changes(func=new_func)
 
-                # 3. Create the new Call node, replacing the function but keeping args.
-                replacement_node = node.with_changes(func=new_func)
-
-                # Report the violation and provide the fix.
-                self.report(
-                    node,
-                    "The `File` class is deprecated. Use `Content.from_path` instead. "
-                    "You may need to add 'from weave import Content'.",
-                    replacement=replacement_node,
-                )
-        except Exception:
-            # Avoid crashing the linting process if metadata isn't available for any reason.
-            pass
+            # Report the violation and provide the fix.
+            self.report(
+                node,
+                "The `File` class is deprecated. Use `Content.from_path` instead. "
+                "You may need to add 'from weave import Content'.",
+                replacement=replacement_node,
+            )

@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Annotated, Any, Generic, Literal, TypedDict, Union
 
 from pydantic import BaseModel, Field
-from typing_extensions import Self, TypeVar, NotRequired
+from typing_extensions import NotRequired, Self, TypeVar
 
 from .utils import (
     default_filename,
