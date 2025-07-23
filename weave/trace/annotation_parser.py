@@ -11,39 +11,24 @@ logger = logging.getLogger(__name__)
 CONTENT_CLASS_NAME = "weave.type_wrappers.Content.content.Content"
 
 # Content annotation with a nested Literal type
-# Example: "typing.Annotated[str, <class 'my_app.Content[key=Literal['user_id']]'>]"
-# Explanation:
-# - r"typing\.Annotated\[": Matches the literal "typing.Annotated[".
-# - r"(.+?),\s*": Group 1. Captures the base type (e.g., "str") and the following comma.
-# - rf"<class '{re.escape(CONTENT_CLASS_NAME)}\[": Matches the start of the metadata class string.
-# - r"[^\]]*Literal\[['\"](.+?)['\"]\]": Matches any character except ']' until it finds a Literal, then captures its string content as Group 2.
-# - r"\]'>": Matches the closing characters for the metadata class representation (e.g., "]'>").
-# - r"\]": Matches the final closing bracket of the Annotated type.
-
+# Example: "typing.Annotated[str, weave.type_handlers.Content.content.Content[Literal['pdf']]'>]"
 PATTERN_WITH_TYPE_HINT = re.compile(
-    r"typing\.Annotated\["
-    r"(.+?),\s*"  # Group 1: Base type (non-greedy)
+    r"(?:\w+(?:\.\w+)*\.)?Annotated\["  # Optional module prefix for Annotated
+    r"(.+?),\s*"                      # Group 1: Base type (non-greedy)
     rf"<class '{re.escape(CONTENT_CLASS_NAME)}\["
     r"[^\]]*Literal\[['\"](.+?)['\"]\]"  # Group 2: Any literal, non-greedy
-    r"\]'>"  # Closing bracket for Content[...] and class
-    r"\]"  # Closing bracket for Annotated[...]
+    r"\]'>"                          # Closing bracket for Content[...] and class
+    r"\]"                            # Closing bracket for Annotated[...]
 )
 
 # Content annotation without a format specifier
-# Example: "typing.Annotated[SomePathLikeType, <class 'weave.type_handlers.Content.content.Content'>]"
-# Explanation:
-# - r"typing\.Annotated\[": Matches the literal "typing.Annotated["
-# - r"(.+?)": Group 1. Captures the base type (non-greedy).
-# - r",\s*": Matches a comma followed by optional whitespace.
-# - fr"<class '{re.escape(content_class_name)}'>": Matches the class representation.
-# - r"\]": Matches the closing square bracket for Annotated.
+# Example: typing.Annotated[SomePathLikeType, <class 'weave.type_handlers.Content.content.Content'>]"
 PATTERN_WITHOUT_TYPE_HINT = re.compile(
-    r"typing\.Annotated\["
-    r"(.+?),\s*"  # Group 1: Base type (non-greedy)
+    r"(?:\w+(?:\.\w+)*\.)?Annotated\["  # Optional module prefix for Annotated
+    r"(.+?),\s*"                      # Group 1: Base type (non-greedy)
     rf"<class '{re.escape(CONTENT_CLASS_NAME)}'>"
-    r"\]"  # Closing bracket for Annotated[...]
+    r"\]"                            # Closing bracket for Annotated[...]
 )
-
 
 class ContentAnnotation(BaseModel):
     base_type: str
@@ -72,7 +57,7 @@ def try_parse_annotation_with_hint(annotation_string: str) -> ContentAnnotation 
         return None
 
     base_type = match_with_format.group(1).strip()
-    type_hint = match_with_format.group(2)
+    type_hint = match_with_format.group(2).lower()
 
     if type_hint.find("/") > -1:
         # We know it's a Mimetype if there's a '/'
