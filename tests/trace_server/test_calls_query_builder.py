@@ -489,8 +489,9 @@ def test_query_with_simple_feedback_sort() -> None:
             calls_merged.id AS id
         FROM
             calls_merged
-        LEFT JOIN feedback ON
-            (feedback.project_id = {pb_4:String} AND
+        LEFT JOIN (
+            SELECT * FROM feedback WHERE project_id = {pb_4:String}
+        ) AS feedback ON (
             feedback.weave_ref = concat('weave-trace-internal:///',
             {pb_4:String},
             '/call/',
@@ -547,8 +548,9 @@ def test_query_with_simple_feedback_sort_with_op_name() -> None:
             calls_merged.id AS id
         FROM
             calls_merged
-        LEFT JOIN feedback ON
-            (feedback.project_id = {pb_5:String} AND
+        LEFT JOIN (
+            SELECT * FROM feedback WHERE project_id = {pb_5:String}
+        ) AS feedback ON (
             feedback.weave_ref = concat('weave-trace-internal:///',
             {pb_5:String},
             '/call/',
@@ -583,8 +585,9 @@ def test_query_with_simple_feedback_sort_with_op_name() -> None:
             calls_merged.id AS id
         FROM
             calls_merged
-        LEFT JOIN feedback ON
-            (feedback.project_id = {pb_5:String} AND
+        LEFT JOIN (
+            SELECT * FROM feedback WHERE project_id = {pb_5:String}
+        ) AS feedback ON (
             feedback.weave_ref = concat('weave-trace-internal:///',
             {pb_5:String},
             '/call/',
@@ -646,8 +649,9 @@ def test_query_with_simple_feedback_filter() -> None:
             calls_merged.id AS id
         FROM
             calls_merged
-        LEFT JOIN feedback ON
-            (feedback.project_id = {pb_3:String} AND
+        LEFT JOIN (
+            SELECT * FROM feedback WHERE project_id = {pb_3:String}
+        ) AS feedback ON (
             feedback.weave_ref = concat('weave-trace-internal:///',
             {pb_3:String},
             '/call/',
@@ -698,8 +702,9 @@ def test_query_with_simple_feedback_sort_and_filter() -> None:
             calls_merged.id AS id
         FROM
             calls_merged
-        LEFT JOIN feedback ON
-            (feedback.project_id = {pb_6:String} AND
+        LEFT JOIN (
+            SELECT * FROM feedback WHERE project_id = {pb_6:String}
+        ) AS feedback ON (
             feedback.weave_ref = concat('weave-trace-internal:///',
             {pb_6:String},
             '/call/',
@@ -1978,7 +1983,7 @@ def test_query_with_feedback_filter_and_datetime_and_string_filter() -> None:
         WITH filtered_calls AS
             (SELECT calls_merged.id AS id
             FROM calls_merged
-            LEFT JOIN feedback ON (feedback.project_id = {pb_8:String} AND feedback.weave_ref = concat('weave-trace-internal:///', {pb_8:String}, '/call/', calls_merged.id))
+            LEFT JOIN (SELECT * FROM feedback WHERE project_id = {pb_8:String}) AS feedback ON (feedback.weave_ref = concat('weave-trace-internal:///', {pb_8:String}, '/call/', calls_merged.id))
             WHERE calls_merged.project_id = {pb_8:String}
                 AND (calls_merged.sortable_datetime > {pb_7:String})
                 AND ((calls_merged.inputs_dump LIKE {pb_6:String}
