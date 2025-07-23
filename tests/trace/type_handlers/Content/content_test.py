@@ -235,7 +235,7 @@ class TestWeaveContent:
         content = Content.from_path(image_file, metadata=metadata)
 
         # Check that metadata was stored in extra field
-        assert content.extra == metadata
+        assert content.metadata == metadata
 
         # Check other fields are accessible
         assert content.size > 0
@@ -282,7 +282,7 @@ class TestWeaveContent:
         # Test with custom metadata
         metadata = {"author": "test", "version": "1.0"}
         content = Content.from_bytes(file_bytes, extension="txt", metadata=metadata)
-        assert content.extra == metadata
+        assert content.metadata == metadata
 
         # Test with custom encoding
         content2 = Content.from_bytes(file_bytes, extension="txt", encoding="latin-1")

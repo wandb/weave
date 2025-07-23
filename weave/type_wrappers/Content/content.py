@@ -45,7 +45,7 @@ class ResolvedContentArgsWithoutData(TypedDict):
     input_type: str
 
     # Optional fields - can be omitted
-    extra: NotRequired[dict[str, Any]]
+    metadata: NotRequired[dict[str, Any]]
     path: NotRequired[str]
     extension: NotRequired[str]
     encoding: NotRequired[str]
@@ -77,10 +77,10 @@ class Content(BaseModel, Generic[T]):
     content_type: ContentType
     input_type: str
 
-    extra: Annotated[
+    metadata: Annotated[
         dict[str, Any] | None,
         Field(
-            description="Extra metadata to associate with the content",
+            description="metadata metadata to associate with the content",
             examples=[{"number of cats": 1}],
         ),
     ] = None
@@ -132,13 +132,12 @@ class Content(BaseModel, Generic[T]):
             "filename": filename,
             "content_type": "bytes",
             "input_type": full_name(data),
-            "extra": metadata or {},
             "extension": extension,
             "encoding": encoding or "utf-8",
         }
 
         if metadata:
-            resolved_args["extra"] = metadata
+            resolved_args["metadata"] = metadata
 
         # Use model_construct to bypass our custom __init__
         return cls.model_construct(**resolved_args)
@@ -178,7 +177,7 @@ class Content(BaseModel, Generic[T]):
         }
 
         if metadata:
-            resolved_args["extra"] = metadata
+            resolved_args["metadata"] = metadata
 
         # Use model_construct to bypass our custom __init__
         return cls.model_construct(**resolved_args)
@@ -224,10 +223,11 @@ class Content(BaseModel, Generic[T]):
         }
 
         if metadata:
-            resolved_args["extra"] = metadata
+            resolved_args["metadata"] = metadata
 
         # Use model_construct to bypass our custom __init__
         return cls.model_construct(**resolved_args)
+
 
     @classmethod
     def from_path(
@@ -239,8 +239,42 @@ class Content(BaseModel, Generic[T]):
         metadata: dict[str, Any] | None = None,
     ) -> Self:
         """Initializes Content from a local file path."""
-        # This classmethod delegates to the main constructor
-        return cls(path, encoding=encoding, mimetype=mimetype, metadata=metadata)
+        path_obj = Path(path)
+        if not is_valid_path(path_obj):
+            raise FileNotFoundError(f"File not found at path: {path_obj}")
+
+        data = path_obj.read_bytes()
+        file_name = path_obj.name
+        file_size = path_obj.stat().st_size
+        digest = hashlib.sha256(data).hexdigest()
+
+        mimetype, extension = get_mime_and_extension(
+            mimetype=mimetype,
+            extension=path_obj.suffix,
+            filename=file_name,
+            buffer=data,
+        )
+
+        # We gather all the resolved arguments...
+        resolved_args: ResolvedContentArgs = {
+            "id": uuid.uuid4().hex,
+            "data": data,
+            "size": file_size,
+            "mimetype": mimetype,
+            "digest": digest,
+            "filename": file_name,
+            "content_type": "file",
+            "input_type": full_name(path),
+            "path": str(path_obj.resolve()),
+            "extension": extension,
+            "encoding": encoding,
+        }
+
+        if metadata:
+            resolved_args["metadata"] = metadata
+
+        # Use model_construct to bypass our custom __init__
+        return cls.model_construct(**resolved_args)
 
     @classmethod
     def _from_guess(
