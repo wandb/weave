@@ -25,6 +25,7 @@ ContentType = Literal["bytes", "text", "base64", "file"]
 
 ValidContentInputs = Union[bytes, str, Path]
 
+
 # This is what is saved to the 'metadata.json' file by serialization layer
 # It is used to 'restore' an existing content object
 class ResolvedContentArgsWithoutData(TypedDict):
@@ -37,11 +38,12 @@ class ResolvedContentArgsWithoutData(TypedDict):
     content_type: ContentType
     input_type: str
 
-    # Optional fields - can be ommited or None
+    # Optional fields - can be omitted or None
     extra: NotRequired[dict[str, Any]]
     path: NotRequired[str]
     extension: NotRequired[str]
     encoding: NotRequired[str]
+
 
 class ResolvedContentArgs(ResolvedContentArgsWithoutData):
     # Required Fields
@@ -80,8 +82,6 @@ class Content(BaseModel, Generic[T]):
         str | None,
         Field(description="Last path the file was saved to"),
     ] = Field(None, exclude=True)
-    # Not p
-    _last_saved_path: str | None = None
 
     def __init__(
         self,
@@ -107,8 +107,6 @@ class Content(BaseModel, Generic[T]):
             filename=file_name,
             buffer=data,
         )
-
-
 
         # We gather all the resolved arguments...
         resolved_args: ResolvedContentArgs = {
