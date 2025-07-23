@@ -15,7 +15,7 @@ try:
     import puremagic
 
     MAGIC_LIB_AVAILABLE = True
-except Exception as e:
+except (ImportError, ModuleNotFoundError) as e:
     MAGIC_LIB_AVAILABLE = False
 
 # See: https://mimesniff.spec.whatwg.org/
