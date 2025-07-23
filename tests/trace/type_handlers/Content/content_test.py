@@ -38,7 +38,6 @@ def pdf_file(tmp_path_factory) -> Path:
 
 @pytest.fixture(scope="session")
 def audio_file(tmp_path_factory) -> Path:
-    file = "file.wav"
     file = generate_media("WAV")
     fn = tmp_path_factory.mktemp("data") / "file.wav"
     file.save(fn)
