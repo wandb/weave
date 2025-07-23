@@ -1,52 +1,56 @@
 import weave
-from weave.flow.scorer import prepare_scorer_op_args
+from weave.flow.scorer import Scorer, prepare_scorer_op_args
 
 
 class TestPreparerScorerOpArgs:
     """Test the prepare_scorer_op_args function behavior."""
 
-    def test_skips_kwargs_parameter(self):
+    def test_skips_kwargs_parameter_with_column_map(self):
         """
         Test that prepare_scorer_op_args correctly skips the 'kwargs' parameter
-        when building score arguments, just like it skips 'output' and 'model_output'.
+        when building score arguments with column mapping.
 
         This tests the specific change that adds "kwargs" to the list of
         parameters to skip: if arg in ("output", "model_output", "kwargs")
         """
 
-        @weave.op
-        def scorer_with_kwargs(input_text: str, target: str, output: str, **kwargs):
-            """A scorer function that accepts kwargs."""
-            return len(input_text) - len(target)
+        # Create a Scorer with column_map to trigger the code path where the change was made
+        class TestScorer(Scorer):
+            column_map: dict = {"input_text": "question", "target": "answer"}
 
-        # Test data
+            def score(self, input_text: str, target: str, output: str, **kwargs):
+                """A scorer function that accepts kwargs."""
+                return len(input_text) - len(target)
+
+        scorer = TestScorer()
+
+        # Test data - using the mapped column names
         example = {
-            "input_text": "Hello world",
-            "target": "Hello",
+            "question": "Hello world",  # Maps to input_text
+            "answer": "Hello",  # Maps to target
             "kwargs": {"some": "value"},  # This should be skipped
             "extra_field": "ignored",  # This should also not appear
         }
         model_output = "some output"
 
         # Call the function
-        score_op, score_args = prepare_scorer_op_args(
-            scorer_with_kwargs, example, model_output
-        )
+        score_op, score_args = prepare_scorer_op_args(scorer, example, model_output)
 
         # Verify that kwargs is not in the score_args
         assert "kwargs" not in score_args
 
-        # Verify that the expected arguments are included
+        # Verify that the expected arguments are included with mapped values
         assert "input_text" in score_args
         assert "target" in score_args
-        assert score_args["input_text"] == "Hello world"
-        assert score_args["target"] == "Hello"
+        assert score_args["input_text"] == "Hello world"  # From the mapped "question"
+        assert score_args["target"] == "Hello"  # From the mapped "answer"
 
         # Verify that extra_field is not included (not in scorer signature)
         assert "extra_field" not in score_args
 
-        # Verify the op is correct
-        assert score_op == scorer_with_kwargs
+        # Verify that output is included (added separately for model output)
+        assert "output" in score_args
+        assert score_args["output"] == "some output"
 
     def test_skips_output_and_model_output_parameters(self):
         """
