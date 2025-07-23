@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 import weave
 from weave.flow.scorer import Scorer, prepare_scorer_op_args
 
@@ -12,7 +14,7 @@ def test_skips_kwargs_parameter_with_column_map():
     """
 
     class TestScorer(Scorer):
-        column_map: dict = {"input_text": "question", "target": "answer"}
+        column_map: ClassVar[dict] = {"input_text": "question", "target": "answer"}
 
         @weave.op
         def score(self, *, input_text: str, target: str, output: str, **kwargs):
