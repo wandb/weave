@@ -193,6 +193,7 @@
       "type": "object"
     },
     "CallsFilter": {
+      "additionalProperties": false,
       "properties": {
         "op_names": {
           "anyOf": [
@@ -284,6 +285,36 @@
           "default": null,
           "title": "Call Ids"
         },
+        "thread_ids": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Thread Ids"
+        },
+        "turn_ids": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Turn Ids"
+        },
         "trace_roots_only": {
           "anyOf": [
             {
@@ -328,6 +359,100 @@
         }
       },
       "title": "CallsFilter",
+      "type": "object"
+    },
+    "ChartConfig": {
+      "properties": {
+        "x_axis": {
+          "title": "XAxis",
+          "type": "string"
+        },
+        "y_axis": {
+          "title": "YAxis",
+          "type": "string"
+        },
+        "plot_type": {
+          "anyOf": [
+            {
+              "enum": [
+                "scatter",
+                "line",
+                "bar"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Plot Type"
+        },
+        "bin_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bin Count"
+        },
+        "aggregation": {
+          "anyOf": [
+            {
+              "enum": [
+                "average",
+                "sum",
+                "min",
+                "max",
+                "p95",
+                "p99"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Aggregation"
+        },
+        "group_keys": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Group Keys"
+        },
+        "custom_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Custom Name"
+        }
+      },
+      "required": [
+        "x_axis",
+        "y_axis"
+      ],
+      "title": "ChartConfig",
       "type": "object"
     },
     "Column": {
@@ -487,9 +612,6 @@
         "action_type": {
           "const": "contains_words",
           "default": "contains_words",
-          "enum": [
-            "contains_words"
-          ],
           "title": "Action Type",
           "type": "string"
         },
@@ -1279,9 +1401,6 @@
         "action_type": {
           "const": "llm_judge",
           "default": "llm_judge",
-          "enum": [
-            "llm_judge"
-          ],
           "title": "Action Type",
           "type": "string"
         },
@@ -1448,7 +1567,7 @@
           "type": "string"
         },
         "_digest": {
-          "title": " Digest",
+          "title": "Digest",
           "type": "string"
         },
         "_extra": {
@@ -1456,7 +1575,7 @@
           "items": {
             "type": "string"
           },
-          "title": " Extra",
+          "title": "Extra",
           "type": "array"
         }
       },
@@ -1640,7 +1759,6 @@
       "type": "object"
     },
     "ProviderReturnType": {
-      "const": "openai",
       "enum": [
         "openai"
       ],
@@ -1648,7 +1766,7 @@
       "type": "string"
     },
     "Query": {
-      "description": "The top-level object for querying traced calls.\n\nThe `Query` wraps a single `$expr`, which uses Mongo-style aggregation operators\nto filter calls. This expression can combine logical conditions, comparisons,\ntype conversions, and string matching.\n\nExamples:\n    ```\n    # Filter calls where op_name == \"predict\"\n    {\n        \"$expr\": {\n            \"$eq\": [\n                {\"$getField\": \"op_name\"},\n                {\"$literal\": \"predict\"}\n            ]\n        }\n    }\n\n    # Filter where a call's display name contains \"llm\"\n    {\n        \"$expr\": {\n            \"$contains\": {\n                \"input\": {\"$getField\": \"display_name\"},\n                \"substr\": {\"$literal\": \"llm\"},\n                \"case_insensitive\": true\n            }\n        }\n    }\n    ```",
+      "additionalProperties": false,
       "properties": {
         "$expr": {
           "anyOf": [
@@ -1823,12 +1941,28 @@
           ],
           "default": null,
           "title": "Page Size"
+        },
+        "charts": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/ChartConfig"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Charts"
         }
       },
       "title": "SavedViewDefinition",
       "type": "object"
     },
     "SortBy": {
+      "additionalProperties": false,
       "properties": {
         "field": {
           "title": "Field",
@@ -2030,6 +2164,9 @@
     },
     "LLMStructuredCompletionModel": {
       "$ref": "#/$defs/LLMStructuredCompletionModel"
+    },
+    "ChartConfig": {
+      "$ref": "#/$defs/ChartConfig"
     }
   },
   "required": [
@@ -2042,7 +2179,8 @@
     "Provider",
     "ProviderModel",
     "SavedView",
-    "LLMStructuredCompletionModel"
+    "LLMStructuredCompletionModel",
+    "ChartConfig"
   ],
   "title": "CompositeBaseObject",
   "type": "object"
