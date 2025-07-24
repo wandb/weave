@@ -3,8 +3,8 @@
 #!/usr/bin/env -S uv run --script
 # /// script
 # dependencies = [
-#     "weave",
-#     "rich",
+#     "weave==0.51.56",
+#     "rich==14.0.0",
 # ]
 # ///
 

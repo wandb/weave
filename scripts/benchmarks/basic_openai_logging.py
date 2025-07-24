@@ -3,9 +3,9 @@
 #!/usr/bin/env -S uv run --script
 # /// script
 # dependencies = [
-#     "openai",
-#     "weave",
-#     "rich",
+#     "openai==1.97.1",
+#     "weave==0.51.56",
+#     "rich==14.0.0",
 # ]
 # ///
 

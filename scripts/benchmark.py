@@ -5,8 +5,8 @@ A typer app for selecting and running benchmarks from the benchmarks/ directory.
 #!/usr/bin/env -S uv run --script
 # /// script
 # dependencies = [
-#     "rich",
-#     "typer",
+#     "rich==14.0.0",
+#     "typer==0.16.0",
 # ]
 # ///
 
