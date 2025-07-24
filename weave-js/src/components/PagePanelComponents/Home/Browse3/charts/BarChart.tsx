@@ -29,7 +29,7 @@ import {
   tooltipHeaderStyle,
   tooltipRowStyle,
 } from './styling';
-import {AggregationMethod, ChartAxisField, ExtractedCallData} from './types';
+import {AggregationMethod, BinningMode, ChartAxisField, ExtractedCallData} from './types';
 import {useChartZoom} from './useChartZoom';
 
 type BarChartTooltipData = {
@@ -117,6 +117,7 @@ export type BarChartProps = {
   initialXAxis?: string;
   initialYAxis?: string;
   binCount?: number;
+  binningMode?: BinningMode;
   aggregation?: AggregationMethod;
   groupKeys?: string[];
   chartId?: string;
@@ -130,6 +131,7 @@ export const BarChart: React.FC<BarChartProps> = ({
   initialXAxis = 'started_at',
   initialYAxis = 'latency',
   binCount = 20,
+  binningMode = 'absolute',
   aggregation = 'average',
   groupKeys,
   chartId,
@@ -178,7 +180,8 @@ export const BarChart: React.FC<BarChartProps> = ({
       fullXDomain,
       dataRanges,
       groupKeys,
-      true
+      true,
+      binningMode
     );
     let maxY = 0;
     if (groupKeys && groupKeys.length > 0) {
@@ -204,7 +207,7 @@ export const BarChart: React.FC<BarChartProps> = ({
       });
     }
     return [0, maxY * 1.1] as [number, number];
-  }, [points, binCount, aggregation, dataRanges, groupKeys, isDataReady]);
+  }, [points, binCount, binningMode, aggregation, dataRanges, groupKeys, isDataReady]);
 
   // Initialize state to match double-click reset behavior once data is ready
   const [hasInitialized, setHasInitialized] = React.useState(false);
@@ -254,12 +257,14 @@ export const BarChart: React.FC<BarChartProps> = ({
       domainXDomain,
       dataRanges,
       groupKeys,
-      true
+      true,
+      binningMode
     );
   }, [
     data,
     points,
     binCount,
+    binningMode,
     aggregation,
     groupKeys,
     currentXDomain,
