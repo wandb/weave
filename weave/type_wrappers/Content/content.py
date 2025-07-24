@@ -43,12 +43,12 @@ class ResolvedContentArgsWithoutData(TypedDict):
     filename: str
     content_type: ContentType
     input_type: str
+    encoding: str
 
     # Optional fields - can be omitted
     metadata: NotRequired[dict[str, Any]]
     path: NotRequired[str]
     extension: NotRequired[str]
-    encoding: NotRequired[str]
 
 
 class ResolvedContentArgs(ResolvedContentArgsWithoutData):
