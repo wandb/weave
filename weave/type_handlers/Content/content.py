@@ -19,7 +19,7 @@ def save(obj: Content, artifact: MemTraceFilesArtifact, name: str) -> None:
 
     with artifact.new_file("metadata.json", binary=False) as f:
         # The serialization layer sets non-private fields on pydantic models and saved files
-        # Which we do not want to include here. 
+        # Which we do not want to include here.
         # By doing this, we can ensure that those fields can be set but will never show
         metadata = obj.model_dump(exclude={"data", "ref"})
         json.dump(metadata, f)

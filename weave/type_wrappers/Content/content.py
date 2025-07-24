@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Annotated, Any, Generic, Literal, TypedDict, Union
 
 from pydantic import BaseModel, Field, PrivateAttr
-from typing_extensions import NotRequired, Self, TypeVar, override
+from typing_extensions import NotRequired, Self, TypeVar
 
 from .utils import (
     default_filename,
@@ -376,4 +376,3 @@ class Content(BaseModel, Generic[T]):
 
     # @override
     # def model_dump(self):
-
