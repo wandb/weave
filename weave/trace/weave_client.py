@@ -2150,7 +2150,7 @@ class WeaveClient:
                       Overrides use_progress_bar.
         """
         if use_progress_bar and callback is None:
-            from weave.trace.client_progress_bar import create_progress_bar_callback
+            from weave.display.client_progress_bar import create_progress_bar_callback
 
             callback = create_progress_bar_callback()
 
