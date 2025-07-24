@@ -2,9 +2,9 @@
 
 :::tip[This is a notebook]
 
-<a href="https://colab.research.google.com/github/wandb/weave/blob/master/docs/./notebooks/Intro_to_Weave_Hello_Thread.ipynb" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link button button--secondary button--med margin-right--sm notebook-cta-button"><div><img src="https://upload.wikimedia.org/wikipedia/commons/archive/d/d0/20221103151430%21Google_Colaboratory_SVG_Logo.svg" alt="Open In Colab" height="20px" /><div>Open in Colab</div></div></a>
+<a href="https://colab.research.google.com/github/wandb/weave/blob/master/docs/notebooks/Intro_to_Weave_Hello_Thread.ipynb" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link button button--secondary button--med margin-right--sm notebook-cta-button"><div><img src="https://upload.wikimedia.org/wikipedia/commons/archive/d/d0/20221103151430%21Google_Colaboratory_SVG_Logo.svg" alt="Open In Colab" height="20px" /><div>Open in Colab</div></div></a>
 
-<a href="https://github.com/wandb/weave/blob/master/docs/./notebooks/Intro_to_Weave_Hello_Thread.ipynb" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link button button--secondary button--med margin-right--sm notebook-cta-button"><div><img src="https://upload.wikimedia.org/wikipedia/commons/9/91/Octicons-mark-github.svg" alt="View in Github" height="15px" /><div>View in Github</div></div></a>
+<a href="https://github.com/wandb/weave/blob/master/docs/notebooks/Intro_to_Weave_Hello_Thread.ipynb" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link button button--secondary button--med margin-right--sm notebook-cta-button"><div><img src="https://upload.wikimedia.org/wikipedia/commons/9/91/Octicons-mark-github.svg" alt="View in Github" height="15px" /><div>View in Github</div></div></a>
 
 :::
 
@@ -15,21 +15,23 @@
 
 Weave is a toolkit for developing AI-powered applications.
 
-Threads in Weave group related traces into conversations, making it easy to track multi-turn interactions with LLMs.
+_Threads_ in Weave group related traces into conversations, making it easy to track multi-turn interactions with LLMs.
 
 While individual traces capture single function calls, threads automatically organize these traces into coherent sequences—perfect for debugging chat sessions, multi-step workflows, or any scenario where context builds across multiple operations.
 
-Simply use the same thread ID across related @weave.op decorated functions, and Weave will link them together, giving you a complete view of how your application handles extended conversations or complex workflows.
+Simply use the same thread ID across related `@weave.op` decorated functions, and Weave will link them together, giving you a complete view of how your application handles extended conversations or complex workflows.
 
 
 ## 🔑 Prerequisites (using W&B Inference)
 
-You can use W&B Inference to jumpstart your projects with hosted model inference.\
-Before you can begin tracing in Weave, complete the following prerequisites.
+This guide uses the [W&B Inference service](https://weave-docs.wandb.ai/guides/integrations/inference) to provide hosted model inference.
 
-1. Install the W&B Weave SDK and log in with your [API key](https://wandb.ai/settings#api).
-2. Initialize your W&B project.
-3. Use your OpenAI SDK as you usually would with `https://api.inference.wandb.ai/v1` as your `base_url`.
+Before you can use the guide, you must complete the [W&B Inference service prerequisites](https://weave-docs.wandb.ai/guides/integrations/inference#prerequisites). 
+
+
+> **Tip** 
+>
+> Familiarize yourself with [W&B Inference usage information and limits](https://weave-docs.wandb.ai/guides/integrations/inference#usage-information-and-limits).
 
 
 ```python
@@ -59,8 +61,8 @@ weave_client = weave.init(f"{os.environ['WANDB_TEAM']}/{os.environ['WANDB_PROJEC
 
 ## 🐝 Create your first threads
 
-The following code sample shows how to capture and visualize a capture Traces and Threads in W&B Weave.\
-This will help demonstrate how you can create a thread context which will help you create, resume, and trace to threads in W&B Weave.
+The following code sample demonstrates how to capture and visualize a capture Traces and Threads.\
+Specifically, you create a thread context, which helps you to create, resume, and trace threads in W&B Weave.
 
 
 ```python
@@ -316,4 +318,5 @@ with weave.thread(thread_id) as thread_ctx:
 - Check out the [Quickstart guide](https://weave-docs.wandb.ai/quickstart).
 - Learn more about [advanced tracing topics](https://weave-docs.wandb.ai/tutorial-tracing_2).
 - Learn more about [tracing in Weave](https://weave-docs.wandb.ai/guides/tracking/tracing)
+- Learn more about the [inference service](https://weave-docs.wandb.ai/guides/integrations/inference).
 
