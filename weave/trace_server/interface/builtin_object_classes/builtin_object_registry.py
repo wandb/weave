@@ -13,7 +13,10 @@ from weave.trace_server.interface.builtin_object_classes.provider import (
     Provider,
     ProviderModel,
 )
-from weave.trace_server.interface.builtin_object_classes.saved_view import SavedView
+from weave.trace_server.interface.builtin_object_classes.saved_view import (
+    ChartConfig,
+    SavedView,
+)
 from weave.trace_server.interface.builtin_object_classes.test_only_example import (
     TestOnlyExample,
     TestOnlyInheritedBaseObject,
@@ -43,3 +46,4 @@ register_base_object(Provider)
 register_base_object(ProviderModel)
 register_base_object(SavedView)
 register_base_object(LLMStructuredCompletionModel)
+register_base_object(ChartConfig)
