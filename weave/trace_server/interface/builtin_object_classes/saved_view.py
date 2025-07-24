@@ -1,4 +1,4 @@
-from typing import Optional, Union
+from typing import Literal, Optional, Union
 
 from pydantic import BaseModel, Field
 
@@ -19,6 +19,20 @@ class Column(BaseModel):
     label: Optional[str] = Field(default=None)
 
 
+class ChartConfig(BaseModel):
+    x_axis: str = Field(title="XAxis")
+    y_axis: str = Field(title="YAxis")
+    plot_type: Optional[Literal["scatter", "line", "bar"]] = Field(
+        default=None,
+    )
+    bin_count: Optional[int] = Field(default=None)
+    aggregation: Optional[Literal["average", "sum", "min", "max", "p95", "p99"]] = (
+        Field(default=None)
+    )
+    group_keys: Optional[list[str]] = Field(default=None)
+    custom_name: Optional[str] = Field(default=None)
+
+
 class SavedViewDefinition(BaseModel):
     filter: Optional[tsi.CallsFilter] = Field(default=None)
 
@@ -36,6 +50,7 @@ class SavedViewDefinition(BaseModel):
     pin: Optional[Pin] = Field(default=None)
     sort_by: Optional[list[tsi.SortBy]] = Field(default=None)
     page_size: Optional[int] = Field(default=None)
+    charts: Optional[list[ChartConfig]] = Field(default=None)
 
 
 class SavedView(base_object_def.BaseObject):
