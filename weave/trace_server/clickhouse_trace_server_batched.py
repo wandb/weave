@@ -1773,18 +1773,43 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 (
                     req.query.expr_
                     if req.query
-                    else {
-                        "$eq": [
-                            {"$getField": "pricing_level_id"},
-                            {"$literal": req.project_id},
-                        ],
-                    }
+                    else {"$eq": [{"$literal": "1"}, {"$literal": "1"}]}
                 ),
                 {
-                    "$eq": [
-                        {"$getField": "pricing_level"},
-                        {"$literal": "project"},
-                    ],
+                    "$or": [
+                        {
+                            "$and": [
+                                {
+                                    "$eq": [
+                                        {"$getField": "pricing_level"},
+                                        {"$literal": "project"},
+                                    ],
+                                },
+                                {
+                                    "$eq": [
+                                        {"$getField": "pricing_level_id"},
+                                        {"$literal": req.project_id},
+                                    ],
+                                },
+                            ]
+                        },
+                        {
+                            "$and": [
+                                {
+                                    "$eq": [
+                                        {"$getField": "pricing_level"},
+                                        {"$literal": "default"},
+                                    ],
+                                },
+                                {
+                                    "$eq": [
+                                        {"$getField": "pricing_level_id"},
+                                        {"$literal": "default"},
+                                    ],
+                                },
+                            ]
+                        },
+                    ]
                 },
             ]
         }
