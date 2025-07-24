@@ -684,7 +684,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             ),
         )
 
-    def call_descendants(self, req: tsi.CallDescendantsReq) -> Iterator[tsi.CallSchema]:
+    def calls_descendants(
+        self, req: tsi.CallsDescendantsReq
+    ) -> Iterator[tsi.CallSchema]:
         """Get descendant calls for given call IDs."""
         if req.depth is not None and req.depth < 0:
             raise ValueError("Depth must be a positive integer")
@@ -697,10 +699,15 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         elif limit < 0:
             raise ValueError("Limit must be a positive integer")
 
+        print(">>>>>", req)
+
+        parent_call_ids = req.parent_call_ids or []
+        placeholders = ",".join("?" * len(parent_call_ids))
+
         conn, cursor = get_conn_cursor(self.db_path)
         # Get all child calls recursively
-        cursor.execute(
-            """
+        # Use parameterized query to avoid string formatting issues
+        sql = """
             WITH RECURSIVE call_tree AS (
                 -- Base case: get immediate children
                 SELECT
@@ -756,12 +763,19 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             SELECT * FROM call_tree
             ORDER BY started_at ASC
             LIMIT ?
-            """.format(",".join("?" * len(req.call_ids))),
-            req.call_ids
-            + [req.project_id, req.project_id, req.depth, req.depth, limit],
-        )
+        """
+        params = list(parent_call_ids) + [
+            req.project_id,
+            req.project_id,
+            req.depth,
+            req.depth,
+            limit,
+        ]
+        cursor.execute(sql, params)
 
         rows = cursor.fetchall()
+
+        print(">>>>>", rows)
 
         for row in rows:
             yield tsi.CallSchema(

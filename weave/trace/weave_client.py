@@ -1047,12 +1047,14 @@ class WeaveClient:
 
     @trace_sentry.global_trace_sentry.watch()
     @pydantic.validate_call
-    def get_call_descendants(
+    def get_calls_descendants(
         self,
         *,
-        call_ids: list[str] | None = None,
+        parent_call_ids: list[str] | None = None,
         limit: int | None = None,
         depth: int | None = None,
+        filter: CallsFilter | None = None,
+        query: Query | None = None,
         include_costs: bool = False,
         include_feedback: bool = False,
         columns: list[str] | None = None,
@@ -1083,40 +1085,44 @@ class WeaveClient:
         Examples:
             Get all descendants of a single call:
             ```python
-            descendants = client.get_call_descendants(call_id="call_123")
+            descendants = client.get_calls_descendants(parent_call_ids=["call_123"])
             ```
 
             Get direct children only:
             ```python
-            children = client.get_call_descendants(call_id="call_123", depth=1)
+            children = client.get_calls_descendants(parent_call_ids=["call_123"], depth=1)
             ```
 
             Get descendants of multiple calls:
             ```python
-            descendants = client.get_call_descendants(
-                call_ids=["call_123", "call_456"],
+            descendants = client.get_calls_descendants(
+                parent_call_ids=["call_123", "call_456"],
                 limit=100
             )
             ```
         """
         from weave.trace_server.trace_server_interface import (
-            CallDescendantsReq,
+            CallsDescendantsReq,
         )
 
-        if not call_ids:
+        if not parent_call_ids:
             raise ValueError("Must specify call_ids")
 
-        req = CallDescendantsReq(
+        req = CallsDescendantsReq(
             project_id=self._project_id(),
-            parent_call_ids=call_ids,
+            parent_call_ids=parent_call_ids,
             limit=limit,
             depth=depth,
+            filter=filter,
+            query=query,
             include_costs=include_costs,
             include_feedback=include_feedback,
             columns=columns,
             expand_columns=expand_columns,
         )
-        res = self.server.call_descendants(req)
+        res = self.server.calls_descendants(req)
+        if not res:
+            return []
 
         # Convert response calls to WeaveObject instances
         call_objects = []

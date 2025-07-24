@@ -21,6 +21,7 @@ from tests.trace.util import (
     DatetimeMatcher,
     RegexStringMatcher,
     client_is_sqlite,
+    op_name_from_ref,
 )
 from weave import Evaluation
 from weave.integrations.integration_utilities import op_name_from_call
@@ -3597,7 +3598,7 @@ def test_sum_dict_leaves_mixed_types(client):
     }
 
 
-def test_call_descendants(client):
+def test_calls_descendants(client):
     @weave.op
     def parent_op(x):
         child_op(x + 1)
@@ -3616,29 +3617,18 @@ def test_call_descendants(client):
     result = parent_op(5)
 
     # Get all calls
-    calls = list(client.get_calls())
-    parent_call = None
-    for call in calls:
-        if call.op_name == "parent_op":
-            parent_call = call
-            break
+    calls = list(client.get_calls(filter={"trace_roots_only": True}))
+    assert len(calls) == 1
+    parent_call = calls[0]
+    assert op_name_from_ref(parent_call.op_name) == "parent_op"
 
-    assert parent_call is not None
+    print(" >>>>> ", parent_call.id)
 
     # Test the calls_descendants functionality
-    descendants = list(
-        client.server.calls_descendants(
-            tsi.CallsDescendantsReq(
-                project_id=client._project_id(), call_id=parent_call.id
-            )
-        )
-    )
-
-    # Should have the child and grandchild calls
-    descendant_op_names = [call.op_name for call in descendants]
-    assert "child_op" in descendant_op_names
-    assert "grandchild_op" in descendant_op_names
+    descendants = client.get_calls_descendants(parent_call_ids=[parent_call.id])
     assert len(descendants) == 2
+    assert op_name_from_ref(descendants[0].op_name) == "child_op"
+    assert op_name_from_ref(descendants[1].op_name) == "grandchild_op"
 
 
 def test_sum_dict_leaves_deep_nested(client):

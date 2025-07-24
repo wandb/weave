@@ -188,6 +188,33 @@ class ExternalTraceServer(tsi.TraceServerInterface):
                 call.wb_user_id = self._idc.int_to_ext_user_id(call.wb_user_id)
             yield call
 
+    def calls_descendants(
+        self, req: tsi.CallsDescendantsReq
+    ) -> Iterator[tsi.CallSchema]:
+        original_project_id = req.project_id
+        req.project_id = self._idc.ext_to_int_project_id(original_project_id)
+        if req.filter is not None:
+            if req.filter.wb_run_ids is not None:
+                req.filter.wb_run_ids = [
+                    self._idc.ext_to_int_run_id(run_id)
+                    for run_id in req.filter.wb_run_ids
+                ]
+            if req.filter.wb_user_ids is not None:
+                req.filter.wb_user_ids = [
+                    self._idc.ext_to_int_user_id(user_id)
+                    for user_id in req.filter.wb_user_ids
+                ]
+        res = self._stream_ref_apply(self._internal_trace_server.calls_descendants, req)
+        for call in res:
+            if call.project_id != req.project_id:
+                raise ValueError("Internal Error - Project Mismatch")
+            call.project_id = original_project_id
+            if call.wb_run_id is not None:
+                call.wb_run_id = self._idc.int_to_ext_run_id(call.wb_run_id)
+            if call.wb_user_id is not None:
+                call.wb_user_id = self._idc.int_to_ext_user_id(call.wb_user_id)
+            yield call
+
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         if req.wb_user_id is not None:

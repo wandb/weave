@@ -474,7 +474,7 @@ class CallsQueryStatsRes(BaseModel):
     total_storage_size_bytes: Optional[int] = None
 
 
-class CallDescendantsReq(BaseModel):
+class CallsDescendantsReq(BaseModel):
     """
     Request to get descendants of calls.
 
@@ -492,10 +492,6 @@ class CallDescendantsReq(BaseModel):
     limit: Optional[int] = Field(
         default=None,
         description="Maximum number of descendants to return across all parent calls",
-    )
-    offset: Optional[int] = Field(
-        default=None,
-        description="Number of descendants to skip before returning",
     )
     depth: Optional[int] = Field(
         default=None,
@@ -1255,7 +1251,7 @@ class TraceServerInterface(Protocol):
     def calls_query_stream(self, req: CallsQueryReq) -> Iterator[CallSchema]: ...
     def calls_delete(self, req: CallsDeleteReq) -> CallsDeleteRes: ...
     def calls_query_stats(self, req: CallsQueryStatsReq) -> CallsQueryStatsRes: ...
-    def call_descendants(self, req: CallDescendantsReq) -> Iterator[CallSchema]: ...
+    def calls_descendants(self, req: CallsDescendantsReq) -> Iterator[CallSchema]: ...
 
     def call_update(self, req: CallUpdateReq) -> CallUpdateRes: ...
     def call_start_batch(self, req: CallCreateBatchReq) -> CallCreateBatchRes: ...

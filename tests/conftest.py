@@ -118,7 +118,9 @@ class ThrowingServer(tsi.TraceServerInterface):
     def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
         raise DummyTestException("FAILURE - call_update, req:", req)
 
-    def call_descendants(self, req: tsi.CallDescendantsReq) -> Iterator[tsi.CallSchema]:
+    def calls_descendants(
+        self, req: tsi.CallsDescendantsReq
+    ) -> Iterator[tsi.CallSchema]:
         raise DummyTestException("FAILURE - calls_descendants, req:", req)
 
     # Op API

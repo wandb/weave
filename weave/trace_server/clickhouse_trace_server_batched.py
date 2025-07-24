@@ -602,8 +602,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                             val["_ref"] = ref.uri()
                         set_nested_key(calls[i], col, val)
 
-    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.call_descendants")
-    def call_descendants(self, req: tsi.CallDescendantsReq) -> Iterator[tsi.CallSchema]:
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_descendants")
+    def calls_descendants(
+        self, req: tsi.CallsDescendantsReq
+    ) -> Iterator[tsi.CallSchema]:
         """
         Get all descendants of the specified parent calls using a recursive CTE query.
 
@@ -615,22 +617,21 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             Iterator of CallSchema objects containing the descendant calls.
         """
         # Validate input - must have either parent_call_id or parent_call_ids
-        if req.parent_call_ids:
-            raise ValueError("Must specify parent_call_ids")
+        if not req.parent_call_ids:
+            raise ValueError("Must specify either parent_call_id or parent_call_ids")
 
-        parent_ids = req.parent_call_ids
-        if not parent_ids:
+        if not req.parent_call_ids:
             return
 
         # Build query using CallsQuery with descendant functionality
         cq = CallsQuery(
-            project_id=req.project_id, include_costs=req.include_costs or False
+            project_id=req.project_id,
+            include_costs=req.include_costs or False,
+            parent_call_ids=req.parent_call_ids,
+            depth=req.depth,
         )
-        cq.set_descendant_query_parent_ids(parent_ids)
-        if req.depth is not None:
-            cq.set_descendant_query_depth(req.depth)
 
-        # Handle select columns
+        # Handle columns
         columns = all_call_select_columns
         if req.columns:
             # Split out any nested column requests
