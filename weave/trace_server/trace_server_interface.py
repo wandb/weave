@@ -474,6 +474,56 @@ class CallsQueryStatsRes(BaseModel):
     total_storage_size_bytes: Optional[int] = None
 
 
+class CallDescendantsReq(BaseModel):
+    """
+    Request to get descendants of calls.
+
+    Can specify either:
+    - parent_call_ids: List of parent call IDs to get descendants for (batch mode)
+    - parent_call_id: Single parent call ID (for single call mode)
+    """
+
+    project_id: str
+    parent_call_ids: Optional[list[str]] = Field(
+        default=None,
+        description="List of parent call IDs to get descendants for",
+        examples=[["call_123", "call_456"]],
+    )
+    parent_call_id: Optional[str] = Field(
+        default=None,
+        description="Single parent call ID to get descendants for",
+        examples=["call_123"],
+    )
+    limit: Optional[int] = Field(
+        default=None,
+        description="Maximum number of descendants to return across all parent calls",
+    )
+    depth: Optional[int] = Field(
+        default=None,
+        description="Maximum depth of descendants to return (1 = direct children only)",
+    )
+    include_costs: Optional[bool] = Field(
+        default=False,
+        description="If true, the response will include any model costs for each call.",
+    )
+    include_feedback: Optional[bool] = Field(
+        default=False,
+        description="If true, the response will include feedback for each call.",
+    )
+    columns: Optional[list[str]] = Field(
+        default=None,
+        description="Columns to include in the response",
+    )
+    expand_columns: Optional[list[str]] = Field(
+        default=None,
+        description="Columns to expand, i.e. refs to other objects",
+    )
+
+
+class CallDescendantsRes(BaseModel):
+    calls: list[CallSchema]
+
+
 class CallUpdateReq(BaseModel):
     # required for all updates
     project_id: str
@@ -1210,6 +1260,7 @@ class TraceServerInterface(Protocol):
     def calls_query_stream(self, req: CallsQueryReq) -> Iterator[CallSchema]: ...
     def calls_delete(self, req: CallsDeleteReq) -> CallsDeleteRes: ...
     def calls_query_stats(self, req: CallsQueryStatsReq) -> CallsQueryStatsRes: ...
+    def call_descendants(self, req: CallDescendantsReq) -> CallDescendantsRes: ...
     def call_update(self, req: CallUpdateReq) -> CallUpdateRes: ...
     def call_start_batch(self, req: CallCreateBatchReq) -> CallCreateBatchRes: ...
 

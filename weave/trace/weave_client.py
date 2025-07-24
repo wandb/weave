@@ -1046,6 +1046,96 @@ class WeaveClient:
         return self.get_call(call_id=call_id, include_costs=include_costs)
 
     @trace_sentry.global_trace_sentry.watch()
+    @pydantic.validate_call
+    def get_call_descendants(
+        self,
+        *,
+        call_id: str | None = None,
+        call_ids: list[str] | None = None,
+        limit: int | None = None,
+        depth: int | None = None,
+        include_costs: bool = False,
+        include_feedback: bool = False,
+        columns: list[str] | None = None,
+        expand_columns: list[str] | None = None,
+    ) -> list[WeaveObject]:
+        """
+        Get all descendants of a call or list of calls.
+
+        This method retrieves all child calls (and their children recursively) for the
+        specified parent call(s). It's useful for analyzing the complete execution tree
+        of a traced operation.
+
+        Args:
+            call_id: Single parent call ID to get descendants for (cannot be used with call_ids).
+            call_ids: List of parent call IDs to get descendants for (cannot be used with call_id).
+            limit: Maximum number of descendants to return across all parent calls.
+            depth: Maximum depth of descendants to return (1 = direct children only).
+            include_costs: If True, includes token/cost info in `summary.weave`.
+            include_feedback: If True, includes feedback in `summary.weave.feedback`.
+            columns: List of fields to return per call. Reducing this can improve performance.
+            expand_columns: List of columns to expand (resolve refs to other objects).
+
+        Returns:
+            List of Call objects representing the descendants.
+
+        Raises:
+            ValueError: If neither call_id nor call_ids is provided, or if both are provided.
+
+        Examples:
+            Get all descendants of a single call:
+            ```python
+            descendants = client.get_call_descendants(call_id="call_123")
+            ```
+
+            Get direct children only:
+            ```python
+            children = client.get_call_descendants(call_id="call_123", depth=1)
+            ```
+
+            Get descendants of multiple calls:
+            ```python
+            descendants = client.get_call_descendants(
+                call_ids=["call_123", "call_456"],
+                limit=100
+            )
+            ```
+        """
+        from weave.trace_server.trace_server_interface import (
+            CallDescendantsReq,
+        )
+
+        if not call_id and not call_ids:
+            raise ValueError("Must specify either call_id or call_ids")
+
+        if call_id and call_ids:
+            raise ValueError("Cannot specify both call_id and call_ids")
+
+        req = CallDescendantsReq(
+            project_id=self._project_id(),
+            parent_call_id=call_id,
+            parent_call_ids=call_ids,
+            limit=limit,
+            depth=depth,
+            include_costs=include_costs,
+            include_feedback=include_feedback,
+            columns=columns,
+            expand_columns=expand_columns,
+        )
+
+        res = self.server.call_descendants(req)
+
+        # Convert response calls to WeaveObject instances
+        call_objects = []
+        for call_schema in res.calls:
+            call_obj = make_client_call(
+                self.entity, self.project, call_schema, self.server
+            )
+            call_objects.append(call_obj)
+
+        return call_objects
+
+    @trace_sentry.global_trace_sentry.watch()
     def create_call(
         self,
         op: str | Op,

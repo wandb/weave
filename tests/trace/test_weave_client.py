@@ -3597,6 +3597,50 @@ def test_sum_dict_leaves_mixed_types(client):
     }
 
 
+def test_call_descendants(client):
+    @weave.op
+    def parent_op(x):
+        child_op(x + 1)
+        return x * 2
+
+    @weave.op
+    def child_op(x):
+        grandchild_op(x + 1)
+        return x * 3
+
+    @weave.op
+    def grandchild_op(x):
+        return x * 4
+
+    # Run the parent operation
+    result = parent_op(5)
+
+    # Get all calls
+    calls = list(client.get_calls())
+    parent_call = None
+    for call in calls:
+        if call.op_name == "parent_op":
+            parent_call = call
+            break
+
+    assert parent_call is not None
+
+    # Test the calls_descendants functionality
+    descendants = list(
+        client.server.calls_descendants(
+            tsi.CallsDescendantsReq(
+                project_id=client._project_id(), call_id=parent_call.id
+            )
+        )
+    )
+
+    # Should have the child and grandchild calls
+    descendant_op_names = [call.op_name for call in descendants]
+    assert "child_op" in descendant_op_names
+    assert "grandchild_op" in descendant_op_names
+    assert len(descendants) == 2
+
+
 def test_sum_dict_leaves_deep_nested(client):
     """Test that sum_dict_leaves correctly handles deeply nested dictionaries (2 levels) with mixed types."""
     dicts = [

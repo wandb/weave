@@ -603,6 +603,113 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         set_nested_key(calls[i], col, val)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_delete")
+    def call_descendants(self, req: tsi.CallDescendantsReq) -> tsi.CallDescendantsRes:
+        """
+        Get all descendants of the specified parent calls using a recursive CTE query.
+
+        Args:
+            req: Request containing parent_call_id or parent_call_ids, along with optional
+                 filters like limit, depth, and column specifications.
+
+        Returns:
+            CallDescendantsRes containing the list of descendant calls.
+        """
+        # Validate input - must have either parent_call_id or parent_call_ids
+        if not req.parent_call_id and not req.parent_call_ids:
+            raise ValueError("Must specify either parent_call_id or parent_call_ids")
+
+        if req.parent_call_id and req.parent_call_ids:
+            raise ValueError("Cannot specify both parent_call_id and parent_call_ids")
+
+        parent_ids = (
+            [req.parent_call_id] if req.parent_call_id else (req.parent_call_ids or [])
+        )
+        if not parent_ids:
+            return tsi.CallDescendantsRes(calls=[])
+
+        pb = ParamBuilder()
+        project_id_param = pb.add(req.project_id)
+        parent_ids_clause = pb.add(parent_ids)
+
+        # Determine columns to fetch
+        request_columns = [c for c in req.columns or [] if c in all_call_select_columns]
+        columns = request_columns or all_call_select_columns
+        column_list = ", ".join(columns)
+
+        # Build the recursive CTE query
+        depth_condition = ""
+        if req.depth is not None:
+            depth_condition = f"WHERE depth <= {req.depth}"
+
+        limit_clause = ""
+        if req.limit is not None:
+            limit_clause = f"LIMIT {req.limit}"
+
+        query = f"""
+        WITH RECURSIVE call_descendants AS (
+            -- Base case: select the parent calls
+            SELECT {column_list}, 0 AS depth
+            FROM calls_merged
+            WHERE project_id = {project_id_param}
+              AND id IN ({parent_ids_clause})
+              AND deleted_at IS NULL
+
+            UNION ALL
+
+            -- Recursive case: select children of previous level
+            SELECT c.{column_list.replace(", ", ", c.")}, cd.depth + 1 AS depth
+            FROM calls_merged c
+            INNER JOIN call_descendants cd ON c.parent_id = cd.id
+            WHERE c.project_id = {project_id_param}
+              AND c.deleted_at IS NULL
+              AND cd.depth < 100  -- Prevent infinite recursion
+        )
+        SELECT {column_list}
+        FROM call_descendants
+        {depth_condition}
+        ORDER BY depth, started_at
+        {limit_clause}
+        """
+
+        # Execute the query
+        raw_res = self._query(query, pb.get_params())
+
+        # Convert results to CallSchema objects
+        calls = []
+        for row in raw_res.result_rows:
+            row_dict = dict(zip(columns, row))
+
+            # Convert the row to a CallSchema
+            call_schema = tsi.CallSchema(
+                id=row_dict.get("id"),
+                project_id=row_dict.get("project_id"),
+                op_name=row_dict.get("op_name"),
+                display_name=row_dict.get("display_name"),
+                trace_id=row_dict.get("trace_id"),
+                parent_id=row_dict.get("parent_id"),
+                started_at=row_dict.get("started_at"),
+                ended_at=row_dict.get("ended_at"),
+                exception=row_dict.get("exception"),
+                attributes=row_dict.get("attributes") or {},
+                inputs=row_dict.get("inputs") or {},
+                outputs=row_dict.get("outputs") or {},
+                summary=row_dict.get("summary") or {},
+                wb_user_id=row_dict.get("wb_user_id"),
+                wb_run_id=row_dict.get("wb_run_id"),
+            )
+            calls.append(call_schema)
+
+        # Apply post-processing for costs and feedback if requested
+        if req.include_costs or req.include_feedback:
+            calls_as_dicts = [call.dict() for call in calls]
+            self._expand_call_refs(
+                calls=calls_as_dicts,
+                expand_columns=req.expand_columns or [],
+                ref_cache=LRUCache(max_size=1000),
+            )
+
+        return tsi.CallDescendantsRes(calls=calls)
+
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         assert_non_null_wb_user_id(req)
         if len(req.call_ids) > MAX_DELETE_CALLS_COUNT:
