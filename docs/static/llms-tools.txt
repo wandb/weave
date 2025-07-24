@@ -1,0 +1,872 @@
+<!--- Docs: Tools -->
+<!--- Comparison -->
+
+# Comparison
+
+# Comparison
+
+The Weave Comparison feature allows you to visually compare and diff code, traces, prompts, models, and model configurations.  You can compare two objects side-by-side or analyze a larger set of objects to identify differences, patterns, and trends.
+
+This guide covers the steps to start a comparison and the available actions to tailor your comparison view, including baseline comparisons, numeric diff formatting, and more. 
+
+## Access the Comparison view
+
+1. In the sidebar, select the type of object you'd like to compare (e.g. **Traces**, **Models**, etc.).
+2. Select the objects that you want to compare. The selection method varies depending on the type of object you are comparing:
+   - For **Traces**, select traces to compare by checking the checkboxes in the appropriate rows in the Traces column.
+   - For objects such as **Models**, navigate to the model Versions page and check the checkboxes next to the  versions that you want to compare.
+3. Click **Compare** to open the Comparison view. Now, you can refine your view using the [available actions](#available-actions).
+
+## Available actions
+
+In the Comparison view, you have multiple actions available, depending on how many objects are being compared. Make sure to look at the [usage notes](#usage-notes).
+
+- [Change the diff display](#change-the-diff-display)
+- [Display side-by-side](#display-side-by-side)
+- [Display in a unified view](#display-in-a-unified-view)
+- [Set a baseline](#set-a-baseline)
+- [Remove a baseline](#remove-a-baseline)
+- [Change the comparison order](#change-the-comparison-order)
+- [Change numeric diff display format](#change-numeric-diff-display-format)
+- [Compare with baseline or previous](#compare-with-baseline-or-previous)
+- [Compare a pair from a multi-object comparison](#compare-a-pair-from-a-multi-object-comparison)
+- [Remove an object from comparison](#remove-an-object-from-comparison)
+
+### Change the diff display
+
+By default, **Diff only** is set to off. To filter the table rows so that only changed rows are displayed, toggle **Diff only** on. 
+
+### Display side-by-side 
+
+> This option is only available when comparing two objects, or a [pair from a multi-object comparison](#compare-a-pair-from-a-multi-object-comparison).
+
+To compare each object side-by-side in separate columns, select **Side-by-side**. 
+
+
+
+### Display in a unified view
+
+> This option is only available when comparing two objects, or a [pair from a multi-object comparison](#compare-a-pair-from-a-multi-object-comparison).
+
+To compare each object in a unified view, select **Unified**. 
+
+
+
+### Set a baseline
+
+By default, each object in the Comparison view is compared to the object to its left. However, you can set an object as the _baseline_, which means that all objects will be compared to the leftmost object in the view.
+To set an object as baseline, do the following:
+
+1. In the Comparison view topbar, mouse over the object that you want to set as the baseline.
+2. Click the three dots to the right of the ID.
+   
+3. In the dropdown, select **Make baseline**. The UI refreshes so that the baseline object is furthest left in the topbar, and `Baseline` displays next to the ID.
+    
+
+### Remove a baseline
+
+To remove an object as baseline, do the following:
+
+1. In the Comparison view topbar, mouse over the baseline object.
+2. Click the three dots to the right of the ID.
+3. In the dropdown, select **Remove baseline**. Now, `Baseline` no longer displays next to the call ID.
+
+### Change the comparison order
+
+To change the comparison order, do the following:
+
+1. In the Comparison view topbar, mouse over the ID that you want to reorder. 
+2. Click the six dots to the left of the ID.
+   
+3. Drag the ID to the left or the right, depending on which object was selected. 
+4. Place the ID in the desired ordering. The UI refreshes with an updated comparison ordering.
+
+### Change numeric diff display format 
+
+For numeric values such as `completion_tokens` and `total_tokens`, you can view the diff as either an integer or a percentage. Additionally, positive numeric values can be viewed as a multiplier. To change a numeric diff's display format, do the following:
+
+1. In the Comparison table, find the numeric value that you want to update the diff display format for.
+    
+2. Click the diff value. The format automatically updates to either an integer or a percentage.
+    
+
+### Compare with baseline or previous
+
+> This option is only available when comparing 3 or more objects.
+> You can also [set](#set-a-baseline) or [remove an existing baseline by clicking the 3 dots to the right of the ID](#remove-a-baseline).
+
+To perform a baseline comparison with 3 or more objects, do the following:
+
+1. In the right hand corner of the Comparison view, click the dropdown. Depending on your current view configuration, the dropdown is either titled **Compare with previous** or **Compare with baseline**.
+2. Depending on your current view configuration, select either **Compare with previous** or **Compare with baseline**.
+   - **Compare with baseline**: Sets the leftmost object as the baseline. The table updates so that the leftmost column is the baseline.
+   -  **Compare with previous**: No object is set as baseline.
+
+### Compare a pair from a multi-object comparison
+
+> This option is only available when comparing 3 or more objects.
+
+When comparing 3 or more objects, you can compare a single object to a previous object or baseline. This changes the Comparison table view so that the view is identical to a two-object comparison. To compare a pair of objects from a multi-object comparison, do the following:
+
+1. In the Comparison view topbar, find the ID that you want to compare to previous or baseline. 
+2. To select the item, click the ID. The UI refreshes with a two-way comparison table.
+    
+
+To reset the view so that the first 6 objects selected for comparison are displayed in the table, click the ID again.
+
+### Remove an object from comparison
+
+> This option is only available when comparing 3 or more objects.
+
+To remove an object from comparison, do the following:
+
+1. In the Comparison view topbar, find the object that you want to remove from comparison.
+2. Click the three dots to the right of the ID.
+3. In the dropdown, select **Remove object from comparison**. The UI refreshes with an updated table that no longer includes the removed object.
+
+## Usage notes
+
+ - The Comparison feature is only available in the UI.
+ - You can compare as many objects as you'd like. However, the UI only displays a maximum of 6. To view an object in the comparison table that is not visible when comparing more than 6 objects, either [change the comparison order](#change-the-comparison-order) so that the object is one of the first 6 objects from left to right, or [pair from a multi-object comparison](#compare-a-pair-from-a-multi-object-comparison) for easy viewing.
+
+[Source](https://weave-docs.wandb.ai/guides/tools/comparison)
+
+<!--- Docs: Tools -->
+<!--- Deploy -->
+
+# Deploy
+
+# Deploy
+
+## Deploy to GCP
+
+> 💡 **Note**: `weave deploy` requires your machine to have `gcloud` installed and configured. `weave deploy gcp` will use pre-configured configuration when not directly specified by command line arguments.
+
+Given a Weave ref to any Weave Model you can run:
+
+```
+weave deploy gcp 
+```
+
+to deploy a gcp cloud function that serves your model. The last line of the deployment will look like `Service URL: `. Visit `/docs` to interact with your model!
+
+Run
+
+```
+weave deploy gcp --help
+```
+
+to see all command line options.
+
+[Source](https://weave-docs.wandb.ai/guides/tools/deploy)
+
+<!--- Docs: Tools -->
+<!--- Playground -->
+
+# Playground
+
+# Playground
+
+Evaluating LLM prompts and responses is challenging. The Weave Playground is designed to simplify the process of iterating on LLM prompts and responses, making it easier to experiment with different models and prompts. With features like prompt editing, message retrying, and model comparison, Playground helps you to quickly test and improve your LLM applications. Playground currently supports models from OpenAI, Anthropic, Google, Groq, Amazon Bedrock, and Microsoft Azure, as well as [custom providers](#add-a-custom-provider).
+
+- **Quick access:** Open the Playground from the W&B sidebar for a fresh session or from the Call page to test an existing project.
+- **Message controls:** Edit, retry, or delete messages directly within the chat.
+- **Flexible messaging:** Add new messages as either user or system inputs, and send them to the LLM.
+- **Customizable settings:** Configure your preferred LLM provider and adjust model settings.
+- **Multi-LLM support:** Switch between models, with team-level API key management.
+- **Compare models:** Compare how different models respond to prompts.
+- **Custom providers:** Test OpenAI compatible API endpoints for custom models.
+- **Saved models:** Create and configure a reusable model preset for your workflow
+
+Get started with the Playground to optimize your LLM interactions and streamline your prompt engineering process and LLM application development.
+
+- [Prerequisites](#prerequisites)
+  - [Add provider credentials and information](#add-provider-credentials-and-information)
+  - [Access the Playground](#access-the-playground)
+- [Select an LLM](#select-an-llm)
+- [Customize settings](#customize-settings)
+- [Message controls](#add-retry-edit-and-delete-messages)
+- [Compare LLMs](#compare-llms)
+- [Custom providers](#custom-providers)
+- [Saved models](#saved-models) 
+
+## Prerequisites
+
+Before you can use Playground, you must [add provider credentials](#add-provider-credentials-and-information), and [open the Playground UI](#access-the-playground).
+
+### Add provider credentials and information
+
+Playground currently supports models from OpenAI, Anthropic, Google, Groq, Amazon Bedrock, and Microsoft Azure. To use one of the available models, add the appropriate information to your team secrets in W&B settings.
+
+- OpenAI: `OPENAI_API_KEY`
+- Anthropic: `ANTHROPIC_API_KEY`
+- Google: `GEMINI_API_KEY`
+- Groq: `GROQ_API_KEY`
+- Amazon Bedrock:
+  - `AWS_ACCESS_KEY_ID`
+  - `AWS_SECRET_ACCESS_KEY`
+  - `AWS_REGION_NAME`
+- Azure:
+  - `AZURE_API_KEY`
+  - `AZURE_API_BASE`
+  - `AZURE_API_VERSION`
+- X.AI:
+  - `XAI_API_KEY`
+- Deepseek
+  - `DEEPSEEK_API_KEY`
+
+### Access the Playground
+
+There are two ways to access the Playground:
+
+1. _Open a fresh Playground page with a simple system prompt_: In the sidebar, select **Playground**. Playground opens in the same tab.
+2. _Open Playground for a specific call_:
+   1. In the sidebar, select the **Traces** tab. A list of traces displays.
+   2. In the list of traces, click the name of the call that you want to view. The call's details page opens.
+   3. Click **Open chat in playground**. Playground opens in a new tab.
+
+
+
+## Select an LLM
+
+You can switch the LLM using the dropdown menu in the top left. The available models from various providers are listed below:
+
+- [Amazon Bedrock](#amazon-bedrock)
+- [Anthropic](#anthropic)
+- [Azure](#azure)
+- [Google](#google)
+- [Groq](#groq)
+- [OpenAI](#openai)
+- [X.AI](#xai)
+- [Deepseek](#deepseek)
+
+
+
+
+### [Amazon Bedrock](../integrations/bedrock.md)
+
+- ai21.j2-mid-v1
+- ai21.j2-ultra-v1
+- amazon.nova-micro-v1:0
+- amazon.nova-lite-v1:0
+- amazon.nova-pro-v1:0
+- amazon.titan-text-lite-v1
+- amazon.titan-text-express-v1
+- mistral.mistral-7b-instruct-v0:2
+- mistral.mixtral-8x7b-instruct-v0:1
+- mistral.mistral-large-2402-v1:0
+- mistral.mistral-large-2407-v1:0
+- anthropic.claude-3-sonnet-20240229-v1:0
+- anthropic.claude-3-5-sonnet-20240620-v1:0
+- anthropic.claude-3-haiku-20240307-v1:0
+- anthropic.claude-3-opus-20240229-v1:0
+- anthropic.claude-v2
+- anthropic.claude-v2:1
+- anthropic.claude-instant-v1
+- cohere.command-text-v14
+- cohere.command-light-text-v14
+- cohere.command-r-plus-v1:0
+- cohere.command-r-v1:0
+- meta.llama2-13b-chat-v1
+- meta.llama2-70b-chat-v1
+- meta.llama3-8b-instruct-v1:0
+- meta.llama3-70b-instruct-v1:0
+- meta.llama3-1-8b-instruct-v1:0
+- meta.llama3-1-70b-instruct-v1:0
+- meta.llama3-1-405b-instruct-v1:0
+
+### [Anthropic](../integrations/anthropic.md)
+
+- claude-3-7-sonnet-20250219
+- claude-3-5-sonnet-20240620
+- claude-3-5-sonnet-20241022
+- claude-3-haiku-20240307
+- claude-3-opus-20240229
+- claude-3-sonnet-20240229
+
+### [Azure](../integrations/azure.md)
+
+- azure/o1-mini
+- azure/o1-mini-2024-09-12
+- azure/o1
+- azure/o1-preview
+- azure/o1-preview-2024-09-12
+- azure/gpt-4o
+- azure/gpt-4o-2024-08-06
+- azure/gpt-4o-2024-11-20
+- azure/gpt-4o-2024-05-13
+- azure/gpt-4o-mini
+- azure/gpt-4o-mini-2024-07-18
+
+### [Google](../integrations/google.md)
+
+- gemini/gemini-2.5-pro-preview-03-25
+- gemini/gemini-2.0-pro-exp-02-05
+- gemini/gemini-2.0-flash-exp
+- gemini/gemini-2.0-flash-001
+- gemini/gemini-2.0-flash-thinking-exp
+- gemini/gemini-2.0-flash-thinking-exp-01-21
+- gemini/gemini-2.0-flash
+- gemini/gemini-2.0-flash-lite
+- gemini/gemini-2.0-flash-lite-preview-02-05
+- gemini/gemini-1.5-flash-001
+- gemini/gemini-1.5-flash-002
+- gemini/gemini-1.5-flash-8b-exp-0827
+- gemini/gemini-1.5-flash-8b-exp-0924
+- gemini/gemini-1.5-flash-latest
+- gemini/gemini-1.5-flash
+- gemini/gemini-1.5-pro-001
+- gemini/gemini-1.5-pro-002
+- gemini/gemini-1.5-pro-latest
+- gemini/gemini-1.5-pro
+
+### [Groq](../integrations/groq.md)
+
+- groq/deepseek-r1-distill-llama-70b
+- groq/llama-3.3-70b-versatile
+- groq/llama-3.3-70b-specdec
+- groq/llama-3.2-1b-preview
+- groq/llama-3.2-3b-preview
+- groq/llama-3.2-11b-vision-preview
+- groq/llama-3.2-90b-vision-preview
+- groq/llama-3.1-8b-instant
+- groq/llama3-70b-8192
+- groq/llama3-8b-8192
+- groq/gemma2-9b-it
+
+### [OpenAI](../integrations/openai.md)
+
+- gpt-4.1-mini-2025-04-14
+- gpt-4.1-mini
+- gpt-4.1-2025-04-14
+- gpt-4.1
+- gpt-4.1-nano-2025-04-14
+- gpt-4.1-nano
+- o4-mini-2025-04-16
+- o4-mini
+- gpt-4.5-preview-2025-02-27
+- gpt-4.5-preview
+- o3-2025-04-16
+- o3
+- o3-mini-2025-01-31
+- o3-mini
+- gpt-4o-mini
+- gpt-4o-2024-05-13
+- gpt-4o-2024-08-06
+- gpt-4o-mini-2024-07-18
+- gpt-4o
+- gpt-4o-2024-11-20
+- o1-mini-2024-09-12
+- o1-mini
+- o1-preview-2024-09-12
+- o1-preview
+- o1-2024-12-17
+- gpt-4-1106-preview
+- gpt-4-32k-0314
+- gpt-4-turbo-2024-04-09
+- gpt-4-turbo-preview
+- gpt-4-turbo
+- gpt-4
+- gpt-3.5-turbo-0125
+- gpt-3.5-turbo-1106
+
+### X.AI
+
+- xai/grok-3-beta
+- xai/grok-3-fast-beta
+- xai/grok-3-fast-latest
+- xai/grok-3-mini-beta
+- xai/grok-3-mini-fast-beta
+- xai/grok-3-mini-fast-latest
+- xai/grok-beta
+- xai/grok-2-1212
+- xai/grok-2
+- xai/grok-2-latest
+
+### Deepseek
+
+- deepseek/deepseek-reasoner
+- deepseek/deepseek-chat
+
+
+
+## Customize settings
+
+### Adjust LLM parameters
+
+You can experiment with different parameter values for your selected model. To adjust parameters, do the following:
+
+1. In the upper right corner of the Playground UI, click **Chat settings** to open the parameter settings dropdown.
+2. In the dropdown, adjust parameters as desired. You can also toggle Weave call tracking on or off, and [add a function](#add-a-function).
+3. Click **Chat settings** to close the dropdown and save your changes.
+
+
+
+### Add a function
+
+You can test how different models use functions based on input it receives from the user. To add a function for testing in Playground, do the following:
+
+1. In the upper right corner of the Playground UI, click **Chat settings** to open the parameter settings dropdown.
+2. In the dropdown, click **+ Add function**.
+3. In the pop-up, add your function information.
+4. To save your changes and close the function pop-up, click the **x** in the upper right corner.
+5. Click **Chat settings** to close the settings dropdown and save your changes.
+
+### Adjust the number of trials
+
+Playground allows you to generate multiple outputs for the same input by setting the number of trials. The default setting is `1`. To adjust the number of trials, do the following:
+
+1. In the Playground UI, open the settings sidebar if it is not already open.
+2. Adjust the **Number of trials**.
+
+## Message controls
+
+### Retry, edit, and delete messages
+
+With Playground, you can retry, edit, and delete messages. To use this feature, hover over the message you want to edit, retry, or delete. Three buttons display: **Delete**, **Edit**, and **Retry**.
+
+- **Delete**: Remove the message from the chat.
+- **Edit**: Modify the message content.
+- **Retry**: Delete all subsequent messages and retry the chat from the selected message.
+
+
+
+
+### Add a new message
+
+To add a new message to the chat, do the following:
+
+1. In the chat box, select one of the available roles (**Assistant** or **User**)
+2. Click **+ Add**.
+3. To send a new message to the LLM, click the **Send** button. Alternatively, press the **Command** and **Enter** keys.
+
+
+
+## Compare LLMs
+
+Playground allows you to compare LLMs. To perform a comparison, do the following:
+
+1. In the Playground UI, click **Compare**. A second chat opens next to the original chat.
+2. In the second chat, you can:
+   - [Select the LLM to compare](#select-an-llm)
+   - [Adjust parameters](#adjust-llm-parameters)
+   - [Add functions](#add-a-function)
+3. In the message box, enter a message that you want to test with both models and press **Send**.
+
+## Custom providers
+
+### Add a custom provider
+
+In addition to the [supported providers](#select-an-llm), you can use the Playground to test OpenAI compatible API endpoints for custom models. Examples include:
+
+- Older versions of supported model providers
+- Local models
+
+To add a custom provider to the Playground, do the following:
+
+1. In the upper left corner of the Playground UI, click the **Select a model** dropdown.
+2. Select **+ Add AI provider**.
+3. In the pop-up modal, enter the provider information:
+
+   - _Provider name_: For example, `openai` or `ollama`.
+   - _API key_: For example, an OpenAI API key.
+   - _Base URL_: For example, `https://api.openai.com/v1/` or a ngrok URL `https://e452-2600-1700-45f0-3e10-2d3f-796b-d6f2-8ba7.ngrok-free.app`.
+   - _Headers_ (optional): You can add multiple header keys and values.
+   - _Models_: You can add multiple models for one provider. For example, `deepseek-r1` and `qwq`.
+   - _Max tokens_ (optional): For each model, you can specify the max tokens that the model can generate in a response.
+
+4. Once you've entered your provider information, click **Add provider**.
+5. Select your new provider and available model(s) from the **Select a model** dropdown in the upper left corner of the Playground UI.
+
+> 🚨 **Important**: Because of CORS restrictions, you can't call localhost or 127.0.0.1 URLs directly from the Playground. If you're running a local model server (such as Ollama), use a tunneling service like ngrok to expose it securely. For details, see [Use ngrok with Ollama](#use-ngrok-with-ollama).
+
+Now, you can test the custom provider model(s) using standard Playground features. You can also [edit](#edit-a-custom-provider) or [remove](#remove-a-custom-provider) the custom provider.
+
+### Edit a custom provider
+
+To edit information for a [previously created custom provider](#add-a-custom-provider), do the following:
+
+1. In the Weave sidebar, navigate to **Overview**.
+2. From the top navigation menu, select **AI Providers**.
+3. In the **Custom providers** table, find the custom provider you want to update.
+4. In the **Last Updated** column of the entry for your custom provider, click the edit button (the pencil icon).
+5. In the pop-up modal, edit the provider information.
+6. Click **Save**.
+
+### Remove a custom provider
+
+To remove a [previously created custom provider](#add-a-custom-provider), do the following:
+
+1. In the Weave sidebar, navigate to **Overview**.
+2. From the top navigation menu, select **AI Providers**.
+3. In the **Custom providers** table, find the custom provider you want to update.
+4. In the **Last Updated** column of the entry for your custom provider, click the delete button (the trashcan icon).
+5. In the pop-up modal, confirm that you want to delete the provider. This action cannot be undone.
+6. Click **Delete**.
+
+### Use ngrok with Ollama
+
+To test a locally running Ollama model in the Playground, use ngrok to create a temporary public URL that bypasses CORS restrictions.
+
+To set it up, do the following:
+
+1. [Install ngrok](https://ngrok.com/docs/getting-started/#step-1-install) for your operating system.
+2. Start your Ollama model:
+
+   ```bash
+   ollama run 
+   ```
+
+3. In a separate terminal, create an ngrok tunnel with the required CORS headers:
+
+   ```bash
+   ngrok http 11434 --response-header-add "Access-Control-Allow-Origin: *" --host-header rewrite
+   ```
+
+After ngrok starts, it will display a public URL, such as `https://xxxx-xxxx.ngrok-free.app`. Use this URL as the base URL when you add Ollama as a custom provider in the Playground.
+
+The following diagram illustrates the data flow between your local environment, the ngrok proxy, and the W&B cloud services:
+
+```mermaid
+flowchart LR
+    %% Style definitions
+    classDef clientMachine fill:#FFD95CCC,stroke:#454B52,stroke-width:2px
+    classDef proxy fill:#00CDDBCC,stroke:#454B52,stroke-width:2px
+    classDef wandbCloud fill:#DE72FFCC,stroke:#454B52,stroke-width:2px
+    classDef publicCloud fill:#FFCBADCC,stroke:#454B52,stroke-width:2px
+
+    %% Subgraphs
+    subgraph Client_Machine
+        browser[Browser]
+        llm_local[Local LLM Provider]
+    end
+
+    subgraph Proxy
+        ngrok[Ngrok Proxy]
+    end
+
+    subgraph WandB_Cloud
+        trace_server[Trace Server]
+    end
+
+    subgraph Public_Cloud
+        llm_cloud[Public LLM Provider]
+    end
+
+    %% Apply styles to subgraphs
+    class Client_Machine clientMachine
+    class Proxy proxy
+    class WandB_Cloud wandbCloud
+    class Public_Cloud publicCloud
+
+    %% Current Data Flow
+    browser -->|Sends chat request| trace_server
+    trace_server -->|Uses Public LLM| llm_cloud
+    trace_server -->|Uses Local LLM| ngrok
+    ngrok -->|Forwards to| llm_local
+    llm_cloud -->|Returns response| trace_server
+    llm_local -->|Returns response| ngrok
+    ngrok -->|Forwards to| trace_server
+    trace_server -->|Returns response| browser
+
+    %% Future Possible Connection
+    browser -.->|Future: Call local LLM directly| llm_local
+
+    %% Link styles
+    linkStyle default stroke:#454B52,stroke-width:2px
+    linkStyle 8 stroke:#454B52,stroke-width:2px,stroke-dasharray:5
+```
+
+## Saved models
+
+### Save a model
+
+You can create and configure a reusable model preset for your workflow. Saving a model lets you quickly load it with your preferred settings, parameters, and function hooks.
+
+1. From the LLM dropdown, select a provider.
+2. From the provider list, select a model.
+3. In the upper right corner of the Playground UI, click **Chat settings** to open the chat settings window.
+4. In the chat settings window:
+   - In the **Model Name** field, enter a name for your saved model. 
+   - Adjust parameters as desired. You can also toggle Weave call tracking on or off, and [add a function](#add-a-function).
+5. Click **Publish Model**. The model is saved and accesible from **Saved Models** in the LLM dropdown. You can now [use](#use-a-saved-model) and [update](#update-a-saved-model) the saved model.
+
+
+
+### Use a saved model 
+
+Quickly switch to a previously [saved model](#save-a-model) to maintain consistency across experiments or sessions. This allows you to pick up right where you left off.
+
+1. From the LLM dropdown, select **Saved Models**.
+2. From the list of saved models, click the saved model you want to load. The model loads and is ready for use in the Playground.
+
+
+
+### Update a saved model
+
+Edit an existing [saved model](#save-a-model) to fine-tune parameters or refresh its configuration. This ensures your saved models evolve alongside your use cases.
+
+1. From the LLM dropdown, select **Saved Models**.
+2. From the list of saved models, click the saved model you want to update. 
+3. In the upper right corner of the Playground UI, click **Chat settings** to open the chat settings window.
+4. In the chat settings window, adjust parameters as desired. You can also toggle Weave call tracking on or off, and [add a function](#add-a-function).
+5. Click **Update model**. The model is updated and accesible from **Saved Models** in the LLM dropdown.
+
+[Source](https://weave-docs.wandb.ai/guides/tools/playground)
+
+<!--- Docs: Tools -->
+<!--- Saved Views -->
+
+# Saved Views
+
+# Saved Views
+
+In Weave, _saved views_ allow you to customize how you interact with traced function calls and evaluations. By defining a saved view, you can configure filters, sorting, and column visibility to quickly access relevant data.
+
+You can create, modify, and save views directly in the Weave Python SDK or through the UI. The Python SDK provides fine-grained control for programmatic filtering and querying, while the UI makes it easy to explore and save different table configurations in the **Traces** and **Evals** tabs.
+
+This guide covers:
+
+- [How to create and modify Saved Views in the Python SDK](#saved-views-in-the-python-sdk).
+- [How to create and interact with Saved Views in the Weave UI](#saved-views-in-the-ui).
+
+## Saved views in the Python SDK
+
+The `SavedView` class in Weave provides a way to save, filter, sort, and customize views of trace and evals data. 
+
+### Initialize a `SavedView`
+
+Initialize a `SavedView` instance in your Weave project:
+
+```python
+import weave
+client = weave.init()
+
+view = weave.SavedView()
+```
+
+### Visualize the `SavedView` as a grid
+
+Use `.to_grid()` to represent the saved view as a grid. Specify the maximum number of rows to display with `limit`.
+
+```python
+view.to_grid(limit=5)
+```
+
+Display the grid representation using `.show()`:
+
+```python
+view.to_grid().show()
+```
+
+### Set displayed columns
+
+Use `.set_columns()` to set the columns to be displayed in the view. Specify one or more columns to be displayed.
+
+```python
+view.set_columns("id", "op_name")
+```
+
+### Add columns
+
+Use `.add_column()` to add one or more new columns to the view. Specify one or more columns to be added.
+
+```python
+# Add a column with the field specifier and label "Created"
+view.add_column("Created")
+# Optionally, you can add a second argument to specify a different label name for the new column. By default, the field specifier is use for the label.
+```
+
+### Sort columns
+
+Use `.sort_by()` to sort results based on a specific column. Specify the column name to be sorted and the sort order (`asc` or `desc`).
+
+```python
+view.sort_by("started_at", "desc")
+```
+
+### Filter by operation name
+
+In Weave, every trace or eval is associated with an operation name.
+Use `.filter_op()` to filter the `SavedView` to only include calls where that specific operation was executed. 
+
+```python
+view.filter_op("Evaluation.predict_and_score")
+```
+
+
+### Filter by operator and condition
+
+Use `.add_filter()` to apply a custom filter to the view. Define the filter using one of the [supported filter operators](#filter-operators) and a condition.
+
+```python
+view.add_filter("output.model_latency", ">=", 5)
+```
+
+#### Filter operators
+
+| Operator | Description | Example |
+|----------|-------------|---------|
+| `"contains"` | Checks if a string contains a substring. | `view.add_filter("output.status", "contains", "error")` |
+| `"equals"` | Checks if a string is exactly equal to a given value. | `view.add_filter("input.category", "equals", "Alice")` |
+| `"in"` | Checks if a string is in a list of values. | `view.add_filter("category", "in", ["A", "B", "C"])` |
+| `"="` | Checks if a number is equal to a value. | `view.add_filter("output.score", "=", 80)` |
+| `"≠", "!="` | Checks if a number is not equal to a value. | `view.add_filter("metrics.loss", "!=", 0.5)` |
+| `"<"` | Checks if a number is less than a value. | `view.add_filter("age", "<", 30)` |
+| `"≤", "<="` | Checks if a number is less than or equal to a value. | `view.add_filter("metric.value", "<=", 100)` |
+| `">"` | Checks if a number is greater than a value. | `view.add_filter("output.score", ">", 90)` |
+| `"≥", ">="` | Checks if a number is greater than or equal to a value. | `view.add_filter("output.model_latency", ">=", 5)` |
+| `"is"` | Checks if a boolean field is `True` or `False`. | `view.add_filter("is_active", "is", True)` |
+| `"after"` | Checks if a date is after a given timestamp. | `view.add_filter("started_at", "after", "2024-01-01")` |
+| `"before"` | Checks if a date is before a given timestamp. | `view.add_filter("ended_at", "before", "2024-12-31")` |
+| `"is empty"` | Checks if a field is empty (`None` or `""`). | `view.add_filter("comments", "is empty", None)` |
+| `"is not empty"` | Checks if a field is not empty. | `view.add_filter("attachments", "is not empty", None)` |
+
+### Remove filters
+
+Use `.remove_filter()` to remove a specific filter from the view by index or field name.
+
+```python
+view.remove_filter("output.model_latency")
+```
+
+Use `.remove_filters()` to remove all filters.
+
+```python
+view.remove_filters()
+```
+
+### Save the `SavedView`
+
+Use `.save()` to publish the saved view to Weave.
+
+```python
+view.save()
+```
+
+### Retrieve function calls
+
+Use `.get_calls()` to retrieve function calls that match the filters in the saved view. You can specify optional parameters such as `limit` and `offset`.
+
+```python
+calls = view.get_calls(limit=10)
+```
+
+## Saved views in the UI 
+
+You can create, load, rename, and edit saved views in the Weave UI. For fine-grained control, use the [Python SDK](#saved-views-in-the-python-sdk).
+
+### Create a saved view
+
+1. Navigate to your **Traces** or **Evals** tab.
+2. Adjust any of the following variables in your table configuration:
+   - Filters
+   - Sort order
+   - Page size
+   - Column visibility
+   - Column pinning
+3. Save the view using one of two options:
+   - In the upper right-hand corner, click **Save view**. 
+   - Click the hamburger menu to the left of **Save view**. In the dropdown menu, click **+ Save as new view**.
+
+### Load a saved view
+
+1. Navigate to your **Traces** or **Evals** tab.
+2. Click the hamburger menu to the left of the tab title. A dropdown menu showing all saved views displays. 
+3. Click the view that you want to access. The saved view displays in the **Traces** or **Evals** tab. 
+
+### Rename a saved view
+
+1. Follow the steps described in [Load a saved view](#load-a-saved-view).
+2. In the upper lefthand corner of the **Traces** or **Evals** tab, click the view name.
+3. Enter a new name for the view.
+4. To save the new view name, press **Enter**.
+
+### Edit a saved view
+
+1. Follow the steps described in [Load a saved view](#load-a-saved-view).
+2. Adjust your table configuration.
+3. In the upper right-hand corner, click **Save view**. 
+
+### Delete a saved view 
+
+> 🚨 **Important**: You can delete a view if you believe it is no longer useful to you and your team. This cannot be undone.
+
+1. Navigate to your **Traces** or **Evals** tab.
+2. [Load the view](#load-a-saved-view) that you want to delete.
+3. Click the hamburger menu to the left of **Save view**. 
+4. In the dropdown menu, click **Delete view**.
+5. In the pop-up modal, confirm by clicking **Delete view**. Alternatively, click **Cancel** to stop deletion.
+
+### Return to the default view
+
+1. Navigate to your **Traces** or **Evals** tab.
+2. Click the hamburger menu to the right of the **Traces** or **Evals** tab. A dropdown menu showing all saved views displays. 
+3. At the bottom on the menu, click **Traces** or **Evals**. The default view displays.
+
+[Source](https://weave-docs.wandb.ai/guides/tools/saved-views)
+
+<!--- Docs: Tools -->
+<!--- Index -->
+
+# Index
+
+# Tools & Utilities
+
+Weave is developing a set of tools and utilities to help with your workflow and deployment process for AI applications. These are currently in early alpha stages and subject to change. Here's an overview of what we're working on:
+
+## Serve (experimental)
+
+[Serve](/guides/tools/serve) is a feature to expose your Weave ops and models as API endpoints. We're exploring possibilities such as:
+
+- Creating web services for your Weave components
+- Integrating Weave components into existing applications
+- Providing a way to test models in a more production-like setting
+
+## Deploy (experimental)
+
+[Deploy](/guides/tools/deploy) is another alpha-stage utility we're developing to help with deploying Weave ops and models. Some potential features we're considering include:
+
+- Pushing models to cloud platforms
+- Managing different deployment environments
+- Exploring ways to automate parts of the deployment process
+
+Please note that these tools are still in very early stages of development. They may not be fully functional, could change significantly, or might be discontinued. We recommend using them for experimental purposes only at this time.
+
+[Source](https://weave-docs.wandb.ai/guides/tools/index)
+
+<!--- Docs: Tools -->
+<!--- Serve -->
+
+# Serve
+
+# Serve
+
+Given a Weave ref to any Weave Model you can run:
+
+```
+weave serve 
+```
+
+to run a FastAPI server for that model. Visit [http://0.0.0.0:9996/docs](http://0.0.0.0:9996/docs) to query the model interactively.
+
+## Install FastAPI
+
+```bash
+pip install fastapi uvicorn
+```
+
+## Serve Model
+
+In a terminal, call:
+
+```bash
+weave serve 
+```
+
+Get your model ref by navigating to the model and copying it from the UI. It should look like:
+`weave:///your_entity/project-name/YourModel:`
+
+To use it, navigate to the Swagger UI link, click the predict endpoint and then click "Try it out!".
+
+[Source](https://weave-docs.wandb.ai/guides/tools/serve)

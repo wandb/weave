@@ -41,6 +41,13 @@ export const operationConverter = (
         substr: {$literal: item.value},
       },
     };
+  } else if (item.operator === '(monitored): by') {
+    return {
+      $contains: {
+        input: {$getField: item.field},
+        substr: {$literal: item.value.split('*')[0]},
+      },
+    };
   } else if (item.operator === '(string): equals') {
     return {
       $eq: [{$getField: item.field}, {$literal: item.value}],

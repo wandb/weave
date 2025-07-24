@@ -6,7 +6,7 @@ from weave.trace.context.tests_context import raise_on_captured_errors
 
 
 def test_basic_dataset_lifecycle(client):
-    for i in range(2):
+    for _i in range(2):
         dataset = weave.Dataset(rows=[{"a": 5, "b": 6}, {"a": 7, "b": 10}])
         ref = weave.publish(dataset)
         dataset2 = weave.ref(ref.uri()).get()
@@ -49,7 +49,11 @@ def test_dataset_laziness(client):
     """
     dataset = Dataset(rows=[{"input": i} for i in range(300)])
     log = client.server.attribute_access_log
-    assert _top_level_logs(log) == ["ensure_project_exists"]
+    assert _top_level_logs(log) == [
+        "ensure_project_exists",
+        "get_call_processor",
+        "get_call_processor",
+    ]
     client.server.attribute_access_log = []
 
     length = len(dataset)
@@ -62,7 +66,7 @@ def test_dataset_laziness(client):
 
     assert length == length2
 
-    for row in dataset:
+    for _row in dataset:
         log = client.server.attribute_access_log
         assert _top_level_logs(log) == []
 
@@ -76,7 +80,11 @@ def test_published_dataset_laziness(client):
     """
     dataset = Dataset(rows=[{"input": i} for i in range(300)])
     log = client.server.attribute_access_log
-    assert _top_level_logs(log) == ["ensure_project_exists"]
+    assert _top_level_logs(log) == [
+        "ensure_project_exists",
+        "get_call_processor",
+        "get_call_processor",
+    ]
     client.server.attribute_access_log = []
 
     ref = weave.publish(dataset)
@@ -100,7 +108,7 @@ def test_published_dataset_laziness(client):
 
     assert length == length2
 
-    for i, row in enumerate(dataset):
+    for i, _row in enumerate(dataset):
         log = client.server.attribute_access_log
         # This is the critical part of the test - ensuring that
         # the rows are only fetched when they are actually needed.
@@ -222,3 +230,77 @@ def test_add_rows_to_unsaved_dataset(client):
     ds = weave.Dataset(rows=[{"a": i} for i in range(10)])
     with pytest.raises(TypeError):
         ds.add_rows([{"a": 10}])
+
+
+def test_hf_conversion(client):
+    try:
+        from datasets import Dataset as HFDataset
+        from datasets import DatasetDict as HFDatasetDict
+        from datasets.features import Value  # Import Value for feature checking
+    except ImportError:
+        pytest.skip("requires huggingface datasets library")
+
+    # Define data as list of dicts
+    expected_rows = [{"col1": 1, "col2": "A"}, {"col1": 2, "col2": "B"}]
+
+    # Create a dummy HF Dataset from list of dicts
+    hf_dataset = HFDataset.from_list(expected_rows)
+
+    # Test from_hf
+    weave_dataset = weave.Dataset.from_hf(hf_dataset)
+    assert list(weave_dataset.rows) == expected_rows
+
+    # Test to_hf
+    converted_hf_dataset = weave_dataset.to_hf()
+    assert isinstance(converted_hf_dataset, HFDataset)  # Check type
+    assert list(converted_hf_dataset) == expected_rows
+    assert converted_hf_dataset.column_names == ["col1", "col2"]  # Check column names
+    # Check features (basic type check)
+    assert isinstance(converted_hf_dataset.features["col1"], Value)
+    assert converted_hf_dataset.features["col1"].dtype == "int64"
+    assert isinstance(converted_hf_dataset.features["col2"], Value)
+    assert converted_hf_dataset.features["col2"].dtype == "string"
+
+    # Test round trip consistency
+    assert converted_hf_dataset.to_dict() == hf_dataset.to_dict()
+
+    # Test conversion from DatasetDict (should use 'train' split and warn)
+    train_rows = [{"id": 0, "text": "train_0"}, {"id": 1, "text": "train_1"}]
+    test_rows = [{"id": 2, "text": "test_2"}]
+    hf_dataset_dict = HFDatasetDict(
+        {
+            "train": HFDataset.from_list(train_rows),
+            "test": HFDataset.from_list(test_rows),
+        }
+    )
+
+    with pytest.warns(
+        UserWarning,
+        match="Input dataset has multiple splits. Using 'train' split by default.",
+    ):
+        weave_dataset_from_dict = weave.Dataset.from_hf(hf_dataset_dict)
+
+    assert list(weave_dataset_from_dict.rows) == train_rows
+
+    # Test error when 'train' split is missing
+    hf_dataset_dict_no_train = HFDatasetDict(
+        {"validation": HFDataset.from_list(test_rows)}
+    )
+    with pytest.raises(ValueError, match="does not contain a 'train' split"):
+        weave.Dataset.from_hf(hf_dataset_dict_no_train)
+
+    # Test converting an empty weave.Dataset to HFDataset
+    # Create a valid dataset first, then manually empty its rows to test to_hf directly
+    temp_weave_ds = weave.Dataset(rows=[{"temp": 1}])
+    temp_weave_ds.rows = []  # Manually set rows to empty, bypassing validator
+    empty_hf_ds = temp_weave_ds.to_hf()
+    assert isinstance(empty_hf_ds, HFDataset)
+    assert len(empty_hf_ds) == 0
+    assert empty_hf_ds.column_names == []
+
+    # Test from_hf with an empty HFDataset (should raise ValueError)
+    empty_hf_dataset_input = HFDataset.from_list([])
+    with pytest.raises(
+        ValueError, match="Attempted to construct a Dataset with an empty list"
+    ):
+        weave.Dataset.from_hf(empty_hf_dataset_input)

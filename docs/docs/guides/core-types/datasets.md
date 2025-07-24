@@ -120,6 +120,45 @@ Select a tab to see Python and TypeScript-specific code.
   assert df.equals(df2)
   ```
 
+  ### Hugging Face Datasets
+
+  To create a `Dataset` from a Hugging Face `datasets.Dataset` or `datasets.DatasetDict` object, first ensure you have the necessary dependencies installed:
+
+  ```bash
+  pip install weave[huggingface]
+  ```
+
+  Then, use the `from_hf` method. If you provide a `DatasetDict` with multiple splits (like 'train', 'test', 'validation'), Weave will automatically use the 'train' split and issue a warning. If the 'train' split is not present, it will raise an error. You can provide a specific split directly (e.g., `hf_dataset_dict['test']`).
+
+  To convert a `weave.Dataset` back to a Hugging Face `Dataset`, use the `to_hf` method.
+
+  ```python
+  # Ensure datasets is installed: pip install datasets
+  from datasets import Dataset as HFDataset, DatasetDict
+
+  # Example with HF Dataset
+  hf_rows = [
+      {'id': '0', 'sentence': "He no likes ice cream.", 'correction': "He doesn't like ice cream."},
+      {'id': '1', 'sentence': "She goed to the store.", 'correction': "She went to the store."},
+  ]
+  hf_ds = HFDataset.from_list(hf_rows)
+  weave_ds_from_hf = Dataset.from_hf(hf_ds)
+
+  # Convert back to HF Dataset
+  converted_hf_ds = weave_ds_from_hf.to_hf()
+
+  # Example with HF DatasetDict (uses 'train' split by default)
+  hf_dict = DatasetDict({
+      'train': HFDataset.from_list(hf_rows),
+      'test': HFDataset.from_list([{'id': '2', 'sentence': "Test sentence", 'correction': "Test correction"}])
+  })
+  # This will issue a warning and use the 'train' split
+  weave_ds_from_dict = Dataset.from_hf(hf_dict)
+
+  # Providing a specific split
+  weave_ds_from_test_split = Dataset.from_hf(hf_dict['test'])
+  ```
+
   </TabItem>
   <TabItem value="typescript" label="TypeScript">
    This feature is not currently available in TypeScript.  Stay tuned!
@@ -238,3 +277,37 @@ You can create, edit, and delete `Dataset`s in the UI.
 9. Click **Add to dataset**. Alternatively, to return to the **Configure field mapping** screen, click **Back**.
 
 10. In the confirmation popup, click **View the dataset** to see the changes. Alternatively, navigate to the **Datasets** tab to view the updates to your `Dataset`.
+
+## Other Dataset Operations
+
+<Tabs groupId="programming-language" queryString>
+  <TabItem value="python" label="Python" default>
+  ### Selecting Rows
+
+  You can select specific rows from a `Dataset` by their index using the `select` method. This is useful for creating subsets of your data.
+
+  ```python
+  import weave
+  from weave import Dataset
+
+  # Create a sample dataset
+  dataset = Dataset(rows=[
+      {'col_a': 1, 'col_b': 'x'},
+      {'col_a': 2, 'col_b': 'y'},
+      {'col_a': 3, 'col_b': 'z'},
+      {'col_a': 4, 'col_b': 'w'},
+  ])
+
+  # Select rows at index 0 and 2
+  subset_dataset = dataset.select([0, 2])
+
+  # Now subset_dataset contains only the first and third rows
+  # print(list(subset_dataset))
+  # Output: [{'col_a': 1, 'col_b': 'x'}, {'col_a': 3, 'col_b': 'z'}]
+  ```
+
+  </TabItem>
+  <TabItem value="typescript" label="TypeScript">
+   This feature is not currently available in TypeScript.  Stay tuned!
+  </TabItem>
+</Tabs>

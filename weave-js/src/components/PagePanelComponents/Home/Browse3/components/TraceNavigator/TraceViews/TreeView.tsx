@@ -12,7 +12,7 @@ import {
   getTokensFromUsage,
   TraceStat,
 } from '../../../pages/CallPage/cost';
-import {CallStatusType, StatusChip} from '../../../pages/common/StatusChip';
+import {StatusChip} from '../../../pages/common/StatusChip';
 import {TraceCallSchema} from '../../../pages/wfReactInterface/traceServerClientTypes';
 import {traceCallStatusCode} from '../../../pages/wfReactInterface/tsDataModelHooks';
 import TraceScrubber, {ScrubberOption} from '../TraceScrubber';
@@ -95,10 +95,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
   const chevronIcon: IconName = isExpanded ? 'chevron-down' : 'chevron-next';
   const isDeemphasized = deemphasizeCallIds?.includes(id);
   const hasChildren = childrenIds.length > 0;
-  let statusCode: CallStatusType = traceCallStatusCode(call);
-  if (hasDescendantErrors && statusCode === 'SUCCESS') {
-    statusCode = 'DESCENDANT_ERROR';
-  }
+  const statusCode = traceCallStatusCode(call, hasDescendantErrors);
   const indentMultiplier = 14;
 
   return (

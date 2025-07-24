@@ -16,9 +16,11 @@ import {ReactComponent as ImportBellNotifications} from '../../assets/icons/icon
 import {ReactComponent as ImportBenchmarkSquare} from '../../assets/icons/icon-benchmark-square.svg';
 import {ReactComponent as ImportBlogReport} from '../../assets/icons/icon-blog-report.svg';
 import {ReactComponent as ImportBokeh} from '../../assets/icons/icon-bokeh.svg';
+import {ReactComponent as ImportBold} from '../../assets/icons/icon-bold.svg';
 import {ReactComponent as ImportBookDictionary} from '../../assets/icons/icon-book-dictionary.svg';
 import {ReactComponent as ImportBoolean} from '../../assets/icons/icon-boolean.svg';
 import {ReactComponent as ImportBoxPlot} from '../../assets/icons/icon-box-plot.svg';
+import {ReactComponent as ImportBranchCommit} from '../../assets/icons/icon-branch-commit.svg';
 import {ReactComponent as ImportBug} from '../../assets/icons/icon-bug.svg';
 import {ReactComponent as ImportBuzzBot10} from '../../assets/icons/icon-buzz-bot10.svg';
 import {ReactComponent as ImportCategoryMultimodal} from '../../assets/icons/icon-category-multimodal.svg';
@@ -43,8 +45,10 @@ import {ReactComponent as ImportColumn} from '../../assets/icons/icon-column.svg
 import {ReactComponent as ImportContentFullWidth} from '../../assets/icons/icon-content-full-width.svg';
 import {ReactComponent as ImportContentNarrow} from '../../assets/icons/icon-content-narrow.svg';
 import {ReactComponent as ImportContentWide} from '../../assets/icons/icon-content-wide.svg';
+import {ReactComponent as ImportContextWindow} from '../../assets/icons/icon-context-window.svg';
 import {ReactComponent as ImportContractLeft} from '../../assets/icons/icon-contract-left.svg';
 import {ReactComponent as ImportCopy} from '../../assets/icons/icon-copy.svg';
+import {ReactComponent as ImportCourthouseLicense} from '../../assets/icons/icon-courthouse-license.svg';
 import {ReactComponent as ImportCreditCardPayment} from '../../assets/icons/icon-credit-card-payment.svg';
 import {ReactComponent as ImportCropBeginning} from '../../assets/icons/icon-crop-beginning.svg';
 import {ReactComponent as ImportCropEnd} from '../../assets/icons/icon-crop-end.svg';
@@ -88,7 +92,11 @@ import {ReactComponent as ImportFullScreenModeExpand} from '../../assets/icons/i
 import {ReactComponent as ImportGhostAgent} from '../../assets/icons/icon-ghost-agent.svg';
 import {ReactComponent as ImportGit} from '../../assets/icons/icon-git.svg';
 import {ReactComponent as ImportGithub} from '../../assets/icons/icon-github.svg';
+import {ReactComponent as ImportGrafana} from '../../assets/icons/icon-grafana.svg';
 import {ReactComponent as ImportGroup} from '../../assets/icons/icon-group.svg';
+import {ReactComponent as ImportH1} from '../../assets/icons/icon-h1.svg';
+import {ReactComponent as ImportH2} from '../../assets/icons/icon-h2.svg';
+import {ReactComponent as ImportH3} from '../../assets/icons/icon-h3.svg';
 import {ReactComponent as ImportHeadset} from '../../assets/icons/icon-headset.svg';
 import {ReactComponent as ImportHeart} from '../../assets/icons/icon-heart.svg';
 import {ReactComponent as ImportHeartFilled} from '../../assets/icons/icon-heart-filled.svg';
@@ -100,7 +108,9 @@ import {ReactComponent as ImportIdle} from '../../assets/icons/icon-idle.svg';
 import {ReactComponent as ImportIgnoreOutliers} from '../../assets/icons/icon-ignore-outliers.svg';
 import {ReactComponent as ImportImpersonateMaskAlt} from '../../assets/icons/icon-impersonate-mask-alt.svg';
 import {ReactComponent as ImportImportInsert} from '../../assets/icons/icon-import-insert.svg';
+import {ReactComponent as ImportInference} from '../../assets/icons/icon-inference.svg';
 import {ReactComponent as ImportInfo} from '../../assets/icons/icon-info.svg';
+import {ReactComponent as ImportItalic} from '../../assets/icons/icon-italic.svg';
 import {ReactComponent as ImportJobAutomation} from '../../assets/icons/icon-job-automation.svg';
 import {ReactComponent as ImportJobCalculator} from '../../assets/icons/icon-job-calculator.svg';
 import {ReactComponent as ImportJobProgramCode} from '../../assets/icons/icon-job-program-code.svg';
@@ -147,16 +157,21 @@ import {ReactComponent as ImportNewSectionAbove} from '../../assets/icons/icon-n
 import {ReactComponent as ImportNewSectionBelow} from '../../assets/icons/icon-new-section-below.svg';
 import {ReactComponent as ImportNotVisible} from '../../assets/icons/icon-not-visible.svg';
 import {ReactComponent as ImportNumber} from '../../assets/icons/icon-number.svg';
+import {ReactComponent as ImportNumberedList} from '../../assets/icons/icon-numbered-list.svg';
 import {ReactComponent as ImportOpenNewTab} from '../../assets/icons/icon-open-new-tab.svg';
 import {ReactComponent as ImportOpenaiLogo} from '../../assets/icons/icon-openai-logo.svg';
 import {ReactComponent as ImportOrchestrationLaunch} from '../../assets/icons/icon-orchestration-launch.svg';
 import {ReactComponent as ImportOrganizationCorporate} from '../../assets/icons/icon-organization-corporate.svg';
 import {ReactComponent as ImportOverflowHorizontal} from '../../assets/icons/icon-overflow-horizontal.svg';
 import {ReactComponent as ImportOverflowVertical} from '../../assets/icons/icon-overflow-vertical.svg';
+import {ReactComponent as ImportOverlay2Column} from '../../assets/icons/icon-overlay-2-column.svg';
+import {ReactComponent as ImportOverlay3Column} from '../../assets/icons/icon-overlay-3-column.svg';
+import {ReactComponent as ImportOverlayStack} from '../../assets/icons/icon-overlay-stack.svg';
 import {ReactComponent as ImportPanTool} from '../../assets/icons/icon-pan-tool.svg';
 import {ReactComponent as ImportPanTool1} from '../../assets/icons/icon-pan-tool-1.svg';
 import {ReactComponent as ImportPanel} from '../../assets/icons/icon-panel.svg';
 import {ReactComponent as ImportPanelAutoGen} from '../../assets/icons/icon-panel-auto-gen.svg';
+import {ReactComponent as ImportPanelImages} from '../../assets/icons/icon-panel-images.svg';
 import {ReactComponent as ImportPanelManual} from '../../assets/icons/icon-panel-manual.svg';
 import {ReactComponent as ImportParallelCoordinates} from '../../assets/icons/icon-parallel-coordinates.svg';
 import {ReactComponent as ImportParentBackUp} from '../../assets/icons/icon-parent-back-up.svg';
@@ -165,6 +180,8 @@ import {ReactComponent as ImportPaused} from '../../assets/icons/icon-paused.svg
 import {ReactComponent as ImportPencilEdit} from '../../assets/icons/icon-pencil-edit.svg';
 import {ReactComponent as ImportPhoto} from '../../assets/icons/icon-photo.svg';
 import {ReactComponent as ImportPin} from '../../assets/icons/icon-pin.svg';
+import {ReactComponent as ImportPinToLeft} from '../../assets/icons/icon-pin-to-left.svg';
+import {ReactComponent as ImportPinToLeftFilled} from '../../assets/icons/icon-pin-to-left-filled.svg';
 import {ReactComponent as ImportPinToRight} from '../../assets/icons/icon-pin-to-right.svg';
 import {ReactComponent as ImportPlay} from '../../assets/icons/icon-play.svg';
 import {ReactComponent as ImportPlotly} from '../../assets/icons/icon-plotly.svg';
@@ -220,6 +237,7 @@ import {ReactComponent as ImportStar} from '../../assets/icons/icon-star.svg';
 import {ReactComponent as ImportStarFilled} from '../../assets/icons/icon-star-filled.svg';
 import {ReactComponent as ImportStop} from '../../assets/icons/icon-stop.svg';
 import {ReactComponent as ImportStopped} from '../../assets/icons/icon-stopped.svg';
+import {ReactComponent as ImportStrikethrough} from '../../assets/icons/icon-strikethrough.svg';
 import {ReactComponent as ImportSun} from '../../assets/icons/icon-sun.svg';
 import {ReactComponent as ImportSwap} from '../../assets/icons/icon-swap.svg';
 import {ReactComponent as ImportSweepBayes} from '../../assets/icons/icon-sweep-bayes.svg';
@@ -283,6 +301,10 @@ const updateIconProps = (props: SVGIconProps) => {
     width: 20,
     height: 20,
     ...props,
+    style: {
+      flexShrink: 0,
+      ...props.style,
+    },
   };
 };
 export const IconAddNew = (props: SVGIconProps) => (
@@ -333,6 +355,9 @@ export const IconBlogReport = (props: SVGIconProps) => (
 export const IconBokeh = (props: SVGIconProps) => (
   <ImportBokeh {...updateIconProps(props)} />
 );
+export const IconBold = (props: SVGIconProps) => (
+  <ImportBold {...updateIconProps(props)} />
+);
 export const IconBookDictionary = (props: SVGIconProps) => (
   <ImportBookDictionary {...updateIconProps(props)} />
 );
@@ -341,6 +366,9 @@ export const IconBoolean = (props: SVGIconProps) => (
 );
 export const IconBoxPlot = (props: SVGIconProps) => (
   <ImportBoxPlot {...updateIconProps(props)} />
+);
+export const IconBranchCommit = (props: SVGIconProps) => (
+  <ImportBranchCommit {...updateIconProps(props)} />
 );
 export const IconBug = (props: SVGIconProps) => (
   <ImportBug {...updateIconProps(props)} />
@@ -414,11 +442,17 @@ export const IconContentNarrow = (props: SVGIconProps) => (
 export const IconContentWide = (props: SVGIconProps) => (
   <ImportContentWide {...updateIconProps(props)} />
 );
+export const IconContextWindow = (props: SVGIconProps) => (
+  <ImportContextWindow {...updateIconProps(props)} />
+);
 export const IconContractLeft = (props: SVGIconProps) => (
   <ImportContractLeft {...updateIconProps(props)} />
 );
 export const IconCopy = (props: SVGIconProps) => (
   <ImportCopy {...updateIconProps(props)} />
+);
+export const IconCourthouseLicense = (props: SVGIconProps) => (
+  <ImportCourthouseLicense {...updateIconProps(props)} />
 );
 export const IconCreditCardPayment = (props: SVGIconProps) => (
   <ImportCreditCardPayment {...updateIconProps(props)} />
@@ -549,8 +583,20 @@ export const IconGit = (props: SVGIconProps) => (
 export const IconGithub = (props: SVGIconProps) => (
   <ImportGithub {...updateIconProps(props)} />
 );
+export const IconGrafana = (props: SVGIconProps) => (
+  <ImportGrafana {...updateIconProps(props)} />
+);
 export const IconGroup = (props: SVGIconProps) => (
   <ImportGroup {...updateIconProps(props)} />
+);
+export const IconH1 = (props: SVGIconProps) => (
+  <ImportH1 {...updateIconProps(props)} />
+);
+export const IconH2 = (props: SVGIconProps) => (
+  <ImportH2 {...updateIconProps(props)} />
+);
+export const IconH3 = (props: SVGIconProps) => (
+  <ImportH3 {...updateIconProps(props)} />
 );
 export const IconHeadset = (props: SVGIconProps) => (
   <ImportHeadset {...updateIconProps(props)} />
@@ -585,8 +631,14 @@ export const IconImpersonateMaskAlt = (props: SVGIconProps) => (
 export const IconImportInsert = (props: SVGIconProps) => (
   <ImportImportInsert {...updateIconProps(props)} />
 );
+export const IconInference = (props: SVGIconProps) => (
+  <ImportInference {...updateIconProps(props)} />
+);
 export const IconInfo = (props: SVGIconProps) => (
   <ImportInfo {...updateIconProps(props)} />
+);
+export const IconItalic = (props: SVGIconProps) => (
+  <ImportItalic {...updateIconProps(props)} />
 );
 export const IconJobAutomation = (props: SVGIconProps) => (
   <ImportJobAutomation {...updateIconProps(props)} />
@@ -726,6 +778,9 @@ export const IconNotVisible = (props: SVGIconProps) => (
 export const IconNumber = (props: SVGIconProps) => (
   <ImportNumber {...updateIconProps(props)} />
 );
+export const IconNumberedList = (props: SVGIconProps) => (
+  <ImportNumberedList {...updateIconProps(props)} />
+);
 export const IconOpenNewTab = (props: SVGIconProps) => (
   <ImportOpenNewTab {...updateIconProps(props)} />
 );
@@ -744,6 +799,15 @@ export const IconOverflowHorizontal = (props: SVGIconProps) => (
 export const IconOverflowVertical = (props: SVGIconProps) => (
   <ImportOverflowVertical {...updateIconProps(props)} />
 );
+export const IconOverlay2Column = (props: SVGIconProps) => (
+  <ImportOverlay2Column {...updateIconProps(props)} />
+);
+export const IconOverlay3Column = (props: SVGIconProps) => (
+  <ImportOverlay3Column {...updateIconProps(props)} />
+);
+export const IconOverlayStack = (props: SVGIconProps) => (
+  <ImportOverlayStack {...updateIconProps(props)} />
+);
 export const IconPanTool = (props: SVGIconProps) => (
   <ImportPanTool {...updateIconProps(props)} />
 );
@@ -755,6 +819,9 @@ export const IconPanel = (props: SVGIconProps) => (
 );
 export const IconPanelAutoGen = (props: SVGIconProps) => (
   <ImportPanelAutoGen {...updateIconProps(props)} />
+);
+export const IconPanelImages = (props: SVGIconProps) => (
+  <ImportPanelImages {...updateIconProps(props)} />
 );
 export const IconPanelManual = (props: SVGIconProps) => (
   <ImportPanelManual {...updateIconProps(props)} />
@@ -779,6 +846,12 @@ export const IconPhoto = (props: SVGIconProps) => (
 );
 export const IconPin = (props: SVGIconProps) => (
   <ImportPin {...updateIconProps(props)} />
+);
+export const IconPinToLeft = (props: SVGIconProps) => (
+  <ImportPinToLeft {...updateIconProps(props)} />
+);
+export const IconPinToLeftFilled = (props: SVGIconProps) => (
+  <ImportPinToLeftFilled {...updateIconProps(props)} />
 );
 export const IconPinToRight = (props: SVGIconProps) => (
   <ImportPinToRight {...updateIconProps(props)} />
@@ -944,6 +1017,9 @@ export const IconStop = (props: SVGIconProps) => (
 );
 export const IconStopped = (props: SVGIconProps) => (
   <ImportStopped {...updateIconProps(props)} />
+);
+export const IconStrikethrough = (props: SVGIconProps) => (
+  <ImportStrikethrough {...updateIconProps(props)} />
 );
 export const IconSun = (props: SVGIconProps) => (
   <ImportSun {...updateIconProps(props)} />
@@ -1116,9 +1192,11 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'benchmark-square': IconBenchmarkSquare,
   'blog-report': IconBlogReport,
   bokeh: IconBokeh,
+  bold: IconBold,
   'book-dictionary': IconBookDictionary,
   boolean: IconBoolean,
   'box-plot': IconBoxPlot,
+  'branch-commit': IconBranchCommit,
   bug: IconBug,
   'buzz-bot10': IconBuzzBot10,
   'category-multimodal': IconCategoryMultimodal,
@@ -1143,8 +1221,10 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'content-full-width': IconContentFullWidth,
   'content-narrow': IconContentNarrow,
   'content-wide': IconContentWide,
+  'context-window': IconContextWindow,
   'contract-left': IconContractLeft,
   copy: IconCopy,
+  'courthouse-license': IconCourthouseLicense,
   'credit-card-payment': IconCreditCardPayment,
   'crop-beginning': IconCropBeginning,
   'crop-end': IconCropEnd,
@@ -1188,7 +1268,11 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'ghost-agent': IconGhostAgent,
   git: IconGit,
   github: IconGithub,
+  grafana: IconGrafana,
   group: IconGroup,
+  h1: IconH1,
+  h2: IconH2,
+  h3: IconH3,
   headset: IconHeadset,
   heart: IconHeart,
   'heart-filled': IconHeartFilled,
@@ -1200,7 +1284,9 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'ignore-outliers': IconIgnoreOutliers,
   'impersonate-mask-alt': IconImpersonateMaskAlt,
   'import-insert': IconImportInsert,
+  inference: IconInference,
   info: IconInfo,
+  italic: IconItalic,
   'job-automation': IconJobAutomation,
   'job-calculator': IconJobCalculator,
   'job-program-code': IconJobProgramCode,
@@ -1247,16 +1333,21 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'new-section-below': IconNewSectionBelow,
   'not-visible': IconNotVisible,
   number: IconNumber,
+  'numbered-list': IconNumberedList,
   'open-new-tab': IconOpenNewTab,
   'openai-logo': IconOpenaiLogo,
   'orchestration-launch': IconOrchestrationLaunch,
   'organization-corporate': IconOrganizationCorporate,
   'overflow-horizontal': IconOverflowHorizontal,
   'overflow-vertical': IconOverflowVertical,
+  'overlay-2-column': IconOverlay2Column,
+  'overlay-3-column': IconOverlay3Column,
+  'overlay-stack': IconOverlayStack,
   'pan-tool': IconPanTool,
   'pan-tool-1': IconPanTool1,
   panel: IconPanel,
   'panel-auto-gen': IconPanelAutoGen,
+  'panel-images': IconPanelImages,
   'panel-manual': IconPanelManual,
   'parallel-coordinates': IconParallelCoordinates,
   'parent-back-up': IconParentBackUp,
@@ -1265,6 +1356,8 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'pencil-edit': IconPencilEdit,
   photo: IconPhoto,
   pin: IconPin,
+  'pin-to-left': IconPinToLeft,
+  'pin-to-left-filled': IconPinToLeftFilled,
   'pin-to-right': IconPinToRight,
   play: IconPlay,
   plotly: IconPlotly,
@@ -1320,6 +1413,7 @@ const ICON_NAME_TO_ICON: Record<IconName, ElementType> = {
   'star-filled': IconStarFilled,
   stop: IconStop,
   stopped: IconStopped,
+  strikethrough: IconStrikethrough,
   sun: IconSun,
   swap: IconSwap,
   'sweep-bayes': IconSweepBayes,
@@ -1381,7 +1475,8 @@ export interface IconProps {
 export const Icon = ({name, ...props}: IconProps) => {
   const IconComponent: ElementType = ICON_NAME_TO_ICON[name];
   if (!IconComponent) {
-    throw new Error(`Could not find icon ${name}`);
+    console.error(`Could not find icon ${name}`);
+    return null;
   }
   return <IconComponent {...props} />;
 };

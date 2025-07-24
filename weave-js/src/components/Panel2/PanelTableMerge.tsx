@@ -37,6 +37,7 @@ import React, {useCallback, useMemo} from 'react';
 import {useNodeWithServerType} from '../../react';
 import * as ConfigPanel from './ConfigPanel';
 import * as Panel2 from './panel';
+import {usePanelContext} from './PanelContext';
 import * as TableType from './PanelTable/tableType';
 
 const inputType = {
@@ -342,12 +343,14 @@ const PanelTableMerge: React.FC<PanelTableMergeProps> = props => {
 const PanelTableMergeConfig: React.FC<PanelTableMergeProps> = props => {
   const {input} = props;
   const pathServerType = useNodeWithServerType(input);
+  const {stack} = usePanelContext();
+
   const rowsOrListOfRows = useMemo(
     () =>
       !pathServerType.loading && pathServerType.result.nodeType !== 'void'
-        ? TableType.normalizeTableLike(pathServerType.result)
+        ? TableType.normalizeTableLike(pathServerType.result, stack)
         : voidNode(),
-    [pathServerType]
+    [pathServerType, stack]
   );
   const resolvedPath = useNodeWithServerType(rowsOrListOfRows);
   const innerProps = useMemo(() => {
@@ -549,12 +552,12 @@ export const Spec: Panel2.PanelSpec = {
       propertyTypes: {},
     },
   }),
-  equivalentTransform: async (inputNode, config, refineType) => {
+  equivalentTransform: async (inputNode, config, refineType, client, stack) => {
     const expectedReturnType = list(typedDict({}));
     const defaultNode = constNodeUnsafe(expectedReturnType, []);
     const castedNode: Node = inputNode as any;
     const refinedNode = await refineType(castedNode);
-    const arrNode = TableType.normalizeTableLike(refinedNode);
+    const arrNode = TableType.normalizeTableLike(refinedNode, stack);
     const normalizedNode = opDropNa({
       arr: arrNode,
     });

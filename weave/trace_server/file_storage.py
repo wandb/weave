@@ -46,8 +46,11 @@ from abc import abstractmethod
 from typing import Any, Callable, Optional, Union, cast
 
 import boto3
+from azure.core.exceptions import HttpResponseError
 from azure.storage.blob import BlobServiceClient
 from botocore.config import Config
+from botocore.exceptions import ClientError
+from google.api_core import exceptions as gcp_exceptions
 from google.cloud import storage
 from google.oauth2.credentials import Credentials as GCPCredentials
 from tenacity import (
@@ -56,6 +59,7 @@ from tenacity import (
     retry,
     stop_after_attempt,
     wait_exponential,
+    wait_random_exponential,
 )
 
 from weave.trace_server.environment import wf_file_storage_uri
@@ -128,10 +132,8 @@ def store_in_bucket(
         target_file_storage_uri = client.base_uri.with_path(path)
         client.store(target_file_storage_uri, data)
     except Exception as e:
-        logger.exception(
-            "Failed to store file at %s: %s", target_file_storage_uri, str(e)
-        )
-        raise FileStorageWriteError(f"Failed to store file at {path}: {str(e)}") from e
+        logger.exception("Failed to store file at %s", target_file_storage_uri)
+        raise FileStorageWriteError(f"Failed to store file at {path}: {e!s}") from e
     return target_file_storage_uri
 
 
@@ -142,21 +144,52 @@ def read_from_bucket(
     try:
         return client.read(file_storage_uri)
     except Exception as e:
-        logger.exception("Failed to read file from %s: %s", file_storage_uri, str(e))
+        logger.exception("Failed to read file from %s", file_storage_uri)
         raise FileStorageReadError(
-            f"Failed to read file from {file_storage_uri}: {str(e)}"
+            f"Failed to read file from {file_storage_uri}: {e!s}"
         ) from e
 
 
-### Everything below here is interal
+### Everything below here is internal
 
 
 def key_for_project_digest(project_id: str, digest: str) -> str:
     return f"weave/projects/{project_id}/files/{digest}"
 
 
+def _is_rate_limit_error(exception: Union[BaseException, None]) -> bool:
+    """Check if the exception is a rate limiting error (429) from any cloud provider.
+
+    Based on official cloud provider documentation:
+    - AWS: https://docs.aws.amazon.com/AmazonS3/latest/API/ErrorResponses.html
+    - GCS: https://cloud.google.com/storage/docs/retry-strategy
+    - Azure: https://learn.microsoft.com/en-us/azure/storage/blobs/storage-retry-policy-python
+    """
+    if exception is None:
+        return False
+
+    # Google Cloud Storage - TooManyRequests exception
+    if isinstance(exception, gcp_exceptions.TooManyRequests):
+        return True
+
+    # AWS S3 - ClientError with 429 status code or Throttling error
+    if isinstance(exception, ClientError):
+        error_code = exception.response.get("Error", {}).get("Code", "")
+        if error_code in ["Throttling", "ThrottlingException", "RequestLimitExceeded"]:
+            return True
+        # Check HTTP status code
+        if exception.response.get("ResponseMetadata", {}).get("HTTPStatusCode") == 429:
+            return True
+
+    # Azure - HttpResponseError with 429 status code
+    if isinstance(exception, HttpResponseError) and exception.status_code == 429:
+        return True
+
+    return False
+
+
 def create_retry_decorator(operation_name: str) -> Callable[[Any], Any]:
-    """Creates a retry decorator with consistent retry policy."""
+    """Creates a retry decorator with consistent retry policy and special 429 handling."""
 
     def after_retry(retry_state: RetryCallState) -> None:
         if retry_state.attempt_number > 1:
@@ -168,9 +201,23 @@ def create_retry_decorator(operation_name: str) -> Callable[[Any], Any]:
                 retry_state.seconds_since_start,
             )
 
+    def create_wait_strategy(retry_state: RetryCallState) -> float:
+        """Create wait strategy that uses jitter for rate limit errors."""
+        if retry_state.outcome and retry_state.outcome.failed:
+            exception = retry_state.outcome.exception()
+            if exception and _is_rate_limit_error(exception):
+                # Use random exponential backoff with jitter for rate limiting
+                return wait_random_exponential(
+                    multiplier=RETRY_MIN_WAIT, max=RETRY_MAX_WAIT
+                )(retry_state)
+        # Use regular exponential backoff for other errors
+        return wait_exponential(multiplier=RETRY_MIN_WAIT, max=RETRY_MAX_WAIT)(
+            retry_state
+        )
+
     return retry(
         stop=stop_after_attempt(RETRY_MAX_ATTEMPTS),
-        wait=wait_exponential(multiplier=RETRY_MIN_WAIT, max=RETRY_MAX_WAIT),
+        wait=create_wait_strategy,
         reraise=True,
         before_sleep=before_sleep_log(logger, logging.DEBUG),
         after=after_retry,
@@ -207,9 +254,8 @@ class S3StorageClient(FileStorageClient):
     @create_retry_decorator("s3_storage")
     def store(self, uri: S3FileStorageURI, data: bytes) -> None:
         """Store data in S3 bucket with automatic retries on failure."""
-        assert isinstance(uri, S3FileStorageURI) and uri.to_uri_str().startswith(
-            self.base_uri.to_uri_str()
-        )
+        assert isinstance(uri, S3FileStorageURI)
+        assert uri.to_uri_str().startswith(self.base_uri.to_uri_str())
         # Use KMS key for encryption if available
         put_object_params = {"Bucket": uri.bucket, "Key": uri.path, "Body": data}
 
@@ -223,9 +269,8 @@ class S3StorageClient(FileStorageClient):
     @create_retry_decorator("s3_read")
     def read(self, uri: S3FileStorageURI) -> bytes:
         """Read data from S3 bucket with automatic retries on failure."""
-        assert isinstance(uri, S3FileStorageURI) and uri.to_uri_str().startswith(
-            self.base_uri.to_uri_str()
-        )
+        assert isinstance(uri, S3FileStorageURI)
+        assert uri.to_uri_str().startswith(self.base_uri.to_uri_str())
         response = self.client.get_object(Bucket=uri.bucket, Key=uri.path)
         return response["Body"].read()
 
@@ -246,22 +291,22 @@ class GCSStorageClient(FileStorageClient):
     @create_retry_decorator("gcs_storage")
     def store(self, uri: GCSFileStorageURI, data: bytes) -> None:
         """Store data in GCS bucket with automatic retries on failure."""
-        assert isinstance(uri, GCSFileStorageURI) and uri.to_uri_str().startswith(
-            self.base_uri.to_uri_str()
-        )
+        assert isinstance(uri, GCSFileStorageURI)
+        assert uri.to_uri_str().startswith(self.base_uri.to_uri_str())
         bucket = self.client.bucket(uri.bucket)
         blob = bucket.blob(uri.path)
-        blob.upload_from_string(data, timeout=DEFAULT_READ_TIMEOUT)
+        # Explicitly disable retries at the operation level
+        # https://cloud.google.com/python/docs/reference/storage/latest/retry_timeout
+        blob.upload_from_string(data, timeout=DEFAULT_READ_TIMEOUT, retry=None)
 
     @create_retry_decorator("gcs_read")
     def read(self, uri: GCSFileStorageURI) -> bytes:
         """Read data from GCS bucket with automatic retries on failure."""
-        assert isinstance(uri, GCSFileStorageURI) and uri.to_uri_str().startswith(
-            self.base_uri.to_uri_str()
-        )
+        assert isinstance(uri, GCSFileStorageURI)
+        assert uri.to_uri_str().startswith(self.base_uri.to_uri_str())
         bucket = self.client.bucket(uri.bucket)
         blob = bucket.blob(uri.path)
-        return blob.download_as_bytes(timeout=DEFAULT_READ_TIMEOUT)
+        return blob.download_as_bytes(timeout=DEFAULT_READ_TIMEOUT, retry=None)
 
 
 class AzureStorageClient(FileStorageClient):
@@ -302,9 +347,8 @@ class AzureStorageClient(FileStorageClient):
     @create_retry_decorator("azure_storage")
     def store(self, uri: AzureFileStorageURI, data: bytes) -> None:
         """Store data in Azure container with automatic retries on failure."""
-        assert isinstance(uri, AzureFileStorageURI) and uri.to_uri_str().startswith(
-            self.base_uri.to_uri_str()
-        )
+        assert isinstance(uri, AzureFileStorageURI)
+        assert uri.to_uri_str().startswith(self.base_uri.to_uri_str())
         client = self._get_client(uri.account)
         container_client = client.get_container_client(uri.container)
         blob_client = container_client.get_blob_client(uri.path)
@@ -313,9 +357,8 @@ class AzureStorageClient(FileStorageClient):
     @create_retry_decorator("azure_read")
     def read(self, uri: AzureFileStorageURI) -> bytes:
         """Read data from Azure container with automatic retries on failure."""
-        assert isinstance(uri, AzureFileStorageURI) and uri.to_uri_str().startswith(
-            self.base_uri.to_uri_str()
-        )
+        assert isinstance(uri, AzureFileStorageURI)
+        assert uri.to_uri_str().startswith(self.base_uri.to_uri_str())
         client = self._get_client(uri.account)
         container_client = client.get_container_client(uri.container)
         blob_client = container_client.get_blob_client(uri.path)

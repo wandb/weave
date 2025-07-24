@@ -5,13 +5,21 @@ import {ApolloClient, gql, useApolloClient} from '@apollo/client';
 import React, {useEffect, useState} from 'react';
 
 import {LoadingDots} from '../../../LoadingDots';
+import {RunLink} from '../../../RunLink';
+import {
+  CellFilterWrapper,
+  OnUpdateFilter,
+} from '../Browse3/filters/CellFilterWrapper';
 import {NotApplicable} from '../Browse3/NotApplicable';
-import {Link} from '../Browse3/pages/common/Links';
 
 type CellValueRunProps = {
   entity: string;
   project: string;
   run: string; // "name" e.g. "dk6pv7ri"
+
+  // These props are used for Option+Click support
+  onUpdateFilter?: OnUpdateFilter;
+  rowId: string;
 };
 
 const FIND_RUN_QUERY = gql`
@@ -21,6 +29,8 @@ const FIND_RUN_QUERY = gql`
     $runName: String!
   ) {
     project(name: $projectName, entityName: $entityName) {
+      id
+      internalId
       run(name: $runName) {
         id
         name
@@ -31,7 +41,7 @@ const FIND_RUN_QUERY = gql`
 `;
 
 type RunInfo = {
-  id: string;
+  projectInternalId: string;
   name: string;
   displayName: string;
 };
@@ -54,7 +64,13 @@ const fetchRun = (
       },
     })
     .then(result => {
-      return result.data.project.run as RunInfo;
+      const {project} = result.data;
+      const {run} = project;
+      return {
+        projectInternalId: project.internalId,
+        name: runName,
+        displayName: run.displayName,
+      };
     });
 };
 
@@ -95,7 +111,13 @@ export const useRun = (
   return runInfo;
 };
 
-export const CellValueRun = ({entity, project, run}: CellValueRunProps) => {
+export const CellValueRun = ({
+  entity,
+  project,
+  run,
+  onUpdateFilter,
+  rowId,
+}: CellValueRunProps) => {
   const runInfo = useRun(entity, project, run);
 
   if (runInfo === 'load' || runInfo === 'loading') {
@@ -105,8 +127,24 @@ export const CellValueRun = ({entity, project, run}: CellValueRunProps) => {
     return <NotApplicable />;
   }
 
-  const to = `/${entity}/${project}/runs/${run}`;
   // Would be nice to show a run color indicator here but that requires getting information
   // out of the project view.
-  return <Link to={to}>{runInfo.displayName}</Link>;
+
+  const to = `/${entity}/${project}/runs/${run}`;
+  const filterValue = runInfo.projectInternalId + ':' + runInfo.name;
+  return (
+    <CellFilterWrapper
+      onUpdateFilter={onUpdateFilter}
+      field="wb_run_id"
+      rowId={rowId}
+      operation="(string): equals"
+      value={filterValue}>
+      <RunLink
+        entityName={entity}
+        projectName={project}
+        runName={run}
+        to={to}
+      />
+    </CellFilterWrapper>
+  );
 };

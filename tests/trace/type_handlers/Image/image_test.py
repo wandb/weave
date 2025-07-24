@@ -131,12 +131,12 @@ def test_image_as_file(client: WeaveClient) -> None:
     client.project = "test_image_as_file"
     file_path = Path(__file__).parent.resolve() / "example.jpg"
 
-    @weave.op()
+    @weave.op
     def return_image_jpg_pillow(path: str):
         file_path = Path(path)
         return Image.open(file_path)
 
-    @weave.op()
+    @weave.op
     def accept_image_jpg_pillow(val):
         width, height = val.size
         return f"Image size: {width}x{height}"
@@ -161,8 +161,8 @@ def make_random_image(image_size: tuple[int, int] = (64, 64)):
 @pytest.fixture
 def dataset_ref(client):
     # This fixture represents a saved dataset containing images
-    N_ROWS = 5
-    rows = [{"img": make_random_image()} for _ in range(N_ROWS)]
+    n_rows = 5
+    rows = [{"img": make_random_image()} for _ in range(n_rows)]
     dataset = weave.Dataset(rows=rows)
     ref = weave.publish(dataset)
 
@@ -182,7 +182,8 @@ async def test_images_in_dataset_for_evaluation(client, dataset_ref):
     res = await evaluation.evaluate(model)
 
     assert isinstance(res, dict)
-    assert "model_latency" in res and "mean" in res["model_latency"]
+    assert "model_latency" in res
+    assert "mean" in res["model_latency"]
     assert isinstance(res["model_latency"]["mean"], (int, float))
 
 
@@ -205,8 +206,8 @@ async def test_many_images_will_consistently_log():
 
 
 def test_images_in_load_of_dataset(client):
-    N_ROWS = 5
-    rows = [{"img": make_random_image()} for _ in range(N_ROWS)]
+    n_rows = 5
+    rows = [{"img": make_random_image()} for _ in range(n_rows)]
     dataset = weave.Dataset(rows=rows)
     ref = weave.publish(dataset)
 

@@ -6,7 +6,7 @@
  *    * (BackendExpansion) Move Expansion to Backend, and support filter/sort
  */
 
-import {Autocomplete, FormControl, ListItem, Tooltip} from '@mui/material';
+import {Tooltip} from '@mui/material';
 import {
   GridColDef,
   GridColumnVisibilityModel,
@@ -17,12 +17,10 @@ import {
   GridSortModel,
   useGridApiRef,
 } from '@mui/x-data-grid-pro';
-import {MOON_200, TEAL_300} from '@wandb/weave/common/css/color.styles';
 import {Button} from '@wandb/weave/components/Button';
 import {Checkbox} from '@wandb/weave/components/Checkbox/Checkbox';
 import {ErrorPanel} from '@wandb/weave/components/ErrorPanel';
 import {
-  Icon,
   IconNotVisible,
   IconPinToRight,
   IconSortAscending,
@@ -45,10 +43,12 @@ import {RemovableTag} from '../../../../../Tag';
 import {RemoveAction} from '../../../../../Tag/RemoveAction';
 import {TailwindContents} from '../../../../../Tailwind';
 import {TableRowSelectionContext} from '../../../TableRowSelectionContext';
+import {CallsCharts} from '../../charts/CallsCharts';
 import {
   useWeaveflowCurrentRouteContext,
   WeaveflowPeekContext,
 } from '../../context';
+import {usePeekLocation} from '../../context';
 import {AddToDatasetDrawer} from '../../datasets/AddToDatasetDrawer';
 import {
   convertFeedbackFieldToBackendFilter,
@@ -57,25 +57,19 @@ import {
 import {OnUpdateFilter} from '../../filters/CellFilterWrapper';
 import {getDefaultOperatorForValue} from '../../filters/common';
 import {FilterPanel} from '../../filters/FilterPanel';
+import {getNextFilterId} from '../../filters/filterUtils';
 import {flattenObjectPreservingWeaveTypes} from '../../flattenObject';
 import {DEFAULT_PAGE_SIZE} from '../../grid/pagination';
-import {StyledPaper} from '../../StyledAutocomplete';
 import {StyledDataGrid} from '../../StyledDataGrid';
-import {StyledTextField} from '../../StyledTextField';
 import {ConfirmDeleteModal} from '../CallPage/OverflowMenu';
 import {FilterLayoutTemplate} from '../common/SimpleFilterableDataTable';
 import {prepareFlattenedDataForTable} from '../common/tabularListViews/columnBuilder';
 import {useControllableState, useURLSearchParamsDict} from '../util';
-import {useWFHooks} from '../wfReactInterface/context';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
 import {traceCallToUICallSchema} from '../wfReactInterface/tsDataModelHooks';
 import {EXPANDED_REF_REF_KEY} from '../wfReactInterface/tsDataModelHooksCallRefExpansion';
 import {objectVersionNiceString} from '../wfReactInterface/utilities';
-import {
-  CallSchema,
-  OpVersionSchema,
-} from '../wfReactInterface/wfDataModelHooksInterface';
-import {CallsCharts} from './CallsCharts';
+import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {CallsCustomColumnMenu} from './CallsCustomColumnMenu';
 import {
   BulkAddToDatasetButton,
@@ -99,12 +93,28 @@ import {CallsTableNoRowsOverlay} from './CallsTableNoRowsOverlay';
 import {DEFAULT_FILTER_CALLS, useCallsForQuery} from './callsTableQuery';
 import {useCurrentFilterIsEvaluationsFilter} from './evaluationsFilter';
 import {ManageColumnsButton} from './ManageColumnsButton';
+import {OpSelector} from './OpSelector';
+import {ParentFilterTag} from './ParentFilterTag';
+import {ResizableHandle} from './ResizableHandle';
 
 const MAX_SELECT = 100;
+
+const TABLE_MIN_WIDTH_PX = 200; // Minimum width for the table section
+const CHARTS_MIN_WIDTH_PX = 400; // Minimum width for the charts section
+const RESIZABLE_HANDLE_MAX_WIDTH_OFFSET_PX = 200; // How much space to leave on the right for charts
+const SPLIT_VIEW_CONTAINER_MIN_HEIGHT_PX = 400; // Minimum height for the split view container
+const SPLIT_VIEW_CONTAINER_HEIGHT_OFFSET_PX = 160; // Height offset for the split view container
+const DEFAULT_CHARTS_WIDTH_PX = 500; // Default charts width when peek is closed
+const DEFAULT_TABLE_WIDTH_WHEN_PEEK_OPEN_PX = 340; // Default table width when peek is open
 
 export const DEFAULT_HIDDEN_COLUMN_PREFIXES = [
   'attributes.weave',
   'summary.weave.feedback',
+  'summary.status_counts',
+  // attributes.python was logged for a short period of time
+  // accidentally in v0.51.47. We can hide it for a while
+  // and remove this after a few months (say Sept 2025)
+  'attributes.python',
   'wb_run_id',
   'attributes.otel_span',
 ];
@@ -130,7 +140,23 @@ export const DEFAULT_PAGINATION_CALLS: GridPaginationModel = {
   page: 0,
 };
 
-const CustomLoadingOverlay: React.FC = () => {
+const CustomLoadingOverlay: React.FC<{hideControls?: boolean}> = ({
+  hideControls,
+}) => {
+  if (hideControls) {
+    return (
+      <div
+        style={{
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}>
+        <WaveLoader size="huge" />
+      </div>
+    );
+  }
   return (
     <div
       style={{
@@ -464,7 +490,7 @@ export const CallsTable: FC<{
             items: [
               ...filterModel.items,
               {
-                id: filterModel.items.length,
+                id: getNextFilterId(filterModel.items),
                 field,
                 operator: op,
                 value: strVal,
@@ -555,15 +581,20 @@ export const CallsTable: FC<{
       : null;
   }, [effectiveFilter.outputObjectVersionRefs, outputObjectVersionOptions]);
 
-  // 4. Parent ID
-  const parentIdOptions = useParentIdOptions(entity, project, effectiveFilter);
-  const selectedParentId = useMemo(
-    () =>
-      effectiveFilter.parentId
-        ? parentIdOptions[effectiveFilter.parentId]
-        : null,
-    [effectiveFilter.parentId, parentIdOptions]
+  // 4. Parent ID - UI delegated to ParentFilterTag
+  const onSetParentFilter = useCallback(
+    (parentId: string | undefined) => {
+      setFilter({
+        ...filter,
+        parentId,
+      });
+    },
+    [setFilter, filter]
   );
+
+  // Detect peek drawer state to flip proportions
+  const peekLocation = usePeekLocation();
+  const isPeekOpen = peekLocation != null;
 
   // DataGrid Model Management
   const pinModelResolved = pinModel ?? DEFAULT_PIN_CALLS;
@@ -615,9 +646,27 @@ export const CallsTable: FC<{
   );
 
   const columnVisibilityModel = useMemo(() => {
+    // Always use the default column visibility behavior, regardless of metrics state
     if (!columnVisibilityModelProp) {
       return undefined;
     }
+
+    // When peek drawer is open and metrics are showing, only show the trace column and checkbox
+    if (isPeekOpen && isMetricsChecked) {
+      const visibilityModel: Record<string, boolean> = {};
+      columns.cols.forEach(col => {
+        if (
+          col.field === 'summary.weave.trace_name' ||
+          col.field === 'CustomCheckbox'
+        ) {
+          visibilityModel[col.field] = true;
+        } else {
+          visibilityModel[col.field] = false;
+        }
+      });
+      return visibilityModel;
+    }
+
     const hiddenColumns: string[] = [];
     for (const hiddenColPrefix of DEFAULT_HIDDEN_COLUMN_PREFIXES) {
       const cols = columns.cols.filter(col =>
@@ -638,13 +687,47 @@ export const CallsTable: FC<{
       ...columnVisibilityModelProp,
       ...hiddenColumnVisibilityFalse,
     };
-  }, [columns.cols, columnVisibilityModelProp]);
+  }, [columns.cols, columnVisibilityModelProp, isPeekOpen, isMetricsChecked]);
 
   // Selection Management
   const [selectedCalls, setSelectedCalls] = useState<string[]>([]);
   const clearSelectedCalls = useCallback(() => {
     setSelectedCalls([]);
   }, [setSelectedCalls]);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Calculate initial table width based on peek drawer state
+  const getInitialTableWidth = useCallback(() => {
+    if (isPeekOpen) {
+      return DEFAULT_TABLE_WIDTH_WHEN_PEEK_OPEN_PX;
+    }
+    // When peek is closed, we want charts to be ~300px, so table takes the rest
+    // Start with a reasonable default - will be adjusted by the effect below
+    return Math.max(600, 1200 - DEFAULT_CHARTS_WIDTH_PX - 50); // Assume ~1200px container initially
+  }, [isPeekOpen]);
+
+  const [tableWidthPx, setTableWidthPx] = useState(() =>
+    getInitialTableWidth()
+  );
+
+  // Update table width when peek drawer state changes
+  useEffect(() => {
+    if (containerRef.current && isMetricsChecked) {
+      const containerWidth = containerRef.current.clientWidth;
+      if (isPeekOpen) {
+        // When peek is open, set table to ~300px
+        setTableWidthPx(DEFAULT_TABLE_WIDTH_WHEN_PEEK_OPEN_PX);
+      } else {
+        // When peek is closed, give charts ~300px, table gets the rest
+        const newTableWidth = Math.max(
+          TABLE_MIN_WIDTH_PX,
+          containerWidth - DEFAULT_CHARTS_WIDTH_PX - 20 // 20px for handle/margins
+        );
+        setTableWidthPx(newTableWidth);
+      }
+    }
+  }, [isPeekOpen, isMetricsChecked]);
 
   // Clear selections when switching table types
   useEffect(() => {
@@ -722,10 +805,24 @@ export const CallsTable: FC<{
           );
         },
       },
-      ...columns.cols,
+      ...columns.cols.map(col => {
+        // When peek drawer is open and metrics are showing, make the trace column take full width
+        if (
+          isPeekOpen &&
+          isMetricsChecked &&
+          col.field === 'summary.weave.trace_name'
+        ) {
+          return {
+            ...col,
+            flex: 1,
+            minWidth: 250,
+          };
+        }
+        return col;
+      }),
     ];
     return cols;
-  }, [columns.cols, selectedCalls, tableData]);
+  }, [columns.cols, selectedCalls, tableData, isPeekOpen, isMetricsChecked]);
 
   // MUI data grid is unhappy if you pass it a sort model
   // that references columns that aren't in the grid - it triggers an
@@ -752,8 +849,15 @@ export const CallsTable: FC<{
     tableData.forEach(row => {
       Object.keys(row).forEach(key => keysSet.add(key));
     });
+    // `storage_size_bytes` is never shown in the table view, so don't include it
+    keysSet.delete('storage_size_bytes');
+    // set the `total_storage_size_bytes` based on whether we are showing trace roots only
+    if (!effectiveFilter.traceRootsOnly) {
+      keysSet.delete('total_storage_size_bytes');
+    }
+
     return Array.from(keysSet);
-  }, [tableData]);
+  }, [tableData, effectiveFilter]);
 
   const visibleColumns = useMemo(() => {
     return tableData.length > 0
@@ -765,11 +869,6 @@ export const CallsTable: FC<{
   const [addToDatasetModalOpen, setAddToDatasetModalOpen] = useState(false);
 
   // Called in reaction to Hide column menu
-  const onColumnVisibilityModelChange = setColumnVisibilityModel
-    ? (newModel: GridColumnVisibilityModel) => {
-        setColumnVisibilityModel(newModel);
-      }
-    : undefined;
 
   const onPinnedColumnsChange = useCallback(
     (newModel: GridPinnedColumnFields) => {
@@ -856,6 +955,85 @@ export const CallsTable: FC<{
     project,
   ]);
 
+  // Common StyledDataGrid configuration
+  const dataGridProps = {
+    // Start Column Menu
+    // ColumnMenu is needed to support pinning and column visibility
+    disableColumnMenu: false,
+    // ColumnFilter is definitely useful
+    disableColumnFilter: true,
+    disableMultipleColumnsFiltering: false,
+    // ColumnPinning seems to be required in DataGridPro, else it crashes.
+    // However, in this case it is also useful.
+    disableColumnPinning: false,
+    // ColumnReorder is definitely useful
+    // TODO (Tim): This needs to be managed externally (making column
+    // ordering a controlled property) This is a "regression" from the calls
+    // table refactor
+    disableColumnReorder: true,
+    // ColumnResize is definitely useful
+    disableColumnResize: false,
+    // ColumnSelector is definitely useful
+    disableColumnSelector: false,
+    disableMultipleColumnsSorting: true,
+    // End Column Menu
+    columnHeaderHeight: 40,
+    apiRef,
+    loading: callsLoading,
+    rows: tableData,
+    // initialState={initialState}
+    onColumnVisibilityModelChange: setColumnVisibilityModel
+      ? (newModel: GridColumnVisibilityModel) => {
+          setColumnVisibilityModel(newModel);
+        }
+      : undefined,
+    columnVisibilityModel,
+    // SORT SECTION START
+    sortingMode: 'server' as const,
+    sortModel: sortModelFiltered,
+    onSortModelChange,
+    // SORT SECTION END
+    // PAGINATION SECTION START
+    pagination: true,
+    rowCount: calls.primaryError ? 0 : callsTotal,
+    paginationMode: 'server' as const,
+    paginationModel,
+    onPaginationModelChange,
+    // PAGINATION SECTION END
+    rowHeight: 38,
+    columns: muiColumns,
+    disableRowSelectionOnClick: true,
+    rowSelectionModel,
+    // columnGroupingModel={groupingModel}
+    columnGroupingModel: columns.colGroupingModel,
+    hideFooter: !callsLoading && callsTotal === 0,
+    hideFooterSelectedRowCount: true,
+    onColumnWidthChange: (newCol: any) => {
+      setUserDefinedColumnWidths(curr => {
+        return {
+          ...curr,
+          [newCol.colDef.field]: newCol.colDef.computedWidth,
+        };
+      });
+    },
+    pinnedColumns: pinModelResolved,
+    onPinnedColumnsChange,
+    slots: {
+      noRowsOverlay,
+      columnMenu: CallsCustomColumnMenu,
+      pagination: () => <PaginationButtons hideControls={hideControls} />,
+      columnMenuSortDescendingIcon: IconSortDescending,
+      columnMenuSortAscendingIcon: IconSortAscending,
+      columnMenuHideIcon: IconNotVisible,
+      columnMenuPinLeftIcon: () => (
+        <IconPinToRight style={{transform: 'scaleX(-1)'}} />
+      ),
+      columnMenuPinRightIcon: IconPinToRight,
+      loadingOverlay: CustomLoadingOverlay,
+    },
+    className: 'tw-style',
+  };
+
   // CPR (Tim) - (GeneralRefactoring): Pull out different inline-properties and create them above
   return (
     <FilterLayoutTemplate
@@ -872,15 +1050,17 @@ export const CallsTable: FC<{
                 onClick={() => calls.refetch()}
                 disabled={callsLoading}
               />
-              {columnVisibilityModel && setColumnVisibilityModel && (
-                <div className="flex-none">
-                  <ManageColumnsButton
-                    columnInfo={columns}
-                    columnVisibilityModel={columnVisibilityModel}
-                    setColumnVisibilityModel={setColumnVisibilityModel}
-                  />
-                </div>
-              )}
+              {columnVisibilityModel &&
+                setColumnVisibilityModel &&
+                !(isPeekOpen && isMetricsChecked) && (
+                  <div className="flex-none">
+                    <ManageColumnsButton
+                      columnInfo={columns}
+                      columnVisibilityModel={columnVisibilityModel}
+                      setColumnVisibilityModel={setColumnVisibilityModel}
+                    />
+                  </div>
+                )}
               {!hideOpSelector && (
                 <OpSelector
                   frozenFilter={frozenFilter}
@@ -888,6 +1068,8 @@ export const CallsTable: FC<{
                   setFilter={setFilter}
                   selectedOpVersionOption={selectedOpVersionOption}
                   opVersionOptions={opVersionOptions}
+                  useMenuPortalBody={true}
+                  width="320px"
                 />
               )}
               {filterModel && setFilterModel && (
@@ -983,7 +1165,7 @@ export const CallsTable: FC<{
               )}
             </div>
           )}
-          <div className="ml-auto flex items-center gap-8">
+          <div className="ml-auto flex min-w-0 items-center gap-8 overflow-hidden">
             {selectedInputObjectVersion && (
               <RemovableTag
                 color="moon"
@@ -1022,25 +1204,12 @@ export const CallsTable: FC<{
                 }
               />
             )}
-            {selectedParentId && (
-              <RemovableTag
-                maxChars={48}
-                truncatedPart="middle"
-                color="moon"
-                label={`Parent: ${selectedParentId}`}
-                removeAction={
-                  <RemoveAction
-                    onClick={(e: React.SyntheticEvent) => {
-                      e.stopPropagation();
-                      setFilter({
-                        ...filter,
-                        parentId: undefined,
-                      });
-                    }}
-                  />
-                }
-              />
-            )}
+            <ParentFilterTag
+              entity={entity}
+              project={project}
+              parentId={effectiveFilter.parentId}
+              onSetParentFilter={onSetParentFilter}
+            />
             <div className="flex items-center gap-6">
               <Button
                 variant="ghost"
@@ -1072,232 +1241,92 @@ export const CallsTable: FC<{
           </div>
         </TailwindContents>
       }>
-      {isMetricsChecked && (
-        <CallsCharts
-          entity={entity}
-          project={project}
-          filter={filter}
-          filterModelProp={filterModelResolved}
+      {isMetricsChecked ? (
+        <div
+          ref={containerRef}
+          style={{
+            display: 'flex',
+            height: `calc(100vh - ${SPLIT_VIEW_CONTAINER_HEIGHT_OFFSET_PX}px)`,
+            minHeight: `${SPLIT_VIEW_CONTAINER_MIN_HEIGHT_PX}px`,
+            width: '100%',
+            gap: '0px',
+            position: 'relative',
+            maxWidth: '100%',
+            boxSizing: 'border-box',
+          }}>
+          <div
+            style={{
+              width: `${tableWidthPx}px`,
+              minWidth: `${TABLE_MIN_WIDTH_PX}px`,
+              height: '100%',
+              overflow: 'hidden',
+              flexShrink: 0,
+              flexGrow: 0,
+              boxSizing: 'border-box',
+            }}>
+            <StyledDataGrid
+              {...dataGridProps}
+              sx={{
+                borderRadius: 0,
+                height: '100%',
+                width: '100% !important',
+                maxWidth: 'none !important',
+                minWidth: `${TABLE_MIN_WIDTH_PX}px !important`,
+                overflow: 'hidden',
+                '& .MuiDataGrid-virtualScroller': {
+                  overflowX: 'auto',
+                },
+                // This moves the pagination controls to the left
+                '& .MuiDataGrid-footerContainer': {
+                  justifyContent: 'flex-start',
+                },
+                '& .MuiDataGrid-main:focus-visible': {
+                  outline: 'none',
+                },
+              }}
+            />
+          </div>
+          <ResizableHandle
+            containerRef={containerRef}
+            onWidthChange={setTableWidthPx}
+            minWidth={TABLE_MIN_WIDTH_PX}
+            maxWidthOffset={RESIZABLE_HANDLE_MAX_WIDTH_OFFSET_PX}
+          />
+          <div
+            style={{
+              flex: '1',
+              minWidth: `${CHARTS_MIN_WIDTH_PX}px`,
+              height: '100%',
+              overflowX: 'hidden',
+              overflowY: 'auto',
+              borderTop: '1px solid rgba(224, 224, 224, 1)',
+            }}>
+            <CallsCharts
+              entity={entity}
+              project={project}
+              filter={filter}
+              filterModelProp={filterModelResolved}
+              sortModel={sortModelResolved}
+            />
+          </div>
+        </div>
+      ) : (
+        <StyledDataGrid
+          {...dataGridProps}
+          sx={{
+            borderRadius: 0,
+            // This moves the pagination controls to the left
+            '& .MuiDataGrid-footerContainer': {
+              justifyContent: 'flex-start',
+            },
+            '& .MuiDataGrid-main:focus-visible': {
+              outline: 'none',
+            },
+          }}
         />
       )}
-      <StyledDataGrid
-        // Start Column Menu
-        // ColumnMenu is needed to support pinning and column visibility
-        disableColumnMenu={false}
-        // ColumnFilter is definitely useful
-        disableColumnFilter={true}
-        disableMultipleColumnsFiltering={false}
-        // ColumnPinning seems to be required in DataGridPro, else it crashes.
-        // However, in this case it is also useful.
-        disableColumnPinning={false}
-        // ColumnReorder is definitely useful
-        // TODO (Tim): This needs to be managed externally (making column
-        // ordering a controlled property) This is a "regression" from the calls
-        // table refactor
-        disableColumnReorder={true}
-        // ColumnResize is definitely useful
-        disableColumnResize={false}
-        // ColumnSelector is definitely useful
-        disableColumnSelector={false}
-        disableMultipleColumnsSorting={true}
-        // End Column Menu
-        columnHeaderHeight={40}
-        apiRef={apiRef}
-        loading={callsLoading}
-        rows={tableData}
-        // initialState={initialState}
-        onColumnVisibilityModelChange={onColumnVisibilityModelChange}
-        columnVisibilityModel={columnVisibilityModel}
-        // SORT SECTION START
-        sortingMode="server"
-        sortModel={sortModelFiltered}
-        onSortModelChange={onSortModelChange}
-        // SORT SECTION END
-        // PAGINATION SECTION START
-        pagination
-        rowCount={calls.primaryError ? 0 : callsTotal}
-        paginationMode="server"
-        paginationModel={paginationModel}
-        onPaginationModelChange={onPaginationModelChange}
-        // PAGINATION SECTION END
-        rowHeight={38}
-        columns={muiColumns}
-        disableRowSelectionOnClick
-        rowSelectionModel={rowSelectionModel}
-        // columnGroupingModel={groupingModel}
-        columnGroupingModel={columns.colGroupingModel}
-        hideFooter={!callsLoading && callsTotal === 0}
-        hideFooterSelectedRowCount
-        onColumnWidthChange={newCol => {
-          setUserDefinedColumnWidths(curr => {
-            return {
-              ...curr,
-              [newCol.colDef.field]: newCol.colDef.computedWidth,
-            };
-          });
-        }}
-        pinnedColumns={pinModelResolved}
-        onPinnedColumnsChange={onPinnedColumnsChange}
-        sx={{
-          borderRadius: 0,
-          // This moves the pagination controls to the left
-          '& .MuiDataGrid-footerContainer': {
-            justifyContent: 'flex-start',
-          },
-          '& .MuiDataGrid-main:focus-visible': {
-            outline: 'none',
-          },
-        }}
-        slots={{
-          noRowsOverlay,
-          columnMenu: CallsCustomColumnMenu,
-          pagination: () => <PaginationButtons hideControls={hideControls} />,
-          columnMenuSortDescendingIcon: IconSortDescending,
-          columnMenuSortAscendingIcon: IconSortAscending,
-          columnMenuHideIcon: IconNotVisible,
-          columnMenuPinLeftIcon: () => (
-            <IconPinToRight style={{transform: 'scaleX(-1)'}} />
-          ),
-          columnMenuPinRightIcon: IconPinToRight,
-          loadingOverlay: CustomLoadingOverlay,
-        }}
-        className="tw-style"
-      />
     </FilterLayoutTemplate>
   );
-};
-
-const OpSelector = ({
-  frozenFilter,
-  filter,
-  setFilter,
-  selectedOpVersionOption,
-  opVersionOptions,
-}: {
-  frozenFilter: WFHighLevelCallFilter | undefined;
-  filter: WFHighLevelCallFilter;
-  setFilter: (state: WFHighLevelCallFilter) => void;
-  selectedOpVersionOption: string;
-  opVersionOptions: Record<
-    string,
-    {
-      title: string;
-      ref: string;
-      group: string;
-      objectVersion?: OpVersionSchema;
-    }
-  >;
-}) => {
-  const frozenOpFilter = Object.keys(frozenFilter ?? {}).includes('opVersions');
-  const handleChange = useCallback(
-    (event: any, newValue: string | null) => {
-      if (newValue === ALL_TRACES_OR_CALLS_REF_KEY) {
-        setFilter({
-          ...filter,
-          opVersionRefs: [],
-        });
-      } else {
-        setFilter({
-          ...filter,
-          opVersionRefs: newValue ? [newValue] : [],
-        });
-      }
-    },
-    [filter, setFilter]
-  );
-
-  return (
-    <div className="flex-none">
-      <ListItem sx={{minWidth: 190, width: 320, height: 32, padding: 0}}>
-        <FormControl fullWidth sx={{borderColor: MOON_200}}>
-          <Autocomplete
-            PaperComponent={paperProps => <StyledPaper {...paperProps} />}
-            ListboxProps={{
-              sx: {
-                fontSize: '14px',
-                fontFamily: 'Source Sans Pro',
-                '& .MuiAutocomplete-option': {
-                  fontSize: '14px',
-                  fontFamily: 'Source Sans Pro',
-                },
-                '& .MuiAutocomplete-groupLabel': {
-                  fontSize: '14px',
-                  fontFamily: 'Source Sans Pro',
-                },
-              },
-            }}
-            sx={{
-              '& .MuiOutlinedInput-root': {
-                height: '32px',
-                fontFamily: 'Source Sans Pro',
-                '& fieldset': {
-                  borderColor: MOON_200,
-                },
-                '&:hover fieldset': {
-                  borderColor: `rgba(${TEAL_300}, 0.48)`,
-                },
-              },
-              '& .MuiOutlinedInput-input': {
-                fontSize: '14px',
-                height: '32px',
-                padding: '0 14px',
-                boxSizing: 'border-box',
-                fontFamily: 'Source Sans Pro',
-              },
-              '& .MuiAutocomplete-clearIndicator, & .MuiAutocomplete-popupIndicator':
-                {
-                  backgroundColor: 'transparent',
-                  marginBottom: '2px',
-                },
-            }}
-            size="small"
-            limitTags={1}
-            disabled={frozenOpFilter}
-            value={selectedOpVersionOption}
-            onChange={handleChange}
-            renderInput={renderParams => (
-              <StyledTextField {...renderParams} sx={{maxWidth: '350px'}} />
-            )}
-            getOptionLabel={option => opVersionOptions[option]?.title ?? ''}
-            disableClearable={
-              selectedOpVersionOption === ALL_TRACES_OR_CALLS_REF_KEY
-            }
-            groupBy={option => opVersionOptions[option]?.group}
-            options={Object.keys(opVersionOptions)}
-            popupIcon={<Icon name="chevron-down" width={16} height={16} />}
-            clearIcon={<Icon name="close" width={16} height={16} />}
-          />
-        </FormControl>
-      </ListItem>
-    </div>
-  );
-};
-
-const useParentIdOptions = (
-  entity: string,
-  project: string,
-  effectiveFilter: WFHighLevelCallFilter
-) => {
-  const {useCall} = useWFHooks();
-  const callKey = effectiveFilter.parentId
-    ? {
-        entity,
-        project,
-        callId: effectiveFilter.parentId,
-      }
-    : null;
-  const parentCall = useCall({key: callKey});
-  return useMemo(() => {
-    if (parentCall.loading || parentCall.result == null) {
-      return {};
-    }
-    const call = parentCall.result;
-    const truncatedId = call.callId.slice(-4);
-    const label = `${call.displayName} (${truncatedId})`;
-    return {
-      [call.callId]: label,
-    };
-  }, [parentCall.loading, parentCall.result]);
 };
 
 // Get the tail of the peekPath (ignore query params)
@@ -1313,7 +1342,7 @@ const getPeekId = (peekPath: string | null): string | null => {
 
 export type FlattenedCallData = TraceCallSchema & {[key: string]: string};
 
-function prepareFlattenedCallDataForTable(
+export function prepareFlattenedCallDataForTable(
   callsResult: CallSchema[]
 ): FlattenedCallData[] {
   return prepareFlattenedDataForTable(callsResult.map(c => c.traceCall));

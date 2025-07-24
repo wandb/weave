@@ -1,13 +1,10 @@
-import React, {useEffect, useMemo, useState} from 'react';
+import React from 'react';
 import {AutoSizer} from 'react-virtualized';
-import Lightbox from 'yet-another-react-lightbox';
-import Fullscreen from 'yet-another-react-lightbox/plugins/fullscreen';
-import Zoom from 'yet-another-react-lightbox/plugins/zoom';
 
-import {StyledTooltip, TooltipHint} from '../../../../../DraggablePopups';
 import {LoadingDots} from '../../../../../LoadingDots';
 import {NotApplicable} from '../../NotApplicable';
 import {useWFHooks} from '../../pages/wfReactInterface/context';
+import {ImageContentWithData} from '../Content/ImageView';
 import {CustomWeaveTypePayload} from '../customWeaveType.types';
 
 type PILImageImageTypePayload = CustomWeaveTypePayload<
@@ -52,9 +49,9 @@ const PILImageImageWithSize = ({
 }: PILImageImageWithSizeProps) => {
   const {useFileContent} = useWFHooks();
   const imageTypes = {
-    'image.jpg': 'jpg',
-    'image.png': 'png',
-    'image.webp': 'webp',
+    'image.jpg': 'image/jpeg',
+    'image.png': 'image/png',
+    'image.webp': 'image/webp',
   } as const;
 
   const imageKey = Object.keys(data.files).find(key => key in imageTypes) as
@@ -73,182 +70,15 @@ const PILImageImageWithSize = ({
   } else if (imageBinary.result == null) {
     return <span></span>;
   }
-  const fileExt = imageTypes[imageKey as keyof typeof imageTypes];
+  const mimetype = imageTypes[imageKey as keyof typeof imageTypes];
+  // Delegate to content representation
 
   return (
-    <PILImageImageWithData
-      fileExt={fileExt}
+    <ImageContentWithData
+      mimetype={mimetype}
       buffer={imageBinary.result}
       containerWidth={containerWidth}
       containerHeight={containerHeight}
     />
-  );
-};
-
-const loadImage = (setImageDim: any, imageUrl: string) => {
-  const img = new Image();
-  img.src = imageUrl;
-
-  img.onload = () => {
-    setImageDim({
-      height: img.height,
-      width: img.width,
-    });
-  };
-  img.onerror = err => {
-    console.log('img error');
-    console.error(err);
-  };
-};
-
-type PILImageImageWithDataProps = {
-  fileExt: 'jpg' | 'png' | 'webp';
-  buffer: ArrayBuffer;
-  containerWidth: number;
-  containerHeight: number;
-};
-
-const PILImageImageWithData = ({
-  fileExt,
-  buffer,
-  containerWidth,
-  containerHeight,
-}: PILImageImageWithDataProps) => {
-  const url = useMemo(() => {
-    const blob = new Blob([buffer], {
-      type: `image/${fileExt}`,
-    });
-    return URL.createObjectURL(blob);
-  }, [buffer, fileExt]);
-
-  const [imageDim, setImageDim] = useState({
-    width: -1,
-    height: -1,
-  });
-  useEffect(() => {
-    setImageDim({width: -1, height: -1});
-    loadImage(setImageDim, url);
-  }, [url]);
-
-  if (imageDim.width === -1 || imageDim.height === -1) {
-    return <LoadingDots />;
-  }
-  return (
-    <PILImageImageLoaded
-      url={url}
-      fileExt={fileExt}
-      imageWidth={imageDim.width}
-      imageHeight={imageDim.height}
-      containerWidth={containerWidth}
-      containerHeight={containerHeight}
-    />
-  );
-};
-
-type PILImageImageLoadedProps = {
-  url: string;
-  fileExt: 'jpg' | 'png' | 'webp';
-  imageWidth: number;
-  imageHeight: number;
-  containerWidth: number;
-  containerHeight: number;
-};
-
-const previewWidth = 300;
-const previewHeight = 300;
-
-const PILImageImageLoaded = ({
-  url,
-  fileExt,
-  imageWidth,
-  imageHeight,
-  containerWidth,
-  containerHeight,
-}: PILImageImageLoadedProps) => {
-  const [lightboxOpen, setLightboxOpen] = useState(false);
-  const onClick = () => setLightboxOpen(true);
-
-  let image = (
-    <img
-      style={{
-        maxWidth: '100%',
-        maxHeight: '100%',
-        cursor: 'pointer',
-      }}
-      src={url}
-      alt="Custom"
-      onClick={onClick}
-    />
-  );
-
-  const hasPreview =
-    containerWidth < previewWidth || containerHeight < previewHeight;
-
-  if (hasPreview) {
-    const preview = (
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          cursor: 'pointer',
-        }}>
-        <div
-          style={{
-            maxWidth: previewWidth,
-            maxHeight: previewHeight,
-            margin: 'auto',
-            overflow: 'hidden',
-          }}>
-          <img
-            style={{
-              maxWidth: '100%',
-              maxHeight: '100%',
-              objectFit: 'contain',
-            }}
-            src={url}
-            alt="Custom"
-            onClick={onClick}
-          />
-        </div>
-        <TooltipHint>
-          {imageWidth}x{imageHeight}, {fileExt} - Click for more details
-        </TooltipHint>
-      </div>
-    );
-    image = (
-      <StyledTooltip enterDelay={500} title={preview}>
-        {image}
-      </StyledTooltip>
-    );
-  }
-
-  return (
-    <>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          height: '100%',
-        }}>
-        {image}
-      </div>
-      <Lightbox
-        plugins={[Fullscreen, Zoom]}
-        open={lightboxOpen}
-        close={() => setLightboxOpen(false)}
-        controller={{
-          closeOnBackdropClick: true,
-        }}
-        slides={[{src: url}]}
-        render={{
-          // Hide previous and next buttons because we only have one image.
-          buttonPrev: () => null,
-          buttonNext: () => null,
-        }}
-        carousel={{finite: true}}
-        zoom={{maxZoomPixelRatio: 5}}
-      />
-    </>
   );
 };

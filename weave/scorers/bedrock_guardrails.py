@@ -51,9 +51,11 @@ class BedrockGuardrailScorer(weave.Scorer):
             raise ImportError(
                 "boto3 is not installed. Please install it with 'pip install boto3' "
                 "to use the BedrockGuardrailScorer."
-            )
+            ) from None
         except Exception as e:
-            raise RuntimeError(f"Failed to initialize Bedrock runtime client: {e}")
+            raise RuntimeError(
+                f"Failed to initialize Bedrock runtime client: {e}"
+            ) from e
 
     def format_content(self, output: str) -> dict[str, Any]:
         """Format the content for the guardrail API."""
@@ -98,7 +100,7 @@ class BedrockGuardrailScorer(weave.Scorer):
             return WeaveScorerResult(
                 passed=False,
                 metadata={
-                    "error": f"Error applying Bedrock guardrail: {str(e)}",
-                    "reason": f"Error applying Bedrock guardrail: {str(e)}",
+                    "error": f"Error applying Bedrock guardrail: {e!s}",
+                    "reason": f"Error applying Bedrock guardrail: {e!s}",
                 },
             )

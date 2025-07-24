@@ -24,6 +24,7 @@ export type WFHighLevelCallFilter = {
   inputObjectVersionRefs?: string[];
   outputObjectVersionRefs?: string[];
   parentId?: string | null;
+  runIds?: string[];
   // This really doesn't belong here. We are using it to indicate that the
   // filter is frozen and should not be updated by the user. However, this
   // control should really be managed outside of the filter itself.
@@ -118,7 +119,8 @@ export const useInputObjectVersionOptions = (
 export const useOpVersionOptions = (
   entity: string,
   project: string,
-  effectiveFilter: WFHighLevelCallFilter
+  effectiveFilter: WFHighLevelCallFilter,
+  includeAllOpsOption: boolean = true
 ): {
   [ref: string]: {
     title: string;
@@ -195,20 +197,25 @@ export const useOpVersionOptions = (
 
   return useMemo(() => {
     return {
-      [ALL_TRACES_OR_CALLS_REF_KEY]: {
-        title: filterShouldUseTraceRootsOnly({
-          ...effectiveFilter,
-          opVersionRefs: [],
-        })
-          ? ALL_TRACES_TITLE
-          : ALL_CALLS_TITLE,
-        ref: '',
-        group: ANY_OP_GROUP_HEADER,
-      },
+      ...(includeAllOpsOption
+        ? {
+            [ALL_TRACES_OR_CALLS_REF_KEY]: {
+              title: filterShouldUseTraceRootsOnly({
+                ...effectiveFilter,
+                opVersionRefs: [],
+              })
+                ? ALL_TRACES_TITLE
+                : ALL_CALLS_TITLE,
+              ref: '',
+              group: ANY_OP_GROUP_HEADER,
+            },
+          }
+        : {}),
       ...opVersionOptionsWithoutAllSection,
     };
-  }, [effectiveFilter, opVersionOptionsWithoutAllSection]);
+  }, [effectiveFilter, opVersionOptionsWithoutAllSection, includeAllOpsOption]);
 };
+
 export const useOutputObjectVersionOptions = (
   effectiveFilter: WFHighLevelCallFilter
 ) => {

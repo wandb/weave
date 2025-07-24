@@ -224,7 +224,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install nox "uv<0.7.0"  # pin to unblock CI
+          pip install nox uv
       - name: Run nox
         run: nox -e lint
 
@@ -244,6 +244,39 @@ jobs:
       - name: Run docs
         run: make docs
 
+  trace_no_server:
+    name: Trace non-trace server tests
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version-major: ["3"]
+        python-version-minor: [
+            "9",
+            "10",
+            "11",
+            "12",
+            "13",
+            #
+          ]
+        nox-shard: ["trace_no_server"]
+      fail-fast: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Set up Python ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install nox uv
+      - name: Run nox (Non Trace Server)
+        run: |
+          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
+            -m "not trace_server"
+
   trace-tests:
     name: Trace nox tests
     timeout-minutes: 30
@@ -260,9 +293,13 @@ jobs:
             #
           ]
         nox-shard: [
-            "trace",
+            "trace1",
+            "trace2",
+            "trace3",
+            "trace4",
             "flow",
             "trace_server",
+            "trace_server_bindings",
             "anthropic",
             "bedrock",
             "cerebras",
@@ -277,13 +314,14 @@ jobs:
             "langchain",
             "litellm",
             "llamaindex",
-            "mistral0",
-            "mistral1",
+            "mistral",
             "notdiamond",
             "openai",
             "vertexai",
             "pandas-test",
             "mcp",
+            "smolagents",
+            "autogen_tests",
           ]
       fail-fast: false
     services:
@@ -310,7 +348,7 @@ jobs:
         ports:
           - "10000:10000"
       weave_clickhouse:
-        image: clickhouse/clickhouse-server
+        image: clickhouse/clickhouse-server:25.4
         env:
           CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
           CLICKHOUSE_USER: default
@@ -333,8 +371,8 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install nox "uv<0.7.0"  # pin to unblock CI
-      - name: Run nox (Sqlite Only)
+          pip install nox uv
+      - name: Run nox (Sqlite Trace Server)
         env:
           WEAVE_SENTRY_ENV: ci
           CI: 1
@@ -349,8 +387,10 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           DD_TRACE_ENABLED: false
         run: |
-          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')"
-      - name: Run nox (Clickhouse Only)
+          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
+            -m "trace_server" \
+            --trace-server=sqlite
+      - name: Run nox (Clickhouse Trace Server)
         env:
           WEAVE_SENTRY_ENV: ci
           CI: 1
@@ -360,8 +400,7 @@ jobs:
           DD_TRACE_ENABLED: false
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
-            -m "weave_client and not skip_clickhouse_client" \
-            --weave-server=clickhouse
+            -m "trace_server and not skip_clickhouse_client"
   trace-tests-matrix-check: # This job does nothing and is only used for the branch protection
     if: always()
 

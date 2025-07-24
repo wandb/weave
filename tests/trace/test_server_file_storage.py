@@ -181,12 +181,12 @@ class TestGCSStorage:
         # In-memory storage for all blobs
         blob_data = {}
 
-        def mock_upload_from_string(data, timeout=None):
+        def mock_upload_from_string(data, timeout=None, **kwargs):
             # Get the blob name from the mock's name attribute
             blob_name = mock_blob.name
             blob_data[blob_name] = data
 
-        def mock_download_as_bytes(timeout=None):
+        def mock_download_as_bytes(timeout=None, **kwargs):
             # Get the blob name from the mock's name attribute
             blob_name = mock_blob.name
             return blob_data.get(blob_name, b"")
@@ -337,3 +337,69 @@ def test_support_for_variable_length_chunks(client: WeaveClient):
         ):
             digest = create_and_read_file(large_file)
             assert digest == large_digest
+
+
+@pytest.mark.disable_logging_error_check
+def test_file_storage_retry_limit(client: WeaveClient):
+    """Test that file storage operations retry exactly 3 times on storage failures."""
+    if client_is_sqlite(client):
+        pytest.skip("Not implemented in SQLite")
+
+    attempt_count = 0
+
+    def mock_upload_fail(*args, **kwargs):
+        nonlocal attempt_count
+        attempt_count += 1
+        # Simulate a 429 rate limit error
+        from google.api_core import exceptions
+
+        raise exceptions.TooManyRequests("Rate limit exceeded")
+
+    with mock.patch.dict(
+        os.environ,
+        {
+            "WF_FILE_STORAGE_GCP_CREDENTIALS_JSON_B64": base64.b64encode(
+                b"""{
+                "type": "service_account",
+                "project_id": "test-project",
+                "private_key_id": "test-key-id",
+                "private_key": "test-key",
+                "client_email": "test@test-project.iam.gserviceaccount.com",
+                "client_id": "test-client-id",
+                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                "token_uri": "https://oauth2.googleapis.com/token"
+            }"""
+            ).decode(),
+            "WF_FILE_STORAGE_URI": f"gs://{TEST_BUCKET}",
+            "WF_FILE_STORAGE_PROJECT_ALLOW_LIST": "*",
+        },
+    ):
+        # Mock GCS client
+        mock_storage_client = mock.MagicMock()
+        mock_bucket = mock.MagicMock()
+        mock_blob = mock.MagicMock()
+
+        # Setup mock chain
+        mock_storage_client.bucket.return_value = mock_bucket
+        mock_bucket.blob.return_value = mock_blob
+        mock_blob.upload_from_string.side_effect = mock_upload_fail
+
+        with (
+            mock.patch("google.cloud.storage.Client", return_value=mock_storage_client),
+            mock.patch(
+                "google.oauth2.service_account.Credentials.from_service_account_info"
+            ),
+        ):
+            # GCS should fail after 3 attempts, then fall back to database storage
+            result = client.server.file_create(
+                FileCreateReq(
+                    project_id=client._project_id(),
+                    name="test.txt",
+                    content=TEST_CONTENT,
+                )
+            )
+            # Should succeed via database fallback
+            assert result.digest is not None
+
+        # Verify GCS was attempted exactly 3 times before fallback
+        assert attempt_count == 3, f"Expected 3 GCS attempts, got {attempt_count}"

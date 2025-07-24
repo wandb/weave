@@ -1,9 +1,11 @@
 import {
   applyOpToOneOrMany,
   constBoolean,
+  isConstNode,
   isFile,
   isJoinedTable,
   isListLike,
+  isOutputNode,
   isPartitionedTable,
   isTable,
   listObjectType,
@@ -12,9 +14,11 @@ import {
   opFileJoinedTable,
   opFilePartitionedTable,
   opFileTable,
+  opFileTableWithIncrements,
   opJoinedTableRows,
   opPartitionedTableRows,
   opTableRows,
+  Stack,
   Type,
 } from '@wandb/weave/core';
 
@@ -63,14 +67,22 @@ export const DataTableLikeType = {
   members: [DataTableType, ConvertibleToDataTableType],
 };
 
-export function normalizeTableLike(node: Node) {
+export function normalizeTableLike(node: Node, stack: Stack = []) {
   let type = nullableTaggableValue(node.type);
+
   if (isListLike(type)) {
     type = nullableTaggableValue(listObjectType(type));
   }
 
   // wb table file
   if (isFile(type) && type.wbObjectType != null && isTable(type.wbObjectType)) {
+    if (isSingleRunWorkspace(stack) && !hasRunHistoryOp(node)) {
+      // The only time incremental table should be loaded is in a
+      // single run workspace and not via run history.
+      // We want to display the increment at that history when using
+      // the stepper.
+      return opTableRows({table: opFileTableWithIncrements({file: node})});
+    }
     return opTableRows({table: opFileTable({file: node})});
   }
   // table
@@ -168,3 +180,44 @@ export function isTableTypeLike(type: Type) {
 
   return false;
 }
+
+const isSingleRunWorkspace = (stack: Stack) => {
+  const singleRunWorkspaceVar = stack.find(
+    stackVar => stackVar.name === 'singleRunWorkspace'
+  );
+
+  if (
+    singleRunWorkspaceVar == null ||
+    !isConstNode(singleRunWorkspaceVar.value)
+  ) {
+    return false;
+  }
+
+  return singleRunWorkspaceVar.value.val;
+};
+
+const hasRunHistoryOp = (node: Node): boolean => {
+  const hasRunHistoryOpPattern = (currentNode: any): boolean => {
+    if (!currentNode?.fromOp) {
+      return false;
+    }
+
+    const opName = currentNode.fromOp.name;
+
+    if (opName === 'run-history') {
+      return true;
+    }
+
+    const inputs = currentNode.fromOp.inputs;
+    if (inputs) {
+      return Object.values(inputs).some(
+        input =>
+          input != null && isOutputNode(input) && hasRunHistoryOpPattern(input)
+      );
+    }
+
+    return false;
+  };
+
+  return node.nodeType === 'output' && hasRunHistoryOpPattern(node);
+};

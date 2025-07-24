@@ -6,6 +6,7 @@ import {TargetBlank} from '../../../../../../common/util/links';
 import {Button} from '../../../../../Button';
 import {CreateDatasetDrawer} from '../../datasets/CreateDatasetDrawer';
 import {useDatasetSaving} from '../../datasets/useDatasetSaving';
+import {MonitorDrawerRouter} from '../MonitorsPage/MonitorFormDrawer';
 import {EmptyProps} from './Empty';
 import {Link} from './Links';
 
@@ -33,6 +34,27 @@ const NewDatasetButton: React.FC = () => {
         onSaveDataset={handleSaveDataset}
         isCreating={isCreatingDataset}
         data-testid="create-dataset-drawer"
+      />
+    </>
+  );
+};
+
+const NewMonitorButton: React.FC = () => {
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+
+  return (
+    <>
+      <Button
+        variant="primary"
+        icon="add-new"
+        onClick={() => setIsDrawerOpen(true)}
+        data-testid="create-monitor-button">
+        New monitor
+      </Button>
+      <MonitorDrawerRouter
+        open={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        monitor={undefined}
       />
     </>
   );
@@ -236,6 +258,26 @@ export const EMPTY_PROPS_OBJECT_VERSIONS: EmptyProps = {
     </>
   ),
 };
+
+export const EMPTY_PROPS_MONITORS: EmptyProps = {
+  icon: 'job-automation' as const,
+  heading: 'Create your first monitor',
+  description:
+    'Use monitors to automatically run scorers on incoming traces to track performance over time.',
+  moreInformation: (
+    <>
+      Learn{' '}
+      <TargetBlank href="https://wandb.me/docs-monitors">
+        monitor basics
+      </TargetBlank>
+      .
+      <Box sx={{mt: 2}}>
+        <NewMonitorButton />
+      </Box>
+    </>
+  ),
+};
+
 export const EMPTY_NO_TRACE_SERVER: EmptyProps = {
   icon: 'weave' as const,
   heading: 'Weave coming soon!',

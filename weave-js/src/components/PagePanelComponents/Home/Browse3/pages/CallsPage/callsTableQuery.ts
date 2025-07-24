@@ -239,7 +239,7 @@ export const useFilterSortby = (
   };
 };
 
-const getFilterByRaw = (
+export const getFilterByRaw = (
   gridFilter: GridFilterModel
 ): Query['$expr'] | undefined => {
   const completeItems = gridFilter.items.filter(
@@ -294,6 +294,7 @@ export const convertHighLevelFilterToLowLevelFilter = (
     parentIds: effectiveFilter.parentId
       ? [effectiveFilter.parentId]
       : undefined,
+    runIds: effectiveFilter.runIds,
   };
 };
 

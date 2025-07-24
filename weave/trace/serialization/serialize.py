@@ -12,9 +12,6 @@ from weave.trace.refs import ObjectRef, TableRef, parse_uri
 from weave.trace.sanitize import REDACTED_VALUE, should_redact
 from weave.trace.serialization import custom_objs
 from weave.trace.serialization.dictifiable import try_to_dict
-from weave.trace_server.interface.builtin_object_classes.builtin_object_registry import (
-    BUILTIN_OBJECT_REGISTRY,
-)
 from weave.trace_server.trace_server_interface import (
     FileContentReadReq,
     FileCreateReq,
@@ -56,6 +53,18 @@ def to_json(
     elif isinstance(obj, ObjectRecord):
         res = {"_type": obj._class_name}
         for k, v in obj.__dict__.items():
+            if k == "ref":
+                # Refs are pointers to remote objects and should not be part of
+                # the serialized payload. They are attached by the client after
+                # the object is saved and returned from the server. If we encounter
+                # a ref in the serialized payload, this would almost certainly be a
+                # bug. However, we would prefer not to raise and error as that would
+                # result in lost data. These refs should be removed before serialization.
+                if v is not None:
+                    logging.exception(f"Unexpected ref in object record: {obj}")
+                else:
+                    logging.warning(f"Unexpected null ref in object record: {obj}")
+                    continue
             res[k] = to_json(v, project_id, client, use_dictify)
         return res
     elif isinstance_namedtuple(obj):
@@ -148,9 +157,8 @@ def stringify(obj: Any, limit: int = MAX_STR_LEN) -> str:
             rep = str(obj)
         except Exception:
             rep = f"<{type(obj).__name__}: {id(obj)}>"
-    if isinstance(rep, str):
-        if len(rep) > limit:
-            rep = rep[: limit - 3] + "..."
+    if isinstance(rep, str) and len(rep) > limit:
+        rep = rep[: limit - 3] + "..."
     return rep
 
 
@@ -211,7 +219,7 @@ def dictify(
                         to_dict_result[k] = stringify(v)
                 return to_dict_result
         except Exception:
-            raise ValueError("to_dict failed")
+            raise ValueError("to_dict failed") from None
 
     result: dict[Any, Any] = {}
     result["__class__"] = {
@@ -263,9 +271,8 @@ def fallback_encode(obj: Any) -> Any:
             rep = str(obj)
         except Exception:
             rep = f"<{type(obj).__name__}: {id(obj)}>"
-    if isinstance(rep, str):
-        if len(rep) > MAX_STR_LEN:
-            rep = rep[:MAX_STR_LEN] + "..."
+    if isinstance(rep, str) and len(rep) > MAX_STR_LEN:
+        rep = rep[:MAX_STR_LEN] + "..."
     return rep
 
 
@@ -304,16 +311,22 @@ def from_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
             return custom_objs.decode_custom_files_obj(
                 obj["weave_type"], files, obj.get("load_op")
             )
-        elif (
-            isinstance(val_type, str)
-            and obj.get("_class_name") == val_type
-            and (builtin_object_class := BUILTIN_OBJECT_REGISTRY.get(val_type))
-        ):
-            return builtin_object_class.model_validate(obj)
-        else:
-            return ObjectRecord(
-                {k: from_json(v, project_id, server) for k, v in obj.items()}
+        elif isinstance(val_type, str) and obj.get("_class_name") == val_type:
+            from weave.trace_server.interface.builtin_object_classes.builtin_object_registry import (
+                BUILTIN_OBJECT_REGISTRY,
             )
+
+            cls = BUILTIN_OBJECT_REGISTRY.get(val_type)
+            if cls:
+                # Filter out metadata fields before validation
+                obj_data = {
+                    k: v for k, v in obj.items() if k in cls.model_fields.keys()
+                }
+                return cls.model_validate(obj_data)
+
+        return ObjectRecord(
+            {k: from_json(v, project_id, server) for k, v in obj.items()}
+        )
     elif isinstance(obj, str) and obj.startswith("weave://"):
         return parse_uri(obj)
 

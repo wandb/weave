@@ -8,7 +8,7 @@ from weave.flow.obj import deprecated_field
 
 
 def test_weaveflow_op_wandb(client):
-    @weave.op()
+    @weave.op
     def custom_adder(a: int, b: int) -> int:
         return a + b
 
@@ -17,7 +17,7 @@ def test_weaveflow_op_wandb(client):
 
 
 def test_weaveflow_op_wandb_return_list(client):
-    @weave.op()
+    @weave.op
     def custom_adder(a: int, b: int) -> list[int]:
         return [a + b]
 
@@ -29,7 +29,7 @@ def test_weaveflow_object_wandb_with_opmethod(client):
     class ATestObj(weave.Object):
         a: int
 
-        @weave.op()
+        @weave.op
         def a_test_add(self, b: int) -> int:
             return self.a + b
 
@@ -39,11 +39,11 @@ def test_weaveflow_object_wandb_with_opmethod(client):
 
 
 def test_weaveflow_nested_op(client):
-    @weave.op()
+    @weave.op
     def adder(a: int, b: int) -> int:
         return a + b
 
-    @weave.op()
+    @weave.op
     def double_adder(a: int, b: int) -> int:
         return adder(a, a) + adder(b, b)
 
@@ -52,13 +52,13 @@ def test_weaveflow_nested_op(client):
 
 
 def test_async_ops(client):
-    @weave.op()
+    @weave.op
     async def async_op_add1(v: int) -> int:
         return v + 1
 
-    @weave.op()
+    @weave.op
     async def async_op_add5(v: int) -> int:
-        for i in range(5):
+        for _i in range(5):
             v = await async_op_add1(v)
         return v
 
@@ -84,7 +84,7 @@ def test_weaveflow_unknown_type_op_param_undeclared():
         def __init__(self, x: int):
             self.x = x
 
-    @weave.op()
+    @weave.op
     def op_with_unknown_param(v) -> int:
         return v.x + 2
 
@@ -98,7 +98,7 @@ def test_weaveflow_unknown_type_op_param_declared():
         def __init__(self, x: int):
             self.x = x
 
-    @weave.op()
+    @weave.op
     def op_with_unknown_param(v: SomeUnknownObject) -> int:
         return v.x + 2
 
@@ -114,7 +114,7 @@ def test_weaveflow_unknown_type_op_param_closure():
 
     v = SomeUnknownObject(x=10)
 
-    @weave.op()
+    @weave.op
     def op_with_unknown_param() -> int:
         return v.x + 2
 
@@ -126,7 +126,7 @@ def test_subobj_ref_passing(client):
         weave.Dataset(rows=[{"x": 1, "y": 3}, {"x": 2, "y": 16}]), "my-dataset"
     )
 
-    @weave.op()
+    @weave.op
     def get_item(row):
         return {"in": row["x"], "out": row["x"]}
 
@@ -137,7 +137,7 @@ def test_subobj_ref_passing(client):
 class MyModel(weave.Model):
     a: int
 
-    @weave.op()
+    @weave.op
     def predict(self, x: int) -> int:
         return x + 1
 
@@ -150,7 +150,7 @@ def test_op_method_name(client):
 
 
 def test_agent_has_tools(client):
-    @weave.op()
+    @weave.op
     def get_weather(city: str) -> str:
         return f"weather in {city} is sunny"
 

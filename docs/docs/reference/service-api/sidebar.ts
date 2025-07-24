@@ -197,6 +197,12 @@ const sidebar: SidebarsConfig = {
           label: "File Content",
           className: "api-method post",
         },
+        {
+          type: "doc",
+          id: "reference/service-api/files-stats-files-query-stats-post",
+          label: "Files Stats",
+          className: "api-method post",
+        },
       ],
     },
     {

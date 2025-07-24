@@ -30,7 +30,7 @@ For the other key mappings, a dict is dumped with each of the top level keys in 
 The inner list of those key represents the attributes which are checked similarly to
 how INPUT_KEYS and OUTPUT_KEYS are checked, where the first one found is used.
 
-If we recieved attributes where:
+If we received attributes where:
 gen_ai.usage.prompt_tokens: 30
 gen_ai.usage.completion_tokens: 40
 gen_ai.usage.llm.usage.total_tokens: 70
@@ -44,17 +44,17 @@ This would be the resulting dict dumped to clickhouse:
 # INPUT_KEYS: Maps attribute keys that represent user prompts or inputs to LLMs
 # Priority is given to standards in this order:
 # This is used to populate the `inputs_dump` column in clickhouse
-from weave.trace_server.opentelemetry.helpers import try_parse_int
 
 INPUT_KEYS = [
     "ai.prompt",  # Vercel
     "gen_ai.prompt",  # From OpenTelemetry AI semantic conventions
     "input.value",  # From OpenInference standard
     "mlflow.spanInputs",  # From MLFlow's tracking format
-    "traceloop.entity.input"  # From Traceloop's conventions
+    "traceloop.entity.input",  # From Traceloop's conventions
     "gcp.vertex.agent.tool_call_args",  # From Google's Vertex AI
     "gcp.vertex.agent.llm_request",  # From Google's Vertex AI
     "input",  # Generic fallback for Pydantic models - lowest priority
+    "inputs",
 ]
 
 # OUTPUT_KEYS: Maps attribute keys that represent model completions or outputs
@@ -70,6 +70,7 @@ OUTPUT_KEYS = [
     "gcp.vertex.agent.tool_response",  # From Google's Vertex AI
     "gcp.vertex.agent.llm_response",  # From Google's Vertex AI
     "output",  # Generic fallback for Pydantic models - lowest priority
+    "outputs",
 ]
 
 # USAGE_KEYS: Maps internal Weave usage metric names to their equivalent keys in
@@ -81,10 +82,6 @@ USAGE_KEYS = {
     # Maps Weave's "prompt_tokens" to keys from different standards
     "input_tokens": [
         ("gen_ai.usage.input_tokens", try_parse_int),
-    ],
-    # Maps Weave's "completion_tokens" to keys from different standards
-    "completion_tokens": [
-        ("gen_ai.usage.output_tokens", try_parse_int),
     ],
     "prompt_tokens": [
         ("gen_ai.usage.prompt_tokens", try_parse_int),

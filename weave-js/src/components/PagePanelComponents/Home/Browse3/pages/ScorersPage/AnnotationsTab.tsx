@@ -1,5 +1,6 @@
 import React from 'react';
 
+import {EMPTY_PROPS_ANNOTATIONS} from '../common/EmptyContent';
 import {FilterableObjectVersionsTable} from '../ObjectsPage/ObjectVersionsTable';
 
 export const AnnotationsTab: React.FC<{
@@ -15,6 +16,7 @@ export const AnnotationsTab: React.FC<{
       initialFilter={{
         baseObjectClass: 'AnnotationSpec',
       }}
+      propsEmpty={EMPTY_PROPS_ANNOTATIONS}
     />
   );
 };

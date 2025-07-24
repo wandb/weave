@@ -13,6 +13,7 @@
  */
 
 import {getCookie} from '@wandb/weave/common/util/cookie';
+import {urlPrefixed} from '@wandb/weave/config';
 import {HTTPError} from '@wandb/weave/errors';
 import fetch from 'isomorphic-unfetch';
 
@@ -21,6 +22,8 @@ import {
   ActionsExecuteBatchRes,
   CompletionsCreateReq,
   CompletionsCreateRes,
+  CompletionsCreateStreamReq,
+  CompletionsCreateStreamRes,
   ContentType,
   FeedbackCreateReq,
   FeedbackCreateRes,
@@ -36,6 +39,9 @@ import {
   TableCreateRes,
   TableUpdateReq,
   TableUpdateRes,
+  ThreadSchema,
+  ThreadsQueryReq,
+  ThreadsQueryRes,
   TraceCallReadReq,
   TraceCallReadRes,
   TraceCallSchema,
@@ -373,11 +379,176 @@ export class DirectTraceServerClient {
     }
   }
 
+  public completionsCreateStream(
+    req: CompletionsCreateStreamReq,
+    onChunk?: (chunk: any) => void
+  ): Promise<CompletionsCreateStreamRes> {
+    const url = `${this.baseUrl}/completions/create_stream`;
+    const reqBody = JSON.stringify(req);
+
+    // Set up headers with auth and admin privileges if needed
+    const headers: {[key: string]: string} = {
+      'Content-Type': 'application/json',
+      Authorization: 'Basic ' + btoa(':'),
+    };
+    if (getCookie('use_admin_privileges') === 'true') {
+      headers['use-admin-privileges'] = 'true';
+    }
+
+    return new Promise((resolve, reject) => {
+      fetch(urlPrefixed(url), {
+        method: 'POST',
+        credentials: 'include',
+        headers,
+        body: reqBody,
+      })
+        .then(response => {
+          if (!response.ok || !response.body) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+          return this.processCompletionStream(response.body, onChunk);
+        })
+        .then(result => {
+          resolve(result);
+        })
+        .catch(err => {
+          if ((err as any)?.api_key_name) {
+            console.error('Missing LLM API key:', (err as any).api_key_name);
+          }
+          reject(err);
+        });
+    });
+  }
+
+  /**
+   * Process a ReadableStream of JSON lines from a completion stream, handling both regular chunks and metadata.
+   * @param stream The ReadableStream to process
+   * @param onChunk Optional callback for each chunk as it arrives
+   * @returns Promise resolving to the final chunks and weave_call_id
+   */
+  private processCompletionStream(
+    stream: ReadableStream,
+    onChunk?: (chunk: any) => void
+  ): Promise<CompletionsCreateStreamRes> {
+    const reader = stream.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    const chunks: any[] = [];
+    let weaveCallId: string | undefined;
+
+    // Process a single line of JSON
+    const processLine = (line: string) => {
+      if (line.trim() === '') return;
+      try {
+        const parsed = JSON.parse(line);
+        if (parsed._meta?.weave_call_id) {
+          weaveCallId = parsed._meta.weave_call_id;
+        } else {
+          chunks.push(parsed);
+          onChunk?.(parsed);
+        }
+      } catch (err) {
+        console.error('Error parsing completion chunk line:', line, err);
+      }
+    };
+
+    // Read and process the stream
+    const read = (): Promise<void> => {
+      return reader.read().then(({done, value}) => {
+        if (done) {
+          // Process any remaining data in the buffer
+          if (buffer.trim() !== '') {
+            processLine(buffer);
+          }
+          return;
+        }
+
+        // Decode the new chunk and add it to our buffer
+        buffer += decoder.decode(value, {stream: true});
+
+        // Process complete lines from the buffer
+        let newlineIndex;
+        while ((newlineIndex = buffer.indexOf('\n')) >= 0) {
+          const line = buffer.slice(0, newlineIndex);
+          buffer = buffer.slice(newlineIndex + 1);
+          processLine(line);
+        }
+
+        // Continue reading
+        return read();
+      });
+    };
+
+    return read().then(() => ({chunks, weave_call_id: weaveCallId}));
+  }
+
   public projectStats(req: ProjectStatsReq): Promise<ProjectStatsRes> {
     return this.makeRequest<ProjectStatsReq, ProjectStatsRes>(
       '/project/stats',
       req
     );
+  }
+
+  public async threadsStreamQuery(
+    req: ThreadsQueryReq
+  ): Promise<ThreadsQueryRes> {
+    try {
+      let content = await this.makeRequest<ThreadsQueryReq, string>(
+        '/threads/stream_query',
+        req,
+        'text'
+      );
+
+      // `content` is jsonl string, we need to parse it.
+      if (!content) {
+        return {threads: []};
+      }
+
+      if (content.endsWith('\n')) {
+        content = content.slice(0, -1);
+      }
+
+      if (content === '') {
+        return {threads: []};
+      }
+
+      const threads: ThreadSchema[] = [];
+      const lines = content.split('\n');
+
+      for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+        const line = lines[lineIndex];
+        try {
+          threads.push(JSON.parse(line));
+        } catch (err) {
+          if (lineIndex === lines.length - 1 && lineIndex > 0) {
+            // This is a very special case where the last line is not a
+            // complete json object. This can happen if the stream is
+            // terminated early. Instead of just failing, we can make a
+            // new request to the server to resume the stream from the
+            // last line. This should only occur projects with massive
+            // thread data.
+            const newReq = {...req};
+            const origOffset = req.offset || 0;
+            newReq.offset = origOffset + lineIndex;
+            console.debug(
+              `Early stream termination, performing a new request resuming from ${newReq.offset}`
+            );
+
+            const innerRes = await this.threadsStreamQuery(newReq);
+            threads.push(...innerRes.threads);
+            return {threads};
+          } else {
+            console.error(
+              `Error parsing line ${lineIndex} of ${lines.length}: ${line}`
+            );
+          }
+        }
+      }
+
+      return {threads};
+    } catch (err) {
+      throw err;
+    }
   }
 
   private makeRequest = async <QT, ST>(

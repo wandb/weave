@@ -49,6 +49,9 @@ describe('OpenAI Integration', () => {
           throw new Error('not implemented');
         },
       },
+      responses: {
+        create: jest.fn(),
+      },
     };
     patchedOpenAI = wrapOpenAI(mockOpenAI);
   });
@@ -299,5 +302,69 @@ describe('OpenAI Integration', () => {
         },
       },
     });
+  });
+
+  test('should handle interrupted streaming response', async () => {
+    const pirateChunks = [
+      {
+        type: 'response.created',
+        sequence_number: 0,
+        response: {
+          id: 'resp_6847619ad8e081998070ccf8ae64864a065b082f4ff399b5',
+          instructions: 'You are a coding assistant that talks like a pirate',
+          model: 'gpt-4o-2024-08-06',
+          status: 'in_progress',
+        },
+      },
+      {
+        type: 'response.output_text.delta',
+        sequence_number: 4,
+        delta: 'Arr',
+      },
+      {
+        type: 'response.output_text.delta',
+        sequence_number: 5,
+        delta: 'r',
+      },
+    ];
+
+    // Override mock for this test
+    mockOpenAI.responses.create = jest.fn().mockResolvedValue({
+      async *[Symbol.asyncIterator]() {
+        for (const chunk of pirateChunks) {
+          yield chunk;
+        }
+      },
+    });
+
+    const options = {
+      model: 'gpt-4o-2024-08-06',
+      instructions: 'You are a coding assistant that talks like a pirate',
+      messages: [
+        {role: 'user', content: 'Are semicolons required in JavaScript?'},
+      ],
+      stream: true,
+    };
+
+    const stream = await patchedOpenAI.responses.create(options);
+
+    let deltaText = '';
+    for await (const chunk of stream) {
+      if (chunk.type === 'response.output_text.delta') {
+        deltaText += chunk.delta;
+      }
+    }
+
+    // Verify that deltas accumulated to "Arr" + "r" = "Arrr"
+    expect(deltaText).toBe('Arrr');
+
+    // Wait for any pending batch processing
+    await wait(300);
+
+    const calls = await getCalls(inMemoryTraceServer, testProjectName);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].op_name).toContain('create');
+    expect(calls[0].inputs).toEqual(options);
+    expect(calls[0].output.responses[0].output[0].content[0].text).toBe('Arrr');
   });
 });

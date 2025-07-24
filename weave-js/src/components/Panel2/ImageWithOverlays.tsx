@@ -1,7 +1,9 @@
+import * as RadixTooltip from '@radix-ui/react-tooltip';
 import {LineStyle, Style} from '@wandb/weave/common/components/MediaCard';
 import {BoundingBox2D, LayoutType} from '@wandb/weave/common/types/media';
 import {colorFromString} from '@wandb/weave/common/util/colors';
 import {boxColor} from '@wandb/weave/common/util/media';
+import * as Tooltip from '@wandb/weave/components/RadixTooltip';
 import {
   constString,
   File,
@@ -392,6 +394,7 @@ const SegmentationMaskFromCG: FC<SegmentationMaskFromCGProps> = props => {
 
 export interface BoundingBoxCanvasProps {
   mediaSize: {width: number; height: number};
+  cardSize?: {width: number; height: number};
   boxData: BoundingBox2D[];
   bboxControls: Controls.BoxControlState;
   sliders?: Controls.BoxSliderState;
@@ -440,6 +443,7 @@ const isBoundingBoxHidden = (
 
 export const BoundingBoxesCanvas: FC<BoundingBoxCanvasProps> = ({
   mediaSize,
+  cardSize,
   boxData,
   bboxControls,
   classStates,
@@ -449,7 +453,7 @@ export const BoundingBoxesCanvas: FC<BoundingBoxCanvasProps> = ({
   const {lineStyle, classOverlayStates} = bboxControls;
 
   useEffect(() => {
-    if (canvasRef.current == null) {
+    if (canvasRef.current == null || cardSize != null) {
       return;
     }
 
@@ -466,7 +470,10 @@ export const BoundingBoxesCanvas: FC<BoundingBoxCanvasProps> = ({
       const isHidden = isBoundingBoxHidden(box, bboxControls, sliderControls);
 
       if (!isHidden) {
-        const color = boxColor(classId);
+        let color = boxColor(classId);
+        if (classStates?.[classId]?.color) {
+          color = classStates?.[classId]?.color;
+        }
         const name = classStates?.[classId]?.name ?? `ID: ${box.class_id}`;
         drawBox(canvas, box, name, mediaSize, color, opts);
       }
@@ -479,9 +486,120 @@ export const BoundingBoxesCanvas: FC<BoundingBoxCanvasProps> = ({
     bboxControls,
     mediaSize,
     sliderControls,
+    cardSize,
   ]);
 
-  return <OverlayCanvas {...mediaSize} ref={canvasRef} />;
+  const collisionBoundary = useRef<HTMLDivElement>(null);
+
+  // Scale the image to fit the card size
+  const scale = Math.min(
+    (cardSize?.width ?? 0) / mediaSize.width,
+    (cardSize?.height ?? 0) / mediaSize.height
+  );
+  const imageWidth = mediaSize.width * scale;
+  const imageHeight = mediaSize.height * scale;
+
+  return (
+    <div className="relative flex h-full w-full items-center">
+      {cardSize && Number.isFinite(scale) && (
+        <div
+          className="relative overflow-hidden"
+          ref={collisionBoundary}
+          style={{
+            width: imageWidth,
+            height: imageHeight,
+            minWidth: imageWidth,
+          }}>
+          {boxData.map(box => {
+            const isHidden = isBoundingBoxHidden(
+              box,
+              bboxControls,
+              sliderControls
+            );
+            if (isHidden) {
+              return null;
+            }
+
+            const {class_id: classId} = box;
+            const name = classStates?.[classId]?.name ?? `ID: ${box.class_id}`;
+
+            let color = boxColor(classId);
+            if (classStates?.[classId]?.color) {
+              color = classStates?.[classId]?.color;
+            }
+            const position = box.position;
+            const widthMultiplier = box.domain === 'pixel' ? scale : imageWidth;
+            const heightMultiplier =
+              box.domain === 'pixel' ? scale : imageHeight;
+
+            let left, top, width, height;
+            if ('minX' in position) {
+              left = position.minX * widthMultiplier;
+              top = position.minY * heightMultiplier;
+              width = (position.maxX - position.minX) * widthMultiplier;
+              height = (position.maxY - position.minY) * heightMultiplier;
+            } else {
+              left =
+                (position.middle[0] - position.width / 2) * widthMultiplier;
+              top =
+                (position.middle[1] - position.height / 2) * heightMultiplier;
+              width = position.width * widthMultiplier;
+              height = position.height * heightMultiplier;
+            }
+            // Scale the outline width based on the card size. If it's a small card, we probably want a thinner outline so
+            // the image isn't obstructed too much. But if it's a large card, we want a thicker outline so it's more visible.
+            const outlineWidth = Math.min(6, Math.max(2, cardSize.width / 100));
+
+            return (
+              <div
+                data-test="single-bounding-box"
+                key={classId}
+                className="absolute"
+                style={{
+                  left,
+                  top,
+                }}>
+                <div className="relative">
+                  <Tooltip.Provider delayDuration={0}>
+                    <RadixTooltip.Root>
+                      <Tooltip.Trigger>
+                        <div
+                          style={{
+                            outlineWidth,
+                            outlineColor: color,
+                            outlineStyle:
+                              lineStyle === 'line'
+                                ? 'solid'
+                                : lineStyle ?? 'solid',
+                            width,
+                            height,
+                          }}
+                        />
+                      </Tooltip.Trigger>
+                      <Tooltip.Content
+                        hideWhenDetached
+                        style={{backgroundColor: color, padding: 4}}
+                        avoidCollisions
+                        side="top"
+                        align="start"
+                        collisionBoundary={collisionBoundary.current}>
+                        <div
+                          style={{backgroundColor: color}}
+                          className="text-white">
+                          {name}
+                        </div>
+                      </Tooltip.Content>
+                    </RadixTooltip.Root>
+                  </Tooltip.Provider>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      <OverlayCanvas {...mediaSize} ref={canvasRef} />
+    </div>
+  );
 };
 
 export interface BoundingBoxesProps {

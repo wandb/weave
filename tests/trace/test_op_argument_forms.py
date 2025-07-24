@@ -53,7 +53,7 @@ from weave.trace_server import trace_server_interface as tsi
 
 
 @pytest.mark.parametrize(
-    "fn, arg_variations",
+    ("fn", "arg_variations"),
     [
         # | fn()                            |   NO    |    NO    |  NO     |   NO     |    1     |
         (
@@ -451,7 +451,7 @@ def test_no_args(client):
 
 
 def test_args_empty(client):
-    @weave.op()
+    @weave.op
     def my_op() -> int:
         return 1
 
@@ -468,7 +468,7 @@ def test_args_empty(client):
 
 
 def test_args_concrete(client):
-    @weave.op()
+    @weave.op
     def my_op(val):
         return [val]
 
@@ -486,7 +486,7 @@ def test_args_concrete(client):
 
 
 def test_args_concrete_splat(client):
-    @weave.op()
+    @weave.op
     def my_op(val, *args):
         return [val, args]
 
@@ -508,7 +508,7 @@ def test_args_concrete_splat(client):
 
 
 def test_args_concrete_splats(client):
-    @weave.op()
+    @weave.op
     def my_op(val, *args, **kwargs):
         return [val, args, kwargs]
 
@@ -538,7 +538,7 @@ def test_args_concrete_splats(client):
 
 
 def test_args_concrete_splat_concrete(client):
-    @weave.op()
+    @weave.op
     def my_op(val, *args, a=0):
         return [val, args, a]
 
@@ -564,7 +564,7 @@ def test_args_concrete_splat_concrete(client):
 
 
 def test_args_concrete_splat_concrete_splat(client):
-    @weave.op()
+    @weave.op
     def my_op(val, *args, a=0, **kwargs):
         return [val, args, a, kwargs]
 

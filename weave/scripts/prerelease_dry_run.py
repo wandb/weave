@@ -24,7 +24,7 @@ def main() -> None:
     client = weave.init("test-project")
     res = func(42)
 
-    client._flush()
+    client.flush()
     calls = func.calls()
 
     assert len(calls) == 1

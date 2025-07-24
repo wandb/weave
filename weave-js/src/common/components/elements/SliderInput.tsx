@@ -5,6 +5,7 @@ import {Popup} from 'semantic-ui-react';
 
 import {ID} from '../../util/id';
 import {SliderKeyboardOperation} from '../../util/media';
+import {shiftInputByValue} from '../../util/shiftInputByValue';
 // Doesn't yet work in nested panels yet.
 // import {BetterPopup} from '../BetterPopup';
 import NumberInput from './NumberInput';
@@ -85,13 +86,29 @@ const SliderInput: React.FC<SliderInputProps> = React.memo(
     const keyboardOperations = React.useMemo(() => {
       return {
         [SliderKeyboardOperation.INCREMENT]: (event: KeyboardEvent) => {
-          update(sliderValue + 1);
+          const newValue = shiftInputByValue(
+            ticks,
+            strideLength,
+            1,
+            sliderValue,
+            min,
+            max
+          );
+          update(newValue);
         },
         [SliderKeyboardOperation.DECREMENT]: (event: KeyboardEvent) => {
-          update(sliderValue - 1);
+          const newValue = shiftInputByValue(
+            ticks,
+            strideLength,
+            -1,
+            sliderValue,
+            min,
+            max
+          );
+          update(newValue);
         },
       };
-    }, [sliderValue, update]);
+    }, [sliderValue, update, ticks, strideLength, min, max]);
 
     const isFormField = React.useCallback(
       (node?: Element | null | undefined) => {
@@ -121,9 +138,18 @@ const SliderInput: React.FC<SliderInputProps> = React.memo(
         if (isEmpty(keyboardBindings) || isFormField(document.activeElement)) {
           return;
         }
-        const eventKey = event.key;
-        const operation = (keyboardBindings ?? {})[eventKey];
+
+        // Build the key combination string based on modifiers
+        const modifiers = [];
+        if (event.metaKey) modifiers.push('Meta');
+        if (event.ctrlKey) modifiers.push('Control');
+
+        const keyCombo = [...modifiers, event.key].join('+');
+        const operation = (keyboardBindings ?? {})[keyCombo];
+
         if (operation && operation in keyboardOperations) {
+          event.preventDefault();
+          event.stopPropagation();
           const handler = keyboardOperations[operation];
           return handler(event);
         }
@@ -160,7 +186,7 @@ const SliderInput: React.FC<SliderInputProps> = React.memo(
 
     const renderSlider = () => {
       return (
-        <div style={{display: 'flex', alignItems: 'center'}}>
+        <div style={{display: 'flex', flexGrow: 1, alignItems: 'center'}}>
           {minLabel && <label className="min">{minLabel}</label>}
           <input
             // Other code relies on this class to detect if the event

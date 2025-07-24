@@ -52,6 +52,7 @@
       "type": "object"
     },
     "AndOperation": {
+      "description": "Logical AND. All conditions must evaluate to true.\n\nExample:\n    ```\n    {\n        \"$and\": [\n            {\"$eq\": [{\"$getField\": \"op_name\"}, {\"$literal\": \"predict\"}]},\n            {\"$gt\": [{\"$getField\": \"summary.usage.tokens\"}, {\"$literal\": 1000}]}\n        ]\n    }\n    ```",
       "properties": {
         "$and": {
           "items": {
@@ -192,6 +193,7 @@
       "type": "object"
     },
     "CallsFilter": {
+      "additionalProperties": false,
       "properties": {
         "op_names": {
           "anyOf": [
@@ -283,6 +285,36 @@
           "default": null,
           "title": "Call Ids"
         },
+        "thread_ids": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Thread Ids"
+        },
+        "turn_ids": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Turn Ids"
+        },
         "trace_roots_only": {
           "anyOf": [
             {
@@ -329,6 +361,100 @@
       "title": "CallsFilter",
       "type": "object"
     },
+    "ChartConfig": {
+      "properties": {
+        "x_axis": {
+          "title": "XAxis",
+          "type": "string"
+        },
+        "y_axis": {
+          "title": "YAxis",
+          "type": "string"
+        },
+        "plot_type": {
+          "anyOf": [
+            {
+              "enum": [
+                "scatter",
+                "line",
+                "bar"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Plot Type"
+        },
+        "bin_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bin Count"
+        },
+        "aggregation": {
+          "anyOf": [
+            {
+              "enum": [
+                "average",
+                "sum",
+                "min",
+                "max",
+                "p95",
+                "p99"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Aggregation"
+        },
+        "group_keys": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Group Keys"
+        },
+        "custom_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Custom Name"
+        }
+      },
+      "required": [
+        "x_axis",
+        "y_axis"
+      ],
+      "title": "ChartConfig",
+      "type": "object"
+    },
     "Column": {
       "properties": {
         "path": {
@@ -370,6 +496,7 @@
       "type": "object"
     },
     "ContainsOperation": {
+      "description": "Case-insensitive substring match.\n\nNot part of MongoDB. Weave-specific addition.\n\nExample:\n    ```\n    {\n        \"$contains\": {\n            \"input\": {\"$getField\": \"display_name\"},\n            \"substr\": {\"$literal\": \"llm\"},\n            \"case_insensitive\": true\n        }\n    }\n    ```",
       "properties": {
         "$contains": {
           "$ref": "#/$defs/ContainsSpec"
@@ -382,6 +509,7 @@
       "type": "object"
     },
     "ContainsSpec": {
+      "description": "Specification for the `$contains` operation.\n\n- `input`: The string to search.\n- `substr`: The substring to search for.\n- `case_insensitive`: If true, match is case-insensitive.",
       "properties": {
         "input": {
           "anyOf": [
@@ -484,9 +612,6 @@
         "action_type": {
           "const": "contains_words",
           "default": "contains_words",
-          "enum": [
-            "contains_words"
-          ],
           "title": "Action Type",
           "type": "string"
         },
@@ -505,6 +630,7 @@
       "type": "object"
     },
     "ConvertOperation": {
+      "description": "Convert the input value to a specific type (e.g., `int`, `bool`, `string`).\n\nExample:\n    ```\n    {\n        \"$convert\": {\n            \"input\": {\"$getField\": \"inputs.value\"},\n            \"to\": \"int\"\n        }\n    }\n    ```",
       "properties": {
         "$convert": {
           "$ref": "#/$defs/ConvertSpec"
@@ -517,6 +643,7 @@
       "type": "object"
     },
     "ConvertSpec": {
+      "description": "Specifies conversion details for `$convert`.\n\n- `input`: The operand to convert.\n- `to`: The type to convert to.",
       "properties": {
         "input": {
           "anyOf": [
@@ -576,6 +703,7 @@
       "type": "object"
     },
     "EqOperation": {
+      "description": "Equality check between two operands.\n\nExample:\n    ```\n    {\n        \"$eq\": [{\"$getField\": \"op_name\"}, {\"$literal\": \"predict\"}]\n    }\n    ```",
       "properties": {
         "$eq": {
           "maxItems": 2,
@@ -667,6 +795,7 @@
       "type": "object"
     },
     "GetFieldOperator": {
+      "description": "Access a field on the traced call.\n\nSupports dot notation for nested access, e.g. `summary.usage.tokens`.\n\nOnly works on fields present in the `CallSchema`, including:\n- Top-level fields like `op_name`, `trace_id`, `started_at`\n- Nested fields like `inputs.input_name`, `summary.usage.tokens`, etc.\n\nExample:\n    ```\n    {\"$getField\": \"op_name\"}\n    ```",
       "properties": {
         "$getField": {
           "title": "$Getfield",
@@ -680,6 +809,7 @@
       "type": "object"
     },
     "GtOperation": {
+      "description": "Greater than comparison.\n\nExample:\n    ```\n    {\n        \"$gt\": [{\"$getField\": \"summary.usage.tokens\"}, {\"$literal\": 100}]\n    }\n    ```",
       "properties": {
         "$gt": {
           "maxItems": 2,
@@ -771,6 +901,7 @@
       "type": "object"
     },
     "GteOperation": {
+      "description": "Greater than or equal comparison.\n\nExample:\n    ```\n    {\n        \"$gte\": [{\"$getField\": \"summary.usage.tokens\"}, {\"$literal\": 100}]\n    }\n    ```",
       "properties": {
         "$gte": {
           "maxItems": 2,
@@ -862,6 +993,7 @@
       "type": "object"
     },
     "InOperation": {
+      "description": "Membership check.\n\nReturns true if the left operand is in the list provided as the second operand.\n\nExample:\n    ```\n    {\n        \"$in\": [\n            {\"$getField\": \"op_name\"},\n            [{\"$literal\": \"predict\"}, {\"$literal\": \"generate\"}]\n        ]\n    }\n    ```",
       "properties": {
         "$in": {
           "maxItems": 2,
@@ -956,6 +1088,7 @@
       "type": "object"
     },
     "LLMStructuredCompletionModel": {
+      "additionalProperties": false,
       "properties": {
         "name": {
           "anyOf": [
@@ -981,6 +1114,17 @@
           "default": null,
           "title": "Description"
         },
+        "ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObjectRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "llm_model_id": {
           "title": "Llm Model Id",
           "type": "string"
@@ -998,11 +1142,19 @@
     "LLMStructuredCompletionModelDefaultParams": {
       "properties": {
         "messages_template": {
-          "items": {
-            "$ref": "#/$defs/Message"
-          },
-          "title": "Messages Template",
-          "type": "array"
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/Message"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Messages Template"
         },
         "temperature": {
           "anyOf": [
@@ -1109,18 +1261,21 @@
         "response_format": {
           "anyOf": [
             {
-              "$ref": "#/$defs/ResponseFormat"
+              "enum": [
+                "json_object",
+                "json_schema",
+                "text"
+              ],
+              "type": "string"
             },
             {
               "type": "null"
             }
           ],
-          "default": null
+          "default": null,
+          "title": "Response Format"
         }
       },
-      "required": [
-        "messages_template"
-      ],
       "title": "LLMStructuredCompletionModelDefaultParams",
       "type": "object"
     },
@@ -1200,6 +1355,7 @@
       "type": "object"
     },
     "LiteralOperation": {
+      "description": "Represents a constant value in the query language.\n\nThis can be any standard JSON-serializable value.\n\nExample:\n    ```\n    {\"$literal\": \"predict\"}\n    ```",
       "properties": {
         "$literal": {
           "anyOf": [
@@ -1245,9 +1401,6 @@
         "action_type": {
           "const": "llm_judge",
           "default": "llm_judge",
-          "enum": [
-            "llm_judge"
-          ],
           "title": "Action Type",
           "type": "string"
         },
@@ -1298,6 +1451,7 @@
               "type": "null"
             }
           ],
+          "default": null,
           "title": "Content"
         },
         "name": {
@@ -1309,6 +1463,7 @@
               "type": "null"
             }
           ],
+          "default": null,
           "title": "Name"
         },
         "function_call": {
@@ -1320,6 +1475,7 @@
               "type": "null"
             }
           ],
+          "default": null,
           "title": "Function Call"
         },
         "tool_call_id": {
@@ -1331,20 +1487,18 @@
               "type": "null"
             }
           ],
+          "default": null,
           "title": "Tool Call Id"
         }
       },
       "required": [
-        "role",
-        "content",
-        "name",
-        "function_call",
-        "tool_call_id"
+        "role"
       ],
       "title": "Message",
       "type": "object"
     },
     "NotOperation": {
+      "description": "Logical NOT. Inverts the condition.\n\nExample:\n    ```\n    {\n        \"$not\": [\n            {\"$eq\": [{\"$getField\": \"op_name\"}, {\"$literal\": \"debug\"}]}\n        ]\n    }\n    ```",
       "properties": {
         "$not": {
           "maxItems": 1,
@@ -1398,7 +1552,44 @@
       "title": "NotOperation",
       "type": "object"
     },
+    "ObjectRef": {
+      "properties": {
+        "entity": {
+          "title": "Entity",
+          "type": "string"
+        },
+        "project": {
+          "title": "Project",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "_digest": {
+          "title": "Digest",
+          "type": "string"
+        },
+        "_extra": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Extra",
+          "type": "array"
+        }
+      },
+      "required": [
+        "entity",
+        "project",
+        "name",
+        "_digest"
+      ],
+      "title": "ObjectRef",
+      "type": "object"
+    },
     "OrOperation": {
+      "description": "Logical OR. At least one condition must be true.\n\nExample:\n    ```\n    {\n        \"$or\": [\n            {\"$eq\": [{\"$getField\": \"op_name\"}, {\"$literal\": \"a\"}]},\n            {\"$eq\": [{\"$getField\": \"op_name\"}, {\"$literal\": \"b\"}]}\n        ]\n    }\n    ```",
       "properties": {
         "$or": {
           "items": {
@@ -1514,11 +1705,7 @@
           "type": "object"
         },
         "return_type": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/ProviderReturnType"
-            }
-          ],
+          "$ref": "#/$defs/ProviderReturnType",
           "default": "openai"
         }
       },
@@ -1572,7 +1759,6 @@
       "type": "object"
     },
     "ProviderReturnType": {
-      "const": "openai",
       "enum": [
         "openai"
       ],
@@ -1580,6 +1766,7 @@
       "type": "string"
     },
     "Query": {
+      "additionalProperties": false,
       "properties": {
         "$expr": {
           "anyOf": [
@@ -1616,14 +1803,6 @@
       ],
       "title": "Query",
       "type": "object"
-    },
-    "ResponseFormat": {
-      "enum": [
-        "json",
-        "text"
-      ],
-      "title": "ResponseFormat",
-      "type": "string"
     },
     "SavedView": {
       "properties": {
@@ -1762,12 +1941,28 @@
           ],
           "default": null,
           "title": "Page Size"
+        },
+        "charts": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/ChartConfig"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Charts"
         }
       },
       "title": "SavedViewDefinition",
       "type": "object"
     },
     "SortBy": {
+      "additionalProperties": false,
       "properties": {
         "field": {
           "title": "Field",
@@ -1835,6 +2030,54 @@
       "title": "TestOnlyExample",
       "type": "object"
     },
+    "TestOnlyInheritedBaseObject": {
+      "description": "A builtin object that inherits from another builtin object for testing inheritance.",
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "b": {
+          "title": "B",
+          "type": "integer"
+        },
+        "c": {
+          "title": "C",
+          "type": "integer"
+        },
+        "additional_field": {
+          "default": "default_value",
+          "title": "Additional Field",
+          "type": "string"
+        }
+      },
+      "required": [
+        "b",
+        "c"
+      ],
+      "title": "TestOnlyInheritedBaseObject",
+      "type": "object"
+    },
     "TestOnlyNestedBaseModel": {
       "properties": {
         "a": {
@@ -1898,6 +2141,9 @@
     "TestOnlyNestedBaseObject": {
       "$ref": "#/$defs/TestOnlyNestedBaseObject"
     },
+    "TestOnlyInheritedBaseObject": {
+      "$ref": "#/$defs/TestOnlyInheritedBaseObject"
+    },
     "Leaderboard": {
       "$ref": "#/$defs/Leaderboard"
     },
@@ -1918,18 +2164,23 @@
     },
     "LLMStructuredCompletionModel": {
       "$ref": "#/$defs/LLMStructuredCompletionModel"
+    },
+    "ChartConfig": {
+      "$ref": "#/$defs/ChartConfig"
     }
   },
   "required": [
     "TestOnlyExample",
     "TestOnlyNestedBaseObject",
+    "TestOnlyInheritedBaseObject",
     "Leaderboard",
     "ActionSpec",
     "AnnotationSpec",
     "Provider",
     "ProviderModel",
     "SavedView",
-    "LLMStructuredCompletionModel"
+    "LLMStructuredCompletionModel",
+    "ChartConfig"
   ],
   "title": "CompositeBaseObject",
   "type": "object"

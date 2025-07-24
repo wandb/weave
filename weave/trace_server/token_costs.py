@@ -228,9 +228,9 @@ def get_ranked_prices(
             END,
             CASE
                 -- Order by pricing level then by effective_date
-                -- WHEN {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level = '{PRICING_LEVELS['ORG']}' AND {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id = ORG_PARAM THEN 1
-                WHEN {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level = '{PRICING_LEVELS['PROJECT']}' AND {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id = '{project_id}' THEN 2
-                WHEN {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level = '{PRICING_LEVELS['DEFAULT']}' AND {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id = '{DEFAULT_PRICING_LEVEL_ID}' THEN 3
+                -- WHEN {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level = '{PRICING_LEVELS["ORG"]}' AND {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id = ORG_PARAM THEN 1
+                WHEN {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level = '{PRICING_LEVELS["PROJECT"]}' AND {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id = '{project_id}' THEN 2
+                WHEN {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level = '{PRICING_LEVELS["DEFAULT"]}' AND {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id = '{DEFAULT_PRICING_LEVEL_ID}' THEN 3
                 ELSE 4
             END,
             {LLM_TOKEN_PRICES_TABLE_NAME}.effective_date DESC
@@ -477,12 +477,12 @@ def cost_query(
         ranked_prices AS ({get_ranked_prices(pb, "llm_usage", project_id).sql})
 
         -- Final Select, which just selects the correct fields, and adds a costs object
-        {final_call_select_with_cost(pb, 'ranked_prices', select_fields, order_fields).sql}
+        {final_call_select_with_cost(pb, "ranked_prices", select_fields, order_fields).sql}
     """
     return raw_sql
 
 
-# This is a temporary workaround for the issue of clickhouse not allowing the use of parametes in row_number() over function
+# This is a temporary workaround for the issue of clickhouse not allowing the use of parameters in row_number() over function
 # Use a parameter when this is fixed
 # This checks that a project_id is a valid base64 encoded string, that follows the pattern "ProjectInternalId: <number>"
 def is_project_id_sql_injection_safe(project_id: str) -> None:
@@ -501,7 +501,7 @@ def is_project_id_sql_injection_safe(project_id: str) -> None:
 
         raise ValueError("Invalid project_id", project_id)
     except Exception:
-        raise ValueError("Invalid project_id", project_id)
+        raise ValueError("Invalid project_id", project_id) from None
 
 
 MESSAGE_INVALID_COST_PURGE = "Can only purge costs by specifying one or more cost ids"

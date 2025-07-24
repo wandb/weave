@@ -6,6 +6,11 @@ Weave automatically logs videos using [`moviepy`](https://zulko.github.io/moviep
 Video support is currently only available in Python.
 :::
 
+## Usage prerequisites
+
+1. Install `weave` and `moviepy==1.0.3`.
+2. Create a W&B account.
+
 ## Supported video types
 
 Weave recognizes `moviepy` video clip objects, such as:
@@ -40,19 +45,16 @@ The following code sample demonstrates how to trace a video processing function 
 3. Uploads and tracks the clip in Weave.
 4. Automatically generates a dummy MP4 video if none is found.
 
-Before you can use the code sample, complete the prerequisites:
-
-1. Install `weave` and `moviepy==1.0.3`.
-2. Create a W&B account.
-
 :::important
 To avoid thread-safety issues, always pass the path to `VideoFileClip` objects instead of creating them outside the Weave `op`.
 :::
 
+Before you use the following code snippet, complete the [usage prerequisites](#usage-prerequisites).
+
 ```python
 import os
 import weave
-from moviepy import VideoFileClip, ColorClip, VideoClip
+from moviepy.editor import VideoFileClip, ColorClip, VideoClip
 
 # Update to your project name, or create a new project named 'video-test'
 weave.init('video-test')

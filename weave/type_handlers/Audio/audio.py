@@ -135,7 +135,7 @@ class Audio(Generic[T]):
             ValueError: If format is not supported
         """
         data = try_decode(data)
-        if not format in list(map(str, SUPPORTED_FORMATS)):
+        if format not in list(map(str, SUPPORTED_FORMATS)):
             raise ValueError("Unknown format {format}, must be one of: mp3 or wav")
 
         # We already attempted to decode it as base64 and coerced to bytes so we can skip that step
@@ -165,7 +165,7 @@ class Audio(Generic[T]):
             raise ValueError(f"File {path} does not exist")
 
         format_str = get_format_from_filename(str(path))
-        if not format_str in list(map(str, SUPPORTED_FORMATS)):
+        if format_str not in list(map(str, SUPPORTED_FORMATS)):
             raise ValueError(
                 f"Invalid file path {path}, file must end in one of: mp3 or wav"
             )
@@ -229,7 +229,7 @@ def save(
             json.dump(metadata, f)
 
     if isinstance(obj, wave.Wave_read):
-        with artifact.writeable_file_path(audio_filename(".wav")) as fp:
+        with artifact.writeable_file_path(audio_filename("wav")) as fp:
             return export_wave_read(obj, fp, name)
 
     with artifact.writeable_file_path(audio_filename(obj.format)) as fp:

@@ -37,6 +37,7 @@ import {
 } from '../common/SimplePageLayout';
 import {StorageSizeSection} from '../common/StorageSizeSection';
 import {EvaluationLeaderboardTab} from '../LeaderboardTab';
+import {MonitorPage} from '../MonitorsPage/MonitorPage';
 import {TabUsePrompt} from '../OpsPage/Tabs/TabUsePrompt';
 import {KNOWN_BASE_OBJECT_CLASSES} from '../wfReactInterface/constants';
 import {useWFHooks} from '../wfReactInterface/context';
@@ -74,9 +75,10 @@ const OBJECT_ICONS: Record<KnownBaseObjectClassType, IconName> = {
   SavedView: 'view-glasses',
   Provider: 'model',
   ProviderModel: 'model',
+  Monitor: 'job-automation',
   LLMStructuredCompletionModel: 'model',
 };
-const ObjectIcon = ({baseObjectClass}: ObjectIconProps) => {
+export const ObjectIcon = ({baseObjectClass}: ObjectIconProps) => {
   if (baseObjectClass in OBJECT_ICONS) {
     const iconName = OBJECT_ICONS[baseObjectClass];
     return (
@@ -124,6 +126,10 @@ export const ObjectVersionPage: React.FC<{
   } else if (objectVersion.result == null) {
     return <NotFoundPanel title="Object not found" />;
   }
+  if (objectVersion.result.baseObjectClass === 'Monitor') {
+    return <MonitorPage {...props} objectVersion={objectVersion.result} />;
+  }
+
   return (
     <ObjectVersionPageInner {...props} objectVersion={objectVersion.result} />
   );
@@ -282,10 +288,6 @@ const ObjectVersionPageInner: React.FC<{
               </div>
             </div>
             <div className="block">
-              <p className="text-moon-500">Version</p>
-              <p>{objectVersionIndex}</p>
-            </div>
-            <div className="block">
               <p className="text-moon-500">Last updated</p>
               <p>
                 <Timestamp value={createdAtMs / 1000} format="relative" />
@@ -346,32 +348,6 @@ const ObjectVersionPageInner: React.FC<{
           </div>
         </Tailwind>
       }
-      // menuItems={[
-      //   {
-      //     label: 'Open in Board',
-      //     onClick: () => {
-      //       onMakeBoard();
-      //     },
-      //   },
-      //   {
-      //     label: '(Under Construction) Compare',
-      //     onClick: () => {
-      //       console.log('(Under Construction) Compare');
-      //     },
-      //   },
-      //   {
-      //     label: '(Under Construction) Process with Function',
-      //     onClick: () => {
-      //       console.log('(Under Construction) Process with Function');
-      //     },
-      //   },
-      //   {
-      //     label: '(Coming Soon) Add to Hub',
-      //     onClick: () => {
-      //       console.log('(Under Construction) Add to Hub');
-      //     },
-      //   },
-      // ]}
       tabs={[
         ...(showPromptTab
           ? [
@@ -450,12 +426,15 @@ const ObjectVersionPageInner: React.FC<{
                     entityName={entityName}
                     projectName={projectName}
                     data={viewerDataAsObject}
+                    versionIndex={objectVersionIndex}
                   />
                 ) : baseObjectClass === 'Model' ? (
                   <TabUseModel
                     name={objectName}
                     uri={refUri}
+                    entityName={entityName}
                     projectName={projectName}
+                    versionIndex={objectVersionIndex}
                   />
                 ) : baseObjectClass === 'AnnotationSpec' ? (
                   <TabUseAnnotationSpec
@@ -465,7 +444,13 @@ const ObjectVersionPageInner: React.FC<{
                     data={viewerDataAsObject}
                   />
                 ) : (
-                  <TabUseObject name={objectName} uri={refUri} />
+                  <TabUseObject
+                    name={objectName}
+                    uri={refUri}
+                    entityName={entityName}
+                    projectName={projectName}
+                    versionIndex={objectVersionIndex}
+                  />
                 )}
               </Tailwind>
             </ScrollableTabContent>

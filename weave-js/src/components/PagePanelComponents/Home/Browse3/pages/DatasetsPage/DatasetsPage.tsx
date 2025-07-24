@@ -12,6 +12,7 @@ import {Loading} from '../../../../../Loading';
 import {useWeaveflowCurrentRouteContext} from '../../context';
 import {CreateDatasetDrawer} from '../../datasets/CreateDatasetDrawer';
 import {useDatasetSaving} from '../../datasets/useDatasetSaving';
+import {EMPTY_PROPS_DATASETS} from '../common/EmptyContent';
 import {SimplePageLayout} from '../common/SimplePageLayout';
 import {DeleteObjectVersionsButtonWithModal} from '../ObjectsPage/ObjectDeleteButtons';
 import {WFHighLevelObjectVersionFilter} from '../ObjectsPage/objectsPageTypes';
@@ -118,6 +119,7 @@ export const DatasetsPage: React.FC<{
                 setSelectedVersions={
                   hasComparison ? setSelectedVersions : undefined
                 }
+                propsEmpty={EMPTY_PROPS_DATASETS}
               />
             ),
           },

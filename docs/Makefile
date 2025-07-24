@@ -33,3 +33,8 @@ generate_all: generate_service_api_docs generate_python_sdk_docs generate_notebo
 
 update_playground_models:
 	python scripts/update_playground_models.py
+
+generate_llms_docs:
+	mkdir -p ./docs/static
+	python docs/scripts/generate_llmstxt.py
+	python docs/scripts/generate_llmstxt.py --categories

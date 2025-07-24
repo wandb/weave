@@ -64,6 +64,7 @@ class TraceStatus(str, Enum):
     SUCCESS = "success"
     ERROR = "error"
     RUNNING = "running"
+    DESCENDANT_ERROR = "descendant_error"
 
 
 class WeaveSummarySchema(ExtraKeysTypedDict, total=False):
@@ -77,6 +78,7 @@ class WeaveSummarySchema(ExtraKeysTypedDict, total=False):
 
 class SummaryInsertMap(ExtraKeysTypedDict, total=False):
     usage: dict[str, LLMUsageSchema]
+    status_counts: dict[TraceStatus, int]
 
 
 class SummaryMap(SummaryInsertMap, total=False):
@@ -96,6 +98,10 @@ class CallSchema(BaseModel):
     trace_id: str
     # Parent ID is optional because the call may be a root
     parent_id: Optional[str] = None
+    # Thread ID is optional
+    thread_id: Optional[str] = None
+    # Turn ID is optional
+    turn_id: Optional[str] = None
 
     # Start time is required
     started_at: datetime.datetime
@@ -120,6 +126,7 @@ class CallSchema(BaseModel):
     # WB Metadata
     wb_user_id: Optional[str] = None
     wb_run_id: Optional[str] = None
+    wb_run_step: Optional[int] = None
 
     deleted_at: Optional[datetime.datetime] = None
 
@@ -150,6 +157,10 @@ class StartedCallSchemaForInsert(BaseModel):
     trace_id: Optional[str] = None  # Will be generated if not provided
     # Parent ID is optional because the call may be a root
     parent_id: Optional[str] = None
+    # Thread ID is optional
+    thread_id: Optional[str] = None
+    # Turn ID is optional
+    turn_id: Optional[str] = None
 
     # Start time is required
     started_at: datetime.datetime
@@ -162,6 +173,7 @@ class StartedCallSchemaForInsert(BaseModel):
     # WB Metadata
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
     wb_run_id: Optional[str] = None
+    wb_run_step: Optional[int] = None
 
 
 class EndedCallSchemaForInsert(BaseModel):
@@ -195,6 +207,7 @@ class ObjSchema(BaseModel):
     is_latest: int
     kind: str
     base_object_class: Optional[str]
+    leaf_object_class: Optional[str] = None
     val: Any
 
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
@@ -208,7 +221,7 @@ class ObjSchemaForInsert(BaseModel):
     builtin_object_class: Optional[str] = None
     # Keeping `set_base_object_class` here until it is successfully removed from UI client
     set_base_object_class: Optional[str] = Field(
-        include=False, default=None, deprecated=True
+        exclude=True, default=None, deprecated=True
     )
 
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
@@ -350,18 +363,24 @@ class CompletionsCreateRes(BaseModel):
 
 
 class CallsFilter(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     op_names: Optional[list[str]] = None
     input_refs: Optional[list[str]] = None
     output_refs: Optional[list[str]] = None
     parent_ids: Optional[list[str]] = None
     trace_ids: Optional[list[str]] = None
     call_ids: Optional[list[str]] = None
+    thread_ids: Optional[list[str]] = None
+    turn_ids: Optional[list[str]] = None
     trace_roots_only: Optional[bool] = None
     wb_user_ids: Optional[list[str]] = None
     wb_run_ids: Optional[list[str]] = None
 
 
 class SortBy(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     # Field should be a key of `CallSchema`. For dictionary fields
     # (`attributes`, `inputs`, `outputs`, `summary`), the field can be
     # dot-separated.
@@ -402,11 +421,31 @@ class CallsQueryReq(BaseModel):
     # TODO: type this with call schema columns, following the same rules as
     # SortBy and thus GetFieldOperator.get_field_ (without direction)
     columns: Optional[list[str]] = None
-    # columns to expand, i.e. refs to other objects, can be nested
+
+    # Columns to expand, i.e. refs to other objects, can be nested
+    # Also used to provide a list of refs to expand when filtering or sorting.
+    # Requests to filter or order calls by sub fields in columns that have
+    # refs in their path must provide paths to all refs in the expand_columns.
+    # When filtering and ordering, expand_columns can include paths to objects
+    # that are stored in the table_rows table.
+    # TODO: support expand_columns for refs to objects in table_rows (dataset rows)
     expand_columns: Optional[list[str]] = Field(
         default=None,
         examples=[["inputs.self.message", "inputs.model.prompt"]],
         description="Columns to expand, i.e. refs to other objects",
+    )
+    # Controls whether or not to return expanded ref columns. In most clients,
+    # refs are resolved recursively by making additional api calls, either for
+    # performance or convenience reasons. In that case, we do not want to return
+    # resolved refs. However, expand_columns still must contain paths to all
+    # refs when filtering or sorting. Set this value to false to filter/order
+    # by refs but rely on client methods for actually resolving the values. The
+    # default is to resolve and return expanded values when expand_columns is set.
+    return_expanded_column_values: Optional[bool] = Field(
+        default=True,
+        description="If true, the response will include raw values for expanded columns. "
+        "If false, the response expand_columns will only be used for filtering and ordering. "
+        "This is useful for clients that want to resolve refs themselves, e.g. for performance reasons.",
     )
 
 
@@ -420,6 +459,14 @@ class CallsQueryStatsReq(BaseModel):
     query: Optional[Query] = None
     limit: Optional[int] = None
     include_total_storage_size: Optional[bool] = False
+    # List of columns that include refs to objects or table rows that require
+    # expansion during filtering or ordering. Required when filtering
+    # on reffed fields.
+    expand_columns: Optional[list[str]] = Field(
+        default=None,
+        examples=[["inputs.self.message", "inputs.model.prompt"]],
+        description="Columns with refs to objects or table rows that require expansion during filtering or ordering.",
+    )
 
 
 class CallsQueryStatsRes(BaseModel):
@@ -504,6 +551,11 @@ class ObjectVersionFilter(BaseModel):
         default=None,
         description="Filter objects by their base classes",
         examples=[["Model"], ["Dataset"]],
+    )
+    leaf_object_classes: Optional[list[str]] = Field(
+        default=None,
+        description="Filter objects by their leaf classes",
+        examples=[["Model"], ["Dataset"], ["LLMStructuredCompletionModel"]],
     )
     object_ids: Optional[list[str]] = Field(
         default=None,
@@ -671,7 +723,7 @@ class TableUpdateRes(BaseModel):
     # As a result, we might have servers in the wild that
     # do not support this field. Therefore, we want to ensure
     # that clients expecting this field will not break when
-    # they are targetting an older server. We should remove
+    # they are targeting an older server. We should remove
     # this default factory once we are sure that all servers
     # have been updated to support this field.
     updated_row_digests: list[str] = Field(
@@ -693,7 +745,7 @@ class TableCreateRes(BaseModel):
     # As a result, we might have servers in the wild that
     # do not support this field. Therefore, we want to ensure
     # that clients expecting this field will not break when
-    # they are targetting an older server. We should remove
+    # they are targeting an older server. We should remove
     # this default factory once we are sure that all servers
     # have been updated to support this field.
     row_digests: list[str] = Field(
@@ -1022,6 +1074,125 @@ class ProjectStatsRes(BaseModel):
     files_storage_size_bytes: int
 
 
+# Thread API
+
+
+class ThreadSchema(BaseModel):
+    thread_id: str
+    turn_count: int = Field(description="Number of turn calls in this thread")
+    start_time: datetime.datetime = Field(
+        description="Earliest start time of turn calls in this thread"
+    )
+    last_updated: datetime.datetime = Field(
+        description="Latest end time of turn calls in this thread"
+    )
+    first_turn_id: Optional[str] = Field(
+        description="Turn ID of the first turn in this thread (earliest start_time)"
+    )
+    last_turn_id: Optional[str] = Field(
+        description="Turn ID of the latest turn in this thread (latest end_time)"
+    )
+    p50_turn_duration_ms: Optional[float] = Field(
+        description="50th percentile (median) of turn durations in milliseconds within this thread"
+    )
+    p99_turn_duration_ms: Optional[float] = Field(
+        description="99th percentile of turn durations in milliseconds within this thread"
+    )
+
+
+class ThreadsQueryFilter(BaseModel):
+    after_datetime: Optional[datetime.datetime] = Field(
+        default=None,
+        description="Only include threads with start_time after this timestamp",
+        examples=["2024-01-01T00:00:00Z"],
+    )
+    before_datetime: Optional[datetime.datetime] = Field(
+        default=None,
+        description="Only include threads with last_updated before this timestamp",
+        examples=["2024-12-31T23:59:59Z"],
+    )
+    thread_ids: Optional[list[str]] = Field(
+        default=None,
+        description="Only include threads with thread_ids in this list",
+        examples=[["thread_1", "thread_2", "my_thread_id"]],
+    )
+
+
+class ThreadsQueryReq(BaseModel):
+    """
+    Query threads with aggregated statistics based on turn calls only.
+
+    Turn calls are the immediate children of thread contexts (where call.id == turn_id).
+    This provides meaningful conversation-level statistics rather than including all
+    nested implementation details.
+    """
+
+    project_id: str = Field(
+        description="The ID of the project", examples=["my_entity/my_project"]
+    )
+    filter: Optional[ThreadsQueryFilter] = Field(
+        default=None,
+        description="Filter criteria for the threads query",
+    )
+    limit: Optional[int] = Field(
+        default=None, description="Maximum number of threads to return"
+    )
+    offset: Optional[int] = Field(default=None, description="Number of threads to skip")
+    sort_by: Optional[list[SortBy]] = Field(
+        default=None,
+        description="Sorting criteria for the threads. Supported fields: 'thread_id', 'turn_count', 'start_time', 'last_updated', 'p50_turn_duration_ms', 'p99_turn_duration_ms'.",
+        examples=[[SortBy(field="last_updated", direction="desc")]],
+    )
+
+
+class EvaluateModelReq(BaseModel):
+    project_id: str
+    evaluation_ref: str
+    model_ref: str
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    # Fixes the following warning:
+    # UserWarning: Field "model_ref" has conflict with protected namespace "model_".
+    model_config = ConfigDict(protected_namespaces=())
+
+
+class EvaluateModelRes(BaseModel):
+    call_id: str
+
+
+class EvaluationStatusReq(BaseModel):
+    project_id: str
+    call_id: str
+
+
+class EvaluationStatusNotFound(BaseModel):
+    code: Literal["not_found"] = "not_found"
+
+
+class EvaluationStatusRunning(BaseModel):
+    code: Literal["running"] = "running"
+    completed_rows: int
+    total_rows: int
+
+
+class EvaluationStatusFailed(BaseModel):
+    code: Literal["failed"] = "failed"
+    error: Optional[str] = None
+
+
+class EvaluationStatusComplete(BaseModel):
+    code: Literal["complete"] = "complete"
+    output: Optional[Any] = None
+
+
+class EvaluationStatusRes(BaseModel):
+    status: Union[
+        EvaluationStatusNotFound,
+        EvaluationStatusRunning,
+        EvaluationStatusFailed,
+        EvaluationStatusComplete,
+    ]
+
+
 class TraceServerInterface(Protocol):
     def ensure_project_exists(
         self, entity: str, project: str
@@ -1090,5 +1261,20 @@ class TraceServerInterface(Protocol):
     # Execute LLM API
     def completions_create(self, req: CompletionsCreateReq) -> CompletionsCreateRes: ...
 
+    # Execute LLM API (Streaming)
+    # Returns an iterator of JSON-serializable chunks that together form the streamed
+    # response from the model provider. Each element must be a dictionary that can
+    # be serialized with ``json.dumps``.
+    def completions_create_stream(
+        self, req: CompletionsCreateReq
+    ) -> Iterator[dict[str, Any]]: ...
+
     # Project statistics API
     def project_stats(self, req: ProjectStatsReq) -> ProjectStatsRes: ...
+
+    # Thread API
+    def threads_query_stream(self, req: ThreadsQueryReq) -> Iterator[ThreadSchema]: ...
+
+    # Evaluation API
+    def evaluate_model(self, req: EvaluateModelReq) -> EvaluateModelRes: ...
+    def evaluation_status(self, req: EvaluationStatusReq) -> EvaluationStatusRes: ...

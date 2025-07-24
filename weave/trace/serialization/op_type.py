@@ -5,6 +5,7 @@ import builtins
 import inspect
 import io
 import json
+import logging
 import os
 import re
 import sys
@@ -27,8 +28,13 @@ from weave.trace.serialization import serializer
 from weave.trace.serialization.mem_artifact import MemTraceFilesArtifact
 from weave.trace_server.trace_server_interface_util import str_digest
 
+logger = logging.getLogger(__name__)
+
 WEAVE_OP_PATTERN = re.compile(r"@weave\.op(\(\))?")
 WEAVE_OP_NO_PAREN_PATTERN = re.compile(r"@weave\.op(?!\()")
+
+# Memory address with at least 4 characters (decrease false positives)
+MEMORY_ADDRESS_PATTERN = re.compile(r"0x[0-9a-fA-F]{4,}>", re.ASCII)
 
 CODE_DEP_ERROR_SENTINEL = "<error>"
 
@@ -63,15 +69,15 @@ class ExternalVariableFinder(ast.NodeVisitor):
         self.external_vars: dict[str, bool] = {}
         self.scope_stack: list[set[str]] = [set()]  # Start with a global scope
 
-    def visit_Import(self, node: ast.Import) -> None:
+    def visit_Import(self, node: ast.Import) -> None:  # noqa: N802
         for alias in node.names:
             self.scope_stack[-1].add(alias.asname or alias.name)
 
-    def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
+    def visit_ImportFrom(self, node: ast.ImportFrom) -> None:  # noqa: N802
         for alias in node.names:
             self.scope_stack[-1].add(alias.asname or alias.name)
 
-    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:  # noqa: N802
         # Add function name to the current scope
         self.scope_stack[-1].add(node.name)
         # Add function arguments to new scope
@@ -79,40 +85,40 @@ class ExternalVariableFinder(ast.NodeVisitor):
         self.generic_visit(node)
         self.scope_stack.pop()  # Pop function scope when we exit the function
 
-    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:  # noqa: N802
         self.scope_stack[-1].add(node.name)
         self.scope_stack.append(arg_names(node.args))
         self.generic_visit(node)
         self.scope_stack.pop()  # Pop function scope when we exit the function
 
-    def visit_Lambda(self, node: ast.Lambda) -> None:
+    def visit_Lambda(self, node: ast.Lambda) -> None:  # noqa: N802
         # Add function arguments to the current scope
         self.scope_stack.append(arg_names(node.args))
         self.generic_visit(node)
         self.scope_stack.pop()  # Pop function scope when we exit the function
 
-    def visit_ListComp(self, node: ast.ListComp) -> None:
+    def visit_ListComp(self, node: ast.ListComp) -> None:  # noqa: N802
         # Change visit order, visit generators first which is where variable
         # definitions happen
         for generator in node.generators:
             self.visit(generator)
         self.visit(node.elt)
 
-    def visit_SetComp(self, node: ast.SetComp) -> Any:
+    def visit_SetComp(self, node: ast.SetComp) -> Any:  # noqa: N802
         # Change visit order, visit generators first which is where variable
         # definitions happen
         for generator in node.generators:
             self.visit(generator)
         self.visit(node.elt)
 
-    def visit_GeneratorExp(self, node: ast.GeneratorExp) -> None:
+    def visit_GeneratorExp(self, node: ast.GeneratorExp) -> None:  # noqa: N802
         # Change visit order, visit generators first which is where variable
         # definitions happen
         for generator in node.generators:
             self.visit(generator)
         self.visit(node.elt)
 
-    def visit_DictComp(self, node: ast.DictComp) -> None:
+    def visit_DictComp(self, node: ast.DictComp) -> None:  # noqa: N802
         # Change visit order, visit generators first which is where variable
         # definitions happen
         for generator in node.generators:
@@ -120,13 +126,13 @@ class ExternalVariableFinder(ast.NodeVisitor):
         self.visit(node.key)
         self.visit(node.value)
 
-    def visit_ExceptHandler(self, node: ExceptHandler) -> None:
+    def visit_ExceptHandler(self, node: ExceptHandler) -> None:  # noqa: N802
         if node.name is None:
             return
         self.scope_stack[-1].add(node.name)
         self.generic_visit(node)
 
-    def visit_Name(self, node: ast.Name) -> None:
+    def visit_Name(self, node: ast.Name) -> None:  # noqa: N802
         # print("  VISIT NAME", node.id, node.ctx)
         # If a variable is used (loaded) but not defined in any scope in the stack, and not builtin it's external
         # TODO: we don't capture python version, but builtins can change from version to version!
@@ -160,7 +166,7 @@ class RefJSONEncoder(json.JSONEncoder):
 
     def default(self, o: Any) -> Any:
         if isinstance(o, (ObjectRef)):
-            ref_code = f"weave.ref('{str(o)}')"
+            ref_code = f"weave.ref('{o!s}')"
 
         if ref_code is not None:
             # This will be a quoted json string in the json.dumps result. We put special
@@ -215,9 +221,11 @@ def reconstruct_signature(fn: Callable) -> str:
                 return annotation.__name__
             # Otherwise, check if the type is imported and use the alias if given
             for name, obj in module.__dict__.items():
-                if isinstance(obj, py_types.ModuleType):
-                    if annotation.__module__ == obj.__name__:
-                        return f"{name}.{annotation.__name__}"
+                if (
+                    isinstance(obj, py_types.ModuleType)
+                    and annotation.__module__ == obj.__name__
+                ):
+                    return f"{name}.{annotation.__name__}"
         return str(annotation)
 
     def quote_default_str(default: Any) -> Any:
@@ -298,7 +306,7 @@ def get_code_deps_safe(
       to be present in the loading code)
     - doesn't serialize python requirements and other necessary system information
     - type annotations are not well handled, and may cause errors
-    - refering to @weave.type() objects will cause errors
+    - referring to @weave.type() objects will cause errors
 
     Args:
         fn: The Python function to analyze.
@@ -313,7 +321,7 @@ def get_code_deps_safe(
     try:
         return _get_code_deps(fn, artifact, {}, depth)
     except Exception as e:
-        print(f"Error getting code deps for {fn}: {e}")
+        logger.info(f"Error getting code deps for {fn}: {e}")
         return {
             "import_code": [],
             "code": [CODE_DEP_ERROR_SENTINEL],
@@ -379,7 +387,7 @@ def _get_code_deps(
             import_code.append(import_line)
         elif isinstance(var_value, (py_types.FunctionType, type)) or is_op(var_value):
             if var_value.__module__ == fn.__module__:
-                if not var_value in seen:
+                if var_value not in seen:
                     seen[var_value] = True
                     result = _get_code_deps(var_value, artifact, seen, depth + 1)
                     fn_warnings = result["warnings"]
@@ -442,6 +450,8 @@ def _get_code_deps(
                         json_val = REDACTED_VALUE
                     else:
                         json_val = to_json(var_value, client._project_id(), client)
+                        if _has_memory_address(json_val):
+                            json_val = _replace_memory_address(json_val)
                 except Exception as e:
                     warnings.append(
                         f"Serialization error for value of {var_name} needed by {fn}. Encountered:\n    {e}"
@@ -460,6 +470,22 @@ def _get_code_deps(
                     )
                     code.append(code_paragraph)
     return {"import_code": import_code, "code": code, "warnings": warnings}
+
+
+def _has_memory_address(obj: Any) -> bool:
+    return isinstance(obj, str) and MEMORY_ADDRESS_PATTERN.search(obj) is not None
+
+
+def _replace_memory_address(json_val: str) -> str:
+    """Turn <Function object at 0x10c349010> into <Function object at 0x000000000>"""
+
+    def _replacement_with_same_length(match: re.Match[str]) -> str:
+        # Get matched text and replace with 0s of the same length
+        address = match.group(0)
+        # Keep the 0x prefix and > suffix, replace the rest with 0s
+        return "0x" + "0" * (len(address) - 3) + ">"
+
+    return MEMORY_ADDRESS_PATTERN.sub(_replacement_with_same_length, json_val)
 
 
 def find_last_weave_op_function(
@@ -563,7 +589,7 @@ def load_instance(
     try:
         mod = __import__(import_name, fromlist=[module_dir])
     except Exception as e:
-        print("Op loading exception. This might be fine!", e)
+        logger.info(f"Op loading exception. This might be fine! {e}")
         import traceback
 
         traceback.print_exc()
@@ -582,7 +608,7 @@ def load_instance(
     # so we resort to looking at the source ast.
     last_op_function = find_last_weave_op_function(inspect.getsource(mod))
     if last_op_function is None:
-        print(
+        logger.info(
             f"Unexpected Weave module saved in: {module_path}. No op defs found. All members: {dir(mod)}. {module_dir=} {import_name=}"
         )
         return None

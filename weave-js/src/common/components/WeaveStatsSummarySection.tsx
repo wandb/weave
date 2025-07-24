@@ -19,7 +19,6 @@ export const WeaveStatsSummarySection = ({
   const {result, loading: callsStatsLoading} = useCallsStats({
     entity,
     project,
-    includeTotalStorageSize: true,
   });
 
   const {

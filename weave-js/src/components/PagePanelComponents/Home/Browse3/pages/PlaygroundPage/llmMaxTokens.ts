@@ -1,9 +1,61 @@
 import levenshtein from 'js-levenshtein';
 
+// Type definition for model configuration
+export interface LLMModelConfig {
+  label?: string;
+  provider: string;
+  max_tokens: number;
+  supports_function_calling: boolean;
+}
+
 // This is a mapping of LLM names to their max token limits.
 // Directly from the pycache model_providers.json in trace_server.
 // Some were removed because they are not supported when Josiah tried on Oct 30, 2024.
-export const LLM_MAX_TOKENS = {
+export const LLM_MAX_TOKENS: Record<string, LLMModelConfig> = {
+  // CoreWeave hosted models
+  'cw_meta-llama_Llama-3.1-8B-Instruct': {
+    label: 'Llama 3.1 8B',
+    provider: 'coreweave',
+    max_tokens: 1000,
+    supports_function_calling: false,
+  },
+  'cw_deepseek-ai_DeepSeek-R1-0528': {
+    label: 'DeepSeek R1-0528',
+    provider: 'coreweave',
+    max_tokens: 1000,
+    supports_function_calling: false,
+  },
+  'cw_deepseek-ai_DeepSeek-V3-0324': {
+    label: 'DeepSeek V3-0324',
+    provider: 'coreweave',
+    max_tokens: 1000,
+    supports_function_calling: false,
+  },
+  'cw_meta-llama_Llama-3.3-70B-Instruct': {
+    label: 'Llama 3.3 70B',
+    provider: 'coreweave',
+    max_tokens: 1000,
+    supports_function_calling: false,
+  },
+  'cw_meta-llama_Llama-4-Scout-17B-16E-Instruct': {
+    label: 'Llama 4 Scout',
+    provider: 'coreweave',
+    max_tokens: 1000,
+    supports_function_calling: false,
+  },
+  'cw_microsoft_Phi-4-mini-instruct': {
+    label: 'Phi 4 Mini',
+    provider: 'coreweave',
+    max_tokens: 1000,
+    supports_function_calling: false,
+  },
+  'cw_moonshotai_Kimi-K2-Instruct': {
+    label: 'Kimi K2',
+    provider: 'coreweave',
+    max_tokens: 1000,
+    supports_function_calling: false,
+  },
+  // End hosted models
   'gpt-4.1-mini-2025-04-14': {
     provider: 'openai',
     max_tokens: 32768,
@@ -172,6 +224,16 @@ export const LLM_MAX_TOKENS = {
   },
 
   // Anthropic models
+  'claude-opus-4-20250514': {
+    provider: 'anthropic',
+    max_tokens: 32000,
+    supports_function_calling: true,
+  },
+  'claude-sonnet-4-20250514': {
+    provider: 'anthropic',
+    max_tokens: 64000,
+    supports_function_calling: true,
+  },
   'claude-3-7-sonnet-20250219': {
     provider: 'anthropic',
     max_tokens: 8192,
@@ -204,6 +266,81 @@ export const LLM_MAX_TOKENS = {
   },
 
   // Azure models
+  'azure/gpt-4.1': {
+    provider: 'azure',
+    max_tokens: 32768,
+    supports_function_calling: true,
+  },
+  'azure/gpt-4.1-2025-04-14': {
+    provider: 'azure',
+    max_tokens: 32768,
+    supports_function_calling: true,
+  },
+  'azure/gpt-4.1-mini': {
+    provider: 'azure',
+    max_tokens: 32768,
+    supports_function_calling: true,
+  },
+  'azure/gpt-4.1-mini-2025-04-14': {
+    provider: 'azure',
+    max_tokens: 32768,
+    supports_function_calling: true,
+  },
+  'azure/gpt-4.1-nano': {
+    provider: 'azure',
+    max_tokens: 32768,
+    supports_function_calling: true,
+  },
+  'azure/gpt-4.1-nano-2025-04-14': {
+    provider: 'azure',
+    max_tokens: 32768,
+    supports_function_calling: true,
+  },
+  'azure/o3': {
+    provider: 'azure',
+    max_tokens: 100000,
+    supports_function_calling: true,
+  },
+  'azure/o3-2025-04-16': {
+    provider: 'azure',
+    max_tokens: 100000,
+    supports_function_calling: true,
+  },
+  'azure/o3-mini': {
+    provider: 'azure',
+    max_tokens: 100000,
+    supports_function_calling: true,
+  },
+  'azure/o3-mini-2025-01-31': {
+    provider: 'azure',
+    max_tokens: 100000,
+    supports_function_calling: true,
+  },
+  'azure/o4-mini': {
+    provider: 'azure',
+    max_tokens: 100000,
+    supports_function_calling: true,
+  },
+  'azure/o4-mini-2025-04-16': {
+    provider: 'azure',
+    max_tokens: 100000,
+    supports_function_calling: true,
+  },
+  'azure/o1-pro': {
+    provider: 'azure',
+    max_tokens: 100000,
+    supports_function_calling: true,
+  },
+  'azure/o1-pro-2025-03-19': {
+    provider: 'azure',
+    max_tokens: 100000,
+    supports_function_calling: true,
+  },
+  'azure/o1-2024-12-17': {
+    provider: 'azure',
+    max_tokens: 100000,
+    supports_function_calling: true,
+  },
   'azure/o1-mini': {
     provider: 'azure',
     max_tokens: 65536,
@@ -231,7 +368,7 @@ export const LLM_MAX_TOKENS = {
   },
   'azure/gpt-4o': {
     provider: 'azure',
-    max_tokens: 4096,
+    max_tokens: 16384,
     supports_function_calling: true,
   },
   'azure/gpt-4o-2024-08-06': {
@@ -562,6 +699,21 @@ export const LLM_MAX_TOKENS = {
   },
 
   // xAI models
+  'xai/grok-4': {
+    provider: 'xai',
+    max_tokens: 256000,
+    supports_function_calling: true,
+  },
+  'xai/grok-4-0709': {
+    provider: 'xai',
+    max_tokens: 256000,
+    supports_function_calling: true,
+  },
+  'xai/grok-4-latest': {
+    provider: 'xai',
+    max_tokens: 256000,
+    supports_function_calling: true,
+  },
   'xai/grok-3-beta': {
     provider: 'xai',
     max_tokens: 131072,
@@ -658,7 +810,8 @@ export const LLM_MAX_TOKENS = {
   },
 };
 
-export const DEFAULT_LLM_MODEL: LLMMaxTokensKey = 'gpt-4.1-mini-2025-04-14';
+export const DEFAULT_LLM_MODEL: LLMMaxTokensKey =
+  'cw_meta-llama_Llama-3.1-8B-Instruct';
 
 export type LLMMaxTokensKey = keyof typeof LLM_MAX_TOKENS;
 
@@ -667,6 +820,7 @@ export const LLM_MAX_TOKENS_KEYS: LLMMaxTokensKey[] = Object.keys(
 ) as LLMMaxTokensKey[];
 
 export const LLM_PROVIDER_SECRETS: Record<string, string[]> = {
+  coreweave: [],
   openai: ['OPENAI_API_KEY'],
   anthropic: ['ANTHROPIC_API_KEY'],
   gemini: ['GEMINI_API_KEY'],
@@ -686,6 +840,7 @@ export const LLM_PROVIDER_LABELS: Record<
   (typeof LLM_PROVIDERS)[number],
   string
 > = {
+  coreweave: 'W&B Inference',
   openai: 'OpenAI',
   anthropic: 'Anthropic',
   azure: 'Azure',

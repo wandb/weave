@@ -3,3 +3,5 @@ dist/
 .vite_cache/
 build/
 src/generated
+.eslintcache
+tsconfig.tsbuildinfo

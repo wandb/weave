@@ -138,7 +138,10 @@ export const ReactionsLoaded = ({
 
   const onMouseEnter = () => setIsMouseOver(true);
   const onMouseLeave = () => setIsMouseOver(false);
-  const showContent = forceVisible || isMouseOver || reactions.length > 0;
+  const legacyReactions = reactions.filter(r =>
+    feedbackIsLegacy(r.feedback_type)
+  );
+  const showContent = forceVisible || isMouseOver || legacyReactions.length > 0;
 
   const wrapperStyles = {
     overflow: 'auto',
@@ -273,3 +276,10 @@ export const ReactionsLoaded = ({
     </Tailwind>
   );
 };
+
+function feedbackIsLegacy(feedbackType: string) {
+  return (
+    feedbackType.startsWith('wandb.note') ||
+    feedbackType.startsWith('wandb.reaction')
+  );
+}

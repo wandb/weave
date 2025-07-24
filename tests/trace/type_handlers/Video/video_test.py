@@ -285,11 +285,11 @@ def test_video_as_file(client: WeaveClient, tmp_path: Path) -> None:
             str(fp), codec="libx264", audio=False, verbose=False, logger=None
         )
 
-    @weave.op()
+    @weave.op
     def return_video_mp4(path: str):
         return VideoFileClip(path)
 
-    @weave.op()
+    @weave.op
     def accept_video_mp4(val):
         width, height = val.size
         return f"Video size: {width}x{height}"
@@ -308,8 +308,8 @@ def make_random_video(video_size: tuple[int, int] = (64, 64), duration: float = 
 @pytest.fixture
 def dataset_ref(client):
     # This fixture represents a saved dataset containing videos
-    N_ROWS = 3
-    rows = weave.Table([{"video": make_random_video()} for _ in range(N_ROWS)])
+    n_rows = 3
+    rows = weave.Table([{"video": make_random_video()} for _ in range(n_rows)])
     dataset = weave.Dataset(rows=rows)
     ref = weave.publish(dataset)
 
@@ -330,46 +330,47 @@ async def test_videos_in_dataset_for_evaluation(client, dataset_ref):
     res = await evaluation.evaluate(model)
 
     assert isinstance(res, dict)
-    assert "model_latency" in res and "mean" in res["model_latency"]
+    assert "model_latency" in res
+    assert "mean" in res["model_latency"]
     assert isinstance(res["model_latency"]["mean"], (int, float))
 
 
 def test_videos_in_load_of_dataset(client):
-    N_ROWS = 3
+    n_rows = 3
     # Create smaller duration videos to avoid encoding issues
-    videos = [make_random_video(duration=0.1) for _ in range(N_ROWS)]
+    videos = [make_random_video(duration=0.1) for _ in range(n_rows)]
     rows = weave.Table([{"video": video} for video in videos])
     dataset = weave.Dataset(rows=rows)
     ref = weave.publish(dataset)
 
     dataset = ref.get()
     for i, (gotten_row, local_row) in enumerate(zip(dataset.rows, rows)):
-        assert isinstance(
-            gotten_row["video"], VideoClip
-        ), f"Row {i} video is not a VideoClip"
+        assert isinstance(gotten_row["video"], VideoClip), (
+            f"Row {i} video is not a VideoClip"
+        )
 
         # Handle difference in size representation (list vs tuple)
         gotten_size = gotten_row["video"].size
         local_size = local_row["video"].size
 
         if isinstance(gotten_size, list) and isinstance(local_size, tuple):
-            assert (
-                tuple(gotten_size) == local_size
-            ), f"Row {i} size mismatch: {gotten_size} != {local_size}"
+            assert tuple(gotten_size) == local_size, (
+                f"Row {i} size mismatch: {gotten_size} != {local_size}"
+            )
         elif isinstance(gotten_size, tuple) and isinstance(local_size, list):
-            assert gotten_size == tuple(
-                local_size
-            ), f"Row {i} size mismatch: {gotten_size} != {local_size}"
+            assert gotten_size == tuple(local_size), (
+                f"Row {i} size mismatch: {gotten_size} != {local_size}"
+            )
         else:
-            assert (
-                gotten_size == local_size
-            ), f"Row {i} size mismatch: {gotten_size} != {local_size}"
+            assert gotten_size == local_size, (
+                f"Row {i} size mismatch: {gotten_size} != {local_size}"
+            )
 
         # Duration may be rounded due to encoding limitations, especially with small durations
         # Allow some tolerance in comparison
-        assert (
-            abs(gotten_row["video"].duration - videos[i].duration) < 0.05
-        ), f"Row {i} duration too different: {gotten_row['video'].duration} != {videos[i].duration}"
+        assert abs(gotten_row["video"].duration - videos[i].duration) < 0.05, (
+            f"Row {i} duration too different: {gotten_row['video'].duration} != {videos[i].duration}"
+        )
 
 
 def test_video_format_from_filename():

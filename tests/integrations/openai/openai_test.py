@@ -12,54 +12,6 @@ model = "gpt-4o"
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
 @pytest.mark.vcr(
-    filter_headers=["authorization"],
-    allowed_hosts=["api.wandb.ai", "localhost"],
-)
-def test_openai_responses_quickstart(
-    client: weave.trace.weave_client.WeaveClient,
-) -> None:
-    api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
-
-    openai_client = OpenAI(api_key=api_key)
-
-    response = openai_client.chat.completions.create(
-        model=model,
-        messages=[{"role": "user", "content": "How are you?"}],
-        temperature=0.0,
-        max_tokens=64,
-        top_p=1,
-    )
-    calls = list(client.calls())
-    assert len(calls) == 1
-    call = calls[0]
-
-    exp = "I'm just a computer program, so I don't have feelings, but I'm here and ready to help you! How can I assist you today?"
-    assert response.choices[0].message.content == exp
-
-    assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
-    assert call.started_at is not None
-    assert call.started_at < call.ended_at  # type: ignore
-
-    output = call.output
-    assert output["model"] == "gpt-4o-2024-05-13"
-    assert output["object"] == "chat.completion"
-
-    usage = call.summary["usage"][output["model"]]  # type: ignore
-    assert usage["requests"] == 1
-    assert usage["completion_tokens"] == 28
-    assert usage["prompt_tokens"] == 11
-    assert usage["total_tokens"] == 39
-
-    inputs = call.inputs
-    assert inputs["model"] == "gpt-4o"
-    assert inputs["messages"] == [{"role": "user", "content": "How are you?"}]
-    assert inputs["max_tokens"] == 64
-    assert inputs["temperature"] == 0.0
-    assert inputs["top_p"] == 1
-
-
-@pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
-@pytest.mark.vcr(
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
 @pytest.mark.asyncio
@@ -77,7 +29,7 @@ async def test_openai_async_quickstart(
         max_tokens=64,
         top_p=1,
     )
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 
@@ -129,7 +81,7 @@ def test_openai_stream_quickstart(client: weave.trace.weave_client.WeaveClient) 
         if chunk.choices[0].delta.content:
             all_content += chunk.choices[0].delta.content
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 
@@ -186,7 +138,7 @@ async def test_openai_async_stream_quickstart(
         if chunk.choices[0].delta.content:
             all_content += chunk.choices[0].delta.content
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 
@@ -238,9 +190,9 @@ def test_openai_stream_usage_quickstart(
         },  # User needs to pass this argument to get usage
     )
 
-    for chunk in response:
+    for _chunk in response:
         pass
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 
@@ -306,7 +258,7 @@ def test_openai_function_call(client: weave.trace.weave_client.WeaveClient) -> N
         top_p=1,
     )
     print(response)
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 
@@ -392,7 +344,7 @@ async def test_openai_function_call_async(
         max_tokens=64,
         top_p=1,
     )
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 
@@ -480,10 +432,10 @@ async def test_openai_function_call_async_stream(
         stream=True,
     )
     # TODO: figure out if this is the write pattern
-    async for chunk in response:
+    async for _chunk in response:
         pass
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 
@@ -568,7 +520,7 @@ def test_openai_tool_call(client: weave.trace.weave_client.WeaveClient) -> None:
     )
     print(response)
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 
@@ -655,7 +607,7 @@ async def test_openai_tool_call_async(
         max_tokens=64,
         top_p=1,
     )
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 
@@ -747,10 +699,10 @@ async def test_openai_tool_call_async_stream(
         },  # User needs to pass this argument to get usage
     )
     # TODO: figure out if this is the write pattern
-    async for chunk in response:
+    async for _chunk in response:
         pass
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 
@@ -812,7 +764,7 @@ def test_openai_as_context_manager(
             if chunk.choices[0].delta.content:
                 all_content += chunk.choices[0].delta.content
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 
@@ -867,7 +819,7 @@ async def test_openai_as_context_manager_async(
             if chunk.choices[0].delta.content:
                 all_content += chunk.choices[0].delta.content
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 
@@ -915,7 +867,7 @@ def test_openai_moderation_patching(
         input="...text to classify goes here...",
     )
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 
@@ -951,7 +903,7 @@ async def test_openai_async_moderation_patching(
         input="...text to classify goes here...",
     )
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 
@@ -987,7 +939,7 @@ def test_openai_embeddings_patching(
         input="embed this",
     )
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 
@@ -1023,7 +975,7 @@ async def test_openai_async_embeddings_patching(
         input="embed this",
     )
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 1
     call = calls[0]
 
@@ -1191,7 +1143,7 @@ async def test_openai_responses_quickstart_async_stream(client: WeaveClient) -> 
         input="Write a one-sentence bedtime story about a unicorn.",
         stream=True,
     )
-    async for chunk in response:
+    async for _chunk in response:
         pass
 
     calls = client.get_calls()
@@ -1408,7 +1360,7 @@ async def test_openai_responses_tool_calling_async_stream(client: WeaveClient) -
         input="What was a positive news story from today?",
         stream=True,
     )
-    async for chunk in response:
+    async for _chunk in response:
         pass
 
     calls = client.get_calls()

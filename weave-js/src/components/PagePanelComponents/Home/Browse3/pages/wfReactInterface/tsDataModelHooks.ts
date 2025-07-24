@@ -6,8 +6,11 @@
 
 import {isSimpleTypeShape, union} from '@wandb/weave/core/model/helpers';
 import * as _ from 'lodash';
+import {isEmpty} from 'lodash';
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import useAsync from 'react-use/lib/useAsync';
+import {useAsyncFn} from 'react-use';
+import useAsync, {AsyncState} from 'react-use/lib/useAsync';
+import useAsyncRetry from 'react-use/lib/useAsyncRetry';
 
 import * as Types from '../../../../../../core/model/types';
 import {useDeepMemo} from '../../../../../../hookUtils';
@@ -31,6 +34,10 @@ import {
 import * as traceServerClient from './traceServerClient';
 import {useGetTraceServerClientContext} from './traceServerClientContext';
 import * as traceServerTypes from './traceServerClientTypes';
+import {
+  ComputedCallStatuses,
+  ComputedCallStatusType,
+} from './traceServerClientTypes';
 import {useClientSideCallRefExpansion} from './tsDataModelHooksCallRefExpansion';
 import {opVersionRefOpName, refUriToObjectVersionKey} from './utilities';
 import {
@@ -70,6 +77,7 @@ import {
   UseTableQueryStatsParams,
   UseTableRowsQueryParams,
   UseTableUpdateParams,
+  WeaveObjectVersionKey,
   WFDataModelHooksInterface,
 } from './wfDataModelHooksInterface';
 
@@ -182,7 +190,7 @@ const useMakeTraceServerEndpoint = <
   return traceServerRequest;
 };
 
-const useCall = (params: UseCallParams): Loadable<CallSchema | null> => {
+export const useCall = (params: UseCallParams): Loadable<CallSchema | null> => {
   const getTsClient = useGetTraceServerClientContext();
   const loadingRef = useRef(false);
 
@@ -324,6 +332,7 @@ const useCallsNoExpansion = (
       columns: params.columns,
       include_costs: params.includeCosts,
       include_feedback: params.includeFeedback,
+      ...(params.includeStorageSize ? {include_storage_size: true} : null),
       ...(params.includeTotalStorageSize
         ? {include_total_storage_size: true}
         : null),
@@ -339,11 +348,12 @@ const useCallsNoExpansion = (
     params.columns,
     params.includeCosts,
     params.includeFeedback,
+    params.includeStorageSize,
     params.includeTotalStorageSize,
   ]);
 
   // Keep track of the request we're waiting for, so that we
-  // can ignore requests that are superceded by more recent reqs
+  // can ignore requests that are superseded by more recent reqs
   const expectedRequestRef = useRef(req);
 
   const doFetch = useCallback(() => {
@@ -356,6 +366,7 @@ const useCallsNoExpansion = (
       if (_.isEqual(expectedRequestRef.current, req)) {
         loadingRef.current = false;
         setCallRes(res);
+        setError(null);
       }
     };
     const onError = (e: any) => {
@@ -472,7 +483,7 @@ const useCalls = (
   }, [calls.refetch, expandedCalls, loading, calls.error]);
 };
 
-const useCallsStats = (
+export const useCallsStats = (
   params: UseCallsStatsParams
 ): Loadable<traceServerTypes.TraceCallsQueryStatsRes> & Refetchable => {
   const getTsClient = useGetTraceServerClientContext();
@@ -496,17 +507,19 @@ const useCallsStats = (
         entity: params.entity,
         project: params.project,
       }),
-      filter: {
-        op_names: deepFilter?.opVersionRefs,
-        input_refs: deepFilter?.inputObjectVersionRefs,
-        output_refs: deepFilter?.outputObjectVersionRefs,
-        parent_ids: deepFilter?.parentIds,
-        trace_ids: deepFilter?.traceId ? [deepFilter.traceId] : undefined,
-        call_ids: deepFilter?.callIds,
-        trace_roots_only: deepFilter?.traceRootsOnly,
-        wb_run_ids: deepFilter?.runIds,
-        wb_user_ids: deepFilter?.userIds,
-      },
+      filter: deepFilter
+        ? {
+            op_names: deepFilter?.opVersionRefs,
+            input_refs: deepFilter?.inputObjectVersionRefs,
+            output_refs: deepFilter?.outputObjectVersionRefs,
+            parent_ids: deepFilter?.parentIds,
+            trace_ids: deepFilter?.traceId ? [deepFilter.traceId] : undefined,
+            call_ids: deepFilter?.callIds,
+            trace_roots_only: deepFilter?.traceRootsOnly,
+            wb_run_ids: deepFilter?.runIds,
+            wb_user_ids: deepFilter?.userIds,
+          }
+        : undefined,
       query: params.query,
       limit: params.limit,
       ...(!!params.includeTotalStorageSize
@@ -568,7 +581,6 @@ const useProjectHasCalls = (
   const callsStats = useCallsStats({
     entity: params.entity,
     project: params.project,
-    filter: {},
     limit: 1,
     skip: params.skip,
   });
@@ -670,6 +682,9 @@ const useCallsExport = () => {
         expand_columns: params.expandedRefCols ?? undefined,
         include_feedback: params.includeFeedback ?? false,
         include_costs: params.includeCosts ?? false,
+        include_total_storage_size: (params.columns ?? []).includes(
+          'total_storage_size_bytes'
+        ),
       };
       return getTsClient().callsStreamDownload(req, params.contentType);
     },
@@ -992,7 +1007,7 @@ const useFileContent = (
   }, [fileContentRes, params.skip, error]);
 };
 
-const useObjectVersion = (
+export const useObjectVersion = (
   params: UseObjectVersionParams
 ): LoadableWithError<ObjectVersionSchema | null> => {
   const getTsClient = useGetTraceServerClientContext();
@@ -1135,7 +1150,7 @@ export const convertTraceServerObjectVersionToSchema = <
   };
 };
 
-const useRootObjectVersions = (
+export const useRootObjectVersions = (
   params: UseRootObjectVersionsParams
 ): LoadableWithError<ObjectVersionSchema[]> => {
   const getTsClient = useGetTraceServerClientContext();
@@ -1169,6 +1184,7 @@ const useRootObjectVersions = (
       },
       limit: params.limit,
       metadata_only: params.metadataOnly,
+      sort_by: params.sortBy,
       ...(!!params.includeStorageSize ? {include_storage_size: true} : null),
     };
     const onSuccess = (res: traceServerTypes.TraceObjQueryRes) => {
@@ -1193,6 +1209,7 @@ const useRootObjectVersions = (
     params.limit,
     params.metadataOnly,
     params.includeStorageSize,
+    params.sortBy,
     getTsClient,
   ]);
 
@@ -1347,8 +1364,14 @@ const useObjectDeleteFunc = () => {
 
 const useRefsReadBatch = (params: UseRefsReadBatchParams) => {
   const getTsClient = useGetTraceServerClientContext();
-  const [refsRes, setRefsRes] =
-    useState<traceServerTypes.TraceRefsReadBatchRes | null>(null);
+  // Here we keep track of the result and the uris we fetched for. This is
+  // because repeated calls to this hook with different uris will return
+  // could result in stale results if we just returned the result from the
+  // hook.
+  const [refsRes, setRefsRes] = useState<{
+    res: traceServerTypes.TraceRefsReadBatchRes;
+    forUris: string[];
+  } | null>(null);
   const loadingRef = useRef(false);
 
   const deepRefUris = useDeepMemo(params.refUris);
@@ -1365,7 +1388,7 @@ const useRefsReadBatch = (params: UseRefsReadBatchParams) => {
       })
       .then((res: traceServerTypes.TraceRefsReadBatchRes) => {
         loadingRef.current = false;
-        setRefsRes(res);
+        setRefsRes({res, forUris: deepRefUris});
       })
       .catch((err: Error) => {
         loadingRef.current = false;
@@ -1378,11 +1401,15 @@ const useRefsReadBatch = (params: UseRefsReadBatchParams) => {
     if (params.skip || params.refUris.length === 0) {
       return {loading: false, result: null};
     }
-    if (refsRes == null || loadingRef.current) {
+    if (
+      refsRes == null ||
+      loadingRef.current ||
+      refsRes.forUris !== deepRefUris
+    ) {
       return {loading: true, result: null};
     }
-    return {loading: false, result: refsRes.vals};
-  }, [refsRes, params.skip, params.refUris]);
+    return {loading: false, result: refsRes.res.vals};
+  }, [params.skip, params.refUris.length, refsRes, deepRefUris]);
 };
 
 const useTableQuery = makeTraceServerEndpointHook<
@@ -1929,17 +1956,65 @@ const useRefsType = (params: UseGetRefsTypeParams): Loadable<Types.Type[]> => {
 };
 
 /// Converters ///
-type StatusCodeType = 'SUCCESS' | 'ERROR' | 'UNSET';
-export const traceCallStatusCode = (
-  traceCall: traceServerTypes.TraceCallSchema
-): StatusCodeType => {
-  if (traceCall.exception) {
-    return 'ERROR';
-  } else if (traceCall.ended_at) {
-    return 'SUCCESS';
-  } else {
-    return 'UNSET';
+
+const statusCode = (
+  serverSideStatus: traceServerTypes.ComputedCallStatusType | undefined,
+  exception: string | undefined,
+  endedAt: string | undefined,
+  statusCounts: {error: number} | undefined,
+  hasDescendantErrors?: boolean
+) => {
+  if (serverSideStatus) {
+    if (
+      serverSideStatus === traceServerTypes.ComputedCallStatuses.success &&
+      hasDescendantErrors
+    ) {
+      return traceServerTypes.ComputedCallStatuses.descendant_error;
+    }
+    return serverSideStatus;
   }
+  if (exception) {
+    return traceServerTypes.ComputedCallStatuses.error;
+  } else if (endedAt) {
+    const errors = statusCounts?.error ?? 0;
+    if (errors > 0 || hasDescendantErrors) {
+      return traceServerTypes.ComputedCallStatuses.descendant_error;
+    }
+    return traceServerTypes.ComputedCallStatuses.success;
+  }
+  return traceServerTypes.ComputedCallStatuses.running;
+};
+
+/**
+ * Getting the status code for a trace call has a few complexities.
+ */
+export const traceCallStatusCode = (
+  traceCall: traceServerTypes.TraceCallSchema,
+  hasDescendantErrors?: boolean
+): traceServerTypes.ComputedCallStatusType => {
+  return statusCode(
+    traceCall.summary?.weave?.status,
+    traceCall.exception,
+    traceCall.ended_at,
+    traceCall.summary?.status_counts,
+    hasDescendantErrors
+  );
+};
+
+/**
+ * Getting the status code for a trace call has a few complexities.
+ */
+export const flattenedTraceCallStatusCode = (
+  traceCall: {[key: string]: any},
+  hasDescendantErrors?: boolean
+): traceServerTypes.ComputedCallStatusType => {
+  return statusCode(
+    traceCall['summary.weave.status'],
+    traceCall.exception,
+    traceCall.ended_at,
+    traceCall['summary.status_counts.error'],
+    hasDescendantErrors
+  );
 };
 
 export const traceCallLatencyS = (
@@ -2092,6 +2167,54 @@ export const useObjCreate = () => {
   );
 };
 
+export const useScorerCreate = () => {
+  const objCreate = useObjCreate();
+
+  return useCallback(
+    async ({
+      entity,
+      project,
+      name,
+      val,
+    }: {
+      entity: string;
+      project: string;
+      name: string;
+      val: any;
+    }): Promise<WeaveObjectVersionKey> => {
+      const scorerObj = {
+        _type: name,
+        name: name,
+        description: `${name} created from the UI.`,
+        ref: null,
+        column_map: null,
+        _class_name: name,
+        _bases: ['Scorer', 'Object', 'BaseModel'],
+        ...val,
+      };
+
+      const scorerDigest = await objCreate({
+        projectId: `${entity}/${project}`,
+        objectId: name,
+        val: scorerObj,
+      });
+
+      const objectVersionKey: WeaveObjectVersionKey = {
+        scheme: 'weave',
+        entity,
+        project,
+        weaveKind: 'object',
+        objectId: name,
+        versionHash: scorerDigest,
+        path: '',
+      };
+
+      return objectVersionKey;
+    },
+    [objCreate]
+  );
+};
+
 export const useTableCreate = (): ((
   table: traceServerTypes.TableCreateReq
 ) => Promise<traceServerTypes.TableCreateRes>) => {
@@ -2111,6 +2234,430 @@ export const useProjectStats = (projectId: string) => {
   return useAsync(async () => {
     return getTsClient().projectStats({project_id: projectId});
   }, [getTsClient, projectId]);
+};
+
+// Helper function to process first turn inputs
+const processFirstTurnInputs = async (
+  getTsClient: () => traceServerClient.TraceServerClient,
+  projectId: string,
+  groupedCalls: {[turnId: string]: traceServerTypes.TraceCallSchema[]}
+): Promise<Map<string, traceServerTypes.TraceCallSchema['inputs']>> => {
+  const firstTurnsInputs = new Map();
+  const firstCallsPerTurn = Object.entries(groupedCalls)
+    .map(([turnId, calls]) => {
+      // Build set of all parent IDs within this turn
+      const parentIds = new Set(
+        calls.map(call => call.parent_id).filter(Boolean)
+      );
+
+      // Find leaf calls (calls whose ID is not a parent of any other call)
+      const leafCalls = calls.filter(call => !parentIds.has(call.id));
+
+      // Filter leaf calls for LLM calls (those with usage data)
+      const llmLeafCalls = leafCalls.filter(
+        call => !isEmpty(call.summary?.usage)
+      );
+
+      if (llmLeafCalls.length === 0) {
+        return null;
+      }
+
+      // Sort by started_at ascending to get the first LLM leaf call
+      const sortedLlmLeafCalls = llmLeafCalls.sort((a, b) => {
+        return (
+          new Date(a.started_at).getTime() - new Date(b.started_at).getTime()
+        );
+      });
+
+      return {turnId, call: sortedLlmLeafCalls[0]};
+    })
+    .filter(Boolean);
+
+  // Get inputs for first calls
+  if (firstCallsPerTurn.length > 0) {
+    const callInputs = await getTsClient().callsStreamQuery({
+      project_id: projectId,
+      filter: {call_ids: firstCallsPerTurn.map(item => item!.call.id)},
+      columns: ['inputs', 'turn_id'],
+    });
+
+    (callInputs.calls ?? []).forEach(call => {
+      firstTurnsInputs.set(call.turn_id, call.inputs);
+    });
+  }
+
+  return firstTurnsInputs;
+};
+
+// Helper function to process last turn outputs and statuses
+const processLastTurnData = async (
+  getTsClient: () => traceServerClient.TraceServerClient,
+  projectId: string,
+  groupedCalls: {[turnId: string]: traceServerTypes.TraceCallSchema[]}
+): Promise<{
+  outputs: Map<string, traceServerTypes.TraceCallSchema['output']>;
+  statuses: Map<string, string>;
+}> => {
+  const lastTurnsOutputs = new Map();
+  const lastTurnsStatuses = new Map();
+
+  const lastCallsPerTurn = Object.entries(groupedCalls)
+    .map(([turnId, calls]) => {
+      // Build set of all parent IDs within this turn
+      const parentIds = new Set(
+        calls.map(call => call.parent_id).filter(Boolean)
+      );
+
+      // Find leaf calls (calls whose ID is not a parent of any other call)
+      const leafCalls = calls.filter(call => !parentIds.has(call.id));
+
+      // Filter leaf calls for LLM calls (those with usage data)
+      const llmLeafCalls = leafCalls.filter(
+        call => !isEmpty(call.summary?.usage)
+      );
+
+      if (llmLeafCalls.length === 0) {
+        return null;
+      }
+
+      // Sort by ended_at descending to get the last completed LLM leaf call
+      const sortedLlmLeafCalls = llmLeafCalls.sort((a, b) => {
+        // Handle cases where ended_at might be null (still running calls)
+        const aEndTime = a.ended_at ? new Date(a.ended_at).getTime() : 0;
+        const bEndTime = b.ended_at ? new Date(b.ended_at).getTime() : 0;
+        return bEndTime - aEndTime;
+      });
+
+      return {turnId, call: sortedLlmLeafCalls[0]};
+    })
+    .filter(Boolean);
+
+  // Process last turn statuses (using the same data from the main query)
+  Object.entries(groupedCalls).forEach(([turnId, calls]) => {
+    // Since turn IDs are call IDs, find the turn call itself
+    const turnCall = calls.find(call => call.id === turnId);
+    if (turnCall) {
+      // Use same logic as flattenedTraceCallStatusCode
+      let status;
+      if (turnCall.exception) {
+        status = ComputedCallStatuses.error;
+      } else if (turnCall.ended_at) {
+        status = ComputedCallStatuses.success;
+      } else {
+        status = ComputedCallStatuses.running;
+      }
+      lastTurnsStatuses.set(turnId, status);
+    }
+  });
+
+  // Get outputs for last calls
+  if (lastCallsPerTurn.length > 0) {
+    const callOutputs = await getTsClient().callsStreamQuery({
+      project_id: projectId,
+      filter: {call_ids: lastCallsPerTurn.map(item => item!.call.id)},
+      columns: ['output', 'turn_id'],
+    });
+
+    (callOutputs.calls ?? []).forEach(call => {
+      lastTurnsOutputs.set(call.turn_id, call.output);
+    });
+  }
+
+  return {outputs: lastTurnsOutputs, statuses: lastTurnsStatuses};
+};
+
+const useTurnCallsData = (
+  projectId: string,
+  firstTurnIds: string[],
+  lastTurnIds: string[]
+): {
+  dataLoading: boolean;
+  dataError: Error | undefined;
+  firstTurnsLoading: boolean;
+  firstTurnsError: Error | undefined;
+  firstTurnsInputs: Map<string, traceServerTypes.TraceCallSchema['inputs']>;
+  lastTurnsLoading: boolean;
+  lastTurnsError: Error | undefined;
+  lastTurnsOutputs: Map<string, traceServerTypes.TraceCallSchema['output']>;
+  lastTurnsStatuses: Map<string, ComputedCallStatusType>;
+} => {
+  const getTsClient = useGetTraceServerClientContext();
+
+  // Union of all turn IDs to make a single request
+  const allTurnIds = useMemo(() => {
+    const union = new Set([...firstTurnIds, ...lastTurnIds]);
+    return Array.from(union);
+  }, [firstTurnIds, lastTurnIds]);
+
+  // First step: Load all calls and group them
+  const [groupedCallsResult, loadGroupedCalls] = useAsyncFn(async () => {
+    if (!allTurnIds || allTurnIds.length === 0) {
+      return null;
+    }
+
+    // Single request to get all calls for all turn IDs
+    const result = await getTsClient().callsStreamQuery({
+      project_id: projectId,
+      filter: {turn_ids: allTurnIds},
+      columns: [
+        'id',
+        'parent_id',
+        'summary',
+        'turn_id',
+        'started_at',
+        'ended_at',
+        'exception',
+      ],
+    });
+
+    // Group calls by turn_id
+    const groupedCalls = _.groupBy(result.calls, 'turn_id');
+
+    const firstTurnIdsSet = new Set(firstTurnIds);
+    const lastTurnIdsSet = new Set(lastTurnIds);
+
+    // Separate the groups for first and last turn processing using Sets for O(1) lookup
+    const firstTurnGroups = Object.fromEntries(
+      Object.entries(groupedCalls).filter(([turnId]) =>
+        firstTurnIdsSet.has(turnId)
+      )
+    );
+    const lastTurnGroups = Object.fromEntries(
+      Object.entries(groupedCalls).filter(([turnId]) =>
+        lastTurnIdsSet.has(turnId)
+      )
+    );
+
+    return {
+      firstTurnGroups,
+      lastTurnGroups,
+    };
+  }, [getTsClient, projectId, allTurnIds]);
+
+  // Second step: Process first turn inputs (runs when groupedCallsResult is ready)
+  const [firstTurnsInputsResult, loadFirstTurnsInputs] =
+    useAsyncFn(async () => {
+      if (!groupedCallsResult.value?.firstTurnGroups) {
+        return new Map();
+      }
+      return await processFirstTurnInputs(
+        getTsClient,
+        projectId,
+        groupedCallsResult.value.firstTurnGroups
+      );
+    }, [getTsClient, projectId, groupedCallsResult.value]);
+
+  // Third step: Process last turn data (runs when groupedCallsResult is ready)
+  const [lastTurnsDataResult, loadLastTurnsData] = useAsyncFn(async () => {
+    if (!groupedCallsResult.value?.lastTurnGroups) {
+      return {outputs: new Map(), statuses: new Map()};
+    }
+    const r = await processLastTurnData(
+      getTsClient,
+      projectId,
+      groupedCallsResult.value.lastTurnGroups
+    );
+    return r;
+  }, [getTsClient, projectId, groupedCallsResult.value]);
+
+  // Trigger the initial data loading
+  useEffect(() => {
+    if (allTurnIds && allTurnIds.length > 0) {
+      loadGroupedCalls();
+    }
+  }, [allTurnIds, loadGroupedCalls]);
+
+  // Trigger the processing when grouped data is ready
+  useEffect(() => {
+    if (groupedCallsResult.value) {
+      loadFirstTurnsInputs();
+      loadLastTurnsData();
+    }
+  }, [groupedCallsResult.value, loadFirstTurnsInputs, loadLastTurnsData]);
+
+  // Return separate states for each processing thread
+  return useMemo(() => {
+    return {
+      // Data loading state
+      dataLoading: groupedCallsResult.loading,
+      dataError: groupedCallsResult.error,
+
+      // First turn processing state
+      firstTurnsLoading:
+        groupedCallsResult.loading || firstTurnsInputsResult.loading,
+      firstTurnsError: firstTurnsInputsResult.error,
+      firstTurnsInputs: firstTurnsInputsResult.value ?? new Map(),
+
+      // Last turn processing state
+      lastTurnsLoading:
+        groupedCallsResult.loading || lastTurnsDataResult.loading,
+      lastTurnsError: lastTurnsDataResult.error,
+      lastTurnsOutputs: lastTurnsDataResult.value?.outputs ?? new Map(),
+      lastTurnsStatuses: lastTurnsDataResult.value?.statuses ?? new Map(),
+    };
+  }, [
+    groupedCallsResult.loading,
+    groupedCallsResult.error,
+    firstTurnsInputsResult.loading,
+    firstTurnsInputsResult.error,
+    firstTurnsInputsResult.value,
+    lastTurnsDataResult.loading,
+    lastTurnsDataResult.error,
+    lastTurnsDataResult.value,
+  ]);
+};
+
+export const useThreadsQuery = (
+  params: traceServerTypes.ThreadsQueryReq
+): {
+  threadsState: ReturnType<
+    typeof useAsyncRetry<traceServerTypes.ThreadsQueryRes>
+  >;
+  turnCallsDataResult: ReturnType<typeof useTurnCallsData>;
+} => {
+  const getTsClient = useGetTraceServerClientContext();
+  const deepParams = useDeepMemo(params);
+
+  const [{firstTurnIds, lastTurnIds}, setTurnIds] = useState<{
+    firstTurnIds: string[];
+    lastTurnIds: string[];
+  }>({firstTurnIds: [], lastTurnIds: []});
+
+  const threadsState = useAsyncRetry(async () => {
+    const result = await getTsClient().threadsStreamQuery(deepParams);
+    const threads = result.threads ?? [];
+
+    setTurnIds({
+      firstTurnIds: threads
+        .map(thread => thread.first_turn_id!)
+        .filter(Boolean),
+      lastTurnIds: threads.map(thread => thread.last_turn_id!).filter(Boolean),
+    });
+
+    return result;
+  }, [getTsClient, deepParams]);
+
+  const turnCallsDataResult = useTurnCallsData(
+    deepParams.project_id,
+    firstTurnIds,
+    lastTurnIds
+  );
+
+  return {
+    threadsState,
+    turnCallsDataResult,
+  };
+};
+
+export const useThreadTurns = (
+  projectId: string,
+  threadId: string
+): {
+  turnsState: AsyncState<traceServerTypes.TraceCallSchema[]>;
+} => {
+  const getTsClient = useGetTraceServerClientContext();
+  const turns = useAsync(async () => {
+    const result = await getTsClient().callsStreamQuery({
+      project_id: projectId,
+      query: {
+        $expr: {
+          $and: [
+            {$eq: [{$getField: 'thread_id'}, {$literal: threadId}]},
+            {$eq: [{$getField: 'id'}, {$getField: 'turn_id'}]},
+          ],
+        },
+      },
+      sort_by: [{field: 'started_at', direction: 'asc'}],
+      limit: 1000,
+      columns: [
+        'id',
+        'turn_id',
+        'started_at',
+        'ended_at',
+        'exception',
+        'inputs',
+        'op_name',
+      ],
+    });
+
+    return result.calls ?? [];
+  }, [getTsClient, threadId]);
+
+  return {
+    turnsState: turns,
+  };
+};
+
+export const useThreadMessageIds = (
+  projectId: string,
+  threadId: string
+): AsyncState<Array<string>> => {
+  const getTsClient = useGetTraceServerClientContext();
+  return useAsync(async () => {
+    const result = await getTsClient().callsStreamQuery({
+      project_id: projectId,
+      query: {
+        $expr: {
+          $eq: [{$getField: 'thread_id'}, {$literal: threadId}],
+        },
+      },
+      columns: ['id', 'parent_id', 'summary', 'started_at'],
+    });
+
+    const calls = result.calls ?? [];
+
+    const parentIds = new Set(
+      calls.map(call => call.parent_id).filter(Boolean)
+    );
+
+    // Find leaf calls (calls whose ID is not a parent of any other call)
+    const leafCalls = calls.filter(call => !parentIds.has(call.id));
+
+    // Filter leaf calls for LLM calls (those with usage data)
+    const llmLeafCalls = leafCalls.filter(
+      call => !isEmpty(call.summary?.usage)
+    );
+
+    if (llmLeafCalls.length === 0) {
+      return [];
+    }
+
+    return _.map(llmLeafCalls, 'id');
+  }, [getTsClient, threadId]);
+};
+
+export const useThreadMessagesLoader = (
+  projectId: string,
+  threadId: string
+) => {
+  const getTsClient = useGetTraceServerClientContext();
+
+  const messageIdsState = useThreadMessageIds(projectId, threadId);
+
+  const [loadMessagesState, loadMessages] = useAsyncFn(async () => {
+    if (messageIdsState.loading) {
+      return [];
+    }
+
+    const result = await getTsClient().callsStreamQuery({
+      project_id: projectId,
+      filter: {call_ids: messageIdsState.value},
+      sort_by: [{field: 'started_at', direction: 'asc'}],
+      limit: 1000,
+      columns: ['id', 'started_at', 'turn_id', 'inputs', 'output'],
+      expand_columns: ['inputs', 'output'], // Server-side ref expansion
+    });
+
+    return result.calls ?? [];
+  }, [getTsClient, projectId, threadId, messageIdsState.value]);
+
+  useEffect(() => {
+    if (messageIdsState.value) {
+      loadMessages();
+    }
+  }, [messageIdsState.value, loadMessages]);
+
+  return loadMessagesState;
 };
 
 /// Utility Functions ///

@@ -31,7 +31,7 @@ import threading
 from collections import defaultdict
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
-from typing import Any, Optional, Union, cast
+from typing import Any, Callable, Optional, Union, cast
 from zoneinfo import ZoneInfo
 
 import clickhouse_connect
@@ -95,11 +95,15 @@ from weave.trace_server.file_storage import (
 )
 from weave.trace_server.file_storage_uris import FileStorageURI
 from weave.trace_server.ids import generate_id
+from weave.trace_server.kafka import KafkaProducer
 from weave.trace_server.llm_completion import (
     get_custom_provider_info,
     lite_llm_completion,
+    lite_llm_completion_stream,
 )
+from weave.trace_server.methods.evaluation_status import evaluation_status
 from weave.trace_server.model_providers.model_providers import (
+    LLMModelProviderInfo,
     read_model_to_provider_info_map,
 )
 from weave.trace_server.object_class_util import process_incoming_object_val
@@ -120,6 +124,7 @@ from weave.trace_server.table_query_builder import (
     make_standard_table_query,
     make_table_stats_query_with_storage_size,
 )
+from weave.trace_server.threads_query_builder import make_threads_query
 from weave.trace_server.token_costs import (
     LLM_TOKEN_PRICES_TABLE,
     validate_cost_purge_req,
@@ -191,10 +196,16 @@ CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT = 3.5 * 1024 * 1024  # 3.5 MiB
 CLICKHOUSE_SINGLE_VALUE_BYTES_LIMIT = 1 * 1024 * 1024  # 1 MiB
 ENTITY_TOO_LARGE_PAYLOAD = '{"_weave": {"error":"<EXCEEDS_LIMITS>"}}'
 
+# https://clickhouse.com/docs/operations/settings/settings#max_memory_usage
 DEFAULT_MAX_MEMORY_USAGE = 16 * 1024 * 1024 * 1024  # 16 GiB
+# https://clickhouse.com/docs/operations/settings/settings#max_execution_time
+DEFAULT_MAX_EXECUTION_TIME = 60 * 1  # 1 minute
 CLICKHOUSE_DEFAULT_QUERY_SETTINGS = {
     "max_memory_usage": wf_env.wf_clickhouse_max_memory_usage()
-    or DEFAULT_MAX_MEMORY_USAGE
+    or DEFAULT_MAX_MEMORY_USAGE,
+    "max_execution_time": wf_env.wf_clickhouse_max_execution_time()
+    or DEFAULT_MAX_EXECUTION_TIME,
+    "function_json_value_return_type_allow_complex": "1",
 }
 
 
@@ -221,6 +232,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._use_async_insert = use_async_insert
         self._model_to_provider_info_map = read_model_to_provider_info_map()
         self._file_storage_client: Optional[FileStorageClient] = None
+        self._kafka_producer: Optional[KafkaProducer] = None
 
     @classmethod
     def from_env(cls, use_async_insert: bool = False) -> "ClickHouseTraceServer":
@@ -241,6 +253,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             return self._file_storage_client
         self._file_storage_client = maybe_get_storage_client_from_env()
         return self._file_storage_client
+
+    @property
+    def kafka_producer(self) -> KafkaProducer:
+        if self._kafka_producer is not None:
+            return self._kafka_producer
+        self._kafka_producer = KafkaProducer.from_env()
+        return self._kafka_producer
 
     def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
         if not isinstance(req.traces, ExportTraceServiceRequest):
@@ -276,6 +295,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         try:
             yield
             self._flush_calls()
+            self.kafka_producer.flush()
         finally:
             self._call_batch = []
             self._flush_immediately = True
@@ -287,7 +307,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 if item.mode == "start":
                     res.append(self.call_start(item.req))
                 elif item.mode == "end":
-                    res.append(self.call_end(item.req))
+                    res.append(self.call_end(item.req, flush_immediately=False))
                 else:
                     raise ValueError("Invalid mode")
         return tsi.CallCreateBatchRes(res=res)
@@ -309,7 +329,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             trace_id=ch_call.trace_id,
         )
 
-    def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
+    def call_end(
+        self,
+        req: tsi.CallEndReq,
+        publish: bool = True,
+        flush_immediately: bool = False,
+    ) -> tsi.CallEndRes:
         # Converts the user-provided call details into a clickhouse schema.
         # This does validation and conversion of the input data as well
         # as enforcing business rules and defaults
@@ -318,6 +343,15 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # Inserts the call into the clickhouse database, verifying that
         # the call does not already exist
         self._insert_call(ch_call)
+
+        if wf_env.wf_enable_online_eval() and publish:
+            # Strip large and optional fields, dont modify param
+            end_copy = req.end.model_copy()
+            end_copy.output = None
+            end_copy.summary = {}
+            end_copy.exception = None
+            # Don't flush immediately by default, rely on explicit flush
+            self.kafka_producer.produce_call_end(end_copy, flush_immediately)
 
         # Returns the id of the newly created call
         return tsi.CallEndRes()
@@ -336,10 +370,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             )
         )
         try:
-            _call = next(res)
+            call = next(res)
         except StopIteration:
-            _call = None
-        return tsi.CallReadRes(call=_call)
+            call = None
+        return tsi.CallReadRes(call=call)
 
     def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
         stream = self.calls_query_stream(req)
@@ -424,6 +458,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 "summary_dump",
             ]
 
+        if req.expand_columns is not None:
+            cq.set_expand_columns(req.expand_columns)
         for col in columns:
             cq.add_field(col)
         if req.filter is not None:
@@ -435,18 +471,20 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if req.sort_by is not None:
             for sort_by in req.sort_by:
                 cq.add_order(sort_by.field, sort_by.direction)
+            # If user isn't already sorting by id, add id as secondary sort for consistency
+            if not any(sort_by.field == "id" for sort_by in req.sort_by):
+                cq.add_order("id", "asc")
         else:
+            # Default sorting: started_at with id as secondary sort for consistency
             cq.add_order("started_at", "asc")
+            cq.add_order("id", "asc")
         if req.limit is not None:
             cq.set_limit(req.limit)
         if req.offset is not None:
             cq.set_offset(req.offset)
 
         pb = ParamBuilder()
-        raw_res = self._query_stream(
-            cq.as_sql(pb),
-            pb.get_params(),
-        )
+        raw_res = self._query_stream(cq.as_sql(pb), pb.get_params())
 
         select_columns = [c.field for c in cq.select_fields]
         expand_columns = req.expand_columns or []
@@ -469,7 +507,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         for batch in batch_processor.make_batches(raw_res):
             call_dicts = [row_to_call_schema_dict(row) for row in batch]
-            if expand_columns:
+            if expand_columns and req.return_expanded_column_values:
                 self._expand_call_refs(
                     req.project_id, call_dicts, expand_columns, ref_cache
                 )
@@ -512,7 +550,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 if not isinstance(ref, ri.InternalObjectRef):
                     continue
 
-                refs_to_resolve[(i, col)] = ref
+                refs_to_resolve[i, col] = ref
         return refs_to_resolve
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._expand_call_refs")
@@ -703,6 +741,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             wb_user_id=req.obj.wb_user_id,
             kind=get_kind(processed_val),
             base_object_class=processed_result["base_object_class"],
+            leaf_object_class=processed_result["leaf_object_class"],
             refs=extract_refs_from_values(processed_val),
             val_dump=json_val,
             digest=digest,
@@ -753,6 +792,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 object_query_builder.add_base_object_classes_condition(
                     req.filter.base_object_classes
                 )
+            if req.filter.leaf_object_classes:
+                object_query_builder.add_leaf_object_classes_condition(
+                    req.filter.leaf_object_classes
+                )
         if req.limit is not None:
             object_query_builder.set_limit(req.limit)
         if req.offset is not None:
@@ -777,10 +820,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         If no digests are provided all versions will have their data overwritten with
         an empty val_dump.
         """
-        MAX_OBJECTS_TO_DELETE = 100
-        if req.digests and len(req.digests) > MAX_OBJECTS_TO_DELETE:
+        max_objects_to_delete = 100
+        if req.digests and len(req.digests) > max_objects_to_delete:
             raise ValueError(
-                f"Object delete request contains {len(req.digests)} objects. Please delete {MAX_OBJECTS_TO_DELETE} or fewer objects at a time."
+                f"Object delete request contains {len(req.digests)} objects. Please delete {max_objects_to_delete} or fewer objects at a time."
             )
 
         object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
@@ -805,6 +848,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     val_dump=obj.val_dump,
                     refs=obj.refs,
                     base_object_class=obj.base_object_class,
+                    leaf_object_class=obj.leaf_object_class,
                     deleted_at=now,
                     wb_user_id=obj.wb_user_id,
                     # Keep the original created_at timestamp
@@ -967,11 +1011,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     ) -> Iterator[tsi.TableRowSchema]:
         conds = []
         pb = ParamBuilder()
-        if req.filter:
-            if req.filter.row_digests:
-                conds.append(
-                    f"tr.digest IN {{{pb.add_param(req.filter.row_digests)}: Array(String)}}"
-                )
+        if req.filter and req.filter.row_digests:
+            conds.append(
+                f"tr.digest IN {{{pb.add_param(req.filter.row_digests)}: Array(String)}}"
+            )
 
         sort_fields = []
         if req.sort_by:
@@ -1005,7 +1048,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         pb: ParamBuilder,
         *,
         # using the `sql_safe_*` prefix is a way to signal to the caller
-        # that these strings should have been santized by the caller.
+        # that these strings should have been sanitized by the caller.
         sql_safe_conditions: Optional[list[str]] = None,
         sort_fields: Optional[list[OrderField]] = None,
         limit: Optional[int] = None,
@@ -1141,6 +1184,67 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             raise RuntimeError("Unexpected number of results", query_result)
 
         return tsi.ProjectStatsRes(**dict(zip(columns, query_result.result_rows[0])))
+
+    def threads_query_stream(
+        self, req: tsi.ThreadsQueryReq
+    ) -> Iterator[tsi.ThreadSchema]:
+        """Stream threads with aggregated statistics sorted by last activity."""
+        pb = ParamBuilder()
+
+        # Extract filter values
+        after_datetime = None
+        before_datetime = None
+        thread_ids = None
+        if req.filter is not None:
+            after_datetime = req.filter.after_datetime
+            before_datetime = req.filter.before_datetime
+            thread_ids = req.filter.thread_ids
+
+        # Use the dedicated query builder
+        query = make_threads_query(
+            project_id=req.project_id,
+            pb=pb,
+            limit=req.limit,
+            offset=req.offset,
+            sort_by=req.sort_by,
+            sortable_datetime_after=after_datetime,
+            sortable_datetime_before=before_datetime,
+            thread_ids=thread_ids,
+        )
+
+        # Stream the results using _query_stream
+        raw_res = self._query_stream(query, pb.get_params())
+
+        for row in raw_res:
+            (
+                thread_id,
+                turn_count,
+                start_time,
+                last_updated,
+                first_turn_id,
+                last_turn_id,
+                p50_turn_duration_ms,
+                p99_turn_duration_ms,
+            ) = row
+
+            # Ensure datetimes have timezone info
+            start_time_with_tz = _ensure_datetimes_have_tz(start_time)
+            last_updated_with_tz = _ensure_datetimes_have_tz(last_updated)
+
+            if start_time_with_tz is None or last_updated_with_tz is None:
+                # Skip threads without valid timestamps
+                continue
+
+            yield tsi.ThreadSchema(
+                thread_id=thread_id,
+                turn_count=turn_count,
+                start_time=start_time_with_tz,
+                last_updated=last_updated_with_tz,
+                first_turn_id=first_turn_id,
+                last_turn_id=last_turn_id,
+                p50_turn_duration_ms=p50_turn_duration_ms,
+                p99_turn_duration_ms=p99_turn_duration_ms,
+            )
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._parsed_refs_read_batch")
     def _parsed_refs_read_batch(
@@ -1343,7 +1447,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
             if len(needed_extra_results) > 0:
                 refs: list[ri.InternalObjectRef] = []
-                for i, extra_result in needed_extra_results:
+                for _, extra_result in needed_extra_results:
                     if extra_result.unresolved_obj_ref is None:
                         raise ValueError("Expected unresolved obj ref")
                     refs.append(extra_result.unresolved_obj_ref)
@@ -1555,7 +1659,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             # The general case where this can occur is when there are multiple
             # writes of the same digest AND the effective `FILE_CHUNK_SIZE`
             # of the most recent write is more than the effective `FILE_CHUNK_SIZE`
-            # of any previous write. In that case, you have something like tthe following:
+            # of any previous write. In that case, you have something like the following:
             # Consider a file of size 500 bytes.
             # Insert Batch 1 (chunk_size=100): C0(0-99), C1(100-199), C2(200-299), C3(300-399), C4(400-499)
             # Insert Batch 2 (chunk_size=50): C0(0-49), C1(50-99), C2(100-149), C3(150-199), C4(200-249), C5(250-299), C6(300-349), C7(350-399), C8(400-449), C9(450-499)
@@ -1747,8 +1851,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         created_at = datetime.datetime.now(ZoneInfo("UTC"))
         # TODO: Any validation on weave_ref?
         payload = _dict_value_to_dump(req.payload)
-        MAX_PAYLOAD = 1 << 20  # 1 MiB
-        if len(payload) > MAX_PAYLOAD:
+        max_payload = 1 << 20  # 1 MiB
+        if len(payload) > max_payload:
             raise InvalidRequest("Feedback payload too large")
         row: Row = {
             "id": feedback_id,
@@ -1846,81 +1950,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def completions_create(
         self, req: tsi.CompletionsCreateReq
     ) -> tsi.CompletionsCreateRes:
-        # Required fields
-        model_name = req.inputs.model
-        api_key = None
-        provider = None
-
-        # Custom model fields
-        base_url: Optional[str] = None
-        extra_headers: dict[str, str] = {}
-        return_type: Optional[str] = None
-
-        # For custom and standard models, we fetch the fields differently
-        #  1. Standard models: All of the information comes from the model_to_provider_info_map
-        #  2. Custom models: We fetch the provider object and provider model object
-
-        # First we try to see if the model name is a custom model
-        model_info = self._model_to_provider_info_map.get(model_name)
-
-        if model_info:
-            # Handle standard model case
-            # 1. We get the model info from the map
-            # 2. We fetch the API key, with the secret fetcher
-            # 3. We set the provider, to the litellm provider
-            # 4. If no api key, we raise an error, except for bedrock and bedrock_converse (we fetch bedrock credentials, in lite_llm_completion)
-
-            secret_name = model_info.get("api_key_name")
-            if not secret_name:
-                raise InvalidRequest(f"No secret name found for model {model_name}")
-
-            secret_fetcher = _secret_fetcher_context.get()
-            if not secret_fetcher:
-                raise InvalidRequest(
-                    f"No secret fetcher found, cannot fetch API key for model {model_name}"
-                )
-
-            api_key = (
-                secret_fetcher.fetch(secret_name).get("secrets", {}).get(secret_name)
+        # Use shared setup logic
+        model_info = self._model_to_provider_info_map.get(req.inputs.model)
+        try:
+            model_name, api_key, provider, base_url, extra_headers, return_type = (
+                _setup_completion_model_info(model_info, req, self.obj_read)
             )
-            provider = model_info.get("litellm_provider", "openai")
-
-            # We fetch bedrock credentials, in lite_llm_completion, later
-            if not api_key and provider != "bedrock" and provider != "bedrock_converse":
-                raise MissingLLMApiKeyError(
-                    f"No API key {secret_name} found for model {model_name}",
-                    api_key_name=secret_name,
-                )
-
-        else:
-            # If we don't have model info, we assume it is a custom model
-            # Handle custom provider case
-            # We fetch the provider object and provider model object
-            try:
-                custom_provider_info = get_custom_provider_info(
-                    project_id=req.project_id,
-                    model_name=model_name,
-                    obj_read_func=self.obj_read,
-                )
-
-                base_url = custom_provider_info.base_url
-                api_key = custom_provider_info.api_key
-                extra_headers = custom_provider_info.extra_headers
-                return_type = custom_provider_info.return_type
-                actual_model_name = custom_provider_info.actual_model_name
-
-            except Exception as e:
-                return tsi.CompletionsCreateRes(response={"error": str(e)})
-
-            # Always use "custom" as the provider for litellm
-            provider = "custom"
-            # Update the model name for the API call
-            # If the model name is ollama, we need to add the ollama/ prefix
-            req.inputs.model = (
-                "ollama/" + actual_model_name
-                if "ollama" in model_name
-                else actual_model_name
-            )
+        except Exception as e:
+            return tsi.CompletionsCreateRes(response={"error": str(e)})
 
         # Now that we have all the fields for both cases, we can make the API call
         start_time = datetime.datetime.now()
@@ -1977,6 +2014,73 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.CompletionsCreateRes(
             response=res.response, weave_call_id=start_call.id
         )
+
+    # -------------------------------------------------------------------
+    # Streaming variant
+    # -------------------------------------------------------------------
+    def completions_create_stream(
+        self, req: tsi.CompletionsCreateReq
+    ) -> Iterator[dict[str, Any]]:
+        """Stream LLM completion chunks.
+
+        Mirrors ``completions_create`` but with streaming enabled.  If
+        ``track_llm_call`` is True we emit a call_start record immediately and
+        a call_end record once the stream finishes (successfully or not).
+        """
+        # --- Shared setup logic (copy of completions_create up to litellm call)
+        model_info = self._model_to_provider_info_map.get(req.inputs.model)
+        try:
+            model_name, api_key, provider, base_url, extra_headers, return_type = (
+                _setup_completion_model_info(model_info, req, self.obj_read)
+            )
+        except Exception as e:
+            # Yield error as single chunk then stop.
+            def _single_error_iter(e: Exception) -> Iterator[dict[str, str]]:
+                yield {"error": str(e)}
+
+            return _single_error_iter(e)
+
+        # Track start call if requested
+        start_call: Optional[CallStartCHInsertable] = None
+        if req.track_llm_call:
+            start = tsi.StartedCallSchemaForInsert(
+                project_id=req.project_id,
+                wb_user_id=req.wb_user_id,
+                op_name=COMPLETIONS_CREATE_OP_NAME,
+                started_at=datetime.datetime.now(),
+                inputs={**req.inputs.model_dump(exclude_none=True)},
+                attributes={},
+            )
+            start_call = _start_call_for_insert_to_ch_insertable_start_call(start)
+            # Insert immediately so that callers can see the call in progress
+            self._insert_call(start_call)
+
+        # --- Build the underlying chunk iterator
+        chunk_iter = lite_llm_completion_stream(
+            api_key=api_key or "",
+            inputs=req.inputs,
+            provider=provider,
+            base_url=base_url,
+            extra_headers=extra_headers,
+            return_type=return_type,
+        )
+
+        # If tracking not requested just return chunks directly
+        if not req.track_llm_call or start_call is None:
+            return chunk_iter
+
+        # Otherwise, wrap the iterator with tracking
+        return _create_tracked_stream_wrapper(
+            self._insert_call, chunk_iter, start_call, model_name, req.project_id
+        )
+
+    def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
+        raise NotImplementedError("Evaluate model is not implemented")
+
+    def evaluation_status(
+        self, req: tsi.EvaluationStatusReq
+    ) -> tsi.EvaluationStatusRes:
+        return evaluation_status(self, req)
 
     # Private Methods
     @property
@@ -2089,7 +2193,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         object_values: dict[tuple[str, str], Any] = {}
         for row in query_result:
             (object_id, digest, val_dump) = row
-            object_values[(object_id, digest)] = val_dump
+            object_values[object_id, digest] = val_dump
 
         # update the val_dump for each object
         for obj in metadata_result:
@@ -2209,7 +2313,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     "Database insertion failed. Record too large. "
                     "A likely cause is that a single row or cell exceeded "
                     "the limit. If logging images, save them as `Image.PIL`."
-                )
+                ) from e
             raise
         except Exception as e:
             # Do potentially expensive data length calculation, only on
@@ -2222,9 +2326,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     "table": table,
                     "data_len": len(data),
                     "data_bytes": data_bytes,
-                    "example_data": None if len(data) == 0 else data[0],
-                    "column_names": column_names,
-                    "settings": settings,
                 },
             )
             raise
@@ -2374,6 +2475,8 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: dict) -> dict:
         "id": ch_call_dict.get("id"),
         "trace_id": ch_call_dict.get("trace_id"),
         "parent_id": ch_call_dict.get("parent_id"),
+        "thread_id": ch_call_dict.get("thread_id"),
+        "turn_id": ch_call_dict.get("turn_id"),
         "op_name": ch_call_dict.get("op_name"),
         "started_at": started_at,
         "ended_at": ended_at,
@@ -2390,6 +2493,7 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: dict) -> dict:
         ),
         "exception": ch_call_dict.get("exception"),
         "wb_run_id": ch_call_dict.get("wb_run_id"),
+        "wb_run_step": ch_call_dict.get("wb_run_step"),
         "wb_user_id": ch_call_dict.get("wb_user_id"),
         "display_name": display_name,
         "storage_size_bytes": ch_call_dict.get("storage_size_bytes"),
@@ -2408,6 +2512,7 @@ def _ch_obj_to_obj_schema(ch_obj: SelectableCHObjSchema) -> tsi.ObjSchema:
         digest=ch_obj.digest,
         kind=ch_obj.kind,
         base_object_class=ch_obj.base_object_class,
+        leaf_object_class=ch_obj.leaf_object_class,
         val=json.loads(ch_obj.val_dump),
         size_bytes=ch_obj.size_bytes,
     )
@@ -2416,9 +2521,10 @@ def _ch_obj_to_obj_schema(ch_obj: SelectableCHObjSchema) -> tsi.ObjSchema:
 def _ch_table_stats_to_table_stats_schema(
     ch_table_stats_row: Sequence[Any],
 ) -> tsi.TableStatsRow:
-    digest, count, storage_size_bytes = (lambda a, b, c=cast(Any, None): (a, b, c))(
-        *ch_table_stats_row
-    )
+    # Unpack the row with a default for the third value if it doesn't exist
+    row_tuple = tuple(ch_table_stats_row)
+    digest, count = row_tuple[:2]
+    storage_size_bytes = row_tuple[2] if len(row_tuple) > 2 else cast(Any, None)
 
     return tsi.TableStatsRow(
         count=count,
@@ -2439,12 +2545,15 @@ def _start_call_for_insert_to_ch_insertable_start_call(
         id=call_id,
         trace_id=trace_id,
         parent_id=start_call.parent_id,
+        thread_id=start_call.thread_id,
+        turn_id=start_call.turn_id,
         op_name=start_call.op_name,
         started_at=start_call.started_at,
         attributes_dump=_dict_value_to_dump(start_call.attributes),
         inputs_dump=_dict_value_to_dump(start_call.inputs),
         input_refs=extract_refs_from_values(start_call.inputs),
         wb_run_id=start_call.wb_run_id,
+        wb_run_step=start_call.wb_run_step,
         wb_user_id=start_call.wb_user_id,
         display_name=start_call.display_name,
     )
@@ -2496,7 +2605,7 @@ def _process_parameters(
 
 
 def get_type(val: Any) -> str:
-    if val == None:
+    if val is None:
         return "none"
     elif isinstance(val, dict):
         if "_type" in val:
@@ -2578,3 +2687,280 @@ def set_root_span_dd_tags(tags: dict[str, Union[str, float, int]]) -> None:
         logger.debug("No root span")
     else:
         root_span.set_tags(tags)
+
+
+def _update_metadata_from_chunk(
+    chunk: dict[str, Any], aggregated_metadata: dict[str, Any]
+) -> None:
+    """Update aggregated metadata from a chunk."""
+    metadata_fields = [
+        "id",
+        "created",
+        "model",
+        "system_fingerprint",
+        "service_tier",
+        "usage",
+    ]
+
+    for field in metadata_fields:
+        if field in chunk and field not in aggregated_metadata:
+            if field == "service_tier":
+                aggregated_metadata[field] = chunk.get(field, "default")
+            else:
+                aggregated_metadata[field] = chunk[field]
+
+
+def _process_tool_call_delta(
+    tool_call_delta: list, tool_calls: list[dict[str, Any]]
+) -> None:
+    """Process tool call delta and update tool_calls list."""
+    for tool_call in tool_call_delta:
+        tool_call_index = tool_call.get("index", 0)
+
+        # Ensure we have enough tool calls in our list
+        while len(tool_calls) <= tool_call_index:
+            tool_calls.append(
+                {
+                    "id": None,
+                    "type": "function",
+                    "function": {"name": "", "arguments": ""},
+                }
+            )
+
+        existing_tool_call = tool_calls[tool_call_index]
+
+        # Update existing tool call fields
+        if tool_call.get("id"):
+            existing_tool_call["id"] = tool_call["id"]
+        if tool_call.get("type"):
+            existing_tool_call["type"] = tool_call["type"]
+
+        if "function" in tool_call:
+            function_data = tool_call["function"]
+            if function_data.get("name"):
+                existing_tool_call["function"]["name"] = function_data["name"]
+            if "arguments" in function_data:
+                existing_tool_call["function"]["arguments"] += function_data[
+                    "arguments"
+                ]
+
+
+def _clean_tool_calls(tool_calls: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Clean up tool_calls - remove incomplete ones and ensure proper format."""
+    cleaned_tool_calls = [
+        {
+            "function": {
+                "arguments": tool_call["function"]["arguments"],
+                "name": tool_call["function"]["name"],
+            },
+            "id": tool_call["id"],
+            "type": "function",
+        }
+        for tool_call in tool_calls
+        if tool_call.get("id") is not None
+        and tool_call.get("function", {}).get("name") is not None
+    ]
+    return cleaned_tool_calls
+
+
+def _build_aggregated_output(
+    aggregated_metadata: dict[str, Any],
+    assistant_acc: list[str],
+    tool_calls: list[dict[str, Any]],
+    chunk: dict[str, Any],
+) -> dict[str, Any]:
+    """Build the aggregated output from accumulated data."""
+    current_finish_reason = chunk.get("choices", [{}])[0].get("finish_reason")
+    cleaned_tool_calls = _clean_tool_calls(tool_calls)
+
+    return {
+        "id": aggregated_metadata.get("id", ""),
+        "created": aggregated_metadata.get("created", 0),
+        "model": aggregated_metadata.get("model", ""),
+        "object": "chat.completion",
+        "system_fingerprint": aggregated_metadata.get("system_fingerprint", ""),
+        "choices": [
+            {
+                "finish_reason": current_finish_reason,
+                "index": 0,
+                "message": {
+                    "content": (
+                        "".join(assistant_acc)
+                        if assistant_acc
+                        else (None if cleaned_tool_calls else "")
+                    ),
+                    "role": "assistant",
+                    "tool_calls": (cleaned_tool_calls if cleaned_tool_calls else None),
+                    "function_call": None,
+                },
+            }
+        ],
+        "usage": aggregated_metadata.get("usage", {}),
+        "service_tier": aggregated_metadata.get("service_tier", "default"),
+    }
+
+
+def _create_tracked_stream_wrapper(
+    insert_call: Callable[[CallEndCHInsertable], None],
+    chunk_iter: Iterator[dict[str, Any]],
+    start_call: CallStartCHInsertable,
+    model_name: str,
+    project_id: str,
+) -> Iterator[dict[str, Any]]:
+    """Create a wrapper that tracks streaming completion and emits call records."""
+
+    def _stream_wrapper() -> Iterator[dict[str, Any]]:
+        # (1) send meta chunk first so clients can associate stream
+        yield {"_meta": {"weave_call_id": start_call.id}}
+
+        # Initialize accumulation variables
+        aggregated_output: Optional[dict[str, Any]] = None
+        assistant_acc: list[str] = []
+        tool_calls: list[dict[str, Any]] = []
+        aggregated_metadata: dict[str, Any] = {}
+
+        try:
+            for chunk in chunk_iter:
+                yield chunk  # Yield to client immediately
+
+                if not isinstance(chunk, dict):
+                    continue
+
+                # Accumulate metadata from chunks
+                _update_metadata_from_chunk(chunk, aggregated_metadata)
+
+                # Process assistant content and tool calls
+                choices = chunk.get("choices")
+                if choices:
+                    delta = choices[0].get("delta")
+                    if delta and isinstance(delta, dict):
+                        # Accumulate assistant content
+                        content_piece = delta.get("content")
+                        if content_piece:
+                            assistant_acc.append(content_piece)
+
+                        # Handle tool calls
+                        tool_call_delta = delta.get("tool_calls")
+                        if tool_call_delta:
+                            _process_tool_call_delta(tool_call_delta, tool_calls)
+
+                # Build aggregated output
+                aggregated_output = _build_aggregated_output(
+                    aggregated_metadata, assistant_acc, tool_calls, chunk
+                )
+
+        finally:
+            # Handle fallback case for aggregated output
+            if aggregated_output is None and (assistant_acc or tool_calls):
+                cleaned_tool_calls = _clean_tool_calls(tool_calls)
+                aggregated_output = {
+                    "choices": [
+                        {
+                            "message": {
+                                "role": "assistant",
+                                "content": (
+                                    "".join(assistant_acc)
+                                    if assistant_acc
+                                    else (None if cleaned_tool_calls else "")
+                                ),
+                                "tool_calls": (
+                                    cleaned_tool_calls if cleaned_tool_calls else None
+                                ),
+                            }
+                        }
+                    ]
+                }
+
+            # Prepare summary and end call
+            summary: dict[str, Any] = {}
+            if aggregated_output and "usage" in aggregated_output:
+                summary["usage"] = {model_name: aggregated_output["usage"]}
+
+            end = tsi.EndedCallSchemaForInsert(
+                project_id=project_id,
+                id=start_call.id,
+                ended_at=datetime.datetime.now(),
+                output=aggregated_output,
+                summary=summary,
+            )
+            end_call = _end_call_for_insert_to_ch_insertable_end_call(end)
+            insert_call(end_call)
+
+    return _stream_wrapper()
+
+
+def _setup_completion_model_info(
+    model_info: Optional[LLMModelProviderInfo],
+    req: tsi.CompletionsCreateReq,
+    obj_read: Callable[[tsi.ObjReadReq], tsi.ObjReadRes],
+) -> tuple[str, Optional[str], str, Optional[str], dict[str, str], Optional[str]]:
+    """Extract model setup logic shared between completions_create and completions_create_stream.
+
+    Returns: (model_name, api_key, provider, base_url, extra_headers, return_type)
+    Note: api_key can be None for bedrock providers since they use AWS credentials instead.
+    """
+    model_name = req.inputs.model
+    api_key = None
+    provider = None
+    base_url: Optional[str] = None
+    extra_headers: dict[str, str] = {}
+    return_type: Optional[str] = None
+
+    if model_info:
+        secret_name = model_info.get("api_key_name")
+        if not secret_name:
+            raise InvalidRequest(f"No secret name found for model {model_name}")
+
+        secret_fetcher = _secret_fetcher_context.get()
+        if not secret_fetcher:
+            raise InvalidRequest(
+                f"No secret fetcher found, cannot fetch API key for model {model_name}"
+            )
+
+        api_key = secret_fetcher.fetch(secret_name).get("secrets", {}).get(secret_name)
+        provider = model_info.get("litellm_provider", "openai")
+
+        if not api_key and provider not in ("bedrock", "bedrock_converse"):
+            raise MissingLLMApiKeyError(
+                f"No API key {secret_name} found for model {model_name}",
+                api_key_name=secret_name,
+            )
+    elif model_name.startswith("coreweave/"):
+        # See https://docs.litellm.ai/docs/providers/openai_compatible
+        # but ignore the bit about omitting the /v1 because it is actually necessary
+        req.inputs.model = model_name.replace("coreweave/", "openai/", 1)
+
+        provider = "custom"
+
+        base_url = wf_env.inference_service_base_url()
+
+        # The API key should have been passed in as an extra header.
+        if req.inputs.extra_headers:
+            api_key = req.inputs.extra_headers.pop("api_key", None)
+            extra_headers = req.inputs.extra_headers
+            req.inputs.extra_headers = None
+
+        return_type = "openai"
+
+    else:
+        # Custom provider path
+        custom_provider_info = get_custom_provider_info(
+            project_id=req.project_id,
+            model_name=model_name,
+            obj_read_func=obj_read,
+        )
+
+        base_url = custom_provider_info.base_url
+        api_key = custom_provider_info.api_key
+        extra_headers = custom_provider_info.extra_headers
+        return_type = custom_provider_info.return_type
+        actual_model_name = custom_provider_info.actual_model_name
+
+        provider = "custom"
+        req.inputs.model = (
+            "ollama/" + actual_model_name
+            if "ollama" in model_name
+            else actual_model_name
+        )
+
+    return model_name, api_key, provider, base_url, extra_headers, return_type

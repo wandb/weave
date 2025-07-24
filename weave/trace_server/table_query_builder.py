@@ -63,7 +63,7 @@ def make_standard_table_query(
     pb: ParamBuilder,
     *,
     # using the `sql_safe_*` prefix is a way to signal to the caller
-    # that these strings should have been santized by the caller.
+    # that these strings should have been sanitized by the caller.
     sql_safe_conditions: Optional[list[str]] = None,
     sql_safe_sort_clause: Optional[str] = None,
     limit: Optional[int] = None,

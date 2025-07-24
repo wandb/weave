@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import traceback
 from datetime import datetime
@@ -6,7 +7,6 @@ from itertools import chain, repeat
 from typing import Any, Callable, Literal, Optional, Union
 
 from pydantic import PrivateAttr
-from rich import print
 from rich.console import Console
 from typing_extensions import Self
 
@@ -29,7 +29,7 @@ from weave.flow.scorer import (
 )
 from weave.flow.util import make_memorable_name, transpose
 from weave.trace.env import get_weave_parallelism
-from weave.trace.objectify import register_object
+from weave.trace.objectify import maybe_objectify, register_object
 from weave.trace.op import CallDisplayNameFunc, Op, OpCallError, as_op, is_op
 from weave.trace.vals import WeaveObject
 from weave.trace.weave_client import Call, get_ref
@@ -118,6 +118,29 @@ class Evaluation(Object):
             if hasattr(obj, field_name):
                 field_values[field_name] = getattr(obj, field_name)
 
+        # Start mega-hack
+        # This is a very bad hack. Our deserialization/portability logic
+        # is totally broken. It will require a complete re-write of our
+        # deserialization layer to fix. The specific issue is that our
+        # deserialization code does not recursively deserialize custom objects
+        # (in this case scorers) and therefore needs to be done manually.
+        # In the meantime, this is such a common pattern, that I am going to
+        # fix it here. If you are a future dev and you actually fix the
+        # serialization stuff, that may or may not break this. That is OK!
+        # please feel free to remove this as we have tests that validate the
+        # end-user experience.
+        if orig_scorers := field_values.get("scorers"):
+            from weave import scorers as weave_scorers
+
+            assert weave_scorers
+            scorers = []
+            for scorer in orig_scorers:
+                if isinstance(scorer, WeaveObject):
+                    scorer = maybe_objectify(scorer)
+                scorers.append(scorer)
+            field_values["scorers"] = scorers
+        # End mega-hack
+
         return cls(**field_values)
 
     def model_post_init(self, __context: Any) -> None:
@@ -169,7 +192,7 @@ class Evaluation(Object):
             "model_latency": model_latency,
         }
 
-    @weave.op()
+    @weave.op
     async def summarize(self, eval_table: EvaluationResults) -> dict:
         eval_table_rows = list(eval_table.rows)
         cols = transpose(eval_table_rows)
@@ -195,7 +218,7 @@ class Evaluation(Object):
     async def get_eval_results(self, model: Union[Op, Model]) -> EvaluationResults:
         if not is_valid_model(model):
             raise ValueError(INVALID_MODEL_ERROR)
-        eval_rows = []
+        eval_rows: list[tuple[int, dict]] = []
 
         async def eval_example(example: dict) -> dict:
             try:
@@ -203,22 +226,22 @@ class Evaluation(Object):
             except OpCallError as e:
                 raise e
             except Exception:
-                print("Predict and score failed")
+                logger.info("Predict and score failed")
                 traceback.print_exc()
                 return {self._output_key: None, "scores": {}}
             return eval_row
 
         n_complete = 0
         dataset = self.dataset
-        _rows = dataset.rows
-        num_rows = len(_rows) * self.trials
+        rows = dataset.rows
+        num_rows = len(rows) * self.trials
 
-        trial_rows = chain.from_iterable(repeat(_rows, self.trials))
-        async for example, eval_row in util.async_foreach(
+        trial_rows = chain.from_iterable(repeat(rows, self.trials))
+        async for index, _example, eval_row in util.async_foreach(
             trial_rows, eval_example, get_weave_parallelism()
         ):
             n_complete += 1
-            print(f"Evaluated {n_complete} of {num_rows} examples")
+            logger.info(f"Evaluated {n_complete} of {num_rows} examples")
             if eval_row is None:
                 eval_row = {self._output_key: None, "scores": {}}
             else:
@@ -229,17 +252,33 @@ class Evaluation(Object):
                     scorer_name = scorer_attributes.scorer_name
                     if scorer_name not in eval_row["scores"]:
                         eval_row["scores"][scorer_name] = {}
-            eval_rows.append(eval_row)
-        return EvaluationResults(rows=weave.Table(eval_rows))
+            eval_rows.append((index, eval_row))
+        eval_rows.sort(key=lambda x: x[0])
+        table_rows = [eval_row for _, eval_row in eval_rows]
+        return EvaluationResults(rows=weave.Table(table_rows))
 
     @weave.op(call_display_name=default_evaluation_display_name)
     async def evaluate(self, model: Union[Op, Model]) -> dict:
         eval_results = await self.get_eval_results(model)
         summary = await self.summarize(eval_results)
 
-        print("Evaluation summary", summary)
+        summary_str = _safe_summarize_to_str(summary)
+        if summary_str:
+            logger.info(f"Evaluation summary {summary_str}")
 
         return summary
+
+
+def _safe_summarize_to_str(summary: dict) -> str:
+    summary_str = ""
+    try:
+        summary_str = json.dumps(summary, indent=2)
+    except Exception:
+        try:
+            summary_str = str(summary)
+        except Exception:
+            pass
+    return summary_str
 
 
 def evaluate(

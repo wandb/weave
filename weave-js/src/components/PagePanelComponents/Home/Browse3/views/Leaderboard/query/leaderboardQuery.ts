@@ -9,6 +9,7 @@ import {
   convertISOToDate,
   projectIdFromParts,
 } from '../../../pages/wfReactInterface/tsDataModelHooks';
+import {isImperativeEvalCall} from '../../../pages/wfReactInterface/tsDataModelHooksEvaluationComparison';
 import {
   objectVersionKeyToRefUri,
   opVersionKeyToRefUri,
@@ -44,6 +45,7 @@ export type LeaderboardValueRecord = {
   // A bit hacky to denormalize `shouldMinimize` here, but it's convenient
   // for the caller and not externally visible
   shouldMinimize?: boolean;
+  isRunning?: boolean;
 };
 
 type GroupableLeaderboardValueRecord = {
@@ -241,6 +243,7 @@ const getLeaderboardGroupableData = async (
       createdAt: convertISOToDate(call.started_at),
       sourceEvaluationCallId: call.id,
       sourceEvaluationObjectRef: evalObjectRefUri,
+      isRunning: !call.ended_at,
     };
 
     const scorerRefUris = (evalObject.val.scorers ?? []) as string[];
@@ -609,7 +612,7 @@ const getLeaderboardObjectGroupableData = async (
             parseRefMaybe(scorer ?? '')?.artifactName === col.scorer_name
         );
         const scorerRef = parseRefMaybe(scorerRefUri ?? '');
-        if (scorerRef?.scheme !== 'weave') {
+        if (scorerRef?.scheme !== 'weave' && !isImperativeEvalCall(call)) {
           return;
         }
         let value = call.output;
@@ -636,7 +639,9 @@ const getLeaderboardObjectGroupableData = async (
         });
         const modelGroup = `${modelRef.artifactName}:${modelRef.artifactVersion}`;
         const datasetGroup = `${datasetRef.artifactName}:${datasetRef.artifactVersion}`;
-        const scorerGroup = `${scorerRef.artifactName}:${scorerRef.artifactVersion}`;
+        const scorerGroup = scorerRef
+          ? `${scorerRef.artifactName}:${scorerRef.artifactVersion}`
+          : col.scorer_name; // Use the scorer name from dropdown for imperative evals
         const row: GroupableLeaderboardValueRecord = {
           modelGroup,
           datasetGroup,
@@ -647,8 +652,8 @@ const getLeaderboardObjectGroupableData = async (
             datasetName: datasetRef.artifactName,
             datasetVersion: datasetRef.artifactVersion,
             metricType: 'scorerMetric',
-            scorerName: scorerRef.artifactName,
-            scorerVersion: scorerRef.artifactVersion,
+            scorerName: scorerRef ? scorerRef.artifactName : col.scorer_name, // Use the scorer name from dropdown for imperative evals
+            scorerVersion: scorerRef ? scorerRef.artifactVersion : '', // Use empty string for imperative evals
             metricPath: col.summary_metric_path,
             metricValue: value as any,
             modelName: modelRef.artifactName,
@@ -659,6 +664,7 @@ const getLeaderboardObjectGroupableData = async (
             sourceEvaluationCallId: call.id,
             sourceEvaluationObjectRef: col.evaluation_object_ref,
             shouldMinimize: col.should_minimize ?? false,
+            isRunning: !call.ended_at,
           },
         };
         data.push(row);
@@ -668,8 +674,9 @@ const getLeaderboardObjectGroupableData = async (
             scorers: {},
           };
         }
-        evalData[col.evaluation_object_ref].scorers[scorerRef.artifactName] =
-          scorerGroup;
+        evalData[col.evaluation_object_ref].scorers[
+          scorerRef ? scorerRef.artifactName : col.scorer_name
+        ] = scorerGroup;
       }
     });
   });

@@ -339,11 +339,10 @@ class ExternalTraceServer(tsi.TraceServerInterface):
                 if feedback["project_id"] != req.project_id:
                     raise ValueError("Internal Error - Project Mismatch")
                 feedback["project_id"] = original_project_id
-            if "wb_user_id" in feedback:
-                if feedback["wb_user_id"] is not None:
-                    feedback["wb_user_id"] = self._idc.int_to_ext_user_id(
-                        feedback["wb_user_id"]
-                    )
+            if "wb_user_id" in feedback and feedback["wb_user_id"] is not None:
+                feedback["wb_user_id"] = self._idc.int_to_ext_user_id(
+                    feedback["wb_user_id"]
+                )
         return res
 
     def feedback_purge(self, req: tsi.FeedbackPurgeReq) -> tsi.FeedbackPurgeRes:
@@ -400,6 +399,35 @@ class ExternalTraceServer(tsi.TraceServerInterface):
         res = self._ref_apply(self._internal_trace_server.completions_create, req)
         return res
 
+    # Streaming completions – simply proxy through after converting project ID.
+    def completions_create_stream(
+        self, req: tsi.CompletionsCreateReq
+    ) -> typing.Iterator[dict[str, typing.Any]]:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        # The streamed chunks contain no project-scoped references, so we can
+        # forward directly without additional ref conversion.
+        return self._internal_trace_server.completions_create_stream(req)
+
     def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(self._internal_trace_server.project_stats, req)
+
+    def threads_query_stream(
+        self, req: tsi.ThreadsQueryReq
+    ) -> Iterator[tsi.ThreadSchema]:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._stream_ref_apply(
+            self._internal_trace_server.threads_query_stream, req
+        )
+
+    def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        if req.wb_user_id is not None:
+            req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
+        return self._ref_apply(self._internal_trace_server.evaluate_model, req)
+
+    def evaluation_status(
+        self, req: tsi.EvaluationStatusReq
+    ) -> tsi.EvaluationStatusRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.evaluation_status, req)

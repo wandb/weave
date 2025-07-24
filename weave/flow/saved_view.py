@@ -415,16 +415,14 @@ def operand_to_filter(operand: tsi_query.Operand) -> Filter:
         else:
             raise QueryTranslationException(f"Could not parse {filter}")
         return filter
-    if isinstance(operand, tsi_query.OrOperation):
-        if len(operand.or_) > 0:
-            operands = [operand_to_filter(o) for o in operand.or_]
-            if all(o.field == operands[0].field for o in operands):
-                if all(o.operator == "(string): equals" for o in operands):
-                    operator = "(string): in"
-                    value = [o.value for o in operands]
-                    return Filter(
-                        field=operands[0].field, operator=operator, value=value
-                    )
+    if isinstance(operand, tsi_query.OrOperation) and len(operand.or_) > 0:
+        operands = [operand_to_filter(o) for o in operand.or_]
+        if all(o.field == operands[0].field for o in operands) and all(
+            o.operator == "(string): equals" for o in operands
+        ):
+            operator = "(string): in"
+            value = [o.value for o in operands]
+            return Filter(field=operands[0].field, operator=operator, value=value)
     raise QueryTranslationException(f"Could not parse {operand}")
 
 
@@ -890,7 +888,7 @@ class SavedView:
         columns = self.get_table_columns()
         grid = Grid()
         for col in columns:
-            # TODO: Should we have a sort indictor in the column header?
+            # TODO: Should we have a sort indicator in the column header?
             grid.add_column(col["label"])
         for call in calls:
             row = []
@@ -934,9 +932,12 @@ class SavedView:
         ]
         # Add any columns that are visible that are not in the above list
         for key, value in visibility.items():
-            if value and key not in default_column_paths:
-                if ObjectPath.parse_str(key).elements[0] in KNOWN_COLUMNS:
-                    default_column_paths.append(key)
+            if (
+                value
+                and key not in default_column_paths
+                and ObjectPath.parse_str(key).elements[0] in KNOWN_COLUMNS
+            ):
+                default_column_paths.append(key)
         pin: Pin = self.base.definition.pin or DEFAULT_PIN
         for pin_right in pin["right"]:
             # If a column is pinned to the right, move it to the end of the list

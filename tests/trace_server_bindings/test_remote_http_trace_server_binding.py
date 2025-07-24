@@ -11,6 +11,7 @@ import pytest
 import requests
 import tenacity
 
+from weave.trace.term import configure_logger
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
 from weave.trace_server_bindings.remote_http_trace_server import (
@@ -64,13 +65,13 @@ def success_response():
 
 @pytest.fixture
 def server(request):
-    _server = RemoteHTTPTraceServer("http://example.com", should_batch=True)
+    server_ = RemoteHTTPTraceServer("http://example.com", should_batch=True)
 
     if request.param == "normal":
-        _server._send_batch_to_server = MagicMock()
+        server_._send_batch_to_server = MagicMock()
     elif request.param == "small_limit":
-        _server.remote_request_bytes_limit = 1024  # 1kb
-        _server._send_batch_to_server = MagicMock()
+        server_.remote_request_bytes_limit = 1024  # 1kb
+        server_._send_batch_to_server = MagicMock()
     elif request.param == "fast_retrying":
         fast_retry = tenacity.retry(
             wait=tenacity.wait_fixed(0.1),
@@ -78,14 +79,14 @@ def server(request):
             reraise=True,
         )
         unwrapped_send_batch_to_server = MethodType(
-            _server._send_batch_to_server.__wrapped__, _server
+            server_._send_batch_to_server.__wrapped__, server_
         )
-        _server._send_batch_to_server = fast_retry(unwrapped_send_batch_to_server)
+        server_._send_batch_to_server = fast_retry(unwrapped_send_batch_to_server)
 
-    yield _server
+    yield server_
 
-    if _server.call_processor:
-        _server.call_processor.stop_accepting_new_work_and_flush_queue()
+    if server_.call_processor:
+        server_.call_processor.stop_accepting_new_work_and_flush_queue()
 
 
 @pytest.mark.parametrize("server", ["small_limit"], indirect=True)
@@ -141,9 +142,13 @@ def test_empty_batch_is_noop(server):
     assert server._send_batch_to_server.call_count == 0
 
 
+@pytest.mark.disable_logging_error_check
 @pytest.mark.parametrize("server", ["small_limit"], indirect=True)
-def test_oversized_item_will_error_without_sending(server):
-    """Test that a single item that's too large raises an error."""
+def test_oversized_item_will_log_warning_and_send(server, caplog):
+    """Test that a single item that's too large logs an error but doesn't raise an exception and still tries to submit."""
+    # Set logging level to capture error logs
+    caplog.set_level(logging.WARNING)
+
     # Create a single item with a very large payload
     start = generate_start()
     start.attributes = {
@@ -151,21 +156,20 @@ def test_oversized_item_will_error_without_sending(server):
     }
     batch = [StartBatchItem(req=tsi.CallStartReq(start=start))]
 
-    # Verify the single item is actually large enough to trigger the error
+    # Verify the single item is actually large enough to trigger the error message
     data = Batch(batch=batch).model_dump_json()
     encoded_data = data.encode("utf-8")
     assert len(encoded_data) > server.remote_request_bytes_limit
 
-    # Process the batch and expect an error
-    with pytest.raises(ValueError) as excinfo:
-        server._flush_calls(batch)
+    # Process the batch - should NOT raise an exception now
+    server._flush_calls(batch)
 
-    # Verify the error message
-    assert "Single call size" in str(excinfo.value)
-    assert "is too large to send" in str(excinfo.value)
+    # Verify error was logged
+    assert any("Single call size" in record.message for record in caplog.records)
+    assert any("may be too large" in record.message for record in caplog.records)
 
-    # Verify _send_batch_to_server was not called
-    assert server._send_batch_to_server.call_count == 0
+    # Verify _send_batch_to_server was still called
+    assert server._send_batch_to_server.call_count == 1
 
 
 @pytest.mark.parametrize("server", ["small_limit"], indirect=True)
@@ -297,44 +301,43 @@ def test_post_timeout(mock_post, success_response, server, log_collector):
     This test modifies the retry mechanism to use a short wait time and limited retries
     to verify behavior when retries are exhausted.
     """
+    configure_logger()
     # Configure mock to timeout twice to exhaust retries
     mock_post.side_effect = [
         # First batch times out twice
         requests.exceptions.Timeout("Connection timed out"),
         requests.exceptions.Timeout("Connection timed out"),
-        # Second batch times out once, but then succeeds
-        requests.exceptions.Timeout("Connection timed out"),
-        success_response,
     ]
 
     # Phase 1: Try but fail to process the first batch
     server.call_start(tsi.CallStartReq(start=generate_start()))
     server.call_processor.stop_accepting_new_work_and_flush_queue()
-    logs = log_collector.get_error_logs()
-    assert len(logs) == 1
-    assert "Failed to send batch after max retries" in logs[0].msg
+    logs = log_collector.get_warning_logs()
+    assert len(logs) >= 1
+    assert any("requeueing batch" in log.msg for log in logs)
 
     # Phase 2: Reset mock and verify we can still process a new batch
+    mock_post.reset_mock()
     mock_post.side_effect = [
         requests.exceptions.Timeout("Connection timed out"),
         success_response,
     ]
 
     # Create a new server since the old one has shutdown its batch processor
-    server = RemoteHTTPTraceServer("http://example.com", should_batch=False)
+    new_server = RemoteHTTPTraceServer("http://example.com", should_batch=False)
     fast_retry = tenacity.retry(
         wait=tenacity.wait_fixed(0.1),
         stop=tenacity.stop_after_attempt(2),
         reraise=True,
     )
     unwrapped_send_batch_to_server = MethodType(
-        server._send_batch_to_server.__wrapped__, server
+        new_server._send_batch_to_server.__wrapped__, new_server
     )
-    server._send_batch_to_server = fast_retry(unwrapped_send_batch_to_server)
+    new_server._send_batch_to_server = fast_retry(unwrapped_send_batch_to_server)
 
     # Should succeed with retry
     start_req = tsi.CallStartReq(start=generate_start())
-    response = server.call_start(start_req)
+    response = new_server.call_start(start_req)
     assert response.id == "test_id"
     assert response.trace_id == "test_trace_id"
 
@@ -367,6 +370,9 @@ def test_requeue_after_max_retries(server, caplog):
     """Test that batches are requeued after max retries."""
     caplog.set_level(logging.WARNING)
 
+    # Mock is_accepting_new_work to return True so we can test requeuing
+    server.call_processor.is_accepting_new_work = MagicMock(return_value=True)
+
     # Mock enqueue to verify it gets called, and _send_batch_to_server to throw an exception
     server.call_processor.enqueue = MagicMock()
     server._send_batch_to_server = MagicMock(
@@ -384,4 +390,5 @@ def test_requeue_after_max_retries(server, caplog):
     # On enqueue, the user should expect this error message
     assert len(caplog.records) == 1
     msg = caplog.records[0].message
-    assert "requeueing for later processing" in msg
+    # Match exact message format from the implementation
+    assert "Batch failed after max retries, requeueing batch with" in msg

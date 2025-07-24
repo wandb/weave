@@ -1,11 +1,11 @@
+import {Message} from '../ChatView/types';
 import {TraceCallSchema} from '../wfReactInterface/traceServerClientTypes';
 import {LLMMaxTokensKey} from './llmMaxTokens';
 
 export enum PlaygroundResponseFormats {
   Text = 'text',
   JsonObject = 'json_object',
-  // Fast follow
-  // JsonSchema = 'json_schema',
+  JsonSchema = 'json_schema',
 }
 
 export type SavedPlaygroundModelState = {
@@ -40,6 +40,7 @@ export type PlaygroundModelParams = {
   }>;
   stopSequences: string[];
   responseFormatSchema?: Record<string, any>;
+  jsonSchema?: string;
 };
 
 // Define the keys from PlaygroundModelParams to iterate and compare
@@ -70,3 +71,23 @@ export type PlaygroundStateKey = keyof PlaygroundState;
 export type OptionalTraceCallSchema = Partial<TraceCallSchema>;
 
 export type PlaygroundMessageRole = 'assistant' | 'user' | 'system' | 'tool';
+
+export type LitellmCompletionResponse = {
+  id: string;
+  created: Date;
+  model: string;
+  object: string;
+  system_fingerprint: string;
+  usage: object;
+  service_tier: string;
+  choices: Array<Partial<LitellmCompletionChoice>>;
+};
+
+export type LitellmCompletionChoice = {
+  message: Partial<Message>;
+  index: number;
+  finish_reason: string;
+};
+
+export type OptionalLitellmCompletionResponse =
+  Partial<LitellmCompletionResponse>;

@@ -170,7 +170,14 @@ export const useProjectSidebar = (
             name: 'Playground',
             slug: 'weave/playground',
             isShown: showWeaveSidebarItems || isShowAll,
-            iconName: IconNames.RobotServiceMember,
+            iconName: IconNames.VideoPlay,
+          },
+          {
+            type: 'button' as const,
+            name: 'Monitors',
+            slug: 'weave/monitors',
+            isShown: showWeaveSidebarItems || isShowAll,
+            iconName: IconNames.JobAutomation,
           },
           {
             type: 'button' as const,
@@ -199,6 +206,13 @@ export const useProjectSidebar = (
             slug: 'weave/scorers',
             isShown: isWeaveOnly,
             iconName: IconNames.TypeNumberAlt,
+          },
+          {
+            type: 'button' as const,
+            name: 'Threads',
+            slug: 'weave/threads',
+            isShown: (showWeaveSidebarItems || isShowAll) && isWandbAdmin,
+            iconName: IconNames.ForumChatBubble,
           },
           {
             type: 'button' as const,

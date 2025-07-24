@@ -1,5 +1,11 @@
 # Playground
 
+:::tip
+For a limited time, the new W&B Inference service is included in your free tier. W&B Inference provides access to leading open-source foundation models via API and the Weave Playground. 
+- [Developer documentation](../integrations/inference.md)
+- [Product page](https://wandb.ai/site/inference) 
+:::
+
 Evaluating LLM prompts and responses is challenging. The Weave Playground is designed to simplify the process of iterating on LLM prompts and responses, making it easier to experiment with different models and prompts. With features like prompt editing, message retrying, and model comparison, Playground helps you to quickly test and improve your LLM applications. Playground currently supports models from OpenAI, Anthropic, Google, Groq, Amazon Bedrock, and Microsoft Azure, as well as [custom providers](#add-a-custom-provider).
 
 - **Quick access:** Open the Playground from the W&B sidebar for a fresh session or from the Call page to test an existing project.

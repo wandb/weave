@@ -1,0 +1,6187 @@
+<!--- Docs: Python SDK -->
+<!--- Index -->
+
+# Index
+
+# weave
+
+The top-level functions and classes for working with Weave.
+
+---
+
+
+# API Overview
+
+
+
+## Classes
+
+- [`obj.Object`](#class-object)
+- [`dataset.Dataset`](#class-dataset): Dataset object with easy saving and automatic versioning
+- [`model.Model`](#class-model): Intended to capture a combination of code and data the operates on an input.
+- [`prompt.Prompt`](#class-prompt)
+- [`prompt.StringPrompt`](#class-stringprompt)
+- [`prompt.MessagesPrompt`](#class-messagesprompt)
+- [`eval.Evaluation`](#class-evaluation): Sets up an evaluation which includes a set of scorers and a dataset.
+- [`eval_imperative.EvaluationLogger`](#class-evaluationlogger): This class provides an imperative interface for logging evaluations.
+- [`scorer.Scorer`](#class-scorer)
+- [`annotation_spec.AnnotationSpec`](#class-annotationspec)
+- [`markdown.Markdown`](#class-markdown): A Markdown renderable.
+- [`monitor.Monitor`](#class-monitor): Sets up a monitor to score incoming calls automatically.
+- [`saved_view.SavedView`](#class-savedview): A fluent-style class for working with SavedView objects.
+
+## Functions
+
+- [`api.init`](#function-init): Initialize weave tracking, logging to a wandb project.
+- [`api.publish`](#function-publish): Save and version a python object.
+- [`api.ref`](#function-ref): Construct a Ref to a Weave object.
+- [`call_context.require_current_call`](#function-require_current_call): Get the Call object for the currently executing Op, within that Op.
+- [`call_context.get_current_call`](#function-get_current_call): Get the Call object for the currently executing Op, within that Op.
+- [`api.finish`](#function-finish): Stops logging to weave.
+- [`op.op`](#function-op): A decorator to weave op-ify a function or method. Works for both sync and async.
+- [`api.attributes`](#function-attributes): Context manager for setting attributes on a call.
+
+
+---
+
+
+
+
+### function `init`
+
+```python
+init(
+    project_name: 'str',
+    settings: 'UserSettings | dict[str, Any] | None' = None,
+    autopatch_settings: 'AutopatchSettings | None' = None,
+    global_postprocess_inputs: 'PostprocessInputsFunc | None' = None,
+    global_postprocess_output: 'PostprocessOutputFunc | None' = None,
+    global_attributes: 'dict[str, Any] | None' = None
+) → WeaveClient
+```
+
+Initialize weave tracking, logging to a wandb project. 
+
+Logging is initialized globally, so you do not need to keep a reference to the return value of init. 
+
+Following init, calls of weave.op() decorated functions will be logged to the specified project. 
+
+
+
+**Args:**
+ 
+ - `project_name`:  The name of the Weights & Biases project to log to. 
+ - `settings`:  Configuration for the Weave client generally. 
+ - `autopatch_settings`:  Configuration for autopatch integrations, e.g. openai 
+ - `global_postprocess_inputs`:  A function that will be applied to all inputs of all ops. 
+ - `global_postprocess_output`:  A function that will be applied to all outputs of all ops. 
+ - `global_attributes`:  A dictionary of attributes that will be applied to all traces. 
+
+NOTE: Global postprocessing settings are applied to all ops after each op's own postprocessing.  The order is always: 1. Op-specific postprocessing 2. Global postprocessing 
+
+
+
+**Returns:**
+ A Weave client. 
+
+---
+
+
+
+### function `publish`
+
+```python
+publish(obj: 'Any', name: 'str | None' = None) → ObjectRef
+```
+
+Save and version a python object. 
+
+If an object with name already exists, and the content hash of obj does not match the latest version of that object, a new version will be created. 
+
+TODO: Need to document how name works with this change. 
+
+
+
+**Args:**
+ 
+ - `obj`:  The object to save and version. 
+ - `name`:  The name to save the object under. 
+
+
+
+**Returns:**
+ A weave Ref to the saved object. 
+
+---
+
+
+
+### function `ref`
+
+```python
+ref(location: 'str') → ObjectRef
+```
+
+Construct a Ref to a Weave object. 
+
+TODO: what happens if obj does not exist 
+
+
+
+**Args:**
+ 
+ - `location`:  A fully-qualified weave ref URI, or if weave.init() has been called, "name:version" or just "name" ("latest" will be used for version in this case). 
+
+
+
+
+
+**Returns:**
+ A weave Ref to the object. 
+
+---
+
+
+
+### function `require_current_call`
+
+```python
+require_current_call() → Call
+```
+
+Get the Call object for the currently executing Op, within that Op. 
+
+This allows you to access attributes of the Call such as its id or feedback while it is running. 
+
+```python
+@weave.op
+def hello(name: str) -> None:
+     print(f"Hello {name}!")
+     current_call = weave.require_current_call()
+     print(current_call.id)
+``` 
+
+It is also possible to access a Call after the Op has returned. 
+
+If you have the Call's id, perhaps from the UI, you can use the `get_call` method on the `WeaveClient` returned from `weave.init` to retrieve the Call object. 
+
+```python
+client = weave.init("")
+mycall = client.get_call("")
+``` 
+
+Alternately, after defining your Op you can use its `call` method. For example: 
+
+```python
+@weave.op
+def add(a: int, b: int) -> int:
+     return a + b
+
+result, call = add.call(1, 2)
+print(call.id)
+``` 
+
+
+
+**Returns:**
+  The Call object for the currently executing Op 
+
+
+
+**Raises:**
+ 
+ - `NoCurrentCallError`:  If tracking has not been initialized or this method is  invoked outside an Op. 
+
+---
+
+
+
+### function `get_current_call`
+
+```python
+get_current_call() → Call | None
+```
+
+Get the Call object for the currently executing Op, within that Op. 
+
+
+
+**Returns:**
+  The Call object for the currently executing Op, or  None if tracking has not been initialized or this method is  invoked outside an Op. 
+
+---
+
+
+
+### function `finish`
+
+```python
+finish() → None
+```
+
+Stops logging to weave. 
+
+Following finish, calls of weave.op() decorated functions will no longer be logged. You will need to run weave.init() again to resume logging. 
+
+---
+
+
+
+### function `op`
+
+```python
+op(
+    func: 'Callable[P, R] | None' = None,
+    name: 'str | None' = None,
+    call_display_name: 'str | CallDisplayNameFunc | None' = None,
+    postprocess_inputs: 'PostprocessInputsFunc | None' = None,
+    postprocess_output: 'PostprocessOutputFunc | None' = None,
+    tracing_sample_rate: 'float' = 1.0,
+    enable_code_capture: 'bool' = True
+) → Callable[[Callable[P, R]], Op[P, R]] | Op[P, R]
+```
+
+A decorator to weave op-ify a function or method. Works for both sync and async. Automatically detects iterator functions and applies appropriate behavior. 
+
+---
+
+
+
+### function `attributes`
+
+```python
+attributes(attributes: 'dict[str, Any]') → Iterator
+```
+
+Context manager for setting attributes on a call. 
+
+
+
+**Example:**
+ 
+
+```python
+with weave.attributes({'env': 'production'}):
+     print(my_function.call("World"))
+``` 
+
+---
+
+
+
+## class `Object`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `name`: `typing.Optional[str]`
+- `description`: `typing.Optional[str]`
+- `ref`: `typing.Optional[trace.refs.ObjectRef]`
+---
+
+
+
+### classmethod `from_uri`
+
+```python
+from_uri(uri: str, objectify: bool = True) → Self
+```
+
+
+
+
+
+---
+
+
+
+### classmethod `handle_relocatable_object`
+
+```python
+handle_relocatable_object(
+    v: Any,
+    handler: ValidatorFunctionWrapHandler,
+    info: ValidationInfo
+) → Any
+```
+
+
+
+
+
+
+---
+
+
+
+## class `Dataset`
+Dataset object with easy saving and automatic versioning 
+
+
+
+**Examples:**
+ 
+
+```python
+# Create a dataset
+dataset = Dataset(name='grammar', rows=[
+     {'id': '0', 'sentence': "He no likes ice cream.", 'correction': "He doesn't like ice cream."},
+     {'id': '1', 'sentence': "She goed to the store.", 'correction': "She went to the store."},
+     {'id': '2', 'sentence': "They plays video games all day.", 'correction': "They play video games all day."}
+])
+
+# Publish the dataset
+weave.publish(dataset)
+
+# Retrieve the dataset
+dataset_ref = weave.ref('grammar').get()
+
+# Access a specific example
+example_label = dataset_ref.rows[2]['sentence']
+``` 
+
+
+**Pydantic Fields:**
+
+- `name`: `typing.Optional[str]`
+- `description`: `typing.Optional[str]`
+- `ref`: `typing.Optional[trace.refs.ObjectRef]`
+- `rows`: `typing.Union[trace.table.Table, trace.vals.WeaveTable]`
+---
+
+
+
+### method `add_rows`
+
+```python
+add_rows(rows: Iterable[dict]) → Dataset
+```
+
+Create a new dataset version by appending rows to the existing dataset. 
+
+This is useful for adding examples to large datasets without having to load the entire dataset into memory. 
+
+
+
+**Args:**
+ 
+ - `rows`:  The rows to add to the dataset. 
+
+
+
+**Returns:**
+ The updated dataset. 
+
+---
+
+
+
+### classmethod `convert_to_table`
+
+```python
+convert_to_table(rows: Any) → Union[Table, WeaveTable]
+```
+
+
+
+
+
+---
+
+
+
+### classmethod `from_calls`
+
+```python
+from_calls(calls: Iterable[Call]) → Self
+```
+
+
+
+
+
+---
+
+
+
+### classmethod `from_obj`
+
+```python
+from_obj(obj: WeaveObject) → Self
+```
+
+
+
+
+
+---
+
+
+
+### classmethod `from_pandas`
+
+```python
+from_pandas(df: 'DataFrame') → Self
+```
+
+
+
+
+
+---
+
+
+
+### method `to_pandas`
+
+```python
+to_pandas() → DataFrame
+```
+
+
+
+
+
+
+---
+
+
+
+## class `Model`
+Intended to capture a combination of code and data the operates on an input. For example it might call an LLM with a prompt to make a prediction or generate text. 
+
+When you change the attributes or the code that defines your model, these changes will be logged and the version will be updated. This ensures that you can compare the predictions across different versions of your model. Use this to iterate on prompts or to try the latest LLM and compare predictions across different settings 
+
+
+
+**Examples:**
+ 
+
+```python
+class YourModel(Model):
+     attribute1: str
+     attribute2: int
+
+     @weave.op()
+     def predict(self, input_data: str) -> dict:
+         # Model logic goes here
+         prediction = self.attribute1 + ' ' + input_data
+         return {'pred': prediction}
+``` 
+
+
+**Pydantic Fields:**
+
+- `name`: `typing.Optional[str]`
+- `description`: `typing.Optional[str]`
+- `ref`: `typing.Optional[trace.refs.ObjectRef]`
+---
+
+
+
+### method `get_infer_method`
+
+```python
+get_infer_method() → Callable
+```
+
+
+
+
+
+
+---
+
+
+
+## class `Prompt`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `name`: `typing.Optional[str]`
+- `description`: `typing.Optional[str]`
+- `ref`: `typing.Optional[trace.refs.ObjectRef]`
+---
+
+
+
+### method `format`
+
+```python
+format(**kwargs: Any) → Any
+```
+
+
+
+
+
+
+---
+
+
+
+## class `StringPrompt`
+
+
+
+
+
+
+### method `__init__`
+
+```python
+__init__(content: str)
+```
+
+
+
+
+
+
+**Pydantic Fields:**
+
+- `name`: `typing.Optional[str]`
+- `description`: `typing.Optional[str]`
+- `ref`: `typing.Optional[trace.refs.ObjectRef]`
+- `content`: ``
+---
+
+
+
+### method `format`
+
+```python
+format(**kwargs: Any) → str
+```
+
+
+
+
+
+---
+
+
+
+### classmethod `from_obj`
+
+```python
+from_obj(obj: WeaveObject) → Self
+```
+
+
+
+
+
+
+---
+
+
+
+## class `MessagesPrompt`
+
+
+
+
+
+
+### method `__init__`
+
+```python
+__init__(messages: list[dict])
+```
+
+
+
+
+
+
+**Pydantic Fields:**
+
+- `name`: `typing.Optional[str]`
+- `description`: `typing.Optional[str]`
+- `ref`: `typing.Optional[trace.refs.ObjectRef]`
+- `messages`: `list[dict]`
+---
+
+
+
+### method `format`
+
+```python
+format(**kwargs: Any) → list
+```
+
+
+
+
+
+---
+
+
+
+### method `format_message`
+
+```python
+format_message(message: dict, **kwargs: Any) → dict
+```
+
+
+
+
+
+---
+
+
+
+### classmethod `from_obj`
+
+```python
+from_obj(obj: WeaveObject) → Self
+```
+
+
+
+
+
+
+---
+
+
+
+## class `Evaluation`
+Sets up an evaluation which includes a set of scorers and a dataset. 
+
+Calling evaluation.evaluate(model) will pass in rows from a dataset into a model matching  the names of the columns of the dataset to the argument names in model.predict. 
+
+Then it will call all of the scorers and save the results in weave. 
+
+If you want to preprocess the rows from the dataset you can pass in a function to preprocess_model_input. 
+
+
+
+**Examples:**
+ 
+
+```python
+# Collect your examples
+examples = [
+     {"question": "What is the capital of France?", "expected": "Paris"},
+     {"question": "Who wrote 'To Kill a Mockingbird'?", "expected": "Harper Lee"},
+     {"question": "What is the square root of 64?", "expected": "8"},
+]
+
+# Define any custom scoring function
+@weave.op()
+def match_score1(expected: str, model_output: dict) -> dict:
+     # Here is where you'd define the logic to score the model output
+     return {'match': expected == model_output['generated_text']}
+
+@weave.op()
+def function_to_evaluate(question: str):
+     # here's where you would add your LLM call and return the output
+     return  {'generated_text': 'Paris'}
+
+# Score your examples using scoring functions
+evaluation = Evaluation(
+     dataset=examples, scorers=[match_score1]
+)
+
+# Start tracking the evaluation
+weave.init('intro-example')
+# Run the evaluation
+asyncio.run(evaluation.evaluate(function_to_evaluate))
+``` 
+
+
+**Pydantic Fields:**
+
+- `name`: `typing.Optional[str]`
+- `description`: `typing.Optional[str]`
+- `ref`: `typing.Optional[trace.refs.ObjectRef]`
+- `dataset`: ``
+- `scorers`: `typing.Optional[list[typing.Annotated[typing.Union[trace.op.Op, flow.scorer.Scorer], BeforeValidator(func=, json_schema_input_type=PydanticUndefined)]]]`
+- `preprocess_model_input`: `typing.Optional[typing.Callable[[dict], dict]]`
+- `trials`: ``
+- `evaluation_name`: `typing.Union[str, typing.Callable[[trace.weave_client.Call], str], NoneType]`
+---
+
+
+
+### method `evaluate`
+
+```python
+evaluate(model: Union[Op, Model]) → dict
+```
+
+
+
+
+
+---
+
+
+
+### classmethod `from_obj`
+
+```python
+from_obj(obj: WeaveObject) → Self
+```
+
+
+
+
+
+---
+
+
+
+### method `get_eval_results`
+
+```python
+get_eval_results(model: Union[Op, Model]) → EvaluationResults
+```
+
+
+
+
+
+---
+
+
+
+### method `predict_and_score`
+
+```python
+predict_and_score(model: Union[Op, Model], example: dict) → dict
+```
+
+
+
+
+
+---
+
+
+
+### method `summarize`
+
+```python
+summarize(eval_table: EvaluationResults) → dict
+```
+
+
+
+
+
+
+---
+
+
+
+## class `EvaluationLogger`
+This class provides an imperative interface for logging evaluations. 
+
+An evaluation is started automatically when the first prediction is logged using the `log_prediction` method, and finished when the `log_summary` method is called. 
+
+Each time you log a prediction, you will get back a `ScoreLogger` object. You can use this object to log scores and metadata for that specific prediction. For more information, see the `ScoreLogger` class. 
+
+
+
+**Example:**
+ ```python
+     ev = EvaluationLogger()
+     pred = ev.log_prediction(inputs, output)
+     pred.log_score(scorer_name, score)
+     ev.log_summary(summary)
+    ``` 
+
+
+**Pydantic Fields:**
+
+- `name`: `str | None`
+- `model`: `flow.model.Model | dict | str`
+- `dataset`: `flow.dataset.Dataset | list[dict] | str`
+---
+
+#### property ui_url
+
+
+
+
+
+
+
+---
+
+
+
+### method `finish`
+
+```python
+finish() → None
+```
+
+Clean up the evaluation resources explicitly without logging a summary. 
+
+Ensures all prediction calls and the main evaluation call are finalized. This is automatically called if the logger is used as a context manager. 
+
+---
+
+
+
+### method `log_prediction`
+
+```python
+log_prediction(inputs: 'dict', output: 'Any') → ScoreLogger
+```
+
+Log a prediction to the Evaluation, and return a reference. 
+
+The reference can be used to log scores which are attached to the specific prediction instance. 
+
+---
+
+
+
+### method `log_summary`
+
+```python
+log_summary(summary: 'dict | None' = None) → None
+```
+
+Log a summary dict to the Evaluation. 
+
+This will calculate the summary, call the summarize op, and then finalize the evaluation, meaning no more predictions or scores can be logged. 
+
+
+---
+
+
+
+## class `Scorer`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `name`: `typing.Optional[str]`
+- `description`: `typing.Optional[str]`
+- `ref`: `typing.Optional[trace.refs.ObjectRef]`
+- `column_map`: `typing.Optional[dict[str, str]]`
+---
+
+
+
+### method `model_post_init`
+
+```python
+model_post_init(_Scorer__context: Any) → None
+```
+
+
+
+
+
+---
+
+
+
+### method `score`
+
+```python
+score(output: Any, **kwargs: Any) → Any
+```
+
+
+
+
+
+---
+
+
+
+### method `summarize`
+
+```python
+summarize(score_rows: list) → Optional[dict]
+```
+
+
+
+
+
+
+---
+
+
+
+## class `AnnotationSpec`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `name`: `typing.Optional[str]`
+- `description`: `typing.Optional[str]`
+- `field_schema`: `dict[str, typing.Any]`
+- `unique_among_creators`: ``
+- `op_scope`: `typing.Optional[list[str]]`
+---
+
+
+
+### classmethod `preprocess_field_schema`
+
+```python
+preprocess_field_schema(data: dict[str, Any]) → dict[str, Any]
+```
+
+
+
+
+
+---
+
+
+
+### classmethod `validate_field_schema`
+
+```python
+validate_field_schema(schema: dict[str, Any]) → dict[str, Any]
+```
+
+
+
+
+
+---
+
+
+
+### method `value_is_valid`
+
+```python
+value_is_valid(payload: Any) → bool
+```
+
+Validates a payload against this annotation spec's schema. 
+
+
+
+**Args:**
+ 
+ - `payload`:  The data to validate against the schema 
+
+
+
+**Returns:**
+ 
+ - `bool`:  True if validation succeeds, False otherwise 
+
+
+---
+
+
+
+## class `Markdown`
+A Markdown renderable. 
+
+
+
+**Args:**
+ 
+ - `markup` (str):  A string containing markdown. 
+ - `code_theme` (str, optional):  Pygments theme for code blocks. Defaults to "monokai". See https://pygments.org/styles/ for code themes. 
+ - `justify` (JustifyMethod, optional):  Justify value for paragraphs. Defaults to None. 
+ - `style` (Union[str, Style], optional):  Optional style to apply to markdown. 
+ - `hyperlinks` (bool, optional):  Enable hyperlinks. Defaults to ``True``. 
+ - `inline_code_lexer`:  (str, optional): Lexer to use if inline code highlighting is  enabled. Defaults to None. 
+ - `inline_code_theme`:  (Optional[str], optional): Pygments theme for inline code  highlighting, or None for no highlighting. Defaults to None. 
+
+
+
+### method `__init__`
+
+```python
+__init__(
+    markup: 'str',
+    code_theme: 'str' = 'monokai',
+    justify: 'JustifyMethod | None' = None,
+    style: 'str | Style' = 'none',
+    hyperlinks: 'bool' = True,
+    inline_code_lexer: 'str | None' = None,
+    inline_code_theme: 'str | None' = None
+) → None
+```
+
+
+
+
+
+
+
+
+
+---
+
+
+
+## class `Monitor`
+Sets up a monitor to score incoming calls automatically. 
+
+
+
+**Examples:**
+ 
+
+```python
+import weave
+from weave.scorers import ValidJSONScorer
+
+json_scorer = ValidJSONScorer()
+
+my_monitor = weave.Monitor(
+     name="my-monitor",
+     description="This is a test monitor",
+     sampling_rate=0.5,
+     op_names=["my_op"],
+     query={
+         "$expr": {
+             "$gt": [
+                 {
+                         "$getField": "started_at"
+                     },
+                     {
+                         "$literal": 1742540400
+                     }
+                 ]
+             }
+         }
+     },
+     scorers=[json_scorer],
+)
+
+my_monitor.activate()
+``` 
+
+
+**Pydantic Fields:**
+
+- `name`: `typing.Optional[str]`
+- `description`: `typing.Optional[str]`
+- `ref`: `typing.Optional[trace.refs.ObjectRef]`
+- `sampling_rate`: ``
+- `scorers`: `list[flow.scorer.Scorer]`
+- `op_names`: `list[str]`
+- `query`: `typing.Optional[trace_server.interface.query.Query]`
+- `active`: ``
+---
+
+
+
+### method `activate`
+
+```python
+activate() → ObjectRef
+```
+
+Activates the monitor. 
+
+
+
+**Returns:**
+  The ref to the monitor. 
+
+---
+
+
+
+### method `deactivate`
+
+```python
+deactivate() → ObjectRef
+```
+
+Deactivates the monitor. 
+
+
+
+**Returns:**
+  The ref to the monitor. 
+
+---
+
+
+
+### classmethod `from_obj`
+
+```python
+from_obj(obj: WeaveObject) → Self
+```
+
+
+
+
+
+
+---
+
+
+
+## class `SavedView`
+A fluent-style class for working with SavedView objects. 
+
+
+
+### method `__init__`
+
+```python
+__init__(view_type: 'str' = 'traces', label: 'str' = 'SavedView') → None
+```
+
+
+
+
+
+
+---
+
+#### property entity
+
+
+
+
+
+---
+
+#### property label
+
+
+
+
+
+---
+
+#### property project
+
+
+
+
+
+---
+
+#### property view_type
+
+
+
+
+
+
+
+---
+
+
+
+### method `add_column`
+
+```python
+add_column(path: 'str | ObjectPath', label: 'str | None' = None) → SavedView
+```
+
+
+
+
+
+---
+
+
+
+### method `add_columns`
+
+```python
+add_columns(*columns: 'str') → SavedView
+```
+
+Convenience method for adding multiple columns to the grid. 
+
+---
+
+
+
+### method `add_filter`
+
+```python
+add_filter(
+    field: 'str',
+    operator: 'str',
+    value: 'Any | None' = None
+) → SavedView
+```
+
+
+
+
+
+---
+
+
+
+### method `add_sort`
+
+```python
+add_sort(field: 'str', direction: 'SortDirection') → SavedView
+```
+
+
+
+
+
+---
+
+
+
+### method `column_index`
+
+```python
+column_index(path: 'int | str | ObjectPath') → int
+```
+
+
+
+
+
+---
+
+
+
+### method `filter_op`
+
+```python
+filter_op(op_name: 'str | None') → SavedView
+```
+
+
+
+
+
+---
+
+
+
+### method `get_calls`
+
+```python
+get_calls(
+    limit: 'int | None' = None,
+    offset: 'int | None' = None,
+    include_costs: 'bool' = False,
+    include_feedback: 'bool' = False,
+    all_columns: 'bool' = False
+) → CallsIter
+```
+
+Get calls matching this saved view's filters and settings. 
+
+---
+
+
+
+### method `get_known_columns`
+
+```python
+get_known_columns(num_calls_to_query: 'int | None' = None) → list[str]
+```
+
+Get the set of columns that are known to exist. 
+
+---
+
+
+
+### method `get_table_columns`
+
+```python
+get_table_columns() → list[TableColumn]
+```
+
+
+
+
+
+---
+
+
+
+### method `hide_column`
+
+```python
+hide_column(col_name: 'str') → SavedView
+```
+
+
+
+
+
+---
+
+
+
+### method `insert_column`
+
+```python
+insert_column(
+    idx: 'int',
+    path: 'str | ObjectPath',
+    label: 'str | None' = None
+) → SavedView
+```
+
+
+
+
+
+---
+
+
+
+### classmethod `load`
+
+```python
+load(ref: 'str') → SavedView
+```
+
+
+
+
+
+---
+
+
+
+### method `page_size`
+
+```python
+page_size(page_size: 'int') → SavedView
+```
+
+
+
+
+
+---
+
+
+
+### method `pin_column_left`
+
+```python
+pin_column_left(col_name: 'str') → SavedView
+```
+
+
+
+
+
+---
+
+
+
+### method `pin_column_right`
+
+```python
+pin_column_right(col_name: 'str') → SavedView
+```
+
+
+
+
+
+---
+
+
+
+### method `remove_column`
+
+```python
+remove_column(path: 'int | str | ObjectPath') → SavedView
+```
+
+
+
+
+
+---
+
+
+
+### method `remove_columns`
+
+```python
+remove_columns(*columns: 'str') → SavedView
+```
+
+Remove columns from the saved view. 
+
+---
+
+
+
+### method `remove_filter`
+
+```python
+remove_filter(index_or_field: 'int | str') → SavedView
+```
+
+
+
+
+
+---
+
+
+
+### method `remove_filters`
+
+```python
+remove_filters() → SavedView
+```
+
+Remove all filters from the saved view. 
+
+---
+
+
+
+### method `rename`
+
+```python
+rename(label: 'str') → SavedView
+```
+
+
+
+
+
+---
+
+
+
+### method `rename_column`
+
+```python
+rename_column(path: 'int | str | ObjectPath', label: 'str') → SavedView
+```
+
+
+
+
+
+---
+
+
+
+### method `save`
+
+```python
+save() → SavedView
+```
+
+Publish the saved view to the server. 
+
+---
+
+
+
+### method `set_columns`
+
+```python
+set_columns(*columns: 'str') → SavedView
+```
+
+Set the columns to be displayed in the grid. 
+
+---
+
+
+
+### method `show_column`
+
+```python
+show_column(col_name: 'str') → SavedView
+```
+
+
+
+
+
+---
+
+
+
+### method `sort_by`
+
+```python
+sort_by(field: 'str', direction: 'SortDirection') → SavedView
+```
+
+
+
+
+
+---
+
+
+
+### method `to_grid`
+
+```python
+to_grid(limit: 'int | None' = None) → Grid
+```
+
+
+
+
+
+---
+
+
+
+### method `to_rich_table_str`
+
+```python
+to_rich_table_str() → str
+```
+
+
+
+
+
+---
+
+
+
+### method `ui_url`
+
+```python
+ui_url() → str | None
+```
+
+URL to show this saved view in the UI. 
+
+Note this is the "result" page with traces etc, not the URL for the view object. 
+
+---
+
+
+
+### method `unpin_column`
+
+```python
+unpin_column(col_name: 'str') → SavedView
+```
+
+[Source](https://weave-docs.wandb.ai/reference/python-sdk/weave/index)
+
+<!--- Docs: Python SDK -->
+<!--- Weave.Trace.Op -->
+
+# Weave.Trace.Op
+
+# weave.trace.op
+
+Defines the Op protocol and related functions.
+
+---
+
+
+# API Overview
+
+
+
+
+
+## Functions
+
+- [`op.call`](#function-call): Executes the op and returns both the result and a Call representing the execution.
+- [`op.calls`](#function-calls): Get an iterator over all calls to this op.
+
+
+---
+
+
+
+
+### function `call`
+
+```python
+call(
+    op: 'Op',
+    *args: 'Any',
+    __weave: 'WeaveKwargs | None' = None,
+    __should_raise: 'bool' = False,
+    __require_explicit_finish: 'bool' = False,
+    **kwargs: 'Any'
+) → tuple[Any, Call] | Coroutine[Any, Any, tuple[Any, Call]]
+```
+
+Executes the op and returns both the result and a Call representing the execution. 
+
+This function will never raise.  Any errors are captured in the Call object. 
+
+This method is automatically bound to any function decorated with `@weave.op`, allowing for usage like: 
+
+```python
+@weave.op
+def add(a: int, b: int) -> int:
+     return a + b
+
+result, call = add.call(1, 2)
+``` 
+
+---
+
+
+
+### function `calls`
+
+```python
+calls(op: 'Op') → CallsIter
+```
+
+Get an iterator over all calls to this op. 
+
+This method is automatically bound to any function decorated with `@weave.op`, allowing for usage like: 
+
+```python
+@weave.op
+def add(a: int, b: int) -> int:
+     return a + b
+
+calls = add.calls()
+for call in calls:
+     print(call)
+```
+
+[Source](https://weave-docs.wandb.ai/reference/python-sdk/weave/trace/weave.trace.op)
+
+<!--- Docs: Python SDK -->
+<!--- Weave.Trace.Weave Client -->
+
+# Weave.Trace.Weave Client
+
+# weave.trace.weave_client
+
+
+
+---
+
+
+# API Overview
+
+
+
+## Classes
+
+- [`weave_client.WeaveClient`](#class-weaveclient)
+- [`weave_client.Call`](#class-call): A Call represents a single operation that was executed as part of a trace.
+
+## Functions
+
+- [`weave_client.PaginatedIterator`](#function-paginatediterator)
+
+
+---
+
+
+
+
+## class `WeaveClient`
+
+
+
+
+
+
+### method `__init__`
+
+```python
+__init__(
+    entity: 'str',
+    project: 'str',
+    server: 'TraceServerInterface',
+    ensure_project_exists: 'bool' = True
+)
+```
+
+
+
+
+
+
+---
+
+#### property num_outstanding_jobs
+
+Returns the total number of pending jobs across all executors and the server. 
+
+This property can be used to check the progress of background tasks without blocking the main thread. 
+
+
+
+**Returns:**
+ 
+ - `int`:  The total number of pending jobs 
+
+
+
+---
+
+
+
+### method `add_cost`
+
+```python
+add_cost(
+    llm_id: 'str',
+    prompt_token_cost: 'float',
+    completion_token_cost: 'float',
+    effective_date: 'datetime | None' = datetime.datetime(2025, 4, 30, 23, 50, 40, 886784, tzinfo=datetime.timezone.utc),
+    prompt_token_cost_unit: 'str | None' = 'USD',
+    completion_token_cost_unit: 'str | None' = 'USD',
+    provider_id: 'str | None' = 'default'
+) → CostCreateRes
+```
+
+Add a cost to the current project. 
+
+
+
+**Examples:**
+ 
+
+```python
+     client.add_cost(llm_id="my_expensive_custom_model", prompt_token_cost=1, completion_token_cost=2)
+     client.add_cost(llm_id="my_expensive_custom_model", prompt_token_cost=500, completion_token_cost=1000, effective_date=datetime(1998, 10, 3))
+    ``` 
+
+
+
+**Args:**
+ 
+ - `llm_id`:  The ID of the LLM. eg "gpt-4o-mini-2024-07-18" 
+ - `prompt_token_cost`:  The cost per prompt token. eg .0005 
+ - `completion_token_cost`:  The cost per completion token. eg .0015 
+ - `effective_date`:  Defaults to the current date. A datetime.datetime object. 
+ - `provider_id`:  The provider of the LLM. Defaults to "default". eg "openai" 
+ - `prompt_token_cost_unit`:  The unit of the cost for the prompt tokens. Defaults to "USD". (Currently unused, will be used in the future to specify the currency type for the cost eg "tokens" or "time") 
+ - `completion_token_cost_unit`:  The unit of the cost for the completion tokens. Defaults to "USD". (Currently unused, will be used in the future to specify the currency type for the cost eg "tokens" or "time") 
+
+
+
+**Returns:**
+ A CostCreateRes object. Which has one field called a list of tuples called ids. Each tuple contains the llm_id and the id of the created cost object. 
+
+---
+
+
+
+### method `call`
+
+```python
+call(call_id: 'str', include_costs: 'bool' = False) → WeaveObject
+```
+
+
+
+
+
+---
+
+
+
+### method `calls`
+
+```python
+calls(
+    filter: 'CallsFilter | None' = None,
+    include_costs: 'bool' = False
+) → CallsIter
+```
+
+
+
+
+
+---
+
+
+
+### method `create_call`
+
+```python
+create_call(
+    op: 'str | Op',
+    inputs: 'dict',
+    parent: 'Call | None' = None,
+    attributes: 'dict | None' = None,
+    display_name: 'str | Callable[[Call], str] | None' = None,
+    use_stack: 'bool' = True
+) → Call
+```
+
+Create, log, and push a call onto the runtime stack. 
+
+
+
+**Args:**
+ 
+ - `op`:  The operation producing the call, or the name of an anonymous operation. 
+ - `inputs`:  The inputs to the operation. 
+ - `parent`:  The parent call. If parent is not provided, the current run is used as the parent. 
+ - `display_name`:  The display name for the call. Defaults to None. 
+ - `attributes`:  The attributes for the call. Defaults to None. 
+ - `use_stack`:  Whether to push the call onto the runtime stack. Defaults to True. 
+
+
+
+**Returns:**
+ The created Call object. 
+
+---
+
+
+
+### method `delete_call`
+
+```python
+delete_call(call: 'Call') → None
+```
+
+
+
+
+
+---
+
+
+
+### method `delete_calls`
+
+```python
+delete_calls(call_ids: 'list[str]') → None
+```
+
+Delete calls by their IDs. 
+
+Deleting a call will also delete all of its children. 
+
+
+
+**Args:**
+ 
+ - `call_ids`:  A list of call IDs to delete. Ex: ["2F0193e107-8fcf-7630-b576-977cc3062e2e"] 
+
+---
+
+
+
+### method `delete_object_version`
+
+```python
+delete_object_version(object: 'ObjectRef') → None
+```
+
+
+
+
+
+---
+
+
+
+### method `delete_op_version`
+
+```python
+delete_op_version(op: 'OpRef') → None
+```
+
+
+
+
+
+---
+
+
+
+### method `fail_call`
+
+```python
+fail_call(call: 'Call', exception: 'BaseException') → None
+```
+
+Fail a call with an exception. This is a convenience method for finish_call. 
+
+---
+
+
+
+### method `feedback`
+
+```python
+feedback(
+    query: 'Query | str | None' = None,
+    reaction: 'str | None' = None,
+    offset: 'int' = 0,
+    limit: 'int' = 100
+) → FeedbackQuery
+```
+
+
+
+
+
+---
+
+
+
+### method `finish`
+
+```python
+finish(
+    use_progress_bar: 'bool' = True,
+    callback: 'Callable[[FlushStatus], None] | None' = None
+) → None
+```
+
+Flushes all background tasks to ensure they are processed. 
+
+This method blocks until all currently enqueued jobs are processed, displaying a progress bar to show the status of the pending tasks. It ensures parallel processing during main thread execution and can improve performance when user code completes before data has been uploaded to the server. 
+
+
+
+**Args:**
+ 
+ - `use_progress_bar`:  Whether to display a progress bar during flush.  Set to False for environments where a progress bar  would not render well (e.g., CI environments). 
+ - `callback`:  Optional callback function that receives status updates.  Overrides use_progress_bar. 
+
+---
+
+
+
+### method `finish_call`
+
+```python
+finish_call(
+    call: 'Call',
+    output: 'Any' = None,
+    exception: 'BaseException | None' = None,
+    op: 'Op | None' = None
+) → None
+```
+
+
+
+
+
+---
+
+
+
+### method `flush`
+
+```python
+flush() → None
+```
+
+Flushes background asynchronous tasks, safe to call multiple times. 
+
+---
+
+
+
+### method `get`
+
+```python
+get(ref: 'ObjectRef', objectify: 'bool' = True) → Any
+```
+
+
+
+
+
+---
+
+
+
+### method `get_call`
+
+```python
+get_call(
+    call_id: 'str',
+    include_costs: 'bool' = False,
+    include_feedback: 'bool' = False,
+    columns: 'list[str] | None' = None
+) → WeaveObject
+```
+
+Get a single call by its ID. 
+
+
+
+**Args:**
+ 
+ - `call_id`:  The ID of the call to get. 
+ - `include_costs`:  If true, cost info is included at summary.weave 
+ - `include_feedback`:  If true, feedback info is included at summary.weave.feedback 
+ - `columns`:  A list of columns to include in the response. If None,  all columns are included. Specifying fewer columns may be more performant. 
+ - `Some columns are always included`:  id, project_id, trace_id, op_name, started_at 
+
+
+
+**Returns:**
+ A call object. 
+
+---
+
+
+
+### method `get_calls`
+
+```python
+get_calls(
+    filter: 'CallsFilter | None' = None,
+    limit: 'int | None' = None,
+    offset: 'int | None' = None,
+    sort_by: 'list[SortBy] | None' = None,
+    query: 'Query | None' = None,
+    include_costs: 'bool' = False,
+    include_feedback: 'bool' = False,
+    columns: 'list[str] | None' = None,
+    scored_by: 'str | list[str] | None' = None,
+    page_size: 'int' = 1000
+) → CallsIter
+```
+
+Get a list of calls. 
+
+
+
+**Args:**
+ 
+ - `filter`:  A filter to apply to the calls. 
+ - `limit`:  The maximum number of calls to return. 
+ - `offset`:  The number of calls to skip. 
+ - `sort_by`:  A list of fields to sort the calls by. 
+ - `query`:  A mongo-like query to filter the calls. 
+ - `include_costs`:  If true, cost info is included at summary.weave 
+ - `include_feedback`:  If true, feedback info is included at summary.weave.feedback 
+ - `columns`:  A list of columns to include in the response. If None,  all columns are included. Specifying fewer columns may be more performant. 
+ - `Some columns are always included`:  id, project_id, trace_id, op_name, started_at 
+ - `scored_by`:  Accepts a list or single item. Each item is a name or ref uri of a scorer  to filter by. Multiple scorers are ANDed together. If passing in just the name,  then scores for all versions of the scorer are returned. If passing in the full ref  URI, then scores for a specific version of the scorer are returned. 
+ - `page_size`:  Tune performance by changing the number of calls fetched at a time. 
+
+
+
+**Returns:**
+ An iterator of calls. 
+
+---
+
+
+
+### method `get_feedback`
+
+```python
+get_feedback(
+    query: 'Query | str | None' = None,
+    reaction: 'str | None' = None,
+    offset: 'int' = 0,
+    limit: 'int' = 100
+) → FeedbackQuery
+```
+
+Query project for feedback. 
+
+
+
+**Examples:**
+ ```python
+     # Fetch a specific feedback object.
+     # Note that this still returns a collection, which is expected
+     # to contain zero or one item(s).
+     client.get_feedback("1B4082A3-4EDA-4BEB-BFEB-2D16ED59AA07")
+
+     # Find all feedback objects with a specific reaction.
+     client.get_feedback(reaction="👍", limit=10)
+    ``` 
+
+
+
+**Args:**
+ 
+ - `query`:  A mongo-style query expression. For convenience, also accepts a feedback UUID string. 
+ - `reaction`:  For convenience, filter by a particular reaction emoji. 
+ - `offset`:  The offset to start fetching feedback objects from. 
+ - `limit`:  The maximum number of feedback objects to fetch. 
+
+
+
+**Returns:**
+ A FeedbackQuery object. 
+
+---
+
+
+
+### method `purge_costs`
+
+```python
+purge_costs(ids: 'list[str] | str') → None
+```
+
+Purge costs from the current project. 
+
+
+
+**Examples:**
+ 
+
+```python
+     client.purge_costs([ids])
+     client.purge_costs(ids)
+    ``` 
+
+
+
+**Args:**
+ 
+ - `ids`:  The cost IDs to purge. Can be a single ID or a list of IDs. 
+
+---
+
+
+
+### method `query_costs`
+
+```python
+query_costs(
+    query: 'Query | str | None' = None,
+    llm_ids: 'list[str] | None' = None,
+    offset: 'int' = 0,
+    limit: 'int' = 100
+) → list[CostQueryOutput]
+```
+
+Query project for costs. 
+
+
+
+**Examples:**
+ 
+
+```python
+     # Fetch a specific cost object.
+     # Note that this still returns a collection, which is expected
+     # to contain zero or one item(s).
+     client.query_costs("1B4082A3-4EDA-4BEB-BFEB-2D16ED59AA07")
+
+     # Find all cost objects with a specific reaction.
+     client.query_costs(llm_ids=["gpt-4o-mini-2024-07-18"], limit=10)
+    ``` 
+
+
+
+**Args:**
+ 
+ - `query`:  A mongo-style query expression. For convenience, also accepts a cost UUID string. 
+ - `llm_ids`:  For convenience, filter for a set of llm_ids. 
+ - `offset`:  The offset to start fetching cost objects from. 
+ - `limit`:  The maximum number of cost objects to fetch. 
+
+
+
+**Returns:**
+ A CostQuery object. 
+
+---
+
+
+
+### method `save`
+
+```python
+save(val: 'Any', name: 'str', branch: 'str' = 'latest') → Any
+```
+
+Do not call directly, use weave.publish() instead. 
+
+
+
+**Args:**
+ 
+ - `val`:  The object to save. 
+ - `name`:  The name to save the object under. 
+ - `branch`:  The branch to save the object under. Defaults to "latest". 
+
+
+
+**Returns:**
+ A deserialized version of the saved object. 
+
+
+---
+
+
+
+## class `Call`
+A Call represents a single operation that was executed as part of a trace. 
+
+">
+
+### method `__init__`
+
+```python
+__init__(
+    _op_name: 'str | Future[str]',
+    trace_id: 'str',
+    project_id: 'str',
+    parent_id: 'str | None',
+    inputs: 'dict',
+    id: 'str | None' = None,
+    output: 'Any' = None,
+    exception: 'str | None' = None,
+    summary: 'dict | None' = None,
+    _display_name: 'str | Callable[[Call], str] | None' = None,
+    attributes: 'dict | None' = None,
+    started_at: 'datetime | None' = None,
+    ended_at: 'datetime | None' = None,
+    deleted_at: 'datetime | None' = None,
+    _children: 'list[Call]' = &lt;factory&gt;,
+    _feedback: 'RefFeedbackQuery | None' = None
+) → None
+```
+
+
+
+
+
+
+---
+
+#### property display_name
+
+
+
+
+
+---
+
+#### property feedback
+
+
+
+
+
+---
+
+#### property func_name
+
+The decorated function's name that produced this call. 
+
+This is different from `op_name` which is usually the ref of the op. 
+
+---
+
+#### property op_name
+
+
+
+
+
+---
+
+#### property ref
+
+
+
+
+
+---
+
+#### property ui_url
+
+
+
+
+
+
+
+---
+
+
+
+### method `apply_scorer`
+
+```python
+apply_scorer(
+    scorer: 'Op | Scorer',
+    additional_scorer_kwargs: 'dict | None' = None
+) → ApplyScorerResult
+```
+
+`apply_scorer` is a method that applies a Scorer to a Call. This is useful for guarding application logic with a scorer and/or monitoring the quality of critical ops. Scorers are automatically logged to Weave as Feedback and can be used in queries & analysis. 
+
+
+
+**Args:**
+ 
+ - `scorer`:  The Scorer to apply. 
+ - `additional_scorer_kwargs`:  Additional kwargs to pass to the scorer. This is  useful for passing in additional context that is not part of the call  inputs.useful for passing in additional context that is not part of the call  inputs. 
+
+
+
+**Returns:**
+ The result of the scorer application in the form of an `ApplyScorerResult`. 
+
+```python
+class ApplyScorerSuccess:
+
+ - `    result`:  Any
+
+ - `    score_call`:  Call
+``` 
+
+Example usage: 
+
+```python
+my_scorer = ... # construct a scorer
+prediction, prediction_call = my_op.call(input_data)
+result, score_call = prediction.apply_scorer(my_scorer)
+``` 
+
+---
+
+
+
+### method `children`
+
+```python
+children(page_size: 'int' = 1000) → CallsIter
+```
+
+Get the children of the call. 
+
+
+
+**Args:**
+ 
+ - `page_size`:  Tune performance by changing the number of calls fetched at a time. 
+
+
+
+**Returns:**
+ An iterator of calls. 
+
+---
+
+
+
+### method `delete`
+
+```python
+delete() → bool
+```
+
+Delete the call. 
+
+---
+
+
+
+### method `remove_display_name`
+
+```python
+remove_display_name() → None
+```
+
+
+
+
+
+---
+
+
+
+### method `set_display_name`
+
+```python
+set_display_name(name: 'str | None') → None
+```
+
+Set the display name for the call. 
+
+
+
+**Args:**
+ 
+ - `name`:  The display name to set for the call. 
+
+
+
+**Example:**
+ 
+
+```python
+result, call = my_function.call("World")
+call.set_display_name("My Custom Display Name")
+``` 
+
+---
+
+
+
+### method `to_dict`
+
+```python
+to_dict() → CallDict
+```
+
+
+
+
+
+
+---
+
+### function `PaginatedIterator`
+
+```python
+PaginatedIterator(*args, **kwargs)
+```
+
+[Source](https://weave-docs.wandb.ai/reference/python-sdk/weave/trace/weave.trace.weave_client)
+
+<!--- Docs: Python SDK -->
+<!--- Weave.Trace.Util -->
+
+# Weave.Trace.Util
+
+# weave.trace.util
+
+
+
+---
+
+
+# API Overview
+
+
+
+## Classes
+
+- [`util.ContextAwareThreadPoolExecutor`](#class-contextawarethreadpoolexecutor): A ThreadPoolExecutor that runs functions with the context of the caller.
+- [`util.ContextAwareThread`](#class-contextawarethread): A Thread that runs functions with the context of the caller.
+
+
+
+
+---
+
+
+
+
+## class `ContextAwareThreadPoolExecutor`
+A ThreadPoolExecutor that runs functions with the context of the caller. 
+
+This is a drop-in replacement for concurrent.futures.ThreadPoolExecutor that ensures weave calls behave as expected inside the executor.  Weave requires certain contextvars to be set (see call_context.py), but new threads do not automatically copy context from the parent, which can cause the call context to be lost -- not good!  This class automates contextvar copying so using this executor "just works" as the user probably expects. 
+
+You can achieve the same effect without this class by instead writing: 
+
+```python
+with concurrent.futures.ThreadPoolExecutor() as executor:
+     contexts = [copy_context() for _ in range(len(vals))]
+
+     def _wrapped_fn(*args):
+         return contexts.pop().run(fn, *args)
+
+     executor.map(_wrapped_fn, vals)
+``` 
+
+
+
+### method `__init__`
+
+```python
+__init__(*args: 'Any', **kwargs: 'Any') → None
+```
+
+
+
+
+
+
+
+
+---
+
+
+
+### method `map`
+
+```python
+map(
+    fn: 'Callable',
+    *iterables: 'Iterable[Any]',
+    timeout: 'float | None' = None,
+    chunksize: 'int' = 1
+) → Iterator
+```
+
+
+
+
+
+---
+
+
+
+### method `submit`
+
+```python
+submit(fn: 'Callable', *args: 'Any', **kwargs: 'Any') → Any
+```
+
+
+
+
+
+
+---
+
+
+
+## class `ContextAwareThread`
+A Thread that runs functions with the context of the caller. 
+
+This is a drop-in replacement for threading.Thread that ensures calls behave as expected inside the thread.  Weave requires certain contextvars to be set (see call_context.py), but new threads do not automatically copy context from the parent, which can cause the call context to be lost -- not good!  This class automates contextvar copying so using this thread "just works" as the user probably expects. 
+
+You can achieve the same effect without this class by instead writing: 
+
+```python
+def run_with_context(func, *args, **kwargs):
+     context = copy_context()
+     def wrapper():
+         context.run(func, *args, **kwargs)
+     return wrapper
+
+thread = threading.Thread(target=run_with_context(your_func, *args, **kwargs))
+thread.start()
+``` 
+
+
+
+### method `__init__`
+
+```python
+__init__(*args: 'Any', **kwargs: 'Any') → None
+```
+
+
+
+
+
+
+---
+
+#### property daemon
+
+A boolean value indicating whether this thread is a daemon thread. 
+
+This must be set before start() is called, otherwise RuntimeError is raised. Its initial value is inherited from the creating thread; the main thread is not a daemon thread and therefore all threads created in the main thread default to daemon = False. 
+
+The entire Python program exits when only daemon threads are left. 
+
+---
+
+#### property ident
+
+Thread identifier of this thread or None if it has not been started. 
+
+This is a nonzero integer. See the get_ident() function. Thread identifiers may be recycled when a thread exits and another thread is created. The identifier is available even after the thread has exited. 
+
+---
+
+#### property name
+
+A string used for identification purposes only. 
+
+It has no semantics. Multiple threads may be given the same name. The initial name is set by the constructor. 
+
+---
+
+#### property native_id
+
+Native integral thread ID of this thread, or None if it has not been started. 
+
+This is a non-negative integer. See the get_native_id() function. This represents the Thread ID as reported by the kernel. 
+
+
+
+---
+
+
+
+### method `run`
+
+```python
+run() → None
+```
+
+[Source](https://weave-docs.wandb.ai/reference/python-sdk/weave/trace/weave.trace.util)
+
+<!--- Docs: Python SDK -->
+<!--- Weave.Trace.Feedback -->
+
+# Weave.Trace.Feedback
+
+# weave.trace.feedback
+
+Classes for working with feedback on a project or ref level.
+
+---
+
+
+# API Overview
+
+
+
+## Classes
+
+- [`feedback.Feedbacks`](#class-feedbacks): A collection of Feedback objects with utilities.
+- [`feedback.FeedbackQuery`](#class-feedbackquery): Lazy-loading object for fetching feedback from the server.
+- [`feedback.RefFeedbackQuery`](#class-reffeedbackquery): Object for interacting with feedback associated with a particular ref.
+
+
+
+
+---
+
+
+
+
+## class `Feedbacks`
+A collection of Feedback objects with utilities. 
+
+
+
+### method `__init__`
+
+```python
+__init__(
+    show_refs: 'bool',
+    feedbacks: 'Iterable[Feedback] | None' = None
+) → None
+```
+
+
+
+
+
+
+
+
+---
+
+
+
+### method `refs`
+
+```python
+refs() → Refs
+```
+
+Return the unique refs associated with these feedbacks. 
+
+
+---
+
+
+
+## class `FeedbackQuery`
+Lazy-loading object for fetching feedback from the server. 
+
+
+
+### method `__init__`
+
+```python
+__init__(
+    entity: 'str',
+    project: 'str',
+    query: 'Query',
+    offset: 'int | None' = None,
+    limit: 'int | None' = None,
+    show_refs: 'bool' = False
+)
+```
+
+
+
+
+
+
+
+
+---
+
+
+
+### method `execute`
+
+```python
+execute() → Feedbacks
+```
+
+
+
+
+
+---
+
+
+
+### method `refresh`
+
+```python
+refresh() → Feedbacks
+```
+
+
+
+
+
+---
+
+
+
+### method `refs`
+
+```python
+refs() → Refs
+```
+
+
+
+
+
+
+---
+
+
+
+## class `RefFeedbackQuery`
+Object for interacting with feedback associated with a particular ref. 
+
+
+
+### method `__init__`
+
+```python
+__init__(ref: 'str') → None
+```
+
+
+
+
+
+
+
+
+---
+
+
+
+### method `add`
+
+```python
+add(
+    feedback_type: 'str',
+    payload: 'dict[str, Any] | None' = None,
+    creator: 'str | None' = None,
+    annotation_ref: 'str | None' = None,
+    **kwargs: 'dict[str, Any]'
+) → str
+```
+
+Add feedback to the ref. 
+
+feedback_type: A string identifying the type of feedback. The "wandb." prefix is reserved. creator: The name to display for the originator of the feedback. 
+
+---
+
+
+
+### method `add_note`
+
+```python
+add_note(note: 'str', creator: 'str | None' = None) → str
+```
+
+
+
+
+
+---
+
+
+
+### method `add_reaction`
+
+```python
+add_reaction(emoji: 'str', creator: 'str | None' = None) → str
+```
+
+
+
+
+
+---
+
+
+
+### method `execute`
+
+```python
+execute() → Feedbacks
+```
+
+
+
+
+
+---
+
+
+
+### method `purge`
+
+```python
+purge(feedback_id: 'str') → None
+```
+
+
+
+
+
+---
+
+
+
+### method `refresh`
+
+```python
+refresh() → Feedbacks
+```
+
+
+
+
+
+---
+
+
+
+### method `refs`
+
+```python
+refs() → Refs
+```
+
+[Source](https://weave-docs.wandb.ai/reference/python-sdk/weave/trace/weave.trace.feedback)
+
+<!--- Docs: Python SDK -->
+<!--- Weave.Trace Server Bindings.Remote Http Trace Server -->
+
+# Weave.Trace Server Bindings.Remote Http Trace Server
+
+# weave.trace_server_bindings.remote_http_trace_server
+
+
+
+---
+
+
+# API Overview
+
+
+
+## Classes
+
+- [`remote_http_trace_server.RemoteHTTPTraceServer`](#class-remotehttptraceserver)
+- [`remote_http_trace_server.ServerInfoRes`](#class-serverinfores)
+- [`remote_http_trace_server.StartBatchItem`](#class-startbatchitem)
+- [`remote_http_trace_server.EndBatchItem`](#class-endbatchitem)
+- [`remote_http_trace_server.Batch`](#class-batch)
+
+
+
+
+---
+
+
+
+
+## class `RemoteHTTPTraceServer`
+
+
+
+
+
+
+### method `__init__`
+
+```python
+__init__(
+    trace_server_url: str,
+    should_batch: bool = False,
+    remote_request_bytes_limit: int = 32505856
+)
+```
+
+
+
+
+
+
+
+
+---
+
+
+
+### method `actions_execute_batch`
+
+```python
+actions_execute_batch(
+    req: Union[ActionsExecuteBatchReq, dict[str, Any]]
+) → ActionsExecuteBatchRes
+```
+
+
+
+
+
+---
+
+
+
+### method `call_end`
+
+```python
+call_end(req: Union[CallEndReq, dict[str, Any]]) → CallEndRes
+```
+
+
+
+
+
+---
+
+
+
+### method `call_read`
+
+```python
+call_read(req: Union[CallReadReq, dict[str, Any]]) → CallReadRes
+```
+
+
+
+
+
+---
+
+
+
+### method `call_start`
+
+```python
+call_start(req: Union[CallStartReq, dict[str, Any]]) → CallStartRes
+```
+
+
+
+
+
+---
+
+
+
+### method `call_start_batch`
+
+```python
+call_start_batch(req: CallCreateBatchReq) → CallCreateBatchRes
+```
+
+
+
+
+
+---
+
+
+
+### method `call_update`
+
+```python
+call_update(req: Union[CallUpdateReq, dict[str, Any]]) → CallUpdateRes
+```
+
+
+
+
+
+---
+
+
+
+### method `calls_delete`
+
+```python
+calls_delete(req: Union[CallsDeleteReq, dict[str, Any]]) → CallsDeleteRes
+```
+
+
+
+
+
+---
+
+
+
+### method `calls_query`
+
+```python
+calls_query(req: Union[CallsQueryReq, dict[str, Any]]) → CallsQueryRes
+```
+
+
+
+
+
+---
+
+
+
+### method `calls_query_stats`
+
+```python
+calls_query_stats(
+    req: Union[CallsQueryStatsReq, dict[str, Any]]
+) → CallsQueryStatsRes
+```
+
+
+
+
+
+---
+
+
+
+### method `calls_query_stream`
+
+```python
+calls_query_stream(
+    req: Union[CallsQueryReq, dict[str, Any]]
+) → Iterator[CallSchema]
+```
+
+
+
+
+
+---
+
+
+
+### method `completions_create`
+
+```python
+completions_create(req: CompletionsCreateReq) → CompletionsCreateRes
+```
+
+
+
+
+
+---
+
+
+
+### method `cost_create`
+
+```python
+cost_create(req: Union[CostCreateReq, dict[str, Any]]) → CostCreateRes
+```
+
+
+
+
+
+---
+
+
+
+### method `cost_purge`
+
+```python
+cost_purge(req: Union[CostPurgeReq, dict[str, Any]]) → CostPurgeRes
+```
+
+
+
+
+
+---
+
+
+
+### method `cost_query`
+
+```python
+cost_query(req: Union[CostQueryReq, dict[str, Any]]) → CostQueryRes
+```
+
+
+
+
+
+---
+
+
+
+### method `ensure_project_exists`
+
+```python
+ensure_project_exists(entity: str, project: str) → EnsureProjectExistsRes
+```
+
+
+
+
+
+---
+
+
+
+### method `feedback_create`
+
+```python
+feedback_create(
+    req: Union[FeedbackCreateReq, dict[str, Any]]
+) → FeedbackCreateRes
+```
+
+
+
+
+
+---
+
+
+
+### method `feedback_purge`
+
+```python
+feedback_purge(req: Union[FeedbackPurgeReq, dict[str, Any]]) → FeedbackPurgeRes
+```
+
+
+
+
+
+---
+
+
+
+### method `feedback_query`
+
+```python
+feedback_query(req: Union[FeedbackQueryReq, dict[str, Any]]) → FeedbackQueryRes
+```
+
+
+
+
+
+---
+
+
+
+### method `feedback_replace`
+
+```python
+feedback_replace(
+    req: Union[FeedbackReplaceReq, dict[str, Any]]
+) → FeedbackReplaceRes
+```
+
+
+
+
+
+---
+
+
+
+### method `file_content_read`
+
+```python
+file_content_read(req: FileContentReadReq) → FileContentReadRes
+```
+
+
+
+
+
+---
+
+
+
+### method `file_create`
+
+```python
+file_create(req: FileCreateReq) → FileCreateRes
+```
+
+
+
+
+
+---
+
+
+
+### method `files_stats`
+
+```python
+files_stats(req: FilesStatsReq) → FilesStatsRes
+```
+
+
+
+
+
+---
+
+
+
+### classmethod `from_env`
+
+```python
+from_env(should_batch: bool = False) → RemoteHTTPTraceServer
+```
+
+
+
+
+
+---
+
+
+
+### method `obj_create`
+
+```python
+obj_create(req: Union[ObjCreateReq, dict[str, Any]]) → ObjCreateRes
+```
+
+
+
+
+
+---
+
+
+
+### method `obj_delete`
+
+```python
+obj_delete(req: ObjDeleteReq) → ObjDeleteRes
+```
+
+
+
+
+
+---
+
+
+
+### method `obj_read`
+
+```python
+obj_read(req: Union[ObjReadReq, dict[str, Any]]) → ObjReadRes
+```
+
+
+
+
+
+---
+
+
+
+### method `objs_query`
+
+```python
+objs_query(req: Union[ObjQueryReq, dict[str, Any]]) → ObjQueryRes
+```
+
+
+
+
+
+---
+
+
+
+### method `op_create`
+
+```python
+op_create(req: Union[OpCreateReq, dict[str, Any]]) → OpCreateRes
+```
+
+
+
+
+
+---
+
+
+
+### method `op_read`
+
+```python
+op_read(req: Union[OpReadReq, dict[str, Any]]) → OpReadRes
+```
+
+
+
+
+
+---
+
+
+
+### method `ops_query`
+
+```python
+ops_query(req: Union[OpQueryReq, dict[str, Any]]) → OpQueryRes
+```
+
+
+
+
+
+---
+
+
+
+### method `otel_export`
+
+```python
+otel_export(req: OtelExportReq) → OtelExportRes
+```
+
+
+
+
+
+---
+
+
+
+### method `refs_read_batch`
+
+```python
+refs_read_batch(req: Union[RefsReadBatchReq, dict[str, Any]]) → RefsReadBatchRes
+```
+
+
+
+
+
+---
+
+
+
+### method `server_info`
+
+```python
+server_info() → ServerInfoRes
+```
+
+
+
+
+
+---
+
+
+
+### method `set_auth`
+
+```python
+set_auth(auth: tuple[str, str]) → None
+```
+
+
+
+
+
+---
+
+
+
+### method `table_create`
+
+```python
+table_create(req: Union[TableCreateReq, dict[str, Any]]) → TableCreateRes
+```
+
+Similar to `calls/batch_upsert`, we can dynamically adjust the payload size due to the property that table creation can be decomposed into a series of updates. This is useful when the table creation size is too big to be sent in a single request. We can create an empty table first, then update the table with the rows. 
+
+---
+
+
+
+### method `table_query`
+
+```python
+table_query(req: Union[TableQueryReq, dict[str, Any]]) → TableQueryRes
+```
+
+
+
+
+
+---
+
+
+
+### method `table_query_stats`
+
+```python
+table_query_stats(
+    req: Union[TableQueryStatsReq, dict[str, Any]]
+) → TableQueryStatsRes
+```
+
+
+
+
+
+---
+
+
+
+### method `table_query_stats_batch`
+
+```python
+table_query_stats_batch(
+    req: Union[TableQueryStatsReq, dict[str, Any]]
+) → TableQueryStatsRes
+```
+
+
+
+
+
+---
+
+
+
+### method `table_query_stream`
+
+```python
+table_query_stream(req: TableQueryReq) → Iterator[TableRowSchema]
+```
+
+
+
+
+
+---
+
+
+
+### method `table_update`
+
+```python
+table_update(req: TableUpdateReq) → TableUpdateRes
+```
+
+Similar to `calls/batch_upsert`, we can dynamically adjust the payload size due to the property that table updates can be decomposed into a series of updates. 
+
+
+---
+
+
+
+## class `ServerInfoRes`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `min_required_weave_python_version`: ``
+
+---
+
+
+
+## class `StartBatchItem`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `mode`: ``
+- `req`: ``
+
+---
+
+
+
+## class `EndBatchItem`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `mode`: ``
+- `req`: ``
+
+---
+
+
+
+## class `Batch`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `batch`: `list[typing.Union[StartBatchItem, EndBatchItem]]`
+
+[Source](https://weave-docs.wandb.ai/reference/python-sdk/weave/trace_server_bindings/weave.trace_server_bindings.remote_http_trace_server)
+
+<!--- Docs: Python SDK -->
+<!--- Weave.Trace Server.Trace Server Interface -->
+
+# Weave.Trace Server.Trace Server Interface
+
+# weave.trace_server.trace_server_interface
+
+
+
+---
+
+
+# API Overview
+
+
+
+## Classes
+
+- [`trace_server_interface.ActionsExecuteBatchReq`](#class-actionsexecutebatchreq)
+- [`trace_server_interface.ActionsExecuteBatchRes`](#class-actionsexecutebatchres)
+- [`trace_server_interface.CallBatchEndMode`](#class-callbatchendmode)
+- [`trace_server_interface.CallBatchStartMode`](#class-callbatchstartmode)
+- [`trace_server_interface.CallCreateBatchReq`](#class-callcreatebatchreq)
+- [`trace_server_interface.CallCreateBatchRes`](#class-callcreatebatchres)
+- [`trace_server_interface.CallEndReq`](#class-callendreq)
+- [`trace_server_interface.CallEndRes`](#class-callendres)
+- [`trace_server_interface.CallReadReq`](#class-callreadreq)
+- [`trace_server_interface.CallReadRes`](#class-callreadres)
+- [`trace_server_interface.CallSchema`](#class-callschema)
+- [`trace_server_interface.CallStartReq`](#class-callstartreq)
+- [`trace_server_interface.CallStartRes`](#class-callstartres)
+- [`trace_server_interface.CallUpdateReq`](#class-callupdatereq)
+- [`trace_server_interface.CallUpdateRes`](#class-callupdateres)
+- [`trace_server_interface.CallsDeleteReq`](#class-callsdeletereq)
+- [`trace_server_interface.CallsDeleteRes`](#class-callsdeleteres)
+- [`trace_server_interface.CallsFilter`](#class-callsfilter)
+- [`trace_server_interface.CallsQueryReq`](#class-callsqueryreq)
+- [`trace_server_interface.CallsQueryRes`](#class-callsqueryres)
+- [`trace_server_interface.CallsQueryStatsReq`](#class-callsquerystatsreq)
+- [`trace_server_interface.CallsQueryStatsRes`](#class-callsquerystatsres)
+- [`trace_server_interface.CompletionsCreateReq`](#class-completionscreatereq)
+- [`trace_server_interface.CompletionsCreateRequestInputs`](#class-completionscreaterequestinputs)
+- [`trace_server_interface.CompletionsCreateRes`](#class-completionscreateres)
+- [`trace_server_interface.CostCreateInput`](#class-costcreateinput)
+- [`trace_server_interface.CostCreateReq`](#class-costcreatereq)
+- [`trace_server_interface.CostCreateRes`](#class-costcreateres)
+- [`trace_server_interface.CostPurgeReq`](#class-costpurgereq)
+- [`trace_server_interface.CostPurgeRes`](#class-costpurgeres)
+- [`trace_server_interface.CostQueryOutput`](#class-costqueryoutput)
+- [`trace_server_interface.CostQueryReq`](#class-costqueryreq)
+- [`trace_server_interface.CostQueryRes`](#class-costqueryres)
+- [`trace_server_interface.EndedCallSchemaForInsert`](#class-endedcallschemaforinsert)
+- [`trace_server_interface.EnsureProjectExistsRes`](#class-ensureprojectexistsres)
+- [`trace_server_interface.ExportTracePartialSuccess`](#class-exporttracepartialsuccess)
+- [`trace_server_interface.ExtraKeysTypedDict`](#class-extrakeystypeddict)
+- [`trace_server_interface.Feedback`](#class-feedback)
+- [`trace_server_interface.FeedbackCreateReq`](#class-feedbackcreatereq)
+- [`trace_server_interface.FeedbackCreateRes`](#class-feedbackcreateres)
+- [`trace_server_interface.FeedbackDict`](#class-feedbackdict)
+- [`trace_server_interface.FeedbackPurgeReq`](#class-feedbackpurgereq)
+- [`trace_server_interface.FeedbackPurgeRes`](#class-feedbackpurgeres)
+- [`trace_server_interface.FeedbackQueryReq`](#class-feedbackqueryreq)
+- [`trace_server_interface.FeedbackQueryRes`](#class-feedbackqueryres)
+- [`trace_server_interface.FeedbackReplaceReq`](#class-feedbackreplacereq)
+- [`trace_server_interface.FeedbackReplaceRes`](#class-feedbackreplaceres)
+- [`trace_server_interface.FileContentReadReq`](#class-filecontentreadreq)
+- [`trace_server_interface.FileContentReadRes`](#class-filecontentreadres)
+- [`trace_server_interface.FileCreateReq`](#class-filecreatereq)
+- [`trace_server_interface.FileCreateRes`](#class-filecreateres)
+- [`trace_server_interface.FilesStatsReq`](#class-filesstatsreq)
+- [`trace_server_interface.FilesStatsRes`](#class-filesstatsres)
+- [`trace_server_interface.LLMCostSchema`](#class-llmcostschema)
+- [`trace_server_interface.LLMUsageSchema`](#class-llmusageschema)
+- [`trace_server_interface.ObjCreateReq`](#class-objcreatereq)
+- [`trace_server_interface.ObjCreateRes`](#class-objcreateres)
+- [`trace_server_interface.ObjDeleteReq`](#class-objdeletereq)
+- [`trace_server_interface.ObjDeleteRes`](#class-objdeleteres)
+- [`trace_server_interface.ObjQueryReq`](#class-objqueryreq)
+- [`trace_server_interface.ObjQueryRes`](#class-objqueryres)
+- [`trace_server_interface.ObjReadReq`](#class-objreadreq)
+- [`trace_server_interface.ObjReadRes`](#class-objreadres)
+- [`trace_server_interface.ObjSchema`](#class-objschema)
+- [`trace_server_interface.ObjSchemaForInsert`](#class-objschemaforinsert)
+- [`trace_server_interface.ObjectVersionFilter`](#class-objectversionfilter)
+- [`trace_server_interface.OpCreateReq`](#class-opcreatereq)
+- [`trace_server_interface.OpCreateRes`](#class-opcreateres)
+- [`trace_server_interface.OpQueryReq`](#class-opqueryreq)
+- [`trace_server_interface.OpQueryRes`](#class-opqueryres)
+- [`trace_server_interface.OpReadReq`](#class-opreadreq)
+- [`trace_server_interface.OpReadRes`](#class-opreadres)
+- [`trace_server_interface.OpVersionFilter`](#class-opversionfilter)
+- [`trace_server_interface.OtelExportReq`](#class-otelexportreq)
+- [`trace_server_interface.OtelExportRes`](#class-otelexportres)
+- [`trace_server_interface.RefsReadBatchReq`](#class-refsreadbatchreq)
+- [`trace_server_interface.RefsReadBatchRes`](#class-refsreadbatchres)
+- [`trace_server_interface.SortBy`](#class-sortby)
+- [`trace_server_interface.StartedCallSchemaForInsert`](#class-startedcallschemaforinsert)
+- [`trace_server_interface.SummaryInsertMap`](#class-summaryinsertmap)
+- [`trace_server_interface.SummaryMap`](#class-summarymap)
+- [`trace_server_interface.TableAppendSpec`](#class-tableappendspec)
+- [`trace_server_interface.TableAppendSpecPayload`](#class-tableappendspecpayload)
+- [`trace_server_interface.TableCreateReq`](#class-tablecreatereq)
+- [`trace_server_interface.TableCreateRes`](#class-tablecreateres)
+- [`trace_server_interface.TableInsertSpec`](#class-tableinsertspec)
+- [`trace_server_interface.TableInsertSpecPayload`](#class-tableinsertspecpayload)
+- [`trace_server_interface.TablePopSpec`](#class-tablepopspec)
+- [`trace_server_interface.TablePopSpecPayload`](#class-tablepopspecpayload)
+- [`trace_server_interface.TableQueryReq`](#class-tablequeryreq)
+- [`trace_server_interface.TableQueryRes`](#class-tablequeryres)
+- [`trace_server_interface.TableQueryStatsBatchReq`](#class-tablequerystatsbatchreq)
+- [`trace_server_interface.TableQueryStatsBatchRes`](#class-tablequerystatsbatchres)
+- [`trace_server_interface.TableQueryStatsReq`](#class-tablequerystatsreq)
+- [`trace_server_interface.TableQueryStatsRes`](#class-tablequerystatsres)
+- [`trace_server_interface.TableRowFilter`](#class-tablerowfilter)
+- [`trace_server_interface.TableRowSchema`](#class-tablerowschema)
+- [`trace_server_interface.TableSchemaForInsert`](#class-tableschemaforinsert)
+- [`trace_server_interface.TableStatsRow`](#class-tablestatsrow)
+- [`trace_server_interface.TableUpdateReq`](#class-tableupdatereq)
+- [`trace_server_interface.TableUpdateRes`](#class-tableupdateres)
+- [`trace_server_interface.TraceServerInterface`](#class-traceserverinterface)
+- [`trace_server_interface.TraceStatus`](#class-tracestatus): An enumeration.
+- [`trace_server_interface.WeaveSummarySchema`](#class-weavesummaryschema)
+
+
+
+
+---
+
+
+
+
+## class `ActionsExecuteBatchReq`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `project_id`: ``
+- `action_ref`: ``
+- `call_ids`: `list[str]`
+- `wb_user_id`: `typing.Optional[str]`
+
+---
+
+
+
+## class `ActionsExecuteBatchRes`
+
+
+
+
+
+
+---
+
+
+
+## class `CallBatchEndMode`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `mode`: ``
+- `req`: ``
+
+---
+
+
+
+## class `CallBatchStartMode`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `mode`: ``
+- `req`: ``
+
+---
+
+
+
+## class `CallCreateBatchReq`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `batch`: `list[typing.Union[CallBatchStartMode, CallBatchEndMode]]`
+
+---
+
+
+
+## class `CallCreateBatchRes`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `res`: `list[typing.Union[CallStartRes, CallEndRes]]`
+
+---
+
+
+
+## class `CallEndReq`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `end`: ``
+
+---
+
+
+
+## class `CallEndRes`
+
+
+
+
+
+
+---
+
+
+
+## class `CallReadReq`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `project_id`: ``
+- `id`: ``
+- `include_costs`: `typing.Optional[bool]`
+- `include_storage_size`: `typing.Optional[bool]`
+- `include_total_storage_size`: `typing.Optional[bool]`
+
+---
+
+
+
+## class `CallReadRes`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `call`: `typing.Optional[CallSchema]`
+
+---
+
+
+
+## class `CallSchema`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `id`: ``
+- `project_id`: ``
+- `op_name`: ``
+- `display_name`: `typing.Optional[str]`
+- `trace_id`: ``
+- `parent_id`: `typing.Optional[str]`
+- `started_at`: ``
+- `attributes`: `dict[str, typing.Any]`
+- `inputs`: `dict[str, typing.Any]`
+- `ended_at`: `typing.Optional[datetime.datetime]`
+- `exception`: `typing.Optional[str]`
+- `output`: `typing.Optional[typing.Any]`
+- `summary`: `typing.Optional[SummaryMap]`
+- `wb_user_id`: `typing.Optional[str]`
+- `wb_run_id`: `typing.Optional[str]`
+- `deleted_at`: `typing.Optional[datetime.datetime]`
+- `storage_size_bytes`: `typing.Optional[int]`
+- `total_storage_size_bytes`: `typing.Optional[int]`
+---
+
+
+
+### method `serialize_typed_dicts`
+
+```python
+serialize_typed_dicts(v: dict[str, Any]) → dict[str, Any]
+```
+
+
+
+
+
+
+---
+
+
+
+## class `CallStartReq`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `start`: ``
+
+---
+
+
+
+## class `CallStartRes`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `id`: ``
+- `trace_id`: ``
+
+---
+
+
+
+## class `CallUpdateReq`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `project_id`: ``
+- `call_id`: ``
+- `display_name`: `typing.Optional[str]`
+- `wb_user_id`: `typing.Optional[str]`
+
+---
+
+
+
+## class `CallUpdateRes`
+
+
+
+
+
+
+---
+
+
+
+## class `CallsDeleteReq`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `project_id`: ``
+- `call_ids`: `list[str]`
+- `wb_user_id`: `typing.Optional[str]`
+
+---
+
+
+
+## class `CallsDeleteRes`
+
+
+
+
+
+
+---
+
+
+
+## class `CallsFilter`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `op_names`: `typing.Optional[list[str]]`
+- `input_refs`: `typing.Optional[list[str]]`
+- `output_refs`: `typing.Optional[list[str]]`
+- `parent_ids`: `typing.Optional[list[str]]`
+- `trace_ids`: `typing.Optional[list[str]]`
+- `call_ids`: `typing.Optional[list[str]]`
+- `trace_roots_only`: `typing.Optional[bool]`
+- `wb_user_ids`: `typing.Optional[list[str]]`
+- `wb_run_ids`: `typing.Optional[list[str]]`
+
+---
+
+
+
+## class `CallsQueryReq`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `project_id`: ``
+- `filter`: `typing.Optional[CallsFilter]`
+- `limit`: `typing.Optional[int]`
+- `offset`: `typing.Optional[int]`
+- `sort_by`: `typing.Optional[list[SortBy]]`
+- `query`: `typing.Optional[weave.trace_server.interface.query.Query]`
+- `include_costs`: `typing.Optional[bool]`
+- `include_feedback`: `typing.Optional[bool]`
+- `include_storage_size`: `typing.Optional[bool]`
+- `include_total_storage_size`: `typing.Optional[bool]`
+- `columns`: `typing.Optional[list[str]]`
+- `expand_columns`: `typing.Optional[list[str]]`
+
+---
+
+
+
+## class `CallsQueryRes`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `calls`: `list[CallSchema]`
+
+---
+
+
+
+## class `CallsQueryStatsReq`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `project_id`: ``
+- `filter`: `typing.Optional[CallsFilter]`
+- `query`: `typing.Optional[weave.trace_server.interface.query.Query]`
+- `limit`: `typing.Optional[int]`
+- `include_total_storage_size`: `typing.Optional[bool]`
+
+---
+
+
+
+## class `CallsQueryStatsRes`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `count`: ``
+- `total_storage_size_bytes`: `typing.Optional[int]`
+
+---
+
+
+
+## class `CompletionsCreateReq`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `project_id`: ``
+- `inputs`: ``
+- `wb_user_id`: `typing.Optional[str]`
+- `track_llm_call`: `typing.Optional[bool]`
+
+---
+
+
+
+## class `CompletionsCreateRequestInputs`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `model`: ``
+- `messages`: ``
+- `timeout`: `typing.Union[float, str, NoneType]`
+- `temperature`: `typing.Optional[float]`
+- `top_p`: `typing.Optional[float]`
+- `n`: `typing.Optional[int]`
+- `stop`: `typing.Union[str, list, NoneType]`
+- `max_completion_tokens`: `typing.Optional[int]`
+- `max_tokens`: `typing.Optional[int]`
+- `modalities`: `typing.Optional[list]`
+- `presence_penalty`: `typing.Optional[float]`
+- `frequency_penalty`: `typing.Optional[float]`
+- `logit_bias`: `typing.Optional[dict]`
+- `user`: `typing.Optional[str]`
+- `response_format`: `typing.Union[dict, type[pydantic.main.BaseModel], NoneType]`
+- `seed`: `typing.Optional[int]`
+- `tools`: `typing.Optional[list]`
+- `tool_choice`: `typing.Union[str, dict, NoneType]`
+- `logprobs`: `typing.Optional[bool]`
+- `top_logprobs`: `typing.Optional[int]`
+- `parallel_tool_calls`: `typing.Optional[bool]`
+- `extra_headers`: `typing.Optional[dict]`
+- `functions`: `typing.Optional[list]`
+- `function_call`: `typing.Optional[str]`
+- `api_version`: `typing.Optional[str]`
+
+---
+
+
+
+## class `CompletionsCreateRes`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `response`: `dict[str, typing.Any]`
+- `weave_call_id`: `typing.Optional[str]`
+
+---
+
+
+
+## class `CostCreateInput`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `prompt_token_cost`: ``
+- `completion_token_cost`: ``
+- `prompt_token_cost_unit`: `typing.Optional[str]`
+- `completion_token_cost_unit`: `typing.Optional[str]`
+- `effective_date`: `typing.Optional[datetime.datetime]`
+- `provider_id`: `typing.Optional[str]`
+
+---
+
+
+
+## class `CostCreateReq`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `project_id`: ``
+- `costs`: `dict[str, CostCreateInput]`
+- `wb_user_id`: `typing.Optional[str]`
+
+---
+
+
+
+## class `CostCreateRes`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `ids`: `list[tuple[str, str]]`
+
+---
+
+
+
+## class `CostPurgeReq`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `project_id`: ``
+- `query`: ``
+
+---
+
+
+
+## class `CostPurgeRes`
+
+
+
+
+
+
+---
+
+
+
+## class `CostQueryOutput`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `id`: `typing.Optional[str]`
+- `llm_id`: `typing.Optional[str]`
+- `prompt_token_cost`: `typing.Optional[float]`
+- `completion_token_cost`: `typing.Optional[float]`
+- `prompt_token_cost_unit`: `typing.Optional[str]`
+- `completion_token_cost_unit`: `typing.Optional[str]`
+- `effective_date`: `typing.Optional[datetime.datetime]`
+- `provider_id`: `typing.Optional[str]`
+
+---
+
+
+
+## class `CostQueryReq`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `project_id`: ``
+- `fields`: `typing.Optional[list[str]]`
+- `query`: `typing.Optional[weave.trace_server.interface.query.Query]`
+- `sort_by`: `typing.Optional[list[SortBy]]`
+- `limit`: `typing.Optional[int]`
+- `offset`: `typing.Optional[int]`
+
+---
+
+
+
+## class `CostQueryRes`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `results`: `list[CostQueryOutput]`
+
+---
+
+
+
+## class `EndedCallSchemaForInsert`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `project_id`: ``
+- `id`: ``
+- `ended_at`: ``
+- `exception`: `typing.Optional[str]`
+- `output`: `typing.Optional[typing.Any]`
+- `summary`: ``
+---
+
+
+
+### method `serialize_typed_dicts`
+
+```python
+serialize_typed_dicts(v: dict[str, Any]) → dict[str, Any]
+```
+
+
+
+
+
+
+---
+
+
+
+## class `EnsureProjectExistsRes`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `project_name`: ``
+
+---
+
+
+
+## class `ExportTracePartialSuccess`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `rejected_spans`: ``
+- `error_message`: ``
+
+---
+
+
+
+## class `ExtraKeysTypedDict`
+
+
+
+
+
+
+
+
+---
+
+
+
+## class `Feedback`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `project_id`: ``
+- `weave_ref`: ``
+- `creator`: `typing.Optional[str]`
+- `feedback_type`: ``
+- `payload`: `dict[str, typing.Any]`
+- `annotation_ref`: `typing.Optional[str]`
+- `runnable_ref`: `typing.Optional[str]`
+- `call_ref`: `typing.Optional[str]`
+- `trigger_ref`: `typing.Optional[str]`
+- `wb_user_id`: `typing.Optional[str]`
+- `id`: ``
+- `created_at`: ``
+
+---
+
+
+
+## class `FeedbackCreateReq`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `project_id`: ``
+- `weave_ref`: ``
+- `creator`: `typing.Optional[str]`
+- `feedback_type`: ``
+- `payload`: `dict[str, typing.Any]`
+- `annotation_ref`: `typing.Optional[str]`
+- `runnable_ref`: `typing.Optional[str]`
+- `call_ref`: `typing.Optional[str]`
+- `trigger_ref`: `typing.Optional[str]`
+- `wb_user_id`: `typing.Optional[str]`
+
+---
+
+
+
+## class `FeedbackCreateRes`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `id`: ``
+- `created_at`: ``
+- `wb_user_id`: ``
+- `payload`: `dict[str, typing.Any]`
+
+---
+
+
+
+## class `FeedbackDict`
+
+
+
+
+
+
+
+
+---
+
+
+
+## class `FeedbackPurgeReq`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `project_id`: ``
+- `query`: ``
+
+---
+
+
+
+## class `FeedbackPurgeRes`
+
+
+
+
+
+
+---
+
+
+
+## class `FeedbackQueryReq`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `project_id`: ``
+- `fields`: `typing.Optional[list[str]]`
+- `query`: `typing.Optional[weave.trace_server.interface.query.Query]`
+- `sort_by`: `typing.Optional[list[SortBy]]`
+- `limit`: `typing.Optional[int]`
+- `offset`: `typing.Optional[int]`
+
+---
+
+
+
+## class `FeedbackQueryRes`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `result`: `list[dict[str, typing.Any]]`
+
+---
+
+
+
+## class `FeedbackReplaceReq`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `project_id`: ``
+- `weave_ref`: ``
+- `creator`: `typing.Optional[str]`
+- `feedback_type`: ``
+- `payload`: `dict[str, typing.Any]`
+- `annotation_ref`: `typing.Optional[str]`
+- `runnable_ref`: `typing.Optional[str]`
+- `call_ref`: `typing.Optional[str]`
+- `trigger_ref`: `typing.Optional[str]`
+- `wb_user_id`: `typing.Optional[str]`
+- `feedback_id`: ``
+
+---
+
+
+
+## class `FeedbackReplaceRes`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `id`: ``
+- `created_at`: ``
+- `wb_user_id`: ``
+- `payload`: `dict[str, typing.Any]`
+
+---
+
+
+
+## class `FileContentReadReq`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `project_id`: ``
+- `digest`: ``
+
+---
+
+
+
+## class `FileContentReadRes`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `content`: ``
+
+---
+
+
+
+## class `FileCreateReq`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `project_id`: ``
+- `name`: ``
+- `content`: ``
+
+---
+
+
+
+## class `FileCreateRes`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `digest`: ``
+
+---
+
+
+
+## class `FilesStatsReq`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `project_id`: ``
+
+---
+
+
+
+## class `FilesStatsRes`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `total_size_bytes`: ``
+
+---
+
+
+
+## class `LLMCostSchema`
+
+
+
+
+
+
+
+
+---
+
+
+
+## class `LLMUsageSchema`
+
+
+
+
+
+
+
+
+---
+
+
+
+## class `ObjCreateReq`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `obj`: ``
+
+---
+
+
+
+## class `ObjCreateRes`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `digest`: ``
+
+---
+
+
+
+## class `ObjDeleteReq`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `project_id`: ``
+- `object_id`: ``
+- `digests`: `typing.Optional[list[str]]`
+
+---
+
+
+
+## class `ObjDeleteRes`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `num_deleted`: ``
+
+---
+
+
+
+## class `ObjQueryReq`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `project_id`: ``
+- `filter`: `typing.Optional[ObjectVersionFilter]`
+- `limit`: `typing.Optional[int]`
+- `offset`: `typing.Optional[int]`
+- `sort_by`: `typing.Optional[list[SortBy]]`
+- `metadata_only`: `typing.Optional[bool]`
+- `include_storage_size`: `typing.Optional[bool]`
+
+---
+
+
+
+## class `ObjQueryRes`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `objs`: `list[ObjSchema]`
+
+---
+
+
+
+## class `ObjReadReq`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `project_id`: ``
+- `object_id`: ``
+- `digest`: ``
+- `metadata_only`: `typing.Optional[bool]`
+
+---
+
+
+
+## class `ObjReadRes`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `obj`: ``
+
+---
+
+
+
+## class `ObjSchema`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `project_id`: ``
+- `object_id`: ``
+- `created_at`: ``
+- `deleted_at`: `typing.Optional[datetime.datetime]`
+- `digest`: ``
+- `version_index`: ``
+- `is_latest`: ``
+- `kind`: ``
+- `base_object_class`: `typing.Optional[str]`
+- `val`: `typing.Any`
+- `wb_user_id`: `typing.Optional[str]`
+- `size_bytes`: `typing.Optional[int]`
+
+---
+
+
+
+## class `ObjSchemaForInsert`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `project_id`: ``
+- `object_id`: ``
+- `val`: `typing.Any`
+- `builtin_object_class`: `typing.Optional[str]`
+- `set_base_object_class`: `typing.Optional[str]`
+- `wb_user_id`: `typing.Optional[str]`
+---
+
+
+
+### method `model_post_init`
+
+```python
+model_post_init(_ObjSchemaForInsert__context: Any) → None
+```
+
+
+
+
+
+
+---
+
+
+
+## class `ObjectVersionFilter`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `base_object_classes`: `typing.Optional[list[str]]`
+- `object_ids`: `typing.Optional[list[str]]`
+- `is_op`: `typing.Optional[bool]`
+- `latest_only`: `typing.Optional[bool]`
+
+---
+
+
+
+## class `OpCreateReq`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `op_obj`: ``
+
+---
+
+
+
+## class `OpCreateRes`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `digest`: ``
+
+---
+
+
+
+## class `OpQueryReq`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `project_id`: ``
+- `filter`: `typing.Optional[OpVersionFilter]`
+
+---
+
+
+
+## class `OpQueryRes`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `op_objs`: `list[ObjSchema]`
+
+---
+
+
+
+## class `OpReadReq`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `project_id`: ``
+- `name`: ``
+- `digest`: ``
+
+---
+
+
+
+## class `OpReadRes`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `op_obj`: ``
+
+---
+
+
+
+## class `OpVersionFilter`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `op_names`: `typing.Optional[list[str]]`
+- `latest_only`: `typing.Optional[bool]`
+
+---
+
+
+
+## class `OtelExportReq`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `project_id`: ``
+- `traces`: `typing.Any`
+- `wb_user_id`: `typing.Optional[str]`
+
+---
+
+
+
+## class `OtelExportRes`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `partial_success`: `typing.Optional[ExportTracePartialSuccess]`
+
+---
+
+
+
+## class `RefsReadBatchReq`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `refs`: `list[str]`
+
+---
+
+
+
+## class `RefsReadBatchRes`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `vals`: `list[typing.Any]`
+
+---
+
+
+
+## class `SortBy`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `field`: ``
+- `direction`: `typing.Literal['asc', 'desc']`
+
+---
+
+
+
+## class `StartedCallSchemaForInsert`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `project_id`: ``
+- `id`: `typing.Optional[str]`
+- `op_name`: ``
+- `display_name`: `typing.Optional[str]`
+- `trace_id`: `typing.Optional[str]`
+- `parent_id`: `typing.Optional[str]`
+- `started_at`: ``
+- `attributes`: `dict[str, typing.Any]`
+- `inputs`: `dict[str, typing.Any]`
+- `wb_user_id`: `typing.Optional[str]`
+- `wb_run_id`: `typing.Optional[str]`
+
+---
+
+
+
+## class `SummaryInsertMap`
+
+
+
+
+
+
+
+
+---
+
+
+
+## class `SummaryMap`
+
+
+
+
+
+
+
+
+---
+
+
+
+## class `TableAppendSpec`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `append`: ``
+
+---
+
+
+
+## class `TableAppendSpecPayload`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `row`: `dict[str, typing.Any]`
+
+---
+
+
+
+## class `TableCreateReq`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `table`: ``
+
+---
+
+
+
+## class `TableCreateRes`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `digest`: ``
+- `row_digests`: `list[str]`
+
+---
+
+
+
+## class `TableInsertSpec`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `insert`: ``
+
+---
+
+
+
+## class `TableInsertSpecPayload`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `index`: ``
+- `row`: `dict[str, typing.Any]`
+
+---
+
+
+
+## class `TablePopSpec`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `pop`: ``
+
+---
+
+
+
+## class `TablePopSpecPayload`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `index`: ``
+
+---
+
+
+
+## class `TableQueryReq`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `project_id`: ``
+- `digest`: ``
+- `filter`: `typing.Optional[TableRowFilter]`
+- `limit`: `typing.Optional[int]`
+- `offset`: `typing.Optional[int]`
+- `sort_by`: `typing.Optional[list[SortBy]]`
+
+---
+
+
+
+## class `TableQueryRes`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `rows`: `list[TableRowSchema]`
+
+---
+
+
+
+## class `TableQueryStatsBatchReq`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `project_id`: ``
+- `digests`: `typing.Optional[list[str]]`
+- `include_storage_size`: `typing.Optional[bool]`
+
+---
+
+
+
+## class `TableQueryStatsBatchRes`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `tables`: `list[TableStatsRow]`
+
+---
+
+
+
+## class `TableQueryStatsReq`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `project_id`: ``
+- `digest`: ``
+
+---
+
+
+
+## class `TableQueryStatsRes`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `count`: ``
+
+---
+
+
+
+## class `TableRowFilter`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `row_digests`: `typing.Optional[list[str]]`
+
+---
+
+
+
+## class `TableRowSchema`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `digest`: ``
+- `val`: `typing.Any`
+- `original_index`: `typing.Optional[int]`
+
+---
+
+
+
+## class `TableSchemaForInsert`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `project_id`: ``
+- `rows`: `list[dict[str, typing.Any]]`
+
+---
+
+
+
+## class `TableStatsRow`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `count`: ``
+- `digest`: ``
+- `storage_size_bytes`: `typing.Optional[int]`
+
+---
+
+
+
+## class `TableUpdateReq`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `project_id`: ``
+- `base_digest`: ``
+- `updates`: `list[typing.Union[TableAppendSpec, TablePopSpec, TableInsertSpec]]`
+
+---
+
+
+
+## class `TableUpdateRes`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `digest`: ``
+- `updated_row_digests`: `list[str]`
+
+---
+
+
+
+## class `TraceServerInterface`
+
+
+
+
+
+
+
+---
+
+
+
+### method `actions_execute_batch`
+
+```python
+actions_execute_batch(req: ActionsExecuteBatchReq) → ActionsExecuteBatchRes
+```
+
+
+
+
+
+---
+
+
+
+### method `call_end`
+
+```python
+call_end(req: CallEndReq) → CallEndRes
+```
+
+
+
+
+
+---
+
+
+
+### method `call_read`
+
+```python
+call_read(req: CallReadReq) → CallReadRes
+```
+
+
+
+
+
+---
+
+
+
+### method `call_start`
+
+```python
+call_start(req: CallStartReq) → CallStartRes
+```
+
+
+
+
+
+---
+
+
+
+### method `call_start_batch`
+
+```python
+call_start_batch(req: CallCreateBatchReq) → CallCreateBatchRes
+```
+
+
+
+
+
+---
+
+
+
+### method `call_update`
+
+```python
+call_update(req: CallUpdateReq) → CallUpdateRes
+```
+
+
+
+
+
+---
+
+
+
+### method `calls_delete`
+
+```python
+calls_delete(req: CallsDeleteReq) → CallsDeleteRes
+```
+
+
+
+
+
+---
+
+
+
+### method `calls_query`
+
+```python
+calls_query(req: CallsQueryReq) → CallsQueryRes
+```
+
+
+
+
+
+---
+
+
+
+### method `calls_query_stats`
+
+```python
+calls_query_stats(req: CallsQueryStatsReq) → CallsQueryStatsRes
+```
+
+
+
+
+
+---
+
+
+
+### method `calls_query_stream`
+
+```python
+calls_query_stream(req: CallsQueryReq) → Iterator[CallSchema]
+```
+
+
+
+
+
+---
+
+
+
+### method `completions_create`
+
+```python
+completions_create(req: CompletionsCreateReq) → CompletionsCreateRes
+```
+
+
+
+
+
+---
+
+
+
+### method `cost_create`
+
+```python
+cost_create(req: CostCreateReq) → CostCreateRes
+```
+
+
+
+
+
+---
+
+
+
+### method `cost_purge`
+
+```python
+cost_purge(req: CostPurgeReq) → CostPurgeRes
+```
+
+
+
+
+
+---
+
+
+
+### method `cost_query`
+
+```python
+cost_query(req: CostQueryReq) → CostQueryRes
+```
+
+
+
+
+
+---
+
+
+
+### method `ensure_project_exists`
+
+```python
+ensure_project_exists(entity: str, project: str) → EnsureProjectExistsRes
+```
+
+
+
+
+
+---
+
+
+
+### method `feedback_create`
+
+```python
+feedback_create(req: FeedbackCreateReq) → FeedbackCreateRes
+```
+
+
+
+
+
+---
+
+
+
+### method `feedback_purge`
+
+```python
+feedback_purge(req: FeedbackPurgeReq) → FeedbackPurgeRes
+```
+
+
+
+
+
+---
+
+
+
+### method `feedback_query`
+
+```python
+feedback_query(req: FeedbackQueryReq) → FeedbackQueryRes
+```
+
+
+
+
+
+---
+
+
+
+### method `feedback_replace`
+
+```python
+feedback_replace(req: FeedbackReplaceReq) → FeedbackReplaceRes
+```
+
+
+
+
+
+---
+
+
+
+### method `file_content_read`
+
+```python
+file_content_read(req: FileContentReadReq) → FileContentReadRes
+```
+
+
+
+
+
+---
+
+
+
+### method `file_create`
+
+```python
+file_create(req: FileCreateReq) → FileCreateRes
+```
+
+
+
+
+
+---
+
+
+
+### method `files_stats`
+
+```python
+files_stats(req: FilesStatsReq) → FilesStatsRes
+```
+
+
+
+
+
+---
+
+
+
+### method `obj_create`
+
+```python
+obj_create(req: ObjCreateReq) → ObjCreateRes
+```
+
+
+
+
+
+---
+
+
+
+### method `obj_delete`
+
+```python
+obj_delete(req: ObjDeleteReq) → ObjDeleteRes
+```
+
+
+
+
+
+---
+
+
+
+### method `obj_read`
+
+```python
+obj_read(req: ObjReadReq) → ObjReadRes
+```
+
+
+
+
+
+---
+
+
+
+### method `objs_query`
+
+```python
+objs_query(req: ObjQueryReq) → ObjQueryRes
+```
+
+
+
+
+
+---
+
+
+
+### method `op_create`
+
+```python
+op_create(req: OpCreateReq) → OpCreateRes
+```
+
+
+
+
+
+---
+
+
+
+### method `op_read`
+
+```python
+op_read(req: OpReadReq) → OpReadRes
+```
+
+
+
+
+
+---
+
+
+
+### method `ops_query`
+
+```python
+ops_query(req: OpQueryReq) → OpQueryRes
+```
+
+
+
+
+
+---
+
+
+
+### method `otel_export`
+
+```python
+otel_export(req: OtelExportReq) → OtelExportRes
+```
+
+
+
+
+
+---
+
+
+
+### method `refs_read_batch`
+
+```python
+refs_read_batch(req: RefsReadBatchReq) → RefsReadBatchRes
+```
+
+
+
+
+
+---
+
+
+
+### method `table_create`
+
+```python
+table_create(req: TableCreateReq) → TableCreateRes
+```
+
+
+
+
+
+---
+
+
+
+### method `table_query`
+
+```python
+table_query(req: TableQueryReq) → TableQueryRes
+```
+
+
+
+
+
+---
+
+
+
+### method `table_query_stats`
+
+```python
+table_query_stats(req: TableQueryStatsReq) → TableQueryStatsRes
+```
+
+
+
+
+
+---
+
+
+
+### method `table_query_stats_batch`
+
+```python
+table_query_stats_batch(req: TableQueryStatsBatchReq) → TableQueryStatsBatchRes
+```
+
+
+
+
+
+---
+
+
+
+### method `table_query_stream`
+
+```python
+table_query_stream(req: TableQueryReq) → Iterator[TableRowSchema]
+```
+
+
+
+
+
+---
+
+
+
+### method `table_update`
+
+```python
+table_update(req: TableUpdateReq) → TableUpdateRes
+```
+
+
+
+
+
+
+---
+
+
+
+## class `TraceStatus`
+An enumeration. 
+
+
+
+
+
+---
+
+
+
+## class `WeaveSummarySchema`
+
+[Source](https://weave-docs.wandb.ai/reference/python-sdk/weave/trace_server/weave.trace_server.trace_server_interface)
+
+<!--- Docs: Python SDK -->
+<!--- Weave.Trace Server.Interface.Query -->
+
+# Weave.Trace Server.Interface.Query
+
+# weave.trace_server.interface.query
+
+
+This file contains the interface definition for the Trace Server Query model. It
+is heavily inspired by the MongoDB query language, but is a subset of the full
+MongoDB query language. In particular, we have made the following
+simplifications:
+
+* We only support the "aggregation" operators, not the "query" operators. This is
+    purely for simplicity and because the "aggregation" operators are more powerful.
+    The Mongo docs language has evolved over time and the primary query language
+    is column-oriented. However, the more expressive aggregation language can be
+    used for both direct queries, but also for column comparison and
+    calculations. We can add support for the "query" operators in the future if
+    needed.
+
+* We only support a subset of the operators / shorthand forms for now. We can add
+    more operators in the future as needed.
+
+    * One notable omission here is the lack of support for "$field" as a shorthand for
+        the "getField"  operator.
+
+* We have _added_ a `$contains` operator which is not in the MongoDB query
+    language. This is a simple substring match operator.
+
+
+---
+
+
+# API Overview
+
+
+
+## Classes
+
+- [`query.AndOperation`](#class-andoperation)
+- [`query.ContainsOperation`](#class-containsoperation)
+- [`query.ContainsSpec`](#class-containsspec)
+- [`query.ConvertOperation`](#class-convertoperation)
+- [`query.ConvertSpec`](#class-convertspec)
+- [`query.EqOperation`](#class-eqoperation)
+- [`query.GetFieldOperator`](#class-getfieldoperator)
+- [`query.GtOperation`](#class-gtoperation)
+- [`query.GteOperation`](#class-gteoperation)
+- [`query.InOperation`](#class-inoperation)
+- [`query.LiteralOperation`](#class-literaloperation)
+- [`query.NotOperation`](#class-notoperation)
+- [`query.OrOperation`](#class-oroperation)
+- [`query.Query`](#class-query)
+
+
+
+
+---
+
+
+
+
+## class `AndOperation`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `$and`: `list['Operand']`
+
+---
+
+
+
+## class `ContainsOperation`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `$contains`: ``
+
+---
+
+
+
+## class `ContainsSpec`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `input`: `typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, InOperation, ContainsOperation]`
+- `substr`: `typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, InOperation, ContainsOperation]`
+- `case_insensitive`: `typing.Optional[bool]`
+
+---
+
+
+
+## class `ConvertOperation`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `$convert`: ``
+
+---
+
+
+
+## class `ConvertSpec`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `input`: `typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, InOperation, ContainsOperation]`
+- `to`: `typing.Literal['double', 'string', 'int', 'bool', 'exists']`
+
+---
+
+
+
+## class `EqOperation`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `$eq`: `tuple['Operand', 'Operand']`
+
+---
+
+
+
+## class `GetFieldOperator`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `$getField`: ``
+
+---
+
+
+
+## class `GtOperation`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `$gt`: `tuple['Operand', 'Operand']`
+
+---
+
+
+
+## class `GteOperation`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `$gte`: `tuple['Operand', 'Operand']`
+
+---
+
+
+
+## class `InOperation`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `$in`: `tuple['Operand', list['Operand']]`
+
+---
+
+
+
+## class `LiteralOperation`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `$literal`: `typing.Union[str, int, float, bool, dict[str, 'LiteralOperation'], list['LiteralOperation'], NoneType]`
+
+---
+
+
+
+## class `NotOperation`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `$not`: `tuple['Operand']`
+
+---
+
+
+
+## class `OrOperation`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `$or`: `list['Operand']`
+
+---
+
+
+
+## class `Query`
+
+
+
+
+
+**Pydantic Fields:**
+
+- `$expr`: `typing.Union[AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, InOperation, ContainsOperation]`
+
+[Source](https://weave-docs.wandb.ai/reference/python-sdk/weave/trace_server/interface/weave.trace_server.interface.query)

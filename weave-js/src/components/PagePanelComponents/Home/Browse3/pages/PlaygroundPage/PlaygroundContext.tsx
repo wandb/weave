@@ -4,6 +4,7 @@ import {Message} from '../ChatView/types';
 import {PlaygroundMessageRole} from './types';
 
 export type PlaygroundContextType = {
+  isStreaming: boolean;
   isPlayground: boolean;
   addMessage: (newMessage: Message) => void;
   editMessage: (messageIndex: number, newMessage: Message) => void;
@@ -23,6 +24,7 @@ export type PlaygroundContextType = {
 };
 
 const DEFAULT_CONTEXT: PlaygroundContextType = {
+  isStreaming: false,
   isPlayground: false,
   addMessage: () => {},
   editMessage: () => {},

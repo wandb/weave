@@ -11,6 +11,7 @@ import uuid
 import pydantic
 import pytest
 import requests
+from pydantic import ValidationError
 
 import weave
 import weave.trace_server.trace_server_interface as tsi
@@ -25,6 +26,7 @@ from weave import Evaluation
 from weave.integrations.integration_utilities import op_name_from_call
 from weave.trace import refs, weave_client
 from weave.trace.context import call_context
+from weave.trace.context.call_context import tracing_disabled
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import is_op
 from weave.trace.refs import (
@@ -33,6 +35,7 @@ from weave.trace.refs import (
     OBJECT_ATTR_EDGE_NAME,
     TABLE_ROW_ID_EDGE_NAME,
     DeletedRef,
+    TableRef,
 )
 from weave.trace.serialization.serializer import (
     get_serializer_for_obj,
@@ -135,14 +138,14 @@ def test_table_update(client):
     assert check_res.digest == table_create_res.digest
 
 
-@pytest.mark.skip()
+@pytest.mark.skip
 def test_table_append(server):
     table_ref = server.new_table([1, 2, 3])
     new_table_ref, item_id = server.table_append(table_ref, 4)
     assert [r.val for r in server.table_query(new_table_ref)] == [1, 2, 3, 4]
 
 
-@pytest.mark.skip()
+@pytest.mark.skip
 def test_table_remove(server):
     table_ref0 = server.new_table([1])
     table_ref1, item_id2 = server.table_append(table_ref0, 2)
@@ -151,23 +154,23 @@ def test_table_remove(server):
     assert [r.val for r in server.table_query(table_ref3)] == [1, 3]
 
 
-@pytest.mark.skip()
+@pytest.mark.skip
 def new_val_single(server):
     obj_id = server.new_val(42)
     assert server.get(obj_id) == 42
 
 
-@pytest.mark.skip()
+@pytest.mark.skip
 def test_new_val_with_list(server):
     ref = server.new_val({"a": [1, 2, 3]})
     server_val = server.get_val(ref)
     table_ref = server_val["a"]
-    assert isinstance(table_ref, chobj.TableRef)
+    assert isinstance(table_ref, TableRef)
     table_val = server.table_query(table_ref)
     assert [r.val for r in table_val] == [1, 2, 3]
 
 
-@pytest.mark.skip()
+@pytest.mark.skip
 def test_object(server):
     obj_ref = server.new_object({"a": 43}, "my-obj", "latest")
     val_ref = server._resolve_object("my-obj", "latest")
@@ -264,6 +267,58 @@ def test_pydantic(client):
     assert not weave_isinstance(val2, int)
 
 
+def test_filter_sort_by_query_validation(client):
+    # Test invalid types
+    with pytest.raises(TypeError):
+        client.get_calls(filter="not a filter")
+    with pytest.raises(TypeError):
+        client.get_calls(filter=1)
+    with pytest.raises(TypeError):
+        client.get_calls(filter=["not a filter"])
+
+    # Test invalid field names - these should fail with pydantic validation error
+    with pytest.raises(ValueError, match="Extra inputs are not permitted"):
+        client.get_calls(filter={"op_name": ["should be op_names"]})
+    with pytest.raises(ValueError, match="Extra inputs are not permitted"):
+        client.get_calls(filter={"call_id": ["should be call_ids"]})
+    with pytest.raises(ValueError, match="Extra inputs are not permitted"):
+        client.get_calls(filter={"invalid_field": "invalid_value"})
+
+    # Test that valid fields work
+    client.get_calls(filter={"op_names": ["some_op"]})
+    client.get_calls(filter={"call_ids": ["some_call_id"]})
+    client.get_calls(filter={"trace_ids": ["some_trace_id"]})
+
+    # now order_by
+    with pytest.raises(ValidationError):
+        client.get_calls(sort_by="not a sort_by")
+    with pytest.raises(ValidationError):
+        client.get_calls(sort_by=1)
+    with pytest.raises(TypeError):
+        client.get_calls(sort_by=["not a sort_by"])
+
+    # test valid
+    client.get_calls(sort_by=[tsi.SortBy(field="started_at", direction="desc")])
+
+    # now query like filter
+    with pytest.raises(TypeError):
+        client.get_calls(query="not a query")
+    with pytest.raises(TypeError):
+        client.get_calls(query=1)
+    with pytest.raises(TypeError):
+        client.get_calls(query=["not a query"])
+
+    with pytest.raises(
+        ValidationError, match="8 validation errors for WeaveClient.get_calls"
+    ):
+        client.get_calls(query={"$expr": {"$invalid_field": "invalid_value"}})
+
+    # test valid
+    client.get_calls(
+        query={"$expr": {"$eq": [{"$getField": "op_name"}, {"$literal": "predict"}]}}
+    )
+
+
 def test_call_create(client):
     call = client.create_call("x", {"a": 5, "b": 10})
     client.finish_call(call, "hello")
@@ -278,11 +333,15 @@ def test_call_create(client):
         output="hello",
         exception=None,
         summary={
+            "status_counts": {
+                "success": 1,
+                "error": 0,
+            },
             "weave": {
                 "status": "success",
                 "trace_name": "x",
                 "latency_ms": AnyIntMatcher(),
-            }
+            },
         },
         _children=[],
         attributes={
@@ -329,7 +388,7 @@ def test_calls_query(client):
             "weave": {
                 "status": "running",
                 "trace_name": "x",
-            }
+            },
         },
         started_at=DatetimeMatcher(),
         ended_at=None,
@@ -355,7 +414,7 @@ def test_calls_query(client):
             "weave": {
                 "status": "running",
                 "trace_name": "x",
-            }
+            },
         },
         started_at=DatetimeMatcher(),
         ended_at=None,
@@ -582,7 +641,7 @@ def test_calls_delete(client):
 
     assert len(list(client.get_calls())) == 4
 
-    result = list(client.get_calls(filter=tsi.CallsFilter(op_names=[call0.op_name])))
+    result = list(client.get_calls(filter={"op_names": [call0.op_name]}))
     assert len(result) == 3
 
     # should deleted call0_child1, _call0_child2, call1, but not call0
@@ -606,13 +665,13 @@ def test_calls_delete(client):
 
 def test_calls_delete_cascade(client):
     # run an evaluation, then delete the evaluation and its children
-    @weave.op()
+    @weave.op
     async def model_predict(input) -> str:
         return eval(input)
 
     dataset_rows = [{"input": "1 + 2", "target": 3}, {"input": "2**4", "target": 15}]
 
-    @weave.op()
+    @weave.op
     async def score(target, model_output):
         return target == model_output
 
@@ -638,7 +697,7 @@ def test_calls_delete_cascade(client):
 
 
 def test_delete_calls(client):
-    @weave.op()
+    @weave.op
     def my_op(a: int) -> int:
         return a + 1
 
@@ -725,16 +784,18 @@ def test_dataset_calls(client):
         weave.Dataset(rows=[{"doc": "xx", "label": "c"}, {"doc": "yy", "label": "d"}]),
         "my-dataset",
     )
+    op_name = ""
     for row in ref.rows:
         call = client.create_call("x", {"a": row["doc"]})
+        op_name = call.op_name
         client.finish_call(call, None)
 
-    calls = list(client.get_calls(filter={"op_name": "x"}))
+    calls = list(client.get_calls(filter={"op_names": [op_name]}))
     assert calls[0].inputs["a"] == "xx"
     assert calls[1].inputs["a"] == "yy"
 
 
-@pytest.mark.skip()
+@pytest.mark.skip
 def test_mutations(client):
     dataset = client.save(
         weave.Dataset(
@@ -796,7 +857,7 @@ def test_mutations(client):
     assert new_ds_rows[2] == {"doc": "zz", "label": "e"}
 
 
-@pytest.mark.skip()
+@pytest.mark.skip
 def test_stable_dataset_row_refs(client):
     dataset = client.save(
         weave.Dataset(
@@ -820,7 +881,7 @@ def test_stable_dataset_row_refs(client):
 
 
 def test_opdef(client):
-    @weave.op()
+    @weave.op
     def add2(x, y):
         return x + y
 
@@ -836,7 +897,7 @@ def test_object_mismatch_project_ref(client):
     class MyModel(weave.Model):
         prompt: str
 
-        @weave.op()
+        @weave.op
         def predict(self, input):
             return self.prompt.format(input=input)
 
@@ -854,7 +915,7 @@ def test_object_mismatch_project_ref(client):
 def test_object_mismatch_project_ref_nested(client):
     client.project = "test-project"
 
-    @weave.op()
+    @weave.op
     def hello_world():
         return "Hello world"
 
@@ -882,12 +943,12 @@ def test_object_mismatch_project_ref_nested(client):
     res = client.server.objs_query(tsi.ObjQueryReq(project_id=client._project_id()))
     assert len(res.objs) == 2
 
-    op = [x for x in res.objs if x.kind == "op"][0]
+    op = next(x for x in res.objs if x.kind == "op")
     assert op.object_id == "hello_world"
     assert op.project_id == "shawn/test-project2"
     assert op.kind == "op"
 
-    obj = [x for x in res.objs if x.kind == "object"][0]
+    obj = next(x for x in res.objs if x.kind == "object")
     assert obj.object_id == "my-object"
     assert obj.project_id == "shawn/test-project2"
 
@@ -941,7 +1002,7 @@ def test_save_model(client):
     class MyModel(weave.Model):
         prompt: str
 
-        @weave.op()
+        @weave.op
         def predict(self, input):
             return self.prompt.format(input=input)
 
@@ -957,7 +1018,7 @@ def test_saved_nested_modellike(client):
     class A(weave.Object):
         x: int
 
-        @weave.op()
+        @weave.op
         async def call(self, input):
             return self.x + input
 
@@ -965,7 +1026,7 @@ def test_saved_nested_modellike(client):
         a: A
         y: int
 
-        @weave.op()
+        @weave.op
         async def call(self, input):
             return await self.a.call(input - self.y)
 
@@ -977,11 +1038,11 @@ def test_saved_nested_modellike(client):
         b: B
         z: int
 
-        @weave.op()
+        @weave.op
         async def call(self, input):
             return await self.b.call(input - 2 * self.z)
 
-    @weave.op()
+    @weave.op
     async def call_model(c, input):
         return await c.call(input)
 
@@ -999,13 +1060,13 @@ def test_dataset_rows_ref(client):
 
 @pytest.mark.skip("failing in ci, due to some kind of /tmp file slowness?")
 def test_evaluate(client):
-    @weave.op()
+    @weave.op
     async def model_predict(input) -> str:
         return eval(input)
 
     dataset_rows = [{"input": "1 + 2", "target": 3}, {"input": "2**4", "target": 15}]
 
-    @weave.op()
+    @weave.op
     async def score(target, output):
         return target == output
 
@@ -1115,7 +1176,7 @@ def test_evaluate(client):
 def test_nested_ref_is_inner(client):
     dataset_rows = [{"input": "1 + 2", "target": 3}, {"input": "2**4", "target": 15}]
 
-    @weave.op()
+    @weave.op
     async def score(target, output):
         return target == output
 
@@ -1141,7 +1202,7 @@ def test_obj_dedupe(client):
 
 
 def test_op_query(client):
-    @weave.op()
+    @weave.op
     def myop(x):
         return x
 
@@ -1274,7 +1335,7 @@ def test_isinstance_checks(client):
 
 
 def test_summary_tokens(client):
-    @weave.op()
+    @weave.op
     def model_a(text):
         result = "a: " + text
         return {
@@ -1286,7 +1347,7 @@ def test_summary_tokens(client):
             },
         }
 
-    @weave.op()
+    @weave.op
     def model_b(text):
         result = "bbbb: " + text
         return {
@@ -1298,7 +1359,7 @@ def test_summary_tokens(client):
             },
         }
 
-    @weave.op()
+    @weave.op
     def models(text):
         return (
             model_a(text)["result"]
@@ -1311,7 +1372,7 @@ def test_summary_tokens(client):
     res = models("hello")
     assert res == "a: hello a: hello bbbb: hello"
 
-    call = list(models.calls())[0]
+    call = next(iter(models.calls()))
 
     assert call.summary["usage"] == {
         "model_a": {"requests": 2, "prompt_tokens": 10, "completion_tokens": 16},
@@ -1321,26 +1382,26 @@ def test_summary_tokens(client):
 
 @pytest.mark.skip("descendent error tracking disabled until we fix UI")
 def test_summary_descendents(client):
-    @weave.op()
+    @weave.op
     def model_a(text):
         return "a: " + text
 
-    @weave.op()
+    @weave.op
     def model_b(text):
         return "bbbb: " + text
 
-    @weave.op()
+    @weave.op
     def model_error(text):
         raise ValueError("error: " + text)
 
-    @weave.op()
+    @weave.op
     def model_error_catch(text):
         try:
             model_error(text)
         except ValueError as e:
             return str(e)
 
-    @weave.op()
+    @weave.op
     def models(text):
         return (
             model_a(text)
@@ -1355,7 +1416,7 @@ def test_summary_descendents(client):
     res = models("hello")
     assert res == "a: hello a: hello bbbb: hello error: hello"
 
-    call = list(models.calls())[0]
+    call = next(iter(models.calls()))
 
     assert list(call.summary["descendants"].items()) == [
         (ObjectRefStrMatcher(name="model_a"), {"successes": 2, "errors": 0}),
@@ -1370,7 +1431,7 @@ def test_weave_server(client):
     class MyModel(weave.Model):
         prompt: str
 
-        @weave.op()
+        @weave.op
         def predict(self, input: str) -> str:
             return self.prompt.format(input=input)
 
@@ -1395,8 +1456,8 @@ def test_table_partitioning(network_proxy_client):
     creation into multiple updates
     """
     client, remote_client, records = network_proxy_client
-    NUM_ROWS = 16
-    rows = list(row_gen(NUM_ROWS, 1024))
+    num_rows = 16
+    rows = list(row_gen(num_rows, 1024))
     exp_digest = "15696550bde28f9231173a085ce107c823e7eab6744a97adaa7da55bc9c93347"
     row_digests = [
         "2df5YAp2sqlYyxEpTKsIrUlf9Kc5ZxEkbqtqUnYOLhk",
@@ -1447,7 +1508,7 @@ def test_table_partitioning(network_proxy_client):
     assert len(records) == (
         1  # The first create call,
         + 1  # the second  create
-        + NUM_ROWS / 2  # updates - 2 per batch
+        + num_rows / 2  # updates - 2 per batch
     )
 
 
@@ -1456,7 +1517,7 @@ def test_summary_tokens_cost(client):
         # SQLite does not support costs
         return
 
-    @weave.op()
+    @weave.op
     def gpt4(text):
         result = "a: " + text
         return {
@@ -1468,7 +1529,7 @@ def test_summary_tokens_cost(client):
             },
         }
 
-    @weave.op()
+    @weave.op
     def gpt4o(text):
         result = "bbbb: " + text
         return {
@@ -1480,7 +1541,7 @@ def test_summary_tokens_cost(client):
             },
         }
 
-    @weave.op()
+    @weave.op
     def models(text):
         return (
             gpt4(text)["result"]
@@ -1493,7 +1554,7 @@ def test_summary_tokens_cost(client):
     res = models("hello")
     assert res == "a: hello a: hello bbbb: hello"
 
-    call = list(models.calls())[0]
+    call = next(iter(models.calls()))
 
     assert call.summary["usage"] == {
         "gpt-4": {
@@ -1508,30 +1569,30 @@ def test_summary_tokens_cost(client):
         },
     }
 
-    callsWithCost = list(
+    calls_with_cost = list(
         client.get_calls(
             filter=tsi.CallsFilter(op_names=[call.op_name]),
             include_costs=True,
         )
     )
-    callsNoCost = list(
+    calls_no_cost = list(
         client.get_calls(
             filter=tsi.CallsFilter(op_names=[call.op_name]),
             include_costs=False,
         )
     )
 
-    assert len(callsWithCost) == len(callsNoCost)
-    assert len(callsWithCost) == 1
+    assert len(calls_with_cost) == len(calls_no_cost)
+    assert len(calls_with_cost) == 1
 
-    noCostCallSummary = callsNoCost[0].summary
-    withCostCallSummary = callsWithCost[0].summary
+    no_cost_call_summary = calls_no_cost[0].summary
+    with_cost_call_summary = calls_with_cost[0].summary
 
-    assert withCostCallSummary.get("weave", "bah") != "bah"
-    assert len(withCostCallSummary["weave"]["costs"]) == 2
+    assert with_cost_call_summary.get("weave", "bah") != "bah"
+    assert len(with_cost_call_summary["weave"]["costs"]) == 2
 
-    gpt4cost = withCostCallSummary["weave"]["costs"]["gpt-4"]
-    gpt4ocost = withCostCallSummary["weave"]["costs"]["gpt-4o"]
+    gpt4cost = with_cost_call_summary["weave"]["costs"]["gpt-4"]
+    gpt4ocost = with_cost_call_summary["weave"]["costs"]["gpt-4o"]
 
     # delete the effective_date and created_at fields, as they will be different each start up
     del gpt4cost["effective_date"]
@@ -1579,7 +1640,7 @@ def test_summary_tokens_cost(client):
 
     # for no cost call, there should be no cost information
     # currently that means no weave object in the summary
-    assert noCostCallSummary["weave"] == {
+    assert no_cost_call_summary["weave"] == {
         "status": "success",
         "trace_name": "models",
         "latency_ms": AnyIntMatcher(),
@@ -1598,14 +1659,14 @@ def test_summary_tokens_cost_sqlite(client):
     _call0_child2 = client.create_call("x", {"a": 5, "b": 12}, call0_child1)
     call1 = client.create_call("y", {"a": 6, "b": 11})
 
-    callsWithCost = list(client.get_calls(include_costs=True))
-    callsNoCost = list(client.get_calls(include_costs=False))
+    calls_with_cost = list(client.get_calls(include_costs=True))
+    calls_no_cost = list(client.get_calls(include_costs=False))
 
-    assert len(callsWithCost) == len(callsNoCost)
-    assert len(callsWithCost) == 4
+    assert len(calls_with_cost) == len(calls_no_cost)
+    assert len(calls_with_cost) == 4
 
-    noCostCallSummary = callsNoCost[0].summary
-    withCostCallSummary = callsWithCost[0].summary
+    no_cost_call_summary = calls_no_cost[0].summary
+    with_cost_call_summary = calls_with_cost[0].summary
 
     weave_summary = {
         "weave": {
@@ -1614,8 +1675,8 @@ def test_summary_tokens_cost_sqlite(client):
         }
     }
 
-    assert noCostCallSummary == weave_summary
-    assert withCostCallSummary == weave_summary
+    assert no_cost_call_summary == weave_summary
+    assert with_cost_call_summary == weave_summary
 
 
 def test_ref_in_dict(client):
@@ -1773,7 +1834,7 @@ def test_object_version_read(client):
 
 @pytest.mark.asyncio
 async def test_op_calltime_display_name(client):
-    @weave.op()
+    @weave.op
     def my_op(a: int) -> int:
         return a
 
@@ -1902,7 +1963,7 @@ def test_recursive_object_deletion(client):
 
 
 def test_delete_op_version(client):
-    @weave.op()
+    @weave.op
     def my_op(a: int) -> int:
         return a
 
@@ -1930,7 +1991,7 @@ def test_delete_op_version(client):
 
 
 def test_global_attributes(client_creator):
-    @weave.op()
+    @weave.op
     def my_op(a: int) -> int:
         return a
 
@@ -1947,7 +2008,7 @@ def test_global_attributes(client_creator):
 
 
 def test_global_attributes_with_call_attributes(client_creator):
-    @weave.op()
+    @weave.op
     def my_op(a: int) -> int:
         return a
 
@@ -2038,7 +2099,7 @@ def test_calls_query_filter_by_strings(client):
     """Test string filter optimization with nested queries."""
     test_id = str(uuid.uuid4())
 
-    @weave.op()
+    @weave.op
     def test_op(test_id: str, name: str, tags: list[str], value: int, active: bool):
         return {
             "test_id": test_id,
@@ -2058,7 +2119,7 @@ def test_calls_query_filter_by_strings(client):
     test_op(test_id, "delta_test", ["backend", "database"], 400, "False")
     test_op(test_id, "epsilon_test", ["frontend", "api"], 500, "True")
 
-    for i in range(5):
+    for _i in range(5):
         dummy_op()
 
     # Flush to ensure all calls are persisted
@@ -2399,20 +2460,20 @@ def test_calls_query_sort_by_latency(client):
     # Fast call - minimal latency
     fast_call = client.create_call("x", {"a": 1, "b": 1, "test_id": test_id})
     client.finish_call(fast_call, "fast result")
+    client.flush()
 
     # Medium latency
     medium_call = client.create_call("x", {"a": 2, "b": 2, "test_id": test_id})
     # Sleep to ensure different latency
     time.sleep(0.05)
     client.finish_call(medium_call, "medium result")
+    client.flush()
 
     # Slow call - higher latency
     slow_call = client.create_call("x", {"a": 3, "b": 3, "test_id": test_id})
     # Sleep to ensure different latency
     time.sleep(0.1)
     client.finish_call(slow_call, "slow result")
-
-    # Flush to make sure all calls are committed
     client.flush()
 
     # Create a query to find just our test calls
@@ -2743,18 +2804,18 @@ def test_calls_query_sort_by_display_name_prioritized(client):
     assert call_list[0].op_name == call_list[1].op_name == call_list[2].op_name
 
 
-async def test_tracing_enabled_context(client):
+def test_tracing_enabled_context(client):
     """Test that gc.create_call() and gc.finish_call() respect the _tracing_enabled context variable."""
     from weave.trace.weave_client import Call
 
-    @weave.op()
+    @weave.op
     def test_op():
         return "test"
 
     # Test create_call with tracing enabled
-    call = await client.create_call(test_op, {})
+    call = client.create_call(test_op, {})
     assert isinstance(call, Call)
-    assert call._op_name == "test_op"  # Use string literal instead of __name__
+    assert call.op_name.endswith("/test_op:epbtXLYvbWDYBxWnDKcKBp506QCJhrjEXswOgNShkQc")
     assert len(list(client.get_calls())) == 1  # Verify only one call was created
 
     # Test create_call with tracing disabled
@@ -3303,15 +3364,15 @@ def test_calls_query_with_non_uuidv7_ids(client):
 
 
 def test_calls_query_filter_by_root_refs(client):
-    @weave.op()
+    @weave.op
     def root_op(x: int):
         return {"n": x, "child": child_op(x)}
 
-    @weave.op()
+    @weave.op
     def child_op(x: int):
         return grandchild_op(x)
 
-    @weave.op()
+    @weave.op
     def grandchild_op(x: int):
         return x + 3
 
@@ -3454,7 +3515,7 @@ def test_files_stats(client):
 
 
 def test_no_400_on_invalid_artifact_url(client):
-    @weave.op()
+    @weave.op
     def test() -> str:
         # This url is too long, should be wandb-artifact:///entity/project/name:version
         return "wandb-artifact:///entity/project/toxic-extra-path/artifact:latest"
@@ -3466,7 +3527,7 @@ def test_no_400_on_invalid_artifact_url(client):
 
 
 def test_no_400_on_invalid_refs(client):
-    @weave.op()
+    @weave.op
     def test() -> str:
         # This ref is too long, should be weave:///entity/project/object/name:version
         return "weave:///entity/project/object/toxic-extra-path/object:latest"
@@ -3475,3 +3536,91 @@ def test_no_400_on_invalid_refs(client):
     id = call.id
     server_call = client.get_call(id)
     assert server_call.id == id
+
+
+def test_sum_dict_leaves_list_of_dicts(client):
+    """Test that sum_dict_leaves correctly handles lists of dictionaries."""
+    dicts = [
+        {"a": 1, "b": "hello", "c": 2},
+        {"a": 3, "b": "world", "c": 4},
+        {"a": 5, "b": "!", "c": 6},
+    ]
+    result = weave_client.sum_dict_leaves(dicts)
+    assert result == {"a": 9, "b": ["hello", "world", "!"], "c": 12}
+
+    # Test with nested dictionaries in the list
+    dicts = [
+        {"a": {"x": 1, "y": 2}, "b": 3},
+        {"a": {"x": 4, "y": 5}, "b": 6},
+        {"a": {"x": 7, "y": 8}, "b": 9},
+    ]
+    result = weave_client.sum_dict_leaves(dicts)
+    assert result == {"a": {"x": 12, "y": 15}, "b": 18}
+
+    # Test with empty list
+    assert weave_client.sum_dict_leaves([]) == {}
+
+    # Test with list containing empty dictionaries
+    assert weave_client.sum_dict_leaves([{}]) == {}
+
+    # Test with None values
+    dicts = [
+        {"a": 1, "b": None, "c": 2},
+        {"a": 3, "b": None, "c": 4},
+        {"a": 5, "b": None, "c": 6},
+    ]
+    result = weave_client.sum_dict_leaves(dicts)
+    assert result == {"a": 9, "c": 12}
+
+
+def test_sum_dict_leaves_mixed_types(client):
+    """Test that sum_dict_leaves correctly handles dictionaries where the same key has different types."""
+    dicts = [
+        {"a": 1, "b": "hello", "c": 2},
+        {"a": "world", "b": 3, "c": 4},
+        {"a": 5, "b": "!", "c": "test"},
+    ]
+    result = weave_client.sum_dict_leaves(dicts)
+    # When a key has mixed types, all values should be collected in a list
+    assert result == {"a": [1, "world", 5], "b": ["hello", 3, "!"], "c": [2, 4, "test"]}
+
+    # Test with nested dictionaries having mixed types
+    dicts = [
+        {"a": {"x": 1, "y": "hello"}, "b": 3},
+        {"a": {"x": "world", "y": 2}, "b": "test"},
+        {"a": {"x": 5, "y": 3}, "b": 6},
+    ]
+    result = weave_client.sum_dict_leaves(dicts)
+    assert result == {
+        "a": {"x": [1, "world", 5], "y": ["hello", 2, 3]},
+        "b": [3, "test", 6],
+    }
+
+
+def test_sum_dict_leaves_deep_nested(client):
+    """Test that sum_dict_leaves correctly handles deeply nested dictionaries (2 levels) with mixed types."""
+    dicts = [
+        {
+            "level1": {"level2": {"a": 1, "b": "hello", "c": {"x": 2, "y": "world"}}},
+            "top": 10,
+        },
+        {
+            "level1": {"level2": {"a": "test", "b": 3, "c": {"x": "deep", "y": 4}}},
+            "top": "mixed",
+        },
+        {
+            "level1": {"level2": {"a": 5, "b": "!", "c": {"x": 6, "y": "nested"}}},
+            "top": 20,
+        },
+    ]
+    result = weave_client.sum_dict_leaves(dicts)
+    assert result == {
+        "level1": {
+            "level2": {
+                "a": [1, "test", 5],
+                "b": ["hello", 3, "!"],
+                "c": {"x": [2, "deep", 6], "y": ["world", 4, "nested"]},
+            }
+        },
+        "top": [10, "mixed", 20],
+    }

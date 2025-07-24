@@ -1,0 +1,2023 @@
+<!--- Docs: Evaluation -->
+<!--- Builtin Scorers -->
+
+# Builtin Scorers
+
+# Builtin Scorers
+
+
+  
+    **Installation**
+
+    To use Weave's predefined scorers you need to install some additional dependencies:
+
+    ```bash
+    pip install weave[scorers]
+    ```
+
+    **LLM-evaluators**
+    Update Feb 2025: The pre-defined scorers that leverage LLMs now automatically integrate with litellm.
+    You no longer need to pass an LLM client; just set the `model_id`. 
+    See the supported models [here](https://docs.litellm.ai/docs/providers).
+
+    ## `HallucinationFreeScorer`
+
+    This scorer checks if your AI system's output includes any hallucinations based on the input data.
+
+    ```python
+    from weave.scorers import HallucinationFreeScorer
+
+    scorer = HallucinationFreeScorer()
+    ```
+
+    **Customization:**
+
+    - Customize the `system_prompt` and `user_prompt` fields of the scorer to define what "hallucination" means for you.
+
+    **Notes:**
+
+    - The `score` method expects an input column named `context`. If your dataset uses a different name, use the `column_map` attribute to map `context` to the dataset column.
+
+    Here you have an example in the context of an evaluation:
+
+    ```python
+    import asyncio
+    import weave
+    from weave.scorers import HallucinationFreeScorer
+
+    # Initialize scorer with a column mapping if needed.
+    hallucination_scorer = HallucinationFreeScorer(
+        model_id="openai/gpt-4o", # or any other model supported by litellm
+        column_map={"context": "input", "output": "other_col"}
+    )
+
+    # Create dataset
+    dataset = [
+        {"input": "John likes various types of cheese."},
+        {"input": "Pepe likes various types of cheese."},
+    ]
+
+    @weave.op
+    def model(input: str) -> str:
+        return "The person's favorite cheese is cheddar."
+
+    # Run evaluation
+    evaluation = weave.Evaluation(
+        dataset=dataset,
+        scorers=[hallucination_scorer],
+    )
+    result = asyncio.run(evaluation.evaluate(model))
+    print(result)
+    # Example output:
+    # {'HallucinationFreeScorer': {'has_hallucination': {'true_count': 2, 'true_fraction': 1.0}}, 'model_latency': {'mean': ...}}
+    ```
+
+    ---
+
+    ## `SummarizationScorer`
+
+    Use an LLM to compare a summary to the original text and evaluate the quality of the summary.
+
+    ```python
+    from weave.scorers import SummarizationScorer
+
+    scorer = SummarizationScorer(
+        model_id="openai/gpt-4o"  # or any other model supported by litellm
+    )
+    ```
+
+    **How It Works:**
+
+    This scorer evaluates summaries in two ways:
+
+    1. **Entity Density:** Checks the ratio of unique entities (like names, places, or things) mentioned in the summary to the total word count in the summary in order to estimate the "information density" of the summary. Uses an LLM to extract the entities. Similar to how entity density is used in the Chain of Density paper, https://arxiv.org/abs/2309.04269
+    2. **Quality Grading:** An LLM evaluator grades the summary as `poor`, `ok`, or `excellent`. These grades are then mapped to scores (0.0 for poor, 0.5 for ok, and 1.0 for excellent) for aggregate performance evaluation.
+
+    **Customization:**
+
+    - Adjust `summarization_evaluation_system_prompt` and `summarization_evaluation_prompt` to tailor the evaluation process.
+
+    **Notes:**
+
+    - The scorer uses litellm internally.
+    - The `score` method expects the original text (the one being summarized) to be present in the `input` column. Use `column_map` if your dataset uses a different name.
+
+    Here you have an example usage in the context of an evaluation:
+
+    ```python
+    import asyncio
+    import weave
+    from weave.scorers import SummarizationScorer
+
+    class SummarizationModel(weave.Model):
+        @weave.op()
+        async def predict(self, input: str) -> str:
+            return "This is a summary of the input text."
+
+    # Initialize scorer
+    summarization_scorer = SummarizationScorer(
+        model_id="openai/gpt-4o"  # or any other model supported by litellm
+    )
+    # Create dataset
+    dataset = [
+        {"input": "The quick brown fox jumps over the lazy dog."},
+        {"input": "Artificial Intelligence is revolutionizing various industries."}
+    ]
+    # Run evaluation
+    evaluation = weave.Evaluation(dataset=dataset, scorers=[summarization_scorer])
+    results = asyncio.run(evaluation.evaluate(SummarizationModel()))
+    print(results)
+    # Example output:
+    # {'SummarizationScorer': {'is_entity_dense': {'true_count': 0, 'true_fraction': 0.0}, 'summarization_eval_score': {'mean': 0.0}, 'entity_density': {'mean': 0.0}}, 'model_latency': {'mean': ...}}
+    ```
+
+    ---
+
+    ## `OpenAIModerationScorer`
+
+    The `OpenAIModerationScorer` uses OpenAI's Moderation API to check if the AI system's output contains disallowed content, such as hate speech or explicit material.
+
+    ```python
+    from weave.scorers import OpenAIModerationScorer
+
+    scorer = OpenAIModerationScorer()
+    ```
+
+    **How It Works:**
+
+    - Sends the AI's output to the OpenAI Moderation endpoint and returns a structured response indicating if the content is flagged.
+
+    **Notes:**
+    Here is an example in the context of an evaluation:
+
+    ```python
+    import asyncio
+    import weave
+    from weave.scorers import OpenAIModerationScorer
+
+    class MyModel(weave.Model):
+        @weave.op
+        async def predict(self, input: str) -> str:
+            return input
+
+    # Initialize scorer
+    moderation_scorer = OpenAIModerationScorer()
+
+    # Create dataset
+    dataset = [
+        {"input": "I love puppies and kittens!"},
+        {"input": "I hate everyone and want to hurt them."}
+    ]
+
+    # Run evaluation
+    evaluation = weave.Evaluation(dataset=dataset, scorers=[moderation_scorer])
+    results = asyncio.run(evaluation.evaluate(MyModel()))
+    print(results)
+    # Example output:
+    # {'OpenAIModerationScorer': {'flagged': {'true_count': 1, 'true_fraction': 0.5}, 'categories': {'violence': {'true_count': 1, 'true_fraction': 1.0}}}, 'model_latency': {'mean': ...}}
+    ```
+
+    ---
+
+    ## `EmbeddingSimilarityScorer`
+
+    The `EmbeddingSimilarityScorer` computes the cosine similarity between the embeddings of the AI system's output and a target text from your dataset. It is useful for measuring how similar the AI's output is to a reference text.
+
+    ```python
+    from weave.scorers import EmbeddingSimilarityScorer
+
+    similarity_scorer = EmbeddingSimilarityScorer(
+        model_id="openai/text-embedding-3-small",  # or any other model supported by litellm
+        threshold=0.4  # the cosine similarity threshold
+    )
+    ```
+
+    Note: You can use `column_map` to map the `target` column to a different name.
+
+    **Parameters:**
+
+    - `threshold` (float): The minimum cosine similarity score (between -1 and 1) needed to consider the two texts similar (defaults to `0.5`).
+
+    Here is an example usage in the context of an evaluation:
+
+    ```python
+    import asyncio
+    import weave
+    from weave.scorers import EmbeddingSimilarityScorer
+
+    # Initialize scorer
+    similarity_scorer = EmbeddingSimilarityScorer(
+        model_id="openai/text-embedding-3-small",  # or any other model supported by litellm
+        threshold=0.7
+    )
+    # Create dataset
+    dataset = [
+        {
+            "input": "He's name is John",
+            "target": "John likes various types of cheese.",
+        },
+        {
+            "input": "He's name is Pepe.",
+            "target": "Pepe likes various types of cheese.",
+        },
+    ]
+    # Define model
+    @weave.op
+    def model(input: str) -> str:
+        return "John likes various types of cheese."
+
+    # Run evaluation
+    evaluation = weave.Evaluation(
+        dataset=dataset,
+        scorers=[similarity_scorer],
+    )
+    result = asyncio.run(evaluation.evaluate(model))
+    print(result)
+    # Example output:
+    # {'EmbeddingSimilarityScorer': {'is_similar': {'true_count': 1, 'true_fraction': 0.5}, 'similarity_score': {'mean': 0.844851403}}, 'model_latency': {'mean': ...}}
+    ```
+
+    ---
+
+    ## `ValidJSONScorer`
+
+    The `ValidJSONScorer` checks whether the AI system's output is valid JSON. This scorer is useful when you expect the output to be in JSON format and need to verify its validity.
+
+    ```python
+    from weave.scorers import ValidJSONScorer
+
+    json_scorer = ValidJSONScorer()
+    ```
+
+    Here is an example in the context of an evaluation:
+
+    ```python
+    import asyncio
+    import weave
+    from weave.scorers import ValidJSONScorer
+
+    class JSONModel(weave.Model):
+        @weave.op()
+        async def predict(self, input: str) -> str:
+            # This is a placeholder.
+            # In a real scenario, this would generate JSON.
+            return '{"key": "value"}'
+
+    model = JSONModel()
+    json_scorer = ValidJSONScorer()
+
+    dataset = [
+        {"input": "Generate a JSON object with a key and value"},
+        {"input": "Create an invalid JSON"}
+    ]
+
+    evaluation = weave.Evaluation(dataset=dataset, scorers=[json_scorer])
+    results = asyncio.run(evaluation.evaluate(model))
+    print(results)
+    # Example output:
+    # {'ValidJSONScorer': {'json_valid': {'true_count': 2, 'true_fraction': 1.0}}, 'model_latency': {'mean': ...}}
+    ```
+
+    ---
+
+    ## `ValidXMLScorer`
+
+    The `ValidXMLScorer` checks whether the AI system's output is valid XML. It is useful when expecting XML-formatted outputs.
+
+    ```python
+    from weave.scorers import ValidXMLScorer
+
+    xml_scorer = ValidXMLScorer()
+    ```
+
+    Here is an example in the context of an evaluation:
+
+    ```python
+    import asyncio
+    import weave
+    from weave.scorers import ValidXMLScorer
+
+    class XMLModel(weave.Model):
+        @weave.op()
+        async def predict(self, input: str) -> str:
+            # This is a placeholder. In a real scenario, this would generate XML.
+            return 'value'
+
+    model = XMLModel()
+    xml_scorer = ValidXMLScorer()
+
+    dataset = [
+        {"input": "Generate a valid XML with a root element"},
+        {"input": "Create an invalid XML"}
+    ]
+
+    evaluation = weave.Evaluation(dataset=dataset, scorers=[xml_scorer])
+    results = asyncio.run(evaluation.evaluate(model))
+    print(results)
+    # Example output:
+    # {'ValidXMLScorer': {'xml_valid': {'true_count': 2, 'true_fraction': 1.0}}, 'model_latency': {'mean': ...}}
+    ```
+
+    ---
+
+    ## `PydanticScorer`
+
+    The `PydanticScorer` validates the AI system's output against a Pydantic model to ensure it adheres to a specified schema or data structure.
+
+    ```python
+    from weave.scorers import PydanticScorer
+    from pydantic import BaseModel
+
+    class FinancialReport(BaseModel):
+        revenue: int
+        year: str
+
+    pydantic_scorer = PydanticScorer(model=FinancialReport)
+    ```
+
+    ---
+
+    ## RAGAS - `ContextEntityRecallScorer`
+
+    The `ContextEntityRecallScorer` estimates context recall by extracting entities from both the AI system's output and the provided context, then computing the recall score. It is based on the [RAGAS](https://github.com/explodinggradients/ragas) evaluation library.
+
+    ```python
+    from weave.scorers import ContextEntityRecallScorer
+
+    entity_recall_scorer = ContextEntityRecallScorer(
+        model_id="openai/gpt-4o"
+    )
+    ```
+
+    **How It Works:**
+
+    - Uses an LLM to extract unique entities from the output and context and calculates recall.
+    - **Recall** indicates the proportion of important entities from the context that are captured in the output.
+    - Returns a dictionary with the recall score.
+
+    **Notes:**
+
+    - Expects a `context` column in your dataset. Use the `column_map` attribute if the column name is different.
+
+    ---
+
+    ## RAGAS - `ContextRelevancyScorer`
+
+    The `ContextRelevancyScorer` evaluates the relevancy of the provided context to the AI system's output. It is based on the [RAGAS](https://github.com/explodinggradients/ragas) evaluation library.
+
+    ```python
+    from weave.scorers import ContextRelevancyScorer
+
+    relevancy_scorer = ContextRelevancyScorer(
+        model_id="openai/gpt-4o",  # or any other model supported by litellm
+        relevancy_prompt="""
+    Given the following question and context, rate the relevancy of the context to the question on a scale from 0 to 1.
+
+    Question: {question}
+    Context: {context}
+    Relevancy Score (0-1):
+    """
+    )
+    ```
+
+    **How It Works:**
+
+    - Uses an LLM to rate the relevancy of the context to the output on a scale from 0 to 1.
+    - Returns a dictionary with the `relevancy_score`.
+
+    **Notes:**
+
+    - Expects a `context` column in your dataset. Use `column_map` if a different name is used.
+    - Customize the `relevancy_prompt` to define how relevancy is assessed.
+
+    Here is an example usage in the context of an evaluation:
+
+    ```python
+    import asyncio
+    from textwrap import dedent
+    import weave
+    from weave.scorers import ContextEntityRecallScorer, ContextRelevancyScorer
+
+    class RAGModel(weave.Model):
+        @weave.op()
+        async def predict(self, question: str) -> str:
+            "Retrieve relevant context"
+            return "Paris is the capital of France."
+
+    # Define prompts
+    relevancy_prompt: str = dedent("""
+        Given the following question and context, rate the relevancy of the context to the question on a scale from 0 to 1.
+
+        Question: {question}
+        Context: {context}
+        Relevancy Score (0-1):
+        """)
+    # Initialize scorers
+    entity_recall_scorer = ContextEntityRecallScorer()
+    relevancy_scorer = ContextRelevancyScorer(relevancy_prompt=relevancy_prompt)
+    # Create dataset
+    dataset = [
+        {
+            "question": "What is the capital of France?",
+            "context": "Paris is the capital city of France."
+        },
+        {
+            "question": "Who wrote Romeo and Juliet?",
+            "context": "William Shakespeare wrote many famous plays."
+        }
+    ]
+    # Run evaluation
+    evaluation = weave.Evaluation(
+        dataset=dataset,
+        scorers=[entity_recall_scorer, relevancy_scorer]
+    )
+    results = asyncio.run(evaluation.evaluate(RAGModel()))
+    print(results)
+    # Example output:
+    # {'ContextEntityRecallScorer': {'recall': {'mean': ...}}, 
+    # 'ContextRelevancyScorer': {'relevancy_score': {'mean': ...}}, 
+    # 'model_latency': {'mean': ...}}
+    ```
+  
+  
+    ```plaintext
+    This feature is not available in TypeScript yet.  Stay tuned!
+    ```
+  
+
+
+**Note:** The built-in scorers were calibrated using OpenAI models (e.g. `openai/gpt-4o`, `openai/text-embedding-3-small`). If you wish to experiment with other providers, you can simply update the `model_id`. For example, to use an Anthropic model:
+
+```python
+from weave.scorers import SummarizationScorer
+
+# Switch to Anthropic's Claude model
+summarization_scorer = SummarizationScorer(
+    model_id="anthropic/claude-3-5-sonnet-20240620"
+)
+```
+
+[Source](https://weave-docs.wandb.ai/guides/evaluation/builtin_scorers)
+
+<!--- Docs: Evaluation -->
+<!--- Guardrails And Monitors -->
+
+# Guardrails And Monitors
+
+# Online Evaluation: Guardrails and Monitors
+
+
+
+## Introduction
+
+Building production LLM applications? Two questions likely keep you up at night:
+1. How do you ensure your LLMs generate safe, appropriate content?
+2. How do you measure and improve output quality over time?
+
+Weave's unified scoring system answers both questions through a simple yet powerful framework. Whether you need active safety controls (guardrails) or passive quality monitoring, this guide will show you how to implement robust evaluation systems for your LLM applications.
+
+The foundation of Weave's evaluation system is the [**Scorer**](./scorers.md) - a component that evaluates your function's inputs and outputs to measure quality, safety, or any other metric you care about. Scorers are versatile and can be used in two ways:
+
+- **As Guardrails**: Block or modify unsafe content before it reaches users
+- **As Monitors**: Track quality metrics over time to identify trends and improvements
+
+:::note Terminology
+Throughout this guide, we'll refer to functions decorated with `@weave.op` as "ops". These are regular Python functions that have been enhanced with Weave's tracking capabilities.
+:::
+
+#### Ready-to-Use Scorers
+While this guide shows you how to create custom scorers, Weave comes with a variety of [predefined scorers](./builtin_scorers.mdx) that you can use right away, including:
+- [Hallucination detection](./builtin_scorers.mdx#hallucinationfreescorer)
+- [Summarization quality](./builtin_scorers.mdx#summarizationscorer)
+- [Embedding similarity](./builtin_scorers.mdx#embeddingsimilarityscorer)
+- [Relevancy evaluation](./builtin_scorers.mdx#ragas---contextrelevancyscorer)
+- And more!
+
+### Guardrails vs. Monitors: When to Use Each
+
+While scorers power both guardrails and monitors, they serve different purposes:
+
+| Aspect | Guardrails | Monitors |
+|--------|------------|----------|
+| **Purpose** | Active intervention to prevent issues | Passive observation for analysis |
+| **Timing** | Real-time, before output reaches users | Can be asynchronous or batched |
+| **Performance** | Must be fast (affects response time) | Can be slower, run in background |
+| **Sampling** | Usually every request | Often sampled (e.g., 10% of calls) |
+| **Control Flow** | Can block/modify outputs | No impact on application flow |
+| **Resource Usage** | Must be efficient | Can use more resources if needed |
+
+For example, a toxicity scorer could be used:
+- 🛡️ **As a Guardrail**: Block toxic content immediately
+- 📊 **As a Monitor**: Track toxicity levels over time
+
+> 💡 **Note**: Every scorer result is automatically stored in Weave's database. This means your guardrails double as monitors without any extra work! You can always analyze historical scorer results, regardless of how they were originally used.
+
+### Using the `.call()` Method
+
+To use scorers with Weave ops, you'll need access to both the operation's result and its tracking information. The `.call()` method provides both:
+
+```python
+# Instead of calling the op directly:
+result = generate_text(input)  # Primary way to call the op but doesn't give access to the Call object
+
+# Use the .call() method to get both result and Call object:
+result, call = generate_text.call(input)  # Now you can use the call object with scorers
+```
+
+:::tip Why Use `.call()`?
+The Call object is essential for associating the score with the call in the database. While you can directly call the scoring function, this would not be associated with the call, and therefore not searchable, filterable, or exportable for later analysis.
+
+For more details about Call objects, see the [Calls guide section on Call objects](../tracking/tracing.mdx#getting-a-handle-to-the-call-object-during-execution).
+:::
+
+## Getting Started with Scorers
+
+### Basic Example
+
+Here's a simple example showing how to use `.call()` with a scorer:
+
+```python
+import weave
+from weave import Scorer
+
+class LengthScorer(Scorer):
+    @weave.op
+    def score(self, output: str) -> dict:
+        """A simple scorer that checks output length."""
+        return {
+            "length": len(output),
+            "is_short": len(output) < 100
+        }
+
+@weave.op
+def generate_text(prompt: str) -> str:
+    return "Hello, world!"
+
+# Get both result and Call object
+result, call = generate_text.call("Say hello")
+
+# Now you can apply scorers
+await call.apply_scorer(LengthScorer())
+```
+
+## Using Scorers as Guardrails {#using-scorers-as-guardrails}
+
+Guardrails act as safety checks that run before allowing LLM output to reach users. Here's a practical example:
+
+```python
+import weave
+from weave import Scorer
+
+@weave.op
+def generate_text(prompt: str) -> str:
+    """Generate text using an LLM."""
+    # Your LLM generation logic here
+    return "Generated response..."
+
+class ToxicityScorer(Scorer):
+    @weave.op
+    def score(self, output: str) -> dict:
+        """
+        Evaluate content for toxic language.
+        """
+        # Your toxicity detection logic here
+        return {
+            "flagged": False,  # True if content is toxic
+            "reason": None     # Optional explanation if flagged
+        }
+
+async def generate_safe_response(prompt: str) -> str:
+    # Get result and Call object
+    result, call = generate_text.call(prompt)
+    
+    # Check safety
+    safety = await call.apply_scorer(ToxicityScorer())
+    if safety.result["flagged"]:
+        return f"I cannot generate that content: {safety.result['reason']}"
+    
+    return result
+```
+
+:::note Scorer Timing
+When applying scorers:
+- The main operation (`generate_text`) completes and is marked as finished in the UI
+- Scorers run asynchronously after the main operation
+- Scorer results are attached to the call once they complete
+- You can view scorer results in the UI or query them via the API
+:::
+
+## Using Scorers as Monitors {#using-scorers-as-monitors}
+
+Monitors help track quality metrics over time without blocking operations. This is useful for:
+- Identifying quality trends
+- Detecting model drift
+- Gathering data for model improvements
+
+```python
+import weave
+from weave import Scorer
+from weave.scorers import ValidJSONScorer, ValidXMLScorer
+
+import random
+
+@weave.op
+def generate_text(prompt: str) -> str:
+    """Generate text using an LLM."""
+    return "Generated response..."
+
+async def generate_with_monitoring(prompt: str) -> str:
+    # Get both the result and tracking information
+    result, call = generate_text.call(prompt)
+    
+    # Sample monitoring (only monitor 10% of calls)
+    if random.random() < 0.1:
+        # Monitor multiple aspects asynchronously
+        await call.apply_scorer(ValidJSONScorer())
+        await call.apply_scorer(ValidXMLScorer())
+    
+    return result
+```
+
+## AWS Bedrock Guardrails
+
+The `BedrockGuardrailScorer` uses AWS Bedrock's guardrail feature to detect and filter content based on configured policies. It calls the `apply_guardrail` API to apply the guardrail to the content.
+
+To use the `BedrockGuardrailScorer`, you need the following:
+- An AWS account with Bedrock access
+- An AWS account with access to Bedrock
+- A configured guardrail in the AWS Bedrock console
+- The `boto3` Python package
+
+> 🌟 **Tip**: You don't need to create your own Bedrock client—Weave creates it for you.  To specify a region, pass the `bedrock_runtime_kwargs` parameter to the scorer.
+
+For more details on creating a guardrail, see the [Bedrock guardrails notebook](https://github.com/aws-samples/amazon-bedrock-samples/blob/main/responsible_ai/bedrock-guardrails/guardrails-api.ipynb).
+```python
+import weave
+import boto3
+from weave.scorers.bedrock_guardrails import BedrockGuardrailScorer
+
+# Initialize Weave
+weave.init("my_app")
+
+# Create a guardrail scorer
+guardrail_scorer = BedrockGuardrailScorer(
+    guardrail_id="your-guardrail-id",  # Replace "your-guardrail-id" with your guardrail ID
+    guardrail_version="DRAFT",          # Use guardrail_version to use a specific guardrail version
+    source="INPUT",                             # Can be "INPUT" or "OUTPUT"
+    bedrock_runtime_kwargs={"region_name": "us-east-1"}  # AWS region
+)
+
+@weave.op
+def generate_text(prompt: str) -> str:
+    # Add your text generation logic here
+    return "Generated text..."
+
+# Use the guardrail as a safety check
+async def generate_safe_text(prompt: str) -> str:
+    result, call = generate_text.call(prompt)
+    
+    # Apply the guardrail
+    score = await call.apply_scorer(guardrail_scorer)
+    
+    # Check if the content passed the guardrail
+    if not score.result.passed:
+        # Use the modified output if available
+        if score.result.metadata.get("modified_output"):
+            return score.result.metadata["modified_output"]
+        return "I cannot generate that content due to content policy restrictions."
+    
+    return result
+```
+
+
+## Implementation Details
+
+### The Scorer Interface
+
+A scorer is a class that inherits from `Scorer` and implements a `score` method. The method receives:
+- `output`: The result from your function
+- Any input parameters matching your function's parameters
+
+Here's a comprehensive example:
+
+```python
+@weave.op
+def generate_styled_text(prompt: str, style: str, temperature: float) -> str:
+    """Generate text in a specific style."""
+    return "Generated text in requested style..."
+
+class StyleScorer(Scorer):
+    @weave.op
+    def score(self, output: str, prompt: str, style: str) -> dict:
+        """
+        Evaluate if the output matches the requested style.
+        
+        Args:
+            output: The generated text (automatically provided)
+            prompt: Original prompt (matched from function input)
+            style: Requested style (matched from function input)
+        """
+        return {
+            "style_match": 0.9,  # How well it matches requested style
+            "prompt_relevance": 0.8  # How relevant to the prompt
+        }
+
+# Example usage
+async def generate_and_score():
+    # Generate text with style
+    result, call = generate_styled_text.call(
+        prompt="Write a story",
+        style="noir",
+        temperature=0.7
+    )
+    
+    # Score the result
+    score = await call.apply_scorer(StyleScorer())
+    print(f"Style match score: {score.result['style_match']}")
+```
+
+### Score Parameters
+
+#### Parameter Matching Rules
+- The `output` parameter is special and always contains the function's result
+- Other parameters must match the function's parameter names exactly
+- Scorers can use any subset of the function's parameters
+- Parameter types should match the function's type hints
+
+#### Handling Parameter Name Mismatches
+
+Sometimes your scorer's parameter names might not match your function's parameter names exactly. For example:
+
+```python
+@weave.op
+def generate_text(user_input: str):  # Uses 'user_input'
+    return process(user_input)
+
+class QualityScorer(Scorer):
+    @weave.op
+    def score(self, output: str, prompt: str):  # Expects 'prompt'
+        """Evaluate response quality."""
+        return {"quality_score": evaluate_quality(prompt, output)}
+
+result, call = generate_text.call(user_input="Say hello")
+
+# Map 'prompt' parameter to 'user_input'
+scorer = QualityScorer(column_map={"prompt": "user_input"})
+await call.apply_scorer(scorer)
+```
+
+Common use cases for `column_map`:
+- Different naming conventions between functions and scorers
+- Reusing scorers across different functions
+- Using third-party scorers with your function names
+
+
+#### Adding Additional Parameters
+
+Sometimes scorers need extra parameters that aren't part of your function. You can provide these using `additional_scorer_kwargs`:
+
+```python
+class ReferenceScorer(Scorer):
+    @weave.op
+    def score(self, output: str, reference_answer: str):
+        """Compare output to a reference answer."""
+        similarity = compute_similarity(output, reference_answer)
+        return {"matches_reference": similarity > 0.8}
+
+# Provide the reference answer as an additional parameter
+await call.apply_scorer(
+    ReferenceScorer(),
+    additional_scorer_kwargs={
+        "reference_answer": "The Earth orbits around the Sun."
+    }
+)
+```
+
+This is useful when your scorer needs context or configuration that isn't part of the original function call.
+
+
+### Using Scorers: Two Approaches
+
+1. **With Weave's Op System** (Recommended)
+```python
+result, call = generate_text.call(input)
+score = await call.apply_scorer(MyScorer())
+```
+
+2. **Direct Usage** (Quick Experiments)
+```python
+scorer = MyScorer()
+score = scorer.score(output="some text")
+```
+
+**When to use each:**
+- 👉 Use the op system for production, tracking, and analysis
+- 👉 Use direct scoring for quick experiments or one-off evaluations
+
+**Tradeoffs of Direct Usage:**
+- ✅ Simpler for quick tests
+- ✅ No Op required
+- ❌ No association with the LLM/Op call
+
+### Score Analysis
+
+
+For detailed information about querying calls and their scorer results, see our [Score Analysis Guide](./scorers.md#score-analysis) and our [Data Access Guide](/guides/tracking/tracing#querying--exporting-calls).
+
+
+## Production Best Practices
+
+### 1. Set Appropriate Sampling Rates
+```python
+@weave.op
+def generate_text(prompt: str) -> str:
+    return generate_response(prompt)
+
+async def generate_with_sampling(prompt: str) -> str:
+    result, call = generate_text.call(prompt)
+    
+    # Only monitor 10% of calls
+    if random.random() < 0.1:
+        await call.apply_scorer(ToxicityScorer())
+        await call.apply_scorer(QualityScorer())
+    
+    return result
+```
+
+### 2. Monitor Multiple Aspects
+```python
+async def evaluate_comprehensively(call):
+    await call.apply_scorer(ToxicityScorer())
+    await call.apply_scorer(QualityScorer())
+    await call.apply_scorer(LatencyScorer())
+```
+### 3. Analyze and Improve
+- Review trends in the Weave Dashboard
+- Look for patterns in low-scoring outputs
+- Use insights to improve your LLM system
+- Set up alerts for concerning patterns (coming soon)
+
+### 4. Access Historical Data
+Scorer results are stored with their associated calls and can be accessed through:
+- The Call object's `feedback` field
+- The Weave Dashboard
+- Our query APIs
+
+### 5. Initialize Guards Efficiently
+
+For optimal performance, especially with locally-run models, initialize your guards outside of the main function. This pattern is particularly important when:
+- Your scorers load ML models
+- You're using local LLMs where latency is critical
+- Your scorers maintain network connections
+- You have high-traffic applications
+
+See the Complete Example section below for a demonstration of this pattern.
+
+:::caution Performance Tips
+For Guardrails:
+- Keep logic simple and fast
+- Consider caching common results
+- Avoid heavy external API calls
+- Initialize guards outside of your main functions to avoid repeated initialization costs
+
+For Monitors:
+- Use sampling to reduce load
+- Can use more complex logic
+- Can make external API calls
+:::
+
+## Complete Example
+
+Here's a comprehensive example that brings together all the concepts we've covered:
+
+```python
+import weave
+from weave import Scorer
+import asyncio
+import random
+from typing import Optional
+
+class ToxicityScorer(Scorer):
+    def __init__(self):
+        # Initialize any expensive resources here
+        self.model = load_toxicity_model()
+    
+    @weave.op
+    async def score(self, output: str) -> dict:
+        """Check content for toxic language."""
+        try:
+            result = await self.model.evaluate(output)
+            return {
+                "flagged": result.is_toxic,
+                "reason": result.explanation if result.is_toxic else None
+            }
+        except Exception as e:
+            # Log error and default to conservative behavior
+            print(f"Toxicity check failed: {e}")
+            return {"flagged": True, "reason": "Safety check unavailable"}
+
+class QualityScorer(Scorer):
+    @weave.op
+    async def score(self, output: str, prompt: str) -> dict:
+        """Evaluate response quality and relevance."""
+        return {
+            "coherence": evaluate_coherence(output),
+            "relevance": evaluate_relevance(output, prompt),
+            "grammar": evaluate_grammar(output)
+        }
+
+# Initialize scorers at module level (optional optimization)
+toxicity_guard = ToxicityScorer()
+quality_monitor = QualityScorer()
+relevance_monitor = RelevanceScorer()
+
+@weave.op
+def generate_text(
+    prompt: str,
+    style: Optional[str] = None,
+    temperature: float = 0.7
+) -> str:
+    """Generate an LLM response."""
+    # Your LLM generation logic here
+    return "Generated response..."
+
+async def generate_safe_response(
+    prompt: str,
+    style: Optional[str] = None,
+    temperature: float = 0.7
+) -> str:
+    """Generate a response with safety checks and quality monitoring."""
+    try:
+        # Generate initial response
+        result, call = generate_text.call(
+            prompt=prompt,
+            style=style,
+            temperature=temperature
+        )
+
+        # Apply safety check (guardrail)
+        safety = await call.apply_scorer(toxicity_guard)
+        if safety.result["flagged"]:
+            return f"I cannot generate that content: {safety.result['reason']}"
+
+        # Sample quality monitoring (10% of requests)
+        if random.random() < 0.1:
+            # Run quality checks in parallel
+            await asyncio.gather(
+                call.apply_scorer(quality_monitor),
+                call.apply_scorer(relevance_monitor)
+            )
+        
+        return result
+
+    except Exception as e:
+        # Log error and return user-friendly message
+        print(f"Generation failed: {e}")
+        return "I'm sorry, I encountered an error. Please try again."
+
+# Example usage
+async def main():
+    # Basic usage
+    response = await generate_safe_response("Tell me a story")
+    print(f"Basic response: {response}")
+    
+    # Advanced usage with all parameters
+    response = await generate_safe_response(
+        prompt="Tell me a story",
+        style="noir",
+        temperature=0.8
+    )
+    print(f"Styled response: {response}")
+
+```
+
+This example demonstrates:
+- Proper scorer initialization and error handling
+- Combined use of guardrails and monitors
+- Async operation with parallel scoring
+- Production-ready error handling and logging
+
+## Next Steps
+
+- Explore [Available Scorers](./scorers.md)
+- Learn about [Weave Ops](../../guides/tracking/ops.md)
+
+[Source](https://weave-docs.wandb.ai/guides/evaluation/guardrails_and_monitors)
+
+<!--- Docs: Evaluation -->
+<!--- Scorers -->
+
+# Scorers
+
+# Scoring Overview
+
+In Weave, Scorers are used to evaluate AI outputs and return evaluation metrics. They take the AI's output, analyze it, and return a dictionary of results. Scorers can use your input data as reference if needed and can also output extra information, such as explanations or reasonings from the evaluation.
+
+
+  
+    Scorers are passed to a `weave.Evaluation` object during evaluation. There are two types of Scorers in weave:
+
+    1. **Function-based Scorers:** Simple Python functions decorated with `@weave.op`.
+    2. **Class-based Scorers:** Python classes that inherit from `weave.Scorer` for more complex evaluations.
+
+    Scorers must return a dictionary and can return multiple metrics, nested metrics and non-numeric values such as text returned from a LLM-evaluator about its reasoning.
+
+  
+  
+    Scorers are special ops passed to a `weave.Evaluation` object during evaluation.
+  
+
+
+## Create your own Scorers
+
+:::tip[Ready-to-Use Scorers]
+While this guide shows you how to create custom scorers, Weave comes with a variety of [predefined scorers](./builtin_scorers.mdx) and [local SLM scorers](./weave_local_scorers.md) that you can use right away, including:
+- [Hallucination detection](./builtin_scorers.mdx#hallucinationfreescorer)
+- [Summarization quality](./builtin_scorers.mdx#summarizationscorer)
+- [Embedding similarity](./builtin_scorers.mdx#embeddingsimilarityscorer)
+- [Toxicity detection (local)](./weave_local_scorers.md#weavetoxicityscorerv1)
+- [Context Relevance scoring (local)](./weave_local_scorers.md#weavecontextrelevancescorerv1)
+- And more!
+:::
+
+### Function-based Scorers
+
+
+  
+    These are functions decorated with `@weave.op` that return a dictionary. They're great for simple evaluations like:
+
+    ```python
+    import weave
+
+    @weave.op
+    def evaluate_uppercase(text: str) -> dict:
+        return {"text_is_uppercase": text.isupper()}
+
+    my_eval = weave.Evaluation(
+        dataset=[{"text": "HELLO WORLD"}],
+        scorers=[evaluate_uppercase]
+    )
+    ```
+
+    When the evaluation is run, `evaluate_uppercase` checks if the text is all uppercase.
+
+  
+  
+    These are functions wrapped with `weave.op` that accept an object with `modelOutput` and optionally `datasetRow`.  They're great for simple evaluations like:
+    ```typescript
+    import * as weave from 'weave'
+
+    const evaluateUppercase = weave.op(
+        ({modelOutput}) => modelOutput.toUpperCase() === modelOutput,
+        {name: 'textIsUppercase'}
+    );
+
+
+    const myEval = new weave.Evaluation({
+        dataset: [{text: 'HELLO WORLD'}],
+        scorers: [evaluateUppercase],
+    })
+    ```
+
+  
+
+
+### Class-based Scorers
+
+
+  
+    For more advanced evaluations, especially when you need to keep track of additional scorer metadata, try different prompts for your LLM-evaluators, or make multiple function calls, you can use the `Scorer` class.
+
+    **Requirements:**
+
+    1. Inherit from `weave.Scorer`.
+    2. Define a `score` method decorated with `@weave.op`.
+    3. The `score` method must return a dictionary.
+
+    Example:
+
+    ```python
+    import weave
+    from openai import OpenAI
+    from weave import Scorer
+
+    llm_client = OpenAI()
+
+    #highlight-next-line
+    class SummarizationScorer(Scorer):
+        model_id: str = "gpt-4o"
+        system_prompt: str = "Evaluate whether the summary is good."
+
+        @weave.op
+        def some_complicated_preprocessing(self, text: str) -> str:
+            processed_text = "Original text: \n" + text + "\n"
+            return processed_text
+
+        @weave.op
+        def call_llm(self, summary: str, processed_text: str) -> dict:
+            res = llm_client.chat.completions.create(
+                messages=[
+                    {"role": "system", "content": self.system_prompt},
+                    {"role": "user", "content": (
+                        f"Analyse how good the summary is compared to the original text."
+                        f"Summary: {summary}\n{processed_text}"
+                    )}])
+            return {"summary_quality": res}
+
+        @weave.op
+        def score(self, output: str, text: str) -> dict:
+            """Score the summary quality.
+
+            Args:
+                output: The summary generated by an AI system
+                text: The original text being summarized
+            """
+            processed_text = self.some_complicated_preprocessing(text)
+            eval_result = self.call_llm(summary=output, processed_text=processed_text)
+            return {"summary_quality": eval_result}
+
+    evaluation = weave.Evaluation(
+        dataset=[{"text": "The quick brown fox jumps over the lazy dog."}],
+        scorers=[summarization_scorer])
+    ```
+
+    This class evaluates how good a summary is by comparing it to the original text.
+
+  
+  
+    ```plaintext
+    This feature is not available in TypeScript yet.  Stay tuned!
+    ```
+  
+
+
+## How Scorers Work
+
+### Scorer Keyword Arguments
+
+
+  
+    Scorers can access both the output from your AI system and the input data from the dataset row.
+
+    - **Input:** If you would like your scorer to use data from your dataset row, such as a "label" or "target" column then you can easily make this available to the scorer by adding a `label` or `target` keyword argument to your scorer definition.
+
+    For example if you wanted to use a column called "label" from your dataset then your scorer function (or `score` class method) would have a parameter list like this:
+
+    ```python
+    @weave.op
+    def my_custom_scorer(output: str, label: int) -> dict:
+        ...
+    ```
+
+    When a weave `Evaluation` is run, the output of the AI system is passed to the `output` parameter. The `Evaluation` also automatically tries to match any additional scorer argument names to your dataset columns. If customizing your scorer arguments or dataset columns is not feasible, you can use column mapping - see below for more.
+
+    - **Output:** Include an `output` parameter in your scorer function's signature to access the AI system's output.
+
+    ### Mapping Column Names with `column_map`
+
+    Sometimes, the `score` methods' argument names don't match the column names in your dataset. You can fix this using a `column_map`.
+
+    If you're using a class-based scorer, pass a dictionary to the `column_map` attribute of `Scorer` when you initialise your scorer class. This dictionary maps your `score` method's argument names to the dataset's column names, in the order: `{scorer_keyword_argument: dataset_column_name}`.
+
+    Example:
+
+    ```python
+    import weave
+    from weave import Scorer
+
+    # A dataset with news articles to be summarised
+    dataset = [
+        {"news_article": "The news today was great...", "date": "2030-04-20", "source": "Bright Sky Network"},
+        ...
+    ]
+
+    # Scorer class
+    class SummarizationScorer(Scorer):
+
+        @weave.op
+        def score(self, output, text) -> dict:
+            """
+                output: output summary from a LLM summarization system
+                text: the text being summarised
+            """
+            ...  # evaluate the quality of the summary
+
+    # create a scorer with a column mapping the `text` argument to the `news_article` data column
+    scorer = SummarizationScorer(column_map={"text" : "news_article"})
+    ```
+
+    Now, the `text` argument in the `score` method will receive data from the `news_article` dataset column.
+
+    **Notes:**
+
+    - Another equivalent option to map your columns is to subclass the `Scorer` and overload the `score` method mapping the columns explicitly.
+
+    ```python
+    import weave
+    from weave import Scorer
+
+    class MySummarizationScorer(SummarizationScorer):
+
+        @weave.op
+        def score(self, output: str, news_article: str) -> dict:  # Added type hints
+            # overload the score method and map columns manually
+            return super().score(output=output, text=news_article)
+    ```
+
+  
+  
+    Scorers can access both the output from your AI system and the contents of the dataset row.
+
+    You can easily access relevant columns from the dataset row by adding a `datasetRow` keyword argument to your scorer definition.
+
+    ```typescript
+    const myScorer = weave.op(
+        ({modelOutput, datasetRow}) => {
+            return modelOutput * 2 === datasetRow.expectedOutputTimesTwo;
+        },
+        {name: 'myScorer'}
+    );
+    ```
+
+    ### Mapping Column Names with `columnMapping`
+    > 🚨 **Important**:     In TypeScript, this feature is currently on the `Evaluation` object, not individual scorers.
+
+    :::
+
+    Sometimes your `datasetRow` keys will not exactly match the scorer's naming scheme, but they are semantically similar. You can map the columns using the `Evaluation`'s `columnMapping` option.
+
+    The mapping is always from the scorer's perspective, i.e. `{scorer_key: dataset_column_name}`.
+
+    Example:
+
+    ```typescript
+    const myScorer = weave.op(
+        ({modelOutput, datasetRow}) => {
+            return modelOutput * 2 === datasetRow.expectedOutputTimesTwo;
+        },
+        {name: 'myScorer'}
+    );
+
+    const myEval = new weave.Evaluation({
+        dataset: [{expected: 2}],
+        scorers: [myScorer],
+        columnMapping: {expectedOutputTimesTwo: 'expected'}
+    });
+    ```
+
+  
+
+
+### Final summarization of the scorer
+
+
+  
+    During evaluation, the scorer will be computed for each row of your dataset. To provide a final score for the evaluation we provide an `auto_summarize` depending on the returning type of the output.
+    - Averages are computed for numerical columns
+    - Count and fraction for boolean columns
+    - Other column types are ignored
+
+    You can override the `summarize` method on the `Scorer` class and provide your own way of computing the final scores. The `summarize` function expects:
+
+    - A single parameter `score_rows`: This is a list of dictionaries, where each dictionary contains the scores returned by the `score` method for a single row of your dataset.
+    - It should return a dictionary containing the summarized scores.
+
+    **Why this is useful?**
+
+    When you need to score all rows before deciding on the final value of the score for the dataset.
+
+    ```python
+    class MyBinaryScorer(Scorer):
+        """
+        Returns True if the full output matches the target, False if not
+        """
+
+        @weave.op
+        def score(self, output, target):
+            return {"match": output == target}
+
+        def summarize(self, score_rows: list) -> dict:
+            full_match = all(row["match"] for row in score_rows)
+            return {"full_match": full_match}
+    ```
+
+    > In this example, the default `auto_summarize` would have returned the count and proportion of True.
+
+    If you want to learn more, check the implementation of [CorrectnessLLMJudge](/tutorial-rag#optional-defining-a-scorer-class).
+
+  
+  
+    During evaluation, the scorer will be computed for each row of your dataset.  To provide a final score, we use an internal `summarizeResults` function that aggregates depending on the output type.
+    - Averages are computed for numerical columns
+    - Count and fraction for boolean columns
+    - Other column types are ignored
+
+    We don't currently support custom summarization.
+
+  
+
+
+### Applying Scorers to a Call
+
+To apply scorers to your Weave ops, you'll need to use the `.call()` method which provides access to both the operation's result and its tracking information. This allows you to associate scorer results with specific calls in Weave's database.
+
+For more information on how to use the `.call()` method, see the [Calling Ops](../tracking/tracing#calling-ops#getting-a-handle-to-the-call-object-during-execution) guide.
+
+
+  
+    Here's a basic example:
+
+    ```python
+    # Get both result and Call object
+    result, call = generate_text.call("Say hello")
+
+    # Apply a scorer
+    score = await call.apply_scorer(MyScorer())
+    ```
+
+    You can also apply multiple scorers to the same call:
+
+    ```python
+    # Apply multiple scorers in parallel
+    await asyncio.gather(
+        call.apply_scorer(quality_scorer),
+        call.apply_scorer(toxicity_scorer)
+    )
+    ```
+
+    **Notes:**
+    - Scorer results are automatically stored in Weave's database
+    - Scorers run asynchronously after the main operation completes
+    - You can view scorer results in the UI or query them via the API
+
+    For more detailed information about using scorers as guardrails or monitors, including production best practices and complete examples, see our [Guardrails and Monitors guide](./guardrails_and_monitors.md).
+
+  
+  
+    ```plaintext
+    This feature is not available in TypeScript yet. Stay tuned!
+    ```
+  
+
+
+### Use `preprocess_model_input` 
+
+You can use the `preprocess_model_input` parameter to modify dataset examples before they reach your model during evaluation. 
+important
+The `preprocess_model_input` function only transforms inputs before they are passed to the model’s prediction function.
+
+Scorer functions always receive the original dataset examples, without any preprocessing applied.
+:::
+
+For usage information and an example, see [Using `preprocess_model_input` to format dataset rows before evaluating](../core-types/evaluations.md#using-preprocess_model_input-to-format-dataset-rows-before-evaluating).
+
+## Score Analysis
+
+In this section, we'll show you how to analyze the scores for a single call, multiple calls, and all calls scored by a specific scorer.
+
+### Analyze a single Call's Scores
+
+#### Single Call API
+
+To retrieve the calls for a single call, you can use the `get_call` method.
+
+```python
+client = weave.init("my-project")
+
+# Get a single call
+call = client.get_call("call-uuid-here")
+
+# Get the feedback for the call which contains the scores
+feedback = list(call.feedback)
+```
+
+
+#### Single Call UI
+
+
+
+Scores for an individual call are displayed in the call details page under the "Scores" tab.
+
+
+### Analyze multiple Calls' Scores
+
+#### Multiple Calls API
+
+To retrieve the calls for multiple calls, you can use the `get_calls` method.
+
+```python
+client = weave.init("my-project")
+
+# Get multiple calls - use whatever filters you want and include feedback
+calls = client.get_calls(..., include_feedback=True)
+
+# Iterate over the calls and access the feedback which contains the scores
+for call in calls:
+    feedback = list(call.feedback)
+```
+
+#### Multiple Calls UI
+
+
+
+Scores for multiple calls are displayed in the traces table under the "Scores" column.
+
+### Analyze all Calls scored by a specific Scorer
+
+#### All Calls by Scorer API
+
+To retrieve all calls scored by a specific scorer, you can use the `get_calls` method.
+
+```python
+client = weave.init("my-project")
+
+# To get all the calls scored by any version of a scorer, use the scorer name (typically the class name)
+calls = client.get_calls(scored_by=["MyScorer"], include_feedback=True)
+
+# To get all the calls scored by a specific version of a scorer, use the entire ref
+# Refs can be obtained from the scorer object or via the UI.
+calls = client.get_calls(scored_by=[myScorer.ref.uri()], include_feedback=True)
+
+# Iterate over the calls and access the feedback which contains the scores
+for call in calls:
+    feedback = list(call.feedback)
+```
+
+
+#### All Calls by Scorer UI
+
+Finally, if you would like to see all the calls scored by a Scorer, navigate to the Scorers Tab in the UI and select "Programmatic Scorer" tab. Click your Scorer to open the Scorer details page.
+
+
+
+Next, click the `View Traces` button under `Scores` to view all the calls scored by your Scorer.
+
+
+
+This will default to the selected version of the Scorer. You can remove the version filter to see all the calls scored by any version of the Scorer.
+
+[Source](https://weave-docs.wandb.ai/guides/evaluation/scorers)
+
+<!--- Docs: Evaluation -->
+<!--- Weave Local Scorers -->
+
+# Weave Local Scorers
+
+# Weave Local Scorers
+
+
+
+
+
+Weave's local scorers are a suite of small language models that run locally on your machine with minimal latency. These models evaluate the safety and quality of your AI system’s inputs, context, and outputs.
+
+Some of these models are fine-tuned by Weights & Biases, while others are state-of-the-art open-source models trained by the community. Weights & Biases (W&B) Reports were used for training and evaluation. You can find the full details in this [list of W&B Reports](https://wandb.ai/c-metrics/weave-scorers/reports/Weave-Scorers-v1--VmlldzoxMDQ0MDE1OA).
+
+The model weights are publicly available in W&B Artifacts, and are automatically downloaded when you instantiate the scorer class. The artifact paths can be found here if you'd like to download them yourself: `weave.scorers.default_models`
+
+The object returned by these scorers contains a `passed` boolean attribute indicating whether the input text is safe or high quality, as well as a `metadata` attribute that contains more detail such as the raw score from the model.
+
+> 🌟 **Tip**: While local scorers can be run on CPUs and GPUs, use GPUs for best performance.  
+
+
+  
+
+    ## Prerequisites
+
+    Before you can use Weave local scorers, install additional dependencies:
+
+    ```bash
+    pip install weave[scorers]
+    ```
+
+    ## Select a scorer
+
+    The following local scorers are available. Select a scorer based on your use case.
+
+    | Scorer                           | Scenario                                                                                                                                                                      |
+    |----------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+    | [WeaveToxicityScorerV1](#weavetoxicityscorerv1)                  | Identify toxic or harmful content in your AI system's inputs and outputs, including hate speech or threats.                                                       |
+    | [WeaveBiasScorerV1](#weavebiasscorerv1)                          | Detect biased or stereotypical content in your AI system's inputs and outputs. Ideal for reducing harmful biases in generated text.                               |
+    | [WeaveHallucinationScorerV1](#weavehallucinationscorerv1)       | Identify whether your RAG system generates hallucinations in its output based on the input and context provided.                                                  |
+    | [WeaveContextRelevanceScorerV1](#weavecontextrelevancescorerv1) | Measure whether the AI system's output is relevant to the input and context provided.                                                                             |
+    | [WeaveCoherenceScorerV1](#weavecoherencescorerv1)                | Evaluate the coherence and logical structure of the AI system's output.                                                                                           |
+    | [WeaveFluencyScorerV1](#weavefluencyscorerv1)                    | Measure whether the AI system's output is fluent.                                                                                                                  |
+    | [WeaveTrustScorerV1](#weavetrustscorerv1)                        | An aggregate scorer that leverages the toxicity, hallucination, context relevance, fluency, and coherence scorers.                                                |
+    | [PresidioScorer](#presidioscorer)                                | Detect Personally Identifiable Information (PII) in your AI system's inputs and outputs using the Presidio library from Microsoft.                                |
+
+    ## `WeaveBiasScorerV1`
+
+    This scorer assesses gender and race/origin bias along two dimensions:
+        
+        - Race and Origin: Racism and bias against a country or region of origin, immigration status, ethnicity, etc.
+        - Gender and Sexuality: Sexism, misogyny, homophobia, transphobia, sexual harassment, etc.
+
+    `WeaveBiasScorerV1` uses a fine-tuned [deberta-small-long-nli](https://huggingface.co/tasksource/deberta-small-long-nli) model. For more details on the model, dataset, and calibration process, see the [WeaveBiasScorerV1 W&B Report](https://wandb.ai/c-metrics/bias-benchmark/reports/Bias-Scorer--VmlldzoxMDM2MTgzNw).
+
+    ### Usage notes 
+
+    - The `score` method expects a string to be passed to the `output` parameter. 
+    - A higher score means that there is a stronger prediction of bias in the text.
+    - The `threshold` parameter is set but can also be overridden on initialization.
+    
+    ### Usage example
+
+    ```python
+    import weave
+    from weave.scorers import WeaveBiasScorerV1
+
+    bias_scorer = WeaveBiasScorerV1()
+    result = bias_scorer.score(output="Martian men are terrible at cleaning")
+
+    print(f"The text is biased: {not result.passed}")
+    print(result)
+    ```
+
+    ---
+
+    ## `WeaveToxicityScorerV1`
+
+    This scorer assesses the input text for toxicity along five dimensions:
+    
+        - Race and Origin: Racism and bias against a country or region of origin, immigration status, ethnicity, etc.
+        - Gender and Sexuality: Sexism, misogyny, homophobia, transphobia, sexual harassment, etc.
+        - Religious: Bias or stereotypes against someone's religion.
+        - Ability: Bias related to someone's physical, mental, or intellectual ability or disability.
+        - Violence and Abuse: Overly graphic descriptions of violence, threats of violence, or incitement of violence.
+    
+    The `WeaveToxicityScorerV1` uses the open source [Celadon](https://huggingface.co/PleIAs/celadon) model from PleIAs. For more information, see the [WeaveToxicityScorerV1 W&B Report](https://wandb.ai/c-metrics/toxicity-benchmark/reports/Toxicity-Scorer--VmlldzoxMDMyNjc0NQ).
+
+    ### Usage notes
+
+    - The `score` method expects a string to be passed to the `output` parameter. 
+    - The model returns scores from `0` to `3` across five different categories: 
+      - If the sum of these scores is above `total_threshold` (default value `5`), the input is flagged as toxic. 
+      - If any single category has a score higher than `category_threshold` (default `2`), the input is flagged as toxic.
+    - To make filtering more aggressive, override `category_threshold` or `total_threshold` during initialization.
+
+    ### Usage example
+
+    ```python
+    import weave
+    from weave.scorers import WeaveToxicityScorerV1
+
+    toxicity_scorer = WeaveToxicityScorerV1()
+    result = toxicity_scorer.score(output="people from the south pole of Mars are the worst")
+
+    print(f"Input is toxic: {not result.passed}")
+    print(result)
+    ```
+
+    ---
+
+    ## `WeaveHallucinationScorerV1`
+
+    This scorer checks if your AI system's output contains any hallucinations based on the input data.
+
+    The `WeaveHallucinationScorerV1` uses the open source [HHEM 2.1 model](https://huggingface.co/vectara/hallucination_evaluation_model) from Vectara. For more information, see the [WeaveHallucinationScorerV1 W&B Report](https://wandb.ai/c-metrics/hallucination/reports/Hallucination-Scorer--VmlldzoxMDM3NDA3MA).
+
+    ### Usage notes
+
+    - The `score` method expects values to be passed to the `query` and `output` parameters.  
+    - The context should be passed to the `output` parameter (as a string or list of strings).  
+    - A higher output score means a stronger prediction of hallucination in the output.
+    - The `threshold` parameter is set but can be overridden on initialization.
+
+    ### Usage example 
+
+    ```python
+    import weave
+    from weave.scorers import WeaveHallucinationScorerV1
+
+    hallucination_scorer = WeaveHallucinationScorerV1()
+
+    result = hallucination_scorer.score(
+        query="What is the capital of Antarctica?",
+        context="People in Antarctica love the penguins.",
+        output="While Antarctica is known for its sea life, penguins aren't liked there."
+    )
+
+    print(f"Output is hallucinated: {not result.passed}")
+    print(result)
+    ```
+
+    ---
+
+    ## `WeaveContextRelevanceScorerV1`
+
+    This scorer is designed to be used when evaluating RAG systems. It scores the relevance of the context to the query.
+
+    The `WeaveContextRelevanceScorerV1` uses a fine-tuned [deberta-small-long-nli](https://huggingface.co/tasksource/deberta-small-long-nli) model from tasksource. For more details, see the [WeaveContextRelevanceScorerV1 W&B Report](https://wandb.ai/c-metrics/context-relevance-scorer/reports/Context-Relevance-Scorer--VmlldzoxMDYxNjEyNA).
+
+    ### Usage notes
+
+    - The `score` method expects values for `query` and `output`.  
+    - The context should be passed to the `output` parameter (string or list of strings).
+    - A higher score means a stronger prediction that the context is relevant to the query.
+    - You can pass `verbose=True` to the `score` method to get per-chunk scores.
+
+    ### Usage example
+
+    ```python
+    import weave
+    from weave.scorers import WeaveContextRelevanceScorerV1
+
+    context_relevance_scorer = WeaveContextRelevanceScorerV1()
+
+    result = context_relevance_scorer.score(
+        query="What is the capital of Antarctica?",
+        output="The Antarctic has the happiest penguins."  # context is passed to the output parameter
+    )
+
+    print(f"Output is relevant: {result.passed}")
+    print(result)
+    ```
+
+    ## `WeaveCoherenceScorerV1`
+
+    This scorer checks whether the input text is coherent.
+
+    The `WeaveCoherenceScorerV1` uses a fine-tuned [deberta-small-long-nli](https://huggingface.co/tasksource/deberta-small-long-nli) model from tasksource. For more information, see the [WeaveCoherenceScorerV1 W&B Report](https://wandb.ai/c-metrics/coherence_scorer/reports/Coherence-Scorer--VmlldzoxMDI5MjA1MA).
+
+    ### Usage notes
+
+    - The `score` method expects text to be passed to the `query` and `output` parameters.
+    - A higher output score means a stronger prediction of coherence.
+
+    ### Usage example 
+
+    ```python
+    import weave
+    from weave.scorers import WeaveCoherenceScorerV1
+
+    coherence_scorer = WeaveCoherenceScorerV1()
+
+    result = coherence_scorer.score(
+        query="What is the capital of Antarctica?",
+        output="but why not monkey up day"
+    )
+
+    print(f"Output is coherent: {result.passed}")
+    print(result)
+    ```
+
+    ---
+
+    ## `WeaveFluencyScorerV1`
+
+    This scorer checks whether the input text is fluent—that is, easy to read and understand, similar to natural human language. It evaluates grammar, syntax, and overall readability.
+
+    The `WeaveFluencyScorerV1` uses a fine-tuned [ModernBERT-base](https://huggingface.co/answerdotai/ModernBERT-base) model from AnswerDotAI. For more information, see the [WeaveFluencyScorerV1 W&B Report](https://wandb.ai/c-metrics/fluency-eval/reports/Fluency-Scorer--VmlldzoxMTA3NzE2Ng).
+
+    ### Usage notes
+
+    - The `score` method expects text to be passed to the `output` parameter.
+    - A higher output score indicates higher fluency.
+
+    ### Usage example 
+
+    ```python
+    import weave
+    from weave.scorers import WeaveFluencyScorerV1
+
+    fluency_scorer = WeaveFluencyScorerV1()
+
+    result = fluency_scorer.score(
+        output="The cat did stretching lazily into warmth of sunlight."
+    )
+
+    print(f"Output is fluent: {result.passed}")
+    print(result)
+    ```
+
+    ---
+
+    ## `WeaveTrustScorerV1`
+
+    The `WeaveTrustScorerV1` is a composite scorer for RAG systems that evaluates the trustworthiness of model outputs by grouping other scorers into two categories: Critical and Advisory. Based on the composite score, it returns a trust level:
+
+    - `high`: No issues detected  
+    - `medium`: Only Advisory issues detected  
+    - `low`: Critical issues detected or input is empty  
+
+    Any input that fails a Critical scorer results in a `low` trust level. Failing an Advisory scorer results in `medium`.
+
+    - **Critical:**
+        - `WeaveToxicityScorerV1`
+        - `WeaveHallucinationScorerV1`
+        - `WeaveContextRelevanceScorerV1`
+
+    - **Advisory:**
+        - `WeaveFluencyScorerV1`
+        - `WeaveCoherenceScorerV1`
+
+    ### Usage notes
+
+    - This scorer is designed for evaluating RAG pipelines.  
+    - It requires `query`, `context`, and `output` keys for correct scoring.
+
+    ### Usage example
+
+    ```python
+    import weave
+    from weave.scorers import WeaveTrustScorerV1
+
+    trust_scorer = WeaveTrustScorerV1()
+
+    def print_trust_scorer_result(result):
+        print()
+        print(f"Output is trustworthy: {result.passed}")
+        print(f"Trust level: {result.metadata['trust_level']}")
+        if not result.passed:
+            print("Triggered scorers:")
+            for scorer_name, scorer_data in result.metadata['raw_outputs'].items():
+                if not scorer_data.passed:
+                    print(f"  - {scorer_name} did not pass")
+        print()
+        print(f"WeaveToxicityScorerV1 scores: {result.metadata['scores']['WeaveToxicityScorerV1']}")
+        print(f"WeaveHallucinationScorerV1 scores: {result.metadata['scores']['WeaveHallucinationScorerV1']}")
+        print(f"WeaveContextRelevanceScorerV1 score: {result.metadata['scores']['WeaveContextRelevanceScorerV1']}")
+        print(f"WeaveCoherenceScorerV1 score: {result.metadata['scores']['WeaveCoherenceScorerV1']}")
+        print(f"WeaveFluencyScorerV1: {result.metadata['scores']['WeaveFluencyScorerV1']}")
+        print()
+
+    result = trust_scorer.score(
+        query="What is the capital of Antarctica?",
+        context="People in Antarctica love the penguins.",
+        output="The cat stretched lazily in the warm sunlight."
+    )
+
+    print_trust_scorer_result(result)
+    print(result)
+    ```
+
+    ---
+
+    ## `PresidioScorer`
+
+    This scorer uses the [Presidio library](https://github.com/microsoft/presidio) to detect Personally Identifiable Information (PII) in your AI system's inputs and outputs.
+
+    ### Usage notes
+
+    - To specify specific entity types, such as emails or phone numbers, pass a list of Presidio entities to the `selected_entities` parameter. Otherwise, Presidio will detect all entity types in its default entities list.
+    - To detect specific entity types, such as emails or phone numbers, pass a list to the `selected_entities` parameter.
+    - You can pass custom recognizers via the `custom_recognizers` parameter as a list of `presidio.EntityRecognizer` instances.
+    - To handle non-English input, use the `language` parameter to specify the language.
+
+    ### Usage example
+
+    ```python
+    import weave
+    from weave.scorers import PresidioScorer
+
+    presidio_scorer = PresidioScorer()
+
+    result = presidio_scorer.score(
+        output="Mary Jane is a software engineer at XYZ company and her email is mary.jane@xyz.com."
+    )
+
+    print(f"Output contains PII: {not result.passed}")
+    print(result)
+    ```
+
+  
+  
+    Weave local scorers are not available in TypeScript yet. Stay tuned!
+
+    To use Weave scorers in TypeScript, see [function-based scorers](scorers#function-based-scorers).
+
+[Source](https://weave-docs.wandb.ai/guides/evaluation/weave_local_scorers)
+
+<!--- Docs: Evaluation -->
+<!--- Evaluation Logger -->
+
+# Evaluation Logger
+
+# `EvaluationLogger`
+
+The `EvaluationLogger` provides a flexible, incremental way to log evaluation data directly from your Python code. You don't need deep knowledge of Weave's internal data types; simply instantiate a logger and use its methods (`log_prediction`, `log_score`, `log_summary`) to record evaluation steps.
+
+This approach is particularly helpful in complex workflows where the entire dataset or all scorers might not be defined upfront.
+
+In contrast to the standard `Evaluation` object, which requires a predefined `Dataset` and list of `Scorer` objects, the `EvaluationLogger` allows you to log individual predictions and their associated scores incrementally as they become available.
+
+:::info Prefer a more structured evaluation?
+
+If you prefer a more opinionated evaluation framework with predefined datasets and scorers, see [Weave's standard Evaluation framework](../core-types/evaluations.md). 
+
+The `EvaluationLogger` offers flexibility while the standard framework offers structure and guidance.
+:::
+
+## Basic workflow
+
+1. _Initialize the logger:_ Create an instance of `EvaluationLogger`, optionally providing metadata about the `model` and `dataset`. Defaults will be used if omitted.
+2. _Log predictions:_ Call `log_prediction` for each input/output pair from your system.
+3. _Log scores:_ Use the returned `ScoreLogger` to `log_score` for the prediction. Multiple scores per prediction are supported.
+4. _Finish prediction:_ Always call `finish()` after logging scores for a prediction to finalize it.
+5. _Log summary:_ After all predictions are processed, call `log_summary` to aggregate scores and add optional custom metrics.
+
+> 🚨 **Important**: After calling `finish()` on a prediction, no more scores can be logged for it.
+
+For a Python code demonstrating the described workflow, see the [Basic example](#basic-example).
+
+## Basic example
+The following example shows how to use `EvaluationLogger` to log predictions and scores inline with your existing Python code.
+
+The `user_model` model function is defined and applied to a list of inputs. For each example:
+
+- The input and output are logged using `log_prediction`.
+- A simple correctness score (`correctness_score`) is logged via `log_score`.
+- `finish()` finalizes logging for that prediction.
+Finally, `log_summary` records any aggregate metrics and triggers automatic score summarization in Weave.
+
+```python
+import weave
+from openai import OpenAI
+from weave.flow.eval_imperative import EvaluationLogger
+
+# Initialize the logger (model/dataset names are optional metadata)
+eval_logger = EvaluationLogger(
+    model="my_model",
+    dataset="my_dataset"
+)
+
+# Example input data (this can be any data structure you want)
+eval_samples = [
+    {'inputs': {'a': 1, 'b': 2}, 'expected': 3},
+    {'inputs': {'a': 2, 'b': 3}, 'expected': 5},
+    {'inputs': {'a': 3, 'b': 4}, 'expected': 7},
+]
+
+# Example model logic.  This does not have to be decorated with @weave.op,
+# but if you do, it will be traced and logged.
+@weave.op
+def user_model(a: int, b: int) -> int:
+    oai = OpenAI()
+    _ = oai.chat.completions.create(messages=[{"role": "user", "content": f"What is {a}+{b}?"}], model="gpt-4o-mini")
+    return a + b
+
+# Iterate through examples, predict, and log
+for sample in eval_samples:
+    inputs = sample["inputs"]
+    model_output = user_model(**inputs) # Pass inputs as kwargs
+
+    # Log the prediction input and output
+    pred_logger = eval_logger.log_prediction(
+        inputs=inputs,
+        output=model_output
+    )
+
+    # Calculate and log a score for this prediction
+    expected = sample["expected"]
+    correctness_score = model_output == expected
+    pred_logger.log_score(
+        scorer="correctness", # Simple string name for the scorer
+        score=correctness_score
+    )
+
+    # Finish logging for this specific prediction
+    pred_logger.finish()
+
+# Log a final summary for the entire evaluation.
+# Weave auto-aggregates the 'correctness' scores logged above.
+summary_stats = {"subjective_overall_score": 0.8}
+eval_logger.log_summary(summary_stats)
+
+print("Evaluation logging complete. View results in the Weave UI.")
+```
+
+## Advanced usage
+
+### Get outputs before logging
+
+You can first compute your model outputs, then separately log predictions and scores. This allows for better separation of evaluation and logging logic.
+
+```python
+ev = EvaluationLogger(model="example_model", dataset="example_dataset")
+
+outputs = [your_output_generator(**inputs) for inputs in your_dataset]
+preds = [ev.log_prediction(inputs, output) for inputs, output in zip(your_dataset, outputs)]
+for pred in preds:
+    pred.log_score(scorer="greater_than_5_scorer", score=output > 5)
+    pred.log_score(scorer="greater_than_7_scorer", score=output > 7)
+
+ev.log_summary()
+```
+
+### Log rich media
+
+Inputs, outputs, and scores can include rich media such as images, videos, audio, or structured tables. Simply pass a dict or media object into the `log_prediction` or `log_score` methods:
+
+```python
+import io
+import wave
+import struct
+from PIL import Image
+import random
+from typing import Any
+import weave
+
+def generate_random_audio_wave_read(duration=2, sample_rate=44100):
+    n_samples = duration * sample_rate
+    amplitude = 32767  # 16-bit max amplitude
+
+    buffer = io.BytesIO()
+
+    # Write wave data to the buffer
+    with wave.open(buffer, 'wb') as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)  # 16-bit
+        wf.setframerate(sample_rate)
+
+        for _ in range(n_samples):
+            sample = random.randint(-amplitude, amplitude)
+            wf.writeframes(struct.pack('<h', sample))
+
+    # Rewind the buffer to the beginning so we can read from it
+    buffer.seek(0)
+
+    # Return a Wave_read object
+    return wave.open(buffer, 'rb')
+
+rich_media_dataset = [
+    {
+        'image': Image.new(
+            "RGB",
+            (100, 100),
+            color=(
+                random.randint(0, 255),
+                random.randint(0, 255),
+                random.randint(0, 255),
+            ),
+        ),
+        "audio": generate_random_audio_wave_read(),
+    }
+    for _ in range(5)
+]
+
+@weave.op
+def your_output_generator(image: Image.Image, audio) -> dict[str, Any]:
+    return {
+        "result": random.randint(0, 10),
+        "image": image,
+        "audio": audio,
+    }
+
+ev = EvaluationLogger(model="example_model", dataset="example_dataset")
+
+for inputs in rich_media_dataset:
+    output = your_output_generator(**inputs)
+    pred = ev.log_prediction(inputs, output)
+    pred.log_score(scorer="greater_than_5_scorer", score=output["result"] > 5)
+    pred.log_score(scorer="greater_than_7_scorer", score=output["result"] > 7)
+
+ev.log_summary()
+```
+
+### Log and compare multiple evaluations
+
+With `EvaluationLogger`, you can log and compare multiple evaluations.
+
+1. Run the code sample shown below.
+2. In the Weave UI, navigate to the `Evals` tab.
+3. Select the evals that you want to compare.
+4. Click the **Compare** button. In the Compare view, you can:
+   - Choose which Evals to add or remove
+   - Choose which metrics to show or hide
+   - Page through specific examples to see how different models performed for the same input on a given dataset
+   
+   For more information on comparisons, see [Comparisons](../tools/comparison.md)
+
+```python
+import weave
+
+models = [
+    "model1",
+    "model2",
+     {"name": "model3", "metadata": {"coolness": 9001}}
+]
+
+for model in models:
+    ev = EvaluationLogger(model=model, dataset="example_dataset")
+    for inputs in your_dataset:
+        output = your_output_generator(**inputs)
+        pred = ev.log_prediction(inputs=inputs, output=output)
+        pred.log_score(scorer="greater_than_3_scorer", score=output > 3)
+        pred.log_score(scorer="greater_than_5_scorer", score=output > 5)
+        pred.log_score(scorer="greater_than_7_scorer", score=output > 7)
+        pred.finish()
+
+    ev.log_summary()
+```
+
+
+
+
+
+## Usage tips
+
+- Call `finish()` promptly after each prediction.
+- Use `log_summary` to capture metrics not tied to single predictions (e.g., overall latency).
+- Rich media logging is great for qualitative analysis.
+
+[Source](https://weave-docs.wandb.ai/guides/evaluation/evaluation_logger)

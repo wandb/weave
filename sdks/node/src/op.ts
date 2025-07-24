@@ -1,6 +1,7 @@
+import {Call, InternalCall} from './call';
 import {getGlobalClient} from './clientApi';
 import {TRACE_CALL_EMOJI} from './constants';
-import {Op, OpOptions, OpRef} from './opType';
+import {Op, OpOptions, OpRef, CallMethod} from './opType';
 import {getGlobalDomain} from './urls';
 import {warnOnce} from './utils/warnOnce';
 
@@ -113,12 +114,17 @@ function createOpWrapper<T extends (...args: any[]) => any>(
 ): Op<T> {
   const {context, ...options} = optionsAndContext;
 
+  const call = new InternalCall();
+
   const opWrapper = async function (
     this: any,
     ...params: Parameters<T>
   ): Promise<Awaited<ReturnType<T>>> {
     const client = getGlobalClient();
-    const thisArg = options?.isDecorator ? this : options?.bindThis;
+    const thisArg =
+      options?.isDecorator || options?.shouldAdoptThis
+        ? this
+        : options?.bindThis;
 
     if (!client) {
       warnOnce(
@@ -143,6 +149,7 @@ function createOpWrapper<T extends (...args: any[]) => any>(
     const opRefForCall: Op<any> | OpRef = opWrapper as Op<any>;
 
     const startCallPromise = client.createCall(
+      call,
       opRefForCall,
       params,
       options?.parameterNames,
@@ -165,36 +172,48 @@ function createOpWrapper<T extends (...args: any[]) => any>(
         result !== null &&
         Symbol.asyncIterator in result
       ) {
-        const {initialStateFn, reduceFn} = options.streamReducer;
+        const {initialStateFn, reduceFn, finalizeFn} = options.streamReducer;
         let state = initialStateFn();
 
-        const wrappedIterator = {
-          [Symbol.asyncIterator]: async function* () {
-            try {
-              for await (const chunk of result as AsyncIterable<any>) {
-                state = reduceFn(state, chunk);
-                yield chunk;
-              }
-            } finally {
-              if (client) {
-                const endTime = new Date();
-                await client.finishCall(
-                  state,
-                  currentCall,
-                  parentCall,
-                  options?.summarize,
-                  endTime,
-                  startCallPromise
-                );
-              }
+        async function* WeaveIterator() {
+          try {
+            for await (const chunk of result as AsyncIterable<any>) {
+              state = reduceFn(state, chunk);
+              yield chunk;
             }
+          } finally {
+            if (client) {
+              const endTime = new Date();
+              finalizeFn(state);
+              await client.finishCall(
+                call,
+                state,
+                currentCall,
+                parentCall,
+                options?.summarize,
+                endTime,
+                startCallPromise
+              );
+            }
+          }
+        }
+        const proxy = new Proxy(result, {
+          get: (target, prop) => {
+            if (prop === Symbol.asyncIterator) {
+              return WeaveIterator;
+            }
+
+            // allow all other properties to be accessed normally
+            return Reflect.get(target, prop);
           },
-        };
-        return wrappedIterator as Awaited<ReturnType<T>>;
+        });
+
+        return proxy;
       } else {
         // Non-stream handling
         const endTime = new Date();
         await client.finishCall(
+          call,
           result,
           currentCall,
           parentCall,
@@ -207,6 +226,7 @@ function createOpWrapper<T extends (...args: any[]) => any>(
     } catch (error) {
       const endTime = new Date();
       await client.finishCallWithException(
+        call,
         error,
         currentCall,
         parentCall,
@@ -234,6 +254,8 @@ function createOpWrapper<T extends (...args: any[]) => any>(
       opWrapper.__name = `${actualClassName}.${String(context.name)}`;
     });
   }
+
+  opWrapper.invoke = createCallMethod<T>(opWrapper, call.proxy) as any;
 
   return opWrapper;
 }
@@ -406,4 +428,19 @@ export function op(...args: any[]): any {
 
 export function isOp(fn: any): fn is Op<any> {
   return fn?.__isOp === true;
+}
+
+export function createCallMethod<F extends (...args: any[]) => any>(
+  opWrapper: (
+    this: any,
+    ...args: Parameters<F>
+  ) => Promise<Awaited<ReturnType<F>>>,
+  callProxy: Call
+): CallMethod<F> {
+  return async function call(this: any, ...args: Parameters<F>) {
+    return [await opWrapper.apply(this, args), callProxy] as [
+      Awaited<ReturnType<F>>,
+      Call,
+    ];
+  };
 }

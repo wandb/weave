@@ -31,11 +31,12 @@ describe('createNewDataset', () => {
 
   it('should create a new dataset with initial data', async () => {
     mockTableCreate.mockResolvedValue({digest: 'new-digest'});
-    mockObjCreate.mockResolvedValue({version: 'v1'});
+    mockObjCreate.mockResolvedValue('v1');
 
     const result = await createNewDataset(createOptions);
 
     expect(result).toEqual({
+      objectDigest: 'v1',
       url: '/mock-url',
       objectId: 'new-dataset',
     });
@@ -88,11 +89,12 @@ describe('updateExistingDataset', () => {
 
   it('should update existing dataset with new version', async () => {
     mockTableUpdate.mockResolvedValue({digest: 'updated-digest'});
-    mockObjCreate.mockResolvedValue({version: 'v2'});
+    mockObjCreate.mockResolvedValue('v2');
 
     const result = await updateExistingDataset(updateOptions);
 
     expect(result).toEqual({
+      objectDigest: 'v2',
       url: '/mock-url',
       objectId: 'dataset-123',
     });

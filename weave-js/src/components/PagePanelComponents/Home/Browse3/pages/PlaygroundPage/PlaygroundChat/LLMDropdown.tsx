@@ -1,18 +1,29 @@
 import {Select} from '@wandb/weave/components/Form/Select';
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {useHistory} from 'react-router-dom';
 
+import {useEntityProject} from '../../../context';
+import {INFERENCE_PATH} from '../../../inference/util';
 import {AddProviderDrawer} from '../../OverviewPage/AddProviderDrawer';
-import {TraceObjSchemaForBaseObjectClass} from '../../wfReactInterface/objectClassQuery';
+import {
+  TraceObjSchemaForBaseObjectClass,
+  useBaseObjectInstances,
+  useLeafObjectInstances,
+} from '../../wfReactInterface/objectClassQuery';
 import {LLMMaxTokensKey} from '../llmMaxTokens';
 import {SavedPlaygroundModelState} from '../types';
+import {useConfiguredProviders} from '../useConfiguredProviders';
 import {
   CustomOption,
   LLMOption,
   LLMOptionToSavedPlaygroundModelState,
+  OpenDirection,
   ProviderOption,
   SAVED_MODEL_OPTION_VALUE,
+  useLLMDropdownOptions,
 } from './LLMDropdownOptions';
 import {ProviderConfigDrawer} from './ProviderConfigDrawer';
+
 interface LLMDropdownProps {
   value: LLMMaxTokensKey | string;
   onChange: (
@@ -28,6 +39,9 @@ interface LLMDropdownProps {
   llmDropdownOptions: ProviderOption[];
   areProvidersLoading: boolean;
   customProvidersResult: TraceObjSchemaForBaseObjectClass<'Provider'>[];
+  selectFirstAvailable?: boolean;
+  direction: OpenDirection;
+  className?: string;
 }
 
 export const LLMDropdown: React.FC<LLMDropdownProps> = ({
@@ -41,10 +55,24 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
   llmDropdownOptions,
   areProvidersLoading,
   customProvidersResult,
+  selectFirstAvailable,
+  direction,
+  className,
 }) => {
   const [isAddProviderDrawerOpen, setIsAddProviderDrawerOpen] = useState(false);
   const [configDrawerOpen, setConfigDrawerOpen] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
+  const [menuPlacement, setMenuPlacement] = useState<'top' | 'bottom' | 'auto'>(
+    'auto'
+  );
+  const selectRef = useRef<HTMLDivElement>(null);
+
+  // TOOD: Avoid direct url manipulation
+  const history = useHistory();
+  const handleViewCatalog = (path?: string) => {
+    const prefixedPath = path ? `${INFERENCE_PATH}/${path}` : INFERENCE_PATH;
+    history.push(prefixedPath);
+  };
 
   const handleCloseDrawer = () => {
     setIsAddProviderDrawerOpen(false);
@@ -77,7 +105,7 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
   );
 
   useEffect(() => {
-    if (!isValueAvailable && !areProvidersLoading) {
+    if (!isValueAvailable && !areProvidersLoading && selectFirstAvailable) {
       let firstAvailableLlm: LLMOption | null = null;
 
       // Check if the value is a saved model
@@ -118,10 +146,22 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
     onChange,
     value,
     areProvidersLoading,
+    selectFirstAvailable,
   ]);
 
+  const handleMenuOpen = () => {
+    if (selectRef.current) {
+      const rect = selectRef.current.getBoundingClientRect();
+      const dropdownMidpoint = (rect.top + rect.bottom) / 2;
+      const viewportMidpoint = window.innerHeight / 2;
+
+      // If dropdown is above 50% of viewport, open down; if below, open up
+      setMenuPlacement(dropdownMidpoint < viewportMidpoint ? 'bottom' : 'top');
+    }
+  };
+
   return (
-    <div className="w-[300px]">
+    <div className={className} ref={selectRef}>
       <Select
         isDisabled={areProvidersLoading}
         placeholder={
@@ -157,6 +197,8 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
         }}
         options={llmDropdownOptions}
         maxMenuHeight={500}
+        menuPlacement={menuPlacement}
+        onMenuOpen={handleMenuOpen}
         components={{
           Option: props => (
             <CustomOption
@@ -166,6 +208,8 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
               project={project}
               isAdmin={isTeamAdmin}
               onConfigureProvider={handleConfigureProvider}
+              onViewCatalog={handleViewCatalog}
+              direction={direction}
             />
           ),
         }}
@@ -203,5 +247,101 @@ export const LLMDropdown: React.FC<LLMDropdownProps> = ({
         />
       )}
     </div>
+  );
+};
+
+interface LLMDropdownLoadedProps {
+  value: LLMMaxTokensKey | string;
+  onChange: (
+    value: LLMMaxTokensKey | string,
+    maxTokens: number,
+    savedModel?: SavedPlaygroundModelState
+  ) => void;
+  isTeamAdmin: boolean;
+  className?: string;
+  direction: OpenDirection;
+  selectFirstAvailable?: boolean;
+}
+
+export const LLMDropdownLoaded: React.FC<LLMDropdownLoadedProps> = ({
+  value,
+  onChange,
+  isTeamAdmin,
+  className,
+  direction,
+  selectFirstAvailable = false,
+}) => {
+  const {entity, project, projectId} = useEntityProject();
+
+  const {
+    result: configuredProviders,
+    loading: configuredProvidersLoading,
+    refetch: refetchConfiguredProviders,
+  } = useConfiguredProviders(entity);
+
+  const {
+    result: customProvidersResult,
+    loading: customProvidersLoading,
+    refetch: refetchCustomProviders,
+  } = useBaseObjectInstances('Provider', {
+    project_id: projectId,
+    filter: {
+      latest_only: true,
+    },
+  });
+
+  const {
+    result: customProviderModelsResult,
+    loading: customProviderModelsLoading,
+    refetch: refetchCustomProviderModels,
+  } = useBaseObjectInstances('ProviderModel', {
+    project_id: projectId,
+    filter: {
+      latest_only: true,
+    },
+  });
+
+  const {result: savedModelsResult, loading: savedModelsLoading} =
+    useLeafObjectInstances('LLMStructuredCompletionModel', {
+      project_id: projectId,
+    });
+
+  const refetchCustomLLMs = useCallback(() => {
+    refetchCustomProviders();
+    refetchCustomProviderModels();
+  }, [refetchCustomProviders, refetchCustomProviderModels]);
+
+  const llmDropdownOptions = useLLMDropdownOptions(
+    configuredProviders,
+    configuredProvidersLoading,
+    customProvidersResult || [],
+    customProviderModelsResult || [],
+    customProvidersLoading,
+    savedModelsResult || [],
+    savedModelsLoading
+  );
+
+  const areCustomProvidersLoading =
+    customProvidersLoading || customProviderModelsLoading;
+
+  const areProvidersLoading =
+    configuredProvidersLoading || areCustomProvidersLoading;
+
+  return (
+    <LLMDropdown
+      value={value}
+      onChange={onChange}
+      isTeamAdmin={isTeamAdmin}
+      direction={direction}
+      selectFirstAvailable={selectFirstAvailable}
+      entity={entity}
+      project={project}
+      refetchConfiguredProviders={refetchConfiguredProviders}
+      refetchCustomLLMs={refetchCustomLLMs}
+      llmDropdownOptions={llmDropdownOptions}
+      areProvidersLoading={areProvidersLoading}
+      customProvidersResult={customProvidersResult || []}
+      className={className}
+    />
   );
 };

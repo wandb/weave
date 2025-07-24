@@ -318,7 +318,7 @@ export const buildDynamicColumns = <T extends GridValidRowModel>(
               ) : (
                 <CustomWeaveTypeProjectContext.Provider
                   value={{entity, project}}>
-                  <CellValue value={val} />
+                  <CellValue value={val} field={key.split('.').pop() ?? ''} />
                 </CustomWeaveTypeProjectContext.Provider>
               )}
             </CellFilterWrapper>

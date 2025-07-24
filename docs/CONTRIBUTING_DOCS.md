@@ -7,6 +7,7 @@ Thanks for contributing to Weave Docs 💛!
 - Ensure tone and style is consistent with existing documentation.
 - Update the `sidebar.ts` file if you add new pages.
 - **Always run** `make docs` before submitting a PR to ensure all auto-generated docs are fresh.
+- When moving a page from one location to another e.g. moving from `https://weave-docs.wandb.ai/old_url` to `https://weave-docs.wandb.ai/new_url`, always [add redirects as described here](#moving-pages-and-redirects).
 
 ## Setup
 
@@ -21,10 +22,9 @@ Set up your environment to build and serve the Weave documentation locally:
     ```bash
     npm install --global yarn
     ```
-4. Set up your Python environment:
+4. Set up your Python environment, including the docs dependencies:
     ```bash
-    pip install -r requirements.dev.txt
-    pip install -e .
+    pip install -e ".[docs]"
     ```
 5. Install Playwright:
     ```bash
@@ -54,7 +54,8 @@ In successful `yarn start` output, you'll see a port number where you can previe
    ```bash
    yarn start
    ```
-4. Preview and review your changes in the docs UI. 
+4. Preview and review your changes in the docs UI.
+   > When moving a page from one location to another e.g. moving from `https://weave-docs.wandb.ai/old_url` to `https://weave-docs.wandb.ai/new_url`, always [add redirects as described here](#moving-pages-and-redirects).
 5. Run `make docs` to regenerate API and notebook docs. 
 
     > Our CI builds and deploys the current state of the documentation but does not automatically regenerate API or notebook docs. If you skip `make docs`, stale or missing docs might be deployed. For more information, see [`make docs`](#make-docs).
@@ -83,6 +84,48 @@ When to run `make docs`:
 - On any Python, Service, SDK, or docs-related changes.
 - Always run before opening a documentation pull request.
 
+## Moving pages and redirects
+
+When moving a page from one location to another e.g. moving from `https://weave-docs.wandb.ai/old_url` to `https://weave-docs.wandb.ai/new_url`, always add redirects. To add and test a redirect, follow these steps:
+
+1. Open `docs/docusaurus.config.ts`
+2. Find `redirects`:
+
+   ```typescript
+   {
+    redirects: [
+        {
+           from: ['/guides/evaluation/imperative_evaluations'],
+           to: '/guides/evaluation/evaluation_logger',
+        },
+      ]  
+    },
+   ```
+3. Add a new redirect object to the `redirects` list and save the file:
+
+   ```typescript
+   {
+    redirects: [
+        {
+           from: ['/guides/evaluation/imperative_evaluations'],
+           to: '/guides/evaluation/evaluation_logger',
+        },
+        {
+           from: ['/old_url'],
+           to: '/new_url',
+        }
+      ]  
+    },
+   ```
+4. Test the build. Note that you can't test redirects when running `yarn start`:
+   ```bash
+   yarn build
+   yarn serve
+   ```
+5. Navigate to the local site build e.g. `http://localhost:3000/`
+6. Manually confirm that the redirect works e.g. `http://localhost:3000/old_url` redirects to `http://localhost:3000/new_url`
+7. Complete all steps described in [How to edit the docs locally](#how-to-edit-the-docs-locally).
+
 ## Doc generation details
 
 ### Python SDK doc generation
@@ -104,10 +147,10 @@ When to run `make docs`:
 - Script: `docs/scripts/generate_notebooks.py`
 - Converts `.ipynb` files from `docs/notebooks` to Markdown in `docs/reference/gen_notebooks`.
 
-You can convert a single notebook:
+You can convert a single notebook by running the below while in the `weave/docs` directory:
 
 ```bash
-python docs/scripts/generate_notebooks.py path/to/your_notebook.ipynb
+python scripts/generate_notebooks.py path/to/your_notebook.ipynb
 ```
 
 To add Docusaurus metadata to a notebook, include:
@@ -129,3 +172,46 @@ make update_playground_models
 ```
 
 This regenerates the model list section automatically.
+
+
+### LLM context doc generation
+
+To make Weave documentation usable by AI tools like Cursor, GPT, or Claude, we generate special machine-readable files that summarize the full documentation set.
+
+- Script: `docs/scripts/generate_llmstxt.py`
+
+This script produces two types of files:
+
+* `llms-full.txt`: A single Markdown file with all documentation content.
+* `llms-full.json`: A structured JSON file for use in RAG pipelines or embeddings.
+* Optionally: Per-category `.txt` files (e.g., `llms-integrations.txt`, `llms-api.txt`). These are useful for asking targeted questions, as `llms-full.txt` is too large for most context windows.
+
+#### Usage
+
+Run the script from the project root:
+
+```bash
+python docs/scripts/generate_llmstxt.py
+```
+
+This will generate:
+
+* `static/llms-full.txt`
+* `static/llms-full.json`
+
+To also generate per-category `.txt` files (recommended for LLM tools like Cursor with context limits):
+
+```bash
+python docs/scripts/generate_llmstxt.py --categories
+```
+
+These files can be used by developers and agents to quickly access documentation content without navigating the full site.
+
+> **Important:** These files are not used by the docs site directly but may be used in downstream applications or LLM pipelines.
+
+#### Regeneration checklist
+
+Run this script if:
+
+- You’ve added or edited any docs that should be used by an LLM.
+- You want to verify how your content will be surfaced in tools like Cursor or GPT.

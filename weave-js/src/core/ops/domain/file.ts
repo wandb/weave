@@ -377,6 +377,43 @@ export const opFileTable = makeTagConsumingStandardOp({
   },
 });
 
+export const opFileTableWithIncrements = makeTagConsumingStandardOp({
+  name: 'file-table_with_increments',
+  argTypes: fileArgTypes,
+  description: `Returns the contents of the ${docType('file')} as a ${docType(
+    'table'
+  )}`,
+  hidden: true,
+  argDescriptions: {
+    file: fileArgDescription,
+  },
+  returnValueDescription: `The contents of the ${docType(
+    'file'
+  )} as a ${docType('table')}`,
+  returnType: inputTypes =>
+    taggedValue(
+      isTaggedValue(inputTypes.file)
+        ? (inputTypes.file as TaggedValueType).tag
+        : null,
+      withFileTag(maybe({type: 'table', columnTypes: {}}), {
+        type: 'file',
+        extension: 'json',
+        wbObjectType: {type: 'table', columnTypes: {}},
+      })
+    ),
+  resolver: async (
+    {file},
+    inputTypes,
+    rawInputs,
+    forwardGraph,
+    forwardOp,
+    context,
+    engine
+  ) => {
+    throw new Error('Not implemented in weave0');
+  },
+});
+
 export const opFileJoinedTable = makeFileOp({
   name: 'file-joinedTable',
   argTypes: {

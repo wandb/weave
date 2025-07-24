@@ -50,7 +50,7 @@ const PageControls: React.FC<{
     <></>
   ) : (
     <S.ControlBar>
-      <S.ArrowIcon name="previous" onClick={prevPage} />
+      <S.ArrowIcon name="chevron-back" onClick={prevPage} />
       <span
         style={{
           flex: '1 1 auto',
@@ -59,7 +59,7 @@ const PageControls: React.FC<{
         {startIndex + 1}
         {!singleItem && `-${endIndex}`} of {totalItems}{' '}
       </span>
-      <S.ArrowIcon name="next" onClick={nextPage} />
+      <S.ArrowIcon name="chevron-next" onClick={nextPage} />
     </S.ControlBar>
   );
 };

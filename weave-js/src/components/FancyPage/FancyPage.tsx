@@ -35,10 +35,10 @@ export const FancyPage = React.memo(
           selectedItem={activeItem}
           baseUrl={baseUrl}
         />
-        <div className="fancy-page__content">
+        <main id="main-content" className="fancy-page__content">
           {children ??
             (activeItem && 'render' in activeItem && activeItem.render?.())}
-        </div>
+        </main>
       </div>
     );
   }

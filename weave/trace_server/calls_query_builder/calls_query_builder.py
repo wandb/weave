@@ -34,10 +34,21 @@ from typing import Callable, Literal, Optional, cast
 from pydantic import BaseModel, Field
 
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.calls_query_builder.object_ref_query_builder import (
+    ObjectRefCondition,
+    ObjectRefOrderCondition,
+    ObjectRefQueryProcessor,
+    build_object_ref_ctes,
+    get_all_object_ref_conditions,
+    has_object_ref_field,
+    is_object_ref_operand,
+    process_query_for_object_refs,
+)
 from weave.trace_server.calls_query_builder.optimization_builder import (
     process_query_to_optimization_sql,
 )
 from weave.trace_server.calls_query_builder.utils import (
+    json_dump_field_as_sql,
     param_slot,
     safely_format_sql,
 )
@@ -48,7 +59,6 @@ from weave.trace_server.orm import (
     clickhouse_cast,
     combine_conditions,
     python_value_to_ch_type,
-    quote_json_path_parts,
 )
 from weave.trace_server.token_costs import cost_query
 from weave.trace_server.trace_server_common import assert_parameter_length_less_than_max
@@ -181,7 +191,11 @@ class CallsMergedFeedbackPayloadField(CallsMergedField):
 
     @classmethod
     def from_path(cls, path: str) -> "CallsMergedFeedbackPayloadField":
-        """Expected format: `[feedback.type].dot.path`"""
+        """
+        Expected format: `[feedback.type].dot.path`
+
+        feedback.type can be '*' to select all feedback types.
+        """
         regex = re.compile(r"^(\[.+\])\.(.+)$")
         match = regex.match(path)
         if not match:
@@ -201,6 +215,10 @@ class CallsMergedFeedbackPayloadField(CallsMergedField):
             return CallsMergedFeedbackPayloadField(
                 field="runnable_ref", feedback_type=feedback_type, extra_path=[]
             )
+        elif extra_path[0] == "trigger_ref":
+            return CallsMergedFeedbackPayloadField(
+                field="trigger_ref", feedback_type=feedback_type, extra_path=[]
+            )
         raise InvalidFieldError(f"Invalid feedback path: {path}")
 
     def is_heavy(self) -> bool:
@@ -213,8 +231,11 @@ class CallsMergedFeedbackPayloadField(CallsMergedField):
         cast: Optional[tsi_query.CastTo] = None,
     ) -> str:
         inner = super().as_sql(pb, "feedback")
-        param_name = pb.add_param(self.feedback_type)
-        res = f"anyIf({inner}, feedback.feedback_type = {param_slot(param_name, 'String')})"
+        if self.feedback_type == "*":
+            res = f"any({inner})"
+        else:
+            param_name = pb.add_param(self.feedback_type)
+            res = f"anyIf({inner}, feedback.feedback_type = {param_slot(param_name, 'String')})"
         # If there is no extra path, then we can just return the inner sql (JSON_VALUE does not like empty extra_path)
         if not self.extra_path:
             return res
@@ -290,40 +311,17 @@ class QueryBuilderDynamicField(QueryBuilderField):
         return f"{super().as_sql(pb, table_alias)} AS {self.field}"
 
 
-def json_dump_field_as_sql(
-    pb: ParamBuilder,
-    table_alias: str,
-    root_field_sanitized: str,
-    extra_path: Optional[list[str]] = None,
-    cast: Optional[tsi_query.CastTo] = None,
-    use_agg_fn: bool = True,
-) -> str:
-    if cast != "exists":
-        if not use_agg_fn:
-            return f"{root_field_sanitized}"
-
-        path_str = "'$'"
-        if extra_path:
-            param_name = pb.add_param(quote_json_path_parts(extra_path))
-            path_str = param_slot(param_name, "String")
-        val = f"JSON_VALUE({root_field_sanitized}, {path_str})"
-        return clickhouse_cast(val, cast)
-    else:
-        # Note: ClickHouse has limitations in distinguishing between null, non-existent, empty string, and "null".
-        # This workaround helps to handle these cases.
-        path_parts = []
-        if extra_path:
-            for part in extra_path:
-                path_parts.append(", " + param_slot(pb.add_param(part), "String"))
-        safe_path = "".join(path_parts)
-        return f"(NOT (JSONType({root_field_sanitized}{safe_path}) = 'Null' OR JSONType({root_field_sanitized}{safe_path}) IS NULL))"
-
-
 class OrderField(BaseModel):
     field: QueryBuilderField
     direction: Literal["ASC", "DESC"]
 
-    def as_sql(self, pb: ParamBuilder, table_alias: str) -> str:
+    def as_sql(
+        self,
+        pb: ParamBuilder,
+        table_alias: str,
+        expand_columns: Optional[list[str]] = None,
+        field_to_object_join_alias_map: Optional[dict[str, str]] = None,
+    ) -> str:
         options: list[tuple[Optional[tsi_query.CastTo], str]]
         if isinstance(
             self.field,
@@ -341,19 +339,85 @@ class OrderField(BaseModel):
             ]
         else:
             options = [(None, self.direction)]
+
+        # Check if this is an object ref order field
+        if (
+            expand_columns
+            and field_to_object_join_alias_map
+            and has_object_ref_field(self.raw_field_path, expand_columns)
+        ):
+            order_condition = ObjectRefOrderCondition(
+                field_path=self.raw_field_path,
+                expand_columns=expand_columns,
+            )
+            cte_alias = field_to_object_join_alias_map.get(order_condition.unique_key)
+            if cte_alias:
+                res = ""
+                base_sql = f"any({cte_alias}.object_val_dump)"
+                for index, (cast_to, direction) in enumerate(options):
+                    if index > 0:
+                        res += ", "
+                    # For object refs, we use the base_sql directly with casting
+                    if cast_to == "exists":
+                        cast_sql = f"(NOT (JSONType(any({cte_alias}.object_val_dump)) = 'Null' OR JSONType(any({cte_alias}.object_val_dump)) IS NULL))"
+                    else:
+                        cast_sql = clickhouse_cast(base_sql, cast_to)
+                    res += f"{cast_sql} {direction}"
+                return res
+
+        # Standard field ordering logic
         res = ""
-        for index, (cast, direction) in enumerate(options):
+        for index, (cast_to, direction) in enumerate(options):
             if index > 0:
                 res += ", "
-            res += f"{self.field.as_sql(pb, table_alias, cast)} {direction}"
+            res += f"{self.field.as_sql(pb, table_alias, cast_to)} {direction}"
         return res
+
+    @property
+    def raw_field_path(self) -> str:
+        """
+        Returns the raw field path as a user would see it, i.e. the field path
+        without the _dump suffix and includes the extra path dot separate.
+
+        example:
+            OrderField(field=CallsMergedField(field="inputs_dump", extra_path=["model", "temperature"])).raw_field_path
+                -> inputs.model.temperature
+        """
+        field_path = self.field.field
+        if field_path.endswith("_dump"):
+            field_path = field_path[:-5]
+        if hasattr(self.field, "extra_path"):
+            field_path += "." + ".".join(self.field.extra_path)
+        return field_path
 
 
 class Condition(BaseModel):
     operand: "tsi_query.Operand"
     _consumed_fields: Optional[list[CallsMergedField]] = None
 
-    def as_sql(self, pb: ParamBuilder, table_alias: str) -> str:
+    def as_sql(
+        self,
+        pb: ParamBuilder,
+        table_alias: str,
+        expand_columns: Optional[list[str]] = None,
+        field_to_object_join_alias_map: Optional[dict[str, str]] = None,
+    ) -> str:
+        # Check if this condition involves object references
+        if (
+            expand_columns
+            and is_object_ref_operand(self.operand, expand_columns)
+            and field_to_object_join_alias_map
+        ):
+            processor = ObjectRefQueryProcessor(
+                pb, table_alias, expand_columns, field_to_object_join_alias_map
+            )
+            sql = processor.process_operand(self.operand)
+            if self._consumed_fields is None:
+                self._consumed_fields = []
+            for raw_field_path in processor.fields_used:
+                self._consumed_fields.append(get_field_by_name(raw_field_path))
+            return sql
+
         conditions = process_query_to_conditions(
             tsi_query.Query.model_validate({"$expr": {"$and": [self.operand]}}),
             pb,
@@ -384,6 +448,20 @@ class Condition(BaseModel):
                 return True
         return False
 
+    def get_object_ref_conditions(
+        self, expand_columns: Optional[list[str]] = None
+    ) -> list[ObjectRefCondition]:
+        """Get any object ref conditions for CTE building"""
+        expand_cols = expand_columns or []
+        if not expand_cols or not is_object_ref_operand(self.operand, expand_cols):
+            return []
+
+        query_for_condition = tsi_query.Query.model_validate({"$expr": self.operand})
+        object_ref_conditions = process_query_for_object_refs(
+            query_for_condition, ParamBuilder(), "calls_merged", expand_cols
+        )
+        return object_ref_conditions
+
 
 class HardCodedFilter(BaseModel):
     filter: tsi.CallsFilter
@@ -403,6 +481,7 @@ class HardCodedFilter(BaseModel):
                 self.filter.trace_roots_only is not None,
                 self.filter.wb_user_ids,
                 self.filter.wb_run_ids,
+                self.filter.turn_ids,
             ]
         )
 
@@ -423,6 +502,7 @@ class CallsQuery(BaseModel):
     order_fields: list[OrderField] = Field(default_factory=list)
     limit: Optional[int] = None
     offset: Optional[int] = None
+    expand_columns: list[str] = Field(default_factory=list)
     include_costs: bool = False
     include_storage_size: bool = False
     include_total_storage_size: bool = False
@@ -450,6 +530,8 @@ class CallsQuery(BaseModel):
         return self
 
     def add_order(self, field: str, direction: str) -> "CallsQuery":
+        if field in DISALLOWED_FILTERING_FIELDS:
+            raise ValueError(f"Field {field} is not allowed in ORDER BY")
         direction = direction.upper()
         if direction not in ("ASC", "DESC"):
             raise ValueError(f"Direction {direction} is not allowed")
@@ -488,6 +570,10 @@ class CallsQuery(BaseModel):
 
     def set_include_costs(self, include_costs: bool) -> "CallsQuery":
         self.include_costs = include_costs
+        return self
+
+    def set_expand_columns(self, expand_columns: list[str]) -> "CallsQuery":
+        self.expand_columns = expand_columns
         return self
 
     def as_sql(self, pb: ParamBuilder, table_alias: str = "calls_merged") -> str:
@@ -566,17 +652,13 @@ class CallsQuery(BaseModel):
             raise ValueError("Missing select columns")
 
         # Determine if the query `has_heavy_fields` by checking
-        # if it `has_heavy_select or has_heavy_filter or has_heavy_order`
         has_heavy_select = any(field.is_heavy() for field in self.select_fields)
-
         has_heavy_filter = any(
             condition.is_heavy() for condition in self.query_conditions
         )
-
         has_heavy_order = any(
             order_field.field.is_heavy() for order_field in self.order_fields
         )
-
         has_heavy_fields = has_heavy_select or has_heavy_filter or has_heavy_order
 
         # Determine if `predicate_pushdown_possible` which is
@@ -611,22 +693,26 @@ class CallsQuery(BaseModel):
 
         # Important: We must always filter out calls that have not been started
         # This can occur when there is an out of order call part insertion or worse,
-        # when such occurance happens and the client terminates early.
+        # when such occurrence happens and the client terminates early.
         # Additionally: This condition is also REQUIRED for proper functioning
-        # when using the op_name and trace_id pre-group by optimizations
+        # when using pre-group by (WHERE) optimizations
         self.add_condition(
             tsi_query.NotOperation.model_validate(
                 {"$not": [{"$eq": [{"$getField": "started_at"}, {"$literal": None}]}]}
             )
         )
 
+        object_ref_conditions = get_all_object_ref_conditions(
+            self.query_conditions, self.order_fields, self.expand_columns
+        )
+
         # If we should not optimize, then just build the base query
-        if not should_optimize and not self.include_costs:
+        if not should_optimize and not self.include_costs and not object_ref_conditions:
             return self._as_sql_base_format(pb, table_alias)
 
-        # If so, build the two queries
+        # Build two queries, first filter query CTE, then select the columns
         filter_query = CallsQuery(project_id=self.project_id)
-        outer_query = CallsQuery(
+        select_query = CallsQuery(
             project_id=self.project_id,
             include_storage_size=self.include_storage_size,
             include_total_storage_size=self.include_total_storage_size,
@@ -635,32 +721,37 @@ class CallsQuery(BaseModel):
         # Select Fields:
         filter_query.add_field("id")
         for field in self.select_fields:
-            outer_query.select_fields.append(field)
+            select_query.select_fields.append(field)
 
-        # Query Conditions
+        # Build CTEs for object reference filtering and ordering
+        object_join_cte, field_to_object_join_alias_map = build_object_ref_ctes(
+            pb, self.project_id, object_ref_conditions
+        )
+
+        # Query conditions and filter
         for condition in self.query_conditions:
-            if condition.is_heavy():
-                outer_query.query_conditions.append(condition)
-            else:
-                filter_query.query_conditions.append(condition)
+            filter_query.query_conditions.append(condition)
 
-        # Hardcoded Filter - always light
         filter_query.hardcoded_filter = self.hardcoded_filter
 
         # Order Fields:
-        if has_light_order_filter:
-            filter_query.order_fields = self.order_fields
-            filter_query.limit = self.limit
-            filter_query.offset = self.offset
-            # SUPER IMPORTANT: still need to re-sort the final query
-            outer_query.order_fields = self.order_fields
-        else:
-            outer_query.order_fields = self.order_fields
-            outer_query.limit = self.limit
-            outer_query.offset = self.offset
+        filter_query.order_fields = self.order_fields
+        filter_query.limit = self.limit
+        filter_query.offset = self.offset
+        # SUPER IMPORTANT: still need to re-sort the final query
+        select_query.order_fields = self.order_fields
 
-        raw_sql = f"""
-        WITH filtered_calls AS ({filter_query._as_sql_base_format(pb, table_alias)})
+        raw_sql = "WITH "
+        if object_join_cte:
+            raw_sql += f"{object_join_cte},\n"
+        raw_sql += f"""filtered_calls AS ({
+            filter_query._as_sql_base_format(
+                pb,
+                table_alias,
+                field_to_object_join_alias_map=field_to_object_join_alias_map,
+                expand_columns=self.expand_columns,
+            )
+        })
         """
 
         if self.include_costs:
@@ -672,15 +763,24 @@ class CallsQuery(BaseModel):
                 )
                 for sort_by in self.order_fields
             ]
+            select_fields = [field.field for field in self.select_fields]
+            inner_sql = cost_query(
+                pb, "all_calls", self.project_id, select_fields, order_by_fields
+            )
             raw_sql += f""",
-            all_calls AS ({outer_query._as_sql_base_format(pb, table_alias, id_subquery_name="filtered_calls")}),
-            {cost_query(pb, "all_calls", self.project_id, [field.field for field in self.select_fields], order_by_fields)}
+            all_calls AS ({select_query._as_sql_base_format(pb, table_alias, id_subquery_name="filtered_calls", field_to_object_join_alias_map=field_to_object_join_alias_map, expand_columns=self.expand_columns)}),
+            {inner_sql}
             """
 
         else:
-            raw_sql += f"""
-            {outer_query._as_sql_base_format(pb, table_alias, id_subquery_name="filtered_calls")}
-            """
+            base_sql = select_query._as_sql_base_format(
+                pb,
+                table_alias,
+                id_subquery_name="filtered_calls",
+                field_to_object_join_alias_map=field_to_object_join_alias_map,
+                expand_columns=self.expand_columns,
+            )
+            raw_sql += base_sql
 
         return safely_format_sql(raw_sql, logger)
 
@@ -689,6 +789,8 @@ class CallsQuery(BaseModel):
         pb: ParamBuilder,
         table_alias: str,
         id_subquery_name: Optional[str] = None,
+        field_to_object_join_alias_map: Optional[dict[str, str]] = None,
+        expand_columns: Optional[list[str]] = None,
     ) -> str:
         needs_feedback = False
         select_fields_sql = ", ".join(
@@ -698,10 +800,14 @@ class CallsQuery(BaseModel):
         having_filter_sql = ""
         having_conditions_sql: list[str] = []
         if len(self.query_conditions) > 0:
-            having_conditions_sql.extend(
-                c.as_sql(pb, table_alias) for c in self.query_conditions
-            )
             for query_condition in self.query_conditions:
+                query_condition_sql = query_condition.as_sql(
+                    pb,
+                    table_alias,
+                    expand_columns=expand_columns,
+                    field_to_object_join_alias_map=field_to_object_join_alias_map,
+                )
+                having_conditions_sql.append(query_condition_sql)
                 if query_condition.is_feedback():
                     needs_feedback = True
         if self.hardcoded_filter is not None:
@@ -727,6 +833,16 @@ class CallsQuery(BaseModel):
             pb,
             table_alias,
         )
+        thread_id_sql = process_thread_id_filter_to_sql(
+            self.hardcoded_filter,
+            pb,
+            table_alias,
+        )
+        turn_id_sql = process_turn_id_filter_to_sql(
+            self.hardcoded_filter,
+            pb,
+            table_alias,
+        )
         # ref filters also have group by filters, because output_refs exist on the
         # call end parts.
         ref_filter_opt_sql = process_ref_filters_to_sql(
@@ -739,9 +855,37 @@ class CallsQuery(BaseModel):
             pb,
             table_alias,
         )
+        # parent_id is valid as null, so we must always include the HAVING filter
+        # in addition to this optimization
+        parent_ids_filter_sql = process_parent_ids_filter_to_sql(
+            self.hardcoded_filter,
+            pb,
+            table_alias,
+        )
+
+        # Filter out object ref conditions from optimization since they're handled via CTEs
+        non_object_ref_conditions = []
+        object_ref_fields_consumed: set[str] = set()
+        for condition in self.query_conditions:
+            if not (
+                expand_columns
+                and is_object_ref_operand(condition.operand, expand_columns)
+            ):
+                non_object_ref_conditions.append(condition)
+            else:
+                if condition._consumed_fields is not None:
+                    object_ref_fields_consumed.update(
+                        f.field for f in condition._consumed_fields
+                    )
+
+        object_refs_filter_opt_sql = process_object_refs_filter_to_opt_sql(
+            pb,
+            table_alias,
+            object_ref_fields_consumed,
+        )
 
         optimization_conditions = process_query_to_optimization_sql(
-            self.query_conditions,
+            non_object_ref_conditions,
             pb,
             table_alias,
         )
@@ -752,12 +896,13 @@ class CallsQuery(BaseModel):
 
         order_by_sql = ""
         if len(self.order_fields) > 0:
-            order_by_sql = "ORDER BY " + ", ".join(
-                [
-                    order_field.as_sql(pb, table_alias)
-                    for order_field in self.order_fields
-                ]
-            )
+            order_by_sqls = [
+                order_field.as_sql(
+                    pb, table_alias, expand_columns, field_to_object_join_alias_map
+                )
+                for order_field in self.order_fields
+            ]
+            order_by_sql = "ORDER BY " + ", ".join(order_by_sqls)
             for order_field in self.order_fields:
                 if isinstance(order_field.field, CallsMergedFeedbackPayloadField):
                     needs_feedback = True
@@ -785,33 +930,59 @@ class CallsQuery(BaseModel):
         feedback_join_sql = ""
         if needs_feedback:
             feedback_join_sql = f"""
-            LEFT JOIN feedback
-            ON (feedback.weave_ref = concat('weave-trace-internal:///', {param_slot(project_param, "String")}, '/call/', calls_merged.id))
+            LEFT JOIN (
+                SELECT * FROM feedback WHERE feedback.project_id = {param_slot(project_param, "String")}
+            ) AS feedback ON (
+                feedback.weave_ref = concat('weave-trace-internal:///', {param_slot(project_param, "String")}, '/call/', calls_merged.id))
             """
 
         storage_size_sql = ""
         if self.include_storage_size:
             storage_size_sql = f"""
-            LEFT JOIN (SELECT
-                id,
-                sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) as storage_size_bytes
-            FROM calls_merged_stats
-            WHERE project_id = {param_slot(project_param, "String")}
-            GROUP BY id) as {STORAGE_SIZE_TABLE_NAME}
-            on calls_merged.id = {STORAGE_SIZE_TABLE_NAME}.id
+            LEFT JOIN (
+                SELECT
+                    id,
+                    sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) AS storage_size_bytes
+                FROM calls_merged_stats
+                WHERE project_id = {param_slot(project_param, "String")}
+                GROUP BY id
+            ) AS {STORAGE_SIZE_TABLE_NAME}
+            ON calls_merged.id = {STORAGE_SIZE_TABLE_NAME}.id
             """
 
         total_storage_size_sql = ""
         if self.include_total_storage_size:
             total_storage_size_sql = f"""
-            LEFT JOIN (SELECT
-                trace_id,
-                sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) as total_storage_size_bytes
-            FROM calls_merged_stats
-            WHERE project_id = {param_slot(project_param, "String")}
-            GROUP BY trace_id) as {ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME}
-            on calls_merged.trace_id = {ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME}.trace_id
+            LEFT JOIN (
+                SELECT
+                    trace_id,
+                    sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) AS total_storage_size_bytes
+                FROM calls_merged_stats
+                WHERE project_id = {param_slot(project_param, "String")}
+                GROUP BY trace_id
+            ) AS {ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME}
+            ON calls_merged.trace_id = {ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME}.trace_id
             """
+
+        # Add JOINs for object reference ordering
+        object_ref_joins_sql = ""
+        if expand_columns and field_to_object_join_alias_map:
+            for order_field in self.order_fields:
+                field_path = order_field.raw_field_path
+                if not has_object_ref_field(field_path, expand_columns):
+                    continue
+                order_condition = ObjectRefOrderCondition(
+                    field_path=field_path,
+                    expand_columns=expand_columns,
+                )
+                join_condition_sql = order_condition.as_sql_condition(
+                    pb,
+                    table_alias,
+                    field_to_object_join_alias_map,
+                    is_order_join=True,
+                    use_agg_fn=False,
+                )
+                object_ref_joins_sql += join_condition_sql
 
         raw_sql = f"""
         SELECT {select_fields_sql}
@@ -819,15 +990,20 @@ class CallsQuery(BaseModel):
         {feedback_join_sql}
         {storage_size_sql}
         {total_storage_size_sql}
+        {object_ref_joins_sql}
         WHERE calls_merged.project_id = {param_slot(project_param, "String")}
         {id_mask_sql}
         {id_subquery_sql}
         {sortable_datetime_sql}
         {trace_roots_only_sql}
+        {parent_ids_filter_sql}
         {op_name_sql}
         {trace_id_sql}
+        {thread_id_sql}
+        {turn_id_sql}
         {str_filter_opt_sql}
         {ref_filter_opt_sql}
+        {object_refs_filter_opt_sql}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         {having_filter_sql}
         {order_by_sql}
@@ -846,6 +1022,8 @@ ALLOWED_CALL_FIELDS = {
     "id": CallsMergedField(field="id"),
     "trace_id": CallsMergedAggField(field="trace_id", agg_fn="any"),
     "parent_id": CallsMergedAggField(field="parent_id", agg_fn="any"),
+    "thread_id": CallsMergedAggField(field="thread_id", agg_fn="any"),
+    "turn_id": CallsMergedAggField(field="turn_id", agg_fn="any"),
     "op_name": CallsMergedAggField(field="op_name", agg_fn="any"),
     "started_at": CallsMergedAggField(field="started_at", agg_fn="any"),
     "attributes_dump": CallsMergedDynamicField(field="attributes_dump", agg_fn="any"),
@@ -858,6 +1036,7 @@ ALLOWED_CALL_FIELDS = {
     "exception": CallsMergedAggField(field="exception", agg_fn="any"),
     "wb_user_id": CallsMergedAggField(field="wb_user_id", agg_fn="any"),
     "wb_run_id": CallsMergedAggField(field="wb_run_id", agg_fn="any"),
+    "wb_run_step": CallsMergedAggField(field="wb_run_step", agg_fn="any"),
     "deleted_at": CallsMergedAggField(field="deleted_at", agg_fn="any"),
     "display_name": CallsMergedAggField(field="display_name", agg_fn="argMaxMerge"),
     "storage_size_bytes": AggFieldWithTableOverrides(
@@ -888,9 +1067,8 @@ def get_field_by_name(name: str) -> CallsMergedField:
             dumped_start_part = start_part + "_dump"
             if dumped_start_part in ALLOWED_CALL_FIELDS:
                 field = ALLOWED_CALL_FIELDS[dumped_start_part]
-                if isinstance(field, CallsMergedDynamicField):
-                    if len(field_parts) > 1:
-                        return field.with_path(field_parts[1:])
+                if isinstance(field, CallsMergedDynamicField) and len(field_parts) > 1:
+                    return field.with_path(field_parts[1:])
                 return field
             raise InvalidFieldError(f"Field {name} is not allowed")
     return ALLOWED_CALL_FIELDS[name]
@@ -904,13 +1082,18 @@ def _handle_status_summary_field(pb: ParamBuilder, table_alias: str) -> str:
     # - Else -> SUCCESS
     exception_sql = get_field_by_name("exception").as_sql(pb, table_alias)
     ended_to_sql = get_field_by_name("ended_at").as_sql(pb, table_alias)
+    status_counts_sql = get_field_by_name("summary.status_counts.error").as_sql(
+        pb, table_alias, cast="int"
+    )
 
     error_param = pb.add_param(tsi.TraceStatus.ERROR.value)
     running_param = pb.add_param(tsi.TraceStatus.RUNNING.value)
     success_param = pb.add_param(tsi.TraceStatus.SUCCESS.value)
+    descendant_error_param = pb.add_param(tsi.TraceStatus.DESCENDANT_ERROR.value)
 
     return f"""CASE
         WHEN {exception_sql} IS NOT NULL THEN {param_slot(error_param, "String")}
+        WHEN IFNULL({status_counts_sql}, 0) > 0 THEN {param_slot(descendant_error_param, "String")}
         WHEN {ended_to_sql} IS NULL THEN {param_slot(running_param, "String")}
         ELSE {param_slot(success_param, "String")}
     END"""
@@ -1169,6 +1352,76 @@ def process_trace_id_filter_to_sql(
     return f" AND ({trace_cond} OR {trace_id_field_sql} IS NULL)"
 
 
+def process_thread_id_filter_to_sql(
+    hardcoded_filter: Optional[HardCodedFilter],
+    param_builder: ParamBuilder,
+    table_alias: str,
+) -> str:
+    """Pulls out the thread_id and returns a sql string if there are any thread_ids."""
+    if (
+        hardcoded_filter is None
+        or hardcoded_filter.filter.thread_ids is None
+        or len(hardcoded_filter.filter.thread_ids) == 0
+    ):
+        return ""
+
+    thread_ids = hardcoded_filter.filter.thread_ids
+
+    assert_parameter_length_less_than_max("thread_ids", len(thread_ids))
+
+    thread_id_field = get_field_by_name("thread_id")
+    if not isinstance(thread_id_field, CallsMergedAggField):
+        raise TypeError("thread_id is not an aggregate field")
+    thread_id_field_sql = thread_id_field.as_sql(
+        param_builder, table_alias, use_agg_fn=False
+    )
+
+    # If there's only one thread_id, use an equality condition for performance
+    if len(thread_ids) == 1:
+        thread_cond = f"{thread_id_field_sql} = {param_slot(param_builder.add_param(thread_ids[0]), 'String')}"
+    elif len(thread_ids) > 1:
+        thread_cond = f"{thread_id_field_sql} IN {param_slot(param_builder.add_param(thread_ids), 'Array(String)')}"
+    else:
+        return ""
+
+    return f" AND ({thread_cond} OR {thread_id_field_sql} IS NULL)"
+
+
+def process_turn_id_filter_to_sql(
+    hardcoded_filter: Optional[HardCodedFilter],
+    param_builder: ParamBuilder,
+    table_alias: str,
+) -> str:
+    """Pulls out the turn_id and returns a sql string if there are any turn_ids."""
+    if (
+        hardcoded_filter is None
+        or hardcoded_filter.filter.turn_ids is None
+        or len(hardcoded_filter.filter.turn_ids) == 0
+    ):
+        return ""
+
+    turn_ids = hardcoded_filter.filter.turn_ids
+
+    assert_parameter_length_less_than_max("turn_ids", len(turn_ids))
+
+    turn_id_field = get_field_by_name("turn_id")
+    if not isinstance(turn_id_field, CallsMergedAggField):
+        raise TypeError("turn_id is not an aggregate field")
+    turn_id_field_sql = turn_id_field.as_sql(
+        param_builder, table_alias, use_agg_fn=False
+    )
+
+    # If there's only one turn_id, use an equality condition for performance
+    if len(turn_ids) == 1:
+        turn_cond = f"{turn_id_field_sql} = {param_slot(param_builder.add_param(turn_ids[0]), 'String')}"
+    elif len(turn_ids) > 1:
+        turn_cond = f"{turn_id_field_sql} IN {param_slot(param_builder.add_param(turn_ids), 'Array(String)')}"
+    else:
+        return ""
+
+    return f" AND ({turn_cond} OR {turn_id_field_sql} IS NULL)"
+
+
 def process_trace_roots_only_filter_to_sql(
     hardcoded_filter: Optional[HardCodedFilter],
     param_builder: ParamBuilder,
@@ -1187,6 +1440,28 @@ def process_trace_roots_only_filter_to_sql(
     )
 
     return f"AND ({parent_id_field_sql} IS NULL)"
+
+
+def process_parent_ids_filter_to_sql(
+    hardcoded_filter: Optional[HardCodedFilter],
+    param_builder: ParamBuilder,
+    table_alias: str,
+) -> str:
+    """Pulls out the parent_id and returns a sql string if there are any parent_ids."""
+    if hardcoded_filter is None or not hardcoded_filter.filter.parent_ids:
+        return ""
+
+    parent_id_field = get_field_by_name("parent_id")
+    if not isinstance(parent_id_field, CallsMergedAggField):
+        raise TypeError("parent_id is not an aggregate field")
+
+    parent_id_field_sql = parent_id_field.as_sql(
+        param_builder, table_alias, use_agg_fn=False
+    )
+
+    parent_ids_sql = f"{parent_id_field_sql} IN {param_slot(param_builder.add_param(hardcoded_filter.filter.parent_ids), 'Array(String)')}"
+
+    return f"AND ({parent_ids_sql} OR {parent_id_field_sql} IS NULL)"
 
 
 def process_ref_filters_to_sql(
@@ -1232,6 +1507,28 @@ def process_ref_filters_to_sql(
     return " AND (" + combine_conditions(ref_filters, "AND") + ")"
 
 
+def process_object_refs_filter_to_opt_sql(
+    param_builder: ParamBuilder,
+    table_alias: str,
+    object_ref_fields_consumed: set[str],
+) -> str:
+    """Processes object ref fields to an optimization sql string."""
+    if not object_ref_fields_consumed:
+        return ""
+
+    # Optimization for filtering with refs, only include calls that have non-zero
+    # input refs when we are conditioning on refs in inputs, or is a naked call end.
+    refs_filter_opt_sql = ""
+    if "inputs_dump" in object_ref_fields_consumed:
+        refs_filter_opt_sql += f"AND (length({table_alias}.input_refs) > 0 OR {table_alias}.started_at IS NULL)"
+    # If we are conditioning on output refs, filter down calls to those with non-zero
+    # output refs, or they are a naked call start.
+    if "output_dump" in object_ref_fields_consumed:
+        refs_filter_opt_sql += f"AND (length({table_alias}.output_refs) > 0 OR {table_alias}.ended_at IS NULL)"
+
+    return refs_filter_opt_sql
+
+
 def process_calls_filter_to_conditions(
     filter: tsi.CallsFilter,
     param_builder: ParamBuilder,
@@ -1270,6 +1567,18 @@ def process_calls_filter_to_conditions(
             f"{get_field_by_name('id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.call_ids), 'Array(String)')}"
         )
 
+    if filter.thread_ids is not None:
+        assert_parameter_length_less_than_max("thread_ids", len(filter.thread_ids))
+        conditions.append(
+            f"{get_field_by_name('thread_id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.thread_ids), 'Array(String)')}"
+        )
+
+    if filter.turn_ids is not None:
+        assert_parameter_length_less_than_max("turn_ids", len(filter.turn_ids))
+        conditions.append(
+            f"{get_field_by_name('turn_id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.turn_ids), 'Array(String)')}"
+        )
+
     if filter.wb_user_ids:
         conditions.append(
             f"{get_field_by_name('wb_user_id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.wb_user_ids), 'Array(String)')}"
@@ -1298,7 +1607,7 @@ def optimized_project_contains_call_query(
         )
         THEN 1
         ELSE 0
-        END as has_any
+        END AS has_any
     """,
         logger,
     )
@@ -1320,6 +1629,8 @@ def build_calls_query_stats_query(
         cq.add_condition(req.query.expr_)
     if req.limit is not None:
         cq.set_limit(req.limit)
+    if req.expand_columns is not None:
+        cq.set_expand_columns(req.expand_columns)
 
     aggregated_columns = {"count": "count()"}
     if req.include_total_storage_size:

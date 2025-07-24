@@ -116,8 +116,12 @@ def postprocess_inputs_invoke(inputs: dict[str, Any]) -> dict[str, Any]:
     return exploded_kwargs
 
 
-def postprocess_output_invoke(outputs: dict[str, Any]) -> dict[str, Any]:
+def postprocess_output_invoke(
+    outputs: Optional[dict[str, Any]],
+) -> Optional[dict[str, Any]]:
     """Process the outputs for logging without affecting the original response."""
+    if outputs is None:
+        return None
     if "body" in outputs:
         # Get the original body
         body = outputs["body"]

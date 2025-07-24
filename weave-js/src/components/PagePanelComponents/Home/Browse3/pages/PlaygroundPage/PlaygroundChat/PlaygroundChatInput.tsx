@@ -10,7 +10,6 @@ type PlaygroundChatInputProps = {
   isLoading: boolean;
   onSend: (role: PlaygroundMessageRole, chatText: string) => void;
   onAdd: (role: PlaygroundMessageRole, chatText: string) => void;
-  settingsTab: number | null;
   hasConfiguredProviders?: boolean;
 };
 
@@ -128,8 +127,7 @@ export const PlaygroundChatInput: React.FC<PlaygroundChatInputProps> = ({
               onClick={() => handleSend(addMessageRole)}
               disabled={
                 isLoading || chatText.trim() === '' || !hasConfiguredProviders
-              }
-              startIcon={isLoading ? 'loading' : undefined}>
+              }>
               {isLoading ? 'Sending...' : 'Send'}
             </Button>
           </div>

@@ -1,4 +1,4 @@
-import {Box} from '@mui/material';
+import {Box, Tooltip} from '@mui/material';
 import {
   GridColDef,
   GridColumnGroup,
@@ -7,9 +7,10 @@ import {
   GridSortDirection,
   GridSortItem,
 } from '@mui/x-data-grid-pro';
+import {Checkbox} from '@wandb/weave/components/Checkbox';
 import {Loading} from '@wandb/weave/components/Loading';
 import {Timestamp} from '@wandb/weave/components/Timestamp';
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useHistory} from 'react-router-dom';
 
 import {parseRefMaybe} from '../../../../../../react';
@@ -18,6 +19,7 @@ import {NotApplicable} from '../../NotApplicable';
 import {PaginationButtons} from '../../pages/CallsPage/CallsTableButtons';
 import {Empty} from '../../pages/common/Empty';
 import {EMPTY_PROPS_LEADERBOARD} from '../../pages/common/EmptyContent';
+import {StatusChip} from '../../pages/common/StatusChip';
 import {SmallRef} from '../../smallRef/SmallRef';
 import {StyledDataGrid} from '../../StyledDataGrid';
 import {
@@ -27,6 +29,8 @@ import {
 } from './query/leaderboardQuery';
 
 const USE_COMPARE_EVALUATIONS_PAGE = true;
+const MAX_SELECT = 100;
+
 export type LeaderboardColumnOrderType = Array<{
   datasetGroup: string;
   scorerGroup: string;
@@ -39,6 +43,9 @@ interface LeaderboardGridProps {
   data: GroupedLeaderboardData;
   columnOrder?: LeaderboardColumnOrderType;
   loading: boolean;
+  selectedEvaluations?: string[];
+  onSelectedEvaluationsChange?: (evaluations: string[]) => void;
+  allRecords?: LeaderboardValueRecord[];
 }
 
 type RowData = {
@@ -53,28 +60,78 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
   data,
   loading,
   columnOrder,
+  selectedEvaluations: controlledSelectedEvaluations,
+  onSelectedEvaluationsChange,
+  allRecords = [],
 }) => {
   const {peekingRouter} = useWeaveflowRouteContext();
   const history = useHistory();
-  const onCellClick = useCallback(
-    (record: LeaderboardValueRecord) => {
-      const sourceCallId = record.sourceEvaluationCallId;
-      if (sourceCallId) {
-        let to: string;
-        if (USE_COMPARE_EVALUATIONS_PAGE) {
-          to = peekingRouter.compareEvaluationsUri(
-            entity,
-            project,
-            [sourceCallId],
-            null
-          );
-        } else {
-          to = peekingRouter.callUIUrl(entity, project, '', sourceCallId);
-        }
-        history.push(to);
+
+  // Internal state for uncontrolled mode
+  const [internalSelectedEvaluations, setInternalSelectedEvaluations] =
+    useState<string[]>([]);
+
+  // Use controlled value if provided, otherwise use internal state
+  const isControlled = controlledSelectedEvaluations !== undefined;
+  const selectedEvaluations = isControlled
+    ? controlledSelectedEvaluations
+    : internalSelectedEvaluations;
+
+  const setSelectedEvaluations = useCallback(
+    (evaluations: string[]) => {
+      if (isControlled && onSelectedEvaluationsChange) {
+        onSelectedEvaluationsChange(evaluations);
+      } else {
+        setInternalSelectedEvaluations(evaluations);
       }
     },
-    [entity, history, peekingRouter, project]
+    [isControlled, onSelectedEvaluationsChange]
+  );
+
+  const onCellClick = useCallback(
+    (record: LeaderboardValueRecord, event: React.MouseEvent) => {
+      const sourceCallId = record.sourceEvaluationCallId;
+      if (sourceCallId) {
+        const isMultiSelect = event.altKey || event.metaKey;
+
+        if (isMultiSelect) {
+          // Toggle selection using alt/option key
+          if (selectedEvaluations.includes(sourceCallId)) {
+            // Remove from selection
+            setSelectedEvaluations(
+              selectedEvaluations.filter(id => id !== sourceCallId)
+            );
+          } else {
+            // Add to selection (enforce MAX_SELECT limit)
+            if (selectedEvaluations.length < MAX_SELECT) {
+              setSelectedEvaluations([...selectedEvaluations, sourceCallId]);
+            }
+          }
+        } else if (selectedEvaluations.length === 0) {
+          // Single selection - navigate immediately only if no selections
+          let to: string;
+          if (USE_COMPARE_EVALUATIONS_PAGE) {
+            to = peekingRouter.compareEvaluationsUri(
+              entity,
+              project,
+              [sourceCallId],
+              null
+            );
+          } else {
+            to = peekingRouter.callUIUrl(entity, project, '', sourceCallId);
+          }
+          history.push(to);
+        }
+      }
+    },
+    [
+      entity,
+      history,
+      peekingRouter,
+      project,
+      selectedEvaluations,
+      setSelectedEvaluations,
+    ]
   );
 
   const columnStats = useMemo(() => getColumnStats(data), [data]);
@@ -117,8 +174,139 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
     return rowData;
   }, [data]);
 
+  // Get all evaluation IDs from the current row data using allRecords
+  const getAllEvaluationIds = useCallback(
+    (row: RowData): string[] => {
+      const modelGroupName = row.modelGroupName;
+
+      // Split modelGroupName into name and version parts
+      const [modelName, modelVersion] = modelGroupName.includes(':')
+        ? modelGroupName.split(':')
+        : [modelGroupName, undefined];
+
+      // Filter records by both modelName and modelVersion
+      const matchingRecords = allRecords.filter(record => {
+        if (!record.sourceEvaluationCallId) return false;
+
+        // Check if model name matches
+        if (record.modelName !== modelName) return false;
+
+        // If we have a version in the group name, check if it matches
+        if (modelVersion && record.modelVersion !== modelVersion) return false;
+
+        return true;
+      });
+
+      return [
+        ...new Set(
+          matchingRecords.map(record => record.sourceEvaluationCallId)
+        ),
+      ];
+    },
+    [allRecords]
+  );
+
+  // Get all available evaluation IDs from all rows
+  const allAvailableEvaluationIds = useMemo(() => {
+    return [
+      ...new Set(
+        allRecords.map(record => record.sourceEvaluationCallId).filter(Boolean)
+      ),
+    ];
+  }, [allRecords]);
+
   const columns: Array<GridColDef<RowData>> = useMemo(
     () => [
+      {
+        minWidth: 35,
+        width: 35,
+        field: 'CustomCheckbox',
+        sortable: false,
+        disableColumnMenu: true,
+        resizable: false,
+        disableExport: true,
+        display: 'flex',
+        renderHeader: (params: any) => {
+          const isAllSelected =
+            selectedEvaluations.length === allAvailableEvaluationIds.length &&
+            allAvailableEvaluationIds.length > 0;
+          const isSomeSelected =
+            selectedEvaluations.length > 0 &&
+            selectedEvaluations.length < allAvailableEvaluationIds.length;
+
+          return (
+            <Checkbox
+              size="small"
+              checked={
+                selectedEvaluations.length === 0
+                  ? false
+                  : selectedEvaluations.length ===
+                    allAvailableEvaluationIds.length
+                  ? true
+                  : 'indeterminate'
+              }
+              onCheckedChange={() => {
+                if (isAllSelected || isSomeSelected) {
+                  // Deselect all
+                  setSelectedEvaluations([]);
+                } else {
+                  // Select all (up to MAX_SELECT)
+                  setSelectedEvaluations(
+                    allAvailableEvaluationIds.slice(0, MAX_SELECT)
+                  );
+                }
+              }}
+            />
+          );
+        },
+        renderCell: (params: GridRenderCellParams) => {
+          const row = params.row as RowData;
+          const rowEvaluationIds = getAllEvaluationIds(row);
+          const isSelected = rowEvaluationIds.some(id =>
+            selectedEvaluations.includes(id)
+          );
+          const disabled =
+            !isSelected && selectedEvaluations.length >= MAX_SELECT;
+          const tooltipText =
+            selectedEvaluations.length >= MAX_SELECT && !isSelected
+              ? `Selection limited to ${MAX_SELECT} items`
+              : '';
+
+          return (
+            <Tooltip title={tooltipText} placement="right" arrow>
+              {/* https://mui.com/material-ui/react-tooltip/ */}
+              {/* By default disabled elements like <button> do not trigger user interactions */}
+              {/* To accommodate disabled elements, add a simple wrapper element, such as a span. */}
+              <span style={{marginLeft: 'auto', marginRight: 'auto'}}>
+                <Checkbox
+                  size="small"
+                  disabled={disabled}
+                  checked={isSelected}
+                  onCheckedChange={() => {
+                    if (isSelected) {
+                      // Remove all evaluation IDs from this row
+                      setSelectedEvaluations(
+                        selectedEvaluations.filter(
+                          id => !rowEvaluationIds.includes(id)
+                        )
+                      );
+                    } else {
+                      // Add all evaluation IDs from this row
+                      const newSelection = [
+                        ...selectedEvaluations,
+                        ...rowEvaluationIds,
+                      ];
+                      setSelectedEvaluations(
+                        [...new Set(newSelection)].slice(0, MAX_SELECT)
+                      );
+                    }
+                  }}
+                />
+              </span>
+            </Tooltip>
+          );
+        },
+      },
       {
         field: 'modelGroupName',
         headerName: 'Model',
@@ -129,13 +317,18 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
           const modelRef = parseRefMaybe(
             `weave:///${entity}/${project}/${isOp ? 'op' : 'object'}/${
               params.value
-            }` ?? ''
+            }`
           );
+
+          // Check if any evaluation for this model is running
+          const modelGroup = (params.row as RowData).modelGroup;
+          const isRunning = modelHasRunningEvaluation(modelGroup);
+
           if (modelRef) {
             return (
               <div
                 style={{
-                  width: '100%',
+                  width: 'max-content',
                   height: '100%',
                   alignContent: 'center',
                   display: 'flex',
@@ -143,8 +336,16 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
                   justifyContent: 'center',
                   lineHeight: '20px',
                   marginLeft: '10px',
+                  gap: '8px',
                 }}>
                 <SmallRef objRef={modelRef} />
+                {isRunning && (
+                  <StatusChip
+                    value="running"
+                    iconOnly
+                    tooltipOverride="Evaluation in progress"
+                  />
+                )}
               </div>
             );
           }
@@ -181,6 +382,11 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
                         metricPathGroupName
                       );
                       const value = record?.metricValue;
+                      const isSelected =
+                        record?.sourceEvaluationCallId &&
+                        selectedEvaluations.includes(
+                          record.sourceEvaluationCallId
+                        );
                       let inner: React.ReactNode = value;
                       if (inner == null) {
                         inner = <NotApplicable />;
@@ -212,7 +418,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
                             overflow: 'hidden',
                             padding: '2px',
                           }}
-                          onClick={() => record && onCellClick(record)}>
+                          onClick={e => record && onCellClick(record, e)}>
                           <div
                             style={{
                               width: '100%',
@@ -230,6 +436,12 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
                                 metricPathGroupName,
                                 value
                               ),
+                              cursor:
+                                selectedEvaluations.length > 0
+                                  ? 'default'
+                                  : 'pointer',
+                              border: isSelected ? '2px solid #13A9BA' : 'none',
+                              boxSizing: 'border-box',
                             }}>
                             {inner}
                           </div>
@@ -243,7 +455,17 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
           )
       ),
     ],
-    [columnStats.datasetGroups, entity, getColorForScore, onCellClick, project]
+    [
+      columnStats.datasetGroups,
+      entity,
+      getColorForScore,
+      onCellClick,
+      project,
+      selectedEvaluations,
+      allAvailableEvaluationIds,
+      getAllEvaluationIds,
+      setSelectedEvaluations,
+    ]
   );
 
   const groupingModel: GridColumnGroup[] = useMemo(() => {
@@ -257,7 +479,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
           children: [],
           renderHeaderGroup: params => {
             const ref = parseRefMaybe(
-              `weave:///${entity}/${project}/object/${datasetGroupName}` ?? ''
+              `weave:///${entity}/${project}/object/${datasetGroupName}`
             );
             if (ref) {
               return <SmallRef objRef={ref} />;
@@ -275,7 +497,7 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
               children: [],
               renderHeaderGroup: params => {
                 const ref = parseRefMaybe(
-                  `weave:///${entity}/${project}/op/${scorerGroupName}` ?? ''
+                  `weave:///${entity}/${project}/op/${scorerGroupName}`
                 );
                 if (ref) {
                   return <SmallRef objRef={ref} />;
@@ -318,6 +540,8 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
     });
   }, [columns, columnOrder]);
 
+  const sortModelInitialized = useRef(false);
+
   const defaultSortModel: GridSortItem[] = useMemo(() => {
     if (!columnOrder) {
       return columns.map(c => ({field: c.field, sort: 'desc'}));
@@ -330,10 +554,11 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
   }, [columnOrder, columns]);
 
   useEffect(() => {
-    if (columns.length > 1 && !loading) {
+    if (columns.length > 1 && !loading && !sortModelInitialized.current) {
       setSortModel(defaultSortModel);
+      sortModelInitialized.current = true;
     }
-  }, [columns, defaultSortModel, loading]);
+  }, [columns.length, defaultSortModel, loading]);
 
   if (loading) {
     return <Loading centered />;
@@ -372,14 +597,18 @@ export const LeaderboardGrid: React.FC<LeaderboardGridProps> = ({
         hideFooterSelectedRowCount
         disableMultipleColumnsSorting={false}
         columnHeaderHeight={40}
-        rowHeight={40}
+        rowHeight={38}
         loading={loading}
         sortModel={sortModel}
         onSortModelChange={setSortModel}
+        pinnedColumns={{left: ['CustomCheckbox']}}
         sx={{
           borderRadius: 0,
           '& .MuiDataGrid-footerContainer': {
             justifyContent: 'flex-start',
+          },
+          '& .MuiDataGrid-main:focus-visible': {
+            outline: 'none',
           },
           '& .MuiDataGrid-cell': {
             cursor: 'pointer',
@@ -508,6 +737,32 @@ const modelGroupIsOp = (modelGroup: GroupedLeaderboardModelGroup) => {
     console.log(e);
   }
   return isOp;
+};
+
+/**
+ * Check if a model group has any running evaluations.
+ */
+const modelHasRunningEvaluation = (
+  modelGroup: GroupedLeaderboardModelGroup
+) => {
+  try {
+    for (const datasetGroup of Object.values(modelGroup.datasetGroups)) {
+      for (const scorerGroup of Object.values(datasetGroup.scorerGroups)) {
+        for (const metricPathGroup of Object.values(
+          scorerGroup.metricPathGroups
+        )) {
+          for (const record of metricPathGroup) {
+            if (record.isRunning) {
+              return true;
+            }
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.log(e);
+  }
+  return false;
 };
 
 const valueFromRowData = (

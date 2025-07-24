@@ -36,6 +36,7 @@ const isJSON = (value: string): boolean => {
 
 type CellValueStringProps = {
   value: string;
+  style?: React.CSSProperties;
 };
 
 const Collapsed = styled.div`
@@ -83,7 +84,9 @@ const Spacer = styled.div`
 `;
 Spacer.displayName = 'S.Spacer';
 
-const CellValueStringWithPopup = ({value}: CellValueStringProps) => {
+const MAX_DISPLAY_LENGTH = 500;
+
+const CellValueStringWithPopup = ({value, style}: CellValueStringProps) => {
   const ref = useRef<HTMLDivElement>(null);
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const onClick = (event: React.MouseEvent<HTMLElement>) => {
@@ -94,6 +97,10 @@ const CellValueStringWithPopup = ({value}: CellValueStringProps) => {
   const id = open ? 'simple-popper' : undefined;
 
   const trimmed = value.trim();
+  const displayTrimmed =
+    trimmed.length > MAX_DISPLAY_LENGTH
+      ? trimmed.substring(0, MAX_DISPLAY_LENGTH) + '...'
+      : trimmed;
   const json = isJSON(trimmed);
   const [format, setFormat] = useState('Text');
 
@@ -131,8 +138,8 @@ const CellValueStringWithPopup = ({value}: CellValueStringProps) => {
     '' // Suppress tooltip when popper is open.
   ) : (
     <TooltipContent onClick={onClick}>
-      <TooltipText isJSON={json}>{trimmed}</TooltipText>
-      <TooltipHint>Click for more details</TooltipHint>
+      <TooltipText isJSON={json}>{displayTrimmed}</TooltipText>
+      <TooltipHint>Click to view full content</TooltipHint>
     </TooltipContent>
   );
 
@@ -142,8 +149,8 @@ const CellValueStringWithPopup = ({value}: CellValueStringProps) => {
   return (
     <>
       <StyledTooltip enterDelay={500} title={title}>
-        <Collapsed ref={ref} onClick={onClick}>
-          {trimmed}
+        <Collapsed ref={ref} onClick={onClick} style={style}>
+          {displayTrimmed}
         </Collapsed>
       </StyledTooltip>
       <Popover
@@ -254,10 +261,10 @@ const CellValueStringWithPopup = ({value}: CellValueStringProps) => {
   );
 };
 
-export const CellValueString = ({value}: CellValueStringProps) => {
+export const CellValueString = ({value, style}: CellValueStringProps) => {
   const trimmed = value.trim();
   if (isUrl(trimmed)) {
     return <TargetBlank href={trimmed}>{trimmed}</TargetBlank>;
   }
-  return <CellValueStringWithPopup value={value} />;
+  return <CellValueStringWithPopup value={value} style={style} />;
 };

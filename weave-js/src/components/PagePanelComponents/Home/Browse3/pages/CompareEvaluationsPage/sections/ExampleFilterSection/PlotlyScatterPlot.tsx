@@ -1,5 +1,7 @@
+import {Box} from '@mui/material';
+import {LoadingDots} from '@wandb/weave/components/LoadingDots';
 import * as Plotly from 'plotly.js';
-import React, {useEffect, useMemo, useRef} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 
 import {usePeekLocation} from '../../../../context';
 import {PLOT_GRID_COLOR} from '../../ecpConstants';
@@ -125,55 +127,57 @@ export const PlotlyScatterPlot: React.FC<{
     };
   }, []);
 
+  const [successfullyMounted, setSuccessfullyMounted] = useState(false);
+
   useEffect(() => {
     if (divRef.current) {
       const current = divRef.current;
-      Plotly.newPlot(current, plotlyData, plotlyLayout, plotlyConfig);
+      let mountedInternal = false;
+      // Move out of render loop
+      const to = setTimeout(() => {
+        Plotly.newPlot(current, plotlyData, plotlyLayout, plotlyConfig);
 
-      // Set up event listener for relayout (zoom and range change)
-      (current as any).on('plotly_selected', (eventData: any) => {
-        if (eventData == null) {
-          // Clear bounding box:
-          Plotly.relayout(current, {
-            dragmode: undefined,
-          })
-            .then(() => {
-              return Plotly.relayout(current, {
-                dragmode: 'select',
-              });
+        // Set up event listener for relayout (zoom and range change)
+        (current as any).on('plotly_selected', (eventData: any) => {
+          if (eventData == null) {
+            // Clear bounding box:
+            Plotly.relayout(current, {
+              dragmode: undefined,
             })
-            .then(() => {
-              setTimeout(() => {
-                props.onRangeChange();
-              }, 250); // really weird hack to get the range to clear
-            });
-        } else {
-          const newXMin = eventData.range.x[0];
-          const newXMax = eventData.range.x[1];
-          const newYMin = eventData.range.y[0];
-          const newYMax = eventData.range.y[1];
-          props.onRangeChange(newXMin, newXMax, newYMin, newYMax);
-        }
-      });
+              .then(() => {
+                return Plotly.relayout(current, {
+                  dragmode: 'select',
+                });
+              })
+              .then(() => {
+                setTimeout(() => {
+                  props.onRangeChange();
+                }, 250); // really weird hack to get the range to clear
+              });
+          } else {
+            const newXMin = eventData.range.x[0];
+            const newXMax = eventData.range.x[1];
+            const newYMin = eventData.range.y[0];
+            const newYMax = eventData.range.y[1];
+            props.onRangeChange(newXMin, newXMax, newYMin, newYMax);
+          }
+        });
+
+        mountedInternal = true;
+        setSuccessfullyMounted(true);
+      }, 1);
 
       // Clean up event listener on unmount
       return () => {
-        (current as any).removeAllListeners('plotly_selected');
+        clearTimeout(to);
+        if (mountedInternal) {
+          (current as any)?.removeAllListeners('plotly_selected');
+        }
       };
     }
+
     return () => {};
   }, [plotlyConfig, plotlyData, plotlyLayout, props]);
-
-  useEffect(() => {
-    if (props.data && divRef.current != null) {
-      Plotly.relayout(divRef.current, {
-        dragmode: 'zoom',
-      });
-      Plotly.relayout(divRef.current, {
-        dragmode: 'select',
-      });
-    }
-  }, [props.data]);
 
   // Hack that does not belong here to resize the plotly plot
   // when the peeking state closes
@@ -188,5 +192,14 @@ export const PlotlyScatterPlot: React.FC<{
     }
   }, [peekLoc]);
 
-  return <div ref={divRef}></div>;
+  return (
+    <Box
+      sx={{
+        width: '100%',
+        height: '300px',
+      }}>
+      {!successfullyMounted && <LoadingDots />}
+      <div ref={divRef}></div>
+    </Box>
+  );
 };

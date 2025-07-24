@@ -39,7 +39,14 @@ import {
   WeaveInterface,
 } from '@wandb/weave/core';
 import _ from 'lodash';
-import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import BaseTable, {BaseTableProps} from 'react-base-table';
 import AutoSizer from 'react-virtualized-auto-sizer';
 import {
@@ -138,7 +145,11 @@ export const PanelTable: React.FC<
   }
 > = props => {
   const {input, config, updateConfig} = props;
-  const inputNode = useMemo(() => TableType.normalizeTableLike(input), [input]);
+  const {stack} = usePanelContext();
+  const inputNode = useMemo(
+    () => TableType.normalizeTableLike(input, stack),
+    [input, stack]
+  );
   const typedInputNodeUse = LLReact.useNodeWithServerType(inputNode);
   const typedInputNode = typedInputNodeUse.loading
     ? undefined
@@ -1105,7 +1116,7 @@ const PanelTableInner: React.FC<
   });
   const actionBarRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const updateDimensions = () => {
       if (actionBarRef.current) {
         const {width: actionBarWidth, height: actionBarHeight} =
@@ -1624,7 +1635,7 @@ export const TableSpec: Panel2.PanelSpec = {
       throw new Error('Table input node is null');
     }
     const tableNormInput = await weave.refineNode(
-      TableType.normalizeTableLike(inputNode),
+      TableType.normalizeTableLike(inputNode, stack),
       stack
     );
     const dereffedInput = dereferenceAllVars(tableNormInput, stack)
@@ -1633,10 +1644,11 @@ export const TableSpec: Panel2.PanelSpec = {
   },
   Component: PanelTable,
   inputType,
-  equivalentTransform: async (inputNode, config, refineType, client) => {
+  equivalentTransform: async (inputNode, config, refineType, client, stack) => {
     const weave = new WeaveApp(client);
+
     const typedInputNode = await refineType(
-      TableType.normalizeTableLike(inputNode as any)
+      TableType.normalizeTableLike(inputNode as any, stack)
     );
     const finalConfig = getTableConfig(typedInputNode, config, weave);
     const finalTableState = finalConfig.tableState!; // definitely defined by getTableConfig

@@ -251,7 +251,10 @@ const filterToClause = (item: Filter): Record<string, any> => {
     return {
       $not: [{$eq: [{$getField: item.field}, {$literal: item.value}]}],
     };
-  } else if (item.operator === '(string): in') {
+  } else if (
+    item.operator === '(string): in' ||
+    item.operator === '(monitored): by'
+  ) {
     const values =
       typeof item.value === 'string'
         ? item.value.split(',').map((v: string) => v.trim())
@@ -696,23 +699,62 @@ export const savedViewDefinitionToParams = (
   return params;
 };
 
+// Common configuration for calls, evaluations, and traces
+const CALLS_EVALUATIONS_TRACES_CONFIG: Partial<SavedViewDefinition> = {
+  pin: {
+    left: ['CustomCheckbox', 'summary.weave.trace_name'],
+    right: [],
+  },
+  sort_by: [
+    {
+      field: 'started_at',
+      direction: 'desc',
+    },
+  ],
+};
+
+// Default view definitions by view type
+const DEFAULT_VIEW_DEFINITIONS: Record<string, Partial<SavedViewDefinition>> = {
+  calls: CALLS_EVALUATIONS_TRACES_CONFIG,
+  evaluations: CALLS_EVALUATIONS_TRACES_CONFIG,
+  traces: CALLS_EVALUATIONS_TRACES_CONFIG,
+  threads: {
+    sort_by: [
+      {
+        field: 'last_updated',
+        direction: 'desc',
+      },
+    ],
+    // Add default filter for past 1 week
+    query: {
+      $expr: {
+        $and: [
+          {
+            $gt: [
+              {$getField: 'started_at'},
+              {
+                $literal: Math.floor(
+                  (Date.now() - 7 * 24 * 60 * 60 * 1000) / 1000
+                ),
+              },
+            ],
+          },
+        ],
+      },
+    },
+  },
+};
+
 export const getDefaultViewVal = (viewType: string): SavedView => {
   const label = capitalizeFirst(viewType);
+  // Use calls as the fallback for any unmatched view types
+  const definition =
+    DEFAULT_VIEW_DEFINITIONS[viewType] ?? DEFAULT_VIEW_DEFINITIONS.calls;
+
   return {
     view_type: viewType,
     label,
-    definition: {
-      pin: {
-        left: ['CustomCheckbox', 'summary.weave.trace_name'],
-        right: [],
-      },
-      sort_by: [
-        {
-          field: 'started_at',
-          direction: 'desc',
-        },
-      ],
-    },
+    definition,
   };
 };
 

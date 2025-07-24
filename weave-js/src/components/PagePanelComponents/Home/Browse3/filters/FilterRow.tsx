@@ -25,6 +25,7 @@ type FilterRowProps = {
   onUpdateFilter: (item: GridFilterItem) => void;
   onRemoveFilter: (id: FilterId) => void;
   activeEditId?: FilterId | null;
+  disabled?: boolean;
 };
 
 export const FilterRow = ({
@@ -36,6 +37,7 @@ export const FilterRow = ({
   onUpdateFilter,
   onRemoveFilter,
   activeEditId,
+  disabled = false,
 }: FilterRowProps) => {
   const onSelectField = (field: string) => {
     if (item.id == null) {
@@ -45,7 +47,13 @@ export const FilterRow = ({
       // because the default is string
       const newOperatorOptions = getGroupedOperatorOptions(field);
       const operator = newOperatorOptions[0].options[0].value;
-      onUpdateFilter({...item, field, operator});
+
+      // Check if field type changed (eg str -> int) and clear value if so
+      const oldFieldType = getFieldType(item.field);
+      const newFieldType = getFieldType(field);
+      const value = oldFieldType !== newFieldType ? undefined : item.value;
+
+      onUpdateFilter({...item, field, operator, value});
     }
   };
 
@@ -64,7 +72,9 @@ export const FilterRow = ({
 
   const isOperatorDisabled =
     isWeaveRef(item.value) ||
-    ['id', 'status', 'user'].includes(getFieldType(item.field));
+    ['id', 'status', 'run', 'user', 'monitor'].includes(
+      getFieldType(item.field)
+    );
 
   return (
     <>
@@ -73,6 +83,7 @@ export const FilterRow = ({
           options={options}
           value={item.field}
           onSelectField={onSelectField}
+          isDisabled={disabled}
         />
       </div>
       <div className="w-[165px]">
@@ -81,7 +92,7 @@ export const FilterRow = ({
             options={operatorOptions}
             value={item.operator}
             onSelectOperator={onSelectOperator}
-            isDisabled={isOperatorDisabled}
+            isDisabled={disabled || isOperatorDisabled}
           />
         )}
       </div>

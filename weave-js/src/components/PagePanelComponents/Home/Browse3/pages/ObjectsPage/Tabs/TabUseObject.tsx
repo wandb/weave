@@ -10,10 +10,22 @@ import {TabUseBanner} from '../../common/TabUseBanner';
 type TabUseObjectProps = {
   name: string;
   uri: string;
+  entityName: string;
+  projectName: string;
+  versionIndex: number;
 };
 
-export const TabUseObject = ({name, uri}: TabUseObjectProps) => {
+export const TabUseObject = ({
+  name,
+  uri,
+  entityName,
+  projectName,
+  versionIndex,
+}: TabUseObjectProps) => {
   const pythonName = isValidVarName(name) ? name : 'obj';
+  const long = `weave.init('${entityName}/${projectName}')
+${pythonName} = weave.ref('${name}:v${versionIndex}').get()`;
+
   return (
     <Box className="text-sm">
       <TabUseBanner>
@@ -37,6 +49,8 @@ export const TabUseObject = ({name, uri}: TabUseObjectProps) => {
           copyText={`${pythonName} = weave.ref("${uri}").get()`}
           tooltipText="Click to copy unabridged string"
         />
+        <div className="mt-8">or</div>
+        <CopyableText language="python" text={long} />
       </Box>
     </Box>
   );

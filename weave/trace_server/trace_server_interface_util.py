@@ -46,16 +46,15 @@ def extract_refs_from_values(
         elif isinstance(val, list):
             for v in val:
                 _visit(v)
-        elif isinstance(val, str):
-            if any(
-                val.startswith(scheme + ":///") for scheme in valid_internal_schemes
-            ):
-                try:
-                    parsed = refs_internal.parse_internal_uri(val)
-                    if parsed.uri() == val:
-                        refs.append(val)
-                except Exception:
-                    pass
+        elif isinstance(val, str) and any(
+            val.startswith(scheme + ":///") for scheme in valid_internal_schemes
+        ):
+            try:
+                parsed = refs_internal.parse_internal_uri(val)
+                if parsed.uri() == val:
+                    refs.append(val)
+            except Exception:
+                pass
 
     _visit(vals)
     return refs

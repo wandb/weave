@@ -96,6 +96,7 @@ interface CreateDatasetContextType {
   state: CreateDatasetState;
   dispatch: Dispatch<CreateDatasetAction>;
   parseFile: (file: File) => Promise<void>;
+  initializeDataset: (transformedRows: Record<string, any>[]) => void;
   handleCloseDrawer: () => void;
   handlePublishDataset: () => void;
   clearDataset: () => void;
@@ -133,6 +134,50 @@ const CreateDatasetProviderInner: React.FC<{
     message: string;
     row?: number;
   }
+
+  const initializeDataset = useCallback(
+    (transformedRows: Record<string, any>[]) => {
+      // Add weave metadata to each row
+      transformedRows = transformedRows.map(
+        (row: Record<string, any>, index: number) => ({
+          ...row,
+          ___weave: {
+            id: `row-${index}`,
+            index,
+            isNew: true,
+          },
+        })
+      );
+
+      // Create a Map of the transformed rows for the editor context
+      const rowsMap = new Map<string, any>(
+        transformedRows.map((row: Record<string, any>) => [
+          row.___weave.id,
+          row,
+        ])
+      );
+
+      const transformedData: DatasetObjectVal = {
+        _type: 'Dataset',
+        name: state.datasetName || null,
+        description: null,
+        rows: JSON.stringify(transformedRows),
+        _class_name: 'Dataset',
+        _bases: ['Object', 'BaseModel'],
+      };
+
+      dispatch({
+        type: CREATE_DATASET_ACTIONS.SET_PARSED_DATA,
+        payload: transformedData,
+      });
+
+      // Initialize the editor context with the transformed rows
+      editorContext.setEditedRows(new Map());
+      editorContext.setDeletedRows([]);
+      editorContext.setAddedRows(rowsMap);
+    },
+    [dispatch, state.datasetName, editorContext]
+  );
 
   const parseFile = useCallback(
     async (file: File) => {
@@ -196,44 +241,7 @@ const CreateDatasetProviderInner: React.FC<{
             );
         }
 
-        // Add weave metadata to each row
-        transformedRows = transformedRows.map(
-          (row: Record<string, any>, index: number) => ({
-            ...row,
-            ___weave: {
-              id: `row-${index}`,
-              index,
-              isNew: true,
-            },
-          })
-        );
-
-        // Create a Map of the transformed rows for the editor context
-        const rowsMap = new Map<string, any>(
-          transformedRows.map((row: Record<string, any>) => [
-            row.___weave.id,
-            row,
-          ])
-        );
-
-        const transformedData: DatasetObjectVal = {
-          _type: 'Dataset',
-          name: state.datasetName || null,
-          description: null,
-          rows: JSON.stringify(transformedRows),
-          _class_name: 'Dataset',
-          _bases: ['Object', 'BaseModel'],
-        };
-
-        dispatch({
-          type: CREATE_DATASET_ACTIONS.SET_PARSED_DATA,
-          payload: transformedData,
-        });
-
-        // Initialize the editor context with the transformed rows
-        editorContext.setEditedRows(new Map());
-        editorContext.setDeletedRows([]);
-        editorContext.setAddedRows(rowsMap);
+        initializeDataset(transformedRows);
       } catch (error) {
         dispatch({
           type: CREATE_DATASET_ACTIONS.SET_ERROR,
@@ -244,15 +252,13 @@ const CreateDatasetProviderInner: React.FC<{
         dispatch({type: CREATE_DATASET_ACTIONS.SET_IS_LOADING, payload: false});
       }
     },
-    [dispatch, state.datasetName, editorContext]
+    [initializeDataset]
   );
 
   // Handle drawer close
   const handleCloseDrawer = useCallback(() => {
     dispatch({type: CREATE_DATASET_ACTIONS.SET_IS_OPEN, payload: false});
-    dispatch({type: CREATE_DATASET_ACTIONS.SET_PARSED_DATA, payload: null});
-    editorContext.resetEditState();
-  }, [editorContext]);
+  }, []);
 
   // Handle publish dataset
   const handlePublishDataset = useCallback(() => {
@@ -271,9 +277,8 @@ const CreateDatasetProviderInner: React.FC<{
 
   // Handle clear dataset
   const clearDataset = useCallback(() => {
-    dispatch({type: CREATE_DATASET_ACTIONS.SET_PARSED_DATA, payload: null});
-    editorContext.resetEditState();
-  }, [editorContext]);
+    dispatch({type: CREATE_DATASET_ACTIONS.RESET});
+  }, []);
 
   return (
     <CreateDatasetContext.Provider
@@ -281,6 +286,7 @@ const CreateDatasetProviderInner: React.FC<{
         state,
         dispatch,
         parseFile,
+        initializeDataset,
         handleCloseDrawer,
         handlePublishDataset,
         clearDataset,

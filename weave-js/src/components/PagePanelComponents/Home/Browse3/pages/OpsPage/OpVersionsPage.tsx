@@ -25,6 +25,12 @@ import {opVersionKeyToRefUri} from '../wfReactInterface/utilities';
 import {OpVersionSchema} from '../wfReactInterface/wfDataModelHooksInterface';
 import {WFHighLevelOpVersionFilter} from './opsPageTypes';
 
+// Cache for storing call stats and peer versions query results
+type QueryCache = {
+  callStats: Map<string, number>;
+  peerVersions: Map<string, {count: number; isLimited: boolean}>;
+};
+
 export const OpVersionsPage: React.FC<{
   entity: string;
   project: string;
@@ -102,6 +108,15 @@ export const FilterableOpVersionsTable: React.FC<{
     });
   }, [filteredOpVersions.result]);
 
+  // cache results in the table, so scrolling doesn't cause re-query
+  const queryCache = useMemo(
+    (): QueryCache => ({
+      callStats: new Map<string, number>(),
+      peerVersions: new Map<string, {count: number; isLimited: boolean}>(),
+    }),
+    []
+  );
+
   // only show user column if there are any columns with a user id
   const showUserColumn = rows.some(row => row.obj.userId != null);
 
@@ -134,7 +149,7 @@ export const FilterableOpVersionsTable: React.FC<{
       filterable: false,
       renderCell: cellParams => {
         const obj: OpVersionSchema = cellParams.row.obj;
-        return <OpCallsLink obj={obj} />;
+        return <OpCallsLink obj={obj} queryCache={queryCache} />;
       },
     }),
 
@@ -174,7 +189,7 @@ export const FilterableOpVersionsTable: React.FC<{
             filterable: false,
             renderCell: cellParams => {
               const obj: OpVersionSchema = cellParams.row.obj;
-              return <PeerVersionsLink obj={obj} />;
+              return <PeerVersionsLink obj={obj} queryCache={queryCache} />;
             },
           }),
         ]
@@ -258,9 +273,19 @@ export const FilterableOpVersionsTable: React.FC<{
   );
 };
 
-const PeerVersionsLink: React.FC<{obj: OpVersionSchema}> = props => {
+const PeerVersionsLink: React.FC<{
+  obj: OpVersionSchema;
+  queryCache: QueryCache;
+}> = ({obj, queryCache}) => {
   const {useOpVersions} = useWFHooks();
-  const obj = props.obj;
+
+  // Create a cache key for this specific op
+  const cacheKey = `${obj.entity}/${obj.project}/${obj.opId}`;
+
+  // Check if we already have the result cached
+  const cachedResult = queryCache.peerVersions.get(cacheKey);
+  const shouldFetch = cachedResult === undefined;
+
   // Here, we really just want to know the count - and it should be calculated
   // by the server, not by the client. This is a performance optimization. In
   // the meantime we will just fetch the first 100 versions and display 99+ if
@@ -274,12 +299,35 @@ const PeerVersionsLink: React.FC<{obj: OpVersionSchema}> = props => {
     },
     limit: 100,
     metadataOnly: true,
+    skip: !shouldFetch,
   });
-  if (ops.loading) {
+
+  // Cache the result when available
+  if (ops.result && shouldFetch) {
+    const versionCount = ops.result.length;
+    queryCache.peerVersions.set(cacheKey, {
+      count: Math.min(versionCount, 99),
+      isLimited: versionCount === 100,
+    });
+  }
+
+  // Use cached value if available, otherwise use the current query result
+  const result =
+    cachedResult ??
+    (ops.result
+      ? {
+          count: Math.min(ops.result.length, 99),
+          isLimited: ops.result.length === 100,
+        }
+      : null);
+
+  if (ops.loading && cachedResult === undefined) {
     return <LoadingDots />;
   }
 
-  const versionCount = ops?.result?.length ?? 0;
+  if (!result) {
+    return <LoadingDots />;
+  }
 
   return (
     <OpVersionsLink
@@ -288,19 +336,26 @@ const PeerVersionsLink: React.FC<{obj: OpVersionSchema}> = props => {
       filter={{
         opName: obj.opId,
       }}
-      versionCount={Math.min(versionCount, 99)}
-      countIsLimited={versionCount === 100}
+      versionCount={result.count}
+      countIsLimited={result.isLimited}
       neverPeek
       variant="secondary"
     />
   );
 };
 
-const OpCallsLink: React.FC<{obj: OpVersionSchema}> = props => {
+const OpCallsLink: React.FC<{
+  obj: OpVersionSchema;
+  queryCache: QueryCache;
+}> = props => {
   const {useCallsStats} = useWFHooks();
 
   const obj = props.obj;
   const refUri = opVersionKeyToRefUri(obj);
+
+  // Check if we already have the result cached
+  const cachedCallCount = props.queryCache.callStats.get(refUri);
+  const shouldFetch = cachedCallCount === undefined;
 
   const calls = useCallsStats({
     entity: obj.entity,
@@ -308,12 +363,20 @@ const OpCallsLink: React.FC<{obj: OpVersionSchema}> = props => {
     filter: {
       opVersionRefs: [refUri],
     },
+    skip: !shouldFetch,
   });
-  if (calls.loading) {
-    return <LoadingDots />;
+
+  // Cache the result when available
+  if (calls.result?.count !== undefined && shouldFetch) {
+    props.queryCache.callStats.set(refUri, calls.result.count);
   }
 
-  const callCount = calls?.result?.count ?? 0;
+  // Use cached value if available, otherwise use the current query result
+  const callCount = cachedCallCount ?? calls?.result?.count ?? 0;
+
+  if (calls.loading && cachedCallCount === undefined) {
+    return <LoadingDots />;
+  }
 
   if (callCount === 0) {
     return null;

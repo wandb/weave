@@ -293,6 +293,7 @@ export const CallLink: React.FC<{
   focusedCallId?: string;
   tracetree?: boolean;
   icon?: React.ReactNode;
+  noName?: boolean;
   color?: string;
   isEval?: boolean;
 }> = props => {
@@ -348,16 +349,18 @@ export const CallLink: React.FC<{
             minWidth: 0,
           }}>
           {props.icon}
-          <span
-            style={{
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-              flexGrow: 1,
-              flexShrink: 1,
-            }}>
-            {opName}
-          </span>
+          {!props.noName && (
+            <span
+              style={{
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                flexGrow: 1,
+                flexShrink: 1,
+              }}>
+              {opName}
+            </span>
+          )}
           <span style={{flexShrink: 0}}>
             <Id id={props.callId} type="Call" />
           </span>

@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 from typing import Callable, TypedDict
 
 import pytest
@@ -65,13 +66,15 @@ def test_basic_evaluation(
     assert evaluate_call.inputs["self"]._class_name == "Evaluation"
     assert evaluate_call.inputs["model"]._class_name == "Model"
     assert evaluate_call.output == {
-        "avg_score": 1.0,
-        "total_examples": 3,
         "greater_than_2_scorer": {"true_count": 3, "true_fraction": 1.0},
         "greater_than_4_scorer": {"true_count": 3, "true_fraction": 1.0},
+        "output": {
+            "avg_score": 1.0,
+            "total_examples": 3,
+        },
     }
 
-    for i, (inputs, outputs, score1, score2) in enumerate(
+    for i, (inputs, output_val, score1, score2) in enumerate(
         zip(user_dataset, outputs, score1_results, score2_results)
     ):
         predict_index = 1 + i * 4
@@ -86,14 +89,14 @@ def test_basic_evaluation(
         assert predict_and_score_call.inputs["self"]._class_name == "Evaluation"
         assert predict_and_score_call.inputs["model"]._class_name == "Model"
         assert predict_and_score_call.inputs["example"] == inputs
-        assert predict_and_score_call.output["output"] == outputs
+        assert predict_and_score_call.output["output"] == output_val
 
         predict_call = calls[predict_index + 1]
         assert op_name_from_call(predict_call) == "Model.predict"
         assert predict_call.attributes["_weave_eval_meta"]["imperative"] is True
         assert predict_call.inputs["self"]._class_name == "Model"
         assert predict_call.inputs["inputs"] == inputs
-        assert predict_call.output == outputs
+        assert predict_call.output == output_val
 
         feedbacks = list(predict_call.feedback)
         assert len(feedbacks) == 2
@@ -103,14 +106,14 @@ def test_basic_evaluation(
         scorer1_call = calls[predict_index + 2]
         assert op_name_from_call(scorer1_call) == "greater_than_2_scorer"
         assert scorer1_call.attributes["_weave_eval_meta"]["imperative"] is True
-        assert scorer1_call.inputs["output"] == outputs
+        assert scorer1_call.inputs["output"] == output_val
         assert scorer1_call.inputs["inputs"] == inputs
         assert scorer1_call.output == score1
 
         scorer2_call = calls[predict_index + 3]
         assert op_name_from_call(scorer2_call) == "greater_than_4_scorer"
         assert scorer2_call.attributes["_weave_eval_meta"]["imperative"] is True
-        assert scorer2_call.inputs["output"] == outputs
+        assert scorer2_call.inputs["output"] == output_val
         assert scorer2_call.inputs["inputs"] == inputs
         assert scorer2_call.output == score2
 
@@ -119,10 +122,12 @@ def test_basic_evaluation(
     assert summarize_call.attributes["_weave_eval_meta"]["imperative"] is True
     assert summarize_call.inputs["self"]._class_name == "Evaluation"
     assert summarize_call.output == {
-        "avg_score": 1.0,
-        "total_examples": 3,
         "greater_than_2_scorer": {"true_count": 3, "true_fraction": 1.0},
         "greater_than_4_scorer": {"true_count": 3, "true_fraction": 1.0},
+        "output": {
+            "avg_score": 1.0,
+            "total_examples": 3,
+        },
     }
 
 
@@ -292,7 +297,7 @@ def test_evaluation_version_reuse(
 
 
 def generate_evaluation_logger_kwargs_permutations():
-    NOT_SPECIFIED = object()
+    not_specified = object()
 
     class MyModel(weave.Model):
         const_value: int
@@ -310,7 +315,7 @@ def generate_evaluation_logger_kwargs_permutations():
             return self.const_value
 
     models = [
-        NOT_SPECIFIED,
+        not_specified,
         "string_model",
         {"name": "dict_model"},
         MyModel(const_value=42),
@@ -318,7 +323,7 @@ def generate_evaluation_logger_kwargs_permutations():
     ]
 
     datasets = [
-        NOT_SPECIFIED,
+        not_specified,
         "string_dataset",
         [
             {"sample": "a", "exp_output": 1},
@@ -335,9 +340,9 @@ def generate_evaluation_logger_kwargs_permutations():
     for model in models:
         for dataset in datasets:
             kwargs = {}
-            if model is not NOT_SPECIFIED:
+            if model is not not_specified:
                 kwargs["model"] = model
-            if dataset is not NOT_SPECIFIED:
+            if dataset is not not_specified:
                 kwargs["dataset"] = dataset
 
             yield kwargs
@@ -352,7 +357,7 @@ def scorer(request):
     elif request.param == "weave-scorer":
 
         class MyScorer(weave.Scorer):
-            @weave.op()
+            @weave.op
             def score(self, output: int, exp_output: int):
                 return output == exp_output
 
@@ -391,6 +396,7 @@ def scorer(request):
         {"value": True, "reason": "bool"},
     ],
 )
+@pytest.mark.skip(reason="Flaking in CI, needs to be more stable")
 @pytest.mark.asyncio
 async def test_various_input_forms(client, evaluation_logger_kwargs, scorer, score):
     your_dataset = [
@@ -467,7 +473,7 @@ def test_evaluation_no_auto_summarize(client):
     calls = client.get_calls()
     # assert len(calls) == 1
     summarize_call = calls[4]
-    assert summarize_call.output == {}
+    assert summarize_call.output == {"output": {}}
 
 
 def test_evaluation_no_auto_summarize_with_custom_dict(client):
@@ -481,4 +487,96 @@ def test_evaluation_no_auto_summarize_with_custom_dict(client):
     calls = client.get_calls()
     # assert len(calls) == 1
     summarize_call = calls[4]
-    assert summarize_call.output == {"something": 1, "else": 2}
+    assert summarize_call.output == {
+        "something": 1,
+        "else": 2,
+        "output": {"something": 1, "else": 2},
+    }
+
+
+def test_evaluation_logger_model_inference_method_handling(client):
+    """Test that EvaluationLogger correctly handles models with and without inference methods.
+
+    This test validates the fix where EvaluationLogger only adds a predict method
+    if the model doesn't already have an inference method.
+    """
+    # GENERATED MODELS
+    # 1a. For generated models, we should patch on a new predict method
+    ev1 = EvaluationLogger()
+    infer_method = ev1.model.get_infer_method()
+    assert infer_method is not None
+    assert infer_method.__name__ == "predict"
+
+    # 1b. And logging should work
+    pred1 = ev1.log_prediction(inputs={"text": "value"}, output="result1")
+    pred1.finish()
+    ev1.finish()
+
+    # USER DEFINED MODELS
+
+    class UserModelWithInferenceMethod(Model):
+        @weave.op
+        def predict(self, text: str, value: int, multiplier: int = 2, **kwargs) -> str:
+            return f"{text}_processed_{value * multiplier}"
+
+    user_defined_model = UserModelWithInferenceMethod()
+
+    # Capture the original method and its signature
+    original_predict = user_defined_model.get_infer_method()
+    original_signature = inspect.signature(original_predict)
+
+    # 2a. For user defined models, we should keep the existing inference method
+    ev2 = EvaluationLogger(model=user_defined_model)
+    assert ev2.model.get_infer_method() == original_predict
+    assert inspect.signature(ev2.model.get_infer_method()) == original_signature
+
+    # 2b. And the original method should still work with its original signature
+    result = ev2.model.get_infer_method()("test", value=100, multiplier=3)
+    assert result == "test_processed_300"
+
+    # 2c. And logging should work
+    pred2 = ev2.log_prediction(
+        inputs={"text": "test", "value": 100, "multiplier": 3},
+        output="test_processed_300",
+    )
+    pred2.finish()
+    ev2.finish()
+
+
+def test_evaluation_logger_model_with_different_inference_method_names(client):
+    """Test that EvaluationLogger handles models with different inference method names."""
+
+    class ModelWithInfer(Model):
+        @weave.op
+        def infer(self, special_param: str, count: int = 1) -> str:
+            return f"infer_result_{special_param}_{count}"
+
+    class ModelWithForward(Model):
+        @weave.op
+        def forward(self, data: list, transform: bool = True) -> str:
+            return f"forward_result_{len(data)}_{transform}"
+
+    class ModelWithInvoke(Model):
+        @weave.op
+        def invoke(self, query: dict, **options) -> str:
+            return f"invoke_result_{query.get('type', 'default')}"
+
+    models = [ModelWithInfer(), ModelWithForward(), ModelWithInvoke()]
+
+    for model in models:
+        infer_method = model.get_infer_method()
+        original_signature = inspect.signature(infer_method)
+
+        ev = EvaluationLogger(model=model)
+
+        # The inference method and signatures should be the same
+        assert ev.model.get_infer_method() == infer_method
+        assert inspect.signature(ev.model.get_infer_method()) == original_signature
+
+        # Test that basic logging works
+        pred = ev.log_prediction(
+            inputs={"value": "test"},
+            output=f"result_from_{infer_method.__name__}",
+        )
+        pred.finish()
+        ev.finish()

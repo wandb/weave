@@ -266,7 +266,13 @@ const doExpansionIteration = async (
     // Only continue recursion if there are more depths to expand
     const nextDepth = expansionDepth > 0 ? expansionDepth - 1 : 0;
 
-    if (nextDepth > 0 || iterationCount === 0) {
+    // Calculate the maximum needed depth based on the longest expandedRefColumn path
+    const maxNeededDepth = Math.max(
+      1,
+      ...Array.from(expandedRefColumns).map(column => column.split('.').length)
+    );
+
+    if (nextDepth > 0 || iterationCount < maxNeededDepth) {
       return doExpansionIteration(
         expandedTraceCalls,
         expandedRefColumns,

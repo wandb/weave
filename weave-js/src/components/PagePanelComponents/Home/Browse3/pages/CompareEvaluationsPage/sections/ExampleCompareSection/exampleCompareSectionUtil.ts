@@ -1,4 +1,4 @@
-import {isWeaveObjectRef, parseRefMaybe} from '@wandb/weave/react';
+import {isWeaveObjectRef, ObjectRef, parseRefMaybe} from '@wandb/weave/react';
 import _ from 'lodash';
 import {useEffect, useMemo, useState} from 'react';
 
@@ -32,11 +32,12 @@ type RowBase = {
 type FlattenedRow = RowBase & {
   output: {[outputKey: string]: any};
   scores: {[scoreId: string]: number | boolean | undefined};
+  trialNdx: number;
 };
 
 export type PivotedRow = RowBase & {
   output: {[outputKey: string]: {[callId: string]: any}};
-  scores: {[scoreId: string]: {[callId: string]: number | boolean}};
+  scores: {[scoreId: string]: {[callId: string]: number | boolean | undefined}};
 };
 
 const aggregateGroupedNestedRows = <T>(
@@ -121,7 +122,31 @@ const rowIsSelected = (
   });
 };
 
-export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
+export type FilteredAggregateRows = {
+  id: string;
+  count: number;
+  inputDigest: string;
+  inputRef: ObjectRef | null;
+  output: {
+    [k: string]: {
+      [k: string]: any;
+    };
+  };
+  scores: {
+    [k: string]: {
+      [k: string]: number | undefined;
+    };
+  };
+  originalRows: PivotedRow[];
+}[];
+
+export const useFilteredAggregateRows = (
+  state: EvaluationComparisonState
+): {
+  filteredRows: FilteredAggregateRows;
+  outputColumnKeys: string[];
+  leafDims: string[];
+} => {
   const leafDims = useMemo(() => getOrderedCallIds(state), [state]);
   const compositeMetricsMap = useMemo(
     () => buildCompositeMetricsMap(state.summary, 'score'),
@@ -135,7 +160,7 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
     ).forEach(([rowDigest, rowCollection]) => {
       Object.values(rowCollection.evaluations).forEach(modelCollection => {
         Object.values(modelCollection.predictAndScores).forEach(
-          predictAndScoreRes => {
+          (predictAndScoreRes, trialNdx) => {
             const output = predictAndScoreRes._rawPredictTraceData?.output;
             rows.push({
               id: predictAndScoreRes.callId,
@@ -163,6 +188,7 @@ export const useFilteredAggregateRows = (state: EvaluationComparisonState) => {
                 predictAndScoreRes.callId,
               ],
               predictAndScore: predictAndScoreRes,
+              trialNdx,
             });
           }
         );
@@ -376,7 +402,7 @@ export function useExampleCompareDataAndPrefetch(
 }
 
 // Primary method for fetching and caching a single row
-function useExampleCompareData(
+export function useExampleCompareData(
   ctx: CompareEvaluationContext,
   targetDigest: string
 ) {
@@ -537,3 +563,10 @@ async function loadRowDataIntoCache(
   }
   return rowsRes.rows.map(row => row.val);
 }
+
+export const removePrefix = (key: string, prefix: string) => {
+  if (key.startsWith(prefix)) {
+    return key.slice(prefix.length);
+  }
+  return key;
+};

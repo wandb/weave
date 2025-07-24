@@ -99,7 +99,7 @@ export const EvaluationModelLink: React.FC<{
       version={objRef.artifactVersion}
       versionIndex={objectVersion.result?.versionIndex ?? 0}
       color={MOON_800}
-      icon={<ModelIcon />}
+      icon={<ModelIcon color={evaluationCall.color} />}
     />
   );
 };
@@ -118,7 +118,7 @@ export const EvaluationDatasetLink: React.FC<{
   return <SmallRef objRef={parsed} />;
 };
 
-const ModelIcon: React.FC = () => {
+const ModelIcon: React.FC<{color?: string}> = ({color}) => {
   return (
     <Box
       mr="4px"
@@ -131,21 +131,9 @@ const ModelIcon: React.FC = () => {
         flex: '0 0 22px',
         justifyContent: 'center',
         alignItems: 'center',
-        color: MOON_600,
+        color: color ?? MOON_600,
       }}>
       <Icon name={IconNames.Model} width={14} height={14} />
     </Box>
-  );
-};
-
-export const VerticalBar: React.FC = () => {
-  return (
-    <div
-      style={{
-        width: '1px',
-        height: '100%',
-        backgroundColor: MOON_300,
-      }}
-    />
   );
 };

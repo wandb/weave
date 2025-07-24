@@ -48,7 +48,7 @@ Use Python’s `datetime.datetime` (with timezone info), and publish the object 
 
 ## How do I render Markdown in the UI?
 
-Wrap your string with `weave.Markdown(...)` before saving, and use `weave.publish(...)` to store it. Weave uses the object’s type to determine rendering, and `weave.Markdown` maps to a known UI renderer.  The value will be shown as a formatted Markdown object in the UI.
+Wrap your string with `weave.Markdown(...)` before saving, and use `weave.publish(...)` to store it. Weave uses the object’s type to determine rendering, and `weave.Markdown` maps to a known UI renderer.  The value will be shown as a formatted Markdown object in the UI. For a full code sample, see [Viewing calls](./tracing.mdx#viewing-calls).
 
 ## Will Weave affect my function's execution speed?
 
@@ -148,3 +148,40 @@ pref_scorer = PreferenceScorer(other_model=model_b)
 evaluation = Evaluation(dataset=dataset, scorers=[pref_scorer])
 evaluation.evaluate(model_a)
 ```
+
+## Pricing FAQs
+
+The following section provides answers to pricing FAQs. For the latest information, see the [pricing page](https://wandb.ai/site/pricing/).
+
+### How is Weave data ingestion calculated?
+We define ingested bytes as bytes that we receive, process, and store on your behalf. This includes trace metadata, LLM inputs/outputs, and any other information you explicitly log to Weave, but does not include communication overhead (e.g., HTTP headers) or any other data that is not placed in long term storage. We count bytes as "ingested" only once at the time they are received and stored.
+
+### How much Weave data ingestion do I need?
+We recommend using the free trial to estimate how much data ingestion you can expect to use. An average trace is approximately 0.22 MB, but the distribution is wide and varies depending on the use case and type of data sent.
+
+### How much does Inference cost?
+Each inference API has different costs for input and output tokens. Explore detailed pricing.
+
+### What is a tracked hour?
+A tracked hour is wall-clock time when training a model. If your model takes 8 hours to train, you have used 8 tracked hours. Today, this is irrespective of GPU quality, speed, etc. Importing runs from other platforms or syncing offline runs will contribute to your organization's tracked hour limit.
+
+### How is storage calculated?
+Storage includes both artifacts and data logged to runs.
+
+Weights & Biases calculates your storage usage over the last 30 days. For example, if you use 100 GB of storage for 15 days of March, 200 GB for 1 day of March, and 300GB over 14 days of March your storage usage would be:
+
+100 GB x 15 days = 1500 GB-days  
+200 GB x 1 day x = 200 GB-days  
+300 GB x 14 days x = 4200 GB-days  
+5900 GB-days / (30 days) = 196.6 GB
+
+At the end of 30 days, Weights & Biases rounds your storage to the nearest MB. Therefore, your storage usage for March would be 197 GB.
+
+### Does tracked data stored on an external server count against my storage quota?
+Absolutely not. Only the size of the metadata that you actually store in Weights & Biases counts against your storage quota. Reference artifacts and data stored in an external storage bucket will not count.
+
+### Who qualifies as an academic?
+Weights & Biases provides a free Pro license to academic institutions pursuing research not connected to a for-profit entity. This license is intended for students, professors, and postdoctoral researchers. An active email address affiliated with an academic institution is required.
+
+### What does the academic license include?
+The free academic license comes with all the product features included on Pro, 200GB of cloud storage, unlimited tracked hours, and up to 100 seats. Additional cloud storage can be purchased for $0.03 per GB, billed monthly. If you host Weights & Biases locally, cloud storage limits do not apply.

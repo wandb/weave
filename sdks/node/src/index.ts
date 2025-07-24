@@ -12,3 +12,5 @@ export {weaveAudio, weaveImage, WeaveAudio, WeaveImage} from './media';
 export {op} from './op';
 export * from './types';
 export {WeaveObject} from './weaveObject';
+import './utils/commonJSLoader';
+import './integrations/hooks';

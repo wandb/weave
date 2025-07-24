@@ -46,9 +46,9 @@ class Feedbacks(AbstractRichContainer[tsi.Feedback]):
     def _item_to_row(self, item: tsi.Feedback) -> list:
         feedback = item
 
-        typ = feedback.feedback_type
-        display_type = typ
-        if typ == "wandb.reaction.1":
+        type_ = feedback.feedback_type
+        display_type = type_
+        if type_ == "wandb.reaction.1":
             display_type = "reaction"
             if util.is_notebook():
                 # TODO: Emojis mess up table alignment in Jupyter 😢
@@ -56,7 +56,7 @@ class Feedbacks(AbstractRichContainer[tsi.Feedback]):
                 content = feedback.payload["alias"]
             else:
                 content = feedback.payload["emoji"]
-        elif typ == "wandb.note.1":
+        elif type_ == "wandb.note.1":
             display_type = "note"
             content = feedback.payload["note"]
         else:
@@ -207,7 +207,7 @@ class RefFeedbackQuery(FeedbackQuery):
             except TypeError:
                 raise TypeError(
                     "annotation_ref must be a valid object ref, eg weave:///<entity>/<project>/object/<name>:<digest>"
-                )
+                ) from None
             freq.annotation_ref = annotation_ref
         response = self.client.server.feedback_create(freq)
         self.feedbacks = None  # Clear cache

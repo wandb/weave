@@ -6,5 +6,5 @@
     "outDir": "../../../dist/__tests__/legacy",
     "tsBuildInfoFile": "../../../dist/__tests__/legacy/.tsbuildinfo"
   },
-  "include": ["../../../src/**/*"]
+  "include": ["../../../src/**/*", "../../../types/**/*"]
 } 
