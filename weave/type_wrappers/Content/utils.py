@@ -74,10 +74,10 @@ def default_filename(
     return f"{type_name}-{digest_suffix}{extension}"
 
 
-def get_extension_from_mimetype(mimetype: str) -> str:
+def get_extension_from_mimetype(mimetype: str) -> str | None:
     extension = mimetypes.guess_extension(mimetype)
     if not extension:
-        raise ValueError(
+        logger.warning(
             f"Got mime-type {mimetype} but failed to resolve a valid extension"
         )
     return extension
