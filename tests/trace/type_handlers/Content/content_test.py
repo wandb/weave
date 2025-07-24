@@ -272,7 +272,7 @@ class TestWeaveContent:
         assert content_ascii_art.as_string() == ascii_art
 
         # Test 11: Binary data through base64
-        binary_data = bytes([i for i in range(256)])
+        binary_data = bytes(list(range(256)))
         b64_binary = base64.b64encode(binary_data).decode("ascii")
         content_binary = Content.from_base64(b64_binary)
         assert content_binary.as_string() == b64_binary
