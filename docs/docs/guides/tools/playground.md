@@ -452,3 +452,12 @@ Edit an existing [saved model](#save-a-model) to fine-tune parameters or refresh
 3. In the upper right corner of the Playground UI, click **Chat settings** to open the chat settings window.
 4. In the chat settings window, adjust parameters as desired. You can also toggle Weave call tracking on or off, and [add a function](#add-a-function).
 5. Click **Update model**. The model is updated and accesible from **Saved Models** in the LLM dropdown.
+
+### Structured output
+
+By default, the response format for all models in Playground is text. You can change this setting to output a JSON object. To change the response format, do the following:
+
+1. In the upper right corner of the Playground UI, click **Chat settings** to open the parameter settings dropdown.
+2. Under **Response format**, click the dropdown.
+3. Select **text** (default) or **json_object**.
+3. Click **Publish model** to close the dropdown and save your changes.
