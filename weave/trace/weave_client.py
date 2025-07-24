@@ -1050,7 +1050,6 @@ class WeaveClient:
     def get_call_descendants(
         self,
         *,
-        call_id: str | None = None,
         call_ids: list[str] | None = None,
         limit: int | None = None,
         depth: int | None = None,
@@ -1067,7 +1066,6 @@ class WeaveClient:
         of a traced operation.
 
         Args:
-            call_id: Single parent call ID to get descendants for (cannot be used with call_ids).
             call_ids: List of parent call IDs to get descendants for (cannot be used with call_id).
             limit: Maximum number of descendants to return across all parent calls.
             depth: Maximum depth of descendants to return (1 = direct children only).
@@ -1105,15 +1103,11 @@ class WeaveClient:
             CallDescendantsReq,
         )
 
-        if not call_id and not call_ids:
-            raise ValueError("Must specify either call_id or call_ids")
-
-        if call_id and call_ids:
-            raise ValueError("Cannot specify both call_id and call_ids")
+        if not call_ids:
+            raise ValueError("Must specify call_ids")
 
         req = CallDescendantsReq(
             project_id=self._project_id(),
-            parent_call_id=call_id,
             parent_call_ids=call_ids,
             limit=limit,
             depth=depth,
@@ -1122,12 +1116,11 @@ class WeaveClient:
             columns=columns,
             expand_columns=expand_columns,
         )
-
         res = self.server.call_descendants(req)
 
         # Convert response calls to WeaveObject instances
         call_objects = []
-        for call_schema in res.calls:
+        for call_schema in res:
             call_obj = make_client_call(
                 self.entity, self.project, call_schema, self.server
             )

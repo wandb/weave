@@ -506,6 +506,8 @@ class CallsQuery(BaseModel):
     include_costs: bool = False
     include_storage_size: bool = False
     include_total_storage_size: bool = False
+    descendant_query_parent_ids: Optional[list[str]] = None
+    descendant_query_depth: Optional[int] = None
 
     def add_field(self, field: str) -> "CallsQuery":
         name = get_field_by_name(field)
@@ -566,6 +568,11 @@ class CallsQuery(BaseModel):
             hardcoded_filter=self.hardcoded_filter,
             limit=self.limit,
             offset=self.offset,
+            descendant_query_parent_ids=(
+                self.descendant_query_parent_ids.copy()
+                if self.descendant_query_parent_ids
+                else None
+            ),
         )
 
     def set_include_costs(self, include_costs: bool) -> "CallsQuery":
@@ -574,6 +581,16 @@ class CallsQuery(BaseModel):
 
     def set_expand_columns(self, expand_columns: list[str]) -> "CallsQuery":
         self.expand_columns = expand_columns
+        return self
+
+    def set_descendant_query_parent_ids(self, parent_ids: list[str]) -> "CallsQuery":
+        if not parent_ids:
+            raise ValueError("Parent IDs list cannot be empty")
+        self.descendant_query_parent_ids = parent_ids
+        return self
+
+    def set_descendant_query_depth(self, depth: int) -> "CallsQuery":
+        self.descendant_query_depth = depth
         return self
 
     def as_sql(self, pb: ParamBuilder, table_alias: str = "calls_merged") -> str:
@@ -683,6 +700,10 @@ class CallsQuery(BaseModel):
         # Determine if we should optimize!
         should_optimize = has_heavy_fields and predicate_pushdown_possible
 
+        # Also optimize if we have a descendant query
+        has_descendant_query = self.descendant_query_parent_ids is not None
+        should_optimize = should_optimize or has_descendant_query
+
         # Important: Always inject deleted_at into the query.
         # Note: it might be better to make this configurable.
         self.add_condition(
@@ -707,7 +728,12 @@ class CallsQuery(BaseModel):
         )
 
         # If we should not optimize, then just build the base query
-        if not should_optimize and not self.include_costs and not object_ref_conditions:
+        if (
+            not should_optimize
+            and not self.include_costs
+            and not object_ref_conditions
+            and not has_descendant_query
+        ):
             return self._as_sql_base_format(pb, table_alias)
 
         # Build two queries, first filter query CTE, then select the columns
@@ -742,17 +768,44 @@ class CallsQuery(BaseModel):
         select_query.order_fields = self.order_fields
 
         raw_sql = "WITH "
-        if object_join_cte:
-            raw_sql += f"{object_join_cte},\n"
-        raw_sql += f"""filtered_calls AS ({
-            filter_query._as_sql_base_format(
+        cte_parts = []
+
+        # Add descendant CTE if needed
+        if has_descendant_query:
+            descendant_cte = build_descendant_cte_sql(
+                self.project_id,
+                self.descendant_query_parent_ids or [],
+                self.descendant_query_depth,
                 pb,
-                table_alias,
-                field_to_object_join_alias_map=field_to_object_join_alias_map,
-                expand_columns=self.expand_columns,
             )
-        })
-        """
+            cte_parts.append(descendant_cte)
+
+        # Add object join CTE if needed
+        if object_join_cte:
+            cte_parts.append(object_join_cte)
+
+        # Build filtered_calls CTE
+        if has_descendant_query:
+            # When using descendant query, filter by descendant IDs
+            filtered_calls_cte = """filtered_calls AS (
+                SELECT id
+                FROM descendant_call_ids
+            )"""
+        else:
+            # Regular filtered_calls CTE
+            filtered_calls_cte = f"""filtered_calls AS ({
+                filter_query._as_sql_base_format(
+                    pb,
+                    table_alias,
+                    field_to_object_join_alias_map=field_to_object_join_alias_map,
+                    expand_columns=self.expand_columns,
+                )
+            })"""
+
+        cte_parts.append(filtered_calls_cte)
+
+        # Join all CTE parts
+        raw_sql += ",\n".join(cte_parts) + "\n"
 
         if self.include_costs:
             # TODO: We should unify the calls query order by fields to be orm sort by fields
@@ -1608,6 +1661,57 @@ def optimized_project_contains_call_query(
         THEN 1
         ELSE 0
         END AS has_any
+    """,
+        logger,
+    )
+
+
+def build_descendant_cte_sql(
+    project_id: str,
+    parent_ids: list[str],
+    max_depth: Optional[int],
+    pb: ParamBuilder,
+) -> str:
+    """
+    Builds a recursive CTE SQL string for finding descendant calls.
+
+    Args:
+        project_id: The project ID to filter by
+        parent_ids: List of parent call IDs to find descendants for
+        pb: ParamBuilder for parameterization
+        max_depth: Optional maximum recursion depth (defaults to 100)
+
+    Returns:
+        SQL string for the recursive CTE
+    """
+    if not parent_ids:
+        raise ValueError("Parent IDs list cannot be empty")
+
+    max_depth = max_depth or 100
+    max_depth_param = pb.add_param(max_depth)
+    project_id_param = pb.add_param(project_id)
+    parent_ids_param = pb.add_param(parent_ids)
+
+    return safely_format_sql(
+        f"""
+        descendant_call_ids AS (
+            -- Base case: select the parent call IDs
+            SELECT id, 0 AS depth
+            FROM calls_merged
+            WHERE project_id = {param_slot(project_id_param, "String")}
+              AND id IN {param_slot(parent_ids_param, "Array(String)")}
+              AND deleted_at IS NULL
+
+            UNION ALL
+
+            -- Recursive case: select children IDs of previous level
+            SELECT c.id, dci.depth + 1 AS depth
+            FROM calls_merged c
+            INNER JOIN descendant_call_ids dci ON c.parent_id = dci.id
+            WHERE c.project_id = {param_slot(project_id_param, "String")}
+              AND c.deleted_at IS NULL
+              AND dci.depth < {param_slot(max_depth_param, "UInt64")}  -- Prevent infinite recursion
+        )
     """,
         logger,
     )

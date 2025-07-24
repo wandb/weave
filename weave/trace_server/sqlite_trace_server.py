@@ -684,7 +684,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             ),
         )
 
-    def call_descendants(self, req: tsi.CallDescendantsReq) -> tsi.CallDescendantsRes:
+    def call_descendants(self, req: tsi.CallDescendantsReq) -> Iterator[tsi.CallSchema]:
         """Get descendant calls for given call IDs."""
         if req.depth is not None and req.depth < 0:
             raise ValueError("Depth must be a positive integer")

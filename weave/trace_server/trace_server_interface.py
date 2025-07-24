@@ -489,14 +489,13 @@ class CallDescendantsReq(BaseModel):
         description="List of parent call IDs to get descendants for",
         examples=[["call_123", "call_456"]],
     )
-    parent_call_id: Optional[str] = Field(
-        default=None,
-        description="Single parent call ID to get descendants for",
-        examples=["call_123"],
-    )
     limit: Optional[int] = Field(
         default=None,
         description="Maximum number of descendants to return across all parent calls",
+    )
+    offset: Optional[int] = Field(
+        default=None,
+        description="Number of descendants to skip before returning",
     )
     depth: Optional[int] = Field(
         default=None,
@@ -518,10 +517,6 @@ class CallDescendantsReq(BaseModel):
         default=None,
         description="Columns to expand, i.e. refs to other objects",
     )
-
-
-class CallDescendantsRes(BaseModel):
-    calls: list[CallSchema]
 
 
 class CallUpdateReq(BaseModel):
@@ -1260,7 +1255,8 @@ class TraceServerInterface(Protocol):
     def calls_query_stream(self, req: CallsQueryReq) -> Iterator[CallSchema]: ...
     def calls_delete(self, req: CallsDeleteReq) -> CallsDeleteRes: ...
     def calls_query_stats(self, req: CallsQueryStatsReq) -> CallsQueryStatsRes: ...
-    def call_descendants(self, req: CallDescendantsReq) -> CallDescendantsRes: ...
+    def call_descendants(self, req: CallDescendantsReq) -> Iterator[CallSchema]: ...
+
     def call_update(self, req: CallUpdateReq) -> CallUpdateRes: ...
     def call_start_batch(self, req: CallCreateBatchReq) -> CallCreateBatchRes: ...
 

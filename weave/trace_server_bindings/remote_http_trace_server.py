@@ -327,9 +327,9 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
     def call_descendants(
         self, req: Union[tsi.CallDescendantsReq, dict[str, Any]]
-    ) -> tsi.CallDescendantsRes:
-        return self._generic_request(
-            "/call/descendants", req, tsi.CallDescendantsReq, tsi.CallDescendantsRes
+    ) -> Iterator[tsi.CallSchema]:
+        return self._generic_stream_request(
+            "/call/descendants", req, tsi.CallDescendantsReq, tsi.CallSchema
         )
 
     def calls_delete(
