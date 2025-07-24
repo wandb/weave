@@ -10,8 +10,8 @@ import uuid
 from pathlib import Path
 from typing import Annotated, Any, Generic, Literal, TypedDict, Union
 
-from pydantic import BaseModel, ConfigDict, Field
-from typing_extensions import NotRequired, Self, TypeVar
+from pydantic import BaseModel, Field, PrivateAttr
+from typing_extensions import NotRequired, Self, TypeVar, override
 
 from .utils import (
     default_filename,
@@ -70,7 +70,6 @@ class Content(BaseModel, Generic[T]):
 
     # This is required due to some attribute setting done by our serialization layer
     # Without it, it is hard to know if it was processed properly
-    model_config = ConfigDict(extra="allow")
     id: str
     data: bytes
     size: int
@@ -94,6 +93,11 @@ class Content(BaseModel, Generic[T]):
     _last_saved_path: Annotated[
         str | None, Field(description="Last path the file was saved to")
     ] = None
+
+    # These fields are set by serialization layer when it picks up a pydantic class
+    # We define them here so they can be set without doing `extra=allow`
+    ref: Annotated[Any, PrivateAttr] = None
+    art: Annotated[Any, PrivateAttr] = None
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         """
@@ -369,3 +373,7 @@ class Content(BaseModel, Generic[T]):
 
         # Update the last_saved_path to reflect the saved copy. This ensures open works.
         self._last_saved_path = str(path)
+
+    # @override
+    # def model_dump(self):
+
