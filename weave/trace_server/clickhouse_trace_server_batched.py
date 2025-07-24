@@ -425,10 +425,15 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             include_total_storage_size=req.include_total_storage_size or False,
         )
         columns = all_call_select_columns
+        debug_columns = []  # Track debug columns for error testing
         if req.columns:
             # TODO: add support for json extract fields
             # Split out any nested column requests
             columns = [col.split(".")[0] for col in req.columns]
+
+            # Check for debug columns and filter them out from regular processing
+            debug_columns = [col for col in columns if col.startswith("__debug_")]
+            columns = [col for col in columns if not col.startswith("__debug_")]
 
             # If we are returning a summary object, make sure that all fields
             # required to compute the summary are in the columns
@@ -492,7 +497,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         include_feedback = req.include_feedback or False
 
         def row_to_call_schema_dict(row: tuple[Any, ...]) -> dict[str, Any]:
-            return _ch_call_dict_to_call_schema_dict(dict(zip(select_columns, row)))
+            result = _ch_call_dict_to_call_schema_dict(dict(zip(select_columns, row)))
+            # Check for debug errors after processing each row
+            self._check_debug_errors(debug_columns)
+            return result
 
         if not expand_columns and not include_feedback:
             for row in raw_res:
@@ -518,6 +526,93 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
             for call in call_dicts:
                 yield tsi.CallSchema.model_validate(call)
+
+    def _check_debug_errors(self, debug_columns: list[str]) -> None:
+        """
+        Check for debug columns and raise appropriate errors for testing.
+
+        Args:
+            debug_columns: List of debug column names to check
+
+        Raises:
+            Various exceptions based on the debug column names to test error handling
+        """
+        if not debug_columns:
+            return
+
+        for debug_col in debug_columns:
+            if debug_col == "__debug_stream_error":
+                raise RuntimeError("Debug stream error triggered for testing")
+            elif debug_col == "__debug_db_error":
+                # Simulate a ClickHouse database error
+                import clickhouse_connect
+                raise clickhouse_connect.common.exceptions.ClickHouseError(
+                    "Debug database error triggered for testing"
+                )
+            elif debug_col == "__debug_validation_error":
+                from pydantic import ValidationError
+                raise ValidationError.from_exception_data(
+                    "Debug validation error",
+                    [
+                        {
+                            "type": "value_error",
+                            "loc": ["debug_field"],
+                            "msg": "Debug validation error triggered for testing",
+                        }
+                    ],
+                )
+            elif debug_col == "__debug_memory_error":
+                # Simulate memory limit exceeded error that would be caught by handle_clickhouse_query_error
+                raise Exception(
+                    "MEMORY_LIMIT_EXCEEDED: Debug memory error triggered for testing"
+                )
+            elif debug_col == "__debug_timeout_error":
+                raise TimeoutError("Debug timeout error triggered for testing")
+            elif debug_col == "__debug_request_too_large":
+                from weave.trace_server.errors import RequestTooLarge
+                raise RequestTooLarge("Debug request too large error triggered for testing")
+            elif debug_col == "__debug_invalid_request":
+                from weave.trace_server.errors import InvalidRequest
+                raise InvalidRequest("Debug invalid request error triggered for testing")
+            elif debug_col == "__debug_no_common_type":
+                from weave.trace_server.errors import NoCommonType
+                raise NoCommonType("Debug no common type error triggered for testing")
+            elif debug_col == "__debug_insert_too_large":
+                from weave.trace_server.errors import InsertTooLarge
+                raise InsertTooLarge("Debug insert too large error triggered for testing")
+            elif debug_col == "__debug_invalid_field":
+                from weave.trace_server.errors import InvalidFieldError
+                raise InvalidFieldError("Debug invalid field error triggered for testing")
+            elif debug_col == "__debug_not_found":
+                from weave.trace_server.errors import NotFoundError
+                raise NotFoundError("Debug not found error triggered for testing")
+            elif debug_col == "__debug_missing_api_key":
+                from weave.trace_server.errors import MissingLLMApiKeyError
+                raise MissingLLMApiKeyError("Debug missing API key error triggered for testing", "test_api_key")
+            elif debug_col == "__debug_object_deleted":
+                import datetime
+                from weave.trace_server.errors import ObjectDeletedError
+                raise ObjectDeletedError("Debug object deleted error triggered for testing", datetime.datetime.now())
+            elif debug_col == "__debug_value_error":
+                raise ValueError("Debug value error triggered for testing")
+            elif debug_col == "__debug_read_timeout":
+                import requests
+                raise requests.exceptions.ReadTimeout("Debug read timeout error triggered for testing")
+            elif debug_col == "__debug_connect_timeout":
+                import requests
+                raise requests.exceptions.ConnectTimeout("Debug connect timeout error triggered for testing")
+            elif debug_col == "__debug_database_error":
+                import clickhouse_connect
+                raise clickhouse_connect.driver.exceptions.DatabaseError("Debug database error triggered for testing")
+            elif debug_col == "__debug_operational_error":
+                import clickhouse_connect
+                raise clickhouse_connect.driver.exceptions.OperationalError("Debug operational error triggered for testing")
+            elif debug_col == "__debug_transport_query_error":
+                from gql.transport.exceptions import TransportQueryError
+                raise TransportQueryError("Debug transport query error triggered for testing")
+            elif debug_col == "__debug_query_memory_limit":
+                from weave.trace_server.errors import QueryMemoryLimitExceeded
+                raise QueryMemoryLimitExceeded("Debug query memory limit exceeded error triggered for testing")
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._add_feedback_to_calls")
     def _add_feedback_to_calls(
