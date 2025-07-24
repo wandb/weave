@@ -8,6 +8,7 @@ import logoIBM from './logos/icon-ibm.png';
 import logoMeta from './logos/icon-meta.png';
 import logoMicrosoft from './logos/icon-microsoft.png';
 import logoMistral from './logos/icon-mistral.png';
+import logoMoonshotAI from './logos/icon-moonshot-ai.png';
 import {InferenceContext, InferenceContextType, Model, Source} from './types';
 
 // TODO: Duplicating this from core - move into context?
@@ -33,6 +34,7 @@ const sourceNameMap: Record<Source, string> = {
   microsoft: 'Microsoft',
   mistral: 'Mistral',
   mistralai: 'Mistral',
+  moonshotai: 'MoonshotAI',
   openai: 'OpenAI',
   Qwen: 'Alibaba',
   xai: 'xAI',
@@ -47,6 +49,7 @@ const sourceLogoMap: Record<Source, string> = {
   microsoft: 'microsoft',
   mistral: 'mistral',
   mistralai: 'mistral',
+  moonshotai: 'moonshotai',
   openai: 'openai',
   Qwen: 'alibaba',
 };
@@ -59,6 +62,7 @@ const logoIdToImageMap: Record<string, any> = {
   meta: logoMeta,
   microsoft: logoMicrosoft,
   mistral: logoMistral,
+  moonshotai: logoMoonshotAI,
 };
 
 export const getModelSource = (model: Model): Source => {

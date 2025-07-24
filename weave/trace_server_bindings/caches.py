@@ -182,7 +182,7 @@ class DiskCache:
         try:
             self._cache.close()
         except Exception as e:
-            logger.exception(f"Error closing disk cache: {e}")
+            logger.exception("Error closing disk cache")
 
     def __contains__(self, key: str) -> bool:
         """Check if key exists in cache. Returns False on errors."""

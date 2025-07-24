@@ -7,7 +7,7 @@ import weave
 from weave.flow.scorer import WeaveScorerResult
 from weave.scorers.default_models import MODEL_PATHS
 from weave.scorers.scorer_types import HuggingFaceScorer
-from weave.scorers.utils import load_hf_model_weights
+from weave.scorers.utils import load_local_model_weights
 
 CONTEXT_RELEVANCE_SCORER_THRESHOLD = 0.55
 
@@ -72,7 +72,7 @@ class WeaveContextRelevanceScorerV1(HuggingFaceScorer):
     def load_model(self) -> None:
         from transformers import AutoModelForTokenClassification
 
-        self._local_model_path = load_hf_model_weights(
+        self._local_model_path = load_local_model_weights(
             self.model_name_or_path, MODEL_PATHS["relevance_scorer"]
         )
         self._model = AutoModelForTokenClassification.from_pretrained(
@@ -147,7 +147,7 @@ class WeaveContextRelevanceScorerV1(HuggingFaceScorer):
             span_prob = positive_probs[start:end].mean()
             spans_with_probs.append({"text": span_text, "score": float(span_prob)})
 
-        return spans_with_probs, int(label_mask.sum()), int(len(label_mask))
+        return spans_with_probs, int(label_mask.sum()), len(label_mask)
 
     @validate_call
     @weave.op

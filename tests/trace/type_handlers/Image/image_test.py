@@ -131,12 +131,12 @@ def test_image_as_file(client: WeaveClient) -> None:
     client.project = "test_image_as_file"
     file_path = Path(__file__).parent.resolve() / "example.jpg"
 
-    @weave.op()
+    @weave.op
     def return_image_jpg_pillow(path: str):
         file_path = Path(path)
         return Image.open(file_path)
 
-    @weave.op()
+    @weave.op
     def accept_image_jpg_pillow(val):
         width, height = val.size
         return f"Image size: {width}x{height}"
