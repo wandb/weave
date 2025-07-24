@@ -124,6 +124,9 @@ class Content(BaseModel, Generic[T]):
         encoding: str = "utf-8",
     ) -> Self:
         """Initializes Content from raw bytes."""
+        if len(data) == 0:
+            logger.warning("Content.from_bytes received empty data")
+
         digest = hashlib.sha256(data).hexdigest()
         size = len(data)
         mimetype, extension = get_mime_and_extension(
@@ -163,6 +166,9 @@ class Content(BaseModel, Generic[T]):
         encoding: str = "utf-8",
     ) -> Self:
         """Initializes Content from a string of text."""
+        if len(text) == 0:
+            logger.warning("Content.from_text received empty text")
+
         data = text.encode(encoding)
         digest = hashlib.sha256(data).hexdigest()
         size = len(data)
@@ -209,6 +215,9 @@ class Content(BaseModel, Generic[T]):
         metadata: dict[str, Any] | None = None,
     ) -> Self:
         """Initializes Content from a base64 encoded string or bytes."""
+        if len(b64_data) == 0:
+            logger.warning("Content.from_base64 received empty input")
+
         input_type = full_name(b64_data)
         if isinstance(b64_data, str):
             b64_data = b64_data.encode("ascii")
