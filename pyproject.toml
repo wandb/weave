@@ -423,3 +423,6 @@ BoxedNDArray = "BoxedNDArray"
 [tool.fixit]
 enable = [".rules.op_deco", ".rules.legacy_methods"]
 disable = ["fixit.rules"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
