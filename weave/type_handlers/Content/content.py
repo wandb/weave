@@ -18,7 +18,12 @@ def save(obj: Content, artifact: MemTraceFilesArtifact, name: str) -> None:
         f.write(obj.data)
 
     with artifact.new_file("metadata.json", binary=False) as f:
-        metadata = obj.model_dump(exclude={"data"})
+        # Exclude the raw data
+        exclude = {"data"}
+        # Exclude any extra keys set by the serialization layer for the ref handling
+        if obj.model_extra:
+            exclude = exclude.union(obj.model_extra.keys())
+        metadata = obj.model_dump(exclude=exclude)
         json.dump(metadata, f)
 
 

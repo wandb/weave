@@ -10,7 +10,7 @@ import uuid
 from pathlib import Path
 from typing import Annotated, Any, Generic, Literal, TypedDict, Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing_extensions import NotRequired, Self, TypeVar
 
 from .utils import (
@@ -68,6 +68,9 @@ class Content(BaseModel, Generic[T]):
     - from_base64()
     """
 
+    # This is required due to some attribute setting done by our serialization layer
+    # Without it, it is hard to know if it was processed properly
+    model_config = ConfigDict(extra="allow")
     id: str
     data: bytes
     size: int

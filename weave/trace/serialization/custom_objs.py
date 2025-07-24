@@ -125,11 +125,7 @@ def _decode_custom_files_obj(
     load_instance_op._tracing_enabled = False  # type: ignore
     art = MemTraceFilesArtifact(encoded_path_contents, metadata={})
     res = load_instance_op(art, "obj")
-    # Pydantic models don't allow attribute setting like this
-    try:
-        res.art = art
-    except Exception as e:
-        pass
+    res.art = art
     return res
 
 

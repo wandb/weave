@@ -118,11 +118,13 @@ def get_mime_and_extension(
     elif (
         mimetype
         and not extension
-        and (guessed := get_extension_from_mimetype(mimetype))
+        and (guessed_ext := get_extension_from_mimetype(mimetype))
     ):
-        return mimetype, guessed
-    elif extension and not mimetype and (guessed := guess_from_extension(extension)):
-        return guessed, extension
+        return mimetype, guessed_ext
+    elif (
+        extension and not mimetype and (guessed_type := guess_from_extension(extension))
+    ):
+        return guessed_type, extension
 
     if filename is not None:
         mimetype = guess_from_filename(filename)
