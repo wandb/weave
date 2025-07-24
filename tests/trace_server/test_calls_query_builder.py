@@ -485,40 +485,41 @@ def test_query_with_simple_feedback_sort() -> None:
     assert_sql(
         cq,
         """
-        SELECT
-            calls_merged.id AS id
-        FROM
-            calls_merged
-        LEFT JOIN feedback ON
-            (feedback.project_id = {pb_4:String} AND
-            feedback.weave_ref = concat('weave-trace-internal:///',
-            {pb_4:String},
-            '/call/',
-            calls_merged.id))
-        WHERE
-            calls_merged.project_id = {pb_4:String}
-        GROUP BY
-            (calls_merged.project_id,
-            calls_merged.id)
-        HAVING
-            (((any(calls_merged.deleted_at) IS NULL))
-                AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
-        ORDER BY
-            (NOT (JSONType(anyIf(feedback.payload_dump,
-            feedback.feedback_type = {pb_0:String}),
-            {pb_1:String},
-            {pb_2:String}) = 'Null'
-                OR JSONType(anyIf(feedback.payload_dump,
+            SELECT
+                calls_merged.id AS id
+            FROM
+                calls_merged
+            LEFT JOIN (
+                SELECT * FROM feedback WHERE feedback.project_id = {pb_4:String}
+            ) AS feedback ON (
+                feedback.weave_ref = concat('weave-trace-internal:///',
+                {pb_4:String},
+                '/call/',
+                calls_merged.id))
+            WHERE
+                calls_merged.project_id = {pb_4:String}
+            GROUP BY
+                (calls_merged.project_id,
+                calls_merged.id)
+            HAVING
+                (((any(calls_merged.deleted_at) IS NULL))
+                    AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+            ORDER BY
+                (NOT (JSONType(anyIf(feedback.payload_dump,
                 feedback.feedback_type = {pb_0:String}),
                 {pb_1:String},
-                {pb_2:String}) IS NULL)) desc,
-            toFloat64OrNull(coalesce(nullIf(JSON_VALUE(anyIf(feedback.payload_dump,
-            feedback.feedback_type = {pb_0:String}),
-            {pb_3:String}), 'null'), '')) DESC,
-            toString(coalesce(nullIf(JSON_VALUE(anyIf(feedback.payload_dump,
-            feedback.feedback_type = {pb_0:String}),
-            {pb_3:String}), 'null'), '')) DESC
-        """,
+                {pb_2:String}) = 'Null'
+                    OR JSONType(anyIf(feedback.payload_dump,
+                    feedback.feedback_type = {pb_0:String}),
+                    {pb_1:String},
+                    {pb_2:String}) IS NULL)) desc,
+                toFloat64OrNull(coalesce(nullIf(JSON_VALUE(anyIf(feedback.payload_dump,
+                feedback.feedback_type = {pb_0:String}),
+                {pb_3:String}), 'null'), '')) DESC,
+                toString(coalesce(nullIf(JSON_VALUE(anyIf(feedback.payload_dump,
+                feedback.feedback_type = {pb_0:String}),
+                {pb_3:String}), 'null'), '')) DESC
+            """,
         {
             "pb_0": "wandb.runnable.my_op",
             "pb_1": "output",
@@ -547,16 +548,17 @@ def test_query_with_simple_feedback_sort_with_op_name() -> None:
             calls_merged.id AS id
         FROM
             calls_merged
-        LEFT JOIN feedback ON
-            (feedback.project_id = {pb_5:String} AND
-            feedback.weave_ref = concat('weave-trace-internal:///',
-            {pb_5:String},
-            '/call/',
-            calls_merged.id))
-        WHERE
-            calls_merged.project_id = {pb_5:String}
-            AND ((calls_merged.op_name IN {pb_0:Array(String)})
-                OR (calls_merged.op_name IS NULL))
+                    LEFT JOIN (
+                SELECT * FROM feedback WHERE feedback.project_id = {pb_5:String}
+            ) AS feedback ON (
+                feedback.weave_ref = concat('weave-trace-internal:///',
+                {pb_5:String},
+                '/call/',
+                calls_merged.id))
+            WHERE
+                calls_merged.project_id = {pb_5:String}
+                AND ((calls_merged.op_name IN {pb_0:Array(String)})
+                    OR (calls_merged.op_name IS NULL))
         GROUP BY
             (calls_merged.project_id,
             calls_merged.id)
@@ -583,15 +585,16 @@ def test_query_with_simple_feedback_sort_with_op_name() -> None:
             calls_merged.id AS id
         FROM
             calls_merged
-        LEFT JOIN feedback ON
-            (feedback.project_id = {pb_5:String} AND
-            feedback.weave_ref = concat('weave-trace-internal:///',
-            {pb_5:String},
-            '/call/',
-            calls_merged.id))
-        WHERE
-            calls_merged.project_id = {pb_5:String}
-            AND (calls_merged.id IN filtered_calls)
+                    LEFT JOIN (
+                SELECT * FROM feedback WHERE feedback.project_id = {pb_5:String}
+            ) AS feedback ON (
+                feedback.weave_ref = concat('weave-trace-internal:///',
+                {pb_5:String},
+                '/call/',
+                calls_merged.id))
+            WHERE
+                calls_merged.project_id = {pb_5:String}
+                AND (calls_merged.id IN filtered_calls)
         GROUP BY
             (calls_merged.project_id,
             calls_merged.id)
@@ -646,8 +649,9 @@ def test_query_with_simple_feedback_filter() -> None:
             calls_merged.id AS id
         FROM
             calls_merged
-        LEFT JOIN feedback ON
-            (feedback.project_id = {pb_3:String} AND
+                    LEFT JOIN (
+                SELECT * FROM feedback WHERE feedback.project_id = {pb_3:String}
+            ) AS feedback ON (
             feedback.weave_ref = concat('weave-trace-internal:///',
             {pb_3:String},
             '/call/',
@@ -698,8 +702,9 @@ def test_query_with_simple_feedback_sort_and_filter() -> None:
             calls_merged.id AS id
         FROM
             calls_merged
-        LEFT JOIN feedback ON
-            (feedback.project_id = {pb_6:String} AND
+                    LEFT JOIN (
+                SELECT * FROM feedback WHERE feedback.project_id = {pb_6:String}
+            ) AS feedback ON (
             feedback.weave_ref = concat('weave-trace-internal:///',
             {pb_6:String},
             '/call/',
@@ -1978,7 +1983,7 @@ def test_query_with_feedback_filter_and_datetime_and_string_filter() -> None:
         WITH filtered_calls AS
             (SELECT calls_merged.id AS id
             FROM calls_merged
-            LEFT JOIN feedback ON (feedback.project_id = {pb_8:String} AND feedback.weave_ref = concat('weave-trace-internal:///', {pb_8:String}, '/call/', calls_merged.id))
+                            LEFT JOIN (SELECT * FROM feedback WHERE feedback.project_id = {pb_8:String}) AS feedback ON (feedback.weave_ref = concat('weave-trace-internal:///', {pb_8:String}, '/call/', calls_merged.id))
             WHERE calls_merged.project_id = {pb_8:String}
                 AND (calls_merged.sortable_datetime > {pb_7:String})
                 AND ((calls_merged.inputs_dump LIKE {pb_6:String}

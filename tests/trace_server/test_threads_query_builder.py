@@ -53,36 +53,30 @@ def test_clickhouse_basic_query():
         """
         SELECT
             thread_id,
-            COUNT(*) as turn_count,
-            min(call_start_time) as start_time,          -- Earliest start time across all calls in thread
-            max(call_end_time) as last_updated,          -- Latest end time across all calls in thread
-            argMin(id, call_start_time) as first_turn_id,     -- Turn ID with earliest start_time
-            argMax(id, call_end_time) as last_turn_id,   -- Turn ID with latest last_updated
-            quantile(0.5)(call_duration) as p50_turn_duration_ms,  -- P50 of turn durations in milliseconds
-            quantile(0.99)(call_duration) as p99_turn_duration_ms  -- P99 of turn durations in milliseconds
+            COUNT(*) AS turn_count,
+            min(call_start_time) AS start_time,
+            max(call_end_time) AS last_updated,
+            argMin(id, call_start_time) AS first_turn_id,
+            argMax(id, call_end_time) AS last_turn_id,
+            quantile(0.5)(call_duration) AS p50_turn_duration_ms,
+            quantile(0.99)(call_duration) AS p99_turn_duration_ms
         FROM (
-            -- INNER QUERY: Consolidate each individual call before thread-level aggregation
-            -- This handles cases where calls_merged has multiple partial rows per call_id
-            -- due to ClickHouse materialized view background merge behavior
             SELECT
-                id,                              -- Call identifier
-                any(thread_id) as thread_id,     -- Get any non-null thread_id for this call
-                                                -- (all non-null values should be identical)
-                min(started_at) as call_start_time,   -- Earliest start time for this call
-                max(ended_at) as call_end_time,   -- Latest end time for this call
-                -- Calculate call duration in milliseconds
+                id,
+                any(thread_id) AS thread_id,
+                min(started_at) AS call_start_time,
+                max(ended_at) AS call_end_time,
                 CASE
                     WHEN call_end_time IS NOT NULL AND call_start_time IS NOT NULL
                     THEN dateDiff('millisecond', call_start_time, call_end_time)
                     ELSE NULL
-                END as call_duration
+                END AS call_duration
             FROM calls_merged
             WHERE project_id = {pb_0: String}
 
-            GROUP BY id                         -- Group by call id to merge partial rows
-            HAVING thread_id IS NOT NULL AND thread_id != '' AND id = any(turn_id)  -- Filter to turn calls only
-        ) as properly_merged_calls
-        -- OUTER QUERY: Now aggregate at thread level with properly consolidated calls
+            GROUP BY id
+            HAVING thread_id IS NOT NULL AND thread_id != '' AND id = any(turn_id)
+        ) AS properly_merged_calls
         GROUP BY thread_id
         ORDER BY last_updated DESC
         """,
@@ -97,32 +91,28 @@ def test_sqlite_basic_query():
         """
             SELECT
                 thread_id,
-                COUNT(*) as turn_count,
-                MIN(started_at) as start_time,
-                MAX(ended_at) as last_updated,
-                -- Get turn ID with earliest start time for this thread
+                COUNT(*) AS turn_count,
+                MIN(started_at) AS start_time,
+                MAX(ended_at) AS last_updated,
                 (SELECT id FROM calls c2
                  WHERE c2.thread_id = c1.thread_id
                  AND c2.project_id = c1.project_id
                  AND c2.id = c2.turn_id
                  ORDER BY c2.started_at ASC
-                 LIMIT 1) as first_turn_id,
-                -- Get turn ID with latest end time for this thread
+                 LIMIT 1) AS first_turn_id,
                 (SELECT id FROM calls c2
                  WHERE c2.thread_id = c1.thread_id
                  AND c2.project_id = c1.project_id
                  AND c2.id = c2.turn_id
                  ORDER BY c2.ended_at DESC
-                 LIMIT 1) as last_turn_id,
-                -- P50 calculation placeholder - might be implemented properly later
-                -1 as p50_turn_duration_ms,
-                -- P99 calculation placeholder - might be implemented properly later
-                -1 as p99_turn_duration_ms
+                 LIMIT 1) AS last_turn_id,
+                -1 AS p50_turn_duration_ms,
+                -1 AS p99_turn_duration_ms
             FROM calls c1
             WHERE project_id = ?
                 AND thread_id IS NOT NULL
                 AND thread_id != ''
-                AND id = turn_id                 -- Only include turn calls for meaningful thread stats
+                AND id = turn_id
 
             GROUP BY thread_id
             ORDER BY last_updated DESC
@@ -146,36 +136,30 @@ def test_clickhouse_custom_sorting():
         """
         SELECT
             thread_id,
-            COUNT(*) as turn_count,
-            min(call_start_time) as start_time,          -- Earliest start time across all calls in thread
-            max(call_end_time) as last_updated,          -- Latest end time across all calls in thread
-            argMin(id, call_start_time) as first_turn_id,     -- Turn ID with earliest start_time
-            argMax(id, call_end_time) as last_turn_id,   -- Turn ID with latest last_updated
-            quantile(0.5)(call_duration) as p50_turn_duration_ms,  -- P50 of turn durations in milliseconds
-            quantile(0.99)(call_duration) as p99_turn_duration_ms  -- P99 of turn durations in milliseconds
+            COUNT(*) AS turn_count,
+            min(call_start_time) AS start_time,
+            max(call_end_time) AS last_updated,
+            argMin(id, call_start_time) AS first_turn_id,
+            argMax(id, call_end_time) AS last_turn_id,
+            quantile(0.5)(call_duration) AS p50_turn_duration_ms,
+            quantile(0.99)(call_duration) AS p99_turn_duration_ms
         FROM (
-            -- INNER QUERY: Consolidate each individual call before thread-level aggregation
-            -- This handles cases where calls_merged has multiple partial rows per call_id
-            -- due to ClickHouse materialized view background merge behavior
             SELECT
-                id,                              -- Call identifier
-                any(thread_id) as thread_id,     -- Get any non-null thread_id for this call
-                                                -- (all non-null values should be identical)
-                min(started_at) as call_start_time,   -- Earliest start time for this call
-                max(ended_at) as call_end_time,   -- Latest end time for this call
-                -- Calculate call duration in milliseconds
+                id,
+                any(thread_id) AS thread_id,
+                min(started_at) AS call_start_time,
+                max(ended_at) AS call_end_time,
                 CASE
                     WHEN call_end_time IS NOT NULL AND call_start_time IS NOT NULL
                     THEN dateDiff('millisecond', call_start_time, call_end_time)
                     ELSE NULL
-                END as call_duration
+                END AS call_duration
             FROM calls_merged
             WHERE project_id = {pb_0: String}
 
-            GROUP BY id                         -- Group by call id to merge partial rows
-            HAVING thread_id IS NOT NULL AND thread_id != '' AND id = any(turn_id)  -- Filter to turn calls only
-        ) as properly_merged_calls
-        -- OUTER QUERY: Now aggregate at thread level with properly consolidated calls
+            GROUP BY id
+            HAVING thread_id IS NOT NULL AND thread_id != '' AND id = any(turn_id)
+        ) AS properly_merged_calls
         GROUP BY thread_id
         ORDER BY turn_count ASC, start_time DESC
         """,
@@ -196,32 +180,28 @@ def test_sqlite_custom_sorting():
         """
         SELECT
             thread_id,
-            COUNT(*) as turn_count,
-            MIN(started_at) as start_time,
-            MAX(ended_at) as last_updated,
-            -- Get turn ID with earliest start time for this thread
+            COUNT(*) AS turn_count,
+            MIN(started_at) AS start_time,
+            MAX(ended_at) AS last_updated,
             (SELECT id FROM calls c2
              WHERE c2.thread_id = c1.thread_id
              AND c2.project_id = c1.project_id
              AND c2.id = c2.turn_id
              ORDER BY c2.started_at ASC
-             LIMIT 1) as first_turn_id,
-            -- Get turn ID with latest end time for this thread
+             LIMIT 1) AS first_turn_id,
             (SELECT id FROM calls c2
              WHERE c2.thread_id = c1.thread_id
              AND c2.project_id = c1.project_id
              AND c2.id = c2.turn_id
              ORDER BY c2.ended_at DESC
-             LIMIT 1) as last_turn_id,
-            -- P50 calculation placeholder - might be implemented properly later
-            -1 as p50_turn_duration_ms,
-            -- P99 calculation placeholder - might be implemented properly later
-            -1 as p99_turn_duration_ms
+             LIMIT 1) AS last_turn_id,
+            -1 AS p50_turn_duration_ms,
+            -1 AS p99_turn_duration_ms
         FROM calls c1
         WHERE project_id = ?
             AND thread_id IS NOT NULL
             AND thread_id != ''
-            AND id = turn_id                 -- Only include turn calls for meaningful thread stats
+            AND id = turn_id
 
         GROUP BY thread_id
         ORDER BY thread_id ASC, turn_count DESC
@@ -241,36 +221,30 @@ def test_clickhouse_with_limit():
         """
         SELECT
             thread_id,
-            COUNT(*) as turn_count,
-            min(call_start_time) as start_time,          -- Earliest start time across all calls in thread
-            max(call_end_time) as last_updated,          -- Latest end time across all calls in thread
-            argMin(id, call_start_time) as first_turn_id,     -- Turn ID with earliest start_time
-            argMax(id, call_end_time) as last_turn_id,   -- Turn ID with latest last_updated
-            quantile(0.5)(call_duration) as p50_turn_duration_ms,  -- P50 of turn durations in milliseconds
-            quantile(0.99)(call_duration) as p99_turn_duration_ms  -- P99 of turn durations in milliseconds
+            COUNT(*) AS turn_count,
+            min(call_start_time) AS start_time,
+            max(call_end_time) AS last_updated,
+            argMin(id, call_start_time) AS first_turn_id,
+            argMax(id, call_end_time) AS last_turn_id,
+            quantile(0.5)(call_duration) AS p50_turn_duration_ms,
+            quantile(0.99)(call_duration) AS p99_turn_duration_ms
         FROM (
-            -- INNER QUERY: Consolidate each individual call before thread-level aggregation
-            -- This handles cases where calls_merged has multiple partial rows per call_id
-            -- due to ClickHouse materialized view background merge behavior
             SELECT
-                id,                              -- Call identifier
-                any(thread_id) as thread_id,     -- Get any non-null thread_id for this call
-                                                -- (all non-null values should be identical)
-                min(started_at) as call_start_time,   -- Earliest start time for this call
-                max(ended_at) as call_end_time,   -- Latest end time for this call
-                -- Calculate call duration in milliseconds
+                id,
+                any(thread_id) AS thread_id,
+                min(started_at) AS call_start_time,
+                max(ended_at) AS call_end_time,
                 CASE
                     WHEN call_end_time IS NOT NULL AND call_start_time IS NOT NULL
                     THEN dateDiff('millisecond', call_start_time, call_end_time)
                     ELSE NULL
-                END as call_duration
+                END AS call_duration
             FROM calls_merged
             WHERE project_id = {pb_0: String}
 
-            GROUP BY id                         -- Group by call id to merge partial rows
-            HAVING thread_id IS NOT NULL AND thread_id != '' AND id = any(turn_id)  -- Filter to turn calls only
-        ) as properly_merged_calls
-        -- OUTER QUERY: Now aggregate at thread level with properly consolidated calls
+            GROUP BY id
+            HAVING thread_id IS NOT NULL AND thread_id != '' AND id = any(turn_id)
+        ) AS properly_merged_calls
         GROUP BY thread_id
         ORDER BY last_updated DESC
         LIMIT {pb_1: Int64}
@@ -287,36 +261,30 @@ def test_clickhouse_with_limit_and_offset():
         """
         SELECT
             thread_id,
-            COUNT(*) as turn_count,
-            min(call_start_time) as start_time,          -- Earliest start time across all calls in thread
-            max(call_end_time) as last_updated,          -- Latest end time across all calls in thread
-            argMin(id, call_start_time) as first_turn_id,     -- Turn ID with earliest start_time
-            argMax(id, call_end_time) as last_turn_id,   -- Turn ID with latest last_updated
-            quantile(0.5)(call_duration) as p50_turn_duration_ms,  -- P50 of turn durations in milliseconds
-            quantile(0.99)(call_duration) as p99_turn_duration_ms  -- P99 of turn durations in milliseconds
+            COUNT(*) AS turn_count,
+            min(call_start_time) AS start_time,
+            max(call_end_time) AS last_updated,
+            argMin(id, call_start_time) AS first_turn_id,
+            argMax(id, call_end_time) AS last_turn_id,
+            quantile(0.5)(call_duration) AS p50_turn_duration_ms,
+            quantile(0.99)(call_duration) AS p99_turn_duration_ms
         FROM (
-            -- INNER QUERY: Consolidate each individual call before thread-level aggregation
-            -- This handles cases where calls_merged has multiple partial rows per call_id
-            -- due to ClickHouse materialized view background merge behavior
             SELECT
-                id,                              -- Call identifier
-                any(thread_id) as thread_id,     -- Get any non-null thread_id for this call
-                                                -- (all non-null values should be identical)
-                min(started_at) as call_start_time,   -- Earliest start time for this call
-                max(ended_at) as call_end_time,   -- Latest end time for this call
-                -- Calculate call duration in milliseconds
+                id,
+                any(thread_id) AS thread_id,
+                min(started_at) AS call_start_time,
+                max(ended_at) AS call_end_time,
                 CASE
                     WHEN call_end_time IS NOT NULL AND call_start_time IS NOT NULL
                     THEN dateDiff('millisecond', call_start_time, call_end_time)
                     ELSE NULL
-                END as call_duration
+                END AS call_duration
             FROM calls_merged
             WHERE project_id = {pb_0: String}
 
-            GROUP BY id                         -- Group by call id to merge partial rows
-            HAVING thread_id IS NOT NULL AND thread_id != '' AND id = any(turn_id)  -- Filter to turn calls only
-        ) as properly_merged_calls
-        -- OUTER QUERY: Now aggregate at thread level with properly consolidated calls
+            GROUP BY id
+            HAVING thread_id IS NOT NULL AND thread_id != '' AND id = any(turn_id)
+        ) AS properly_merged_calls
         GROUP BY thread_id
         ORDER BY last_updated DESC
         LIMIT {pb_1: Int64}
@@ -335,32 +303,28 @@ def test_sqlite_with_limit_and_offset():
         """
         SELECT
             thread_id,
-            COUNT(*) as turn_count,
-            MIN(started_at) as start_time,
-            MAX(ended_at) as last_updated,
-            -- Get turn ID with earliest start time for this thread
+            COUNT(*) AS turn_count,
+            MIN(started_at) AS start_time,
+            MAX(ended_at) AS last_updated,
             (SELECT id FROM calls c2
              WHERE c2.thread_id = c1.thread_id
              AND c2.project_id = c1.project_id
              AND c2.id = c2.turn_id
              ORDER BY c2.started_at ASC
-             LIMIT 1) as first_turn_id,
-            -- Get turn ID with latest end time for this thread
+             LIMIT 1) AS first_turn_id,
             (SELECT id FROM calls c2
              WHERE c2.thread_id = c1.thread_id
              AND c2.project_id = c1.project_id
              AND c2.id = c2.turn_id
              ORDER BY c2.ended_at DESC
-             LIMIT 1) as last_turn_id,
-            -- P50 calculation placeholder - might be implemented properly later
-            -1 as p50_turn_duration_ms,
-            -- P99 calculation placeholder - might be implemented properly later
-            -1 as p99_turn_duration_ms
+             LIMIT 1) AS last_turn_id,
+            -1 AS p50_turn_duration_ms,
+            -1 AS p99_turn_duration_ms
         FROM calls c1
         WHERE project_id = ?
             AND thread_id IS NOT NULL
             AND thread_id != ''
-            AND id = turn_id                 -- Only include turn calls for meaningful thread stats
+            AND id = turn_id
 
         GROUP BY thread_id
         ORDER BY last_updated DESC
@@ -386,36 +350,30 @@ def test_clickhouse_with_date_filters():
         """
         SELECT
             thread_id,
-            COUNT(*) as turn_count,
-            min(call_start_time) as start_time,          -- Earliest start time across all calls in thread
-            max(call_end_time) as last_updated,          -- Latest end time across all calls in thread
-            argMin(id, call_start_time) as first_turn_id,     -- Turn ID with earliest start_time
-            argMax(id, call_end_time) as last_turn_id,   -- Turn ID with latest last_updated
-            quantile(0.5)(call_duration) as p50_turn_duration_ms,  -- P50 of turn durations in milliseconds
-            quantile(0.99)(call_duration) as p99_turn_duration_ms  -- P99 of turn durations in milliseconds
+            COUNT(*) AS turn_count,
+            min(call_start_time) AS start_time,
+            max(call_end_time) AS last_updated,
+            argMin(id, call_start_time) AS first_turn_id,
+            argMax(id, call_end_time) AS last_turn_id,
+            quantile(0.5)(call_duration) AS p50_turn_duration_ms,
+            quantile(0.99)(call_duration) AS p99_turn_duration_ms
         FROM (
-            -- INNER QUERY: Consolidate each individual call before thread-level aggregation
-            -- This handles cases where calls_merged has multiple partial rows per call_id
-            -- due to ClickHouse materialized view background merge behavior
             SELECT
-                id,                              -- Call identifier
-                any(thread_id) as thread_id,     -- Get any non-null thread_id for this call
-                                                -- (all non-null values should be identical)
-                min(started_at) as call_start_time,   -- Earliest start time for this call
-                max(ended_at) as call_end_time,   -- Latest end time for this call
-                -- Calculate call duration in milliseconds
+                id,
+                any(thread_id) AS thread_id,
+                min(started_at) AS call_start_time,
+                max(ended_at) AS call_end_time,
                 CASE
                     WHEN call_end_time IS NOT NULL AND call_start_time IS NOT NULL
                     THEN dateDiff('millisecond', call_start_time, call_end_time)
                     ELSE NULL
-                END as call_duration
+                END AS call_duration
             FROM calls_merged
             WHERE project_id = {pb_0: String}
                 AND sortable_datetime > {pb_1: String} AND sortable_datetime < {pb_2: String}
-            GROUP BY id                         -- Group by call id to merge partial rows
-            HAVING thread_id IS NOT NULL AND thread_id != '' AND id = any(turn_id)  -- Filter to turn calls only
-        ) as properly_merged_calls
-        -- OUTER QUERY: Now aggregate at thread level with properly consolidated calls
+            GROUP BY id
+            HAVING thread_id IS NOT NULL AND thread_id != '' AND id = any(turn_id)
+        ) AS properly_merged_calls
         GROUP BY thread_id
         ORDER BY last_updated DESC
         """,
@@ -439,32 +397,28 @@ def test_sqlite_with_date_filters():
         """
         SELECT
             thread_id,
-            COUNT(*) as turn_count,
-            MIN(started_at) as start_time,
-            MAX(ended_at) as last_updated,
-            -- Get turn ID with earliest start time for this thread
+            COUNT(*) AS turn_count,
+            MIN(started_at) AS start_time,
+            MAX(ended_at) AS last_updated,
             (SELECT id FROM calls c2
              WHERE c2.thread_id = c1.thread_id
              AND c2.project_id = c1.project_id
              AND c2.id = c2.turn_id
              ORDER BY c2.started_at ASC
-             LIMIT 1) as first_turn_id,
-            -- Get turn ID with latest end time for this thread
+             LIMIT 1) AS first_turn_id,
             (SELECT id FROM calls c2
              WHERE c2.thread_id = c1.thread_id
              AND c2.project_id = c1.project_id
              AND c2.id = c2.turn_id
              ORDER BY c2.ended_at DESC
-             LIMIT 1) as last_turn_id,
-            -- P50 calculation placeholder - might be implemented properly later
-            -1 as p50_turn_duration_ms,
-            -- P99 calculation placeholder - might be implemented properly later
-            -1 as p99_turn_duration_ms
+             LIMIT 1) AS last_turn_id,
+            -1 AS p50_turn_duration_ms,
+            -1 AS p99_turn_duration_ms
         FROM calls c1
         WHERE project_id = ?
             AND thread_id IS NOT NULL
             AND thread_id != ''
-            AND id = turn_id                 -- Only include turn calls for meaningful thread stats
+            AND id = turn_id
             AND started_at > ? AND started_at < ?
         GROUP BY thread_id
         ORDER BY last_updated DESC
@@ -489,36 +443,30 @@ def test_clickhouse_full_featured_query():
         """
         SELECT
             thread_id,
-            COUNT(*) as turn_count,
-            min(call_start_time) as start_time,          -- Earliest start time across all calls in thread
-            max(call_end_time) as last_updated,          -- Latest end time across all calls in thread
-            argMin(id, call_start_time) as first_turn_id,     -- Turn ID with earliest start_time
-            argMax(id, call_end_time) as last_turn_id,   -- Turn ID with latest last_updated
-            quantile(0.5)(call_duration) as p50_turn_duration_ms,  -- P50 of turn durations in milliseconds
-            quantile(0.99)(call_duration) as p99_turn_duration_ms  -- P99 of turn durations in milliseconds
+            COUNT(*) AS turn_count,
+            min(call_start_time) AS start_time,
+            max(call_end_time) AS last_updated,
+            argMin(id, call_start_time) AS first_turn_id,
+            argMax(id, call_end_time) AS last_turn_id,
+            quantile(0.5)(call_duration) AS p50_turn_duration_ms,
+            quantile(0.99)(call_duration) AS p99_turn_duration_ms
         FROM (
-            -- INNER QUERY: Consolidate each individual call before thread-level aggregation
-            -- This handles cases where calls_merged has multiple partial rows per call_id
-            -- due to ClickHouse materialized view background merge behavior
             SELECT
-                id,                              -- Call identifier
-                any(thread_id) as thread_id,     -- Get any non-null thread_id for this call
-                                                -- (all non-null values should be identical)
-                min(started_at) as call_start_time,   -- Earliest start time for this call
-                max(ended_at) as call_end_time,   -- Latest end time for this call
-                -- Calculate call duration in milliseconds
+                id,
+                any(thread_id) AS thread_id,
+                min(started_at) AS call_start_time,
+                max(ended_at) AS call_end_time,
                 CASE
                     WHEN call_end_time IS NOT NULL AND call_start_time IS NOT NULL
                     THEN dateDiff('millisecond', call_start_time, call_end_time)
                     ELSE NULL
-                END as call_duration
+                END AS call_duration
             FROM calls_merged
             WHERE project_id = {pb_0: String}
                 AND sortable_datetime > {pb_1: String} AND sortable_datetime < {pb_2: String}
-            GROUP BY id                         -- Group by call id to merge partial rows
-            HAVING thread_id IS NOT NULL AND thread_id != '' AND id = any(turn_id)  -- Filter to turn calls only
-        ) as properly_merged_calls
-        -- OUTER QUERY: Now aggregate at thread level with properly consolidated calls
+            GROUP BY id
+            HAVING thread_id IS NOT NULL AND thread_id != '' AND id = any(turn_id)
+        ) AS properly_merged_calls
         GROUP BY thread_id
         ORDER BY turn_count DESC
         LIMIT {pb_3: Int64}
@@ -552,32 +500,28 @@ def test_sqlite_full_featured_query():
         """
         SELECT
             thread_id,
-            COUNT(*) as turn_count,
-            MIN(started_at) as start_time,
-            MAX(ended_at) as last_updated,
-            -- Get turn ID with earliest start time for this thread
+            COUNT(*) AS turn_count,
+            MIN(started_at) AS start_time,
+            MAX(ended_at) AS last_updated,
             (SELECT id FROM calls c2
              WHERE c2.thread_id = c1.thread_id
              AND c2.project_id = c1.project_id
              AND c2.id = c2.turn_id
              ORDER BY c2.started_at ASC
-             LIMIT 1) as first_turn_id,
-            -- Get turn ID with latest end time for this thread
+             LIMIT 1) AS first_turn_id,
             (SELECT id FROM calls c2
              WHERE c2.thread_id = c1.thread_id
              AND c2.project_id = c1.project_id
              AND c2.id = c2.turn_id
              ORDER BY c2.ended_at DESC
-             LIMIT 1) as last_turn_id,
-            -- P50 calculation placeholder - might be implemented properly later
-            -1 as p50_turn_duration_ms,
-            -- P99 calculation placeholder - might be implemented properly later
-            -1 as p99_turn_duration_ms
+             LIMIT 1) AS last_turn_id,
+            -1 AS p50_turn_duration_ms,
+            -1 AS p99_turn_duration_ms
         FROM calls c1
         WHERE project_id = ?
             AND thread_id IS NOT NULL
             AND thread_id != ''
-            AND id = turn_id                 -- Only include turn calls for meaningful thread stats
+            AND id = turn_id
             AND started_at > ?
         GROUP BY thread_id
         ORDER BY last_updated ASC, thread_id DESC
@@ -602,36 +546,30 @@ def test_clickhouse_only_after_date():
         """
         SELECT
             thread_id,
-            COUNT(*) as turn_count,
-            min(call_start_time) as start_time,          -- Earliest start time across all calls in thread
-            max(call_end_time) as last_updated,          -- Latest end time across all calls in thread
-            argMin(id, call_start_time) as first_turn_id,     -- Turn ID with earliest start_time
-            argMax(id, call_end_time) as last_turn_id,   -- Turn ID with latest last_updated
-            quantile(0.5)(call_duration) as p50_turn_duration_ms,  -- P50 of turn durations in milliseconds
-            quantile(0.99)(call_duration) as p99_turn_duration_ms  -- P99 of turn durations in milliseconds
+            COUNT(*) AS turn_count,
+            min(call_start_time) AS start_time,
+            max(call_end_time) AS last_updated,
+            argMin(id, call_start_time) AS first_turn_id,
+            argMax(id, call_end_time) AS last_turn_id,
+            quantile(0.5)(call_duration) AS p50_turn_duration_ms,
+            quantile(0.99)(call_duration) AS p99_turn_duration_ms
         FROM (
-            -- INNER QUERY: Consolidate each individual call before thread-level aggregation
-            -- This handles cases where calls_merged has multiple partial rows per call_id
-            -- due to ClickHouse materialized view background merge behavior
             SELECT
-                id,                              -- Call identifier
-                any(thread_id) as thread_id,     -- Get any non-null thread_id for this call
-                                                -- (all non-null values should be identical)
-                min(started_at) as call_start_time,   -- Earliest start time for this call
-                max(ended_at) as call_end_time,   -- Latest end time for this call
-                -- Calculate call duration in milliseconds
+                id,
+                any(thread_id) AS thread_id,
+                min(started_at) AS call_start_time,
+                max(ended_at) AS call_end_time,
                 CASE
                     WHEN call_end_time IS NOT NULL AND call_start_time IS NOT NULL
                     THEN dateDiff('millisecond', call_start_time, call_end_time)
                     ELSE NULL
-                END as call_duration
+                END AS call_duration
             FROM calls_merged
             WHERE project_id = {pb_0: String}
                 AND sortable_datetime > {pb_1: String}
-            GROUP BY id                         -- Group by call id to merge partial rows
-            HAVING thread_id IS NOT NULL AND thread_id != '' AND id = any(turn_id)  -- Filter to turn calls only
-        ) as properly_merged_calls
-        -- OUTER QUERY: Now aggregate at thread level with properly consolidated calls
+            GROUP BY id
+            HAVING thread_id IS NOT NULL AND thread_id != '' AND id = any(turn_id)
+        ) AS properly_merged_calls
         GROUP BY thread_id
         ORDER BY last_updated DESC
         """,
@@ -649,32 +587,28 @@ def test_sqlite_only_before_date():
         """
         SELECT
             thread_id,
-            COUNT(*) as turn_count,
-            MIN(started_at) as start_time,
-            MAX(ended_at) as last_updated,
-            -- Get turn ID with earliest start time for this thread
+            COUNT(*) AS turn_count,
+            MIN(started_at) AS start_time,
+            MAX(ended_at) AS last_updated,
             (SELECT id FROM calls c2
              WHERE c2.thread_id = c1.thread_id
              AND c2.project_id = c1.project_id
              AND c2.id = c2.turn_id
              ORDER BY c2.started_at ASC
-             LIMIT 1) as first_turn_id,
-            -- Get turn ID with latest end time for this thread
+             LIMIT 1) AS first_turn_id,
             (SELECT id FROM calls c2
              WHERE c2.thread_id = c1.thread_id
              AND c2.project_id = c1.project_id
              AND c2.id = c2.turn_id
              ORDER BY c2.ended_at DESC
-             LIMIT 1) as last_turn_id,
-            -- P50 calculation placeholder - might be implemented properly later
-            -1 as p50_turn_duration_ms,
-            -- P99 calculation placeholder - might be implemented properly later
-            -1 as p99_turn_duration_ms
+             LIMIT 1) AS last_turn_id,
+            -1 AS p50_turn_duration_ms,
+            -1 AS p99_turn_duration_ms
         FROM calls c1
         WHERE project_id = ?
             AND thread_id IS NOT NULL
             AND thread_id != ''
-            AND id = turn_id                 -- Only include turn calls for meaningful thread stats
+            AND id = turn_id
             AND started_at < ?
         GROUP BY thread_id
         ORDER BY last_updated DESC
@@ -765,7 +699,7 @@ def test_query_structure_documentation():
     """
     Test that documents the structure and purpose of the threads query.
 
-    This test serves as living documentation of what the threads query does
+    This test serves AS living documentation of what the threads query does
     and why it's structured the way it is.
     """
     pb = ParamBuilder("pb")
@@ -778,9 +712,9 @@ def test_query_structure_documentation():
     assert "GROUP BY id" in query  # Inner aggregation by call
 
     # Should include key aggregations
-    assert "COUNT(*) as turn_count" in query
-    assert "min(call_start_time) as start_time" in query
-    assert "max(call_end_time) as last_updated" in query
+    assert "COUNT(*) AS turn_count" in query
+    assert "min(call_start_time) AS start_time" in query
+    assert "max(call_end_time) AS last_updated" in query
 
     # Should include turn filtering
     assert "id = any(turn_id)" in query
