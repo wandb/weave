@@ -86,14 +86,9 @@ The chat pane displays structured message data extracted from LLM calls made dur
 
 #### What qualifies as a message?
 
-Messages are extracted from child calls within a turn that:
+Messages are extracted from calls within a turn that represent direct interactions with LLM providers (e.g., sending a prompt and receiving a response). Only calls that are not further nested inside other calls are shown as messages. This avoids duplicating intermediate steps or aggregated internal logic.
 
-- Have the `usage` attribute (indicating an LLM API call occurred)
-- Are not further nested beneath other calls
-
-This means that only relevant user-facing LLM responses are visible, while aggregated internal usage is still reflected at higher levels.
-
-Typically, these messages are emitted by automatically patched third-party SDKs such as:
+Typically, messages are emitted by automatically patched third-party SDKs like:
 - `openai.ChatCompletion.create`
 - `anthropic.Anthropic.completion`
 
