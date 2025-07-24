@@ -87,8 +87,7 @@ def apply_doc_fixes(raw_json):
     def empty_object_fix_mapper(value):
         if (
             isinstance(value, dict)
-            and "anyOf" in value
-            and isinstance(value["anyOf"], list)
+            isinstance(value.get("anyOf"), list)
         ):
             # Filter out empty objects from anyOf arrays
             filtered_any_of = [item for item in value["anyOf"] if item != {}]
