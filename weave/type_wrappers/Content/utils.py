@@ -111,7 +111,12 @@ def guess_from_buffer(buffer: bytes) -> str | None:
         matcher = cast("MagicMatcher", MagicMatcher.DEFAULT_INSTANCE)
         return next(matcher.match(buffer)).mimetypes[0]
     except (ImportError, ModuleNotFoundError):
-        logger.debug("polyfile library not installed, cannot guess mime from buffer.")
+        logger.warning(
+            "Failed to determine MIME type from file extension and cannot infer from data\n"
+            "MIME type detection from raw data requires the polyfile library\n"
+            "Install it by running: `pip install polyfile `\n"
+            "See: https://pypi.org/project/polyfile for detailed instructions"
+        )
         return None
     except IndexError:
         # This occurs if polyfile is installed but finds no match.
