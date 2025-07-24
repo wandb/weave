@@ -41,8 +41,7 @@ A _Thread_ is a logical grouping of related calls that share a common conversati
 A _Turn_ is a high-level operation within a Thread, displayed in the UI as individual rows in a thread view. Each Turn:
 
 - Represents one logical step in a conversation or workflow
-- Turns are the direct children of a thread context and are 
-- May include nested lower-level calls (not shown in thread-level stats).
+- Turns are the direct children of a thread context and may include nested lower-level calls (not shown in thread-level stats).
 
 ### Call
 
@@ -77,6 +76,41 @@ In the Weave sidebar, select **Threads** to access the [Threads list view](#thre
 - Includes call-level metadata (latency, inputs, outputs)
 - Optionally shows message content or structured data if logged
 - To view the full execution of a turn, you can open it from the thread detail drawer. This lets you drill into all nested operations that occurred during that specific turn.
+- If a turn includes messages extracted from LLM calls, they will appear in the right-hand chat pane. These messages typically come from calls made by supported integrations (e.g., `openai.ChatCompletion.create`) and must meet specific criteria to display. For more information, see [Chat view behavior](#chat-view-behavior).
+
+### Chat view behavior
+
+The chat pane displays structured message data extracted from LLM calls made during each turn. This view gives you a conversational-style rendering of the interaction.
+
+![Chat view](imgs/threads-chat-view.png)
+
+#### What qualifies as a message?
+
+Messages are extracted from child calls within a turn that:
+
+- Have the `usage` attribute (indicating an LLM API call occurred)
+- Are not further nested beneath other calls
+
+This means that only relevant user-facing LLM responses are visible, while aggregated internal usage is still reflected at higher levels.
+
+Typically, these messages are emitted by automatically patched third-party SDKs such as:
+- `openai.ChatCompletion.create`
+- `anthropic.Anthropic.completion`
+
+#### What happens if no messages are present?
+
+If a turn doesn't emit any messages, the chat pane will show an empty message section for that turn. However, the chat pane may still include messages from other turns in the same thread.
+
+#### Turn and Chat interactions
+
+- Clicking a turn scrolls the chat pane to that turn's message location (pinning behavior).
+- Scrolling the chat pane highlights the corresponding turn in the left-hand list.
+
+#### Navigate to and from the trace view
+
+You can open the full trace for a turn by clicking into it.
+
+A back button appears in the upper left corner to return to the thread detail view. UI state (like scroll position) is not preserved across the transition.
 
 ![The Threads drawer view](imgs/threads-drawer.png)
 
@@ -92,50 +126,23 @@ The return value from `weave.thread()` is a `ThreadContext` object with a `threa
 
 Nested `weave.thread()` contexts always start a new thread unless the same `thread_id` is reused. Ending a child context does not interrupt or overwrite the parent context. This allows for forked thread structures or layered thread orchestration, depending on your app logic.
 
-### Query recent active threads
+### Basic thread creation
 
-This example fetches the 50 most recently updated threads. Replace `my-project` with your actual project ID.
-
-```python
-# Get most recently active threads
-response = client.threads_query(ThreadsQueryReq(
-    project_id="my-project",
-    sort_by=[SortBy(field="last_updated", direction="desc")],
-    limit=50
-))
-
-for thread in response.threads:
-    print(f"Thread {thread.thread_id}: {thread.turn_count} turns, last active {thread.last_updated}")
-```
-
-### Query threads by activity level
-
-This example fetches the 20 most active threads, ordered by number of turns.
+The following code sample demonstrates how to use `weave.thread()` to group one or more operations under a shared `thread_id`. This is the simplest way to start using Threads in your application.
 
 ```python
-# Get threads with most activity (most turns)
-response = client.threads_query(ThreadsQueryReq(
-    project_id="my-project",
-    sort_by=[SortBy(field="turn_count", direction="desc")],
-    limit=20
-))
+import weave
+
+@weave.op
+def say_hello(name: str) -> str:
+    return f"Hello, {name}!"
+
+# Start a new thread context
+with weave.thread() as thread_ctx:
+    print(f"Thread ID: {thread_ctx.thread_id}")
+    say_hello("Bill Nye the Science Guy")
 ```
 
-### Query recent threads only
-
-This example returns threads that started in the past 24 hours. You can change the time window by adjusting the value of `days` in `timedelta`.
-
-```python
-from datetime import datetime, timedelta
-
-# Get threads started in the last 24 hours
-yesterday = datetime.now() - timedelta(days=1)
-response = client.threads_query(ThreadsQueryReq(
-    project_id="my-project",
-    sortable_datetime_after=yesterday,
-    sort_by=[SortBy(field="start_time", direction="desc")]
-))
-```
 
 ### Manual agent loop implementation 
 
@@ -520,4 +527,49 @@ class ThreadSchema:
 
 class ThreadsQueryRes:
     threads: List[ThreadSchema]
+```
+
+### Query recent active threads
+
+This example fetches the 50 most recently updated threads. Replace `my-project` with your actual project ID.
+
+```python
+# Get most recently active threads
+response = client.threads_query(ThreadsQueryReq(
+    project_id="my-project",
+    sort_by=[SortBy(field="last_updated", direction="desc")],
+    limit=50
+))
+
+for thread in response.threads:
+    print(f"Thread {thread.thread_id}: {thread.turn_count} turns, last active {thread.last_updated}")
+```
+
+### Query threads by activity level
+
+This example fetches the 20 most active threads, ordered by number of turns.
+
+```python
+# Get threads with most activity (most turns)
+response = client.threads_query(ThreadsQueryReq(
+    project_id="my-project",
+    sort_by=[SortBy(field="turn_count", direction="desc")],
+    limit=20
+))
+```
+
+### Query recent threads only
+
+This example returns threads that started in the past 24 hours. You can change the time window by adjusting the value of `days` in `timedelta`.
+
+```python
+from datetime import datetime, timedelta
+
+# Get threads started in the last 24 hours
+yesterday = datetime.now() - timedelta(days=1)
+response = client.threads_query(ThreadsQueryReq(
+    project_id="my-project",
+    sortable_datetime_after=yesterday,
+    sort_by=[SortBy(field="start_time", direction="desc")]
+))
 ```
