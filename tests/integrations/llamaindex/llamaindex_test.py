@@ -43,7 +43,7 @@ def test_llamaindex_llm_complete_sync(client: WeaveClient) -> None:
     llm = OpenAI(model="gpt-4o-mini", api_key=api_key)
     response = llm.complete("William Shakespeare is ")
 
-    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
     flattened_calls = flatten_calls(calls)
 
     exp = [
@@ -55,7 +55,7 @@ def test_llamaindex_llm_complete_sync(client: WeaveClient) -> None:
 
     call_0, _ = flattened_calls[0]
     assert call_0.started_at < call_0.ended_at
-    assert call_0.parent_id == None
+    assert call_0.parent_id is None
     assert call_0.inputs["model"] == "gpt-4o-mini"
     assert call_0.inputs["temperature"] == 0.1
     assert len(call_0.output["text"]) > 0
@@ -113,7 +113,7 @@ async def test_llamaindex_llm_complete_async(client: WeaveClient) -> None:
     llm = OpenAI(model="gpt-4o-mini", api_key=api_key)
     response = await llm.acomplete("William Shakespeare is ")
 
-    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
     flattened_calls = flatten_calls(calls)
 
     exp = [
@@ -182,7 +182,7 @@ def test_llamaindex_llm_stream_complete_sync(client: WeaveClient) -> None:
         if token.delta:
             all_content += token.delta
 
-    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
     flattened_calls = flatten_calls(calls)
 
     exp = [
@@ -262,7 +262,7 @@ async def test_llamaindex_llm_stream_complete_async(client: WeaveClient) -> None
         if token.delta:
             all_content += token.delta
 
-    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
     flattened_calls = flatten_calls(calls)
 
     exp = [
@@ -334,7 +334,7 @@ def test_llamaindex_llm_chat_sync(client: WeaveClient) -> None:
 
     response = llm.chat(messages)
 
-    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
     flattened_calls = flatten_calls(calls)
 
     exp = [
@@ -418,7 +418,7 @@ async def test_llamaindex_llm_chat_async(client: WeaveClient) -> None:
 
     response = await llm.achat(messages)
 
-    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
     flattened_calls = flatten_calls(calls)
 
     exp = [
@@ -506,7 +506,7 @@ def test_llamaindex_llm_stream_chat_sync(client: WeaveClient) -> None:
         if token.delta:
             all_content += token.delta
 
-    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
     flattened_calls = flatten_calls(calls)
 
     exp = [
@@ -616,7 +616,7 @@ async def test_llamaindex_llm_stream_chat_async(client: WeaveClient) -> None:
         if token.delta:
             all_content += token.delta
 
-    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
     flattened_calls = flatten_calls(calls)
 
     exp = [
@@ -727,7 +727,7 @@ def test_llamaindex_tool_calling_sync(client: WeaveClient) -> None:
 
     response = llm.predict_and_call([tool], "Pick a random song for me")
 
-    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
     flattened_calls = flatten_calls(calls)
 
     # Verify we have the expected call structure
@@ -813,7 +813,7 @@ async def test_llamaindex_workflow(client: WeaveClient) -> None:
     assert result == "Workflow complete."
 
     # Check the captured calls
-    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
     flattened_calls = flatten_calls(calls)
     print(len(flattened_calls))
 
@@ -866,59 +866,59 @@ async def test_llamaindex_quick_start(client: WeaveClient) -> None:
     # Now we can ask questions about the documents or do calculations
     response = await agent.run("What did the author do in college? Also, what's 7 * 8?")
 
-    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
     flattened_calls = flatten_calls(calls)
 
     assert len(flattened_calls) == 50
     assert flattened_calls_to_names(flattened_calls) == [
-        ("llama_index.span.MetadataAwareTextSplitter-parse_nodes", 0),
+        ("llama_index.span.SentenceSplitter-parse_nodes", 0),
         ("llama_index.span.SentenceSplitter.split_text_metadata_aware", 1),
-        ("llama_index.span.Workflow.run", 0),
-        ("llama_index.span.BaseWorkflowAgent.init_run", 1),
-        ("llama_index.span.BaseWorkflowAgent.setup_agent", 1),
-        ("llama_index.span.BaseWorkflowAgent.run_agent_step", 1),
+        ("llama_index.span.FunctionAgent.run", 0),
+        ("llama_index.span.FunctionAgent.init_run", 1),
+        ("llama_index.span.FunctionAgent.setup_agent", 1),
+        ("llama_index.span.FunctionAgent.run_agent_step", 1),
         ("llama_index.span.OpenAI-prepare_chat_with_tools", 2),
         ("llama_index.span.OpenAI.astream_chat", 2),
         ("llama_index.event.LLMChat", 3),
         ("llama_index.event.LLMChatInProgress", 4),
         ("openai.chat.completions.create", 5),
-        ("llama_index.span.BaseWorkflowAgent.parse_agent_output", 1),
-        ("llama_index.span.BaseWorkflowAgent.call_tool", 1),
+        ("llama_index.span.FunctionAgent.parse_agent_output", 1),
+        ("llama_index.span.FunctionAgent.call_tool", 1),
         ("llama_index.span.FunctionTool.acall", 2),
-        ("llama_index.span.BaseQueryEngine.aquery", 3),
+        ("llama_index.span.RetrieverQueryEngine.aquery", 3),
         ("llama_index.event.Query", 4),
         ("llama_index.span.RetrieverQueryEngine-aquery", 4),
-        ("llama_index.span.BaseRetriever.aretrieve", 5),
+        ("llama_index.span.VectorIndexRetriever.aretrieve", 5),
         ("llama_index.event.Retrieval", 6),
         ("llama_index.span.VectorIndexRetriever-aretrieve", 6),
-        ("llama_index.span.BaseEmbedding.aget_query_embedding", 7),
+        ("llama_index.span.OpenAIEmbedding.aget_query_embedding", 7),
         ("llama_index.event.Embedding", 8),
         ("llama_index.span.OpenAIEmbedding-aget_query_embedding", 8),
         ("openai.embeddings.create", 9),
-        ("llama_index.span.BaseSynthesizer.asynthesize", 5),
+        ("llama_index.span.CompactAndRefine.asynthesize", 5),
         ("llama_index.event.Synthesize", 6),
         ("llama_index.span.CompactAndRefine.aget_response", 6),
         ("llama_index.span.TokenTextSplitter.split_text", 7),
-        ("llama_index.span.Refine.aget_response", 7),
+        ("llama_index.span.CompactAndRefine.aget_response", 7),
         ("llama_index.event.GetResponse", 8),
         ("llama_index.span.TokenTextSplitter.split_text", 8),
-        ("llama_index.span.LLM.apredict", 8),
+        ("llama_index.span.OpenAI.apredict", 8),
         ("llama_index.event.LLMPredict", 9),
         ("llama_index.span.OpenAI.achat", 9),
         ("llama_index.event.LLMChat", 10),
         ("openai.chat.completions.create", 11),
-        ("llama_index.span.BaseWorkflowAgent.call_tool", 1),
+        ("llama_index.span.FunctionAgent.call_tool", 1),
         ("llama_index.span.FunctionTool.acall", 2),
-        ("llama_index.span.BaseWorkflowAgent.aggregate_tool_results", 1),
-        ("llama_index.span.BaseWorkflowAgent.aggregate_tool_results", 1),
-        ("llama_index.span.BaseWorkflowAgent.setup_agent", 1),
-        ("llama_index.span.BaseWorkflowAgent.run_agent_step", 1),
+        ("llama_index.span.FunctionAgent.aggregate_tool_results", 1),
+        ("llama_index.span.FunctionAgent.aggregate_tool_results", 1),
+        ("llama_index.span.FunctionAgent.setup_agent", 1),
+        ("llama_index.span.FunctionAgent.run_agent_step", 1),
         ("llama_index.span.OpenAI-prepare_chat_with_tools", 2),
         ("llama_index.span.OpenAI.astream_chat", 2),
         ("llama_index.event.LLMChat", 3),
         ("llama_index.event.LLMChatInProgress", 4),
         ("openai.chat.completions.create", 5),
-        ("llama_index.span.BaseWorkflowAgent.parse_agent_output", 1),
-        ("llama_index.span.Workflow-done", 1),
+        ("llama_index.span.FunctionAgent.parse_agent_output", 1),
+        ("llama_index.span.FunctionAgent-done", 1),
         ("llama_index.event.SpanDrop", 2),
     ]

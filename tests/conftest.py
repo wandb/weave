@@ -231,7 +231,7 @@ class InMemoryWeaveLogCollector(logging.Handler):
             )
             # Exclude legacy
             and not record.name.startswith("weave.weave_server")
-            and not "legacy" in record.name
+            and "legacy" not in record.name
         ]
 
     def get_error_logs(self):

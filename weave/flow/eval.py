@@ -233,10 +233,10 @@ class Evaluation(Object):
 
         n_complete = 0
         dataset = self.dataset
-        _rows = dataset.rows
-        num_rows = len(_rows) * self.trials
+        rows = dataset.rows
+        num_rows = len(rows) * self.trials
 
-        trial_rows = chain.from_iterable(repeat(_rows, self.trials))
+        trial_rows = chain.from_iterable(repeat(rows, self.trials))
         async for index, _example, eval_row in util.async_foreach(
             trial_rows, eval_example, get_weave_parallelism()
         ):

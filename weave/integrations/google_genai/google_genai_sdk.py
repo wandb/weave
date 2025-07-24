@@ -40,7 +40,7 @@ def get_google_genai_patcher(
 
     base = settings.op_settings
 
-    _google_genai_patcher = MultiPatcher(
+    google_genai_patcher = MultiPatcher(
         [
             get_google_genai_symbol_patcher(
                 "google.genai.models",
@@ -105,4 +105,4 @@ def get_google_genai_patcher(
         ]
     )
 
-    return _google_genai_patcher
+    return google_genai_patcher
