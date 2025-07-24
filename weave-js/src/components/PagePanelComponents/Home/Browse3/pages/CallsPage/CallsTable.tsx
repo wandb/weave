@@ -43,10 +43,12 @@ import {RemovableTag} from '../../../../../Tag';
 import {RemoveAction} from '../../../../../Tag/RemoveAction';
 import {TailwindContents} from '../../../../../Tailwind';
 import {TableRowSelectionContext} from '../../../TableRowSelectionContext';
+import {CallsCharts} from '../../charts/CallsCharts';
 import {
   useWeaveflowCurrentRouteContext,
   WeaveflowPeekContext,
 } from '../../context';
+import {usePeekLocation} from '../../context';
 import {AddToDatasetDrawer} from '../../datasets/AddToDatasetDrawer';
 import {
   convertFeedbackFieldToBackendFilter,
@@ -68,7 +70,6 @@ import {traceCallToUICallSchema} from '../wfReactInterface/tsDataModelHooks';
 import {EXPANDED_REF_REF_KEY} from '../wfReactInterface/tsDataModelHooksCallRefExpansion';
 import {objectVersionNiceString} from '../wfReactInterface/utilities';
 import {CallSchema} from '../wfReactInterface/wfDataModelHooksInterface';
-import {CallsCharts} from './CallsCharts';
 import {CallsCustomColumnMenu} from './CallsCustomColumnMenu';
 import {
   BulkAddToDatasetButton,
@@ -94,8 +95,17 @@ import {useCurrentFilterIsEvaluationsFilter} from './evaluationsFilter';
 import {ManageColumnsButton} from './ManageColumnsButton';
 import {OpSelector} from './OpSelector';
 import {ParentFilterTag} from './ParentFilterTag';
+import {ResizableHandle} from './ResizableHandle';
 
 const MAX_SELECT = 100;
+
+const TABLE_MIN_WIDTH_PX = 200; // Minimum width for the table section
+const CHARTS_MIN_WIDTH_PX = 400; // Minimum width for the charts section
+const RESIZABLE_HANDLE_MAX_WIDTH_OFFSET_PX = 200; // How much space to leave on the right for charts
+const SPLIT_VIEW_CONTAINER_MIN_HEIGHT_PX = 400; // Minimum height for the split view container
+const SPLIT_VIEW_CONTAINER_HEIGHT_OFFSET_PX = 160; // Height offset for the split view container
+const DEFAULT_CHARTS_WIDTH_PX = 500; // Default charts width when peek is closed
+const DEFAULT_TABLE_WIDTH_WHEN_PEEK_OPEN_PX = 340; // Default table width when peek is open
 
 export const DEFAULT_HIDDEN_COLUMN_PREFIXES = [
   'attributes.weave',
@@ -582,6 +592,10 @@ export const CallsTable: FC<{
     [setFilter, filter]
   );
 
+  // Detect peek drawer state to flip proportions
+  const peekLocation = usePeekLocation();
+  const isPeekOpen = peekLocation != null;
+
   // DataGrid Model Management
   const pinModelResolved = pinModel ?? DEFAULT_PIN_CALLS;
 
@@ -632,9 +646,27 @@ export const CallsTable: FC<{
   );
 
   const columnVisibilityModel = useMemo(() => {
+    // Always use the default column visibility behavior, regardless of metrics state
     if (!columnVisibilityModelProp) {
       return undefined;
     }
+
+    // When peek drawer is open and metrics are showing, only show the trace column and checkbox
+    if (isPeekOpen && isMetricsChecked) {
+      const visibilityModel: Record<string, boolean> = {};
+      columns.cols.forEach(col => {
+        if (
+          col.field === 'summary.weave.trace_name' ||
+          col.field === 'CustomCheckbox'
+        ) {
+          visibilityModel[col.field] = true;
+        } else {
+          visibilityModel[col.field] = false;
+        }
+      });
+      return visibilityModel;
+    }
+
     const hiddenColumns: string[] = [];
     for (const hiddenColPrefix of DEFAULT_HIDDEN_COLUMN_PREFIXES) {
       const cols = columns.cols.filter(col =>
@@ -655,13 +687,47 @@ export const CallsTable: FC<{
       ...columnVisibilityModelProp,
       ...hiddenColumnVisibilityFalse,
     };
-  }, [columns.cols, columnVisibilityModelProp]);
+  }, [columns.cols, columnVisibilityModelProp, isPeekOpen, isMetricsChecked]);
 
   // Selection Management
   const [selectedCalls, setSelectedCalls] = useState<string[]>([]);
   const clearSelectedCalls = useCallback(() => {
     setSelectedCalls([]);
   }, [setSelectedCalls]);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Calculate initial table width based on peek drawer state
+  const getInitialTableWidth = useCallback(() => {
+    if (isPeekOpen) {
+      return DEFAULT_TABLE_WIDTH_WHEN_PEEK_OPEN_PX;
+    }
+    // When peek is closed, we want charts to be ~300px, so table takes the rest
+    // Start with a reasonable default - will be adjusted by the effect below
+    return Math.max(600, 1200 - DEFAULT_CHARTS_WIDTH_PX - 50); // Assume ~1200px container initially
+  }, [isPeekOpen]);
+
+  const [tableWidthPx, setTableWidthPx] = useState(() =>
+    getInitialTableWidth()
+  );
+
+  // Update table width when peek drawer state changes
+  useEffect(() => {
+    if (containerRef.current && isMetricsChecked) {
+      const containerWidth = containerRef.current.clientWidth;
+      if (isPeekOpen) {
+        // When peek is open, set table to ~300px
+        setTableWidthPx(DEFAULT_TABLE_WIDTH_WHEN_PEEK_OPEN_PX);
+      } else {
+        // When peek is closed, give charts ~300px, table gets the rest
+        const newTableWidth = Math.max(
+          TABLE_MIN_WIDTH_PX,
+          containerWidth - DEFAULT_CHARTS_WIDTH_PX - 20 // 20px for handle/margins
+        );
+        setTableWidthPx(newTableWidth);
+      }
+    }
+  }, [isPeekOpen, isMetricsChecked]);
 
   // Clear selections when switching table types
   useEffect(() => {
@@ -739,10 +805,24 @@ export const CallsTable: FC<{
           );
         },
       },
-      ...columns.cols,
+      ...columns.cols.map(col => {
+        // When peek drawer is open and metrics are showing, make the trace column take full width
+        if (
+          isPeekOpen &&
+          isMetricsChecked &&
+          col.field === 'summary.weave.trace_name'
+        ) {
+          return {
+            ...col,
+            flex: 1,
+            minWidth: 250,
+          };
+        }
+        return col;
+      }),
     ];
     return cols;
-  }, [columns.cols, selectedCalls, tableData]);
+  }, [columns.cols, selectedCalls, tableData, isPeekOpen, isMetricsChecked]);
 
   // MUI data grid is unhappy if you pass it a sort model
   // that references columns that aren't in the grid - it triggers an
@@ -789,11 +869,6 @@ export const CallsTable: FC<{
   const [addToDatasetModalOpen, setAddToDatasetModalOpen] = useState(false);
 
   // Called in reaction to Hide column menu
-  const onColumnVisibilityModelChange = setColumnVisibilityModel
-    ? (newModel: GridColumnVisibilityModel) => {
-        setColumnVisibilityModel(newModel);
-      }
-    : undefined;
 
   const onPinnedColumnsChange = useCallback(
     (newModel: GridPinnedColumnFields) => {
@@ -880,6 +955,85 @@ export const CallsTable: FC<{
     project,
   ]);
 
+  // Common StyledDataGrid configuration
+  const dataGridProps = {
+    // Start Column Menu
+    // ColumnMenu is needed to support pinning and column visibility
+    disableColumnMenu: false,
+    // ColumnFilter is definitely useful
+    disableColumnFilter: true,
+    disableMultipleColumnsFiltering: false,
+    // ColumnPinning seems to be required in DataGridPro, else it crashes.
+    // However, in this case it is also useful.
+    disableColumnPinning: false,
+    // ColumnReorder is definitely useful
+    // TODO (Tim): This needs to be managed externally (making column
+    // ordering a controlled property) This is a "regression" from the calls
+    // table refactor
+    disableColumnReorder: true,
+    // ColumnResize is definitely useful
+    disableColumnResize: false,
+    // ColumnSelector is definitely useful
+    disableColumnSelector: false,
+    disableMultipleColumnsSorting: true,
+    // End Column Menu
+    columnHeaderHeight: 40,
+    apiRef,
+    loading: callsLoading,
+    rows: tableData,
+    // initialState={initialState}
+    onColumnVisibilityModelChange: setColumnVisibilityModel
+      ? (newModel: GridColumnVisibilityModel) => {
+          setColumnVisibilityModel(newModel);
+        }
+      : undefined,
+    columnVisibilityModel,
+    // SORT SECTION START
+    sortingMode: 'server' as const,
+    sortModel: sortModelFiltered,
+    onSortModelChange,
+    // SORT SECTION END
+    // PAGINATION SECTION START
+    pagination: true,
+    rowCount: calls.primaryError ? 0 : callsTotal,
+    paginationMode: 'server' as const,
+    paginationModel,
+    onPaginationModelChange,
+    // PAGINATION SECTION END
+    rowHeight: 38,
+    columns: muiColumns,
+    disableRowSelectionOnClick: true,
+    rowSelectionModel,
+    // columnGroupingModel={groupingModel}
+    columnGroupingModel: columns.colGroupingModel,
+    hideFooter: !callsLoading && callsTotal === 0,
+    hideFooterSelectedRowCount: true,
+    onColumnWidthChange: (newCol: any) => {
+      setUserDefinedColumnWidths(curr => {
+        return {
+          ...curr,
+          [newCol.colDef.field]: newCol.colDef.computedWidth,
+        };
+      });
+    },
+    pinnedColumns: pinModelResolved,
+    onPinnedColumnsChange,
+    slots: {
+      noRowsOverlay,
+      columnMenu: CallsCustomColumnMenu,
+      pagination: () => <PaginationButtons hideControls={hideControls} />,
+      columnMenuSortDescendingIcon: IconSortDescending,
+      columnMenuSortAscendingIcon: IconSortAscending,
+      columnMenuHideIcon: IconNotVisible,
+      columnMenuPinLeftIcon: () => (
+        <IconPinToRight style={{transform: 'scaleX(-1)'}} />
+      ),
+      columnMenuPinRightIcon: IconPinToRight,
+      loadingOverlay: CustomLoadingOverlay,
+    },
+    className: 'tw-style',
+  };
+
   // CPR (Tim) - (GeneralRefactoring): Pull out different inline-properties and create them above
   return (
     <FilterLayoutTemplate
@@ -896,15 +1050,17 @@ export const CallsTable: FC<{
                 onClick={() => calls.refetch()}
                 disabled={callsLoading}
               />
-              {columnVisibilityModel && setColumnVisibilityModel && (
-                <div className="flex-none">
-                  <ManageColumnsButton
-                    columnInfo={columns}
-                    columnVisibilityModel={columnVisibilityModel}
-                    setColumnVisibilityModel={setColumnVisibilityModel}
-                  />
-                </div>
-              )}
+              {columnVisibilityModel &&
+                setColumnVisibilityModel &&
+                !(isPeekOpen && isMetricsChecked) && (
+                  <div className="flex-none">
+                    <ManageColumnsButton
+                      columnInfo={columns}
+                      columnVisibilityModel={columnVisibilityModel}
+                      setColumnVisibilityModel={setColumnVisibilityModel}
+                    />
+                  </div>
+                )}
               {!hideOpSelector && (
                 <OpSelector
                   frozenFilter={frozenFilter}
@@ -1085,99 +1241,90 @@ export const CallsTable: FC<{
           </div>
         </TailwindContents>
       }>
-      {isMetricsChecked && (
-        <CallsCharts
-          entity={entity}
-          project={project}
-          filter={filter}
-          filterModelProp={filterModelResolved}
+      {isMetricsChecked ? (
+        <div
+          ref={containerRef}
+          style={{
+            display: 'flex',
+            height: `calc(100vh - ${SPLIT_VIEW_CONTAINER_HEIGHT_OFFSET_PX}px)`,
+            minHeight: `${SPLIT_VIEW_CONTAINER_MIN_HEIGHT_PX}px`,
+            width: '100%',
+            gap: '0px',
+            position: 'relative',
+            maxWidth: '100%',
+            boxSizing: 'border-box',
+          }}>
+          <div
+            style={{
+              width: `${tableWidthPx}px`,
+              minWidth: `${TABLE_MIN_WIDTH_PX}px`,
+              height: '100%',
+              overflow: 'hidden',
+              flexShrink: 0,
+              flexGrow: 0,
+              boxSizing: 'border-box',
+            }}>
+            <StyledDataGrid
+              {...dataGridProps}
+              sx={{
+                borderRadius: 0,
+                height: '100%',
+                width: '100% !important',
+                maxWidth: 'none !important',
+                minWidth: `${TABLE_MIN_WIDTH_PX}px !important`,
+                overflow: 'hidden',
+                '& .MuiDataGrid-virtualScroller': {
+                  overflowX: 'auto',
+                },
+                // This moves the pagination controls to the left
+                '& .MuiDataGrid-footerContainer': {
+                  justifyContent: 'flex-start',
+                },
+                '& .MuiDataGrid-main:focus-visible': {
+                  outline: 'none',
+                },
+              }}
+            />
+          </div>
+          <ResizableHandle
+            containerRef={containerRef}
+            onWidthChange={setTableWidthPx}
+            minWidth={TABLE_MIN_WIDTH_PX}
+            maxWidthOffset={RESIZABLE_HANDLE_MAX_WIDTH_OFFSET_PX}
+          />
+          <div
+            style={{
+              flex: '1',
+              minWidth: `${CHARTS_MIN_WIDTH_PX}px`,
+              height: '100%',
+              overflowX: 'hidden',
+              overflowY: 'auto',
+              borderTop: '1px solid rgba(224, 224, 224, 1)',
+            }}>
+            <CallsCharts
+              entity={entity}
+              project={project}
+              filter={filter}
+              filterModelProp={filterModelResolved}
+              sortModel={sortModelResolved}
+            />
+          </div>
+        </div>
+      ) : (
+        <StyledDataGrid
+          {...dataGridProps}
+          sx={{
+            borderRadius: 0,
+            // This moves the pagination controls to the left
+            '& .MuiDataGrid-footerContainer': {
+              justifyContent: 'flex-start',
+            },
+            '& .MuiDataGrid-main:focus-visible': {
+              outline: 'none',
+            },
+          }}
         />
       )}
-      <StyledDataGrid
-        // Start Column Menu
-        // ColumnMenu is needed to support pinning and column visibility
-        disableColumnMenu={false}
-        // ColumnFilter is definitely useful
-        disableColumnFilter={true}
-        disableMultipleColumnsFiltering={false}
-        // ColumnPinning seems to be required in DataGridPro, else it crashes.
-        // However, in this case it is also useful.
-        disableColumnPinning={false}
-        // ColumnReorder is definitely useful
-        // TODO (Tim): This needs to be managed externally (making column
-        // ordering a controlled property) This is a "regression" from the calls
-        // table refactor
-        disableColumnReorder={true}
-        // ColumnResize is definitely useful
-        disableColumnResize={false}
-        // ColumnSelector is definitely useful
-        disableColumnSelector={false}
-        disableMultipleColumnsSorting={true}
-        // End Column Menu
-        columnHeaderHeight={40}
-        apiRef={apiRef}
-        loading={callsLoading}
-        rows={tableData}
-        // initialState={initialState}
-        onColumnVisibilityModelChange={onColumnVisibilityModelChange}
-        columnVisibilityModel={columnVisibilityModel}
-        // SORT SECTION START
-        sortingMode="server"
-        sortModel={sortModelFiltered}
-        onSortModelChange={onSortModelChange}
-        // SORT SECTION END
-        // PAGINATION SECTION START
-        pagination
-        rowCount={calls.primaryError ? 0 : callsTotal}
-        paginationMode="server"
-        paginationModel={paginationModel}
-        onPaginationModelChange={onPaginationModelChange}
-        // PAGINATION SECTION END
-        rowHeight={38}
-        columns={muiColumns}
-        disableRowSelectionOnClick
-        rowSelectionModel={rowSelectionModel}
-        // columnGroupingModel={groupingModel}
-        columnGroupingModel={columns.colGroupingModel}
-        hideFooter={!callsLoading && callsTotal === 0}
-        hideFooterSelectedRowCount
-        onColumnWidthChange={newCol => {
-          setUserDefinedColumnWidths(curr => {
-            return {
-              ...curr,
-              [newCol.colDef.field]: newCol.colDef.computedWidth,
-            };
-          });
-        }}
-        pinnedColumns={pinModelResolved}
-        onPinnedColumnsChange={onPinnedColumnsChange}
-        sx={{
-          borderRadius: 0,
-          // This moves the pagination controls to the left
-          '& .MuiDataGrid-footerContainer': {
-            justifyContent: 'flex-start',
-          },
-          '& .MuiDataGrid-main:focus-visible': {
-            outline: 'none',
-          },
-        }}
-        slots={{
-          noRowsOverlay,
-          columnMenu: CallsCustomColumnMenu,
-          pagination: () => <PaginationButtons hideControls={hideControls} />,
-          columnMenuSortDescendingIcon: IconSortDescending,
-          columnMenuSortAscendingIcon: IconSortAscending,
-          columnMenuHideIcon: IconNotVisible,
-          columnMenuPinLeftIcon: () => (
-            <IconPinToRight style={{transform: 'scaleX(-1)'}} />
-          ),
-          columnMenuPinRightIcon: IconPinToRight,
-          loadingOverlay: () => (
-            <CustomLoadingOverlay hideControls={hideControls} />
-          ),
-        }}
-        className="tw-style"
-      />
     </FilterLayoutTemplate>
   );
 };

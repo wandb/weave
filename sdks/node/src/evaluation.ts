@@ -152,7 +152,7 @@ export class Evaluation<
     this.evaluate = op(this, this.evaluate, {
       parameterNames: 'useParam0Object',
       callDisplayName: inputs =>
-        `${this.id}_${weaveCallableName(inputs.model)}`,
+        `${this.name}_${weaveCallableName(inputs.model)}`,
     });
     this.predictAndScore = op(this, this.predictAndScore, {
       parameterNames: 'useParam0Object',

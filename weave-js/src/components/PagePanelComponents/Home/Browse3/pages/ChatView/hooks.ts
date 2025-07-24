@@ -191,11 +191,10 @@ export const normalizeChatRequest = (request: any): ChatRequest => {
   if (isTraceCallChatFormatOAIResponsesRequest(request)) {
     return normalizeOAIResponsesRequest(request);
   }
-  if (isAnthropicCompletionFormat(request)) {
-    return normalizeAnthropicChatRequest(request);
-  }
+  // Anthropic is close but system and nested tool calls handled differently
+  const chatRequest = normalizeAnthropicChatRequest(request) as ChatRequest;
 
-  const validMessages = request.messages.every((msg: any) => {
+  const validMessages = chatRequest.messages.every((msg: any) => {
     return hasStringProp(msg, 'role');
   });
 
@@ -204,7 +203,7 @@ export const normalizeChatRequest = (request: any): ChatRequest => {
     throw new Error('Invalid message format. Messages missing role');
   }
 
-  return request as ChatRequest;
+  return chatRequest;
 };
 
 export const useCallAsChat = (

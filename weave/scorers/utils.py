@@ -1,4 +1,5 @@
 import json
+import os
 from importlib.util import find_spec
 from pathlib import Path
 from typing import Any, Optional, Union
@@ -9,7 +10,7 @@ from weave.scorers.default_models import MODEL_PATHS
 from weave.trace.settings import scorers_dir
 
 
-def download_model(artifact_path: Union[str, Path]) -> Path:
+def download_model_from_wandb(artifact_path: Union[str, Path]) -> Path:
     try:
         from wandb import Api
     except ImportError:
@@ -65,32 +66,67 @@ def ensure_hf_imports() -> None:
         )
 
 
-def load_hf_model_weights(
-    model_name_or_path: str, default_model: Optional[str] = None
-) -> str:
-    """Load the local model weights for a Hugging Face model.
-
-    If model_name_or_path is a directory, it is assumed to be the local model weights path.
-    If model_name_or_path is provided (non-empty), it is used to download the model using the existing download_model function.
-    If no model_name_or_path is provided, and a default_model is supplied, it downloads the default model.
+def download_model_from_huggingface_hub(model_name: str) -> str:
+    """
+    Download a model from the Hugging Face Hub to a specified directory.
 
     Args:
-        model_name_or_path (str): The path or name of the model.
-        default_model (str, optional): The default model artifact to use if model_name_or_path is empty.
+        model_name (str): The name of the model on Hugging Face Hub.
+        local_dir (str or Path, optional): Directory to download the model to. Defaults to scorers_dir()/model_name.
 
     Returns:
-        str: The local model weights path.
+        str: Path to the downloaded model directory.
+    """
+    from huggingface_hub import snapshot_download
+
+    model_dir_name = model_name.split("/")[-1].replace(":", "_")
+    local_dir = Path(scorers_dir()) / model_dir_name
+    return snapshot_download(model_name, local_dir=str(local_dir))
+
+
+def _resolve_model_path(
+    model_name_or_path: str = "", default_model: Optional[str] = None
+) -> str:
+    """Dispatcher to resolve a model path from various sources.
+
+    Resolution priority:
+    1. A default model from Hugging Face Hub, if `default_model` is provided.
+    2. A local directory path, if `model_name_or_path` is a valid directory.
+    3. A model from W&B Artifacts, if `model_name_or_path` is provided.
+
+    Returns:
+        str: The local path to the downloaded model weights.
 
     Raises:
         ValueError: If neither a model_name_or_path nor a default_model is provided.
     """
-    import os
+    if default_model:
+        return str(download_model_from_huggingface_hub(default_model))
 
-    if os.path.isdir(model_name_or_path):
-        return model_name_or_path
-    elif model_name_or_path:
-        return str(download_model(model_name_or_path))
-    elif default_model:
-        return str(download_model(default_model))
-    else:
-        raise ValueError("No model path provided and no default model available.")
+    if model_name_or_path:
+        if os.path.isdir(model_name_or_path):
+            return model_name_or_path
+        return str(download_model_from_wandb(model_name_or_path))
+
+    raise ValueError(
+        "No model_name_or_path or no default_model provided, please set one of the two."
+    )
+
+
+def load_local_model_weights(
+    model_name_or_path: str = "", default_model: Optional[str] = None
+) -> str:
+    """Resolves the path to a model, downloading it if necessary.
+
+    Args:
+        model_name_or_path (str, optional): The path to a local model directory
+            or the name of a model in W&B Artifacts. Defaults to "".
+        default_model (str, optional): The name of a default Weave local model on the Hugging Face Hub.
+            Defaults to None.
+
+    Returns:
+        str: The local path to the model weights.
+    """
+    return _resolve_model_path(
+        model_name_or_path=model_name_or_path, default_model=default_model
+    )

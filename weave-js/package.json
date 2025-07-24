@@ -93,6 +93,7 @@
     "lodash": "^4.17.21",
     "lru-cache": "5.1.1",
     "mdast-util-to-string": "^1.1.0",
+    "memize": "2.1.0",
     "memoize-one": "^6.0.0",
     "moment": "^2.29.3",
     "monaco-editor": "^0.29.1",
@@ -135,6 +136,7 @@
     "react-vega": "^7.4.1",
     "react-virtualized": "^9.10.1",
     "react-virtualized-auto-sizer": "^1.0.6",
+    "react-vis": "^1.12.1",
     "redux": "^4.0.1",
     "rehype-katex": "^2.0.0",
     "rehype-raw": "^6.1.1",
@@ -168,7 +170,7 @@
     "web-tree-sitter": "^0.20.5",
     "yet-another-react-lightbox": "^3.17.5",
     "zen-observable": "^0.10.0",
-    "zod": "^3.23.8"
+    "zod": "^3.25.71"
   },
   "devDependencies": {
     "@babel/core": "^7.23.2",
@@ -209,6 +211,7 @@
     "@types/react-timeago": "^4.1.0",
     "@types/react-virtualized": "^9.21.8",
     "@types/react-virtualized-auto-sizer": "^1.0.0",
+    "@types/react-vis": "^1.11.15",
     "@types/safe-json-stringify": "^1.1.2",
     "@types/styled-components": "^5.1.26",
     "@types/wavesurfer.js": "^2.0.0",

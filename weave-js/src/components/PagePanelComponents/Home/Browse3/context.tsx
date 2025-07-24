@@ -218,6 +218,13 @@ export const browse2Context = {
   ) => {
     throw new Error('Not implemented');
   },
+
+  threadsUIUrl: (entityName: string, projectName: string) => {
+    throw new Error('Not implemented');
+  },
+  threadUIUrl: (entityName: string, projectName: string, threadId: string) => {
+    throw new Error('Not implemented');
+  },
 };
 
 export const browse3ContextGen = (
@@ -488,6 +495,16 @@ export const browse3ContextGen = (
         .join('&');
       return `${projectRoot(entityName, projectName)}/compare?${params}`;
     },
+    threadsUIUrl: (entityName: string, projectName: string) => {
+      return `${projectRoot(entityName, projectName)}/threads`;
+    },
+    threadUIUrl: (
+      entityName: string,
+      projectName: string,
+      threadId: string
+    ) => {
+      return `${projectRoot(entityName, projectName)}/threads/${threadId}`;
+    },
   };
   return browse3Context;
 };
@@ -587,6 +604,12 @@ type RouteType = {
     entityName: string,
     projectName: string,
     objectSpecifiers: string[]
+  ) => string;
+  threadsUIUrl: (entityName: string, projectName: string) => string;
+  threadUIUrl: (
+    entityName: string,
+    projectName: string,
+    threadId: string
   ) => string;
 };
 
@@ -719,6 +742,12 @@ const useMakePeekingRouter = (): RouteType => {
     ) => {
       return setSearchParam(PEEK_PARAM, baseContext.compareObjectsUri(...args));
     },
+    threadsUIUrl: (...args: Parameters<typeof baseContext.threadsUIUrl>) => {
+      throw new Error('Threads list not available in peek mode');
+    },
+    threadUIUrl: (...args: Parameters<typeof baseContext.threadUIUrl>) => {
+      return setSearchParam(PEEK_PARAM, baseContext.threadUIUrl(...args));
+    },
   };
 };
 
@@ -732,6 +761,8 @@ const WeaveflowRouteContext = createContext<{
 
 export const WeaveflowPeekContext = createContext<{
   isPeeking?: boolean;
+  previousUrl?: string;
+  setPreviousUrl?: (url: string) => void;
 }>({
   isPeeking: false,
 });
@@ -745,6 +776,26 @@ export const useClosePeek = () => {
       history.replace({
         search: queryParams.toString(),
       });
+    }
+  };
+};
+
+export const useBackNavigation = () => {
+  const history = useHistory();
+  const {previousUrl} = useContext(WeaveflowPeekContext);
+
+  return () => {
+    if (previousUrl) {
+      history.push(previousUrl);
+    } else {
+      // Fallback to closing peek if no previous URL
+      const queryParams = new URLSearchParams(history.location.search);
+      if (queryParams.has(PEEK_PARAM)) {
+        queryParams.delete(PEEK_PARAM);
+        history.replace({
+          search: queryParams.toString(),
+        });
+      }
     }
   };
 };

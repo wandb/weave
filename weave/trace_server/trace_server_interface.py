@@ -363,6 +363,8 @@ class CompletionsCreateRes(BaseModel):
 
 
 class CallsFilter(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     op_names: Optional[list[str]] = None
     input_refs: Optional[list[str]] = None
     output_refs: Optional[list[str]] = None
@@ -377,6 +379,8 @@ class CallsFilter(BaseModel):
 
 
 class SortBy(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     # Field should be a key of `CallSchema`. For dictionary fields
     # (`attributes`, `inputs`, `outputs`, `summary`), the field can be
     # dot-separated.
@@ -417,11 +421,31 @@ class CallsQueryReq(BaseModel):
     # TODO: type this with call schema columns, following the same rules as
     # SortBy and thus GetFieldOperator.get_field_ (without direction)
     columns: Optional[list[str]] = None
-    # columns to expand, i.e. refs to other objects, can be nested
+
+    # Columns to expand, i.e. refs to other objects, can be nested
+    # Also used to provide a list of refs to expand when filtering or sorting.
+    # Requests to filter or order calls by sub fields in columns that have
+    # refs in their path must provide paths to all refs in the expand_columns.
+    # When filtering and ordering, expand_columns can include paths to objects
+    # that are stored in the table_rows table.
+    # TODO: support expand_columns for refs to objects in table_rows (dataset rows)
     expand_columns: Optional[list[str]] = Field(
         default=None,
         examples=[["inputs.self.message", "inputs.model.prompt"]],
         description="Columns to expand, i.e. refs to other objects",
+    )
+    # Controls whether or not to return expanded ref columns. In most clients,
+    # refs are resolved recursively by making additional api calls, either for
+    # performance or convenience reasons. In that case, we do not want to return
+    # resolved refs. However, expand_columns still must contain paths to all
+    # refs when filtering or sorting. Set this value to false to filter/order
+    # by refs but rely on client methods for actually resolving the values. The
+    # default is to resolve and return expanded values when expand_columns is set.
+    return_expanded_column_values: Optional[bool] = Field(
+        default=True,
+        description="If true, the response will include raw values for expanded columns. "
+        "If false, the response expand_columns will only be used for filtering and ordering. "
+        "This is useful for clients that want to resolve refs themselves, e.g. for performance reasons.",
     )
 
 
@@ -435,6 +459,14 @@ class CallsQueryStatsReq(BaseModel):
     query: Optional[Query] = None
     limit: Optional[int] = None
     include_total_storage_size: Optional[bool] = False
+    # List of columns that include refs to objects or table rows that require
+    # expansion during filtering or ordering. Required when filtering
+    # on reffed fields.
+    expand_columns: Optional[list[str]] = Field(
+        default=None,
+        examples=[["inputs.self.message", "inputs.model.prompt"]],
+        description="Columns with refs to objects or table rows that require expansion during filtering or ordering.",
+    )
 
 
 class CallsQueryStatsRes(BaseModel):
@@ -691,7 +723,7 @@ class TableUpdateRes(BaseModel):
     # As a result, we might have servers in the wild that
     # do not support this field. Therefore, we want to ensure
     # that clients expecting this field will not break when
-    # they are targetting an older server. We should remove
+    # they are targeting an older server. We should remove
     # this default factory once we are sure that all servers
     # have been updated to support this field.
     updated_row_digests: list[str] = Field(
@@ -713,7 +745,7 @@ class TableCreateRes(BaseModel):
     # As a result, we might have servers in the wild that
     # do not support this field. Therefore, we want to ensure
     # that clients expecting this field will not break when
-    # they are targetting an older server. We should remove
+    # they are targeting an older server. We should remove
     # this default factory once we are sure that all servers
     # have been updated to support this field.
     row_digests: list[str] = Field(
@@ -1079,6 +1111,11 @@ class ThreadsQueryFilter(BaseModel):
         description="Only include threads with last_updated before this timestamp",
         examples=["2024-12-31T23:59:59Z"],
     )
+    thread_ids: Optional[list[str]] = Field(
+        default=None,
+        description="Only include threads with thread_ids in this list",
+        examples=[["thread_1", "thread_2", "my_thread_id"]],
+    )
 
 
 class ThreadsQueryReq(BaseModel):
@@ -1106,6 +1143,54 @@ class ThreadsQueryReq(BaseModel):
         description="Sorting criteria for the threads. Supported fields: 'thread_id', 'turn_count', 'start_time', 'last_updated', 'p50_turn_duration_ms', 'p99_turn_duration_ms'.",
         examples=[[SortBy(field="last_updated", direction="desc")]],
     )
+
+
+class EvaluateModelReq(BaseModel):
+    project_id: str
+    evaluation_ref: str
+    model_ref: str
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    # Fixes the following warning:
+    # UserWarning: Field "model_ref" has conflict with protected namespace "model_".
+    model_config = ConfigDict(protected_namespaces=())
+
+
+class EvaluateModelRes(BaseModel):
+    call_id: str
+
+
+class EvaluationStatusReq(BaseModel):
+    project_id: str
+    call_id: str
+
+
+class EvaluationStatusNotFound(BaseModel):
+    code: Literal["not_found"] = "not_found"
+
+
+class EvaluationStatusRunning(BaseModel):
+    code: Literal["running"] = "running"
+    completed_rows: int
+    total_rows: int
+
+
+class EvaluationStatusFailed(BaseModel):
+    code: Literal["failed"] = "failed"
+    error: Optional[str] = None
+
+
+class EvaluationStatusComplete(BaseModel):
+    code: Literal["complete"] = "complete"
+    output: Optional[Any] = None
+
+
+class EvaluationStatusRes(BaseModel):
+    status: Union[
+        EvaluationStatusNotFound,
+        EvaluationStatusRunning,
+        EvaluationStatusFailed,
+        EvaluationStatusComplete,
+    ]
 
 
 class TraceServerInterface(Protocol):
@@ -1189,3 +1274,7 @@ class TraceServerInterface(Protocol):
 
     # Thread API
     def threads_query_stream(self, req: ThreadsQueryReq) -> Iterator[ThreadSchema]: ...
+
+    # Evaluation API
+    def evaluate_model(self, req: EvaluateModelReq) -> EvaluateModelRes: ...
+    def evaluation_status(self, req: EvaluationStatusReq) -> EvaluationStatusRes: ...

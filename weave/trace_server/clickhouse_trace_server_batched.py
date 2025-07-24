@@ -101,6 +101,7 @@ from weave.trace_server.llm_completion import (
     lite_llm_completion,
     lite_llm_completion_stream,
 )
+from weave.trace_server.methods.evaluation_status import evaluation_status
 from weave.trace_server.model_providers.model_providers import (
     LLMModelProviderInfo,
     read_model_to_provider_info_map,
@@ -369,10 +370,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             )
         )
         try:
-            _call = next(res)
+            call = next(res)
         except StopIteration:
-            _call = None
-        return tsi.CallReadRes(call=_call)
+            call = None
+        return tsi.CallReadRes(call=call)
 
     def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
         stream = self.calls_query_stream(req)
@@ -457,6 +458,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 "summary_dump",
             ]
 
+        if req.expand_columns is not None:
+            cq.set_expand_columns(req.expand_columns)
         for col in columns:
             cq.add_field(col)
         if req.filter is not None:
@@ -468,18 +471,20 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if req.sort_by is not None:
             for sort_by in req.sort_by:
                 cq.add_order(sort_by.field, sort_by.direction)
+            # If user isn't already sorting by id, add id as secondary sort for consistency
+            if not any(sort_by.field == "id" for sort_by in req.sort_by):
+                cq.add_order("id", "asc")
         else:
+            # Default sorting: started_at with id as secondary sort for consistency
             cq.add_order("started_at", "asc")
+            cq.add_order("id", "asc")
         if req.limit is not None:
             cq.set_limit(req.limit)
         if req.offset is not None:
             cq.set_offset(req.offset)
 
         pb = ParamBuilder()
-        raw_res = self._query_stream(
-            cq.as_sql(pb),
-            pb.get_params(),
-        )
+        raw_res = self._query_stream(cq.as_sql(pb), pb.get_params())
 
         select_columns = [c.field for c in cq.select_fields]
         expand_columns = req.expand_columns or []
@@ -502,7 +507,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         for batch in batch_processor.make_batches(raw_res):
             call_dicts = [row_to_call_schema_dict(row) for row in batch]
-            if expand_columns:
+            if expand_columns and req.return_expanded_column_values:
                 self._expand_call_refs(
                     req.project_id, call_dicts, expand_columns, ref_cache
                 )
@@ -545,7 +550,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 if not isinstance(ref, ri.InternalObjectRef):
                     continue
 
-                refs_to_resolve[(i, col)] = ref
+                refs_to_resolve[i, col] = ref
         return refs_to_resolve
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._expand_call_refs")
@@ -1043,7 +1048,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         pb: ParamBuilder,
         *,
         # using the `sql_safe_*` prefix is a way to signal to the caller
-        # that these strings should have been santized by the caller.
+        # that these strings should have been sanitized by the caller.
         sql_safe_conditions: Optional[list[str]] = None,
         sort_fields: Optional[list[OrderField]] = None,
         limit: Optional[int] = None,
@@ -1189,9 +1194,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # Extract filter values
         after_datetime = None
         before_datetime = None
+        thread_ids = None
         if req.filter is not None:
             after_datetime = req.filter.after_datetime
             before_datetime = req.filter.before_datetime
+            thread_ids = req.filter.thread_ids
 
         # Use the dedicated query builder
         query = make_threads_query(
@@ -1202,6 +1209,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             sort_by=req.sort_by,
             sortable_datetime_after=after_datetime,
             sortable_datetime_before=before_datetime,
+            thread_ids=thread_ids,
         )
 
         # Stream the results using _query_stream
@@ -1651,7 +1659,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             # The general case where this can occur is when there are multiple
             # writes of the same digest AND the effective `FILE_CHUNK_SIZE`
             # of the most recent write is more than the effective `FILE_CHUNK_SIZE`
-            # of any previous write. In that case, you have something like tthe following:
+            # of any previous write. In that case, you have something like the following:
             # Consider a file of size 500 bytes.
             # Insert Batch 1 (chunk_size=100): C0(0-99), C1(100-199), C2(200-299), C3(300-399), C4(400-499)
             # Insert Batch 2 (chunk_size=50): C0(0-49), C1(50-99), C2(100-149), C3(150-199), C4(200-249), C5(250-299), C6(300-349), C7(350-399), C8(400-449), C9(450-499)
@@ -2066,6 +2074,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             self._insert_call, chunk_iter, start_call, model_name, req.project_id
         )
 
+    def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
+        raise NotImplementedError("Evaluate model is not implemented")
+
+    def evaluation_status(
+        self, req: tsi.EvaluationStatusReq
+    ) -> tsi.EvaluationStatusRes:
+        return evaluation_status(self, req)
+
     # Private Methods
     @property
     def ch_client(self) -> CHClient:
@@ -2177,7 +2193,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         object_values: dict[tuple[str, str], Any] = {}
         for row in query_result:
             (object_id, digest, val_dump) = row
-            object_values[(object_id, digest)] = val_dump
+            object_values[object_id, digest] = val_dump
 
         # update the val_dump for each object
         for obj in metadata_result:
@@ -2589,7 +2605,7 @@ def _process_parameters(
 
 
 def get_type(val: Any) -> str:
-    if val == None:
+    if val is None:
         return "none"
     elif isinstance(val, dict):
         if "_type" in val:

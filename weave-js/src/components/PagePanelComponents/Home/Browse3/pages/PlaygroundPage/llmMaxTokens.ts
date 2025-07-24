@@ -1,9 +1,17 @@
 import levenshtein from 'js-levenshtein';
 
+// Type definition for model configuration
+export interface LLMModelConfig {
+  label?: string;
+  provider: string;
+  max_tokens: number;
+  supports_function_calling: boolean;
+}
+
 // This is a mapping of LLM names to their max token limits.
 // Directly from the pycache model_providers.json in trace_server.
 // Some were removed because they are not supported when Josiah tried on Oct 30, 2024.
-export const LLM_MAX_TOKENS = {
+export const LLM_MAX_TOKENS: Record<string, LLMModelConfig> = {
   // CoreWeave hosted models
   'cw_meta-llama_Llama-3.1-8B-Instruct': {
     label: 'Llama 3.1 8B',
@@ -37,6 +45,12 @@ export const LLM_MAX_TOKENS = {
   },
   'cw_microsoft_Phi-4-mini-instruct': {
     label: 'Phi 4 Mini',
+    provider: 'coreweave',
+    max_tokens: 1000,
+    supports_function_calling: false,
+  },
+  'cw_moonshotai_Kimi-K2-Instruct': {
+    label: 'Kimi K2',
     provider: 'coreweave',
     max_tokens: 1000,
     supports_function_calling: false,
@@ -685,6 +699,21 @@ export const LLM_MAX_TOKENS = {
   },
 
   // xAI models
+  'xai/grok-4': {
+    provider: 'xai',
+    max_tokens: 256000,
+    supports_function_calling: true,
+  },
+  'xai/grok-4-0709': {
+    provider: 'xai',
+    max_tokens: 256000,
+    supports_function_calling: true,
+  },
+  'xai/grok-4-latest': {
+    provider: 'xai',
+    max_tokens: 256000,
+    supports_function_calling: true,
+  },
   'xai/grok-3-beta': {
     provider: 'xai',
     max_tokens: 131072,

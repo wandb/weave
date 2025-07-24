@@ -16,16 +16,16 @@ def test_presidio_email_detection(presidio_entity_recognition_guardrail):
     and mark the result as not passing.
     """
     input_text = "My is thomas@gmail.com"
-    result = presidio_entity_recognition_guardrail.score(input_text)
+    result = presidio_entity_recognition_guardrail.score(output=input_text)
 
     # Since an entity is detected, we expect the overall result to fail.
     assert not result.passed, "Expected result to fail when an email is detected."
 
     # Check that the detected entities include the expected email.
     detected_emails = result.metadata["detected_entities"].get("EMAIL_ADDRESS", [])
-    assert (
-        "thomas@gmail.com" in detected_emails
-    ), "Expected to detect 'thomas@gmail.com' as an EMAIL_ADDRESS."
+    assert "thomas@gmail.com" in detected_emails, (
+        "Expected to detect 'thomas@gmail.com' as an EMAIL_ADDRESS."
+    )
 
 
 # A custom recognizer to detect numbers by checking each token's `like_num` attribute.
@@ -64,7 +64,7 @@ def test_presidio_scoring_with_custom_number_recognizer():
     # Create a PresidioScorer with the custom recognizer.
     scorer = PresidioScorer(custom_recognizers=[new_numbers_recognizer])
     input_text = "Roberto lives in Five 10 Broad st."
-    result = scorer.score(input_text)
+    result = scorer.score(output=input_text)
 
     # Check that the custom recognizer detected numbers.
     detected_numbers = result.metadata["detected_entities"].get("NUMBER", [])
