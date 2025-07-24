@@ -121,7 +121,7 @@ def get_mime_and_extension(
     if buffer and len(buffer) == 0:
         buffer = None
 
-    if extension is not None:
+    if extension is not None and len(extension) > 0:
         extension = f".{extension.lstrip('.')}"
     if mimetype and extension:
         return mimetype, extension
