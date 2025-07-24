@@ -14,10 +14,21 @@ Environment:
  - A local uvicorn server is used to fetch the OpenAPI spec.
 """
 
-from __future__ import annotations
+#!/usr/bin/env -S uv run --script
+# /// script
+# dependencies = [
+#     "click==8.2.1",
+#     "httpx==0.28.1",
+#     "tomlkit==0.13.3",
+#     "PyYAML==6.0.2",
+#     "rich==14.0.0",
+# ]
+# ///
 
 import json
 import os
+import random
+import string
 import subprocess
 import sys
 import time
@@ -154,19 +165,21 @@ def generate_code(
         sys.exit(1)
 
     cmd = [
-        "node",
-        f"{CODEGEN_BUNDLE_PATH}",
-        f"--org-name={STAINLESS_ORG_NAME}",
-        f"--project-name={STAINLESS_PROJECT_NAME}",
-        f"--config-path={STAINLESS_CONFIG_PATH}",
-        f"--oas-path={STAINLESS_OAS_PATH}",
+        "stl",
+        "builds",
+        "create",
+        f"--project={STAINLESS_PROJECT_NAME}",
+        f"--config={STAINLESS_CONFIG_PATH}",
+        f"--oas={STAINLESS_OAS_PATH}",
+        f"--branch={_random_temp_dir()}",
+        "--pull",
     ]
     if python_path:
-        cmd.append(f"--output-python={python_path}")
+        cmd.append(f"--target=python:{python_path}")
     if node_path:
-        cmd.append(f"--output-node={node_path}")
+        cmd.append(f"--target=node:{node_path}")
     if typescript_path:
-        cmd.append(f"--output-typescript={typescript_path}")
+        cmd.append(f"--target=typescript:{typescript_path}")
 
     try:
         subprocess.run(cmd, check=True, timeout=SUBPROCESS_TIMEOUT)
@@ -591,6 +604,12 @@ def _load_config(config_path: str | Path) -> dict[str, Any]:
         sys.exit(1)
     else:
         return cfg
+
+
+def _random_temp_dir() -> str:
+    ascii_letters_and_digits = string.ascii_letters + string.digits
+    random_string = "".join(random.choices(ascii_letters_and_digits, k=16))
+    return f"tmp/{random_string}"
 
 
 if __name__ == "__main__":
