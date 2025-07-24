@@ -11,6 +11,7 @@ if TYPE_CHECKING:
 
 from weave.trace.serialization.custom_objs import MemTraceFilesArtifact
 
+
 def save(obj: Content, artifact: MemTraceFilesArtifact, name: str) -> None:
     with artifact.new_file("content", binary=True) as f:
         f.write(obj.data)
@@ -20,7 +21,7 @@ def save(obj: Content, artifact: MemTraceFilesArtifact, name: str) -> None:
         json.dump(metadata, f)
 
 
-def load(artifact: MemTraceFilesArtifact, name: str) -> "Content":
+def load(artifact: MemTraceFilesArtifact, name: str) -> Content:
     from weave.type_wrappers.Content.content import Content
     from weave.type_wrappers.Content.content_types import (
         ResolvedContentArgs,
@@ -41,6 +42,7 @@ def load(artifact: MemTraceFilesArtifact, name: str) -> "Content":
 
 
 def register() -> None:
-    from weave.type_wrappers.Content.content import Content
     from weave.trace.serialization import serializer
+    from weave.type_wrappers.Content.content import Content
+
     serializer.register_serializer(Content, save, load)

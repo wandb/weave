@@ -282,12 +282,13 @@ class OpCallError(Exception): ...
 
 def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedInputs:
     # Lazy load so Content modele isn't resolved until necessary
-    from weave.type_wrappers import Content
     from weave.trace.annotation_parser import (
         ContentAnnotation,
         parse_content_annotation,
         parse_from_signature,
     )
+    from weave.type_wrappers import Content
+
     try:
         sig = inspect.signature(func)
         inputs = sig.bind(*args, **kwargs).arguments
@@ -300,7 +301,6 @@ def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedI
     # If user defines postprocess_inputs manually, trust it instead of running this
     to_weave_inputs = {}
     if not func.postprocess_inputs:
-
         parsed_annotations = parse_from_signature(sig)
         for param_name, value in inputs_with_defaults.items():
             # Check if we found an annotation which requires substitution

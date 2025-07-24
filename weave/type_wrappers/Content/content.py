@@ -9,13 +9,11 @@ import sys
 import uuid
 from pathlib import Path
 from typing import Annotated, Any, Generic
+
 from pydantic import BaseModel, Field, PrivateAttr
 from typing_extensions import Self, TypeVar
-from .content_types import (
-    ContentType,
-    ResolvedContentArgs,
-    ValidContentInputs
-)
+
+from .content_types import ContentType, ResolvedContentArgs, ValidContentInputs
 
 logger = logging.getLogger(__name__)
 
@@ -188,6 +186,7 @@ class Content(BaseModel, Generic[T]):
     ) -> Self:
         """Initializes Content from a base64 encoded string or bytes."""
         from .utils import default_filename, full_name, get_mime_and_extension
+
         if len(b64_data) == 0:
             logger.warning("Content.from_base64 received empty input")
 
@@ -290,8 +289,8 @@ class Content(BaseModel, Generic[T]):
         extension: str | None = None,
         mimetype: str | None = None,
     ) -> Self:
-
         from .utils import is_valid_b64, is_valid_path
+
         # First check if it is a path, we only check validity for str scenario
         # because we have dedicated error message for invalid path
         if isinstance(input, Path) or (isinstance(input, str) and is_valid_path(input)):

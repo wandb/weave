@@ -91,7 +91,9 @@ class File:
 
 @deprecated(DEPRECATION_MESSAGE)
 def save(obj: File, artifact: MemTraceFilesArtifact, name: str) -> None:
-    from weave.type_handlers.Content.content import Content, save as save_content
+    from weave.type_handlers.Content.content import Content
+    from weave.type_handlers.Content.content import save as save_content
+
     logger.warning("Saving File as Content object")
     content: Content = Content.from_path(obj.path, mimetype=obj.mimetype)
     save_content(content, artifact, name)

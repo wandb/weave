@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Any, Literal, TypedDict, Union
+
 from typing_extensions import NotRequired
 
 ContentType = Literal["bytes", "text", "base64", "file"]
