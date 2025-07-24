@@ -11,8 +11,9 @@ _W&B Inference_ provides access to leading open-source foundation models via W&B
 :::important
 W&B Inference credits are included with Free, Pro, and Academic plans for a limited time. Availability may vary for Enterprise. Once credits are consumed:
 
-- Free accounts must upgrade to a Pro plan to continue using Inference.
+- Free accounts must upgrade to a Pro plan to continue using Inference. **[Upgrade your plan here](https://wandb.ai/subscriptions)**.
 - Pro plan users will be billed for Inference overages on a monthly basis, based on the model-specific pricing.
+- Enterprise accounts will need to contact their account executive.
 
 To learn more, see the [pricing page](https://wandb.ai/site/pricing/) and [W&B Inference model costs](https://wandb.ai/site/pricing/inference).
 :::
@@ -452,23 +453,27 @@ Visit the [Inference pricing page for a breakdown of per-model pricing](https://
 
 The following section describes important usage information and limits. Familiarize yourself with this information before using the service.
 
-### Geographic restrictions
-
-The Inference service is only accessible from supported geographic locations. For more information, see the [Terms of Service](https://docs.coreweave.com/docs/policies/terms-of-service/terms-of-use#geographic-restrictions).
-
-### Concurrency limits
-
-To ensure fair usage and stable performance, the W&B Inference API enforces rate limits at the user and project level. These limits help:
-
-- Prevent misuse and protect API stability
-- Ensure access for all users
-- Manage infrastructure load effectively
-
-If a rate limit is exceeded, the API will return a `429 Concurrency limit reached for requests` response. To resolve this error, reduce the number of concurrent requests.
-
 ### Pricing
 
 For model pricing information, visit [https://wandb.ai/site/pricing/inference](https://wandb.ai/site/pricing/inference).
+
+### Purchase more credits
+
+W&B Inference credits are included with Free, Pro, and Academic plans for a limited time. Availability may vary for Enterprise. Once credits are consumed:
+
+- Free accounts must upgrade to a Pro plan to continue using Inference. **[Upgrade your plan here](https://wandb.ai/subscriptions)**.
+- Pro plan users will be billed for Inference overages on a monthly basis, based on the model-specific pricing.
+- Enterprise accounts will need to contact their account executive.
+
+### Concurrency limits
+
+If a rate limit is exceeded, the API will return a `429 Concurrency limit reached for requests` response. To resolve this error, reduce the number of concurrent requests.
+
+W&B applies rate limits per W&B project. For example, if you have 3 projects associated with a team, each project has its own rate limit quota. Users on [Paid plans](https://wandb.ai/site/pricing) have higher rate limits than Free plans.
+
+### Geographic restrictions
+
+The Inference service is only accessible from supported geographic locations. For more information, see the [Terms of Service](https://docs.coreweave.com/docs/policies/terms-of-service/terms-of-use#geographic-restrictions).
 
 ## API errors
 
@@ -476,7 +481,7 @@ For model pricing information, visit [https://wandb.ai/site/pricing/inference](h
 | ---------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
 | 401        | Invalid Authentication                                                      | Invalid authentication credentials or your W&B project entity and/or name are incorrect. | Ensure the correct API key is being used and/or that your W&B project name and entity are correct. |
 | 403        | Country, region, or territory not supported                                 | Accessing the API from an unsupported location.                                          | Please see [Geographic restrictions](#geographic-restrictions)                                     |
-| 429        | Concurrency limit reached for requests                                      | Too many concurrent requests.                                                            | Reduce the number of concurrent requests.                                                          |
-| 429        | You exceeded your current quota, please check your plan and billing details | Out of credits or reached monthly spending cap.                                          | Purchase more credits or increase your limits.                                                     |
+| 429        | Concurrency limit reached for requests                                      | Too many concurrent requests.                                                            | Reduce the number of concurrent requests or increase your limits. For more information, see [Usage information and limits](#usage-information-and-limits).                                                             |
+| 429        | You exceeded your current quota, please check your plan and billing details | Out of credits or reached monthly spending cap.                                          | Purchase more credits or increase your limits. For more information, see [Usage information and limits](#usage-information-and-limits).                                                     |
 | 500        | The server had an error while processing your request                       | Internal server error.                                                                   | Retry after a brief wait and contact support if it persists.                                       |
 | 503        | The engine is currently overloaded, please try again later                  | Server is experiencing high traffic.                                                     | Retry your request after a short delay.                                                            |
