@@ -107,9 +107,6 @@ def guess_from_buffer(buffer: bytes) -> str | None:
     try:
         # Lazily import polyfile only when needed.
         from polyfile.magic import MagicMatcher
-
-        matcher = cast("MagicMatcher", MagicMatcher.DEFAULT_INSTANCE)
-        return next(matcher.match(buffer)).mimetypes[0]
     except (ImportError, ModuleNotFoundError):
         logger.warning(
             "Failed to determine MIME type from file extension and cannot infer from data\n"
@@ -118,9 +115,15 @@ def guess_from_buffer(buffer: bytes) -> str | None:
             "See: https://pypi.org/project/polyfile for detailed instructions"
         )
         return None
+
+    try:
+        matcher = cast("MagicMatcher", MagicMatcher.DEFAULT_INSTANCE)
+        return next(matcher.match(buffer)).mimetypes[0]
     except IndexError:
         # This occurs if polyfile is installed but finds no match.
         return None
+
+
 
 
 def guess_from_filename(filename: str) -> str | None:
