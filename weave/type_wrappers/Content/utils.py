@@ -87,9 +87,10 @@ def guess_from_buffer(buffer: bytes) -> str | None:
     if not MAGIC_LIB_AVAILABLE or len(buffer) == 0:
         return None
 
-    if res := next(MagicMatcher.DEFAULT_INSTANCE.match(buffer)).mimetypes[0]:
-        return res
-    return None
+    try:
+        return next(MagicMatcher.DEFAULT_INSTANCE.match(buffer)).mimetypes[0]
+    except IndexError:
+        return None
 
 
 def guess_from_filename(filename: str) -> str | None:
@@ -124,12 +125,14 @@ def get_mime_and_extension(
         extension = f".{extension.lstrip('.')}"
     if mimetype and extension:
         return mimetype, extension
+
     elif (
         mimetype
         and not extension
         and (guessed_ext := get_extension_from_mimetype(mimetype))
     ):
         return mimetype, guessed_ext
+
     elif (
         extension and not mimetype and (guessed_type := guess_from_extension(extension))
     ):
@@ -137,15 +140,22 @@ def get_mime_and_extension(
 
     if filename is not None:
         mimetype = guess_from_filename(filename)
+
     if not mimetype and extension is not None:
         mimetype = guess_from_extension(extension)
+
     if not mimetype and buffer is not None:
         mimetype = guess_from_buffer(buffer[:MIME_DETECTION_BUFFER_SIZE])
 
     if mimetype and extension:
         return mimetype, extension
-    elif mimetype and not extension:
-        return mimetype, get_extension_from_mimetype(mimetype)
+
+    elif (
+        mimetype
+        and not extension
+        and (extension := get_extension_from_mimetype(mimetype))
+    ):
+        return mimetype, extension
 
     elif not MAGIC_LIB_AVAILABLE:
         logger.warning(
@@ -154,9 +164,10 @@ def get_mime_and_extension(
             "Install it by running: `pip install polyfile `\n"
             "See: https://pypi.org/project/polyfile for detailed instructions"
         )
+
     if filename is not None:
         idx = filename.rfind(".")
         if idx != -1:
             extension = filename[idx:]
 
-    return default_mimetype, default_extension
+    return mimetype or default_mimetype, extension or default_extension
