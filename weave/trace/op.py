@@ -38,11 +38,6 @@ from typing import (
 from typing_extensions import ParamSpec
 
 from weave.trace import box, settings
-from weave.trace.annotation_parser import (
-    ContentAnnotation,
-    parse_content_annotation,
-    parse_from_signature,
-)
 from weave.trace.constants import TRACE_CALL_EMOJI
 from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
@@ -54,7 +49,6 @@ from weave.trace.context.call_context import (
 from weave.trace.context.tests_context import get_raise_on_captured_errors
 from weave.trace.refs import ObjectRef
 from weave.trace.util import log_once
-from weave.type_wrappers import Content
 
 if TYPE_CHECKING:
     from weave.trace.weave_client import Call, CallsIter
@@ -287,6 +281,13 @@ class OpCallError(Exception): ...
 
 
 def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedInputs:
+    # Lazy load so Content modele isn't resolved until necessary
+    from weave.type_wrappers import Content
+    from weave.trace.annotation_parser import (
+        ContentAnnotation,
+        parse_content_annotation,
+        parse_from_signature,
+    )
     try:
         sig = inspect.signature(func)
         inputs = sig.bind(*args, **kwargs).arguments
@@ -299,6 +300,7 @@ def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedI
     # If user defines postprocess_inputs manually, trust it instead of running this
     to_weave_inputs = {}
     if not func.postprocess_inputs:
+
         parsed_annotations = parse_from_signature(sig)
         for param_name, value in inputs_with_defaults.items():
             # Check if we found an annotation which requires substitution

@@ -8,17 +8,13 @@ import subprocess
 import sys
 import uuid
 from pathlib import Path
-from typing import Annotated, Any, Generic, Literal, TypedDict, Union
-
+from typing import Annotated, Any, Generic
 from pydantic import BaseModel, Field, PrivateAttr
-from typing_extensions import NotRequired, Self, TypeVar
-
-from .utils import (
-    default_filename,
-    full_name,
-    get_mime_and_extension,
-    is_valid_b64,
-    is_valid_path,
+from typing_extensions import Self, TypeVar
+from .content_types import (
+    ContentType,
+    ResolvedContentArgs,
+    ValidContentInputs
 )
 
 logger = logging.getLogger(__name__)
@@ -26,34 +22,6 @@ logger = logging.getLogger(__name__)
 # Dummy typevar to allow for passing mimetype/extension through annotated content
 # e.x. Content["pdf"] or Content["application/pdf"]
 T = TypeVar("T", bound=str)
-
-ContentType = Literal["bytes", "text", "base64", "file"]
-
-ValidContentInputs = Union[bytes, str, Path]
-
-
-# This is what is saved to the 'metadata.json' file by serialization layer
-# It is used to 'restore' an existing content object
-class ResolvedContentArgsWithoutData(TypedDict):
-    # Required Fields
-    id: str
-    size: int
-    mimetype: str
-    digest: str
-    filename: str
-    content_type: ContentType
-    input_type: str
-    encoding: str
-
-    # Optional fields - can be omitted
-    metadata: NotRequired[dict[str, Any]]
-    path: NotRequired[str]
-    extension: NotRequired[str]
-
-
-class ResolvedContentArgs(ResolvedContentArgsWithoutData):
-    # Required Fields
-    data: bytes
 
 
 class Content(BaseModel, Generic[T]):
@@ -124,6 +92,8 @@ class Content(BaseModel, Generic[T]):
         encoding: str = "utf-8",
     ) -> Self:
         """Initializes Content from raw bytes."""
+        from .utils import default_filename, full_name, get_mime_and_extension
+
         if len(data) == 0:
             logger.warning("Content.from_bytes received empty data")
 
@@ -166,6 +136,8 @@ class Content(BaseModel, Generic[T]):
         encoding: str = "utf-8",
     ) -> Self:
         """Initializes Content from a string of text."""
+        from .utils import default_filename, full_name, get_mime_and_extension
+
         if len(text) == 0:
             logger.warning("Content.from_text received empty text")
 
@@ -215,6 +187,7 @@ class Content(BaseModel, Generic[T]):
         metadata: dict[str, Any] | None = None,
     ) -> Self:
         """Initializes Content from a base64 encoded string or bytes."""
+        from .utils import default_filename, full_name, get_mime_and_extension
         if len(b64_data) == 0:
             logger.warning("Content.from_base64 received empty input")
 
@@ -267,6 +240,8 @@ class Content(BaseModel, Generic[T]):
         metadata: dict[str, Any] | None = None,
     ) -> Self:
         """Initializes Content from a local file path."""
+        from .utils import full_name, get_mime_and_extension, is_valid_path
+
         path_obj = Path(path)
         if not is_valid_path(path_obj):
             raise FileNotFoundError(f"File not found at path: {path_obj}")
@@ -310,11 +285,13 @@ class Content(BaseModel, Generic[T]):
     @classmethod
     def _from_guess(
         cls: type[Self],
-        input: bytes | str | Path,
+        input: ValidContentInputs,
         /,
         extension: str | None = None,
         mimetype: str | None = None,
     ) -> Self:
+
+        from .utils import is_valid_b64, is_valid_path
         # First check if it is a path, we only check validity for str scenario
         # because we have dedicated error message for invalid path
         if isinstance(input, Path) or (isinstance(input, str) and is_valid_path(input)):

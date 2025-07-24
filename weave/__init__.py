@@ -79,6 +79,7 @@ __all__ = [
     "Object",
     "Prompt",
     "SavedView",
+    "Content",
     "Scorer",
     "StringPrompt",
     "attributes",
