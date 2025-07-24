@@ -31,7 +31,6 @@ ContentType = Literal["bytes", "text", "base64", "file"]
 
 ValidContentInputs = Union[bytes, str, Path]
 
-
 # This is what is saved to the 'metadata.json' file by serialization layer
 # It is used to 'restore' an existing content object
 class ResolvedContentArgsWithoutData(TypedDict):
@@ -79,6 +78,8 @@ class Content(BaseModel, Generic[T]):
     content_type: ContentType
     input_type: str
 
+    encoding: str = Field("utf-8", description="Encoding to use when decoding bytes to string")
+
     metadata: Annotated[
         dict[str, Any] | None,
         Field(
@@ -86,7 +87,6 @@ class Content(BaseModel, Generic[T]):
             examples=[{"number of cats": 1}],
         ),
     ] = None
-    encoding: str | None = "utf-8"
     path: str | None = None
     extension: str | None = None
 
@@ -96,8 +96,8 @@ class Content(BaseModel, Generic[T]):
 
     # These fields are set by serialization layer when it picks up a pydantic class
     # We define them here so they can be set without doing `extra=allow`
-    ref: Annotated[Any, PrivateAttr] = None
-    art: Annotated[Any, PrivateAttr] = None
+    _ref: Annotated[Any, PrivateAttr] = PrivateAttr(None)
+    _art: Annotated[Any, PrivateAttr] = PrivateAttr(None)
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         """
@@ -319,6 +319,17 @@ class Content(BaseModel, Generic[T]):
         """
         return cls.model_construct(**args)
 
+    def as_string(self) -> str:
+        """
+        Display the data as a string. Bytes are decoded using the `encoding` attribute
+        If base64, the data will be re-encoded to base64 bytes then decoded to an ASCII string
+        Returns:
+            str
+        """
+        if self.encoding == "base64":
+            return base64.b64encode(self.data).decode("ascii")
+        return self.data.decode(encoding=self.encoding)
+
     def open(self) -> bool:
         """Open the file using the operating system's default application.
 
@@ -374,5 +385,21 @@ class Content(BaseModel, Generic[T]):
         # Update the last_saved_path to reflect the saved copy. This ensures open works.
         self._last_saved_path = str(path)
 
-    # @override
-    # def model_dump(self):
+    # These methods are just here so that we can keep both ref and art as private attributes.
+    # This way the serialization and ref tracking layers can access and set them as needed
+    # But they will be totally ignored with regards to the pydantic model
+    @property
+    def ref(self) -> Any:
+        return self._ref
+
+    @ref.setter
+    def ref(self, value: Any) -> None:
+        self._ref = value
+
+    @property
+    def art(self) -> Any:
+        return self._art
+
+    @art.setter
+    def art(self, value: Any) -> None:
+        self._art = value
