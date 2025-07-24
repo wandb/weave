@@ -13,7 +13,7 @@ Using Weave, you can trace, evaluate, monitor, and iterate on your W&B Inference
 :::important
 W&B Inference credits are included with Free, Pro, and Academic plans for a limited time. Availability may vary for Enterprise. Once credits are consumed:
 
-- Free accounts must upgrade to a paid plan to continue using W&B Inference. **[Upgrade to either Pro or Enterprise to continue using inference.](https://wandb.ai/subscriptions)**
+- Free accounts must upgrade to a paid plan to continue using W&B Inference. **[Upgrade to either Pro or Enterprise to continue using W&B Inference.](https://wandb.ai/subscriptions)**
 - Pro plan users will be billed for Inference overages on a monthly basis, based on the model-specific pricing.
 - Enterprise accounts will need to contact their account executive.
 
@@ -56,7 +56,7 @@ For model pricing information, visit [https://wandb.ai/site/pricing/inference](h
 
 W&B Inference credits are included with Free, Pro, and Academic plans for a limited time. Availability may vary for Enterprise. Once credits are consumed:
 
-- Free accounts must upgrade to a paid plan to continue using W&B Inference. **[Upgrade to either Pro or Enterprise to continue using inference.](https://wandb.ai/subscriptions)**
+- Free accounts must upgrade to a paid plan to continue using W&B Inference. **[Upgrade to either Pro or Enterprise to continue using W&B Inference.](https://wandb.ai/subscriptions)**
 - Pro plan users will be billed for Inference overages on a monthly basis, based on the [model-specific pricing](https://wandb.ai/site/pricing/inference).
 - Enterprise accounts will need to contact their account executive.
 
@@ -72,7 +72,7 @@ W&B applies rate limits per W&B project. For example, if you have 3 projects ass
 Personal entities were deprecated in May 2024, so the following information only applies to legacy accounts.
 :::
 
-Personal accounts (personal entities) don’t support the W&B Inference service. To access W&B Inference, switch to a non-personal account. You can do this by creating a team.
+Personal accounts (personal entities) don’t support the W&B Inference service. To access W&B Inference, switch to a non-personal account. You can do this by creating a Team.
 
 ### Geographic restrictions
 
@@ -496,5 +496,6 @@ Visit the [Inference pricing page for a breakdown of per-model pricing](https://
 | 403        | Country, region, or territory not supported                                 | Accessing the API from an unsupported location.                                          | Please see [Geographic restrictions](#geographic-restrictions)                                     |
 | 429        | Concurrency limit reached for requests                                      | Too many concurrent requests.                                                            | Reduce the number of concurrent requests or increase your limits. For more information, see [Usage information and limits](#usage-information-and-limits).                                                             |
 | 429        | You exceeded your current quota, please check your plan and billing details | Out of credits or reached monthly spending cap.                                          | Purchase more credits or increase your limits. For more information, see [Usage information and limits](#usage-information-and-limits).                                                     |
+| 429 | W&B Inference is not available for personal accounts. Please switch to a non-personal account to access W&B Inference | The user is on a personal account, which does not have access to W&B Inference. | Switch to a non-personal account. If one is not avalible, create a Team to create a non-personal account. For more information, see [Personal entities unsupported](#personal-entities-unsupported).|
 | 500        | The server had an error while processing your request                       | Internal server error.                                                                   | Retry after a brief wait and contact support if it persists.                                       |
 | 503        | The engine is currently overloaded, please try again later                  | Server is experiencing high traffic.                                                     | Retry your request after a short delay.                                                            |
