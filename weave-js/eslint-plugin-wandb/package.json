@@ -1,9 +1,0 @@
-{
-  "name": "eslint-plugin-wandb",
-  "description": "ESLint plugin with custom wandb rules.  See README.md",
-  "version": "1.0.1",
-  "main": "index.js",
-  "dependencies": {
-    "jsx-ast-utils": "^3.1.0"
-  }
-}
