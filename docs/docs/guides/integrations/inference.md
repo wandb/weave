@@ -13,7 +13,7 @@ Using Weave, you can trace, evaluate, monitor, and iterate on your W&B Inference
 :::important
 W&B Inference credits are included with Free, Pro, and Academic plans for a limited time. Availability may vary for Enterprise. Once credits are consumed:
 
-- Free accounts must upgrade to a Pro plan to continue using Inference. **[Upgrade your plan here](https://wandb.ai/subscriptions)**.
+- Free accounts must upgrade to a paid plan to continue using W&B Inference. **[Upgrade to either Pro or Enterprise to continue using inference.](https://wandb.ai/subscriptions)**
 - Pro plan users will be billed for Inference overages on a monthly basis, based on the model-specific pricing.
 - Enterprise accounts will need to contact their account executive.
 
@@ -56,15 +56,15 @@ For model pricing information, visit [https://wandb.ai/site/pricing/inference](h
 
 W&B Inference credits are included with Free, Pro, and Academic plans for a limited time. Availability may vary for Enterprise. Once credits are consumed:
 
-- Free accounts must upgrade to a Pro plan to continue using Inference. **[Upgrade your plan here](https://wandb.ai/subscriptions)**.
-- Pro plan users will be billed for Inference overages on a monthly basis, based on the model-specific pricing.
+- Free accounts must upgrade to a paid plan to continue using W&B Inference. **[Upgrade to either Pro or Enterprise to continue using inference.](https://wandb.ai/subscriptions)**
+- Pro plan users will be billed for Inference overages on a monthly basis, based on the [model-specific pricing](https://wandb.ai/site/pricing/inference).
 - Enterprise accounts will need to contact their account executive.
 
 ### Concurrency limits
 
 If a rate limit is exceeded, the API will return a `429 Concurrency limit reached for requests` response. To resolve this error, reduce the number of concurrent requests.
 
-W&B applies rate limits per W&B project. For example, if you have 3 projects associated with a team, each project has its own rate limit quota. Users on [Paid plans](https://wandb.ai/site/pricing) have higher rate limits than Free plans.
+W&B applies rate limits per W&B project. For example, if you have 3 projects associated with a team, each project has its own rate limit quota.
 
 ### Personal entities unsupported
 
@@ -72,7 +72,7 @@ W&B applies rate limits per W&B project. For example, if you have 3 projects ass
 Personal entities were deprecated in May 2024, so the following information only applies to legacy accounts.
 :::
 
-Personal accounts (personal entities) don’t support the Inference service. To access Inference, you either need to create a team, or switch to a non-personal account. 
+Personal accounts (personal entities) don’t support the W&B Inference service. To access W&B Inference, switch to a non-personal account. You can do this by creating a team.
 
 ### Geographic restrictions
 
