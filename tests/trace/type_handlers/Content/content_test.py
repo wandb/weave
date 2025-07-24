@@ -194,22 +194,6 @@ class TestWeaveContent:
         assert result["extension"] == extension
         assert result["mimetype"] == mimetype
 
-    def test_content_as_string(self):
-        """Test converting Content to string for text files."""
-        # Create a text content
-        text_data = "Hello, this is a test file!\nWith multiple lines."
-
-        content = Content.from_bytes(text_data.encode("utf-8"), extension="txt")
-        # The content class doesn't have an as_string method in the new API
-        # Instead we can decode the data directly
-        assert content.data.decode("utf-8") == text_data
-
-        # Test with different encoding
-        content_utf16 = Content.from_bytes(
-            text_data.encode("utf-16"), extension="txt", encoding="utf-16"
-        )
-        assert content_utf16.data.decode("utf-16") == text_data
-
     def test_content_from_text(self):
         """Test creating Content from text string."""
         text_data = "Hello, this is a test file!\nWith multiple lines."
@@ -228,6 +212,96 @@ class TestWeaveContent:
         content2 = Content.from_text(text_data, extension=".txt", encoding="utf-16")
         assert content2.data == text_data.encode("utf-16")
         assert content2.encoding == "utf-16"
+
+    def test_content_as_string(self):
+        """Test converting Content to string for text files using as_string method."""
+        # Test 1: Basic UTF-8 text content
+        text_data = "Hello, this is a test file!\nWith multiple lines."
+        content = Content.from_text(text_data)
+        assert content.as_string() == text_data
+
+        # Test 2: UTF-8 content from bytes
+        content_bytes = Content.from_bytes(text_data.encode("utf-8"), extension="txt")
+        assert content_bytes.as_string() == text_data
+
+        # Test 3: UTF-16 encoded content
+        content_utf16 = Content.from_bytes(
+            text_data.encode("utf-16"), extension="txt", encoding="utf-16"
+        )
+        assert content_utf16.as_string() == text_data
+
+        # Test 4: Latin-1 encoded content
+        latin_text = "Café, naïve, résumé"
+        content_latin1 = Content.from_bytes(
+            latin_text.encode("latin-1"), extension="txt", encoding="latin-1"
+        )
+        assert content_latin1.as_string() == latin_text
+
+        # Test 5: Base64 encoded content
+        b64_data = base64.b64encode(b"Binary data \x00\x01\x02").decode("ascii")
+        content_b64 = Content.from_base64(b64_data, extension="bin")
+        assert content_b64.as_string() == b64_data
+
+        # Test 6: Empty content
+        empty_content = Content.from_text("")
+        assert empty_content.as_string() == ""
+
+        # Test 7: Content with special characters
+        special_chars = "Special chars: \t\n\r€£¥"
+        content_special = Content.from_text(special_chars)
+        assert content_special.as_string() == special_chars
+
+        # Test 8: Japanese text (UTF-8)
+        japanese_text = "こんにちは世界"
+        content_japanese = Content.from_text(japanese_text)
+        assert content_japanese.as_string() == japanese_text
+
+        # Test 9: Emoji content
+        emoji_text = "Hello 👋 World 🌍!"
+        content_emoji = Content.from_text(emoji_text)
+        assert content_emoji.as_string() == emoji_text
+
+        # Test 10: ASCII art
+        ascii_art = """
+        ╔═══════════╗
+        ║  ASCII    ║
+        ║   ART     ║
+        ╚═══════════╝
+        """
+        content_ascii_art = Content.from_text(ascii_art)
+        assert content_ascii_art.as_string() == ascii_art
+
+        # Test 11: Binary data through base64
+        binary_data = bytes([i for i in range(256)])
+        b64_binary = base64.b64encode(binary_data).decode("ascii")
+        content_binary = Content.from_base64(b64_binary)
+        assert content_binary.as_string() == b64_binary
+
+        # Test 12: Multiline with different line endings
+        multiline = "Line1\nLine2\rLine3\r\nLine4"
+        content_multiline = Content.from_text(multiline)
+        assert content_multiline.as_string() == multiline
+
+        # Test 13: UTF-32 encoded content
+        content_utf32 = Content.from_bytes(
+            text_data.encode("utf-32"), extension="txt", encoding="utf-32"
+        )
+        assert content_utf32.as_string() == text_data
+
+        # Test 14: Windows-1252 encoded content
+        win_text = "Windows specific: ''"
+        content_win1252 = Content.from_bytes(
+            win_text.encode("windows-1252"), extension="txt", encoding="windows-1252"
+        )
+        assert content_win1252.as_string() == win_text
+
+        # Test 15: Very long string
+        long_text = "A" * 10000 + "\n" + "B" * 10000
+        content_long = Content.from_text(long_text)
+        assert content_long.as_string() == long_text
+        assert (
+            len(content_long.as_string()) == 20001
+        )  # 10000 A's + 1 newline + 10000 B's
 
     def test_content_metadata(self, image_file):
         """Test Content extra metadata property."""
@@ -352,3 +426,75 @@ class TestWeaveContent:
         assert result.data == test_data
         assert result.extension == ".txt"
         assert result.mimetype == "text/plain"  # Simplified in mock
+
+    def test_empty_file_with_extension(self):
+        """Test handling empty file with extension."""
+        empty_data = b""
+
+        # Test empty bytes with .txt extension
+        content_txt = Content.from_bytes(empty_data, extension="txt")
+        assert content_txt.data == b""
+        assert content_txt.extension == ".txt"
+        assert content_txt.mimetype == "text/plain"
+        assert content_txt.size == 0
+        assert content_txt.as_string() == ""
+
+        # Test empty bytes with .json extension
+        content_json = Content.from_bytes(empty_data, extension="json")
+        assert content_json.data == b""
+        assert content_json.extension == ".json"
+        assert content_json.mimetype == "application/json"
+        assert content_json.size == 0
+
+        # Test empty bytes with .png extension
+        content_png = Content.from_bytes(empty_data, extension="png")
+        assert content_png.data == b""
+        assert content_png.extension == ".png"
+        assert content_png.mimetype == "image/png"
+        assert content_png.size == 0
+
+        # Test empty text content
+        content_text = Content.from_text("", extension="txt")
+        assert content_text.data == b""
+        assert content_text.extension == ".txt"
+        assert content_text.size == 0
+        assert content_text.as_string() == ""
+
+        # Test empty base64 content
+        content_b64 = Content.from_base64("", extension="bin")
+        assert content_b64.data == b""
+        assert content_b64.extension == ".bin"
+        assert content_b64.size == 0
+
+    def test_file_no_extension_no_contents(self):
+        """Test handling file with no extension and no contents."""
+        empty_data = b""
+
+        # Test empty bytes with no extension
+        content_no_ext = Content.from_bytes(empty_data)
+        assert content_no_ext.data == b""
+        assert content_no_ext.extension == ""
+        assert content_no_ext.mimetype == "application/octet-stream"  # Default mimetype
+        assert content_no_ext.size == 0
+
+        # Test empty file path with no extension
+        with tempfile.NamedTemporaryFile(delete=False, suffix="") as tmp:
+            tmp_path = tmp.name
+            # File is created empty by default
+
+        try:
+            content_file = Content.from_path(tmp_path)
+            assert content_file.data == b""
+            assert content_file.extension == ""
+            assert content_file.mimetype == "application/octet-stream"
+            assert content_file.size == 0
+            assert content_file.filename == Path(tmp_path).name
+        finally:
+            # Clean up
+            Path(tmp_path).unlink()
+
+        # Test empty text with no extension
+        content_text_no_ext = Content.from_text("")
+        assert content_text_no_ext.data == b""
+        assert content_text_no_ext.extension == ".txt"  # Default for text
+        assert content_text_no_ext.size == 0

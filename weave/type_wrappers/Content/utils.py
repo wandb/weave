@@ -36,13 +36,18 @@ def full_name(obj: Any) -> str:
 
 
 def is_valid_b64(input: str | bytes) -> bool:
+    if len(input) == 0:
+        return False
+
     # Normalize to bytes
     if isinstance(input, str):
         input = input.encode("ascii")
     try:
         base64.b64decode(input, validate=True)
+
     except (ValueError, TypeError) as _:
         return False
+
     return True
 
 
@@ -79,7 +84,7 @@ def get_extension_from_mimetype(mimetype: str) -> str:
 
 
 def guess_from_buffer(buffer: bytes) -> str | None:
-    if not MAGIC_LIB_AVAILABLE:
+    if not MAGIC_LIB_AVAILABLE or len(buffer) == 0:
         return None
 
     if res := next(MagicMatcher.DEFAULT_INSTANCE.match(buffer)).mimetypes[0]:
@@ -111,6 +116,10 @@ def get_mime_and_extension(
     default_mimetype: str = "application/octet-stream",
     default_extension: str = "",
 ) -> tuple[str, str]:
+    # Set it to none if empty
+    if buffer and len(buffer) == 0:
+        buffer = None
+
     if extension is not None:
         extension = f".{extension.lstrip('.')}"
     if mimetype and extension:

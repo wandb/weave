@@ -166,6 +166,7 @@ class Content(BaseModel, Generic[T]):
         data = text.encode(encoding)
         digest = hashlib.sha256(data).hexdigest()
         size = len(data)
+
         mimetype, extension = get_mime_and_extension(
             mimetype=mimetype,
             extension=extension,
@@ -212,7 +213,10 @@ class Content(BaseModel, Generic[T]):
         if isinstance(b64_data, str):
             b64_data = b64_data.encode("ascii")
         try:
-            data = base64.b64decode(b64_data, validate=True)
+            if len(b64_data) == 0:
+                data = b""
+            else:
+                data = base64.b64decode(b64_data, validate=True)
         except (ValueError, TypeError) as e:
             raise ValueError("Invalid base64 data provided.") from e
 
@@ -262,6 +266,9 @@ class Content(BaseModel, Generic[T]):
         file_name = path_obj.name
         file_size = path_obj.stat().st_size
         digest = hashlib.sha256(data).hexdigest()
+
+        if file_size == 0:
+            logger.warning("Content.from_path received empty file")
 
         mimetype, extension = get_mime_and_extension(
             mimetype=mimetype,
