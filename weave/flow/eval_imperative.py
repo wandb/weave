@@ -22,7 +22,7 @@ from pydantic import (
 import weave
 from weave.flow.dataset import Dataset
 from weave.flow.eval import Evaluation, default_evaluation_display_name
-from weave.flow.model import Model
+from weave.flow.model import MissingInferenceMethodError, Model
 from weave.flow.scorer import Scorer
 from weave.flow.scorer import auto_summarize as auto_summarize_fn
 from weave.flow.util import make_memorable_name
@@ -389,12 +389,18 @@ class EvaluationLogger(BaseModel):
         # objects that "look right" to our object saving system.
 
         # --- Setup the model object ---
-        @weave.op(name="Model.predict", enable_code_capture=False)
-        def predict(self: Model, inputs: dict) -> Any:
-            # Get the output from the context variable
-            return current_output.get()
+        # Only modify the predict method if the model doesn't already have one
+        try:
+            assert isinstance(self.model, Model)
+            self.model.get_infer_method()
+        except MissingInferenceMethodError:
 
-        self.model.__dict__["predict"] = MethodType(predict, self.model)
+            @weave.op(name="Model.predict", enable_code_capture=False)
+            def predict(self: Model, inputs: dict) -> Any:
+                # Get the output from the context variable
+                return current_output.get()
+
+            self.model.__dict__["predict"] = MethodType(predict, self.model)
 
         # --- Setup the evaluation object ---
         @weave.op(name="Evaluation.evaluate", enable_code_capture=False)
