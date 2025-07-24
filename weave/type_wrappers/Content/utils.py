@@ -2,20 +2,18 @@ from __future__ import annotations
 
 import base64
 import logging
-import mimetypes
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+
+# The types module is imported here as it has no external dependencies
+# and is used in the `_get_mimetypes_module` helper.
+from types import ModuleType
+from typing import TYPE_CHECKING, Any, cast
 
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
+    # This block is only for static analysis and does not cause an import at runtime.
     from polyfile.magic import MagicMatcher
-try:
-    from polyfile.magic import MagicMatcher
-
-    MAGIC_LIB_AVAILABLE = True
-except (ImportError, ModuleNotFoundError) as e:
-    MAGIC_LIB_AVAILABLE = False
 
 # See: https://mimesniff.spec.whatwg.org/
 # Buffer size should be >= 1445 for deterministic results in most cases
@@ -23,8 +21,25 @@ except (ImportError, ModuleNotFoundError) as e:
 # If the data is smaller than 2048 just use the entire thing
 MIME_DETECTION_BUFFER_SIZE = 2048
 
-# Mimetypes is missing text/markdown
-mimetypes.add_type("text/markdown", ".md")
+# A global variable to hold the lazily imported mimetypes module.
+_mimetypes_module: ModuleType | None = None
+
+
+def _get_mimetypes_module() -> ModuleType:
+    """
+    Lazily import and initialize the mimetypes module.
+
+    This ensures the module is only loaded into memory when it's first needed
+    and that its custom types are only added once.
+    """
+    global _mimetypes_module
+    if _mimetypes_module is None:
+        import mimetypes as _m
+
+        # Mimetypes is missing text/markdown, add it on first use.
+        _m.add_type("text/markdown", ".md")
+        _mimetypes_module = _m
+    return _mimetypes_module
 
 
 def full_name(obj: Any) -> str:
@@ -75,6 +90,7 @@ def default_filename(
 
 
 def get_extension_from_mimetype(mimetype: str) -> str | None:
+    mimetypes = _get_mimetypes_module()
     extension = mimetypes.guess_extension(mimetype)
     if not extension:
         logger.warning(
@@ -84,16 +100,26 @@ def get_extension_from_mimetype(mimetype: str) -> str | None:
 
 
 def guess_from_buffer(buffer: bytes) -> str | None:
-    if not MAGIC_LIB_AVAILABLE or len(buffer) == 0:
+    """Guess the mimetype from a byte buffer using polyfile."""
+    if len(buffer) == 0:
         return None
 
     try:
-        return next(MagicMatcher.DEFAULT_INSTANCE.match(buffer)).mimetypes[0]
+        # Lazily import polyfile only when needed.
+        from polyfile.magic import MagicMatcher
+
+        matcher = cast("MagicMatcher", MagicMatcher.DEFAULT_INSTANCE)
+        return next(matcher.match(buffer)).mimetypes[0]
+    except (ImportError, ModuleNotFoundError):
+        logger.debug("polyfile library not installed, cannot guess mime from buffer.")
+        return None
     except IndexError:
+        # This occurs if polyfile is installed but finds no match.
         return None
 
 
 def guess_from_filename(filename: str) -> str | None:
+    mimetypes = _get_mimetypes_module()
     return mimetypes.guess_type(filename)[0]
 
 
@@ -156,14 +182,6 @@ def get_mime_and_extension(
         and (extension := get_extension_from_mimetype(mimetype))
     ):
         return mimetype, extension
-
-    elif not MAGIC_LIB_AVAILABLE:
-        logger.warning(
-            "Failed to determine MIME type from file extension and cannot infer from data\n"
-            "MIME type detection from raw data requires the polyfile library\n"
-            "Install it by running: `pip install polyfile `\n"
-            "See: https://pypi.org/project/polyfile for detailed instructions"
-        )
 
     if filename is not None:
         idx = filename.rfind(".")
