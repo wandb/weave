@@ -124,8 +124,6 @@ def guess_from_buffer(buffer: bytes) -> str | None:
         return None
 
 
-
-
 def guess_from_filename(filename: str) -> str | None:
     mimetypes = _get_mimetypes_module()
     return mimetypes.guess_type(filename)[0]
