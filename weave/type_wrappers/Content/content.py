@@ -31,6 +31,7 @@ ContentType = Literal["bytes", "text", "base64", "file"]
 
 ValidContentInputs = Union[bytes, str, Path]
 
+
 # This is what is saved to the 'metadata.json' file by serialization layer
 # It is used to 'restore' an existing content object
 class ResolvedContentArgsWithoutData(TypedDict):
@@ -78,7 +79,9 @@ class Content(BaseModel, Generic[T]):
     content_type: ContentType
     input_type: str
 
-    encoding: str = Field("utf-8", description="Encoding to use when decoding bytes to string")
+    encoding: str = Field(
+        "utf-8", description="Encoding to use when decoding bytes to string"
+    )
 
     metadata: Annotated[
         dict[str, Any] | None,
