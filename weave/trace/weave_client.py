@@ -1109,6 +1109,8 @@ class WeaveClient:
 
         if not parent_call_ids:
             raise ValueError("Must specify call_ids")
+        if depth is not None and depth < 1:
+            raise ValueError("Depth must be at least 1")
 
         req = CallsDescendantsReq(
             project_id=self._project_id(),

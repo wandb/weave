@@ -3623,11 +3623,40 @@ def test_calls_descendants(client):
     parent_call = calls[0]
     assert op_name_from_ref(parent_call.op_name) == "parent_op"
 
-    # Test the calls_descendants functionality
+    # Test the calls_descendants functionality - unlimited depth (default)
     descendants = client.get_calls_descendants(parent_call_ids=[parent_call.id])
     assert len(descendants) == 2
     assert op_name_from_ref(descendants[0].op_name) == "child_op"
     assert op_name_from_ref(descendants[1].op_name) == "grandchild_op"
+
+    # Test depth=0 - should error, this doesn't make sense
+    with pytest.raises(ValueError):
+        descendants_depth_0 = list(
+            client.get_calls_descendants(parent_call_ids=[parent_call.id], depth=0)
+        )
+
+    # Test depth=1 - should return only direct children (child_op)
+    descendants_depth_1 = client.get_calls_descendants(
+        parent_call_ids=[parent_call.id], depth=1
+    )
+    assert len(descendants_depth_1) == 1
+    assert op_name_from_ref(descendants_depth_1[0].op_name) == "child_op"
+
+    # Test depth=2 - should return both child and grandchild
+    descendants_depth_2 = client.get_calls_descendants(
+        parent_call_ids=[parent_call.id], depth=2
+    )
+    assert len(descendants_depth_2) == 2
+    assert op_name_from_ref(descendants_depth_2[0].op_name) == "child_op"
+    assert op_name_from_ref(descendants_depth_2[1].op_name) == "grandchild_op"
+
+    # should return same as depth=2 since we only have 2 levels of descendants
+    descendants_depth_3 = client.get_calls_descendants(
+        parent_call_ids=[parent_call.id], depth=10
+    )
+    assert len(descendants_depth_3) == 2
+    assert op_name_from_ref(descendants_depth_3[0].op_name) == "child_op"
+    assert op_name_from_ref(descendants_depth_3[1].op_name) == "grandchild_op"
 
 
 def test_calls_descendants_complex(client):
