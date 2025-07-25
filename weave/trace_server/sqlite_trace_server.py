@@ -22,6 +22,7 @@ from weave.trace_server.errors import (
     InvalidRequest,
     NotFoundError,
     ObjectDeletedError,
+    RequestTooLarge,
 )
 from weave.trace_server.feedback import (
     TABLE_FEEDBACK,
@@ -681,6 +682,99 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 for call in calls
                 if call.total_storage_size_bytes is not None
             ),
+        )
+
+    def calls_descendants(
+        self, req: tsi.CallsDescendantsReq
+    ) -> Iterator[tsi.CallSchema]:
+        """Get descendant calls for given call IDs."""
+        if req.depth is not None and req.depth < 0:
+            raise ValueError("Depth must be a positive integer")
+
+        limit = req.limit or 100_000
+        if limit > 100_000:
+            raise RequestTooLarge(
+                f"Cannot get more than 100000 children at once (requested: {req.limit})."
+            )
+        elif limit < 0:
+            raise ValueError("Limit must be a positive integer")
+
+        parent_call_ids = req.parent_call_ids or []
+        placeholders = ",".join("?" * len(parent_call_ids))
+
+        conn, cursor = get_conn_cursor(self.db_path)
+        # Get all child calls recursively
+        # Use parameterized query to avoid string formatting issues
+        sql = f"""
+            WITH RECURSIVE call_tree AS (
+                -- Base case: get immediate children
+                SELECT
+                    c.id,
+                    c.project_id,
+                    c.trace_id,
+                    c.parent_id,
+                    c.deleted_at,
+                    c.started_at,
+                    0 as depth
+                FROM calls c
+                WHERE c.parent_id IN ({placeholders})
+                    AND c.deleted_at IS NULL
+                    AND c.project_id = ?
+
+                UNION ALL
+
+                -- Recursive case: get children of children
+                SELECT
+                    c.id,
+                    c.project_id,
+                    c.trace_id,
+                    c.parent_id,
+                    c.deleted_at,
+                    c.started_at,
+                    ct.depth + 1 as depth
+                FROM calls c
+                JOIN call_tree ct ON c.parent_id = ct.id
+                WHERE c.project_id = ?
+                    AND c.deleted_at IS NULL
+                    AND (? IS NULL OR ct.depth < ?)
+            )
+            SELECT id FROM call_tree
+            ORDER BY started_at ASC
+            LIMIT ?
+        """
+        params = list(parent_call_ids) + [
+            req.project_id,
+            req.project_id,
+            req.depth,
+            req.depth,
+            limit,
+        ]
+        cursor.execute(sql, params)
+
+        rows = cursor.fetchall()
+        ids = {row[0] for row in rows}
+
+        filter = req.filter or tsi.CallsFilter()
+        if filter and filter.call_ids and len(filter.call_ids) > 0:
+            # intersection of existing filter.call_ids with desencent ids
+            ids = ids & set(filter.call_ids)
+            if len(ids) == 0:
+                return iter([])
+
+        filter.call_ids = list(ids)
+
+        return self.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=req.project_id,
+                filter=filter,
+                query=req.query,
+                limit=req.limit,
+                offset=req.offset,
+                include_feedback=req.include_feedback,
+                include_costs=req.include_costs,
+                columns=req.columns,
+                expand_columns=req.expand_columns,
+            )
         )
 
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
