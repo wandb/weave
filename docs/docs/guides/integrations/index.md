@@ -44,6 +44,7 @@ Frameworks help orchestrate the actual execution pipelines in AI applications. T
 - **[AutoGen](/guides/integrations/autogen)**
 - **[Verdict](/guides/integrations/verdict)**
 - **[TypeScript SDK](/guides/integrations/js)**
+- **[Agno](/guides/integrations/agno.md)**
 
 ## Protocols
 
