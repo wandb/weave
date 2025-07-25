@@ -13,6 +13,9 @@ from typing import Annotated, Any, Generic
 from pydantic import BaseModel, Field, PrivateAttr
 from typing_extensions import Self, TypeVar
 
+from weave.trace.refs import Ref
+from weave.trace.serialization.mem_artifact import MemTraceFilesArtifact
+
 from .content_types import ContentType, ResolvedContentArgs, ValidContentInputs
 
 logger = logging.getLogger(__name__)
@@ -65,8 +68,8 @@ class Content(BaseModel, Generic[T]):
 
     # These fields are set by serialization layer when it picks up a pydantic class
     # We define them here so they can be set without doing `extra=allow`
-    _ref: Annotated[Any, PrivateAttr] = PrivateAttr(None)
-    _art: Annotated[Any, PrivateAttr] = PrivateAttr(None)
+    _ref: Ref | None = PrivateAttr(None)
+    _art: MemTraceFilesArtifact | None = PrivateAttr(None)
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         """
