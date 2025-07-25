@@ -354,13 +354,13 @@ class EvaluationLogger(BaseModel):
             "If you don't, you can just pass any string as a unique identifier",
         ),
     ]
-    
+
     eval_attributes: Annotated[
         dict[str, Any],
         Field(
             default_factory=dict,
             description="(Optional): A dictionary of attributes to add to the evaluation call."
-            "These attributes can be used to add additional metadata columns to the Evaluation"
+            "These attributes can be used to add additional metadata columns to the Evaluation",
         ),
     ]
 
