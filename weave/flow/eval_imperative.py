@@ -354,6 +354,15 @@ class EvaluationLogger(BaseModel):
             "If you don't, you can just pass any string as a unique identifier",
         ),
     ]
+    
+    eval_attributes: Annotated[
+        dict[str, Any],
+        Field(
+            default_factory=dict,
+            description="(Optional): A dictionary of attributes to add to the evaluation call."
+            "These attributes can be used to add additional metadata columns to the Evaluation"
+        ),
+    ]
 
     _eval_started: bool = PrivateAttr(False)
     _logged_summary: bool = PrivateAttr(False)
@@ -368,6 +377,10 @@ class EvaluationLogger(BaseModel):
         if self._evaluate_call is None:
             return None
         return self._evaluate_call.ui_url
+
+    @property
+    def attributes(self) -> dict[str, Any]:
+        return IMPERATIVE_EVAL_MARKER | self.eval_attributes
 
     # This private attr is used to keep track of predictions so we can finish
     # them if the user forgot to.
@@ -444,7 +457,7 @@ class EvaluationLogger(BaseModel):
                 "self": self._pseudo_evaluation,
                 "model": self.model,
             },
-            attributes=IMPERATIVE_EVAL_MARKER,
+            attributes=self.attributes,
             use_stack=False,  # Don't push to global stack to prevent nesting
         )
         if self._evaluate_call is None:
@@ -499,7 +512,7 @@ class EvaluationLogger(BaseModel):
         with call_context.set_call_stack([self._evaluate_call]):
             # Make the prediction call
             with _set_current_output(output):
-                with weave.attributes(IMPERATIVE_EVAL_MARKER):
+                with weave.attributes(self.attributes):
                     _, predict_and_score_call = (
                         self._pseudo_evaluation.predict_and_score.call(
                             self._pseudo_evaluation,
@@ -563,7 +576,7 @@ class EvaluationLogger(BaseModel):
         with call_context.set_call_stack([self._evaluate_call]):
             try:
                 with _set_current_summary(final_summary):
-                    with weave.attributes(IMPERATIVE_EVAL_MARKER):
+                    with weave.attributes(self.attributes):
                         self._pseudo_evaluation.summarize()
             except Exception:
                 logger.error("Error during execution of summarize op.", exc_info=True)
