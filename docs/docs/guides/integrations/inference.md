@@ -11,14 +11,16 @@ _W&B Inference_ provides access to leading open-source foundation models via W&B
 Using Weave, you can trace, evaluate, monitor, and iterate on your W&B Inference-powered applications.
 
 :::important
-W&B Inference credits are included with Free, Pro, and Academic plans for a limited time. Availability may vary for Enterprise. Once credits are consumed:
+W&B Inference credits are included with Free, Pro, and Academic plans for a limited time. Availability may vary for Enterprise accounts. Once credits are consumed:
 
-- Free accounts must upgrade to a paid plan to continue using W&B Inference. **[Upgrade to either Pro or Enterprise to continue using W&B Inference.](https://wandb.ai/subscriptions)**
-- Pro plan users will be billed for Inference overages on a monthly basis, based on the model-specific pricing.
-- Enterprise accounts will need to contact their account executive.
+- Free users must upgrade to a paid plan to continue using Inference.  
+  👉 **[Upgrade to Pro or Enterprise](https://wandb.ai/subscriptions)**
+- Pro users are billed monthly for usage beyond the free credits, up to a default cap of **$6,000/month**. See [Account tiering and default usage caps](#account-tiering-and-default-usage-caps).
+- Enterprise usage is capped at **$700,000/year**, with billing and limit increases handled by your account executive. See [Account tiering and default usage caps](#account-tiering-and-default-usage-caps).
 
-To learn more, see the [pricing page](https://wandb.ai/site/pricing/) and [W&B Inference model costs](https://wandb.ai/site/pricing/inference).
+To learn more, visit the [pricing page](https://wandb.ai/site/pricing/) or see [model-specific costs](https://wandb.ai/site/pricing/inference).
 :::
+
 
 ## Get started
 
@@ -34,6 +36,7 @@ The following models are available through W&B Inference:
 
 | Model                      | Model ID (for API usage)                  | Type(s)      | Context Window | Parameters                  | Description                                                                                                                    |
 | -------------------------- | ----------------------------------------- | ------------ | -------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Qwen3 235B A22B Thinking-2507 | Qwen/Qwen3-235B-A22B-Thinking-2507 | Text  262K           | 22B - 235B (Active - Total) | High-performance Mixture-of-Experts model optimized for structured reasoning, math, and long-form generation. |
 | Qwen3 235B A22B-2507       | Qwen/Qwen3-235B-A22B-Instruct-2507        | Text         | 262K           | 22B - 235B (Active - Total) | Efficient multilingual, Mixture-of-Experts, instruction-tuned model, optimized for logical reasoning.                          |
 | Qwen3 Coder 480B A35B | Qwen/Qwen3-Coder-480B-A35B-Instruct       | Text         | 262K           | 35B - 480B (Active - Total) | Mixture-of-Experts model optimized for agentic coding tasks such as function calling, tooling use, and long-context reasoning. |
 | MoonshotAI Kimi K2         | moonshotai/Kimi-K2-Instruct               | Text         | 128K           | 32B - 1T (Active - Total)   | Mixture-of-Experts model optimized for complex tool use, reasoning, and code synthesis.                                        |
@@ -59,6 +62,19 @@ W&B Inference credits are included with Free, Pro, and Academic plans for a limi
 - Free accounts must upgrade to a paid plan to continue using W&B Inference. **[Upgrade to either Pro or Enterprise to continue using W&B Inference.](https://wandb.ai/subscriptions)**
 - Pro plan users will be billed for Inference overages on a monthly basis, based on the [model-specific pricing](https://wandb.ai/site/pricing/inference).
 - Enterprise accounts will need to contact their account executive.
+
+### Account tiering and default usage caps
+
+W&B Inference plan caps are modeled after OpenAI’s usage tier policy. Each account type has a predefined spending limit to help manage costs and prevent unexpected overages. W&B requires prepayment for access to paid Inference.
+
+:::note
+The max approved limit reflects the highest cap available upon manual review (10× for Pro, 100× for Enterprise). Contact your account executive or support to request a limit increase.
+:::
+
+| Account Tier | Plan Price (Prepaid) | Default Monthly/Annual Cap | Upgrade Eligibility | Max Approved Limit |
+|--------------|----------------------|-----------------------------|----------------------|---------------------|
+| Pro          | $600/year            | $6,000/month                | Manual review only.  Contact your account executive or support to request a limit increase.   | Up to $60,000/month |
+| Enterprise   | $7,000+/year         | $700,000/year               | Manual review only.  Contact your account executive or support to request a limit increase.   | Up to $7M/year      |
 
 ### Concurrency limits
 
@@ -158,6 +174,7 @@ To create a chat completion, you will need:
   - `moonshotai/Kimi-K2-Instruct`
   - `Qwen/Qwen3-235B-A22B-Instruct-2507`
   - `Qwen/Qwen3-Coder-480B-A35B-Instruct`
+  - `Qwen/Qwen3-235B-A22B-Thinking-2507`
 
 <Tabs groupId="programming-language" queryString>
   <TabItem value="bash" label="Bash" default>
@@ -201,6 +218,7 @@ To create a chat completion, you will need:
     # moonshotai/Kimi-K2-Instruct
     # Qwen/Qwen3-235B-A22B-Instruct-2507
     # Qwen/Qwen3-Coder-480B-A35B-Instruct
+    # Qwen/Qwen3-235B-A22B-Thinking-2507
 
     response = client.chat.completions.create(
         model="<model-id>",
