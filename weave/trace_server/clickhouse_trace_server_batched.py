@@ -598,7 +598,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             descendant_query_parent_ids=req.parent_call_ids,
             descendant_query_depth=req.depth,
         )
-
         columns = self._construct_call_columns(
             columns=req.columns,
             include_costs=req.include_costs or False,
@@ -614,12 +613,26 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             cq.set_hardcoded_filter(HardCodedFilter(filter=req.filter))
         if req.query is not None:
             cq.add_condition(req.query.expr_)
+        if req.limit is not None:
+            cq.set_limit(req.limit)
+        if req.offset is not None:
+            cq.set_offset(req.offset)
 
-        cq.add_order("started_at", "asc")
-        cq.add_order("id", "asc")
+        # Sort with empty list results in no sorting
+        if req.sort_by is not None:
+            for sort_by in req.sort_by:
+                cq.add_order(sort_by.field, sort_by.direction)
+            # If user isn't already sorting by id, add id as secondary sort for consistency
+            if not any(sort_by.field == "id" for sort_by in req.sort_by):
+                cq.add_order("id", "asc")
+        else:
+            # Default sorting: started_at with id as secondary sort for consistency
+            cq.add_order("started_at", "asc")
+            cq.add_order("id", "asc")
 
         pb = ParamBuilder()
-        raw_res = self._query_stream(cq.as_sql(pb), pb.get_params())
+        sql = cq.as_sql(pb)
+        raw_res = self._query_stream(sql, pb.get_params())
 
         select_columns = [c.field for c in cq.select_fields]
         expand_columns = req.expand_columns or []

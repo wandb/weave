@@ -38,6 +38,7 @@ def lint(session):
             "pre-push",
             "--files",
             "./weave/__init__.py",
+            "--unsafe-fixes",
         )
     else:
         session.run("pre-commit", "run", "--hook-stage=pre-push", "--all-files")

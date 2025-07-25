@@ -489,6 +489,10 @@ class CallsDescendantsReq(BaseModel):
         description="List of parent call IDs to get descendants for",
         examples=[["call_123", "call_456"]],
     )
+    depth: Optional[int] = Field(
+        default=None,
+        description="Maximum depth of descendants to return (1 = direct children only)",
+    )
     filter: Optional[CallsFilter] = Field(
         default=None,
         description="Filter to apply to the descendants",
@@ -505,9 +509,15 @@ class CallsDescendantsReq(BaseModel):
         default=None,
         description="Number of descendants to skip before returning results (used for pagination)",
     )
-    depth: Optional[int] = Field(
+    sort_by: Optional[list[SortBy]] = Field(
         default=None,
-        description="Maximum depth of descendants to return (1 = direct children only)",
+        description="Sorting criteria for the descendants",
+        examples=[
+            [
+                SortBy(field="started_at", direction="asc"),
+                SortBy(field="id", direction="asc"),
+            ]
+        ],
     )
     include_costs: Optional[bool] = Field(
         default=False,

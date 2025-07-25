@@ -3625,9 +3625,110 @@ def test_calls_descendants(client):
 
     # Test the calls_descendants functionality
     descendants = client.get_calls_descendants(parent_call_ids=[parent_call.id])
+    assert len(descendants) == 3
+    assert op_name_from_ref(descendants[0].op_name) == "parent_op"
+    assert op_name_from_ref(descendants[1].op_name) == "child_op"
+    assert op_name_from_ref(descendants[2].op_name) == "grandchild_op"
+
+
+def test_calls_descendants_complex(client):
+    # Create operations with different properties for filtering
+    obj = {"val": "cheap"}
+    ref_cheap = client.save(obj, "obj_cheap").ref
+    obj = {"val": "expensive"}
+    ref_expensive = client.save(obj, "obj_expensive").ref
+
+    @weave.op
+    def expensive_op(value: int):
+        cheap_op(value + 1)
+        cheap_op(value + 2)
+        return {"result": value * 2, "cost": "high", "ref": ref_expensive}
+
+    @weave.op
+    def cheap_op(value: int):
+        return {"result": value * 3, "cost": "low", "ref": ref_cheap}
+
+    # Execute operations to create call hierarchy
+    result = expensive_op(10)
+    client.flush()
+
+    # Get root call for descendants testing
+    parent_calls = list(client.get_calls(filter={"trace_roots_only": True}))
+    assert len(parent_calls) == 1
+    parent_call = parent_calls[0]
+
+    # Test descendants with filter
+    descendants = client.get_calls_descendants(
+        parent_call_ids=[parent_call.id],
+        filter=tsi.CallsFilter(call_ids=[parent_call.id]),
+    )
+    assert len(descendants) == 1
+    assert op_name_from_ref(descendants[0].op_name) == "expensive_op"
+
+    # Test descendants with filter and offset, only get children of parent
+    descendants = client.get_calls_descendants(
+        parent_call_ids=[parent_call.id],
+        filter=tsi.CallsFilter(parent_ids=[parent_call.id]),
+        offset=1,
+    )
+    assert len(descendants) == 1
+
+    # Test descendants with column selection
+    descendants = client.get_calls_descendants(
+        parent_call_ids=[parent_call.id],
+        columns=["id", "op_name"],
+    )
+    assert len(descendants) == 3
+    for descendant in descendants:
+        assert not descendant.inputs
+        assert not descendant.output
+
+    # Test descendants with query parameter
+    query = tsi.Query(
+        **{"$expr": {"$eq": [{"$getField": "output.cost"}, {"$literal": "high"}]}}
+    )
+    descendants_with_query = client.get_calls_descendants(
+        parent_call_ids=[parent_call.id], query=query
+    )
+    assert len(descendants_with_query) == 1
+    assert op_name_from_ref(descendants_with_query[0].op_name) == "expensive_op"
+
+    descendants_with_query[0].feedback.add_reaction("👍")
+
+    # Test descendants with costs and feedback enabled
+    descendants_with_costs = client.get_calls_descendants(
+        parent_call_ids=[parent_call.id],
+        sort_by=[tsi.SortBy(field="started_at", direction="asc")],
+        include_costs=True,
+        include_feedback=True,
+    )
+    assert len(descendants_with_costs) == 3
+    assert descendants_with_costs[0].summary is not None
+    assert descendants_with_costs[1].summary is not None
+    assert descendants_with_costs[2].summary is not None
+    assert (
+        descendants_with_costs[0].summary["weave"]["feedback"][0]["payload"]["emoji"]
+        == "👍"
+    )
+    assert len(descendants_with_costs[1].summary["weave"]["feedback"]) == 0
+    assert len(descendants_with_costs[2].summary["weave"]["feedback"]) == 0
+
+    # filter by ref in descendants and sort
+    descendants = client.get_calls_descendants(
+        parent_call_ids=[parent_call.id],
+        sort_by=[tsi.SortBy(field="started_at", direction="desc")],
+        query={
+            "$expr": {"$eq": [{"$getField": "output.ref.val"}, {"$literal": "cheap"}]}
+        },
+        expand_columns=["output.ref"],
+    )
     assert len(descendants) == 2
-    assert op_name_from_ref(descendants[0].op_name) == "child_op"
-    assert op_name_from_ref(descendants[1].op_name) == "grandchild_op"
+    assert op_name_from_ref(descendants[0].op_name) == "cheap_op"
+    assert descendants[0].output["ref"]["val"] == "cheap"
+    assert descendants[0].inputs["value"] == 12
+    assert op_name_from_ref(descendants[0].op_name) == "cheap_op"
+    assert descendants[0].output["ref"]["val"] == "cheap"
+    assert descendants[1].inputs["value"] == 11
 
 
 def test_sum_dict_leaves_deep_nested(client):
