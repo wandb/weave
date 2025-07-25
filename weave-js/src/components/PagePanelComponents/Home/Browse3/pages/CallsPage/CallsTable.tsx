@@ -95,16 +95,14 @@ import {useCurrentFilterIsEvaluationsFilter} from './evaluationsFilter';
 import {ManageColumnsButton} from './ManageColumnsButton';
 import {OpSelector} from './OpSelector';
 import {ParentFilterTag} from './ParentFilterTag';
-import {ResizableHandle} from './ResizableHandle';
+import {usePinnedColumnsWidth} from './usePinnedColumnsWidth';
 
 const MAX_SELECT = 100;
 
 const TABLE_MIN_WIDTH_PX = 200; // Minimum width for the table section
 const CHARTS_MIN_WIDTH_PX = 400; // Minimum width for the charts section
-const RESIZABLE_HANDLE_MAX_WIDTH_OFFSET_PX = 200; // How much space to leave on the right for charts
 const SPLIT_VIEW_CONTAINER_MIN_HEIGHT_PX = 400; // Minimum height for the split view container
 const SPLIT_VIEW_CONTAINER_HEIGHT_OFFSET_PX = 160; // Height offset for the split view container
-const DEFAULT_CHARTS_WIDTH_PX = 500; // Default charts width when peek is closed
 const DEFAULT_TABLE_WIDTH_WHEN_PEEK_OPEN_PX = 340; // Default table width when peek is open
 
 export const DEFAULT_HIDDEN_COLUMN_PREFIXES = [
@@ -599,6 +597,10 @@ export const CallsTable: FC<{
   // DataGrid Model Management
   const pinModelResolved = pinModel ?? DEFAULT_PIN_CALLS;
 
+  // Calculate pinned columns width
+  const pinnedColumnsWidth = usePinnedColumnsWidth(apiRef, pinModelResolved);
+  console.log('pinnedColumnsWidth', pinnedColumnsWidth);
+
   // END OF CPR FACTORED CODE
 
   // CPR (Tim) - (GeneralRefactoring): Preferably this is passed in from the top, not
@@ -697,37 +699,25 @@ export const CallsTable: FC<{
 
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Calculate initial table width based on peek drawer state
-  const getInitialTableWidth = useCallback(() => {
+  // Calculate table width based on peek drawer state
+  const getTableWidth = useCallback(() => {
     if (isPeekOpen) {
       return DEFAULT_TABLE_WIDTH_WHEN_PEEK_OPEN_PX;
     }
-    // When peek is closed, we want charts to be ~300px, so table takes the rest
-    // Start with a reasonable default - will be adjusted by the effect below
-    return Math.max(600, 1200 - DEFAULT_CHARTS_WIDTH_PX - 50); // Assume ~1200px container initially
-  }, [isPeekOpen]);
+    // When peek is closed, table takes remaining space after chart container
+    return pinnedColumnsWidth.total;
+  }, [isPeekOpen, pinnedColumnsWidth.total]);
 
   const [tableWidthPx, setTableWidthPx] = useState(() =>
-    getInitialTableWidth()
+    getTableWidth()
   );
 
-  // Update table width when peek drawer state changes
+  // Update table width when peek drawer state or pinnedColumnsWidth changes
   useEffect(() => {
-    if (containerRef.current && isMetricsChecked) {
-      const containerWidth = containerRef.current.clientWidth;
-      if (isPeekOpen) {
-        // When peek is open, set table to ~300px
-        setTableWidthPx(DEFAULT_TABLE_WIDTH_WHEN_PEEK_OPEN_PX);
-      } else {
-        // When peek is closed, give charts ~300px, table gets the rest
-        const newTableWidth = Math.max(
-          TABLE_MIN_WIDTH_PX,
-          containerWidth - DEFAULT_CHARTS_WIDTH_PX - 20 // 20px for handle/margins
-        );
-        setTableWidthPx(newTableWidth);
-      }
+    if (isMetricsChecked) {
+      setTableWidthPx(getTableWidth());
     }
-  }, [isPeekOpen, isMetricsChecked]);
+  }, [getTableWidth, isMetricsChecked]);
 
   // Clear selections when switching table types
   useEffect(() => {
@@ -1286,16 +1276,11 @@ export const CallsTable: FC<{
               }}
             />
           </div>
-          <ResizableHandle
-            containerRef={containerRef}
-            onWidthChange={setTableWidthPx}
-            minWidth={TABLE_MIN_WIDTH_PX}
-            maxWidthOffset={RESIZABLE_HANDLE_MAX_WIDTH_OFFSET_PX}
-          />
           <div
             style={{
-              flex: '1',
+              width: '100%',
               minWidth: `${CHARTS_MIN_WIDTH_PX}px`,
+              borderLeft: '1px solid rgba(224, 224, 224, 1)',
               height: '100%',
               overflowX: 'hidden',
               overflowY: 'auto',
