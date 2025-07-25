@@ -65,16 +65,14 @@ W&B Inference credits are included with Free, Pro, and Academic plans for a limi
 
 ### Account tiering and default usage caps
 
-W&B Inference plan caps are modeled after OpenAI’s usage tier policy. Each account type has a predefined spending limit to help manage costs and prevent unexpected overages. W&B requires prepayment for access to paid Inference.
+Each account tier has a default spending cap to help manage costs and prevent unexpected overages. W&B requires prepayment for access to paid Inference.
 
-:::note
-The max approved limit reflects the highest cap available upon manual review (10× for Pro, 100× for Enterprise). Contact your account executive or support to request a limit increase.
-:::
+Some users may need to raise or lower their cap. Contact your account executive or support to adjust your limit.
 
-| Account Tier | Plan Price (Prepaid) | Default Monthly/Annual Cap | Upgrade Eligibility | Max Approved Limit |
-|--------------|----------------------|-----------------------------|----------------------|---------------------|
-| Pro          | $600/year            | $6,000/month                | Manual review only.  Contact your account executive or support to request a limit increase.   | Up to $60,000/month |
-| Enterprise   | $7,000+/year         | $700,000/year               | Manual review only.  Contact your account executive or support to request a limit increase.   | Up to $7M/year      |
+| Account Tier | Default Monthly/Annual Cap | Upgrade Eligibility |
+|--------------|-----------------------------|----------------------|
+| Pro          | $6,000/month                | Manual review only. Contact your account executive or support to request a limit change. |
+| Enterprise   | $700,000/year               | Manual review only. Contact your account executive or support to request a limit change. |
 
 ### Concurrency limits
 
