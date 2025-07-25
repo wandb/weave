@@ -713,18 +713,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     c.project_id,
                     c.trace_id,
                     c.parent_id,
-                    c.op_name,
-                    c.started_at,
-                    c.ended_at,
-                    c.inputs,
-                    c.output,
-                    c.attributes,
-                    c.summary,
-                    c.exception,
-                    c.wb_user_id,
-                    c.wb_run_id,
                     c.deleted_at,
-                    c.display_name,
+                    c.started_at,
                     0 as depth
                 FROM calls c
                 WHERE c.parent_id IN ({placeholders})
@@ -739,18 +729,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     c.project_id,
                     c.trace_id,
                     c.parent_id,
-                    c.op_name,
-                    c.started_at,
-                    c.ended_at,
-                    c.inputs,
-                    c.output,
-                    c.attributes,
-                    c.summary,
-                    c.exception,
-                    c.wb_user_id,
-                    c.wb_run_id,
                     c.deleted_at,
-                    c.display_name,
+                    c.started_at,
                     ct.depth + 1 as depth
                 FROM calls c
                 JOIN call_tree ct ON c.parent_id = ct.id
@@ -758,7 +738,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     AND c.deleted_at IS NULL
                     AND (? IS NULL OR ct.depth < ?)
             )
-            SELECT * FROM call_tree
+            SELECT id FROM call_tree
             ORDER BY started_at ASC
             LIMIT ?
         """
@@ -772,26 +752,30 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         cursor.execute(sql, params)
 
         rows = cursor.fetchall()
+        ids = {row[0] for row in rows}
 
-        for row in rows:
-            yield tsi.CallSchema(
-                id=row[0],
-                project_id=row[1],
-                trace_id=row[2],
-                parent_id=row[3],
-                op_name=row[4],
-                started_at=row[5],
-                ended_at=row[6],
-                inputs=json.loads(row[7]) if row[7] else {},
-                output=json.loads(row[8]) if row[8] else {},
-                attributes=json.loads(row[9]) if row[9] else None,
-                summary=json.loads(row[10]) if row[10] else None,
-                exception=row[11],
-                wb_user_id=row[12],
-                wb_run_id=row[13],
-                deleted_at=row[14],
-                display_name=row[15],
+        filter = req.filter or tsi.CallsFilter()
+        if filter and filter.call_ids and len(filter.call_ids) > 0:
+            # intersection of existing filter.call_ids with desencent ids
+            ids = ids & set(filter.call_ids)
+            if len(ids) == 0:
+                return iter([])
+
+        filter.call_ids = list(ids)
+
+        return self.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=req.project_id,
+                filter=filter,
+                query=req.query,
+                limit=req.limit,
+                offset=req.offset,
+                include_feedback=req.include_feedback,
+                include_costs=req.include_costs,
+                columns=req.columns,
+                expand_columns=req.expand_columns,
             )
+        )
 
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         assert_non_null_wb_user_id(req)

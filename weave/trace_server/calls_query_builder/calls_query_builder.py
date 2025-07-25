@@ -1688,12 +1688,12 @@ def build_descendant_cte_sql(
     project_id_param = pb.add_param(project_id)
     parent_ids_param = pb.add_param(parent_ids)
 
-    # Base case: select the parent call IDs
+    # Base case: select the immediate children of parent call IDs
     base_case_sql = f"""
-    SELECT id, 0 AS depth
+    SELECT id, 1 AS depth
     FROM calls_merged
     WHERE project_id = {param_slot(project_id_param, "String")}
-      AND id IN {param_slot(parent_ids_param, "Array(String)")}
+      AND parent_id IN {param_slot(parent_ids_param, "Array(String)")}
     """
 
     # Recursive case: select children IDs of previous level
