@@ -13,8 +13,8 @@ Features:
 
 Usage:
     As a script:
-        $ uv run gh_actions/slack_digest.py  # Console output
-        $ uv run gh_actions/slack_digest.py --slack --channel weave-dev-digest  # Slack output
+        $ uv run scripts/slack_digest.py  # Console output
+        $ uv run scripts/slack_digest.py --slack --channel weave-dev-digest  # Slack output
 
     As a GitHub Action:
         See .github/workflows/slack-digest.yml
