@@ -49,7 +49,7 @@ dependencies = [
 
   # Used for content type detection
   # Remove once license content filtering is upstreamed
-  "polyfile @ git+https://github.com/zbirenbaum/polyfile@16b5d803e3a10a1c35fce4d4fdcfe253f26eb910",
+  "polyfile-weave",
 
   # This dependency will be updated each time we regenerate the trace server bindings.
   # 1. For normal dev, pin to a SHA and allow direct references.  This will look like:
@@ -423,6 +423,3 @@ BoxedNDArray = "BoxedNDArray"
 [tool.fixit]
 enable = [".rules.op_deco", ".rules.legacy_methods"]
 disable = ["fixit.rules"]
-
-[tool.hatch.metadata]
-allow-direct-references = true
