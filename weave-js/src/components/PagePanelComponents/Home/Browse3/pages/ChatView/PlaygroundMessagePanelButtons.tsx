@@ -49,19 +49,21 @@ export const PlaygroundMessagePanelButtons: React.FC<
         disabled={!hasContent}>
         Copy
       </Button>
-      <Button
-        variant="ghost"
-        size="small"
-        startIcon="randomize-reset-reload"
-        onClick={() => retry?.(index, choiceIndex)}
-        tooltip={
-          !hasContent
-            ? 'We currently do not support retrying functions'
-            : 'Retry'
-        }
-        disabled={!hasContent}>
-        Retry
-      </Button>
+      {retry && (
+        <Button
+          variant="ghost"
+          size="small"
+          startIcon="randomize-reset-reload"
+          onClick={() => retry?.(index, choiceIndex)}
+          tooltip={
+            !hasContent
+              ? 'We currently do not support retrying functions'
+              : 'Retry'
+          }
+          disabled={!hasContent}>
+          Retry
+        </Button>
+      )}
       <Button
         variant="ghost"
         size="small"

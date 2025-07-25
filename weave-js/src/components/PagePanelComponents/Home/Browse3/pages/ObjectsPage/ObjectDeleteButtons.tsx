@@ -18,7 +18,8 @@ import {ObjectVersionSchema} from '../wfReactInterface/wfDataModelHooksInterface
 export const DeleteObjectButtonWithModal: React.FC<{
   objVersionSchema: ObjectVersionSchema;
   overrideDisplayStr?: string;
-}> = ({objVersionSchema, overrideDisplayStr}) => {
+  tooltip?: string;
+}> = ({objVersionSchema, overrideDisplayStr, tooltip}) => {
   const {useObjectDeleteFunc} = useWFHooks();
   const closePeek = useClosePeek();
   const {isPeeking} = useContext(WeaveflowPeekContext);
@@ -58,6 +59,7 @@ export const DeleteObjectButtonWithModal: React.FC<{
         icon="delete"
         variant="ghost"
         onClick={() => setDeleteModalOpen(true)}
+        tooltip={tooltip}
       />
       <DeleteModal
         open={deleteModalOpen}
@@ -84,7 +86,16 @@ export const DeleteObjectVersionsButtonWithModal: React.FC<{
   objectVersions: string[];
   disabled?: boolean;
   onSuccess: () => void;
-}> = ({entity, project, objectName, objectVersions, disabled, onSuccess}) => {
+  tooltip?: string;
+}> = ({
+  entity,
+  project,
+  objectName,
+  objectVersions,
+  disabled,
+  onSuccess,
+  tooltip,
+}) => {
   const {useObjectDeleteFunc} = useWFHooks();
   const {objectVersionsDelete} = useObjectDeleteFunc();
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -101,6 +112,7 @@ export const DeleteObjectVersionsButtonWithModal: React.FC<{
         variant="ghost"
         onClick={() => setDeleteModalOpen(true)}
         disabled={disabled}
+        tooltip={tooltip}
       />
       <DeleteModal
         open={deleteModalOpen}
@@ -128,7 +140,8 @@ export const DeleteObjectsButtonWithModal: React.FC<{
   objectIds: string[];
   disabled?: boolean;
   onSuccess: () => void;
-}> = ({entity, project, objectIds, disabled, onSuccess}) => {
+  tooltip?: string;
+}> = ({entity, project, objectIds, disabled, onSuccess, tooltip}) => {
   const {useObjectDeleteFunc} = useWFHooks();
   const {objectDeleteAllVersions} = useObjectDeleteFunc();
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -164,6 +177,7 @@ export const DeleteObjectsButtonWithModal: React.FC<{
         variant="ghost"
         onClick={() => setDeleteModalOpen(true)}
         disabled={disabled}
+        tooltip={tooltip}
       />
       <DeleteModal
         open={deleteModalOpen}
