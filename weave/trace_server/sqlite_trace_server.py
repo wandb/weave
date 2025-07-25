@@ -699,15 +699,13 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         elif limit < 0:
             raise ValueError("Limit must be a positive integer")
 
-        print(">>>>>", req)
-
         parent_call_ids = req.parent_call_ids or []
         placeholders = ",".join("?" * len(parent_call_ids))
 
         conn, cursor = get_conn_cursor(self.db_path)
         # Get all child calls recursively
         # Use parameterized query to avoid string formatting issues
-        sql = """
+        sql = f"""
             WITH RECURSIVE call_tree AS (
                 -- Base case: get immediate children
                 SELECT
@@ -729,7 +727,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     c.display_name,
                     1 as depth
                 FROM calls c
-                WHERE c.parent_id IN ({})
+                WHERE c.parent_id IN ({placeholders})
                     AND c.deleted_at IS NULL
                     AND c.project_id = ?
 
@@ -774,8 +772,6 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         cursor.execute(sql, params)
 
         rows = cursor.fetchall()
-
-        print(">>>>>", rows)
 
         for row in rows:
             yield tsi.CallSchema(

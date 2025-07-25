@@ -489,6 +489,14 @@ class CallsDescendantsReq(BaseModel):
         description="List of parent call IDs to get descendants for",
         examples=[["call_123", "call_456"]],
     )
+    filter: Optional[CallsFilter] = Field(
+        default=None,
+        description="Filter to apply to the descendants",
+    )
+    query: Optional[Query] = Field(
+        default=None,
+        description="Query to apply to the descendants",
+    )
     limit: Optional[int] = Field(
         default=None,
         description="Maximum number of descendants to return across all parent calls",

@@ -3615,14 +3615,13 @@ def test_calls_descendants(client):
 
     # Run the parent operation
     result = parent_op(5)
+    client.flush()
 
     # Get all calls
     calls = list(client.get_calls(filter={"trace_roots_only": True}))
     assert len(calls) == 1
     parent_call = calls[0]
     assert op_name_from_ref(parent_call.op_name) == "parent_op"
-
-    print(" >>>>> ", parent_call.id)
 
     # Test the calls_descendants functionality
     descendants = client.get_calls_descendants(parent_call_ids=[parent_call.id])

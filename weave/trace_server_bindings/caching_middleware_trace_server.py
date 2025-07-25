@@ -441,6 +441,9 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
     def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
         return self._next_trace_server.call_update(req)
 
+    def calls_descendants(self, req: tsi.CallsDescendantsReq) -> Iterator[tsi.CallSchema]:
+        return self._next_trace_server.calls_descendants(req)s
+
     # OTEL API
     def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
         return self._next_trace_server.otel_export(req)
