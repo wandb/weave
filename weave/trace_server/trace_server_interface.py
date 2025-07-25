@@ -331,6 +331,7 @@ class CompletionsCreateRequestInputs(BaseModel):
     modalities: Optional[list] = None
     presence_penalty: Optional[float] = None
     frequency_penalty: Optional[float] = None
+    stream: Optional[bool] = None
     logit_bias: Optional[dict] = None
     user: Optional[str] = None
     # openai v1.0+ new params
@@ -1111,6 +1112,11 @@ class ThreadsQueryFilter(BaseModel):
         description="Only include threads with last_updated before this timestamp",
         examples=["2024-12-31T23:59:59Z"],
     )
+    thread_ids: Optional[list[str]] = Field(
+        default=None,
+        description="Only include threads with thread_ids in this list",
+        examples=[["thread_1", "thread_2", "my_thread_id"]],
+    )
 
 
 class ThreadsQueryReq(BaseModel):
@@ -1145,6 +1151,9 @@ class EvaluateModelReq(BaseModel):
     evaluation_ref: str
     model_ref: str
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    # Fixes the following warning:
+    # UserWarning: Field "model_ref" has conflict with protected namespace "model_".
+    model_config = ConfigDict(protected_namespaces=())
 
 
 class EvaluateModelRes(BaseModel):
