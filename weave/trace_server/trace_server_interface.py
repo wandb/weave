@@ -501,6 +501,10 @@ class CallsDescendantsReq(BaseModel):
         default=None,
         description="Maximum number of descendants to return across all parent calls",
     )
+    offset: Optional[int] = Field(
+        default=None,
+        description="Number of descendants to skip before returning results (used for pagination)",
+    )
     depth: Optional[int] = Field(
         default=None,
         description="Maximum depth of descendants to return (1 = direct children only)",

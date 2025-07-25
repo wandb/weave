@@ -423,49 +423,24 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             include_storage_size=req.include_storage_size or False,
             include_total_storage_size=req.include_total_storage_size or False,
         )
-        columns = all_call_select_columns
-        if req.columns:
-            # TODO: add support for json extract fields
-            # Split out any nested column requests
-            columns = [col.split(".")[0] for col in req.columns]
-
-            # If we are returning a summary object, make sure that all fields
-            # required to compute the summary are in the columns
-            if "summary" in columns or req.include_costs:
-                columns += ["ended_at", "exception", "display_name"]
-
-            # Set columns to user-requested columns, w/ required columns
-            # These are all formatted by the CallsQuery, which prevents injection
-            # and other attack vectors.
-            columns = list(set(required_call_columns + columns))
-
-        # sort the columns such that similar queries are grouped together
-        columns = sorted(columns)
-
-        # The order is actually important, it has something to do with how the cost_query wants to arrange things.
-        # specifically, the summary column should always be the last.
-        if req.include_storage_size:
-            columns.append("storage_size_bytes")
-
-        if req.include_total_storage_size:
-            columns.append("total_storage_size_bytes")
-
-        # We put summary_dump last so that when we compute the costs and summary its in the right place
-        if req.include_costs:
-            summary_columns = ["summary", "summary_dump"]
-            columns = [
-                *[col for col in columns if col not in summary_columns],
-                "summary_dump",
-            ]
-
-        if req.expand_columns is not None:
-            cq.set_expand_columns(req.expand_columns)
+        columns = self._construct_call_columns(
+            columns=req.columns,
+            include_costs=req.include_costs or False,
+            include_storage_size=req.include_storage_size or False,
+            include_total_storage_size=req.include_total_storage_size or False,
+        )
         for col in columns:
             cq.add_field(col)
+        if req.expand_columns is not None:
+            cq.set_expand_columns(req.expand_columns)
         if req.filter is not None:
             cq.set_hardcoded_filter(HardCodedFilter(filter=req.filter))
         if req.query is not None:
             cq.add_condition(req.query.expr_)
+        if req.limit is not None:
+            cq.set_limit(req.limit)
+        if req.offset is not None:
+            cq.set_offset(req.offset)
 
         # Sort with empty list results in no sorting
         if req.sort_by is not None:
@@ -478,10 +453,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             # Default sorting: started_at with id as secondary sort for consistency
             cq.add_order("started_at", "asc")
             cq.add_order("id", "asc")
-        if req.limit is not None:
-            cq.set_limit(req.limit)
-        if req.offset is not None:
-            cq.set_offset(req.offset)
 
         pb = ParamBuilder()
         raw_res = self._query_stream(cq.as_sql(pb), pb.get_params())
@@ -620,55 +591,32 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if not req.parent_call_ids:
             raise ValueError("Must specify either parent_call_id or parent_call_ids")
 
-        if not req.parent_call_ids:
-            return
-
         # Build query using CallsQuery with descendant functionality
         cq = CallsQuery(
             project_id=req.project_id,
             include_costs=req.include_costs or False,
-            parent_call_ids=req.parent_call_ids,
-            depth=req.depth,
+            descendant_query_parent_ids=req.parent_call_ids,
+            descendant_query_depth=req.depth,
         )
 
-        # Handle columns
-        columns = all_call_select_columns
-        if req.columns:
-            # Split out any nested column requests
-            columns = [col.split(".")[0] for col in req.columns]
-
-            # If we are returning a summary object, make sure that all fields
-            # required to compute the summary are in the columns
-            if "summary" in columns or req.include_costs:
-                columns += ["ended_at", "exception", "display_name"]
-
-            # Set columns to user-requested columns, w/ required columns
-            columns = list(set(required_call_columns + columns))
-
-        # sort the columns such that similar queries are grouped together
-        columns = sorted(columns)
-
-        # We put summary_dump last so that when we compute the costs and summary its in the right place
-        if req.include_costs:
-            summary_columns = ["summary", "summary_dump"]
-            columns = [
-                *[col for col in columns if col not in summary_columns],
-                "summary_dump",
-            ]
-
-        if req.expand_columns is not None:
-            cq.set_expand_columns(req.expand_columns)
+        columns = self._construct_call_columns(
+            columns=req.columns,
+            include_costs=req.include_costs or False,
+            include_storage_size=False,
+            include_total_storage_size=False,
+        )
         for col in columns:
             cq.add_field(col)
 
-        # Handle sorting - default to depth then started_at
+        if req.expand_columns is not None:
+            cq.set_expand_columns(req.expand_columns)
+        if req.filter is not None:
+            cq.set_hardcoded_filter(HardCodedFilter(filter=req.filter))
+        if req.query is not None:
+            cq.add_condition(req.query.expr_)
+
         cq.add_order("started_at", "asc")
         cq.add_order("id", "asc")
-
-        if req.limit is not None:
-            cq.set_limit(req.limit)
-        if req.offset is not None:
-            cq.set_offset(req.offset)
 
         pb = ParamBuilder()
         raw_res = self._query_stream(cq.as_sql(pb), pb.get_params())
@@ -2493,6 +2441,73 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             }
         )
         return final_batch
+
+    def _construct_call_columns(
+        self,
+        *,
+        columns: Optional[list[str]] = None,
+        include_costs: bool = False,
+        include_storage_size: bool = False,
+        include_total_storage_size: bool = False,
+    ) -> list[str]:
+        """
+        Construct column list for call queries based on request parameters.
+
+        Args:
+            columns: User-requested columns, if any
+            include_costs: Whether to include cost-related columns
+            include_storage_size: Whether to include storage size column
+            include_total_storage_size: Whether to include total storage size column
+
+        Returns:
+            list[str]: Processed column list ready for query construction
+
+        Examples:
+            >>> # Basic usage with default columns
+            >>> server._construct_call_columns()
+            ['display_name', 'ended_at', 'exception', 'id', ...]
+
+            >>> # With custom columns and costs
+            >>> server._construct_call_columns(
+            ...     columns=['id', 'display_name'],
+            ...     include_costs=True
+            ... )
+            ['display_name', 'ended_at', 'exception', 'id', 'summary_dump']
+        """
+        # Start with default columns
+        result_columns = all_call_select_columns
+
+        if columns:
+            # Split out any nested column requests
+            result_columns = [col.split(".")[0] for col in columns]
+
+            # If we are returning a summary object, make sure that all fields
+            # required to compute the summary are in the columns
+            if "summary" in result_columns or include_costs:
+                result_columns += ["ended_at", "exception", "display_name"]
+
+            # Set columns to user-requested columns, w/ required columns
+            result_columns = list(set(required_call_columns + result_columns))
+
+        # Sort the columns such that similar queries are grouped together
+        result_columns = sorted(result_columns)
+
+        # Add storage size columns if requested
+        if include_storage_size:
+            result_columns.append("storage_size_bytes")
+
+        if include_total_storage_size:
+            result_columns.append("total_storage_size_bytes")
+
+        # We put summary_dump last so that when we compute the costs and summary its in the right place
+        if include_costs:
+            summary_columns = ["summary", "summary_dump"]
+            result_columns = [
+                *[col for col in result_columns if col not in summary_columns],
+                "summary_dump",
+            ]
+
+        return result_columns
 
 
 def _num_bytes(data: Any) -> int:
