@@ -75,6 +75,7 @@ import {
 } from './callsTableColumnsUtil';
 import {WFHighLevelCallFilter} from './callsTableFilter';
 import {OpVersionIndexText} from './OpVersionIndexText';
+import {useWFHooks} from '../wfReactInterface/context';
 
 const HIDDEN_DYNAMIC_COLUMN_PREFIXES = [
   'summary.usage',
@@ -222,37 +223,100 @@ export const useCallsTableColumns = (
 };
 
 const CallLinkCell: FC<{
-  rowParams: GridRenderCellParams;
+  // rowParams: GridRenderCellParams;
   entity: string;
   project: string;
+  callId: string;
+  opName: string;
+  displayName?: string;
   preservePath: boolean;
-}> = ({rowParams, entity, project, preservePath}) => {
+}> = ({entity, project, callId, opName, displayName, preservePath}) => {
   const {getDescendantCallIdAtSelectionPath} = useContext(
     TableRowSelectionContext
   );
 
-  const opName =
-    rowParams.row.display_name ??
-    opVersionRefOpName(rowParams.row.op_name) ??
-    rowParams.row.op_name;
-  const isEval = isEvaluateOp(opVersionRefOpName(rowParams.row.op_name));
+  const opNameResolved = displayName ?? opVersionRefOpName(opName) ?? opName;
+  const isEval = isEvaluateOp(opVersionRefOpName(opName));
 
   return (
     <CallLink
       entityName={entity}
       projectName={project}
-      opName={opName}
-      callId={rowParams.row.id}
+      opName={opNameResolved}
+      callId={callId}
       fullWidth={true}
       color={TEAL_600}
       isEval={isEval}
       focusedCallId={
         preservePath
-          ? getDescendantCallIdAtSelectionPath?.(rowParams.row.id) ?? undefined
+          ? getDescendantCallIdAtSelectionPath?.(callId) ?? undefined
           : undefined
       }
     />
   );
+};
+
+const ParentLinkCell: FC<{
+  entity: string;
+  project: string;
+  parentId: string;
+}> = ({entity, project, parentId}) => {
+  const {useCall} = useWFHooks();
+  const {result: call, loading} = useCall({
+    key: {
+      entity,
+      project,
+      callId: parentId,
+    },
+  });
+  if (loading) {
+    return <LoadingDots />;
+  }
+  if (!call) {
+    return <div>ERROR: {parentId}</div>;
+  }
+  // return <div>TODO: {parentId}</div>;
+  return (
+    <CallLinkCell
+      entity={entity}
+      project={project}
+      callId={parentId}
+      opName={call.spanName}
+      displayName={call.displayName ?? undefined}
+      preservePath={false}
+    />
+  );
+  // const rowParams = {row: {}};
+  // return <CallLinkCell
+  //     rowParams={rowParams}
+  //     entity={entity}
+  //     project={project}
+  //     preservePath={false}
+  //   />
+  // );
+
+  // const opName =
+  //   rowParams.row.display_name ??
+  //   opVersionRefOpName(rowParams.row.op_name) ??
+  //   rowParams.row.op_name;
+  // const isEval = isEvaluateOp(opVersionRefOpName(rowParams.row.op_name));
+
+  // return (
+  //   <CallLink
+  //     entityName={entity}
+  //     projectName={project}
+  //     opName={opName}
+  //     callId={rowParams.row.id}
+  //     fullWidth={true}
+  //     color={TEAL_600}
+  //     isEval={isEval}
+  //     focusedCallId={
+  //       preservePath
+  //         ? getDescendantCallIdAtSelectionPath?.(rowParams.row.id) ?? undefined
+  //         : undefined
+  //     }
+  //   />
+  // );
 };
 
 function buildCallsTableColumns(
@@ -332,9 +396,12 @@ function buildCallsTableColumns(
               width: '100%',
             }}>
             <CallLinkCell
-              rowParams={rowParams}
+              // rowParams={rowParams}
               entity={entity}
               project={project}
+              callId={rowParams.row.id}
+              displayName={rowParams.row.display_name}
+              opName={rowParams.row.op_name}
               preservePath={preservePath}
             />
           </CellFilterWrapper>
@@ -410,6 +477,67 @@ function buildCallsTableColumns(
           </CellFilterWrapper>
         );
       },
+    },
+    {
+      field: 'parent_id',
+      headerName: 'Parent',
+      headerAlign: 'center',
+      sortable: true,
+      disableColumnMenu: true,
+      resizable: false,
+      width: 300,
+      renderCell: rowParams => {
+        const {parent_id: parentId} = rowParams.row;
+        if (!parentId) {
+          return null;
+        }
+        // const name =
+        //   rowParams.row.display_name ??
+        //   // Rows are flattened at this point, they DO NOT strictly
+        //   // follow the TraceCallSchema!
+        //   (rowParams.row as any)['summary.weave.trace_name'];
+        return (
+          <CellFilterWrapper
+            onUpdateFilter={onUpdateFilter}
+            field="parent_id"
+            rowId={rowParams.id.toString()}
+            operation={'(string): equals'}
+            value={parentId}
+            style={{
+              display: 'flex',
+              width: '100%',
+            }}>
+            {/* {parent_id} */}
+            <ParentLinkCell
+              entity={entity}
+              project={project}
+              parentId={parentId}
+              // preservePath={preservePath}
+            />
+          </CellFilterWrapper>
+        );
+      },
+      // display: 'flex',
+      // valueGetter: (unused: any, row: any) => {
+      //   return traceCallStatusCode(row);
+      // },
+      // renderCell: cellParams => {
+      //   console.dir({cellParams});
+      //   const valueStatus = traceCallStatusCode(cellParams.row);
+      //   const valueFilter = STATUS_TO_FILTER[valueStatus];
+      //   return (
+      //     <CellFilterWrapper
+      //       onUpdateFilter={onUpdateFilter}
+      //       field="summary.weave.status"
+      //       rowId={cellParams.id.toString()}
+      //       operation={'(string): in'}
+      //       value={valueFilter}>
+      //       <div style={{margin: 'auto'}}>
+      //         <StatusChip value={valueStatus} iconOnly />
+      //       </div>
+      //     </CellFilterWrapper>
+      //   );
+      // },
     },
   ];
 
