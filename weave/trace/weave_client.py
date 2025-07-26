@@ -1064,6 +1064,7 @@ class WeaveClient:
         display_name: str | Callable[[Call], str] | None = None,
         *,
         use_stack: bool = True,
+        call_id: str | None = None,
     ) -> Call:
         """Create, log, and push a call onto the runtime stack.
 
@@ -1138,7 +1139,7 @@ class WeaveClient:
         thread_id = call_context.get_thread_id()
         current_turn_id = call_context.get_turn_id()
 
-        call_id = generate_id()
+        call_id = call_id or generate_id()
 
         # Determine turn_id: call becomes a turn if thread boundary is crossed
         if thread_id is None:
