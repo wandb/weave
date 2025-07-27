@@ -171,6 +171,7 @@ autogen_tests = ["autogen-agentchat>=0.5.7", "autogen-ext[openai]>=0.5.7"]
 
 test = [
   "nox",
+  "sentry-sdk>=2.0.0",
   "pytest>=8.2.0",
   "pytest-asyncio>=0.23.6",
   "pytest-cov>=5.0.0",
