@@ -253,7 +253,7 @@ ApplyScorerResult = ApplyScorerSuccess
 
 
 def preparer_scorer_op_args(
-    scorer: Union[Op, Scorer], example: dict, model_output: Any
+    scorer: Union[Op, Scorer], example: dict[str, Any], model_output: Any
 ) -> tuple[Op, dict[str, Any]]:
     # Extract the core components of the scorer
     scorer_attributes = get_scorer_attributes(scorer)
@@ -376,7 +376,7 @@ def preparer_scorer_op_args(
 
 
 async def apply_scorer_async(
-    scorer: Union[Op, Scorer], example: dict, model_output: Any
+    scorer: Union[Op, Scorer], example: dict[str, Any], model_output: Any
 ) -> ApplyScorerResult:
     """Apply a scoring function to model output and example data asynchronously.
 

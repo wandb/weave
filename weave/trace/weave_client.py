@@ -310,6 +310,13 @@ def map_to_refs(obj: Any) -> Any:
         # above with `_get_direct_ref`
         return _remove_empty_ref(obj.map_values(map_to_refs))
     elif isinstance(obj, (pydantic.BaseModel, pydantic.v1.BaseModel)):
+        # Check if this object has a custom serializer registered
+        from weave.trace.serialization.serializer import get_serializer_for_obj
+
+        if get_serializer_for_obj(obj) is not None:
+            # If it has a custom serializer, don't convert to ObjectRecord
+            # Let the serialization layer handle it
+            return obj
         obj_record = pydantic_object_record(obj)
         # Here, we expect ref to be empty since it would have short circuited
         # above with `_get_direct_ref`
@@ -346,13 +353,13 @@ class CallDict(TypedDict):
     trace_id: str
     project_id: str
     parent_id: str | None
-    inputs: dict
+    inputs: dict[str, Any]
     id: str | None
     output: Any
     exception: str | None
-    summary: dict | None
+    summary: dict[str, Any] | None
     display_name: str | None
-    attributes: dict | None
+    attributes: dict[str, Any] | None
     started_at: datetime.datetime | None
     ended_at: datetime.datetime | None
     deleted_at: datetime.datetime | None
@@ -376,13 +383,13 @@ class Call:
     trace_id: str
     project_id: str
     parent_id: str | None
-    inputs: dict
+    inputs: dict[str, Any]
     id: str | None = None
     output: Any = None
     exception: str | None = None
-    summary: dict | None = dataclasses.field(default_factory=dict)
+    summary: dict[str, Any] | None = dataclasses.field(default_factory=dict)
     _display_name: str | Callable[[Call], str] | None = None
-    attributes: dict | None = None
+    attributes: dict[str, Any] | None = None
     started_at: datetime.datetime | None = None
     ended_at: datetime.datetime | None = None
     deleted_at: datetime.datetime | None = None
@@ -523,7 +530,9 @@ class Call:
         self.set_display_name(None)
 
     async def apply_scorer(
-        self, scorer: Op | Scorer, additional_scorer_kwargs: dict | None = None
+        self,
+        scorer: Op | Scorer,
+        additional_scorer_kwargs: dict[str, Any] | None = None,
     ) -> ApplyScorerResult:
         """
         `apply_scorer` is a method that applies a Scorer to a Call. This is useful
@@ -1123,9 +1132,9 @@ class WeaveClient:
     def create_call(
         self,
         op: str | Op,
-        inputs: dict,
+        inputs: dict[str, Any],
         parent: Call | None = None,
-        attributes: dict | None = None,
+        attributes: dict[str, Any] | None = None,
         display_name: str | Callable[[Call], str] | None = None,
         *,
         use_stack: bool = True,
@@ -1345,7 +1354,7 @@ class WeaveClient:
         call.output = postprocessed_output
 
         # Summary handling
-        computed_summary: dict = {}
+        computed_summary: dict[str, Any] = {}
         if call._children:
             computed_summary = sum_dict_leaves(
                 [child.summary or {} for child in call._children]
@@ -1389,7 +1398,7 @@ class WeaveClient:
         # Merge any user-provided summary values with computed values
         merged_summary = copy.deepcopy(call.summary or {})
 
-        def _deep_update(dst: dict, src: dict) -> None:
+        def _deep_update(dst: dict[str, Any], src: dict[str, Any]) -> None:
             for k, v in src.items():
                 if isinstance(v, dict) and isinstance(dst.get(k), dict):
                     _deep_update(dst[k], v)
@@ -2458,7 +2467,7 @@ def check_wandb_run_matches(
             )
 
 
-def _build_anonymous_op(name: str, config: dict | None = None) -> Op:
+def _build_anonymous_op(name: str, config: dict[str, Any] | None = None) -> Op:
     if config is None:
 
         def op_fn(*args, **kwargs):  # type: ignore
@@ -2533,7 +2542,7 @@ def elide_display_name(name: str) -> str:
     return name
 
 
-def zip_dicts(base_dict: dict, new_dict: dict) -> dict:
+def zip_dicts(base_dict: dict[str, Any], new_dict: dict[str, Any]) -> dict[str, Any]:
     final_dict = {}
     for key, value in base_dict.items():
         if key in new_dict:

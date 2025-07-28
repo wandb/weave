@@ -331,6 +331,7 @@ class CompletionsCreateRequestInputs(BaseModel):
     modalities: Optional[list] = None
     presence_penalty: Optional[float] = None
     frequency_penalty: Optional[float] = None
+    stream: Optional[bool] = None
     logit_bias: Optional[dict] = None
     user: Optional[str] = None
     # openai v1.0+ new params
