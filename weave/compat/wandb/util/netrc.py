@@ -16,10 +16,10 @@ import stat
 from pathlib import Path
 from typing import TypedDict
 
-NETRC_FILES = [
-    ".netrc",  # default
-    "_netrc",  # windows
-]
+NETRC_FILES = {
+    "default": ".netrc",
+    "Windows": "_netrc",
+}
 
 logger = logging.getLogger(__name__)
 
@@ -237,9 +237,7 @@ class _NetrcPermissions:
     write_access: bool
 
 
-def check_netrc_access(
-    netrc_path: str,
-) -> _NetrcPermissions:
+def check_netrc_access(netrc_path: str) -> _NetrcPermissions:
     """Check if we can read and write to the netrc file."""
     file_exists = False
     write_access = False
@@ -253,7 +251,7 @@ def check_netrc_access(
         # If the netrc file doesn't exist, we will create it.
         write_access = True
         read_access = True
-    except OSError as e:
+    except OSError:
         logger.exception(f"Unable to read permissions for {netrc_path}")
 
     return _NetrcPermissions(
@@ -278,11 +276,11 @@ def get_netrc_file_path() -> str:
     if fp := os.getenv("NETRC"):
         return str(Path(fp).expanduser())
 
-    for netrc_file in NETRC_FILES:
+    for netrc_file in NETRC_FILES.values():
         home_dir = Path.home()
         netrc_path = home_dir / netrc_file
         if netrc_path.exists():
             return str(netrc_path)
 
-    netrc_file = ".netrc" if platform.system() != "Windows" else "_netrc"
+    netrc_file = NETRC_FILES.get(platform.system(), NETRC_FILES["default"])
     return str(Path.home() / netrc_file)
