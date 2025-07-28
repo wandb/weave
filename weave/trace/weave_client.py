@@ -67,7 +67,6 @@ from weave.trace.refs import (
 )
 from weave.trace.sanitize import REDACTED_VALUE, should_redact
 from weave.trace.serialization.serialize import (
-    dictify,
     from_json,
     isinstance_namedtuple,
     to_json,
@@ -2526,7 +2525,7 @@ def zip_dicts(base_dict: dict[str, Any], new_dict: dict[str, Any]) -> dict[str, 
 def dataframeify(calls: Iterable[Call]) -> pd.DataFrame:
     import pandas as pd
 
-    call_series = pd.Series(calls).apply(dictify)
+    call_series = pd.Series(calls).apply(lambda x: x.to_dict())
     return pd.json_normalize(call_series)
 
 
