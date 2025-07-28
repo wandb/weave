@@ -715,7 +715,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     c.parent_id,
                     c.deleted_at,
                     c.started_at,
-                    0 as depth
+                    1 as depth
                 FROM calls c
                 WHERE c.parent_id IN ({placeholders})
                     AND c.deleted_at IS NULL
