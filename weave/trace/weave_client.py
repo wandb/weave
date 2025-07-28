@@ -157,6 +157,9 @@ CallsIter = PaginatedIterator[CallSchema, WeaveObject]
 DEFAULT_CALLS_PAGE_SIZE = 1000
 
 
+OP_PYTHON_NAME_EXPR = re.compile(r"/op/([^:]+)")
+
+
 def _make_calls_iterator(
     server: TraceServerInterface,
     project_id: str,
@@ -926,6 +929,39 @@ class WeaveClient:
         return weave_obj
 
     ################ Query API ################
+
+    def get_evaluations(self) -> CallsIter:
+        return self.get_calls(
+            query={
+                "$expr": {
+                    "$contains": {
+                        "input": {"$getField": "op_name"},
+                        "substr": {"$literal": "Evaluation.evaluate"},
+                    }
+                }
+            }
+        )
+
+    def get_scores(self) -> CallsIter:
+        # only for imperative evals
+        return self.get_calls(
+            query={
+                "$expr": {
+                    "$eq": [
+                        {
+                            "$convert": {
+                                "input": {
+                                    "$getField": "attributes._weave_eval_meta.score"
+                                },
+                                "to": "string",
+                            },
+                        },
+                        {"$literal": "true"},
+                    ]
+                }
+            },
+            expand_columns=["attributes._weave_eval_meta.score"],
+        )
 
     @trace_sentry.global_trace_sentry.watch()
     @pydantic.validate_call
