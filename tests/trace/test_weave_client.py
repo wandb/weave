@@ -3598,6 +3598,35 @@ def test_sum_dict_leaves_mixed_types(client):
     }
 
 
+def test_sum_dict_leaves_deep_nested(client):
+    """Test that sum_dict_leaves correctly handles deeply nested dictionaries (2 levels) with mixed types."""
+    dicts = [
+        {
+            "level1": {"level2": {"a": 1, "b": "hello", "c": {"x": 2, "y": "world"}}},
+            "top": 10,
+        },
+        {
+            "level1": {"level2": {"a": "test", "b": 3, "c": {"x": "deep", "y": 4}}},
+            "top": "mixed",
+        },
+        {
+            "level1": {"level2": {"a": 5, "b": "!", "c": {"x": 6, "y": "nested"}}},
+            "top": 20,
+        },
+    ]
+    result = weave_client.sum_dict_leaves(dicts)
+    assert result == {
+        "level1": {
+            "level2": {
+                "a": [1, "test", 5],
+                "b": ["hello", 3, "!"],
+                "c": {"x": [2, "deep", 6], "y": ["world", 4, "nested"]},
+            }
+        },
+        "top": [10, "mixed", 20],
+    }
+
+
 def test_calls_descendants(client):
     @weave.op
     def parent_op(x):
@@ -3760,30 +3789,95 @@ def test_calls_descendants_complex(client):
         assert descendants[1].inputs["value"] == 11
 
 
-def test_sum_dict_leaves_deep_nested(client):
-    """Test that sum_dict_leaves correctly handles deeply nested dictionaries (2 levels) with mixed types."""
-    dicts = [
-        {
-            "level1": {"level2": {"a": 1, "b": "hello", "c": {"x": 2, "y": "world"}}},
-            "top": 10,
-        },
-        {
-            "level1": {"level2": {"a": "test", "b": 3, "c": {"x": "deep", "y": 4}}},
-            "top": "mixed",
-        },
-        {
-            "level1": {"level2": {"a": 5, "b": "!", "c": {"x": 6, "y": "nested"}}},
-            "top": 20,
-        },
-    ]
-    result = weave_client.sum_dict_leaves(dicts)
-    assert result == {
-        "level1": {
-            "level2": {
-                "a": [1, "test", 5],
-                "b": ["hello", 3, "!"],
-                "c": {"x": [2, "deep", 6], "y": ["world", 4, "nested"]},
-            }
-        },
-        "top": [10, "mixed", 20],
+def test_calls_descendants_multi(client):
+    """Test get_calls_descendants with multiple parent call IDs from different stacks."""
+
+    @weave.op
+    def stack1_parent(x):
+        stack1_child(x + 1)
+        return f"stack1_parent_{x}"
+
+    @weave.op
+    def stack1_child(x):
+        stack1_grandchild(x + 1)
+        return f"stack1_child_{x}"
+
+    @weave.op
+    def stack1_grandchild(x):
+        return f"stack1_grandchild_{x}"
+
+    @weave.op
+    def stack2_parent(x):
+        stack2_child(x + 10)
+        return f"stack2_parent_{x}"
+
+    @weave.op
+    def stack2_child(x):
+        stack2_grandchild(x + 10)
+        return f"stack2_child_{x}"
+
+    @weave.op
+    def stack2_grandchild(x):
+        return f"stack2_grandchild_{x}"
+
+    @weave.op
+    def stack3_parent(x):
+        stack3_child(x + 100)
+        return f"stack3_parent_{x}"
+
+    @weave.op
+    def stack3_child(x):
+        stack3_grandchild(x + 100)
+        return f"stack3_child_{x}"
+
+    @weave.op
+    def stack3_grandchild(x):
+        return f"stack3_grandchild_{x}"
+
+    # Execute all three stacks
+    stack1_parent(1)
+    stack2_parent(2)
+    stack3_parent(3)
+    client.flush()
+
+    # Get all root calls (should be 3)
+    root_calls = list(client.get_calls(filter={"trace_roots_only": True}))
+    assert len(root_calls) == 3
+
+    # Verify we have the expected parent operations
+    parent_ops = [op_name_from_ref(call.op_name) for call in root_calls]
+    assert set(parent_ops) == {"stack1_parent", "stack2_parent", "stack3_parent"}
+
+    # Test with multiple parent IDs - should get descendants from all stacks
+    all_parent_ids = [call.id for call in root_calls]
+    descendants = client.get_calls_descendants(parent_call_ids=all_parent_ids)
+
+    # Should have 6 descendants total (2 per stack: child + grandchild)
+    assert len(descendants) == 6
+
+    # Verify we have the expected descendant operations
+    descendant_ops = [op_name_from_ref(call.op_name) for call in descendants]
+    expected_ops = {
+        "stack1_child",
+        "stack1_grandchild",
+        "stack2_child",
+        "stack2_grandchild",
+        "stack3_child",
+        "stack3_grandchild",
     }
+    assert set(descendant_ops) == expected_ops
+
+    # Test with subset of parent IDs (first 2 stacks only)
+    subset_descendants = client.get_calls_descendants(
+        parent_call_ids=all_parent_ids[:2]
+    )
+    assert len(subset_descendants) == 4
+
+    subset_ops = [op_name_from_ref(call.op_name) for call in subset_descendants]
+    expected_subset_ops = {
+        "stack1_child",
+        "stack1_grandchild",
+        "stack2_child",
+        "stack2_grandchild",
+    }
+    assert set(subset_ops) == expected_subset_ops
