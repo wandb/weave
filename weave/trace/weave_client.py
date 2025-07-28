@@ -15,13 +15,7 @@ from collections import defaultdict
 from collections.abc import Iterable, Sequence
 from concurrent.futures import Future
 from functools import cached_property
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Callable,
-    TypedDict,
-    cast,
-)
+from typing import TYPE_CHECKING, Any, Callable, TypedDict, cast
 
 import pydantic
 from requests import HTTPError
