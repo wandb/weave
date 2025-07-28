@@ -1070,9 +1070,13 @@ class WeaveClient:
         of a traced operation.
 
         Args:
-            call_ids: List of parent call IDs to get descendants for (cannot be used with call_id).
-            limit: Maximum number of descendants to return across all parent calls.
+            parent_call_ids: List of parent call IDs to get descendants for (cannot be used with call_id).
             depth: Maximum depth of descendants to return (1 = direct children only).
+            limit: Maximum number of descendants to return across all parent calls.
+            offset: Offset to start returning descendants from.
+            sort_by: List of fields to sort by.
+            filter: Filter to apply to the descendants.
+            query: Query to apply to the descendants.
             include_costs: If True, includes token/cost info in `summary.weave`.
             include_feedback: If True, includes feedback in `summary.weave.feedback`.
             columns: List of fields to return per call. Reducing this can improve performance.
@@ -1080,28 +1084,6 @@ class WeaveClient:
 
         Returns:
             List of Call objects representing the descendants.
-
-        Raises:
-            ValueError: If neither call_id nor call_ids is provided, or if both are provided.
-
-        Examples:
-            Get all descendants of a single call:
-            ```python
-            descendants = client.get_calls_descendants(parent_call_ids=["call_123"])
-            ```
-
-            Get direct children only:
-            ```python
-            children = client.get_calls_descendants(parent_call_ids=["call_123"], depth=1)
-            ```
-
-            Get descendants of multiple calls:
-            ```python
-            descendants = client.get_calls_descendants(
-                parent_call_ids=["call_123", "call_456"],
-                limit=100
-            )
-            ```
         """
         from weave.trace_server.trace_server_interface import (
             CallsDescendantsReq,
