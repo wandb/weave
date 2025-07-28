@@ -47,6 +47,10 @@ dependencies = [
   "diskcache==5.6.3",         # Used for data caching
   "nest-asyncio==1.6.0",      # Used to support nested event loops in asyncio
 
+  # Used for content type detection
+  # Remove once license content filtering is upstreamed
+  "polyfile-weave",
+
   # This dependency will be updated each time we regenerate the trace server bindings.
   # 1. For normal dev, pin to a SHA and allow direct references.  This will look like:
   #    weave_server_sdk @ git+https://github.com/wandb/weave-stainless@daf91fdd07535c570eb618b343e2d125f9b09e25
@@ -190,6 +194,10 @@ test = [
   "moviepy<=1.0.3",
   "filelock",
   "httpx",
+
+  # Media Generation
+  "opencv-python", # Video generation
+  "reportlab",     # PDF generation
 
   "confluent-kafka",
 
@@ -372,7 +380,7 @@ module = "weave_query.*"
 ignore_errors = true
 
 [tool.bumpversion]
-current_version = "0.51.57-dev0"
+current_version = "0.51.60-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.
