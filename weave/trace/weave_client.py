@@ -157,9 +157,6 @@ CallsIter = PaginatedIterator[CallSchema, WeaveObject]
 DEFAULT_CALLS_PAGE_SIZE = 1000
 
 
-OP_PYTHON_NAME_EXPR = re.compile(r"/op/([^:]+)")
-
-
 def _make_calls_iterator(
     server: TraceServerInterface,
     project_id: str,
@@ -931,6 +928,7 @@ class WeaveClient:
     ################ Query API ################
 
     def get_evaluations(self) -> CallsIter:
+        """Gets all root Evaluation.evaluate calls in this project."""
         return self.get_calls(
             query={
                 "$expr": {
@@ -943,7 +941,9 @@ class WeaveClient:
         )
 
     def get_scores(self) -> CallsIter:
-        # only for imperative evals
+        """Gets all score calls in this project.
+
+        Currently only works for imperative evals"""
         return self.get_calls(
             query={
                 "$expr": {
