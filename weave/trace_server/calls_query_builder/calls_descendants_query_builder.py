@@ -1,18 +1,19 @@
 from typing import Optional
 
-from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.calls_query_builder.utils import param_slot
+from weave.trace_server.orm import ParamBuilder
+
 
 def make_descendants_query(
     project_id: str,
-    parent_call_ids: list[str] | None,
-    max_depth: int | None,
+    parent_call_ids: Optional[list[str]],
+    max_depth: Optional[int],
     table_alias: str,
     pb: ParamBuilder,
 ) -> tuple[Optional[str], Optional[str]]:
     if not parent_call_ids:
         return None, None
-    
+
     cte_name = "descendant_call_ids"
     descendant_cte = build_descendant_cte_sql(
         project_id,
