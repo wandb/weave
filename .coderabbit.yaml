@@ -2,14 +2,14 @@ language: en-US
 # CodeRabbit configuration
 reviews:
   # High-level configuration
-  poem: true
+  poem: false
   review_status: false
   auto_review:
     enabled: true
     ignore_title_keywords:
       - "WIP"
       - "DO NOT MERGE"
-    drafts: true
+    drafts: false
 
   # Language-specific instructions
   path_instructions:
