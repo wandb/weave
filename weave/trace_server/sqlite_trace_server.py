@@ -1,15 +1,15 @@
 # Sqlite Trace Server
 
+import asyncio
 import contextvars
 import datetime
 import hashlib
 import json
-import sqlite3
-import threading
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, AsyncGenerator
 from typing import Any, Optional, cast
 from zoneinfo import ZoneInfo
 
+import aiosqlite
 import emoji
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
     ExportTraceServiceRequest,
@@ -17,6 +17,7 @@ from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
 
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.async_trace_server_interface import AsyncTraceServerInterface
 from weave.trace_server.emoji_util import detone_emojis
 from weave.trace_server.errors import (
     InvalidRequest,
@@ -54,40 +55,75 @@ from weave.trace_server.trace_server_interface_util import (
 )
 from weave.trace_server.validation import object_id_validator
 
-_conn_cursor: contextvars.ContextVar[
-    Optional[tuple[sqlite3.Connection, sqlite3.Cursor]]
-] = contextvars.ContextVar("conn_cursor", default=None)
+_async_conn: contextvars.ContextVar[Optional[aiosqlite.Connection]] = (
+    contextvars.ContextVar("async_conn", default=None)
+)
 
 
-def get_conn_cursor(db_path: str) -> tuple[sqlite3.Connection, sqlite3.Cursor]:
-    # conn_cursor = _conn_cursor.get()
-    conn_cursor = None
-    if conn_cursor is None:
-        conn = sqlite3.connect(db_path)
-        # Create an array reverse function.
-        conn.create_function("reverse", 1, lambda x: x[::-1])
-        cursor = conn.cursor()
-        conn_cursor = (conn, cursor)
-        _conn_cursor.set(conn_cursor)
-    return conn_cursor
-
-
-class SqliteTraceServer(tsi.TraceServerInterface):
+class AsyncSQLiteQueryHelper:
     def __init__(self, db_path: str):
-        self.lock = threading.Lock()
         self.db_path = db_path
+        self._conn: Optional[aiosqlite.Connection] = None
 
-    def drop_tables(self) -> None:
-        conn, cursor = get_conn_cursor(self.db_path)
-        cursor.execute(TABLE_FEEDBACK.drop_sql())
-        cursor.execute("DROP TABLE IF EXISTS calls")
-        cursor.execute("DROP TABLE IF EXISTS objects")
-        cursor.execute("DROP TABLE IF EXISTS tables")
-        cursor.execute("DROP TABLE IF EXISTS table_rows")
+    async def get_connection(self) -> aiosqlite.Connection:
+        conn = _async_conn.get()
+        if conn is None:
+            conn = await aiosqlite.connect(self.db_path)
+            # Create an array reverse function
+            await conn.create_function("reverse", 1, lambda x: x[::-1])
+            _async_conn.set(conn)
+        return conn
 
-    def setup_tables(self) -> None:
-        conn, cursor = get_conn_cursor(self.db_path)
-        cursor.execute(
+    async def execute(self, query: str, params: tuple = ()) -> aiosqlite.Cursor:
+        conn = await self.get_connection()
+        cursor = await conn.execute(query, params)
+        return cursor
+
+    async def executemany(
+        self, query: str, params_list: list[tuple]
+    ) -> aiosqlite.Cursor:
+        conn = await self.get_connection()
+        cursor = await conn.executemany(query, params_list)
+        return cursor
+
+    async def commit(self) -> None:
+        conn = await self.get_connection()
+        await conn.commit()
+
+    async def fetchall(self, cursor: aiosqlite.Cursor) -> list[tuple[Any, ...]]:
+        return await cursor.fetchall()
+
+    async def fetchone(self, cursor: aiosqlite.Cursor) -> Optional[tuple[Any, ...]]:
+        return await cursor.fetchone()
+
+    async def close(self) -> None:
+        conn = _async_conn.get()
+        if conn:
+            await conn.close()
+            _async_conn.set(None)
+
+
+class SqliteTraceServer(AsyncTraceServerInterface):
+    def __init__(self, db_path: str):
+        self.lock = asyncio.Lock()
+        self.db_path = db_path
+        self.db_helper = AsyncSQLiteQueryHelper(db_path)
+
+    async def drop_tables(self) -> None:
+        """
+        Drop all tables in the database.
+        """
+        await self.db_helper.execute(TABLE_FEEDBACK.drop_sql())
+        await self.db_helper.execute("DROP TABLE IF EXISTS calls")
+        await self.db_helper.execute("DROP TABLE IF EXISTS objects")
+        await self.db_helper.execute("DROP TABLE IF EXISTS tables")
+        await self.db_helper.execute("DROP TABLE IF EXISTS table_rows")
+
+    async def setup_tables(self) -> None:
+        """
+        Create all required tables in the database.
+        """
+        await self.db_helper.execute(
             """
             CREATE TABLE IF NOT EXISTS calls (
                 project_id TEXT,
@@ -114,7 +150,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             )
         """
         )
-        cursor.execute(
+        await self.db_helper.execute(
             """
             CREATE TABLE IF NOT EXISTS objects (
                 project_id TEXT,
@@ -134,7 +170,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             )
         """
         )
-        cursor.execute(
+        await self.db_helper.execute(
             """
             CREATE TABLE IF NOT EXISTS tables (
                 project_id TEXT,
@@ -143,7 +179,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             )
             """
         )
-        cursor.execute(
+        await self.db_helper.execute(
             """
             CREATE TABLE IF NOT EXISTS table_rows (
                 project_id TEXT,
@@ -152,7 +188,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             )
             """
         )
-        cursor.execute(
+        await self.db_helper.execute(
             """
             CREATE TABLE IF NOT EXISTS files (
                 project_id TEXT,
@@ -162,31 +198,41 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             )
             """
         )
-        cursor.execute(TABLE_FEEDBACK.create_sql())
+        await self.db_helper.execute(TABLE_FEEDBACK.create_sql())
 
-    def call_start_batch(self, req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
-        res = []
+    async def call_start_batch(
+        self, req: tsi.CallCreateBatchReq
+    ) -> tsi.CallCreateBatchRes:
+        """
+        Process a batch of call start/end requests.
+
+        Args:
+            req (tsi.CallCreateBatchReq): The batch request.
+
+        Returns:
+            tsi.CallCreateBatchRes: The batch response.
+        """
+        res: list[tsi.CallStartRes | tsi.CallEndRes] = []
         for item in req.batch:
             if item.mode == "start":
-                res.append(self.call_start(item.req))
+                res.append(await self.call_start(item.req))
             elif item.mode == "end":
-                res.append(self.call_end(item.req))
+                res.append(await self.call_end(item.req))
             else:
                 raise ValueError("Invalid mode")
         return tsi.CallCreateBatchRes(res=res)
 
-    # Creates a new call
-    def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
-        conn, cursor = get_conn_cursor(self.db_path)
+    async def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
         if req.start.trace_id is None:
             raise ValueError("trace_id is required")
         if req.start.id is None:
             raise ValueError("id is required")
-        with self.lock:
+
+        async with self.lock:
             # Converts the user-provided call details into a clickhouse schema.
             # This does validation and conversion of the input data as well
             # as enforcing business rules and defaults
-            cursor.execute(
+            cursor = await self.db_helper.execute(
                 """INSERT INTO calls (
                     project_id,
                     id,
@@ -224,7 +270,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     req.start.wb_run_step,
                 ),
             )
-            conn.commit()
+            await self.db_helper.commit()
 
         # Returns the id of the newly created call
         return tsi.CallStartRes(
@@ -232,14 +278,14 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             trace_id=req.start.trace_id,
         )
 
-    def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
-        conn, cursor = get_conn_cursor(self.db_path)
+    async def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
         parsable_output = req.end.output
         if not isinstance(parsable_output, dict):
             parsable_output = {"output": parsable_output}
         parsable_output = cast(dict, parsable_output)
-        with self.lock:
-            cursor.execute(
+
+        async with self.lock:
+            cursor = await self.db_helper.execute(
                 """UPDATE calls SET
                     ended_at = ?,
                     exception = ?,
@@ -258,21 +304,29 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     req.end.id,
                 ),
             )
-            conn.commit()
+            await self.db_helper.commit()
         return tsi.CallEndRes()
 
-    def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
-        calls = self.calls_query(
+    async def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
+        calls = await self.calls_query(
             tsi.CallsQueryReq(
                 project_id=req.project_id,
                 limit=1,
                 filter=tsi.CallsFilter(call_ids=[req.id]),
             )
-        ).calls
-        return tsi.CallReadRes(call=calls[0] if calls else None)
+        )
+        return tsi.CallReadRes(call=calls.calls[0] if calls.calls else None)
 
-    def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
-        conn, cursor = get_conn_cursor(self.db_path)
+    async def calls_query(self, req: tsi.CallsQueryReq) -> tsi.CallsQueryRes:
+        """
+        Query calls with filtering, sorting, and pagination.
+
+        Args:
+            req (tsi.CallsQueryReq): The calls query request.
+
+        Returns:
+            tsi.CallsQueryRes: The calls query response.
+        """
         conds = []
         filter = req.filter
         if filter:
@@ -578,9 +632,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 query += " LIMIT -1"
             query += f" OFFSET {req.offset}"
 
-        cursor.execute(query)
-
-        query_result = cursor.fetchall()
+        cursor = await self.db_helper.execute(query)
+        query_result = await self.db_helper.fetchall(cursor)
         calls = []
         for row in query_result:
             call_dict = dict(zip(select_columns_names, row))
@@ -591,9 +644,10 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     data = json.loads(call_dict[json_field])
                     # do ref expansion
                     if req.expand_columns:
-                        data = self._expand_refs(
+                        data = await self._expand_refs(
                             {json_field: data}, req.expand_columns
-                        )[json_field]
+                        )
+                        data = data[json_field]
                     call_dict[json_field] = data
             # convert empty string display_names to None
             if "display_name" in call_dict:
@@ -626,18 +680,14 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
         if req.include_feedback:
             feedback_query_req = make_feedback_query_req(req.project_id, calls)
-            feedback = self.feedback_query(feedback_query_req)
+            feedback = await self.feedback_query(feedback_query_req)
             hydrate_calls_with_feedback(calls, feedback)
 
         return tsi.CallsQueryRes(calls=[tsi.CallSchema(**call) for call in calls])
 
-    def _expand_refs(
+    async def _expand_refs(
         self, data: dict[str, Any], expand_columns: list[str]
     ) -> dict[str, Any]:
-        """
-        Recursively expand refs in the data. Only expand refs if requested in the
-        expand_columns list. expand_columns must be sorted by depth, shallowest first.
-        """
         cols = sorted(expand_columns, key=lambda x: x.count("."))
         for col in cols:
             val = data.get(col)
@@ -652,20 +702,28 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             if not isinstance(ri.parse_internal_uri(val), ri.InternalObjectRef):
                 continue
 
-            derefed_val = self.refs_read_batch(tsi.RefsReadBatchReq(refs=[val])).vals[0]
+            derefed_val = (
+                await self.refs_read_batch(tsi.RefsReadBatchReq(refs=[val]))
+            ).vals[0]
             set_nested_key(data, col, derefed_val)
             ref_col = f"{col}._ref"
             set_nested_key(data, ref_col, val)
 
         return data
 
-    def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
-        return iter(self.calls_query(req).calls)
+    async def calls_query_stream(
+        self, req: tsi.CallsQueryReq
+    ) -> AsyncGenerator[tsi.CallSchema, None]:
+        calls_response = await self.calls_query(req)
+        for call in calls_response.calls:
+            yield call
 
-    def calls_query_stats(self, req: tsi.CallsQueryStatsReq) -> tsi.CallsQueryStatsRes:
+    async def calls_query_stats(
+        self, req: tsi.CallsQueryStatsReq
+    ) -> tsi.CallsQueryStatsRes:
         if req.limit is not None and req.limit < 1:
             raise ValueError("Limit must be a positive integer")
-        calls = self.calls_query(
+        calls = await self.calls_query(
             tsi.CallsQueryReq(
                 project_id=req.project_id,
                 filter=req.filter,
@@ -673,21 +731,21 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 limit=req.limit,
                 include_total_storage_size=req.include_total_storage_size,
             )
-        ).calls
+        )
         return tsi.CallsQueryStatsRes(
-            count=len(calls),
+            count=len(calls.calls),
             total_storage_size_bytes=sum(
                 call.total_storage_size_bytes
-                for call in calls
+                for call in calls.calls
                 if call.total_storage_size_bytes is not None
             ),
         )
 
-    def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
+    async def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         assert_non_null_wb_user_id(req)
         # update row with a deleted_at field set to now
-        conn, cursor = get_conn_cursor(self.db_path)
-        with self.lock:
+        async with self.lock:
+            conn = await self.db_helper.get_connection()
             recursive_query = """
                 WITH RECURSIVE Descendants AS (
                     SELECT id
@@ -707,8 +765,10 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             """.format(", ".join("?" * len(req.call_ids)))
 
             params = [req.project_id] + req.call_ids
-            cursor.execute(recursive_query, params)
-            all_ids = [x[0] for x in cursor.fetchall()] + req.call_ids
+            cursor = await self.db_helper.execute(recursive_query, tuple(params))
+            all_ids = [
+                x[0] for x in await self.db_helper.fetchall(cursor)
+            ] + req.call_ids
 
             # set deleted_at for all children and parents
             delete_query = """
@@ -718,37 +778,35 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     id IN ({})
             """.format(", ".join("?" * len(all_ids)))
             print("MUTATION", delete_query)
-            cursor.execute(delete_query, all_ids)
-            conn.commit()
+            await self.db_helper.execute(delete_query, tuple(all_ids))
+            await self.db_helper.commit()
 
         return tsi.CallsDeleteRes()
 
-    def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
+    async def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
         assert_non_null_wb_user_id(req)
         if req.display_name is None:
             raise ValueError("One of [display_name] is required for call update")
 
-        conn, cursor = get_conn_cursor(self.db_path)
-        with self.lock:
-            cursor.execute(
+        async with self.lock:
+            conn = await self.db_helper.get_connection()
+            cursor = await self.db_helper.execute(
                 "UPDATE calls SET display_name = ? WHERE id = ?",
                 (req.display_name, req.call_id),
             )
-            conn.commit()
+            await conn.commit()
         return tsi.CallUpdateRes()
 
-    def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
+    async def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
         raise NotImplementedError()
 
-    def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
+    async def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
         raise NotImplementedError()
 
-    def ops_query(self, req: tsi.OpQueryReq) -> tsi.OpQueryRes:
+    async def ops_query(self, req: tsi.OpQueryReq) -> tsi.OpQueryRes:
         raise NotImplementedError()
 
-    def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
-        conn, cursor = get_conn_cursor(self.db_path)
-
+    async def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
         processed_result = process_incoming_object_val(
             req.obj.val, req.obj.builtin_object_class
         )
@@ -761,17 +819,16 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             req.obj.wb_user_id,
         )
 
-        # Validate
         object_id_validator(object_id)
 
-        with self.lock:
-            if self._obj_exists(cursor, project_id, object_id, digest):
+        async with self.lock:
+            if await self._obj_exists(project_id, object_id, digest):
                 return tsi.ObjCreateRes(digest=digest)
 
-            cursor.execute("BEGIN TRANSACTION")
-            self._mark_existing_objects_as_not_latest(cursor, project_id, object_id)
-            version_index = self._get_obj_version_index(cursor, project_id, object_id)
-            cursor.execute(
+            await self.db_helper.execute("BEGIN TRANSACTION")
+            await self._mark_existing_objects_as_not_latest(project_id, object_id)
+            version_index = await self._get_obj_version_index(project_id, object_id)
+            await self.db_helper.execute(
                 """INSERT OR IGNORE INTO objects (
                     project_id,
                     object_id,
@@ -814,41 +871,33 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     wb_user_id,
                 ),
             )
-            conn.commit()
+            await self.db_helper.commit()
         return tsi.ObjCreateRes(digest=digest)
 
-    def _obj_exists(
-        self, cursor: sqlite3.Cursor, project_id: str, object_id: str, digest: str
-    ) -> bool:
-        cursor.execute(
+    async def _obj_exists(self, project_id: str, object_id: str, digest: str) -> bool:
+        cursor = await self.db_helper.execute(
             "SELECT COUNT(*) FROM objects WHERE project_id = ? AND object_id = ? AND digest = ? AND deleted_at IS NULL",
             (project_id, object_id, digest),
         )
-        return_row = cursor.fetchone()
+        return_row = await self.db_helper.fetchone(cursor)
         if return_row is None:
             return False
         return return_row[0] > 0
 
-    def _mark_existing_objects_as_not_latest(
-        self, cursor: sqlite3.Cursor, project_id: str, object_id: str
+    async def _mark_existing_objects_as_not_latest(
+        self, project_id: str, object_id: str
     ) -> None:
-        """Mark all existing objects with such id as not latest.
-        We are creating a new object with the same id, all existing ones are no longer latest.
-        """
-        cursor.execute(
+        await self.db_helper.execute(
             "UPDATE objects SET is_latest = 0 WHERE project_id = ? AND object_id = ?",
             (project_id, object_id),
         )
 
-    def _get_obj_version_index(
-        self, cursor: sqlite3.Cursor, project_id: str, object_id: str
-    ) -> int:
-        """Get the version index for a new object with such id."""
-        cursor.execute(
+    async def _get_obj_version_index(self, project_id: str, object_id: str) -> int:
+        cursor = await self.db_helper.execute(
             "SELECT COUNT(*) FROM objects WHERE project_id = ? AND object_id = ?",
             (project_id, object_id),
         )
-        return_row = cursor.fetchone()
+        return_row = await self.db_helper.fetchone(cursor)
         if return_row is None:
             return 0
         return return_row[0]
@@ -864,11 +913,24 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             else:
                 return f"digest = '{digest}'"
 
-    def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
+    async def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
+        """
+        Async version of obj_read method.
+
+        Args:
+            req (tsi.ObjReadReq): The read request for a specific object.
+
+        Returns:
+            tsi.ObjReadRes: Response containing the requested object.
+
+        Raises:
+            NotFoundError: If the object is not found.
+            ObjectDeletedError: If the object has been deleted.
+        """
         conds = [f"object_id = '{req.object_id}'"]
         digest_condition = self._make_digest_condition(req.digest)
         conds.append(digest_condition)
-        objs = self._select_objs_query(
+        objs = await self._select_objs_query(
             req.project_id,
             conditions=conds,
             include_deleted=True,
@@ -883,7 +945,16 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             )
         return tsi.ObjReadRes(obj=objs[0])
 
-    def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
+    async def objs_query(self, req: tsi.ObjQueryReq) -> tsi.ObjQueryRes:
+        """
+        Async version of objs_query method.
+
+        Args:
+            req (tsi.ObjQueryReq): The query request for objects.
+
+        Returns:
+            tsi.ObjQueryRes: Response containing the queried objects.
+        """
         conds: list[str] = []
         parameters: dict[str, Any] = {}
         if req.filter:
@@ -907,7 +978,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 conds.append(f"leaf_object_class IN ({placeholders})")
                 parameters["leaf_object_classes"] = req.filter.leaf_object_classes
 
-        objs = self._select_objs_query(
+        objs = await self._select_objs_query(
             req.project_id,
             conditions=conds,
             parameters=parameters,
@@ -919,7 +990,20 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
         return tsi.ObjQueryRes(objs=objs)
 
-    def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
+    async def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
+        """
+        Async version of obj_delete method.
+
+        Args:
+            req (tsi.ObjDeleteReq): The delete request for objects.
+
+        Returns:
+            tsi.ObjDeleteRes: Response containing the number of deleted objects.
+
+        Raises:
+            ValueError: If too many objects requested for deletion.
+            NotFoundError: If objects to delete are not found.
+        """
         max_objects_to_delete = 100
         if req.digests and len(req.digests) > max_objects_to_delete:
             raise ValueError(
@@ -941,9 +1025,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             digest_conditions_str = " OR ".join(digest_conditions)
             select_query += f"AND ({digest_conditions_str})"
 
-        conn, cursor = get_conn_cursor(self.db_path)
-        cursor.execute(select_query, parameters)
-        matching_objects = cursor.fetchall()
+        cursor = await self.db_helper.execute(select_query, tuple(parameters))
+        matching_objects = await self.db_helper.fetchall(cursor)
 
         if len(matching_objects) == 0:
             raise NotFoundError(
@@ -966,15 +1049,25 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         """.format(", ".join("?" * len(found_digests)))
         delete_parameters = [req.project_id, req.object_id] + list(found_digests)
 
-        with self.lock:
-            cursor.execute("BEGIN TRANSACTION")
-            cursor.execute(delete_query, delete_parameters)
-            conn.commit()
+        await self.db_helper.execute("BEGIN TRANSACTION")
+        await self.db_helper.execute(delete_query, tuple(delete_parameters))
+        await self.db_helper.commit()
 
         return tsi.ObjDeleteRes(num_deleted=len(matching_objects))
 
-    def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
-        conn, cursor = get_conn_cursor(self.db_path)
+    async def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
+        """
+        Async version of table_create method.
+
+        Args:
+            req (tsi.TableCreateReq): The table creation request.
+
+        Returns:
+            tsi.TableCreateRes: Response containing the digest and row digests.
+
+        Raises:
+            TypeError: If all rows are not dictionaries.
+        """
         insert_rows = []
         for r in req.table.rows:
             if not isinstance(r, dict):
@@ -982,32 +1075,42 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             row_json = json.dumps(r)
             row_digest = str_digest(row_json)
             insert_rows.append((req.table.project_id, row_digest, row_json))
-        with self.lock:
-            cursor.executemany(
-                "INSERT OR IGNORE INTO table_rows (project_id, digest, val) VALUES (?, ?, ?)",
-                insert_rows,
-            )
 
-            row_digests = [r[1] for r in insert_rows]
+        await self.db_helper.executemany(
+            "INSERT OR IGNORE INTO table_rows (project_id, digest, val) VALUES (?, ?, ?)",
+            insert_rows,
+        )
 
-            table_hasher = hashlib.sha256()
-            for row_digest in row_digests:
-                table_hasher.update(row_digest.encode())
-            digest = table_hasher.hexdigest()
+        row_digests = [r[1] for r in insert_rows]
 
-            cursor.execute(
-                "INSERT OR IGNORE INTO tables (project_id, digest, row_digests) VALUES (?, ?, ?)",
-                (req.table.project_id, digest, json.dumps(row_digests)),
-            )
-            conn.commit()
+        table_hasher = hashlib.sha256()
+        for row_digest in row_digests:
+            table_hasher.update(row_digest.encode())
+        digest = table_hasher.hexdigest()
+
+        await self.db_helper.execute(
+            "INSERT OR IGNORE INTO tables (project_id, digest, row_digests) VALUES (?, ?, ?)",
+            (req.table.project_id, digest, json.dumps(row_digests)),
+        )
+        await self.db_helper.commit()
 
         return tsi.TableCreateRes(digest=digest, row_digests=row_digests)
 
-    def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
-        conn, cursor = get_conn_cursor(self.db_path)
-        # conds = ["project_id = {project_id: String}"]
+    async def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
+        """
+        Async version of table_update method.
 
-        cursor.execute(
+        Args:
+            req (tsi.TableUpdateReq): The table update request.
+
+        Returns:
+            tsi.TableUpdateRes: Response containing the digest and updated row digests.
+
+        Raises:
+            TypeError: If all rows are not dictionaries or for unrecognized updates.
+            ValueError: If index is out of range.
+        """
+        cursor = await self.db_helper.execute(
             """
             SELECT
                 tables.row_digests
@@ -1019,7 +1122,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             """,
             (req.project_id, req.base_digest),
         )
-        query_result = cursor.fetchall()
+        query_result = await self.db_helper.fetchall(cursor)
         final_row_digests: list[str] = json.loads(query_result[0][0])
         new_rows_needed_to_insert = []
         known_digests = set(final_row_digests)
@@ -1058,26 +1161,25 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 raise TypeError("Unrecognized update", update)
 
         # Perform the actual DB inserts
-        with self.lock:
-            cursor.executemany(
-                "INSERT OR IGNORE INTO table_rows (project_id, digest, val) VALUES (?, ?, ?)",
-                new_rows_needed_to_insert,
-            )
+        await self.db_helper.executemany(
+            "INSERT OR IGNORE INTO table_rows (project_id, digest, val) VALUES (?, ?, ?)",
+            new_rows_needed_to_insert,
+        )
 
-            table_hasher = hashlib.sha256()
-            for row_digest in final_row_digests:
-                table_hasher.update(row_digest.encode())
-            digest = table_hasher.hexdigest()
+        table_hasher = hashlib.sha256()
+        for row_digest in final_row_digests:
+            table_hasher.update(row_digest.encode())
+        digest = table_hasher.hexdigest()
 
-            cursor.execute(
-                "INSERT OR IGNORE INTO tables (project_id, digest, row_digests) VALUES (?, ?, ?)",
-                (req.project_id, digest, json.dumps(final_row_digests)),
-            )
-            conn.commit()
+        await self.db_helper.execute(
+            "INSERT OR IGNORE INTO tables (project_id, digest, row_digests) VALUES (?, ?, ?)",
+            (req.project_id, digest, json.dumps(final_row_digests)),
+        )
+        await self.db_helper.commit()
 
         return tsi.TableUpdateRes(digest=digest, updated_row_digests=updated_digests)
 
-    def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
+    async def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
         conds = []
         parameters: list[str] = []
         if req.filter:
@@ -1143,9 +1245,10 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 query += " LIMIT -1"
             query += f" OFFSET {req.offset}"
 
-        conn, cursor = get_conn_cursor(self.db_path)
-        cursor.execute(query, [req.project_id, req.digest] + list(parameters))
-        query_result = cursor.fetchall()
+        cursor = await self.db_helper.execute(
+            query, tuple([req.project_id, req.digest] + list(parameters))
+        )
+        query_result = await self.db_helper.fetchall(cursor)
 
         return tsi.TableQueryRes(
             rows=[
@@ -1159,12 +1262,14 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         )
 
     # This is a legacy endpoint, it should be removed once the client is mostly updated
-    def table_query_stats(self, req: tsi.TableQueryStatsReq) -> tsi.TableQueryStatsRes:
+    async def table_query_stats(
+        self, req: tsi.TableQueryStatsReq
+    ) -> tsi.TableQueryStatsRes:
         batch_req = tsi.TableQueryStatsBatchReq(
             project_id=req.project_id, digests=[req.digest]
         )
 
-        res = self.table_query_stats_batch(batch_req)
+        res = await self.table_query_stats_batch(batch_req)
 
         if len(res.tables) != 1:
             raise RuntimeError("Unexpected number of results", res)
@@ -1172,7 +1277,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         count = res.tables[0].count
         return tsi.TableQueryStatsRes(count=count)
 
-    def table_query_stats_batch(
+    async def table_query_stats_batch(
         self, req: tsi.TableQueryStatsBatchReq
     ) -> tsi.TableQueryStatsBatchRes:
         parameters: list[Any] = [req.project_id] + list(req.digests or [])
@@ -1188,10 +1293,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             tables.digest in ({placeholders})
         """
 
-        conn, cursor = get_conn_cursor(self.db_path)
-        cursor.execute(query, parameters)
-
-        query_result = cursor.fetchall()
+        cursor = await self.db_helper.execute(query, tuple(parameters))
+        query_result = await self.db_helper.fetchall(cursor)
 
         tables = []
 
@@ -1202,7 +1305,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
         return tsi.TableQueryStatsBatchRes(tables=tables)
 
-    def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
+    async def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
         # TODO: This reads one ref at a time, it should read them in batches
         # where it can. Like it should group by object that we need to read.
         # And it should also batch into table refs (like when we are reading a bunch
@@ -1215,12 +1318,12 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             raise ValueError("Table refs not supported")
         parsed_obj_refs = cast(list[ri.InternalObjectRef], parsed_refs)
 
-        def read_ref(r: ri.InternalObjectRef) -> Any:
+        async def read_ref(r: ri.InternalObjectRef) -> Any:
             conds = [
                 f"object_id = '{r.name}'",
                 f"digest = '{r.version}'",
             ]
-            objs = self._select_objs_query(
+            objs = await self._select_objs_query(
                 r.project_id,
                 conditions=conds,
                 include_deleted=True,
@@ -1248,7 +1351,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                             raise ValueError(
                                 "invalid data layout encountered, expected TableRef when resolving id"
                             )
-                        row = self._table_row_read(
+                        row = await self._table_row_read(
                             project_id=table_ref.project_id,
                             row_digest=arg,
                         )
@@ -1261,11 +1364,25 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     raise ValueError(f"Unknown ref type: {extra[extra_index]}")
             return val
 
-        return tsi.RefsReadBatchRes(vals=[read_ref(r) for r in parsed_obj_refs])
+        return tsi.RefsReadBatchRes(vals=[await read_ref(r) for r in parsed_obj_refs])
 
-    def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
+    async def feedback_create(
+        self, req: tsi.FeedbackCreateReq
+    ) -> tsi.FeedbackCreateRes:
+        """
+        Async version of feedback_create method.
+
+        Args:
+            req (tsi.FeedbackCreateReq): The feedback creation request.
+
+        Returns:
+            tsi.FeedbackCreateRes: Response containing the created feedback details.
+
+        Raises:
+            InvalidRequest: If emoji validation fails or payload is too large.
+        """
         assert_non_null_wb_user_id(req)
-        validate_feedback_create_req(req, self)
+        await validate_feedback_create_req(req, self)
 
         # Augment emoji with alias.
         res_payload = {}
@@ -1302,11 +1419,11 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             "call_ref": req.call_ref,
             "trigger_ref": req.trigger_ref,
         }
-        conn, cursor = get_conn_cursor(self.db_path)
-        with self.lock:
-            prepared = TABLE_FEEDBACK.insert(row).prepare(database_type="sqlite")
-            cursor.executemany(prepared.sql, prepared.data)
-            conn.commit()
+        prepared = TABLE_FEEDBACK.insert(row).prepare(database_type="sqlite")
+        await self.db_helper.executemany(
+            prepared.sql, [tuple(row) for row in prepared.data]
+        )
+        await self.db_helper.commit()
         return tsi.FeedbackCreateRes(
             id=feedback_id,
             created_at=created_at,
@@ -1314,8 +1431,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             payload=res_payload,
         )
 
-    def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
-        conn, cursor = get_conn_cursor(self.db_path)
+    async def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
         query = TABLE_FEEDBACK.select()
         query = query.project_id(req.project_id)
         query = query.fields(req.fields)
@@ -1323,27 +1439,46 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         query = query.order_by(req.sort_by)
         query = query.limit(req.limit).offset(req.offset)
         prepared = query.prepare(database_type="sqlite")
-        r = cursor.execute(prepared.sql, prepared.parameters)
-        result = TABLE_FEEDBACK.tuples_to_rows(r.fetchall(), prepared.fields)
+        cursor = await self.db_helper.execute(prepared.sql, tuple(prepared.parameters))
+        r = await self.db_helper.fetchall(cursor)
+        result = TABLE_FEEDBACK.tuples_to_rows(r, prepared.fields)
         return tsi.FeedbackQueryRes(result=result)
 
-    def feedback_purge(self, req: tsi.FeedbackPurgeReq) -> tsi.FeedbackPurgeRes:
+    async def feedback_purge(self, req: tsi.FeedbackPurgeReq) -> tsi.FeedbackPurgeRes:
+        """
+        Async version of feedback_purge method.
+
+        Args:
+            req (tsi.FeedbackPurgeReq): The feedback purge request.
+
+        Returns:
+            tsi.FeedbackPurgeRes: Response confirming the purge operation.
+        """
         # TODO: Instead of passing conditions to DELETE FROM,
         #       should we select matching ids, and then DELETE FROM WHERE id IN (...)?
         #       This would allow us to return the number of rows deleted, and complain
         #       if too many things would be deleted.
-        validate_feedback_purge_req(req)
-        conn, cursor = get_conn_cursor(self.db_path)
+        await validate_feedback_purge_req(req)
         query = TABLE_FEEDBACK.purge()
         query = query.project_id(req.project_id)
         query = query.where(req.query)
         prepared = query.prepare(database_type="sqlite")
-        with self.lock:
-            cursor.execute(prepared.sql, prepared.parameters)
-            conn.commit()
+        await self.db_helper.execute(prepared.sql, tuple(prepared.parameters))
+        await self.db_helper.commit()
         return tsi.FeedbackPurgeRes()
 
-    def feedback_replace(self, req: tsi.FeedbackReplaceReq) -> tsi.FeedbackReplaceRes:
+    async def feedback_replace(
+        self, req: tsi.FeedbackReplaceReq
+    ) -> tsi.FeedbackReplaceRes:
+        """
+        Async version of feedback_replace method.
+
+        Args:
+            req (tsi.FeedbackReplaceReq): The feedback replace request.
+
+        Returns:
+            tsi.FeedbackReplaceRes: Response containing the replaced feedback details.
+        """
         purge_request = tsi.FeedbackPurgeReq(
             project_id=req.project_id,
             query={
@@ -1355,9 +1490,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 }
             },
         )
-        self.feedback_purge(purge_request)
+        await self.feedback_purge(purge_request)
         create_req = tsi.FeedbackCreateReq(**req.model_dump(exclude={"feedback_id"}))
-        create_result = self.feedback_create(create_req)
+        create_result = await self.feedback_create(create_req)
 
         return tsi.FeedbackReplaceRes(
             id=create_result.id,
@@ -1366,71 +1501,70 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             payload=create_result.payload,
         )
 
-    def actions_execute_batch(
+    async def actions_execute_batch(
         self, req: tsi.ActionsExecuteBatchReq
     ) -> tsi.ActionsExecuteBatchRes:
         raise NotImplementedError(
             "actions_execute_batch is not implemented for SQLite trace server"
         )
 
-    def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
-        conn, cursor = get_conn_cursor(self.db_path)
+    async def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         digest = bytes_digest(req.content)
-        with self.lock:
-            cursor.execute(
-                "INSERT OR IGNORE INTO files (project_id, digest, val) VALUES (?, ?, ?)",
-                (
-                    req.project_id,
-                    digest,
-                    req.content,
-                ),
-            )
-            conn.commit()
+        await self.db_helper.execute(
+            "INSERT OR IGNORE INTO files (project_id, digest, val) VALUES (?, ?, ?)",
+            (
+                req.project_id,
+                digest,
+                req.content,
+            ),
+        )
+        await self.db_helper.commit()
         return tsi.FileCreateRes(digest=digest)
 
-    def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
-        conn, cursor = get_conn_cursor(self.db_path)
-        cursor.execute(
+    async def file_content_read(
+        self, req: tsi.FileContentReadReq
+    ) -> tsi.FileContentReadRes:
+        cursor = await self.db_helper.execute(
             "SELECT val FROM files WHERE project_id = ? AND digest = ?",
             (req.project_id, req.digest),
         )
-        query_result = cursor.fetchone()
+        query_result = await self.db_helper.fetchone(cursor)
         if query_result is None:
             raise NotFoundError(f"File {req.digest} not found")
         return tsi.FileContentReadRes(content=query_result[0])
 
-    def files_stats(self, req: tsi.FilesStatsReq) -> tsi.FilesStatsRes:
+    async def files_stats(self, req: tsi.FilesStatsReq) -> tsi.FilesStatsRes:
         print("files_stats is not implemented for SQLite trace server", req)
         return tsi.FilesStatsRes(total_size_bytes=-1)
 
-    def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
+    async def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
         print("COST CREATE is not implemented for local sqlite", req)
         return tsi.CostCreateRes()
 
-    def cost_query(self, req: tsi.CostQueryReq) -> tsi.CostQueryRes:
+    async def cost_query(self, req: tsi.CostQueryReq) -> tsi.CostQueryRes:
         print("COST QUERY is not implemented for local sqlite", req)
         return tsi.CostQueryRes()
 
-    def cost_purge(self, req: tsi.CostPurgeReq) -> tsi.CostPurgeRes:
+    async def cost_purge(self, req: tsi.CostPurgeReq) -> tsi.CostPurgeRes:
         print("COST PURGE is not implemented for local sqlite", req)
         return tsi.CostPurgeRes()
 
-    def completions_create(
+    async def completions_create(
         self, req: tsi.CompletionsCreateReq
     ) -> tsi.CompletionsCreateRes:
         # TODO: This is not implemented for the sqlite trace server
         # Currently, this will only be called from the weave file, so we return an empty dict for now
         return tsi.CompletionsCreateRes(response={})
 
-    def completions_create_stream(
+    async def completions_create_stream(
         self, req: tsi.CompletionsCreateReq
-    ) -> Iterator[dict[str, Any]]:
+    ) -> AsyncIterator[dict[str, Any]]:
         # TODO: This is not implemented for the sqlite trace server
         # Fall back to non-streaming completion
-        response = self.completions_create(req)
+        response = await self.completions_create(req)
         yield {"response": response.response, "weave_call_id": response.weave_call_id}
 
-    def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
+    async def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
         if not isinstance(req.traces, ExportTraceServiceRequest):
             raise TypeError(
                 "Expected traces as ExportTraceServiceRequest, got {type(req.traces)}"
@@ -1454,21 +1588,18 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                             {"mode": "end", "req": tsi.CallEndReq(end=end_call)},
                         ]
                     )
-        res = self.call_start_batch(tsi.CallCreateBatchReq(batch=calls))
+        res = await self.call_start_batch(tsi.CallCreateBatchReq(batch=calls))
         # Return the empty ExportTraceServiceResponse as per the OTLP spec
         return tsi.OtelExportRes()
 
-    def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes:
+    async def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes:
         raise NotImplementedError(
             "project_stats is not implemented for SQLite trace server"
         )
 
-    def threads_query_stream(
+    async def threads_query_stream(
         self, req: tsi.ThreadsQueryReq
-    ) -> Iterator[tsi.ThreadSchema]:
-        """Stream threads with aggregated statistics sorted by last activity."""
-        conn, cursor = get_conn_cursor(self.db_path)
-
+    ) -> AsyncIterator[tsi.ThreadSchema]:
         # Extract filter values
         after_datetime = None
         before_datetime = None
@@ -1489,8 +1620,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             thread_ids=thread_ids,
         )
 
-        cursor.execute(query, parameters)
-        query_result = cursor.fetchall()
+        cursor = await self.db_helper.execute(query, tuple(parameters))
+        query_result = await self.db_helper.fetchall(cursor)
 
         # Use iter() as requested for SQLite implementation
         for row in iter(query_result):
@@ -1533,34 +1664,34 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 p99_turn_duration_ms=p99_turn_duration_ms,
             )
 
-    def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
+    async def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
         raise NotImplementedError(
             "evaluate_model is not implemented for SQLite trace server"
         )
 
-    def evaluation_status(
+    async def evaluation_status(
         self, req: tsi.EvaluationStatusReq
     ) -> tsi.EvaluationStatusRes:
         return evaluation_status(self, req)
 
-    def _table_row_read(self, project_id: str, row_digest: str) -> tsi.TableRowSchema:
-        conn, cursor = get_conn_cursor(self.db_path)
-        # Now get the rows
-        cursor.execute(
+    async def _table_row_read(
+        self, project_id: str, row_digest: str
+    ) -> tsi.TableRowSchema:
+        cursor = await self.db_helper.execute(
             """
             SELECT digest, val FROM table_rows
             WHERE project_id = ? AND digest = ?
             """,
-            [project_id, row_digest],
+            (project_id, row_digest),
         )
-        query_result = cursor.fetchone()
+        query_result = await self.db_helper.fetchone(cursor)
         if query_result is None:
             raise NotFoundError(f"Row {row_digest} not found")
         return tsi.TableRowSchema(
             digest=query_result[0], val=json.loads(query_result[1])
         )
 
-    def _select_objs_query(
+    async def _select_objs_query(
         self,
         project_id: str,
         conditions: Optional[list[str]] = None,
@@ -1571,7 +1702,6 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         offset: Optional[int] = None,
         sort_by: Optional[list[tsi.SortBy]] = None,
     ) -> list[tsi.ObjSchema]:
-        conn, cursor = get_conn_cursor(self.db_path)
         conditions = conditions or []
         if not include_deleted:
             conditions.append("deleted_at IS NULL")
@@ -1621,8 +1751,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             for param_list in parameters.values():
                 params.extend(param_list)
 
-        cursor.execute(query, params)
-        query_result = cursor.fetchall()
+        cursor = await self.db_helper.execute(query, tuple(params))
+        query_result = await self.db_helper.fetchall(cursor)
         result: list[tsi.ObjSchema] = []
         for row in query_result:
             result.append(
@@ -1643,11 +1773,12 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             )
         return result
 
-    def table_query_stream(
+    async def table_query_stream(
         self, req: tsi.TableQueryReq
-    ) -> Iterator[tsi.TableRowSchema]:
-        results = self.table_query(req)
-        yield from results.rows
+    ) -> AsyncIterator[tsi.TableRowSchema]:
+        results = await self.table_query(req)
+        for row in results.rows:
+            yield row
 
 
 def get_type(val: Any) -> str:

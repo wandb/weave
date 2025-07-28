@@ -2,6 +2,7 @@ from pydantic import ValidationError
 
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.async_trace_server_interface import AsyncTraceServerInterface
 from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.interface.builtin_object_classes.annotation_spec import (
     AnnotationSpec,
@@ -41,8 +42,8 @@ TABLE_FEEDBACK = Table(
 )
 
 
-def validate_feedback_create_req(
-    req: tsi.FeedbackCreateReq, trace_server: tsi.TraceServerInterface
+async def validate_feedback_create_req(
+    req: tsi.FeedbackCreateReq, trace_server: AsyncTraceServerInterface
 ) -> None:
     payload_schema = FEEDBACK_PAYLOAD_SCHEMAS.get(req.feedback_type)
     if payload_schema:
@@ -116,7 +117,7 @@ def validate_feedback_create_req(
             )
 
         # 2. Read the annotation spec
-        data = trace_server.refs_read_batch(
+        data = await trace_server.refs_read_batch(
             tsi.RefsReadBatchReq(refs=[req.annotation_ref])
         )
         if len(data.vals) == 0:
@@ -141,15 +142,15 @@ MESSAGE_INVALID_FEEDBACK_PURGE = (
 )
 
 
-def validate_feedback_purge_req(req: tsi.FeedbackPurgeReq) -> None:
+async def validate_feedback_purge_req(req: tsi.FeedbackPurgeReq) -> None:
     """For safety, we currently only allow purging by feedback id."""
     expr = req.query.expr_.model_dump()
     keys = list(expr.keys())
     if len(keys) != 1:
         raise InvalidRequest(MESSAGE_INVALID_FEEDBACK_PURGE)
     if keys[0] == "eq_":
-        validate_purge_req_one(expr, MESSAGE_INVALID_FEEDBACK_PURGE)
+        await validate_purge_req_one(expr, MESSAGE_INVALID_FEEDBACK_PURGE)
     elif keys[0] == "or_":
-        validate_purge_req_multiple(expr["or_"], MESSAGE_INVALID_FEEDBACK_PURGE)
+        await validate_purge_req_multiple(expr["or_"], MESSAGE_INVALID_FEEDBACK_PURGE)
     else:
         raise InvalidRequest(MESSAGE_INVALID_FEEDBACK_PURGE)

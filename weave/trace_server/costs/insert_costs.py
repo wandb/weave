@@ -10,7 +10,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional, TypedDict
 
-from clickhouse_connect.driver.client import Client
+from clickhouse_connect.driver.client import AsyncClient as CHClientAsync
 
 COST_FILE = "cost_checkpoint.json"
 
@@ -18,10 +18,10 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-def get_current_costs(
-    client: Client,
+async def get_current_costs(
+    client: CHClientAsync,
 ) -> list[tuple[str, float, float, datetime]]:
-    current_costs = client.query(
+    current_costs = await client.query(
         """
         SELECT
             llm_id,
@@ -61,7 +61,9 @@ def load_costs_from_json(file_name: str = COST_FILE) -> dict[str, list[CostDetai
     return data
 
 
-def insert_costs_into_db(client: Client, data: dict[str, list[CostDetails]]) -> None:
+async def insert_costs_into_db(
+    client: CHClientAsync, data: dict[str, list[CostDetails]]
+) -> None:
     rows = []
     for llm_id, costs in data.items():
         for cost in costs:
@@ -91,7 +93,7 @@ def insert_costs_into_db(client: Client, data: dict[str, list[CostDetails]]) -> 
                 ),
             )
     # Insert the data into the table
-    client.insert(
+    await client.insert(
         "llm_token_prices",
         rows,
         column_names=[
@@ -111,10 +113,10 @@ def insert_costs_into_db(client: Client, data: dict[str, list[CostDetails]]) -> 
     )
 
 
-def filter_out_current_costs(
-    client: Client, new_costs: dict[str, list[CostDetails]]
+async def filter_out_current_costs(
+    client: CHClientAsync, new_costs: dict[str, list[CostDetails]]
 ) -> dict[str, list[CostDetails]]:
-    current_costs = get_current_costs(client)
+    current_costs = await get_current_costs(client)
     for (
         llm_id,
         prompt_token_cost,
@@ -148,7 +150,7 @@ def sum_costs(data: dict[str, list[CostDetails]]) -> float:
     return total_costs
 
 
-def insert_costs(client: Client, target_db: str) -> None:
+async def insert_costs(client: CHClientAsync, target_db: str) -> None:
     client.database = target_db
     # Get costs from json
     try:
@@ -160,7 +162,7 @@ def insert_costs(client: Client, target_db: str) -> None:
 
     # filter out current costs
     try:
-        new_costs = filter_out_current_costs(client, new_costs)
+        new_costs = await filter_out_current_costs(client, new_costs)
     except Exception as e:
         logger.exception("Failed to filter out current costs")
         return
@@ -175,7 +177,7 @@ def insert_costs(client: Client, target_db: str) -> None:
 
     # Attempt to insert the costs into the table
     try:
-        insert_costs_into_db(client, new_costs)
+        await insert_costs_into_db(client, new_costs)
     except Exception as e:
         logger.exception("Failed to insert costs into db")
         return
