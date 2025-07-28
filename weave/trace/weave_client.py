@@ -100,6 +100,7 @@ from weave.trace_server.trace_server_interface import (
     CallEndReq,
     CallSchema,
     CallsDeleteReq,
+    CallsDescendantsReq,
     CallsFilter,
     CallsQueryReq,
     CallsQueryStatsReq,
@@ -1085,10 +1086,6 @@ class WeaveClient:
         Returns:
             List of Call objects representing the descendants.
         """
-        from weave.trace_server.trace_server_interface import (
-            CallsDescendantsReq,
-        )
-
         if not parent_call_ids:
             raise ValueError("Must specify call_ids")
         if depth is not None and depth < 1:
