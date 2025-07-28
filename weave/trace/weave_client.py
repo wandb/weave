@@ -925,12 +925,14 @@ class WeaveClient:
 
     def get_evaluations(self) -> CallsIter:
         """Gets all root Evaluation.evaluate calls in this project."""
+        evaluate_op_name = "Evaluation.evaluate"
+
         return self.get_calls(
             query={
                 "$expr": {
                     "$contains": {
                         "input": {"$getField": "op_name"},
-                        "substr": {"$literal": "Evaluation.evaluate"},
+                        "substr": {"$literal": evaluate_op_name},
                     }
                 }
             }
@@ -940,15 +942,15 @@ class WeaveClient:
         """Gets all score calls in this project.
 
         Currently only works for imperative evals"""
+        score_json_path = "attributes._weave_eval_meta.score"
+
         return self.get_calls(
             query={
                 "$expr": {
                     "$eq": [
                         {
                             "$convert": {
-                                "input": {
-                                    "$getField": "attributes._weave_eval_meta.score"
-                                },
+                                "input": {"$getField": score_json_path},
                                 "to": "string",
                             },
                         },
@@ -956,7 +958,7 @@ class WeaveClient:
                     ]
                 }
             },
-            expand_columns=["attributes._weave_eval_meta.score"],
+            expand_columns=[score_json_path],
         )
 
     @trace_sentry.global_trace_sentry.watch()
