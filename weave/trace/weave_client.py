@@ -12,7 +12,7 @@ import re
 import sys
 import time
 from collections import defaultdict
-from collections.abc import Iterable, Sequence
+from collections.abc import Sequence
 from concurrent.futures import Future
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, Callable, TypedDict, cast
@@ -133,7 +133,6 @@ from weave.trace_server.trace_server_interface import (
 from weave.utils.paginated_iterator import PaginatedIterator
 
 if TYPE_CHECKING:
-    import pandas as pd
     import wandb
 
     from weave.flow.scorer import ApplyScorerResult, Scorer
@@ -2520,13 +2519,6 @@ def zip_dicts(base_dict: dict[str, Any], new_dict: dict[str, Any]) -> dict[str, 
             final_dict[key] = value
 
     return final_dict
-
-
-def dataframeify(calls: Iterable[Call]) -> pd.DataFrame:
-    import pandas as pd
-
-    call_series = pd.Series(calls).apply(lambda x: x.to_dict())
-    return pd.json_normalize(call_series)
 
 
 __docspec__ = [WeaveClient, Call, CallsIter]
