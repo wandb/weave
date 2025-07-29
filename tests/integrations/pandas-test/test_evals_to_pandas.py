@@ -1,5 +1,7 @@
 import pytest
 
+from tests.trace.util import client_is_sqlite
+
 
 def test_get_evaluations_to_pandas(client, make_evals):
     evals_df = client.get_evaluations().to_pandas(flatten=True)
