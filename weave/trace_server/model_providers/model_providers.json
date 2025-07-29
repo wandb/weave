@@ -1,4 +1,40 @@
 {
+  "Qwen/Qwen3-235B-A22B-Instruct-2507": {
+    "litellm_provider": "coreweave",
+    "api_key_name": "WANDB_API_KEY"
+  },
+  "Qwen/Qwen3-Coder-480B-A35B-Instruct": {
+    "litellm_provider": "coreweave",
+    "api_key_name": "WANDB_API_KEY"
+  },
+  "moonshotai/Kimi-K2-Instruct": {
+    "litellm_provider": "coreweave",
+    "api_key_name": "WANDB_API_KEY"
+  },
+  "meta-llama/Llama-3.1-8B-Instruct": {
+    "litellm_provider": "coreweave",
+    "api_key_name": "WANDB_API_KEY"
+  },
+  "deepseek-ai/DeepSeek-R1-0528": {
+    "litellm_provider": "coreweave",
+    "api_key_name": "WANDB_API_KEY"
+  },
+  "deepseek-ai/DeepSeek-V3-0324": {
+    "litellm_provider": "coreweave",
+    "api_key_name": "WANDB_API_KEY"
+  },
+  "meta-llama/Llama-3.3-70B-Instruct": {
+    "litellm_provider": "coreweave",
+    "api_key_name": "WANDB_API_KEY"
+  },
+  "meta-llama/Llama-4-Scout-17B-16E-Instruct": {
+    "litellm_provider": "coreweave",
+    "api_key_name": "WANDB_API_KEY"
+  },
+  "microsoft/Phi-4-mini-instruct": {
+    "litellm_provider": "coreweave",
+    "api_key_name": "WANDB_API_KEY"
+  },
   "omni-moderation-latest": {
     "litellm_provider": "openai",
     "api_key_name": "OPENAI_API_KEY"
@@ -1652,6 +1688,30 @@
     "api_key_name": "GEMINI_API_KEY"
   },
   "gemini/gemini-gemma-2-9b-it": {
+    "litellm_provider": "gemini",
+    "api_key_name": "GEMINI_API_KEY"
+  },
+  "gemini/imagen-4.0-generate-preview-06-06": {
+    "litellm_provider": "gemini",
+    "api_key_name": "GEMINI_API_KEY"
+  },
+  "gemini/imagen-4.0-ultra-generate-preview-06-06": {
+    "litellm_provider": "gemini",
+    "api_key_name": "GEMINI_API_KEY"
+  },
+  "gemini/imagen-4.0-fast-generate-preview-06-06": {
+    "litellm_provider": "gemini",
+    "api_key_name": "GEMINI_API_KEY"
+  },
+  "gemini/imagen-3.0-generate-002": {
+    "litellm_provider": "gemini",
+    "api_key_name": "GEMINI_API_KEY"
+  },
+  "gemini/imagen-3.0-generate-001": {
+    "litellm_provider": "gemini",
+    "api_key_name": "GEMINI_API_KEY"
+  },
+  "gemini/imagen-3.0-fast-generate-001": {
     "litellm_provider": "gemini",
     "api_key_name": "GEMINI_API_KEY"
   },

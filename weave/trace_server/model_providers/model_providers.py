@@ -1,12 +1,22 @@
 import json
 import logging
 import os
+from pathlib import Path
 from typing import TypedDict
 
 import requests
 
 model_providers_url = "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json"
 MODEL_PROVIDER_INFO_FILE = "model_providers.json"
+
+HOSTED_MODEL_INFO_DIR = (
+    Path(__file__)
+    .parent.joinpath(
+        "../../../../../../frontends/weave/src/components/PagePanelComponents/Home/Browse3/inference"
+    )
+    .resolve()
+)
+HOSTED_MODEL_INFO_FILE = HOSTED_MODEL_INFO_DIR / "modelsFinal.json"
 
 
 PROVIDER_TO_API_KEY_NAME_MAP = {
@@ -15,6 +25,7 @@ PROVIDER_TO_API_KEY_NAME_MAP = {
     "azure_ai": "AZURE_API_KEY",
     "bedrock": "BEDROCK_API_KEY",
     "bedrock_converse": "BEDROCK_API_KEY",
+    "coreweave": "WANDB_API_KEY",
     "deepseek": "DEEPSEEK_API_KEY",
     "fireworks": "FIREWORKS_API_KEY",
     "gemini": "GEMINI_API_KEY",
@@ -51,6 +62,24 @@ def main(
     file_name: str = MODEL_PROVIDER_INFO_FILE,
 ) -> dict[str, LLMModelProviderInfo]:
     full_path = os.path.join(os.path.dirname(__file__), file_name)
+
+    providers: dict[str, LLMModelProviderInfo] = {}
+
+    # Start with information about CoreWeave hosted models
+    with open(HOSTED_MODEL_INFO_FILE) as f:
+        hosted_models = json.load(f)
+    for model in hosted_models["models"]:
+        provider = model["provider"]
+        if provider != "coreweave":
+            continue
+        api_key_name = PROVIDER_TO_API_KEY_NAME_MAP.get(provider)
+        if api_key_name is None:
+            raise ValueError(f"No API key name found for provider: {provider}")
+        providers[model["idPlayground"]] = LLMModelProviderInfo(
+            litellm_provider=provider, api_key_name=api_key_name
+        )
+
+    # Next add in information from the LiteLLM model provider info file
     try:
         req = requests.get(model_providers_url)
         req.raise_for_status()
@@ -58,8 +87,12 @@ def main(
         print("Failed to fetch models:", e)
         return {}
 
-    providers: dict[str, LLMModelProviderInfo] = {}
     for k, val in req.json().items():
+        if k in providers:
+            # If this happens, it becomes unclear which provider to use,
+            # we'll have to manually resolve it somehow.
+            raise ValueError(f"Conflict between hosted model ID and LiteLLM: {k}")
+
         provider = val.get("litellm_provider")
         api_key_name = PROVIDER_TO_API_KEY_NAME_MAP.get(provider)
         if api_key_name:
