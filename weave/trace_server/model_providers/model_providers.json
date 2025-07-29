@@ -7,6 +7,10 @@
     "litellm_provider": "coreweave",
     "api_key_name": "WANDB_API_KEY"
   },
+  "Qwen/Qwen3-235B-A22B-Thinking-2507": {
+    "litellm_provider": "coreweave",
+    "api_key_name": "WANDB_API_KEY"
+  },
   "moonshotai/Kimi-K2-Instruct": {
     "litellm_provider": "coreweave",
     "api_key_name": "WANDB_API_KEY"

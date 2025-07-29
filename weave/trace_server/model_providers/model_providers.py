@@ -1,7 +1,6 @@
 import json
 import logging
 import os
-from pathlib import Path
 from typing import TypedDict
 
 import requests
@@ -9,14 +8,8 @@ import requests
 model_providers_url = "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json"
 MODEL_PROVIDER_INFO_FILE = "model_providers.json"
 
-HOSTED_MODEL_INFO_DIR = (
-    Path(__file__)
-    .parent.joinpath(
-        "../../../../../../frontends/weave/src/components/PagePanelComponents/Home/Browse3/inference"
-    )
-    .resolve()
-)
-HOSTED_MODEL_INFO_FILE = HOSTED_MODEL_INFO_DIR / "modelsFinal.json"
+# This is a symlink to the catalog file in the frontend to avoid further ground truth dilution.
+HOSTED_MODEL_INFO_FILE = "modelsFinal.json"
 
 
 PROVIDER_TO_API_KEY_NAME_MAP = {
@@ -61,12 +54,11 @@ def read_model_to_provider_info_map(
 def main(
     file_name: str = MODEL_PROVIDER_INFO_FILE,
 ) -> dict[str, LLMModelProviderInfo]:
-    full_path = os.path.join(os.path.dirname(__file__), file_name)
-
     providers: dict[str, LLMModelProviderInfo] = {}
 
     # Start with information about CoreWeave hosted models
-    with open(HOSTED_MODEL_INFO_FILE) as f:
+    full_path_hosted = os.path.join(os.path.dirname(__file__), HOSTED_MODEL_INFO_FILE)
+    with open(full_path_hosted) as f:
         hosted_models = json.load(f)
     for model in hosted_models["models"]:
         provider = model["provider"]
@@ -99,11 +91,12 @@ def main(
             providers[k] = LLMModelProviderInfo(
                 litellm_provider=provider, api_key_name=api_key_name
             )
-    os.makedirs(os.path.dirname(full_path), exist_ok=True)
-    with open(full_path, "w") as f:
+    full_path_output = os.path.join(os.path.dirname(__file__), file_name)
+    os.makedirs(os.path.dirname(full_path_output), exist_ok=True)
+    with open(full_path_output, "w") as f:
         json.dump(providers, f, indent=2)
     print(
-        f"Updated model to model provider info file at: {full_path}. {len(providers)} models updated."
+        f"Updated model to model provider info file at: {full_path_output}. {len(providers)} models updated."
     )
     return providers
 
