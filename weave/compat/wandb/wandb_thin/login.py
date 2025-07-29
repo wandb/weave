@@ -9,7 +9,7 @@ from typing import Literal
 import click
 
 from weave.compat.wandb.util.netrc import Netrc
-from weave.compat.wandb.wandb_thin import util
+from weave.compat.wandb.wandb_thin import env, util
 
 logger = logging.getLogger(__name__)
 
@@ -104,7 +104,7 @@ def _get_default_host() -> str:
     This mimics the behavior of the real wandb library to ensure consistency.
     """
     # Check environment variable first
-    env_base_url = os.getenv("WANDB_BASE_URL")
+    env_base_url = os.getenv(env.BASE_URL)
     if env_base_url:
         env_base_url = env_base_url.rstrip("/")
         # Parse out just the hostname from the URL
@@ -129,7 +129,7 @@ def _get_host_from_settings() -> str | None:
     """
     try:
         default_config_dir = Path.home() / ".config" / "wandb"
-        config_dir = os.environ.get("WANDB_CONFIG_DIR", str(default_config_dir))
+        config_dir = os.getenv(env.CONFIG_DIR, str(default_config_dir))
         settings_path = Path(config_dir) / "settings"
 
         if not settings_path.exists():
