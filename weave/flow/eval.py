@@ -141,6 +141,9 @@ class Evaluation(Object):
             field_values["scorers"] = scorers
         # End mega-hack
 
+        if not field_values.get("dataset"):
+            field_values["dataset"] = weave.Dataset(rows=[{"a": 1}])
+
         return cls(**field_values)
 
     def model_post_init(self, __context: Any) -> None:
