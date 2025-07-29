@@ -467,6 +467,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 "summary_dump",
             ]
 
+        if req.expand_columns is not None:
+            cq.set_expand_columns(req.expand_columns)
         for col in columns:
             cq.add_field(col)
         if req.filter is not None:
@@ -478,18 +480,20 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if req.sort_by is not None:
             for sort_by in req.sort_by:
                 cq.add_order(sort_by.field, sort_by.direction)
+            # If user isn't already sorting by id, add id as secondary sort for consistency
+            if not any(sort_by.field == "id" for sort_by in req.sort_by):
+                cq.add_order("id", "asc")
         else:
+            # Default sorting: started_at with id as secondary sort for consistency
             cq.add_order("started_at", "asc")
+            cq.add_order("id", "asc")
         if req.limit is not None:
             cq.set_limit(req.limit)
         if req.offset is not None:
             cq.set_offset(req.offset)
 
         pb = ParamBuilder()
-        raw_res = self._query_stream(
-            cq.as_sql(pb),
-            pb.get_params(),
-        )
+        raw_res = self._query_stream(cq.as_sql(pb), pb.get_params())
 
         select_columns = [c.field for c in cq.select_fields]
         expand_columns = req.expand_columns or []
@@ -512,7 +516,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         for batch in batch_processor.make_batches(raw_res):
             call_dicts = [row_to_call_schema_dict(row) for row in batch]
-            if expand_columns:
+            if expand_columns and req.return_expanded_column_values:
                 self._expand_call_refs(
                     req.project_id, call_dicts, expand_columns, ref_cache
                 )
@@ -1199,9 +1203,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # Extract filter values
         after_datetime = None
         before_datetime = None
+        thread_ids = None
         if req.filter is not None:
             after_datetime = req.filter.after_datetime
             before_datetime = req.filter.before_datetime
+            thread_ids = req.filter.thread_ids
 
         # Use the dedicated query builder
         query = make_threads_query(
@@ -1212,6 +1218,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             sort_by=req.sort_by,
             sortable_datetime_after=after_datetime,
             sortable_datetime_before=before_datetime,
+            thread_ids=thread_ids,
         )
 
         # Stream the results using _query_stream

@@ -282,6 +282,14 @@ class OpCallError(Exception): ...
 
 
 def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedInputs:
+    # Lazy load so Content modele isn't resolved until necessary
+    from weave.trace.annotation_parser import (
+        ContentAnnotation,
+        parse_content_annotation,
+        parse_from_signature,
+    )
+    from weave.type_wrappers import Content
+
     try:
         sig = inspect.signature(func)
         inputs = sig.bind(*args, **kwargs).arguments
@@ -289,12 +297,41 @@ def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedI
         raise OpCallError(f"Error calling {func.name}: {e}") from e
 
     inputs_with_defaults = _apply_fn_defaults_to_inputs(func, inputs)
+
+    # Annotated input type flow
+    # If user defines postprocess_inputs manually, trust it instead of running this
+    to_weave_inputs = {}
+    if not func.postprocess_inputs:
+        parsed_annotations = parse_from_signature(sig)
+        for param_name, value in inputs_with_defaults.items():
+            # Check if we found an annotation which requires substitution
+            parsed = parsed_annotations.get(param_name)
+            # We don't need to do anything with this if a special annotation is not found
+            if not parsed:
+                to_weave_inputs[param_name] = value
+                continue
+            elif isinstance(parsed, ContentAnnotation):
+                to_weave_inputs[param_name] = Content._from_guess(
+                    value, mimetype=parsed.mimetype, extension=parsed.extension
+                )
+    else:
+        to_weave_inputs = inputs_with_defaults
+
+    # Annotated return type flow
+    # If user defines postprocess_output manually, trust it instead of running this
+    if not func.postprocess_output and sig.return_annotation:
+        parsed = parse_content_annotation(str(sig.return_annotation))
+        if isinstance(parsed, ContentAnnotation):
+            func.postprocess_output = lambda x: Content._from_guess(
+                x, mimetype=parsed.mimetype, extension=parsed.extension
+            )
+
     return ProcessedInputs(
         original_args=args,
         original_kwargs=kwargs,
         args=args,
         kwargs=kwargs,
-        inputs=inputs_with_defaults,
+        inputs=to_weave_inputs,
     )
 
 
