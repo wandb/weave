@@ -121,12 +121,7 @@ def setup_test_objects(server: TraceServerInterface, entity: str, project: str):
     def create_dataset() -> str:
         """Create a test dataset and return its reference URI."""
         dataset_table_val = [
-            {"user_input": "How are you?", "expected": "I'm doing well, thank you!"},
-            # {"user_input": "What's 2+2?", "expected": "4"},
-            # {
-            #     "user_input": "Tell me a joke",
-            #     "expected": "Why did the chicken cross the road?",
-            # },
+            {"user_input": "How are you?", "expected": "I'm doing well, thank you!"}
         ]
         dataset_table_res = server.table_create(
             TableCreateReq.model_validate(
@@ -327,7 +322,8 @@ def test_evaluate_model(client: WeaveClient, direct_script_execution):
             }
         )
     )
-
+    
+    # Here are the 9 calls that are expected:
     # evaluate
     # predict_and_score
     #    predict
