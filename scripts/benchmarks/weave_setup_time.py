@@ -14,6 +14,8 @@ import subprocess
 import sys
 import time
 import uuid
+from collections.abc import Callable
+from typing import Any
 
 from _utils import (
     calculate_stats,
@@ -26,6 +28,45 @@ from _utils import (
 from rich.console import Console
 
 console = Console()
+
+
+def _run_timing_script(
+    script_content: str,
+    test_name: str,
+    parser_func: Callable,
+) -> Any:
+    """Run a timing script in a fresh process and parse the output.
+
+    Args:
+        script_content (str): The Python script content to execute.
+        test_name (str): A name for the test (used in temp file naming and error messages).
+        parser_func: Function to parse the stdout and return the desired result.
+
+    Returns:
+        The result from parser_func, or appropriate default on failure.
+    """
+    # Write to a temporary file
+    temp_file = f"temp_{test_name}_{uuid.uuid4().hex[:8]}.py"
+    try:
+        with open(temp_file, "w") as f:
+            f.write(script_content)
+
+        # Run in a fresh Python process
+        result = subprocess.run(
+            [sys.executable, temp_file], capture_output=True, text=True, timeout=30
+        )
+
+        if result.returncode == 0:
+            return parser_func(result.stdout.strip())
+        else:
+            console.print(
+                f"[red]{test_name.title()} test failed: {result.stderr}[/red]"
+            )
+            return parser_func("")  # Let parser_func handle the error case
+    finally:
+        # Clean up temp file
+        if os.path.exists(temp_file):
+            os.remove(temp_file)
 
 
 def time_weave_import() -> float:
@@ -43,50 +84,12 @@ end_time = time.perf_counter()
 print(end_time - start_time)
 """
 
-    # Write to a temporary file
-    temp_file = f"temp_import_test_{uuid.uuid4().hex[:8]}.py"
-    try:
-        with open(temp_file, "w") as f:
-            f.write(temp_script)
-
-        # Run in a fresh Python process
-        result = subprocess.run(
-            [sys.executable, temp_file], capture_output=True, text=True, timeout=30
-        )
-
-        if result.returncode == 0:
-            return float(result.stdout.strip())
-        else:
-            console.print(f"[red]Import test failed: {result.stderr}[/red]")
+    def parse_import_time(output: str) -> float:
+        if not output:
             return 0.0
-    finally:
-        # Clean up temp file
-        if os.path.exists(temp_file):
-            os.remove(temp_file)
+        return float(output)
 
-
-def time_weave_init() -> float:
-    """Time the weave.init() call.
-
-    Returns:
-        float: Time taken to initialize weave in seconds.
-    """
-    # Force a fresh import by removing from cache if it exists
-    if "weave" in sys.modules:
-        del sys.modules["weave"]
-
-    # Import weave fresh
-    import weave
-
-    # Time the init call
-    start_time = time.perf_counter()
-    weave.init(
-        f"benchmark_init_{uuid.uuid4().hex[:8]}",
-        settings={"print_call_link": False},
-    )
-    end_time = time.perf_counter()
-
-    return end_time - start_time
+    return _run_timing_script(temp_script, "import", parse_import_time)
 
 
 def time_total_weave_setup() -> tuple[float, float]:
@@ -118,27 +121,35 @@ init_time = init_end - init_start
 print(f"{{import_time}},{{init_time}}")
 """
 
-    # Write to a temporary file
-    temp_file = f"temp_full_test_{uuid.uuid4().hex[:8]}.py"
-    try:
-        with open(temp_file, "w") as f:
-            f.write(temp_script)
-
-        # Run in a fresh Python process
-        result = subprocess.run(
-            [sys.executable, temp_file], capture_output=True, text=True, timeout=30
-        )
-
-        if result.returncode == 0:
-            import_time, init_time = map(float, result.stdout.strip().split(","))
-            return import_time, init_time
-        else:
-            console.print(f"[red]Full test failed: {result.stderr}[/red]")
+    def parse_setup_times(output: str) -> tuple[float, float]:
+        if not output:
             return 0.0, 0.0
-    finally:
-        # Clean up temp file
-        if os.path.exists(temp_file):
-            os.remove(temp_file)
+        import_time, init_time = map(float, output.split(","))
+        return import_time, init_time
+
+    return _run_timing_script(temp_script, "full", parse_setup_times)
+
+
+def time_weave_init() -> float:
+    """Time the weave.init() call.
+
+    Returns:
+        float: Time taken to initialize weave in seconds.
+    """
+    # Force a fresh import by removing from cache if it exists
+    if "weave" in sys.modules:
+        del sys.modules["weave"]
+
+    import weave
+
+    start_time = time.perf_counter()
+    weave.init(
+        f"benchmark_init_{uuid.uuid4().hex[:8]}",
+        settings={"print_call_link": False},
+    )
+    end_time = time.perf_counter()
+
+    return end_time - start_time
 
 
 def run_benchmark_iterations(iterations: int) -> dict[str, list[float]]:
