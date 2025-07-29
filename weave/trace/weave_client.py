@@ -15,7 +15,7 @@ from collections import defaultdict
 from collections.abc import Sequence
 from concurrent.futures import Future
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Callable, TypedDict, cast
+from typing import TYPE_CHECKING, Any, Callable, TypedDict, TypeVar, cast
 
 import pydantic
 from requests import HTTPError
@@ -149,6 +149,8 @@ logger = logging.getLogger(__name__)
 # TODO: should be Call, not WeaveObject
 CallsIter = PaginatedIterator[CallSchema, WeaveObject]
 DEFAULT_CALLS_PAGE_SIZE = 1000
+
+T = TypeVar("T")
 
 
 def _make_calls_iterator(
@@ -1005,8 +1007,17 @@ class WeaveClient:
                 }
             },
             expand_columns=[score_json_path],
-            return_expanded_column_values=False,
         )
+
+    def get_scores(self) -> dict[str, list[Any]]:
+        d = {}
+        for call in self.get_score_calls():
+            scorer_name = call.inputs["self"].name
+            scorer_output = call.output
+            if scorer_name not in d:
+                d[scorer_name] = []
+            d[scorer_name].append(scorer_output)
+        return d
 
     @trace_sentry.global_trace_sentry.watch()
     @pydantic.validate_call

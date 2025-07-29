@@ -3,7 +3,7 @@ import pytest
 from tests.trace.util import client_is_sqlite
 
 
-def test_get_evaluations_to_pandas(client, make_evals):
+def test_get_evaluation_calls_to_pandas(client, make_evals):
     evals_df = client.get_evaluation_calls().to_pandas(flatten=True)
     assert evals_df.loc[0, "output.score.mean"] == 3
     assert evals_df.loc[0, "output.score2.mean"] == 4
@@ -12,7 +12,7 @@ def test_get_evaluations_to_pandas(client, make_evals):
     assert evals_df.loc[0, "inputs.model"].name == "abc"
 
 
-def test_get_scores_to_pandas(client, make_evals):
+def test_get_score_calls_to_pandas(client, make_evals):
     if client_is_sqlite(client):
         return pytest.skip("skipping for sqlite")
 
