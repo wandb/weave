@@ -924,7 +924,29 @@ class WeaveClient:
     ################ Query API ################
 
     def get_evaluations(self) -> CallsIter:
-        """Gets all root Evaluation.evaluate calls in this project."""
+        """
+        Retrieves all root Evaluation.evaluate calls in this project.
+
+        Returns:
+            CallsIter: An iterator over Call objects representing evaluation runs.
+                Supports slicing, iteration, and conversion to pandas DataFrames via `.to_pandas()`.
+
+        Examples:
+            Basic usage to get all evaluations:
+
+            >>> client = weave.init("my-project")
+            >>> evaluations = client.get_evaluations()
+            >>> for eval_call in evaluations:
+            ...     print(f"Evaluation: {eval_call.id}")
+
+            Convert to a list:
+
+            >>> eval_list = list(client.get_evaluations())
+
+            Convert to pandas DataFrame:
+
+            >>> eval_df = client.get_evaluations().to_pandas(flatten=True)
+        """
         evaluate_op_name = "Evaluation.evaluate"
 
         return self.get_calls(
@@ -939,9 +961,33 @@ class WeaveClient:
         )
 
     def get_scores(self) -> CallsIter:
-        """Gets all score calls in this project.
+        """
+        Retrieves all score calls in this project.
 
-        Currently only works for imperative evals"""
+        Note:
+            Currently only works for imperative evaluations (using EvaluationLogger).
+
+        Returns:
+            CallsIter: An iterator over Call objects representing score calculations.
+                Supports slicing, iteration, and conversion to pandas DataFrames via `.to_pandas()`.
+
+        Examples:
+            Basic usage to get all score calls:
+
+            >>> client = weave.init("my-project")
+            >>> scores = client.get_scores()
+            >>> for score_call in scores:
+            ...     print(f"Score: {score_call.output}")
+
+            Convert to a list:
+
+            >>> score_list = list(client.get_scores())
+
+            Convert to pandas DataFrame for analysis:
+
+            >>> scores_df = client.get_scores().to_pandas(flatten=True)
+            >>> print(scores_df[['inputs', 'output', 'summary']])
+        """
         score_json_path = "attributes._weave_eval_meta.score"
 
         return self.get_calls(
