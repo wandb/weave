@@ -923,7 +923,7 @@ class WeaveClient:
 
     ################ Query API ################
 
-    def get_evaluations(self) -> CallsIter:
+    def get_evaluation_calls(self) -> CallsIter:
         """
         Retrieves all root Evaluation.evaluate calls in this project.
 
@@ -935,17 +935,17 @@ class WeaveClient:
             Basic usage to get all evaluations:
 
             >>> client = weave.init("my-project")
-            >>> evaluations = client.get_evaluations()
+            >>> evaluations = client.get_evaluation_calls()
             >>> for eval_call in evaluations:
             ...     print(f"Evaluation: {eval_call.id}")
 
             Convert to a list:
 
-            >>> eval_list = list(client.get_evaluations())
+            >>> eval_list = list(client.get_evaluation_calls())
 
             Convert to pandas DataFrame:
 
-            >>> eval_df = client.get_evaluations().to_pandas(flatten=True)
+            >>> eval_df = client.get_evaluation_calls().to_pandas(flatten=True)
         """
         evaluate_op_name = "Evaluation.evaluate"
 
@@ -960,7 +960,7 @@ class WeaveClient:
             }
         )
 
-    def get_scores(self) -> CallsIter:
+    def get_score_calls(self) -> CallsIter:
         """
         Retrieves all score calls in this project.
 
@@ -975,17 +975,17 @@ class WeaveClient:
             Basic usage to get all score calls:
 
             >>> client = weave.init("my-project")
-            >>> scores = client.get_scores()
+            >>> scores = client.get_score_calls()
             >>> for score_call in scores:
             ...     print(f"Score: {score_call.output}")
 
             Convert to a list:
 
-            >>> score_list = list(client.get_scores())
+            >>> score_list = list(client.get_score_calls())
 
             Convert to pandas DataFrame for analysis:
 
-            >>> scores_df = client.get_scores().to_pandas(flatten=True)
+            >>> scores_df = client.get_score_calls().to_pandas(flatten=True)
             >>> print(scores_df[['inputs', 'output', 'summary']])
         """
         score_json_path = "attributes._weave_eval_meta.score"

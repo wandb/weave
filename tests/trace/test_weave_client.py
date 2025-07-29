@@ -3627,7 +3627,7 @@ def test_sum_dict_leaves_deep_nested(client):
 
 
 def test_get_evaluations(client, make_evals):
-    evals = list(client.get_evaluations())
+    evals = list(client.get_evaluation_calls())
     assert len(evals) == 1
     ev2 = evals[0]
     assert ev2.output["score"]["mean"] == 3
@@ -3641,7 +3641,7 @@ def test_get_scores(client, make_evals):
     if client_is_sqlite(client):
         return pytest.skip("skipping for sqlite")
 
-    scores = list(client.get_scores())
+    scores = list(client.get_score_calls())
     assert len(scores) == 2
     assert scores[0].inputs["self"].name == "score"
     assert scores[0].inputs["inputs"]["x"] == 1
