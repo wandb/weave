@@ -5,6 +5,12 @@ import TabItem from '@theme/TabItem';
 
 This guide shows you how to use W&B Weave with the W&B Inference service. You can build and trace LLM applications without setting up your own infrastructure or managing API keys from multiple providers.
 
+The W&B Inference service helps you learn Weave faster because:
+- You can start immediately without obtaining API keys from other providers
+- You get access to multiple models in one place, making it easier to compare their behavior
+- Your usage is automatically tracked, so you can see Weave's tracing features in action
+- You work with the same models and APIs you might use in production
+
 ## What you'll learn
 
 In this guide, you'll:
