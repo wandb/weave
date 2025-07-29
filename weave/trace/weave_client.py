@@ -129,7 +129,7 @@ from weave.trace_server.trace_server_interface import (
     TraceStatus,
 )
 from weave.utils.attributes_dict import AttributesDict
-from weave.utils.dict_utils import sum_dict_leaves
+from weave.utils.dict_utils import sum_dict_leaves, zip_dicts
 from weave.utils.paginated_iterator import PaginatedIterator
 
 if TYPE_CHECKING:
@@ -2339,27 +2339,6 @@ def elide_display_name(name: str) -> str:
         )
         return name[: MAX_DISPLAY_NAME_LENGTH - 3] + "..."
     return name
-
-
-def zip_dicts(base_dict: dict[str, Any], new_dict: dict[str, Any]) -> dict[str, Any]:
-    final_dict = {}
-    for key, value in base_dict.items():
-        if key in new_dict:
-            # Shared key (if both dicts, merge)
-            new_value = new_dict[key]
-            if isinstance(value, dict) and isinstance(new_value, dict):
-                final_dict[key] = zip_dicts(value, new_value)
-            else:
-                # base-only key
-                final_dict[key] = new_value
-        else:
-            final_dict[key] = value
-    for key, value in new_dict.items():
-        if key not in base_dict:
-            # new-only key
-            final_dict[key] = value
-
-    return final_dict
 
 
 __docspec__ = [WeaveClient, Call, CallsIter]

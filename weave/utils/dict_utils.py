@@ -109,3 +109,24 @@ def sum_dict_leaves(dicts: list[dict]) -> dict:
         result[k] = sum_dict_leaves(nested_dicts[k])
 
     return result
+
+
+def zip_dicts(base_dict: dict[str, Any], new_dict: dict[str, Any]) -> dict[str, Any]:
+    final_dict = {}
+    for key, value in base_dict.items():
+        if key in new_dict:
+            # Shared key (if both dicts, merge)
+            new_value = new_dict[key]
+            if isinstance(value, dict) and isinstance(new_value, dict):
+                final_dict[key] = zip_dicts(value, new_value)
+            else:
+                # base-only key
+                final_dict[key] = new_value
+        else:
+            final_dict[key] = value
+    for key, value in new_dict.items():
+        if key not in base_dict:
+            # new-only key
+            final_dict[key] = value
+
+    return final_dict

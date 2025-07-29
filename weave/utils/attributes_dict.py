@@ -1,17 +1,17 @@
 from typing import Any
 
 
-class _WeaveKeyDict(dict):
+class _WeaveKeyDict(dict[str, Any]):
     """A dict representing the 'weave' subdictionary of a call's attributes.
 
     This dictionary is not intended to be set directly.
     """
 
-    def __setitem__(self, key: Any, value: Any) -> None:
+    def __setitem__(self, key: str, value: Any) -> None:
         raise KeyError("Cannot modify `weave` dict directly -- for internal use only!")
 
 
-class AttributesDict(dict):
+class AttributesDict(dict[str, Any]):
     """A dict representing the attributes of a call.
 
     The ``weave`` key is reserved for internal use and cannot be set directly.
@@ -39,14 +39,14 @@ class AttributesDict(dict):
     def freeze(self) -> None:
         self._frozen = True
 
-    def __setitem__(self, key: Any, value: Any) -> None:
+    def __setitem__(self, key: str, value: Any) -> None:
         if self.__dict__.get("_frozen", False):
             raise TypeError("Cannot modify attributes after call start")
         if key == "weave":
             raise KeyError("Cannot set 'weave' directly -- for internal use only!")
         super().__setitem__(key, value)
 
-    def __delitem__(self, key: Any) -> None:
+    def __delitem__(self, key: str) -> None:
         if self.__dict__.get("_frozen", False):
             raise TypeError("Cannot modify attributes after call start")
         super().__delitem__(key)
@@ -57,7 +57,7 @@ class AttributesDict(dict):
         for k, v in dict(*args, **kwargs).items():
             self[k] = v
 
-    def _set_weave_item(self, subkey: Any, value: Any) -> None:
+    def _set_weave_item(self, subkey: str, value: Any) -> None:
         """Internal method to set items in the 'weave' subdictionary."""
         dict.__setitem__(self["weave"], subkey, value)
 
