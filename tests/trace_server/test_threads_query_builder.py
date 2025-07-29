@@ -52,7 +52,7 @@ def test_clickhouse_basic_query():
     assert_clickhouse_sql(
         """
         SELECT
-            thread_id,
+            aggregated_thread_id AS thread_id,
             COUNT(*) AS turn_count,
             min(call_start_time) AS start_time,
             max(call_end_time) AS last_updated,
@@ -63,7 +63,7 @@ def test_clickhouse_basic_query():
         FROM (
             SELECT
                 id,
-                any(thread_id) AS thread_id,
+                any(thread_id) AS aggregated_thread_id,
                 min(started_at) AS call_start_time,
                 max(ended_at) AS call_end_time,
                 CASE
@@ -74,10 +74,10 @@ def test_clickhouse_basic_query():
             FROM calls_merged
             WHERE project_id = {pb_0: String}
 
-            GROUP BY id
-            HAVING thread_id IS NOT NULL AND thread_id != '' AND id = any(turn_id)
+            GROUP BY (project_id, id)
+            HAVING id = any(turn_id) AND aggregated_thread_id IS NOT NULL AND aggregated_thread_id != ''
         ) AS properly_merged_calls
-        GROUP BY thread_id
+        GROUP BY aggregated_thread_id
         ORDER BY last_updated DESC
         """,
         {"pb_0": "test_project"},
@@ -110,10 +110,9 @@ def test_sqlite_basic_query():
                 -1 AS p99_turn_duration_ms
             FROM calls c1
             WHERE project_id = ?
+                AND id = turn_id
                 AND thread_id IS NOT NULL
                 AND thread_id != ''
-                AND id = turn_id
-
             GROUP BY thread_id
             ORDER BY last_updated DESC
             """,
@@ -135,7 +134,7 @@ def test_clickhouse_custom_sorting():
     assert_clickhouse_sql(
         """
         SELECT
-            thread_id,
+            aggregated_thread_id AS thread_id,
             COUNT(*) AS turn_count,
             min(call_start_time) AS start_time,
             max(call_end_time) AS last_updated,
@@ -146,7 +145,7 @@ def test_clickhouse_custom_sorting():
         FROM (
             SELECT
                 id,
-                any(thread_id) AS thread_id,
+                any(thread_id) AS aggregated_thread_id,
                 min(started_at) AS call_start_time,
                 max(ended_at) AS call_end_time,
                 CASE
@@ -157,10 +156,10 @@ def test_clickhouse_custom_sorting():
             FROM calls_merged
             WHERE project_id = {pb_0: String}
 
-            GROUP BY id
-            HAVING thread_id IS NOT NULL AND thread_id != '' AND id = any(turn_id)
+            GROUP BY (project_id, id)
+            HAVING id = any(turn_id) AND aggregated_thread_id IS NOT NULL AND aggregated_thread_id != ''
         ) AS properly_merged_calls
-        GROUP BY thread_id
+        GROUP BY aggregated_thread_id
         ORDER BY turn_count ASC, start_time DESC
         """,
         {"pb_0": "test_project"},
@@ -199,10 +198,9 @@ def test_sqlite_custom_sorting():
             -1 AS p99_turn_duration_ms
         FROM calls c1
         WHERE project_id = ?
+            AND id = turn_id
             AND thread_id IS NOT NULL
             AND thread_id != ''
-            AND id = turn_id
-
         GROUP BY thread_id
         ORDER BY thread_id ASC, turn_count DESC
         """,
@@ -220,7 +218,7 @@ def test_clickhouse_with_limit():
     assert_clickhouse_sql(
         """
         SELECT
-            thread_id,
+            aggregated_thread_id AS thread_id,
             COUNT(*) AS turn_count,
             min(call_start_time) AS start_time,
             max(call_end_time) AS last_updated,
@@ -231,7 +229,7 @@ def test_clickhouse_with_limit():
         FROM (
             SELECT
                 id,
-                any(thread_id) AS thread_id,
+                any(thread_id) AS aggregated_thread_id,
                 min(started_at) AS call_start_time,
                 max(ended_at) AS call_end_time,
                 CASE
@@ -242,10 +240,10 @@ def test_clickhouse_with_limit():
             FROM calls_merged
             WHERE project_id = {pb_0: String}
 
-            GROUP BY id
-            HAVING thread_id IS NOT NULL AND thread_id != '' AND id = any(turn_id)
+            GROUP BY (project_id, id)
+            HAVING id = any(turn_id) AND aggregated_thread_id IS NOT NULL AND aggregated_thread_id != ''
         ) AS properly_merged_calls
-        GROUP BY thread_id
+        GROUP BY aggregated_thread_id
         ORDER BY last_updated DESC
         LIMIT {pb_1: Int64}
         """,
@@ -260,7 +258,7 @@ def test_clickhouse_with_limit_and_offset():
     assert_clickhouse_sql(
         """
         SELECT
-            thread_id,
+            aggregated_thread_id AS thread_id,
             COUNT(*) AS turn_count,
             min(call_start_time) AS start_time,
             max(call_end_time) AS last_updated,
@@ -271,7 +269,7 @@ def test_clickhouse_with_limit_and_offset():
         FROM (
             SELECT
                 id,
-                any(thread_id) AS thread_id,
+                any(thread_id) AS aggregated_thread_id,
                 min(started_at) AS call_start_time,
                 max(ended_at) AS call_end_time,
                 CASE
@@ -282,10 +280,10 @@ def test_clickhouse_with_limit_and_offset():
             FROM calls_merged
             WHERE project_id = {pb_0: String}
 
-            GROUP BY id
-            HAVING thread_id IS NOT NULL AND thread_id != '' AND id = any(turn_id)
+            GROUP BY (project_id, id)
+            HAVING id = any(turn_id) AND aggregated_thread_id IS NOT NULL AND aggregated_thread_id != ''
         ) AS properly_merged_calls
-        GROUP BY thread_id
+        GROUP BY aggregated_thread_id
         ORDER BY last_updated DESC
         LIMIT {pb_1: Int64}
         OFFSET {pb_2: Int64}
@@ -322,10 +320,9 @@ def test_sqlite_with_limit_and_offset():
             -1 AS p99_turn_duration_ms
         FROM calls c1
         WHERE project_id = ?
+            AND id = turn_id
             AND thread_id IS NOT NULL
             AND thread_id != ''
-            AND id = turn_id
-
         GROUP BY thread_id
         ORDER BY last_updated DESC
         LIMIT ?
@@ -349,7 +346,7 @@ def test_clickhouse_with_date_filters():
     assert_clickhouse_sql(
         """
         SELECT
-            thread_id,
+            aggregated_thread_id AS thread_id,
             COUNT(*) AS turn_count,
             min(call_start_time) AS start_time,
             max(call_end_time) AS last_updated,
@@ -360,7 +357,7 @@ def test_clickhouse_with_date_filters():
         FROM (
             SELECT
                 id,
-                any(thread_id) AS thread_id,
+                any(thread_id) AS aggregated_thread_id,
                 min(started_at) AS call_start_time,
                 max(ended_at) AS call_end_time,
                 CASE
@@ -371,10 +368,10 @@ def test_clickhouse_with_date_filters():
             FROM calls_merged
             WHERE project_id = {pb_0: String}
                 AND sortable_datetime > {pb_1: String} AND sortable_datetime < {pb_2: String}
-            GROUP BY id
-            HAVING thread_id IS NOT NULL AND thread_id != '' AND id = any(turn_id)
+            GROUP BY (project_id, id)
+            HAVING id = any(turn_id) AND aggregated_thread_id IS NOT NULL AND aggregated_thread_id != ''
         ) AS properly_merged_calls
-        GROUP BY thread_id
+        GROUP BY aggregated_thread_id
         ORDER BY last_updated DESC
         """,
         {
@@ -416,10 +413,10 @@ def test_sqlite_with_date_filters():
             -1 AS p99_turn_duration_ms
         FROM calls c1
         WHERE project_id = ?
-            AND thread_id IS NOT NULL
-            AND thread_id != ''
             AND id = turn_id
             AND started_at > ? AND started_at < ?
+            AND thread_id IS NOT NULL
+            AND thread_id != ''
         GROUP BY thread_id
         ORDER BY last_updated DESC
         """,
@@ -442,7 +439,7 @@ def test_clickhouse_full_featured_query():
     assert_clickhouse_sql(
         """
         SELECT
-            thread_id,
+            aggregated_thread_id AS thread_id,
             COUNT(*) AS turn_count,
             min(call_start_time) AS start_time,
             max(call_end_time) AS last_updated,
@@ -453,7 +450,7 @@ def test_clickhouse_full_featured_query():
         FROM (
             SELECT
                 id,
-                any(thread_id) AS thread_id,
+                any(thread_id) AS aggregated_thread_id,
                 min(started_at) AS call_start_time,
                 max(ended_at) AS call_end_time,
                 CASE
@@ -464,10 +461,10 @@ def test_clickhouse_full_featured_query():
             FROM calls_merged
             WHERE project_id = {pb_0: String}
                 AND sortable_datetime > {pb_1: String} AND sortable_datetime < {pb_2: String}
-            GROUP BY id
-            HAVING thread_id IS NOT NULL AND thread_id != '' AND id = any(turn_id)
+            GROUP BY (project_id, id)
+            HAVING id = any(turn_id) AND aggregated_thread_id IS NOT NULL AND aggregated_thread_id != ''
         ) AS properly_merged_calls
-        GROUP BY thread_id
+        GROUP BY aggregated_thread_id
         ORDER BY turn_count DESC
         LIMIT {pb_3: Int64}
         OFFSET {pb_4: Int64}
@@ -519,10 +516,10 @@ def test_sqlite_full_featured_query():
             -1 AS p99_turn_duration_ms
         FROM calls c1
         WHERE project_id = ?
-            AND thread_id IS NOT NULL
-            AND thread_id != ''
             AND id = turn_id
             AND started_at > ?
+            AND thread_id IS NOT NULL
+            AND thread_id != ''
         GROUP BY thread_id
         ORDER BY last_updated ASC, thread_id DESC
         LIMIT ?
@@ -545,7 +542,7 @@ def test_clickhouse_only_after_date():
     assert_clickhouse_sql(
         """
         SELECT
-            thread_id,
+            aggregated_thread_id AS thread_id,
             COUNT(*) AS turn_count,
             min(call_start_time) AS start_time,
             max(call_end_time) AS last_updated,
@@ -556,7 +553,7 @@ def test_clickhouse_only_after_date():
         FROM (
             SELECT
                 id,
-                any(thread_id) AS thread_id,
+                any(thread_id) AS aggregated_thread_id,
                 min(started_at) AS call_start_time,
                 max(ended_at) AS call_end_time,
                 CASE
@@ -567,10 +564,10 @@ def test_clickhouse_only_after_date():
             FROM calls_merged
             WHERE project_id = {pb_0: String}
                 AND sortable_datetime > {pb_1: String}
-            GROUP BY id
-            HAVING thread_id IS NOT NULL AND thread_id != '' AND id = any(turn_id)
+            GROUP BY (project_id, id)
+            HAVING id = any(turn_id) AND aggregated_thread_id IS NOT NULL AND aggregated_thread_id != ''
         ) AS properly_merged_calls
-        GROUP BY thread_id
+        GROUP BY aggregated_thread_id
         ORDER BY last_updated DESC
         """,
         {"pb_0": "test_project", "pb_1": "2024-01-01 00:00:00.000000"},
@@ -606,10 +603,10 @@ def test_sqlite_only_before_date():
             -1 AS p99_turn_duration_ms
         FROM calls c1
         WHERE project_id = ?
-            AND thread_id IS NOT NULL
-            AND thread_id != ''
             AND id = turn_id
             AND started_at < ?
+            AND thread_id IS NOT NULL
+            AND thread_id != ''
         GROUP BY thread_id
         ORDER BY last_updated DESC
         """,
@@ -690,9 +687,332 @@ def test_turn_filtering_explanation():
     assert "id = turn_id" in sqlite_query
 
     # Check that thread filtering is also present (non-null, non-empty)
-    assert "thread_id IS NOT NULL AND thread_id != ''" in clickhouse_query
+    # For ClickHouse, filtering is now in the HAVING clause using aggregated_thread_id
+    assert (
+        "aggregated_thread_id IS NOT NULL AND aggregated_thread_id != ''"
+        in clickhouse_query
+    )
     assert "thread_id IS NOT NULL" in sqlite_query
     assert "thread_id != ''" in sqlite_query
+
+
+# Thread ID Filtering Tests
+
+
+def test_clickhouse_with_thread_id_filter():
+    """Test ClickHouse query with thread_id filter."""
+    assert_clickhouse_sql(
+        """
+        SELECT
+            aggregated_thread_id AS thread_id,
+            COUNT(*) AS turn_count,
+            min(call_start_time) AS start_time,
+            max(call_end_time) AS last_updated,
+            argMin(id, call_start_time) AS first_turn_id,
+            argMax(id, call_end_time) AS last_turn_id,
+            quantile(0.5)(call_duration) AS p50_turn_duration_ms,
+            quantile(0.99)(call_duration) AS p99_turn_duration_ms
+        FROM (
+            SELECT
+                id,
+                any(thread_id) AS aggregated_thread_id,
+                min(started_at) AS call_start_time,
+                max(ended_at) AS call_end_time,
+                CASE
+                    WHEN call_end_time IS NOT NULL AND call_start_time IS NOT NULL
+                    THEN dateDiff('millisecond', call_start_time, call_end_time)
+                    ELSE NULL
+                END AS call_duration
+            FROM calls_merged
+            WHERE project_id = {pb_0: String}
+                AND (thread_id IS NULL OR thread_id IN ({pb_1: String}))
+            GROUP BY (project_id, id)
+            HAVING id = any(turn_id) AND aggregated_thread_id IN ({pb_1: String})
+        ) AS properly_merged_calls
+        GROUP BY aggregated_thread_id
+         ORDER BY last_updated DESC
+        """,
+        {"pb_0": "test_project", "pb_1": "my_specific_thread"},
+        project_id="test_project",
+        thread_ids=["my_specific_thread"],
+    )
+
+
+def test_sqlite_with_thread_id_filter():
+    """Test SQLite query with thread_id filter."""
+    assert_sqlite_sql(
+        """
+        SELECT
+            thread_id,
+            COUNT(*) AS turn_count,
+            MIN(started_at) AS start_time,
+            MAX(ended_at) AS last_updated,
+            (SELECT id FROM calls c2
+             WHERE c2.thread_id = c1.thread_id
+             AND c2.project_id = c1.project_id
+             AND c2.id = c2.turn_id
+             ORDER BY c2.started_at ASC
+             LIMIT 1) AS first_turn_id,
+            (SELECT id FROM calls c2
+             WHERE c2.thread_id = c1.thread_id
+             AND c2.project_id = c1.project_id
+             AND c2.id = c2.turn_id
+             ORDER BY c2.ended_at DESC
+             LIMIT 1) AS last_turn_id,
+            -1 AS p50_turn_duration_ms,
+            -1 AS p99_turn_duration_ms
+        FROM calls c1
+        WHERE project_id = ?
+            AND id = turn_id
+            AND thread_id IN (?)
+        GROUP BY thread_id
+        ORDER BY last_updated DESC
+        """,
+        ["test_project", "another_thread_id"],
+        project_id="test_project",
+        thread_ids=["another_thread_id"],
+    )
+
+
+def test_clickhouse_with_thread_id_and_date_filters():
+    """Test ClickHouse query with both thread_id and date filters."""
+    after_date = datetime.datetime(2024, 1, 1, 12, 0, 0)
+    before_date = datetime.datetime(2024, 12, 31, 23, 59, 59)
+
+    assert_clickhouse_sql(
+        """
+        SELECT
+            aggregated_thread_id AS thread_id,
+            COUNT(*) AS turn_count,
+            min(call_start_time) AS start_time,
+            max(call_end_time) AS last_updated,
+            argMin(id, call_start_time) AS first_turn_id,
+            argMax(id, call_end_time) AS last_turn_id,
+            quantile(0.5)(call_duration) AS p50_turn_duration_ms,
+            quantile(0.99)(call_duration) AS p99_turn_duration_ms
+        FROM (
+            SELECT
+                id,
+                any(thread_id) AS aggregated_thread_id,
+                min(started_at) AS call_start_time,
+                max(ended_at) AS call_end_time,
+                CASE
+                    WHEN call_end_time IS NOT NULL AND call_start_time IS NOT NULL
+                    THEN dateDiff('millisecond', call_start_time, call_end_time)
+                    ELSE NULL
+                END AS call_duration
+            FROM calls_merged
+            WHERE project_id = {pb_0: String}
+                AND sortable_datetime > {pb_1: String} AND sortable_datetime < {pb_2: String}
+                AND (thread_id IS NULL OR thread_id IN ({pb_3: String}))
+            GROUP BY (project_id, id)
+            HAVING id = any(turn_id) AND aggregated_thread_id IN ({pb_3: String})
+        ) AS properly_merged_calls
+        GROUP BY aggregated_thread_id
+         ORDER BY last_updated DESC
+        """,
+        {
+            "pb_0": "test_project",
+            "pb_1": "2024-01-01 12:00:00.000000",
+            "pb_2": "2024-12-31 23:59:59.000000",
+            "pb_3": "thread_with_dates",
+        },
+        project_id="test_project",
+        sortable_datetime_after=after_date,
+        sortable_datetime_before=before_date,
+        thread_ids=["thread_with_dates"],
+    )
+
+
+def test_sqlite_with_thread_id_and_date_filters():
+    """Test SQLite query with both thread_id and date filters."""
+    after_date = datetime.datetime(2024, 6, 15, 10, 30, 0)
+    before_date = datetime.datetime(2024, 6, 15, 18, 0, 0)
+
+    assert_sqlite_sql(
+        """
+        SELECT
+            thread_id,
+            COUNT(*) AS turn_count,
+            MIN(started_at) AS start_time,
+            MAX(ended_at) AS last_updated,
+            (SELECT id FROM calls c2
+             WHERE c2.thread_id = c1.thread_id
+             AND c2.project_id = c1.project_id
+             AND c2.id = c2.turn_id
+             ORDER BY c2.started_at ASC
+             LIMIT 1) AS first_turn_id,
+            (SELECT id FROM calls c2
+             WHERE c2.thread_id = c1.thread_id
+             AND c2.project_id = c1.project_id
+             AND c2.id = c2.turn_id
+             ORDER BY c2.ended_at DESC
+             LIMIT 1) AS last_turn_id,
+            -1 AS p50_turn_duration_ms,
+            -1 AS p99_turn_duration_ms
+        FROM calls c1
+        WHERE project_id = ?
+            AND id = turn_id
+            AND started_at > ? AND started_at < ?
+            AND thread_id IN (?)
+        GROUP BY thread_id
+        ORDER BY last_updated DESC
+        """,
+        [
+            "test_project",
+            "2024-06-15T10:30:00",
+            "2024-06-15T18:00:00",
+            "specific_thread",
+        ],
+        project_id="test_project",
+        sortable_datetime_after=after_date,
+        sortable_datetime_before=before_date,
+        thread_ids=["specific_thread"],
+    )
+
+
+def test_clickhouse_with_thread_id_and_all_options():
+    """Test ClickHouse query with thread_id, dates, sorting, and pagination."""
+    after_date = datetime.datetime(2024, 1, 1)
+    before_date = datetime.datetime(2024, 12, 31)
+    sort_by = [tsi.SortBy(field="turn_count", direction="desc")]
+
+    assert_clickhouse_sql(
+        """
+        SELECT
+            aggregated_thread_id AS thread_id,
+            COUNT(*) AS turn_count,
+            min(call_start_time) AS start_time,
+            max(call_end_time) AS last_updated,
+            argMin(id, call_start_time) AS first_turn_id,
+            argMax(id, call_end_time) AS last_turn_id,
+            quantile(0.5)(call_duration) AS p50_turn_duration_ms,
+            quantile(0.99)(call_duration) AS p99_turn_duration_ms
+        FROM (
+            SELECT
+                id,
+                any(thread_id) AS aggregated_thread_id,
+                min(started_at) AS call_start_time,
+                max(ended_at) AS call_end_time,
+                CASE
+                    WHEN call_end_time IS NOT NULL AND call_start_time IS NOT NULL
+                    THEN dateDiff('millisecond', call_start_time, call_end_time)
+                    ELSE NULL
+                END AS call_duration
+            FROM calls_merged
+            WHERE project_id = {pb_0: String}
+                AND sortable_datetime > {pb_1: String} AND sortable_datetime < {pb_2: String}
+                AND (thread_id IS NULL OR thread_id IN ({pb_3: String}))
+            GROUP BY (project_id, id)
+            HAVING id = any(turn_id) AND aggregated_thread_id IN ({pb_3: String})
+        ) AS properly_merged_calls
+        GROUP BY aggregated_thread_id
+         ORDER BY turn_count DESC
+         LIMIT {pb_4: Int64}
+         OFFSET {pb_5: Int64}
+        """,
+        {
+            "pb_0": "test_project",
+            "pb_1": "2024-01-01 00:00:00.000000",
+            "pb_2": "2024-12-31 00:00:00.000000",
+            "pb_3": "full_featured_thread",
+            "pb_4": 15,
+            "pb_5": 30,
+        },
+        project_id="test_project",
+        sortable_datetime_after=after_date,
+        sortable_datetime_before=before_date,
+        sort_by=sort_by,
+        limit=15,
+        offset=30,
+        thread_ids=["full_featured_thread"],
+    )
+
+
+def test_sqlite_with_thread_id_and_all_options():
+    """Test SQLite query with thread_id, dates, sorting, and pagination."""
+    after_date = datetime.datetime(2024, 3, 15)
+    sort_by = [
+        tsi.SortBy(field="last_updated", direction="asc"),
+        tsi.SortBy(field="thread_id", direction="desc"),
+    ]
+
+    assert_sqlite_sql(
+        """
+        SELECT
+            thread_id,
+            COUNT(*) AS turn_count,
+            MIN(started_at) AS start_time,
+            MAX(ended_at) AS last_updated,
+            (SELECT id FROM calls c2
+             WHERE c2.thread_id = c1.thread_id
+             AND c2.project_id = c1.project_id
+             AND c2.id = c2.turn_id
+             ORDER BY c2.started_at ASC
+             LIMIT 1) AS first_turn_id,
+            (SELECT id FROM calls c2
+             WHERE c2.thread_id = c1.thread_id
+             AND c2.project_id = c1.project_id
+             AND c2.id = c2.turn_id
+             ORDER BY c2.ended_at DESC
+             LIMIT 1) AS last_turn_id,
+            -1 AS p50_turn_duration_ms,
+            -1 AS p99_turn_duration_ms
+        FROM calls c1
+        WHERE project_id = ?
+            AND id = turn_id
+            AND started_at > ?
+            AND thread_id IN (?)
+        GROUP BY thread_id
+        ORDER BY last_updated ASC, thread_id DESC
+        LIMIT ?
+        """,
+        ["test_project", "2024-03-15T00:00:00", "comprehensive_thread", 5],
+        project_id="test_project",
+        sortable_datetime_after=after_date,
+        sort_by=sort_by,
+        limit=5,
+        thread_ids=["comprehensive_thread"],
+    )
+
+
+def test_thread_id_filter_no_match():
+    """Test that thread_id filter doesn't break query even if no threads match."""
+    # This test verifies that the SQL generation doesn't break with thread_id filter
+    pb = ParamBuilder("pb")
+    query = make_threads_query(
+        project_id="test_project", pb=pb, thread_ids=["nonexistent_thread"]
+    )
+
+    # Should contain the thread filter
+    assert "thread_id IN ({pb_1: String})" in query
+
+    # Should have the expected parameter
+    params = pb.get_params()
+    assert "pb_1" in params
+    assert params["pb_1"] == "nonexistent_thread"
+
+
+def test_thread_id_filter_consistency():
+    """Test that both ClickHouse and SQLite handle thread_id filtering consistently."""
+    pb = ParamBuilder("pb")
+
+    # Generate both queries with same parameters
+    clickhouse_query = make_threads_query(
+        project_id="test_project", pb=pb, thread_ids=["consistency_test"]
+    )
+    sqlite_query, sqlite_params = make_threads_query_sqlite(
+        project_id="test_project", thread_ids=["consistency_test"]
+    )
+
+    # Both should filter by thread_ids
+    assert "thread_id IN ({pb_1: String})" in clickhouse_query  # ClickHouse style
+    assert "AND thread_id IN (?)" in sqlite_query  # SQLite style
+
+    # Parameters should be consistent
+    ch_params = pb.get_params()
+    assert ch_params["pb_1"] == "consistency_test"
+    assert "consistency_test" in sqlite_params
 
 
 def test_query_structure_documentation():
@@ -708,8 +1028,8 @@ def test_query_structure_documentation():
     # Should be a two-level aggregation for ClickHouse
     assert "SELECT" in query  # Outer query
     assert "FROM (" in query  # Inner subquery
-    assert "GROUP BY thread_id" in query  # Outer aggregation by thread
-    assert "GROUP BY id" in query  # Inner aggregation by call
+    assert "GROUP BY aggregated_thread_id" in query  # Outer aggregation by thread
+    assert "GROUP BY (project_id, id)" in query  # Inner aggregation by call
 
     # Should include key aggregations
     assert "COUNT(*) AS turn_count" in query
