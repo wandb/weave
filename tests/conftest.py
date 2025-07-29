@@ -489,3 +489,13 @@ def caching_client_isolation(monkeypatch, tmp_path):
     monkeypatch.setenv("WEAVE_SERVER_CACHE_DIR", str(test_specific_cache_dir))
     return test_specific_cache_dir
     # tmp_path and monkeypatch automatically handle cleanup
+
+
+@pytest.fixture
+def make_evals(client):
+    ev = weave.EvaluationLogger(model="abc", dataset="def")
+    pred = ev.log_prediction(inputs={"x": 1}, output=2)
+    pred.log_score("score", 3)
+    pred.log_score("score2", 4)
+    ev.log_summary(summary={"y": 5})
+    return
