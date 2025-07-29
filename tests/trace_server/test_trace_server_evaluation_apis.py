@@ -322,7 +322,7 @@ def test_evaluate_model(client: WeaveClient, direct_script_execution):
             }
         )
     )
-    
+
     # Here are the 9 calls that are expected:
     # evaluate
     # predict_and_score
