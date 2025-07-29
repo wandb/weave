@@ -2,6 +2,7 @@ from typing import Callable
 
 import pytest
 
+import weave
 from tests.trace_server.conftest_lib.clickhouse_server import *
 from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     TestOnlyUserInjectingExternalTraceServer,
@@ -99,3 +100,12 @@ def trace_server(
         # For now, just return the sqlite trace server so we don't break existing tests.
         # raise ValueError(f"Invalid trace server: {trace_server_flag}")
         return get_sqlite_trace_server()
+
+
+@pytest.fixture
+def make_evals(client):
+    ev = weave.EvaluationLogger(model="abc", dataset="def")
+    pred = ev.log_prediction(inputs={"x": 1}, output=2)
+    pred.log_score("score", 3)
+    pred.log_score("score2", 4)
+    ev.log_summary(summary={"y": 5})
