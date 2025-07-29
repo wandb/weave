@@ -3626,6 +3626,16 @@ def test_sum_dict_leaves_deep_nested(client):
     }
 
 
+@pytest.fixture
+def make_evals(client):
+    ev = weave.EvaluationLogger(model="abc", dataset="def")
+    pred = ev.log_prediction(inputs={"x": 1}, output=2)
+    pred.log_score("score", 3)
+    pred.log_score("score2", 4)
+    ev.log_summary(summary={"y": 5})
+    return
+
+
 def test_get_evaluations(client, make_evals):
     evals = list(client.get_evaluations())
     assert len(evals) == 1

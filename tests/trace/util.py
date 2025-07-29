@@ -8,10 +8,11 @@ import time
 from collections.abc import Callable
 from contextlib import contextmanager
 
+from weave.trace.weave_client import WeaveClient
 from weave.trace_server.sqlite_trace_server import SqliteTraceServer
 
 
-def client_is_sqlite(client):
+def client_is_sqlite(client: WeaveClient) -> bool:
     return isinstance(
         client.server._next_trace_server._internal_trace_server,
         SqliteTraceServer,

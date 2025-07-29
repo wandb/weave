@@ -1,6 +1,17 @@
 import pytest
 
+import weave
 from tests.trace.util import client_is_sqlite
+
+
+@pytest.fixture
+def make_evals(client):
+    ev = weave.EvaluationLogger(model="abc", dataset="def")
+    pred = ev.log_prediction(inputs={"x": 1}, output=2)
+    pred.log_score("score", 3)
+    pred.log_score("score2", 4)
+    ev.log_summary(summary={"y": 5})
+    return
 
 
 def test_get_evaluations_to_pandas(client, make_evals):
