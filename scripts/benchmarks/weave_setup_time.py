@@ -25,6 +25,7 @@ from _utils import (
     write_csv_with_headers,
 )
 from rich.console import Console
+from rich.table import Table
 
 console = Console()
 
@@ -189,7 +190,7 @@ def write_results_to_csv(results: dict[str, list[float]], filename: str) -> None
     write_csv_with_headers(filename, headers, rows)
 
 
-def create_results_table(stats: dict[str, dict[str, float]]):
+def create_results_table(stats: dict[str, dict[str, float]]) -> Table:
     """Create a Rich table from timing statistics.
 
     Args:
@@ -258,7 +259,7 @@ def get_stats_from_csv(csv_data: list[dict[str, str]]) -> dict[str, dict[str, fl
     return stats
 
 
-def main():
+def main() -> None:
     """Benchmark weave setup time and log results."""
     parser = argparse.ArgumentParser(description="Benchmark Weave setup time")
     parser.add_argument(

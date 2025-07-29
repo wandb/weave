@@ -13,6 +13,8 @@ import argparse
 import os
 import time
 import uuid
+from collections.abc import Callable
+from typing import Any
 
 from _utils import (
     calculate_stats,
@@ -25,6 +27,7 @@ from _utils import (
 )
 from openai import OpenAI
 from rich.console import Console
+from rich.table import Table
 
 import weave
 
@@ -53,7 +56,9 @@ def make_openai_call() -> str:
     return response.choices[0].message.content or ""
 
 
-def time_function_calls(func, iterations: int, warmup: int = 3) -> list[float]:
+def time_function_calls(
+    func: Callable[[], Any], iterations: int, warmup: int = 3
+) -> list[float]:
     """Time function calls and return list of execution times.
 
     Args:
@@ -166,7 +171,7 @@ def create_results_table(
     with_weave_stats: dict[str, float] | None = None,
     without_weave_stats: dict[str, float] | None = None,
     csv_data: list[dict[str, str]] | None = None,
-):
+) -> Table:
     """Create a Rich table from either stats or CSV data."""
     headers = ["Metric", "Without Weave", "With Weave", "Overhead"]
     column_styles = ["cyan", "red", "green", "yellow"]
@@ -223,7 +228,7 @@ def create_results_table(
     )
 
 
-def main():
+def main() -> None:
     """Benchmark OpenAI calls with and without Weave logging."""
     parser = argparse.ArgumentParser(
         description="Benchmark Weave overhead on OpenAI calls"

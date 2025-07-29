@@ -112,7 +112,9 @@ def display_benchmarks_table(benchmarks: list[Path]) -> None:
     console.print()
 
 
-def execute_benchmark(benchmark_path: Path, extra_args: list[str] = None) -> bool:
+def execute_benchmark(
+    benchmark_path: Path, extra_args: list[str] | None = None
+) -> bool:
     """
     Execute the selected benchmark using uv run.
 
