@@ -47,6 +47,10 @@ dependencies = [
   "diskcache==5.6.3",         # Used for data caching
   "nest-asyncio==1.6.0",      # Used to support nested event loops in asyncio
 
+  # Used for content type detection
+  # Remove once license content filtering is upstreamed
+  "polyfile-weave",
+
   # This dependency will be updated each time we regenerate the trace server bindings.
   # 1. For normal dev, pin to a SHA and allow direct references.  This will look like:
   #    weave_server_sdk @ git+https://github.com/wandb/weave-stainless@daf91fdd07535c570eb618b343e2d125f9b09e25
@@ -72,7 +76,7 @@ trace_server = [
   # BYOB - S3
   "boto3>=1.34.0",
   # BYOB - Azure
-  "azure-storage-blob>=12.24.0",
+  "azure-storage-blob>=12.24.0,<12.26.0",
   # BYOB - GCP
   "google-cloud-storage>=2.7.0",
   # LLM Support
@@ -135,8 +139,8 @@ langchain_nvidia_ai_endpoints = [
   "langchain-nvidia-ai-endpoints",
 ]
 litellm = ["litellm>=1.36.1"]
-# temporary max pin b/c 0.12.0 changes call structure and therefor tests
-llamaindex = ["llama-index>=0.10.35", "openai<1.92.0"]
+# temporary max pin b/c 0.12.50 changes call structure and therefor tests
+llamaindex = ["llama-index>=0.10.35,<0.12.50", "llama-index-core<0.12.50", "openai<1.92.0"]
 mistral = ["mistralai>=1.0.0"]
 scorers = [
   "numpy>1.21.0",
@@ -150,6 +154,7 @@ scorers = [
   "pip>=20.0",                    # this is needed for presidio-analyzer to pull the spacy models
   "presidio-analyzer>=2.2.0",
   "presidio-anonymizer>=2.2.0",
+  "huggingface_hub>=0.28.1"
 ]
 notdiamond = ["notdiamond>=0.3.21", "litellm<=1.49.1"]
 openai = ["openai>=1.0.0,<1.92.0"]
@@ -189,6 +194,10 @@ test = [
   "moviepy<=1.0.3",
   "filelock",
   "httpx",
+
+  # Media Generation
+  "opencv-python", # Video generation
+  "reportlab",     # PDF generation
 
   "confluent-kafka",
 
@@ -305,10 +314,15 @@ select = [
   "RUF015",  # https://docs.astral.sh/ruff/rules/unnecessary-iterable-allocation-for-first-element/
   "RUF018",  # https://docs.astral.sh/ruff/rules/assignment-in-assert/
   "RUF022",  # https://docs.astral.sh/ruff/rules/unsorted-dunder-all/
+  "RUF031",  # https://docs.astral.sh/ruff/rules/incorrectly-parenthesized-tuple-in-subscript/
+  "RUF039",  # https://docs.astral.sh/ruff/rules/unraw-re-pattern/
   "RUF046",  # https://docs.astral.sh/ruff/rules/unnecessary-cast-to-int/
   "RUF047",  # https://docs.astral.sh/ruff/rules/needless-else/
+  "RUF052",  # https://docs.astral.sh/ruff/rules/used-dummy-variable/
   "RUF059",  # https://docs.astral.sh/ruff/rules/unused-unpacked-variable/
   "RUF100",  # https://docs.astral.sh/ruff/rules/unused-noqa/
+  "E711",    # https://docs.astral.sh/ruff/rules/none-comparison/
+  "E713",    # https://docs.astral.sh/ruff/rules/not-in-test/
 ]
 ignore = [
   # we use Google style
@@ -366,7 +380,7 @@ module = "weave_query.*"
 ignore_errors = true
 
 [tool.bumpversion]
-current_version = "0.51.57-dev0"
+current_version = "0.51.60-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.
@@ -407,5 +421,5 @@ alog_score = "alog_score"
 BoxedNDArray = "BoxedNDArray"
 
 [tool.fixit]
-enable = [".rules.op_deco"]
+enable = [".rules.op_deco", ".rules.legacy_methods"]
 disable = ["fixit.rules"]
