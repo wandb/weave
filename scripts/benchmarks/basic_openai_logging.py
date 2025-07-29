@@ -14,9 +14,7 @@ import os
 import time
 import uuid
 
-from openai import OpenAI
-from rich.console import Console
-from utils import (
+from _utils import (
     calculate_stats,
     create_basic_table,
     format_percentage,
@@ -25,6 +23,8 @@ from utils import (
     read_results_from_csv,
     write_csv_with_headers,
 )
+from openai import OpenAI
+from rich.console import Console
 
 import weave
 
@@ -269,6 +269,58 @@ def create_results_table_from_csv(csv_data: list[dict[str, str]]):
     )
 
 
+def create_results_table_from_stats(
+    with_weave_stats: dict[str, float],
+    without_weave_stats: dict[str, float],
+):
+    """Create a Rich table directly from stats results.
+
+    Args:
+        with_weave_stats: Statistics from Weave-enabled run.
+        without_weave_stats: Statistics from Weave-disabled run.
+
+    Returns:
+        Rich table with comparison results.
+    """
+    headers = ["Metric", "Without Weave", "With Weave", "Overhead"]
+    column_styles = ["cyan", "red", "green", "yellow"]
+    column_justifications = ["left", "right", "right", "right"]
+
+    rows = []
+    metrics = ["mean", "median", "std_dev", "min", "max"]
+    metric_labels = ["Mean", "Median", "Std Dev", "Min", "Max"]
+
+    for metric, label in zip(metrics, metric_labels):
+        with_val = with_weave_stats[metric]
+        without_val = without_weave_stats[metric]
+
+        # Calculate overhead percentage
+        if without_val > 0:
+            overhead_pct = ((with_val - without_val) / without_val) * 100
+        else:
+            overhead_pct = 0
+
+        # Format values
+        overhead_str = format_percentage(overhead_pct)
+
+        rows.append(
+            [
+                label,
+                format_seconds(without_val),
+                format_seconds(with_val),
+                overhead_str,
+            ]
+        )
+
+    return create_basic_table(
+        "Weave Overhead Benchmark Results",
+        headers,
+        rows,
+        column_styles,
+        column_justifications,
+    )
+
+
 def main():
     """Benchmark OpenAI calls with and without Weave logging."""
     parser = argparse.ArgumentParser(
@@ -292,8 +344,38 @@ def main():
         default=3,
         help="Number of warm-up calls before timing (default: 3)",
     )
+    parser.add_argument(
+        "--out_filetype",
+        choices=["csv"],
+        help="Output file type for results (csv)",
+    )
+    parser.add_argument(
+        "--from_file",
+        type=str,
+        help="Read results from existing file instead of running benchmark",
+    )
 
     args = parser.parse_args()
+
+    if args.from_file:
+        # Read results from existing file
+        console.print(f"[bold]Reading results from: {args.from_file}[/bold]\n")
+        if not os.path.exists(args.from_file):
+            console.print(f"[red]Error: File {args.from_file} does not exist[/red]")
+            return
+
+        csv_data = read_results_from_csv(args.from_file)
+        console.print()
+        table = create_results_table_from_csv(csv_data)
+        console.print(table)
+
+        # Show summary (calculate from CSV data)
+        mean_row = next(row for row in csv_data if row["Metric"] == "Mean")
+        mean_overhead = float(mean_row["Overhead_Percent"])
+        console.print(
+            f"\n[bold]Summary:[/bold] Weave adds an average overhead of [yellow]{format_percentage(mean_overhead)}[/yellow] per API call"
+        )
+        return
 
     # Main orchestration mode
     console.print("[bold]Weave Overhead Benchmark[/bold]")
@@ -307,25 +389,44 @@ def main():
         args.iterations, args.rounds, args.warmup
     )
 
-    # Write results to CSV in the same directory as the script
-    script_dir = get_script_dir_path(__file__)
-    csv_filename = os.path.join(script_dir, "basic_openai_logging_results.csv")
-    write_results_to_csv(with_weave_stats, without_weave_stats, csv_filename)
+    if args.out_filetype == "csv":
+        # Write results to CSV in the same directory as the script
+        script_dir = get_script_dir_path(__file__)
+        csv_filename = os.path.join(script_dir, "basic_openai_logging_results.csv")
+        write_results_to_csv(with_weave_stats, without_weave_stats, csv_filename)
 
-    # Read results back from CSV
-    csv_data = read_results_from_csv(csv_filename)
+        # Read results back from CSV
+        csv_data = read_results_from_csv(csv_filename)
 
-    # Display results in a table
-    console.print()
-    table = create_results_table_from_csv(csv_data)
-    console.print(table)
+        # Display results in a table
+        console.print()
+        table = create_results_table_from_csv(csv_data)
+        console.print(table)
 
-    # Show summary (calculate from CSV data)
-    mean_row = next(row for row in csv_data if row["Metric"] == "Mean")
-    mean_overhead = float(mean_row["Overhead_Percent"])
-    console.print(
-        f"\n[bold]Summary:[/bold] Weave adds an average overhead of [yellow]{format_percentage(mean_overhead)}[/yellow] per API call"
-    )
+        # Show summary (calculate from CSV data)
+        mean_row = next(row for row in csv_data if row["Metric"] == "Mean")
+        mean_overhead = float(mean_row["Overhead_Percent"])
+        console.print(
+            f"\n[bold]Summary:[/bold] Weave adds an average overhead of [yellow]{format_percentage(mean_overhead)}[/yellow] per API call"
+        )
+    else:
+        # Work directly with in-memory results
+        console.print()
+        table = create_results_table_from_stats(with_weave_stats, without_weave_stats)
+        console.print(table)
+
+        # Show summary from in-memory stats
+        if without_weave_stats["mean"] > 0:
+            mean_overhead = (
+                (with_weave_stats["mean"] - without_weave_stats["mean"])
+                / without_weave_stats["mean"]
+            ) * 100
+        else:
+            mean_overhead = 0
+
+        console.print(
+            f"\n[bold]Summary:[/bold] Weave adds an average overhead of [yellow]{format_percentage(mean_overhead)}[/yellow] per API call"
+        )
 
 
 if __name__ == "__main__":

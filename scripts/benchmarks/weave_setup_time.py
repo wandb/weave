@@ -15,8 +15,7 @@ import sys
 import time
 import uuid
 
-from rich.console import Console
-from utils import (
+from _utils import (
     calculate_stats,
     create_basic_table,
     format_seconds,
@@ -24,6 +23,7 @@ from utils import (
     read_results_from_csv,
     write_csv_with_headers,
 )
+from rich.console import Console
 
 console = Console()
 
@@ -230,6 +230,42 @@ def create_results_table_from_csv(csv_data: list[dict[str, str]]):
     )
 
 
+def create_results_table_from_stats(results: dict[str, list[float]]):
+    """Create a Rich table directly from stats results.
+
+    Args:
+        results: Dictionary with timing results for import, init, and total.
+
+    Returns:
+        Rich table with timing results.
+    """
+    # Calculate stats for each timing type
+    stats = {}
+    for timing_type, times in results.items():
+        stats[timing_type] = calculate_stats(times)
+
+    headers = ["Component", "Metric", "Time (seconds)"]
+    column_styles = ["cyan", "magenta", "green"]
+    column_justifications = ["left", "left", "right"]
+
+    rows = []
+    metrics = ["mean", "median", "std_dev", "min", "max"]
+    metric_labels = ["Mean", "Median", "Std Dev", "Min", "Max"]
+
+    for timing_type in ["import", "init", "total"]:
+        for metric, label in zip(metrics, metric_labels):
+            value = stats[timing_type][metric]
+            rows.append([timing_type.title(), label, format_seconds(value)])
+
+    return create_basic_table(
+        "Weave Setup Timing Results",
+        headers,
+        rows,
+        column_styles,
+        column_justifications,
+    )
+
+
 def main():
     """Benchmark weave setup time and log results."""
     parser = argparse.ArgumentParser(description="Benchmark Weave setup time")
@@ -239,8 +275,56 @@ def main():
         default=10,
         help="Number of setup iterations to run (default: 10)",
     )
+    parser.add_argument(
+        "--out_filetype",
+        choices=["csv"],
+        help="Output file type for results (csv)",
+    )
+    parser.add_argument(
+        "--from_file",
+        type=str,
+        help="Read results from existing file instead of running benchmark",
+    )
 
     args = parser.parse_args()
+
+    if args.from_file:
+        # Read results from existing file
+        console.print(f"[bold]Reading results from: {args.from_file}[/bold]\n")
+        if not os.path.exists(args.from_file):
+            console.print(f"[red]Error: File {args.from_file} does not exist[/red]")
+            return
+
+        csv_data = read_results_from_csv(args.from_file)
+        console.print()
+        table = create_results_table_from_csv(csv_data)
+        console.print(table)
+
+        # Show summary from CSV data
+        import_mean = None
+        init_mean = None
+        total_mean = None
+
+        for row in csv_data:
+            if row["Timing_Type"] == "Import" and row["Metric"] == "Mean":
+                import_mean = float(row["Value_Seconds"])
+            elif row["Timing_Type"] == "Init" and row["Metric"] == "Mean":
+                init_mean = float(row["Value_Seconds"])
+            elif row["Timing_Type"] == "Total" and row["Metric"] == "Mean":
+                total_mean = float(row["Value_Seconds"])
+
+        if import_mean is not None and init_mean is not None and total_mean is not None:
+            console.print("\n[bold]Summary:[/bold]")
+            console.print(
+                f"  • Import time: [yellow]{format_seconds(import_mean)}[/yellow]"
+            )
+            console.print(
+                f"  • Init time: [yellow]{format_seconds(init_mean)}[/yellow]"
+            )
+            console.print(
+                f"  • Total time: [yellow]{format_seconds(total_mean)}[/yellow]"
+            )
+        return
 
     console.print("[bold]Weave Setup Time Benchmark[/bold]")
     console.print(f"Running {args.iterations} iterations...\n")
@@ -248,38 +332,63 @@ def main():
     # Run the benchmark
     results = run_benchmark_iterations(args.iterations)
 
-    # Write results to CSV in the same directory as the script
-    script_dir = get_script_dir_path(__file__)
-    csv_filename = os.path.join(script_dir, "weave_setup_time_results.csv")
-    write_results_to_csv(results, csv_filename)
+    if args.out_filetype == "csv":
+        # Write results to CSV in the same directory as the script
+        script_dir = get_script_dir_path(__file__)
+        csv_filename = os.path.join(script_dir, "weave_setup_time_results.csv")
+        write_results_to_csv(results, csv_filename)
 
-    # Read results back from CSV and display
-    csv_data = read_results_from_csv(csv_filename)
+        # Read results back from CSV and display
+        csv_data = read_results_from_csv(csv_filename)
+        console.print()
+        table = create_results_table_from_csv(csv_data)
+        console.print(table)
 
-    console.print()
-    table = create_results_table_from_csv(csv_data)
-    console.print(table)
+        # Show summary from CSV data
+        import_mean = None
+        init_mean = None
+        total_mean = None
 
-    # Show summary
-    import_mean = None
-    init_mean = None
-    total_mean = None
+        for row in csv_data:
+            if row["Timing_Type"] == "Import" and row["Metric"] == "Mean":
+                import_mean = float(row["Value_Seconds"])
+            elif row["Timing_Type"] == "Init" and row["Metric"] == "Mean":
+                init_mean = float(row["Value_Seconds"])
+            elif row["Timing_Type"] == "Total" and row["Metric"] == "Mean":
+                total_mean = float(row["Value_Seconds"])
 
-    for row in csv_data:
-        if row["Timing_Type"] == "Import" and row["Metric"] == "Mean":
-            import_mean = float(row["Value_Seconds"])
-        elif row["Timing_Type"] == "Init" and row["Metric"] == "Mean":
-            init_mean = float(row["Value_Seconds"])
-        elif row["Timing_Type"] == "Total" and row["Metric"] == "Mean":
-            total_mean = float(row["Value_Seconds"])
+        if import_mean is not None and init_mean is not None and total_mean is not None:
+            console.print("\n[bold]Summary:[/bold]")
+            console.print(
+                f"  • Import time: [yellow]{format_seconds(import_mean)}[/yellow]"
+            )
+            console.print(
+                f"  • Init time: [yellow]{format_seconds(init_mean)}[/yellow]"
+            )
+            console.print(
+                f"  • Total time: [yellow]{format_seconds(total_mean)}[/yellow]"
+            )
+    else:
+        # Work directly with in-memory results
+        console.print()
+        table = create_results_table_from_stats(results)
+        console.print(table)
 
-    if import_mean is not None and init_mean is not None and total_mean is not None:
+        # Show summary from in-memory stats
+        stats = {}
+        for timing_type, times in results.items():
+            stats[timing_type] = calculate_stats(times)
+
         console.print("\n[bold]Summary:[/bold]")
         console.print(
-            f"  • Import time: [yellow]{format_seconds(import_mean)}[/yellow]"
+            f"  • Import time: [yellow]{format_seconds(stats['import']['mean'])}[/yellow]"
         )
-        console.print(f"  • Init time: [yellow]{format_seconds(init_mean)}[/yellow]")
-        console.print(f"  • Total time: [yellow]{format_seconds(total_mean)}[/yellow]")
+        console.print(
+            f"  • Init time: [yellow]{format_seconds(stats['init']['mean'])}[/yellow]"
+        )
+        console.print(
+            f"  • Total time: [yellow]{format_seconds(stats['total']['mean'])}[/yellow]"
+        )
 
 
 if __name__ == "__main__":

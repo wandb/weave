@@ -2,6 +2,7 @@
 
 A typer app for selecting and running benchmarks from the benchmarks/ directory.
 """
+
 #!/usr/bin/env -S uv run --script
 # /// script
 # dependencies = [
@@ -9,10 +10,11 @@ A typer app for selecting and running benchmarks from the benchmarks/ directory.
 #     "typer==0.16.0",
 # ]
 # ///
+from __future__ import annotations
 
 import subprocess
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Annotated
 
 import typer
 from rich import box
@@ -48,7 +50,7 @@ def find_benchmarks(benchmarks_dir: Path) -> list[Path]:
 
     benchmarks = []
     for file_path in benchmarks_dir.glob("*.py"):
-        if file_path.is_file():
+        if file_path.is_file() and not file_path.name.startswith("_"):
             benchmarks.append(file_path)
 
     return sorted(benchmarks)
@@ -110,12 +112,13 @@ def display_benchmarks_table(benchmarks: list[Path]) -> None:
     console.print()
 
 
-def execute_benchmark(benchmark_path: Path) -> bool:
+def execute_benchmark(benchmark_path: Path, extra_args: list[str] = None) -> bool:
     """
     Execute the selected benchmark using uv run.
 
     Args:
         benchmark_path (Path): Path to the benchmark file to run.
+        extra_args (list[str]): Additional arguments to pass to the benchmark script.
 
     Returns:
         bool: True if benchmark completed successfully, False otherwise.
@@ -123,13 +126,20 @@ def execute_benchmark(benchmark_path: Path) -> bool:
     console.print(
         f"[green]🚀 Running benchmark:[/green] [bold]{benchmark_path.name}[/bold]"
     )
+
+    # Build command with extra arguments
+    cmd = ["uv", "run", str(benchmark_path)]
+    if extra_args:
+        cmd.extend(extra_args)
+
+    # Show the full command being executed
+    cmd_display = " ".join(cmd)
+    console.print(f"[dim]Command: {cmd_display}[/dim]")
     console.print()
 
     try:
         # Change to the benchmark directory and run with uv
-        result = subprocess.run(
-            ["uv", "run", str(benchmark_path)], cwd=benchmark_path.parent, check=False
-        )
+        result = subprocess.run(cmd, cwd=benchmark_path.parent, check=False)
 
         console.print()
         if result.returncode == 0:
@@ -174,7 +184,7 @@ def list_benchmarks() -> None:
 @app.command("run")
 def run_benchmark(
     benchmark_name: Annotated[
-        Optional[str],
+        str | None,
         typer.Argument(help="Name of the benchmark to run (without .py extension)"),
     ] = None,
     interactive: Annotated[
@@ -183,6 +193,17 @@ def run_benchmark(
             "--interactive", "-i", help="Run in interactive mode to select benchmark"
         ),
     ] = False,
+    out_filetype: Annotated[
+        str | None,
+        typer.Option("--out_filetype", help="Output file type for results (csv)"),
+    ] = None,
+    from_file: Annotated[
+        str | None,
+        typer.Option(
+            "--from_file",
+            help="Read results from existing file instead of running benchmark",
+        ),
+    ] = None,
 ) -> None:
     """🚀 Run a specific benchmark or select interactively."""
     script_dir = Path(__file__).parent
@@ -254,9 +275,16 @@ def run_benchmark(
             console.print("\n[dim]👋 Goodbye![/dim]")
             raise typer.Exit(0) from None
 
+    # Build extra arguments for the benchmark script
+    extra_args = []
+    if out_filetype:
+        extra_args.extend(["--out_filetype", out_filetype])
+    if from_file:
+        extra_args.extend(["--from_file", from_file])
+
     # Run the selected benchmark
     console.print()
-    success = execute_benchmark(selected_benchmark)
+    success = execute_benchmark(selected_benchmark, extra_args)
     if not success:
         raise typer.Exit(1)
 
@@ -269,6 +297,17 @@ def run_all_benchmarks(
             "--continue", "-c", help="Continue running other benchmarks if one fails"
         ),
     ] = False,
+    out_filetype: Annotated[
+        str | None,
+        typer.Option("--out_filetype", help="Output file type for results (csv)"),
+    ] = None,
+    from_file: Annotated[
+        str | None,
+        typer.Option(
+            "--from_file",
+            help="Read results from existing file instead of running benchmark",
+        ),
+    ] = None,
 ) -> None:
     """🚀 Run all available benchmarks sequentially."""
     script_dir = Path(__file__).parent
@@ -291,10 +330,17 @@ def run_all_benchmarks(
     )
     console.print(header_panel)
 
+    # Build extra arguments for the benchmark script
+    extra_args = []
+    if out_filetype:
+        extra_args.extend(["--out_filetype", out_filetype])
+    if from_file:
+        extra_args.extend(["--from_file", from_file])
+
     results = []
     for i, benchmark in enumerate(benchmarks, 1):
         console.print(f"\n[cyan]═══ Benchmark {i}/{len(benchmarks)} ═══[/cyan]")
-        success = execute_benchmark(benchmark)
+        success = execute_benchmark(benchmark, extra_args)
         results.append((benchmark.stem, success))
 
         if not success and not continue_on_failure:
