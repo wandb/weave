@@ -70,8 +70,6 @@ def get_dspy_patcher(
             get_symbol_patcher("dspy", "LabeledFewShot.compile", base),
             get_symbol_patcher("dspy", "MIPROv2.compile", base),
             # TODO: add dspy.InferRules.compile
-            # Evaluate
-            get_symbol_patcher("dspy", "Evaluate.__call__", base),
         ]
     )
 

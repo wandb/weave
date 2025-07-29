@@ -129,3 +129,47 @@ if not import_failed:
                 gc.finish_call(
                     self._call_map[call_id], dump_dspy_objects(outputs), exception
                 )
+
+        def on_evaluate_start(
+            self,
+            call_id: str,
+            instance: Any,
+            inputs: dict[str, Any],
+        ):
+            """A handler triggered when evaluation is started.
+
+            Args:
+                call_id: A unique identifier for the call. Can be used to connect start/end handlers.
+                instance: The Evaluate instance.
+                inputs: The inputs to the Evaluate's __call__ method. Each arguments is stored as
+                    a key-value pair in a dictionary.
+            """
+            gc = weave_client_context.require_weave_client()
+            if instance is not None:
+                inputs = {"self": dictify(instance), **inputs}
+            op_name = get_op_name_for_callback(instance, inputs)
+            self._call_map[call_id] = gc.create_call(
+                op_name,
+                inputs=dspy_postprocess_inputs(inputs),
+                display_name=op_name,
+            )
+
+        def on_evaluate_end(
+            self,
+            call_id: str,
+            outputs: Any | None,
+            exception: Exception | None = None,
+        ):
+            """A handler triggered after evaluation is executed.
+
+            Args:
+                call_id: A unique identifier for the call. Can be used to connect start/end handlers.
+                outputs: The outputs of the Evaluate's __call__ method. If the method is interrupted by
+                    an exception, this will be None.
+                exception: If an exception is raised during the execution, it will be stored here.
+            """
+            gc = weave_client_context.require_weave_client()
+            if call_id in self._call_map:
+                gc.finish_call(
+                    self._call_map[call_id], dump_dspy_objects(outputs), exception
+                )
