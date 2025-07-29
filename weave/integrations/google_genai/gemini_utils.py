@@ -1,5 +1,6 @@
+from collections.abc import Callable
 from functools import wraps
-from typing import TYPE_CHECKING, Any, Callable, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 import weave
 from weave.trace.autopatch import OpSettings
@@ -37,7 +38,7 @@ def google_genai_gemini_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, 
 
 
 def google_genai_gemini_on_finish(
-    call: Call, output: Any, exception: Optional[BaseException] = None
+    call: Call, output: Any, exception: BaseException | None = None
 ) -> None:
     """
     On finish handler for the Google GenAI Gemini API integration that ensures the usage

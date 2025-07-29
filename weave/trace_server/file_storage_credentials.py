@@ -1,5 +1,5 @@
 import base64
-from typing import Optional, TypedDict, Union
+from typing import TypedDict
 
 from google.oauth2.credentials import Credentials as GCPCredentials
 from typing_extensions import NotRequired
@@ -11,11 +11,11 @@ class AWSCredentials(TypedDict):
     """AWS authentication credentials for S3 access.
     The session_token is optional and only required for temporary credentials."""
 
-    access_key_id: NotRequired[Optional[str]]
-    secret_access_key: NotRequired[Optional[str]]
-    session_token: NotRequired[Optional[str]]
-    kms_key: NotRequired[Optional[str]]
-    region: NotRequired[Optional[str]]
+    access_key_id: NotRequired[str | None]
+    secret_access_key: NotRequired[str | None]
+    session_token: NotRequired[str | None]
+    kms_key: NotRequired[str | None]
+    region: NotRequired[str | None]
 
 
 class AzureConnectionCredentials(TypedDict):
@@ -28,7 +28,7 @@ class AzureAccountCredentials(TypedDict):
     """Azure authentication using account-based credentials."""
 
     access_key: str
-    account_url: NotRequired[Optional[str]]
+    account_url: NotRequired[str | None]
 
 
 def get_aws_credentials() -> AWSCredentials:
@@ -63,7 +63,7 @@ def get_aws_credentials() -> AWSCredentials:
     )
 
 
-def get_gcp_credentials() -> Optional[GCPCredentials]:
+def get_gcp_credentials() -> GCPCredentials | None:
     """Retrieves GCP service account credentials from environment variables.
 
     Required env vars:
@@ -90,9 +90,7 @@ def get_gcp_credentials() -> Optional[GCPCredentials]:
         raise ValueError(f"Invalid GCP credentials JSON: {e}") from e
 
 
-def get_azure_credentials() -> Union[
-    AzureConnectionCredentials, AzureAccountCredentials
-]:
+def get_azure_credentials() -> AzureConnectionCredentials | AzureAccountCredentials:
     """Retrieves Azure credentials from environment variables.
     Supports both connection string and account-based authentication.
 

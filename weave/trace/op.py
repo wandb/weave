@@ -13,6 +13,7 @@ from collections import defaultdict
 from collections.abc import (
     AsyncGenerator,
     AsyncIterator,
+    Callable,
     Coroutine,
     Generator,
     Iterator,
@@ -24,7 +25,6 @@ from types import MethodType
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
     Generic,
     Optional,
     Protocol,
@@ -127,11 +127,11 @@ class ProcessedInputs:
     inputs: dict[str, Any]
 
 
-OnInputHandlerType = Callable[["Op", tuple, dict], Optional[ProcessedInputs]]
-FinishCallbackType = Callable[[Any, Optional[BaseException]], None]
+OnInputHandlerType = Callable[["Op", tuple, dict], ProcessedInputs | None]
+FinishCallbackType = Callable[[Any, BaseException | None], None]
 OnOutputHandlerType = Callable[[Any, FinishCallbackType, dict], Any]
 # Call, original function output, exception if occurred
-OnFinishHandlerType = Callable[["Call", Any, Optional[BaseException]], None]
+OnFinishHandlerType = Callable[["Call", Any, BaseException | None], None]
 
 
 def _value_is_sentinel(param: Any) -> bool:

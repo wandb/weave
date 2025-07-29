@@ -1,6 +1,7 @@
 import asyncio
 import inspect
-from typing import Callable, TypedDict
+from collections.abc import Callable
+from typing import TypedDict
 
 import pytest
 

@@ -47,15 +47,15 @@ class LiteralOperation(BaseModel):
         ```
     """
 
-    literal_: typing.Union[
-        str,
-        int,
-        float,
-        bool,
-        dict[str, "LiteralOperation"],
-        list["LiteralOperation"],
-        None,
-    ] = Field(alias="$literal")
+    literal_: (
+        str
+        | int
+        | float
+        | bool
+        | dict[str, "LiteralOperation"]
+        | list["LiteralOperation"]
+        | None
+    ) = Field(alias="$literal")
 
 
 # https://www.mongodb.com/docs/manual/reference/operator/aggregation/getField/
@@ -289,21 +289,22 @@ class ContainsSpec(BaseModel):
 
     input: "Operand"
     substr: "Operand"
-    case_insensitive: typing.Optional[bool] = False
+    case_insensitive: bool | None = False
 
 
 # Convenience type for all Operands and Operations
-Operation = typing.Union[
-    AndOperation,
-    OrOperation,
-    NotOperation,
-    EqOperation,
-    GtOperation,
-    GteOperation,
-    InOperation,
-    ContainsOperation,
-]
-Operand = typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, Operation]
+Operation = (
+    AndOperation
+    | OrOperation
+    | NotOperation
+    | EqOperation
+    | GtOperation
+    | GteOperation
+    | InOperation
+    | ContainsOperation
+)
+
+Operand = LiteralOperation | GetFieldOperator | ConvertOperation | Operation
 
 # Update the models to include the recursive types
 LiteralOperation.model_rebuild()

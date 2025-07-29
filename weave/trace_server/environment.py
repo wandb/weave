@@ -1,6 +1,5 @@
 import logging
 import os
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +62,7 @@ def wf_clickhouse_database() -> str:
     return os.environ.get("WF_CLICKHOUSE_DATABASE", "default")
 
 
-def wf_clickhouse_max_memory_usage() -> Optional[int]:
+def wf_clickhouse_max_memory_usage() -> int | None:
     """The maximum memory usage for the clickhouse server."""
     mem = os.environ.get("WF_CLICKHOUSE_MAX_MEMORY_USAGE")
     if mem is None:
@@ -75,7 +74,7 @@ def wf_clickhouse_max_memory_usage() -> Optional[int]:
         return None
 
 
-def wf_clickhouse_max_execution_time() -> Optional[int]:
+def wf_clickhouse_max_execution_time() -> int | None:
     """The maximum execution time for the clickhouse server."""
     time = os.environ.get("WF_CLICKHOUSE_MAX_EXECUTION_TIME")
     if time is None:
@@ -92,12 +91,12 @@ def wf_clickhouse_max_execution_time() -> Optional[int]:
 # BYOB Settings
 
 
-def wf_file_storage_uri() -> Optional[str]:
+def wf_file_storage_uri() -> str | None:
     """The storage bucket URI."""
     return os.environ.get("WF_FILE_STORAGE_URI")
 
 
-def wf_file_storage_project_allow_list() -> Optional[list[str]]:
+def wf_file_storage_project_allow_list() -> list[str] | None:
     """Get the list of project IDs allowed to use file storage.
 
     Returns:
@@ -121,52 +120,52 @@ def wf_file_storage_project_allow_list() -> Optional[list[str]]:
     return project_ids
 
 
-def wf_storage_bucket_aws_access_key_id() -> Optional[str]:
+def wf_storage_bucket_aws_access_key_id() -> str | None:
     """The AWS access key ID."""
     return os.environ.get("WF_FILE_STORAGE_AWS_ACCESS_KEY_ID")
 
 
-def wf_storage_bucket_aws_secret_access_key() -> Optional[str]:
+def wf_storage_bucket_aws_secret_access_key() -> str | None:
     """The AWS secret access key."""
     return os.environ.get("WF_FILE_STORAGE_AWS_SECRET_ACCESS_KEY")
 
 
-def wf_storage_bucket_aws_session_token() -> Optional[str]:
+def wf_storage_bucket_aws_session_token() -> str | None:
     """The AWS session token."""
     return os.environ.get("WF_FILE_STORAGE_AWS_SESSION_TOKEN")
 
 
-def wf_storage_bucket_aws_kms_key() -> Optional[str]:
+def wf_storage_bucket_aws_kms_key() -> str | None:
     """The AWS KMS key."""
     return os.environ.get("WF_FILE_STORAGE_AWS_KMS_KEY")
 
 
-def wf_storage_bucket_aws_region() -> Optional[str]:
+def wf_storage_bucket_aws_region() -> str | None:
     """The AWS region."""
     return os.environ.get("WF_FILE_STORAGE_AWS_REGION")
 
 
-def wf_storage_bucket_azure_connection_string() -> Optional[str]:
+def wf_storage_bucket_azure_connection_string() -> str | None:
     """The Azure connection string."""
     return os.environ.get("WF_FILE_STORAGE_AZURE_CONNECTION_STRING")
 
 
-def wf_storage_bucket_azure_access_key() -> Optional[str]:
+def wf_storage_bucket_azure_access_key() -> str | None:
     """The Azure credential."""
     return os.environ.get("WF_FILE_STORAGE_AZURE_ACCESS_KEY")
 
 
-def wf_storage_bucket_azure_account_url() -> Optional[str]:
+def wf_storage_bucket_azure_account_url() -> str | None:
     """The Azure account url (optional override)."""
     return os.environ.get("WF_FILE_STORAGE_AZURE_ACCOUNT_URL")
 
 
-def wf_storage_bucket_gcp_credentials_json_b64() -> Optional[str]:
+def wf_storage_bucket_gcp_credentials_json_b64() -> str | None:
     """The GCP credentials JSON string (base64 encoded)."""
     return os.environ.get("WF_FILE_STORAGE_GCP_CREDENTIALS_JSON_B64")
 
 
-def wf_file_storage_project_ramp_pct() -> Optional[int]:
+def wf_file_storage_project_ramp_pct() -> int | None:
     """The percentage of projects that should use file storage (0-100).
 
     Returns:

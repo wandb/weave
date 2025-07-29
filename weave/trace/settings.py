@@ -22,7 +22,7 @@ If True, prints a link to the Weave UI when calling a weave op.
 import os
 from contextvars import ContextVar
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, PrivateAttr
 
@@ -93,7 +93,7 @@ class UserSettings(BaseModel):
     capture_system_info: bool = True
     """Toggles capture of system information (OS name and version) for ops."""
 
-    client_parallelism: Optional[int] = None
+    client_parallelism: int | None = None
     """
     Sets the number of workers to use for background operations.
     If not set, automatically adjusts based on the number of cores.
@@ -121,7 +121,7 @@ class UserSettings(BaseModel):
     Can be overridden with the environment variable `WEAVE_SERVER_CACHE_SIZE_LIMIT`
     """
 
-    server_cache_dir: Optional[str] = None
+    server_cache_dir: str | None = None
     """
     Sets the directory for the server cache, defaults to None (temporary cache)
     Ignored if `use_server_cache` is False.
@@ -210,7 +210,7 @@ def should_capture_system_info() -> bool:
     return _should("capture_system_info")
 
 
-def client_parallelism() -> Optional[int]:
+def client_parallelism() -> int | None:
     return _optional_int("client_parallelism")
 
 
@@ -230,7 +230,7 @@ def server_cache_size_limit() -> int:
     return _optional_int("server_cache_size_limit") or 1_000_000_000
 
 
-def server_cache_dir() -> Optional[str]:
+def server_cache_dir() -> str | None:
     return _optional_str("server_cache_dir")
 
 
@@ -267,7 +267,7 @@ def should_enable_disk_fallback() -> bool:
 
 
 def parse_and_apply_settings(
-    settings: Optional[Union[UserSettings, dict[str, Any]]] = None,
+    settings: UserSettings | dict[str, Any] | None = None,
 ) -> None:
     if isinstance(settings, UserSettings):
         user_settings = settings
@@ -295,7 +295,7 @@ def _should(name: str) -> bool:
     return _context_vars[name].get()
 
 
-def _optional_int(name: str) -> Optional[int]:
+def _optional_int(name: str) -> int | None:
     if env := os.getenv(f"{SETTINGS_PREFIX}{name.upper()}"):
         return int(env)
     return _context_vars[name].get()
@@ -307,13 +307,13 @@ def _list_str(name: str) -> list[str]:
     return _context_vars[name].get() or []
 
 
-def _optional_str(name: str) -> Optional[str]:
+def _optional_str(name: str) -> str | None:
     if env := os.getenv(f"{SETTINGS_PREFIX}{name.upper()}"):
         return env
     return _context_vars[name].get()
 
 
-def _optional_float(name: str) -> Optional[float]:
+def _optional_float(name: str) -> float | None:
     if env := os.getenv(f"{SETTINGS_PREFIX}{name.upper()}"):
         return float(env)
     return _context_vars[name].get()

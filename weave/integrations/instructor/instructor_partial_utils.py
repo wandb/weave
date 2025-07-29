@@ -1,4 +1,4 @@
-from typing import Callable, Optional
+from collections.abc import Callable
 
 from pydantic import BaseModel
 
@@ -8,7 +8,7 @@ from weave.trace.op import _add_accumulator
 
 
 def instructor_partial_accumulator(
-    acc: Optional[BaseModel], value: BaseModel
+    acc: BaseModel | None, value: BaseModel
 ) -> BaseModel:
     if acc is None or acc != value:
         acc = value

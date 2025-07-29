@@ -7,7 +7,7 @@ import json
 import sqlite3
 import threading
 from collections.abc import Iterator
-from typing import Any, Optional, cast
+from typing import Any, cast
 from zoneinfo import ZoneInfo
 
 import emoji
@@ -55,7 +55,7 @@ from weave.trace_server.trace_server_interface_util import (
 from weave.trace_server.validation import object_id_validator
 
 _conn_cursor: contextvars.ContextVar[
-    Optional[tuple[sqlite3.Connection, sqlite3.Cursor]]
+    tuple[sqlite3.Connection, sqlite3.Cursor] | None
 ] = contextvars.ContextVar("conn_cursor", default=None)
 
 
@@ -494,7 +494,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         if order_by is not None:
             order_parts = []
             for field, direction in order_by:
-                json_path: Optional[str] = None
+                json_path: str | None = None
                 if field.startswith("inputs"):
                     field = "inputs" + field[len("inputs") :]
                     if field.startswith("inputs."):
@@ -1563,13 +1563,13 @@ class SqliteTraceServer(tsi.TraceServerInterface):
     def _select_objs_query(
         self,
         project_id: str,
-        conditions: Optional[list[str]] = None,
-        parameters: Optional[dict[str, Any]] = None,
-        metadata_only: Optional[bool] = False,
-        limit: Optional[int] = None,
+        conditions: list[str] | None = None,
+        parameters: dict[str, Any] | None = None,
+        metadata_only: bool | None = False,
+        limit: int | None = None,
         include_deleted: bool = False,
-        offset: Optional[int] = None,
-        sort_by: Optional[list[tsi.SortBy]] = None,
+        offset: int | None = None,
+        sort_by: list[tsi.SortBy] | None = None,
     ) -> list[tsi.ObjSchema]:
         conn, cursor = get_conn_cursor(self.db_path)
         conditions = conditions or []
@@ -1673,7 +1673,7 @@ def get_kind(val: Any) -> str:
 
 def _transform_external_calls_field_to_internal_calls_field(
     field: str,
-    cast: Optional[str] = None,
+    cast: str | None = None,
 ) -> str:
     json_path = None
     if field == "inputs" or field.startswith("inputs."):

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import importlib
+from collections.abc import Callable
 from functools import wraps
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 import weave
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher

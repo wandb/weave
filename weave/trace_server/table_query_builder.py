@@ -1,5 +1,3 @@
-from typing import Optional
-
 from weave.trace_server.orm import ParamBuilder
 
 # Constants for table and column names
@@ -13,8 +11,8 @@ def make_natural_sort_table_query(
     digest: str,
     pb: ParamBuilder,
     *,
-    limit: Optional[int] = None,
-    offset: Optional[int] = None,
+    limit: int | None = None,
+    offset: int | None = None,
     natural_direction: str = "ASC",
 ) -> str:
     """
@@ -64,10 +62,10 @@ def make_standard_table_query(
     *,
     # using the `sql_safe_*` prefix is a way to signal to the caller
     # that these strings should have been sanitized by the caller.
-    sql_safe_conditions: Optional[list[str]] = None,
-    sql_safe_sort_clause: Optional[str] = None,
-    limit: Optional[int] = None,
-    offset: Optional[int] = None,
+    sql_safe_conditions: list[str] | None = None,
+    sql_safe_sort_clause: str | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
 ) -> str:
     """
     Generate a standard query for table rows with custom sorting and filtering.

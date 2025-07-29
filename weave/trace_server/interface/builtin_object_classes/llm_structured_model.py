@@ -1,5 +1,5 @@
 import json
-from typing import Annotated, Any, Literal, Optional, Union
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, BeforeValidator, Field
 
@@ -31,10 +31,10 @@ class Message(BaseModel):
     """
 
     role: str
-    content: Optional[Union[str, list[dict]]] = None
-    name: Optional[str] = None
-    function_call: Optional[dict] = None
-    tool_call_id: Optional[str] = None
+    content: str | list[dict] | None = None
+    name: str | None = None
+    function_call: dict | None = None
+    tool_call_id: str | None = None
 
 
 def _substitute_template_variables(
@@ -65,19 +65,19 @@ class LLMStructuredCompletionModelDefaultParams(BaseModel):
     # Could use Prompt objects for the message template
     # This is a list of Messages, loosely following litellm's message format
     # https://docs.litellm.ai/docs/completion/input#properties-of-messages
-    messages_template: Optional[list[Message]] = None
+    messages_template: list[Message] | None = None
 
-    temperature: Optional[float] = None
-    top_p: Optional[float] = None
-    max_tokens: Optional[int] = None
-    presence_penalty: Optional[float] = None
-    frequency_penalty: Optional[float] = None
-    stop: Optional[list[str]] = None
-    n_times: Optional[int] = None
-    functions: Optional[list[dict]] = None
+    temperature: float | None = None
+    top_p: float | None = None
+    max_tokens: int | None = None
+    presence_penalty: float | None = None
+    frequency_penalty: float | None = None
+    stop: list[str] | None = None
+    n_times: int | None = None
+    functions: list[dict] | None = None
 
     # Either json, text, or json_schema
-    response_format: Optional[ResponseFormat] = None
+    response_format: ResponseFormat | None = None
 
     # TODO: Currently not used. Fast follow up with json_schema
     # if default_params.response_format is set to JSON_SCHEMA, this will be used
@@ -126,7 +126,7 @@ LLMStructuredModelParamsLike = Annotated[
 
 class LLMStructuredCompletionModel(Model):
     # <provider>/<model> or ref to a provider model
-    llm_model_id: Union[str, base_object_def.RefStr]
+    llm_model_id: str | base_object_def.RefStr
 
     default_params: LLMStructuredCompletionModelDefaultParams = Field(
         default_factory=LLMStructuredCompletionModelDefaultParams
@@ -135,10 +135,10 @@ class LLMStructuredCompletionModel(Model):
     @op
     def predict(
         self,
-        user_input: Optional[MessageListLike] = None,
-        config: Optional[LLMStructuredModelParamsLike] = None,
+        user_input: MessageListLike | None = None,
+        config: LLMStructuredModelParamsLike | None = None,
         **template_vars: Any,
-    ) -> Union[Message, str, dict[str, Any]]:
+    ) -> Message | str | dict[str, Any]:
         """
         Generates a prediction by preparing messages (template + user_input)
         and calling the LLM completions endpoint with overridden config, using the provided client.
@@ -195,7 +195,7 @@ class LLMStructuredCompletionModel(Model):
         self,
         project_id: str,
         user_input: MessageListLike,
-        config: Optional[LLMStructuredModelParamsLike],
+        config: LLMStructuredModelParamsLike | None,
         **template_vars: Any,
     ) -> CompletionsCreateReq:
         # Ensure user_input is properly converted to a list of Message objects
@@ -244,8 +244,8 @@ class LLMStructuredCompletionModel(Model):
 
 
 def parse_response(
-    response_payload: dict, response_format: Optional[ResponseFormat]
-) -> Union[Message, str, dict[str, Any]]:
+    response_payload: dict, response_format: ResponseFormat | None
+) -> Message | str | dict[str, Any]:
     if response_payload.get("error"):
         # Or handle more gracefully depending on desired behavior
         raise RuntimeError(f"LLM API returned an error: {response_payload['error']}")
@@ -262,7 +262,7 @@ def parse_response(
 
 
 def _prepare_llm_messages(
-    template_messages: Optional[list[Message]],
+    template_messages: list[Message] | None,
     user_input: list[Message],
 ) -> list[dict[str, Any]]:
     """

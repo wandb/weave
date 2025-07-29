@@ -1,6 +1,6 @@
 import logging
 import warnings
-from typing import TYPE_CHECKING, Any, Literal, Optional, Union
+from typing import TYPE_CHECKING, Any, Literal, Optional
 
 from pydantic import Field, PrivateAttr
 
@@ -183,7 +183,7 @@ class RollingWindowScorer(HuggingFaceScorer):
         description="The method to aggregate predictions",
     )
 
-    def predict_chunk(self, input_ids: "torch.Tensor") -> list[Union[int, float]]:
+    def predict_chunk(self, input_ids: "torch.Tensor") -> list[int | float]:
         raise NotImplementedError("Subclasses must implement predict_chunk method.")
 
     def _tokenize_input(self, prompt: str) -> "torch.Tensor":
@@ -202,7 +202,7 @@ class RollingWindowScorer(HuggingFaceScorer):
         ).input_ids.to(self.device)
 
     def _aggregate_predictions(
-        self, all_predictions: list[list[Union[int, float]]]
+        self, all_predictions: list[list[int | float]]
     ) -> list[float]:
         """
         Aggregate predictions using the specified class attribute method.

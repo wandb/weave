@@ -1,7 +1,6 @@
 """Support for a collection of refs."""
 
 from collections.abc import Iterable
-from typing import Optional
 
 from rich.table import Table
 
@@ -14,7 +13,7 @@ from weave.trace.vals import WeaveObject
 class Refs(AbstractRichContainer[str]):
     """A collection of ref strings with utilities."""
 
-    def __init__(self, refs: Optional[Iterable[str]] = None) -> None:
+    def __init__(self, refs: Iterable[str] | None = None) -> None:
         super().__init__("Ref", refs)
 
     def _add_table_columns(self, table: Table) -> None:

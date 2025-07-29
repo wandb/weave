@@ -5,8 +5,8 @@ import json
 import logging
 import os
 import tempfile
-from collections.abc import Iterator
-from typing import Any, Callable, TypedDict, TypeVar
+from collections.abc import Callable, Iterator
+from typing import Any, TypedDict, TypeVar
 
 from pydantic import BaseModel
 from typing_extensions import Self

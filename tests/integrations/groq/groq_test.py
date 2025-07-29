@@ -1,6 +1,5 @@
 import asyncio
 import os
-from typing import Union
 
 import pytest
 
@@ -344,7 +343,7 @@ def test_groq_tool_call(
             return json.dumps({"team_name": team_name, "score": "unknown"})
 
     @weave.op
-    def run_conversation(user_prompt: str) -> Union[str, None]:
+    def run_conversation(user_prompt: str) -> str | None:
         # Step 1: send the conversation and available functions to the model
         messages = [
             {

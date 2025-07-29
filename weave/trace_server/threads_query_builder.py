@@ -1,5 +1,4 @@
 import datetime
-from typing import Optional, Union
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.orm import ParamBuilder
@@ -9,12 +8,12 @@ def make_threads_query(
     project_id: str,
     pb: ParamBuilder,
     *,
-    limit: Optional[int] = None,
-    offset: Optional[int] = None,
-    sort_by: Optional[list[tsi.SortBy]] = None,
-    sortable_datetime_after: Optional[datetime.datetime] = None,
-    sortable_datetime_before: Optional[datetime.datetime] = None,
-    thread_ids: Optional[list[str]] = None,
+    limit: int | None = None,
+    offset: int | None = None,
+    sort_by: list[tsi.SortBy] | None = None,
+    sortable_datetime_after: datetime.datetime | None = None,
+    sortable_datetime_before: datetime.datetime | None = None,
+    thread_ids: list[str] | None = None,
 ) -> str:
     """
     Generate a query to fetch threads with aggregated statistics from turn calls only.
@@ -193,12 +192,12 @@ def make_threads_query(
 def make_threads_query_sqlite(
     project_id: str,
     *,
-    limit: Optional[int] = None,
-    offset: Optional[int] = None,
-    sort_by: Optional[list[tsi.SortBy]] = None,
-    sortable_datetime_after: Optional[datetime.datetime] = None,
-    sortable_datetime_before: Optional[datetime.datetime] = None,
-    thread_ids: Optional[list[str]] = None,
+    limit: int | None = None,
+    offset: int | None = None,
+    sort_by: list[tsi.SortBy] | None = None,
+    sortable_datetime_after: datetime.datetime | None = None,
+    sortable_datetime_before: datetime.datetime | None = None,
+    thread_ids: list[str] | None = None,
 ) -> tuple[str, list]:
     """
     Generate a SQLite query to fetch threads with aggregated statistics from turn calls only.
@@ -220,7 +219,7 @@ def make_threads_query_sqlite(
     Returns:
         Tuple of (SQL query string, parameters list) for SQLite
     """
-    parameters: list[Union[str, int]] = [project_id]
+    parameters: list[str | int] = [project_id]
 
     # Build optional timestamp filter clauses (SQLite uses started_at instead of sortable_datetime)
     timestamp_filter_clauses = []

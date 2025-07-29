@@ -2,7 +2,6 @@ import asyncio
 import json
 import logging
 from concurrent.futures import ThreadPoolExecutor
-from typing import Optional
 
 from playwright.async_api import async_playwright
 
@@ -14,12 +13,12 @@ logging.basicConfig(
 async def generate_screenshot_from_browser(
     url: str,
     output_path: str,
-    selector: Optional[str] = None,
-    viewport_size: Optional[tuple[int, int]] = None,
-    clicks: Optional[list[str]] = None,
-    delay: Optional[float] = None,
-    local_storage: Optional[dict[str, str]] = None,
-    zoom: Optional[float] = None,
+    selector: str | None = None,
+    viewport_size: tuple[int, int] | None = None,
+    clicks: list[str] | None = None,
+    delay: float | None = None,
+    local_storage: dict[str, str] | None = None,
+    zoom: float | None = None,
 ) -> None:
     """
     Generate a screenshot from a web page using a headless browser.

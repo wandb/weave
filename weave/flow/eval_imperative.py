@@ -9,7 +9,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from threading import Lock
 from types import MethodType
-from typing import Annotated, Any, TypeVar, Union, cast
+from typing import Annotated, Any, TypeVar, cast
 
 from pydantic import (
     BaseModel,
@@ -33,7 +33,7 @@ from weave.trace.weave_client import Call
 
 T = TypeVar("T")
 ID = str
-ScoreType = Union[float, bool, dict]
+ScoreType = float | bool | dict
 
 logger = logging.getLogger(__name__)
 

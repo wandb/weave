@@ -1,5 +1,6 @@
 import logging
-from typing import Any, Callable, Optional, TypeVar
+from collections.abc import Callable
+from typing import Any, TypeVar
 
 from pydantic import (
     BaseModel,
@@ -95,9 +96,9 @@ class Object(BaseModel):
         ```
     """
 
-    name: Optional[str] = None
-    description: Optional[str] = None
-    ref: Optional[ObjectRef] = Field(default=None, repr=False)
+    name: str | None = None
+    description: str | None = None
+    ref: ObjectRef | None = Field(default=None, repr=False)
 
     # Allow Op attributes
     model_config = ConfigDict(

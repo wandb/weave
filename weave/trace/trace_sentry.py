@@ -18,7 +18,8 @@ import functools
 import os
 import site
 import sys
-from typing import TYPE_CHECKING, Any, Callable, Literal
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any, Literal
 
 if TYPE_CHECKING:
     from sentry_sdk._types import Event, ExcInfo

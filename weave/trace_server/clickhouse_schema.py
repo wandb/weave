@@ -1,5 +1,4 @@
 import datetime
-from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -10,20 +9,20 @@ class CallStartCHInsertable(BaseModel):
     project_id: str
     id: str
     trace_id: str
-    parent_id: Optional[str] = None
-    thread_id: Optional[str] = None
-    turn_id: Optional[str] = None
+    parent_id: str | None = None
+    thread_id: str | None = None
+    turn_id: str | None = None
     op_name: str
     started_at: datetime.datetime
     attributes_dump: str
     inputs_dump: str
     input_refs: list[str]
     output_refs: list[str] = Field(default_factory=list)  # sadly, this is required
-    display_name: Optional[str] = None
+    display_name: str | None = None
 
-    wb_user_id: Optional[str] = None
-    wb_run_id: Optional[str] = None
-    wb_run_step: Optional[int] = None
+    wb_user_id: str | None = None
+    wb_run_id: str | None = None
+    wb_run_step: int | None = None
 
     _project_id_v = field_validator("project_id")(validation.project_id_validator)
     _id_v = field_validator("id")(validation.call_id_validator)
@@ -42,7 +41,7 @@ class CallEndCHInsertable(BaseModel):
     project_id: str
     id: str
     ended_at: datetime.datetime
-    exception: Optional[str] = None
+    exception: str | None = None
     summary_dump: str
     output_dump: str
     input_refs: list[str] = Field(default_factory=list)  # sadly, this is required
@@ -78,7 +77,7 @@ class CallUpdateCHInsertable(BaseModel):
     wb_user_id: str
 
     # update types
-    display_name: Optional[str] = None
+    display_name: str | None = None
 
     # required types
     input_refs: list[str] = Field(default_factory=list)
@@ -100,41 +99,41 @@ class SelectableCHCallSchema(BaseModel):
     id: str
 
     op_name: str
-    display_name: Optional[str] = None
+    display_name: str | None = None
 
     trace_id: str
-    parent_id: Optional[str] = None
-    thread_id: Optional[str] = None
-    turn_id: Optional[str] = None
+    parent_id: str | None = None
+    thread_id: str | None = None
+    turn_id: str | None = None
 
     started_at: datetime.datetime
-    ended_at: Optional[datetime.datetime] = None
-    exception: Optional[str] = None
+    ended_at: datetime.datetime | None = None
+    exception: str | None = None
 
     # attributes and inputs are required on call schema, but can be
     # optionally selected when querying
-    attributes_dump: Optional[str] = None
-    inputs_dump: Optional[str] = None
+    attributes_dump: str | None = None
+    inputs_dump: str | None = None
 
-    output_dump: Optional[str] = None
-    summary_dump: Optional[str] = None
+    output_dump: str | None = None
+    summary_dump: str | None = None
 
     input_refs: list[str]
     output_refs: list[str]
 
-    wb_user_id: Optional[str] = None
-    wb_run_id: Optional[str] = None
-    wb_run_step: Optional[int] = None
+    wb_user_id: str | None = None
+    wb_run_id: str | None = None
+    wb_run_step: int | None = None
 
-    deleted_at: Optional[datetime.datetime] = None
+    deleted_at: datetime.datetime | None = None
 
 
 class ObjCHInsertable(BaseModel):
     project_id: str
-    wb_user_id: Optional[str] = None
+    wb_user_id: str | None = None
     kind: str
-    base_object_class: Optional[str]
-    leaf_object_class: Optional[str]
+    base_object_class: str | None
+    leaf_object_class: str | None
     object_id: str
     refs: list[str]
     val_dump: str
@@ -155,14 +154,14 @@ class SelectableCHObjSchema(BaseModel):
     project_id: str
     object_id: str
     created_at: datetime.datetime
-    wb_user_id: Optional[str] = None
+    wb_user_id: str | None = None
     refs: list[str]
     val_dump: str
     kind: str
-    base_object_class: Optional[str]
-    leaf_object_class: Optional[str]
+    base_object_class: str | None
+    leaf_object_class: str | None
     digest: str
     version_index: int
     is_latest: int
-    deleted_at: Optional[datetime.datetime] = None
-    size_bytes: Optional[int] = None
+    deleted_at: datetime.datetime | None = None
+    size_bytes: int | None = None

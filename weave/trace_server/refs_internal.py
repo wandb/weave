@@ -6,7 +6,7 @@
 # the trace interface should only ever operate on internal refs.
 import dataclasses
 import urllib
-from typing import Any, Union
+from typing import Any
 
 WEAVE_INTERNAL_SCHEME = "weave-trace-internal"
 WEAVE_SCHEME = "weave"
@@ -158,9 +158,9 @@ class InternalArtifactRef:
         return u
 
 
-InternalRef = Union[
-    InternalObjectRef, InternalTableRef, InternalCallRef, InternalArtifactRef
-]
+InternalRef = (
+    InternalObjectRef | InternalTableRef | InternalCallRef | InternalArtifactRef
+)
 
 
 def parse_internal_uri(

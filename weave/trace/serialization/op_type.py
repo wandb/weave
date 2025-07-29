@@ -12,7 +12,8 @@ import sys
 import textwrap
 import types as py_types
 from _ast import AsyncFunctionDef, ExceptHandler
-from typing import Any, Callable, TypedDict, get_args, get_origin
+from collections.abc import Callable
+from typing import Any, TypedDict, get_args, get_origin
 
 from weave.trace import settings
 from weave.trace.context.weave_client_context import get_weave_client

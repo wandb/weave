@@ -6,7 +6,7 @@
 
 import contextvars
 import dataclasses
-from typing import Any, Optional
+from typing import Any
 
 import aiohttp
 import gql
@@ -31,10 +31,10 @@ from weave.trace import env
 # for this symbol.
 @dataclasses.dataclass
 class WandbApiContext:
-    user_id: Optional[str] = None  # TODO: delete
-    api_key: Optional[str] = None
-    headers: Optional[dict[str, str]] = None  # TODO: delete
-    cookies: Optional[dict[str, str]] = None  # TODO: delete
+    user_id: str | None = None  # TODO: delete
+    api_key: str | None = None
+    headers: dict[str, str] | None = None  # TODO: delete
+    cookies: dict[str, str] | None = None  # TODO: delete
 
     @classmethod
     def from_json(cls, json: Any) -> "WandbApiContext":
@@ -45,15 +45,15 @@ class WandbApiContext:
 
 
 ## wandb_api.py context
-_wandb_api_context: contextvars.ContextVar[Optional[WandbApiContext]] = (
+_wandb_api_context: contextvars.ContextVar[WandbApiContext | None] = (
     contextvars.ContextVar("wandb_api_context", default=None)
 )
 
 
 def set_wandb_thread_local_api_settings(
-    api_key: Optional[str],
-    cookies: Optional[dict],
-    headers: Optional[dict],
+    api_key: str | None,
+    cookies: dict | None,
+    headers: dict | None,
 ) -> None:
     if WANDB_AVAILABLE:
         _thread_local_api_settings.api_key = api_key
@@ -62,11 +62,11 @@ def set_wandb_thread_local_api_settings(
 
 
 def set_wandb_api_context(
-    user_id: Optional[str],
-    api_key: Optional[str],
-    headers: Optional[dict],
-    cookies: Optional[dict],
-) -> Optional[contextvars.Token[Optional[WandbApiContext]]]:
+    user_id: str | None,
+    api_key: str | None,
+    headers: dict | None,
+    cookies: dict | None,
+) -> contextvars.Token[WandbApiContext | None] | None:
     cur_ctx = get_wandb_api_context()
     if cur_ctx:
         # WANDB API context is only allowed to be set once per thread, since we
@@ -78,11 +78,11 @@ def set_wandb_api_context(
 
 
 # api.py, weave_init.py
-def get_wandb_api_context() -> Optional[WandbApiContext]:
+def get_wandb_api_context() -> WandbApiContext | None:
     return _wandb_api_context.get()
 
 
-def init() -> Optional[contextvars.Token[Optional[WandbApiContext]]]:
+def init() -> contextvars.Token[WandbApiContext | None] | None:
     api_key = env.weave_wandb_api_key()
     if api_key:
         return set_wandb_api_context("admin", api_key, None, None)
@@ -170,7 +170,7 @@ class WandbApi:
         """
     )
 
-    def default_entity_name(self) -> Optional[str]:
+    def default_entity_name(self) -> str | None:
         try:
             result = self.query(self.VIEWER_DEFAULT_ENTITY_QUERY)
         except gql.transport.exceptions.TransportQueryError as e:
@@ -180,7 +180,7 @@ class WandbApi:
         except AttributeError:
             return None
 
-    def username(self) -> Optional[str]:
+    def username(self) -> str | None:
         try:
             result = self.query(self.VIEWER_DEFAULT_ENTITY_QUERY)
         except gql.transport.exceptions.TransportQueryError as e:
@@ -204,8 +204,8 @@ class WandbApi:
     def upsert_project(
         self,
         project: str,
-        description: Optional[str] = None,
-        entity: Optional[str] = None,
+        description: str | None = None,
+        entity: str | None = None,
     ) -> dict[str, Any]:
         """Create a new project.
 

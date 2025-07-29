@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any
 
 import weave
 from weave.integrations.dspy.dspy_utils import (
@@ -47,8 +47,8 @@ if not import_failed:
         def on_module_end(
             self,
             call_id: str,
-            outputs: Optional[Any],
-            exception: Optional[Exception] = None,
+            outputs: Any | None,
+            exception: Exception | None = None,
         ) -> None:
             gc = weave_client_context.require_weave_client()
             if call_id in self._call_map:
@@ -78,8 +78,8 @@ if not import_failed:
         def on_tool_end(
             self,
             call_id: str,
-            outputs: Optional[dict[str, Any]],
-            exception: Optional[Exception] = None,
+            outputs: dict[str, Any] | None,
+            exception: Exception | None = None,
         ) -> None:
             gc = weave_client_context.require_weave_client()
             if call_id in self._call_map:

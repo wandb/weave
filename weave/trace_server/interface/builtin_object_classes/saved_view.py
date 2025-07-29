@@ -1,11 +1,11 @@
-from typing import Literal, Optional, Union
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.interface.builtin_object_classes import base_object_def
 
-PathElement = Union[str, int]
+PathElement = str | int
 
 
 class Pin(BaseModel):
@@ -15,42 +15,42 @@ class Pin(BaseModel):
 
 class Column(BaseModel):
     # Optional in case we want something like computed columns in the future.
-    path: Optional[list[PathElement]] = Field(default=None)
-    label: Optional[str] = Field(default=None)
+    path: list[PathElement] | None = Field(default=None)
+    label: str | None = Field(default=None)
 
 
 class ChartConfig(BaseModel):
     x_axis: str = Field(title="XAxis")
     y_axis: str = Field(title="YAxis")
-    plot_type: Optional[Literal["scatter", "line", "bar"]] = Field(
+    plot_type: Literal["scatter", "line", "bar"] | None = Field(
         default=None,
     )
-    bin_count: Optional[int] = Field(default=None)
-    aggregation: Optional[Literal["average", "sum", "min", "max", "p95", "p99"]] = (
-        Field(default=None)
+    bin_count: int | None = Field(default=None)
+    aggregation: Literal["average", "sum", "min", "max", "p95", "p99"] | None = Field(
+        default=None
     )
-    group_keys: Optional[list[str]] = Field(default=None)
-    custom_name: Optional[str] = Field(default=None)
+    group_keys: list[str] | None = Field(default=None)
+    custom_name: str | None = Field(default=None)
 
 
 class SavedViewDefinition(BaseModel):
-    filter: Optional[tsi.CallsFilter] = Field(default=None)
+    filter: tsi.CallsFilter | None = Field(default=None)
 
-    query: Optional[tsi.Query] = Field(default=None)
+    query: tsi.Query | None = Field(default=None)
 
     # cols is the current UI column visibility config that
     # doesn't allow specifying column order - prefer use of
     # explicit columns list which is what we should work towards.
-    cols: Optional[dict[str, bool]] = Field(default=None)
+    cols: dict[str, bool] | None = Field(default=None)
 
     # columns is specifying exactly which columns to include
     # including order.
-    columns: Optional[list[Column]] = Field(default=None)
+    columns: list[Column] | None = Field(default=None)
 
-    pin: Optional[Pin] = Field(default=None)
-    sort_by: Optional[list[tsi.SortBy]] = Field(default=None)
-    page_size: Optional[int] = Field(default=None)
-    charts: Optional[list[ChartConfig]] = Field(default=None)
+    pin: Pin | None = Field(default=None)
+    sort_by: list[tsi.SortBy] | None = Field(default=None)
+    page_size: int | None = Field(default=None)
+    charts: list[ChartConfig] | None = Field(default=None)
 
 
 class SavedView(base_object_def.BaseObject):

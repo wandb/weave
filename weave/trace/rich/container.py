@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Iterator
-from typing import Any, Generic, Optional, TypeVar
+from typing import Any, Generic, TypeVar
 
 from rich.table import Table
 
@@ -15,7 +15,7 @@ class AbstractRichContainer(ABC, Generic[T]):
     item_type: str
     items: list[T]
 
-    def __init__(self, item_type: str, items: Optional[Iterable[T]] = None) -> None:
+    def __init__(self, item_type: str, items: Iterable[T] | None = None) -> None:
         self.item_type = item_type
         self.items = list(items) if items else []
 

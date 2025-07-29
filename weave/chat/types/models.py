@@ -1,7 +1,9 @@
 # For simplicity now, just doing this instead of bringing over SyncPage stuff from OpenAI.
 
+from __future__ import annotations
+
 from collections.abc import Iterator
-from typing import Literal, Union
+from typing import Literal
 
 from weave.chat.types._models import BaseModel
 from weave.chat.types.model import Model
@@ -34,4 +36,4 @@ class ModelsResponseError(BaseModel):
     error: ModelsResponseErrorDetails
 
 
-ModelsResponse = Union[ModelsResponseSuccess, ModelsResponseError]
+ModelsResponse = ModelsResponseSuccess | ModelsResponseError

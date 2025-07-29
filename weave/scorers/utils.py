@@ -2,7 +2,7 @@ import json
 import os
 from importlib.util import find_spec
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -10,7 +10,7 @@ from weave.scorers.default_models import MODEL_PATHS
 from weave.trace.settings import scorers_dir
 
 
-def download_model_from_wandb(artifact_path: Union[str, Path]) -> Path:
+def download_model_from_wandb(artifact_path: str | Path) -> Path:
     try:
         from wandb import Api
     except ImportError:
@@ -85,7 +85,7 @@ def download_model_from_huggingface_hub(model_name: str) -> str:
 
 
 def _resolve_model_path(
-    model_name_or_path: str = "", default_model: Optional[str] = None
+    model_name_or_path: str = "", default_model: str | None = None
 ) -> str:
     """Dispatcher to resolve a model path from various sources.
 
@@ -114,7 +114,7 @@ def _resolve_model_path(
 
 
 def load_local_model_weights(
-    model_name_or_path: str = "", default_model: Optional[str] = None
+    model_name_or_path: str = "", default_model: str | None = None
 ) -> str:
     """Resolves the path to a model, downloading it if necessary.
 

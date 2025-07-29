@@ -1,4 +1,5 @@
-from typing import Callable, Optional, TypeVar, cast
+from collections.abc import Callable
+from typing import TypeVar, cast
 
 from pydantic import BaseModel
 
@@ -74,7 +75,7 @@ D = TypeVar("D")
 
 def universal_int_to_ext_ref_converter(
     obj: C,
-    convert_int_to_ext_project_id: Callable[[str], Optional[str]],
+    convert_int_to_ext_project_id: Callable[[str], str | None],
 ) -> C:
     """Takes any object and recursively replaces all internal references with
     external references. The internal references are expected to be in the
@@ -90,7 +91,7 @@ def universal_int_to_ext_ref_converter(
         The object with all internal references replaced with external
         references.
     """
-    int_to_ext_project_cache: dict[str, Optional[str]] = {}
+    int_to_ext_project_cache: dict[str, str | None] = {}
 
     def replace_ref(ref_str: str) -> str:
         if not ref_str.startswith(weave_internal_prefix):

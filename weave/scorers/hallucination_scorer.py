@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Union
+from typing import Any
 
 from pydantic import BaseModel, Field, PrivateAttr, validate_call
 
@@ -236,9 +236,7 @@ class WeaveHallucinationScorerV1(HuggingFacePipelineScorer):
             trust_remote_code=True,
         )
 
-    def _predict(
-        self, query: str, context: Union[str, list[str]], output: str
-    ) -> float:
+    def _predict(self, query: str, context: str | list[str], output: str) -> float:
         assert self._pipeline is not None, (
             "Pipeline not loaded, check your `model_name_or_path`"
         )
@@ -282,7 +280,7 @@ class WeaveHallucinationScorerV1(HuggingFacePipelineScorer):
         self,
         *,
         query: str,
-        context: Union[str, list[str]],
+        context: str | list[str],
         output: str,
         **kwargs: Any,
     ) -> WeaveScorerResult:

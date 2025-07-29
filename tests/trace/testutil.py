@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any
 
 from weave.trace.refs import ObjectRef, OpRef, parse_uri
 
@@ -6,12 +6,12 @@ from weave.trace.refs import ObjectRef, OpRef, parse_uri
 class ObjectRefStrMatcher:
     def __init__(
         self,
-        entity: Optional[str] = None,
-        project: Optional[str] = None,
-        kind: Optional[str] = None,
-        name: Optional[str] = None,
-        digest: Optional[str] = None,
-        extra: Optional[list[str]] = None,
+        entity: str | None = None,
+        project: str | None = None,
+        kind: str | None = None,
+        name: str | None = None,
+        digest: str | None = None,
+        extra: list[str] | None = None,
     ) -> None:
         self.entity = entity
         self.project = project

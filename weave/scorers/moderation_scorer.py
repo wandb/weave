@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Union
+from typing import TYPE_CHECKING, Any
 
 from pydantic import Field, PrivateAttr, validate_call
 
@@ -134,7 +134,7 @@ class WeaveToxicityScorerV1(RollingWindowScorer):
 
         self._tokenizer = AutoTokenizer.from_pretrained(self._local_model_path)
 
-    def predict_chunk(self, input_ids: "Tensor") -> list[Union[int, float]]:
+    def predict_chunk(self, input_ids: "Tensor") -> list[int | float]:
         """
         Predict toxicity scores for a chunk of tokenized input.
 

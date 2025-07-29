@@ -1,5 +1,6 @@
 import importlib
-from typing import TYPE_CHECKING, Any, Callable, Union
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any, Union
 
 from pydantic import BaseModel
 
@@ -95,7 +96,7 @@ def dspy_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
 
 def dspy_postprocess_outputs(
     outputs: Union[Any, "Example"],
-) -> Union[list[Any], dict[str, Any], Any]:
+) -> list[Any] | dict[str, Any] | Any:
     import numpy as np
     from dspy import Example, Module
 

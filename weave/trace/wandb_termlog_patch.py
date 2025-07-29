@@ -10,7 +10,7 @@ start to track referrers.
 
 import inspect
 from functools import wraps
-from typing import Any, Optional
+from typing import Any
 
 import weave.wandb_thin as wandb
 
@@ -27,7 +27,7 @@ def unsafe_termlog(*args: Any, **kwargs: Any) -> None:
     """
     bound_args = inspect.signature(wandb_termlog).bind(*args, **kwargs)
     bound_args.apply_defaults()
-    string_arg_val: Optional[str] = bound_args.arguments.get("string")
+    string_arg_val: str | None = bound_args.arguments.get("string")
     if (
         string_arg_val
         and isinstance(string_arg_val, str)

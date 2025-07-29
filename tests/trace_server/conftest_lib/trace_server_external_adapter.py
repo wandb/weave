@@ -1,5 +1,4 @@
 import base64
-import typing
 
 from weave.trace_server import (
     external_to_internal_trace_server_adapter,
@@ -65,7 +64,7 @@ class DummyIdConverter(external_to_internal_trace_server_adapter.IdConverter):
     def ext_to_int_project_id(self, project_id: str) -> str:
         return self._project_map.ext_to_int(project_id, b64(project_id))
 
-    def int_to_ext_project_id(self, project_id: str) -> typing.Optional[str]:
+    def int_to_ext_project_id(self, project_id: str) -> str | None:
         return self._project_map.int_to_ext(project_id, b64(project_id))
 
     def ext_to_int_run_id(self, run_id: str) -> str:

@@ -5,7 +5,7 @@ import json
 import os
 import threading
 from time import time
-from typing import Any, Optional, Union
+from typing import Any
 
 from requests import HTTPError as HTTPError
 from requests import PreparedRequest, Response, Session
@@ -34,7 +34,7 @@ STYLE_DIVIDER_RESPONSE = "bright_black"
 THEME_JSON = "ansi_dark"
 
 
-def decode_str(string: Union[str, bytes]) -> str:
+def decode_str(string: str | bytes) -> str:
     """Decode a bytes object to a string."""
     return string if isinstance(string, str) else string.decode("utf-8")
 
@@ -156,15 +156,15 @@ session.mount("http://", adapter)
 session.mount("https://", adapter)
 
 
-def get(url: str, params: Optional[dict[str, str]] = None, **kwargs: Any) -> Response:
+def get(url: str, params: dict[str, str] | None = None, **kwargs: Any) -> Response:
     """Send a GET request with optional logging."""
     return session.get(url, params=params, **kwargs)
 
 
 def post(
     url: str,
-    data: Optional[Union[dict[str, Any], str]] = None,
-    json: Optional[dict[str, Any]] = None,
+    data: dict[str, Any] | str | None = None,
+    json: dict[str, Any] | None = None,
     **kwargs: Any,
 ) -> Response:
     """Send a POST request with optional logging."""

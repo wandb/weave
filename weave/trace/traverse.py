@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from collections.abc import Collection, Iterator
 from functools import cmp_to_key
-from typing import Any, Union, overload
+from typing import Any, overload
 
 # String indicates object key access, number indicates array index access
 # This structure allows us to handle corner cases like periods or brackets
 # in object keys.
 
-PathElement = Union[str, int]
+PathElement = str | int
 
 
 def escape_key(key: str) -> str:

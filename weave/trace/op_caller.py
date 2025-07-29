@@ -1,13 +1,13 @@
 import asyncio
 import inspect
-from collections.abc import Coroutine
-from typing import Any, Callable, Union
+from collections.abc import Callable, Coroutine
+from typing import Any
 
 from weave.trace.op import Op, as_op, is_op
 from weave.trace.weave_client import Call
 
 
-def async_call(func: Union[Callable, Op], *args: Any, **kwargs: Any) -> Coroutine:
+def async_call(func: Callable | Op, *args: Any, **kwargs: Any) -> Coroutine:
     """For async functions, calls them directly. For sync functions, runs them in a thread.
     This provides a common async interface for both sync and async functions.
 

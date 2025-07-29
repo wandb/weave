@@ -4,7 +4,8 @@ This module should not require any dependencies beyond the standard library. It 
 check if libraries are installed and imported and patch in the case that they are.
 """
 
-from typing import Any, Callable, Optional, Union
+from collections.abc import Callable
+from typing import Any
 
 from pydantic import BaseModel, Field, validate_call
 
@@ -16,10 +17,10 @@ class OpSettings(BaseModel):
     These currently subset the `op` decorator args to provide a consistent interface
     when working with auto-patched functions.  See the `op` decorator for more details."""
 
-    name: Optional[str] = None
-    call_display_name: Optional[Union[str, Callable[[Call], str]]] = None
-    postprocess_inputs: Optional[Callable[[dict[str, Any]], dict[str, Any]]] = None
-    postprocess_output: Optional[Callable[[Any], Any]] = None
+    name: str | None = None
+    call_display_name: str | Callable[[Call], str] | None = None
+    postprocess_inputs: Callable[[dict[str, Any]], dict[str, Any]] | None = None
+    postprocess_output: Callable[[Any], Any] | None = None
 
 
 class IntegrationSettings(BaseModel):
@@ -61,7 +62,7 @@ class AutopatchSettings(BaseModel):
 
 
 @validate_call
-def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
+def autopatch(settings: AutopatchSettings | None = None) -> None:
     if settings is None:
         settings = AutopatchSettings()
     if settings.disable_autopatch:

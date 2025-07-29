@@ -39,7 +39,7 @@ class PresidioScorer(weave.Scorer):
         description="A list of custom recognizers to add to the analyzer. Check Presidio's documentation for more information; https://microsoft.github.io/presidio/samples/python/customizing_presidio_analyzer/",
     )
 
-    selected_entities: Optional[list[str]] = Field(
+    selected_entities: list[str] | None = Field(
         default=None,
         description="A list of entity types to detect in the text.",
         examples=[["EMAIL_ADDRESS"]],
@@ -125,7 +125,7 @@ class PresidioScorer(weave.Scorer):
         output: str,
         analyzer_results: list["RecognizerResult"],
         detected_entities: dict[str, list[str]],
-    ) -> Optional[str]:
+    ) -> str | None:
         anonymized_text = None
         if detected_entities and self._anonymizer is not None:
             anonymized_result = self._anonymizer.anonymize(
@@ -136,7 +136,7 @@ class PresidioScorer(weave.Scorer):
 
     @weave.op
     def score(
-        self, *, output: str, entities: Optional[list[str]] = None, **kwargs: Any
+        self, *, output: str, entities: list[str] | None = None, **kwargs: Any
     ) -> WeaveScorerResult:
         if self._analyzer is None:
             raise ValueError("Analyzer is not initialized")

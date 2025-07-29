@@ -44,11 +44,12 @@ import logging
 import os
 import re
 import time
+from collections.abc import Callable
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from re import Pattern
-from typing import Any, Callable, Protocol
+from typing import Any, Protocol
 
 import pytz
 import urllib3

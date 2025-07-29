@@ -1,4 +1,4 @@
-from typing import Any, Union
+from typing import Any
 
 import numpy as np
 from pydantic import Field, validate_call
@@ -154,7 +154,7 @@ class WeaveContextRelevanceScorerV1(HuggingFaceScorer):
     def score(
         self,
         query: str,
-        output: Union[str, list[str]],  # Pass the context to the `output` parameter
+        output: str | list[str],  # Pass the context to the `output` parameter
         **kwargs: Any,
     ) -> WeaveScorerResult:
         all_spans: list[dict[str, Any]] = []

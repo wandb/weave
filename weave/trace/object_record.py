@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import dataclasses
 import types
+from collections.abc import Callable
 from inspect import getmro, isclass
-from typing import Any, Callable
+from typing import Any
 
 from weave.trace.op import is_op
 from weave.trace_server.client_server_common.pydantic_util import (

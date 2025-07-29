@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
-from typing import Any, Callable
+from collections.abc import Callable, Mapping
+from typing import Any
 
 from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.op import Op, is_op, op

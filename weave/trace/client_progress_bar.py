@@ -5,7 +5,7 @@ tasks in the WeaveClient.
 """
 
 import logging
-from typing import Callable
+from collections.abc import Callable
 
 from rich.console import Console
 from rich.progress import (

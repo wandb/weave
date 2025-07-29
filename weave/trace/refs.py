@@ -4,7 +4,7 @@ import urllib
 from concurrent.futures import Future
 from dataclasses import asdict, dataclass, fields
 from datetime import datetime
-from typing import Any, Union, cast
+from typing import Any, cast
 
 from weave.trace_server import refs_internal
 from weave.trace_server.errors import ObjectDeletedError
@@ -267,7 +267,7 @@ class DeletedRef(Ref):
         return self.ref.uri()
 
 
-AnyRef = Union[ObjectRef, TableRef, CallRef, OpRef]
+AnyRef = ObjectRef | TableRef | CallRef | OpRef
 
 
 def parse_name_version(name_version: str) -> tuple[str, str]:

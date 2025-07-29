@@ -13,7 +13,8 @@ from __future__ import annotations
 import queue
 import sys
 import threading
-from typing import TYPE_CHECKING, Any, Callable
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 import requests
 

@@ -5,14 +5,14 @@ particularly useful when dealing with JSON-like data where keys might not exist 
 """
 
 from collections import defaultdict
-from typing import Any, Optional, TypeVar, Union
+from typing import Any, TypeVar
 
 T = TypeVar("T")
 
 
 def safe_get(
-    obj: Optional[dict], path: list[str], default: Optional[T] = None
-) -> Union[Any, Optional[T]]:
+    obj: dict | None, path: list[str], default: T | None = None
+) -> Any | T | None:
     """Safely get a value from a nested dictionary using a list of keys.
 
     This function traverses a nested dictionary structure using a list of keys,
@@ -47,7 +47,7 @@ def safe_get(
     return safe_get(obj.get(path[0]), path[1:], default)
 
 
-def convert_defaultdict_to_dict(d: Union[dict, defaultdict]) -> dict:
+def convert_defaultdict_to_dict(d: dict | defaultdict) -> dict:
     if isinstance(d, defaultdict):
         return {k: convert_defaultdict_to_dict(v) for k, v in d.items()}
     return d
