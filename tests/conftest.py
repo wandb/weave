@@ -493,8 +493,16 @@ def caching_client_isolation(monkeypatch, tmp_path):
 
 @pytest.fixture
 def make_evals(client):
+    # First eval
     ev = weave.EvaluationLogger(model="abc", dataset="def")
     pred = ev.log_prediction(inputs={"x": 1}, output=2)
     pred.log_score("score", 3)
     pred.log_score("score2", 4)
     ev.log_summary(summary={"y": 5})
+
+    # Make a second eval.  Later we will check to see that we don't get this eval's data when querying
+    ev2 = weave.EvaluationLogger(model="ghi", dataset="jkl")
+    pred2 = ev2.log_prediction(inputs={"alpha": 12}, output=34)
+    pred2.log_score("second_score", 56)
+    pred2.log_score("second_score2", 78)
+    ev2.log_summary(summary={"z": 90})

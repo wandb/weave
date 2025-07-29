@@ -925,7 +925,7 @@ class WeaveClient:
 
     ################ Query API ################
 
-    def get_evaluation_calls(self) -> CallsIter:
+    def get_evaluation_calls(self, evaluation_uri: str | None = None) -> CallsIter:
         """
         Retrieves all root Evaluation.evaluate calls in this project.
 
@@ -951,8 +951,8 @@ class WeaveClient:
         """
         evaluate_op_name = "Evaluation.evaluate"
 
-        return self.get_calls(
-            query={
+        kwargs = {
+            "query": {
                 "$expr": {
                     "$contains": {
                         "input": {"$getField": "op_name"},
@@ -960,9 +960,13 @@ class WeaveClient:
                     }
                 }
             }
-        )
+        }
+        if evaluation_uri:
+            kwargs["filter"] = CallsFilter(input_refs=[evaluation_uri])
 
-    def get_score_calls(self) -> CallsIter:
+        return self.get_calls(**kwargs)
+
+    def get_score_calls(self, evaluation_uri: str | None = None) -> CallsIter:
         """
         Retrieves all score calls in this project.
 
@@ -992,8 +996,8 @@ class WeaveClient:
         """
         score_json_path = "attributes._weave_eval_meta.score"
 
-        return self.get_calls(
-            query={
+        kwargs = {
+            "query": {
                 "$expr": {
                     "$eq": [
                         {
@@ -1006,8 +1010,11 @@ class WeaveClient:
                     ]
                 }
             },
-            expand_columns=[score_json_path],
-        )
+            "expand_columns": [score_json_path],
+        }
+        # TODO: Support evaluation_uri
+
+        return self.get_calls(**kwargs)
 
     def get_scores(self) -> dict[str, list[Any]]:
         d = {}
