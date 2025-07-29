@@ -498,4 +498,3 @@ def make_evals(client):
     pred.log_score("score", 3)
     pred.log_score("score2", 4)
     ev.log_summary(summary={"y": 5})
-    return
