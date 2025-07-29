@@ -9,16 +9,21 @@
 # ///
 
 import argparse
-import csv
 import os
-import statistics
 import subprocess
 import sys
 import time
 import uuid
 
 from rich.console import Console
-from rich.table import Table
+from utils import (
+    calculate_stats,
+    create_basic_table,
+    format_seconds,
+    get_script_dir_path,
+    read_results_from_csv,
+    write_csv_with_headers,
+)
 
 console = Console()
 
@@ -169,27 +174,6 @@ def run_benchmark_iterations(iterations: int) -> dict[str, list[float]]:
     return {"import": import_times, "init": init_times, "total": total_times}
 
 
-def calculate_stats(times: list[float]) -> dict[str, float]:
-    """Calculate timing statistics.
-
-    Args:
-        times: List of execution times.
-
-    Returns:
-        dict[str, float]: Dictionary with statistical measures.
-    """
-    if not times:
-        return {"mean": 0, "median": 0, "std_dev": 0, "min": 0, "max": 0}
-
-    return {
-        "mean": statistics.mean(times),
-        "median": statistics.median(times),
-        "std_dev": statistics.stdev(times) if len(times) > 1 else 0,
-        "min": min(times),
-        "max": max(times),
-    }
-
-
 def write_results_to_csv(results: dict[str, list[float]], filename: str) -> None:
     """Write benchmark results to CSV file.
 
@@ -197,75 +181,53 @@ def write_results_to_csv(results: dict[str, list[float]], filename: str) -> None
         results: Dictionary with timing results.
         filename: Output CSV filename.
     """
-    console.print(f"Writing results to {filename}...")
-
     # Calculate stats for each timing type
     stats = {}
     for timing_type, times in results.items():
         stats[timing_type] = calculate_stats(times)
 
-    with open(filename, "w", newline="") as csvfile:
-        writer = csv.writer(csvfile)
+    # Prepare CSV data
+    headers = ["Timing_Type", "Metric", "Value_Seconds"]
+    rows = []
 
-        # Write header
-        writer.writerow(["Timing_Type", "Metric", "Value_Seconds"])
+    metrics = ["mean", "median", "std_dev", "min", "max"]
+    metric_labels = ["Mean", "Median", "Std Dev", "Min", "Max"]
 
-        # Write data rows
-        metrics = ["mean", "median", "std_dev", "min", "max"]
-        metric_labels = ["Mean", "Median", "Std Dev", "Min", "Max"]
+    for timing_type in ["import", "init", "total"]:
+        for metric, label in zip(metrics, metric_labels):
+            value = stats[timing_type][metric]
+            rows.append([timing_type.title(), label, f"{value:.6f}"])
 
-        for timing_type in ["import", "init", "total"]:
-            for metric, label in zip(metrics, metric_labels):
-                value = stats[timing_type][metric]
-                writer.writerow([timing_type.title(), label, f"{value:.6f}"])
-
-
-def read_results_from_csv(filename: str) -> list[dict[str, str]]:
-    """Read benchmark results from CSV file.
-
-    Args:
-        filename: Input CSV filename.
-
-    Returns:
-        list[dict[str, str]]: List of row dictionaries.
-    """
-    if not os.path.exists(filename):
-        console.print(f"[red]Results file {filename} not found[/red]")
-        return []
-
-    console.print(f"Reading results from {filename}...")
-
-    results = []
-    with open(filename, newline="") as csvfile:
-        reader = csv.DictReader(csvfile)
-        for row in reader:
-            results.append(row)
-
-    return results
+    write_csv_with_headers(filename, headers, rows)
 
 
-def create_results_table_from_csv(csv_data: list[dict[str, str]]) -> Table:
+def create_results_table_from_csv(csv_data: list[dict[str, str]]):
     """Create a Rich table from CSV data.
 
     Args:
         csv_data: List of row dictionaries from CSV.
 
     Returns:
-        Table: Rich table with timing results.
+        Rich table with timing results.
     """
-    table = Table(title="Weave Setup Timing Results")
-    table.add_column("Component", style="cyan", no_wrap=True)
-    table.add_column("Metric", style="magenta", no_wrap=True)
-    table.add_column("Time (seconds)", style="green", justify="right")
+    headers = ["Component", "Metric", "Time (seconds)"]
+    column_styles = ["cyan", "magenta", "green"]
+    column_justifications = ["left", "left", "right"]
 
+    rows = []
     for row in csv_data:
         timing_type = row["Timing_Type"]
         metric = row["Metric"]
         value = float(row["Value_Seconds"])
+        rows.append([timing_type, metric, format_seconds(value)])
 
-        table.add_row(timing_type, metric, f"{value:.3f}s")
-
-    return table
+    return create_basic_table(
+        "Weave Setup Timing Results",
+        headers,
+        rows,
+        column_styles,
+        column_justifications,
+    )
 
 
 def main():
@@ -287,7 +249,7 @@ def main():
     results = run_benchmark_iterations(args.iterations)
 
     # Write results to CSV in the same directory as the script
-    script_dir = os.path.dirname(os.path.abspath(__file__))
+    script_dir = get_script_dir_path(__file__)
     csv_filename = os.path.join(script_dir, "weave_setup_time_results.csv")
     write_results_to_csv(results, csv_filename)
 
@@ -313,9 +275,11 @@ def main():
 
     if import_mean is not None and init_mean is not None and total_mean is not None:
         console.print("\n[bold]Summary:[/bold]")
-        console.print(f"  • Import time: [yellow]{import_mean:.3f}s[/yellow]")
-        console.print(f"  • Init time: [yellow]{init_mean:.3f}s[/yellow]")
-        console.print(f"  • Total time: [yellow]{total_mean:.3f}s[/yellow]")
+        console.print(
+            f"  • Import time: [yellow]{format_seconds(import_mean)}[/yellow]"
+        )
+        console.print(f"  • Init time: [yellow]{format_seconds(init_mean)}[/yellow]")
+        console.print(f"  • Total time: [yellow]{format_seconds(total_mean)}[/yellow]")
 
 
 if __name__ == "__main__":

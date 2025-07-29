@@ -1,0 +1,6 @@
+Metric,With_Weave_Seconds,Without_Weave_Seconds,Overhead_Percent
+Mean,0.864443,0.939324,-7.97
+Median,0.864443,0.939324,-7.97
+Std Dev,0.139177,0.297665,-53.24
+Min,0.766030,0.728843,5.10
+Max,0.962856,1.149806,-16.26
