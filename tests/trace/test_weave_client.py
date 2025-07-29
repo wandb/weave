@@ -2,7 +2,6 @@ import asyncio
 import dataclasses
 import datetime
 import json
-import os
 import platform
 import re
 import sys
@@ -3638,7 +3637,6 @@ def test_get_evaluations(client, make_evals):
     assert ev2.inputs["model"].name == "abc"
 
 
-@pytest.mark.skipif(os.getenv("CI"), reason="fails in CI for some reason")
 def test_get_scores(client, make_evals):
     if client_is_sqlite(client):
         return pytest.skip("skipping for sqlite")
