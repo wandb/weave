@@ -121,6 +121,10 @@ const config: Config = {
             from: ['/guides/evaluation/imperative_evaluations'],
             to: '/guides/evaluation/evaluation_logger',
           },
+          {
+            from: ['/guides/integrations/inference'],
+            to: '/guides/tools/inference',
+          },
         ]  
       },
     ],

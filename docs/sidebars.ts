@@ -20,6 +20,11 @@ const sidebars: SidebarsConfig = {
           label: "Quickstart: Track LLM Calls",
           id: "quickstart",
         },
+        {
+          type: "doc",
+          label: "Try Weave with Inference Service",
+          id: "quickstart-inference",
+        },
       ],
     },
     {
@@ -155,7 +160,7 @@ const sidebars: SidebarsConfig = {
           collapsed: true,
           label: "Tools & Utilities",
           link: { type: "doc", id: "guides/tools/index" },
-          items: ["guides/tools/serve", "guides/tools/deploy", "guides/tracking/otel"],
+          items: ["guides/tools/inference", "guides/tools/serve", "guides/tools/deploy", "guides/tracking/otel"],
         },
       ],
     },
@@ -170,7 +175,6 @@ const sidebars: SidebarsConfig = {
           collapsed: true,
           label: "LLM Providers",
           items: [
-            "guides/integrations/inference",
             "guides/integrations/bedrock",
             "guides/integrations/anthropic",
             "guides/integrations/cerebras",

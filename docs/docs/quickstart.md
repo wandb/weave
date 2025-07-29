@@ -3,10 +3,14 @@ import TabItem from '@theme/TabItem';
 
 # Track LLM inputs & outputs
 
-:::tip
-For a limited time, the new W&B Inference service is included in your free tier. W&B Inference provides access to leading open-source foundation models via API and the Weave [Playground](./guides/tools/playground.md). 
-- [Developer documentation](./guides/integrations/inference.md)
-- [Product page](https://wandb.ai/site/inference) 
+:::info[💡 New to Weave? Consider starting with W&B Inference]
+If you don't have OpenAI API keys yet, or want to experiment without costs, check out our **[W&B Inference quickstart](/quickstart-inference)** instead. It includes:
+- Free credits to get started
+- No external API keys needed
+- Access to powerful models like Llama 3.3 and DeepSeek
+- Same great Weave features demonstrated here
+
+**Continue with this guide if you want to use your own LLM provider API keys.**
 :::
 
 <!-- TODO: Update wandb.me/weave-quickstart to match this new link -->
@@ -147,4 +151,18 @@ Calls made to OpenAI, Anthropic and [many more LLM libraries](./guides/integrati
 
 ## What's next?
 
-- Follow the [Tracking flows and app metadata](/tutorial-tracing_2) to start tracking and the data flowing through your app.
+### 🚀 Try W&B Inference Service
+Now that you've seen Weave in action, level up your experimentation with our Inference service:
+
+**[Get Started with W&B Inference →](/quickstart-inference)**
+
+Why try it next?
+- **Experiment freely**: No need to manage multiple API keys
+- **Compare models easily**: Test Llama, DeepSeek, Qwen side-by-side
+- **Build evaluations**: Learn systematic model comparison
+- **Free credits included**: Perfect for learning and prototyping
+
+### 📚 Continue learning
+- **[Track flows and app metadata](/tutorial-tracing_2)**: Dive deeper into tracing complex applications
+- **[Build evaluations](/tutorial-eval)**: Learn systematic model evaluation
+- **[Explore integrations](./guides/integrations/index.md)**: Connect more LLM providers and frameworks

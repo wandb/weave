@@ -329,7 +329,7 @@ Once you run the code sample, you can view the trace in Weave by clicking the li
 
 Next, try the [advanced example](#advanced-example-use-weave-evaluations-and-leaderboards-with-the-inference-service).
 
-![Traces display](imgs/image.png)
+![Traces display](./imgs/image.png)
 
 ### Advanced example: Use Weave Evaluations and Leaderboards with the inference service
 
@@ -415,9 +415,9 @@ After you run the following code sample, navigate to your W&B account at [https:
 - Navigate to the **Evals** tab to [view your model evaluations](../core-types/evaluations.md)
 - Navigate to the **Leaders** tab to [view the generated leaderboard](../core-types/leaderboards.md)
 
-![View your model evaluations](imgs/inference-advanced-evals.png)
+![View your model evaluations](./imgs/inference-advanced-evals.png)
 
-![View your traces](imgs/inference-advanced-leaderboard.png)
+![View your traces](./imgs/inference-advanced-leaderboard.png)
 
 ## UI
 
@@ -440,7 +440,7 @@ Navigate to [https://wandb.ai/inference](https://wandb.ai/inference).
 1. Navigate to your W&B account at [https://wandb.ai/](https://wandb.ai/).
 2. From the left sidebar, select **Inference**. A page with available models and model information displays.
 
-![Using an Inference model in the Playground](imgs/inference-playground-single.png)
+![Using an Inference model in the Playground](./imgs/inference-playground-single.png)
 
 #### From the Playground tab
 
@@ -450,7 +450,7 @@ Navigate to [https://wandb.ai/inference](https://wandb.ai/inference).
    - Click the name of any available model to [try it in the Playground](#try-a-model-in-the-playground).
    - [Compare one or more models in the Playground](#compare-multiple-models)
 
-![The Inference models dropdown in Playground](imgs/inference-playground.png)
+![The Inference models dropdown in Playground](./imgs/inference-playground.png)
 
 ### Try a model in the Playground
 
@@ -477,7 +477,7 @@ You can compare multiple Inference models in the Playground. The Compare view ca
 
 Now, you can compare models in the Playground, and use any of the features described in [Try a model in the Playground](#try-a-model-in-the-playground).
 
-![Select multiple models to compare in Playground](imgs/inference-playground-compare.png)
+![Select multiple models to compare in Playground](./imgs/inference-playground-compare.png)
 
 #### Access the Compare view from the Playground tab
 
