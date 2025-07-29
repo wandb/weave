@@ -22,7 +22,7 @@ const sidebars: SidebarsConfig = {
         },
         {
           type: "doc",
-          label: "Try Weave with Inference Service",
+          label: "Get started with W&B Inference",
           id: "quickstart-inference",
         },
       ],
