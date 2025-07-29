@@ -39,7 +39,9 @@ from __future__ import annotations
 import inspect
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, TypeGuard
+from typing import TYPE_CHECKING, Any
+
+from typing_extensions import TypeGuard
 
 # Not locking down the return type for inline encoding but
 # it would be expected to be something like a str or dict.

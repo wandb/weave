@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from typing import Any, TypeGuard, TypeVar
+from typing import Any, TypeVar
+
+from typing_extensions import TypeGuard
 
 from weave.trace.object_record import ObjectRecord
 from weave.trace.vals import WeaveObject
