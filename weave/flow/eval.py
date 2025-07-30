@@ -326,6 +326,8 @@ class Evaluation(Object):
         for trace_id, calls in score_calls.items():
             d[trace_id] = {}
             for call in calls:
+                if call.summary is None:
+                    continue
                 scorer_name = call.summary.get("weave", {}).get("trace_name")
                 if scorer_name not in d[trace_id]:
                     d[trace_id][scorer_name] = []
