@@ -499,6 +499,10 @@ export const BoundingBoxesCanvas: FC<BoundingBoxCanvasProps> = ({
   const imageWidth = mediaSize.width * scale;
   const imageHeight = mediaSize.height * scale;
 
+  if (cardSize == null) {
+    return <OverlayCanvas {...mediaSize} ref={canvasRef} />;
+  }
+
   return (
     <div className="relative flex h-full w-full items-center">
       {cardSize && Number.isFinite(scale) && (
@@ -597,7 +601,6 @@ export const BoundingBoxesCanvas: FC<BoundingBoxCanvasProps> = ({
           })}
         </div>
       )}
-      <OverlayCanvas {...mediaSize} ref={canvasRef} />
     </div>
   );
 };

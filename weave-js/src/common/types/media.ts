@@ -109,13 +109,15 @@ export interface HtmlMetadata {
   count: number; // number of html files
 }
 
-export interface MediaCardMetadata {
+export type MediaCardMetadata = {
   width: number | null;
   height: number | null;
   grouping?: number;
   sizingSettings: any; // TODO(p0): type
   count?: number;
-}
+  size?: number;
+  _type: MediaString;
+};
 
 /*
  * A bunch of the original media strings ("images", "audio", "html", "object3D")
