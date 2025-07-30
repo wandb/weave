@@ -224,7 +224,7 @@ class RunAsUser:
     def _start_process(self) -> None:
         """Start the worker process."""
         ctx = multiprocessing.get_context("spawn")
-        
+
         self._request_queue = ctx.Queue()
         self._response_queue = ctx.Queue()
         self._process = ctx.Process(
