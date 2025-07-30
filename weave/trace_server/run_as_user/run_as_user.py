@@ -324,6 +324,7 @@ class RunAsUser:
                                 response_queue.put(result)
                             except Exception as e:
                                 # Send exception back to parent
+                                logger.error(f"Error executing function: {e}", exc_info=True)
                                 response_queue.put(e)
                         else:
                             # TODO: Consider making this more extensible for future signal types

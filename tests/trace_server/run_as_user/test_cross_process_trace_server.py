@@ -343,7 +343,7 @@ class TestCrossProcessTraceServerIntegration:
         """Test complete end-to-end communication flow."""
 
         # Create a more realistic mock trace server
-        class RealisticeTraceServer:
+        class RealisticTraceServer:
             def __init__(self):
                 self.calls = []
 
@@ -373,7 +373,7 @@ class TestCrossProcessTraceServerIntegration:
                     inputs={},
                 )
 
-        server = RealisticeTraceServer()
+        server = RealisticTraceServer()
         receiver = CrossProcessTraceServerReceiver(server)
         sender = receiver.get_sender_trace_server()
 

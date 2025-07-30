@@ -382,17 +382,17 @@ def log_to_weave(req: SimpleRequest):
 
 @pytest.mark.asyncio
 async def test_correct_isolation(client):
-    """This test demonstrates sucessful isolation of function execution, but
+    """This test demonstrates successful isolation of function execution, but
     consistency within a single process.
 
-    Each call to the log function internall increaments a counter that is stateful
-    accross multiple executions of the function.
+    Each call to the log function internally increments a counter that is stateful
+    across multiple executions of the function.
 
-    However, correctly, that counter is not shared accross processes.
+    However, correctly, that counter is not shared across processes.
 
-    Also, the internal refs are not shared accross processes.
+    Also, the internal refs are not shared across processes.
 
-    We also assert that call are successfully logged to the trace server.
+    We also assert that calls are successfully logged to the trace server.
     """
     async with runner_with_cleanup(
         client.server, entity=client.entity, project=client.project
