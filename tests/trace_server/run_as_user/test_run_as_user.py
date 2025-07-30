@@ -25,6 +25,7 @@ from weave.trace.ref_util import get_ref
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server.run_as_user.run_as_user import RunAsUser, RunAsUserError
 from weave.trace_server.trace_server_interface import TraceServerInterface
+from weave.trace.context.weave_client_context import get_weave_client
 
 
 class TestResponse(BaseModel):
@@ -219,8 +220,6 @@ async def test_process_exit_code(client):
 
 async def check_isolation_function(req: TestRequest) -> TestResponse:
     """A function that checks the current context matches expectations."""
-    from weave.trace.context.weave_client_context import get_weave_client
-
     client = get_weave_client()
     if client is None:
         return TestResponse(result="No client in context")
