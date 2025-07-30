@@ -40,7 +40,7 @@ import sys
 import time
 from collections.abc import Awaitable, Coroutine
 from multiprocessing.context import SpawnProcess
-from typing import Any, Callable, Optional, TypeVar, Union, overload
+from typing import Any, Callable, TypeVar, Union, overload
 
 from pydantic import BaseModel
 
