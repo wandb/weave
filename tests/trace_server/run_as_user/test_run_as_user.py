@@ -25,7 +25,7 @@ from weave.trace.ref_util import get_ref
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server.run_as_user.run_as_user import RunAsUser, RunAsUserError
 from weave.trace_server.trace_server_interface import TraceServerInterface
-
+from weave.trace.context.weave_client_context import get_weave_client
 
 class TestResponse(BaseModel):
     """Simple response model for tests."""
@@ -424,3 +424,37 @@ async def test_correct_isolation(client):
     assert len(calls) == 6
 
     assert get_ref(log_to_weave_op) is None
+
+
+async def check_client_isolation_function(req: SimpleRequest) -> SimpleResponse:
+    """Module-level function to check client isolation (required for spawn)."""
+    child_client = get_weave_client()
+    if child_client is None:
+        return SimpleResponse(result="No client found")
+
+    # The child should have a different client instance
+    # even though it may have the same entity/project
+    return SimpleResponse(
+        result=f"Client entity: {child_client.entity}, Client id: {id(child_client)}"
+    )
+
+@pytest.mark.asyncio
+async def test_global_client_isolation(client):
+    """Test that global client from parent process doesn't leak into child."""
+    # Ensure we have a client in the parent process
+    parent_client = get_weave_client()
+    assert parent_client is not None
+    assert parent_client.entity == client.entity
+
+    async with runner_with_cleanup(
+        client.server, entity="different_entity", project="different_project"
+    ) as runner:
+        req = SimpleRequest(value="test")
+        result = await runner.execute(check_client_isolation_function, req)
+
+        # Child should have its own client with different entity
+        assert "different_entity" in result.result
+
+        # Parent client should remain unchanged
+        assert get_weave_client() == parent_client
+        assert get_weave_client().entity == client.entity
