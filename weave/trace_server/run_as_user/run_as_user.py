@@ -37,11 +37,8 @@ import asyncio
 import logging
 import multiprocessing
 import multiprocessing.spawn
-import os
-import signal
 import sys
 import time
-import traceback
 from collections.abc import Awaitable, Coroutine
 from multiprocessing.context import SpawnProcess
 from typing import Any, Callable, TypeVar, Union, overload
@@ -70,28 +67,6 @@ FC = TypeVar("FC")
 SyncCallable = Callable[[T], R]
 AsyncCallable = Callable[[T], Awaitable[R]]
 AnyCallable = Union[SyncCallable[T, R], AsyncCallable[T, R]]
-
-
-def _segfault_handler(signum: int, frame: Any) -> None:
-    """Handle SIGSEGV signal to provide debugging information."""
-    logger.error(f"Received signal {signum} (SIGSEGV)")
-    logger.error("Current stack trace:")
-    traceback.print_stack(frame)
-    logger.error("Process will exit with code -11")
-    sys.exit(-11)
-
-
-def _log_memory_usage(stage: str) -> None:
-    """Log current memory usage for debugging."""
-    try:
-        import psutil
-        process = psutil.Process(os.getpid())
-        memory_info = process.memory_info()
-        logger.info(f"Memory usage at {stage}: RSS={memory_info.rss / 1024 / 1024:.1f}MB, VMS={memory_info.vms / 1024 / 1024:.1f}MB")
-    except ImportError:
-        logger.info(f"Memory monitoring not available at {stage}")
-    except Exception as e:
-        logger.warning(f"Failed to get memory usage at {stage}: {e}")
 
 
 class RunAsUserError(Exception):
@@ -317,64 +292,42 @@ class RunAsUser:
         Handles both synchronous and asynchronous function execution.
         """
         try:
-            # Install signal handler for SIGSEGV
-            signal.signal(signal.SIGSEGV, _segfault_handler)
-            
-            logger.info("Worker process starting...")
-            _log_memory_usage("worker_start")
-            
             if get_weave_client() is not None:
                 raise RunAsUserError("Weave client already exists in context")
 
             # Create and initialize the client
-            logger.info("Creating WeaveClient...")
             client = client_factory(client_factory_config)
-            logger.info("WeaveClient created successfully")
-            _log_memory_usage("client_created")
-            
-            logger.info("Initializing client...")
             ic = InitializedClient(client)
-            logger.info("Client initialized successfully")
-            _log_memory_usage("client_initialized")
 
             try:
                 while True:
                     try:
                         # Get next request
-                        logger.debug("Waiting for request...")
-                        cmd_signal, func, request = request_queue.get()
-                        logger.debug(f"Received signal: {cmd_signal}")
+                        signal, func, request = request_queue.get()
 
-                        if cmd_signal == "STOP":
-                            logger.info("Received STOP signal, shutting down...")
+                        if signal == "STOP":
                             break
-                        elif cmd_signal == "EXEC":
+                        elif signal == "EXEC":
                             try:
-                                logger.debug("Executing function...")
                                 # Execute the function
                                 result = func(request)
 
                                 # Handle async functions - check for both Coroutine and Awaitable
                                 if isinstance(result, Coroutine):
-                                    logger.debug("Function returned coroutine, awaiting...")
                                     result = asyncio.run(result)
                                 elif hasattr(result, "__await__"):
                                     # Handle other awaitable types
-                                    logger.debug("Function returned awaitable, awaiting...")
                                     result = asyncio.run(result)
 
-                                logger.debug("Function execution completed successfully")
                                 response_queue.put(result)
                             except Exception as e:
-                                logger.error(f"Function execution failed: {e}", exc_info=True)
                                 # Send exception back to parent
                                 response_queue.put(e)
                         else:
                             # TODO: Consider making this more extensible for future signal types
-                            raise ValueError(f"Unknown signal: {cmd_signal}")
+                            raise ValueError(f"Unknown signal: {signal}")
 
                     except KeyboardInterrupt:
-                        logger.info("Received KeyboardInterrupt, shutting down...")
                         break
                     except Exception as e:
                         logger.error(f"Error in worker loop: {e}", exc_info=True)
@@ -383,16 +336,13 @@ class RunAsUser:
 
             finally:
                 # Clean up the client
-                logger.info("Cleaning up client...")
                 try:
                     client.finish(use_progress_bar=False)
-                    logger.info("Client finished successfully")
                 except Exception as e:
                     logger.error(f"Error finishing client: {e}", exc_info=True)
 
                 try:
                     ic.reset()
-                    logger.info("Client reset successfully")
                 except Exception as e:
                     logger.error(f"Error resetting client: {e}", exc_info=True)
 
