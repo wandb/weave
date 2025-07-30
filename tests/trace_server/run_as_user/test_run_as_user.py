@@ -21,11 +21,12 @@ import weave
 from tests.trace_server.run_as_user.cross_process_trace_server import (
     CrossProcessTraceServerReceiver,
 )
+from weave.trace.context.weave_client_context import get_weave_client
 from weave.trace.ref_util import get_ref
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server.run_as_user.run_as_user import RunAsUser, RunAsUserError
 from weave.trace_server.trace_server_interface import TraceServerInterface
-from weave.trace.context.weave_client_context import get_weave_client
+
 
 class TestResponse(BaseModel):
     """Simple response model for tests."""
@@ -437,6 +438,7 @@ async def check_client_isolation_function(req: SimpleRequest) -> SimpleResponse:
     return SimpleResponse(
         result=f"Client entity: {child_client.entity}, Client id: {id(child_client)}"
     )
+
 
 @pytest.mark.asyncio
 async def test_global_client_isolation(client):
