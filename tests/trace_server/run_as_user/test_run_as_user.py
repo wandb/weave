@@ -367,7 +367,7 @@ class SimpleResponse(BaseModel):
     result: str
 
 
-@weave.op()
+@weave.op
 def log_to_weave_op(req: SimpleRequest) -> SimpleResponse:
     if not hasattr(log_to_weave_op, "count"):
         log_to_weave_op.count = 0

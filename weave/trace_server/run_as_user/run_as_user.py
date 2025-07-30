@@ -273,7 +273,7 @@ class RunAsUser:
         try:
             self.stop()
         except Exception as e:
-            logger.exception(f"Error during RunAsUser cleanup: {e}")
+            logger.exception("Error during RunAsUser cleanup")
 
     @staticmethod
     def _worker_loop(
