@@ -16,7 +16,9 @@ import uuid
 from collections.abc import Callable
 from typing import Any
 
-from _utils import (
+from rich.console import Console
+from rich.table import Table
+from utils import (
     calculate_stats,
     create_basic_table,
     format_seconds,
@@ -24,8 +26,6 @@ from _utils import (
     read_results_from_csv,
     write_csv_with_headers,
 )
-from rich.console import Console
-from rich.table import Table
 
 console = Console()
 

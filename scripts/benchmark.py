@@ -50,7 +50,7 @@ def find_benchmarks(benchmarks_dir: Path) -> list[Path]:
 
     benchmarks = []
     for file_path in benchmarks_dir.glob("*.py"):
-        if file_path.is_file() and not file_path.name.startswith("_"):
+        if file_path.is_file() and file_path.name != "utils.py":
             benchmarks.append(file_path)
 
     return sorted(benchmarks)
