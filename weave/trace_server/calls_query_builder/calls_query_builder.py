@@ -34,6 +34,9 @@ from typing import Callable, Literal, Optional, cast
 from pydantic import BaseModel, Field
 
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.calls_query_builder.calls_descendants_query_builder import (
+    make_descendants_query,
+)
 from weave.trace_server.calls_query_builder.object_ref_query_builder import (
     ObjectRefCondition,
     ObjectRefOrderCondition,
@@ -506,6 +509,8 @@ class CallsQuery(BaseModel):
     include_costs: bool = False
     include_storage_size: bool = False
     include_total_storage_size: bool = False
+    descendant_query_parent_ids: Optional[list[str]] = None
+    descendant_query_depth: Optional[int] = None
 
     def add_field(self, field: str) -> "CallsQuery":
         name = get_field_by_name(field)
@@ -566,6 +571,11 @@ class CallsQuery(BaseModel):
             hardcoded_filter=self.hardcoded_filter,
             limit=self.limit,
             offset=self.offset,
+            descendant_query_parent_ids=(
+                self.descendant_query_parent_ids.copy()
+                if self.descendant_query_parent_ids
+                else None
+            ),
         )
 
     def set_include_costs(self, include_costs: bool) -> "CallsQuery":
@@ -574,6 +584,16 @@ class CallsQuery(BaseModel):
 
     def set_expand_columns(self, expand_columns: list[str]) -> "CallsQuery":
         self.expand_columns = expand_columns
+        return self
+
+    def set_descendant_query_parent_ids(self, parent_ids: list[str]) -> "CallsQuery":
+        if not parent_ids:
+            raise ValueError("Parent IDs list cannot be empty")
+        self.descendant_query_parent_ids = parent_ids
+        return self
+
+    def set_descendant_query_depth(self, depth: int) -> "CallsQuery":
+        self.descendant_query_depth = depth
         return self
 
     def as_sql(self, pb: ParamBuilder, table_alias: str = "calls_merged") -> str:
@@ -680,6 +700,8 @@ class CallsQuery(BaseModel):
             has_light_filter or has_light_query or has_light_order_filter
         )
 
+        has_descendant_query = self.descendant_query_parent_ids is not None
+
         # Determine if we should optimize!
         should_optimize = has_heavy_fields and predicate_pushdown_possible
 
@@ -707,7 +729,12 @@ class CallsQuery(BaseModel):
         )
 
         # If we should not optimize, then just build the base query
-        if not should_optimize and not self.include_costs and not object_ref_conditions:
+        if (
+            not should_optimize
+            and not self.include_costs
+            and not object_ref_conditions
+            and not has_descendant_query
+        ):
             return self._as_sql_base_format(pb, table_alias)
 
         # Build two queries, first filter query CTE, then select the columns
@@ -723,11 +750,6 @@ class CallsQuery(BaseModel):
         for field in self.select_fields:
             select_query.select_fields.append(field)
 
-        # Build CTEs for object reference filtering and ordering
-        object_join_cte, field_to_object_join_alias_map = build_object_ref_ctes(
-            pb, self.project_id, object_ref_conditions
-        )
-
         # Query conditions and filter
         for condition in self.query_conditions:
             filter_query.query_conditions.append(condition)
@@ -741,20 +763,45 @@ class CallsQuery(BaseModel):
         # SUPER IMPORTANT: still need to re-sort the final query
         select_query.order_fields = self.order_fields
 
-        raw_sql = "WITH "
+        # Build CTEs for descendant filtering, ref filtering, query filtering, and/or costs
+        cte_parts = []
+        descendant_cte, descendant_filter_sql = make_descendants_query(
+            project_id=self.project_id,
+            parent_call_ids=self.descendant_query_parent_ids,
+            max_depth=self.descendant_query_depth,
+            table_alias=table_alias,
+            pb=pb,
+        )
+        if descendant_cte:
+            cte_parts.append(descendant_cte)
+
+        object_join_cte, field_to_object_join_alias_map = build_object_ref_ctes(
+            pb, self.project_id, object_ref_conditions
+        )
         if object_join_cte:
-            raw_sql += f"{object_join_cte},\n"
-        raw_sql += f"""filtered_calls AS ({
-            filter_query._as_sql_base_format(
+            cte_parts.append(object_join_cte)
+
+        filtered_calls_sql = filter_query._as_sql_base_format(
+            pb,
+            table_alias,
+            field_to_object_join_alias_map=field_to_object_join_alias_map,
+            expand_columns=self.expand_columns,
+            descendant_filter_sql=descendant_filter_sql,
+        )
+        filtered_calls_cte = f"filtered_calls AS ({filtered_calls_sql})"
+
+        cte_parts.append(filtered_calls_cte)
+        with_clause = "WITH " + ", ".join(cte_parts)
+
+        if self.include_costs:
+            # Add all_calls CTE and get cost query
+            all_calls_sql = select_query._as_sql_base_format(
                 pb,
                 table_alias,
+                id_subquery_name="filtered_calls",
                 field_to_object_join_alias_map=field_to_object_join_alias_map,
                 expand_columns=self.expand_columns,
             )
-        })
-        """
-
-        if self.include_costs:
             # TODO: We should unify the calls query order by fields to be orm sort by fields
             order_by_fields = [
                 tsi.SortBy(
@@ -764,15 +811,12 @@ class CallsQuery(BaseModel):
                 for sort_by in self.order_fields
             ]
             select_fields = [field.field for field in self.select_fields]
-            inner_sql = cost_query(
+            cost_sql = cost_query(
                 pb, "all_calls", self.project_id, select_fields, order_by_fields
             )
-            raw_sql += f""",
-            all_calls AS ({select_query._as_sql_base_format(pb, table_alias, id_subquery_name="filtered_calls", field_to_object_join_alias_map=field_to_object_join_alias_map, expand_columns=self.expand_columns)}),
-            {inner_sql}
-            """
-
+            raw_sql = f"{with_clause}, all_calls AS ({all_calls_sql}), {cost_sql}"
         else:
+            # Get base query (just final SELECT)
             base_sql = select_query._as_sql_base_format(
                 pb,
                 table_alias,
@@ -780,7 +824,7 @@ class CallsQuery(BaseModel):
                 field_to_object_join_alias_map=field_to_object_join_alias_map,
                 expand_columns=self.expand_columns,
             )
-            raw_sql += base_sql
+            raw_sql = f"{with_clause} {base_sql}"
 
         return safely_format_sql(raw_sql, logger)
 
@@ -791,6 +835,7 @@ class CallsQuery(BaseModel):
         id_subquery_name: Optional[str] = None,
         field_to_object_join_alias_map: Optional[dict[str, str]] = None,
         expand_columns: Optional[list[str]] = None,
+        descendant_filter_sql: Optional[str] = None,
     ) -> str:
         needs_feedback = False
         select_fields_sql = ", ".join(
@@ -994,6 +1039,7 @@ class CallsQuery(BaseModel):
         WHERE calls_merged.project_id = {param_slot(project_param, "String")}
         {id_mask_sql}
         {id_subquery_sql}
+        {descendant_filter_sql or ""}
         {sortable_datetime_sql}
         {trace_roots_only_sql}
         {parent_ids_filter_sql}

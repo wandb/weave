@@ -100,6 +100,7 @@ from weave.trace_server.trace_server_interface import (
     CallEndReq,
     CallSchema,
     CallsDeleteReq,
+    CallsDescendantsReq,
     CallsFilter,
     CallsQueryReq,
     CallsQueryStatsReq,
@@ -1053,6 +1054,79 @@ class WeaveClient:
         include_costs: bool = False,
     ) -> WeaveObject:
         return self.get_call(call_id=call_id, include_costs=include_costs)
+
+    @trace_sentry.global_trace_sentry.watch()
+    @pydantic.validate_call
+    def get_calls_descendants(
+        self,
+        *,
+        parent_call_ids: list[str] | None = None,
+        depth: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+        sort_by: list[SortByLike] | None = None,
+        filter: CallsFilterLike | None = None,
+        query: QueryLike | None = None,
+        include_costs: bool = False,
+        include_feedback: bool = False,
+        columns: list[str] | None = None,
+        expand_columns: list[str] | None = None,
+    ) -> list[WeaveObject]:
+        """
+        Get all descendants of a call or list of calls.
+
+        This method retrieves all child calls (and their children recursively) for the
+        specified parent call(s). It's useful for analyzing the complete execution tree
+        of a traced operation.
+
+        Args:
+            parent_call_ids: List of parent call IDs to get descendants for (cannot be used with call_id).
+            depth: Maximum depth of descendants to return (1 = direct children only).
+            limit: Maximum number of descendants to return across all parent calls.
+            offset: Offset to start returning descendants from.
+            sort_by: List of fields to sort by.
+            filter: Filter to apply to the descendants.
+            query: Query to apply to the descendants.
+            include_costs: If True, includes token/cost info in `summary.weave`.
+            include_feedback: If True, includes feedback in `summary.weave.feedback`.
+            columns: List of fields to return per call. Reducing this can improve performance.
+            expand_columns: List of columns to expand (resolve refs to other objects).
+
+        Returns:
+            List of Call objects representing the descendants.
+        """
+        if not parent_call_ids:
+            raise ValueError("Must specify call_ids")
+        if depth is not None and depth < 1:
+            raise ValueError("Depth must be at least 1")
+
+        req = CallsDescendantsReq(
+            project_id=self._project_id(),
+            parent_call_ids=parent_call_ids,
+            limit=limit,
+            offset=offset,
+            sort_by=sort_by,
+            depth=depth,
+            filter=filter,
+            query=query,
+            include_costs=include_costs,
+            include_feedback=include_feedback,
+            columns=columns,
+            expand_columns=expand_columns,
+        )
+        res = self.server.calls_descendants(req)
+        if not res:
+            return []
+
+        # Convert response calls to WeaveObject instances
+        call_objects = []
+        for call_schema in res:
+            call_obj = make_client_call(
+                self.entity, self.project, call_schema, self.server
+            )
+            call_objects.append(call_obj)
+
+        return call_objects
 
     @trace_sentry.global_trace_sentry.watch()
     def create_call(

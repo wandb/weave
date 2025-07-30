@@ -475,6 +475,69 @@ class CallsQueryStatsRes(BaseModel):
     total_storage_size_bytes: Optional[int] = None
 
 
+class CallsDescendantsReq(BaseModel):
+    """
+    Request to get descendants of calls.
+
+    Can specify either:
+    - parent_call_ids: List of parent call IDs to get descendants for (batch mode)
+    - parent_call_id: Single parent call ID (for single call mode)
+    """
+
+    project_id: str
+    parent_call_ids: Optional[list[str]] = Field(
+        default=None,
+        description="List of parent call IDs to get descendants for",
+        examples=[["call_123", "call_456"]],
+    )
+    depth: Optional[int] = Field(
+        default=None,
+        description="Maximum depth of descendants to return (1 = direct children only)",
+    )
+    filter: Optional[CallsFilter] = Field(
+        default=None,
+        description="Filter to apply to the descendants",
+    )
+    query: Optional[Query] = Field(
+        default=None,
+        description="Query to apply to the descendants",
+    )
+    limit: Optional[int] = Field(
+        default=None,
+        description="Maximum number of descendants to return across all parent calls",
+    )
+    offset: Optional[int] = Field(
+        default=None,
+        description="Number of descendants to skip before returning results (used for pagination)",
+    )
+    sort_by: Optional[list[SortBy]] = Field(
+        default=None,
+        description="Sorting criteria for the descendants",
+        examples=[
+            [
+                SortBy(field="started_at", direction="asc"),
+                SortBy(field="id", direction="asc"),
+            ]
+        ],
+    )
+    include_costs: Optional[bool] = Field(
+        default=False,
+        description="If true, the response will include any model costs for each call.",
+    )
+    include_feedback: Optional[bool] = Field(
+        default=False,
+        description="If true, the response will include feedback for each call.",
+    )
+    columns: Optional[list[str]] = Field(
+        default=None,
+        description="Columns to include in the response",
+    )
+    expand_columns: Optional[list[str]] = Field(
+        default=None,
+        description="Columns to expand, i.e. refs to other objects",
+    )
+
+
 class CallUpdateReq(BaseModel):
     # required for all updates
     project_id: str
@@ -1211,6 +1274,8 @@ class TraceServerInterface(Protocol):
     def calls_query_stream(self, req: CallsQueryReq) -> Iterator[CallSchema]: ...
     def calls_delete(self, req: CallsDeleteReq) -> CallsDeleteRes: ...
     def calls_query_stats(self, req: CallsQueryStatsReq) -> CallsQueryStatsRes: ...
+    def calls_descendants(self, req: CallsDescendantsReq) -> Iterator[CallSchema]: ...
+
     def call_update(self, req: CallUpdateReq) -> CallUpdateRes: ...
     def call_start_batch(self, req: CallCreateBatchReq) -> CallCreateBatchRes: ...
 

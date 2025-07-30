@@ -18,6 +18,10 @@ def client_is_sqlite(client):
     )
 
 
+def op_name_from_ref(op_name: str) -> str:
+    return op_name.split("/")[-1].split(":")[0]
+
+
 class AnyStrMatcher:
     """Matches any string."""
 
