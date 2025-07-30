@@ -28,11 +28,13 @@ from weave.flow.scorer import (
     get_scorer_attributes,
 )
 from weave.flow.util import make_memorable_name, transpose
+from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.env import get_weave_parallelism
 from weave.trace.objectify import maybe_objectify, register_object
 from weave.trace.op import CallDisplayNameFunc, Op, OpCallError, as_op, is_op
 from weave.trace.vals import WeaveObject
-from weave.trace.weave_client import Call, get_ref
+from weave.trace.weave_client import Call, CallsIter, get_ref
+from weave.trace_server.trace_server_interface import CallsFilter
 
 console = Console()
 logger = logging.getLogger(__name__)
@@ -270,6 +272,53 @@ class Evaluation(Object):
             logger.info(f"Evaluation summary {summary_str}")
 
         return summary
+
+    def get_evaluate_calls(self) -> CallsIter:
+        evaluate_op_name = "Evaluation.evaluate"
+
+        if not self.ref:
+            raise ValueError("Evaluation has no ref, please run the evaluation first!")
+
+        client = require_weave_client()
+        return client.get_calls(
+            query={
+                "$expr": {
+                    "$contains": {
+                        "input": {"$getField": "op_name"},
+                        "substr": {"$literal": evaluate_op_name},
+                    }
+                }
+            },
+            filter=CallsFilter(input_refs=[self.ref.uri()]),
+        )
+
+    def get_score_calls(self) -> dict[str, list[Call]]:
+        # TODO: This needs to recursively walk the tree of calls to find all scores.
+        # That will be slow.  We should figure out how to push this down to the server layer!
+
+        d = {}
+        evaluate_calls = self.get_evaluate_calls()
+        for call in evaluate_calls:
+            eval_trace_id = call.trace_id
+            d[eval_trace_id] = {}
+            predict_and_score_calls = list(call.children())[:-1]
+            for predict_and_score_call in predict_and_score_calls:
+                score_calls = list(predict_and_score_call.children())[1:]
+                for score_call in score_calls:
+                    scorer_name = score_call.summary["weave"]["trace_name"]
+                    if scorer_name not in d[eval_trace_id]:
+                        d[eval_trace_id][scorer_name] = []
+                    d[eval_trace_id][scorer_name].append(score_call)
+        return d
+
+    def get_scores(self) -> dict[str, dict[str, Any]]:
+        score_calls = self.get_score_calls()
+        d = {}
+        for eval_trace_id, scorer_calls_dict in score_calls.items():
+            d[eval_trace_id] = {}
+            for scorer_name, scorer_calls in scorer_calls_dict.items():
+                d[eval_trace_id][scorer_name] = [c.output for c in scorer_calls]
+        return d
 
 
 def _safe_summarize_to_str(summary: dict) -> str:

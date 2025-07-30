@@ -135,6 +135,7 @@ from weave.utils.paginated_iterator import PaginatedIterator
 if TYPE_CHECKING:
     import wandb
 
+    from weave.flow.eval import Evaluation
     from weave.flow.scorer import ApplyScorerResult, Scorer
 
 
@@ -933,106 +934,33 @@ class WeaveClient:
 
     ################ Query API ################
 
-    def get_evaluation_calls(self, evaluation_uri: str | None = None) -> CallsIter:
-        """
-        Retrieves all root Evaluation.evaluate calls in this project.
+    def get_evaluation(self, uri: str) -> Evaluation:
+        import weave
 
-        Returns:
-            CallsIter: An iterator over Call objects representing evaluation runs.
-                Supports slicing, iteration, and conversion to pandas DataFrames via `.to_pandas()`.
+        res = weave.ref(uri).get()
+        if not isinstance(res, weave.Evaluation):
+            raise TypeError(f"Expected Evaluation, got {type(res)}")
+        return res
 
-        Examples:
-            Basic usage to get all evaluations:
+    # TODO: Make into EvaluationsIter
+    # TODO: Add option to select a subset of evaluations
+    # TODO: Ref is missing when loading the object back
+    def get_evaluations(self) -> list[Evaluation]:
+        from weave.flow.eval import Evaluation
 
-            >>> client = weave.init("my-project")
-            >>> evaluations = client.get_evaluation_calls()
-            >>> for eval_call in evaluations:
-            ...     print(f"Evaluation: {eval_call.id}")
-
-            Convert to a list:
-
-            >>> eval_list = list(client.get_evaluation_calls())
-
-            Convert to pandas DataFrame:
-
-            >>> eval_df = client.get_evaluation_calls().to_pandas(flatten=True)
-        """
-        evaluate_op_name = "Evaluation.evaluate"
-
-        kwargs = {
-            "query": {
-                "$expr": {
-                    "$contains": {
-                        "input": {"$getField": "op_name"},
-                        "substr": {"$literal": evaluate_op_name},
-                    }
-                }
-            }
-        }
-        if evaluation_uri:
-            kwargs["filter"] = CallsFilter(input_refs=[evaluation_uri])
-
-        return self.get_calls(**kwargs)
-
-    def get_score_calls(self, evaluation_uri: str | None = None) -> CallsIter:
-        """
-        Retrieves all score calls in this project.
-
-        Note:
-            Currently only works for imperative evaluations (using EvaluationLogger).
-
-        Returns:
-            CallsIter: An iterator over Call objects representing score calculations.
-                Supports slicing, iteration, and conversion to pandas DataFrames via `.to_pandas()`.
-
-        Examples:
-            Basic usage to get all score calls:
-
-            >>> client = weave.init("my-project")
-            >>> scores = client.get_score_calls()
-            >>> for score_call in scores:
-            ...     print(f"Score: {score_call.output}")
-
-            Convert to a list:
-
-            >>> score_list = list(client.get_score_calls())
-
-            Convert to pandas DataFrame for analysis:
-
-            >>> scores_df = client.get_score_calls().to_pandas(flatten=True)
-            >>> print(scores_df[['inputs', 'output', 'summary']])
-        """
-        score_json_path = "attributes._weave_eval_meta.score"
-
-        kwargs = {
-            "query": {
-                "$expr": {
-                    "$eq": [
-                        {
-                            "$convert": {
-                                "input": {"$getField": score_json_path},
-                                "to": "string",
-                            },
-                        },
-                        {"$literal": "true"},
-                    ]
-                }
-            },
-        }
-
-        # TODO: Support evaluation_uri
-
-        return self.get_calls(**kwargs)
-
-    def get_scores(self) -> dict[str, list[Any]]:
-        d = {}
-        for call in self.get_score_calls():
-            scorer_name = call.inputs["self"].name
-            scorer_output = call.output
-            if scorer_name not in d:
-                d[scorer_name] = []
-            d[scorer_name].append(scorer_output)
-        return d
+        evals_objs = self._objects(
+            filter=ObjectVersionFilter(base_object_classes=["Evaluation"])
+        )
+        lst = []
+        for obj in evals_objs:
+            try:
+                # TODO: This should add the ref back...
+                obj = Evaluation.from_obj(obj)
+            except Exception:
+                logger.warning(f"Failed to convert {obj.uri()} to Evaluation")
+            else:
+                lst.append(obj)
+        return lst
 
     @trace_sentry.global_trace_sentry.watch()
     @pydantic.validate_call
