@@ -40,7 +40,7 @@ import multiprocessing.spawn
 import sys
 import time
 from collections.abc import Awaitable, Coroutine
-from multiprocessing.context import SpawnProcess
+from multiprocessing.context import ForkProcess
 from typing import Any, Callable, TypeVar, Union, overload
 
 from pydantic import BaseModel
@@ -117,7 +117,7 @@ class RunAsUser:
         self.client_factory = client_factory
         self.client_factory_config = client_factory_config
         self.timeout_seconds = timeout_seconds
-        self._process: SpawnProcess | None = None
+        self._process: ForkProcess | None = None
         self._request_queue: multiprocessing.Queue[tuple[str, Any, Any]] | None = None
         self._response_queue: multiprocessing.Queue[Any] | None = None
 
