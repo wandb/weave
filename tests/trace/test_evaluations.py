@@ -1098,8 +1098,8 @@ def test_get_score_calls(client, make_evals):
     assert len(score_calls2) == 4
 
     assert score_calls2[0].output == 56
-    assert score_calls2[1].output == 5656
-    assert score_calls2[2].output == 78
+    assert score_calls2[1].output == 78
+    assert score_calls2[2].output == 5656
     assert score_calls2[3].output == 7878
 
 

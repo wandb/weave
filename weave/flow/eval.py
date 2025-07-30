@@ -152,6 +152,10 @@ class Evaluation(Object):
                 name=obj.object_id,
                 _digest=obj.digest,
             )
+        print(f"{cls.model_fields=}")
+
+        print(f"{obj=}")
+        print(f"{field_values=}")
 
         return cls(**field_values)
 
@@ -301,22 +305,18 @@ class Evaluation(Object):
             >>> for call in calls:
             ...     print(f"Evaluation run: {call.id} at {call.started_at}")
         """
-        evaluate_op_name = "Evaluation.evaluate"
+        client = require_weave_client()
 
         if not self.ref:
             raise ValueError("Evaluation has no ref, please run the evaluation first!")
 
-        client = require_weave_client()
+        evaluate_op_name = "Evaluation.evaluate"
+        eval_op_ref = f"weave:///{client._project_id()}/op/{evaluate_op_name}:*"
         return client.get_calls(
-            query={
-                "$expr": {
-                    "$contains": {
-                        "input": {"$getField": "op_name"},
-                        "substr": {"$literal": evaluate_op_name},
-                    }
-                }
-            },
-            filter=CallsFilter(input_refs=[self.ref.uri()]),
+            filter=CallsFilter(
+                input_refs=[self.ref.uri()],
+                op_names=[eval_op_ref],
+            ),
         )
 
     def get_score_calls(self) -> dict[str, list[Call]]:
@@ -340,8 +340,10 @@ class Evaluation(Object):
         """
         d = {}
         client = require_weave_client()
-        for call in self.get_evaluate_calls():
-            descendents = list(client.get_calls(filter={"trace_ids": [call.trace_id]}))
+        for evaluate_call in self.get_evaluate_calls():
+            descendents = list(
+                client.get_calls(filter={"trace_ids": [evaluate_call.trace_id]})
+            )
             summary_call = list(descendents)[-1]
             scorer_names = {
                 k for k in summary_call.output if k not in ["output", "model_latency"]
@@ -351,7 +353,7 @@ class Evaluation(Object):
                 for call in descendents
                 if call.summary.get("weave", {}).get("trace_name") in scorer_names
             ]
-            d[call.trace_id] = score_calls
+            d[evaluate_call.trace_id] = score_calls
 
         return d
 
