@@ -949,12 +949,11 @@ class WeaveClient:
         from weave.flow.eval import Evaluation
 
         evals_objs = self._objects(
-            filter=ObjectVersionFilter(base_object_classes=["Evaluation"])
+            filter=ObjectVersionFilter(base_object_classes=["Evaluation"]),
         )
         lst = []
         for obj in evals_objs:
             try:
-                # TODO: This should add the ref back...
                 obj = Evaluation.from_obj(obj)
             except Exception:
                 logger.warning(f"Failed to convert {obj.uri()} to Evaluation")

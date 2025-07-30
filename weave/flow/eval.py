@@ -32,6 +32,7 @@ from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.env import get_weave_parallelism
 from weave.trace.objectify import maybe_objectify, register_object
 from weave.trace.op import CallDisplayNameFunc, Op, OpCallError, as_op, is_op
+from weave.trace.refs import ObjectRef
 from weave.trace.vals import WeaveObject
 from weave.trace.weave_client import Call, CallsIter, get_ref
 from weave.trace_server.trace_server_interface import CallsFilter
@@ -145,6 +146,15 @@ class Evaluation(Object):
 
         if not field_values.get("dataset"):
             field_values["dataset"] = weave.Dataset(rows=[{"a": 1}])
+
+        if not field_values.get("ref"):
+            entity, project = obj.project_id.split("/")
+            field_values["ref"] = ObjectRef(
+                entity=entity,
+                project=project,
+                name=obj.object_id,
+                _digest=obj.digest,
+            )
 
         return cls(**field_values)
 
@@ -298,6 +308,8 @@ class Evaluation(Object):
 
         d = {}
         evaluate_calls = self.get_evaluate_calls()
+
+        # IMPL1: Walk the tree of calls
         for call in evaluate_calls:
             eval_trace_id = call.trace_id
             d[eval_trace_id] = {}
@@ -309,6 +321,10 @@ class Evaluation(Object):
                     if scorer_name not in d[eval_trace_id]:
                         d[eval_trace_id][scorer_name] = []
                     d[eval_trace_id][scorer_name].append(score_call)
+
+        # IMPL2: Get all calls per trace_id
+        # call_ids = [call.id for call in evaluate_calls]
+
         return d
 
     def get_scores(self) -> dict[str, dict[str, Any]]:
