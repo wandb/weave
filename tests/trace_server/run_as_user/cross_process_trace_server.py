@@ -473,8 +473,12 @@ class CrossProcessTraceServerReceiver:
         self.trace_server = trace_server
         # Create manager to enable queue sharing across processes
         self.manager = multiprocessing.Manager()
-        self.request_queue: multiprocessing.Queue[RequestQueueItem] = self.manager.Queue()
-        self.response_queue: multiprocessing.Queue[ResponseQueueItem] = self.manager.Queue()
+        self.request_queue: multiprocessing.Queue[RequestQueueItem] = (
+            self.manager.Queue()
+        )
+        self.response_queue: multiprocessing.Queue[ResponseQueueItem] = (
+            self.manager.Queue()
+        )
         self._stop_event = threading.Event()
         self._worker_thread: Optional[threading.Thread] = None
         self._start_worker()
@@ -595,7 +599,9 @@ class CrossProcessTraceServerReceiver:
         """
         # Create a new lock for this sender instance through the manager
         sender_lock = self.manager.Lock()
-        return CrossProcessTraceServerSender(self.request_queue, self.response_queue, sender_lock)
+        return CrossProcessTraceServerSender(
+            self.request_queue, self.response_queue, sender_lock
+        )
 
     def stop(self) -> None:
         """

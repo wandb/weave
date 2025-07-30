@@ -36,10 +36,11 @@ from __future__ import annotations
 import asyncio
 import logging
 import multiprocessing
+from multiprocessing.context import SpawnProcess
 import sys
 import time
 from collections.abc import Awaitable, Coroutine
-from typing import Any, Callable, TypeVar, Union, overload
+from typing import Any, Callable, Optional, TypeVar, Union, overload
 
 from pydantic import BaseModel
 
@@ -117,7 +118,7 @@ class RunAsUser:
         self.client_factory = client_factory
         self.client_factory_config = client_factory_config
         self.timeout_seconds = timeout_seconds
-        self._process: multiprocessing.Process | None = None
+        self._process: Optional[SpawnProcess] = None
         self._request_queue: multiprocessing.Queue[tuple[str, Any, Any]] | None = None
         self._response_queue: multiprocessing.Queue[Any] | None = None
 
