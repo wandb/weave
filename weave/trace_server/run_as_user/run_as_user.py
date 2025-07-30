@@ -36,7 +36,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import multiprocessing
-import warnings
 import sys
 import time
 from collections.abc import Awaitable, Coroutine
@@ -69,7 +68,9 @@ AsyncCallable = Callable[[T], Awaitable[R]]
 AnyCallable = Union[SyncCallable[T, R], AsyncCallable[T, R]]
 
 # Queue message types - using BaseModel as the constraint since all our messages are BaseModel
-RequestMessage = tuple[str, Callable[[BaseModel], Union[BaseModel, Awaitable[BaseModel]]], BaseModel]
+RequestMessage = tuple[
+    str, Callable[[BaseModel], Union[BaseModel, Awaitable[BaseModel]]], BaseModel
+]
 ResponseMessage = Union[BaseModel, Exception]
 
 
@@ -80,7 +81,9 @@ def _worker_loop_wrapper(
     response_queue: multiprocessing.Queue[ResponseMessage],
 ) -> None:
     """Module-level wrapper for worker loop to ensure spawn compatibility."""
-    RunAsUser._worker_loop(client_factory, client_factory_config, request_queue, response_queue)
+    RunAsUser._worker_loop(
+        client_factory, client_factory_config, request_queue, response_queue
+    )
 
 
 class RunAsUserError(Exception):
@@ -201,22 +204,24 @@ class RunAsUser:
                 elapsed = time.time() - start_time
                 if elapsed >= effective_timeout:
                     break
-                    
+
                 remaining_timeout = effective_timeout - elapsed
                 poll_timeout = min(RESPONSE_POLL_INTERVAL_SECONDS, remaining_timeout)
-                
+
                 try:
                     # Use blocking get with timeout to avoid race conditions
                     result = await asyncio.get_event_loop().run_in_executor(
                         None, self._response_queue.get, True, poll_timeout
                     )
-                    
+
                     # Check if it's an exception
                     if isinstance(result, Exception):
-                        raise RunAsUserError(f"Function execution failed: {result}") from result
+                        raise RunAsUserError(
+                            f"Function execution failed: {result}"
+                        ) from result
 
                     return result
-                    
+
                 except asyncio.CancelledError:
                     raise
                 except Exception:  # Queue.Empty
@@ -252,7 +257,7 @@ class RunAsUser:
 
     def _start_process(self) -> None:
         """Start the worker process.
-        
+
         Note: We use 'spawn' to ensure complete isolation. This creates a fresh
         Python interpreter process with no shared memory, ensuring that:
         - _global_weave_client is not inherited
@@ -264,6 +269,7 @@ class RunAsUser:
         # Test if the config is pickleable (required for spawn)
         try:
             import pickle
+
             pickle.dumps((self.client_factory, self.client_factory_config))
         except Exception as e:
             raise RunAsUserError(
@@ -271,7 +277,7 @@ class RunAsUser:
                 "This is required for spawn context. Ensure all objects in the "
                 "config are serializable."
             ) from e
-            
+
         self._request_queue = ctx.Queue(maxsize=MAX_QUEUE_SIZE)
         self._response_queue = ctx.Queue(maxsize=MAX_QUEUE_SIZE)
         # Use module-level function for better spawn compatibility
@@ -284,7 +290,7 @@ class RunAsUser:
                 self._response_queue,
             ),
         )
-        
+
         try:
             self._process.start()
         except Exception as e:
