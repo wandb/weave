@@ -135,6 +135,7 @@ from weave.utils.paginated_iterator import PaginatedIterator
 if TYPE_CHECKING:
     import wandb
 
+    from weave.flow.eval import Evaluation
     from weave.flow.scorer import ApplyScorerResult, Scorer
 
 
@@ -821,7 +822,6 @@ class WeaveClient:
             try:
                 obj = Evaluation.from_obj(obj)
             except Exception:
-                # pass
                 logger.warning(f"Failed to convert {obj} to Evaluation")
             else:
                 lst.append(obj)
