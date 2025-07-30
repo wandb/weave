@@ -43,6 +43,7 @@ from typing import Any, Callable, TypeVar, Union, overload
 
 from pydantic import BaseModel
 
+from weave.trace.context.weave_client_context import get_weave_client
 from weave.trace.weave_client import WeaveClient
 from weave.trace.weave_init import InitializedClient
 
@@ -288,6 +289,9 @@ class RunAsUser:
         Handles both synchronous and asynchronous function execution.
         """
         try:
+            if get_weave_client() is not None:
+                raise RunAsUserError("Weave client already exists in context")
+
             # Create and initialize the client
             client = client_factory(client_factory_config)
             ic = InitializedClient(client)
