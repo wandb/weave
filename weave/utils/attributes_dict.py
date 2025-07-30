@@ -9,7 +9,7 @@ class _WeaveKeyDict(dict[str, Any]):
 
     def __setitem__(self, key: str, value: Any) -> None:
         raise KeyError("Cannot modify `weave` dict directly -- for internal use only!")
-    
+
     def unwrap(self) -> dict:
         return dict(self)
 
@@ -66,9 +66,9 @@ class AttributesDict(dict[str, Any]):
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({super().__repr__()})"
-    
+
     def unwrap(self) -> dict:
         unwrapped = dict(self)
-        if "weave" in unwrapped and isinstance(unwrapped["weave"], WeaveKeyDict):
+        if "weave" in unwrapped and isinstance(unwrapped["weave"], _WeaveKeyDict):
             unwrapped["weave"] = unwrapped["weave"].unwrap()
         return unwrapped
