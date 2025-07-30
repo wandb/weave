@@ -152,10 +152,6 @@ class Evaluation(Object):
                 name=obj.object_id,
                 _digest=obj.digest,
             )
-        print(f"{cls.model_fields=}")
-
-        print(f"{obj=}")
-        print(f"{field_values=}")
 
         return cls(**field_values)
 

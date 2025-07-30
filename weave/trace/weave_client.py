@@ -851,15 +851,23 @@ class WeaveClient:
             >>> for eval in evaluations:
             ...     print(f"Evaluation: {eval.name}")
         """
-        from weave.flow.eval import Evaluation
-
-        evals_objs = self._objects(
+        eval_objs = self._objects(
             filter=ObjectVersionFilter(base_object_classes=["Evaluation"]),
         )
+
         lst = []
-        for obj in evals_objs:
+        for obj in eval_objs:
+            # It's unfortunate we have to do this, but it's currently the easiest
+            # way get the correct behaviour given our serialization layer...
+            entity, project = obj.project_id.split("/")
+            ref = ObjectRef(
+                entity=entity,
+                project=project,
+                name=obj.val["name"],
+                _digest=obj.digest,
+            )
             try:
-                obj = Evaluation.from_obj(obj)
+                obj = ref.get()
             except Exception:
                 logger.exception(f"Failed to convert {obj} to Evaluation")
             else:

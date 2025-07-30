@@ -3551,5 +3551,9 @@ def test_get_evaluations(client, make_evals):
     assert len(evs) == 2
     assert isinstance(evs[0], Evaluation)
     assert isinstance(evs[1], Evaluation)
+
     assert evs[0].ref.uri() == ref.uri()
+    assert evs[0].dataset.rows[0] == {"dataset_id": "def"}
+
     assert evs[1].ref.uri() == ref2.uri()
+    assert evs[1].dataset.rows[1] == {"dataset_id": "jkl"}
