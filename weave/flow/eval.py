@@ -307,33 +307,32 @@ class Evaluation(Object):
         # That will be slow.  We should figure out how to push this down to the server layer!
 
         d = {}
-        evaluate_calls = self.get_evaluate_calls()
-
-        # IMPL1: Walk the tree of calls
-        for call in evaluate_calls:
-            eval_trace_id = call.trace_id
-            d[eval_trace_id] = {}
-            predict_and_score_calls = list(call.children())[:-1]
-            for predict_and_score_call in predict_and_score_calls:
-                score_calls = list(predict_and_score_call.children())[1:]
-                for score_call in score_calls:
-                    scorer_name = score_call.summary["weave"]["trace_name"]
-                    if scorer_name not in d[eval_trace_id]:
-                        d[eval_trace_id][scorer_name] = []
-                    d[eval_trace_id][scorer_name].append(score_call)
-
-        # IMPL2: Get all calls per trace_id
-        # call_ids = [call.id for call in evaluate_calls]
+        client = require_weave_client()
+        for call in self.get_evaluate_calls():
+            descendents = list(client.get_calls(filter={"trace_ids": [call.trace_id]}))
+            summary_call = list(descendents)[-1]
+            scorer_names = {
+                k for k in summary_call.output if k not in ["output", "model_latency"]
+            }
+            score_calls = [
+                call
+                for call in descendents
+                if call.summary.get("weave", {}).get("trace_name") in scorer_names
+            ]
+            d[call.trace_id] = score_calls
 
         return d
 
-    def get_scores(self) -> dict[str, dict[str, Any]]:
+    def get_scores(self) -> dict[str, dict[str, list[Any]]]:
         score_calls = self.get_score_calls()
-        d = {}
-        for eval_trace_id, scorer_calls_dict in score_calls.items():
-            d[eval_trace_id] = {}
-            for scorer_name, scorer_calls in scorer_calls_dict.items():
-                d[eval_trace_id][scorer_name] = [c.output for c in scorer_calls]
+        d: dict[str, dict[str, list[Any]]] = {}
+        for trace_id, calls in score_calls.items():
+            d[trace_id] = {}
+            for call in calls:
+                scorer_name = call.summary.get("weave", {}).get("trace_name")
+                if scorer_name not in d[trace_id]:
+                    d[trace_id][scorer_name] = []
+                d[trace_id][scorer_name].append(call.output)
         return d
 
 

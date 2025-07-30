@@ -956,7 +956,8 @@ class WeaveClient:
             try:
                 obj = Evaluation.from_obj(obj)
             except Exception:
-                logger.warning(f"Failed to convert {obj.uri()} to Evaluation")
+                # pass
+                logger.warning(f"Failed to convert {obj} to Evaluation")
             else:
                 lst.append(obj)
         return lst
