@@ -1,11 +1,10 @@
 import {Box} from '@mui/material';
-import { Tailwind } from '@wandb/weave/components/Tailwind';
+import {Tailwind} from '@wandb/weave/components/Tailwind';
 import React, {useState} from 'react';
-import {useParams} from 'react-router-dom';
 
 import {TargetBlank} from '../../../../../../common/util/links';
 import {Button} from '../../../../../Button';
-import { useEntityProject } from '../../context';
+import {useEntityProject} from '../../context';
 import {CreateDatasetDrawer} from '../../datasets/CreateDatasetDrawer';
 import {useDatasetSaving} from '../../datasets/useDatasetSaving';
 import {CreatePromptDrawer} from '../../prompts/CreatePromptDrawer';
@@ -108,7 +107,7 @@ export const EMPTY_PROPS_TRACES: EmptyProps = {
         following our quickstart guide
       </TargetBlank>
       .
-      <div className='tw-style mt-2'>
+      <div className="tw-style mt-2">
         <TargetBlank href="https://colab.research.google.com/github/wandb/weave/blob/master/docs/notebooks/Intro_to_Weave_Hello_Trace.ipynb">
           <Button variant="secondary" icon="logo-colab">
             Get started with Colab
@@ -193,7 +192,7 @@ export const EMPTY_PROPS_PROMPTS: EmptyProps = {
       </TargetBlank>
       .
       <Tailwind>
-        <div className='mt-16'>
+        <div className="mt-16">
           <NewPromptButton />
         </div>
       </Tailwind>

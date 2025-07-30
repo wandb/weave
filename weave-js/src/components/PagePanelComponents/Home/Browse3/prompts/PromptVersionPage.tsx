@@ -54,7 +54,7 @@ export const PromptVersionPage: React.FC<{
     project: projectName,
     objectId: objectName,
     versionIndex: objectVersionIndex,
-    createdAtMs
+    createdAtMs,
   } = objectVersion;
 
   // Get information about other versions of this object

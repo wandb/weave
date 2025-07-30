@@ -847,10 +847,7 @@ const PromptsPageBinding = () => {
   );
 
   return (
-    <PromptsPage
-      initialFilter={filters}
-      onFilterUpdate={onFilterUpdate}
-    />
+    <PromptsPage initialFilter={filters} onFilterUpdate={onFilterUpdate} />
   );
 };
 

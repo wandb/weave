@@ -30,7 +30,7 @@ export const PromptsPage: React.FC<{
   initialFilter?: PromptFilter;
   onFilterUpdate?: (filter: PromptFilter) => void;
 }> = props => {
-  const {entity, project} = useEntityProject()
+  const {entity, project} = useEntityProject();
   const history = useHistory();
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
   const router = useWeaveflowCurrentRouteContext();

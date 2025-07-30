@@ -1,8 +1,9 @@
 import React, {useCallback, useState} from 'react';
+
 import {Button} from '../../../../Button';
-import {Tailwind} from '../../../../Tailwind';
 import {TextField} from '../../../../Form/TextField';
 import {WaveLoader} from '../../../../Loaders/WaveLoader';
+import {Tailwind} from '../../../../Tailwind';
 import {Messages} from '../pages/ChatView/types';
 import {ResizableDrawer} from '../pages/common/TailwindResizableDrawer';
 import {TabPrompt} from '../pages/ObjectsPage/Tabs/TabPrompt';
