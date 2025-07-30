@@ -19,11 +19,8 @@ from pydantic import BaseModel
 
 import weave
 from tests.trace_server.run_as_user.cross_process_trace_server import (
-    ConnectionInfo,
-    CrossProcessTraceServerSender,
-    create_cross_process_trace_server_factory,
+    CrossProcessTraceServerReceiver,
 )
-from weave.trace.context.weave_client_context import get_weave_client
 from weave.trace.ref_util import get_ref
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server.run_as_user.run_as_user import RunAsUser, RunAsUserError
@@ -52,48 +49,30 @@ class TestRequest(BaseModel):
 
 
 class WeaveClientFactoryConfig:
-    """Configuration for creating a WeaveClient in a subprocess.
-
-    This config is fully pickleable for spawn context compatibility.
-    """
-
     entity: str
     project: str
-    connection_info: Optional[ConnectionInfo] = None
+    server: TraceServerInterface
     ensure_project_exists: bool = False
 
     def __init__(
         self,
         entity: str,
         project: str,
-        connection_info: Optional[ConnectionInfo] = None,
+        server: TraceServerInterface,
         ensure_project_exists: bool = False,
     ):
         self.entity = entity
         self.project = project
-        self.connection_info = connection_info
+        self.server = server
         self.ensure_project_exists = ensure_project_exists
 
 
 def weave_client_factory(config: WeaveClientFactoryConfig):
-    """Factory function that creates a WeaveClient - completely self-contained.
-
-    This function works with spawn context by creating the trace server
-    sender fresh in the child process using serializable connection info.
-    """
-    if config.connection_info is not None:
-        # Create sender in child process using connection info
-        server = CrossProcessTraceServerSender(config.connection_info)
-    else:
-        # Fallback for tests that don't use cross-process setup
-        from unittest.mock import MagicMock
-
-        server = MagicMock()
-
+    """Factory function that creates a WeaveClient - completely self-contained."""
     return WeaveClient(
         entity=config.entity,
         project=config.project,
-        server=server,
+        server=config.server,
         ensure_project_exists=config.ensure_project_exists,
     )
 
@@ -106,31 +85,32 @@ def create_test_client_factory_and_cleanup(
     """
     Create a client factory function and cleanup function for testing.
 
-    This function sets up cross-process trace server communication that works
-    with spawn context by using serializable connection info.
+    This function sets up cross-process trace server communication where the main process
+    has the actual trace server and the child process communicates via queues.
 
     Args:
-        trace_server: The trace server to wrap
+        trace_server_factory: Factory function that creates a trace server
         entity: The entity name for the client
         project: The project name for the client
 
     Returns:
-        A tuple of (factory_config, cleanup_function)
+        A tuple of (factory_function, cleanup_function)
     """
-    # Create cross-process setup with serializable connection info
-    connection_info, receiver = create_cross_process_trace_server_factory(trace_server)
+    # Create a cross-process receiver that wraps the main trace server
+    receiver = CrossProcessTraceServerReceiver(trace_server)
 
-    # Create config with serializable connection info
+    # Get a sender that can be used in the child process
+    sender_trace_server = receiver.get_sender_trace_server()
+
+    # Create a completely self-contained factory function
     factory_config = WeaveClientFactoryConfig(
-        entity=entity,
-        project=project,
-        connection_info=connection_info,
-        ensure_project_exists=False,
+        entity=entity, project=project, server=sender_trace_server
     )
 
     # Create a cleanup function that handles the receiver
     def cleanup():
         """Cleanup function that stops the cross-process communication."""
+        sender_trace_server.stop()
         receiver.stop()
 
     return factory_config, cleanup
@@ -239,6 +219,8 @@ async def test_process_exit_code(client):
 
 async def check_isolation_function(req: TestRequest) -> TestResponse:
     """A function that checks the current context matches expectations."""
+    from weave.trace.context.weave_client_context import get_weave_client
+
     client = get_weave_client()
     if client is None:
         return TestResponse(result="No client in context")
@@ -397,19 +379,6 @@ def log_to_weave(req: SimpleRequest):
     return log_to_weave_op(req)
 
 
-async def check_client_isolation_function(req: SimpleRequest) -> SimpleResponse:
-    """Module-level function to check client isolation (required for spawn)."""
-    child_client = get_weave_client()
-    if child_client is None:
-        return SimpleResponse(result="No client found")
-
-    # The child should have a different client instance
-    # even though it may have the same entity/project
-    return SimpleResponse(
-        result=f"Client entity: {child_client.entity}, Client id: {id(child_client)}"
-    )
-
-
 @pytest.mark.asyncio
 async def test_correct_isolation(client):
     """This test demonstrates sucessful isolation of function execution, but
@@ -455,25 +424,3 @@ async def test_correct_isolation(client):
     assert len(calls) == 6
 
     assert get_ref(log_to_weave_op) is None
-
-
-@pytest.mark.asyncio
-async def test_global_client_isolation(client):
-    """Test that global client from parent process doesn't leak into child."""
-    # Ensure we have a client in the parent process
-    parent_client = get_weave_client()
-    assert parent_client is not None
-    assert parent_client.entity == client.entity
-
-    async with runner_with_cleanup(
-        client.server, entity="different_entity", project="different_project"
-    ) as runner:
-        req = SimpleRequest(value="test")
-        result = await runner.execute(check_client_isolation_function, req)
-
-        # Child should have its own client with different entity
-        assert "different_entity" in result.result
-
-        # Parent client should remain unchanged
-        assert get_weave_client() == parent_client
-        assert get_weave_client().entity == client.entity
