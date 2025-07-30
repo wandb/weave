@@ -43,7 +43,9 @@ from typing import Any, Callable, TypeVar, Union, overload
 
 from pydantic import BaseModel
 
-from weave.trace.context.weave_client_context import set_weave_client_global, get_weave_client
+from weave.trace.context.weave_client_context import (
+    get_weave_client,
+)
 from weave.trace.weave_client import WeaveClient
 from weave.trace.weave_init import InitializedClient
 
