@@ -43,6 +43,7 @@ from typing import Any, Callable, TypeVar, Union, overload
 
 from pydantic import BaseModel
 
+from weave.trace.context.weave_client_context import set_weave_client_global, get_weave_client
 from weave.trace.weave_client import WeaveClient
 from weave.trace.weave_init import InitializedClient
 
@@ -222,10 +223,11 @@ class RunAsUser:
 
     def _start_process(self) -> None:
         """Start the worker process."""
-        self._request_queue = multiprocessing.Queue()
-        self._response_queue = multiprocessing.Queue()
+        ctx = multiprocessing.get_context("spawn")
+        self._request_queue = ctx.Queue()
+        self._response_queue = ctx.Queue()
 
-        self._process = multiprocessing.Process(
+        self._process = ctx.Process(
             target=self._worker_loop,
             args=(
                 self.client_factory,
@@ -289,8 +291,11 @@ class RunAsUser:
         """
         try:
             # Create and initialize the client
+            prev_client = get_weave_client()
+            set_weave_client_global(None)
             client = client_factory(client_factory_config)
             ic = InitializedClient(client)
+            new_client = get_weave_client()
 
             try:
                 while True:
