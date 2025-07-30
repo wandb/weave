@@ -270,6 +270,7 @@ class RunAsUser:
         # Test this early to give a clear error message
         try:
             import pickle
+
             pickle.dumps(self.client_factory)
             pickle.dumps(self.client_factory_config)
         except Exception as e:

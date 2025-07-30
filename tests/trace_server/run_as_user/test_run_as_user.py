@@ -9,7 +9,6 @@ spawning and isolation. The timeout tests are particularly important for
 ensuring the system can handle stuck processes.
 """
 
-import multiprocessing
 import os
 import time
 from contextlib import asynccontextmanager
@@ -21,7 +20,6 @@ from pydantic import BaseModel
 import weave
 from tests.trace_server.run_as_user.cross_process_trace_server import (
     ConnectionInfo,
-    CrossProcessTraceServerReceiver,
     CrossProcessTraceServerSender,
     create_cross_process_trace_server_factory,
 )
@@ -89,6 +87,7 @@ def weave_client_factory(config: WeaveClientFactoryConfig):
     else:
         # Fallback for tests that don't use cross-process setup
         from unittest.mock import MagicMock
+
         server = MagicMock()
 
     return WeaveClient(
@@ -403,12 +402,11 @@ async def check_client_isolation_function(req: SimpleRequest) -> SimpleResponse:
     child_client = get_weave_client()
     if child_client is None:
         return SimpleResponse(result="No client found")
-    
+
     # The child should have a different client instance
     # even though it may have the same entity/project
     return SimpleResponse(
-        result=f"Client entity: {child_client.entity}, "
-               f"Client id: {id(child_client)}"
+        result=f"Client entity: {child_client.entity}, Client id: {id(child_client)}"
     )
 
 
