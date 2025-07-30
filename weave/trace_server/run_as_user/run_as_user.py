@@ -342,13 +342,13 @@ class RunAsUser:
                     try:
                         # Get next request
                         logger.debug("Waiting for request...")
-                        signal, func, request = request_queue.get()
-                        logger.debug(f"Received signal: {signal}")
+                        cmd_signal, func, request = request_queue.get()
+                        logger.debug(f"Received signal: {cmd_signal}")
 
-                        if signal == "STOP":
+                        if cmd_signal == "STOP":
                             logger.info("Received STOP signal, shutting down...")
                             break
-                        elif signal == "EXEC":
+                        elif cmd_signal == "EXEC":
                             try:
                                 logger.debug("Executing function...")
                                 # Execute the function
@@ -371,7 +371,7 @@ class RunAsUser:
                                 response_queue.put(e)
                         else:
                             # TODO: Consider making this more extensible for future signal types
-                            raise ValueError(f"Unknown signal: {signal}")
+                            raise ValueError(f"Unknown signal: {cmd_signal}")
 
                     except KeyboardInterrupt:
                         logger.info("Received KeyboardInterrupt, shutting down...")
