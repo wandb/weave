@@ -49,12 +49,13 @@ export const PromptVersionPage: React.FC<{
   const tsClient = getTsClient();
 
   const [isEditing, setIsEditing] = useState(false);
-
-  const entityName = objectVersion.entity;
-  const projectName = objectVersion.project;
-  const objectName = objectVersion.objectId;
-  const objectVersionIndex = objectVersion.versionIndex;
-  const {createdAtMs} = objectVersion;
+  const {
+    entity: entityName,
+    project: projectName,
+    objectId: objectName,
+    versionIndex: objectVersionIndex,
+    createdAtMs
+  } = objectVersion;
 
   // Get information about other versions of this object
   const objectVersions = useRootObjectVersions({

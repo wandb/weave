@@ -1,9 +1,11 @@
 import {Box} from '@mui/material';
+import { Tailwind } from '@wandb/weave/components/Tailwind';
 import React, {useState} from 'react';
 import {useParams} from 'react-router-dom';
 
 import {TargetBlank} from '../../../../../../common/util/links';
 import {Button} from '../../../../../Button';
+import { useEntityProject } from '../../context';
 import {CreateDatasetDrawer} from '../../datasets/CreateDatasetDrawer';
 import {useDatasetSaving} from '../../datasets/useDatasetSaving';
 import {CreatePromptDrawer} from '../../prompts/CreatePromptDrawer';
@@ -14,7 +16,7 @@ import {Link} from './Links';
 
 const NewPromptButton: React.FC = () => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const {entity, project} = useParams<{entity: string; project: string}>();
+  const {entity, project} = useEntityProject();
   const {isCreatingPrompt, handleSavePrompt} = usePromptSaving({
     entity,
     project,
@@ -35,7 +37,6 @@ const NewPromptButton: React.FC = () => {
         onClose={() => setIsDrawerOpen(false)}
         onSavePrompt={handleSavePrompt}
         isCreating={isCreatingPrompt}
-        data-testid="create-prompt-drawer"
       />
     </>
   );
@@ -43,7 +44,7 @@ const NewPromptButton: React.FC = () => {
 
 const NewDatasetButton: React.FC = () => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const {entity, project} = useParams<{entity: string; project: string}>();
+  const {entity, project} = useEntityProject();
   const {isCreatingDataset, handleSaveDataset} = useDatasetSaving({
     entity,
     project,
@@ -107,13 +108,13 @@ export const EMPTY_PROPS_TRACES: EmptyProps = {
         following our quickstart guide
       </TargetBlank>
       .
-      <Box sx={{mt: 2}}>
+      <div className='tw-style mt-2'>
         <TargetBlank href="https://colab.research.google.com/github/wandb/weave/blob/master/docs/notebooks/Intro_to_Weave_Hello_Trace.ipynb">
           <Button variant="secondary" icon="logo-colab">
             Get started with Colab
           </Button>
         </TargetBlank>
-      </Box>
+      </div>
     </>
   ),
 };
@@ -191,9 +192,11 @@ export const EMPTY_PROPS_PROMPTS: EmptyProps = {
         prompt basics
       </TargetBlank>
       .
-      <Box sx={{mt: 2}}>
-        <NewPromptButton />
-      </Box>
+      <Tailwind>
+        <div className='mt-16'>
+          <NewPromptButton />
+        </div>
+      </Tailwind>
     </>
   ),
 };

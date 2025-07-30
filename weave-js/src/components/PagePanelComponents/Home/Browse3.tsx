@@ -28,6 +28,7 @@ import {
   PEEK_PARAM,
   SHOW_FEEDBACK_PARAM,
   useClosePeek,
+  useEntityProject,
   usePeekLocation,
   useWeaveflowCurrentRouteContext,
   useWeaveflowRouteContext,
@@ -822,7 +823,7 @@ const ObjectVersionsPageBinding = () => {
 };
 
 const PromptsPageBinding = () => {
-  const {entity, project} = useParamsDecoded<Browse3TabParams>();
+  const {entity, project} = useEntityProject();
   const query = useURLSearchParamsDict();
   const filters = useMemo(() => {
     if (query.filter === undefined) {
@@ -847,8 +848,6 @@ const PromptsPageBinding = () => {
 
   return (
     <PromptsPage
-      entity={entity}
-      project={project}
       initialFilter={filters}
       onFilterUpdate={onFilterUpdate}
     />

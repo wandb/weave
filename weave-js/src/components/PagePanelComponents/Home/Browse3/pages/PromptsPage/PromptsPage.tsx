@@ -9,7 +9,7 @@ import React, {useMemo, useState} from 'react';
 import {useHistory} from 'react-router-dom';
 
 import {Loading} from '../../../../../Loading';
-import {useWeaveflowCurrentRouteContext} from '../../context';
+import {useEntityProject, useWeaveflowCurrentRouteContext} from '../../context';
 import {CreatePromptDrawer} from '../../prompts/CreatePromptDrawer';
 import {usePromptSaving} from '../../prompts/usePromptSaving';
 import {EMPTY_PROPS_PROMPTS} from '../common/EmptyContent';
@@ -27,12 +27,10 @@ export type PromptFilter = WFHighLevelObjectVersionFilter;
 const PROMPT_TYPE = 'Prompt' as const;
 
 export const PromptsPage: React.FC<{
-  entity: string;
-  project: string;
   initialFilter?: PromptFilter;
   onFilterUpdate?: (filter: PromptFilter) => void;
 }> = props => {
-  const {entity, project} = props;
+  const {entity, project} = useEntityProject()
   const history = useHistory();
   const {loading: loadingUserInfo, userInfo} = useViewerInfo();
   const router = useWeaveflowCurrentRouteContext();
@@ -66,7 +64,7 @@ export const PromptsPage: React.FC<{
 
   const title = useMemo(() => {
     if (filter.objectName) {
-      return 'Versions of ' + filter.objectName;
+      return `Versions of ${filter.objectName}`;
     }
     return 'Prompts';
   }, [filter.objectName]);
@@ -100,8 +98,6 @@ export const PromptsPage: React.FC<{
         hideTabsIfSingle
         headerExtra={
           <PromptsPageHeaderExtra
-            entity={entity}
-            project={project}
             objectName={filter.objectName ?? null}
             selectedVersions={selectedVersions}
             setSelectedVersions={setSelectedVersions}
@@ -141,8 +137,6 @@ export const PromptsPage: React.FC<{
 };
 
 const PromptsPageHeaderExtra: React.FC<{
-  entity: string;
-  project: string;
   objectName: string | null;
   selectedVersions: string[];
   setSelectedVersions: (selected: string[]) => void;
@@ -152,8 +146,6 @@ const PromptsPageHeaderExtra: React.FC<{
   onCreatePrompt: () => void;
   isReadonly: boolean;
 }> = ({
-  entity,
-  project,
   objectName,
   selectedVersions,
   setSelectedVersions,
@@ -163,6 +155,7 @@ const PromptsPageHeaderExtra: React.FC<{
   onCreatePrompt,
   isReadonly,
 }) => {
+  const {entity, project} = useEntityProject();
   const compareButton = showCompareButton ? (
     <Button disabled={selectedVersions.length < 2} onClick={onCompare}>
       Compare
