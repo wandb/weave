@@ -7,9 +7,9 @@ from weave.flow.casting import Scorer
 from weave.flow.obj import Object
 from weave.trace.api import ObjectRef, publish
 from weave.trace.objectify import register_object
+from weave.trace.ref_util import set_ref
 from weave.trace.vals import WeaveObject
 from weave.trace_server.interface.query import Query
-from weave.trace.ref_util import set_ref
 
 
 @register_object

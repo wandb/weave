@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from pydantic import v1 as pydantic_v1
 
 from weave.trace import box
+from weave.trace.context.ref_property_handler import RefProperty
 from weave.trace.context.tests_context import get_raise_on_captured_errors
 from weave.trace.context.weave_client_context import (
     get_weave_client,
@@ -28,7 +29,6 @@ from weave.trace.refs import (
     RefWithExtra,
     TableRef,
 )
-from weave.trace.context.ref_property_handler import RefProperty
 from weave.trace.serialization.serialize import from_json
 from weave.trace.table import Table
 from weave.trace_server.errors import ObjectDeletedError
@@ -120,6 +120,7 @@ class Traceable:
         """Recursively mark this object and its ancestors as dirty and removes their refs."""
         self._is_dirty = True
         from weave.trace.ref_util import set_ref
+
         set_ref(self, None)
         if (
             # Written this way to satisfy mypy

@@ -1313,6 +1313,7 @@ def op(
 
             wrapper.name = name or inferred_name  # type: ignore
             from weave.trace.ref_util import set_ref
+
             set_ref(wrapper, None)  # type: ignore
 
             wrapper.postprocess_inputs = postprocess_inputs  # type: ignore

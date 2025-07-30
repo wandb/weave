@@ -4,7 +4,6 @@ import threading
 from collections.abc import Generator
 from contextlib import contextmanager
 from typing import TYPE_CHECKING
-import contextvars
 
 from weave.trace.context import context_state
 

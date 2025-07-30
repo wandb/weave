@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections.abc import Iterator
 from typing import Any
 
-from weave.trace.refs import TableRef
 from weave.trace.context.ref_property_handler import RefProperty
 
 

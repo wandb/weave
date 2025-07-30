@@ -1789,6 +1789,7 @@ class WeaveClient:
         # _save_object_nested and it has a special table_ref -- skip it here.
         if getattr(val, "_is_dirty", False) and not isinstance(val, WeaveTable):
             from weave.trace.ref_util import set_ref
+
             set_ref(val, None)
 
         val = map_to_refs(val)
@@ -1888,6 +1889,7 @@ class WeaveClient:
         )
 
         from weave.trace.ref_util import set_ref
+
         set_ref(table, table_ref)
 
         if isinstance(table, WeaveTable):
