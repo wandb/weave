@@ -223,6 +223,7 @@ class RunAsUser:
 
     def _start_process(self) -> None:
         """Start the worker process."""
+        # Spawning is safer than forking.
         ctx = multiprocessing.get_context("spawn")
         self._request_queue = ctx.Queue()
         self._response_queue = ctx.Queue()
@@ -291,11 +292,11 @@ class RunAsUser:
         """
         try:
             # Create and initialize the client
-            prev_client = get_weave_client()
-            set_weave_client_global(None)
+            if get_weave_client() is not None:
+                raise RunAsUserError("Unsafe to run as user with existing weave client")
+
             client = client_factory(client_factory_config)
             ic = InitializedClient(client)
-            new_client = get_weave_client()
 
             try:
                 while True:
