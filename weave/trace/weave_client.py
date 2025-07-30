@@ -802,6 +802,31 @@ class WeaveClient:
     ################ Query API ################
 
     def get_evaluation(self, uri: str) -> Evaluation:
+        """
+        Retrieve a specific Evaluation object by its URI.
+
+        Evaluation URIs typically follow the format:
+        `weave:///entity/project/object/Evaluation:version`
+
+        You can also get the evaluation by its "friendly" name:
+        get_evaluation("Evaluation:v1")
+
+        Args:
+            uri (str): The unique resource identifier of the evaluation to retrieve.
+
+        Returns:
+            Evaluation: The Evaluation object corresponding to the provided URI.
+
+        Raises:
+            TypeError: If the object at the URI is not an Evaluation instance.
+            ValueError: If the URI is invalid or the object cannot be found.
+
+        Examples:
+            >>> client = weave.init("my-project")
+            >>> evaluation = client.get_evaluation("weave:///entity/project/object/my-eval:v1")
+            >>> print(evaluation.name)
+            'my-eval'
+        """
         import weave
 
         res = weave.ref(uri).get()
@@ -812,6 +837,20 @@ class WeaveClient:
     # TODO: Make into EvaluationsIter
     # TODO: Add option to select a subset of evaluations
     def get_evaluations(self) -> list[Evaluation]:
+        """
+        Retrieve all Evaluation objects from the current project.
+
+        Returns:
+            list[Evaluation]: A list of all Evaluation objects in the current project.
+                Empty list if no evaluations are found or if all conversions fail.
+
+        Examples:
+            >>> client = weave.init("my-project")
+            >>> evaluations = client.get_evaluations()
+            >>> print(f"Found {len(evaluations)} evaluations")
+            >>> for eval in evaluations:
+            ...     print(f"Evaluation: {eval.name}")
+        """
         from weave.flow.eval import Evaluation
 
         evals_objs = self._objects(

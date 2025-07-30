@@ -281,6 +281,26 @@ class Evaluation(Object):
         return summary
 
     def get_evaluate_calls(self) -> CallsIter:
+        """
+        Retrieve all evaluation calls that used this Evaluation object.
+
+        Note that this returns a CallsIter instead of a single call because it's
+        possible to have multiple evaluation calls for a single evaluation (e.g.
+        if you run the same evaluation multiple times).
+
+        Returns:
+            CallsIter: An iterator over Call objects representing evaluation runs.
+
+        Raises:
+            ValueError: If the evaluation has no ref (hasn't been saved/run yet).
+
+        Examples:
+            >>> evaluation = Evaluation(dataset=examples, scorers=[scorer])
+            >>> await evaluation.evaluate(model)  # Run evaluation first
+            >>> calls = evaluation.get_evaluate_calls()
+            >>> for call in calls:
+            ...     print(f"Evaluation run: {call.id} at {call.started_at}")
+        """
         evaluate_op_name = "Evaluation.evaluate"
 
         if not self.ref:
@@ -300,6 +320,24 @@ class Evaluation(Object):
         )
 
     def get_score_calls(self) -> dict[str, list[Call]]:
+        """
+        Retrieve scorer calls for each evaluation run, grouped by trace ID.
+
+        Returns:
+            dict[str, list[Call]]: A dictionary mapping trace IDs to lists of scorer Call objects.
+                Each trace ID represents one evaluation run, and the list contains all scorer
+                calls executed during that run.
+
+        Examples:
+            >>> evaluation = Evaluation(dataset=examples, scorers=[accuracy_scorer, f1_scorer])
+            >>> await evaluation.evaluate(model)
+            >>> score_calls = evaluation.get_score_calls()
+            >>> for trace_id, calls in score_calls.items():
+            ...     print(f"Trace {trace_id}: {len(calls)} scorer calls")
+            ...     for call in calls:
+            ...         scorer_name = call.summary.get("weave", {}).get("trace_name")
+            ...         print(f"  Scorer: {scorer_name}, Output: {call.output}")
+        """
         d = {}
         client = require_weave_client()
         for call in self.get_evaluate_calls():
@@ -318,6 +356,32 @@ class Evaluation(Object):
         return d
 
     def get_scores(self) -> dict[str, dict[str, list[Any]]]:
+        """
+        Extract and organize scorer outputs from evaluation runs.
+
+        Returns:
+            dict[str, dict[str, list[Any]]]: A nested dictionary structure where:
+                - First level keys are trace IDs (evaluation runs)
+                - Second level keys are scorer names
+                - Values are lists of scorer outputs for that run and scorer
+
+        Examples:
+            >>> evaluation = Evaluation(dataset=examples, scorers=[accuracy_scorer, f1_scorer])
+            >>> await evaluation.evaluate(model)
+            >>> scores = evaluation.get_scores()
+            >>> # Access scores by trace and scorer
+            >>> for trace_id, trace_scores in scores.items():
+            ...     print(f"Evaluation run {trace_id}:")
+            ...     for scorer_name, outputs in trace_scores.items():
+            ...         print(f"  {scorer_name}: {outputs}")
+            >>> # Example output structure:
+            >>> # {
+            >>> #   "trace_123": {
+            >>> #     "accuracy_scorer": [{"accuracy": 0.85}],
+            >>> #     "f1_scorer": [{"f1": 0.78}]
+            >>> #   }
+            >>> # }
+        """
         score_calls = self.get_score_calls()
         d: dict[str, dict[str, list[Any]]] = {}
         for trace_id, calls in score_calls.items():
