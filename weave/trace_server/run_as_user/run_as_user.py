@@ -36,12 +36,11 @@ from __future__ import annotations
 import asyncio
 import logging
 import multiprocessing
-import multiprocessing.spawn
+import warnings
 import sys
 import time
 from collections.abc import Awaitable, Coroutine
-from multiprocessing.context import ForkProcess
-from typing import Any, Callable, TypeVar, Union, overload
+from typing import Callable, TypeVar, Union, overload
 
 from pydantic import BaseModel
 
@@ -54,6 +53,7 @@ logger = logging.getLogger(__name__)
 # Constants for better maintainability
 DEFAULT_EXECUTION_TIMEOUT_SECONDS = 30.0
 DEFAULT_SHUTDOWN_TIMEOUT_SECONDS = 600.0
+MAX_QUEUE_SIZE = 1000  # Prevent unbounded queue growth
 RESPONSE_POLL_INTERVAL_SECONDS = 0.1
 PROCESS_TERMINATION_TIMEOUT_SECONDS = 5.0
 
@@ -67,6 +67,20 @@ FC = TypeVar("FC")
 SyncCallable = Callable[[T], R]
 AsyncCallable = Callable[[T], Awaitable[R]]
 AnyCallable = Union[SyncCallable[T, R], AsyncCallable[T, R]]
+
+# Queue message types - using BaseModel as the constraint since all our messages are BaseModel
+RequestMessage = tuple[str, Callable[[BaseModel], Union[BaseModel, Awaitable[BaseModel]]], BaseModel]
+ResponseMessage = Union[BaseModel, Exception]
+
+
+def _worker_loop_wrapper(
+    client_factory: Callable[[FC], WeaveClient],
+    client_factory_config: FC,
+    request_queue: multiprocessing.Queue[RequestMessage],
+    response_queue: multiprocessing.Queue[ResponseMessage],
+) -> None:
+    """Module-level wrapper for worker loop to ensure spawn compatibility."""
+    RunAsUser._worker_loop(client_factory, client_factory_config, request_queue, response_queue)
 
 
 class RunAsUserError(Exception):
@@ -117,9 +131,11 @@ class RunAsUser:
         self.client_factory = client_factory
         self.client_factory_config = client_factory_config
         self.timeout_seconds = timeout_seconds
-        self._process: ForkProcess | None = None
-        self._request_queue: multiprocessing.Queue[tuple[str, Any, Any]] | None = None
-        self._response_queue: multiprocessing.Queue[Any] | None = None
+        self._process: multiprocessing.Process | None = None
+        # Queue types: request contains (signal, function, request_object)
+        # Response contains the result object or Exception
+        self._request_queue: multiprocessing.Queue[RequestMessage] | None = None
+        self._response_queue: multiprocessing.Queue[ResponseMessage] | None = None
 
     # Overloads to provide better type safety for sync vs async callables
     @overload
@@ -181,24 +197,35 @@ class RunAsUser:
 
             # Wait for response with timeout
             start_time = time.time()
-            while time.time() - start_time < effective_timeout:
-                if not self._response_queue.empty():
-                    result = self._response_queue.get()
-
+            while True:
+                elapsed = time.time() - start_time
+                if elapsed >= effective_timeout:
+                    break
+                    
+                remaining_timeout = effective_timeout - elapsed
+                poll_timeout = min(RESPONSE_POLL_INTERVAL_SECONDS, remaining_timeout)
+                
+                try:
+                    # Use blocking get with timeout to avoid race conditions
+                    result = await asyncio.get_event_loop().run_in_executor(
+                        None, self._response_queue.get, True, poll_timeout
+                    )
+                    
                     # Check if it's an exception
                     if isinstance(result, Exception):
-                        raise RunAsUserError(f"Function execution failed: {result}")
+                        raise RunAsUserError(f"Function execution failed: {result}") from result
 
                     return result
-
-                # Check if process is still alive
-                if not self._process.is_alive():
-                    exit_code = self._process.exitcode
-                    raise RunAsUserError(
-                        f"Worker process terminated unexpectedly with exit code: {exit_code}"
-                    )
-
-                await asyncio.sleep(RESPONSE_POLL_INTERVAL_SECONDS)
+                    
+                except asyncio.CancelledError:
+                    raise
+                except Exception:  # Queue.Empty
+                    # Check if process is still alive
+                    if not self._process.is_alive():
+                        exit_code = self._process.exitcode
+                        raise RunAsUserError(
+                            f"Worker process terminated unexpectedly with exit code: {exit_code}"
+                        )
 
             # Timeout occurred
             raise RunAsUserError(
@@ -224,13 +251,32 @@ class RunAsUser:
         self._stop_process(timeout_seconds)
 
     def _start_process(self) -> None:
-        """Start the worker process."""
+        """Start the worker process.
+        
+        Note: We use 'spawn' to ensure complete isolation. This creates a fresh
+        Python interpreter process with no shared memory, ensuring that:
+        - _global_weave_client is not inherited
+        - Object refs are not shared
+        - Each process has truly isolated state
+        """
         ctx = multiprocessing.get_context("spawn")
 
-        self._request_queue = ctx.Queue()
-        self._response_queue = ctx.Queue()
+        # Test if the config is pickleable (required for spawn)
+        try:
+            import pickle
+            pickle.dumps((self.client_factory, self.client_factory_config))
+        except Exception as e:
+            raise RunAsUserError(
+                f"Client factory or config is not pickleable: {e}. "
+                "This is required for spawn context. Ensure all objects in the "
+                "config are serializable."
+            ) from e
+            
+        self._request_queue = ctx.Queue(maxsize=MAX_QUEUE_SIZE)
+        self._response_queue = ctx.Queue(maxsize=MAX_QUEUE_SIZE)
+        # Use module-level function for better spawn compatibility
         self._process = ctx.Process(
-            target=self._worker_loop,
+            target=_worker_loop_wrapper,
             args=(
                 self.client_factory,
                 self.client_factory_config,
@@ -238,7 +284,15 @@ class RunAsUser:
                 self._response_queue,
             ),
         )
-        self._process.start()
+        
+        try:
+            self._process.start()
+        except Exception as e:
+            # Clean up queues if process start fails
+            self._request_queue = None
+            self._response_queue = None
+            self._process = None
+            raise RunAsUserError(f"Failed to start worker process: {e}") from e
 
     def _stop_process(
         self, timeout_seconds: float = DEFAULT_SHUTDOWN_TIMEOUT_SECONDS
@@ -292,6 +346,7 @@ class RunAsUser:
         Handles both synchronous and asynchronous function execution.
         """
         try:
+            # With spawn, we start with a clean process - no inherited state
             if get_weave_client() is not None:
                 raise RunAsUserError("Weave client already exists in context")
 

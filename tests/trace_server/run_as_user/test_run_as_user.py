@@ -9,6 +9,7 @@ spawning and isolation. The timeout tests are particularly important for
 ensuring the system can handle stuck processes.
 """
 
+import multiprocessing
 import os
 import time
 from contextlib import asynccontextmanager
@@ -20,6 +21,8 @@ from pydantic import BaseModel
 import weave
 from tests.trace_server.run_as_user.cross_process_trace_server import (
     CrossProcessTraceServerReceiver,
+    RequestQueueItem,
+    ResponseQueueItem,
 )
 from weave.trace.context.weave_client_context import get_weave_client
 from weave.trace.ref_util import get_ref
@@ -50,30 +53,58 @@ class TestRequest(BaseModel):
 
 
 class WeaveClientFactoryConfig:
+    """Configuration for creating a WeaveClient in a subprocess.
+    
+    For spawn context, this needs to be pickleable. We store queue references
+    instead of the actual CrossProcessTraceServerSender to avoid pickling issues.
+    """
     entity: str
     project: str
-    server: TraceServerInterface
+    # These are the actual queue types from CrossProcessTraceServer
+    request_queue: Optional["multiprocessing.Queue[RequestQueueItem]"] = None
+    response_queue: Optional["multiprocessing.Queue[ResponseQueueItem]"] = None
+    server: Optional[TraceServerInterface] = None  # For fork context
     ensure_project_exists: bool = False
 
     def __init__(
         self,
         entity: str,
         project: str,
-        server: TraceServerInterface,
+        server: Optional[TraceServerInterface] = None,
+        request_queue: Optional["multiprocessing.Queue[RequestQueueItem]"] = None,
+        response_queue: Optional["multiprocessing.Queue[ResponseQueueItem]"] = None,
         ensure_project_exists: bool = False,
     ):
         self.entity = entity
         self.project = project
         self.server = server
+        self.request_queue = request_queue
+        self.response_queue = response_queue
         self.ensure_project_exists = ensure_project_exists
 
 
 def weave_client_factory(config: WeaveClientFactoryConfig):
-    """Factory function that creates a WeaveClient - completely self-contained."""
+    """Factory function that creates a WeaveClient - completely self-contained.
+    
+    This function needs to work with spawn context, so it reconstructs the
+    CrossProcessTraceServerSender from the queues if needed.
+    """
+    # If we have queues, create a new sender (spawn context)
+    if config.request_queue is not None and config.response_queue is not None:
+        from tests.trace_server.run_as_user.cross_process_trace_server import (
+            CrossProcessTraceServerSender,
+        )
+        server = CrossProcessTraceServerSender(
+            config.request_queue, config.response_queue
+        )
+    else:
+        # Use the provided server (fork context)
+        server = config.server
+        
     return WeaveClient(
         entity=config.entity,
         project=config.project,
-        server=config.server,
+        server=server,
         ensure_project_exists=config.ensure_project_exists,
     )
 
@@ -104,8 +135,13 @@ def create_test_client_factory_and_cleanup(
     sender_trace_server = receiver.get_sender_trace_server()
 
     # Create a completely self-contained factory function
+    # For spawn context, pass the queues instead of the sender
     factory_config = WeaveClientFactoryConfig(
-        entity=entity, project=project, server=sender_trace_server
+        entity=entity, 
+        project=project, 
+        server=sender_trace_server,
+        request_queue=receiver.request_queue,
+        response_queue=receiver.response_queue
     )
 
     # Create a cleanup function that handles the receiver
@@ -423,3 +459,38 @@ async def test_correct_isolation(client):
     assert len(calls) == 6
 
     assert get_ref(log_to_weave_op) is None
+
+
+@pytest.mark.asyncio
+async def test_global_client_isolation(client):
+    """Test that global client from parent process doesn't leak into child."""
+    # Ensure we have a client in the parent process
+    parent_client = get_weave_client()
+    assert parent_client is not None
+    assert parent_client.entity == client.entity
+    
+    async def check_client_isolation(req: SimpleRequest) -> SimpleResponse:
+        """Check that child process has its own isolated client."""
+        child_client = get_weave_client()
+        if child_client is None:
+            return SimpleResponse(result="No client found")
+        
+        # The child should have a different client instance
+        # even though it may have the same entity/project
+        return SimpleResponse(
+            result=f"Client entity: {child_client.entity}, "
+                   f"Client id: {id(child_client)}"
+        )
+    
+    async with runner_with_cleanup(
+        client.server, entity="different_entity", project="different_project"
+    ) as runner:
+        req = SimpleRequest(value="test")
+        result = await runner.execute(check_client_isolation, req)
+        
+        # Child should have its own client with different entity
+        assert "different_entity" in result.result
+        
+        # Parent client should remain unchanged
+        assert get_weave_client() == parent_client
+        assert get_weave_client().entity == client.entity
