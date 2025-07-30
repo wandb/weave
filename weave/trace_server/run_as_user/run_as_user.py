@@ -266,16 +266,18 @@ class RunAsUser:
         """
         ctx = multiprocessing.get_context("spawn")
 
-        # Test if the config is pickleable (required for spawn)
+        # With spawn context, the client factory and config must be pickleable
+        # Test this early to give a clear error message
         try:
             import pickle
-
-            pickle.dumps((self.client_factory, self.client_factory_config))
+            pickle.dumps(self.client_factory)
+            pickle.dumps(self.client_factory_config)
         except Exception as e:
             raise RunAsUserError(
                 f"Client factory or config is not pickleable: {e}. "
                 "This is required for spawn context. Ensure all objects in the "
-                "config are serializable."
+                "config are serializable (no Queue objects, open files, etc.). "
+                "For testing with in-memory queues, use fork context instead."
             ) from e
 
         self._request_queue = ctx.Queue(maxsize=MAX_QUEUE_SIZE)
