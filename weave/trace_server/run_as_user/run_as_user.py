@@ -50,7 +50,7 @@ logger = logging.getLogger(__name__)
 
 # Constants for better maintainability
 DEFAULT_EXECUTION_TIMEOUT_SECONDS = 30.0
-DEFAULT_SHUTDOWN_TIMEOUT_SECONDS = 600.0  # Also used as trace server flush timeout
+DEFAULT_SHUTDOWN_TIMEOUT_SECONDS = 600.0
 RESPONSE_POLL_INTERVAL_SECONDS = 0.1
 PROCESS_TERMINATION_TIMEOUT_SECONDS = 5.0
 
