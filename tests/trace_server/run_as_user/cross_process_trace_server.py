@@ -14,7 +14,7 @@ import uuid
 from collections.abc import Generator, Iterator
 from contextlib import contextmanager
 from queue import Empty
-from typing import Any, Protocol
+from typing import Any, Optional, Protocol
 
 from pydantic import BaseModel
 
@@ -82,8 +82,8 @@ class ResponseQueueItem(BaseModel):
     """
 
     request_id: str
-    error: str | None = None
-    payload: BaseModel | None = None
+    error: Optional[str] = None
+    payload: Optional[BaseModel] = None
 
 
 class CrossProcessTraceServerSender(tsi.TraceServerInterface):
@@ -479,7 +479,7 @@ class CrossProcessTraceServerReceiver:
             multiprocessing.Queue()
         )
         self._stop_event = threading.Event()
-        self._worker_thread: threading.Thread | None = None
+        self._worker_thread: Optional[threading.Thread] = None
         self._start_worker()
 
     def _start_worker(self) -> None:
