@@ -40,8 +40,11 @@ Frameworks help orchestrate the actual execution pipelines in AI applications. T
 - **[CrewAI](/guides/integrations/crewai)**
 - **[Smolagents](/guides/integrations/smolagents)**
 - **[PydanticAI](/guides/integrations/pydantic_ai)**
-- **[Google Agent Development Kit (ADK)](/guides/integrations/google_adk.md)**
-- **[TypeScript SDK](/guides/integrations/js.md)**
+- **[Google Agent Development Kit (ADK)](/guides/integrations/google_adk)**
+- **[AutoGen](/guides/integrations/autogen)**
+- **[Verdict](/guides/integrations/verdict)**
+- **[TypeScript SDK](/guides/integrations/js)**
+- **[Agno](/guides/integrations/agno.md)**
 
 ## Protocols
 

@@ -6,7 +6,7 @@ import weave
 from weave.flow.scorer import WeaveScorerResult
 from weave.scorers.default_models import OPENAI_DEFAULT_MODERATION_MODEL
 from weave.scorers.scorer_types import LLMScorer, RollingWindowScorer
-from weave.scorers.utils import MODEL_PATHS, load_hf_model_weights
+from weave.scorers.utils import MODEL_PATHS, load_local_model_weights
 
 if TYPE_CHECKING:
     from torch import Tensor
@@ -121,7 +121,7 @@ class WeaveToxicityScorerV1(RollingWindowScorer):
     def load_model(self) -> None:
         from transformers import AutoModelForSequenceClassification
 
-        self._local_model_path = load_hf_model_weights(
+        self._local_model_path = load_local_model_weights(
             self.model_name_or_path, MODEL_PATHS["toxicity_scorer"]
         )
         self._model = AutoModelForSequenceClassification.from_pretrained(
@@ -220,7 +220,7 @@ class WeaveBiasScorerV1(RollingWindowScorer):
     def load_model(self) -> None:
         from transformers import AutoModelForSequenceClassification
 
-        self._local_model_path = load_hf_model_weights(
+        self._local_model_path = load_local_model_weights(
             self.model_name_or_path, MODEL_PATHS["bias_scorer"]
         )
         self._model = AutoModelForSequenceClassification.from_pretrained(

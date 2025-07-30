@@ -8,7 +8,7 @@ from weave.trace.weave_client import Call
 
 
 def test_sync_val(client):
-    @weave.op()
+    @weave.op
     def sync_val():
         return 1
 
@@ -21,7 +21,7 @@ def test_sync_val(client):
 
 def test_sync_val_method(client):
     class TestClass:
-        @weave.op()
+        @weave.op
         def sync_val(self):
             return 1
 
@@ -35,7 +35,7 @@ def test_sync_val_method(client):
 
 @pytest.mark.asyncio
 async def test_sync_coro(client):
-    @weave.op()
+    @weave.op
     def sync_coro():
         return asyncio.to_thread(lambda: 1)
 
@@ -51,7 +51,7 @@ async def test_sync_coro(client):
 @pytest.mark.asyncio
 async def test_sync_coro_method(client):
     class TestClass:
-        @weave.op()
+        @weave.op
         def sync_coro(self):
             return asyncio.to_thread(lambda: 1)
 
@@ -67,7 +67,7 @@ async def test_sync_coro_method(client):
 
 @pytest.mark.asyncio
 async def test_async_coro(client):
-    @weave.op()
+    @weave.op
     async def async_coro():
         return asyncio.to_thread(lambda: 1)
 
@@ -85,7 +85,7 @@ async def test_async_coro(client):
 @pytest.mark.asyncio
 async def test_async_coro_method(client):
     class TestClass:
-        @weave.op()
+        @weave.op
         async def async_coro(self):
             return asyncio.to_thread(lambda: 1)
 
@@ -104,7 +104,7 @@ async def test_async_coro_method(client):
 
 @pytest.mark.asyncio
 async def test_async_awaited_coro(client):
-    @weave.op()
+    @weave.op
     async def async_awaited_coro():
         return await asyncio.to_thread(lambda: 1)
 
@@ -119,7 +119,7 @@ async def test_async_awaited_coro(client):
 @pytest.mark.asyncio
 async def test_async_awaited_coro_method(client):
     class TestClass:
-        @weave.op()
+        @weave.op
         async def async_awaited_coro(self):
             return await asyncio.to_thread(lambda: 1)
 
@@ -134,7 +134,7 @@ async def test_async_awaited_coro_method(client):
 
 @pytest.mark.asyncio
 async def test_async_val(client):
-    @weave.op()
+    @weave.op
     async def async_val():
         return 1
 
@@ -149,7 +149,7 @@ async def test_async_val(client):
 @pytest.mark.asyncio
 async def test_async_val_method(client):
     class TestClass:
-        @weave.op()
+        @weave.op
         async def async_val(self):
             return 1
 
@@ -163,7 +163,7 @@ async def test_async_val_method(client):
 
 
 def test_sync_with_exception(client):
-    @weave.op()
+    @weave.op
     def sync_with_exception():
         raise ValueError("test")
 
@@ -177,7 +177,7 @@ def test_sync_with_exception(client):
 
 def test_sync_with_exception_method(client):
     class TestClass:
-        @weave.op()
+        @weave.op
         def sync_with_exception(self):
             raise ValueError("test")
 
@@ -192,7 +192,7 @@ def test_sync_with_exception_method(client):
 
 @pytest.mark.asyncio
 async def test_async_with_exception(client):
-    @weave.op()
+    @weave.op
     async def async_with_exception():
         raise ValueError("test")
 
@@ -207,7 +207,7 @@ async def test_async_with_exception(client):
 @pytest.mark.asyncio
 async def test_async_with_exception_method(client):
     class TestClass:
-        @weave.op()
+        @weave.op
         async def async_with_exception(self):
             raise ValueError("test")
 

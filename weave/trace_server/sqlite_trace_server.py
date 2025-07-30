@@ -30,6 +30,7 @@ from weave.trace_server.feedback import (
 )
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface import query as tsi_query
+from weave.trace_server.methods.evaluation_status import evaluation_status
 from weave.trace_server.object_class_util import process_incoming_object_val
 from weave.trace_server.opentelemetry.python_spans import ResourceSpans
 from weave.trace_server.orm import Row, quote_json_path
@@ -52,6 +53,10 @@ from weave.trace_server.trace_server_interface_util import (
     str_digest,
 )
 from weave.trace_server.validation import object_id_validator
+from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker import (
+    EvaluateModelArgs,
+    EvaluateModelDispatcher,
+)
 
 _conn_cursor: contextvars.ContextVar[
     Optional[tuple[sqlite3.Connection, sqlite3.Cursor]]
@@ -72,9 +77,14 @@ def get_conn_cursor(db_path: str) -> tuple[sqlite3.Connection, sqlite3.Cursor]:
 
 
 class SqliteTraceServer(tsi.TraceServerInterface):
-    def __init__(self, db_path: str):
+    def __init__(
+        self,
+        db_path: str,
+        evaluate_model_dispatcher: Optional[EvaluateModelDispatcher] = None,
+    ):
         self.lock = threading.Lock()
         self.db_path = db_path
+        self._evaluate_model_dispatcher = evaluate_model_dispatcher
 
     def drop_tables(self) -> None:
         conn, cursor = get_conn_cursor(self.db_path)
@@ -1471,9 +1481,11 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         # Extract filter values
         after_datetime = None
         before_datetime = None
+        thread_ids = None
         if req.filter is not None:
             after_datetime = req.filter.after_datetime
             before_datetime = req.filter.before_datetime
+            thread_ids = req.filter.thread_ids
 
         # Use the dedicated query builder
         query, parameters = make_threads_query_sqlite(
@@ -1483,6 +1495,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             sort_by=req.sort_by,
             sortable_datetime_after=after_datetime,
             sortable_datetime_before=before_datetime,
+            thread_ids=thread_ids,
         )
 
         cursor.execute(query, parameters)
@@ -1528,6 +1541,28 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 p50_turn_duration_ms=p50_turn_duration_ms,
                 p99_turn_duration_ms=p99_turn_duration_ms,
             )
+
+    def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
+        if self._evaluate_model_dispatcher is None:
+            raise ValueError("Evaluate model dispatcher is not set")
+        if req.wb_user_id is None:
+            raise ValueError("wb_user_id is required")
+        call_id = generate_id()
+        self._evaluate_model_dispatcher.dispatch(
+            EvaluateModelArgs(
+                project_id=req.project_id,
+                evaluation_ref=req.evaluation_ref,
+                model_ref=req.model_ref,
+                wb_user_id=req.wb_user_id,
+                evaluation_call_id=call_id,
+            )
+        )
+        return tsi.EvaluateModelRes(call_id=call_id)
+
+    def evaluation_status(
+        self, req: tsi.EvaluationStatusReq
+    ) -> tsi.EvaluationStatusRes:
+        return evaluation_status(self, req)
 
     def _table_row_read(self, project_id: str, row_digest: str) -> tsi.TableRowSchema:
         conn, cursor = get_conn_cursor(self.db_path)
@@ -1637,7 +1672,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
 
 def get_type(val: Any) -> str:
-    if val == None:
+    if val is None:
         return "none"
     elif isinstance(val, dict):
         if "_type" in val:
