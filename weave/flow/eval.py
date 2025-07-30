@@ -144,9 +144,6 @@ class Evaluation(Object):
             field_values["scorers"] = scorers
         # End mega-hack
 
-        # if not field_values.get("dataset"):
-        #     field_values["dataset"] = weave.Dataset(rows=[{"a": 1}])
-
         if not field_values.get("ref"):
             entity, project = obj.project_id.split("/")
             field_values["ref"] = ObjectRef(
