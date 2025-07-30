@@ -91,7 +91,7 @@ def set_ref(obj: Any, ref: Optional["Ref"]) -> None:
             # Create a wrapper that holds the ref
             # The wrapper will be garbage collected when obj is collected
             class RefWrapper:
-                def __init__(self, ref):
+                def __init__(self, ref: Ref) -> None:
                     self.ref = ref
 
             wrapper = RefWrapper(ref)
