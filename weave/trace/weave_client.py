@@ -15,7 +15,13 @@ from collections import defaultdict
 from collections.abc import Sequence
 from concurrent.futures import Future
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Callable, TypedDict, TypeVar, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    TypedDict,
+    cast,
+)
 
 import pydantic
 from requests import HTTPError
@@ -135,7 +141,6 @@ from weave.utils.paginated_iterator import PaginatedIterator
 if TYPE_CHECKING:
     import wandb
 
-    from weave.flow.eval import Evaluation
     from weave.flow.scorer import ApplyScorerResult, Scorer
 
 
@@ -150,8 +155,6 @@ logger = logging.getLogger(__name__)
 # TODO: should be Call, not WeaveObject
 CallsIter = PaginatedIterator[CallSchema, WeaveObject]
 DEFAULT_CALLS_PAGE_SIZE = 1000
-
-T = TypeVar("T")
 
 
 def _make_calls_iterator(
@@ -488,7 +491,7 @@ class Call:
         return _make_calls_iterator(
             client.server,
             self.project_id,
-            filter=CallsFilter(parent_ids=[self.id]),
+            CallsFilter(parent_ids=[self.id]),
             page_size=page_size,
         )
 
