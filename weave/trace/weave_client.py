@@ -469,12 +469,7 @@ class Call:
         return CallRef(entity, project, self.id)
 
     # These are the children if we're using Call at read-time
-    def children(
-        self,
-        *,
-        filter: CallsFilter | None = None,
-        page_size: int = DEFAULT_CALLS_PAGE_SIZE,
-    ) -> CallsIter:
+    def children(self, *, page_size: int = DEFAULT_CALLS_PAGE_SIZE) -> CallsIter:
         """
         Get the children of the call.
 
@@ -489,14 +484,11 @@ class Call:
                 "Can't get children of call without ID, was `weave.init` called?"
             )
 
-        if filter is None:
-            filter = CallsFilter(parent_ids=[self.id])
-
         client = weave_client_context.require_weave_client()
         return _make_calls_iterator(
             client.server,
             self.project_id,
-            filter=filter,
+            filter=CallsFilter(parent_ids=[self.id]),
             page_size=page_size,
         )
 

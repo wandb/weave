@@ -135,7 +135,7 @@ class PaginatedIterator(Generic[T, R]):
             raise TypeError("This iterator does not support len()")
         return self.size_func()
 
-    def to_pandas(self, *, flatten: bool = False) -> pd.DataFrame:
+    def to_pandas(self) -> pd.DataFrame:
         """Convert the iterator's contents to a pandas DataFrame.
 
         Returns:
@@ -165,8 +165,5 @@ class PaginatedIterator(Generic[T, R]):
                 records.append(item.to_dict())
             else:
                 raise ValueError(f"Unable to convert item to dict: {item}")
-
-        if flatten:
-            return pd.json_normalize(pd.Series(records))
 
         return pd.DataFrame(records)
