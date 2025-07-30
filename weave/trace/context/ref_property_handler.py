@@ -5,7 +5,7 @@ This module provides a base class and descriptor that automatically
 routes .ref access through get_ref/set_ref for proper context isolation.
 """
 
-from typing import Any, Optional, Type
+from typing import Any, Optional
 from weakref import WeakKeyDictionary
 
 from weave.trace.refs import Ref
@@ -24,7 +24,7 @@ class RefProperty:
         # was installed (for backward compatibility during migration)
         self._legacy_refs: WeakKeyDictionary[Any, Optional[Ref]] = WeakKeyDictionary()
 
-    def __get__(self, instance: Any, owner: Type[Any] = None) -> Optional[Ref]:
+    def __get__(self, instance: Any, owner: Optional[type] = None) -> Optional[Ref]:
         if instance is None:
             return self
 
@@ -97,7 +97,7 @@ class RefPropertyMixin:
     ref = RefProperty()
 
 
-def add_ref_property(cls: Type[Any]) -> Type[Any]:
+def add_ref_property(cls: type) -> type:
     """
     Class decorator that adds the ref property descriptor to a class.
 
@@ -125,7 +125,7 @@ def add_ref_property(cls: Type[Any]) -> Type[Any]:
     return cls
 
 
-def monkey_patch_ref_property(cls: Type[Any]) -> None:
+def monkey_patch_ref_property(cls: type) -> None:
     """
     Monkey patch an existing class to use the ref property descriptor.
 

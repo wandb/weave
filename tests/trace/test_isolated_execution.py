@@ -393,7 +393,7 @@ async def test_data_leakage_stress():
             set_ref(obj, ref)
 
         # Verify all refs are correct within this context
-        for i, obj in enumerate(shared_objects):
+        for obj in shared_objects:
             ref = get_ref(obj)
             assert ref is not None
             # Note: Due to backward compatibility, the ref on the object

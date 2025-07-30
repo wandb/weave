@@ -1,6 +1,4 @@
-"""
-Tests for the ref property migration to ensure .ref access is properly intercepted.
-"""
+"""Tests for the ref property migration to ensure .ref access is properly intercepted."""
 
 from unittest.mock import MagicMock
 
