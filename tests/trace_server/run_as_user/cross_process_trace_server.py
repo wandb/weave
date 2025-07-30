@@ -105,6 +105,7 @@ class CrossProcessTraceServerSender(tsi.TraceServerInterface):
         self,
         request_queue: multiprocessing.Queue,
         response_queue: multiprocessing.Queue,
+        lock: multiprocessing.Lock,
     ):
         self.request_queue = request_queue
         self.response_queue = response_queue
@@ -113,9 +114,7 @@ class CrossProcessTraceServerSender(tsi.TraceServerInterface):
         # TODO: Add periodic cleanup of old entries to prevent memory leaks
         # TODO: Consider adding maximum cache size with LRU eviction
         self._pending_requests: dict[str, ResponseQueueItem] = {}
-        self._lock = (
-            multiprocessing.Lock()
-        )  # Protects _pending_requests and _request_id_counter
+        self._lock = lock  # Protects _pending_requests and _request_id_counter
 
     @contextmanager
     def lock(self) -> Generator[None, None, None]:
@@ -472,12 +471,10 @@ class CrossProcessTraceServerReceiver:
 
     def __init__(self, trace_server: tsi.TraceServerInterface):
         self.trace_server = trace_server
-        self.request_queue: multiprocessing.Queue[RequestQueueItem] = (
-            multiprocessing.Queue()
-        )
-        self.response_queue: multiprocessing.Queue[ResponseQueueItem] = (
-            multiprocessing.Queue()
-        )
+        # Create manager to enable queue sharing across processes
+        self.manager = multiprocessing.Manager()
+        self.request_queue: multiprocessing.Queue[RequestQueueItem] = self.manager.Queue()
+        self.response_queue: multiprocessing.Queue[ResponseQueueItem] = self.manager.Queue()
         self._stop_event = threading.Event()
         self._worker_thread: Optional[threading.Thread] = None
         self._start_worker()
@@ -596,7 +593,9 @@ class CrossProcessTraceServerReceiver:
         Returns:
             CrossProcessTraceServerSender: Configured to send requests to this receiver
         """
-        return CrossProcessTraceServerSender(self.request_queue, self.response_queue)
+        # Create a new lock for this sender instance through the manager
+        sender_lock = self.manager.Lock()
+        return CrossProcessTraceServerSender(self.request_queue, self.response_queue, sender_lock)
 
     def stop(self) -> None:
         """
@@ -607,3 +606,5 @@ class CrossProcessTraceServerReceiver:
         self._stop_event.set()
         if self._worker_thread and self._worker_thread.is_alive():
             self._worker_thread.join(timeout=WORKER_SHUTDOWN_TIMEOUT_SECONDS)
+        # Clean up the manager
+        self.manager.shutdown()
