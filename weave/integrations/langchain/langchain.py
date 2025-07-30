@@ -414,9 +414,11 @@ def _extract_usage_data(call: Call, output: Any) -> None:
         elif (generations := safe_get(first_output, ["generations"])) and (
             len(generations) > 0
             and len(generations[0]) > 0
-            and safe_get(generations[0][0], ["generation_info", "usage_metadata"])
+            and (
+                safe_get(generations[0][0], ["message", "kwargs", "usage_metadata"])
+                or safe_get(generations[0][0], ["generation_info", "usage_metadata"])
+            )
         ):
-            # google genai response format
             usage = _extract_google_genai_usage(output)
 
     if usage is not None:
@@ -468,20 +470,64 @@ def _extract_google_vertexai_usage(output: dict) -> dict[ModelName, LLMUsageSche
 
 
 def _extract_google_genai_usage(output: dict) -> dict[ModelName, LLMUsageSchema]:
+    """
+    Extract token usage data from Google GenAI LangChain responses.
+
+    Google GenAI can return usage metadata in two different response formats:
+
+    Format 1 (Current): generations[i][j]["message"]["kwargs"]["usage_metadata"]
+    - Usage data is stored in the message kwargs
+    - Model name comes from generation_info["model_name"]
+    - This is the format used by newer versions of langchain-google-genai
+
+    Format 2 (Legacy): generations[i][j]["generation_info"]["usage_metadata"]
+    - Usage data is stored directly in generation_info
+    - Model name also comes from generation_info["model_name"]
+    - This format is maintained for backwards compatibility
+
+    Token Mapping:
+    Google GenAI uses different token field names than the standard LLM schema:
+    - "input_tokens" -> "prompt_tokens"
+    - "output_tokens" -> "completion_tokens"
+    - "total_tokens" -> "total_tokens" (unchanged)
+
+    Accumulation Logic:
+    The function iterates through all output items and generations to accumulate
+    token counts per model. This handles batch operations where multiple
+    generations may be produced from a single LLM call.
+    """
     usage: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
 
     for output_item in output["outputs"]:
         for generation_list in output_item["generations"]:
             for generation in generation_list:
-                generation_info = generation["generation_info"]
-                model = generation_info["model_name"]
-                usage_metadata = generation_info["usage_metadata"]
+                model = "unknown"
+                usage_metadata = None
 
-                usage[model]["prompt_tokens"] += usage_metadata.get("input_tokens", 0)
-                usage[model]["completion_tokens"] += usage_metadata.get(
-                    "output_tokens", 0
-                )
-                usage[model]["total_tokens"] += usage_metadata.get("total_tokens", 0)
+                message_kwargs = safe_get(generation, ["message", "kwargs"])
+                if message_kwargs and "usage_metadata" in message_kwargs:
+                    usage_metadata = message_kwargs["usage_metadata"]
+                    generation_info = generation.get("generation_info", {})
+                    model = generation_info.get("model_name", "unknown")
+
+                elif (
+                    "generation_info" in generation
+                    and "usage_metadata" in generation["generation_info"]
+                ):
+                    generation_info = generation["generation_info"]
+                    model = generation_info["model_name"]
+                    usage_metadata = generation_info["usage_metadata"]
+
+                if usage_metadata:
+                    usage[model]["prompt_tokens"] += usage_metadata.get(
+                        "input_tokens", 0
+                    )
+                    usage[model]["completion_tokens"] += usage_metadata.get(
+                        "output_tokens", 0
+                    )
+                    usage[model]["total_tokens"] += usage_metadata.get(
+                        "total_tokens", 0
+                    )
 
     return convert_defaultdict_to_dict(usage)
 
