@@ -498,11 +498,21 @@ def make_evals(client):
     pred = ev.log_prediction(inputs={"x": 1}, output=2)
     pred.log_score("score", 3)
     pred.log_score("score2", 4)
+    pred2 = ev.log_prediction(inputs={"x": 2}, output=3)
+    pred2.log_score("score", 33)
+    pred2.log_score("score2", 44)
     ev.log_summary(summary={"y": 5})
 
     # Make a second eval.  Later we will check to see that we don't get this eval's data when querying
     ev2 = weave.EvaluationLogger(model="ghi", dataset="jkl")
-    pred2 = ev2.log_prediction(inputs={"alpha": 12}, output=34)
-    pred2.log_score("second_score", 56)
-    pred2.log_score("second_score2", 78)
+    pred3 = ev2.log_prediction(inputs={"alpha": 12}, output=34)
+    pred3.log_score("second_score", 56)
+    pred3.log_score("second_score2", 78)
+
+    pred4 = ev2.log_prediction(inputs={"alpha": 34}, output=45)
+    pred4.log_score("second_score", 5656)
+    pred4.log_score("second_score2", 7878)
+
     ev2.log_summary(summary={"z": 90})
+
+    return ev._pseudo_evaluation.ref, ev2._pseudo_evaluation.ref

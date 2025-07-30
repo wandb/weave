@@ -942,7 +942,6 @@ class WeaveClient:
 
     # TODO: Make into EvaluationsIter
     # TODO: Add option to select a subset of evaluations
-    # TODO: Ref is missing when loading the object back
     def get_evaluations(self) -> list[Evaluation]:
         from weave.flow.eval import Evaluation
 

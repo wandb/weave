@@ -3626,37 +3626,18 @@ def test_sum_dict_leaves_deep_nested(client):
     }
 
 
-def test_get_evaluation_calls(client, make_evals):
-    evals = list(client.get_evaluation_calls())
-    assert len(evals) == 1
-    ev2 = evals[0]
-    assert ev2.output["score"]["mean"] == 3
-    assert ev2.output["score2"]["mean"] == 4
-    assert ev2.output["output"]["y"] == 5
-    assert ev2.inputs["self"].name == "def-evaluation"
-    assert ev2.inputs["model"].name == "abc"
+def test_get_evaluation(client, make_evals):
+    ref, _ = make_evals
+    ev = client.get_evaluation(ref.uri())
+    assert isinstance(ev, Evaluation)
+    assert ev.ref.uri() == ref.uri()
 
 
-def test_get_score_calls(client, make_evals):
-    if client_is_sqlite(client):
-        return pytest.skip("skipping for sqlite")
-
-    scores = list(client.get_score_calls())
-    assert len(scores) == 2
-    assert scores[0].inputs["self"].name == "score"
-    assert scores[0].inputs["inputs"]["x"] == 1
-    assert scores[0].inputs["output"] == 2
-    assert scores[0].output == 3
-
-    assert scores[1].inputs["self"].name == "score2"
-    assert scores[1].inputs["inputs"]["x"] == 1
-    assert scores[1].inputs["output"] == 2
-    assert scores[1].output == 4
-
-
-def test_get_scores(client, make_evals):
-    scores = client.get_scores()
-    assert scores == {
-        "score": [3],
-        "score2": [4],
-    }
+def test_get_evaluations(client, make_evals):
+    ref, ref2 = make_evals
+    evs = client.get_evaluations()
+    assert len(evs) == 2
+    assert isinstance(evs[0], Evaluation)
+    assert isinstance(evs[1], Evaluation)
+    assert evs[0].ref.uri() == ref.uri()
+    assert evs[1].ref.uri() == ref2.uri()
