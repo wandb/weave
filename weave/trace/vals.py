@@ -28,6 +28,7 @@ from weave.trace.refs import (
     RefWithExtra,
     TableRef,
 )
+from weave.trace.context.ref_property_handler import RefProperty
 from weave.trace.serialization.serialize import from_json
 from weave.trace.table import Table
 from weave.trace_server.errors import ObjectDeletedError
@@ -108,7 +109,7 @@ def unwrap(val: Any) -> Any:
 
 
 class Traceable:
-    ref: Optional[RefWithExtra]
+    ref = RefProperty()  # Now using the property descriptor
     mutations: Optional[list[Mutation]] = None
     root: "Traceable"
     parent: Optional["Traceable"] = None
@@ -118,7 +119,8 @@ class Traceable:
     def _mark_dirty(self) -> None:
         """Recursively mark this object and its ancestors as dirty and removes their refs."""
         self._is_dirty = True
-        self.ref = None
+        from weave.trace.ref_util import set_ref
+        set_ref(self, None)
         if (
             # Written this way to satisfy mypy
             self.parent is not self

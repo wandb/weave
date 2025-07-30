@@ -4,10 +4,11 @@ from collections.abc import Iterator
 from typing import Any
 
 from weave.trace.refs import TableRef
+from weave.trace.context.ref_property_handler import RefProperty
 
 
 class Table:
-    ref: TableRef | None
+    ref = RefProperty()  # Use property descriptor for context isolation
 
     def __init__(self, rows: list[dict]) -> None:
         if not isinstance(rows, list):
@@ -20,7 +21,7 @@ class Table:
                 pass
         self._validate_rows(rows)
         self._rows = rows
-        self.ref = None
+        # ref is now handled by the property descriptor
 
     def _validate_rows(self, rows: Any) -> None:
         if not isinstance(rows, list) or not all(isinstance(row, dict) for row in rows):

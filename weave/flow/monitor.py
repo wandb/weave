@@ -9,6 +9,7 @@ from weave.trace.api import ObjectRef, publish
 from weave.trace.objectify import register_object
 from weave.trace.vals import WeaveObject
 from weave.trace_server.interface.query import Query
+from weave.trace.ref_util import set_ref
 
 
 @register_object
@@ -62,7 +63,7 @@ class Monitor(Object):
             The ref to the monitor.
         """
         self.active = True
-        self.ref = None
+        set_ref(self, None)
         return publish(self)
 
     def deactivate(self) -> ObjectRef:
@@ -72,7 +73,7 @@ class Monitor(Object):
             The ref to the monitor.
         """
         self.active = False
-        self.ref = None
+        set_ref(self, None)
         return publish(self)
 
     @classmethod

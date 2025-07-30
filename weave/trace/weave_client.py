@@ -1788,7 +1788,8 @@ class WeaveClient:
         # The WeaveTable case is special because object saving happens inside
         # _save_object_nested and it has a special table_ref -- skip it here.
         if getattr(val, "_is_dirty", False) and not isinstance(val, WeaveTable):
-            val.ref = None
+            from weave.trace.ref_util import set_ref
+            set_ref(val, None)
 
         val = map_to_refs(val)
         if isinstance(val, ObjectRef):
@@ -1886,7 +1887,8 @@ class WeaveClient:
             self.entity, self.project, digest_future, row_digests_future
         )
 
-        table.ref = table_ref
+        from weave.trace.ref_util import set_ref
+        set_ref(table, table_ref)
 
         if isinstance(table, WeaveTable):
             table.table_ref = table_ref

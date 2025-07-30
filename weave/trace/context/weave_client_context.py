@@ -4,10 +4,14 @@ import threading
 from collections.abc import Generator
 from contextlib import contextmanager
 from typing import TYPE_CHECKING
+import contextvars
+
+from weave.trace.context import context_state
 
 if TYPE_CHECKING:
     from weave.trace.weave_client import WeaveClient
 
+# Legacy global client for backward compatibility
 _global_weave_client: WeaveClient | None = None
 lock = threading.Lock()
 
@@ -33,8 +37,11 @@ def set_weave_client_global(client: WeaveClient | None) -> None:
 
 
 def get_weave_client() -> WeaveClient | None:
-    # if (context_client := context_state._graph_client.get()) is not None:
-    #     return context_client
+    # First check context-specific client
+    context_client = context_state.get_client()
+    if context_client is not None:
+        return context_client
+    # Fall back to global client for backward compatibility
     return _global_weave_client
 
 

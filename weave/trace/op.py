@@ -1312,7 +1312,8 @@ def op(
             inferred_name = inferred_name.split(".<locals>.")[-1]
 
             wrapper.name = name or inferred_name  # type: ignore
-            wrapper.ref = None  # type: ignore
+            from weave.trace.ref_util import set_ref
+            set_ref(wrapper, None)  # type: ignore
 
             wrapper.postprocess_inputs = postprocess_inputs  # type: ignore
             wrapper.postprocess_output = postprocess_output  # type: ignore
