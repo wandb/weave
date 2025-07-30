@@ -303,9 +303,6 @@ class Evaluation(Object):
         )
 
     def get_score_calls(self) -> dict[str, list[Call]]:
-        # TODO: This needs to recursively walk the tree of calls to find all scores.
-        # That will be slow.  We should figure out how to push this down to the server layer!
-
         d = {}
         client = require_weave_client()
         for call in self.get_evaluate_calls():
