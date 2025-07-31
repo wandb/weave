@@ -8,6 +8,7 @@
 #     "rich==14.0.0",
 # ]
 # ///
+from __future__ import annotations
 
 import argparse
 import os
