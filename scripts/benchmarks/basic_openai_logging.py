@@ -19,7 +19,9 @@ from typing import Any
 from openai import OpenAI
 from rich.console import Console
 from rich.table import Table
-from utils import (
+
+import weave
+from scripts.benchmarks.utils import (
     calculate_stats,
     create_basic_table,
     format_percentage,
@@ -28,8 +30,6 @@ from utils import (
     read_results_from_csv,
     write_csv_with_headers,
 )
-
-import weave
 
 console = Console()
 
