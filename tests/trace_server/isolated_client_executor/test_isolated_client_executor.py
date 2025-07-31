@@ -27,6 +27,7 @@ from weave.trace.weave_client import WeaveClient
 from weave.trace_server.isolated_client_executor import (
     IsolatedClientExecutor,
     IsolatedClientExecutorError,
+    IsolatedClientExecutorTimeoutError,
 )
 from weave.trace_server.trace_server_interface import TraceServerInterface
 
@@ -162,7 +163,8 @@ async def test_successful_execution(client):
     """Test successful function execution in isolated process."""
     async with runner_with_cleanup(client.server, entity=client.entity) as runner:
         req = TestRequest(value="test_value")
-        result = await runner.execute(successful_function, req)
+        result, error = await runner.execute(successful_function, req)
+        assert error is None
 
         assert result.result == "Success: test_value"
         assert result.process_id is not None
@@ -182,10 +184,10 @@ async def test_exception_in_child_process(client):
     """Test handling of exceptions thrown in child process."""
     async with runner_with_cleanup(client.server, entity=client.entity) as runner:
         req = TestRequest(value="test_error")
-        with pytest.raises(
-            IsolatedClientExecutorError, match="Function execution failed"
-        ):
-            await runner.execute(failing_function, req)
+        result, error = await runner.execute(failing_function, req)
+        assert error is not None
+        assert isinstance(error, ValueError)
+        assert "Intentional test failure" in str(error)
 
 
 async def timeout_function(req: TestRequest) -> TestResponse:
@@ -203,10 +205,10 @@ async def test_process_timeout(client):
         client.server, entity=client.entity, timeout_seconds=0.5
     ) as runner:
         req = TestRequest(value="timeout_test", sleep_time=2.0)
-        with pytest.raises(
-            IsolatedClientExecutorError, match="timed out after 0.5 seconds"
-        ):
-            await runner.execute(timeout_function, req)
+        result, error = await runner.execute(timeout_function, req)
+        assert error is not None
+        assert isinstance(error, IsolatedClientExecutorTimeoutError)
+        assert "timed out after 0.5 seconds" in str(error)
 
 
 async def exit_code_function(req: TestRequest) -> TestResponse:
@@ -221,8 +223,10 @@ async def test_process_exit_code(client):
     """Test handling of process that exits with specific code."""
     async with runner_with_cleanup(client.server, entity=client.entity) as runner:
         req = TestRequest(value="exit_test", exit_code=42)
-        with pytest.raises(IsolatedClientExecutorError, match="exit code: 42"):
-            await runner.execute(exit_code_function, req)
+        result, error = await runner.execute(exit_code_function, req)
+        assert error is not None
+        assert isinstance(error, IsolatedClientExecutorError)
+        assert "exit code: 42" in str(error)
 
 
 async def check_isolation_function(req: TestRequest) -> TestResponse:
@@ -270,13 +274,15 @@ async def test_project_isolation(client):
         req1 = TestRequest(
             value="test", expected_project="project1", expected_entity=client.entity
         )
-        result1 = await runner1.execute(check_isolation_function, req1)
+        result1, error = await runner1.execute(check_isolation_function, req1)
+        assert error is None
         assert "Isolation verified" in result1.result
 
         req2 = TestRequest(
             value="test", expected_project="project2", expected_entity=client.entity
         )
-        result2 = await runner2.execute(check_isolation_function, req2)
+        result2, error = await runner2.execute(check_isolation_function, req2)
+        assert error is None
         assert "Isolation verified" in result2.result
 
 
@@ -295,7 +301,8 @@ async def test_multiple_args(client):
             arg_b=42,
             arg_c="custom",
         )
-        result = await runner.execute(multi_arg_function, req)
+        result, error = await runner.execute(multi_arg_function, req)
+        assert error is None
         assert result.result == "a=hello, b=42, c=custom"
 
 
@@ -305,12 +312,14 @@ async def test_reuse_runner(client):
     async with runner_with_cleanup(client.server, entity=client.entity) as runner:
         # First execution
         req1 = TestRequest(value="first")
-        result1 = await runner.execute(successful_function, req1)
+        result1, error = await runner.execute(successful_function, req1)
+        assert error is None
         assert result1.result == "Success: first"
 
         # Second execution
         req2 = TestRequest(value="second")
-        result2 = await runner.execute(successful_function, req2)
+        result2, error = await runner.execute(successful_function, req2)
+        assert error is None
         assert result2.result == "Success: second"
 
         # Both should have run in the same process
@@ -323,18 +332,22 @@ async def test_process_restart_after_crash(client):
     async with runner_with_cleanup(client.server, entity=client.entity) as runner:
         # First execution should succeed
         req1 = TestRequest(value="success")
-        result1 = await runner.execute(successful_function, req1)
+        result1, error = await runner.execute(successful_function, req1)
+        assert error is None
         assert result1.result == "Success: success"
         first_pid = result1.process_id
 
         # Second execution should crash the process
         req2 = TestRequest(value="crash", exit_code=1)
-        with pytest.raises(IsolatedClientExecutorError):
-            await runner.execute(exit_code_function, req2)
+        result2, error = await runner.execute(exit_code_function, req2)
+        assert error is not None
+        assert isinstance(error, IsolatedClientExecutorError)
+        assert "exit code: 1" in str(error)
 
         # Third execution should succeed with a new process
         req3 = TestRequest(value="after_crash")
-        result3 = await runner.execute(successful_function, req3)
+        result3, error = await runner.execute(successful_function, req3)
+        assert error is None
         assert result3.result == "Success: after_crash"
         # Should be a different process
         assert result3.process_id != first_pid
@@ -351,7 +364,8 @@ async def test_context_manager_cleanup(client):
     async with runner_with_cleanup(client.server, entity=client.entity) as runner:
         # Execute a function to start the process
         req = TestRequest(value="test")
-        result = await runner.execute(successful_function, req)
+        result, error = await runner.execute(successful_function, req)
+        assert error is None
         assert result.result == "Success: test"
 
         # Get the process reference
@@ -405,11 +419,14 @@ async def test_correct_isolation(client):
         client.server, entity=client.entity, project=client.project
     ) as runner:
         req = SimpleRequest(value="test")
-        result = await runner.execute(log_to_weave, req)
+        result, error = await runner.execute(log_to_weave, req)
+        assert error is None
         assert result.result == "Success: test 1"
-        result = await runner.execute(log_to_weave, req)
+        result, error = await runner.execute(log_to_weave, req)
+        assert error is None
         assert result.result == "Success: test 2"
-        result = await runner.execute(log_to_weave, req)
+        result, error = await runner.execute(log_to_weave, req)
+        assert error is None
         assert result.result == "Success: test 3"
 
     calls = client.get_calls()
@@ -421,11 +438,14 @@ async def test_correct_isolation(client):
         client.server, entity=client.entity, project=client.project
     ) as runner:
         req = SimpleRequest(value="test")
-        result = await runner.execute(log_to_weave, req)
+        result, error = await runner.execute(log_to_weave, req)
+        assert error is None
         assert result.result == "Success: test 1"
-        result = await runner.execute(log_to_weave, req)
+        result, error = await runner.execute(log_to_weave, req)
+        assert error is None
         assert result.result == "Success: test 2"
-        result = await runner.execute(log_to_weave, req)
+        result, error = await runner.execute(log_to_weave, req)
+        assert error is None
         assert result.result == "Success: test 3"
 
     calls = client.get_calls()
@@ -459,7 +479,8 @@ async def test_global_client_isolation(client):
         client.server, entity="different_entity", project="different_project"
     ) as runner:
         req = SimpleRequest(value="test")
-        result = await runner.execute(check_client_isolation_function, req)
+        result, error = await runner.execute(check_client_isolation_function, req)
+        assert error is None
 
         # Child should have its own client with different entity
         assert "different_entity" in result.result
