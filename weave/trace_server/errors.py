@@ -286,7 +286,9 @@ def handle_clickhouse_query_error(e: Exception) -> None:
     if "NO_COMMON_TYPE" in error_str:
         raise NoCommonType(
             "No common type between data types in query. "
-            "This can occur when comparing integers to strings without using the $convert operation"
+            "This can occur when comparing types without using the $convert operation. "
+            "Example: filtering calls by inputs.integer_value = 1 without using $convert -> "
+            "Correct: {$expr: {$eq: [{$convert: {input: {$getField: 'inputs.integer_value'}, to: 'double'}}, {$literal: 1}]}}"
         ) from e
 
     # Re-raise the original exception if no known pattern matches
