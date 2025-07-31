@@ -16,15 +16,18 @@ from typing import Optional
 
 import pytest
 from pydantic import BaseModel
-
-import weave
-from tests.trace_server.run_as_user.cross_process_trace_server import (
+from tests.trace_server.isolated_client_executor.cross_process_trace_server import (
     CrossProcessTraceServerReceiver,
 )
+from weave.trace_server.isolated_client_executor import (
+    IsolatedClientExecutor,
+    IsolatedClientExecutorError,
+)
+
+import weave
 from weave.trace.context.weave_client_context import get_weave_client
 from weave.trace.ref_util import get_ref
 from weave.trace.weave_client import WeaveClient
-from weave.trace_server.run_as_user.run_as_user import IsolatedClientExecutor, IsolatedClientExecutorError
 from weave.trace_server.trace_server_interface import TraceServerInterface
 
 
@@ -179,7 +182,9 @@ async def test_exception_in_child_process(client):
     """Test handling of exceptions thrown in child process."""
     async with runner_with_cleanup(client.server, entity=client.entity) as runner:
         req = TestRequest(value="test_error")
-        with pytest.raises(IsolatedClientExecutorError, match="Function execution failed"):
+        with pytest.raises(
+            IsolatedClientExecutorError, match="Function execution failed"
+        ):
             await runner.execute(failing_function, req)
 
 
@@ -198,7 +203,9 @@ async def test_process_timeout(client):
         client.server, entity=client.entity, timeout_seconds=0.5
     ) as runner:
         req = TestRequest(value="timeout_test", sleep_time=2.0)
-        with pytest.raises(IsolatedClientExecutorError, match="timed out after 0.5 seconds"):
+        with pytest.raises(
+            IsolatedClientExecutorError, match="timed out after 0.5 seconds"
+        ):
             await runner.execute(timeout_function, req)
 
 

@@ -37,10 +37,10 @@ import asyncio
 import logging
 import multiprocessing
 import time
-from collections.abc import Awaitable, Coroutine
+from collections.abc import Awaitable, Coroutine, Generator
 from contextlib import contextmanager
 from multiprocessing.context import SpawnProcess
-from typing import Any, Callable, Generator, TypeVar, Union, overload
+from typing import Any, Callable, TypeVar, Union, overload
 
 from pydantic import BaseModel
 
@@ -88,6 +88,7 @@ ResponseQueue = multiprocessing.Queue[ResponseTuple]
 
 class IsolatedClientExecutorError(Exception):
     """Base exception for IsolatedClientExecutor errors."""
+
 
 class IsolatedClientExecutorTimeoutError(IsolatedClientExecutorError):
     """Exception for function execution timeouts."""
@@ -140,7 +141,7 @@ class IsolatedClientExecutor:
         self.client_factory = client_factory
         self.client_factory_config = client_factory_config
         self.timeout_seconds = timeout_seconds
-        
+
         # Process management
         self._process: SpawnProcess | None = None
         self._request_queue: RequestQueue | None = None
@@ -255,15 +256,15 @@ class IsolatedClientExecutor:
     ) -> R:
         """
         Execute a function with timeout handling.
-        
+
         Args:
             func: Function to execute
             request: Request data
             timeout_seconds: Timeout in seconds
-            
+
         Returns:
             Function result
-            
+
         Raises:
             IsolatedClientExecutorError: On timeout or process failure
         """
@@ -279,10 +280,10 @@ class IsolatedClientExecutor:
         while time.time() - start_time < timeout_seconds:
             if not self._response_queue.empty():
                 result, exception = self._response_queue.get()
-                
+
                 if exception is not None:
                     raise exception
-                
+
                 return result
 
             # Check if process is still alive
@@ -321,7 +322,7 @@ class IsolatedClientExecutor:
     def _wait_for_shutdown(self, timeout_seconds: float) -> None:
         """Wait for the process to shutdown gracefully."""
         assert self._process is not None
-        
+
         self._process.join(timeout=timeout_seconds)
 
         if self._process.is_alive():
@@ -361,7 +362,7 @@ def _worker_loop(
         while True:
             try:
                 signal, func, request = request_queue.get()
-                
+
                 if signal == SIGNAL_STOP:
                     break
                 elif signal == SIGNAL_EXEC:
@@ -381,16 +382,18 @@ def _worker_loop(
 def _client_context(client: WeaveClient) -> Generator[None, None, None]:
     """
     Context manager for WeaveClient lifecycle management.
-    
+
     Args:
         client: The WeaveClient to manage
-        
+
     Raises:
         IsolatedClientExecutorError: If a weave client already exists
     """
     if get_weave_client() is not None:
-        raise IsolatedClientExecutorError("Unsafe to run as user with existing weave client")
-    
+        raise IsolatedClientExecutorError(
+            "Unsafe to run as user with existing weave client"
+        )
+
     ic = InitializedClient(client)
     try:
         yield
@@ -404,24 +407,24 @@ def _execute_function(
 ) -> ResponseTuple:
     """
     Execute a function and return the result or error.
-    
+
     Args:
         func: Function to execute
         request: Request data to pass to the function
-        
+
     Returns:
         Tuple of (result, error). If successful, error is None.
         If failed, result is None and error contains the exception.
     """
     try:
         result = func(request)
-        
+
         # Handle async functions - check for both Coroutine and Awaitable
         if isinstance(result, Coroutine) or hasattr(result, "__await__"):
             result = asyncio.run(result)
-        
+
         return result, None
-        
+
     except Exception as e:
         logger.error(f"Error executing function: {e}", exc_info=True)
         return None, e
@@ -430,7 +433,7 @@ def _execute_function(
 def _cleanup_client(client: WeaveClient, ic: InitializedClient) -> None:
     """
     Clean up the client and initialized client.
-    
+
     Args:
         client: The weave client to finish
         ic: The initialized client to reset
@@ -444,5 +447,3 @@ def _cleanup_client(client: WeaveClient, ic: InitializedClient) -> None:
         ic.reset()
     except Exception as e:
         logger.error(f"Error resetting client: {e}", exc_info=True)
-
-
