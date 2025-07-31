@@ -73,6 +73,18 @@ class ObjectDeletedError(Error):
         super().__init__(message)
 
 
+class InvalidExternalRef(Error):
+    """Raised when an external reference is invalid."""
+
+    pass
+
+
+class ProjectNotFound(Error):
+    """Raised when a project is not found."""
+
+    pass
+
+
 # Global registry instance
 _error_registry: Optional["ErrorRegistry"] = None
 
@@ -153,6 +165,8 @@ class ErrorRegistry:
         self.register(MissingLLMApiKeyError, 400, self._format_missing_llm_api_key)
         self.register(NotFoundError, 404, self._default_json_formatter)
         self.register(ObjectDeletedError, 404, self._format_object_deleted_error)
+        self.register(InvalidExternalRef, 400, self._default_json_formatter)
+        self.register(ProjectNotFound, 404, self._default_json_formatter)
 
         # Standard library exceptions
         self.register(ValueError, 400, self._default_json_formatter)
