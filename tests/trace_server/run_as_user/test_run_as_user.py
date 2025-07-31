@@ -1,8 +1,8 @@
 """
-Tests for the RunAsUser class.
+Tests for the IsolatedClientExecutor class.
 
 This module tests the process isolation, security validation, and error handling
-of the RunAsUser class using the new callback-based API.
+of the IsolatedClientExecutor class using the new callback-based API.
 
 Note: These tests use the actual trace server fixture to test real process
 spawning and isolation. The timeout tests are particularly important for
@@ -24,7 +24,7 @@ from tests.trace_server.run_as_user.cross_process_trace_server import (
 from weave.trace.context.weave_client_context import get_weave_client
 from weave.trace.ref_util import get_ref
 from weave.trace.weave_client import WeaveClient
-from weave.trace_server.run_as_user.run_as_user import RunAsUser, RunAsUserError
+from weave.trace_server.run_as_user.run_as_user import IsolatedClientExecutor, IsolatedClientExecutorError
 from weave.trace_server.trace_server_interface import TraceServerInterface
 
 
@@ -125,7 +125,7 @@ async def runner_with_cleanup(
     **runner_kwargs,
 ):
     """
-    Async context manager that provides a RunAsUser instance with automatic cleanup.
+    Async context manager that provides a IsolatedClientExecutor instance with automatic cleanup.
 
     This eliminates the repetitive setup/teardown code in tests.
 
@@ -133,15 +133,15 @@ async def runner_with_cleanup(
         trace_server_factory: Factory function that creates a trace server
         entity: Entity name for the client
         project: Project name for the client
-        **runner_kwargs: Additional arguments to pass to RunAsUser constructor
+        **runner_kwargs: Additional arguments to pass to IsolatedClientExecutor constructor
 
     Yields:
-        RunAsUser: Configured runner instance
+        IsolatedClientExecutor: Configured runner instance
     """
     factory_config, cleanup = create_test_client_factory_and_cleanup(
         trace_server, entity=entity, project=project
     )
-    runner = RunAsUser(
+    runner = IsolatedClientExecutor(
         client_factory=weave_client_factory,
         client_factory_config=factory_config,
         **runner_kwargs,
@@ -179,7 +179,7 @@ async def test_exception_in_child_process(client):
     """Test handling of exceptions thrown in child process."""
     async with runner_with_cleanup(client.server, entity=client.entity) as runner:
         req = TestRequest(value="test_error")
-        with pytest.raises(RunAsUserError, match="Function execution failed"):
+        with pytest.raises(IsolatedClientExecutorError, match="Function execution failed"):
             await runner.execute(failing_function, req)
 
 
@@ -198,7 +198,7 @@ async def test_process_timeout(client):
         client.server, entity=client.entity, timeout_seconds=0.5
     ) as runner:
         req = TestRequest(value="timeout_test", sleep_time=2.0)
-        with pytest.raises(RunAsUserError, match="timed out after 0.5 seconds"):
+        with pytest.raises(IsolatedClientExecutorError, match="timed out after 0.5 seconds"):
             await runner.execute(timeout_function, req)
 
 
@@ -214,7 +214,7 @@ async def test_process_exit_code(client):
     """Test handling of process that exits with specific code."""
     async with runner_with_cleanup(client.server, entity=client.entity) as runner:
         req = TestRequest(value="exit_test", exit_code=42)
-        with pytest.raises(RunAsUserError, match="exit code: 42"):
+        with pytest.raises(IsolatedClientExecutorError, match="exit code: 42"):
             await runner.execute(exit_code_function, req)
 
 
@@ -322,7 +322,7 @@ async def test_process_restart_after_crash(client):
 
         # Second execution should crash the process
         req2 = TestRequest(value="crash", exit_code=1)
-        with pytest.raises(RunAsUserError):
+        with pytest.raises(IsolatedClientExecutorError):
             await runner.execute(exit_code_function, req2)
 
         # Third execution should succeed with a new process

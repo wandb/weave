@@ -2,7 +2,7 @@
 The purpose of this module is to expose a pattern/utility that allows a runtime
 to execute a workload on behalf of a user. This is particularly useful for our
 backend workers that need to execute scorers / evals for users. The primary
-interface exposed is the `RunAsUser` class. This class is constructed with a
+interface exposed is the `IsolatedClientExecutor` class. This class is constructed with a
 client factory callback that can construct a WeaveClient, and executes functions
 on behalf of a user in an isolated process. For example:
 
@@ -10,7 +10,7 @@ on behalf of a user in an isolated process. For example:
 def create_client():
     return WeaveClient(entity="my-entity", project="my-project")
 
-runner = RunAsUser(client_factory=create_client)
+runner = IsolatedClientExecutor(client_factory=create_client)
 try:
     result = await runner.execute(my_function, request)
 finally:
@@ -39,44 +39,67 @@ import multiprocessing
 import sys
 import time
 from collections.abc import Awaitable, Coroutine
+from contextlib import contextmanager
 from multiprocessing.context import SpawnProcess
-from typing import Any, Callable, TypeVar, Union, overload
+from typing import Any, Callable, Generator, TypeVar, Union, overload
 
 from pydantic import BaseModel
 
-from weave.trace.context.weave_client_context import (
-    get_weave_client,
-)
+from weave.trace.context.weave_client_context import get_weave_client
 from weave.trace.weave_client import WeaveClient
 from weave.trace.weave_init import InitializedClient
 
 logger = logging.getLogger(__name__)
 
-# Constants for better maintainability
+# =============================================================================
+# Constants
+# =============================================================================
+
 DEFAULT_EXECUTION_TIMEOUT_SECONDS = 30.0
 DEFAULT_SHUTDOWN_TIMEOUT_SECONDS = 600.0
 RESPONSE_POLL_INTERVAL_SECONDS = 0.1
 PROCESS_TERMINATION_TIMEOUT_SECONDS = 5.0
 
+# Request queue signal constants
+SIGNAL_STOP = "STOP"
+SIGNAL_EXEC = "EXEC"
+
+# =============================================================================
+# Type Definitions
+# =============================================================================
+
 T = TypeVar("T", bound=BaseModel)
 R = TypeVar("R", bound=BaseModel)
-
-# Remove the bound=BaseModel constraint as client factory configs can be any type
-FC = TypeVar("FC")
+FC = TypeVar("FC")  # Client factory config type
 
 # Type aliases for better readability
 SyncCallable = Callable[[T], R]
 AsyncCallable = Callable[[T], Awaitable[R]]
 AnyCallable = Union[SyncCallable[T, R], AsyncCallable[T, R]]
 
+# Queue type aliases for better readability
+ResponseTuple = tuple[Any, Exception | None]
+RequestQueue = multiprocessing.Queue[tuple[str, Any, Any]]
+ResponseQueue = multiprocessing.Queue[ResponseTuple]
 
-class RunAsUserError(Exception):
-    """Base exception for RunAsUser errors."""
+# =============================================================================
+# Exceptions
+# =============================================================================
 
-    pass
+
+class IsolatedClientExecutorError(Exception):
+    """Base exception for IsolatedClientExecutor errors."""
+
+class IsolatedClientExecutorTimeoutError(IsolatedClientExecutorError):
+    """Exception for function execution timeouts."""
 
 
-class RunAsUser:
+# =============================================================================
+# Main Class
+# =============================================================================
+
+
+class IsolatedClientExecutor:
     """
     Execute functions on behalf of a user in an isolated process.
 
@@ -94,7 +117,7 @@ class RunAsUser:
     Examples:
         >>> def create_client():
         ...     return WeaveClient(entity="my-entity", project="my-project")
-        >>> runner = RunAsUser(client_factory=create_client)
+        >>> runner = IsolatedClientExecutor(client_factory=create_client)
         >>> try:
         ...     result = await runner.execute(my_function, request)
         ... finally:
@@ -106,9 +129,9 @@ class RunAsUser:
         client_factory: Callable[[FC], WeaveClient],
         client_factory_config: FC,
         timeout_seconds: float = DEFAULT_EXECUTION_TIMEOUT_SECONDS,
-    ):
+    ) -> None:
         """
-        Initialize the RunAsUser with a client factory.
+        Initialize the IsolatedClientExecutor with a client factory.
 
         Args:
             client_factory: A callable that returns a configured WeaveClient.
@@ -118,11 +141,21 @@ class RunAsUser:
         self.client_factory = client_factory
         self.client_factory_config = client_factory_config
         self.timeout_seconds = timeout_seconds
+        
+        # Process management
         self._process: SpawnProcess | None = None
-        self._request_queue: multiprocessing.Queue[tuple[str, Any, Any]] | None = None
-        self._response_queue: multiprocessing.Queue[Any] | None = None
+        self._request_queue: RequestQueue | None = None
+        self._response_queue: ResponseQueue | None = None
 
-    # Overloads to provide better type safety for sync vs async callables
+    # =============================================================================
+    # Public API
+    # =============================================================================
+
+    @property
+    def is_running(self) -> bool:
+        """Check if the worker process is currently running."""
+        return self._process is not None and self._process.is_alive()
+
     @overload
     async def execute(
         self,
@@ -163,55 +196,17 @@ class RunAsUser:
             The result of the function execution.
 
         Raises:
-            RunAsUserError: If execution fails, times out, or process crashes.
+            IsolatedClientExecutorError: If execution fails, times out, or process crashes.
         """
-        # Start the process if not already running
-        if self._process is None or not self._process.is_alive():
-            self._start_process()
-
-        # At this point, queues should be initialized
-        assert self._request_queue is not None
-        assert self._response_queue is not None
-        assert self._process is not None
-
+        self._ensure_process_running()
         effective_timeout = timeout_seconds or self.timeout_seconds
 
         try:
-            # Send the request
-            self._request_queue.put(("EXEC", func, request))
-
-            # Wait for response with timeout
-            start_time = time.time()
-            while time.time() - start_time < effective_timeout:
-                if not self._response_queue.empty():
-                    result = self._response_queue.get()
-
-                    # Check if it's an exception
-                    if isinstance(result, Exception):
-                        raise RunAsUserError(f"Function execution failed: {result}")
-
-                    return result
-
-                # Check if process is still alive
-                if not self._process.is_alive():
-                    exit_code = self._process.exitcode
-                    raise RunAsUserError(
-                        f"Worker process terminated unexpectedly with exit code: {exit_code}"
-                    )
-
-                await asyncio.sleep(RESPONSE_POLL_INTERVAL_SECONDS)
-
-            # Timeout occurred
-            raise RunAsUserError(
-                f"Function execution timed out after {effective_timeout} seconds"
-            )
-
+            return await self._execute_with_timeout(func, request, effective_timeout)
         except Exception as e:
-            # Clean up the process on error
-            self._stop_process()
-            if isinstance(e, RunAsUserError):
+            if isinstance(e, IsolatedClientExecutorError):
                 raise
-            raise RunAsUserError(f"Execution failed: {e}") from e
+            raise IsolatedClientExecutorError(f"Execution failed: {e}") from e
 
     def stop(self, timeout_seconds: float = DEFAULT_SHUTDOWN_TIMEOUT_SECONDS) -> None:
         """
@@ -219,20 +214,34 @@ class RunAsUser:
 
         Args:
             timeout_seconds: Maximum time to wait for the process to stop.
-            Important: this is also the flush timeout for the trace server!
-            Big workloads may need to increase this.
+                Important: this is also the flush timeout for the trace server!
+                Big workloads may need to increase this.
         """
         self._stop_process(timeout_seconds)
 
-    def _start_process(self) -> None:
-        """Start the worker process."""
-        # Spawning is safer than forking.
+    def __del__(self) -> None:
+        """Cleanup method to ensure the worker process is stopped."""
+        try:
+            self.stop()
+        except Exception as e:
+            logger.exception("Error during IsolatedClientExecutor cleanup")
+
+    # =============================================================================
+    # Private Methods
+    # =============================================================================
+
+    def _ensure_process_running(self) -> None:
+        """Ensure the worker process is running, starting it if necessary."""
+        if self.is_running:
+            return
+
+        # Start the worker process
         ctx = multiprocessing.get_context("spawn")
         self._request_queue = ctx.Queue()
         self._response_queue = ctx.Queue()
 
         self._process = ctx.Process(
-            target=self._worker_loop,
+            target=_worker_loop,
             args=(
                 self.client_factory,
                 self.client_factory_config,
@@ -242,116 +251,199 @@ class RunAsUser:
         )
         self._process.start()
 
+    async def _execute_with_timeout(
+        self, func: AnyCallable[T, R], request: T, timeout_seconds: float
+    ) -> R:
+        """
+        Execute a function with timeout handling.
+        
+        Args:
+            func: Function to execute
+            request: Request data
+            timeout_seconds: Timeout in seconds
+            
+        Returns:
+            Function result
+            
+        Raises:
+            IsolatedClientExecutorError: On timeout or process failure
+        """
+        assert self._request_queue is not None
+        assert self._response_queue is not None
+        assert self._process is not None
+
+        # Send the request
+        self._request_queue.put((SIGNAL_EXEC, func, request))
+
+        # Wait for response with timeout
+        start_time = time.time()
+        while time.time() - start_time < timeout_seconds:
+            if not self._response_queue.empty():
+                result, exception = self._response_queue.get()
+                
+                if exception is not None:
+                    raise exception
+                
+                return result
+
+            # Check if process is still alive
+            if not self.is_running:
+                exit_code = self._process.exitcode
+                raise IsolatedClientExecutorError(
+                    f"Worker process terminated unexpectedly with exit code: {exit_code}"
+                )
+
+            await asyncio.sleep(RESPONSE_POLL_INTERVAL_SECONDS)
+
+        # Timeout occurred
+        raise IsolatedClientExecutorTimeoutError(
+            f"Function execution timed out after {timeout_seconds} seconds"
+        )
+
     def _stop_process(
         self, timeout_seconds: float = DEFAULT_SHUTDOWN_TIMEOUT_SECONDS
     ) -> None:
-        """Stop the worker process."""
+        """Stop the worker process gracefully."""
         if self._process is None:
             return
 
         try:
-            if self._process.is_alive():
-                # Send stop signal
-                if self._request_queue is not None:
-                    self._request_queue.put(("STOP", None, None))
-
-                # Wait for graceful shutdown
-                self._process.join(timeout=timeout_seconds)
-
-                if self._process.is_alive():
-                    logger.warning(
-                        "Worker process did not stop gracefully, terminating..."
-                    )
-                    self._process.terminate()
-                    self._process.join(timeout=PROCESS_TERMINATION_TIMEOUT_SECONDS)
-
-                if self._process.is_alive():
-                    logger.error("Worker process did not terminate, killing...")
-                    self._process.kill()
-                    self._process.join()
+            if self.is_running:
+                self._send_stop_signal()
+                self._wait_for_shutdown(timeout_seconds)
         finally:
-            self._process = None
-            self._request_queue = None
-            self._response_queue = None
+            self._cleanup_resources()
 
-    def __del__(self) -> None:
-        """Cleanup method to ensure the worker process is stopped."""
-        try:
-            self.stop()
-        except Exception as e:
-            logger.exception("Error during RunAsUser cleanup")
+    def _send_stop_signal(self) -> None:
+        """Send stop signal to the worker process."""
+        if self._request_queue is not None:
+            self._request_queue.put((SIGNAL_STOP, None, None))
 
-    @staticmethod
-    def _worker_loop(
-        client_factory: Callable[[FC], WeaveClient],
-        client_factory_config: FC,
-        request_queue: multiprocessing.Queue[tuple[str, Any, Any]],
-        response_queue: multiprocessing.Queue[Any],
-    ) -> None:
-        """
-        Main loop for the worker process.
+    def _wait_for_shutdown(self, timeout_seconds: float) -> None:
+        """Wait for the process to shutdown gracefully."""
+        assert self._process is not None
+        
+        self._process.join(timeout=timeout_seconds)
 
-        Handles both synchronous and asynchronous function execution.
-        """
-        # Create and initialize the client
-        if get_weave_client() is not None:
-            raise RunAsUserError("Unsafe to run as user with existing weave client")
-        try:
-            client = client_factory(client_factory_config)
-            ic = InitializedClient(client)
+        if self._process.is_alive():
+            logger.warning("Worker process did not stop gracefully, terminating...")
+            self._process.terminate()
+            self._process.join(timeout=PROCESS_TERMINATION_TIMEOUT_SECONDS)
 
+        if self._process.is_alive():
+            logger.error("Worker process did not terminate, killing...")
+            self._process.kill()
+            self._process.join()
+
+    def _cleanup_resources(self) -> None:
+        """Clean up process resources."""
+        self._process = None
+        self._request_queue = None
+        self._response_queue = None
+
+
+# =============================================================================
+# Worker Process Functions
+# =============================================================================
+
+
+def _worker_loop(
+    client_factory: Callable[[FC], WeaveClient],
+    client_factory_config: FC,
+    request_queue: RequestQueue,
+    response_queue: ResponseQueue,
+) -> None:
+    """
+    Main loop for the worker process.
+
+    Handles both synchronous and asynchronous function execution.
+    """
+    with _client_context(client_factory(client_factory_config)):
+        while True:
             try:
-                while True:
-                    try:
-                        # Get next request
-                        signal, func, request = request_queue.get()
+                signal, func, request = request_queue.get()
+                
+                if signal == SIGNAL_STOP:
+                    break
+                elif signal == SIGNAL_EXEC:
+                    result, error = _execute_function(func, request)
+                    response_queue.put((result, error))
+                else:
+                    raise ValueError(f"Unknown signal: {signal}")
+            except KeyboardInterrupt:
+                break
+            except Exception as e:
+                logger.error(f"Error in worker loop: {e}", exc_info=True)
+                response_queue.put((None, e))
+                break
 
-                        if signal == "STOP":
-                            break
-                        elif signal == "EXEC":
-                            try:
-                                # Execute the function
-                                result = func(request)
 
-                                # Handle async functions - check for both Coroutine and Awaitable
-                                if isinstance(result, Coroutine) or hasattr(result, "__await__"):
-                                    result = asyncio.run(result)
+@contextmanager
+def _client_context(client: WeaveClient) -> Generator[None, None, None]:
+    """
+    Context manager for WeaveClient lifecycle management.
+    
+    Args:
+        client: The WeaveClient to manage
+        
+    Raises:
+        IsolatedClientExecutorError: If a weave client already exists
+    """
+    if get_weave_client() is not None:
+        raise IsolatedClientExecutorError("Unsafe to run as user with existing weave client")
+    
+    ic = InitializedClient(client)
+    try:
+        yield
+    finally:
+        _cleanup_client(client, ic)
 
-                                response_queue.put(result)
-                            except Exception as e:
-                                # Send exception back to parent
-                                logger.error(
-                                    f"Error executing function: {e}", exc_info=True
-                                )
-                                response_queue.put(e)
-                        else:
-                            # TODO: Consider making this more extensible for future signal types
-                            raise ValueError(f"Unknown signal: {signal}")
 
-                    except KeyboardInterrupt:
-                        break
-                    except Exception as e:
-                        logger.error(f"Error in worker loop: {e}", exc_info=True)
-                        response_queue.put(e)
-                        break
+def _execute_function(
+    func: Any,
+    request: Any,
+) -> ResponseTuple:
+    """
+    Execute a function and return the result or error.
+    
+    Args:
+        func: Function to execute
+        request: Request data to pass to the function
+        
+    Returns:
+        Tuple of (result, error). If successful, error is None.
+        If failed, result is None and error contains the exception.
+    """
+    try:
+        result = func(request)
+        
+        # Handle async functions - check for both Coroutine and Awaitable
+        if isinstance(result, Coroutine) or hasattr(result, "__await__"):
+            result = asyncio.run(result)
+        
+        return result, None
+        
+    except Exception as e:
+        logger.error(f"Error executing function: {e}", exc_info=True)
+        return None, e
 
-            finally:
-                # Clean up the client
-                try:
-                    client.finish(use_progress_bar=False)
-                except Exception as e:
-                    logger.error(f"Error finishing client: {e}", exc_info=True)
 
-                try:
-                    ic.reset()
-                except Exception as e:
-                    logger.error(f"Error resetting client: {e}", exc_info=True)
+def _cleanup_client(client: WeaveClient, ic: InitializedClient) -> None:
+    """
+    Clean up the client and initialized client.
+    
+    Args:
+        client: The weave client to finish
+        ic: The initialized client to reset
+    """
+    try:
+        client.finish(use_progress_bar=False)
+    except Exception as e:
+        logger.error(f"Error finishing client: {e}", exc_info=True)
 
-        except Exception as e:
-            logger.error(f"Fatal error in worker process: {e}", exc_info=True)
-            # Try to send the error back
-            try:
-                response_queue.put(e)
-            except Exception:
-                pass
-            sys.exit(1)
+    try:
+        ic.reset()
+    except Exception as e:
+        logger.error(f"Error resetting client: {e}", exc_info=True)
+
+
