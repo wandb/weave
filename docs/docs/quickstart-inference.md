@@ -3,18 +3,14 @@ import TabItem from '@theme/TabItem';
 
 # Get started with W&B Inference
 
-This guide shows you how to use W&B Weave with the W&B Inference service. You can build and trace LLM applications without setting up your own infrastructure or managing API keys from multiple providers.
+This guide shows you how to use W&B Weave with W&B Inference. You can build and trace LLM applications without setting up your own infrastructure or managing API keys from multiple providers.
 
-The W&B Inference service helps you learn Weave faster because:
-- You can start immediately without obtaining API keys from other providers
-- You get access to multiple models in one place, making it easier to compare their behavior
-- Your usage is automatically tracked, so you can see Weave's tracing features in action
-- You work with the same models and APIs you might use in production
+W&B Inference helps you learn Weave faster because you can start immediately without obtaining API keys from other providers. You get access to multiple models in one place, making it easier to compare their behavior. Your usage is automatically tracked, so you can see Weave's tracing features in action. You work with the same models and APIs you might use in production.
 
 ## What you'll learn
 
 In this guide, you'll:
-- Set up Weave and the W&B Inference service
+- Set up Weave and W&B Inference
 - Build a simple LLM application with automatic tracing
 - Compare multiple models
 - Evaluate model performance on a dataset
@@ -23,9 +19,8 @@ In this guide, you'll:
 ## Prerequisites
 
 Before you begin, you need:
-- A W&B account ([sign up free](https://app.wandb.ai/login?signup=true))
+- A [W&B account](https://app.wandb.ai/login?signup=true)
 - Python 3.8 or later
-- Basic Python knowledge
 
 ## Step 1: Install Weave
 
@@ -37,9 +32,14 @@ pip install weave openai
 
 Get your W&B API key from [https://wandb.ai/authorize](https://wandb.ai/authorize).
 
-## Step 2: Make your first traced LLM call
+## Step 2: Trace your first LLM call
 
-Start with a simple example that uses Llama 3.1 8B through W&B Inference:
+Start with a simple example that uses Llama 3.1-8B through W&B Inference. 
+
+When you run this code, Weave:
+- Traces your LLM call automatically
+- Logs inputs, outputs, latency, and token usage
+- Provides a link to view your trace in the Weave UI
 
 ```python
 import weave
@@ -71,11 +71,6 @@ def ask_llama(question: str) -> str:
 result = ask_llama("What are the benefits of using W&B Weave for LLM development?")
 print(result)
 ```
-
-When you run this code, Weave:
-- Traces your LLM call automatically
-- Logs inputs, outputs, latency, and token usage
-- Provides a link to view your trace in the Weave UI
 
 ## Step 3: Build a text summarization application
 
@@ -119,10 +114,11 @@ def summarize_text(text: str) -> dict:
 
 # Try it with sample text
 sample_text = """
-W&B Weave is a framework for building, tracking, and evaluating LLM applications. 
-It provides automatic tracing of LLM calls, helps you understand costs and performance, 
-and makes it easy to compare different models and prompts. With Weave, you can iterate 
-faster on your AI applications by having full visibility into what's happening under the hood.
+The Apollo 11 mission was a historic spaceflight that landed the first humans on the Moon 
+on July 20, 1969. Commander Neil Armstrong and lunar module pilot Buzz Aldrin descended 
+to the lunar surface while Michael Collins remained in orbit. Armstrong became the first 
+person to step onto the Moon, followed by Aldrin 19 minutes later. They spent about 
+two and a quarter hours together outside the spacecraft, collecting samples and taking photographs.
 """
 
 result = summarize_text(sample_text)
@@ -220,8 +216,6 @@ print(f"Accuracy: {results['accuracy']:.2%}")
 print(f"Correct: {results['total_correct']}/{results['total_examples']}")
 ```
 
-## Step 6: View your results in Weave
-
 After running these examples, you'll see links in your terminal. Click any link to view traces in the Weave UI.
 
 In the Weave UI, you can:
@@ -235,7 +229,7 @@ In the Weave UI, you can:
 
 ## Available models
 
-W&B Inference provides access to many models including Llama 3.1 8B for general-purpose tasks, Llama 3.3 70B for complex reasoning, DeepSeek V3 for language processing, and Qwen3 235B for mathematical and structured reasoning. 
+W&B Inference provides access to a variety of state-of-the-art models for different use cases. 
 
 For a complete list of available models with specifications, context windows, pricing, and usage limits, see the [Available Models section](guides/tools/inference.md#available-models) in the W&B Inference reference documentation.
 
@@ -273,11 +267,11 @@ W&B Inference has concurrency limits per project. If you hit rate limits:
 <details>
 <summary>Running out of credits</summary>
 
-The free tier includes limited credits. To continue using W&B Inference:
-- Free users: [Upgrade to Pro](https://wandb.ai/subscriptions)
-- Pro users: Usage is billed monthly after free credits (default cap: $6,000/month)
-- Enterprise users: Contact your account executive
+The free tier includes limited credits. If you run out of credits, to continue using W&B Inference:
+- Free users: [Upgrade to Pro](https://wandb.ai/subscriptions).
+- Pro users: Usage is billed monthly after free credits.
+- Enterprise users: Contact your account team.
 
-See the [pricing and limits documentation](guides/tools/inference.md#usage-information-and-limits) for details.
+See the [pricing and limits documentation](/guides/tools/inference.md#usage-information-and-limits) for details.
 
 </details>

@@ -3,14 +3,8 @@ import TabItem from '@theme/TabItem';
 
 # Track LLM inputs & outputs
 
-:::info[💡 New to Weave? Consider starting with W&B Inference]
-If you don't have OpenAI API keys yet, or want to experiment without costs, check out our **[W&B Inference quickstart](/quickstart-inference)** instead. It includes:
-- Free credits to get started
-- No external API keys needed
-- Access to powerful models like Llama 3.3 and DeepSeek
-- Same great Weave features demonstrated here
-
-**Continue with this guide if you want to use your own LLM provider API keys.**
+:::tip
+New to Weave? Try our [W&B Inference quickstart](/quickstart-inference) to get started without external API keys.
 :::
 
 <!-- TODO: Update wandb.me/weave-quickstart to match this new link -->
@@ -149,20 +143,11 @@ Calls made to OpenAI, Anthropic and [many more LLM libraries](./guides/integrati
 
 ![Weave Trace Outputs 1](../static/img/tutorial_trace_1.png)
 
-## What's next?
+## Next steps
 
-### 🚀 Try W&B Inference Service
-Now that you've seen Weave in action, level up your experimentation with our Inference service:
+Now that you've seen Weave in action, try the W&B Inference service for easier experimentation. [Get Started with W&B Inference](/quickstart-inference) - no need to manage multiple API keys, and free credits are included.
 
-**[Get Started with W&B Inference →](/quickstart-inference)**
-
-Why try it next?
-- **Experiment freely**: No need to manage multiple API keys
-- **Compare models easily**: Test Llama, DeepSeek, Qwen side-by-side
-- **Build evaluations**: Learn systematic model comparison
-- **Free credits included**: Perfect for learning and prototyping
-
-### 📚 Continue learning
-- **[Track flows and app metadata](/tutorial-tracing_2)**: Dive deeper into tracing complex applications
-- **[Build evaluations](/tutorial-eval)**: Learn systematic model evaluation
-- **[Explore integrations](./guides/integrations/index.md)**: Connect more LLM providers and frameworks
+Continue learning:
+- [Track flows and app metadata](/tutorial-tracing_2) - Dive deeper into tracing complex applications
+- [Build evaluations](/tutorial-eval) - Learn systematic model evaluation  
+- [Explore integrations](./guides/integrations/index.md) - Connect more LLM providers and frameworks
