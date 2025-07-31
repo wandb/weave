@@ -8,7 +8,7 @@ from weave.trace_server.environment import (
     kafka_broker_host,
     kafka_broker_port,
     kafka_client_password,
-    kafka_client_username,
+    kafka_client_user,
 )
 
 CALL_ENDED_TOPIC = "weave.call_ended"
@@ -56,7 +56,7 @@ def _make_broker_host() -> str:
 
 
 def _make_auth_config() -> dict[str, str]:
-    username = kafka_client_username()
+    username = kafka_client_user()
 
     if username is None:
         return {}
