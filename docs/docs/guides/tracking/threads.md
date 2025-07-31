@@ -358,7 +358,7 @@ import argparse
 
 def generate_id():
     """Generate a unique thread ID using UUID v7."""
-    return str(uuid.uuid4())
+    return str(uuid.uuid7())
 
 @weave.op
 def load_history(session_id):
