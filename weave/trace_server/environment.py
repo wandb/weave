@@ -7,14 +7,24 @@ logger = logging.getLogger(__name__)
 # Kafka Settings
 
 
-def wf_kafka_broker_host() -> str:
+def kafka_broker_host() -> str:
     """The host of the kafka broker."""
-    return os.environ.get("WF_KAFKA_BROKER_HOST", "localhost")
+    return os.environ.get("KAFKA_BROKER_HOST", "localhost")
 
 
-def wf_kafka_broker_port() -> int:
+def kafka_broker_port() -> int:
     """The port of the kafka broker."""
-    return int(os.environ.get("WF_KAFKA_BROKER_PORT", 9092))
+    return int(os.environ.get("KAFKA_BROKER_PORT", 9092))
+
+
+def kafka_client_username() -> str:
+    """The username for the kafka client."""
+    return os.environ.get("KAFKA_CLIENT_USERNAME")
+
+
+def kafka_client_password() -> str:
+    """The password for the kafka client."""
+    return os.environ.get("KAFKA_CLIENT_PASSWORD")
 
 
 # Scoring worker settings
@@ -70,7 +80,7 @@ def wf_clickhouse_max_memory_usage() -> Optional[int]:
         return None
     try:
         return int(mem)
-    except ValueError as e:
+    except ValueError:
         logger.exception(f"WF_CLICKHOUSE_MAX_MEMORY_USAGE value '{mem}' is not valid")
         return None
 
@@ -82,7 +92,7 @@ def wf_clickhouse_max_execution_time() -> Optional[int]:
         return None
     try:
         return int(time)
-    except ValueError as e:
+    except ValueError:
         logger.exception(
             f"WF_CLICKHOUSE_MAX_EXECUTION_TIME value '{time}' is not valid"
         )
