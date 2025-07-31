@@ -7,6 +7,7 @@ from pydantic import BeforeValidator
 import weave
 from weave.flow.dataset import Dataset
 from weave.flow.scorer import Scorer, _validate_scorer_signature
+from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import Op, as_op, is_op
 from weave.trace.refs import ObjectRef, OpRef
 from weave.trace.vals import WeaveObject
@@ -32,8 +33,7 @@ def cast_to_scorer(obj: Any) -> Scorer | Op:
     res: Scorer | Op
     if isinstance(obj, Scorer):
         res = obj
-    elif (bases := getattr(obj, "_bases", None)) and "Scorer" in bases:
-        # TODO: Ideally this returns the specific scorer class, not the generic Scorer
+    elif weave_isinstance(obj, Scorer):
         res = Scorer.from_obj(obj)
     elif isinstance(obj, type):
         raise TypeError(
