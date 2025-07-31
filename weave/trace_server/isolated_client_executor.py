@@ -423,11 +423,11 @@ def _execute_function(
         if isinstance(result, Coroutine) or hasattr(result, "__await__"):
             result = asyncio.run(result)
 
-        return result, None
-
     except Exception as e:
         logger.error(f"Error executing function: {e}", exc_info=True)
         return None, e
+    
+    return result, None
 
 
 def _cleanup_client(client: WeaveClient, ic: InitializedClient) -> None:
