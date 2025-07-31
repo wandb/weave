@@ -426,7 +426,7 @@ def _execute_function(
     except Exception as e:
         logger.error(f"Error executing function: {e}", exc_info=True)
         return None, e
-    
+
     return result, None
 
 
