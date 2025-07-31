@@ -18,7 +18,8 @@ from typing import Any
 
 from rich.console import Console
 from rich.table import Table
-from utils.utils import (
+
+from .utils.utils import (
     calculate_stats,
     create_basic_table,
     format_seconds,
