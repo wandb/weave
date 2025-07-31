@@ -44,9 +44,7 @@ async def test_evaluation_status(client):
     @weave.op
     def model(a: int) -> int:
         status = get_status()
-        assert status == EvaluationStatusRunning(
-            completed_rows=a - 1, total_rows=3
-        )
+        assert status == EvaluationStatusRunning(completed_rows=a - 1, total_rows=3)
         return a + 1
 
     @weave.op
@@ -80,7 +78,13 @@ async def test_evaluation_status(client):
         ):
             await eval.evaluate(model=model)
 
-    assert get_status() == EvaluationStatusComplete(output={'output': {'mean': 3.0}, 'scorer': {'mean': 1.0}, 'model_latency':  {'mean': pytest.approx(0, abs=1)}})
+    assert get_status() == EvaluationStatusComplete(
+        output={
+            "output": {"mean": 3.0},
+            "scorer": {"mean": 1.0},
+            "model_latency": {"mean": pytest.approx(0, abs=1)},
+        }
+    )
 
 
 def setup_test_objects(server: TraceServerInterface, entity: str, project: str):

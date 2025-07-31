@@ -30,7 +30,9 @@ def evaluation_status(
         return tsi.EvaluationStatusRes(status=tsi.EvaluationStatusFailed())
 
     if eval_call.call.ended_at is not None:
-        return tsi.EvaluationStatusRes(status=tsi.EvaluationStatusComplete(output=eval_call.call.output))
+        return tsi.EvaluationStatusRes(
+            status=tsi.EvaluationStatusComplete(output=eval_call.call.output)
+        )
 
     # determine completed rows (children complete)
     children_calls = server.calls_query(
