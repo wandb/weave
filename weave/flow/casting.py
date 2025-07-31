@@ -32,6 +32,9 @@ def cast_to_scorer(obj: Any) -> Scorer | Op:
     res: Scorer | Op
     if isinstance(obj, Scorer):
         res = obj
+    elif (bases := getattr(obj, "_bases", None)) and "Scorer" in bases:
+        # TODO: Ideally this returns the specific scorer class, not the generic Scorer
+        res = Scorer.from_obj(obj)
     elif isinstance(obj, type):
         raise TypeError(
             f"Scorer {obj.__name__} must be an instance, not a class. Did you instantiate?"

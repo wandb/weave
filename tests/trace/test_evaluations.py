@@ -1062,8 +1062,9 @@ async def test_evaluation_with_custom_name(client):
     assert call.display_name == "wow-custom!"
 
 
-def test_get_evaluate_calls(client, make_evals):
-    ref, ref2 = make_evals
+@pytest.mark.asyncio
+async def test_get_evaluate_calls(client, make_evals):
+    ref, ref2, ref3 = await make_evals
     ev = ref.get()
     evaluate_calls = ev.get_evaluate_calls()
     assert len(evaluate_calls) == 1
@@ -1081,8 +1082,15 @@ def test_get_evaluate_calls(client, make_evals):
     assert call2.inputs["self"].ref.uri() == ref2.uri()
     assert call2.inputs["model"].name == "ghi"
 
+    ev3 = ref3.get()
+    evaluate_calls3 = ev3.get_evaluate_calls()
+    assert len(evaluate_calls3) == 2
+    assert evaluate_calls3[0].inputs["model"].name == "abc"
+    assert evaluate_calls3[1].inputs["model"].name == "ghi"
 
-def test_get_score_calls(client, make_evals):
+
+@pytest.mark.asyncio
+async def test_get_score_calls(client, make_evals):
     ref, ref2 = make_evals
     ev = ref.get()
     score_calls = next(iter(ev.get_score_calls().values()))
@@ -1103,7 +1111,8 @@ def test_get_score_calls(client, make_evals):
     assert score_calls2[3].output == 7878
 
 
-def test_get_scores(client, make_evals):
+@pytest.mark.asyncio
+async def test_get_scores(client, make_evals):
     ref, ref2 = make_evals
     ev = ref.get()
     scores = next(iter(ev.get_scores().values()))

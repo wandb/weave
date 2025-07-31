@@ -492,7 +492,7 @@ def caching_client_isolation(monkeypatch, tmp_path):
 
 
 @pytest.fixture
-def make_evals(client):
+async def make_evals(client):
     # First eval
     ev = weave.EvaluationLogger(model="abc", dataset="def")
     pred = ev.log_prediction(inputs={"x": 1}, output=2)
@@ -512,7 +512,33 @@ def make_evals(client):
     pred4 = ev2.log_prediction(inputs={"alpha": 34}, output=45)
     pred4.log_score("second_score", 5656)
     pred4.log_score("second_score2", 7878)
-
     ev2.log_summary(summary={"z": 90})
 
-    return ev._pseudo_evaluation.ref, ev2._pseudo_evaluation.ref
+    # Make a third eval using the declarative Evaluation harness
+    @weave.op
+    def function_scorer(output: int) -> bool:
+        return output > 1
+
+    class ClassScorer(weave.Scorer):
+        @weave.op
+        def score(self, output: int, **kwargs: typing.Any) -> bool:
+            return output > 1
+
+    ev3 = weave.Evaluation(
+        dataset=[{"a": 1}, {"a": 2}],
+        scorers=[function_scorer, ClassScorer()],
+    )
+
+    @weave.op
+    def function_model(a: int) -> int:
+        return a + 1
+
+    class ClassModel(weave.Model):
+        @weave.op
+        def predict(self, a: int) -> int:
+            return a + 1
+
+    await ev3.evaluate(function_model)
+    await ev3.evaluate(ClassModel())
+
+    return ev._pseudo_evaluation.ref, ev2._pseudo_evaluation.ref, ev3.ref
