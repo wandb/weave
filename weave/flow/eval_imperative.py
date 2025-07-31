@@ -463,7 +463,7 @@ class EvaluationLogger(BaseModel):
                 # This is best effort.  If we fail, just swallow the error.
                 pass
 
-    def _finalize_evaluation(self, output: Any = None) -> None:
+    def _finalize_evaluation(self, output: Any = None, exception: BaseException | None = None) -> None:
         """Handles the final steps of the evaluation: cleaning up predictions and finishing the main call."""
         if self._is_finalized:
             return
@@ -479,7 +479,7 @@ class EvaluationLogger(BaseModel):
         wc = require_weave_client()
         # Ensure the call is finished even if there was an error during summarize or elsewhere
         try:
-            wc.finish_call(self._evaluate_call, output=output)
+            wc.finish_call(self._evaluate_call, output=output, exception=exception)
         except Exception:
             # Log error but continue cleanup
             logger.error(
@@ -571,7 +571,7 @@ class EvaluationLogger(BaseModel):
 
         self._finalize_evaluation(output=final_summary)
 
-    def finish(self) -> None:
+    def finish(self, exception: BaseException | None = None) -> None:
         """Clean up the evaluation resources explicitly without logging a summary.
 
         Ensures all prediction calls and the main evaluation call are finalized.
@@ -581,7 +581,7 @@ class EvaluationLogger(BaseModel):
             return
 
         # Finalize with None output, indicating closure without summary
-        self._finalize_evaluation(output=None)
+        self._finalize_evaluation(output=None, exception=exception)
 
         # Remove from global registry since we've manually finalized
         if self in _active_evaluation_loggers:
