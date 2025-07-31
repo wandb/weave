@@ -11,9 +11,11 @@
 
 import argparse
 import os
+import sys
 import time
 import uuid
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 from openai import OpenAI
@@ -22,15 +24,10 @@ from rich.table import Table
 
 import weave
 
-from .utils.utils import (
-    calculate_stats,
-    create_basic_table,
-    format_percentage,
-    format_seconds,
-    get_script_dir_path,
-    read_results_from_csv,
-    write_csv_with_headers,
-)
+# This is unfortunate, but needed to make the script runnable both as a uv
+# script and as a helper in the test suite
+sys.path.insert(0, str(Path(__file__).parent))
+from utils import utils
 
 console = Console()
 
@@ -90,7 +87,7 @@ def run_benchmark_without_weave(iterations: int, warmup: int = 3) -> dict[str, f
     console.print("Running without Weave...")
     os.environ["WEAVE_DISABLED"] = "true"
     times = time_function_calls(make_openai_call, iterations, warmup)
-    return calculate_stats(times)
+    return utils.calculate_stats(times)
 
 
 def run_benchmark_with_weave(iterations: int, warmup: int = 3) -> dict[str, float]:
@@ -101,7 +98,7 @@ def run_benchmark_with_weave(iterations: int, warmup: int = 3) -> dict[str, floa
 
     weave.init("benchmark_openai", settings={"print_call_link": False})
     times = time_function_calls(make_openai_call, iterations, warmup)
-    return calculate_stats(times)
+    return utils.calculate_stats(times)
 
 
 def run_multiple_rounds(
@@ -132,7 +129,9 @@ def run_multiple_rounds(
         without_weave_means.append(without_stats["mean"])
 
     # Return aggregated stats
-    return calculate_stats(with_weave_means), calculate_stats(without_weave_means)
+    return utils.calculate_stats(with_weave_means), utils.calculate_stats(
+        without_weave_means
+    )
 
 
 def write_results_to_csv(
@@ -165,7 +164,7 @@ def write_results_to_csv(
             [label, f"{with_val:.6f}", f"{without_val:.6f}", f"{overhead_pct:.2f}"]
         )
 
-    write_csv_with_headers(filename, headers, rows)
+    utils.write_csv_with_headers(filename, headers, rows)
 
 
 def create_results_table(
@@ -186,9 +185,9 @@ def create_results_table(
             rows.append(
                 [
                     row["Metric"],
-                    format_seconds(float(row["Without_Weave_Seconds"])),
-                    format_seconds(float(row["With_Weave_Seconds"])),
-                    format_percentage(overhead_pct),
+                    utils.format_seconds(float(row["Without_Weave_Seconds"])),
+                    utils.format_seconds(float(row["With_Weave_Seconds"])),
+                    utils.format_percentage(overhead_pct),
                 ]
             )
     else:
@@ -214,13 +213,13 @@ def create_results_table(
             rows.append(
                 [
                     label,
-                    format_seconds(without_val),
-                    format_seconds(with_val),
-                    format_percentage(overhead_pct),
+                    utils.format_seconds(without_val),
+                    utils.format_seconds(with_val),
+                    utils.format_percentage(overhead_pct),
                 ]
             )
 
-    return create_basic_table(
+    return utils.create_basic_table(
         "Weave Overhead Benchmark Results",
         headers,
         rows,
@@ -267,7 +266,7 @@ def main() -> None:
             console.print(f"[red]Error: File {args.from_file} does not exist[/red]")
             return
 
-        csv_data = read_results_from_csv(args.from_file)
+        csv_data = utils.read_results_from_csv(args.from_file)
         table = create_results_table(csv_data=csv_data)
         console.print()
         console.print(table)
@@ -275,7 +274,7 @@ def main() -> None:
         mean_row = next(row for row in csv_data if row["Metric"] == "Mean")
         mean_overhead = float(mean_row["Overhead_Percent"])
         console.print(
-            f"\n[bold]Summary:[/bold] Weave adds an average overhead of [yellow]{format_percentage(mean_overhead)}[/yellow] per API call"
+            f"\n[bold]Summary:[/bold] Weave adds an average overhead of [yellow]{utils.format_percentage(mean_overhead)}[/yellow] per API call"
         )
         return
 
@@ -292,11 +291,11 @@ def main() -> None:
 
     if args.out_filetype == "csv":
         # Write to CSV and display from CSV
-        script_dir = get_script_dir_path(__file__)
+        script_dir = utils.get_script_dir_path(__file__)
         csv_filename = os.path.join(script_dir, "basic_openai_logging_results.csv")
         write_results_to_csv(with_weave_stats, without_weave_stats, csv_filename)
 
-        csv_data = read_results_from_csv(csv_filename)
+        csv_data = utils.read_results_from_csv(csv_filename)
         table = create_results_table(csv_data=csv_data)
         console.print()
         console.print(table)
@@ -320,7 +319,7 @@ def main() -> None:
         )
 
     console.print(
-        f"\n[bold]Summary:[/bold] Weave adds an average overhead of [yellow]{format_percentage(mean_overhead)}[/yellow] per API call"
+        f"\n[bold]Summary:[/bold] Weave adds an average overhead of [yellow]{utils.format_percentage(mean_overhead)}[/yellow] per API call"
     )
 
 

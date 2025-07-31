@@ -14,19 +14,16 @@ import subprocess
 import sys
 import uuid
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 from rich.console import Console
 from rich.table import Table
 
-from .utils.utils import (
-    calculate_stats,
-    create_basic_table,
-    format_seconds,
-    get_script_dir_path,
-    read_results_from_csv,
-    write_csv_with_headers,
-)
+# This is unfortunate, but needed to make the script runnable both as a uv
+# script and as a helper in the test suite
+sys.path.insert(0, str(Path(__file__).parent))
+from utils import utils
 
 console = Console()
 
@@ -173,7 +170,8 @@ def write_results_to_csv(results: dict[str, list[float]], filename: str) -> None
     """
     # Calculate stats for each timing type
     stats = {
-        timing_type: calculate_stats(times) for timing_type, times in results.items()
+        timing_type: utils.calculate_stats(times)
+        for timing_type, times in results.items()
     }
 
     # Prepare CSV data
@@ -188,7 +186,7 @@ def write_results_to_csv(results: dict[str, list[float]], filename: str) -> None
             value = stats[timing_type][metric]
             rows.append([timing_type.title(), label, f"{value:.6f}"])
 
-    write_csv_with_headers(filename, headers, rows)
+    utils.write_csv_with_headers(filename, headers, rows)
 
 
 def create_results_table(stats: dict[str, dict[str, float]]) -> Table:
@@ -211,9 +209,9 @@ def create_results_table(stats: dict[str, dict[str, float]]) -> Table:
     for timing_type in ["import", "init", "total"]:
         for metric, label in zip(metrics, metric_labels):
             value = stats[timing_type][metric]
-            rows.append([timing_type.title(), label, format_seconds(value)])
+            rows.append([timing_type.title(), label, utils.format_seconds(value)])
 
-    return create_basic_table(
+    return utils.create_basic_table(
         "Weave Setup Timing Results",
         headers,
         rows,
@@ -230,13 +228,13 @@ def display_summary(stats: dict[str, dict[str, float]]) -> None:
     """
     console.print("\n[bold]Summary:[/bold]")
     console.print(
-        f"  • Import time: [yellow]{format_seconds(stats['import']['mean'])}[/yellow]"
+        f"  • Import time: [yellow]{utils.format_seconds(stats['import']['mean'])}[/yellow]"
     )
     console.print(
-        f"  • Init time: [yellow]{format_seconds(stats['init']['mean'])}[/yellow]"
+        f"  • Init time: [yellow]{utils.format_seconds(stats['init']['mean'])}[/yellow]"
     )
     console.print(
-        f"  • Total time: [yellow]{format_seconds(stats['total']['mean'])}[/yellow]"
+        f"  • Total time: [yellow]{utils.format_seconds(stats['total']['mean'])}[/yellow]"
     )
 
 
@@ -289,7 +287,7 @@ def main() -> None:
             console.print(f"[red]Error: File {args.from_file} does not exist[/red]")
             return
 
-        csv_data = read_results_from_csv(args.from_file)
+        csv_data = utils.read_results_from_csv(args.from_file)
         stats = get_stats_from_csv(csv_data)
     else:
         # Run the benchmark
@@ -298,13 +296,13 @@ def main() -> None:
 
         results = run_benchmark_iterations(args.iterations)
         stats = {
-            timing_type: calculate_stats(times)
+            timing_type: utils.calculate_stats(times)
             for timing_type, times in results.items()
         }
 
         if args.out_filetype == "csv":
             # Write results to CSV in the same directory as the script
-            script_dir = get_script_dir_path(__file__)
+            script_dir = utils.get_script_dir_path(__file__)
             csv_filename = os.path.join(script_dir, "weave_setup_time_results.csv")
             write_results_to_csv(results, csv_filename)
 
