@@ -1,4 +1,44 @@
 {
+  "Qwen/Qwen3-235B-A22B-Instruct-2507": {
+    "litellm_provider": "coreweave",
+    "api_key_name": "WANDB_API_KEY"
+  },
+  "Qwen/Qwen3-Coder-480B-A35B-Instruct": {
+    "litellm_provider": "coreweave",
+    "api_key_name": "WANDB_API_KEY"
+  },
+  "Qwen/Qwen3-235B-A22B-Thinking-2507": {
+    "litellm_provider": "coreweave",
+    "api_key_name": "WANDB_API_KEY"
+  },
+  "moonshotai/Kimi-K2-Instruct": {
+    "litellm_provider": "coreweave",
+    "api_key_name": "WANDB_API_KEY"
+  },
+  "meta-llama/Llama-3.1-8B-Instruct": {
+    "litellm_provider": "coreweave",
+    "api_key_name": "WANDB_API_KEY"
+  },
+  "deepseek-ai/DeepSeek-R1-0528": {
+    "litellm_provider": "coreweave",
+    "api_key_name": "WANDB_API_KEY"
+  },
+  "deepseek-ai/DeepSeek-V3-0324": {
+    "litellm_provider": "coreweave",
+    "api_key_name": "WANDB_API_KEY"
+  },
+  "meta-llama/Llama-3.3-70B-Instruct": {
+    "litellm_provider": "coreweave",
+    "api_key_name": "WANDB_API_KEY"
+  },
+  "meta-llama/Llama-4-Scout-17B-16E-Instruct": {
+    "litellm_provider": "coreweave",
+    "api_key_name": "WANDB_API_KEY"
+  },
+  "microsoft/Phi-4-mini-instruct": {
+    "litellm_provider": "coreweave",
+    "api_key_name": "WANDB_API_KEY"
+  },
   "omni-moderation-latest": {
     "litellm_provider": "openai",
     "api_key_name": "OPENAI_API_KEY"
@@ -212,6 +252,10 @@
     "api_key_name": "OPENAI_API_KEY"
   },
   "gpt-4o-realtime-preview-2024-12-17": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "gpt-4o-realtime-preview-2025-06-03": {
     "litellm_provider": "openai",
     "api_key_name": "OPENAI_API_KEY"
   },
@@ -891,6 +935,22 @@
     "litellm_provider": "azure",
     "api_key_name": "AZURE_API_KEY"
   },
+  "azure_ai/grok-3": {
+    "litellm_provider": "azure_ai",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure_ai/global/grok-3": {
+    "litellm_provider": "azure_ai",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure_ai/global/grok-3-mini": {
+    "litellm_provider": "azure_ai",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure_ai/grok-3-mini": {
+    "litellm_provider": "azure_ai",
+    "api_key_name": "AZURE_API_KEY"
+  },
   "azure_ai/deepseek-r1": {
     "litellm_provider": "azure_ai",
     "api_key_name": "AZURE_API_KEY"
@@ -904,6 +964,10 @@
     "api_key_name": "AZURE_API_KEY"
   },
   "azure_ai/jamba-instruct": {
+    "litellm_provider": "azure_ai",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure_ai/jais-30b-chat": {
     "litellm_provider": "azure_ai",
     "api_key_name": "AZURE_API_KEY"
   },
@@ -1375,11 +1439,11 @@
     "litellm_provider": "groq",
     "api_key_name": "GROQ_API_KEY"
   },
-  "groq/qwen-qwq-32b": {
+  "groq/qwen/qwen3-32b": {
     "litellm_provider": "groq",
     "api_key_name": "GROQ_API_KEY"
   },
-  "groq/moonshotai-kimi-k2-instruct": {
+  "groq/moonshotai/kimi-k2-instruct": {
     "litellm_provider": "groq",
     "api_key_name": "GROQ_API_KEY"
   },
@@ -1399,14 +1463,6 @@
     "litellm_provider": "groq",
     "api_key_name": "GROQ_API_KEY"
   },
-  "claude-2": {
-    "litellm_provider": "anthropic",
-    "api_key_name": "ANTHROPIC_API_KEY"
-  },
-  "claude-2.1": {
-    "litellm_provider": "anthropic",
-    "api_key_name": "ANTHROPIC_API_KEY"
-  },
   "claude-3-haiku-20240307": {
     "litellm_provider": "anthropic",
     "api_key_name": "ANTHROPIC_API_KEY"
@@ -1424,10 +1480,6 @@
     "api_key_name": "ANTHROPIC_API_KEY"
   },
   "claude-3-opus-20240229": {
-    "litellm_provider": "anthropic",
-    "api_key_name": "ANTHROPIC_API_KEY"
-  },
-  "claude-3-sonnet-20240229": {
     "litellm_provider": "anthropic",
     "api_key_name": "ANTHROPIC_API_KEY"
   },
@@ -1479,6 +1531,10 @@
     "litellm_provider": "gemini",
     "api_key_name": "GEMINI_API_KEY"
   },
+  "gemini/gemini-2.0-flash-live-001": {
+    "litellm_provider": "gemini",
+    "api_key_name": "GEMINI_API_KEY"
+  },
   "gemini/gemini-2.5-flash-preview-tts": {
     "litellm_provider": "gemini",
     "api_key_name": "GEMINI_API_KEY"
@@ -1492,6 +1548,10 @@
     "api_key_name": "GEMINI_API_KEY"
   },
   "gemini/gemini-2.5-flash-lite-preview-06-17": {
+    "litellm_provider": "gemini",
+    "api_key_name": "GEMINI_API_KEY"
+  },
+  "gemini/gemini-2.5-flash-lite": {
     "litellm_provider": "gemini",
     "api_key_name": "GEMINI_API_KEY"
   },
@@ -1632,6 +1692,30 @@
     "api_key_name": "GEMINI_API_KEY"
   },
   "gemini/gemini-gemma-2-9b-it": {
+    "litellm_provider": "gemini",
+    "api_key_name": "GEMINI_API_KEY"
+  },
+  "gemini/imagen-4.0-generate-preview-06-06": {
+    "litellm_provider": "gemini",
+    "api_key_name": "GEMINI_API_KEY"
+  },
+  "gemini/imagen-4.0-ultra-generate-preview-06-06": {
+    "litellm_provider": "gemini",
+    "api_key_name": "GEMINI_API_KEY"
+  },
+  "gemini/imagen-4.0-fast-generate-preview-06-06": {
+    "litellm_provider": "gemini",
+    "api_key_name": "GEMINI_API_KEY"
+  },
+  "gemini/imagen-3.0-generate-002": {
+    "litellm_provider": "gemini",
+    "api_key_name": "GEMINI_API_KEY"
+  },
+  "gemini/imagen-3.0-generate-001": {
+    "litellm_provider": "gemini",
+    "api_key_name": "GEMINI_API_KEY"
+  },
+  "gemini/imagen-3.0-fast-generate-001": {
     "litellm_provider": "gemini",
     "api_key_name": "GEMINI_API_KEY"
   },
@@ -2396,6 +2480,86 @@
     "api_key_name": "BEDROCK_API_KEY"
   },
   "stability.stable-image-ultra-v1:1": {
+    "litellm_provider": "bedrock",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "bedrock/us-gov-east-1/amazon.titan-embed-text-v1": {
+    "litellm_provider": "bedrock",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "bedrock/us-gov-east-1/amazon.titan-embed-text-v2:0": {
+    "litellm_provider": "bedrock",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "bedrock/us-gov-east-1/amazon.titan-text-express-v1": {
+    "litellm_provider": "bedrock",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "bedrock/us-gov-east-1/amazon.titan-text-lite-v1": {
+    "litellm_provider": "bedrock",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "bedrock/us-gov-east-1/amazon.titan-text-premier-v1:0": {
+    "litellm_provider": "bedrock",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "bedrock/us-gov-east-1/anthropic.claude-3-5-sonnet-20240620-v1:0": {
+    "litellm_provider": "bedrock",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "bedrock/us-gov-east-1/anthropic.claude-3-haiku-20240307-v1:0": {
+    "litellm_provider": "bedrock",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "bedrock/us-gov-east-1/meta.llama3-70b-instruct-v1:0": {
+    "litellm_provider": "bedrock",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "bedrock/us-gov-east-1/meta.llama3-8b-instruct-v1:0": {
+    "litellm_provider": "bedrock",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "bedrock/us-gov-west-1/amazon.titan-embed-text-v1": {
+    "litellm_provider": "bedrock",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "bedrock/us-gov-west-1/amazon.titan-embed-text-v2:0": {
+    "litellm_provider": "bedrock",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "bedrock/us-gov-west-1/amazon.titan-text-express-v1": {
+    "litellm_provider": "bedrock",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "bedrock/us-gov-west-1/amazon.titan-text-lite-v1": {
+    "litellm_provider": "bedrock",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "bedrock/us-gov-west-1/amazon.titan-text-premier-v1:0": {
+    "litellm_provider": "bedrock",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "bedrock/us-gov-west-1/anthropic.claude-3-5-sonnet-20240620-v1:0": {
+    "litellm_provider": "bedrock",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "bedrock/us-gov-west-1/anthropic.claude-3-haiku-20240307-v1:0": {
+    "litellm_provider": "bedrock",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "bedrock/us-gov-west-1/meta.llama3-70b-instruct-v1:0": {
+    "litellm_provider": "bedrock",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "bedrock/us-gov-west-1/meta.llama3-8b-instruct-v1:0": {
+    "litellm_provider": "bedrock",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "bedrock/us-gov-east-1/amazon.nova-pro-v1:0": {
+    "litellm_provider": "bedrock",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "bedrock/us-gov-west-1/amazon.nova-pro-v1:0": {
     "litellm_provider": "bedrock",
     "api_key_name": "BEDROCK_API_KEY"
   }

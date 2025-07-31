@@ -53,6 +53,10 @@ from weave.trace_server.trace_server_interface_util import (
     str_digest,
 )
 from weave.trace_server.validation import object_id_validator
+from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker import (
+    EvaluateModelArgs,
+    EvaluateModelDispatcher,
+)
 
 _conn_cursor: contextvars.ContextVar[
     Optional[tuple[sqlite3.Connection, sqlite3.Cursor]]
@@ -73,9 +77,14 @@ def get_conn_cursor(db_path: str) -> tuple[sqlite3.Connection, sqlite3.Cursor]:
 
 
 class SqliteTraceServer(tsi.TraceServerInterface):
-    def __init__(self, db_path: str):
+    def __init__(
+        self,
+        db_path: str,
+        evaluate_model_dispatcher: Optional[EvaluateModelDispatcher] = None,
+    ):
         self.lock = threading.Lock()
         self.db_path = db_path
+        self._evaluate_model_dispatcher = evaluate_model_dispatcher
 
     def drop_tables(self) -> None:
         conn, cursor = get_conn_cursor(self.db_path)
@@ -1534,9 +1543,21 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             )
 
     def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
-        raise NotImplementedError(
-            "evaluate_model is not implemented for SQLite trace server"
+        if self._evaluate_model_dispatcher is None:
+            raise ValueError("Evaluate model dispatcher is not set")
+        if req.wb_user_id is None:
+            raise ValueError("wb_user_id is required")
+        call_id = generate_id()
+        self._evaluate_model_dispatcher.dispatch(
+            EvaluateModelArgs(
+                project_id=req.project_id,
+                evaluation_ref=req.evaluation_ref,
+                model_ref=req.model_ref,
+                wb_user_id=req.wb_user_id,
+                evaluation_call_id=call_id,
+            )
         )
+        return tsi.EvaluateModelRes(call_id=call_id)
 
     def evaluation_status(
         self, req: tsi.EvaluationStatusReq
