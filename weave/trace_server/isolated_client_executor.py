@@ -36,7 +36,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import multiprocessing
-import sys
 import time
 from collections.abc import Awaitable, Coroutine
 from contextlib import contextmanager
@@ -101,7 +100,7 @@ class IsolatedClientExecutorTimeoutError(IsolatedClientExecutorError):
 
 class IsolatedClientExecutor:
     """
-    Execute functions on behalf of a user in an isolated process.
+    Execute functions within an isolated client context.
 
     This class provides a secure way to execute user code in a separate process
     with proper WeaveClient initialization and cleanup. It accepts a client factory
