@@ -115,6 +115,7 @@ def init_weave(
         wandb_context_module.init()
         wandb_context = wandb_context_module.get_wandb_api_context()
 
+    # Resolve entity name after authentication is ensured
     entity_name, project_name = get_entity_project_from_project_name(project_name)
     wandb_run_id = weave_client.safe_current_wb_run_id()
     weave_client.check_wandb_run_matches(wandb_run_id, entity_name, project_name)

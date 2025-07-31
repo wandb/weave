@@ -70,7 +70,7 @@ def reset_wandb_api_context(token: Token[WandbApiContext | None]) -> None:
 
 
 def get_wandb_api_context() -> WandbApiContext | None:
-    return _wandb_api_context.get()
+    return _wandb_api_context.get(None)
 
 
 def init() -> Token[WandbApiContext | None] | None:

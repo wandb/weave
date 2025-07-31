@@ -43,19 +43,23 @@ def _ensure_project_exists(entity_name: str, project_name: str) -> dict[str, str
     api = wandb.Api()
 
     # Check if the project already exists
-    project = api.project(entity_name, project_name)
-    if project is not None:
-        return _format_project_result(project)
+    project_response = api.project(entity_name, project_name)
+    if project_response is not None and project_response.get("project") is not None:
+        return _format_project_result(project_response["project"])
 
     # Try to create the project
     exception = None
     try:
-        project = api.upsert_project(entity=entity_name, project=project_name)
+        project_response = api.upsert_project(entity=entity_name, project=project_name)
     except Exception as e:
         exception = e
 
-    if project is not None:
-        return _format_project_result(project)
+    if (
+        project_response is not None
+        and project_response.get("upsertModel") is not None
+        and project_response["upsertModel"].get("model") is not None
+    ):
+        return _format_project_result(project_response["upsertModel"]["model"])
 
     # Project creation failed
     if exception is None:
