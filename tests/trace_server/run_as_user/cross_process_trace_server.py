@@ -509,8 +509,8 @@ class CrossProcessTraceServerReceiver:
                         timeout=WORKER_LOOP_TIMEOUT_SECONDS
                     )
                 except Empty:
-                    # Timeout, check stop event and continue
-                    continue  # Timeout, check stop event and continue
+                    # Timeout, just continue (re-enters loop)
+                    continue
 
                 # Check for stop signal
                 if request_item.request_id == STOP_SIGNAL:
