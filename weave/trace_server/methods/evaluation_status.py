@@ -36,20 +36,25 @@ def evaluation_status(
 
     # determine completed rows (children complete)
     children_stats = server.calls_query_stats(
-        tsi.CallsQueryReq(  
+        tsi.CallsQueryReq(
             project_id=req.project_id,
             filter=tsi.CallsFilter(
                 parent_ids=[req.call_id],
             ),
-            query=tsi.Query.model_validate({
-                        "$expr": {
-                            "$not": [{
+            query=tsi.Query.model_validate(
+                {
+                    "$expr": {
+                        "$not": [
+                            {
                                 "$eq": [
-                                {"$getField": "summary.weave.status"},
-                                {"$literal": tsi.TraceStatus.RUNNING},
+                                    {"$getField": "summary.weave.status"},
+                                    {"$literal": tsi.TraceStatus.RUNNING},
                                 ]
-                            }]}}
-                    ),
+                            }
+                        ]
+                    }
+                }
+            ),
         ),
     )
 
