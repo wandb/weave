@@ -32,7 +32,6 @@ This approach allows for more flexible runtime configuration while still respect
 import datetime
 import json
 import logging
-from collections import defaultdict
 from contextlib import contextmanager
 from contextvars import ContextVar
 from uuid import UUID
@@ -42,12 +41,11 @@ from weave.integrations.integration_utilities import (
     make_pythonic_function_name,
     truncate_op_name,
 )
+from weave.integrations.langchain.helpers import _extract_usage_data
 from weave.integrations.patcher import Patcher
 from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.weave_client import Call
-from weave.trace_server.trace_server_interface import LLMUsageSchema
-from weave.utils.dict_utils import convert_defaultdict_to_dict, safe_get
 
 import_failed = False
 
@@ -61,7 +59,7 @@ except ImportError:
     import_failed = True
 
 from collections.abc import Generator
-from typing import Any, Optional, Union
+from typing import Any, Optional
 
 RUNNABLE_SEQUENCE_NAME = "RunnableSequence"
 
@@ -369,182 +367,6 @@ else:
 
     class WeaveTracer:  # type: ignore
         pass
-
-
-ModelName = str
-
-
-def _extract_usage_data(call: Call, output: Any) -> None:
-    """Extract usage data from the output of a call.
-
-    Args:
-        call: The call that finished
-        output: The output of the call
-    """
-    usage: Union[dict[ModelName, LLMUsageSchema], None] = None
-    if output is not None and "outputs" in output and len(output["outputs"]) > 0:
-        first_output = output["outputs"][0]
-        if (
-            (message := safe_get(first_output, ["output"]))
-            and hasattr(message, "response_metadata")
-            and safe_get(message.response_metadata, ["token_usage"])
-        ):
-            # LangChain AIMessage response format
-            usage = _extract_chat_message_usage(message.response_metadata)
-        elif (generations := safe_get(first_output, ["generations"])) and (
-            len(generations) > 0
-            and len(generations[0]) > 0
-            and safe_get(
-                generations[0][0],
-                ["message", "kwargs", "response_metadata", "token_usage"],
-            )
-        ):
-            # openai response format
-            usage = _extract_openai_usage(output)
-        elif (generations := safe_get(first_output, ["generations"])) and (
-            len(generations) > 0
-            and len(generations[0]) > 0
-            and safe_get(
-                generations[0][0],
-                ["message", "kwargs", "response_metadata", "usage_metadata"],
-            )
-        ):
-            # google vertexai response format
-            usage = _extract_google_vertexai_usage(output)
-        elif (generations := safe_get(first_output, ["generations"])) and (
-            len(generations) > 0
-            and len(generations[0]) > 0
-            and (
-                safe_get(generations[0][0], ["message", "kwargs", "usage_metadata"])
-                or safe_get(generations[0][0], ["generation_info", "usage_metadata"])
-            )
-        ):
-            usage = _extract_google_genai_usage(output)
-
-    if usage is not None:
-        if call.summary is None:
-            call.summary = {}
-        call.summary.update({"usage": usage})
-
-
-def _extract_openai_usage(output: dict) -> dict[ModelName, LLMUsageSchema]:
-    usage: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
-
-    for output_item in output["outputs"]:
-        for generation_list in output_item["generations"]:
-            for generation in generation_list:
-                response_metadata = generation["message"]["kwargs"]["response_metadata"]
-                model = response_metadata["model_name"]
-                usage_metadata = response_metadata["token_usage"]
-
-                usage[model]["prompt_tokens"] += usage_metadata.get("prompt_tokens", 0)
-                usage[model]["completion_tokens"] += usage_metadata.get(
-                    "completion_tokens", 0
-                )
-                usage[model]["total_tokens"] += usage_metadata.get("total_tokens", 0)
-
-    return convert_defaultdict_to_dict(usage)
-
-
-def _extract_google_vertexai_usage(output: dict) -> dict[ModelName, LLMUsageSchema]:
-    usage: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
-
-    for output_item in output["outputs"]:
-        for generation_list in output_item["generations"]:
-            for generation in generation_list:
-                response_metadata = generation["message"]["kwargs"]["response_metadata"]
-                model = response_metadata["model_name"]
-                usage_metadata = response_metadata["usage_metadata"]
-
-                usage[model]["prompt_tokens"] += usage_metadata.get(
-                    "prompt_token_count", 0
-                )
-                usage[model]["completion_tokens"] += usage_metadata.get(
-                    "candidates_token_count", 0
-                )
-                usage[model]["total_tokens"] += usage_metadata.get(
-                    "total_token_count", 0
-                )
-
-    return convert_defaultdict_to_dict(usage)
-
-
-def _extract_google_genai_usage(output: dict) -> dict[ModelName, LLMUsageSchema]:
-    """
-    Extract token usage data from Google GenAI LangChain responses.
-
-    Google GenAI can return usage metadata in two different response formats:
-
-    Format 1 (Current): generations[i][j]["message"]["kwargs"]["usage_metadata"]
-    - Usage data is stored in the message kwargs
-    - Model name comes from generation_info["model_name"]
-    - This is the format used by newer versions of langchain-google-genai
-
-    Format 2 (Legacy): generations[i][j]["generation_info"]["usage_metadata"]
-    - Usage data is stored directly in generation_info
-    - Model name also comes from generation_info["model_name"]
-    - This format is maintained for backwards compatibility
-
-    Token Mapping:
-    Google GenAI uses different token field names than the standard LLM schema:
-    - "input_tokens" -> "prompt_tokens"
-    - "output_tokens" -> "completion_tokens"
-    - "total_tokens" -> "total_tokens" (unchanged)
-
-    Accumulation Logic:
-    The function iterates through all output items and generations to accumulate
-    token counts per model. This handles batch operations where multiple
-    generations may be produced from a single LLM call.
-    """
-    usage: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
-
-    for output_item in output["outputs"]:
-        for generation_list in output_item["generations"]:
-            for generation in generation_list:
-                model = "unknown"
-                usage_metadata = None
-
-                message_kwargs = safe_get(generation, ["message", "kwargs"])
-                if message_kwargs and "usage_metadata" in message_kwargs:
-                    usage_metadata = message_kwargs["usage_metadata"]
-                    generation_info = generation.get("generation_info", {})
-                    model = generation_info.get("model_name", "unknown")
-
-                elif (
-                    "generation_info" in generation
-                    and "usage_metadata" in generation["generation_info"]
-                ):
-                    generation_info = generation["generation_info"]
-                    model = generation_info["model_name"]
-                    usage_metadata = generation_info["usage_metadata"]
-
-                if usage_metadata:
-                    usage[model]["prompt_tokens"] += usage_metadata.get(
-                        "input_tokens", 0
-                    )
-                    usage[model]["completion_tokens"] += usage_metadata.get(
-                        "output_tokens", 0
-                    )
-                    usage[model]["total_tokens"] += usage_metadata.get(
-                        "total_tokens", 0
-                    )
-
-    return convert_defaultdict_to_dict(usage)
-
-
-def _extract_chat_message_usage(
-    response_metadata: dict,
-) -> dict[ModelName, LLMUsageSchema]:
-    usage: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
-
-    model = safe_get(response_metadata, ["model_name"]) or "unknown"
-    token_usage = safe_get(response_metadata, ["token_usage"]) or {}
-
-    usage[model]["prompt_tokens"] += token_usage.get("prompt_tokens", 0)
-    usage[model]["completion_tokens"] += token_usage.get("completion_tokens", 0)
-    usage[model]["total_tokens"] += token_usage.get("total_tokens", 0)
-
-    return convert_defaultdict_to_dict(usage)
 
 
 weave_tracing_callback_var: ContextVar[Optional[WeaveTracer]] = ContextVar(
