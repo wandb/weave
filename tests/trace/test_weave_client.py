@@ -3556,4 +3556,4 @@ def test_get_evaluations(client, make_evals):
     assert evs[0].dataset.rows[0] == {"dataset_id": "def"}
 
     assert evs[1].ref.uri() == ref2.uri()
-    assert evs[1].dataset.rows[1] == {"dataset_id": "jkl"}
+    assert evs[1].dataset.rows[0] == {"dataset_id": "jkl"}
