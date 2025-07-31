@@ -331,6 +331,7 @@ class CompletionsCreateRequestInputs(BaseModel):
     modalities: Optional[list] = None
     presence_penalty: Optional[float] = None
     frequency_penalty: Optional[float] = None
+    stream: Optional[bool] = None
     logit_bias: Optional[dict] = None
     user: Optional[str] = None
     # openai v1.0+ new params
@@ -1110,6 +1111,11 @@ class ThreadsQueryFilter(BaseModel):
         default=None,
         description="Only include threads with last_updated before this timestamp",
         examples=["2024-12-31T23:59:59Z"],
+    )
+    thread_ids: Optional[list[str]] = Field(
+        default=None,
+        description="Only include threads with thread_ids in this list",
+        examples=[["thread_1", "thread_2", "my_thread_id"]],
     )
 
 

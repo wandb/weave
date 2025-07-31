@@ -5,23 +5,15 @@ import dataclasses
 import datetime
 import json
 import logging
-import numbers
 import os
 import platform
 import re
 import sys
 import time
-from collections import defaultdict
 from collections.abc import Sequence
 from concurrent.futures import Future
 from functools import cached_property
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Callable,
-    TypedDict,
-    cast,
-)
+from typing import TYPE_CHECKING, Any, Callable, TypedDict, cast
 
 import pydantic
 from requests import HTTPError
@@ -136,6 +128,8 @@ from weave.trace_server.trace_server_interface import (
     TraceServerInterface,
     TraceStatus,
 )
+from weave.utils.attributes_dict import AttributesDict
+from weave.utils.dict_utils import sum_dict_leaves, zip_dicts
 from weave.utils.paginated_iterator import PaginatedIterator
 
 if TYPE_CHECKING:
@@ -169,6 +163,7 @@ def _make_calls_iterator(
     include_feedback: bool = False,
     columns: list[str] | None = None,
     expand_columns: list[str] | None = None,
+    return_expanded_column_values: bool = True,
     page_size: int = DEFAULT_CALLS_PAGE_SIZE,
 ) -> CallsIter:
     def fetch_func(offset: int, limit: int) -> list[CallSchema]:
@@ -191,6 +186,7 @@ def _make_calls_iterator(
                     sort_by=sort_by,
                     columns=columns,
                     expand_columns=expand_columns,
+                    return_expanded_column_values=return_expanded_column_values,
                 )
             )
         )
@@ -309,6 +305,13 @@ def map_to_refs(obj: Any) -> Any:
         # above with `_get_direct_ref`
         return _remove_empty_ref(obj.map_values(map_to_refs))
     elif isinstance(obj, (pydantic.BaseModel, pydantic.v1.BaseModel)):
+        # Check if this object has a custom serializer registered
+        from weave.trace.serialization.serializer import get_serializer_for_obj
+
+        if get_serializer_for_obj(obj) is not None:
+            # If it has a custom serializer, don't convert to ObjectRecord
+            # Let the serialization layer handle it
+            return obj
         obj_record = pydantic_object_record(obj)
         # Here, we expect ref to be empty since it would have short circuited
         # above with `_get_direct_ref`
@@ -345,13 +348,13 @@ class CallDict(TypedDict):
     trace_id: str
     project_id: str
     parent_id: str | None
-    inputs: dict
+    inputs: dict[str, Any]
     id: str | None
     output: Any
     exception: str | None
-    summary: dict | None
+    summary: dict[str, Any] | None
     display_name: str | None
-    attributes: dict | None
+    attributes: dict[str, Any] | None
     started_at: datetime.datetime | None
     ended_at: datetime.datetime | None
     deleted_at: datetime.datetime | None
@@ -375,13 +378,13 @@ class Call:
     trace_id: str
     project_id: str
     parent_id: str | None
-    inputs: dict
+    inputs: dict[str, Any]
     id: str | None = None
     output: Any = None
     exception: str | None = None
-    summary: dict | None = dataclasses.field(default_factory=dict)
+    summary: dict[str, Any] | None = dataclasses.field(default_factory=dict)
     _display_name: str | Callable[[Call], str] | None = None
-    attributes: dict | None = None
+    attributes: dict[str, Any] | None = None
     started_at: datetime.datetime | None = None
     ended_at: datetime.datetime | None = None
     deleted_at: datetime.datetime | None = None
@@ -522,7 +525,9 @@ class Call:
         self.set_display_name(None)
 
     async def apply_scorer(
-        self, scorer: Op | Scorer, additional_scorer_kwargs: dict | None = None
+        self,
+        scorer: Op | Scorer,
+        additional_scorer_kwargs: dict[str, Any] | None = None,
     ) -> ApplyScorerResult:
         """
         `apply_scorer` is a method that applies a Scorer to a Call. This is useful
@@ -636,129 +641,8 @@ def make_client_call(
     return WeaveObject(call, ref, server, None)
 
 
-def sum_dict_leaves(dicts: list[dict]) -> dict:
-    """Recursively combines multiple dictionaries by summing their leaf values.
-
-    This function takes a list of dictionaries and combines them by:
-    1. For non-dict values: extending lists or summing numbers
-    2. For nested dictionaries: recursively combining them
-
-    Args:
-        dicts: A list of dictionaries to combine
-
-    Returns:
-        A single dictionary with combined values
-
-    Examples:
-        >>> # Combining status counts from multiple runs
-        >>> dicts = [
-        ...     {"status_counts": {"SUCCESS": 5, "FAILED": 1}},
-        ...     {"status_counts": {"SUCCESS": 3, "FAILED": 2, "PENDING": 1}}
-        ... ]
-        >>> sum_dict_leaves(dicts)
-        {'status_counts': {'SUCCESS': 8, 'FAILED': 3, 'PENDING': 1}}
-
-        >>> # Combining metrics with nested structure
-        >>> dicts = [
-        ...     {"metrics": {"accuracy": 0.95, "loss": 0.1, "details": {"precision": 0.9, "recall": 0.8}}},
-        ...     {"metrics": {"accuracy": 0.97, "loss": 0.08, "details": {"precision": 0.92, "f1": 0.85}}}
-        ... ]
-        >>> sum_dict_leaves(dicts)
-        {'metrics': {'accuracy': 1.92, 'loss': 0.18, 'details': {'precision': 1.82, 'recall': 0.8, 'f1': 0.85}}}
-    """
-    nested_dicts: dict[str, list[dict]] = defaultdict(list)
-    result: dict[str, Any] = defaultdict(list)
-
-    # First, collect all nested dictionaries by key
-    for d in dicts:
-        for k, v in d.items():
-            if isinstance(v, dict):
-                nested_dicts[k].append(v)
-            elif v is not None:
-                if isinstance(v, list):
-                    result[k].extend(v)
-                else:
-                    result[k].append(v)
-
-    # Sum those values that are numbers
-    for k, values in result.items():
-        # we only sum numbers if we are not going to combine nested dicts later
-        if k not in nested_dicts and all(isinstance(v, numbers.Number) for v in values):
-            result[k] = sum(values)
-
-    # Then recursively sum each collection of nested dictionaries
-    for k in nested_dicts.keys():
-        result[k] = sum_dict_leaves(nested_dicts[k])
-
-    return result
-
-
 RESERVED_SUMMARY_USAGE_KEY = "usage"
 RESERVED_SUMMARY_STATUS_COUNTS_KEY = "status_counts"
-
-
-class WeaveKeyDict(dict):
-    """A dict representing the 'weave' subdictionary of a call's attributes.
-
-    This dictionary is not intended to be set directly.
-    """
-
-    def __setitem__(self, key: Any, value: Any) -> None:
-        raise KeyError("Cannot modify `weave` dict directly -- for internal use only!")
-
-
-class AttributesDict(dict):
-    """A dict representing the attributes of a call.
-
-    The ``weave`` key is reserved for internal use and cannot be set directly.
-    Attributes become immutable once the call is created. Any attempt to modify
-    the dictionary after call start will raise :class:`TypeError`. Use the
-    :func:`weave.attributes` context manager or the ``attributes`` parameter of
-    :meth:`WeaveClient.create_call` to supply metadata before the call begins.
-    """
-
-    def __init__(self, **kwargs: Any) -> None:
-        super().__init__()
-        dict.__setitem__(self, "weave", WeaveKeyDict())
-
-        self._frozen = False
-
-        if kwargs:
-            for key, value in kwargs.items():
-                if key == "weave":
-                    if isinstance(value, dict):
-                        for subkey, subvalue in value.items():
-                            self._set_weave_item(subkey, subvalue)
-                else:
-                    self[key] = value
-
-    def freeze(self) -> None:
-        self._frozen = True
-
-    def __setitem__(self, key: Any, value: Any) -> None:
-        if self.__dict__.get("_frozen", False):
-            raise TypeError("Cannot modify attributes after call start")
-        if key == "weave":
-            raise KeyError("Cannot set 'weave' directly -- for internal use only!")
-        super().__setitem__(key, value)
-
-    def __delitem__(self, key: Any) -> None:
-        if self.__dict__.get("_frozen", False):
-            raise TypeError("Cannot modify attributes after call start")
-        super().__delitem__(key)
-
-    def update(self, *args: Any, **kwargs: Any) -> None:  # type: ignore[override]
-        if self.__dict__.get("_frozen", False):
-            raise TypeError("Cannot modify attributes after call start")
-        for k, v in dict(*args, **kwargs).items():
-            self[k] = v
-
-    def _set_weave_item(self, subkey: Any, value: Any) -> None:
-        """Internal method to set items in the 'weave' subdictionary."""
-        dict.__setitem__(self["weave"], subkey, value)
-
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}({super().__repr__()})"
 
 
 BACKGROUND_PARALLELISM_MIX = 0.5
@@ -932,6 +816,7 @@ class WeaveClient:
         include_feedback: bool = False,
         columns: list[str] | None = None,
         expand_columns: list[str] | None = None,
+        return_expanded_column_values: bool = True,
         scored_by: str | list[str] | None = None,
         page_size: int = DEFAULT_CALLS_PAGE_SIZE,
     ) -> CallsIter:
@@ -988,6 +873,7 @@ class WeaveClient:
             include_feedback=include_feedback,
             columns=columns,
             expand_columns=expand_columns,
+            return_expanded_column_values=return_expanded_column_values,
             page_size=page_size,
         )
 
@@ -1049,12 +935,13 @@ class WeaveClient:
     def create_call(
         self,
         op: str | Op,
-        inputs: dict,
+        inputs: dict[str, Any],
         parent: Call | None = None,
-        attributes: dict | None = None,
+        attributes: dict[str, Any] | None = None,
         display_name: str | Callable[[Call], str] | None = None,
         *,
         use_stack: bool = True,
+        _call_id_override: str | None = None,
     ) -> Call:
         """Create, log, and push a call onto the runtime stack.
 
@@ -1129,7 +1016,7 @@ class WeaveClient:
         thread_id = call_context.get_thread_id()
         current_turn_id = call_context.get_turn_id()
 
-        call_id = generate_id()
+        call_id = _call_id_override or generate_id()
 
         # Determine turn_id: call becomes a turn if thread boundary is crossed
         if thread_id is None:
@@ -1271,7 +1158,7 @@ class WeaveClient:
         call.output = postprocessed_output
 
         # Summary handling
-        computed_summary: dict = {}
+        computed_summary: dict[str, Any] = {}
         if call._children:
             computed_summary = sum_dict_leaves(
                 [child.summary or {} for child in call._children]
@@ -1315,7 +1202,7 @@ class WeaveClient:
         # Merge any user-provided summary values with computed values
         merged_summary = copy.deepcopy(call.summary or {})
 
-        def _deep_update(dst: dict, src: dict) -> None:
+        def _deep_update(dst: dict[str, Any], src: dict[str, Any]) -> None:
             for k, v in src.items():
                 if isinstance(v, dict) and isinstance(dst.get(k), dict):
                     _deep_update(dst[k], v)
@@ -2384,7 +2271,7 @@ def check_wandb_run_matches(
             )
 
 
-def _build_anonymous_op(name: str, config: dict | None = None) -> Op:
+def _build_anonymous_op(name: str, config: dict[str, Any] | None = None) -> Op:
     if config is None:
 
         def op_fn(*args, **kwargs):  # type: ignore
@@ -2457,27 +2344,6 @@ def elide_display_name(name: str) -> str:
         )
         return name[: MAX_DISPLAY_NAME_LENGTH - 3] + "..."
     return name
-
-
-def zip_dicts(base_dict: dict, new_dict: dict) -> dict:
-    final_dict = {}
-    for key, value in base_dict.items():
-        if key in new_dict:
-            # Shared key (if both dicts, merge)
-            new_value = new_dict[key]
-            if isinstance(value, dict) and isinstance(new_value, dict):
-                final_dict[key] = zip_dicts(value, new_value)
-            else:
-                # base-only key
-                final_dict[key] = new_value
-        else:
-            final_dict[key] = value
-    for key, value in new_dict.items():
-        if key not in base_dict:
-            # new-only key
-            final_dict[key] = value
-
-    return final_dict
 
 
 __docspec__ = [WeaveClient, Call, CallsIter]
