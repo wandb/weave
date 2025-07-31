@@ -204,7 +204,7 @@ class IsolatedClientExecutor:
 
         exception = None
         result = None
-        
+
         try:
             result = await self._execute_with_timeout(func, request, effective_timeout)
         except Exception as e:
