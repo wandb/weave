@@ -41,7 +41,7 @@ from collections.abc import Awaitable, Coroutine, Generator
 from contextlib import contextmanager
 from multiprocessing.context import SpawnProcess
 from multiprocessing.queues import Queue
-from typing import TYPE_CHECKING, Any, Callable, TypeVar, Union, overload
+from typing import TYPE_CHECKING, Any, Callable, Optional, TypeVar, Union, overload
 
 from pydantic import BaseModel
 
@@ -78,7 +78,7 @@ AsyncCallable = Callable[[T], Awaitable[R]]
 AnyCallable = Union[SyncCallable[T, R], AsyncCallable[T, R]]
 
 # Queue type aliases for better readability
-ResponseTuple = tuple[Any, Exception | None]
+ResponseTuple = tuple[Any, Optional[Exception]]
 if TYPE_CHECKING:
     RequestQueue = Queue[tuple[str, Any, Any]]
     ResponseQueue = Queue[ResponseTuple]
