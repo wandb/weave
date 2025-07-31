@@ -40,7 +40,7 @@ def test_groq_quickstart(
         chat_completion.choices[0].message.content
         == "The capital of India is New Delhi."
     )
-    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
     flattened_calls = flatten_calls(calls)
     assert len(flattened_calls) == 1
 
@@ -49,7 +49,8 @@ def test_groq_quickstart(
     ]
 
     call = calls[0]
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     output = call.output
     assert output.id == chat_completion.id
     assert output.model == chat_completion.model
@@ -95,7 +96,7 @@ def test_groq_async_chat_completion(
 
     asyncio.run(complete_chat())
 
-    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
     flattened_calls = flatten_calls(calls)
     assert len(flattened_calls) == 1
 
@@ -104,7 +105,8 @@ def test_groq_async_chat_completion(
     ]
 
     call = calls[0]
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     output = call.output
     assert output.model == "llama3-8b-8192"
     assert output.usage.completion_tokens == 152
@@ -157,7 +159,7 @@ def test_groq_streaming_chat_completion(
         if chunk.choices[0].delta.content is not None:
             all_content += chunk.choices[0].delta.content
 
-    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
     flattened_calls = flatten_calls(calls)
     assert len(flattened_calls) == 1
 
@@ -166,7 +168,8 @@ def test_groq_streaming_chat_completion(
     ]
 
     call = calls[0]
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     output = call.output
     assert output.model == "llama3-8b-8192"
     assert output.object == "chat.completion"
@@ -243,7 +246,7 @@ def test_groq_async_streaming_chat_completion(
 
     asyncio.run(generate_reponse())
 
-    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
     flattened_calls = flatten_calls(calls)
     assert len(flattened_calls) == 1
 
@@ -252,7 +255,8 @@ def test_groq_async_streaming_chat_completion(
     ]
 
     call = calls[0]
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     output = call.output
     assert output.model == "llama3-8b-8192"
     assert output.usage.completion_tokens == 152
@@ -289,7 +293,7 @@ def test_groq_tool_call(
 
     groq_client = Groq(api_key=os.getenv("GROQ_API_KEY", "DUMMY_API_KEY"))
 
-    @weave.op()
+    @weave.op
     def get_game_score(team_name: str) -> str:
         """Get the current score for a given NBA game"""
         if "warriors" in team_name.lower():
@@ -339,7 +343,7 @@ def test_groq_tool_call(
         else:
             return json.dumps({"team_name": team_name, "score": "unknown"})
 
-    @weave.op()
+    @weave.op
     def run_conversation(user_prompt: str) -> Union[str, None]:
         # Step 1: send the conversation and available functions to the model
         messages = [
@@ -416,7 +420,7 @@ def test_groq_tool_call(
 
     response = run_conversation("What was the score of the Warriors game?")
 
-    calls = list(client.calls(filter=CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
     flattened_calls = flatten_calls(calls)
     assert len(flattened_calls) == 4
 
@@ -428,12 +432,14 @@ def test_groq_tool_call(
     ]
 
     call_0, _ = flattened_calls[0]
-    assert call_0.exception is None and call_0.ended_at is not None
+    assert call_0.exception is None
+    assert call_0.ended_at is not None
     output_0 = call_0.output
     assert output_0 == response
 
     call_1, _ = flattened_calls[1]
-    assert call_1.exception is None and call_1.ended_at is not None
+    assert call_1.exception is None
+    assert call_1.ended_at is not None
     output_1 = call_1.output
     assert output_1.usage.completion_tokens == 47
     assert output_1.usage.prompt_tokens == 973
@@ -454,7 +460,8 @@ def test_groq_tool_call(
     assert output_1.choices[0].message.tool_calls[0].type == "function"
 
     call_2, _ = flattened_calls[2]
-    assert call_2.exception is None and call_2.ended_at is not None
+    assert call_2.exception is None
+    assert call_2.ended_at is not None
     output_2 = call_2.output
     game_score_data = json.loads(output_2)
     assert game_score_data["game_id"] == "401585601"
@@ -465,7 +472,8 @@ def test_groq_tool_call(
     assert game_score_data["away_team_score"] == 128
 
     call_3, _ = flattened_calls[3]
-    assert call_3.exception is None and call_3.ended_at is not None
+    assert call_3.exception is None
+    assert call_3.ended_at is not None
     output_3 = call_3.output
     assert output_3.usage.completion_tokens == 20
     assert output_3.usage.prompt_tokens == 177

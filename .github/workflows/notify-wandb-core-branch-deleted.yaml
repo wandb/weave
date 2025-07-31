@@ -1,0 +1,40 @@
+# Complements notify-wandb-core.yaml by providing lifecycle notifications for weave branches:
+# - notify-wandb-core.yaml: Sends weave-package-updated events when branches are pushed/updated
+# - this one: Sends weave-branch-deleted events when branches are deleted
+---
+name: Notify wandb/core of branch deletion
+run-name: Notify wandb/core - deleted ${{ github.event.ref }}
+
+on:
+    delete:
+
+jobs:
+    dispatch:
+        if: github.event.ref_type == 'branch'
+        runs-on: ubuntu-latest
+
+        steps:
+            -   name: capture payload
+                run: |
+                    cat >> "${GITHUB_STEP_SUMMARY}" <<- '__summary'
+                    <details>
+                    <summary>triggering event</summary>
+                    ```json
+                    ${{ toJSON(github.event) }}
+                    ```
+                    </details>
+
+                    __summary
+
+            -   name: Send repository dispatch to wandb/core
+                uses: peter-evans/repository-dispatch@v3
+                with:
+                    token: ${{ secrets.WANDB_CORE_ACCESS_TOKEN }}
+                    repository: wandb/core
+                    event-type: weave-branch-deleted
+                    client-payload: |-
+                        {
+                            "branch": "${{ github.event.ref }}",
+                            "repository": "${{ github.repository }}",
+                            "sender": "${{ github.event.sender.login }}"
+                        }

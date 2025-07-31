@@ -4,7 +4,7 @@ from collections.abc import Mapping
 from typing import Any, Callable
 
 from weave.trace.context.weave_client_context import require_weave_client
-from weave.trace.op import Op, op
+from weave.trace.op import Op, is_op, op
 from weave.trace.refs import ObjectRef, OpRef, parse_uri
 from weave.trace.serialization import (
     op_type,  # noqa: F401, Must import this to register op save/load
@@ -28,8 +28,11 @@ KNOWN_TYPES = {
     "Op",
     "PIL.Image.Image",
     "wave.Wave_read",
+    "weave.type_handlers.Audio.audio.Audio",
     "datetime.datetime",
     "rich.markdown.Markdown",
+    "moviepy.video.VideoClip.VideoClip",
+    "weave.type_wrappers.Content.content.Content",
 }
 
 
@@ -49,6 +52,9 @@ def encode_custom_obj(obj: Any) -> dict | None:
         # Ensure load_instance is an op
         if not isinstance(serializer.load, Op):
             serializer.load = op(serializer.load)
+            # We don't want to actually trace the load_instance op,
+            # just save it.
+            serializer.load._tracing_enabled = False  # type: ignore
         # Save the load_instance_op
         wc = require_weave_client()
 
@@ -82,15 +88,19 @@ def encode_custom_obj(obj: Any) -> dict | None:
 
 
 def decode_custom_inline_obj(obj: dict) -> Any:
-    _type = obj["weave_type"]["type"]
-    if _type in KNOWN_TYPES:
-        serializer = get_serializer_by_id(_type)
+    type_ = obj["weave_type"]["type"]
+    if type_ in KNOWN_TYPES:
+        serializer = get_serializer_by_id(type_)
         if serializer is not None:
+            if is_op(serializer.load):
+                # We would expect this to be already set to False, but
+                # just in case.
+                serializer.load._tracing_enabled = False  # type: ignore
             return serializer.load(obj["val"])
 
     load_op_uri = obj.get("load_op")
     if load_op_uri is None:
-        raise ValueError(f"No serializer found for `{_type}`")
+        raise ValueError(f"No serializer found for `{type_}`")
 
     ref = parse_uri(load_op_uri)
     if not isinstance(ref, OpRef):
@@ -100,7 +110,7 @@ def decode_custom_inline_obj(obj: dict) -> Any:
     load_instance_op = wc.get(ref)
     if load_instance_op is None:
         raise ValueError(
-            f"Failed to load op needed to decode object of type `{_type}`. See logs above for more information."
+            f"Failed to load op needed to decode object of type `{type_}`. See logs above for more information."
         )
 
     load_instance_op._tracing_enabled = False  # type: ignore
@@ -124,12 +134,12 @@ def decode_custom_files_obj(
     encoded_path_contents: Mapping[str, str | bytes],
     load_instance_op_uri: str | None = None,
 ) -> Any:
-    _type = weave_type["type"]
+    type_ = weave_type["type"]
     found_serializer = False
 
     # First, try to load the object using a known serializer
-    if _type in KNOWN_TYPES:
-        serializer = get_serializer_by_id(_type)
+    if type_ in KNOWN_TYPES:
+        serializer = get_serializer_by_id(type_)
         if serializer is not None:
             found_serializer = True
             load_instance_op = serializer.load
@@ -142,7 +152,7 @@ def decode_custom_files_obj(
     # Otherwise, fall back to load_instance_op
     if not found_serializer:
         if load_instance_op_uri is None:
-            raise ValueError(f"No serializer found for `{_type}`")
+            raise ValueError(f"No serializer found for `{type_}`")
 
         ref = parse_uri(load_instance_op_uri)
         if not isinstance(ref, ObjectRef):
@@ -152,12 +162,12 @@ def decode_custom_files_obj(
         load_instance_op = wc.get(ref)
         if load_instance_op is None:
             raise ValueError(
-                f"Failed to load op needed to decode object of type `{_type}`. See logs above for more information."
+                f"Failed to load op needed to decode object of type `{type_}`. See logs above for more information."
             )
 
     try:
         return _decode_custom_files_obj(encoded_path_contents, load_instance_op)
     except Exception as e:
         raise DecodeCustomObjectError(
-            f"Failed to decode object of type `{_type}`. See logs above for more information."
+            f"Failed to decode object of type `{type_}`. See logs above for more information."
         ) from e

@@ -44,6 +44,7 @@ const sidebars: SidebarsConfig = {
               id: "guides/tracking/tracing",
             },
             "guides/tracking/costs",
+            "guides/tracking/threads",
             {
               type: "doc",
               label: "Logging Media",
@@ -51,11 +52,16 @@ const sidebars: SidebarsConfig = {
             },
             "guides/tools/playground",
             "guides/integrations/index",
+            "guides/tools/saved-views",
             {
               type: "doc",
               label: "Compare Traces",
               id: "guides/tools/comparison",
             },
+            "guides/tracking/trace-tree",
+            "guides/tracking/otel",
+            "guides/tracking/video",
+            "guides/tracking/trace-plots"
           ]
         },
         {
@@ -102,6 +108,8 @@ const sidebars: SidebarsConfig = {
             "guides/evaluation/scorers",
             "guides/evaluation/builtin_scorers",
             "guides/evaluation/weave_local_scorers",
+            "guides/evaluation/evaluation_logger",
+            "guides/core-types/leaderboards"
           ]
         },
       ],
@@ -147,7 +155,7 @@ const sidebars: SidebarsConfig = {
           collapsed: true,
           label: "Tools & Utilities",
           link: { type: "doc", id: "guides/tools/index" },
-          items: ["guides/tools/serve", "guides/tools/deploy"],
+          items: ["guides/tools/serve", "guides/tools/deploy", "guides/tracking/otel"],
         },
       ],
     },
@@ -162,6 +170,7 @@ const sidebars: SidebarsConfig = {
           collapsed: true,
           label: "LLM Providers",
           items: [
+            "guides/integrations/inference",
             "guides/integrations/bedrock",
             "guides/integrations/anthropic",
             "guides/integrations/cerebras",
@@ -191,6 +200,23 @@ const sidebars: SidebarsConfig = {
             "guides/integrations/dspy",
             "guides/integrations/instructor",
             "guides/integrations/crewai",
+            "guides/integrations/smolagents",
+            "guides/integrations/pydantic_ai",
+            "guides/integrations/google_adk",
+            "guides/integrations/agno",
+            "guides/integrations/autogen",
+            "guides/integrations/verdict",
+            "guides/integrations/js"
+          ],
+        },
+        {
+          type: "category",
+          collapsible: true,
+          collapsed: false,
+          label: "Protocols",
+          link: { type: "doc", id: "guides/integrations/index"},
+          items: [
+            {type: "doc", id: "guides/integrations/mcp", label: "MCP"},
           ],
         },
       ],

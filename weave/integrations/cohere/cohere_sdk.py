@@ -27,10 +27,13 @@ def cohere_accumulator(acc: dict | None, value: Any) -> NonStreamedChatResponse:
         acc = {}
 
     # we wait for the last event
-    if hasattr(value, "event_type"):
-        if value.event_type == "stream-end" and value.is_finished:
-            if value.response:
-                acc = value.response
+    if (
+        hasattr(value, "event_type")
+        and value.event_type == "stream-end"
+        and value.is_finished
+        and value.response
+    ):
+        acc = value.response
     return acc
 
 
@@ -64,16 +67,19 @@ def cohere_accumulator_v2(acc: dict | None, value: Any) -> NonStreamedChatRespon
     if value is None:
         return acc
 
-    if value.type == "content-start" and value.delta.message.content.type == "text":
-        if len(acc.message.content) == value.index:  # type: ignore
-            acc.message.content.append(value.delta.message.content.text)  # type: ignore
+    if (
+        value.type == "content-start"
+        and value.delta.message.content.type == "text"
+        and len(acc.message.content) == value.index  # type: ignore
+    ):
+        acc.message.content.append(value.delta.message.content.text)  # type: ignore
 
     if value.type == "content-delta":
-        _content = _accumulate_content(
+        content = _accumulate_content(
             acc.message.content[value.index],  # type: ignore
             value.delta.message.content.text,  # type: ignore
         )
-        acc.message.content[value.index] = _content  # type: ignore
+        acc.message.content[value.index] = content  # type: ignore
 
     if value.type == "message-end":
         acc = acc.copy(  # type: ignore

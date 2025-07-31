@@ -66,12 +66,6 @@ Modify the following parameters:
 W&B recommends keeping the `clusterName` value in `values.yaml` set to `weave_cluster`.  This is the expected cluster name when W&B Weave runs the database migration. If you need to use a different name, see the [Setting `clusterName`](#setting-clustername) section for more information.
 
 ```yaml
-# Stable version
-image:
-  registry: docker.io
-  repository: bitnami/clickhouse
-  tag: 24.8
-
 ## @param clusterName ClickHouse cluster name
 clusterName: weave_cluster
 
@@ -81,8 +75,10 @@ shards: 1
 ## @param replicaCount Number of ClickHouse replicas per shard to deploy
 ## if keeper enable, same as keeper count, keeper cluster by shards.
 replicaCount: 3
+
 persistence:
-  enabled: false
+  enabled: true
+  size: 30G # this size must be larger than cache size.
 
 ## ClickHouse resource requests and limits
 resources:
@@ -106,6 +102,13 @@ logLevel: information
 ## @section ClickHouse keeper configuration parameters
 keeper:
   enabled: true
+
+## @param extraEnvVars Array with extra environment variables to add to ClickHouse nodes
+##
+extraEnvVars:
+  - name: S3_ENDPOINT
+    value: "https://s3.us-east-1.amazonaws.com/bucketname/$(CLICKHOUSE_REPLICA_ID)"
+
 
 ## @param defaultConfigurationOverrides [string] Default configuration overrides (evaluated as a template)
 defaultConfigurationOverrides: |
@@ -201,13 +204,14 @@ defaultConfigurationOverrides: |
       <asynchronous_metrics>true</asynchronous_metrics>
     </prometheus>
     {{- end }}
+    <listen_host>0.0.0.0</listen_host>
+    <listen_host>::</listen_host>
+    <listen_try>1</listen_try>
     <storage_configuration>
       <disks>
         <s3_disk>
           <type>s3</type>
-          <!-- MODIFY THE BUCKET NAME -->
-          <endpoint>https://s3.us-east-1.amazonaws.com/bucketname/foldername</endpoint>
-          <!-- MODIFY THE BUCKET NAME -->
+          <endpoint from_env="S3_ENDPOINT"></endpoint>
 
           <!-- AVOID USE CREDENTIALS CHECK THE RECOMMENDATION -->
           <access_key_id>xxx</access_key_id>
@@ -220,9 +224,8 @@ defaultConfigurationOverrides: |
   	      <type>cache</type>
           <disk>s3_disk</disk>
           <path>/var/lib/clickhouse/s3_disk_cache/cache/</path>
-          <max_size>100Gi</max_size>
-          <cache_on_write_operations>1</cache_on_write_operations>
-          <enable_filesystem_cache_on_write_operations>1</enable_filesystem_cache_on_write_operations> 
+          <!-- THE CACHE SIZE MUST BE LOWER THAN PERSISTENT VOLUME -->
+          <max_size>20Gi</max_size>
         </s3_disk_cache>
       </disks>
       <policies>
@@ -245,6 +248,20 @@ zookeeper:
   enabled: false
 ```
 
+### S3 endpoint configuration
+
+The bucket endpoint must be set as an environment variable to ensure each ClickHouse replica read and writes data in it's folder in the bucket.
+
+```
+extraEnvVars:
+  - name: S3_ENDPOINT
+    value: "https://s3.us-east-1.amazonaws.com/bucketname/$(CLICKHOUSE_REPLICA_ID)"
+```
+
+:::important
+Do not remove the `$(CLICKHOUSE_REPLICA_ID)` from the bucket endpoint configuration. It will ensure each ClickHouse replica is writing and reading data from it's folder in the bucket.
+:::
+
 ### Provide S3 credentials
 
 You can specify credentials for accessing an S3 bucket by either hardcoding the configuration, or having ClickHouse fetch the data from environment variables or an EC2 instance.
@@ -255,7 +272,7 @@ Directly include the credentials in the storage configuration:
 
 ```plaintext
 <type>s3</type>
-<endpoint>https://s3.us-east-1.amazonaws.com/bucketname/foldername</endpoint>
+<endpoint from_env="S3_ENDPOINT"></endpoint>
 <access_key_id>xxx</access_key_id>
 <secret_access_key>xxx</secret_access_key>
 ```
@@ -272,22 +289,22 @@ You can find more details on this at [ClickHouse: Separation of Storage and Comp
 
 ## 2. Install and deploy ClickHouse
 
-:::important
-If you do not wish to create a new namespace or install ClickHouse in a specific namespace, omit the arguments `--create-namespace --namespace <NAMESPACE>`.
-:::
-
 With the repositories set up and the `values.yaml` file prepared, the next step is to install ClickHouse.
 
 ```bash
-helm install --create-namespace --namespace <NAMESPACE> clickhouse bitnami/clickhouse -f values.yaml 
+helm install clickhouse bitnami/clickhouse -f values.yaml --version 8.0.10
 ```
+
+:::important
+Ensure you're using the version `8.0.10`. The latest chart version (`9.0.0`) doesn't work with the configuration proposed in this document.
+:::
 
 ## 3. Confirm ClickHouse deployment
 
 Confirm that ClickHouse is deployed using the following command:
 
 ```bash
-kubectl get pods -n <NAMESPACE>
+kubectl get pods
 ```
 
 You should see the following pods:
@@ -339,6 +356,7 @@ Weave is already available for automatic deployment via [W&B Operator](https://d
             user: <username>
             database: wandb_weave
             # `replicated` must be set to `true` if replicating data across multiple nodes
+            # This is in preview, use the env var `WF_CLICKHOUSE_REPLICATED`
             replicated: true
 
           weave-trace:
@@ -346,8 +364,20 @@ Weave is already available for automatic deployment via [W&B Operator](https://d
         [...]
         weave-trace:
           install: true
+          extraEnv:
+            WF_CLICKHOUSE_REPLICATED: "true"
         [...]
     ```
+
+:::important
+When using more than one replica (W&B recommend a least 3 replicas), ensure to have the following environment variable set for Weave Traces.
+```
+extraEnv:
+  WF_CLICKHOUSE_REPLICATED: "true"
+```
+This has the same effect of `replicated: true` which in preview.
+:::
+
 
 3. Set the `clusterName` in `values.yaml` to `weave_cluster`. If it is not, the database migration will fail.  
 
@@ -361,7 +391,8 @@ Weave is already available for automatic deployment via [W&B Operator](https://d
         password: <password>
         user: <username>
         database: wandb_weave
-        # This option must be true if replicating data across multiple nodes
+        # `replicated` must be set to `true` if replicating data across multiple nodes
+        # This is in preview, use the env var `WF_CLICKHOUSE_REPLICATED`
         replicated: true
 
       weave-trace:
@@ -370,6 +401,7 @@ Weave is already available for automatic deployment via [W&B Operator](https://d
     weave-trace:
       install: true
       extraEnv:
+        WF_CLICKHOUSE_REPLICATED: "true"
         WF_CLICKHOUSE_REPLICATED_CLUSTER: "different_cluster_name"
     [...]
     ```
@@ -423,12 +455,14 @@ Weave is already available for automatic deployment via [W&B Operator](https://d
 
         weave-trace:
           install: true
+          extraEnv:
+            WF_CLICKHOUSE_REPLICATED: "true"
     ```
 
 4. With the Custom Resource (CR) prepared, apply the new configuration:
 
     ```bash
-    kubectl apply -n <NAMESPACE> -f wandb.yaml
+    kubectl apply -f wandb.yaml
     ```
 
 ## 6. Access Weave

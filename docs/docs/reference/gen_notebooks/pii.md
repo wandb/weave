@@ -96,7 +96,7 @@ Before using Weave with PII data, review the best practices for using Weave with
 ```python
 %%capture
 # @title required python packages:
-!pip install cryptography 
+!pip install cryptography
 !pip install presidio_analyzer
 !pip install presidio_anonymizer
 !python -m spacy download en_core_web_lg    # Presidio uses spacy NLP engine

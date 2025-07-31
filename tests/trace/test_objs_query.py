@@ -322,3 +322,23 @@ def test_objs_query_delete_and_add_new_versions(client: WeaveClient):
     )
     assert len(res.objs) == 3
     assert all(obj.val["i"] in [4, 5, 6] for obj in res.objs)
+
+
+def test_publish_model_query_no_ref(client: WeaveClient):
+    class MyModel(weave.Model):
+        @weave.op
+        def predict(self, x: int) -> int:
+            return x
+
+    model = MyModel()
+    ref = weave.publish(model)
+    res = client.server.objs_query(
+        tsi.ObjQueryReq.model_validate(
+            {
+                "project_id": client._project_id(),
+                "filter": {"object_ids": [ref.name]},
+            }
+        )
+    )
+    assert len(res.objs) == 1
+    assert "ref" not in res.objs[0].val

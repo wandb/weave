@@ -48,6 +48,8 @@ export class InMemoryTraceServer {
   private _calls: Call[] = [];
   private _objs: Obj[] = [];
   private _files: File[] = [];
+  private _lastCallCount: number = 0;
+  private _lastChangeTime: number = Date.now();
 
   call = {
     callStartBatchCallUpsertBatchPost: async (batchReq: {
@@ -56,10 +58,12 @@ export class InMemoryTraceServer {
       for (const item of batchReq.batch) {
         if (item.mode === 'start') {
           this._calls.push(item.req.start);
+          this._updateChangeTime();
         } else if (item.mode === 'end') {
           const call = this._calls.find(c => c.id === item.req.end.id);
           if (call) {
             Object.assign(call, item.req.end);
+            this._updateChangeTime();
           }
         }
       }
@@ -166,10 +170,71 @@ export class InMemoryTraceServer {
     },
   };
 
-  private generateDigest(data: ArrayBuffer): string {
+  private generateDigest(data: any): string {
     // In a real implementation, you'd want to use a proper hashing algorithm.
     // For simplicity, we're using uuidv7 here.
     return uuidv7();
+  }
+
+  private _updateChangeTime(): void {
+    this._lastChangeTime = Date.now();
+    this._lastCallCount = this._calls.length;
+  }
+
+  /**
+   * Waits for all pending operations to complete by checking if the call count
+   * has stabilized for a minimum period. This is specifically designed for tests
+   * where we need to wait for the weave client's async batch processing.
+   *
+   * @param stabilizationTime - How long to wait for no changes (default: 50ms)
+   * @param maxWaitTime - Maximum time to wait before giving up (default: 2000ms)
+   * @param minWaitTime - Minimum time to wait even if calls appear immediately (default: 20ms)
+   * @returns Promise that resolves when operations have stabilized
+   */
+  async waitForPendingOperations(
+    stabilizationTime: number = 50,
+    maxWaitTime: number = 1500,
+    minWaitTime: number = 10
+  ): Promise<void> {
+    const startTime = Date.now();
+    const initialCallCount = this._calls.length;
+    let hasSeenNewCalls = false;
+
+    // Wait minimum time to allow async operations to start
+    await new Promise(resolve => setTimeout(resolve, minWaitTime));
+
+    while (Date.now() - startTime < maxWaitTime) {
+      const currentCallCount = this._calls.length;
+      const timeSinceLastChange = Date.now() - this._lastChangeTime;
+
+      // Track if we've seen new calls since we started waiting
+      if (currentCallCount > initialCallCount) {
+        hasSeenNewCalls = true;
+      }
+
+      // If we've seen new calls and they've been stable for the stabilization time, we're done
+      if (
+        hasSeenNewCalls &&
+        currentCallCount === this._lastCallCount &&
+        timeSinceLastChange >= stabilizationTime
+      ) {
+        return;
+      }
+
+      // Update our tracking
+      if (currentCallCount !== this._lastCallCount) {
+        this._lastCallCount = currentCallCount;
+        this._lastChangeTime = Date.now();
+      }
+
+      // Small delay before checking again
+      await new Promise(resolve => setTimeout(resolve, 5));
+    }
+
+    // If we get here, we timed out, but don't throw - just proceed
+    console.warn(
+      `waitForPendingOperations timed out after ${maxWaitTime}ms. Calls: initial=${initialCallCount}, final=${this._calls.length}`
+    );
   }
 
   // ... other existing methods ...

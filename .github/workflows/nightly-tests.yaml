@@ -1,0 +1,114 @@
+name: nightly-tests
+
+on:
+  schedule:
+    # Run at midnight UTC
+    - cron: "0 0 * * *"
+  # Allow manual triggering
+  workflow_dispatch:
+    inputs:
+      shards:
+        description: "Comma-separated list of shards to run (leave empty for all)"
+        required: false
+        default: ""
+
+jobs:
+  nightly-tests:
+    name: Nightly Tests
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version-major: ["3"]
+        python-version-minor: [
+            "9",
+            "10",
+            "11",
+            "12",
+            "13",
+            #
+          ]
+        shard: [
+            "scorers",
+            # Add future shards here, e.g., "heavy-api-shard"
+          ]
+      fail-fast: false
+    services:
+      wandbservice:
+        image: us-central1-docker.pkg.dev/wandb-production/images/local-testcontainer:master
+        credentials:
+          username: _json_key
+          password: ${{ secrets.gcp_wb_sa_key }}
+        env:
+          CI: 1
+          WANDB_ENABLE_TEST_CONTAINER: true
+          LOGGING_ENABLED: true
+        ports:
+          - "8080:8080"
+          - "8083:8083"
+          - "9015:9015"
+        options: >-
+          --health-cmd "wget -q -O /dev/null http://localhost:8080/healthz || exit 1"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-start-period=10s
+      weave_clickhouse:
+        image: clickhouse/clickhouse-server
+        env:
+          CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+          CLICKHOUSE_USER: default
+          CLICKHOUSE_PASSWORD: ""
+          CLICKHOUSE_DB: default
+        ports:
+          - "8123:8123"
+        options: --health-cmd "wget -nv -O- 'http://localhost:8123/ping' || exit 1" --health-interval=5s --health-timeout=3s
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Filter shards if specified
+        id: filter_shards
+        run: |
+          INPUT_SHARDS="${{ github.event.inputs.shards }}"
+          if [ -n "$INPUT_SHARDS" ]; then
+            echo "Running specific shards: $INPUT_SHARDS"
+            if [[ ! ",$INPUT_SHARDS," == *",${{ matrix.shard }},"* ]]; then
+              echo "Skipping ${{ matrix.shard }} as it's not in the specified list"
+              echo "skip=true" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+          fi
+          echo "Running shard: ${{ matrix.shard }}"
+          echo "skip=false" >> $GITHUB_OUTPUT
+      - name: Enable debug logging
+        if: steps.filter_shards.outputs.skip != 'true'
+        run: echo "ACTIONS_STEP_DEBUG=true" >> $GITHUB_ENV
+      - name: Install SQLite dev package
+        if: steps.filter_shards.outputs.skip != 'true'
+        run: sudo apt update && sudo apt install -y libsqlite3-dev
+      - name: Set up Python ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+        if: steps.filter_shards.outputs.skip != 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+      - name: Install dependencies
+        if: steps.filter_shards.outputs.skip != 'true'
+        run: |
+          python -m pip install --upgrade pip
+          pip install nox uv
+      - name: Run tests for ${{ matrix.shard }} shard
+        if: steps.filter_shards.outputs.skip != 'true'
+        env:
+          WEAVE_SENTRY_ENV: ci
+          CI: 1
+          WB_SERVER_HOST: http://wandbservice
+          WF_CLICKHOUSE_HOST: weave_clickhouse
+          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
+          WANDB_API_KEY: ${{ secrets.WANDB_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          DD_TRACE_ENABLED: false
+        run: |
+          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.shard }}')"

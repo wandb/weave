@@ -64,7 +64,6 @@ def google_genai_gemini_on_finish(
 def google_genai_gemini_accumulator(
     acc: Optional["GenerateContentResponse"], value: "GenerateContentResponse"
 ) -> "GenerateContentResponse":
-    print("google_genai_gemini_accumulator")
     if acc is None:
         return value
 

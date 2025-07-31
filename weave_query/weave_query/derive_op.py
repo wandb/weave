@@ -246,6 +246,7 @@ class MappedDeriveOpHandler(DeriveOpHandler):
             # more generally in the future.
             if (
                 orig_op.name.endswith("file-table")
+                or orig_op.name.endswith("file-table_with_increments")
                 or orig_op.name.endswith("file-joinedTable")
                 or orig_op.name.endswith("file-partitionedTable")
                 or orig_op.name.endswith("run-history")

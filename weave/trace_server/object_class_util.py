@@ -2,6 +2,9 @@ from typing import Any, Optional, TypedDict
 
 from pydantic import BaseModel
 
+from weave.trace_server.client_server_common.pydantic_util import (
+    pydantic_asdict_one_level,
+)
 from weave.trace_server.interface.builtin_object_classes.builtin_object_registry import (
     BUILTIN_OBJECT_REGISTRY,
 )
@@ -23,26 +26,29 @@ class GetObjectClassesResult(TypedDict):
 
 
 def get_object_classes(val: Any) -> Optional[GetObjectClassesResult]:
-    if isinstance(val, dict):
-        if "_bases" in val:
-            if isinstance(val["_bases"], list):
-                if len(val["_bases"]) >= 2:
-                    if val["_bases"][-1] == "BaseModel":
-                        if val["_bases"][-2] in base_object_class_names:
-                            object_class = val["_class_name"]
-                            base_object_class = object_class
-                            if len(val["_bases"]) > 2:
-                                base_object_class = val["_bases"][-3]
-                            return GetObjectClassesResult(
-                                object_class=object_class,
-                                base_object_class=base_object_class,
-                            )
+    if (
+        isinstance(val, dict)
+        and "_bases" in val
+        and isinstance(val["_bases"], list)
+        and len(val["_bases"]) >= 2
+        and val["_bases"][-1] == "BaseModel"
+        and val["_bases"][-2] in base_object_class_names
+    ):
+        object_class = val["_class_name"]
+        base_object_class = object_class
+        if len(val["_bases"]) > 2:
+            base_object_class = val["_bases"][-3]
+        return GetObjectClassesResult(
+            object_class=object_class,
+            base_object_class=base_object_class,
+        )
     return None
 
 
 class ProcessIncomingObjectResult(TypedDict):
     val: Any
     base_object_class: Optional[str]
+    leaf_object_class: Optional[str]
 
 
 def process_incoming_object_val(
@@ -59,7 +65,9 @@ def process_incoming_object_val(
     if not isinstance(val, dict):
         if req_builtin_object_class is not None:
             raise ValueError("object_class cannot be provided for non-dict objects")
-        return ProcessIncomingObjectResult(val=val, base_object_class=None)
+        return ProcessIncomingObjectResult(
+            val=val, base_object_class=None, leaf_object_class=None
+        )
 
     # Next we extract the object classes from the object. the `_bases` and `_class_name` keys are
     # special weave-added keys that tell us the class hierarchy of the object.
@@ -85,7 +93,9 @@ def process_incoming_object_val(
         # In this case, we assume that the object is valid and do not need to process it.
         # This would happen in practice if the user is editing an existing object by simply modifying the keys.
         return ProcessIncomingObjectResult(
-            val=val, base_object_class=val_object_classes["base_object_class"]
+            val=val,
+            base_object_class=val_object_classes["base_object_class"],
+            leaf_object_class=val_object_classes["object_class"],
         )
 
     # Next, we check if the user provided an object class. If they did, we need to validate the object
@@ -110,12 +120,15 @@ def process_incoming_object_val(
             return ProcessIncomingObjectResult(
                 val=dict_val,
                 base_object_class=new_val_object_classes["base_object_class"],
+                leaf_object_class=new_val_object_classes["object_class"],
             )
         else:
             raise ValueError(f"Unknown object class: {req_builtin_object_class}")
 
     # Finally, if there is no requested object class, just return the object as is.
-    return ProcessIncomingObjectResult(val=val, base_object_class=None)
+    return ProcessIncomingObjectResult(
+        val=val, base_object_class=None, leaf_object_class=None
+    )
 
 
 # Server-side version of `pydantic_object_record`
@@ -128,8 +141,9 @@ def dump_object(val: BaseModel) -> dict:
     # Order matters here due to the way we calculate the digest!
     # This matches the client
     dump["_type"] = cls_name
-    for k in val.model_fields:
-        dump[k] = _general_dump(getattr(val, k))
+    d = pydantic_asdict_one_level(val)
+    for k, v in d.items():
+        dump[k] = _general_dump(v)
     # yes, this is done twice, to match the client
     dump["_class_name"] = cls_name
     dump["_bases"] = bases
@@ -137,6 +151,10 @@ def dump_object(val: BaseModel) -> dict:
 
 
 def _general_dump(val: Any) -> Any:
+    """
+    This is a helper function that dumps a value into a dict. It is used to convert
+    pydantic objects to dicts in a recursive manner.
+    """
     if isinstance(val, BaseModel):
         return dump_object(val)
     elif isinstance(val, dict):

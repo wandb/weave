@@ -42,6 +42,8 @@ from weave.utils.iterators import ThreadSafeLazyList
 
 logger = logging.getLogger(__name__)
 
+REMOTE_ITER_PAGE_SIZE = 100
+
 
 @dataclasses.dataclass
 class MutationSetitem:
@@ -90,6 +92,21 @@ def make_mutation(
         raise ValueError(f"Unknown operation: {operation}")
 
 
+def unwrap(val: Any) -> Any:
+    if isinstance(val, Traceable):
+        return val.unwrap()
+    elif isinstance(val, ObjectRecord):
+        return val.unwrap()
+    elif isinstance(val, dict):
+        return {k: unwrap(v) for k, v in val.items()}
+    elif isinstance(val, list):
+        return [unwrap(v) for v in val]
+    elif isinstance(val, tuple):
+        return tuple(unwrap(v) for v in val)
+    else:
+        return val
+
+
 class Traceable:
     ref: Optional[RefWithExtra]
     mutations: Optional[list[Mutation]] = None
@@ -129,6 +146,8 @@ class Traceable:
         self.mutations = None
         raise NotImplementedError("Traceable.save not implemented")
         # return self.server.mutate(self.ref, mutations)
+
+    def unwrap(self) -> Any: ...
 
 
 def pydantic_getattribute(self: BaseModel, name: str) -> Any:
@@ -264,9 +283,12 @@ class WeaveObject(Traceable):
     def __eq__(self, other: Any) -> bool:
         return self._val == other
 
+    def unwrap(self) -> Any:
+        return unwrap(self._val)
+
 
 class WeaveTable(Traceable):
-    filter: TableRowFilter
+    filter: Optional[TableRowFilter] = None
     _known_length: Optional[int] = None
     _rows: Optional[Sequence[dict]] = None
     # _prefetched_rows is a local cache of rows that can be used to
@@ -275,11 +297,11 @@ class WeaveTable(Traceable):
 
     def __init__(
         self,
-        table_ref: Optional[TableRef],
-        ref: Optional[RefWithExtra],
         server: TraceServerInterface,
-        filter: TableRowFilter,
-        root: Optional[Traceable],
+        table_ref: Optional[TableRef] = None,
+        ref: Optional[RefWithExtra] = None,
+        filter: Optional[TableRowFilter] = None,
+        root: Optional[Traceable] = None,
         parent: Optional[Traceable] = None,
     ) -> None:
         self.table_ref = table_ref
@@ -445,7 +467,7 @@ class WeaveTable(Traceable):
         wc = require_weave_client()
 
         page_index = 0
-        page_size = 100
+        page_size = REMOTE_ITER_PAGE_SIZE
         while True:
             response = self.server.table_query(
                 TableQueryReq(
@@ -550,6 +572,9 @@ class WeaveTable(Traceable):
         self._mark_dirty()
         rows.pop(index)
 
+    def unwrap(self) -> Any:
+        return unwrap(list(self.rows))
+
 
 class WeaveList(Traceable, list):
     def __init__(
@@ -625,6 +650,9 @@ class WeaveList(Traceable, list):
             if v1 != v2:
                 return False
         return True
+
+    def unwrap(self) -> Any:
+        return unwrap(list(self))
 
 
 class WeaveDict(Traceable, dict):
@@ -707,6 +735,9 @@ class WeaveDict(Traceable, dict):
             if other[k] != v:
                 return False
         return True
+
+    def unwrap(self) -> Any:
+        return unwrap(dict(self.items()))
 
 
 class InternalError(Exception): ...
@@ -856,7 +887,7 @@ def make_trace_obj(
     if isinstance(box_val, pydantic_v1.BaseModel) or is_op(val):
         box_val.__dict__["ref"] = new_ref
     elif box_val is None or isinstance(box_val, bool):
-        # We intentionally don't box None and bools because it's imposible to
+        # We intentionally don't box None and bools because it's impossible to
         # make them behave like the underlying True/False/None objects in python.
         # This is unlike other objects (dict, list, int) that can be inherited
         # from and compared.

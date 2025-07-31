@@ -50,7 +50,7 @@ export class Dataset<R extends DatasetRow> extends WeaveObject {
 
   constructor(parameters: DatasetParameters<R>) {
     const baseParameters = {
-      id: parameters.id,
+      name: parameters.name,
       description: parameters.description,
     };
     super(baseParameters);

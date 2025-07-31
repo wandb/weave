@@ -17,6 +17,7 @@ from moto import mock_aws
 
 from tests.trace.util import client_is_sqlite
 from weave.trace.weave_client import WeaveClient
+from weave.trace_server import clickhouse_trace_server_batched
 from weave.trace_server.trace_server_interface import FileContentReadReq, FileCreateReq
 
 # Test Data Constants
@@ -26,7 +27,6 @@ TEST_BUCKET = "test-bucket"
 # Azure Constants
 AZURITE_ACCOUNT = "devstoreaccount1"
 AZURITE_KEY = "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw=="
-AZURITE_B64_KEY = base64.b64encode(AZURITE_KEY.encode()).decode()
 AZURITE_URL = f"http://127.0.0.1:10000/{AZURITE_ACCOUNT}"
 
 
@@ -103,6 +103,57 @@ class TestS3Storage:
         obj_response = s3.get_object(Bucket=TEST_BUCKET, Key=obj["Key"])
         assert obj_response["Body"].read() == TEST_CONTENT
 
+    def test_large_file_migration(self, run_storage_test, s3, client: WeaveClient):
+        # This test is critical in that it ensures that the system works correctly for large files. Both
+        # before and after the migration to file storage, we should be able to read the file correctly.
+        def _run_single_test():
+            chunk_size = 100000
+            num_chunks = 3
+            file_part = b"1234567890"
+            large_file = file_part * (chunk_size * num_chunks // len(file_part))
+
+            # Create a new trace
+            res = client.server.file_create(
+                FileCreateReq(
+                    project_id=client._project_id(),
+                    name="test.txt",
+                    content=large_file,
+                )
+            )
+            assert res.digest is not None
+            assert res.digest != ""
+
+            # Get the file
+            file = client.server.file_content_read(
+                FileContentReadReq(project_id=client._project_id(), digest=res.digest)
+            )
+            assert file.content == large_file
+            return res.digest
+
+        def _run_test():
+            # Run with disabled storage:
+            d1 = _run_single_test()
+            # Now "enable" bucket storage:
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "WF_FILE_STORAGE_AWS_ACCESS_KEY_ID": "test-key",
+                    "WF_FILE_STORAGE_AWS_SECRET_ACCESS_KEY": "test-secret",
+                    "WF_FILE_STORAGE_URI": f"s3://{TEST_BUCKET}",
+                    "WF_FILE_STORAGE_PROJECT_ALLOW_LIST": "c2hhd24vdGVzdC1wcm9qZWN0",
+                },
+            ):
+                # This line would error before the fix
+                d2 = _run_single_test()
+            # Run again with disabled storage:
+            d3 = _run_single_test()
+            assert d1 == d2 == d3
+
+        if client_is_sqlite(client):
+            pytest.skip("Not implemented in SQLite")
+
+        _run_test()
+
 
 class TestGCSStorage:
     """Tests for Google Cloud Storage implementation."""
@@ -130,12 +181,12 @@ class TestGCSStorage:
         # In-memory storage for all blobs
         blob_data = {}
 
-        def mock_upload_from_string(data, timeout=None):
+        def mock_upload_from_string(data, timeout=None, **kwargs):
             # Get the blob name from the mock's name attribute
             blob_name = mock_blob.name
             blob_data[blob_name] = data
 
-        def mock_download_as_bytes(timeout=None):
+        def mock_download_as_bytes(timeout=None, **kwargs):
             # Get the blob name from the mock's name attribute
             blob_name = mock_blob.name
             return blob_data.get(blob_name, b"")
@@ -220,7 +271,7 @@ class TestAzureStorage:
         with mock.patch.dict(
             os.environ,
             {
-                "WF_FILE_STORAGE_AZURE_CREDENTIAL_B64": AZURITE_B64_KEY,
+                "WF_FILE_STORAGE_AZURE_ACCESS_KEY": AZURITE_KEY,
                 "WF_FILE_STORAGE_AZURE_ACCOUNT_URL": AZURITE_URL,
                 "WF_FILE_STORAGE_URI": f"az://{AZURITE_ACCOUNT}/{TEST_BUCKET}",
                 "WF_FILE_STORAGE_PROJECT_ALLOW_LIST": "c2hhd24vdGVzdC1wcm9qZWN0",
@@ -241,3 +292,114 @@ class TestAzureStorage:
             f"weave/projects/{project}/files/{res.digest}"
         )
         assert blob_client.download_blob().readall() == TEST_CONTENT
+
+
+def test_support_for_variable_length_chunks(client: WeaveClient):
+    """Test that the system supports variable length chunks.
+    We don't actually want to change this often, but we need to make sure it works.
+    """
+    if client_is_sqlite(client):
+        pytest.skip("Not implemented in SQLite")
+
+    def create_and_read_file(content: bytes):
+        res = client.server.file_create(
+            FileCreateReq(
+                project_id=client._project_id(), name="test.txt", content=content
+            )
+        )
+        assert res.digest is not None
+        assert res.digest != ""
+
+        file = client.server.file_content_read(
+            FileContentReadReq(project_id=client._project_id(), digest=res.digest)
+        )
+        assert file.content == content
+
+        return res.digest
+
+    base_chunk_size = 100000
+    num_chunks = 3
+    file_part = b"1234567890"
+    large_file = file_part * (base_chunk_size * num_chunks // len(file_part))
+    large_digest = create_and_read_file(large_file)
+
+    #  Test increasing and decreasing chunk sizes
+    for size in [
+        base_chunk_size,
+        2 * base_chunk_size,
+        3 * base_chunk_size,
+        4 * base_chunk_size,
+        base_chunk_size,
+        base_chunk_size // 2,
+    ]:
+        with mock.patch.object(
+            clickhouse_trace_server_batched, "FILE_CHUNK_SIZE", size
+        ):
+            digest = create_and_read_file(large_file)
+            assert digest == large_digest
+
+
+@pytest.mark.disable_logging_error_check
+def test_file_storage_retry_limit(client: WeaveClient):
+    """Test that file storage operations retry exactly 3 times on storage failures."""
+    if client_is_sqlite(client):
+        pytest.skip("Not implemented in SQLite")
+
+    attempt_count = 0
+
+    def mock_upload_fail(*args, **kwargs):
+        nonlocal attempt_count
+        attempt_count += 1
+        # Simulate a 429 rate limit error
+        from google.api_core import exceptions
+
+        raise exceptions.TooManyRequests("Rate limit exceeded")
+
+    with mock.patch.dict(
+        os.environ,
+        {
+            "WF_FILE_STORAGE_GCP_CREDENTIALS_JSON_B64": base64.b64encode(
+                b"""{
+                "type": "service_account",
+                "project_id": "test-project",
+                "private_key_id": "test-key-id",
+                "private_key": "test-key",
+                "client_email": "test@test-project.iam.gserviceaccount.com",
+                "client_id": "test-client-id",
+                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                "token_uri": "https://oauth2.googleapis.com/token"
+            }"""
+            ).decode(),
+            "WF_FILE_STORAGE_URI": f"gs://{TEST_BUCKET}",
+            "WF_FILE_STORAGE_PROJECT_ALLOW_LIST": "*",
+        },
+    ):
+        # Mock GCS client
+        mock_storage_client = mock.MagicMock()
+        mock_bucket = mock.MagicMock()
+        mock_blob = mock.MagicMock()
+
+        # Setup mock chain
+        mock_storage_client.bucket.return_value = mock_bucket
+        mock_bucket.blob.return_value = mock_blob
+        mock_blob.upload_from_string.side_effect = mock_upload_fail
+
+        with (
+            mock.patch("google.cloud.storage.Client", return_value=mock_storage_client),
+            mock.patch(
+                "google.oauth2.service_account.Credentials.from_service_account_info"
+            ),
+        ):
+            # GCS should fail after 3 attempts, then fall back to database storage
+            result = client.server.file_create(
+                FileCreateReq(
+                    project_id=client._project_id(),
+                    name="test.txt",
+                    content=TEST_CONTENT,
+                )
+            )
+            # Should succeed via database fallback
+            assert result.digest is not None
+
+        # Verify GCS was attempted exactly 3 times before fallback
+        assert attempt_count == 3, f"Expected 3 GCS attempts, got {attempt_count}"

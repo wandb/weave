@@ -65,7 +65,7 @@ class ClickHouseTraceServerMigrator:
         return re.sub(pattern, replace_engine, sql_query, flags=re.IGNORECASE)
 
     def _create_db_sql(self, db_name: str) -> str:
-        """Geneate SQL database create string for normal and replicated databases."""
+        """Generate SQL database create string for normal and replicated databases."""
         if not self._is_safe_identifier(db_name):
             raise MigrationError(f"Invalid database name: {db_name}")
 
@@ -224,7 +224,7 @@ class ClickHouseTraceServerMigrator:
             # Do not run down migrations if not explicitly requesting target_version
             if current_version > target_version:
                 logger.warning(
-                    f"NOT running down migration from {current_version} to {target_version}"
+                    f"Found current version ({current_version}) greater than known versions ({len(migration_map)}). Will not run any migrations."
                 )
                 return []
         if target_version < 0 or target_version > len(migration_map):
@@ -238,12 +238,15 @@ class ClickHouseTraceServerMigrator:
                 res.append((i, f"{migration_map[i]['up']}"))
             return res
         if target_version < current_version:
-            res = []
-            for i in range(current_version, target_version, -1):
-                if migration_map[i]["down"] is None:
-                    raise MigrationError(f"Missing down migration file for version {i}")
-                res.append((i - 1, f"{migration_map[i]['down']}"))
-            return res
+            logger.warning(
+                f"Automatically running down migrations is disabled and should be done manually. Current version ({current_version}) is greater than target version ({target_version})."
+            )
+            # res = []
+            # for i in range(current_version, target_version, -1):
+            #     if migration_map[i]["down"] is None:
+            #         raise MigrationError(f"Missing down migration file for version {i}")
+            #     res.append((i - 1, f"{migration_map[i]['down']}"))
+            # return res
 
         return []
 

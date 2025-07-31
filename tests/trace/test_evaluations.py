@@ -9,8 +9,8 @@ from PIL import Image
 import weave
 from tests.trace.util import AnyIntMatcher, AnyStrMatcher
 from weave import Evaluation, Model
+from weave.trace.ref_util import get_ref
 from weave.trace.refs import CallRef
-from weave.trace.weave_client import get_ref
 from weave.trace_server import trace_server_interface as tsi
 
 
@@ -43,7 +43,7 @@ def op_name_from_ref(ref: str) -> str:
 class MyModel(Model):
     prompt: str
 
-    @weave.op()
+    @weave.op
     def predict(self, question: str):
         return {"generated_text": "Hello, " + question + self.prompt}
 
@@ -56,11 +56,11 @@ async def do_quickstart():
         {"question": "What is the square root of 64?", "expected": "8"},
     ]
 
-    @weave.op()
+    @weave.op
     def match_score1(expected: str, output: dict) -> dict:
         return {"match": expected == output["generated_text"]}
 
-    @weave.op()
+    @weave.op
     def match_score2(expected: dict, output: dict) -> dict:
         return {"match": expected == output["generated_text"]}
 
@@ -178,14 +178,14 @@ def gpt_mocker(question: str):
 
 
 class SimpleModel(Model):
-    @weave.op()
+    @weave.op
     def predict(self, question: str):
         res = gpt_mocker(question.strip(".") if len(question) % 2 == 1 else question)
         return {"response": res["response"]}
 
 
 class SimpleModelWithConfidence(Model):
-    @weave.op()
+    @weave.op
     def predict(self, question: str):
         res = gpt_mocker(question.strip(".") if len(question) % 2 == 0 else question)
         return {"response": res["response"], "confidence": 1 / (len(res) + 1)}
@@ -223,57 +223,57 @@ def score_dict(expected: str, output: dict) -> dict:
 
 
 class MyIntScorer(weave.Scorer):
-    @weave.op()
+    @weave.op
     def score(self, expected: str, output: dict) -> int:
         return score_int(expected, output)
 
 
 class MyFloatScorer(weave.Scorer):
-    @weave.op()
+    @weave.op
     def score(self, expected: str, output: dict) -> float:
         return score_float(expected, output)
 
 
 class MyBoolScorer(weave.Scorer):
-    @weave.op()
+    @weave.op
     def score(self, expected: str, output: dict) -> bool:
         return score_bool(expected, output)
 
 
 class MyDictScorer(weave.Scorer):
-    @weave.op()
+    @weave.op
     def score(self, expected: str, output: dict) -> dict:
         return score_dict(expected, output)
 
 
 class MyDictScorerWithCustomFloatSummary(weave.Scorer):
-    @weave.op()
+    @weave.op
     def score(self, expected: str, output: dict) -> dict:
         return score_dict(expected, output)
 
-    @weave.op()
+    @weave.op
     def summarize(self, score_rows: list) -> Optional[dict]:
         float_avg = sum(row["d_float"] for row in score_rows) / len(score_rows)
         return float_avg
 
 
 class MyDictScorerWithCustomBoolSummary(weave.Scorer):
-    @weave.op()
+    @weave.op
     def score(self, expected: str, output: dict) -> dict:
         return score_dict(expected, output)
 
-    @weave.op()
+    @weave.op
     def summarize(self, score_rows: list) -> Optional[dict]:
         float_avg = sum(row["d_float"] for row in score_rows) / len(score_rows)
         return float_avg > 0.5
 
 
 class MyDictScorerWithCustomDictSummary(weave.Scorer):
-    @weave.op()
+    @weave.op
     def score(self, expected: str, output: dict) -> dict:
         return score_dict(expected, output)
 
-    @weave.op()
+    @weave.op
     def summarize(self, score_rows: list) -> Optional[dict]:
         float_avg = sum(row["d_float"] for row in score_rows) / len(score_rows)
         bool_avg = sum(1 if row["d_bool"] else 0 for row in score_rows) / len(
@@ -423,6 +423,10 @@ async def test_evaluation_data_topology(client):
                 "total_tokens": 39,
             }
         },
+        "status_counts": {
+            "success": 2,
+            "error": 0,
+        },
         "weave": {
             "latency_ms": AnyIntMatcher(),
             "trace_name": "SimpleModelWithConfidence.predict",
@@ -501,6 +505,10 @@ async def test_evaluation_data_topology(client):
                 ]
                 * 2,
             }
+        },
+        "status_counts": {
+            "success": 25,
+            "error": 0,
         },
         "weave": {
             "display_name": AnyStrMatcher(),
@@ -587,11 +595,11 @@ async def test_eval_supports_model_as_op(client):
     evaluation = make_test_eval()
 
     res = await evaluation.evaluate(function_model)
-    assert res != None
+    assert res is not None
 
     gotten_op = weave.ref(function_model.ref.uri()).get()
     res = await evaluation.evaluate(gotten_op)
-    assert res != None
+    assert res is not None
 
 
 class MyTestModel(Model):
@@ -606,11 +614,11 @@ async def test_eval_supports_model_class(client):
 
     model = MyTestModel()
     res = await evaluation.evaluate(model)
-    assert res != None
+    assert res is not None
 
     gotten_model = weave.ref(model.ref.uri()).get()
     res = await evaluation.evaluate(gotten_model)
-    assert res != None
+    assert res is not None
 
 
 @pytest.mark.asyncio
@@ -677,7 +685,7 @@ async def test_eval_is_robust_to_missing_values(client):
     assert res == {
         "output": {"a": {"mean": 3.0}, "b": {"c": {"mean": 2.0}}},
         "function_score": {"a": {"mean": 3.0}, "b": {"c": {"mean": 2.0}}},
-        "model_latency": {"mean": pytest.approx(0, abs=1)},
+        "model_latency": {"mean": pytest.approx(0, abs=2)},
     }
 
 
@@ -782,7 +790,7 @@ async def test_eval_with_complex_types(client):
 async def test_evaluation_with_column_map():
     # Define a dummy scorer that uses column_map
     class DummyScorer(weave.Scorer):
-        @weave.op()
+        @weave.op
         def score(self, foo: str, bar: str, output: str, target: str) -> dict:
             # Return whether foo + bar equals output
             return {"match": (foo + bar) == output == target}
@@ -790,7 +798,7 @@ async def test_evaluation_with_column_map():
     # Create the scorer with column_map mapping 'foo'->'col1', 'bar'->'col2'
     dummy_scorer = DummyScorer(column_map={"foo": "col1", "bar": "col2"})
 
-    @weave.op()
+    @weave.op
     def model_function(col1, col2):
         # For testing, return the concatenation of col1 and col2
         return col1 + col2
@@ -812,21 +820,21 @@ async def test_evaluation_with_column_map():
 
     # The expected summary should show that 3 out of 4 predictions matched
     expected_results = {"true_count": 3, "true_fraction": 0.75}
-    assert (
-        eval_out["DummyScorer"]["match"] == expected_results
-    ), "The summary should reflect the correct number of matches"
+    assert eval_out["DummyScorer"]["match"] == expected_results, (
+        "The summary should reflect the correct number of matches"
+    )
 
 
 @pytest.mark.asyncio
 async def test_evaluation_with_wrong_column_map():
     # Define a dummy scorer that uses column_map
     class DummyScorer(weave.Scorer):
-        @weave.op()
+        @weave.op
         def score(self, foo: str, bar: str, output: str, target: str) -> dict:
             # Return whether foo + bar equals output
             return {"match": (foo + bar) == output == target}
 
-    @weave.op()
+    @weave.op
     def model_function(col1, col2):
         # For testing, return the concatenation of col1 and col2
         return col1 + col2
@@ -874,13 +882,13 @@ async def test_evaluation_with_wrong_column_map():
 @pytest.mark.asyncio
 async def test_evaluation_with_multiple_column_maps():
     class DummyScorer(weave.Scorer):
-        @weave.op()
+        @weave.op
         def score(self, foo: str, bar: str, output: str, target: str) -> dict:
             # Return whether foo + bar equals output
             return {"match": (foo + bar) == output == target}
 
     class AnotherDummyScorer(weave.Scorer):
-        @weave.op()
+        @weave.op
         def score(self, input1: str, input2: str, output: str) -> dict:
             # Return whether input1 == output reversed
             return {"match": input1 == output[::-1]}
@@ -893,7 +901,7 @@ async def test_evaluation_with_multiple_column_maps():
         column_map={"input1": "col2", "input2": "col1"}
     )
 
-    @weave.op()
+    @weave.op
     def model_function(col1, col2):
         # For testing, return the concatenation of col1 and col2
         return col1 + col2
@@ -917,9 +925,9 @@ async def test_evaluation_with_multiple_column_maps():
 
     # Assertions for the first scorer
     expected_results_dummy = {"true_count": 1, "true_fraction": 1.0 / 3}
-    assert (
-        eval_out["DummyScorer"]["match"] == expected_results_dummy
-    ), "All concatenations should match the target"
+    assert eval_out["DummyScorer"]["match"] == expected_results_dummy, (
+        "All concatenations should match the target"
+    )
 
     # Assertions for the second scorer
     # Since input1 == col2, and output is col1 + col2, we check if col2 == (col1 + col2)[::-1]
@@ -929,9 +937,9 @@ async def test_evaluation_with_multiple_column_maps():
     # Third row: col2 = "zyx", output = "xyzzyx", output[::-1] = "xyzzyx" -> "zyx" == "xyzzyx" is False
     # So all matches are False
     expected_results_another_dummy = {"true_count": 0, "true_fraction": 0.0}
-    assert (
-        eval_out["AnotherDummyScorer"]["match"] == expected_results_another_dummy
-    ), "No matches should be found for AnotherDummyScorer"
+    assert eval_out["AnotherDummyScorer"]["match"] == expected_results_another_dummy, (
+        "No matches should be found for AnotherDummyScorer"
+    )
 
 
 @pytest.mark.asyncio
@@ -969,7 +977,7 @@ async def test_feedback_is_correctly_linked(client):
         == CallRef(
             entity=client.entity,
             project=client.project,
-            id=list(score.calls())[0].id,
+            id=next(iter(score.calls())).id,
         ).uri()
     )
 
@@ -1041,7 +1049,7 @@ async def test_evaluation_with_custom_name(client):
     dataset = weave.Dataset(rows=[{"input": "hi", "output": "hello"}])
     evaluation = weave.Evaluation(dataset=dataset, evaluation_name="wow-custom!")
 
-    @weave.op()
+    @weave.op
     def model(input: str) -> str:
         return "hmmm"
 

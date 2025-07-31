@@ -41,6 +41,15 @@ We need the following libraries for this tutorial:
 !pip install -qU openai weave wandb
 ```
 
+
+```python
+%%capture
+# Temporary workaround to fix bug in openai:
+# TypeError: Client.__init__() got an unexpected keyword argument 'proxies'
+# See https://community.openai.com/t/error-with-openai-1-56-0-client-init-got-an-unexpected-keyword-argument-proxies/1040332/15
+!pip install "httpx<0.28"
+```
+
 We set `WANDB_API_KEY` in our env so that we may easily login with wandb.login() (this should be given to the colab as a secret).
 
 We set the project in W&B we want to log this into in `name_of_wandb_project`.

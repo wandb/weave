@@ -3,6 +3,9 @@ import pytest
 import weave
 from tests.trace.util import capture_output, flushing_callback
 from weave.trace.constants import TRACE_CALL_EMOJI
+from weave.trace.term import configure_logger
+
+configure_logger()
 
 
 @weave.op

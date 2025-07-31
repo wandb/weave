@@ -22,9 +22,8 @@ def should_accumulate_iterable(inputs: dict) -> bool:
     if isinstance(inputs, dict):
         if "stream" in inputs:
             return inputs["stream"]
-        elif "kwargs" in inputs:
-            if "stream" in inputs["kwargs"]:
-                return inputs.get("kwargs", {}).get("stream")
+        elif "kwargs" in inputs and "stream" in inputs["kwargs"]:
+            return inputs.get("kwargs", {}).get("stream")
     return False
 
 

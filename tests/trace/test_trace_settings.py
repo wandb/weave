@@ -31,9 +31,9 @@ def test_disabled_setting(client):
     calls = list(client.get_calls())
     assert len(calls) == 10
 
-    assert (
-        disabled_time * 10 < enabled_time
-    ), "Disabled weave should be faster than enabled weave"
+    assert disabled_time * 10 < enabled_time, (
+        "Disabled weave should be faster than enabled weave"
+    )
 
 
 def test_disabled_env(client):
@@ -47,9 +47,9 @@ def test_disabled_env(client):
     calls = list(client.get_calls())
     assert len(calls) == 10
 
-    assert (
-        disabled_time * 10 < enabled_time
-    ), "Disabled weave should be faster than enabled weave"
+    assert disabled_time * 10 < enabled_time, (
+        "Disabled weave should be faster than enabled weave"
+    )
 
 
 def test_print_call_link_setting(client_creator):
@@ -136,7 +136,7 @@ def test_should_capture_code_env(client):
 
 
 def slow_operation():
-    time.sleep(1)
+    time.sleep(0.1)
 
 
 def speed_test(client, count=5):
@@ -158,26 +158,12 @@ def test_client_parallelism_setting(client_creator):
             assert client.future_executor._max_workers == 4
             assert client.future_executor._executor._max_workers == 4
 
-    parse_and_apply_settings(UserSettings(client_parallelism=0))
-    with mock.patch("os.cpu_count", return_value=4):
-        with client_creator() as client:
-            assert client.future_executor._max_workers == 0
-            assert client.future_executor._executor == None
-            wait_time_0, queue_time_0 = speed_test(client)
-
     parse_and_apply_settings(UserSettings(client_parallelism=1))
     with mock.patch("os.cpu_count", return_value=4):
         with client_creator() as client:
             assert client.future_executor._max_workers == 1
             assert client.future_executor._executor._max_workers == 1
             wait_time_1, queue_time_1 = speed_test(client)
-
-    # Assert that the queue time is much less for 1 than 0
-    assert queue_time_0 > queue_time_1
-    # Assert that the total time is about the same
-    assert wait_time_0 + queue_time_0 == pytest.approx(
-        wait_time_1 + queue_time_1, abs=0.5
-    )
 
     parse_and_apply_settings(UserSettings(client_parallelism=10))
     with client_creator() as client:

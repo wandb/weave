@@ -1,3 +1,4 @@
+import logging
 import warnings
 from typing import TYPE_CHECKING, Any, Literal, Optional, Union
 
@@ -5,6 +6,8 @@ from pydantic import Field, PrivateAttr
 
 import weave
 from weave.scorers.utils import ensure_hf_imports
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     import torch
@@ -36,11 +39,11 @@ class LLMScorer(weave.Scorer):
 
     def model_post_init(self, __context: Any) -> None:
         try:
-            from litellm import acompletion, aembedding, amoderation  # noqa: F401
+            from litellm import acompletion, aembedding, amoderation
         except ImportError:
             raise ImportError(
                 "litellm is required to use the LLM-powered scorers, please install it with `pip install litellm`"
-            )
+            ) from None
         self._acompletion = acompletion
         self._aembedding = aembedding
         self._amoderation = amoderation
@@ -59,7 +62,8 @@ def check_cuda(device: str) -> None:
 
     if torch.cuda.is_available() and device == "cpu":
         warnings.warn(
-            "You have a GPU available, you can pass `device='cuda'` to the scorer init, this will speed up model loading and inference"
+            "You have a GPU available, you can pass `device='cuda'` to the scorer init, this will speed up model loading and inference",
+            stacklevel=2,
         )
 
 
@@ -133,17 +137,17 @@ class HuggingFaceScorer(weave.Scorer):
         if self._model is None:
             self.load_model()
         else:
-            print("Using user-provided model.")
+            logger.info("Using user-provided model.")
 
         if self._tokenizer is None:
             self.load_tokenizer()
         else:
-            print("Using user-provided tokenizer.")
+            logger.info("Using user-provided tokenizer.")
 
         assert self._model is not None, "Model must be loaded, implement `load_model`"
-        assert (
-            self._tokenizer is not None
-        ), "Tokenizer must be loaded, implement `load_tokenizer`"
+        assert self._tokenizer is not None, (
+            "Tokenizer must be loaded, implement `load_tokenizer`"
+        )
 
     def load_model(self) -> None:
         raise NotImplementedError("Subclasses must implement the `load_model` method.")

@@ -1,5 +1,9 @@
+import openai
 from pydantic import BaseModel
 
+import weave
+from weave.trace.object_record import pydantic_object_record
+from weave.trace.serialization.op_type import _replace_memory_address
 from weave.trace.serialization.serialize import (
     dictify,
     fallback_encode,
@@ -14,7 +18,7 @@ def test_dictify_simple() -> None:
         y: int
 
         # This should be ignored
-        def sum() -> int:
+        def sum(self) -> int:
             return self.x + self.y
 
     pt = Point()
@@ -257,3 +261,69 @@ def test_to_json_pydantic_class(client) -> None:
         "title": "CalendarEvent",
         "type": "object",
     }
+
+
+def test_to_json_object_excludes_ref(client) -> None:
+    class MyObj(weave.Object):
+        @weave.op
+        def predict(self, x: int) -> int:
+            return x
+
+    obj = MyObj()
+    obj_rec = pydantic_object_record(obj)
+    serialized = to_json(obj_rec, client._project_id(), client)
+    assert "ref" not in serialized
+
+
+def test_to_json_function_with_memory_address_in_op(client) -> None:
+    openai_client = openai.OpenAI(api_key="fake_key")
+
+    @weave.op
+    def log_me(x: int) -> int:
+        myclient = openai_client
+        return x
+
+    log_me(1)
+    log_me(1)
+
+    assert len(log_me.calls()) == 2
+
+    @weave.op
+    def log_me(x: int) -> int:
+        myclient = openai_client
+        return x
+
+    log_me(1)
+
+    # same op!
+    assert len(log_me.calls()) == 3
+
+    # now make a new client
+    openai_client = openai.OpenAI(api_key="fake_key")
+
+    @weave.op
+    def log_me(x: int) -> int:
+        myclient = openai_client
+        return x
+
+    log_me(1)
+
+    # this should still be the same op!
+    assert len(log_me.calls()) == 4
+
+
+def test__replace_memory_address() -> None:
+    # Test with memory addresses of different lengths
+    assert (
+        _replace_memory_address("<Function object at 0x1234>")
+        == "<Function object at 0x0000>"
+    )
+    assert _replace_memory_address("<Class at 0xdeadbeef>") == "<Class at 0x00000000>"
+
+    # Test with multiple memory addresses
+    assert (
+        _replace_memory_address("<Object at 0x1234> and <Object at 0xabcd>")
+        == "<Object at 0x0000> and <Object at 0x0000>"
+    )
+    # Test with no memory addresses
+    assert _replace_memory_address("No memory address here") == "No memory address here"

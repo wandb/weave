@@ -32,6 +32,7 @@ def make_feedback_query_req(
     feedback_query_req = tsi.FeedbackQueryReq(
         project_id=project_id,
         fields=[
+            "id",
             "feedback_type",
             "weave_ref",
             "payload",
@@ -89,6 +90,8 @@ def make_derived_summary_fields(
         status = tsi.TraceStatus.ERROR
     elif ended_at is None:
         status = tsi.TraceStatus.RUNNING
+    elif summary.get("status_counts", {}).get(tsi.TraceStatus.ERROR, 0) > 0:
+        status = tsi.TraceStatus.DESCENDANT_ERROR
     weave_summary["status"] = status
 
     if ended_at and started_at:
@@ -212,3 +215,15 @@ def digest_is_version_like(digest: str) -> tuple[bool, int]:
         return (True, int(digest[1:]))
     except ValueError:
         return (False, -1)
+
+
+MAX_FILTER_LENGTH = 1000
+
+
+def assert_parameter_length_less_than_max(
+    param_name: str, arr_len: int, max_length: int = MAX_FILTER_LENGTH
+) -> None:
+    if arr_len > max_length:
+        raise ValueError(
+            f"Parameter: '{param_name}' request length is greater than max length ({max_length}). Actual length: {arr_len}"
+        )

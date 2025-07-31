@@ -54,11 +54,12 @@ class PromptInjectionLLMGuardrail(LLMScorer):
         if self.model_id not in SUPPORTED_MODELS:
             warnings.warn(
                 f"The prompting strategy used in this guardrail has been tested with the following models: {', '.join(SUPPORTED_MODELS)}."
-                f"The model {self.model_id} might not yield the best results for this guardrail."
+                f"The model {self.model_id} might not yield the best results for this guardrail.",
+                stacklevel=2,
             )
 
     @weave.op
-    async def score(self, output: str) -> WeaveScorerResult:
+    async def score(self, *, output: str, **kwargs: Any) -> WeaveScorerResult:
         user_prompt = PROMPT_INJECTION_GUARDRAIL_USER_PROMPT.format(
             research_paper_summary=PROMPT_INJECTION_SURVEY_PAPER_SUMMARY,
             prompt=output,

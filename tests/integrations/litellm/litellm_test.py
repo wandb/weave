@@ -33,7 +33,7 @@ def patch_litellm(request: Any) -> Generator[None, None, None]:
     # For some reason pytest's import procedure causes the patching
     # to fail in prod mode. Specifically, the patches get run twice
     # despite the fact that the patcher is a singleton.
-    weave_server_flag = request.config.getoption("--weave-server")
+    weave_server_flag = request.config.getoption("--trace-server")
     if weave_server_flag == ("prod"):
         yield
         return
@@ -61,10 +61,11 @@ def test_litellm_quickstart(
     exp = """Hello! I'm just a computer program, so I don't have feelings, but I'm here to help you. How can I assist you today?"""
 
     assert all_content == exp
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 2
     call = calls[0]
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     output = call.output
     assert output["choices"][0]["message"]["content"] == exp
     assert output["choices"][0]["finish_reason"] == "stop"
@@ -102,10 +103,11 @@ async def test_litellm_quickstart_async(
     exp = """Hello! I'm just a computer program, so I don't have feelings, but I'm here to help you with whatever you need. How can I assist you today?"""
 
     assert all_content == exp
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 2
     call = calls[0]
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     output = call.output
     assert output["choices"][0]["message"]["content"] == exp
     assert output["choices"][0]["finish_reason"] == "stop"
@@ -148,10 +150,11 @@ def test_litellm_quickstart_stream(
     exp = """Hello! I'm just a computer program, so I don't have feelings, but I'm here to help you. How can I assist you today?"""
 
     assert all_content == exp
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 2
     call = calls[0]
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     output = call.output
     assert output["choices"][0]["message"]["content"] == exp
     assert output["choices"][0]["finish_reason"] == "stop"
@@ -196,10 +199,11 @@ async def test_litellm_quickstart_stream_async(
     exp = """Hello! I'm just a computer program, so I don't have feelings, but I'm here and ready to assist you with any questions or tasks you may have. How can I help you today?"""
 
     assert all_content == exp
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 2
     call = calls[0]
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     output = call.output
     assert output["choices"][0]["message"]["content"] == exp
     assert output["choices"][0]["finish_reason"] == "stop"
@@ -233,7 +237,7 @@ def test_model_predict(
         model: str
         temperature: float
 
-        @weave.op()
+        @weave.op
         def predict(self, text: str, target_language: str) -> str:
             response = litellm.completion(
                 api_key=os.environ.get("ANTHROPIC_API_KEY", "sk-ant-DUMMY_API_KEY"),

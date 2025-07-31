@@ -73,3 +73,22 @@ def test_inline_custom_obj_needs_load_op(client):
         assert isinstance(loaded_markdown, rich.markdown.Markdown)
     finally:
         KNOWN_TYPES = original_known_types
+
+
+def test_no_extra_calls_created(client):
+    @weave.op
+    def make_datetime():
+        return datetime.now()
+
+    val = make_datetime()
+
+    calls = client.get_calls()
+    assert len(calls) == 1
+    fetched_output = calls[0].output
+    assert isinstance(fetched_output, datetime)
+    assert fetched_output == val
+
+    # Additional calls should not be created simply
+    # due to deserializing a custom object
+    calls = client.get_calls()
+    assert len(calls) == 1

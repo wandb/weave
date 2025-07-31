@@ -66,7 +66,7 @@ result, call = generate_text.call(input)  # Now you can use the call object with
 :::tip Why Use `.call()`?
 The Call object is essential for associating the score with the call in the database. While you can directly call the scoring function, this would not be associated with the call, and therefore not searchable, filterable, or exportable for later analysis.
 
-For more details about Call objects, see our [Calls guide section on Call objects](../tracking/tracing.mdx#getting-a-handle-to-the-call-object-during-execution).
+For more details about Call objects, see the [Calls guide section on Call objects](../tracking/tracing.mdx#getting-a-handle-to-the-call-object-during-execution).
 :::
 
 ## Getting Started with Scorers
@@ -145,37 +145,170 @@ When applying scorers:
 - You can view scorer results in the UI or query them via the API
 :::
 
-## Using Scorers as Monitors {#using-scorers-as-monitors}
+## Using Scorers as monitors {#using-scorers-as-monitors}
 
-Monitors help track quality metrics over time without blocking operations. This is useful for:
-- Identifying quality trends
-- Detecting model drift
-- Gathering data for model improvements
+:::important
+This feature is only available in Multi-Tenant (MT) SaaS deployments.
+:::
+
+If you want to track quality metrics without writing scoring logic into your app, you can use _monitors_.
+
+A monitor is a background process that:
+- Watches one or more specified functions decorated with `weave.op` 
+- Scores a subset of calls using an _LLM-as-a-judge_ scorer, which is an LLM model with a specific prompt tailored to the ops you want to score 
+- Runs automatically each time the specified `weave.op` is called, no need to manually call `.apply_scorer()`
+
+Monitors are ideal for:
+- Evaluating and tracking production behavior
+- Catching regressions or drift
+- Collecting real-world performance data over time
+
+Learn how to [create a monitor in general](#create-a-monitor) or try out the [end-to-end example of creating a truthfulness monitor](#example-create-a-truthfulness-monitor).
+
+### Create a monitor
+
+1. From the left menu, select the **Monitors** tab.
+2. From the monitors page, click **New Monitor**.
+3. In the drawer, configure the monitor:
+   - **Name**: Valid monitor names must start with a letter or number and can only contain letters, numbers, hyphens, and underscores.
+   - **Description** *(optional)*: Explain what the monitor does.
+   - **Active monitor** toggle: Turn the monitor on or off. 
+   - **Calls to monitor**:
+        - **Operations**: Choose one or more `@weave.op`s to monitor. 
+            :::important
+            You must log at least one trace for an Op for it to appear in the list of available operations.
+            :::
+        - **Filter** *(optional)*: Narrow down which op columns are eligible for monitoring (e.g., `max_tokens` or `top_p`)
+        - **Sampling rate**: The percentage of calls to be scored, between 0% and 100% (e.g., 10%)
+            :::tip 
+            A lower sampling rate is useful for controlling costs, as each scoring call has a cost associated with it.
+            :::
+   - **LLM-as-a-Judge configuration**: 
+        - **Scorer name**: Valid scorer names must start with a letter or number and can only contain letters, numbers, hyphens, and underscores.
+        - **Judge model**: Select the model that will score your ops. Three types of models are available:
+            - [Saved models](../tools/playground.md#saved-models)
+            - Models from providers configured by your W&B admin
+            - [W&B Inference models](../integrations/inference.md)
+        
+        For the selected model, configure the following settings:
+            - **Configuration name**
+            - **System prompt**
+            - **Response format**
+        - **Scoring prompt**: The prompt used by the LLM-as-a-judge to score your ops. “You can reference `{output}`, individual inputs (like `{foo}`), and `{inputs}` as a dictionary. [For more information, see prompt variables](#prompt-variables).”
+4. Click **Create Monitor**. Weave will automatically begin monitoring and scoring calls that match the specified criteria. You can view monitor details in the **Monitors** tab.
+
+### Example: Create a truthfulness monitor
+
+In the following example, you'll create:
+- The `weave.op` to be monitored, `generate_statement`. This function outputs statements that either returns the input `ground_truth` statement (e.g. `"The Earth revolves around the Sun."`), or generates a statement that is incorrect based on the `ground_truth` (e.g. `"The Earth revolves around Saturn."`)
+- A monitor, `truthfulness-monitor`, to evaluate the truthfulness of the generated statements.
+
+1. Define `generate_statement`:
+   ```python
+    import weave
+    import random
+    import openai
+
+    # Replace my-team/my-weave-project with your Weave team and project name 
+    weave.init("my-team/my-weave-project")
+
+    client = openai.OpenAI() 
+
+    @weave.op()
+    def generate_statement(ground_truth: str) -> str:
+        if random.random() < 0.5:
+            response = openai.ChatCompletion.create(
+                model="gpt-4.1",
+                messages=[
+                    {
+                        "role": "user",
+                        "content": f"Generate a statement that is incorrect based on this fact: {ground_truth}"
+                    }
+                ]
+            )
+            return response.choices[0].message["content"]
+        else:
+            return ground_truth
+   ```
+2. Execute the code for `generate_statement`to log a trace. The `generate_statement` op will not appear in the Op dropdown unless it was logged at least once. 
+2. In the Weave UI, navigate to **Monitors**.
+3. From the monitors page, click **New Monitor**.
+4. Configure the monitor as follows:
+    - **Name**: `truthfulness-monitor`  
+    - **Description**:  
+    `A monitor to evaluate the truthfulness of statements generated by an LLM.`
+    - **Active monitor** toggle:  
+    Toggle **on** to begin scoring calls as soon as the monitor is created.
+    ![Creating a monitor part 1](img/monitors-ui-1.png)
+    - **Calls to Monitor**:
+        - **Operations**: `generate_statement`.
+        - **Filter** *(optional)*:  None applied in this example, but could be used to scope monitoring by arguments like `temperature` or `max_tokens`.
+        - **Sampling rate**:  
+        Set to `100%` to score every call.
+        ![Creating a monitor part 2](img/monitors-ui-2.png)
+    - **LLM-as-a-Judge Configuration**:
+        - **Scorer name**: `truthfulness-scorer`  
+        - **Judge model**:  
+        `o3-mini-2025-01-31`
+        - **Model settings**:
+        - **LLM ID**: `o3-mini-2025-01-31`
+        - **Configuration name**: `truthfulness-scorer-judge-model`
+        - **System prompt**:  
+            `You are an impartial AI judge. Your task is to evaluate the truthfulness of statements.`
+        - **Response format**: `json_object`
+        - **Scoring prompt**:  
+            ```text
+            Evaluate whether the output statement is accurate based on the input statement.
+
+            This is the input statement: {ground_truth}
+
+            This is the output statement: {output}
+
+            The response should be a JSON object with the following fields:
+            - is_true: a boolean stating whether the output statement is true or false based on the input statement.
+            - reasoning: your reasoning as to why the statement is true or false.
+            ```
+            ![Creating a monitor part 3](img/monitors-ui-3.png)
+5. Click **Create Monitor**. The `truthfulness-monitor` is ready to start monitoring.
+6. Generate statements for evaluation by the monitor with true and easily verifiable `ground_truth` statements such as `"Water freezes at 0 degrees Celsius."`.
+    ```python
+    generate_statement("The Earth revolves around the Sun.")
+    generate_statement("Water freezes at 0 degrees Celsius.")
+    generate_statement("The Great Wall of China was built over several centuries, with construction beginning as early as the 7th century BCE.")
+    ```
+7. In the Weave UI, navigate to the **Traces** tab.
+8. From the list of available traces, select any trace for **LLMAsAJudgeScorer.score**. 
+9. Inspect the trace to see the monitor in action. For this example, the monitor correctly evaluated the `output` (in this instance, equivalent to the `ground_truth`) as `true` and provided sound `reasoning`.
+    ![Monitor trace](img/monitors-4.png)
+
+### Prompt variables {#prompt-variables}
+
+In scoring prompts, you can reference multiple variables from your op. These values are automatically extracted from your function call when the scorer runs. Consider the following example function:
 
 ```python
-import weave
-from weave import Scorer
-from weave.scorers import ValidJSONScorer, ValidXMLScorer
-
-import random
-
 @weave.op
-def generate_text(prompt: str) -> str:
-    """Generate text using an LLM."""
-    return "Generated response..."
-
-async def generate_with_monitoring(prompt: str) -> str:
-    # Get both the result and tracking information
-    result, call = generate_text.call(prompt)
-    
-    # Sample monitoring (only monitor 10% of calls)
-    if random.random() < 0.1:
-        # Monitor multiple aspects asynchronously
-        await call.apply_scorer(ValidJSONScorer())
-        await call.apply_scorer(ValidXMLScorer())
-    
-    return result
+def my_function(foo: str, bar: str) -> str:
+    return f"{foo} and {bar}"
 ```
+
+In this case, the following variables are accessible:
+
+| Variable     | Description                                           |
+|--------------|-------------------------------------------------------|
+| `{foo}`      | The value of the input argument `foo`                |
+| `{bar}`      | The value of the input argument `bar`                |
+| `{inputs}`   | A JSON dictionary of all input arguments             |
+| `{output}`   | The result returned by your op                       |
+
+For example:
+
+```text
+Input foo: {foo}
+Input bar: {bar}
+Output: {output}
+```
+
+If your op has other arguments, they’ll all be available by name.
 
 ## AWS Bedrock Guardrails
 

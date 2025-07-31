@@ -1,3 +1,4 @@
+import {Call} from './call';
 import {getGlobalDomain} from './urls';
 import {WeaveObject} from './weaveObject';
 
@@ -9,13 +10,49 @@ export type Op<T extends (...args: any[]) => any> = {
   __boundThis?: WeaveObject;
   __name: string;
   __savedRef?: OpRef | Promise<OpRef>;
-} & T;
+  __parameterNames?: ParameterNamesOption;
+  invoke: CallMethod<T>;
+} & T &
+  ((
+    ...args: Parameters<T>
+  ) => ReturnType<T> extends AsyncIterable<infer U>
+    ? AsyncIterable<Awaited<U>>
+    : Promise<Awaited<ReturnType<T>>>);
 
-interface StreamReducer<T, R> {
+export interface StreamReducer<T, R> {
   initialStateFn: () => R;
   reduceFn: (state: R, chunk: T) => R;
+  finalizeFn: (state: R) => void;
 }
 
+/**
+ * Helper type for decorators
+ * This represents a decorator function that can be used with both legacy and Stage 3 decorators.
+ *
+ * For Stage 3 decorators:
+ *   target: The function being decorated (T)
+ *   context: MethodDecoratorContext
+ *
+ * For legacy decorators:
+ *   target: The prototype (instance methods) or constructor (static methods)
+ *   propertyKey: The method name
+ *   descriptor: The property descriptor containing the method
+ */
+export type OpDecorator<T extends (...args: any[]) => any> = ((
+  // Stage 3 signature
+  value: T,
+  context: ClassMethodDecoratorContext
+) => T | void) &
+  ((
+    // Legacy signature
+    target: Object,
+    propertyKey: string | symbol,
+    descriptor: TypedPropertyDescriptor<T>
+  ) => TypedPropertyDescriptor<T> | void);
+
+/**
+ * Options that can be passed to the op wrapper
+ */
 export interface OpOptions<T extends (...args: any[]) => any> {
   name?: string;
   streamReducer?: StreamReducer<any, any>;
@@ -23,7 +60,25 @@ export interface OpOptions<T extends (...args: any[]) => any> {
   callDisplayName?: (...args: Parameters<T>) => string;
   summarize?: (result: Awaited<ReturnType<T>>) => Record<string, any>;
   bindThis?: WeaveObject;
+  isDecorator?: boolean;
+  // If true, the op will adopt the `this` value of the original function
+  shouldAdoptThis?: boolean;
   parameterNames?: ParameterNamesOption;
+}
+
+type AsyncResult<F extends (...args: any[]) => any> = Promise<
+  Awaited<ReturnType<F>>
+>;
+
+export interface OpWrapper<F extends (...args: any[]) => any> {
+  (this: any, ...params: Parameters<F>): AsyncResult<F>;
+}
+
+export interface CallMethod<F extends (...args: any[]) => any> {
+  (
+    this: any,
+    ...params: Parameters<F>
+  ): Promise<[Awaited<ReturnType<F>>, Call]>;
 }
 
 export function isOp(value: any): value is Op<any> {

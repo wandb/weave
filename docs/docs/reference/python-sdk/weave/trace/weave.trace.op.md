@@ -25,7 +25,7 @@ Defines the Op protocol and related functions.
 ---
 
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/op.py#L347"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/op.py#L1086"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>function</kbd> `call`
 
@@ -35,6 +35,7 @@ call(
     *args: 'Any',
     __weave: 'WeaveKwargs | None' = None,
     __should_raise: 'bool' = False,
+    __require_explicit_finish: 'bool' = False,
     **kwargs: 'Any'
 ) → tuple[Any, Call] | Coroutine[Any, Any, tuple[Any, Call]]
 ```
@@ -55,7 +56,7 @@ result, call = add.call(1, 2)
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/op.py#L526"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/op.py#L1133"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>function</kbd> `calls`
 

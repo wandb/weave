@@ -3,8 +3,8 @@ import asyncio
 import pytest
 
 import weave
-from tests.scorers.test_utils import TINY_MODEL_PATHS
 from weave.flow.scorer import WeaveScorerResult
+from weave.scorers.default_models import MODEL_PATHS
 from weave.scorers.trust_scorer import WeaveTrustScorerV1
 
 
@@ -24,11 +24,11 @@ def dummy_scorer():
 def trust_scorer():
     scorer = WeaveTrustScorerV1(
         device="cpu",
-        context_relevance_model_name_or_path=TINY_MODEL_PATHS["relevance_scorer"],
-        hallucination_model_name_or_path=TINY_MODEL_PATHS["hallucination_scorer"],
-        toxicity_model_name_or_path=TINY_MODEL_PATHS["toxicity_scorer"],
-        fluency_model_name_or_path=TINY_MODEL_PATHS["fluency_scorer"],
-        coherence_model_name_or_path=TINY_MODEL_PATHS["coherence_scorer"],
+        context_relevance_model_name_or_path=MODEL_PATHS["relevance_scorer"],
+        hallucination_model_name_or_path=MODEL_PATHS["hallucination_scorer"],
+        toxicity_model_name_or_path=MODEL_PATHS["toxicity_scorer"],
+        fluency_model_name_or_path=MODEL_PATHS["fluency_scorer"],
+        coherence_model_name_or_path=MODEL_PATHS["coherence_scorer"],
         run_in_parallel=False,
     )
     return scorer
@@ -125,14 +125,14 @@ def test_score_with_logic(trust_scorer):
 # we need to test parallelism and how it plays with weave.Evaluations
 def test_trust_scorer_parallelism(trust_scorer):
     trust_scorer.run_in_parallel = True
-
+    n_samples = 100
     ds = [
         {
-            "output": "test_output",
-            "query": "test_query",
-            "context": "context",
+            "output": "France's capital city is paris. It is known for the eiffel tower.",
+            "query": "What is the capital of France?",
+            "context": "Paris is the capital city of France, home of the eiffel tower.",
         }
-    ] * 100
+    ] * n_samples
 
     @weave.op
     def model(output):
@@ -140,36 +140,36 @@ def test_trust_scorer_parallelism(trust_scorer):
 
     evaluation = weave.Evaluation(dataset=ds, scorers=[trust_scorer])
     eval_result = asyncio.run(evaluation.evaluate(model))
+
+    # Check that the trust scorer result structure is correct
     assert "passed" in eval_result["WeaveTrustScorerV1"]
     assert "metadata" in eval_result["WeaveTrustScorerV1"]
     assert len(eval_result["WeaveTrustScorerV1"]["metadata"]["raw_outputs"]) == 5
 
-    # Check that none of the subscorers passed
-    raw_outputs = eval_result["WeaveTrustScorerV1"]["metadata"]["raw_outputs"]
+    # Check that all scorers passed
+    assert eval_result["WeaveTrustScorerV1"]["passed"]["true_count"] == n_samples
+    assert eval_result["WeaveTrustScorerV1"]["passed"]["true_fraction"] == 1.0
 
-    # it's kind of boring...
-    for _, scorer_results in raw_outputs.items():
-        assert scorer_results["passed"]["true_count"] == 0
-        assert scorer_results["passed"]["true_fraction"] == 0.0
+    raw_outputs = eval_result["WeaveTrustScorerV1"]["metadata"]["raw_outputs"]
 
     # Verify specific mean scores
     assert raw_outputs["WeaveHallucinationScorerV1"]["metadata"]["score"][
         "mean"
-    ] == pytest.approx(0.99999, rel=1e-4)
+    ] == pytest.approx(0.0932, rel=1e-3)
     assert raw_outputs["WeaveCoherenceScorerV1"]["metadata"]["score"][
         "mean"
-    ] == pytest.approx(0.20488, rel=1e-4)
+    ] == pytest.approx(0.8197, rel=1e-3)
     assert raw_outputs["WeaveFluencyScorerV1"]["metadata"]["score"][
         "mean"
-    ] == pytest.approx(0.40745, rel=1e-4)
+    ] == pytest.approx(0.5185, rel=1e-3)
     assert raw_outputs["WeaveContextRelevanceScorerV1"]["metadata"]["score"][
         "mean"
-    ] == pytest.approx(0.11111, rel=1e-4)
+    ] == pytest.approx(0.6296, rel=1e-3)
 
     # Verify toxicity categories
     toxicity_results = raw_outputs["WeaveToxicityScorerV1"]["metadata"]
     assert toxicity_results["Ability"]["mean"] == 0.0
     assert toxicity_results["Gender/Sex"]["mean"] == 0.0
-    assert toxicity_results["Violence"]["mean"] == 2.0
-    assert toxicity_results["Race/Origin"]["mean"] == 3.0
-    assert toxicity_results["Religion"]["mean"] == 2.0
+    assert toxicity_results["Violence"]["mean"] == 0.0
+    assert toxicity_results["Race/Origin"]["mean"] == 0.0
+    assert toxicity_results["Religion"]["mean"] == 0.0

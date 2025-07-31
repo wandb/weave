@@ -166,14 +166,14 @@ class WeaveTrustScorerV1(weave.Scorer):
     _loaded_scorers: dict[str, weave.Scorer] = PrivateAttr(default_factory=dict)
     _emoji_pattern: re.Pattern = PrivateAttr(
         default=re.compile(
-            "["
-            "\U0001f600-\U0001f64f"  # emoticons
-            "\U0001f300-\U0001f5ff"  # symbols & pictographs
-            "\U0001f680-\U0001f6ff"  # transport & map symbols
-            "\U0001f1e0-\U0001f1ff"  # flags (iOS)
-            "\U00002702-\U000027b0"  # dingbats
-            "\U000024c2-\U0001f251"
-            "]+",
+            r"["
+            r"\U0001f600-\U0001f64f"  # emoticons
+            r"\U0001f300-\U0001f5ff"  # symbols & pictographs
+            r"\U0001f680-\U0001f6ff"  # transport & map symbols
+            r"\U0001f1e0-\U0001f1ff"  # flags (iOS)
+            r"\U00002702-\U000027b0"  # dingbats
+            r"\U000024c2-\U0001f251"
+            r"]+",
             flags=re.UNICODE,
         )
     )
@@ -285,7 +285,7 @@ class WeaveTrustScorerV1(weave.Scorer):
                     except Exception as e:
                         raise WeaveTrustScorerError(
                             f"Error calling {scorer_name}: {e}", errors=e
-                        )
+                        ) from e
         else:
             # Run scorers sequentially
             for scorer_name, scorer in self._loaded_scorers.items():
@@ -296,7 +296,7 @@ class WeaveTrustScorerV1(weave.Scorer):
                 except Exception as e:
                     raise WeaveTrustScorerError(
                         f"Error calling {scorer_name}: {e}", errors=e
-                    )
+                    ) from e
 
         return results
 
@@ -358,9 +358,11 @@ class WeaveTrustScorerV1(weave.Scorer):
     @weave.op
     def score(
         self,
+        *,
         query: str,
         context: Union[str, list[str]],
         output: str,  # Pass the output of a LLM to this parameter for example
+        **kwargs: Any,
     ) -> WeaveScorerResult:
         """
         Score the query, context and output against 5 different scorers.

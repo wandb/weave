@@ -1,5 +1,5 @@
 import inspect
-from typing import Any
+from typing import Any, Optional, get_type_hints
 
 import pytest
 
@@ -16,7 +16,7 @@ def func():
     def _func(a: int) -> int:
         return a + 1
 
-    yield _func
+    return _func
 
 
 @pytest.fixture
@@ -25,7 +25,7 @@ def afunc():
     async def _afunc(a: int) -> int:
         return a + 1
 
-    yield _afunc
+    return _afunc
 
 
 @pytest.fixture
@@ -39,7 +39,7 @@ def weave_obj():
         async def amethod(self, a: int) -> int:
             return a + 1
 
-    yield A()
+    return A()
 
 
 @pytest.fixture
@@ -53,7 +53,7 @@ def py_obj():
         async def amethod(self, a: int) -> int:
             return a + 1
 
-    yield B()
+    return B()
 
 
 def test_sync_func(client, func):
@@ -127,7 +127,7 @@ def test_sync_method_call(client, weave_obj, py_obj):
             entity="shawn",
             project="test-project",
             name="A",
-            _digest="nzAe1JtLJFEVeEo3yX0TOYYGhh7vAOFYRentYI9ik6U",
+            _digest="tGCIGNe9xznnkoJvn2i75TOocSfV7ui1vldSrIP3ZZo",
             _extra=(),
         ),
         "a": 1,
@@ -162,7 +162,7 @@ async def test_async_method_call(client, weave_obj, py_obj):
             entity="shawn",
             project="test-project",
             name="A",
-            _digest="nzAe1JtLJFEVeEo3yX0TOYYGhh7vAOFYRentYI9ik6U",
+            _digest="tGCIGNe9xznnkoJvn2i75TOocSfV7ui1vldSrIP3ZZo",
             _extra=(),
         ),
         "a": 1,
@@ -288,7 +288,7 @@ def test_postprocessing_funcs(client):
     res = func(1, "should_be_hidden", "also_hidden")
     assert res == {"b": 2, "also_hide_me": "12345"}
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     call = calls[0]
 
     assert call.inputs == {"a": 1}
@@ -302,7 +302,7 @@ def test_op_call_display_name_str(client):
 
     func()
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     call = calls[0]
 
     assert call.display_name == "example"
@@ -323,7 +323,7 @@ def test_op_call_display_name_callable_lambda(client):
 
     func()
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     call = calls[0]
 
     assert call.display_name == "shawn/test-project-123"
@@ -341,7 +341,7 @@ def test_op_call_display_name_callable_func(client):
 
     func()
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     call = calls[0]
 
     assert call.display_name == "wow-1844-tcejorp-tset/nwahs"
@@ -377,7 +377,7 @@ def test_op_call_display_name_callable_other_attributes(client):
     ):
         func()
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert calls[0].display_name == "finetuned-llama-3.1-8b__v0.1.2__2024-08-01"
     assert calls[1].display_name == "finetuned-gpt-4o__v0.1.3__2024-08-02"
 
@@ -401,7 +401,7 @@ def test_op_call_display_name_modified_dynamically(client):
     func.call_display_name = custom_display_name2
     func()
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert calls[0].display_name == "string"
     assert calls[1].display_name == "wow"
     assert calls[2].display_name == "amazing"
@@ -414,8 +414,42 @@ def test_op_name(client):
 
     func()
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     call = calls[0]
 
     parsed = parse_uri(call.op_name)
     assert parsed.name == "custom_name"
+
+
+def test_op_preserves_type_information():
+    """Test that @op decorator preserves type information of the original function."""
+
+    def typed_func(
+        a: int,
+        b: str,
+        c: Optional[float],
+        d: list[int],
+        e: dict[str, float],
+        f: tuple[str, int],
+        g: bool,
+    ) -> dict[str, Any]:
+        """A function with type annotations."""
+        return {"a": a, "b": b, "c": c, "d": d, "e": e, "f": f, "g": g}
+
+    decorated_func = op(typed_func)
+
+    # Check that the type hints and signatures are preserved
+    assert get_type_hints(typed_func) == get_type_hints(decorated_func)
+    assert inspect.signature(decorated_func) == inspect.signature(typed_func)
+
+    values = {
+        "a": 1,
+        "b": "hello",
+        "c": None,
+        "d": [1, 2, 3],
+        "e": {"a": 1.0, "b": 2.0},
+        "f": ("hello", 1),
+        "g": True,
+    }
+    # Check that the function can be called with the correct types
+    assert typed_func(**values) == decorated_func(**values) == values

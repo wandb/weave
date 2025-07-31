@@ -4,6 +4,7 @@ import time
 from unittest.mock import patch
 
 import pytest
+from pydantic import BaseModel
 
 import weave
 from weave import Dataset, Evaluation, Model
@@ -20,23 +21,23 @@ expected_eval_result = {
 
 
 class EvalModel(Model):
-    @weave.op()
+    @weave.op
     async def predict(self, input) -> str:
         return eval(input)
 
 
-@weave.op()
+@weave.op
 def score(target, output):
     return target == output
 
 
-@weave.op()
+@weave.op
 def example_to_model_input(example):
     return {"input": example["input"]}
 
 
 def test_evaluate_callable_as_model(client):
-    @weave.op()
+    @weave.op
     async def model_predict(input) -> str:
         return eval(input)
 
@@ -49,7 +50,7 @@ def test_evaluate_callable_as_model(client):
 
 
 def test_predict_can_receive_other_params(client):
-    @weave.op()
+    @weave.op
     async def model_predict(input, target) -> str:
         return eval(input) + target
 
@@ -68,11 +69,11 @@ def test_predict_can_receive_other_params(client):
 
 
 def test_can_preprocess_model_input(client):
-    @weave.op()
+    @weave.op
     async def model_predict(x) -> str:
         return eval(x)
 
-    @weave.op()
+    @weave.op
     def preprocess(example):
         return {"x": example["input"]}
 
@@ -97,7 +98,7 @@ def test_evaluate_rows_only(client):
 
 def test_evaluate_other_model_method_names():
     class EvalModel(Model):
-        @weave.op()
+        @weave.op
         async def infer(self, input) -> str:
             return eval(input)
 
@@ -112,7 +113,7 @@ def test_evaluate_other_model_method_names():
 
 def test_score_as_class(client):
     class MyScorer(weave.Scorer):
-        @weave.op()
+        @weave.op
         def score(self, target, output):
             return target == output
 
@@ -133,12 +134,12 @@ def test_score_as_class(client):
 
 def test_score_with_custom_summarize(client):
     class MyScorer(weave.Scorer):
-        @weave.op()
+        @weave.op
         def summarize(self, score_rows):
             assert list(score_rows) == [True, False]
             return {"awesome": 3}
 
-        @weave.op()
+        @weave.op
         def score(self, target, output):
             return target == output
 
@@ -159,7 +160,7 @@ def test_score_with_custom_summarize(client):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "scorers,expected_output_key",
+    ("scorers", "expected_output_key"),
     [
         # All scorer styles
         (
@@ -277,7 +278,7 @@ def test_scorer_name_sanitization(scorer_name):
     class MyScorer(weave.Scorer):
         name: str
 
-        @weave.op()
+        @weave.op
         def score(self, target, model_output):
             return target == model_output
 
@@ -292,12 +293,12 @@ def test_scorer_name_sanitization(scorer_name):
 
 
 def test_sync_eval_parallelism(client):
-    @weave.op()
+    @weave.op
     def sync_op(a):
         time.sleep(1)
         return a
 
-    @weave.op()
+    @weave.op
     def score(output):
         return 1
 
@@ -333,11 +334,11 @@ def test_evaluation_from_weaveobject_missing_evaluation_name(client):
     dataset = Dataset(rows=dataset_rows)
 
     class EvalModel(Model):
-        @weave.op()
+        @weave.op
         async def predict(self, input) -> str:
             return eval(input)
 
-    @weave.op()
+    @weave.op
     def score(target, output):
         return target == output
 
@@ -363,27 +364,31 @@ def test_evaluation_from_weaveobject_missing_evaluation_name(client):
     assert result == expected_eval_result
 
 
-def test_evaluate_table_lazy_iter(client):
+def test_evaluate_table_lazy_iter(client, monkeypatch):
     """
     The intention of this test is to show that an evaluation harness
     lazily fetches rows from a table rather than eagerly fetching all
     rows up front.
     """
-    dataset = Dataset(rows=[{"input": i} for i in range(300)])
+    monkeypatch.setattr(weave.trace.vals, "REMOTE_ITER_PAGE_SIZE", 4)
+
+    dataset = Dataset(rows=[{"input": i} for i in range(10)])
     ref = weave.publish(dataset)
     dataset = ref.get()
 
-    @weave.op()
+    @weave.op
     async def model_predict(input) -> int:
         return input * 1
 
-    @weave.op()
+    @weave.op
     def score_simple(input, output):
         return input == output
 
     log = client.server.attribute_access_log
     assert [l for l in log if not l.startswith("_")] == [
         "ensure_project_exists",
+        "get_call_processor",
+        "get_call_processor",
         "table_create",
         "obj_create",
         "obj_read",
@@ -400,8 +405,8 @@ def test_evaluate_table_lazy_iter(client):
     # Make sure we have deterministic results
     with patch.dict(os.environ, {"WEAVE_PARALLELISM": "1"}):
         result = asyncio.run(evaluation.evaluate(model_predict))
-        assert result["output"] == {"mean": 149.5}
-        assert result["score_simple"] == {"true_count": 300, "true_fraction": 1.0}
+        assert result["output"] == {"mean": 4.5}
+        assert result["score_simple"] == {"true_count": 10, "true_fraction": 1.0}
 
     log = client.server.attribute_access_log
     log = [l for l in log if not l.startswith("_")]
@@ -424,7 +429,7 @@ def test_evaluate_table_lazy_iter(client):
     # Note: if this test suite is ran in a different order, then the low level eval ops will already be saved
     # so the first count can be different.
     count = counts_split_by_table_query[0]
-    assert counts_split_by_table_query == [count, 700, 700, 700, 5], log
+    assert counts_split_by_table_query == [count, 28, 28, 14 + 5], log
 
 
 def test_evaluate_table_order(client):
@@ -439,23 +444,21 @@ def test_evaluate_table_order(client):
     def make_image(i):
         return Image.new(
             "RGB",
-            (1024, 1024),
+            (64, 64),
             (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)),
         )
 
     # Create a dataset with ordered values
-    dataset_rows = [
-        {"input": i, "target": i, "image": make_image(i)} for i in range(100)
-    ]
+    dataset_rows = [{"input": i, "target": i, "image": make_image(i)} for i in range(5)]
     dataset = Dataset(rows=dataset_rows)
     ref = weave.publish(dataset)
     dataset = ref.get()
 
-    @weave.op()
+    @weave.op
     async def model_predict(input) -> int:
         return input
 
-    @weave.op()
+    @weave.op
     def score_simple(input, output, target):
         return input == output == target
 
@@ -468,22 +471,44 @@ def test_evaluate_table_order(client):
     result = asyncio.run(evaluation.evaluate(model_predict))
 
     # Verify the overall results
-    assert result["output"] == {"mean": 49.5}  # Average of 0-99
-    assert result["score_simple"] == {"true_count": 100, "true_fraction": 1.0}
+    assert result["output"] == {"mean": 2}  # Average of 0-99
+    assert result["score_simple"] == {"true_count": 5, "true_fraction": 1.0}
 
     # Get all prediction calls and verify order
     predict_and_score_calls = list(evaluation.predict_and_score.calls())
-    assert len(predict_and_score_calls) == 100
+    assert len(predict_and_score_calls) == 5
 
     # Extract inputs and outputs to verify order
     inputs = [c.inputs["example"]["input"] for c in predict_and_score_calls]
     outputs = [c.output["output"] for c in predict_and_score_calls]
 
     # Verify inputs and outputs are in order 0-99
-    assert inputs == list(range(100))
-    assert outputs == list(range(100))
+    assert inputs == list(range(5))
+    assert outputs == list(range(5))
 
     # Verify scores are all True and in order
     scores = [c.output["scores"]["score_simple"] for c in predict_and_score_calls]
     assert all(scores)
-    assert len(scores) == 100
+    assert len(scores) == 5
+
+
+def test_evaluate_with_pydantic_summary(client):
+    class MyScorerSummary(BaseModel):
+        awesome: int
+
+    class MyScorer(weave.Scorer):
+        @weave.op
+        def score(self, target, output):
+            return target == output
+
+        @weave.op
+        def summarize(self, score_rows):
+            return MyScorerSummary(awesome=3)
+
+    evaluation = Evaluation(
+        dataset=dataset_rows,
+        scorers=[MyScorer()],
+    )
+    model = EvalModel()
+    result = asyncio.run(evaluation.evaluate(model))
+    assert result["MyScorer"].awesome == 3

@@ -52,6 +52,13 @@ class UserSettings(BaseModel):
     If True, prints a link to the Weave UI when calling a weave op.
     Can be overridden with the environment variable `WEAVE_PRINT_CALL_LINK`"""
 
+    log_level: str = "INFO"
+    """Toggles the log level.
+
+    Controls the log level of the weave logger.
+    Valid values are: DEBUG, INFO, WARNING, ERROR, CRITICAL
+    Can be overridden with the environment variable `WEAVE_LOG_LEVEL`"""
+
     capture_code: bool = True
     """Toggles code capture for ops.
 
@@ -66,7 +73,7 @@ class UserSettings(BaseModel):
     """Toggles PII redaction using Microsoft Presidio.
 
     If True, redacts PII from trace data before sending to the server.
-    Can be overriden with the environment variable `WEAVE_REDACT_PII`
+    Can be overridden with the environment variable `WEAVE_REDACT_PII`
     """
 
     redact_pii_fields: list[str] = []
@@ -77,7 +84,7 @@ class UserSettings(BaseModel):
     If this list is left empty, the default fields will be redacted.
 
     A list of supported fields can be found here: https://microsoft.github.io/presidio/supported_entities/
-    Can be overriden with the environment variable `WEAVE_REDACT_PII_FIELDS`
+    Can be overridden with the environment variable `WEAVE_REDACT_PII_FIELDS`
     """
 
     capture_client_info: bool = True
@@ -98,11 +105,11 @@ class UserSettings(BaseModel):
     This cannot be changed after the client has been initialized.
     """
 
-    use_server_cache: bool = False
+    use_server_cache: bool = True
     """
-    Toggles caching of server responses, defaults to False
+    Toggles caching of server responses, defaults to True
 
-    If True, caches server responses to disk.
+    If True, caches server responses to disk at `WEAVE_SERVER_CACHE_DIR`.
     Can be overridden with the environment variable `WEAVE_USE_SERVER_CACHE`
     """
 
@@ -152,6 +159,15 @@ class UserSettings(BaseModel):
     Can be overridden with the environment variable `WEAVE_RETRY_MAX_ATTEMPTS`
     """
 
+    enable_disk_fallback: bool = True
+    """
+    Toggles disk fallback for dropped items.
+
+    If True, items that fail to be processed or are dropped due to queue limits
+    will be written to disk as a fallback instead of being lost.
+    Can be overridden with the environment variable `WEAVE_ENABLE_DISK_FALLBACK`
+    """
+
     model_config = ConfigDict(extra="forbid")
     _is_first_apply: bool = PrivateAttr(True)
 
@@ -176,6 +192,10 @@ def should_disable_weave() -> bool:
 
 def should_print_call_link() -> bool:
     return _should("print_call_link")
+
+
+def log_level() -> str:
+    return _optional_str("log_level") or "INFO"
 
 
 def should_capture_code() -> bool:
@@ -239,6 +259,11 @@ def retry_max_interval() -> float:
     if max_interval is None:
         return 60 * 5  # 5 minutes
     return max_interval
+
+
+def should_enable_disk_fallback() -> bool:
+    """Returns whether disk fallback should be enabled for dropped items."""
+    return _should("enable_disk_fallback")
 
 
 def parse_and_apply_settings(

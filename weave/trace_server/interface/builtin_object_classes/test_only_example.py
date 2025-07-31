@@ -1,14 +1,22 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from weave.trace_server.interface.builtin_object_classes import base_object_def
 
 
 class TestOnlyNestedBaseModel(BaseModel):
     a: int
+    aliased_property: int = Field(alias="aliased_property_alias")
 
 
 class TestOnlyNestedBaseObject(base_object_def.BaseObject):
     b: int
+
+
+class TestOnlyInheritedBaseObject(TestOnlyNestedBaseObject):
+    """A builtin object that inherits from another builtin object for testing inheritance."""
+
+    c: int
+    additional_field: str = "default_value"
 
 
 class TestOnlyExample(base_object_def.BaseObject):
@@ -23,4 +31,4 @@ class TestOnlyExample(base_object_def.BaseObject):
     nested_base_object: base_object_def.RefStr
 
 
-__all__ = ["TestOnlyExample", "TestOnlyNestedBaseObject"]
+__all__ = ["TestOnlyExample", "TestOnlyInheritedBaseObject", "TestOnlyNestedBaseObject"]

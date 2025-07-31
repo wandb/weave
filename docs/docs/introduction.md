@@ -4,6 +4,12 @@ slug: /
 
 # W&B Weave
 
+:::tip
+For a limited time, the new W&B Inference service is included in your free tier. W&B Inference provides access to leading open-source foundation models via API and the Weave [Playground](./guides/tools/playground.md). 
+- [Developer documentation](./guides/integrations/inference.md)
+- [Product page](https://wandb.ai/site/inference) 
+:::
+
 Weights & Biases (W&B) Weave is a framework for tracking, experimenting with, evaluating, deploying, and improving LLM-based applications. Designed for flexibility and scalability, Weave supports every stage of your LLM application development workflow:
 
 - **Tracing & Monitoring**: [Track LLM calls and application logic](./guides/tracking/) to debug and analyze production systems.
@@ -17,7 +23,7 @@ Integrate Weave with your existing development stack via the:
 - [TypeScript SDK](./reference/typescript-sdk/weave/README.md)
 - [Service API](./reference/service-api/call-start-call-start-post)
 
-Weave supports [numerous LLM providers, local models, frameworks, and third-party services](./guides/integrations/index.md).
+Weave supports [numerous LLM providers, local models, frameworks, protocols, and third-party services](./guides/integrations/index.md).
 
 ## Get started
 

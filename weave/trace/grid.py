@@ -6,8 +6,6 @@ import csv
 import locale
 import os
 import sys
-import termios
-import tty
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -22,7 +20,11 @@ if TYPE_CHECKING:
 
 
 # Set locale to user's default setting
-locale.setlocale(locale.LC_ALL, "")
+try:
+    locale.setlocale(locale.LC_ALL, "")
+except locale.Error:
+    # Fall back to default C locale if user's locale is not supported
+    locale.setlocale(locale.LC_ALL, "C")
 
 # TODO: Add support for other types, e.g. float, datetime, etc.
 ColumnType = Literal["str", "int", "bool"]
@@ -64,24 +66,31 @@ def get_terminal_height() -> int:
     return os.get_terminal_size().lines - 5  # Adjust for headers & padding
 
 
-def get_key() -> str:
-    """Reads a single keypress from the user without requiring Enter."""
-    fd = sys.stdin.fileno()
-    old_settings = termios.tcgetattr(fd)
-    try:
-        tty.setraw(fd)
-        ch = sys.stdin.read(1)
-        # Check if it might be an arrow key (starts with escape sequence)
-        if ch == "\x1b":
-            # Read the next two characters for arrow keys
-            next_chars = sys.stdin.read(2)
-            return ch + next_chars
-        else:
-            return ch
-    except KeyboardInterrupt:
-        return "q"  # Handle Ctrl+C gracefully
-    finally:
-        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+if os.name == "nt":  # Windows
+    # TODO: Implement a Windows-compatible implementation
+    pass
+else:  # Unix/Linux/MacOS
+    import termios
+    import tty
+
+    def get_key() -> str:
+        """Reads a single keypress from the user without requiring Enter."""
+        fd = sys.stdin.fileno()
+        old_settings = termios.tcgetattr(fd)
+        try:
+            tty.setraw(fd)
+            ch = sys.stdin.read(1)
+            # Check if it might be an arrow key (starts with escape sequence)
+            if ch == "\x1b":
+                # Read the next two characters for arrow keys
+                next_chars = sys.stdin.read(2)
+                return ch + next_chars
+            else:
+                return ch
+        except KeyboardInterrupt:
+            return "q"  # Handle Ctrl+C gracefully
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
 
 
 class Row:
@@ -127,7 +136,7 @@ class Row:
         try:
             return self[name]
         except KeyError:
-            raise AttributeError(f"Row has no attribute or column '{name}'")
+            raise AttributeError(f"Row has no attribute or column '{name}'") from None
 
     def __setattr__(self, name: str, value: Any) -> None:
         """Allow setting column values as attributes.
@@ -347,7 +356,7 @@ class Grid:
             except (ValueError, TypeError):
                 raise ValueError(
                     f"Cannot coerce value '{value}' to type '{col.type}' for column '{col.id}'"
-                )
+                ) from None
 
         self.rows[row_index][column_index] = value
         return self
@@ -400,7 +409,7 @@ class Grid:
 
         # Check column types and coerce values if possible
         processed_values: RowValues = []
-        for i, (value, column) in enumerate(zip(values, self.columns)):
+        for _i, (value, column) in enumerate(zip(values, self.columns)):
             if column.type is not None:
                 try:
                     if column.type == "bool" and not isinstance(value, bool):
@@ -414,7 +423,7 @@ class Grid:
                 except (ValueError, TypeError):
                     raise ValueError(
                         f"Cannot coerce value '{value}' to type '{column.type}' for column '{column.id}'"
-                    )
+                    ) from None
             else:
                 processed_values.append(value)
 
@@ -532,6 +541,11 @@ class Grid:
         return pydantic_util.table_to_str(table)
 
     def show(self, rows_per_page: int | None = None) -> None:
+        if os.name == "nt":  # Windows
+            raise NotImplementedError(
+                "Interactive grid pagination is not yet supported on Windows."
+            )
+
         height = get_terminal_height()
         if self.num_rows < height:
             print(self.to_rich_table_str())
@@ -579,7 +593,7 @@ class Grid:
         try:
             import pandas as pd
         except ImportError:
-            raise ImportError("pandas is required to use this method")
+            raise ImportError("pandas is required to use this method") from None
 
         # Create a DataFrame directly from the grid data
         data: dict[str, list[Any]] = {col.id: [] for col in self.columns}
