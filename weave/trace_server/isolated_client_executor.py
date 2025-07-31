@@ -166,7 +166,7 @@ class IsolatedClientExecutor:
         request: T,
         *,
         timeout_seconds: float | None = None,
-    ) -> R: ...
+    ) -> tuple[R, Optional[Exception]]: ...
 
     @overload
     async def execute(
@@ -175,7 +175,7 @@ class IsolatedClientExecutor:
         request: T,
         *,
         timeout_seconds: float | None = None,
-    ) -> R: ...
+    ) -> tuple[R, Optional[Exception]]: ...
 
     async def execute(
         self,
@@ -183,7 +183,7 @@ class IsolatedClientExecutor:
         request: T,
         *,
         timeout_seconds: float | None = None,
-    ) -> R:
+    ) -> tuple[R, Optional[Exception]]:
         """
         Execute a function in an isolated process with the configured client.
 
@@ -196,20 +196,21 @@ class IsolatedClientExecutor:
             timeout_seconds: Override the default timeout for this execution.
 
         Returns:
-            The result of the function execution.
-
-        Raises:
-            IsolatedClientExecutorError: If execution fails, times out, or process crashes.
+            Tuple of (result, exception). If successful, exception is None.
+            If failed, result is None and exception contains the exception.
         """
         self._ensure_process_running()
         effective_timeout = timeout_seconds or self.timeout_seconds
 
+        exception = None
+        result = None
+        
         try:
-            return await self._execute_with_timeout(func, request, effective_timeout)
+            result = await self._execute_with_timeout(func, request, effective_timeout)
         except Exception as e:
-            if isinstance(e, IsolatedClientExecutorError):
-                raise
-            raise IsolatedClientExecutorError(f"Execution failed: {e}") from e
+            exception = e
+
+        return result, exception
 
     def stop(self, timeout_seconds: float = DEFAULT_SHUTDOWN_TIMEOUT_SECONDS) -> None:
         """
