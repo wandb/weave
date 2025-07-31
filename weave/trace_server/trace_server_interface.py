@@ -1185,6 +1185,7 @@ class EvaluationStatusFailed(BaseModelStrict):
 class EvaluationStatusComplete(BaseModelStrict):
     code: Literal["complete"] = "complete"
     output: Optional[Any] = None
+    scorer: Optional[Any] = None
 
 
 class EvaluationStatusRes(BaseModel):
