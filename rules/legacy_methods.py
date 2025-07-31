@@ -88,8 +88,6 @@ class ClientFeedbackRule(LintRule):
                 "Use client.get_feedback() instead of client.feedback()",
                 replacement=new_call,
             )
-<<<<<<< HEAD
-=======
 
 
 class ReplaceFileWithContentRule(LintRule):
@@ -182,4 +180,3 @@ class ReplaceFileWithContentRule(LintRule):
                 "You may need to add 'from weave import Content'.",
                 replacement=replacement_node,
             )
->>>>>>> master
