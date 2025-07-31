@@ -30,7 +30,7 @@ def evaluation_status(
         return tsi.EvaluationStatusRes(status=tsi.EvaluationStatusFailed())
 
     if eval_call.call.ended_at is not None:
-        return tsi.EvaluationStatusRes(status=tsi.EvaluationStatusComplete())
+        return tsi.EvaluationStatusRes(status=tsi.EvaluationStatusComplete(output=eval_call.call.output))
 
     # determine completed rows (children complete)
     children_calls = server.calls_query(
@@ -42,7 +42,8 @@ def evaluation_status(
             ),
             columns=["id", "ended_at"],
         )
-    )
+    ).calls
+
     completed_children_calls = [
         call.id for call in children_calls if call.ended_at is not None
     ]
@@ -87,7 +88,7 @@ def evaluation_status(
         table_rows_stats = server.table_query_stats(
             tsi.TableQueryStatsReq(
                 project_id=req.project_id,
-                table_id=parsed_table_rows_ref.digest,
+                digest=parsed_table_rows_ref.digest,
             )
         )
         return table_rows_stats.count
