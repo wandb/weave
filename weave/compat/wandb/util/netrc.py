@@ -83,11 +83,9 @@ class Netrc:
 
         try:
             netrc_obj = netrc.netrc(str(self.path))
-            # Convert from netrc format to our TypedDict format with validation
             result: dict[str, Credentials] = {}
             for machine, credentials in netrc_obj.hosts.items():
                 login, account, password = credentials
-                # Validate and ensure all fields are strings, handle None values
                 result[machine] = {
                     "login": login or "",
                     "account": account or "",
