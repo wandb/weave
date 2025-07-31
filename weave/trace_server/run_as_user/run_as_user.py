@@ -293,11 +293,10 @@ class RunAsUser:
 
         Handles both synchronous and asynchronous function execution.
         """
+        # Create and initialize the client
+        if get_weave_client() is not None:
+            raise RunAsUserError("Unsafe to run as user with existing weave client")
         try:
-            # Create and initialize the client
-            if get_weave_client() is not None:
-                raise RunAsUserError("Unsafe to run as user with existing weave client")
-
             client = client_factory(client_factory_config)
             ic = InitializedClient(client)
 
@@ -315,10 +314,7 @@ class RunAsUser:
                                 result = func(request)
 
                                 # Handle async functions - check for both Coroutine and Awaitable
-                                if isinstance(result, Coroutine):
-                                    result = asyncio.run(result)
-                                elif hasattr(result, "__await__"):
-                                    # Handle other awaitable types
+                                if isinstance(result, Coroutine) or hasattr(result, "__await__"):
                                     result = asyncio.run(result)
 
                                 response_queue.put(result)
