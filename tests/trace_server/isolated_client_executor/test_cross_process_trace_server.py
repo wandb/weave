@@ -11,13 +11,13 @@ from collections.abc import Iterator
 from datetime import datetime
 
 import pytest
+
 from tests.trace_server.isolated_client_executor.cross_process_trace_server import (
     CrossProcessTraceServerError,
     CrossProcessTraceServerReceiver,
     EmptyPayload,
     RequestQueueItem,
 )
-
 from weave.trace_server import trace_server_interface as tsi
 
 
