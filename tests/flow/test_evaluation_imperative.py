@@ -584,11 +584,8 @@ def test_evaluation_logger_model_with_different_inference_method_names(client):
 
 def test_evaluation_logger_with_custom_attributes(client):
     ev = weave.EvaluationLogger(eval_attributes={"custom_attribute": "value"})
-    pred = ev.log_prediction(inputs={"a": 1, "b": 2}, output=3)
-    ev.log_summary(auto_summarize=False)
     ev.finish()
     client.flush()
 
     calls = client.get_calls()
-    for call in calls:
-        assert call.attributes["custom_attribute"] == "value"
+    assert calls[0].attributes["custom_attribute"] == "value"

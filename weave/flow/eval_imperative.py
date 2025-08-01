@@ -512,7 +512,7 @@ class EvaluationLogger(BaseModel):
         with call_context.set_call_stack([self._evaluate_call]):
             # Make the prediction call
             with _set_current_output(output):
-                with weave.attributes(self.attributes):
+                with weave.attributes(IMPERATIVE_EVAL_MARKER):
                     _, predict_and_score_call = (
                         self._pseudo_evaluation.predict_and_score.call(
                             self._pseudo_evaluation,
@@ -576,7 +576,7 @@ class EvaluationLogger(BaseModel):
         with call_context.set_call_stack([self._evaluate_call]):
             try:
                 with _set_current_summary(final_summary):
-                    with weave.attributes(self.attributes):
+                    with weave.attributes(IMPERATIVE_EVAL_MARKER):
                         self._pseudo_evaluation.summarize()
             except Exception:
                 logger.error("Error during execution of summarize op.", exc_info=True)
