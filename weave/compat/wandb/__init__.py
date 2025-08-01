@@ -8,13 +8,20 @@ wandb API required by weave."""
 
 try:
     WANDB_AVAILABLE = True
-    from wandb import login, termerror, termlog, termwarn, util
+    from wandb import env, login, termerror, termlog, termwarn, util
     from wandb.errors import AuthenticationError, CommError
     from wandb.sdk.internal.internal_api import logger as wandb_logger
     from wandb.util import app_url
 except (ImportError, ModuleNotFoundError):
     WANDB_AVAILABLE = False
-    from weave.compat.wandb.wandb_thin import login, termerror, termlog, termwarn, util
+    from weave.compat.wandb.wandb_thin import (
+        env,
+        login,
+        termerror,
+        termlog,
+        termwarn,
+        util,
+    )
     from weave.compat.wandb.wandb_thin.errors import AuthenticationError, CommError
     from weave.compat.wandb.wandb_thin.internal_api import logger as wandb_logger
     from weave.compat.wandb.wandb_thin.util import app_url
@@ -28,6 +35,7 @@ __all__ = [
     "AuthenticationError",
     "CommError",
     "app_url",
+    "env",
     "login",
     "termerror",
     "termlog",

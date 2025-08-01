@@ -14,8 +14,8 @@ from typing import Literal
 
 import click
 
+from weave.compat.wandb import env, util
 from weave.compat.wandb.util.netrc import Netrc
-from weave.compat.wandb.wandb_thin import env, util
 
 logger = logging.getLogger(__name__)
 
@@ -363,34 +363,6 @@ def _validate_api_key(api_key: str) -> None:
         raise ValueError(
             f"API key must be 40 characters long, yours was {len(key)}"
         ) from None
-
-
-def _parse_wandb_host(host: str) -> str:
-    """Parse a W&B host URL to extract the hostname.
-
-    Args:
-        host (str): The host URL (e.g., 'https://api.wandb.ai/' or 'api.wandb.ai').
-
-    Returns:
-        str: The hostname without protocol or trailing slash (e.g., 'api.wandb.ai').
-
-    Examples:
-        >>> _parse_wandb_host('https://api.wandb.ai/')
-        'api.wandb.ai'
-        >>> _parse_wandb_host('http://localhost:8080')
-        'localhost:8080'
-        >>> _parse_wandb_host('api.wandb.ai')
-        'api.wandb.ai'
-    """
-    # Remove protocol if present
-    if host.startswith(("http://", "https://")):
-        host = host.split("://", 1)[1]
-
-    # Remove trailing slash if present
-    if host.endswith("/"):
-        host = host[:-1]
-
-    return host
 
 
 def _get_default_host() -> str:
