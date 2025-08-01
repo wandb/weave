@@ -146,9 +146,9 @@ class IsolatedClientExecutor:
         self.timeout_seconds = timeout_seconds
 
         # Process management
-        self._process: SpawnProcess | None = None
-        self._request_queue: RequestQueue | None = None
-        self._response_queue: ResponseQueue | None = None
+        self._process: Optional[SpawnProcess] = None
+        self._request_queue: Optional[RequestQueue] = None
+        self._response_queue: Optional[ResponseQueue] = None
 
     # =============================================================================
     # Public API
@@ -165,7 +165,7 @@ class IsolatedClientExecutor:
         func: SyncCallable[T, R],
         request: T,
         *,
-        timeout_seconds: float | None = None,
+        timeout_seconds: Optional[float] = None,
     ) -> tuple[R, Optional[Exception]]: ...
 
     @overload
