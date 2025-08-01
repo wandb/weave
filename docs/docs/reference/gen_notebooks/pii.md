@@ -150,7 +150,7 @@ print('PII data first sample: "' + pii_data[0]["text"] + '"')
 
 ## Redaction methods overview
 
-Once you've completed the [setup](#setup), you can 
+Once you've completed the [prerequisites](#prerequisites), you can 
 
 To detect and protect our PII data, we'll identify and redact PII data and optionally anonymize it using the following methods:
 
@@ -629,7 +629,7 @@ for entry in pii_data:
 
 ### `autopatch_settings` method
 
-In the following example, we set `postprocess_inputs` for `anthropic` to the `postprocess_inputs_regex()` function () at initialization. The `postprocess_inputs_regex` function applies the`redact_with_regex` method defined in [Method 1: Regular Expression Filtering](#method-1-regular-expression-filtering). Now, `redact_with_regex` will be applied to all inputs to any `anthropic` models.
+In the following example, we set `postprocess_inputs` for `anthropic` to the `postprocess_inputs_regex()` function () at initialization. The `postprocess_inputs_regex` function applies the`redact_with_regex` method defined in [Method 1: Filter using regular expressions](#method-1-filter-using-regular-expressions). Now, `redact_with_regex` will be applied to all inputs to any `anthropic` models.
 
 
 ```python
