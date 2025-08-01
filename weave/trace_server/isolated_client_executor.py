@@ -165,8 +165,8 @@ class IsolatedClientExecutor:
         func: SyncCallable[T, R],
         request: T,
         *,
-        timeout_seconds: Optional[float] = None,
-    ) -> tuple[R, Optional[Exception]]: ...
+        timeout_seconds: float | None = None,
+    ) -> tuple[R | None, Exception | None]: ...
 
     @overload
     async def execute(
@@ -175,7 +175,7 @@ class IsolatedClientExecutor:
         request: T,
         *,
         timeout_seconds: float | None = None,
-    ) -> tuple[R, Optional[Exception]]: ...
+    ) -> tuple[R | None, Exception | None]: ...
 
     async def execute(
         self,
