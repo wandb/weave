@@ -8,6 +8,8 @@ from pathlib import Path
 
 import click
 
+from weave.compat import wandb
+
 logger = logging.getLogger(__name__)
 
 # Weave styling - using the same color as the rest of the weave application
@@ -116,19 +118,18 @@ def weave_login(
 
         # Show final login status
         _print_login_status(host)
-        return True
 
     except Exception as e:
         weave_echo(f"Login failed with error: {e}", err=True)
         return False
+    else:
+        return True
 
 
 def _prompt_for_api_key(host: str) -> str | None:
     """Prompt the user for their API key with helpful messaging."""
-    from weave.compat.wandb.wandb_thin import util
-
     # Generate the appropriate app URL
-    app_url = util.app_url(f"https://{host}")
+    app_url = wandb.util.app_url(f"https://{host}")
 
     # Add the authorize endpoint for easier access
     auth_url = f"{app_url}/authorize?ref=weave"
@@ -164,9 +165,7 @@ def _prompt_for_api_key(host: str) -> str | None:
 def _print_login_status(host: str) -> None:
     """Print the current login status with username if available."""
     try:
-        from weave.compat.wandb.wandb_thin.internal_api import Api
-
-        api = Api()
+        api = wandb.Api()
         username = api.username()
 
         # Style the URL in green and username in yellow (like wandb)
