@@ -360,7 +360,7 @@ class EvaluationLogger(BaseModel):
         Field(
             default_factory=dict,
             description="(Optional): A dictionary of attributes to add to the evaluation call."
-            "These attributes can be used to add additional metadata columns to the Evaluation",
+            "These attributes can be used to add additional metadata columns to the Evaluation.",
         ),
     ]
 
