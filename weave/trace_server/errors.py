@@ -234,7 +234,7 @@ def handle_clickhouse_query_error(e: Exception) -> None:
     """
     Handle common ClickHouse query errors by raising appropriate custom exceptions.
 
-    Args:s
+    Args:
         e: The original exception from ClickHouse
 
     Raises:
@@ -247,7 +247,7 @@ def handle_clickhouse_query_error(e: Exception) -> None:
 
     limit_scope_message = (
         "Please limit the scope of the query by including a date range and/or additional filter"
-        " criteria like call_id, trace_id, or op_name."
+        " criteria. "
     )
 
     if "MEMORY_LIMIT_EXCEEDED" in error_str:
