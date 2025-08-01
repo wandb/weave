@@ -463,7 +463,9 @@ class EvaluationLogger(BaseModel):
                 # This is best effort.  If we fail, just swallow the error.
                 pass
 
-    def _finalize_evaluation(self, output: Any = None, exception: BaseException | None = None) -> None:
+    def _finalize_evaluation(
+        self, output: Any = None, exception: BaseException | None = None
+    ) -> None:
         """Handles the final steps of the evaluation: cleaning up predictions and finishing the main call."""
         if self._is_finalized:
             return

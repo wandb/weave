@@ -476,6 +476,7 @@ def test_evaluation_no_auto_summarize(client):
     summarize_call = calls[4]
     assert summarize_call.output == {"output": {}}
 
+
 def test_evaluation_fail_with_exception(client):
     ev = weave.EvaluationLogger()
     ex = ValueError("test")
@@ -486,7 +487,9 @@ def test_evaluation_fail_with_exception(client):
     assert len(calls) == 1
     finish_call = calls[0]
     assert finish_call.output is None
-    assert finish_call.exception == json.dumps({"type": "ValueError", "message": "test"})
+    assert finish_call.exception == json.dumps(
+        {"type": "ValueError", "message": "test"}
+    )
 
 
 def test_evaluation_no_auto_summarize_with_custom_dict(client):
