@@ -159,12 +159,12 @@ class CrossProcessTraceServerSender(tsi.TraceServerInterface):
 
         if response_item.request_id == request_id:
             return response_item
-        else:
-            # Out-of-order response - cache it for later
-            with self.lock():
-                self._pending_requests[response_item.request_id] = response_item
-            # Recursively wait for the correct response
-            return self._wait_for_response(request_id, method, timeout)
+
+        # Out-of-order response - cache it for later
+        with self.lock():
+            self._pending_requests[response_item.request_id] = response_item
+        # Recursively wait for the correct response
+        return self._wait_for_response(request_id, method, timeout)
 
     def _send_request(self, method: str, payload: BaseModel) -> BaseModel:
         """
@@ -520,6 +520,9 @@ class CrossProcessTraceServerReceiver:
                     # Call the method and handle whatever it returns
                     method_name = request_item.method
                     method = getattr(self.trace_server, method_name)
+
+                    # This might be a long-running method,
+                    # as it could be hitting the DB
                     result = method(request_item.payload)
 
                     # Check if the result is an iterator (streaming response)
