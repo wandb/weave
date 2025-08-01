@@ -37,8 +37,14 @@ class QueryMemoryLimitExceeded(Error):
     pass
 
 
-class NoCommonType(Error):
+class QueryNoCommonType(Error):
     """Raised when a query has no common type."""
+
+    pass
+
+
+class QueryTimeoutExceeded(Error):
+    """Raised when a query timeout is exceeded."""
 
     pass
 
@@ -169,7 +175,7 @@ class ErrorRegistry:
         # Our own error types
         self.register(InvalidRequest, 400)
         self.register(InvalidExternalRef, 400)
-        self.register(NoCommonType, 400)
+        self.register(QueryNoCommonType, 400)
         self.register(MissingLLMApiKeyError, 400, _format_missing_llm_api_key)
         self.register(InvalidFieldError, 403)
         self.register(NotFoundError, 404)
@@ -178,6 +184,7 @@ class ErrorRegistry:
         self.register(InsertTooLarge, 413)
         self.register(RequestTooLarge, 413, lambda exc: {"reason": "Request too large"})
         self.register(QueryMemoryLimitExceeded, 502)
+        self.register(QueryTimeoutExceeded, 504)
 
         # Standard library exceptions
         self.register(ValueError, 400)
@@ -232,19 +239,31 @@ def handle_clickhouse_query_error(e: Exception) -> None:
 
     Raises:
         QueryMemoryLimitExceeded: When the query exceeds memory limits
-        NoCommonType: When there's a type mismatch in the query
+        QueryNoCommonType: When there's a type mismatch in the query
+        QueryTimeoutExceeded: When the query exceeds timeout limits
         Exception: Re-raises the original exception if no known pattern matches
     """
     error_str = str(e)
 
+    limit_scope_message = (
+        "Please limit the scope of the query by including a date range and/or additional filter"
+        " criteria like call_id, trace_id, or op_name."
+    )
+
     if "MEMORY_LIMIT_EXCEEDED" in error_str:
-        raise QueryMemoryLimitExceeded("Query memory limit exceeded") from e
+        raise QueryMemoryLimitExceeded(
+            "Query memory limit exceeded. " + limit_scope_message
+        ) from e
     if "NO_COMMON_TYPE" in error_str:
-        raise NoCommonType(
+        raise QueryNoCommonType(
             "No common type between data types in query. "
             "This can occur when comparing types without using the $convert operation. "
             "Example: filtering calls by inputs.integer_value = 1 without using $convert -> "
             "Correct: {$expr: {$eq: [{$convert: {input: {$getField: 'inputs.integer_value'}, to: 'double'}}, {$literal: 1}]}}"
+        ) from e
+    if "TIMEOUT_EXCEEDED" in error_str:
+        raise QueryTimeoutExceeded(
+            "Query timeout exceeded. " + limit_scope_message
         ) from e
 
     # Re-raise the original exception if no known pattern matches
