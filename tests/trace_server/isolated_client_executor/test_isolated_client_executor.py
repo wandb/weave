@@ -157,12 +157,15 @@ async def runner_with_cleanup(
         runner.stop()
         cleanup()
 
+
 @weave.op
 def get_keys(a):
     return list(a.keys())
 
+
 def do_task(args: dict):
     return get_keys(args)
+
 
 @pytest.mark.asyncio
 async def test_hello_world(client):
@@ -175,8 +178,7 @@ async def test_hello_world(client):
         client.server, entity=client.entity, project=inner_project
     )
     runner = IsolatedClientExecutor(
-        client_factory=weave_client_factory,
-        client_factory_config=factory_config
+        client_factory=weave_client_factory, client_factory_config=factory_config
     )
 
     assert get_ref(get_keys) is None
@@ -188,7 +190,9 @@ async def test_hello_world(client):
     runner.stop()
     cleanup()
 
-    objs = client.server.objs_query(ObjQueryReq(project_id=client.entity + "/" + inner_project)).objs
+    objs = client.server.objs_query(
+        ObjQueryReq(project_id=client.entity + "/" + inner_project)
+    ).objs
     assert len(objs) == exp_obj_count
 
     # now the performing the task in the main process
@@ -198,7 +202,9 @@ async def test_hello_world(client):
     assert err is None
     assert res == ["a"]
 
-    objs = client.server.objs_query(ObjQueryReq(project_id=client.entity + "/" + client.project)).objs
+    objs = client.server.objs_query(
+        ObjQueryReq(project_id=client.entity + "/" + client.project)
+    ).objs
     assert len(objs) == exp_obj_count
 
 

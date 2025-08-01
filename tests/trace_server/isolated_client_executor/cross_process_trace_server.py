@@ -523,7 +523,9 @@ class CrossProcessTraceServerReceiver:
                     result = method(request_item.payload)
 
                     # Check if the result is an iterator (streaming response)
-                    if hasattr(result, '__iter__') and not isinstance(result, (str, bytes, BaseModel)):
+                    if hasattr(result, "__iter__") and not isinstance(
+                        result, (str, bytes, BaseModel)
+                    ):
                         # Handle streaming response
                         for item in result:
                             response_item = ResponseQueueItem(
@@ -531,7 +533,7 @@ class CrossProcessTraceServerReceiver:
                                 payload=item,
                             )
                             self.response_queue.put(response_item)
-                        
+
                         # Signal end of stream
                         response_item = ResponseQueueItem(
                             request_id=request_item.request_id,
