@@ -98,6 +98,7 @@ def dspy_postprocess_outputs(
 ) -> Union[list[Any], dict[str, Any], Any]:
     import numpy as np
     from dspy import Example, Module
+    from litellm import ModelResponse
 
     if isinstance(outputs, Module):
         outputs = outputs.dump_state()
@@ -107,6 +108,9 @@ def dspy_postprocess_outputs(
 
     if isinstance(outputs, np.ndarray):
         outputs = outputs.tolist()
+
+    if isinstance(outputs, ModelResponse):
+        outputs = dictify(outputs)
 
     return dump_dspy_objects(outputs)
 
