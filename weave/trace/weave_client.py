@@ -5,23 +5,15 @@ import dataclasses
 import datetime
 import json
 import logging
-import numbers
 import os
 import platform
 import re
 import sys
 import time
-from collections import defaultdict
 from collections.abc import Sequence
 from concurrent.futures import Future
 from functools import cached_property
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Callable,
-    TypedDict,
-    cast,
-)
+from typing import TYPE_CHECKING, Any, Callable, TypedDict, cast
 
 import pydantic
 from requests import HTTPError
@@ -136,11 +128,14 @@ from weave.trace_server.trace_server_interface import (
     TraceServerInterface,
     TraceStatus,
 )
+from weave.utils.attributes_dict import AttributesDict
+from weave.utils.dict_utils import sum_dict_leaves, zip_dicts
 from weave.utils.paginated_iterator import PaginatedIterator
 
 if TYPE_CHECKING:
     import wandb
 
+    from weave.flow.eval import Evaluation
     from weave.flow.scorer import ApplyScorerResult, Scorer
 
 
@@ -169,6 +164,7 @@ def _make_calls_iterator(
     include_feedback: bool = False,
     columns: list[str] | None = None,
     expand_columns: list[str] | None = None,
+    return_expanded_column_values: bool = True,
     page_size: int = DEFAULT_CALLS_PAGE_SIZE,
 ) -> CallsIter:
     def fetch_func(offset: int, limit: int) -> list[CallSchema]:
@@ -191,6 +187,7 @@ def _make_calls_iterator(
                     sort_by=sort_by,
                     columns=columns,
                     expand_columns=expand_columns,
+                    return_expanded_column_values=return_expanded_column_values,
                 )
             )
         )
@@ -645,129 +642,8 @@ def make_client_call(
     return WeaveObject(call, ref, server, None)
 
 
-def sum_dict_leaves(dicts: list[dict]) -> dict:
-    """Recursively combines multiple dictionaries by summing their leaf values.
-
-    This function takes a list of dictionaries and combines them by:
-    1. For non-dict values: extending lists or summing numbers
-    2. For nested dictionaries: recursively combining them
-
-    Args:
-        dicts: A list of dictionaries to combine
-
-    Returns:
-        A single dictionary with combined values
-
-    Examples:
-        >>> # Combining status counts from multiple runs
-        >>> dicts = [
-        ...     {"status_counts": {"SUCCESS": 5, "FAILED": 1}},
-        ...     {"status_counts": {"SUCCESS": 3, "FAILED": 2, "PENDING": 1}}
-        ... ]
-        >>> sum_dict_leaves(dicts)
-        {'status_counts': {'SUCCESS': 8, 'FAILED': 3, 'PENDING': 1}}
-
-        >>> # Combining metrics with nested structure
-        >>> dicts = [
-        ...     {"metrics": {"accuracy": 0.95, "loss": 0.1, "details": {"precision": 0.9, "recall": 0.8}}},
-        ...     {"metrics": {"accuracy": 0.97, "loss": 0.08, "details": {"precision": 0.92, "f1": 0.85}}}
-        ... ]
-        >>> sum_dict_leaves(dicts)
-        {'metrics': {'accuracy': 1.92, 'loss': 0.18, 'details': {'precision': 1.82, 'recall': 0.8, 'f1': 0.85}}}
-    """
-    nested_dicts: dict[str, list[dict]] = defaultdict(list)
-    result: dict[str, Any] = defaultdict(list)
-
-    # First, collect all nested dictionaries by key
-    for d in dicts:
-        for k, v in d.items():
-            if isinstance(v, dict):
-                nested_dicts[k].append(v)
-            elif v is not None:
-                if isinstance(v, list):
-                    result[k].extend(v)
-                else:
-                    result[k].append(v)
-
-    # Sum those values that are numbers
-    for k, values in result.items():
-        # we only sum numbers if we are not going to combine nested dicts later
-        if k not in nested_dicts and all(isinstance(v, numbers.Number) for v in values):
-            result[k] = sum(values)
-
-    # Then recursively sum each collection of nested dictionaries
-    for k in nested_dicts.keys():
-        result[k] = sum_dict_leaves(nested_dicts[k])
-
-    return result
-
-
 RESERVED_SUMMARY_USAGE_KEY = "usage"
 RESERVED_SUMMARY_STATUS_COUNTS_KEY = "status_counts"
-
-
-class WeaveKeyDict(dict):
-    """A dict representing the 'weave' subdictionary of a call's attributes.
-
-    This dictionary is not intended to be set directly.
-    """
-
-    def __setitem__(self, key: Any, value: Any) -> None:
-        raise KeyError("Cannot modify `weave` dict directly -- for internal use only!")
-
-
-class AttributesDict(dict):
-    """A dict representing the attributes of a call.
-
-    The ``weave`` key is reserved for internal use and cannot be set directly.
-    Attributes become immutable once the call is created. Any attempt to modify
-    the dictionary after call start will raise :class:`TypeError`. Use the
-    :func:`weave.attributes` context manager or the ``attributes`` parameter of
-    :meth:`WeaveClient.create_call` to supply metadata before the call begins.
-    """
-
-    def __init__(self, **kwargs: Any) -> None:
-        super().__init__()
-        dict.__setitem__(self, "weave", WeaveKeyDict())
-
-        self._frozen = False
-
-        if kwargs:
-            for key, value in kwargs.items():
-                if key == "weave":
-                    if isinstance(value, dict):
-                        for subkey, subvalue in value.items():
-                            self._set_weave_item(subkey, subvalue)
-                else:
-                    self[key] = value
-
-    def freeze(self) -> None:
-        self._frozen = True
-
-    def __setitem__(self, key: Any, value: Any) -> None:
-        if self.__dict__.get("_frozen", False):
-            raise TypeError("Cannot modify attributes after call start")
-        if key == "weave":
-            raise KeyError("Cannot set 'weave' directly -- for internal use only!")
-        super().__setitem__(key, value)
-
-    def __delitem__(self, key: Any) -> None:
-        if self.__dict__.get("_frozen", False):
-            raise TypeError("Cannot modify attributes after call start")
-        super().__delitem__(key)
-
-    def update(self, *args: Any, **kwargs: Any) -> None:  # type: ignore[override]
-        if self.__dict__.get("_frozen", False):
-            raise TypeError("Cannot modify attributes after call start")
-        for k, v in dict(*args, **kwargs).items():
-            self[k] = v
-
-    def _set_weave_item(self, subkey: Any, value: Any) -> None:
-        """Internal method to set items in the 'weave' subdictionary."""
-        dict.__setitem__(self["weave"], subkey, value)
-
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}({super().__repr__()})"
 
 
 BACKGROUND_PARALLELISM_MIX = 0.5
@@ -927,6 +803,79 @@ class WeaveClient:
 
     ################ Query API ################
 
+    def get_evaluation(self, uri: str) -> Evaluation:
+        """
+        Retrieve a specific Evaluation object by its URI.
+
+        Evaluation URIs typically follow the format:
+        `weave:///entity/project/object/Evaluation:version`
+
+        You can also get the evaluation by its "friendly" name:
+        get_evaluation("Evaluation:v1")
+
+        Args:
+            uri (str): The unique resource identifier of the evaluation to retrieve.
+
+        Returns:
+            Evaluation: The Evaluation object corresponding to the provided URI.
+
+        Raises:
+            TypeError: If the object at the URI is not an Evaluation instance.
+            ValueError: If the URI is invalid or the object cannot be found.
+
+        Examples:
+            >>> client = weave.init("my-project")
+            >>> evaluation = client.get_evaluation("weave:///entity/project/object/my-eval:v1")
+            >>> print(evaluation.name)
+            'my-eval'
+        """
+        import weave
+
+        res = weave.ref(uri).get()
+        if not isinstance(res, weave.Evaluation):
+            raise TypeError(f"Expected Evaluation, got {type(res)}")
+        return res
+
+    # TODO: Make into EvaluationsIter
+    # TODO: Add option to select a subset of evaluations
+    def get_evaluations(self) -> list[Evaluation]:
+        """
+        Retrieve all Evaluation objects from the current project.
+
+        Returns:
+            list[Evaluation]: A list of all Evaluation objects in the current project.
+                Empty list if no evaluations are found or if all conversions fail.
+
+        Examples:
+            >>> client = weave.init("my-project")
+            >>> evaluations = client.get_evaluations()
+            >>> print(f"Found {len(evaluations)} evaluations")
+            >>> for eval in evaluations:
+            ...     print(f"Evaluation: {eval.name}")
+        """
+        eval_objs = self._objects(
+            filter=ObjectVersionFilter(base_object_classes=["Evaluation"]),
+        )
+
+        lst = []
+        for obj in eval_objs:
+            # It's unfortunate we have to do this, but it's currently the easiest
+            # way get the correct behaviour given our serialization layer...
+            entity, project = obj.project_id.split("/")
+            ref = ObjectRef(
+                entity=entity,
+                project=project,
+                name=obj.val["name"],
+                _digest=obj.digest,
+            )
+            try:
+                obj = ref.get()
+            except Exception:
+                logger.exception(f"Failed to convert {obj} to Evaluation")
+            else:
+                lst.append(obj)
+        return lst
+
     @trace_sentry.global_trace_sentry.watch()
     @pydantic.validate_call
     def get_calls(
@@ -941,6 +890,7 @@ class WeaveClient:
         include_feedback: bool = False,
         columns: list[str] | None = None,
         expand_columns: list[str] | None = None,
+        return_expanded_column_values: bool = True,
         scored_by: str | list[str] | None = None,
         page_size: int = DEFAULT_CALLS_PAGE_SIZE,
     ) -> CallsIter:
@@ -997,6 +947,7 @@ class WeaveClient:
             include_feedback=include_feedback,
             columns=columns,
             expand_columns=expand_columns,
+            return_expanded_column_values=return_expanded_column_values,
             page_size=page_size,
         )
 
@@ -2467,27 +2418,6 @@ def elide_display_name(name: str) -> str:
         )
         return name[: MAX_DISPLAY_NAME_LENGTH - 3] + "..."
     return name
-
-
-def zip_dicts(base_dict: dict[str, Any], new_dict: dict[str, Any]) -> dict[str, Any]:
-    final_dict = {}
-    for key, value in base_dict.items():
-        if key in new_dict:
-            # Shared key (if both dicts, merge)
-            new_value = new_dict[key]
-            if isinstance(value, dict) and isinstance(new_value, dict):
-                final_dict[key] = zip_dicts(value, new_value)
-            else:
-                # base-only key
-                final_dict[key] = new_value
-        else:
-            final_dict[key] = value
-    for key, value in new_dict.items():
-        if key not in base_dict:
-            # new-only key
-            final_dict[key] = value
-
-    return final_dict
 
 
 __docspec__ = [WeaveClient, Call, CallsIter]

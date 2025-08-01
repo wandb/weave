@@ -36,15 +36,15 @@ async def test_evaluation_status(client):
     eval_call_id = generate_id()
 
     def get_status():
+        client.flush()
         return client.server.evaluation_status(
             EvaluationStatusReq(project_id=client._project_id(), call_id=eval_call_id)
         ).status
 
     @weave.op
     def model(a: int) -> int:
-        assert get_status() == EvaluationStatusRunning(
-            completed_rows=a - 1, total_rows=3
-        )
+        status = get_status()
+        assert status == EvaluationStatusRunning(completed_rows=a - 1, total_rows=3)
         return a + 1
 
     @weave.op
@@ -61,7 +61,7 @@ async def test_evaluation_status(client):
     assert get_status() == EvaluationStatusNotFound()
 
     # mock weave.trace.env.py::get_weave_parallelism to return 1 (allows for checking status deterministically)
-    with mock.patch("weave.trace.env.get_weave_parallelism", return_value=1):
+    with mock.patch.dict("os.environ", {"WEAVE_PARALLELISM": "1"}):
         # Patch the first 2 calls to generate_id to return eval_call_id, then defer to the real function
         real_generate_id = generate_id
 
@@ -78,7 +78,13 @@ async def test_evaluation_status(client):
         ):
             await eval.evaluate(model=model)
 
-    assert get_status() == EvaluationStatusComplete(completed_rows=3, total_rows=3)
+    assert get_status() == EvaluationStatusComplete(
+        output={
+            "output": {"mean": 3.0},
+            "scorer": {"mean": 1.0},
+            "model_latency": {"mean": pytest.approx(0, abs=1)},
+        }
+    )
 
 
 def setup_test_objects(server: TraceServerInterface, entity: str, project: str):
