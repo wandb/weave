@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import sys
-from typing import Optional
 
 import click
 
@@ -20,9 +19,9 @@ def cli() -> None:
 @click.option("--relogin", is_flag=True, help="Force relogin if already logged in.")
 @click.option("--verify/--no-verify", default=True, help="Verify login credentials")
 def login(
-    key: Optional[str] = None,
+    key: str | None = None,
     cloud: bool = False,
-    host: Optional[str] = None,
+    host: str | None = None,
     relogin: bool = False,
     verify: bool = True,
 ) -> None:

@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
-from typing import Optional
 
 import click
 
@@ -26,11 +25,11 @@ def weave_echo_styled(message: str, **kwargs) -> None:
 
 
 def weave_login(
-    key: Optional[str] = None,
-    host: Optional[str] = None,
+    key: str | None = None,
+    host: str | None = None,
     relogin: bool = False,
     verify: bool = True,
-    timeout: Optional[int] = None,
+    timeout: int | None = None,
 ) -> bool:
     """Login to Weights & Biases for use with Weave.
 
@@ -124,7 +123,7 @@ def weave_login(
         return False
 
 
-def _prompt_for_api_key(host: str) -> Optional[str]:
+def _prompt_for_api_key(host: str) -> str | None:
     """Prompt the user for their API key with helpful messaging."""
     from weave.compat.wandb.wandb_thin import util
 
