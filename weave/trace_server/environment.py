@@ -17,12 +17,12 @@ def kafka_broker_port() -> int:
     return int(os.environ.get("KAFKA_BROKER_PORT", 9092))
 
 
-def kafka_client_user() -> str:
+def kafka_client_user() -> Optional[str]:
     """The username for the kafka client."""
     return os.environ.get("KAFKA_CLIENT_USER")
 
 
-def kafka_client_password() -> str:
+def kafka_client_password() -> Optional[str]:
     """The password for the kafka client."""
     return os.environ.get("KAFKA_CLIENT_PASSWORD")
 
