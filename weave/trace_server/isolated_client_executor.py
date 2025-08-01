@@ -146,9 +146,9 @@ class IsolatedClientExecutor:
         self.timeout_seconds = timeout_seconds
 
         # Process management
-        self._process: Optional[SpawnProcess] = None
-        self._request_queue: Optional[RequestQueue] = None
-        self._response_queue: Optional[ResponseQueue] = None
+        self._process: SpawnProcess | None = None
+        self._request_queue: RequestQueue | None = None
+        self._response_queue: ResponseQueue | None = None
 
     # =============================================================================
     # Public API
