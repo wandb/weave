@@ -131,6 +131,8 @@ ATTRIBUTE_KEYS = {
 WB_KEYS = {
     # Custom display name for the call in the UI
     "display_name": ["wandb.display_name"],
+    "thread_id": ["wandb.thread_id"],
+    "is_turn": ["wandb.is_turn"],
 }
 
 # These represent fields that are set by a provider which override top level span information

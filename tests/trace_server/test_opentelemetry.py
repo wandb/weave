@@ -199,6 +199,102 @@ def test_otel_export_clickhouse(client: weave_client.WeaveClient):
     assert len(res.calls) == 0
 
 
+def test_otel_export_with_turn_and_thread(client: weave_client.WeaveClient):
+    """Test the otel_export method with turn and thread attributes."""
+    import re
+
+    # Create a test export request
+    export_req = create_test_export_request()
+    project_id = client._project_id()
+    export_req.project_id = project_id
+
+    # Add turn and thread attributes to the span
+    test_thread_id = str(uuid.uuid4())
+    span = export_req.traces.resource_spans[0].scope_spans[0].spans[0]
+
+    kv_is_turn = KeyValue()
+    kv_is_turn.key = "wandb.is_turn"
+    kv_is_turn.value.bool_value = True
+    span.attributes.append(kv_is_turn)
+
+    kv_thread = KeyValue()
+    kv_thread.key = "wandb.thread_id"
+    kv_thread.value.string_value = test_thread_id
+    span.attributes.append(kv_thread)
+
+    # Export the otel traces
+    response = client.server.otel_export(export_req)
+    assert isinstance(response, tsi.OtelExportRes)
+
+    # Query the calls
+    res = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=project_id,
+        )
+    )
+    assert len(res.calls) == 1
+
+    call = res.calls[0]
+
+    # Verify turn_id is set and is a valid UUID
+    assert hasattr(call, "turn_id")
+    assert call.turn_id is not None
+    uuid_pattern = r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    assert re.match(uuid_pattern, call.turn_id)
+
+    # Verify thread_id is set correctly
+    assert hasattr(call, "thread_id")
+    assert call.thread_id == test_thread_id
+
+    # Clean up
+    client.server.calls_delete(
+        tsi.CallsDeleteReq(project_id=project_id, call_ids=[call.id], wb_user_id=None)
+    )
+
+
+def test_otel_export_with_turn_no_thread(client: weave_client.WeaveClient):
+    """Test the otel_export method with is_turn=True but no thread_id."""
+    # Create a test export request
+    export_req = create_test_export_request()
+    project_id = client._project_id()
+    export_req.project_id = project_id
+
+    # Add only is_turn attribute (no thread_id)
+    span = export_req.traces.resource_spans[0].scope_spans[0].spans[0]
+
+    kv_is_turn = KeyValue()
+    kv_is_turn.key = "wandb.is_turn"
+    kv_is_turn.value.bool_value = True
+    span.attributes.append(kv_is_turn)
+
+    # Export the otel traces
+    response = client.server.otel_export(export_req)
+    assert isinstance(response, tsi.OtelExportRes)
+
+    # Query the calls
+    res = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=project_id,
+        )
+    )
+    assert len(res.calls) == 1
+
+    call = res.calls[0]
+
+    # Verify turn_id is NOT set when is_turn is True but thread_id is missing
+    assert hasattr(call, "turn_id")
+    assert call.turn_id is None
+
+    # Verify thread_id is not set
+    assert hasattr(call, "thread_id")
+    assert call.thread_id is None
+
+    # Clean up
+    client.server.calls_delete(
+        tsi.CallsDeleteReq(project_id=project_id, call_ids=[call.id], wb_user_id=None)
+    )
+
+
 class TestPythonSpans:
     def test_span_from_proto(self):
         """Test converting a protobuf Span to a Python Span."""
@@ -292,6 +388,84 @@ class TestPythonSpans:
         assert end_call.id == py_span.span_id
         assert end_call.ended_at == py_span.end_time
         assert end_call.exception is None
+
+    def test_span_to_call_with_turn_and_thread(self):
+        """Test that turn_id and thread_id are correctly handled in span to_call conversion."""
+        import re
+
+        # Create a test span with turn and thread attributes
+        pb_span = create_test_span()
+        test_thread_id = str(uuid.uuid4())
+
+        # Add wandb.is_turn and wandb.thread_id attributes
+        kv_is_turn = KeyValue()
+        kv_is_turn.key = "wandb.is_turn"
+        kv_is_turn.value.bool_value = True
+        pb_span.attributes.append(kv_is_turn)
+
+        kv_thread = KeyValue()
+        kv_thread.key = "wandb.thread_id"
+        kv_thread.value.string_value = test_thread_id
+        pb_span.attributes.append(kv_thread)
+
+        py_span = PySpan.from_proto(pb_span)
+        start_call, end_call = py_span.to_call("test_project")
+
+        # Verify turn_id is generated as a UUID when is_turn is True
+        assert start_call.turn_id is not None
+        # Check that turn_id is a valid UUID
+        uuid_pattern = r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        assert re.match(uuid_pattern, start_call.turn_id)
+
+        # Verify thread_id is passed through
+        assert start_call.thread_id == test_thread_id
+
+        # Test with is_turn = False
+        pb_span_false = create_test_span()
+        kv_is_turn_false = KeyValue()
+        kv_is_turn_false.key = "wandb.is_turn"
+        kv_is_turn_false.value.bool_value = False
+        pb_span_false.attributes.append(kv_is_turn_false)
+
+        kv_thread_false = KeyValue()
+        kv_thread_false.key = "wandb.thread_id"
+        kv_thread_false.value.string_value = test_thread_id
+        pb_span_false.attributes.append(kv_thread_false)
+
+        py_span_false = PySpan.from_proto(pb_span_false)
+        start_call_false, _ = py_span_false.to_call("test_project")
+
+        # Verify turn_id is None when is_turn is False
+        assert start_call_false.turn_id is None
+        assert start_call_false.thread_id == test_thread_id
+
+        # Test without is_turn (should default to None)
+        pb_span_no_turn = create_test_span()
+        kv_thread_only = KeyValue()
+        kv_thread_only.key = "wandb.thread_id"
+        kv_thread_only.value.string_value = test_thread_id
+        pb_span_no_turn.attributes.append(kv_thread_only)
+
+        py_span_no_turn = PySpan.from_proto(pb_span_no_turn)
+        start_call_no_turn, _ = py_span_no_turn.to_call("test_project")
+
+        # Verify turn_id is None when is_turn is not present
+        assert start_call_no_turn.turn_id is None
+        assert start_call_no_turn.thread_id == test_thread_id
+
+        # Test with is_turn = True but no thread_id
+        pb_span_turn_no_thread = create_test_span()
+        kv_is_turn_only = KeyValue()
+        kv_is_turn_only.key = "wandb.is_turn"
+        kv_is_turn_only.value.bool_value = True
+        pb_span_turn_no_thread.attributes.append(kv_is_turn_only)
+
+        py_span_turn_no_thread = PySpan.from_proto(pb_span_turn_no_thread)
+        start_call_turn_no_thread, _ = py_span_turn_no_thread.to_call("test_project")
+
+        # Verify turn_id is None when is_turn is True but thread_id is missing
+        assert start_call_turn_no_thread.turn_id is None
+        assert start_call_turn_no_thread.thread_id is None
 
     def test_traces_data_from_proto(self):
         """Test converting protobuf TracesData to Python TracesData."""
@@ -621,6 +795,52 @@ class TestSemanticConventionParsing:
         )
         extracted = get_wandb_attributes(nested_attributes)
         assert extracted["display_name"] == "Nested Display Name"
+
+    def test_wandb_turn_and_thread_attributes(self):
+        """Test extracting turn and thread attributes from wandb attributes."""
+        # Test with is_turn = True and thread_id
+        test_thread_id = str(uuid.uuid4())
+        attributes = create_attributes(
+            {
+                "wandb.is_turn": True,
+                "wandb.thread_id": test_thread_id,
+            }
+        )
+
+        extracted = get_wandb_attributes(attributes)
+        assert extracted["is_turn"] is True
+        assert extracted["thread_id"] == test_thread_id
+
+        # Test with is_turn = False
+        attributes_false = create_attributes(
+            {
+                "wandb.is_turn": False,
+                "wandb.thread_id": test_thread_id,
+            }
+        )
+        extracted_false = get_wandb_attributes(attributes_false)
+        assert "is_turn" not in extracted_false.keys()
+        assert extracted_false["thread_id"] == test_thread_id
+
+        # Test with only thread_id
+        attributes_thread_only = create_attributes(
+            {
+                "wandb.thread_id": test_thread_id,
+            }
+        )
+        extracted_thread_only = get_wandb_attributes(attributes_thread_only)
+        assert "is_turn" not in extracted_thread_only
+        assert extracted_thread_only["thread_id"] == test_thread_id
+
+        # Test with only is_turn
+        attributes_turn_only = create_attributes(
+            {
+                "wandb.is_turn": True,
+            }
+        )
+        extracted_turn_only = get_wandb_attributes(attributes_turn_only)
+        assert extracted_turn_only["is_turn"] is True
+        assert "thread_id" not in extracted_turn_only
 
     def test_openinference_inputs_extraction(self):
         """Test extracting inputs from OpenInference attributes."""
