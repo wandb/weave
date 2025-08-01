@@ -64,6 +64,6 @@ def _make_auth_config() -> dict[str, str]:
     return {
         "sasl.username": username,
         "sasl.password": kafka_client_password(),
-        "security.protocol": "SASL_SSL",
+        "security.protocol": "SASL_PLAINTEXT",
         "sasl.mechanisms": "PLAIN",
     }
