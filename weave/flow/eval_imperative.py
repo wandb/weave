@@ -380,7 +380,7 @@ class EvaluationLogger(BaseModel):
 
     @property
     def attributes(self) -> dict[str, Any]:
-        return IMPERATIVE_EVAL_MARKER | self.eval_attributes
+        return self.eval_attributes | IMPERATIVE_EVAL_MARKER
 
     # This private attr is used to keep track of predictions so we can finish
     # them if the user forgot to.
