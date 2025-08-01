@@ -587,6 +587,10 @@ class EvaluationLogger(BaseModel):
         if self in _active_evaluation_loggers:
             _active_evaluation_loggers.remove(self)
 
+    def fail(self, exception: BaseException) -> None:
+        """Convenience method to fail the evaluation with an exception."""
+        self.finish(exception=exception)
+
     def __del__(self) -> None:
         """Ensure cleanup happens during garbage collection."""
         _cleanup_evaluation(self)

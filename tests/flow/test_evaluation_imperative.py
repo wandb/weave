@@ -476,10 +476,10 @@ def test_evaluation_no_auto_summarize(client):
     summarize_call = calls[4]
     assert summarize_call.output == {"output": {}}
 
-def test_evaluation_finish_with_exception(client):
+def test_evaluation_fail_with_exception(client):
     ev = weave.EvaluationLogger()
     ex = ValueError("test")
-    ev.finish(exception=ex)
+    ev.fail(exception=ex)
     client.flush()
 
     calls = client.get_calls()
