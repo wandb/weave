@@ -182,8 +182,8 @@ class IsolatedClientExecutor:
         func: AnyCallable[T, R],
         request: T,
         *,
-        timeout_seconds: float | None = None,
-    ) -> tuple[R, Optional[Exception]]:
+        timeout_seconds: Optional[float] = None,
+    ) -> tuple[Optional[R], Optional[Exception]]:
         """
         Execute a function in an isolated process with the configured client.
 
