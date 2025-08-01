@@ -11,7 +11,6 @@ from collections.abc import Iterator
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Optional
-from uuid import uuid4
 
 from opentelemetry.proto.common.v1.common_pb2 import InstrumentationScope
 from opentelemetry.proto.resource.v1.resource_pb2 import Resource as PbResource
@@ -353,6 +352,7 @@ class Span:
 
         thread_id = wandb_attributes.get("thread_id") or None
         if thread_id is not None and (wandb_attributes.get("is_turn")):
+            from uuid import uuid4
             turn_id = str(uuid4())
         else:
             turn_id = None
