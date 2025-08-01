@@ -243,7 +243,7 @@ class TableSchemaForInsert(BaseModel):
     rows: list[dict[str, Any]]
 
 
-class OtelExportReq(BaseModelStrict):
+class OtelExportReq(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     project_id: str
     # traces must be ExportTraceServiceRequest payload but allowing Any removes the proto package as a requirement.
