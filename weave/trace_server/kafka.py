@@ -1,4 +1,5 @@
 import socket
+from typing import Optional
 
 from confluent_kafka import Consumer as ConfluentKafkaConsumer
 from confluent_kafka import Producer as ConfluentKafkaProducer
@@ -57,7 +58,7 @@ def _make_broker_host() -> str:
     return f"{kafka_broker_host()}:{kafka_broker_port()}"
 
 
-def _make_auth_config() -> dict[str, str]:
+def _make_auth_config() -> dict[str, Optional[str]]:
     username = kafka_client_user()
 
     if username is None:
