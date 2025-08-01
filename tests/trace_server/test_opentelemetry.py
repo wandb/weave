@@ -201,8 +201,6 @@ def test_otel_export_clickhouse(client: weave_client.WeaveClient):
 
 def test_otel_export_with_turn_and_thread(client: weave_client.WeaveClient):
     """Test the otel_export method with turn and thread attributes."""
-    import re
-
     # Create a test export request
     export_req = create_test_export_request()
     project_id = client._project_id()
@@ -236,11 +234,9 @@ def test_otel_export_with_turn_and_thread(client: weave_client.WeaveClient):
 
     call = res.calls[0]
 
-    # Verify turn_id is set and is a valid UUID
+    # Verify turn_id equals call.id when is_turn is True
     assert hasattr(call, "turn_id")
-    assert call.turn_id is not None
-    uuid_pattern = r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
-    assert re.match(uuid_pattern, call.turn_id)
+    assert call.turn_id == call.id
 
     # Verify thread_id is set correctly
     assert hasattr(call, "thread_id")
@@ -390,9 +386,7 @@ class TestPythonSpans:
         assert end_call.exception is None
 
     def test_span_to_call_with_turn_and_thread(self):
-        """Test that turn_id and thread_id are correctly handled in span to_call conversion."""
-        import re
-
+        """Test that turn_id equals thread_id when is_turn is True."""
         # Create a test span with turn and thread attributes
         pb_span = create_test_span()
         test_thread_id = str(uuid.uuid4())
@@ -411,12 +405,8 @@ class TestPythonSpans:
         py_span = PySpan.from_proto(pb_span)
         start_call, end_call = py_span.to_call("test_project")
 
-        # Verify turn_id is generated as a UUID when is_turn is True
-        assert start_call.turn_id is not None
-        # Check that turn_id is a valid UUID
-        uuid_pattern = r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
-        assert re.match(uuid_pattern, start_call.turn_id)
-
+        # Verify turn_id equals call.id (span_id) when is_turn is True
+        assert start_call.turn_id == py_span.span_id
         # Verify thread_id is passed through
         assert start_call.thread_id == test_thread_id
 

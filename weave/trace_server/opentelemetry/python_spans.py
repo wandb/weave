@@ -352,9 +352,7 @@ class Span:
 
         thread_id = wandb_attributes.get("thread_id") or None
         if thread_id is not None and (wandb_attributes.get("is_turn")):
-            from uuid import uuid4
-
-            turn_id = str(uuid4())
+            turn_id = self.span_id
         else:
             turn_id = None
 
