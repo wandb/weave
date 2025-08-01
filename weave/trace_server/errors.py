@@ -2,8 +2,13 @@ import datetime
 import json
 from typing import Any, Callable, Optional
 
-import clickhouse_connect
 import requests
+from clickhouse_connect.driver.exceptions import (
+    DatabaseError as CHDatabaseError,
+)
+from clickhouse_connect.driver.exceptions import (
+    OperationalError as CHOperationalError,
+)
 from gql.transport.exceptions import TransportQueryError
 
 
@@ -104,6 +109,15 @@ class ErrorDefinition:
         self.formatter = formatter
 
 
+def _format_error_to_json(exc: Exception) -> dict[str, Any]:
+    """Default formatter that tries to parse JSON or falls back to reason."""
+    exc_str = str(exc)
+    try:
+        return json.loads(exc_str)
+    except json.JSONDecodeError:
+        return {"reason": exc_str}
+
+
 class ErrorRegistry:
     """Central registry for all error handling definitions."""
 
@@ -115,12 +129,9 @@ class ErrorRegistry:
         self,
         exception_class: type,
         status_code: int,
-        formatter: Optional[Callable[[Exception], dict[str, Any]]] = None,
+        formatter: Callable[[Exception], dict[str, Any]] = _format_error_to_json,
     ) -> None:
         """Register an exception with its handling definition."""
-        if formatter is None:
-            formatter = self._default_json_formatter
-
         self._definitions[exception_class] = ErrorDefinition(
             exception_class, status_code, formatter
         )
@@ -141,35 +152,26 @@ class ErrorRegistry:
         if definition:
             error_content = definition.formatter(exc)
             return error_content, definition.status_code
-        else:
-            # Fallback for unknown exceptions
-            return {"reason": "Internal server error"}, 500
 
-    def _default_json_formatter(self, exc: Exception) -> dict[str, Any]:
-        """Default formatter that tries to parse JSON or falls back to reason."""
-        exc_str = str(exc)
-        try:
-            return json.loads(exc_str)
-        except json.JSONDecodeError:
-            return {"reason": exc_str}
+        return {"reason": "Internal server error"}, 500
 
     def _setup_common_errors(self) -> None:
         """Register common/standard library errors that don't depend on domain-specific modules."""
         # Our own error types
+        self.register(InvalidRequest, 400)
+        self.register(InvalidExternalRef, 400)
+        self.register(NoCommonType, 400)
+        self.register(MissingLLMApiKeyError, 400, _format_missing_llm_api_key)
+        self.register(InvalidFieldError, 403)
+        self.register(NotFoundError, 404)
+        self.register(ProjectNotFound, 404)
+        self.register(ObjectDeletedError, 404, _format_object_deleted_error)
+        self.register(InsertTooLarge, 413)
         self.register(RequestTooLarge, 413, lambda exc: {"reason": "Request too large"})
-        self.register(InvalidRequest, 400, self._default_json_formatter)
-        self.register(InsertTooLarge, 413, self._format_insert_too_large)
-        self.register(NoCommonType, 400, self._default_json_formatter)
-        self.register(QueryMemoryLimitExceeded, 502, self._default_json_formatter)
-        self.register(InvalidFieldError, 403, self._default_json_formatter)
-        self.register(MissingLLMApiKeyError, 400, self._format_missing_llm_api_key)
-        self.register(NotFoundError, 404, self._default_json_formatter)
-        self.register(ObjectDeletedError, 404, self._format_object_deleted_error)
-        self.register(InvalidExternalRef, 400, self._default_json_formatter)
-        self.register(ProjectNotFound, 404, self._default_json_formatter)
+        self.register(QueryMemoryLimitExceeded, 502)
 
         # Standard library exceptions
-        self.register(ValueError, 400, self._default_json_formatter)
+        self.register(ValueError, 400)
 
         self.register(
             requests.exceptions.ReadTimeout, 504, lambda exc: {"reason": "Read timeout"}
@@ -180,76 +182,58 @@ class ErrorRegistry:
             lambda exc: {"reason": "Connection timeout"},
         )
 
-        # ClickHouse errors (502)
+        # ClickHouse errors
         self.register(
-            clickhouse_connect.driver.exceptions.DatabaseError,
-            502,
-            lambda exc: {"reason": "Temporary backend error"},
+            CHDatabaseError, 502, lambda exc: {"reason": "Temporary backend error"}
         )
         self.register(
-            clickhouse_connect.driver.exceptions.OperationalError,
-            502,
-            lambda exc: {"reason": "Temporary backend error"},
+            CHOperationalError, 502, lambda exc: {"reason": "Temporary backend error"}
         )
 
-        # GraphQL transport errors (403)
-        self.register(TransportQueryError, 403, self._format_transport_query_error)
+        # GraphQL transport errors
+        self.register(TransportQueryError, 403, _format_transport_query_error)
 
-    def _format_error_to_json(self, exc: Exception) -> dict[str, Any]:
-        """Helper to format exception as JSON or fallback to reason field."""
-        exc_str = str(exc)
-        try:
-            return json.loads(exc_str)
-        except json.JSONDecodeError:
-            return {"reason": exc_str}
 
-    def _format_error_to_json_with_extra(
-        self, exc: Exception, extra_fields: dict[str, Any]
-    ) -> dict[str, Any]:
-        """Helper to format exception as JSON or fallback to reason, always adding extra fields."""
-        exc_str = str(exc)
-        try:
-            result = json.loads(exc_str)
-        except json.JSONDecodeError:
-            result = {"reason": exc_str}
-
+def _format_error_to_json_with_extra(
+    exc: Exception, extra_fields: Optional[dict[str, Any]] = None
+) -> dict[str, Any]:
+    """Helper to format exception as JSON or fallback to reason, always adding extra fields."""
+    result = _format_error_to_json(exc)
+    if extra_fields:
         result.update(extra_fields)
-        return result
+    return result
 
-    def _format_insert_too_large(self, exc: Exception) -> dict[str, Any]:
-        """Format InsertTooLarge exception."""
-        return self._format_error_to_json(exc)
 
-    def _format_transport_query_error(self, exc: Exception) -> dict[str, Any]:
-        """Format TransportQueryError with special permission logic."""
-        transport_exc = exc if isinstance(exc, TransportQueryError) else None
-        if transport_exc and transport_exc.errors:
-            for error in transport_exc.errors:
-                if error.get("extensions", {}).get("code") == "PERMISSION_ERROR":
-                    return {"reason": "Forbidden"}
-                if error.get("message") == "project not found" and error.get(
-                    "path"
-                ) == ["upsertBucket"]:
-                    # This seems counter intuitive, but gorilla returns this error when the project exists
-                    # but the user does not have access to it. This seems like a bug on Gorilla's side.
-                    return {"reason": "Forbidden"}
-        return {"reason": "Forbidden"}
+def _format_transport_query_error(exc: Exception) -> dict[str, Any]:
+    """Format TransportQueryError with special permission logic."""
+    transport_exc = exc if isinstance(exc, TransportQueryError) else None
+    if transport_exc and transport_exc.errors:
+        for error in transport_exc.errors:
+            if error.get("extensions", {}).get("code") == "PERMISSION_ERROR":
+                return {"reason": "Forbidden"}
+            if error.get("message") == "project not found" and error.get("path") == [
+                "upsertBucket"
+            ]:
+                # This seems counter intuitive, but gorilla returns this error when the project exists
+                # but the user does not have access to it. This seems like a bug on Gorilla's side.
+                return {"reason": "Forbidden"}
+    return {"reason": "Forbidden"}
 
-    def _format_missing_llm_api_key(self, exc: Exception) -> dict[str, Any]:
-        """Format MissingLLMApiKeyError with api_key field."""
-        if isinstance(exc, MissingLLMApiKeyError):
-            return self._format_error_to_json_with_extra(
-                exc, {"api_key": exc.api_key_name}
-            )
-        return self._format_error_to_json(exc)
 
-    def _format_object_deleted_error(self, exc: Exception) -> dict[str, Any]:
-        """Format ObjectDeletedError with deleted_at timestamp."""
-        if isinstance(exc, ObjectDeletedError):
-            return self._format_error_to_json_with_extra(
-                exc, {"deleted_at": exc.deleted_at.isoformat()}
-            )
-        return self._format_error_to_json(exc)
+def _format_missing_llm_api_key(exc: Exception) -> dict[str, Any]:
+    """Format MissingLLMApiKeyError with api_key field."""
+    if isinstance(exc, MissingLLMApiKeyError):
+        return _format_error_to_json_with_extra(exc, {"api_key": exc.api_key_name})
+    return _format_error_to_json(exc)
+
+
+def _format_object_deleted_error(exc: Exception) -> dict[str, Any]:
+    """Format ObjectDeletedError with deleted_at timestamp."""
+    if isinstance(exc, ObjectDeletedError):
+        return _format_error_to_json_with_extra(
+            exc, {"deleted_at": exc.deleted_at.isoformat()}
+        )
+    return _format_error_to_json(exc)
 
 
 def get_error_registry() -> ErrorRegistry:
@@ -263,14 +247,15 @@ def get_error_registry() -> ErrorRegistry:
 def register_error(
     exception_class: type,
     status_code: int,
-    formatter: Optional[Callable[[Exception], dict[str, Any]]] = None,
+    formatter: Callable[[Exception], dict[str, Any]] = _format_error_to_json,
 ) -> None:
     """Convenience function to register an error with the global registry."""
     get_error_registry().register(exception_class, status_code, formatter)
 
 
 def error_handler(
-    status_code: int, formatter: Optional[Callable[[Exception], dict[str, Any]]] = None
+    status_code: int,
+    formatter: Callable[[Exception], dict[str, Any]] = _format_error_to_json,
 ) -> Callable[[type], type]:
     """Decorator to register an exception class with error handling."""
 
