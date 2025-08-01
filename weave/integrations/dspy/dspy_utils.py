@@ -1,4 +1,5 @@
 import importlib
+import os
 from typing import TYPE_CHECKING, Any, Callable, Union
 
 from pydantic import BaseModel
@@ -60,6 +61,10 @@ def dspy_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
         dictified_inputs_self = dictify(inputs["self"])
         if dictified_inputs_self["__class__"]["module"] == "__main__":
             dictified_inputs_self["__class__"]["module"] = ""
+
+        # Optionally hide history to reduce trace size
+        if os.getenv("WEAVE_DSPY_HIDE_HISTORY", "false").lower() in ("true", "1", "yes"):
+            dictified_inputs_self.pop("history", None)
 
         # Serialize the signature of the object if it is a Predict or Adapter
         if isinstance(inputs["self"], (Predict, Adapter)) and hasattr(
