@@ -90,8 +90,22 @@ class ProjectNotFound(Error):
     pass
 
 
-# Global registry instance
-_error_registry: Optional["ErrorRegistry"] = None
+def _format_error_to_json(exc: Exception) -> dict[str, Any]:
+    """Default formatter that tries to parse JSON or falls back to reason."""
+    exc_str = str(exc)
+    try:
+        return json.loads(exc_str)
+    except json.JSONDecodeError:
+        return {"reason": exc_str}
+
+
+def _format_error_to_json_with_extra(
+    exc: Exception, extra_fields: dict[str, Any]
+) -> dict[str, Any]:
+    """Helper to format exception as JSON or fallback to reason, always adding extra fields."""
+    result = _format_error_to_json(exc)
+    result.update(extra_fields)
+    return result
 
 
 # Error Registry System
@@ -109,13 +123,8 @@ class ErrorDefinition:
         self.formatter = formatter
 
 
-def _format_error_to_json(exc: Exception) -> dict[str, Any]:
-    """Default formatter that tries to parse JSON or falls back to reason."""
-    exc_str = str(exc)
-    try:
-        return json.loads(exc_str)
-    except json.JSONDecodeError:
-        return {"reason": exc_str}
+# Global registry instance
+_error_registry: Optional["ErrorRegistry"] = None
 
 
 class ErrorRegistry:
@@ -194,14 +203,49 @@ class ErrorRegistry:
         self.register(TransportQueryError, 403, _format_transport_query_error)
 
 
-def _format_error_to_json_with_extra(
-    exc: Exception, extra_fields: Optional[dict[str, Any]] = None
-) -> dict[str, Any]:
-    """Helper to format exception as JSON or fallback to reason, always adding extra fields."""
-    result = _format_error_to_json(exc)
-    if extra_fields:
-        result.update(extra_fields)
-    return result
+def get_error_registry() -> ErrorRegistry:
+    """Get the global error registry, initializing it if needed."""
+    global _error_registry
+    if _error_registry is None:
+        _error_registry = ErrorRegistry()
+    return _error_registry
+
+
+def register_error(
+    exception_class: type,
+    status_code: int,
+    formatter: Callable[[Exception], dict[str, Any]] = _format_error_to_json,
+) -> None:
+    """Convenience function to register an error with the global registry."""
+    get_error_registry().register(exception_class, status_code, formatter)
+
+
+def handle_clickhouse_query_error(e: Exception) -> None:
+    """
+    Handle common ClickHouse query errors by raising appropriate custom exceptions.
+
+    Args:
+        e: The original exception from ClickHouse
+
+    Raises:
+        QueryMemoryLimitExceeded: When the query exceeds memory limits
+        NoCommonType: When there's a type mismatch in the query
+        Exception: Re-raises the original exception if no known pattern matches
+    """
+    error_str = str(e)
+
+    if "MEMORY_LIMIT_EXCEEDED" in error_str:
+        raise QueryMemoryLimitExceeded("Query memory limit exceeded") from e
+    if "NO_COMMON_TYPE" in error_str:
+        raise NoCommonType(
+            "No common type between data types in query. "
+            "This can occur when comparing types without using the $convert operation. "
+            "Example: filtering calls by inputs.integer_value = 1 without using $convert -> "
+            "Correct: {$expr: {$eq: [{$convert: {input: {$getField: 'inputs.integer_value'}, to: 'double'}}, {$literal: 1}]}}"
+        ) from e
+
+    # Re-raise the original exception if no known pattern matches
+    raise
 
 
 def _format_transport_query_error(exc: Exception) -> dict[str, Any]:
@@ -234,61 +278,3 @@ def _format_object_deleted_error(exc: Exception) -> dict[str, Any]:
             exc, {"deleted_at": exc.deleted_at.isoformat()}
         )
     return _format_error_to_json(exc)
-
-
-def get_error_registry() -> ErrorRegistry:
-    """Get the global error registry, initializing it if needed."""
-    global _error_registry
-    if _error_registry is None:
-        _error_registry = ErrorRegistry()
-    return _error_registry
-
-
-def register_error(
-    exception_class: type,
-    status_code: int,
-    formatter: Callable[[Exception], dict[str, Any]] = _format_error_to_json,
-) -> None:
-    """Convenience function to register an error with the global registry."""
-    get_error_registry().register(exception_class, status_code, formatter)
-
-
-def error_handler(
-    status_code: int,
-    formatter: Callable[[Exception], dict[str, Any]] = _format_error_to_json,
-) -> Callable[[type], type]:
-    """Decorator to register an exception class with error handling."""
-
-    def decorator(exception_class: type) -> type:
-        register_error(exception_class, status_code, formatter)
-        return exception_class
-
-    return decorator
-
-
-def handle_clickhouse_query_error(e: Exception) -> None:
-    """
-    Handle common ClickHouse query errors by raising appropriate custom exceptions.
-
-    Args:
-        e: The original exception from ClickHouse
-
-    Raises:
-        QueryMemoryLimitExceeded: When the query exceeds memory limits
-        NoCommonType: When there's a type mismatch in the query
-        Exception: Re-raises the original exception if no known pattern matches
-    """
-    error_str = str(e)
-
-    if "MEMORY_LIMIT_EXCEEDED" in error_str:
-        raise QueryMemoryLimitExceeded("Query memory limit exceeded") from e
-    if "NO_COMMON_TYPE" in error_str:
-        raise NoCommonType(
-            "No common type between data types in query. "
-            "This can occur when comparing types without using the $convert operation. "
-            "Example: filtering calls by inputs.integer_value = 1 without using $convert -> "
-            "Correct: {$expr: {$eq: [{$convert: {input: {$getField: 'inputs.integer_value'}, to: 'double'}}, {$literal: 1}]}}"
-        ) from e
-
-    # Re-raise the original exception if no known pattern matches
-    raise
