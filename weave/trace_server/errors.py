@@ -203,7 +203,7 @@ class ErrorRegistry:
         self.register(TransportQueryError, 403, _format_transport_query_error)
 
 
-def get_error_registry() -> ErrorRegistry:
+def _get_error_registry() -> ErrorRegistry:
     """Get the global error registry, initializing it if needed."""
     global _error_registry
     if _error_registry is None:
@@ -211,20 +211,23 @@ def get_error_registry() -> ErrorRegistry:
     return _error_registry
 
 
-def register_error(
-    exception_class: type,
-    status_code: int,
-    formatter: Callable[[Exception], dict[str, Any]] = _format_error_to_json,
-) -> None:
-    """Convenience function to register an error with the global registry."""
-    get_error_registry().register(exception_class, status_code, formatter)
+def handle_server_exception(exc: Exception) -> tuple[dict[str, Any], int]:
+    """Handle a server exception."""
+    registry = _get_error_registry()
+    return registry.handle_exception(exc)
+
+
+def get_registered_error_classes() -> list[type[Exception]]:
+    """Get all registered error classes."""
+    registry = _get_error_registry()
+    return list(registry.get_all_definitions().keys())
 
 
 def handle_clickhouse_query_error(e: Exception) -> None:
     """
     Handle common ClickHouse query errors by raising appropriate custom exceptions.
 
-    Args:
+    Args:s
         e: The original exception from ClickHouse
 
     Raises:
