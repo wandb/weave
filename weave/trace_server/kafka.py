@@ -23,6 +23,7 @@ class KafkaProducer(ConfluentKafkaProducer):
             "message.timeout.ms": 500,
             **_make_auth_config(),
         }
+
         return cls(config)
 
     def produce_call_end(
@@ -32,6 +33,7 @@ class KafkaProducer(ConfluentKafkaProducer):
             topic=CALL_ENDED_TOPIC,
             value=call_end.model_dump_json(),
         )
+
         if flush_immediately:
             self.flush()
 
@@ -39,7 +41,7 @@ class KafkaProducer(ConfluentKafkaProducer):
 class KafkaConsumer(ConfluentKafkaConsumer):
     @classmethod
     def from_env(cls, group_id: str) -> "KafkaConsumer":
-        conf = {
+        config = {
             "bootstrap.servers": _make_broker_host(),
             "client.id": socket.gethostname(),
             "group.id": group_id,
@@ -47,8 +49,8 @@ class KafkaConsumer(ConfluentKafkaConsumer):
             "enable.auto.commit": False,
             **_make_auth_config(),
         }
-        consumer = cls(conf)
-        return consumer
+
+        return cls(config)
 
 
 def _make_broker_host() -> str:
