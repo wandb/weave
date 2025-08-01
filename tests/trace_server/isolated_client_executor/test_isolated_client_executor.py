@@ -29,7 +29,7 @@ from weave.trace_server.isolated_client_executor import (
     IsolatedClientExecutorError,
     IsolatedClientExecutorTimeoutError,
 )
-from weave.trace_server.trace_server_interface import TraceServerInterface
+from weave.trace_server.trace_server_interface import ObjQueryReq, TraceServerInterface
 
 
 class TestResponse(BaseModel):
@@ -156,6 +156,50 @@ async def runner_with_cleanup(
     finally:
         runner.stop()
         cleanup()
+
+@weave.op
+def get_keys(a):
+    return list(a.keys())
+
+def do_task(args: dict):
+    return get_keys(args)
+
+@pytest.mark.asyncio
+async def test_hello_world(client):
+    exp_obj_count = 1
+    inner_project = client.project + "_inner"
+    # this is the basic example worth showing
+    # you do a task in an isolated executor and it does not leak refs to the parent process
+    # it is expected to publish objects, but not leave refs around
+    factory_config, cleanup = create_test_client_factory_and_cleanup(
+        client.server, entity=client.entity, project=inner_project
+    )
+    runner = IsolatedClientExecutor(
+        client_factory=weave_client_factory,
+        client_factory_config=factory_config
+    )
+
+    assert get_ref(get_keys) is None
+    res, err = await runner.execute(do_task, {"a": {"b": "c"}})
+    assert get_ref(get_keys) is None
+    assert err is None
+    assert res == ["a"]
+
+    runner.stop()
+    cleanup()
+
+    objs = client.server.objs_query(ObjQueryReq(project_id=client.entity + "/" + inner_project)).objs
+    assert len(objs) == exp_obj_count
+
+    # now the performing the task in the main process
+    # it is expected to leave refs around and publish objects
+    res = do_task({"a": {"b": "c"}})
+    assert get_ref(get_keys) is not None
+    assert err is None
+    assert res == ["a"]
+
+    objs = client.server.objs_query(ObjQueryReq(project_id=client.entity + "/" + client.project)).objs
+    assert len(objs) == exp_obj_count
 
 
 @pytest.mark.asyncio

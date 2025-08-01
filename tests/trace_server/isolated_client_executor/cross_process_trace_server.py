@@ -31,7 +31,7 @@ STREAM_END_SIGNAL = "STREAM_END"
 STOP_SIGNAL = "STOP"
 
 
-# Protocol for trace server methods to improve type safety
+# Protocol definitions for type safety (used for documentation and static analysis)
 class TraceServerMethod(Protocol):
     """Protocol for trace server methods that take a BaseModel and return a BaseModel."""
 
@@ -517,16 +517,41 @@ class CrossProcessTraceServerReceiver:
                     break
 
                 try:
-                    # Dispatch to the appropriate method on the trace server
+                    # Call the method and handle whatever it returns
                     method_name = request_item.method
                     method = getattr(self.trace_server, method_name)
+                    result = method(request_item.payload)
 
-                    if method_name.endswith("_stream"):
-                        # Handle streaming methods with multiple responses
-                        self._handle_streaming_method(request_item, method)
+                    # Check if the result is an iterator (streaming response)
+                    if hasattr(result, '__iter__') and not isinstance(result, (str, bytes, BaseModel)):
+                        # Handle streaming response
+                        for item in result:
+                            response_item = ResponseQueueItem(
+                                request_id=request_item.request_id,
+                                payload=item,
+                            )
+                            self.response_queue.put(response_item)
+                        
+                        # Signal end of stream
+                        response_item = ResponseQueueItem(
+                            request_id=request_item.request_id,
+                            error=STREAM_END_SIGNAL,
+                        )
+                        self.response_queue.put(response_item)
                     else:
-                        # Handle regular methods with single response
-                        self._handle_regular_method(request_item, method)
+                        # Handle regular response
+                        response_item = ResponseQueueItem(
+                            request_id=request_item.request_id,
+                            payload=result,
+                        )
+                        self.response_queue.put(response_item)
+
+                except Exception as e:
+                    # Send error response for any processing failure
+                    logger.exception(
+                        f"Error processing request {request_item.request_id}"
+                    )
+                    self._send_error_response(request_item.request_id, str(e))
 
                 except Exception as e:
                     # Send error response for any processing failure
@@ -547,48 +572,6 @@ class CrossProcessTraceServerReceiver:
             error=error_message,
         )
         self.response_queue.put(response_item)
-
-    def _handle_regular_method(
-        self, request_item: RequestQueueItem, method: TraceServerMethod
-    ) -> None:
-        """Handle a regular (non-streaming) method call."""
-        try:
-            result = method(request_item.payload)
-            response_item = ResponseQueueItem(
-                request_id=request_item.request_id,
-                payload=result,
-            )
-            self.response_queue.put(response_item)
-        except Exception as e:
-            logger.exception(f"Error in method {request_item.method}")
-            self._send_error_response(request_item.request_id, str(e))
-
-    def _handle_streaming_method(
-        self,
-        request_item: RequestQueueItem,
-        method: StreamingTraceServerMethod,
-    ) -> None:
-        """Handle a streaming method call that yields multiple responses."""
-        try:
-            result_iterator = method(request_item.payload)
-            # Send each item from the iterator as a separate response
-            for item in result_iterator:
-                response_item = ResponseQueueItem(
-                    request_id=request_item.request_id,
-                    payload=item,
-                )
-                self.response_queue.put(response_item)
-
-            # Signal end of stream with special error code
-            response_item = ResponseQueueItem(
-                request_id=request_item.request_id,
-                error=STREAM_END_SIGNAL,
-            )
-            self.response_queue.put(response_item)
-
-        except Exception as e:
-            logger.exception(f"Error in streaming method {request_item.method}")
-            self._send_error_response(request_item.request_id, str(e))
 
     def get_sender_trace_server(self) -> CrossProcessTraceServerSender:
         """
