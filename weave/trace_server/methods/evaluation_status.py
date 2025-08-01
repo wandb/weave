@@ -30,23 +30,35 @@ def evaluation_status(
         return tsi.EvaluationStatusRes(status=tsi.EvaluationStatusFailed())
 
     if eval_call.call.ended_at is not None:
-        return tsi.EvaluationStatusRes(status=tsi.EvaluationStatusComplete())
+        return tsi.EvaluationStatusRes(
+            status=tsi.EvaluationStatusComplete(output=eval_call.call.output)
+        )
 
     # determine completed rows (children complete)
-    children_calls = server.calls_query(
+    children_stats = server.calls_query_stats(
         tsi.CallsQueryReq(
             project_id=req.project_id,
-            call_id=req.call_id,
             filter=tsi.CallsFilter(
                 parent_ids=[req.call_id],
             ),
-            columns=["id", "ended_at"],
-        )
+            query=tsi.Query.model_validate(
+                {
+                    "$expr": {
+                        "$not": [
+                            {
+                                "$eq": [
+                                    {"$getField": "summary.weave.status"},
+                                    {"$literal": tsi.TraceStatus.RUNNING},
+                                ]
+                            }
+                        ]
+                    }
+                }
+            ),
+        ),
     )
-    completed_children_calls = [
-        call.id for call in children_calls if call.ended_at is not None
-    ]
-    completed_rows = len(completed_children_calls)
+
+    completed_rows = children_stats.count
 
     # Default to completed rows if no dataset is provided
     total_rows = completed_rows
@@ -87,7 +99,7 @@ def evaluation_status(
         table_rows_stats = server.table_query_stats(
             tsi.TableQueryStatsReq(
                 project_id=req.project_id,
-                table_id=parsed_table_rows_ref.digest,
+                digest=parsed_table_rows_ref.digest,
             )
         )
         return table_rows_stats.count

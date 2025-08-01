@@ -165,6 +165,7 @@ def _apply_fn_defaults_to_inputs(
 class WeaveKwargs(TypedDict):
     display_name: str | None
     attributes: dict[str, Any]
+    call_id: str | None
 
 
 def setup_dunder_weave_dict(d: WeaveKwargs | None = None) -> WeaveKwargs:
@@ -352,6 +353,7 @@ def _create_call(
 
     call_time_display_name = __weave.get("display_name") if __weave else None
     call_attrs = __weave.get("attributes") if __weave else None
+    preferred_call_id = __weave.get("call_id") if __weave else None
 
     # If/When we do memoization, this would be a good spot
 
@@ -371,6 +373,7 @@ def _create_call(
         # Very important for `call_time_display_name` to take precedence over `func.call_display_name`
         display_name=call_time_display_name or func.call_display_name,
         attributes=attributes,
+        _call_id_override=preferred_call_id,
     )
 
 
