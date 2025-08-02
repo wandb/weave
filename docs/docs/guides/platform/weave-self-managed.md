@@ -63,7 +63,7 @@ Modify the following parameters:
 - `auth.password`
 - S3 bucket-related configurations
 
-W&B recommends keeping the `clusterName` value in `values.yaml` set to `weave_cluster`.  This is the expected cluster name when W&B Weave runs the database migration. If you need to use a different name, see the [Setting `clusterName`](#setting-clustername) section for more information.
+W&B recommends keeping the `clusterName` value in `values.yaml` set to `weave_cluster`.  This is the expected cluster name when W&B Weave runs the database migration. If you need to use a different name, see step 3 in the [Deploy Weave](#4-deploy-weave) section for more information.
 
 ```yaml
 ## @param clusterName ClickHouse cluster name

@@ -892,7 +892,7 @@ class CallsQuery(BaseModel):
         sortable_datetime_sql = (
             optimization_conditions.sortable_datetime_filters_sql or ""
         )
-        str_filter_opt_sql = optimization_conditions.str_filter_opt_sql or ""
+        heavy_filter_opt_sql = optimization_conditions.heavy_filter_opt_sql or ""
 
         order_by_sql = ""
         if len(self.order_fields) > 0:
@@ -1001,7 +1001,7 @@ class CallsQuery(BaseModel):
         {trace_id_sql}
         {thread_id_sql}
         {turn_id_sql}
-        {str_filter_opt_sql}
+        {heavy_filter_opt_sql}
         {ref_filter_opt_sql}
         {object_refs_filter_opt_sql}
         GROUP BY (calls_merged.project_id, calls_merged.id)

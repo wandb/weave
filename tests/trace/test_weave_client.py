@@ -3536,3 +3536,24 @@ def test_no_400_on_invalid_refs(client):
     id = call.id
     server_call = client.get_call(id)
     assert server_call.id == id
+
+
+def test_get_evaluation(client, make_evals):
+    ref, _ = make_evals
+    ev = client.get_evaluation(ref.uri())
+    assert isinstance(ev, Evaluation)
+    assert ev.ref.uri() == ref.uri()
+
+
+def test_get_evaluations(client, make_evals):
+    ref, ref2 = make_evals
+    evs = client.get_evaluations()
+    assert len(evs) == 2
+    assert isinstance(evs[0], Evaluation)
+    assert isinstance(evs[1], Evaluation)
+
+    assert evs[0].ref.uri() == ref.uri()
+    assert evs[0].dataset.rows[0] == {"dataset_id": "def"}
+
+    assert evs[1].ref.uri() == ref2.uri()
+    assert evs[1].dataset.rows[0] == {"dataset_id": "jkl"}

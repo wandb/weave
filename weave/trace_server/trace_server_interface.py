@@ -1182,7 +1182,7 @@ class EvaluationStatusFailed(BaseModel):
 
 class EvaluationStatusComplete(BaseModel):
     code: Literal["complete"] = "complete"
-    output: Optional[Any] = None
+    output: dict[str, Any]
 
 
 class EvaluationStatusRes(BaseModel):

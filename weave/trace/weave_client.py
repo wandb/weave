@@ -135,6 +135,7 @@ from weave.utils.paginated_iterator import PaginatedIterator
 if TYPE_CHECKING:
     import wandb
 
+    from weave.flow.eval import Evaluation
     from weave.flow.scorer import ApplyScorerResult, Scorer
 
 
@@ -644,7 +645,6 @@ def make_client_call(
 RESERVED_SUMMARY_USAGE_KEY = "usage"
 RESERVED_SUMMARY_STATUS_COUNTS_KEY = "status_counts"
 
-
 BACKGROUND_PARALLELISM_MIX = 0.5
 # This size is correlated with the maximum single row insert size
 # in clickhouse, which is currently unavoidable.
@@ -801,6 +801,79 @@ class WeaveClient:
         return weave_obj
 
     ################ Query API ################
+
+    def get_evaluation(self, uri: str) -> Evaluation:
+        """
+        Retrieve a specific Evaluation object by its URI.
+
+        Evaluation URIs typically follow the format:
+        `weave:///entity/project/object/Evaluation:version`
+
+        You can also get the evaluation by its "friendly" name:
+        get_evaluation("Evaluation:v1")
+
+        Args:
+            uri (str): The unique resource identifier of the evaluation to retrieve.
+
+        Returns:
+            Evaluation: The Evaluation object corresponding to the provided URI.
+
+        Raises:
+            TypeError: If the object at the URI is not an Evaluation instance.
+            ValueError: If the URI is invalid or the object cannot be found.
+
+        Examples:
+            >>> client = weave.init("my-project")
+            >>> evaluation = client.get_evaluation("weave:///entity/project/object/my-eval:v1")
+            >>> print(evaluation.name)
+            'my-eval'
+        """
+        import weave
+
+        res = weave.ref(uri).get()
+        if not isinstance(res, weave.Evaluation):
+            raise TypeError(f"Expected Evaluation, got {type(res)}")
+        return res
+
+    # TODO: Make into EvaluationsIter
+    # TODO: Add option to select a subset of evaluations
+    def get_evaluations(self) -> list[Evaluation]:
+        """
+        Retrieve all Evaluation objects from the current project.
+
+        Returns:
+            list[Evaluation]: A list of all Evaluation objects in the current project.
+                Empty list if no evaluations are found or if all conversions fail.
+
+        Examples:
+            >>> client = weave.init("my-project")
+            >>> evaluations = client.get_evaluations()
+            >>> print(f"Found {len(evaluations)} evaluations")
+            >>> for eval in evaluations:
+            ...     print(f"Evaluation: {eval.name}")
+        """
+        eval_objs = self._objects(
+            filter=ObjectVersionFilter(base_object_classes=["Evaluation"]),
+        )
+
+        lst = []
+        for obj in eval_objs:
+            # It's unfortunate we have to do this, but it's currently the easiest
+            # way get the correct behaviour given our serialization layer...
+            entity, project = obj.project_id.split("/")
+            ref = ObjectRef(
+                entity=entity,
+                project=project,
+                name=obj.val["name"],
+                _digest=obj.digest,
+            )
+            try:
+                obj = ref.get()
+            except Exception:
+                logger.exception(f"Failed to convert {obj} to Evaluation")
+            else:
+                lst.append(obj)
+        return lst
 
     @trace_sentry.global_trace_sentry.watch()
     @pydantic.validate_call
@@ -1083,7 +1156,7 @@ class WeaveClient:
                     started_at=started_at,
                     parent_id=parent_id,
                     inputs=inputs_json,
-                    attributes=attributes_dict,
+                    attributes=attributes_dict.unwrap(),
                     wb_run_id=current_wb_run_id,
                     wb_run_step=current_wb_run_step,
                     thread_id=thread_id,
