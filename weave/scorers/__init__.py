@@ -6,6 +6,7 @@ try:
     from weave.scorers.classification_scorer import MultiTaskBinaryClassificationF1
     from weave.scorers.coherence_scorer import WeaveCoherenceScorerV1
     from weave.scorers.context_relevance_scorer import WeaveContextRelevanceScorerV1
+    from weave.scorers.counterfactual_scorer import LangfairCounterfactualScorer
     from weave.scorers.fluency_scorer import WeaveFluencyScorerV1
     from weave.scorers.hallucination_scorer import (
         HallucinationFreeScorer,
@@ -29,6 +30,7 @@ try:
     from weave.scorers.similarity_scorer import EmbeddingSimilarityScorer
     from weave.scorers.string_scorer import LevenshteinScorer, StringMatchScorer
     from weave.scorers.summarization_scorer import SummarizationScorer
+    from weave.scorers.toxicity_scorer import LangfairToxicityScorer
     from weave.scorers.trust_scorer import WeaveTrustScorerV1
     from weave.scorers.xml_scorer import ValidXMLScorer
 except ModuleNotFoundError as e:
