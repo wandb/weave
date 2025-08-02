@@ -70,8 +70,26 @@ def fix_style(text):
     return text
 
 
+def fix_type_annotations_in_code_blocks(text):
+    # Fix quoted type annotations in Python code blocks
+    # This prevents MDX from misinterpreting them
+    import re
+    
+    # Pattern to match Python code blocks
+    code_block_pattern = r'```python\n(.*?)\n```'
+    
+    def fix_code_block(match):
+        code_content = match.group(1)
+        # Remove quotes around type annotations containing |
+        # Example: 'str | Path' becomes str | Path
+        fixed_content = re.sub(r"'([^']*\|[^']*)'", r"\1", code_content)
+        return f'```python\n{fixed_content}\n```'
+    
+    return re.sub(code_block_pattern, fix_code_block, text, flags=re.DOTALL)
+
+
 def sanitize_markdown(text):
-    return fix_style(fix_imgs(fix_factor(text)))
+    return fix_type_annotations_in_code_blocks(fix_style(fix_imgs(fix_factor(text))))
 
 
 def remove_empty_overview_sections(overview):

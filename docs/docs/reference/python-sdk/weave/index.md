@@ -55,11 +55,11 @@ The top-level functions and classes for working with Weave.
 ```python
 init(
     project_name: 'str',
-    settings: 'UserSettings | dict[str, Any] | None' = None,
-    autopatch_settings: 'AutopatchSettings | None' = None,
-    global_postprocess_inputs: 'PostprocessInputsFunc | None' = None,
-    global_postprocess_output: 'PostprocessOutputFunc | None' = None,
-    global_attributes: 'dict[str, Any] | None' = None
+    settings: UserSettings | dict[str, Any] | None = None,
+    autopatch_settings: AutopatchSettings | None = None,
+    global_postprocess_inputs: PostprocessInputsFunc | None = None,
+    global_postprocess_output: PostprocessOutputFunc | None = None,
+    global_attributes: dict[str, Any] | None = None
 ) → WeaveClient
 ```
 
@@ -94,7 +94,7 @@ NOTE: Global postprocessing settings are applied to all ops after each op's own 
 ### <kbd>function</kbd> `publish`
 
 ```python
-publish(obj: 'Any', name: 'str | None' = None) → ObjectRef
+publish(obj: 'Any', name: str | None = None) → ObjectRef
 ```
 
 Save and version a python object. 
@@ -149,7 +149,7 @@ TODO: what happens if obj does not exist
 ### <kbd>function</kbd> `get`
 
 ```python
-get(uri: 'str | ObjectRef') → Any
+get(uri: str | ObjectRef) → Any
 ```
 
 A convenience function for getting an object from a URI. 
@@ -272,14 +272,14 @@ Following finish, calls of weave.op() decorated functions will no longer be logg
 
 ```python
 op(
-    func: 'Callable[P, R] | None' = None,
-    name: 'str | None' = None,
-    call_display_name: 'str | CallDisplayNameFunc | None' = None,
-    postprocess_inputs: 'PostprocessInputsFunc | None' = None,
-    postprocess_output: 'PostprocessOutputFunc | None' = None,
+    func: Callable[P, R] | None = None,
+    name: str | None = None,
+    call_display_name: str | CallDisplayNameFunc | None = None,
+    postprocess_inputs: PostprocessInputsFunc | None = None,
+    postprocess_output: PostprocessOutputFunc | None = None,
     tracing_sample_rate: 'float' = 1.0,
     enable_code_capture: 'bool' = True,
-    accumulator: 'Callable[[Any | None, Any], Any] | None' = None
+    accumulator: Callable[[Any | None, Any], Any] | None = None
 ) → Callable[[Callable[P, R]], Op[P, R]] | Op[P, R]
 ```
 
@@ -921,7 +921,7 @@ The reference can be used to log scores which are attached to the specific predi
 ### <kbd>method</kbd> `log_summary`
 
 ```python
-log_summary(summary: 'dict | None' = None, auto_summarize: 'bool' = True) → None
+log_summary(summary: dict | None = None, auto_summarize: 'bool' = True) → None
 ```
 
 Log a summary dict to the Evaluation. 
@@ -1070,7 +1070,7 @@ A class representing a file with path, mimetype, and size information.
 ### <kbd>method</kbd> `__init__`
 
 ```python
-__init__(path: 'str | Path', mimetype: 'str | None' = None)
+__init__(path: str | Path, mimetype: str | None = None)
 ```
 
 Initialize a File object. 
@@ -1124,7 +1124,7 @@ This method uses the platform-specific mechanism to open the file with the defau
 ### <kbd>method</kbd> `save`
 
 ```python
-save(dest: 'str | Path') → None
+save(dest: str | Path) → None
 ```
 
 Copy the file to the specified destination path. 
@@ -1342,7 +1342,7 @@ __init__(view_type: 'str' = 'traces', label: 'str' = 'SavedView') → None
 ### <kbd>method</kbd> `add_column`
 
 ```python
-add_column(path: 'str | ObjectPath', label: 'str | None' = None) → SavedView
+add_column(path: str | ObjectPath, label: str | None = None) → SavedView
 ```
 
 
@@ -1371,7 +1371,7 @@ Convenience method for adding multiple columns to the grid.
 add_filter(
     field: 'str',
     operator: 'str',
-    value: 'Any | None' = None
+    value: Any | None = None
 ) → SavedView
 ```
 
@@ -1400,7 +1400,7 @@ add_sort(field: 'str', direction: 'SortDirection') → SavedView
 ### <kbd>method</kbd> `column_index`
 
 ```python
-column_index(path: 'int | str | ObjectPath') → int
+column_index(path: int | str | ObjectPath) → int
 ```
 
 
@@ -1414,7 +1414,7 @@ column_index(path: 'int | str | ObjectPath') → int
 ### <kbd>method</kbd> `filter_op`
 
 ```python
-filter_op(op_name: 'str | None') → SavedView
+filter_op(op_name: str | None) → SavedView
 ```
 
 
@@ -1429,8 +1429,8 @@ filter_op(op_name: 'str | None') → SavedView
 
 ```python
 get_calls(
-    limit: 'int | None' = None,
-    offset: 'int | None' = None,
+    limit: int | None = None,
+    offset: int | None = None,
     include_costs: 'bool' = False,
     include_feedback: 'bool' = False,
     all_columns: 'bool' = False
@@ -1446,7 +1446,7 @@ Get calls matching this saved view's filters and settings.
 ### <kbd>method</kbd> `get_known_columns`
 
 ```python
-get_known_columns(num_calls_to_query: 'int | None' = None) → list[str]
+get_known_columns(num_calls_to_query: int | None = None) → list[str]
 ```
 
 Get the set of columns that are known to exist. 
@@ -1488,8 +1488,8 @@ hide_column(col_name: 'str') → SavedView
 ```python
 insert_column(
     idx: 'int',
-    path: 'str | ObjectPath',
-    label: 'str | None' = None
+    path: str | ObjectPath,
+    label: str | None = None
 ) → SavedView
 ```
 
@@ -1560,7 +1560,7 @@ pin_column_right(col_name: 'str') → SavedView
 ### <kbd>method</kbd> `remove_column`
 
 ```python
-remove_column(path: 'int | str | ObjectPath') → SavedView
+remove_column(path: int | str | ObjectPath) → SavedView
 ```
 
 
@@ -1586,7 +1586,7 @@ Remove columns from the saved view.
 ### <kbd>method</kbd> `remove_filter`
 
 ```python
-remove_filter(index_or_field: 'int | str') → SavedView
+remove_filter(index_or_field: int | str) → SavedView
 ```
 
 
@@ -1626,7 +1626,7 @@ rename(label: 'str') → SavedView
 ### <kbd>method</kbd> `rename_column`
 
 ```python
-rename_column(path: 'int | str | ObjectPath', label: 'str') → SavedView
+rename_column(path: int | str | ObjectPath, label: 'str') → SavedView
 ```
 
 
@@ -1692,7 +1692,7 @@ sort_by(field: 'str', direction: 'SortDirection') → SavedView
 ### <kbd>method</kbd> `to_grid`
 
 ```python
-to_grid(limit: 'int | None' = None) → Grid
+to_grid(limit: int | None = None) → Grid
 ```
 
 
@@ -1798,7 +1798,7 @@ __init__(
 ### <kbd>method</kbd> `export`
 
 ```python
-export(path: 'str | bytes | Path | PathLike') → None
+export(path: str | bytes | Path | PathLike) → None
 ```
 
 Export audio data to a file. 
@@ -1816,7 +1816,7 @@ Export audio data to a file.
 ### <kbd>classmethod</kbd> `from_data`
 
 ```python
-from_data(data: 'str | bytes', format: 'str') → Audio
+from_data(data: str | bytes, format: 'str') → Audio
 ```
 
 Create an Audio object from raw data and specified format. 
@@ -1847,7 +1847,7 @@ Create an Audio object from raw data and specified format.
 ### <kbd>classmethod</kbd> `from_path`
 
 ```python
-from_path(path: 'str | bytes | Path | PathLike') → Audio
+from_path(path: str | bytes | Path | PathLike) → Audio
 ```
 
 Create an Audio object from a file path. 
