@@ -24,4 +24,4 @@ synchronize-base-object-schemas:
 	cd ../../../../frontends/weave && yarn generate-schemas
 
 generate-bindings:
-	python tools/codegen/generate.py $(ARGS)
+	uv run tools/codegen/generate.py $(ARGS)
