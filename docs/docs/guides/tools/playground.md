@@ -24,7 +24,7 @@ Get started with the Playground to optimize your LLM interactions and streamline
   - [Access the Playground](#access-the-playground)
 - [Select an LLM](#select-an-llm)
 - [Customize settings](#customize-settings)
-- [Message controls](#add-retry-edit-and-delete-messages)
+- [Message controls](#retry-edit-and-delete-messages)
 - [Compare LLMs](#compare-llms)
 - [Custom providers](#custom-providers)
 - [Saved models](#saved-models) 

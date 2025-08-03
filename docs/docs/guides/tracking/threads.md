@@ -10,8 +10,8 @@ To get started with Threads, do the following:
    - [The UI experience](#ui-overview)
    - [API specification](#api-specification)
 2. Try the code samples, which demonstrate common usage patterns and real-world use cases.
-   - [Basic usage examples](#basic-examples)
-   - [Advanced usage examples](#advanced-examples)
+   - [Basic usage examples](#basic-thread-creation)
+- [Advanced usage examples](#manual-agent-loop-implementation)
 
 ## Use cases
 
