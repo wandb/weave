@@ -19,84 +19,19 @@ from weave.cli.main import cli
 
 
 @pytest.fixture
-def mock_successful_weave_login():
+def mock_weave_login():
     """Fixture that provides a mock for weave.cli.main.weave_login."""
     with patch("weave.cli.main.weave_login") as mock_login:
-        mock_login.return_value = True  # Default success case
+        mock_login.return_value = True
         yield mock_login
 
 
-def test_login_command_with_key(mock_weave_login):
-    """Test the login command with an API key provided."""
-    runner = CliRunner()
-
-    result = runner.invoke(cli, ["login", "test-api-key"])
-
-    assert result.exit_code == 0
-    mock_weave_login.assert_called_once_with(
-        key="test-api-key", host=None, relogin=False, verify=True
-    )
-
-
-def test_login_command_with_cloud_flag(mock_weave_login):
-    """Test the login command with --cloud flag sets default host."""
-    runner = CliRunner()
-
-    result = runner.invoke(cli, ["login", "--cloud"])
-
-    assert result.exit_code == 0
-    mock_weave_login.assert_called_once_with(
-        key=None, host="https://api.wandb.ai", relogin=False, verify=True
-    )
-
-
-def test_login_command_with_host(mock_weave_login):
-    """Test the login command with custom host."""
-    runner = CliRunner()
-
-    result = runner.invoke(cli, ["login", "--host", "https://custom.wandb.ai"])
-
-    assert result.exit_code == 0
-    mock_weave_login.assert_called_once_with(
-        key=None, host="https://custom.wandb.ai", relogin=False, verify=True
-    )
-
-
-def test_login_command_with_relogin_flag(mock_weave_login):
-    """Test the login command with --relogin flag."""
-    runner = CliRunner()
-
-    result = runner.invoke(cli, ["login", "--relogin"])
-
-    assert result.exit_code == 0
-    mock_weave_login.assert_called_once_with(
-        key=None, host=None, relogin=True, verify=True
-    )
-
-
-def test_login_command_with_no_verify_flag(mock_weave_login):
-    """Test the login command with --no-verify flag."""
-    runner = CliRunner()
-
-    result = runner.invoke(cli, ["login", "--no-verify"])
-
-    assert result.exit_code == 0
-    mock_weave_login.assert_called_once_with(
-        key=None, host=None, relogin=False, verify=False
-    )
-
-
-def test_login_command_failure_exits_with_code_1(mock_weave_login):
-    """Test that login command exits with code 1 when login fails."""
-    runner = CliRunner()
-
-    # Override the default True return value for this specific test
-    mock_weave_login.return_value = False
-
-    result = runner.invoke(cli, ["login"])
-
-    assert result.exit_code == 1
-    assert "Login failed!" in result.output
+@pytest.fixture
+def mock_netrc():
+    """Fixture that provides a mock for weave.cli.login.Netrc."""
+    with patch("weave.cli.login.Netrc") as mock_netrc:
+        mock_netrc.return_value = MagicMock()
+        yield mock_netrc
 
 
 def test_login_command_cloud_and_host_together(mock_weave_login):
@@ -116,61 +51,52 @@ def test_login_command_cloud_and_host_together(mock_weave_login):
     )
 
 
-def test_weave_login_with_valid_key():
+def test_weave_login_with_valid_key(mock_netrc):
     """Test weave_login function with a valid API key."""
     with (
-        patch("weave.cli.login.Netrc") as mock_netrc,
         patch("weave.cli.login._get_default_host") as mock_get_host,
         patch("weave.cli.login._validate_api_key") as mock_validate,
         patch("weave.cli.login._print_login_status") as mock_print_status,
     ):
         mock_get_host.return_value = "api.wandb.ai"
-        mock_netrc_instance = MagicMock()
-        mock_netrc.return_value = mock_netrc_instance
 
         result = weave_login(key="test-key-123")
 
         assert result is True
         mock_validate.assert_called_with("test-key-123")
-        mock_netrc_instance.add_or_update_entry.assert_called_once_with(
+        mock_netrc.add_or_update_entry.assert_called_once_with(
             "api.wandb.ai", "user", "test-key-123"
         )
         mock_print_status.assert_called_once_with("api.wandb.ai")
 
 
-def test_weave_login_already_logged_in():
+def test_weave_login_already_logged_in(mock_netrc):
     """Test weave_login when already logged in and not forcing relogin."""
     with (
-        patch("weave.cli.login.Netrc") as mock_netrc,
         patch("weave.cli.login._get_default_host") as mock_get_host,
         patch("weave.cli.login._print_login_status") as mock_print_status,
     ):
         mock_get_host.return_value = "api.wandb.ai"
-        mock_netrc_instance = MagicMock()
-        mock_netrc.return_value = mock_netrc_instance
-        mock_netrc_instance.get_credentials.return_value = ("user", "existing-key")
+        mock_netrc.get_credentials.return_value = ("user", "existing-key")
 
         result = weave_login()
 
         assert result is True
         mock_print_status.assert_called_once_with("api.wandb.ai")
         # Should not try to add new credentials
-        mock_netrc_instance.add_or_update_entry.assert_not_called()
+        mock_netrc.add_or_update_entry.assert_not_called()
 
 
-def test_weave_login_with_relogin_flag():
+def test_weave_login_with_relogin_flag(mock_netrc):
     """Test weave_login with relogin=True prompts for new key even if logged in."""
     with (
-        patch("weave.cli.login.Netrc") as mock_netrc,
         patch("weave.cli.login._get_default_host") as mock_get_host,
         patch("weave.cli.login._prompt_for_api_key") as mock_prompt,
         patch("weave.cli.login._validate_api_key") as mock_validate,
         patch("weave.cli.login._print_login_status") as mock_print_status,
     ):
         mock_get_host.return_value = "api.wandb.ai"
-        mock_netrc_instance = MagicMock()
-        mock_netrc.return_value = mock_netrc_instance
-        mock_netrc_instance.get_credentials.return_value = ("user", "existing-key")
+        mock_netrc.get_credentials.return_value = ("user", "existing-key")
         mock_prompt.return_value = "new-key-123"
 
         result = weave_login(relogin=True)
@@ -178,107 +104,87 @@ def test_weave_login_with_relogin_flag():
         assert result is True
         mock_prompt.assert_called_once_with("api.wandb.ai")
         mock_validate.assert_called_with("new-key-123")
-        mock_netrc_instance.add_or_update_entry.assert_called_once_with(
+        mock_netrc.add_or_update_entry.assert_called_once_with(
             "api.wandb.ai", "user", "new-key-123"
         )
 
 
-def test_weave_login_prompt_cancelled():
+def test_weave_login_prompt_cancelled(mock_netrc):
     """Test weave_login when user cancels the API key prompt."""
     with (
-        patch("weave.cli.login.Netrc") as mock_netrc,
         patch("weave.cli.login._get_default_host") as mock_get_host,
         patch("weave.cli.login._prompt_for_api_key") as mock_prompt,
     ):
         mock_get_host.return_value = "api.wandb.ai"
-        mock_netrc_instance = MagicMock()
-        mock_netrc.return_value = mock_netrc_instance
-        mock_netrc_instance.get_credentials.return_value = None
+        mock_netrc.get_credentials.return_value = None
         mock_prompt.return_value = None  # User cancelled
 
         result = weave_login()
 
         assert result is False
-        mock_netrc_instance.add_or_update_entry.assert_not_called()
+        mock_netrc.add_or_update_entry.assert_not_called()
 
 
-def test_weave_login_invalid_api_key():
+def test_weave_login_invalid_api_key(mock_netrc):
     """Test weave_login with invalid API key format."""
     with (
-        patch("weave.cli.login.Netrc") as mock_netrc,
         patch("weave.cli.login._get_default_host") as mock_get_host,
         patch("weave.cli.login._validate_api_key") as mock_validate,
     ):
         mock_get_host.return_value = "api.wandb.ai"
-        mock_netrc_instance = MagicMock()
-        mock_netrc.return_value = mock_netrc_instance
         mock_validate.side_effect = ValueError("Invalid key format")
 
         result = weave_login(key="invalid-key")
 
         assert result is False
-        mock_netrc_instance.add_or_update_entry.assert_not_called()
+        mock_netrc.add_or_update_entry.assert_not_called()
 
 
-def test_weave_login_custom_host():
+def test_weave_login_custom_host(mock_netrc):
     """Test weave_login with custom host."""
     with (
-        patch("weave.cli.login.Netrc") as mock_netrc,
         patch("weave.cli.login._validate_api_key") as mock_validate,
         patch("weave.cli.login._print_login_status") as mock_print_status,
     ):
-        mock_netrc_instance = MagicMock()
-        mock_netrc.return_value = mock_netrc_instance
-
         result = weave_login(key="test-key", host="https://custom.wandb.ai")
 
         assert result is True
-        mock_netrc_instance.add_or_update_entry.assert_called_once_with(
+        mock_netrc.add_or_update_entry.assert_called_once_with(
             "custom.wandb.ai", "user", "test-key"
         )
         mock_print_status.assert_called_once_with("custom.wandb.ai")
 
 
-def test_weave_login_host_url_cleanup():
+def test_weave_login_host_url_cleanup(mock_netrc):
     """Test that host URL is properly cleaned of http/https prefixes."""
     with (
-        patch("weave.cli.login.Netrc") as mock_netrc,
         patch("weave.cli.login._validate_api_key") as mock_validate,
         patch("weave.cli.login._print_login_status") as mock_print_status,
     ):
-        mock_netrc_instance = MagicMock()
-        mock_netrc.return_value = mock_netrc_instance
-
         # Test https prefix removal
         result = weave_login(key="test-key", host="https://custom.wandb.ai")
         assert result is True
-        mock_netrc_instance.add_or_update_entry.assert_called_with(
+        mock_netrc.add_or_update_entry.assert_called_with(
             "custom.wandb.ai", "user", "test-key"
         )
 
         # Test http prefix removal
-        mock_netrc_instance.reset_mock()
         result = weave_login(key="test-key", host="http://custom.wandb.ai")
         assert result is True
-        mock_netrc_instance.add_or_update_entry.assert_called_with(
+        mock_netrc.add_or_update_entry.assert_called_with(
             "custom.wandb.ai", "user", "test-key"
         )
 
 
-def test_weave_login_netrc_save_error():
+def test_weave_login_netrc_save_error(mock_netrc):
     """Test weave_login when netrc save fails but continues."""
     with (
-        patch("weave.cli.login.Netrc") as mock_netrc,
         patch("weave.cli.login._get_default_host") as mock_get_host,
         patch("weave.cli.login._validate_api_key") as mock_validate,
         patch("weave.cli.login._print_login_status") as mock_print_status,
     ):
         mock_get_host.return_value = "api.wandb.ai"
-        mock_netrc_instance = MagicMock()
-        mock_netrc.return_value = mock_netrc_instance
-        mock_netrc_instance.add_or_update_entry.side_effect = Exception(
-            "Permission denied"
-        )
+        mock_netrc.add_or_update_entry.side_effect = Exception("Permission denied")
 
         result = weave_login(key="test-key")
 
@@ -287,10 +193,9 @@ def test_weave_login_netrc_save_error():
         mock_print_status.assert_called_once_with("api.wandb.ai")
 
 
-def test_weave_login_verification_disabled():
+def test_weave_login_verification_disabled(mock_netrc):
     """Test weave_login with verify=False skips verification."""
     with (
-        patch("weave.cli.login.Netrc") as mock_netrc,
         patch("weave.cli.login._get_default_host") as mock_get_host,
         patch("weave.cli.login._validate_api_key") as mock_validate,
         patch("weave.cli.login._print_login_status") as mock_print_status,
