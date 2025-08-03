@@ -9,6 +9,8 @@ from pathlib import Path
 import click
 
 from weave.compat import wandb
+from weave.compat.wandb.util.netrc import Netrc
+from weave.compat.wandb.wandb_thin.login import _get_default_host, _validate_api_key
 
 logger = logging.getLogger(__name__)
 
@@ -60,12 +62,6 @@ def weave_login(
         >>> weave_login(host="https://your-wandb-instance.com")
         True
     """
-    from weave.compat.wandb.util.netrc import Netrc
-    from weave.compat.wandb.wandb_thin.login import (
-        _get_default_host,
-        _validate_api_key,
-    )
-
     try:
         # Determine the host
         if not host:
