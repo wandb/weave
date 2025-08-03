@@ -9,7 +9,7 @@ As of [PR #4554](https://github.com/wandb/weave/pull/4554), supported libraries 
 weave.wrapOpenAI(new OpenAI());
 ```
 
-Weave will generally handle this automatically. However, there may be [edge cases](#advanced-usage).
+Weave will generally handle this automatically. However, there may be [edge cases](#advanced-usage-and-troubleshooting).
 :::
 
 ## Usage instructions
