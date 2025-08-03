@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import click
+import pytest
 from click.testing import CliRunner
 
 from weave.cli.login import (
@@ -17,112 +18,102 @@ from weave.cli.login import (
 from weave.cli.main import cli
 
 
-def test_login_command_with_key():
+@pytest.fixture
+def mock_successful_weave_login():
+    """Fixture that provides a mock for weave.cli.main.weave_login."""
+    with patch("weave.cli.main.weave_login") as mock_login:
+        mock_login.return_value = True  # Default success case
+        yield mock_login
+
+
+def test_login_command_with_key(mock_weave_login):
     """Test the login command with an API key provided."""
     runner = CliRunner()
 
-    with patch("weave.cli.main.weave_login") as mock_login:
-        mock_login.return_value = True
+    result = runner.invoke(cli, ["login", "test-api-key"])
 
-        result = runner.invoke(cli, ["login", "test-api-key"])
-
-        assert result.exit_code == 0
-        mock_login.assert_called_once_with(
-            key="test-api-key", host=None, relogin=False, verify=True
-        )
+    assert result.exit_code == 0
+    mock_weave_login.assert_called_once_with(
+        key="test-api-key", host=None, relogin=False, verify=True
+    )
 
 
-def test_login_command_with_cloud_flag():
+def test_login_command_with_cloud_flag(mock_weave_login):
     """Test the login command with --cloud flag sets default host."""
     runner = CliRunner()
 
-    with patch("weave.cli.main.weave_login") as mock_login:
-        mock_login.return_value = True
+    result = runner.invoke(cli, ["login", "--cloud"])
 
-        result = runner.invoke(cli, ["login", "--cloud"])
-
-        assert result.exit_code == 0
-        mock_login.assert_called_once_with(
-            key=None, host="https://api.wandb.ai", relogin=False, verify=True
-        )
+    assert result.exit_code == 0
+    mock_weave_login.assert_called_once_with(
+        key=None, host="https://api.wandb.ai", relogin=False, verify=True
+    )
 
 
-def test_login_command_with_host():
+def test_login_command_with_host(mock_weave_login):
     """Test the login command with custom host."""
     runner = CliRunner()
 
-    with patch("weave.cli.main.weave_login") as mock_login:
-        mock_login.return_value = True
+    result = runner.invoke(cli, ["login", "--host", "https://custom.wandb.ai"])
 
-        result = runner.invoke(cli, ["login", "--host", "https://custom.wandb.ai"])
-
-        assert result.exit_code == 0
-        mock_login.assert_called_once_with(
-            key=None, host="https://custom.wandb.ai", relogin=False, verify=True
-        )
+    assert result.exit_code == 0
+    mock_weave_login.assert_called_once_with(
+        key=None, host="https://custom.wandb.ai", relogin=False, verify=True
+    )
 
 
-def test_login_command_with_relogin_flag():
+def test_login_command_with_relogin_flag(mock_weave_login):
     """Test the login command with --relogin flag."""
     runner = CliRunner()
 
-    with patch("weave.cli.main.weave_login") as mock_login:
-        mock_login.return_value = True
+    result = runner.invoke(cli, ["login", "--relogin"])
 
-        result = runner.invoke(cli, ["login", "--relogin"])
-
-        assert result.exit_code == 0
-        mock_login.assert_called_once_with(
-            key=None, host=None, relogin=True, verify=True
-        )
+    assert result.exit_code == 0
+    mock_weave_login.assert_called_once_with(
+        key=None, host=None, relogin=True, verify=True
+    )
 
 
-def test_login_command_with_no_verify_flag():
+def test_login_command_with_no_verify_flag(mock_weave_login):
     """Test the login command with --no-verify flag."""
     runner = CliRunner()
 
-    with patch("weave.cli.main.weave_login") as mock_login:
-        mock_login.return_value = True
+    result = runner.invoke(cli, ["login", "--no-verify"])
 
-        result = runner.invoke(cli, ["login", "--no-verify"])
-
-        assert result.exit_code == 0
-        mock_login.assert_called_once_with(
-            key=None, host=None, relogin=False, verify=False
-        )
+    assert result.exit_code == 0
+    mock_weave_login.assert_called_once_with(
+        key=None, host=None, relogin=False, verify=False
+    )
 
 
-def test_login_command_failure_exits_with_code_1():
+def test_login_command_failure_exits_with_code_1(mock_weave_login):
     """Test that login command exits with code 1 when login fails."""
     runner = CliRunner()
 
-    with patch("weave.cli.main.weave_login") as mock_login:
-        mock_login.return_value = False
+    # Override the default True return value for this specific test
+    mock_weave_login.return_value = False
 
-        result = runner.invoke(cli, ["login"])
+    result = runner.invoke(cli, ["login"])
 
-        assert result.exit_code == 1
-        assert "Login failed!" in result.output
+    assert result.exit_code == 1
+    assert "Login failed!" in result.output
 
 
-def test_login_command_cloud_and_host_together():
+def test_login_command_cloud_and_host_together(mock_weave_login):
     """Test the login command with both --cloud and --host uses the host value."""
     runner = CliRunner()
 
-    with patch("weave.cli.main.weave_login") as mock_login:
-        mock_login.return_value = True
+    result = runner.invoke(
+        cli, ["login", "--cloud", "--host", "https://custom.wandb.ai"]
+    )
 
-        result = runner.invoke(
-            cli, ["login", "--cloud", "--host", "https://custom.wandb.ai"]
-        )
-
-        assert result.exit_code == 0
-        mock_login.assert_called_once_with(
-            key=None,
-            host="https://custom.wandb.ai",  # Host takes precedence over cloud
-            relogin=False,
-            verify=True,
-        )
+    assert result.exit_code == 0
+    mock_weave_login.assert_called_once_with(
+        key=None,
+        host="https://custom.wandb.ai",  # Host takes precedence over cloud
+        relogin=False,
+        verify=True,
+    )
 
 
 def test_weave_login_with_valid_key():
