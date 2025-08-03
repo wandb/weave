@@ -6,6 +6,8 @@ import sys
 
 import click
 
+from weave.cli.login import weave_login
+
 
 @click.group()
 def cli() -> None:
@@ -26,8 +28,6 @@ def login(
     verify: bool = True,
 ) -> None:
     """Login to Weights & Biases."""
-    from weave.cli.login import weave_login
-
     # Handle cloud option - if cloud is True, use default W&B cloud host
     if cloud and not host:
         host = "https://api.wandb.ai"
@@ -40,8 +40,6 @@ def login(
     )
 
     if not success:
-        import click
-
         # Use the same styling as the rest of the weave application
         weave_prefix = click.style("weave", fg="cyan", bold=True)
         click.echo(f"{weave_prefix}: Login failed!", err=True)
