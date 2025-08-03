@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -425,27 +424,26 @@ def test_get_netrc_path_windows():
         assert result == "C:\\Users\\user\\_netrc"
 
 
-def test_weave_login_integration():
+def test_weave_login_integration(tmp_path):
     """Integration test for weave_login with temporary netrc file."""
-    with tempfile.TemporaryDirectory() as temp_dir:
-        netrc_path = Path(temp_dir) / ".netrc"
+    netrc_path = tmp_path / ".netrc"
 
-        with (
-            patch("weave.cli.login._get_netrc_path") as mock_netrc_path,
-            patch("weave.cli.login._get_default_host") as mock_get_host,
-            patch("weave.cli.login._validate_api_key") as mock_validate,
-            patch("weave.cli.login._print_login_status") as mock_print_status,
-        ):
-            mock_netrc_path.return_value = str(netrc_path)
-            mock_get_host.return_value = "api.wandb.ai"
+    with (
+        patch("weave.cli.login._get_netrc_path") as mock_netrc_path,
+        patch("weave.cli.login._get_default_host") as mock_get_host,
+        patch("weave.cli.login._validate_api_key") as mock_validate,
+        patch("weave.cli.login._print_login_status") as mock_print_status,
+    ):
+        mock_netrc_path.return_value = str(netrc_path)
+        mock_get_host.return_value = "api.wandb.ai"
 
-            # Create an empty netrc file to start with
-            netrc_path.touch()
+        # Create an empty netrc file to start with
+        netrc_path.touch()
 
-            result = weave_login(key="test-integration-key")
+        result = weave_login(key="test-integration-key")
 
-            assert result is True
-            assert netrc_path.exists()
+        assert result is True
+        assert netrc_path.exists()
 
-            # The test verifies the function runs successfully with a real netrc file path
-            # The actual netrc content creation is tested separately in other unit tests
+        # The test verifies the function runs successfully with a real netrc file path
+        # The actual netrc content creation is tested separately in other unit tests

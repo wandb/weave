@@ -2,8 +2,6 @@
 
 import configparser
 import os
-import tempfile
-from pathlib import Path
 from unittest.mock import Mock, patch
 
 import click
@@ -55,21 +53,20 @@ def test_get_default_host_environment_variable():
         assert _get_default_host() == "custom.wandb.ai"
 
 
-def test_get_default_host_settings_file():
+def test_get_default_host_settings_file(tmp_path):
     """Test default host resolution from settings file."""
-    with tempfile.TemporaryDirectory() as temp_dir:
-        settings_path = Path(temp_dir) / "settings"
+    settings_path = tmp_path / "settings"
 
-        # Create settings file with base_url
-        config = configparser.ConfigParser()
-        config.add_section("default")
-        config.set("default", "base_url", "https://custom.wandb.server")
+    # Create settings file with base_url
+    config = configparser.ConfigParser()
+    config.add_section("default")
+    config.set("default", "base_url", "https://custom.wandb.server")
 
-        with open(settings_path, "w") as f:
-            config.write(f)
+    with open(settings_path, "w") as f:
+        config.write(f)
 
-        with patch.dict(os.environ, {"WANDB_CONFIG_DIR": temp_dir}, clear=True):
-            assert _get_default_host() == "custom.wandb.server"
+    with patch.dict(os.environ, {"WANDB_CONFIG_DIR": str(tmp_path)}, clear=True):
+        assert _get_default_host() == "custom.wandb.server"
 
 
 def test_get_default_host_fallback():
@@ -82,51 +79,48 @@ def test_get_default_host_fallback():
             assert _get_default_host() == "api.wandb.ai"
 
 
-def test_get_host_from_settings_missing_file():
+def test_get_host_from_settings_missing_file(tmp_path):
     """Test getting host from settings when file doesn't exist."""
-    with tempfile.TemporaryDirectory() as temp_dir:
-        with patch.dict(os.environ, {"WANDB_CONFIG_DIR": temp_dir}, clear=True):
-            assert _get_host_from_settings() is None
+    with patch.dict(os.environ, {"WANDB_CONFIG_DIR": str(tmp_path)}, clear=True):
+        assert _get_host_from_settings() is None
 
 
-def test_set_setting():
+def test_set_setting(tmp_path):
     """Test setting configuration values."""
-    with tempfile.TemporaryDirectory() as temp_dir:
-        with patch.dict(os.environ, {"WANDB_CONFIG_DIR": temp_dir}, clear=True):
-            _set_setting("base_url", "https://test.wandb.ai")
+    with patch.dict(os.environ, {"WANDB_CONFIG_DIR": str(tmp_path)}, clear=True):
+        _set_setting("base_url", "https://test.wandb.ai")
 
-            # Verify setting was written
-            settings_path = Path(temp_dir) / "settings"
-            assert settings_path.exists()
+        # Verify setting was written
+        settings_path = tmp_path / "settings"
+        assert settings_path.exists()
 
-            config = configparser.ConfigParser()
-            config.read(str(settings_path))
-
-            assert config.has_section("default")
-            assert config.get("default", "base_url") == "https://test.wandb.ai"
-
-
-def test_clear_setting():
-    """Test clearing configuration values."""
-    with tempfile.TemporaryDirectory() as temp_dir:
-        settings_path = Path(temp_dir) / "settings"
-
-        # Create settings file with a setting
         config = configparser.ConfigParser()
-        config.add_section("default")
-        config.set("default", "base_url", "https://test.wandb.ai")
+        config.read(str(settings_path))
 
-        with open(settings_path, "w") as f:
-            config.write(f)
+        assert config.has_section("default")
+        assert config.get("default", "base_url") == "https://test.wandb.ai"
 
-        with patch.dict(os.environ, {"WANDB_CONFIG_DIR": temp_dir}, clear=True):
-            _clear_setting("base_url")
 
-            # Verify setting was cleared
-            config_after = configparser.ConfigParser()
-            config_after.read(str(settings_path))
+def test_clear_setting(tmp_path):
+    """Test clearing configuration values."""
+    settings_path = tmp_path / "settings"
 
-            assert not config_after.has_option("default", "base_url")
+    # Create settings file with a setting
+    config = configparser.ConfigParser()
+    config.add_section("default")
+    config.set("default", "base_url", "https://test.wandb.ai")
+
+    with open(settings_path, "w") as f:
+        config.write(f)
+
+    with patch.dict(os.environ, {"WANDB_CONFIG_DIR": str(tmp_path)}, clear=True):
+        _clear_setting("base_url")
+
+        # Verify setting was cleared
+        config_after = configparser.ConfigParser()
+        config_after.read(str(settings_path))
+
+        assert not config_after.has_option("default", "base_url")
 
 
 def test_handle_host_wandb_setting_default():

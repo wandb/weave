@@ -1,6 +1,5 @@
 """Tests for netrc utility functionality."""
 
-import tempfile
 from netrc import NetrcParseError
 from pathlib import Path
 
@@ -23,286 +22,274 @@ def test_netrc_initialization_custom_path():
     assert netrc_manager.path == Path(custom_path)
 
 
-def test_netrc_read_nonexistent_file():
+def test_netrc_read_nonexistent_file(tmp_path):
     """Test reading from non-existent netrc file."""
-    with tempfile.TemporaryDirectory() as temp_dir:
-        nonexistent_path = Path(temp_dir) / "nonexistent_netrc"
-        netrc_manager = Netrc(nonexistent_path)
+    nonexistent_path = tmp_path / "nonexistent_netrc"
+    netrc_manager = Netrc(nonexistent_path)
 
-        with pytest.raises(FileNotFoundError):
-            netrc_manager.read()
+    with pytest.raises(FileNotFoundError):
+        netrc_manager.read()
 
 
-def test_netrc_write_and_read():
+def test_netrc_write_and_read(tmp_path):
     """Test writing and reading netrc file."""
-    with tempfile.TemporaryDirectory() as temp_dir:
-        netrc_path = Path(temp_dir) / "test_netrc"
-        netrc_manager = Netrc(netrc_path)
+    netrc_path = tmp_path / "test_netrc"
+    netrc_manager = Netrc(netrc_path)
 
-        # Test data
-        credentials = {
-            "api.wandb.ai": {
-                "login": "user",
-                "account": "",
-                "password": "test_api_key_123456789012345678901234567890",
-            },
-            "custom.wandb.server": {
-                "login": "admin",
-                "account": "team",
-                "password": "custom_key_123456789012345678901234567890",
-            },
-        }
+    # Test data
+    credentials = {
+        "api.wandb.ai": {
+            "login": "user",
+            "account": "",
+            "password": "test_api_key_123456789012345678901234567890",
+        },
+        "custom.wandb.server": {
+            "login": "admin",
+            "account": "team",
+            "password": "custom_key_123456789012345678901234567890",
+        },
+    }
 
-        # Write credentials
-        netrc_manager.write(credentials)
+    # Write credentials
+    netrc_manager.write(credentials)
 
-        # Verify file exists and has correct permissions
-        assert netrc_path.exists()
-        stat_info = netrc_path.stat()
-        # Check that file is readable/writable by owner only (0o600)
-        assert stat_info.st_mode & 0o777 == 0o600
+    # Verify file exists and has correct permissions
+    assert netrc_path.exists()
+    stat_info = netrc_path.stat()
+    # Check that file is readable/writable by owner only (0o600)
+    assert stat_info.st_mode & 0o777 == 0o600
 
-        # Read credentials back
-        read_credentials = netrc_manager.read()
+    # Read credentials back
+    read_credentials = netrc_manager.read()
 
-        assert len(read_credentials) == 2
-        assert read_credentials["api.wandb.ai"]["login"] == "user"
-        assert (
-            read_credentials["api.wandb.ai"]["password"]
-            == "test_api_key_123456789012345678901234567890"
-        )
-        assert read_credentials["custom.wandb.server"]["login"] == "admin"
-        assert read_credentials["custom.wandb.server"]["account"] == "team"
+    assert len(read_credentials) == 2
+    assert read_credentials["api.wandb.ai"]["login"] == "user"
+    assert (
+        read_credentials["api.wandb.ai"]["password"]
+        == "test_api_key_123456789012345678901234567890"
+    )
+    assert read_credentials["custom.wandb.server"]["login"] == "admin"
+    assert read_credentials["custom.wandb.server"]["account"] == "team"
 
 
-def test_netrc_read_malformed_file():
+def test_netrc_read_malformed_file(tmp_path):
     """Test reading malformed netrc file."""
-    with tempfile.TemporaryDirectory() as temp_dir:
-        netrc_path = Path(temp_dir) / "malformed_netrc"
+    netrc_path = tmp_path / "malformed_netrc"
 
-        # Write malformed content
-        with open(netrc_path, "w") as f:
-            f.write("machine incomplete")  # Missing required fields
+    # Write malformed content
+    with open(netrc_path, "w") as f:
+        f.write("machine incomplete")  # Missing required fields
 
-        netrc_manager = Netrc(netrc_path)
+    netrc_manager = Netrc(netrc_path)
 
-        with pytest.raises(NetrcParseError):
-            netrc_manager.read()
+    with pytest.raises(NetrcParseError):
+        netrc_manager.read()
 
 
-def test_netrc_add_or_update_entry_new_file():
+def test_netrc_add_or_update_entry_new_file(tmp_path):
     """Test adding entry to new netrc file."""
-    with tempfile.TemporaryDirectory() as temp_dir:
-        netrc_path = Path(temp_dir) / "new_netrc"
-        netrc_manager = Netrc(netrc_path)
+    netrc_path = tmp_path / "new_netrc"
+    netrc_manager = Netrc(netrc_path)
 
-        # Add entry to non-existent file
-        netrc_manager.add_or_update_entry(
-            "api.wandb.ai", "user", "test_api_key_123456789012345678901234567890"
-        )
+    # Add entry to non-existent file
+    netrc_manager.add_or_update_entry(
+        "api.wandb.ai", "user", "test_api_key_123456789012345678901234567890"
+    )
 
-        # Verify file was created and entry exists
-        assert netrc_path.exists()
-        credentials = netrc_manager.read()
+    # Verify file was created and entry exists
+    assert netrc_path.exists()
+    credentials = netrc_manager.read()
 
-        assert "api.wandb.ai" in credentials
-        assert credentials["api.wandb.ai"]["login"] == "user"
-        assert (
-            credentials["api.wandb.ai"]["password"]
-            == "test_api_key_123456789012345678901234567890"
-        )
-        assert credentials["api.wandb.ai"]["account"] == ""
+    assert "api.wandb.ai" in credentials
+    assert credentials["api.wandb.ai"]["login"] == "user"
+    assert (
+        credentials["api.wandb.ai"]["password"]
+        == "test_api_key_123456789012345678901234567890"
+    )
+    assert credentials["api.wandb.ai"]["account"] == ""
 
 
-def test_netrc_add_or_update_entry_existing_file():
+def test_netrc_add_or_update_entry_existing_file(tmp_path):
     """Test updating entry in existing netrc file."""
-    with tempfile.TemporaryDirectory() as temp_dir:
-        netrc_path = Path(temp_dir) / "existing_netrc"
-        netrc_manager = Netrc(netrc_path)
+    netrc_path = tmp_path / "existing_netrc"
+    netrc_manager = Netrc(netrc_path)
 
-        # Create initial entry
-        initial_credentials = {
-            "api.wandb.ai": {
-                "login": "old_user",
-                "account": "",
-                "password": "old_key_123456789012345678901234567890",
-            }
+    # Create initial entry
+    initial_credentials = {
+        "api.wandb.ai": {
+            "login": "old_user",
+            "account": "",
+            "password": "old_key_123456789012345678901234567890",
         }
-        netrc_manager.write(initial_credentials)
+    }
+    netrc_manager.write(initial_credentials)
 
-        # Update entry
-        netrc_manager.add_or_update_entry(
-            "api.wandb.ai",
-            "new_user",
-            "new_key_123456789012345678901234567890",
-            "team_account",
-        )
+    # Update entry
+    netrc_manager.add_or_update_entry(
+        "api.wandb.ai",
+        "new_user",
+        "new_key_123456789012345678901234567890",
+        "team_account",
+    )
 
-        # Verify entry was updated
-        credentials = netrc_manager.read()
+    # Verify entry was updated
+    credentials = netrc_manager.read()
 
-        assert credentials["api.wandb.ai"]["login"] == "new_user"
-        assert (
-            credentials["api.wandb.ai"]["password"]
-            == "new_key_123456789012345678901234567890"
-        )
-        assert credentials["api.wandb.ai"]["account"] == "team_account"
+    assert credentials["api.wandb.ai"]["login"] == "new_user"
+    assert (
+        credentials["api.wandb.ai"]["password"]
+        == "new_key_123456789012345678901234567890"
+    )
+    assert credentials["api.wandb.ai"]["account"] == "team_account"
 
 
-def test_netrc_delete_entry_existing():
+def test_netrc_delete_entry_existing(tmp_path):
     """Test deleting existing entry from netrc file."""
-    with tempfile.TemporaryDirectory() as temp_dir:
-        netrc_path = Path(temp_dir) / "test_netrc"
-        netrc_manager = Netrc(netrc_path)
+    netrc_path = tmp_path / "test_netrc"
+    netrc_manager = Netrc(netrc_path)
 
-        # Create file with multiple entries
-        credentials = {
-            "api.wandb.ai": {
-                "login": "user1",
-                "account": "",
-                "password": "key1_123456789012345678901234567890",
-            },
-            "custom.wandb.server": {
-                "login": "user2",
-                "account": "",
-                "password": "key2_123456789012345678901234567890",
-            },
-        }
-        netrc_manager.write(credentials)
+    # Create file with multiple entries
+    credentials = {
+        "api.wandb.ai": {
+            "login": "user1",
+            "account": "",
+            "password": "key1_123456789012345678901234567890",
+        },
+        "custom.wandb.server": {
+            "login": "user2",
+            "account": "",
+            "password": "key2_123456789012345678901234567890",
+        },
+    }
+    netrc_manager.write(credentials)
 
-        # Delete one entry
-        result = netrc_manager.delete_entry("api.wandb.ai")
+    # Delete one entry
+    result = netrc_manager.delete_entry("api.wandb.ai")
 
-        assert result is True
+    assert result is True
 
-        # Verify entry was deleted
-        remaining_credentials = netrc_manager.read()
+    # Verify entry was deleted
+    remaining_credentials = netrc_manager.read()
 
-        assert "api.wandb.ai" not in remaining_credentials
-        assert "custom.wandb.server" in remaining_credentials
+    assert "api.wandb.ai" not in remaining_credentials
+    assert "custom.wandb.server" in remaining_credentials
 
 
-def test_netrc_delete_entry_nonexistent():
+def test_netrc_delete_entry_nonexistent(tmp_path):
     """Test deleting non-existent entry from netrc file."""
-    with tempfile.TemporaryDirectory() as temp_dir:
-        netrc_path = Path(temp_dir) / "test_netrc"
-        netrc_manager = Netrc(netrc_path)
+    netrc_path = tmp_path / "test_netrc"
+    netrc_manager = Netrc(netrc_path)
 
-        # Create file with one entry
-        credentials = {
-            "api.wandb.ai": {
-                "login": "user",
-                "account": "",
-                "password": "key_123456789012345678901234567890",
-            }
+    # Create file with one entry
+    credentials = {
+        "api.wandb.ai": {
+            "login": "user",
+            "account": "",
+            "password": "key_123456789012345678901234567890",
         }
-        netrc_manager.write(credentials)
+    }
+    netrc_manager.write(credentials)
 
-        # Try to delete non-existent entry
-        result = netrc_manager.delete_entry("nonexistent.server")
+    # Try to delete non-existent entry
+    result = netrc_manager.delete_entry("nonexistent.server")
 
-        assert result is False
+    assert result is False
 
-        # Verify existing entry is still there
-        remaining_credentials = netrc_manager.read()
-        assert "api.wandb.ai" in remaining_credentials
+    # Verify existing entry is still there
+    remaining_credentials = netrc_manager.read()
+    assert "api.wandb.ai" in remaining_credentials
 
 
-def test_netrc_delete_entry_no_file():
+def test_netrc_delete_entry_no_file(tmp_path):
     """Test deleting entry when netrc file doesn't exist."""
-    with tempfile.TemporaryDirectory() as temp_dir:
-        netrc_path = Path(temp_dir) / "nonexistent_netrc"
-        netrc_manager = Netrc(netrc_path)
+    netrc_path = tmp_path / "nonexistent_netrc"
+    netrc_manager = Netrc(netrc_path)
 
-        # Try to delete from non-existent file
-        result = netrc_manager.delete_entry("api.wandb.ai")
+    # Try to delete from non-existent file
+    result = netrc_manager.delete_entry("api.wandb.ai")
 
-        assert result is False
+    assert result is False
 
 
-def test_netrc_get_credentials_existing():
+def test_netrc_get_credentials_existing(tmp_path):
     """Test getting credentials for existing machine."""
-    with tempfile.TemporaryDirectory() as temp_dir:
-        netrc_path = Path(temp_dir) / "test_netrc"
-        netrc_manager = Netrc(netrc_path)
+    netrc_path = tmp_path / "test_netrc"
+    netrc_manager = Netrc(netrc_path)
 
-        # Create file with credentials
-        credentials = {
-            "api.wandb.ai": {
-                "login": "test_user",
-                "account": "test_account",
-                "password": "test_key_123456789012345678901234567890",
-            }
+    # Create file with credentials
+    credentials = {
+        "api.wandb.ai": {
+            "login": "test_user",
+            "account": "test_account",
+            "password": "test_key_123456789012345678901234567890",
         }
-        netrc_manager.write(credentials)
+    }
+    netrc_manager.write(credentials)
 
-        # Get credentials
-        result = netrc_manager.get_credentials("api.wandb.ai")
+    # Get credentials
+    result = netrc_manager.get_credentials("api.wandb.ai")
 
-        assert result is not None
-        assert result["login"] == "test_user"
-        assert result["account"] == "test_account"
-        assert result["password"] == "test_key_123456789012345678901234567890"
+    assert result is not None
+    assert result["login"] == "test_user"
+    assert result["account"] == "test_account"
+    assert result["password"] == "test_key_123456789012345678901234567890"
 
 
-def test_netrc_get_credentials_nonexistent():
+def test_netrc_get_credentials_nonexistent(tmp_path):
     """Test getting credentials for non-existent machine."""
-    with tempfile.TemporaryDirectory() as temp_dir:
-        netrc_path = Path(temp_dir) / "test_netrc"
-        netrc_manager = Netrc(netrc_path)
+    netrc_path = tmp_path / "test_netrc"
+    netrc_manager = Netrc(netrc_path)
 
-        # Create file with different credentials
-        credentials = {
-            "api.wandb.ai": {
-                "login": "user",
-                "account": "",
-                "password": "key_123456789012345678901234567890",
-            }
+    # Create file with different credentials
+    credentials = {
+        "api.wandb.ai": {
+            "login": "user",
+            "account": "",
+            "password": "key_123456789012345678901234567890",
         }
-        netrc_manager.write(credentials)
+    }
+    netrc_manager.write(credentials)
 
-        # Try to get non-existent credentials
-        result = netrc_manager.get_credentials("nonexistent.server")
+    # Try to get non-existent credentials
+    result = netrc_manager.get_credentials("nonexistent.server")
 
-        assert result is None
+    assert result is None
 
 
-def test_netrc_get_credentials_no_file():
+def test_netrc_get_credentials_no_file(tmp_path):
     """Test getting credentials when netrc file doesn't exist."""
-    with tempfile.TemporaryDirectory() as temp_dir:
-        netrc_path = Path(temp_dir) / "nonexistent_netrc"
-        netrc_manager = Netrc(netrc_path)
+    netrc_path = tmp_path / "nonexistent_netrc"
+    netrc_manager = Netrc(netrc_path)
 
-        # Try to get credentials from non-existent file
-        result = netrc_manager.get_credentials("api.wandb.ai")
+    # Try to get credentials from non-existent file
+    result = netrc_manager.get_credentials("api.wandb.ai")
 
-        assert result is None
+    assert result is None
 
 
-def test_netrc_write_creates_parent_directory():
+def test_netrc_write_creates_parent_directory(tmp_path):
     """Test that write creates parent directories if they don't exist."""
-    with tempfile.TemporaryDirectory() as temp_dir:
-        # Create nested path
-        nested_path = Path(temp_dir) / "nested" / "dir" / "netrc"
-        netrc_manager = Netrc(nested_path)
+    # Create nested path
+    nested_path = tmp_path / "nested" / "dir" / "netrc"
+    netrc_manager = Netrc(nested_path)
 
-        # Write credentials (should create parent directories)
-        credentials = {
-            "api.wandb.ai": {
-                "login": "user",
-                "account": "",
-                "password": "key_123456789012345678901234567890",
-            }
+    # Write credentials (should create parent directories)
+    credentials = {
+        "api.wandb.ai": {
+            "login": "user",
+            "account": "",
+            "password": "key_123456789012345678901234567890",
         }
-        netrc_manager.write(credentials)
+    }
+    netrc_manager.write(credentials)
 
-        # Verify file and directories were created
-        assert nested_path.exists()
-        assert nested_path.parent.exists()
+    # Verify file and directories were created
+    assert nested_path.exists()
+    assert nested_path.parent.exists()
 
-        # Verify credentials can be read back
-        read_credentials = netrc_manager.read()
-        assert "api.wandb.ai" in read_credentials
+    # Verify credentials can be read back
+    read_credentials = netrc_manager.read()
+    assert "api.wandb.ai" in read_credentials
 
 
 def test_credentials_typed_dict():

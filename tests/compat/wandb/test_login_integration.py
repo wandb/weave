@@ -1,7 +1,5 @@
 """Integration tests for wandb login functionality."""
 
-import tempfile
-from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
@@ -15,31 +13,30 @@ from weave.wandb_interface.context import (
 )
 
 
-def test_full_login_flow_with_netrc():
+def test_full_login_flow_with_netrc(tmp_path):
     """Test complete login flow using netrc file."""
-    with tempfile.TemporaryDirectory() as temp_dir:
-        netrc_path = Path(temp_dir) / ".netrc"
+    netrc_path = tmp_path / ".netrc"
 
-        # Create netrc with valid API key
-        netrc_manager = Netrc(netrc_path)
-        netrc_manager.add_or_update_entry(
-            "api.wandb.ai",
-            "user",
-            "a" * 40,  # Valid 40-character key
-        )
+    # Create netrc with valid API key
+    netrc_manager = Netrc(netrc_path)
+    netrc_manager.add_or_update_entry(
+        "api.wandb.ai",
+        "user",
+        "a" * 40,  # Valid 40-character key
+    )
 
-        # Mock the netrc path
-        with patch(
-            "weave.compat.wandb.wandb_thin.login._get_default_host",
-            return_value="api.wandb.ai",
-        ):
-            with patch("weave.compat.wandb.util.netrc.Netrc") as mock_netrc_class:
-                mock_netrc_class.return_value = netrc_manager
+    # Mock the netrc path
+    with patch(
+        "weave.compat.wandb.wandb_thin.login._get_default_host",
+        return_value="api.wandb.ai",
+    ):
+        with patch("weave.compat.wandb.util.netrc.Netrc") as mock_netrc_class:
+            mock_netrc_class.return_value = netrc_manager
 
-                # Test login with existing credentials
-                result = _login()
+            # Test login with existing credentials
+            result = _login()
 
-                assert result is True
+            assert result is True
 
 
 def test_full_login_flow_with_prompting():
@@ -167,7 +164,7 @@ def test_host_parsing_integration():
     )
 
 
-def test_settings_management_integration():
+def test_settings_management_integration(tmp_path):
     """Test settings management integration."""
     from weave.compat.wandb.wandb_thin.login import (
         _clear_setting,
@@ -175,17 +172,16 @@ def test_settings_management_integration():
         _set_setting,
     )
 
-    with tempfile.TemporaryDirectory() as temp_dir:
-        with patch.dict("os.environ", {"WANDB_CONFIG_DIR": temp_dir}):
-            # Test setting a value
-            _set_setting("base_url", "https://custom.wandb.ai")
+    with patch.dict("os.environ", {"WANDB_CONFIG_DIR": str(tmp_path)}):
+        # Test setting a value
+        _set_setting("base_url", "https://custom.wandb.ai")
 
-            # Test reading it back
-            host = _get_host_from_settings()
-            assert host == "custom.wandb.ai"
+        # Test reading it back
+        host = _get_host_from_settings()
+        assert host == "custom.wandb.ai"
 
-            # Test clearing it
-            _clear_setting("base_url")
+        # Test clearing it
+        _clear_setting("base_url")
 
-            host_after = _get_host_from_settings()
-            assert host_after is None
+        host_after = _get_host_from_settings()
+        assert host_after is None

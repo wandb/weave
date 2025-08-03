@@ -1,7 +1,6 @@
 import datetime
 import os
 import random
-import tempfile
 import time
 from typing import Any
 
@@ -128,55 +127,52 @@ def get_cache_sizes(cache_dir: str) -> dict[str, int]:
     }
 
 
-def test_server_cache_size_limit(client):
+def test_server_cache_size_limit(client, tmp_path):
     count = 500
     limit = 50000
-    with tempfile.TemporaryDirectory() as temp_dir:
-        caching_server = CachingMiddlewareTraceServer(
-            next_trace_server=MockServer("a" * 1000),
-            cache_dir=temp_dir,
-            size_limit=50000,
+    caching_server = CachingMiddlewareTraceServer(
+        next_trace_server=MockServer("a" * 1000),
+        cache_dir=str(tmp_path),
+        size_limit=50000,
+    )
+
+    sizes = get_cache_sizes(str(tmp_path))
+    assert len(sizes) == 3
+    assert sizes["cache.db-shm"] <= 50000
+    assert sizes["cache.db-wal"] == 0  # WAL should be at 0 now
+    assert sizes["cache.db"] <= 50000
+
+    for i in range(count):
+        caching_server.obj_read(
+            ObjReadReq(project_id="test", object_id="test", digest=f"test_{i}")
         )
 
-        sizes = get_cache_sizes(temp_dir)
+        # Internally, the cache estimates it's own size
+        # Access the disk cache layer (second layer in the stack)
+        disk_cache = caching_server._cache.layers[1]
+        assert disk_cache._cache.volume() <= limit * 1.1
+
+        # Allows us to test the on-disk size
+        sizes = get_cache_sizes(str(tmp_path))
         assert len(sizes) == 3
         assert sizes["cache.db-shm"] <= 50000
-        assert sizes["cache.db-wal"] == 0  # WAL should be at 0 now
-        assert sizes["cache.db"] <= 50000
+        assert sizes["cache.db-wal"] < 4_000_000 * 1.1  # WAL bound by 4MB
+        assert sizes["cache.db"] <= limit * 1.1
+        print(sizes)
 
-        for i in range(count):
-            caching_server.obj_read(
-                ObjReadReq(project_id="test", object_id="test", digest=f"test_{i}")
-            )
-
-            # Internally, the cache estimates it's own size
-            # Access the disk cache layer (second layer in the stack)
-            disk_cache = caching_server._cache.layers[1]
-            assert disk_cache._cache.volume() <= limit * 1.1
-
-            # Allows us to test the on-disk size
-            sizes = get_cache_sizes(temp_dir)
-            assert len(sizes) == 3
-            assert sizes["cache.db-shm"] <= 50000
-            assert sizes["cache.db-wal"] < 4_000_000 * 1.1  # WAL bound by 4MB
-            assert sizes["cache.db"] <= limit * 1.1
-            print(sizes)
-
-        # Assert that the WAL file is removed when the server is deleted
-        del caching_server
-        sizes = get_cache_sizes(temp_dir)
-        # depending on the OS, we could be in 1 of two cases.
-        # Case 1: only the db file remains
-        if len(sizes) == 1:
-            assert sizes["cache.db"] <= limit * 1.1
-        elif len(sizes) == 3:
-            assert sizes["cache.db-shm"] <= 50000
-            assert sizes["cache.db-wal"] == 0
-            assert sizes["cache.db"] <= limit * 1.1
-        else:
-            raise ValueError(
-                f"Unexpected number of files in cache directory: {len(sizes)}"
-            )
+    # Assert that the WAL file is removed when the server is deleted
+    del caching_server
+    sizes = get_cache_sizes(str(tmp_path))
+    # depending on the OS, we could be in 1 of two cases.
+    # Case 1: only the db file remains
+    if len(sizes) == 1:
+        assert sizes["cache.db"] <= limit * 1.1
+    elif len(sizes) == 3:
+        assert sizes["cache.db-shm"] <= 50000
+        assert sizes["cache.db-wal"] == 0
+        assert sizes["cache.db"] <= limit * 1.1
+    else:
+        raise ValueError(f"Unexpected number of files in cache directory: {len(sizes)}")
 
 
 def test_server_cache_latency(client):

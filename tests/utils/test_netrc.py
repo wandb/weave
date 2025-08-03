@@ -7,11 +7,11 @@ the Netrc class, helper functions, and edge cases.
 
 import netrc
 import os
-import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+
 from weave.utils.netrc import (
     Credentials,
     Netrc,
@@ -21,9 +21,8 @@ from weave.utils.netrc import (
 
 
 @pytest.fixture
-def temp_dir_path():
-    with tempfile.TemporaryDirectory() as temp_dir:
-        yield Path(temp_dir)
+def temp_dir_path(tmp_path):
+    return tmp_path
 
 
 @pytest.fixture
@@ -371,15 +370,14 @@ def test_get_netrc_file_path_expanduser():
 
 
 @patch.dict(os.environ, {}, clear=True)
-def test_get_netrc_file_path_existing_file():
+def test_get_netrc_file_path_existing_file(tmp_path):
     """Test getting netrc file path when file exists."""
-    with tempfile.TemporaryDirectory() as temp_dir:
-        netrc_path = Path(temp_dir) / ".netrc"
-        netrc_path.write_text("test")
+    netrc_path = tmp_path / ".netrc"
+    netrc_path.write_text("test")
 
-        with patch("pathlib.Path.home", return_value=Path(temp_dir)):
-            path = get_netrc_file_path()
-            assert path == str(netrc_path)
+    with patch("pathlib.Path.home", return_value=tmp_path):
+        path = get_netrc_file_path()
+        assert path == str(netrc_path)
 
 
 @patch.dict(os.environ, {}, clear=True)
