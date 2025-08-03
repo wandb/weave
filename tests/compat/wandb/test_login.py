@@ -16,7 +16,6 @@ from weave.compat.wandb.wandb_thin.login import (
     _get_host_from_settings,
     _handle_host_wandb_setting,
     _login,
-    _parse_wandb_host,
     _set_setting,
     _validate_api_key,
     _WandbLogin,
@@ -48,21 +47,6 @@ def test_validate_api_key_failure():
     # On-prem key with wrong length after dash
     with pytest.raises(ValueError, match="API key must be 40 characters long"):
         _validate_api_key("local-short")
-
-
-def test_parse_wandb_host():
-    """Test parsing of wandb host URLs."""
-    # With https protocol
-    assert _parse_wandb_host("https://api.wandb.ai/") == "api.wandb.ai"
-
-    # With http protocol
-    assert _parse_wandb_host("http://localhost:8080") == "localhost:8080"
-
-    # Without protocol
-    assert _parse_wandb_host("api.wandb.ai") == "api.wandb.ai"
-
-    # With trailing slash
-    assert _parse_wandb_host("api.wandb.ai/") == "api.wandb.ai"
 
 
 def test_get_default_host_environment_variable():
