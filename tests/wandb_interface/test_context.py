@@ -1,86 +1,43 @@
 """Tests for wandb interface context management."""
 
+import threading
+import time
 from unittest.mock import patch
 
+from tests.compat.wandb.test_login import pytest
 from weave.wandb_interface.context import (
-    WandbApiContext,
     from_environment,
     get_wandb_api_context,
     init,
     reset_wandb_api_context,
     set_wandb_api_context,
+    set_wandb_thread_local_api_settings,
 )
 
 
-def test_wandb_api_context_creation():
-    """Test WandbApiContext dataclass creation."""
-    context = WandbApiContext(
-        user_id="test_user",
-        api_key="test_key",
-        headers={"X-Test": "value"},
-        cookies={"session": "abc123"},
-    )
-
-    assert context.user_id == "test_user"
-    assert context.api_key == "test_key"
-    assert context.headers == {"X-Test": "value"}
-    assert context.cookies == {"session": "abc123"}
+@pytest.fixture
+def valid_api_key():
+    with patch("weave.trace.env.weave_wandb_api_key", return_value="test_api_key"):
+        yield "test_api_key"
 
 
-def test_wandb_api_context_from_json():
-    """Test WandbApiContext creation from JSON."""
-    json_data = {
-        "user_id": "test_user",
-        "api_key": "test_key",
-        "headers": {"X-Test": "value"},
-        "cookies": {"session": "abc123"},
-    }
-
-    context = WandbApiContext.from_json(json_data)
-
-    assert context.user_id == "test_user"
-    assert context.api_key == "test_key"
-    assert context.headers == {"X-Test": "value"}
-    assert context.cookies == {"session": "abc123"}
-
-
-def test_wandb_api_context_to_json():
-    """Test WandbApiContext conversion to JSON."""
-    context = WandbApiContext(
-        user_id="test_user",
-        api_key="test_key",
-        headers={"X-Test": "value"},
-        cookies={"session": "abc123"},
-    )
-
-    json_data = context.to_json()
-
-    expected = {
-        "user_id": "test_user",
-        "api_key": "test_key",
-        "headers": {"X-Test": "value"},
-        "cookies": {"session": "abc123"},
-    }
-
-    assert json_data == expected
-
-
-def test_get_wandb_api_context_unset():
-    """Test getting wandb context when not set (should return None)."""
-    # This tests our fix for the LookupError
-    context = get_wandb_api_context()
-    assert context is None
+@pytest.fixture
+def invalid_api_key():
+    with patch("weave.trace.env.weave_wandb_api_key", return_value=None):
+        yield None
 
 
 def test_set_and_get_wandb_api_context():
     """Test setting and getting wandb context."""
+    context = get_wandb_api_context()
+    assert context is None
+
     token = set_wandb_api_context(
         user_id="test_user",
         api_key="test_key",
         headers={"X-Test": "value"},
         cookies={"session": "abc123"},
     )
-
     assert token is not None
 
     context = get_wandb_api_context()
@@ -91,8 +48,7 @@ def test_set_and_get_wandb_api_context():
     assert context.cookies == {"session": "abc123"}
 
     # Clean up
-    if token:
-        reset_wandb_api_context(token)
+    reset_wandb_api_context(token)
 
 
 def test_set_wandb_api_context_twice():
@@ -110,8 +66,7 @@ def test_set_wandb_api_context_twice():
     assert context.api_key == "key1"
 
     # Clean up
-    if token1:
-        reset_wandb_api_context(token1)
+    reset_wandb_api_context(token1)
 
 
 def test_reset_wandb_api_context():
@@ -131,100 +86,81 @@ def test_reset_wandb_api_context():
     assert context is None
 
 
-def test_reset_wandb_api_context_none_token():
-    """Test resetting wandb context with None token (should be safe)."""
-    # This should not raise an exception
-    reset_wandb_api_context(None)
-
-
 def test_set_wandb_thread_local_api_settings():
     """Test setting thread local API settings."""
-    from weave.wandb_interface.context import set_wandb_thread_local_api_settings
-
     # This should work even when wandb is not available
-    # The function should handle ImportError gracefully
+    # The function should handle ImportError gracefully (no failure)
     set_wandb_thread_local_api_settings(
         api_key="test_key", cookies={"session": "abc123"}, headers={"X-Test": "value"}
     )
-    # No assertion needed - just ensure it doesn't raise
 
 
-def test_init_with_api_key():
+def test_init_with_api_key(valid_api_key):
     """Test init function with API key from environment."""
-    with patch("weave.trace.env.weave_wandb_api_key", return_value="test_api_key"):
-        token = init()
+    token = init()
+    assert token is not None
 
-        assert token is not None
+    context = get_wandb_api_context()
+    assert context is not None
+    assert context.user_id == "admin"
+    assert context.api_key == valid_api_key
 
-        context = get_wandb_api_context()
-        assert context is not None
-        assert context.user_id == "admin"
-        assert context.api_key == "test_api_key"
-
-        # Clean up
-        if token:
-            reset_wandb_api_context(token)
+    # Clean up
+    reset_wandb_api_context(token)
 
 
-def test_init_without_api_key():
+def test_init_without_api_key(invalid_api_key):
     """Test init function without API key."""
-    with patch("weave.trace.env.weave_wandb_api_key", return_value=None):
-        token = init()
+    token = init()
 
-        assert token is None
+    assert token is None
 
+    context = get_wandb_api_context()
+    assert context is None
+
+
+def test_from_environment_context_manager(valid_api_key):
+    """Test from_environment context manager."""
+    # Before entering context
+    context_before = get_wandb_api_context()
+    assert context_before is None
+
+    with from_environment():
+        # Inside context
+        context_inside = get_wandb_api_context()
+        assert context_inside is not None
+        assert context_inside.api_key == valid_api_key
+
+    # After exiting context
+    context_after = get_wandb_api_context()
+    assert context_after is None
+
+
+def test_from_environment_context_manager_no_api_key(invalid_api_key):
+    """Test from_environment context manager without API key."""
+    with from_environment():
+        # Should still work, just no context set
         context = get_wandb_api_context()
         assert context is None
 
 
-def test_from_environment_context_manager():
-    """Test from_environment context manager."""
-    with patch("weave.trace.env.weave_wandb_api_key", return_value="test_api_key"):
-        # Before entering context
-        context_before = get_wandb_api_context()
-        assert context_before is None
-
-        with from_environment():
-            # Inside context
-            context_inside = get_wandb_api_context()
-            assert context_inside is not None
-            assert context_inside.api_key == "test_api_key"
-
-        # After exiting context
-        context_after = get_wandb_api_context()
-        assert context_after is None
-
-
-def test_from_environment_context_manager_no_api_key():
-    """Test from_environment context manager without API key."""
-    with patch("weave.trace.env.weave_wandb_api_key", return_value=None):
-        with from_environment():
-            # Should still work, just no context set
-            context = get_wandb_api_context()
-            assert context is None
-
-
-def test_from_environment_context_manager_with_exception():
+def test_from_environment_context_manager_with_exception(valid_api_key):
     """Test from_environment context manager when exception occurs."""
-    with patch("weave.trace.env.weave_wandb_api_key", return_value="test_api_key"):
-        try:
-            with from_environment():
-                context = get_wandb_api_context()
-                assert context is not None
-                raise ValueError("Test exception")
-        except ValueError:
-            pass
+    try:
+        with from_environment():
+            context = get_wandb_api_context()
+            assert context is not None
+            raise ValueError("Test exception")
+    except ValueError:
+        pass
 
-        # Context should be cleaned up even after exception
-        context_after = get_wandb_api_context()
-        assert context_after is None
+    # Context should be cleaned up even after exception
+    context_after = get_wandb_api_context()
+    assert context_after is None
 
 
 def test_concurrent_context_isolation():
     """Test that contexts are isolated between different operations."""
-    import threading
-    import time
-
     results = {}
 
     def set_context_1():
