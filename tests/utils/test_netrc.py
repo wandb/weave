@@ -13,7 +13,6 @@ from unittest.mock import patch
 import pytest
 
 from weave.compat.wandb.util.netrc import (
-    Credentials,
     Netrc,
     check_netrc_access,
     get_netrc_file_path,
@@ -402,28 +401,3 @@ def test_get_netrc_file_path_default_windows(mock_system):
     with patch("pathlib.Path.home", return_value=Path("C:/Users/user")):
         path = get_netrc_file_path()
         assert path == "C:/Users/user/_netrc"
-
-
-# Tests for Credentials TypedDict
-def test_credentials_structure():
-    """Test that Credentials has the expected structure."""
-    creds: Credentials = {
-        "login": "testuser",
-        "account": "testaccount",
-        "password": "testpass",
-    }
-
-    assert creds["login"] == "testuser"
-    assert creds["account"] == "testaccount"
-    assert creds["password"] == "testpass"
-
-
-def test_credentials_empty_account():
-    """Test Credentials with empty account."""
-    creds: Credentials = {
-        "login": "testuser",
-        "account": "",
-        "password": "testpass",
-    }
-
-    assert creds["account"] == ""
