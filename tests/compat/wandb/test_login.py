@@ -2,6 +2,7 @@
 
 import configparser
 import os
+from dataclasses import dataclass
 from unittest.mock import Mock, patch
 
 import click
@@ -21,39 +22,87 @@ from weave.compat.wandb.wandb_thin.login import (
 )
 
 
-def test_validate_api_key_success():
+@pytest.fixture
+def api_key(request):
+    if request.param == "valid-saas":
+        return "a" * 40
+    elif request.param == "valid-onprem":
+        return "local-" + "b" * 40
+    elif request.param == "invalid-too-short":
+        return "short"
+    elif request.param == "invalid-too-long":
+        return "a" * 41
+    elif request.param == "invalid-onprem-too-short":
+        return "local-short"
+    elif request.param == "invalid-onprem-too-long":
+        return "local-" + "c" * 41
+
+    raise ValueError(f"Invalid API key type: {request.param}")
+
+
+all_valid_keys = ["valid-saas", "valid-onprem"]
+all_invalid_keys = [
+    "invalid-too-short",
+    "invalid-too-long",
+    "invalid-onprem-too-short",
+    "invalid-onprem-too-long",
+]
+
+
+@pytest.mark.parametrize("api_key", all_valid_keys, indirect=True)
+def test_validate_api_key_success(api_key):
     """Test API key validation with valid keys."""
-    # Normal 40-character key
-    valid_key = "a" * 40
-    _validate_api_key(valid_key)  # Should not raise
-
-    # On-prem style key with dash
-    valid_onprem_key = "local-" + "b" * 40
-    _validate_api_key(valid_onprem_key)  # Should not raise
+    _validate_api_key(api_key)
 
 
-def test_validate_api_key_failure():
+@pytest.mark.parametrize("api_key", all_invalid_keys, indirect=True)
+def test_validate_api_key_failure(api_key):
     """Test API key validation with invalid keys."""
-    # Too short
     with pytest.raises(ValueError, match="API key must be 40 characters long"):
-        _validate_api_key("short")
-
-    # Too long
-    with pytest.raises(ValueError, match="API key must be 40 characters long"):
-        _validate_api_key("a" * 41)
-
-    # On-prem key with wrong length after dash
-    with pytest.raises(ValueError, match="API key must be 40 characters long"):
-        _validate_api_key("local-short")
+        _validate_api_key(api_key)
 
 
-def test_get_default_host_environment_variable():
+@dataclass
+class HostAndBaseURL:
+    host: str
+    base_url: str
+
+
+@pytest.fixture
+def host_and_base_url(request):
+    if request.param == "saas":
+        base_url = "https://api.wandb.ai"
+        host = "api.wandb.ai"
+    elif request.param == "aws":
+        base_url = "https://example-aws.wandb.io"
+        host = "example-aws.wandb.io"
+    elif request.param == "gcp":
+        base_url = "https://example-gcp.wandb.io"
+        host = "example-gcp.wandb.io"
+    elif request.param == "azure":
+        base_url = "https://example-azure.wandb.io"
+        host = "example-azure.wandb.io"
+    elif request.param == "onprem":
+        base_url = "https://wandb.customer.com"
+        host = "wandb.customer.com"
+    else:
+        raise ValueError(f"Invalid host type: {request.param}")
+
+    return HostAndBaseURL(host, base_url)
+
+
+all_hosts = ["saas", "aws", "gcp", "azure", "onprem"]
+
+
+@pytest.mark.parametrize("host_and_base_url", all_hosts, indirect=True)
+def test_get_default_host_environment_variable(host_and_base_url):
     """Test default host resolution from environment variable."""
-    with patch.dict(os.environ, {"WANDB_BASE_URL": "https://custom.wandb.ai/"}):
-        assert _get_default_host() == "custom.wandb.ai"
+    with patch.dict(os.environ, {"WANDB_BASE_URL": host_and_base_url.base_url}):
+        assert _get_default_host() == host_and_base_url.host
 
 
-def test_get_default_host_settings_file(tmp_path):
+@pytest.mark.parametrize("host_and_base_url", all_hosts, indirect=True)
+def test_get_default_host_settings_file(tmp_path, host_and_base_url):
     """Test default host resolution from settings file."""
     settings_path = tmp_path / "settings"
 
