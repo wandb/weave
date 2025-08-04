@@ -1,6 +1,7 @@
 """Shared fixtures for wandb compatibility tests."""
 
 import configparser
+import os
 from unittest.mock import Mock, patch
 
 import pytest
@@ -114,3 +115,42 @@ def mock_wandb_api():
         mock_api_instance = Mock()
         mock_api_class.return_value = mock_api_instance
         yield mock_api_instance
+
+
+@pytest.fixture
+def mock_wandb_api_with_entity():
+    """Fixture that provides a mocked wandb Api instance with default entity."""
+    with patch("weave.compat.wandb.Api") as mock_api_class:
+        mock_api_instance = Mock()
+        mock_api_instance.default_entity_name.return_value = "test_entity"
+        mock_api_class.return_value = mock_api_instance
+        yield mock_api_instance
+
+
+@pytest.fixture
+def mock_click_prompt():
+    """Factory fixture for mocking click.prompt with different behaviors."""
+    def _mock_prompt(return_value=None, side_effect=None):
+        return patch("click.prompt", return_value=return_value, side_effect=side_effect)
+    return _mock_prompt
+
+
+@pytest.fixture
+def wandb_env_vars():
+    """Factory fixture for setting wandb environment variables."""
+    def _set_env(clear=False, **kwargs):
+        return patch.dict(os.environ, kwargs, clear=clear)
+    return _set_env
+
+
+@pytest.fixture
+def mock_weave_context():
+    """Fixture that provides mocked weave context operations."""
+    with patch("weave.wandb_interface.context.init") as mock_context_init, \
+         patch("weave.wandb_interface.context.get_wandb_api_context") as mock_get_context, \
+         patch("weave.wandb_interface.context.set_wandb_api_context") as mock_set_context:
+        yield {
+            "init": mock_context_init,
+            "get": mock_get_context,
+            "set": mock_set_context,
+        }

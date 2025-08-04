@@ -9,6 +9,81 @@ from weave.trace.weave_init import (
     get_entity_project_from_project_name,
 )
 
+# Local fixtures for this test module
+
+
+@pytest.fixture
+def mock_wandb_api_with_default_entity():
+    """Fixture that provides a mocked wandb Api instance with default entity."""
+    with patch("weave.compat.wandb.Api") as mock_api_class:
+        mock_api = Mock()
+        mock_api.default_entity_name.return_value = "default_entity"
+        mock_api_class.return_value = mock_api
+        yield mock_api
+
+
+@pytest.fixture
+def mock_wandb_api_no_entity():
+    """Fixture that provides a mocked wandb Api instance with no default entity."""
+    with patch("weave.compat.wandb.Api") as mock_api_class:
+        mock_api = Mock()
+        mock_api.default_entity_name.return_value = None
+        mock_api_class.return_value = mock_api
+        yield mock_api
+
+
+@pytest.fixture
+def mock_weave_login():
+    """Fixture that provides a mocked weave login function."""
+    with patch("weave.compat.wandb.login") as mock_login:
+        yield mock_login
+
+
+@pytest.fixture
+def mock_weave_context_with_existing():
+    """Fixture that provides mocked weave context with existing context."""
+    from weave.wandb_interface.context import WandbApiContext
+
+    existing_context = WandbApiContext(
+        user_id="test_user", api_key="test_api_key", headers=None, cookies=None
+    )
+
+    with (
+        patch("weave.wandb_interface.context.init") as mock_context_init,
+        patch(
+            "weave.wandb_interface.context.get_wandb_api_context",
+            return_value=existing_context,
+        ) as mock_get_context,
+    ):
+        yield {
+            "init": mock_context_init,
+            "get": mock_get_context,
+            "existing_context": existing_context,
+        }
+
+
+@pytest.fixture
+def mock_weave_context_without_existing():
+    """Fixture that provides mocked weave context with no existing context initially."""
+    from weave.wandb_interface.context import WandbApiContext
+
+    login_context = WandbApiContext(
+        user_id="test_user", api_key="test_api_key", headers=None, cookies=None
+    )
+
+    with (
+        patch("weave.wandb_interface.context.init") as mock_context_init,
+        patch(
+            "weave.wandb_interface.context.get_wandb_api_context",
+            side_effect=[None, login_context],
+        ) as mock_get_context,
+    ):
+        yield {
+            "init": mock_context_init,
+            "get": mock_get_context,
+            "login_context": login_context,
+        }
+
 
 def test_get_entity_project_from_project_name_with_entity():
     """Test project name parsing when entity is included."""
@@ -18,32 +93,26 @@ def test_get_entity_project_from_project_name_with_entity():
     assert project == "test_project"
 
 
-def test_get_entity_project_from_project_name_without_entity():
+def test_get_entity_project_from_project_name_without_entity(
+    mock_wandb_api_with_default_entity,
+):
     """Test project name parsing when entity is not included."""
-    with patch("weave.compat.wandb.Api") as mock_api_class:
-        mock_api = Mock()
-        mock_api.default_entity_name.return_value = "default_entity"
-        mock_api_class.return_value = mock_api
+    entity, project = get_entity_project_from_project_name("test_project")
 
-        entity, project = get_entity_project_from_project_name("test_project")
-
-        assert entity == "default_entity"
-        assert project == "test_project"
-        mock_api.default_entity_name.assert_called_once()
+    assert entity == "default_entity"
+    assert project == "test_project"
+    mock_wandb_api_with_default_entity.default_entity_name.assert_called_once()
 
 
-def test_get_entity_project_from_project_name_no_default_entity():
+def test_get_entity_project_from_project_name_no_default_entity(
+    mock_wandb_api_no_entity,
+):
     """Test project name parsing when no default entity is available."""
-    with patch("weave.compat.wandb.Api") as mock_api_class:
-        mock_api = Mock()
-        mock_api.default_entity_name.return_value = None
-        mock_api_class.return_value = mock_api
-
-        with pytest.raises(
-            WeaveWandbAuthenticationException,
-            match='weave init requires wandb. Run "wandb login"',
-        ):
-            get_entity_project_from_project_name("test_project")
+    with pytest.raises(
+        WeaveWandbAuthenticationException,
+        match='weave init requires wandb. Run "wandb login"',
+    ):
+        get_entity_project_from_project_name("test_project")
 
 
 def test_get_entity_project_from_project_name_too_many_slashes():
@@ -70,102 +139,43 @@ def test_get_entity_project_from_project_name_both_empty():
         get_entity_project_from_project_name("/")
 
 
-def test_init_weave_with_existing_context():
+def test_init_weave_with_existing_context(
+    mock_weave_context_with_existing,
+    mock_wandb_api_with_default_entity,
+    mock_weave_init_components,
+    mock_weave_login,
+):
     """Test init_weave when wandb context already exists."""
     from weave.trace.weave_init import init_weave
-    from weave.wandb_interface.context import WandbApiContext
 
-    # Mock existing context
-    existing_context = WandbApiContext(
-        user_id="test_user", api_key="test_api_key", headers=None, cookies=None
-    )
+    # Update the mock API to return test_entity
+    mock_wandb_api_with_default_entity.default_entity_name.return_value = "test_entity"
 
-    with patch("weave.wandb_interface.context.init") as mock_context_init:
-        with patch(
-            "weave.wandb_interface.context.get_wandb_api_context",
-            return_value=existing_context,
-        ):
-            with patch("weave.compat.wandb.Api") as mock_api_class:
-                mock_api = Mock()
-                mock_api.default_entity_name.return_value = "test_entity"
-                mock_api_class.return_value = mock_api
+    # This should not call wandb.login since context exists
+    result = init_weave("test_project")
 
-                with patch(
-                    "weave.trace.weave_init.init_weave_get_server"
-                ) as mock_get_server:
-                    mock_server = Mock()
-                    mock_server.server_info.return_value.min_required_weave_python_version = "0.0.0"
-                    mock_get_server.return_value = mock_server
-
-                    with patch(
-                        "weave.trace.weave_client.WeaveClient"
-                    ) as mock_client_class:
-                        mock_client = Mock()
-                        mock_client.project = "test_project"
-                        mock_client_class.return_value = mock_client
-
-                        with patch(
-                            "weave.trace.weave_init.use_server_cache",
-                            return_value=False,
-                        ):
-                            # This should not call wandb.login since context exists
-                            with patch("weave.compat.wandb.login") as mock_login:
-                                result = init_weave("test_project")
-
-                                mock_login.assert_not_called()
-                                assert result.client == mock_client
+    mock_weave_login.assert_not_called()
+    assert result.client == mock_weave_init_components["client"]
 
 
-def test_init_weave_without_context_triggers_login():
+def test_init_weave_without_context_triggers_login(
+    mock_weave_context_without_existing,
+    mock_wandb_api_with_default_entity,
+    mock_weave_init_components,
+    mock_weave_login,
+):
     """Test init_weave when no wandb context exists (should trigger login)."""
     from weave.trace.weave_init import init_weave
-    from weave.wandb_interface.context import WandbApiContext
 
-    # Mock login creates context
-    login_context = WandbApiContext(
-        user_id="test_user", api_key="test_api_key", headers=None, cookies=None
-    )
+    # Update the mock API to return test_entity
+    mock_wandb_api_with_default_entity.default_entity_name.return_value = "test_entity"
 
-    with patch("weave.wandb_interface.context.init") as mock_context_init:
-        # First call returns None (no context), second call returns context after login
-        with patch(
-            "weave.wandb_interface.context.get_wandb_api_context",
-            side_effect=[None, login_context],
-        ):
-            with patch("weave.compat.wandb.Api") as mock_api_class:
-                mock_api = Mock()
-                mock_api.default_entity_name.return_value = "test_entity"
-                mock_api_class.return_value = mock_api
+    with patch("weave.trace.weave_init.wandb_termlog_patch.ensure_patched"):
+        result = init_weave("test_project")
 
-                with patch(
-                    "weave.trace.weave_init.init_weave_get_server"
-                ) as mock_get_server:
-                    mock_server = Mock()
-                    mock_server.server_info.return_value.min_required_weave_python_version = "0.0.0"
-                    mock_get_server.return_value = mock_server
-
-                    with patch(
-                        "weave.trace.weave_client.WeaveClient"
-                    ) as mock_client_class:
-                        mock_client = Mock()
-                        mock_client.project = "test_project"
-                        mock_client_class.return_value = mock_client
-
-                        with patch(
-                            "weave.trace.weave_init.use_server_cache",
-                            return_value=False,
-                        ):
-                            with patch("weave.compat.wandb.login") as mock_login:
-                                with patch(
-                                    "weave.trace.weave_init.wandb_termlog_patch.ensure_patched"
-                                ):
-                                    result = init_weave("test_project")
-
-                                    # Should call login with specific parameters
-                                    mock_login.assert_called_once_with(
-                                        anonymous="never", force=True
-                                    )
-                                    assert result.client == mock_client
+        # Should call login with specific parameters
+        mock_weave_login.assert_called_once_with(anonymous="never", force=True)
+        assert result.client == mock_weave_init_components["client"]
 
 
 def test_init_weave_authentication_order():

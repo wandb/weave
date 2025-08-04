@@ -17,6 +17,9 @@ from weave.cli.login import (
 )
 from weave.cli.main import cli
 
+# Import shared fixtures from compat/wandb
+pytest_plugins = ["tests.compat.wandb.conftest"]
+
 
 @pytest.fixture
 def mock_weave_login():
@@ -238,50 +241,38 @@ def test_prompt_for_api_key_success():
         )
 
 
-def test_prompt_for_api_key_cancelled():
+def test_prompt_for_api_key_cancelled(mock_click_prompt):
     """Test _prompt_for_api_key when user cancels (Ctrl+C)."""
-    with patch("weave.cli.login.wandb.util"), patch("click.prompt") as mock_prompt:
-        mock_prompt.side_effect = click.Abort()
-
+    with patch("weave.cli.login.wandb.util"), mock_click_prompt(side_effect=click.Abort()):
         result = _prompt_for_api_key("api.wandb.ai")
-
         assert result is None
 
 
-def test_prompt_for_api_key_no_tty():
+def test_prompt_for_api_key_no_tty(mock_click_prompt):
     """Test _prompt_for_api_key when no TTY is available."""
-    with patch("weave.cli.login.wandb.util"), patch("click.prompt") as mock_prompt:
-        mock_prompt.side_effect = EOFError()
-
+    with patch("weave.cli.login.wandb.util"), mock_click_prompt(side_effect=EOFError()):
         result = _prompt_for_api_key("api.wandb.ai")
-
         assert result is None
 
 
-def test_print_login_status_with_username():
+def test_print_login_status_with_username(mock_wandb_api):
     """Test _print_login_status displays username when available."""
-    with patch("weave.cli.login.wandb.Api") as mock_api:
-        mock_api_instance = MagicMock()
-        mock_api.return_value = mock_api_instance
-        mock_api_instance.username.return_value = "testuser"
+    mock_wandb_api.username.return_value = "testuser"
 
-        # This test mainly ensures no exceptions are raised
-        _print_login_status("api.wandb.ai")
+    # This test mainly ensures no exceptions are raised
+    _print_login_status("api.wandb.ai")
 
-        mock_api_instance.username.assert_called_once()
+    mock_wandb_api.username.assert_called_once()
 
 
-def test_print_login_status_without_username():
+def test_print_login_status_without_username(mock_wandb_api):
     """Test _print_login_status when username is not available."""
-    with patch("weave.cli.login.wandb.Api") as mock_api:
-        mock_api_instance = MagicMock()
-        mock_api.return_value = mock_api_instance
-        mock_api_instance.username.return_value = None
+    mock_wandb_api.username.return_value = None
 
-        # This test mainly ensures no exceptions are raised
-        _print_login_status("api.wandb.ai")
+    # This test mainly ensures no exceptions are raised
+    _print_login_status("api.wandb.ai")
 
-        mock_api_instance.username.assert_called_once()
+    mock_wandb_api.username.assert_called_once()
 
 
 def test_print_login_status_api_error():
@@ -293,26 +284,24 @@ def test_print_login_status_api_error():
         _print_login_status("api.wandb.ai")
 
 
-def test_get_netrc_path_unix():
+def test_get_netrc_path_unix(mock_path_operations):
     """Test _get_netrc_path returns correct path on Unix systems."""
-    with patch("os.name", "posix"), patch("pathlib.Path.home") as mock_home:
-        mock_home.return_value = Path("/home/user")
+    mock_path_operations["home"].return_value = Path("/home/user")
 
+    with patch("os.name", "posix"):
         result = _get_netrc_path()
-
         assert result == "/home/user/.netrc"
 
 
-def test_get_netrc_path_windows():
+def test_get_netrc_path_windows(mock_path_operations):
     """Test _get_netrc_path returns correct path on Windows systems."""
-    with patch("os.name", "nt"), patch("pathlib.Path.home") as mock_home:
-        # Create a mock Path object that behaves like a Windows path
-        mock_path = MagicMock()
-        mock_path.__truediv__ = lambda self, other: f"C:\\Users\\user\\{other}"
-        mock_home.return_value = mock_path
+    # Create a mock Path object that behaves like a Windows path
+    mock_path = MagicMock()
+    mock_path.__truediv__ = lambda self, other: f"C:\\Users\\user\\{other}"
+    mock_path_operations["home"].return_value = mock_path
 
+    with patch("os.name", "nt"):
         result = _get_netrc_path()
-
         assert result == "C:\\Users\\user\\_netrc"
 
 
