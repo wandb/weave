@@ -645,7 +645,6 @@ def make_client_call(
 RESERVED_SUMMARY_USAGE_KEY = "usage"
 RESERVED_SUMMARY_STATUS_COUNTS_KEY = "status_counts"
 
-
 BACKGROUND_PARALLELISM_MIX = 0.5
 # This size is correlated with the maximum single row insert size
 # in clickhouse, which is currently unavoidable.
@@ -1157,7 +1156,7 @@ class WeaveClient:
                     started_at=started_at,
                     parent_id=parent_id,
                     inputs=inputs_json,
-                    attributes=attributes_dict,
+                    attributes=attributes_dict.unwrap(),
                     wb_run_id=current_wb_run_id,
                     wb_run_step=current_wb_run_step,
                     thread_id=thread_id,
