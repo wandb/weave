@@ -23,6 +23,16 @@ def mock_wandb_api_with_default_entity():
 
 
 @pytest.fixture
+def mock_wandb_api_no_entity():
+    """Fixture that provides a mocked wandb Api instance with no default entity."""
+    with patch("weave.compat.wandb.Api") as mock_api_class:
+        mock_api = Mock()
+        mock_api.default_entity_name.return_value = None
+        mock_api_class.return_value = mock_api
+        yield mock_api
+
+
+@pytest.fixture
 def mock_weave_context_with_existing():
     """Fixture that provides mocked weave context with existing context."""
     from weave.wandb_interface.context import WandbApiContext
