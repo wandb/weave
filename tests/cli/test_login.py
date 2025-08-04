@@ -93,7 +93,6 @@ def test_weave_login_with_relogin_flag(mock_netrc):
         patch("weave.cli.login._get_default_host") as mock_get_host,
         patch("weave.cli.login._prompt_for_api_key") as mock_prompt,
         patch("weave.cli.login._validate_api_key") as mock_validate,
-        patch("weave.cli.login._print_login_status") as mock_print_status,
     ):
         mock_get_host.return_value = "api.wandb.ai"
         mock_netrc.get_credentials.return_value = ("user", "existing-key")
@@ -143,7 +142,6 @@ def test_weave_login_invalid_api_key(mock_netrc):
 def test_weave_login_custom_host(mock_netrc):
     """Test weave_login with custom host."""
     with (
-        patch("weave.cli.login._validate_api_key") as mock_validate,
         patch("weave.cli.login._print_login_status") as mock_print_status,
     ):
         result = weave_login(key="test-key", host="https://custom.wandb.ai")
@@ -158,7 +156,6 @@ def test_weave_login_custom_host(mock_netrc):
 def test_weave_login_host_url_cleanup(mock_netrc):
     """Test that host URL is properly cleaned of http/https prefixes."""
     with (
-        patch("weave.cli.login._validate_api_key") as mock_validate,
         patch("weave.cli.login._print_login_status") as mock_print_status,
     ):
         # Test https prefix removal
@@ -180,7 +177,6 @@ def test_weave_login_netrc_save_error(mock_netrc):
     """Test weave_login when netrc save fails but continues."""
     with (
         patch("weave.cli.login._get_default_host") as mock_get_host,
-        patch("weave.cli.login._validate_api_key") as mock_validate,
         patch("weave.cli.login._print_login_status") as mock_print_status,
     ):
         mock_get_host.return_value = "api.wandb.ai"
@@ -327,8 +323,6 @@ def test_weave_login_integration(tmp_path):
     with (
         patch("weave.cli.login._get_netrc_path") as mock_netrc_path,
         patch("weave.cli.login._get_default_host") as mock_get_host,
-        patch("weave.cli.login._validate_api_key") as mock_validate,
-        patch("weave.cli.login._print_login_status") as mock_print_status,
     ):
         mock_netrc_path.return_value = str(netrc_path)
         mock_get_host.return_value = "api.wandb.ai"

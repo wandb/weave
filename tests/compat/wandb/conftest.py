@@ -90,6 +90,7 @@ def temp_config_dir(tmp_path):
 @pytest.fixture
 def create_settings_file(temp_config_dir):
     """Fixture that creates a settings file with given content."""
+
     def _create_settings_file(settings_dict):
         settings_path = temp_config_dir / "settings"
         config = configparser.ConfigParser()
@@ -104,3 +105,12 @@ def create_settings_file(temp_config_dir):
         return settings_path
 
     return _create_settings_file
+
+
+@pytest.fixture
+def mock_wandb_api():
+    """Fixture that provides a mocked wandb Api instance."""
+    with patch("weave.compat.wandb.Api") as mock_api_class:
+        mock_api_instance = Mock()
+        mock_api_class.return_value = mock_api_instance
+        yield mock_api_instance

@@ -1,6 +1,6 @@
 """Integration tests for wandb login functionality."""
 
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -20,11 +20,7 @@ def test_full_login_flow_with_netrc(tmp_path, api_key, mock_default_host):
 
     # Create netrc with valid API key
     netrc_manager = Netrc(netrc_path)
-    netrc_manager.add_or_update_entry(
-        "api.wandb.ai",
-        "user",
-        api_key,  # Use fixture API key
-    )
+    netrc_manager.add_or_update_entry("api.wandb.ai", "user", api_key)
 
     with patch("weave.compat.wandb.util.netrc.Netrc") as mock_netrc_class:
         mock_netrc_class.return_value = netrc_manager
@@ -71,38 +67,31 @@ def test_context_integration():
     assert context_after is None
 
 
-def test_weave_init_login_integration():
+def test_weave_init_login_integration(mock_wandb_api):
     """Test that weave init properly triggers login when needed."""
     from weave.trace.weave_init import get_entity_project_from_project_name
 
     # Test with authenticated API
-    with patch("weave.compat.wandb.Api") as mock_api_class:
-        mock_api = Mock()
-        mock_api.default_entity_name.return_value = "test_entity"
-        mock_api_class.return_value = mock_api
+    mock_wandb_api.default_entity_name.return_value = "test_entity"
 
-        entity, project = get_entity_project_from_project_name("test_project")
+    entity, project = get_entity_project_from_project_name("test_project")
 
-        assert entity == "test_entity"
-        assert project == "test_project"
+    assert entity == "test_entity"
+    assert project == "test_project"
 
 
-def test_project_creator_integration():
+def test_project_creator_integration(mock_wandb_api):
     """Test project creator with realistic GraphQL responses."""
     from weave.wandb_interface.project_creator import _ensure_project_exists
 
-    with patch("weave.compat.wandb.Api") as mock_api_class:
-        mock_api = Mock()
-        mock_api_class.return_value = mock_api
+    # Test existing project scenario
+    project_response = {"project": {"name": "existing_project"}}
+    mock_wandb_api.project.return_value = project_response
 
-        # Test existing project scenario
-        project_response = {"project": {"name": "existing_project"}}
-        mock_api.project.return_value = project_response
+    result = _ensure_project_exists("test_entity", "test_project")
 
-        result = _ensure_project_exists("test_entity", "test_project")
-
-        assert result == {"project_name": "existing_project"}
-        mock_api.project.assert_called_once_with("test_entity", "test_project")
+    assert result == {"project_name": "existing_project"}
+    mock_wandb_api.project.assert_called_once_with("test_entity", "test_project")
 
 
 def test_end_to_end_authentication_flow():
