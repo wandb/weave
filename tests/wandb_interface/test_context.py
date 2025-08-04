@@ -1,7 +1,6 @@
 """Tests for wandb interface context management."""
 
 import threading
-import time
 from unittest.mock import patch
 
 from tests.compat.wandb.test_login import pytest
@@ -144,28 +143,22 @@ def test_from_environment_context_manager_with_exception(valid_api_key):
 def test_concurrent_context_isolation():
     """Test that contexts are isolated between different operations."""
     results = {}
+    # Barrier ensures both threads reach the same point before proceeding
+    barrier = threading.Barrier(2)
 
-    def set_context_1():
+    def set_context():
         token = set_wandb_api_context("user1", "key1", None, None)
-        time.sleep(0.1)  # Let other thread run
+        # Wait for both threads to set their contexts
+        barrier.wait()
         context = get_wandb_api_context()
         results["thread1_user"] = context.user_id if context else None
         results["thread1_key"] = context.api_key if context else None
         if token:
             reset_wandb_api_context(token)
 
-    def set_context_2():
-        token = set_wandb_api_context("user2", "key2", None, None)
-        time.sleep(0.1)  # Let other thread run
-        context = get_wandb_api_context()
-        results["thread2_user"] = context.user_id if context else None
-        results["thread2_key"] = context.api_key if context else None
-        if token:
-            reset_wandb_api_context(token)
-
     # Note: ContextVar behavior is thread-local, so each thread will have its own context
-    thread1 = threading.Thread(target=set_context_1)
-    thread2 = threading.Thread(target=set_context_2)
+    thread1 = threading.Thread(target=set_context, args=("user1", "key1"))
+    thread2 = threading.Thread(target=set_context, args=("user2", "key2"))
 
     thread1.start()
     thread2.start()

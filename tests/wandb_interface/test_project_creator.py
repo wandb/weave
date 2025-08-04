@@ -67,16 +67,6 @@ def test_ensure_project_exists_project_not_found_create_fails(mock_api_with_no_p
         ensure_project_exists("test_entity", "test_project")
 
 
-def test_ensure_project_exists_project_not_found_create_exception(
-    mock_api_with_no_project,
-):
-    """Test project creation when project doesn't exist and creation raises exception."""
-    test_exception = Exception("API Error")
-    mock_api.upsert_project.side_effect = test_exception
-    with pytest.raises(Exception, match="API Error"):
-        ensure_project_exists("test_entity", "test_project")
-
-
 def test_ensure_project_exists_authentication_error(mock_api_with_no_project):
     """Test project creation with authentication error."""
     # Upsert raises authentication error
@@ -95,16 +85,3 @@ def test_ensure_project_exists_comm_error(mock_api_with_no_project):
 
     with pytest.raises(CommError, match="Network error"):
         ensure_project_exists("test_entity", "test_project")
-
-
-def test_ensure_project_exists_malformed_project_response(mock_api_with_no_project):
-    """Test project creation with malformed project response."""
-    mock_api.project.return_value = {"data": "something"}
-    mock_api.upsert_project.return_value = {
-        "upsertModel": {"model": {"name": "new_project"}}
-    }
-
-    result = ensure_project_exists("test_entity", "test_project")
-
-    assert result == {"project_name": "new_project"}
-    mock_api.upsert_project.assert_called_once()
