@@ -571,7 +571,7 @@ class EvaluationLogger(BaseModel):
 
         self._finalize_evaluation(output=final_summary)
 
-    def finish(self) -> None:
+    def finish(self, use_progress_bar: bool = False) -> None:
         """Clean up the evaluation resources explicitly without logging a summary.
 
         Ensures all prediction calls and the main evaluation call are finalized.
@@ -586,6 +586,9 @@ class EvaluationLogger(BaseModel):
         # Remove from global registry since we've manually finalized
         if self in _active_evaluation_loggers:
             _active_evaluation_loggers.remove(self)
+
+        wc = require_weave_client()
+        wc.finish(use_progress_bar)
 
     def __del__(self) -> None:
         """Ensure cleanup happens during garbage collection."""
