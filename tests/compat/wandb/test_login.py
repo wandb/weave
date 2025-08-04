@@ -175,12 +175,14 @@ def test_wandb_login_is_apikey_configured_no_credentials(mock_netrc, mock_defaul
     assert wlogin.is_apikey_configured() is False
 
 
-def test_wandb_login_prompt_api_key_success(mock_default_host, mock_app_url):
+def test_wandb_login_prompt_api_key_success(
+    mock_default_host, mock_app_url, mock_click_prompt
+):
     """Test successful API key prompting."""
     wlogin = _WandbLogin()
 
     valid_key = "a" * 40
-    with patch("click.prompt", return_value=valid_key):
+    with mock_click_prompt(return_value=valid_key):
         key, status = wlogin._prompt_api_key()
 
         assert key == valid_key
@@ -213,14 +215,16 @@ def test_wandb_login_prompt_api_key_no_tty(
         assert status == ApiKeyStatus.NOTTY
 
 
-def test_wandb_login_prompt_api_key_invalid_then_valid(mock_default_host, mock_app_url):
+def test_wandb_login_prompt_api_key_invalid_then_valid(
+    mock_default_host, mock_app_url, mock_click_prompt
+):
     """Test API key prompting with invalid key followed by valid key."""
     wlogin = _WandbLogin()
 
     invalid_key = "short"
     valid_key = "a" * 40
 
-    with patch("click.prompt", side_effect=[invalid_key, valid_key]):
+    with mock_click_prompt(side_effect=[invalid_key, valid_key]):
         key, status = wlogin._prompt_api_key()
 
         assert key == valid_key
@@ -287,12 +291,14 @@ def test_login_internal_with_provided_key(mock_netrc, mock_default_host):
     )
 
 
-def test_login_internal_with_prompting(mock_netrc, mock_default_host, mock_app_url):
+def test_login_internal_with_prompting(
+    mock_netrc, mock_default_host, mock_app_url, mock_click_prompt
+):
     """Test internal login function with user prompting."""
     mock_netrc.get_credentials.return_value = None  # No existing credentials
 
     valid_key = "a" * 40
-    with patch("click.prompt", return_value=valid_key):
+    with mock_click_prompt(return_value=valid_key):
         result = _login()
 
         assert result is True
@@ -301,11 +307,13 @@ def test_login_internal_with_prompting(mock_netrc, mock_default_host, mock_app_u
         )
 
 
-def test_login_internal_prompt_failure(mock_netrc, mock_default_host, mock_app_url):
+def test_login_internal_prompt_failure(
+    mock_netrc, mock_default_host, mock_app_url, mock_click_prompt
+):
     """Test internal login function when prompting fails."""
     mock_netrc.get_credentials.return_value = None
 
-    with patch("click.prompt", side_effect=EOFError()):
+    with mock_click_prompt(side_effect=EOFError()):
         result = _login()
 
         assert result is False

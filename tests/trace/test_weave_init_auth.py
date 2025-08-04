@@ -23,23 +23,6 @@ def mock_wandb_api_with_default_entity():
 
 
 @pytest.fixture
-def mock_wandb_api_no_entity():
-    """Fixture that provides a mocked wandb Api instance with no default entity."""
-    with patch("weave.compat.wandb.Api") as mock_api_class:
-        mock_api = Mock()
-        mock_api.default_entity_name.return_value = None
-        mock_api_class.return_value = mock_api
-        yield mock_api
-
-
-@pytest.fixture
-def mock_weave_login():
-    """Fixture that provides a mocked weave login function."""
-    with patch("weave.compat.wandb.login") as mock_login:
-        yield mock_login
-
-
-@pytest.fixture
 def mock_weave_context_with_existing():
     """Fixture that provides mocked weave context with existing context."""
     from weave.wandb_interface.context import WandbApiContext
@@ -143,7 +126,7 @@ def test_init_weave_with_existing_context(
     mock_weave_context_with_existing,
     mock_wandb_api_with_default_entity,
     mock_weave_init_components,
-    mock_weave_login,
+    mock_wandb_login,
 ):
     """Test init_weave when wandb context already exists."""
     from weave.trace.weave_init import init_weave
@@ -154,7 +137,7 @@ def test_init_weave_with_existing_context(
     # This should not call wandb.login since context exists
     result = init_weave("test_project")
 
-    mock_weave_login.assert_not_called()
+    mock_wandb_login.assert_not_called()
     assert result.client == mock_weave_init_components["client"]
 
 
@@ -162,7 +145,7 @@ def test_init_weave_without_context_triggers_login(
     mock_weave_context_without_existing,
     mock_wandb_api_with_default_entity,
     mock_weave_init_components,
-    mock_weave_login,
+    mock_wandb_login,
 ):
     """Test init_weave when no wandb context exists (should trigger login)."""
     from weave.trace.weave_init import init_weave
@@ -174,7 +157,7 @@ def test_init_weave_without_context_triggers_login(
         result = init_weave("test_project")
 
         # Should call login with specific parameters
-        mock_weave_login.assert_called_once_with(anonymous="never", force=True)
+        mock_wandb_login.assert_called_once_with(anonymous="never", force=True)
         assert result.client == mock_weave_init_components["client"]
 
 
@@ -205,30 +188,29 @@ def test_init_weave_authentication_order():
         call_order.append("get_entity_project")
         return "test_entity", "test_project"
 
-    with patch("weave.wandb_interface.context.init"):
-        # Mock the sequence: no context -> login -> context available
-        with patch(
+    with (
+        patch("weave.wandb_interface.context.init"),
+        patch(
             "weave.wandb_interface.context.get_wandb_api_context",
             side_effect=[mock_get_context(), mock_get_context_after_login()],
-        ):
-            with patch("weave.compat.wandb.login", side_effect=mock_login):
-                with patch(
-                    "weave.trace.weave_init.get_entity_project_from_project_name",
-                    side_effect=mock_get_entity_project,
-                ):
-                    with patch("weave.trace.weave_init.init_weave_get_server"):
-                        with patch("weave.trace.weave_client.WeaveClient"):
-                            with patch(
-                                "weave.trace.weave_init.use_server_cache",
-                                return_value=False,
-                            ):
-                                with patch(
-                                    "weave.trace.weave_init.wandb_termlog_patch.ensure_patched"
-                                ):
-                                    try:
-                                        init_weave("test_project")
-                                    except:
-                                        pass  # We just care about call order
+        ),
+        patch("weave.compat.wandb.login", side_effect=mock_login),
+        patch(
+            "weave.trace.weave_init.get_entity_project_from_project_name",
+            side_effect=mock_get_entity_project,
+        ),
+        patch("weave.trace.weave_init.init_weave_get_server"),
+        patch("weave.trace.weave_client.WeaveClient"),
+        patch(
+            "weave.trace.weave_init.use_server_cache",
+            return_value=False,
+        ),
+        patch("weave.trace.weave_init.wandb_termlog_patch.ensure_patched"),
+    ):
+        try:
+            init_weave("test_project")
+        except:
+            pass  # We just care about call order
 
     # Verify that login happens before entity resolution
     assert "login" in call_order

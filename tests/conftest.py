@@ -510,6 +510,92 @@ def mock_path_operations():
 
 
 @pytest.fixture
+def mock_click_prompt():
+    """Factory fixture for mocking click.prompt with different behaviors."""
+
+    def _mock_prompt(return_value=None, side_effect=None):
+        return patch("click.prompt", return_value=return_value, side_effect=side_effect)
+
+    return _mock_prompt
+
+
+@pytest.fixture
+def mock_wandb_api():
+    """Fixture that provides a mocked wandb Api instance."""
+    with patch("weave.compat.wandb.Api") as mock_api_class:
+        mock_api_instance = MagicMock()
+        mock_api_class.return_value = mock_api_instance
+        yield mock_api_instance
+
+
+@pytest.fixture
+def mock_wandb_login():
+    """Fixture that provides a mock for wandb login functionality."""
+    with patch("weave.compat.wandb.login") as mock_login:
+        mock_login.return_value = True
+        yield mock_login
+
+
+@pytest.fixture
+def mock_environment_vars():
+    """Factory fixture for setting environment variables."""
+
+    def _set_env(clear=False, **kwargs):
+        return patch.dict(os.environ, kwargs, clear=clear)
+
+    return _set_env
+
+
+@pytest.fixture
+def mock_default_host():
+    """Fixture that mocks _get_default_host to return api.wandb.ai."""
+    with patch(
+        "weave.cli.login._get_default_host",
+        return_value="api.wandb.ai",
+    ):
+        yield
+
+
+@pytest.fixture
+def mock_netrc_operations():
+    """Fixture providing mock netrc operations for both weave and wandb contexts."""
+    netrc_mocks = {}
+
+    # Mock for weave CLI
+    with patch("weave.cli.login.Netrc") as mock_weave_netrc:
+        mock_weave_instance = MagicMock()
+        mock_weave_netrc.return_value = mock_weave_instance
+        netrc_mocks["weave"] = mock_weave_instance
+
+        # Mock for wandb compatibility layer
+        with patch("weave.compat.wandb.wandb_thin.login.Netrc") as mock_wandb_netrc:
+            mock_wandb_instance = MagicMock()
+            mock_wandb_netrc.return_value = mock_wandb_instance
+            netrc_mocks["wandb"] = mock_wandb_instance
+
+            yield netrc_mocks
+
+
+@pytest.fixture
+def mock_wandb_context():
+    """Fixture that provides mocked weave wandb context operations."""
+    with (
+        patch("weave.wandb_interface.context.init") as mock_context_init,
+        patch(
+            "weave.wandb_interface.context.get_wandb_api_context"
+        ) as mock_get_context,
+        patch(
+            "weave.wandb_interface.context.set_wandb_api_context"
+        ) as mock_set_context,
+    ):
+        yield {
+            "init": mock_context_init,
+            "get": mock_get_context,
+            "set": mock_set_context,
+        }
+
+
+@pytest.fixture
 def mock_weave_init_components():
     """Fixture providing complete weave init mocking context."""
     with (
