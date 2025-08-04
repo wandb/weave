@@ -229,7 +229,7 @@ class _WandbLogin:
         try:
             _validate_api_key(api_key)
         except ValueError as e:
-            logger.exception("API key validation failed")
+            logger.warning("API key validation failed: %s", e)
             return self._prompt_api_key(referrer)
 
         return api_key, ApiKeyStatus.VALID
@@ -322,14 +322,14 @@ def _login(
             try:
                 key, key_status = wlogin.prompt_api_key(referrer=referrer)
             except ValueError as e:
-                logger.exception("Failed to prompt for API key")
+                logger.warning("Failed to prompt for API key: %s", e)
                 return False
 
     if verify and key:
         try:
             wlogin._verify_login(key)
         except ValueError as e:
-            logger.exception("API key verification failed")
+            logger.warning("API key verification failed: %s", e)
             return False
 
     if not key_is_pre_configured and key:

@@ -94,6 +94,35 @@ def host_and_base_url(request):
 all_hosts = ["saas", "aws", "gcp", "azure", "onprem"]
 
 
+@pytest.fixture
+def mock_netrc():
+    """Fixture that provides a mocked Netrc instance."""
+    with patch("weave.compat.wandb.wandb_thin.login.Netrc") as mock_netrc_class:
+        mock_netrc_instance = Mock()
+        mock_netrc_class.return_value = mock_netrc_instance
+        yield mock_netrc_instance
+
+
+@pytest.fixture
+def mock_default_host():
+    """Fixture that mocks _get_default_host to return api.wandb.ai."""
+    with patch(
+        "weave.compat.wandb.wandb_thin.login._get_default_host",
+        return_value="api.wandb.ai",
+    ):
+        yield
+
+
+@pytest.fixture
+def mock_app_url():
+    """Fixture that mocks app_url to return https://wandb.ai."""
+    with patch(
+        "weave.compat.wandb.wandb_thin.util.app_url",
+        return_value="https://wandb.ai",
+    ):
+        yield
+
+
 @pytest.mark.parametrize("host_and_base_url", all_hosts, indirect=True)
 def test_get_default_host_environment_variable(host_and_base_url):
     """Test default host resolution from environment variable."""
@@ -190,27 +219,23 @@ def test_handle_host_wandb_setting_custom():
         mock_set.assert_called_once_with("base_url", "https://custom.wandb.ai")
 
 
-def test_wandb_login_initialization():
+def test_wandb_login_initialization(mock_default_host):
     """Test WandbLogin class initialization."""
-    with patch(
-        "weave.compat.wandb.wandb_thin.login._get_default_host",
-        return_value="api.wandb.ai",
-    ):
-        wlogin = _WandbLogin(
-            anonymous="never",
-            force=True,
-            host="custom.wandb.ai",
-            key="test_key",
-            relogin=True,
-            timeout=30,
-        )
+    wlogin = _WandbLogin(
+        anonymous="never",
+        force=True,
+        host="custom.wandb.ai",
+        key="test_key",
+        relogin=True,
+        timeout=30,
+    )
 
-        assert wlogin._relogin is True
-        assert wlogin._force is True
-        assert wlogin._timeout == 30
-        assert wlogin._key == "test_key"
-        assert wlogin._host == "custom.wandb.ai"
-        assert wlogin.is_anonymous is False
+    assert wlogin._relogin is True
+    assert wlogin._force is True
+    assert wlogin._timeout == 30
+    assert wlogin._key == "test_key"
+    assert wlogin._host == "custom.wandb.ai"
+    assert wlogin.is_anonymous is False
 
 
 def test_wandb_login_is_apikey_configured_with_key():
@@ -219,136 +244,79 @@ def test_wandb_login_is_apikey_configured_with_key():
     assert wlogin.is_apikey_configured() is True
 
 
-def test_wandb_login_is_apikey_configured_from_netrc():
+def test_wandb_login_is_apikey_configured_from_netrc(mock_netrc, mock_default_host):
     """Test API key configuration detection from netrc."""
-    with patch(
-        "weave.compat.wandb.wandb_thin.login._get_default_host",
-        return_value="api.wandb.ai",
-    ):
-        wlogin = _WandbLogin()
+    mock_credentials = {"password": "test_api_key"}
+    mock_netrc.get_credentials.return_value = mock_credentials
 
-        mock_credentials = {"password": "test_api_key"}
-        with patch("weave.compat.wandb.util.netrc.Netrc") as mock_netrc_class:
-            mock_netrc = Mock()
-            mock_netrc.get_credentials.return_value = mock_credentials
-            mock_netrc_class.return_value = mock_netrc
-
-            assert wlogin.is_apikey_configured() is True
+    wlogin = _WandbLogin()
+    assert wlogin.is_apikey_configured() is True
 
 
-def test_wandb_login_is_apikey_configured_no_credentials():
+def test_wandb_login_is_apikey_configured_no_credentials(mock_netrc, mock_default_host):
     """Test API key configuration detection when no credentials exist."""
-    with patch(
-        "weave.compat.wandb.wandb_thin.login._get_default_host",
-        return_value="api.wandb.ai",
-    ):
-        wlogin = _WandbLogin()
+    mock_netrc.get_credentials.return_value = None
 
-        with patch("weave.compat.wandb.util.netrc.Netrc") as mock_netrc_class:
-            mock_netrc = Mock()
-            mock_netrc.get_credentials.return_value = None
-            mock_netrc_class.return_value = mock_netrc
-
-            assert wlogin.is_apikey_configured() is False
+    wlogin = _WandbLogin()
+    assert wlogin.is_apikey_configured() is False
 
 
-def test_wandb_login_prompt_api_key_success():
+def test_wandb_login_prompt_api_key_success(mock_default_host, mock_app_url):
     """Test successful API key prompting."""
-    with patch(
-        "weave.compat.wandb.wandb_thin.login._get_default_host",
-        return_value="api.wandb.ai",
-    ):
-        wlogin = _WandbLogin()
+    wlogin = _WandbLogin()
 
-        valid_key = "a" * 40
-        with patch("click.prompt", return_value=valid_key):
-            with patch(
-                "weave.compat.wandb.wandb_thin.util.app_url",
-                return_value="https://wandb.ai",
-            ):
-                key, status = wlogin._prompt_api_key()
+    valid_key = "a" * 40
+    with patch("click.prompt", return_value=valid_key):
+        key, status = wlogin._prompt_api_key()
 
-                assert key == valid_key
-                assert status == ApiKeyStatus.VALID
+        assert key == valid_key
+        assert status == ApiKeyStatus.VALID
 
 
-def test_wandb_login_prompt_api_key_abort():
+def test_wandb_login_prompt_api_key_abort(mock_default_host, mock_app_url):
     """Test API key prompting when user aborts."""
-    with patch(
-        "weave.compat.wandb.wandb_thin.login._get_default_host",
-        return_value="api.wandb.ai",
-    ):
-        wlogin = _WandbLogin()
+    wlogin = _WandbLogin()
 
-        with patch("click.prompt", side_effect=click.Abort()):
-            with patch(
-                "weave.compat.wandb.wandb_thin.util.app_url",
-                return_value="https://wandb.ai",
-            ):
-                key, status = wlogin._prompt_api_key()
+    with patch("click.prompt", side_effect=click.Abort()):
+        key, status = wlogin._prompt_api_key()
 
-                assert key is None
-                assert status == ApiKeyStatus.OFFLINE
+        assert key is None
+        assert status == ApiKeyStatus.OFFLINE
 
 
-def test_wandb_login_prompt_api_key_no_tty():
+def test_wandb_login_prompt_api_key_no_tty(mock_default_host, mock_app_url):
     """Test API key prompting when no TTY is available."""
-    with patch(
-        "weave.compat.wandb.wandb_thin.login._get_default_host",
-        return_value="api.wandb.ai",
-    ):
-        wlogin = _WandbLogin()
+    wlogin = _WandbLogin()
 
-        with patch("click.prompt", side_effect=EOFError()):
-            with patch(
-                "weave.compat.wandb.wandb_thin.util.app_url",
-                return_value="https://wandb.ai",
-            ):
-                key, status = wlogin._prompt_api_key()
+    with patch("click.prompt", side_effect=EOFError()):
+        key, status = wlogin._prompt_api_key()
 
-                assert key is None
-                assert status == ApiKeyStatus.NOTTY
+        assert key is None
+        assert status == ApiKeyStatus.NOTTY
 
 
-def test_wandb_login_prompt_api_key_invalid_then_valid():
+def test_wandb_login_prompt_api_key_invalid_then_valid(mock_default_host, mock_app_url):
     """Test API key prompting with invalid key followed by valid key."""
-    with patch(
-        "weave.compat.wandb.wandb_thin.login._get_default_host",
-        return_value="api.wandb.ai",
-    ):
-        wlogin = _WandbLogin()
+    wlogin = _WandbLogin()
 
-        invalid_key = "short"
-        valid_key = "a" * 40
+    invalid_key = "short"
+    valid_key = "a" * 40
 
-        with patch("click.prompt", side_effect=[invalid_key, valid_key]):
-            with patch(
-                "weave.compat.wandb.wandb_thin.util.app_url",
-                return_value="https://wandb.ai",
-            ):
-                key, status = wlogin._prompt_api_key()
+    with patch("click.prompt", side_effect=[invalid_key, valid_key]):
+        key, status = wlogin._prompt_api_key()
 
-                assert key == valid_key
-                assert status == ApiKeyStatus.VALID
+        assert key == valid_key
+        assert status == ApiKeyStatus.VALID
 
 
-def test_wandb_login_try_save_api_key():
+def test_wandb_login_try_save_api_key(mock_netrc, mock_default_host):
     """Test saving API key to netrc."""
-    with patch(
-        "weave.compat.wandb.wandb_thin.login._get_default_host",
-        return_value="api.wandb.ai",
-    ):
-        wlogin = _WandbLogin()
+    wlogin = _WandbLogin()
+    wlogin.try_save_api_key("test_key")
 
-        with patch("weave.compat.wandb.util.netrc.Netrc") as mock_netrc_class:
-            mock_netrc = Mock()
-            mock_netrc_class.return_value = mock_netrc
-
-            wlogin.try_save_api_key("test_key")
-
-            mock_netrc.add_or_update_entry.assert_called_once_with(
-                "api.wandb.ai", "user", "test_key"
-            )
+    mock_netrc.add_or_update_entry.assert_called_once_with(
+        "api.wandb.ai", "user", "test_key"
+    )
 
 
 def test_login_function_signature():
@@ -381,106 +349,61 @@ def test_login_function_signature():
             )
 
 
-def test_login_internal_with_preconfigured_key():
+def test_login_internal_with_preconfigured_key(mock_netrc, mock_default_host):
     """Test internal login function with pre-configured key."""
-    with patch("weave.compat.wandb.util.netrc.Netrc") as mock_netrc_class:
-        mock_netrc = Mock()
-        mock_credentials = {"password": "existing_key"}
-        mock_netrc.get_credentials.return_value = mock_credentials
-        mock_netrc_class.return_value = mock_netrc
+    mock_credentials = {"password": "existing_key"}
+    mock_netrc.get_credentials.return_value = mock_credentials
 
-        with patch(
-            "weave.compat.wandb.wandb_thin.login._get_default_host",
-            return_value="api.wandb.ai",
-        ):
-            result = _login()
+    result = _login()
 
-            assert result is True
+    assert result is True
 
 
-def test_login_internal_with_provided_key():
+def test_login_internal_with_provided_key(mock_netrc, mock_default_host):
     """Test internal login function with provided key."""
-    with patch(
-        "weave.compat.wandb.wandb_thin.login._get_default_host",
-        return_value="api.wandb.ai",
-    ):
-        with patch("weave.compat.wandb.util.netrc.Netrc") as mock_netrc_class:
-            mock_netrc = Mock()
-            mock_netrc_class.return_value = mock_netrc
+    result = _login(key="a" * 40)
 
-            result = _login(key="a" * 40)
-
-            assert result is True
-            mock_netrc.add_or_update_entry.assert_called_once_with(
-                "api.wandb.ai", "user", "a" * 40
-            )
+    assert result is True
+    mock_netrc.add_or_update_entry.assert_called_once_with(
+        "api.wandb.ai", "user", "a" * 40
+    )
 
 
-def test_login_internal_with_prompting():
+def test_login_internal_with_prompting(mock_netrc, mock_default_host, mock_app_url):
     """Test internal login function with user prompting."""
-    with patch(
-        "weave.compat.wandb.wandb_thin.login._get_default_host",
-        return_value="api.wandb.ai",
-    ):
-        with patch("weave.compat.wandb.util.netrc.Netrc") as mock_netrc_class:
-            mock_netrc = Mock()
-            mock_netrc.get_credentials.return_value = None  # No existing credentials
-            mock_netrc_class.return_value = mock_netrc
+    mock_netrc.get_credentials.return_value = None  # No existing credentials
 
-            valid_key = "a" * 40
-            with patch("click.prompt", return_value=valid_key):
-                with patch(
-                    "weave.compat.wandb.wandb_thin.util.app_url",
-                    return_value="https://wandb.ai",
-                ):
-                    result = _login()
-
-                    assert result is True
-                    mock_netrc.add_or_update_entry.assert_called_once_with(
-                        "api.wandb.ai", "user", valid_key
-                    )
-
-
-def test_login_internal_prompt_failure():
-    """Test internal login function when prompting fails."""
-    with patch(
-        "weave.compat.wandb.wandb_thin.login._get_default_host",
-        return_value="api.wandb.ai",
-    ):
-        with patch("weave.compat.wandb.util.netrc.Netrc") as mock_netrc_class:
-            mock_netrc = Mock()
-            mock_netrc.get_credentials.return_value = None
-            mock_netrc_class.return_value = mock_netrc
-
-            with patch("click.prompt", side_effect=EOFError()):
-                with patch(
-                    "weave.compat.wandb.wandb_thin.util.app_url",
-                    return_value="https://wandb.ai",
-                ):
-                    result = _login()
-
-                    assert result is False
-
-
-def test_login_internal_with_verification():
-    """Test internal login function with key verification."""
-    with patch(
-        "weave.compat.wandb.wandb_thin.login._get_default_host",
-        return_value="api.wandb.ai",
-    ):
-        valid_key = "a" * 40
-        result = _login(key=valid_key, verify=True)
+    valid_key = "a" * 40
+    with patch("click.prompt", return_value=valid_key):
+        result = _login()
 
         assert result is True
+        mock_netrc.add_or_update_entry.assert_called_once_with(
+            "api.wandb.ai", "user", valid_key
+        )
 
 
-def test_login_internal_verification_failure():
-    """Test internal login function when verification fails."""
-    with patch(
-        "weave.compat.wandb.wandb_thin.login._get_default_host",
-        return_value="api.wandb.ai",
-    ):
-        invalid_key = "short"
-        result = _login(key=invalid_key, verify=True)
+def test_login_internal_prompt_failure(mock_netrc, mock_default_host, mock_app_url):
+    """Test internal login function when prompting fails."""
+    mock_netrc.get_credentials.return_value = None
+
+    with patch("click.prompt", side_effect=EOFError()):
+        result = _login()
 
         assert result is False
+
+
+def test_login_internal_with_verification(mock_default_host):
+    """Test internal login function with key verification."""
+    valid_key = "a" * 40
+    result = _login(key=valid_key, verify=True)
+
+    assert result is True
+
+
+def test_login_internal_verification_failure(mock_default_host):
+    """Test internal login function when verification fails."""
+    invalid_key = "short"
+    result = _login(key=invalid_key, verify=True)
+
+    assert result is False
