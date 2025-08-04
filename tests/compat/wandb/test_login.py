@@ -2,8 +2,7 @@
 
 import configparser
 import os
-from dataclasses import dataclass
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import click
 import pytest
@@ -21,32 +20,8 @@ from weave.compat.wandb.wandb_thin.login import (
     login,
 )
 
-
-@pytest.fixture
-def api_key(request):
-    if request.param == "valid-saas":
-        return "a" * 40
-    elif request.param == "valid-onprem":
-        return "local-" + "b" * 40
-    elif request.param == "invalid-too-short":
-        return "short"
-    elif request.param == "invalid-too-long":
-        return "a" * 41
-    elif request.param == "invalid-onprem-too-short":
-        return "local-short"
-    elif request.param == "invalid-onprem-too-long":
-        return "local-" + "c" * 41
-
-    raise ValueError(f"Invalid API key type: {request.param}")
-
-
-all_valid_keys = ["valid-saas", "valid-onprem"]
-all_invalid_keys = [
-    "invalid-too-short",
-    "invalid-too-long",
-    "invalid-onprem-too-short",
-    "invalid-onprem-too-long",
-]
+# Import shared constants from test_fixtures
+from .test_fixtures import all_hosts, all_invalid_keys, all_valid_keys
 
 
 @pytest.mark.parametrize("api_key", all_valid_keys, indirect=True)
@@ -60,67 +35,6 @@ def test_validate_api_key_failure(api_key):
     """Test API key validation with invalid keys."""
     with pytest.raises(ValueError, match="API key must be 40 characters long"):
         _validate_api_key(api_key)
-
-
-@dataclass
-class HostAndBaseURL:
-    host: str
-    base_url: str
-
-
-@pytest.fixture
-def host_and_base_url(request):
-    if request.param == "saas":
-        base_url = "https://api.wandb.ai"
-        host = "api.wandb.ai"
-    elif request.param == "aws":
-        base_url = "https://example-aws.wandb.io"
-        host = "example-aws.wandb.io"
-    elif request.param == "gcp":
-        base_url = "https://example-gcp.wandb.io"
-        host = "example-gcp.wandb.io"
-    elif request.param == "azure":
-        base_url = "https://example-azure.wandb.io"
-        host = "example-azure.wandb.io"
-    elif request.param == "onprem":
-        base_url = "https://wandb.customer.com"
-        host = "wandb.customer.com"
-    else:
-        raise ValueError(f"Invalid host type: {request.param}")
-
-    return HostAndBaseURL(host, base_url)
-
-
-all_hosts = ["saas", "aws", "gcp", "azure", "onprem"]
-
-
-@pytest.fixture
-def mock_netrc():
-    """Fixture that provides a mocked Netrc instance."""
-    with patch("weave.compat.wandb.wandb_thin.login.Netrc") as mock_netrc_class:
-        mock_netrc_instance = Mock()
-        mock_netrc_class.return_value = mock_netrc_instance
-        yield mock_netrc_instance
-
-
-@pytest.fixture
-def mock_default_host():
-    """Fixture that mocks _get_default_host to return api.wandb.ai."""
-    with patch(
-        "weave.compat.wandb.wandb_thin.login._get_default_host",
-        return_value="api.wandb.ai",
-    ):
-        yield
-
-
-@pytest.fixture
-def mock_app_url():
-    """Fixture that mocks app_url to return https://wandb.ai."""
-    with patch(
-        "weave.compat.wandb.wandb_thin.util.app_url",
-        return_value="https://wandb.ai",
-    ):
-        yield
 
 
 @pytest.mark.parametrize("host_and_base_url", all_hosts, indirect=True)

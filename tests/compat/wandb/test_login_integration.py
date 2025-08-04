@@ -5,7 +5,7 @@ from unittest.mock import Mock, patch
 import pytest
 
 from weave.compat.wandb.util.netrc import Netrc
-from weave.compat.wandb.wandb_thin.login import _login
+from weave.compat.wandb.wandb_thin.login import _login, _validate_api_key
 from weave.wandb_interface.context import (
     get_wandb_api_context,
     reset_wandb_api_context,
@@ -13,7 +13,8 @@ from weave.wandb_interface.context import (
 )
 
 
-def test_full_login_flow_with_netrc(tmp_path):
+@pytest.mark.parametrize("api_key", ["valid-saas"], indirect=True)
+def test_full_login_flow_with_netrc(tmp_path, api_key, mock_default_host):
     """Test complete login flow using netrc file."""
     netrc_path = tmp_path / ".netrc"
 
@@ -22,47 +23,33 @@ def test_full_login_flow_with_netrc(tmp_path):
     netrc_manager.add_or_update_entry(
         "api.wandb.ai",
         "user",
-        "a" * 40,  # Valid 40-character key
+        api_key,  # Use fixture API key
     )
 
-    # Mock the netrc path
-    with patch(
-        "weave.compat.wandb.wandb_thin.login._get_default_host",
-        return_value="api.wandb.ai",
-    ):
-        with patch("weave.compat.wandb.util.netrc.Netrc") as mock_netrc_class:
-            mock_netrc_class.return_value = netrc_manager
+    with patch("weave.compat.wandb.util.netrc.Netrc") as mock_netrc_class:
+        mock_netrc_class.return_value = netrc_manager
 
-            # Test login with existing credentials
-            result = _login()
+        # Test login with existing credentials
+        result = _login()
 
-            assert result is True
+        assert result is True
 
 
-def test_full_login_flow_with_prompting():
+@pytest.mark.parametrize("api_key", ["valid-saas"], indirect=True)
+def test_full_login_flow_with_prompting(
+    api_key, mock_netrc, mock_default_host, mock_app_url
+):
     """Test complete login flow with user prompting."""
-    with patch(
-        "weave.compat.wandb.wandb_thin.login._get_default_host",
-        return_value="api.wandb.ai",
-    ):
-        with patch("weave.compat.wandb.util.netrc.Netrc") as mock_netrc_class:
-            mock_netrc = Mock()
-            mock_netrc.get_credentials.return_value = None  # No existing credentials
-            mock_netrc_class.return_value = mock_netrc
+    mock_netrc.get_credentials.return_value = None  # No existing credentials
 
-            valid_key = "b" * 40
-            with patch("click.prompt", return_value=valid_key):
-                with patch(
-                    "weave.compat.wandb.wandb_thin.util.app_url",
-                    return_value="https://wandb.ai",
-                ):
-                    result = _login()
+    with patch("click.prompt", return_value=api_key):
+        result = _login()
 
-                    assert result is True
-                    # Should save the key
-                    mock_netrc.add_or_update_entry.assert_called_once_with(
-                        "api.wandb.ai", "user", valid_key
-                    )
+        assert result is True
+        # Should save the key
+        mock_netrc.add_or_update_entry.assert_called_once_with(
+            "api.wandb.ai", "user", api_key
+        )
 
 
 def test_context_integration():
@@ -135,36 +122,43 @@ def test_end_to_end_authentication_flow():
         assert context_after is None
 
 
-def test_api_key_validation_integration():
-    """Test API key validation in realistic scenarios."""
-    from weave.compat.wandb.wandb_thin.login import _validate_api_key
+@pytest.mark.parametrize("api_key", ["valid-saas", "valid-onprem"], indirect=True)
+def test_api_key_validation_success(api_key):
+    """Test API key validation with valid keys in realistic scenarios."""
+    _validate_api_key(api_key)  # Should not raise
 
-    # Test valid keys
-    _validate_api_key("a" * 40)  # Should not raise
-    _validate_api_key("local-" + "b" * 40)  # On-prem style
 
-    # Test invalid keys
+@pytest.mark.parametrize(
+    "api_key", ["invalid-too-short", "invalid-onprem-too-short"], indirect=True
+)
+def test_api_key_validation_failure(api_key):
+    """Test API key validation with invalid keys in realistic scenarios."""
     with pytest.raises(ValueError):
-        _validate_api_key("short")
-
-    with pytest.raises(ValueError):
-        _validate_api_key("local-short")
+        _validate_api_key(api_key)
 
 
-def test_host_parsing_integration():
-    """Test host parsing in realistic scenarios."""
-    from weave.compat.wandb.wandb_thin.login import _parse_wandb_host
-
-    # Test various host formats
-    assert _parse_wandb_host("https://api.wandb.ai/") == "api.wandb.ai"
-    assert _parse_wandb_host("http://localhost:8080/") == "localhost:8080"
-    assert _parse_wandb_host("custom.wandb.server") == "custom.wandb.server"
-    assert (
-        _parse_wandb_host("https://custom.server.com/path/") == "custom.server.com/path"
+def test_host_handling_integration(temp_config_dir):
+    """Test host handling functionality in realistic scenarios."""
+    from weave.compat.wandb.wandb_thin.login import (
+        _get_host_from_settings,
+        _handle_host_wandb_setting,
     )
 
+    # Test handling default host (should clear setting)
+    _handle_host_wandb_setting("https://api.wandb.ai")
+    assert _get_host_from_settings() is None
 
-def test_settings_management_integration(tmp_path):
+    # Test handling custom host (should save setting)
+    _handle_host_wandb_setting("https://custom.wandb.ai/")
+    host = _get_host_from_settings()
+    assert host == "custom.wandb.ai"  # Trailing slash removed
+
+    # Test handling None (should clear setting)
+    _handle_host_wandb_setting(None)
+    assert _get_host_from_settings() is None
+
+
+def test_settings_management_integration(temp_config_dir):
     """Test settings management integration."""
     from weave.compat.wandb.wandb_thin.login import (
         _clear_setting,
@@ -172,16 +166,15 @@ def test_settings_management_integration(tmp_path):
         _set_setting,
     )
 
-    with patch.dict("os.environ", {"WANDB_CONFIG_DIR": str(tmp_path)}):
-        # Test setting a value
-        _set_setting("base_url", "https://custom.wandb.ai")
+    # Test setting a value
+    _set_setting("base_url", "https://custom.wandb.ai")
 
-        # Test reading it back
-        host = _get_host_from_settings()
-        assert host == "custom.wandb.ai"
+    # Test reading it back
+    host = _get_host_from_settings()
+    assert host == "custom.wandb.ai"
 
-        # Test clearing it
-        _clear_setting("base_url")
+    # Test clearing it
+    _clear_setting("base_url")
 
-        host_after = _get_host_from_settings()
-        assert host_after is None
+    host_after = _get_host_from_settings()
+    assert host_after is None
