@@ -96,21 +96,19 @@ class ProjectNotFound(Error):
     pass
 
 
-def _format_error_to_json(exc: Exception) -> dict[str, Any]:
-    """Default formatter that tries to parse JSON or falls back to reason."""
-    exc_str = str(exc)
-    try:
-        return json.loads(exc_str)
-    except json.JSONDecodeError:
-        return {"reason": exc_str}
-
-
 def _format_error_to_json_with_extra(
-    exc: Exception, extra_fields: dict[str, Any]
+    exc: Exception, extra_fields: Optional[dict[str, Any]] = None
 ) -> dict[str, Any]:
     """Helper to format exception as JSON or fallback to reason, always adding extra fields."""
-    result = _format_error_to_json(exc)
-    result.update(extra_fields)
+    exc_str = str(exc)
+    result = {}
+    try:
+        result.update(json.loads(exc_str))
+    except json.JSONDecodeError:
+        result["reason"] = exc_str
+
+    if extra_fields:
+        result.update(extra_fields)
     return result
 
 
@@ -144,7 +142,9 @@ class ErrorRegistry:
         self,
         exception_class: type,
         status_code: int,
-        formatter: Callable[[Exception], dict[str, Any]] = _format_error_to_json,
+        formatter: Callable[
+            [Exception], dict[str, Any]
+        ] = _format_error_to_json_with_extra,
     ) -> None:
         """Register an exception with its handling definition."""
         self._definitions[exception_class] = ErrorDefinition(
@@ -207,7 +207,7 @@ class ErrorRegistry:
         )
 
         # GraphQL transport errors
-        self.register(TransportQueryError, 403, _format_transport_query_error)
+        self.register(TransportQueryError, 403, lambda exc: {"reason": "Forbidden"})
 
 
 def _get_error_registry() -> ErrorRegistry:
@@ -270,33 +270,17 @@ def handle_clickhouse_query_error(e: Exception) -> None:
     raise
 
 
-def _format_transport_query_error(exc: Exception) -> dict[str, Any]:
-    """Format TransportQueryError with special permission logic."""
-    transport_exc = exc if isinstance(exc, TransportQueryError) else None
-    if transport_exc and transport_exc.errors:
-        for error in transport_exc.errors:
-            if error.get("extensions", {}).get("code") == "PERMISSION_ERROR":
-                return {"reason": "Forbidden"}
-            if error.get("message") == "project not found" and error.get("path") == [
-                "upsertBucket"
-            ]:
-                # This seems counter intuitive, but gorilla returns this error when the project exists
-                # but the user does not have access to it. This seems like a bug on Gorilla's side.
-                return {"reason": "Forbidden"}
-    return {"reason": "Forbidden"}
-
-
 def _format_missing_llm_api_key(exc: Exception) -> dict[str, Any]:
     """Format MissingLLMApiKeyError with api_key field."""
+    extra = {}
     if isinstance(exc, MissingLLMApiKeyError):
-        return _format_error_to_json_with_extra(exc, {"api_key": exc.api_key_name})
-    return _format_error_to_json(exc)
+        extra["api_key"] = exc.api_key_name
+    return _format_error_to_json_with_extra(exc, extra)
 
 
 def _format_object_deleted_error(exc: Exception) -> dict[str, Any]:
     """Format ObjectDeletedError with deleted_at timestamp."""
+    extra = {}
     if isinstance(exc, ObjectDeletedError):
-        return _format_error_to_json_with_extra(
-            exc, {"deleted_at": exc.deleted_at.isoformat()}
-        )
-    return _format_error_to_json(exc)
+        extra["deleted_at"] = exc.deleted_at.isoformat()
+    return _format_error_to_json_with_extra(exc, extra)
