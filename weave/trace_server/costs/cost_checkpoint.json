@@ -9080,5 +9080,13 @@
       "output": 1.9e-06,
       "created_at": "2025-07-28 10:14:07"
     }
+  ],
+  "openrouter/x-ai/grok-4": [
+    {
+      "provider": "openrouter",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-08-04 11:04:17"
+    }
   ]
 }
