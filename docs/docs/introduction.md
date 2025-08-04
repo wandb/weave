@@ -4,10 +4,12 @@ slug: /
 
 # W&B Weave
 
-:::tip
-For a limited time, the new W&B Inference service is included in your free tier. W&B Inference provides access to leading open-source foundation models via API and the Weave [Playground](./guides/tools/playground.md). 
-- [Developer documentation](./guides/integrations/inference.md)
-- [Product page](https://wandb.ai/site/inference) 
+:::tip[New to Weave? Start with W&B Inference]
+Try Weave with our Inference service. No external API keys needed.
+
+**[Get Started with W&B Inference](/quickstart-inference)**
+
+[Explore in Playground](./guides/tools/playground.md#access-the-playground) | [View all models](./guides/tools/inference.md#available-models)
 :::
 
 Weights & Biases (W&B) Weave is a framework for tracking, experimenting with, evaluating, deploying, and improving LLM-based applications. Designed for flexibility and scalability, Weave supports every stage of your LLM application development workflow:
@@ -27,7 +29,23 @@ Weave supports [numerous LLM providers, local models, frameworks, protocols, and
 
 ## Get started
 
-Are you new to Weave? Set up and start using Weave with the [Python quickstart](/quickstart) or [TypeScript quickstart](./reference/generated_typescript_docs/intro-notebook.md).
+Choose your path to get started with Weave:
+
+### Recommended: Start with W&B Inference
+[Try Weave with Inference Service](/quickstart-inference) - The fastest way to experience Weave
+- No API keys needed - start building immediately
+- Free credits included with all plans
+- Learn tracing, evaluation, and monitoring with real models
+- Access powerful models like Llama 3.3 70B and DeepSeek V3
+
+### Have your own API keys?
+[Track LLM Calls](/quickstart) - Connect your existing LLM providers
+- Works with OpenAI, Anthropic, and [more](./guides/integrations/index.md)
+- Automatic tracing and cost tracking
+- Perfect if you already have LLM infrastructure
+
+### Using TypeScript
+[TypeScript quickstart](./reference/generated_typescript_docs/intro-notebook.md) - Get started with Weave in TypeScript
 
 ## Advanced guides
 
