@@ -232,18 +232,17 @@ class OpenAIProvider:
         # Input validation, routing logic, basic preprocessing
         print(f"  L1: Routing to OpenAI for: {user_input}")
 
-        # Call Level 2 directly - this creates the call chain depth
-        return self.execute_openai_call(user_input, thread_id)
-
-    @weave.op
-    def execute_openai_call(self, user_input: str, thread_id: str) -> str:
-        """Level 2: TURN BOUNDARY - Execute OpenAI API call"""
-        print(f"    L2: Executing OpenAI API call")
-
         # This is the turn boundary - wrap with thread context
         with weave.thread(thread_id):
-            response = f"OpenAI GPT-4 response: {user_input}"
-            return response
+            # Call Level 2 directly - this creates the call chain depth
+            return self.execute_openai_call(user_input)
+
+    @weave.op
+    def execute_openai_call(self, user_input: str) -> str:
+        """Level 2: TURN BOUNDARY - Execute OpenAI API call"""
+        print(f"    L2: Executing OpenAI API call")
+        response = f"OpenAI GPT-4 response: {user_input}"
+        return response
 
 
 class AnthropicProvider:
@@ -266,18 +265,17 @@ class AnthropicProvider:
         # Authentication, rate limiting, session management
         auth_token = "anthropic_key_xyz_authenticated"
 
-        # Call Level 3 - further nesting the call chain
-        return self.execute_anthropic_call(user_input, auth_token, thread_id)
+         # This is the turn boundary - wrap with thread context at Level 3
+        with weave.thread(thread_id):
+            # Call Level 3 - further nesting the call chain
+            return self.execute_anthropic_call(user_input, auth_token)
 
     @weave.op
-    def execute_anthropic_call(self, user_input: str, auth_token: str, thread_id: str) -> str:
+    def execute_anthropic_call(self, user_input: str, auth_token: str) -> str:
         """Level 3: TURN BOUNDARY - Execute Anthropic API call"""
         print(f"      L3: Executing Anthropic API call with auth")
-
-        # This is the turn boundary - wrap with thread context at Level 3
-        with weave.thread(thread_id):
-            response = f"Anthropic Claude response (auth: {auth_token[:15]}...): {user_input}"
-            return response
+        response = f"Anthropic Claude response (auth: {auth_token[:15]}...): {user_input}"
+        return response
 
 
 class MultiProviderAgent:
@@ -341,6 +339,53 @@ if __name__ == "__main__":
 # - All turns share thread_id: "nested_depth_conversation_999"
 # - Turn boundaries marked at different call stack depths
 # - Supporting operations in call chain tracked as nested calls, not turns
+```
+
+### Resume a previous session
+
+Sometimes you need to resume a previously started session and continue adding calls to the same thread. In other cases, you may not be able to resume an existing session and must start a new thread instead.
+
+When implementing optional thread resumption, **never** leave the `thread_id` parameter as `None`, as this will disable thread grouping entirely. Instead, always provide a valid thread ID. If you need to create a new thread, generate a unique identifier using a function like `generate_id()`. 
+
+:::info
+When no `thread_id` is specified, Weave's internal implementation automatically generates a random UUID v7. You can replicate this behavior in your own `generate_id()` function or use any unique string value you prefer.
+:::
+
+```python
+import weave
+import uuidv7
+import argparse
+
+def generate_id():
+    """Generate a unique thread ID using UUID v7."""
+    return str(uuidv7.uuidv7())
+
+@weave.op
+def load_history(session_id):
+    """Load conversation history for the given session."""
+    # Your implementation here
+    return []
+
+# Parse command line arguments for session resumption
+parser = argparse.ArgumentParser()
+parser.add_argument("--session-id", help="Existing session ID to resume")
+args = parser.parse_args()
+
+# Determine thread ID: resume existing session or create new one
+if args.session_id:
+    thread_id = args.session_id
+    print(f"Resuming session: {thread_id}")
+else:
+    thread_id = generate_id()
+    print(f"Starting new session: {thread_id}")
+
+# Establish thread context for tracking calls
+with weave.thread(thread_id) as thread_ctx:
+    # Load or initialize conversation history
+    history = load_history(thread_id)
+    print(f"Active thread ID: {thread_ctx.thread_id}")
+    
+    # Your application logic here...
 ```
 
 ### Nested threads 
