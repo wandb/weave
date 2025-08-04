@@ -90,7 +90,6 @@ def temp_config_dir(tmp_path):
 @pytest.fixture
 def create_settings_file(temp_config_dir):
     """Fixture that creates a settings file with given content."""
-
     def _create_settings_file(settings_dict):
         settings_path = temp_config_dir / "settings"
         config = configparser.ConfigParser()
