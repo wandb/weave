@@ -109,9 +109,7 @@ def test_init_weave_with_existing_context(
 ):
     """Test init_weave when wandb context already exists."""
     # Configure existing context
-    existing_context = WandbApiContext(
-        user_id="test_user", api_key="test_api_key", headers=None, cookies=None
-    )
+    existing_context = WandbApiContext(user_id="test_user", api_key="test_api_key")
     mock_wandb_context["get"].return_value = existing_context
 
     # Configure API to return test_entity
