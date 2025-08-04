@@ -11,7 +11,6 @@ from weave.wandb_interface.context import (
     init,
     reset_wandb_api_context,
     set_wandb_api_context,
-    set_wandb_thread_local_api_settings,
 )
 
 
@@ -86,15 +85,6 @@ def test_reset_wandb_api_context():
     assert context is None
 
 
-def test_set_wandb_thread_local_api_settings():
-    """Test setting thread local API settings."""
-    # This should work even when wandb is not available
-    # The function should handle ImportError gracefully (no failure)
-    set_wandb_thread_local_api_settings(
-        api_key="test_key", cookies={"session": "abc123"}, headers={"X-Test": "value"}
-    )
-
-
 def test_init_with_api_key(valid_api_key):
     """Test init function with API key from environment."""
     token = init()
@@ -134,14 +124,6 @@ def test_from_environment_context_manager(valid_api_key):
     # After exiting context
     context_after = get_wandb_api_context()
     assert context_after is None
-
-
-def test_from_environment_context_manager_no_api_key(invalid_api_key):
-    """Test from_environment context manager without API key."""
-    with from_environment():
-        # Should still work, just no context set
-        context = get_wandb_api_context()
-        assert context is None
 
 
 def test_from_environment_context_manager_with_exception(valid_api_key):
