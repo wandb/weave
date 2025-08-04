@@ -14,7 +14,7 @@ try:
     from wandb.util import app_url
 except (ImportError, ModuleNotFoundError):
     WANDB_AVAILABLE = False
-    from weave.compat.wandb.wandb_thin import (
+    from weave.compat.wandb.wandb_thin import (  # type: ignore[no-redef]
         env,
         login,
         termerror,

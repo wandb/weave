@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
+from typing import Any
 
 import click
 
@@ -18,12 +19,12 @@ logger = logging.getLogger(__name__)
 WEAVE_PREFIX = click.style("weave", fg="cyan", bold=True)
 
 
-def weave_echo(message: str, **kwargs) -> None:
+def weave_echo(message: str, **kwargs: Any) -> None:
     """Echo a message with the weave prefix."""
     click.echo(f"{WEAVE_PREFIX}: {message}", **kwargs)
 
 
-def weave_echo_styled(message: str, **kwargs) -> None:
+def weave_echo_styled(message: str, **kwargs: Any) -> None:
     """Echo a pre-styled message (message already contains styled weave prefix)."""
     click.echo(message, **kwargs)
 

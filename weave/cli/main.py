@@ -14,7 +14,7 @@ def cli() -> None:
     """Weave CLI - A toolkit for building composable interactive data driven applications."""
 
 
-@cli.command()
+@cli.command()  # pyright: ignore[reportFunctionMemberAccess]
 @click.argument("key", required=False)
 @click.option("--cloud", is_flag=True, help="Login to the cloud instead of local")
 @click.option("--host", "--base-url", help="Login to a specific instance of W&B")

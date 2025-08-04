@@ -14,8 +14,9 @@ from typing import Literal
 
 import click
 
-from weave.compat.wandb import env, util
+from weave.compat.wandb import env
 from weave.compat.wandb.util.netrc import Netrc
+from weave.compat.wandb.wandb_thin.util import app_url
 
 logger = logging.getLogger(__name__)
 
@@ -207,9 +208,9 @@ class _WandbLogin:
         Returns:
             Tuple of API key and status.
         """
-        app_url = util.app_url(f"https://{self._host}")
+        url = app_url(f"https://{self._host}")
         logger.info("Logging into Weights & Biases")
-        logger.info(f"You can find your API key in your browser here: {app_url}")
+        logger.info(f"You can find your API key in your browser here: {url}")
         logger.info("Paste an API key from your profile and hit enter:")
 
         try:
