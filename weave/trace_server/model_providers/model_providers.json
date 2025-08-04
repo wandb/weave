@@ -1719,6 +1719,274 @@
     "litellm_provider": "gemini",
     "api_key_name": "GEMINI_API_KEY"
   },
+  "openrouter/deepseek/deepseek-r1-0528": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/x-ai/grok-4": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/bytedance/ui-tars-1.5-7b": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/deepseek/deepseek-r1": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/deepseek/deepseek-chat": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/deepseek/deepseek-coder": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/microsoft/wizardlm-2-8x22b:nitro": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/google/gemini-2.5-pro": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/google/gemini-pro-1.5": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/google/gemini-2.0-flash-001": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/google/gemini-2.5-flash": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/mistralai/mixtral-8x22b-instruct": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/cohere/command-r-plus": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/databricks/dbrx-instruct": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/anthropic/claude-3-haiku": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/anthropic/claude-3-5-haiku": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/anthropic/claude-3-haiku-20240307": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/anthropic/claude-3-5-haiku-20241022": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/anthropic/claude-3.5-sonnet": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/anthropic/claude-3.5-sonnet:beta": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/anthropic/claude-3.7-sonnet": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/anthropic/claude-3.7-sonnet:beta": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/anthropic/claude-3-sonnet": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/anthropic/claude-sonnet-4": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/mistralai/mistral-large": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/mistralai/mistral-small-3.1-24b-instruct": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/mistralai/mistral-small-3.2-24b-instruct": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/cognitivecomputations/dolphin-mixtral-8x7b": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/google/gemini-pro-vision": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/fireworks/firellava-13b": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/meta-llama/llama-3-8b-instruct:free": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/meta-llama/llama-3-8b-instruct:extended": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/meta-llama/llama-3-70b-instruct:nitro": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/meta-llama/llama-3-70b-instruct": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/openai/o1": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/openai/o1-mini": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/openai/o1-mini-2024-09-12": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/openai/o1-preview": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/openai/o1-preview-2024-09-12": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/openai/o3-mini": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/openai/o3-mini-high": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/openai/gpt-4o": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/openai/gpt-4o-2024-05-13": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/openai/gpt-4-vision-preview": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/openai/gpt-3.5-turbo": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/openai/gpt-3.5-turbo-16k": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/openai/gpt-4": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/anthropic/claude-instant-v1": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/anthropic/claude-2": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/anthropic/claude-3-opus": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/google/palm-2-chat-bison": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/google/palm-2-codechat-bison": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/meta-llama/llama-2-13b-chat": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/meta-llama/llama-2-70b-chat": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/meta-llama/codellama-34b-instruct": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/nousresearch/nous-hermes-llama2-13b": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/mancer/weaver": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/gryphe/mythomax-l2-13b": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/jondurbin/airoboros-l2-70b-2.1": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/undi95/remm-slerp-l2-13b": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/pygmalionai/mythalion-13b": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/mistralai/mistral-7b-instruct": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/mistralai/mistral-7b-instruct:free": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/qwen/qwen-2.5-coder-32b-instruct": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/qwen/qwen-vl-plus": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/qwen/qwen3-coder": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
+  "openrouter/switchpoint/router": {
+    "litellm_provider": "openrouter",
+    "api_key_name": "OPENROUTER_API_KEY"
+  },
   "ai21.j2-mid-v1": {
     "litellm_provider": "bedrock",
     "api_key_name": "BEDROCK_API_KEY"
