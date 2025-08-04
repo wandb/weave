@@ -1,4 +1,5 @@
 from typing import Any, Optional
+from contextlib import contextmanager
 
 import weave
 from weave.flow.eval_imperative import EvaluationLogger
@@ -10,6 +11,7 @@ from weave.integrations.dspy.dspy_utils import (
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.serialization.serialize import dictify
 from weave.trace.weave_client import Call
+from weave.trace import settings
 
 import_failed = False
 
@@ -17,6 +19,29 @@ try:
     from dspy.utils.callback import BaseCallback
 except ImportError:
     import_failed = True
+
+
+@contextmanager
+def suppress_weave_call_links():
+    """Context manager to temporarily suppress Weave call link printing.
+    
+    This is used during DSPy evaluations to avoid cluttering the output
+    with individual call URLs while still allowing the main evaluation URL.
+    """
+    # Get the current context variable for print_call_link
+    print_call_link_var = settings._context_vars["print_call_link"]
+    
+    # Save the current value
+    current_value = print_call_link_var.get()
+    
+    # Temporarily set to False
+    token = print_call_link_var.set(False)
+    
+    try:
+        yield
+    finally:
+        # Restore the original value
+        print_call_link_var.reset(token)
 
 if not import_failed:
 
@@ -26,10 +51,24 @@ if not import_failed:
             # Track active evaluations for imperative logging
             self._active_evaluations: dict[str, EvaluationLogger] = {}
             self._evaluation_predictions: dict[str, list] = {}
+            # Track when we're suppressing URLs during evaluation
+            self._evaluation_call_ids: set[str] = set()
+            self._suppression_active: bool = False
 
         def on_module_start(
             self, call_id: str, instance: Any, inputs: dict[str, Any]
         ) -> None:
+            # Suppress URL printing for individual calls during evaluation
+            if self._suppression_active:
+                with suppress_weave_call_links():
+                    self._create_module_call(call_id, instance, inputs)
+            else:
+                self._create_module_call(call_id, instance, inputs)
+        
+        def _create_module_call(
+            self, call_id: str, instance: Any, inputs: dict[str, Any]
+        ) -> None:
+            """Helper method to create module calls."""
             gc = weave_client_context.require_weave_client()
             if instance is not None:
                 inputs = {"self": dictify(instance), **inputs}
@@ -124,6 +163,17 @@ if not import_failed:
                 inputs: The inputs to the LM's __call__ method. Each arguments is stored as
                     a key-value pair in a dictionary.
             """
+            # Suppress URL printing for LM calls during evaluation
+            if self._suppression_active:
+                with suppress_weave_call_links():
+                    self._create_lm_call(call_id, instance, inputs)
+            else:
+                self._create_lm_call(call_id, instance, inputs)
+                
+        def _create_lm_call(
+            self, call_id: str, instance: Any, inputs: dict[str, Any]
+        ) -> None:
+            """Helper method to create LM calls."""
             gc = weave_client_context.require_weave_client()
             if instance is not None:
                 inputs = {"self": dictify(instance), **inputs}
@@ -158,6 +208,17 @@ if not import_failed:
         def on_tool_start(
             self, call_id: str, instance: Any, inputs: dict[str, Any]
         ) -> None:
+            # Suppress URL printing for tool calls during evaluation
+            if self._suppression_active:
+                with suppress_weave_call_links():
+                    self._create_tool_call(call_id, instance, inputs)
+            else:
+                self._create_tool_call(call_id, instance, inputs)
+                
+        def _create_tool_call(
+            self, call_id: str, instance: Any, inputs: dict[str, Any]
+        ) -> None:
+            """Helper method to create tool calls."""
             gc = weave_client_context.require_weave_client()
             if instance is not None:
                 inputs = {"self": dictify(instance), **inputs}
@@ -198,6 +259,7 @@ if not import_failed:
                 inputs: The inputs to the Evaluate's __call__ method. Each arguments is stored as
                     a key-value pair in a dictionary.
             """
+            # Create the evaluation call normally (this should show its URL)
             gc = weave_client_context.require_weave_client()
             if instance is not None:
                 inputs = {"self": dictify(instance), **inputs}
@@ -207,6 +269,10 @@ if not import_failed:
                 inputs=dspy_postprocess_inputs(inputs),
                 display_name=op_name,
             )
+            
+            # Track this as an evaluation call and start suppressing other URLs
+            self._evaluation_call_ids.add(call_id)
+            self._suppression_active = True
             
             # Create Weave EvaluationLogger for imperative evaluation
             try:
@@ -250,6 +316,11 @@ if not import_failed:
                     an exception, this will be None.
                 exception: If an exception is raised during the execution, it will be stored here.
             """
+            # Stop suppressing URLs now that evaluation is ending
+            if call_id in self._evaluation_call_ids:
+                self._suppression_active = False
+                self._evaluation_call_ids.remove(call_id)
+            
             gc = weave_client_context.require_weave_client()
             if call_id in self._call_map:
                 gc.finish_call(
