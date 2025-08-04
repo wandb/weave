@@ -12,11 +12,7 @@ from unittest.mock import patch
 
 import pytest
 
-from weave.compat.wandb.util.netrc import (
-    Netrc,
-    check_netrc_access,
-    get_netrc_file_path,
-)
+from weave.compat.wandb.util.netrc import Netrc, check_netrc_access, get_netrc_file_path
 
 
 @pytest.fixture
