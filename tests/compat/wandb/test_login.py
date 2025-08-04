@@ -187,7 +187,9 @@ def test_wandb_login_prompt_api_key_success(mock_default_host, mock_app_url):
         assert status == ApiKeyStatus.VALID
 
 
-def test_wandb_login_prompt_api_key_abort(mock_default_host, mock_app_url, mock_click_prompt):
+def test_wandb_login_prompt_api_key_abort(
+    mock_default_host, mock_app_url, mock_click_prompt
+):
     """Test API key prompting when user aborts."""
     wlogin = _WandbLogin()
 
@@ -198,7 +200,9 @@ def test_wandb_login_prompt_api_key_abort(mock_default_host, mock_app_url, mock_
         assert status == ApiKeyStatus.OFFLINE
 
 
-def test_wandb_login_prompt_api_key_no_tty(mock_default_host, mock_app_url, mock_click_prompt):
+def test_wandb_login_prompt_api_key_no_tty(
+    mock_default_host, mock_app_url, mock_click_prompt
+):
     """Test API key prompting when no TTY is available."""
     wlogin = _WandbLogin()
 

@@ -497,9 +497,11 @@ def caching_client_isolation(monkeypatch, tmp_path):
 @pytest.fixture
 def mock_path_operations():
     """Fixture for common path/filesystem operations."""
-    with patch("pathlib.Path.home") as mock_home, \
-         patch("os.path.exists") as mock_exists, \
-         patch("os.path.dirname") as mock_dirname:
+    with (
+        patch("pathlib.Path.home") as mock_home,
+        patch("os.path.exists") as mock_exists,
+        patch("os.path.dirname") as mock_dirname,
+    ):
         yield {
             "home": mock_home,
             "exists": mock_exists,
@@ -510,19 +512,22 @@ def mock_path_operations():
 @pytest.fixture
 def mock_weave_init_components():
     """Fixture providing complete weave init mocking context."""
-    with patch("weave.trace.weave_init.init_weave_get_server") as mock_get_server, \
-         patch("weave.trace.weave_client.WeaveClient") as mock_client_class, \
-         patch("weave.trace.weave_init.use_server_cache", return_value=False) as mock_cache:
-        
+    with (
+        patch("weave.trace.weave_init.init_weave_get_server") as mock_get_server,
+        patch("weave.trace.weave_client.WeaveClient") as mock_client_class,
+        patch(
+            "weave.trace.weave_init.use_server_cache", return_value=False
+        ) as mock_cache,
+    ):
         # Setup default mock behavior
         mock_server = MagicMock()
         mock_server.server_info.return_value.min_required_weave_python_version = "0.0.0"
         mock_get_server.return_value = mock_server
-        
+
         mock_client = MagicMock()
         mock_client.project = "test_project"
         mock_client_class.return_value = mock_client
-        
+
         yield {
             "get_server": mock_get_server,
             "client_class": mock_client_class,

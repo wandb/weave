@@ -243,7 +243,10 @@ def test_prompt_for_api_key_success():
 
 def test_prompt_for_api_key_cancelled(mock_click_prompt):
     """Test _prompt_for_api_key when user cancels (Ctrl+C)."""
-    with patch("weave.cli.login.wandb.util"), mock_click_prompt(side_effect=click.Abort()):
+    with (
+        patch("weave.cli.login.wandb.util"),
+        mock_click_prompt(side_effect=click.Abort()),
+    ):
         result = _prompt_for_api_key("api.wandb.ai")
         assert result is None
 
