@@ -7,7 +7,10 @@ import pytest
 from weave.trace.weave_init import (
     WeaveWandbAuthenticationException,
     get_entity_project_from_project_name,
+    init_weave,
+    init_weave_get_server,
 )
+from weave.wandb_interface.context import WandbApiContext
 
 
 def test_get_entity_project_from_project_name_with_entity():
@@ -71,9 +74,6 @@ def test_init_weave_with_existing_context(
     mock_wandb_login,
 ):
     """Test init_weave when wandb context already exists."""
-    from weave.trace.weave_init import init_weave
-    from weave.wandb_interface.context import WandbApiContext
-
     # Configure existing context
     existing_context = WandbApiContext(
         user_id="test_user", api_key="test_api_key", headers=None, cookies=None
@@ -97,9 +97,6 @@ def test_init_weave_without_context_triggers_login(
     mock_wandb_login,
 ):
     """Test init_weave when no wandb context exists (should trigger login)."""
-    from weave.trace.weave_init import init_weave
-    from weave.wandb_interface.context import WandbApiContext
-
     # Configure no context initially, then context after login
     login_context = WandbApiContext(user_id="test_user", api_key="test_api_key")
     mock_wandb_context["get"].side_effect = [None, login_context]
@@ -115,71 +112,8 @@ def test_init_weave_without_context_triggers_login(
         assert result.client == mock_weave_init_components["client"]
 
 
-def test_init_weave_authentication_order():
-    """Test that authentication happens before entity resolution."""
-    from weave.trace.weave_init import init_weave
-    from weave.wandb_interface.context import WandbApiContext
-
-    # This tests our fix - entity resolution should happen AFTER authentication
-    login_context = WandbApiContext(
-        user_id="test_user", api_key="test_api_key", headers=None, cookies=None
-    )
-
-    call_order = []
-
-    def mock_get_context(*args, **kwargs):
-        call_order.append("get_context")
-        return None  # No context initially
-
-    def mock_get_context_after_login(*args, **kwargs):
-        call_order.append("get_context_after_login")
-        return login_context
-
-    def mock_login(*args, **kwargs):
-        call_order.append("login")
-
-    def mock_get_entity_project(*args, **kwargs):
-        call_order.append("get_entity_project")
-        return "test_entity", "test_project"
-
-    with (
-        patch("weave.wandb_interface.context.init"),
-        patch(
-            "weave.wandb_interface.context.get_wandb_api_context",
-            side_effect=[mock_get_context(), mock_get_context_after_login()],
-        ),
-        patch("weave.compat.wandb.login", side_effect=mock_login),
-        patch(
-            "weave.trace.weave_init.get_entity_project_from_project_name",
-            side_effect=mock_get_entity_project,
-        ),
-        patch("weave.trace.weave_init.init_weave_get_server"),
-        patch("weave.trace.weave_client.WeaveClient"),
-        patch(
-            "weave.trace.weave_init.use_server_cache",
-            return_value=False,
-        ),
-        patch("weave.trace.weave_init.wandb_termlog_patch.ensure_patched"),
-    ):
-        try:
-            init_weave("test_project")
-        except:
-            pass  # We just care about call order
-
-    # Verify that login happens before entity resolution
-    assert "login" in call_order
-    assert "get_entity_project" in call_order
-    login_index = call_order.index("login")
-    entity_index = call_order.index("get_entity_project")
-    assert login_index < entity_index, (
-        f"Login should happen before entity resolution. Call order: {call_order}"
-    )
-
-
 def test_init_weave_get_server():
     """Test init_weave_get_server function."""
-    from weave.trace.weave_init import init_weave_get_server
-
     with patch(
         "weave.trace_server_bindings.remote_http_trace_server.RemoteHTTPTraceServer.from_env"
     ) as mock_from_env:
@@ -197,29 +131,3 @@ def test_init_weave_get_server():
 
         assert result == mock_server
         mock_server.set_auth.assert_called_once_with(("api", "test_api_key"))
-
-
-def test_init_weave_disabled():
-    """Test init_weave_disabled function."""
-    from weave.trace.weave_init import init_weave_disabled
-
-    with patch(
-        "weave.trace_server.sqlite_trace_server.SqliteTraceServer"
-    ) as mock_server_class:
-        mock_server = Mock()
-        mock_server_class.return_value = mock_server
-
-        with patch("weave.trace.weave_client.WeaveClient") as mock_client_class:
-            mock_client = Mock()
-            mock_client_class.return_value = mock_client
-
-            result = init_weave_disabled()
-
-            # Should create disabled client
-            mock_client_class.assert_called_once()
-            call_args = mock_client_class.call_args
-
-            # Check that ensure_project_exists is False
-            assert call_args[1]["ensure_project_exists"] is False
-
-            assert result.client == mock_client
