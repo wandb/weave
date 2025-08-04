@@ -14,8 +14,8 @@ from typing import Literal
 
 import click
 
-from weave.compat.wandb import env
 from weave.compat.wandb.util.netrc import Netrc
+from weave.compat.wandb.wandb_thin import env
 from weave.compat.wandb.wandb_thin.util import app_url
 
 logger = logging.getLogger(__name__)

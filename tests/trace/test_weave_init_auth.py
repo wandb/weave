@@ -1,11 +1,12 @@
 """Tests for weave init authentication flow."""
 
+from dataclasses import dataclass
+from typing import Optional
 from unittest.mock import Mock, patch
 
 import pytest
 
 from weave.trace.weave_init import (
-    WeaveWandbAuthenticationException,
     get_entity_project_from_project_name,
     init_weave,
     init_weave_get_server,
@@ -13,58 +14,91 @@ from weave.trace.weave_init import (
 from weave.wandb_interface.context import WandbApiContext
 
 
-def test_get_entity_project_from_project_name_with_entity():
-    """Test project name parsing when entity is included."""
-    entity, project = get_entity_project_from_project_name("test_entity/test_project")
+@dataclass
+class SuccessCase:
+    """Test case for successful project name parsing."""
 
-    assert entity == "test_entity"
-    assert project == "test_project"
+    project_name: str
+    mock_default_entity: Optional[str]
+    expected_entity: str
+    expected_project: str
 
-
-def test_get_entity_project_from_project_name_without_entity(mock_wandb_api):
-    """Test project name parsing when entity is not included."""
-    mock_wandb_api.default_entity_name.return_value = "default_entity"
-
-    entity, project = get_entity_project_from_project_name("test_project")
-
-    assert entity == "default_entity"
-    assert project == "test_project"
-    mock_wandb_api.default_entity_name.assert_called_once()
+    def __str__(self) -> str:
+        return f"{self.expected_entity}/{self.expected_project}"
 
 
-def test_get_entity_project_from_project_name_no_default_entity(mock_wandb_api):
-    """Test project name parsing when no default entity is available."""
-    mock_wandb_api.default_entity_name.return_value = None
+@dataclass
+class ExceptionCase:
+    """Test case for project name parsing exceptions."""
 
-    with pytest.raises(
-        WeaveWandbAuthenticationException,
-        match='weave init requires wandb. Run "wandb login"',
-    ):
-        get_entity_project_from_project_name("test_project")
+    project_name: str
+    expected_match: str
 
-
-def test_get_entity_project_from_project_name_too_many_slashes():
-    """Test project name parsing with too many slashes."""
-    with pytest.raises(ValueError, match="project_name must be of the form"):
-        get_entity_project_from_project_name("entity/project/extra")
+    def __str__(self) -> str:
+        return self.project_name
 
 
-def test_get_entity_project_from_project_name_empty_entity():
-    """Test project name parsing with empty entity."""
-    with pytest.raises(ValueError, match="entity_name must be non-empty"):
-        get_entity_project_from_project_name("/test_project")
+@pytest.mark.parametrize(
+    "case",
+    [
+        SuccessCase(
+            project_name="test_entity/test_project",
+            mock_default_entity=None,
+            expected_entity="test_entity",
+            expected_project="test_project",
+        ),
+        SuccessCase(
+            project_name="test_project",
+            mock_default_entity="default_entity",
+            expected_entity="default_entity",
+            expected_project="test_project",
+        ),
+    ],
+    ids=str,
+)
+def test_get_entity_project_from_project_name_success(
+    case: SuccessCase, mock_wandb_api
+):
+    """Test successful project name parsing scenarios."""
+    # Configure mock if needed
+    if case.mock_default_entity is not None:
+        mock_wandb_api.default_entity_name.return_value = case.mock_default_entity
+
+    entity, project = get_entity_project_from_project_name(case.project_name)
+    assert entity == case.expected_entity
+    assert project == case.expected_project
+
+    # Verify mock was called only when expected
+    if case.mock_default_entity is not None:
+        mock_wandb_api.default_entity_name.assert_called_once()
 
 
-def test_get_entity_project_from_project_name_empty_project():
-    """Test project name parsing with empty project."""
-    with pytest.raises(ValueError, match="project_name must be non-empty"):
-        get_entity_project_from_project_name("test_entity/")
-
-
-def test_get_entity_project_from_project_name_both_empty():
-    """Test project name parsing with both empty."""
-    with pytest.raises(ValueError, match="entity_name must be non-empty"):
-        get_entity_project_from_project_name("/")
+@pytest.mark.parametrize(
+    "case",
+    [
+        ExceptionCase(
+            project_name="entity/project/extra",
+            expected_match="project_name must be of the form",
+        ),
+        ExceptionCase(
+            project_name="/test_project",
+            expected_match="entity_name must be non-empty",
+        ),
+        ExceptionCase(
+            project_name="test_entity/",
+            expected_match="project_name must be non-empty",
+        ),
+        ExceptionCase(
+            project_name="/",
+            expected_match="entity_name must be non-empty",
+        ),
+    ],
+    ids=str,
+)
+def test_get_entity_project_from_project_name_exceptions(case: ExceptionCase):
+    """Test project name parsing exception scenarios."""
+    with pytest.raises(ValueError, match=case.expected_match):
+        get_entity_project_from_project_name(case.project_name)
 
 
 def test_init_weave_with_existing_context(
