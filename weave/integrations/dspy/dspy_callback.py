@@ -1,6 +1,7 @@
 from typing import Any, Optional
 
 import weave
+from weave.flow.eval_imperative import EvaluationLogger
 from weave.integrations.dspy.dspy_utils import (
     dspy_postprocess_inputs,
     dump_dspy_objects,
@@ -22,6 +23,9 @@ if not import_failed:
     class WeaveCallback(BaseCallback):
         def __init__(self) -> None:
             self._call_map: dict[str, Call] = {}
+            # Track active evaluations for imperative logging
+            self._active_evaluations: dict[str, EvaluationLogger] = {}
+            self._evaluation_predictions: dict[str, list] = {}
 
         def on_module_start(
             self, call_id: str, instance: Any, inputs: dict[str, Any]
@@ -43,6 +47,14 @@ if not import_failed:
                 inputs=dspy_postprocess_inputs(inputs),
                 display_name=op_name,
             )
+            
+            # Check if we're in an active evaluation and this is a prediction
+            if self._active_evaluations:
+                try:
+                    # Store inputs for potential prediction logging
+                    self._call_map[call_id]._dspy_eval_inputs = inputs
+                except Exception:
+                    pass
 
         def on_module_end(
             self,
@@ -51,6 +63,48 @@ if not import_failed:
             exception: Optional[Exception] = None,
         ) -> None:
             gc = weave_client_context.require_weave_client()
+            
+            # Check if this is part of an evaluation and log prediction
+            if call_id in self._call_map and self._active_evaluations:
+                try:
+                    call_obj = self._call_map[call_id]
+                    if hasattr(call_obj, '_dspy_eval_inputs') and outputs is not None and exception is None:
+                        # This looks like a prediction we should log
+                        inputs = call_obj._dspy_eval_inputs
+                        
+                        # Find the active evaluation (for simplicity, use the first one)
+                        # In a more robust implementation, we'd track which evaluation each call belongs to
+                        for eval_call_id, eval_logger in self._active_evaluations.items():
+                            try:
+                                # Extract input data for Weave logging
+                                prediction_inputs = {}
+                                for key, value in inputs.items():
+                                    if key != "self" and not key.startswith("_"):
+                                        prediction_inputs[key] = value
+                                
+                                # Log the prediction
+                                pred_logger = eval_logger.log_prediction(
+                                    inputs=prediction_inputs,
+                                    output=dump_dspy_objects(outputs)
+                                )
+                                
+                                # For now, log a simple correctness score placeholder
+                                # In a real implementation, this would come from the metric evaluation
+                                pred_logger.log_score("prediction_logged", True)
+                                pred_logger.finish()
+                                
+                                # Track the prediction for cleanup
+                                if eval_call_id not in self._evaluation_predictions:
+                                    self._evaluation_predictions[eval_call_id] = []
+                                self._evaluation_predictions[eval_call_id].append(pred_logger)
+                                
+                                break  # Only log to one evaluation
+                            except Exception as e:
+                                print(f"Warning: Failed to log prediction to Weave: {e}")
+                                pass
+                except Exception:
+                    pass
+            
             if call_id in self._call_map:
                 gc.finish_call(
                     self._call_map[call_id], dump_dspy_objects(outputs), exception
@@ -153,6 +207,34 @@ if not import_failed:
                 inputs=dspy_postprocess_inputs(inputs),
                 display_name=op_name,
             )
+            
+            # Create Weave EvaluationLogger for imperative evaluation
+            try:
+                program = inputs.get("program")
+                if program:
+                    # Extract model info from the program
+                    model_name = getattr(program, "__class__", {})
+                    if hasattr(model_name, "__name__"):
+                        model_name = model_name.__name__
+                    else:
+                        model_name = str(model_name)
+                else:
+                    model_name = "DSPyModule"
+                
+                # Create evaluation logger
+                eval_logger = EvaluationLogger(
+                    name=f"DSPy Evaluation - {model_name}",
+                    model=model_name,
+                    dataset="DSPy Dataset"
+                )
+                
+                self._active_evaluations[call_id] = eval_logger
+                self._evaluation_predictions[call_id] = []
+                
+            except Exception as e:
+                # Don't let evaluation logging errors break DSPy evaluation
+                print(f"Warning: Failed to create Weave evaluation logger: {e}")
+                pass
 
         def on_evaluate_end(
             self,
@@ -173,3 +255,39 @@ if not import_failed:
                 gc.finish_call(
                     self._call_map[call_id], dump_dspy_objects(outputs), exception
                 )
+            
+            # Finalize Weave evaluation logging
+            if call_id in self._active_evaluations:
+                try:
+                    eval_logger = self._active_evaluations[call_id]
+                    predictions = self._evaluation_predictions.get(call_id, [])
+                    
+                    # Finish any remaining predictions
+                    for pred_logger in predictions:
+                        try:
+                            if not pred_logger._has_finished:
+                                pred_logger.finish()
+                        except Exception:
+                            pass  # Best effort cleanup
+                    
+                    # Create summary from DSPy outputs
+                    summary = {}
+                    if outputs is not None:
+                        if hasattr(outputs, 'score'):
+                            summary["score"] = outputs.score
+                        elif isinstance(outputs, (int, float)):
+                            summary["score"] = outputs
+                        else:
+                            summary["score"] = str(outputs)
+                    
+                    # Log summary and finalize evaluation
+                    eval_logger.log_summary(summary)
+                    
+                    # Clean up
+                    del self._active_evaluations[call_id]
+                    del self._evaluation_predictions[call_id]
+                    
+                except Exception as e:
+                    # Don't let cleanup errors break DSPy evaluation
+                    print(f"Warning: Failed to finalize Weave evaluation: {e}")
+                    pass
