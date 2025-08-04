@@ -12,7 +12,7 @@ from unittest.mock import patch
 
 import pytest
 
-from weave.utils.netrc import (
+from weave.compat.wandb.util.netrc import (
     Credentials,
     Netrc,
     check_netrc_access,
@@ -21,13 +21,8 @@ from weave.utils.netrc import (
 
 
 @pytest.fixture
-def temp_dir_path(tmp_path):
-    return tmp_path
-
-
-@pytest.fixture
-def temp_netrc(temp_dir_path):
-    netrc_path = temp_dir_path / ".netrc"
+def temp_netrc(tmp_path):
+    netrc_path = tmp_path / ".netrc"
     return Netrc(netrc_path)
 
 
@@ -52,6 +47,16 @@ def test_netrc_read_nonexistent_file(temp_netrc):
         temp_netrc.read()
 
 
+def test_netrc_read_malformed_file(temp_netrc):
+    """Test reading a malformed netrc file."""
+    # Create a malformed netrc file
+    malformed_content = "invalid netrc content"
+    temp_netrc.path.write_text(malformed_content)
+
+    with pytest.raises(netrc.NetrcParseError):
+        temp_netrc.read()
+
+
 def test_netrc_read_valid_file(temp_netrc):
     """Test reading a valid netrc file."""
     # Create a test netrc file
@@ -67,25 +72,18 @@ machine api.example.com
     temp_netrc.path.write_text(netrc_content)
 
     credentials = temp_netrc.read()
-
-    assert len(credentials) == 2
-    assert credentials["example.com"]["login"] == "testuser"
-    assert credentials["example.com"]["password"] == "testpass"
-    assert credentials["example.com"]["account"] == ""
-
-    assert credentials["api.example.com"]["login"] == "apiuser"
-    assert credentials["api.example.com"]["password"] == "apipass"
-    assert credentials["api.example.com"]["account"] == "testaccount"
-
-
-def test_netrc_read_malformed_file(temp_netrc):
-    """Test reading a malformed netrc file."""
-    # Create a malformed netrc file
-    malformed_content = "invalid netrc content"
-    temp_netrc.path.write_text(malformed_content)
-
-    with pytest.raises(netrc.NetrcParseError):
-        temp_netrc.read()
+    assert credentials == {
+        "example.com": {
+            "login": "testuser",
+            "account": "",
+            "password": "testpass",
+        },
+        "api.example.com": {
+            "login": "apiuser",
+            "account": "testaccount",
+            "password": "apipass",
+        },
+    }
 
 
 def test_netrc_write_credentials(temp_netrc):
@@ -117,13 +115,17 @@ def test_netrc_write_credentials(temp_netrc):
     assert written_credentials == credentials
 
 
-def test_netrc_write_creates_parent_directory(temp_dir_path):
+def test_netrc_write_creates_parent_directory(tmp_path):
     """Test that write creates parent directories if they don't exist."""
-    nested_path = temp_dir_path / "nested" / "dir" / ".netrc"
+    nested_path = tmp_path / "nested" / "dir" / ".netrc"
     netrc = Netrc(str(nested_path))
 
     credentials = {
-        "example.com": {"login": "testuser", "account": "", "password": "testpass"}
+        "example.com": {
+            "login": "testuser",
+            "account": "",
+            "password": "testpass",
+        }
     }
 
     netrc.write(credentials)
@@ -138,7 +140,11 @@ def test_netrc_write_permission_error(mock_chmod, temp_netrc):
     mock_chmod.side_effect = OSError("Permission denied")
 
     credentials = {
-        "example.com": {"login": "testuser", "account": "", "password": "testpass"}
+        "example.com": {
+            "login": "testuser",
+            "account": "",
+            "password": "testpass",
+        }
     }
 
     with pytest.raises(PermissionError, match="Unable to write to netrc file"):
@@ -299,9 +305,9 @@ def test_netrc_list_machines_no_file(temp_netrc):
 
 
 # Tests for netrc permission checking
-def test_check_netrc_access_nonexistent_file(temp_dir_path):
+def test_check_netrc_access_nonexistent_file(tmp_path):
     """Test checking access for a non-existent file."""
-    netrc_path = temp_dir_path / ".netrc"
+    netrc_path = tmp_path / ".netrc"
     permissions = check_netrc_access(str(netrc_path))
 
     assert permissions.exists is False
@@ -309,10 +315,10 @@ def test_check_netrc_access_nonexistent_file(temp_dir_path):
     assert permissions.write_access is True  # Can create
 
 
-def test_check_netrc_access_existing_file(temp_dir_path):
+def test_check_netrc_access_existing_file(tmp_path):
     """Test checking access for an existing file."""
     # Create a test file with specific permissions
-    netrc_path = temp_dir_path / ".netrc"
+    netrc_path = tmp_path / ".netrc"
     netrc_path.write_text("test content")
     os.chmod(netrc_path, 0o600)
 
@@ -323,10 +329,10 @@ def test_check_netrc_access_existing_file(temp_dir_path):
     assert permissions.write_access is True
 
 
-def test_check_netrc_access_read_only_file(temp_dir_path):
+def test_check_netrc_access_read_only_file(tmp_path):
     """Test checking access for a read-only file."""
     # Create a test file with read-only permissions
-    netrc_path = temp_dir_path / ".netrc"
+    netrc_path = tmp_path / ".netrc"
     netrc_path.write_text("test content")
     os.chmod(netrc_path, 0o400)
 
@@ -341,10 +347,10 @@ def test_check_netrc_access_read_only_file(temp_dir_path):
     reason="This test is expected to raise OSError"
 )
 @patch("os.stat")
-def test_check_netrc_access_os_error(mock_stat, temp_dir_path):
+def test_check_netrc_access_os_error(mock_stat, tmp_path):
     """Test checking access when os.stat raises an OSError."""
     mock_stat.side_effect = OSError("Access denied")
-    netrc_path = temp_dir_path / ".netrc"
+    netrc_path = tmp_path / ".netrc"
 
     permissions = check_netrc_access(str(netrc_path))
 

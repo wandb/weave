@@ -50,9 +50,7 @@ def mock_weave_context_without_existing():
     """Fixture that provides mocked weave context with no existing context initially."""
     from weave.wandb_interface.context import WandbApiContext
 
-    login_context = WandbApiContext(
-        user_id="test_user", api_key="test_api_key", headers=None, cookies=None
-    )
+    login_context = WandbApiContext(user_id="test_user", api_key="test_api_key")
 
     with (
         patch("weave.wandb_interface.context.init") as mock_context_init,
