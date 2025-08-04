@@ -1060,3 +1060,60 @@ async def test_evaluation_with_custom_name(client):
 
     call = calls[0]
     assert call.display_name == "wow-custom!"
+
+
+def test_get_evaluate_calls(client, make_evals):
+    ref, ref2 = make_evals
+    ev = ref.get()
+    evaluate_calls = ev.get_evaluate_calls()
+    assert len(evaluate_calls) == 1
+
+    call1 = evaluate_calls[0]
+    assert call1.inputs["self"].ref.uri() == ref.uri()
+    assert call1.inputs["model"].name == "abc"
+
+    ev2 = ref2.get()
+    evaluate_calls2 = ev2.get_evaluate_calls()
+    assert len(evaluate_calls2) == 1
+
+    call2 = evaluate_calls2[0]
+    assert call2.inputs["self"].ref.uri() == ref2.uri()
+    assert call2.inputs["model"].name == "ghi"
+
+
+def test_get_score_calls(client, make_evals):
+    ref, ref2 = make_evals
+    ev = ref.get()
+    score_calls = next(iter(ev.get_score_calls().values()))
+    assert len(score_calls) == 4
+
+    assert score_calls[0].output == 3
+    assert score_calls[1].output == 4
+    assert score_calls[2].output == 33
+    assert score_calls[3].output == 44
+
+    ev2 = ref2.get()
+    score_calls2 = next(iter(ev2.get_score_calls().values()))
+    assert len(score_calls2) == 4
+
+    assert score_calls2[0].output == 56
+    assert score_calls2[1].output == 78
+    assert score_calls2[2].output == 5656
+    assert score_calls2[3].output == 7878
+
+
+def test_get_scores(client, make_evals):
+    ref, ref2 = make_evals
+    ev = ref.get()
+    scores = next(iter(ev.get_scores().values()))
+    assert scores == {
+        "score": [3, 33],
+        "score2": [4, 44],
+    }
+
+    ev2 = ref2.get()
+    scores2 = next(iter(ev2.get_scores().values()))
+    assert scores2 == {
+        "second_score": [56, 5656],
+        "second_score2": [78, 7878],
+    }

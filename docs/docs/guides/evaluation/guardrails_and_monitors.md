@@ -496,7 +496,7 @@ score = scorer.score(output="some text")
 ### Score Analysis
 
 
-For detailed information about querying calls and their scorer results, see our [Score Analysis Guide](./scorers.md#score-analysis) and our [Data Access Guide](/guides/tracking/tracing#querying--exporting-calls).
+For detailed information about querying calls and their scorer results, see our [Score Analysis Guide](./scorers.md#score-analysis) and our [Data Access Guide](/guides/tracking/tracing#querying-and-exporting-calls).
 
 
 ## Production Best Practices
