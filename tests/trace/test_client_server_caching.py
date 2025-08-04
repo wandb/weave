@@ -134,7 +134,7 @@ def test_server_cache_size_limit(client):
     with tempfile.TemporaryDirectory() as temp_dir:
         caching_server = CachingMiddlewareTraceServer(
             next_trace_server=MockServer("a" * 1000),
-            cache_dir=str(temp_dir),
+            cache_dir=temp_dir,
             size_limit=50000,
         )
 
