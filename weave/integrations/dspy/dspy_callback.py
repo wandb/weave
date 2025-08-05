@@ -87,8 +87,8 @@ if not import_failed:
         def on_lm_end(
             self,
             call_id: str,
-            outputs: dict[str, Any] | None,
-            exception: Exception | None = None,
+            outputs: Optional[dict[str, Any]],
+            exception: Optional[Exception] = None,
         ) -> None:
             """A handler triggered after __call__ method of dspy.LM instance is executed.
 
