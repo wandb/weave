@@ -359,11 +359,15 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         # Process ancestor_ids filter if present
         if req.filter is not None:
-            composite_ids = self._determine_composite_call_id_mask(req.project_id, req.filter)
+            composite_ids = self._determine_composite_call_id_mask(
+                req.project_id, req.filter
+            )
             if composite_ids is not None:
                 if not composite_ids:
                     # No descendants found, return early
-                    return tsi.CallsQueryStatsRes(count=0, total_storage_size_bytes=None)
+                    return tsi.CallsQueryStatsRes(
+                        count=0, total_storage_size_bytes=None
+                    )
                 req.filter.call_ids = list(composite_ids)
                 req.filter.ancestor_ids = None
 
@@ -381,7 +385,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
 
     def _determine_composite_call_id_mask(
-        self, project_id: str, filter:tsi.CallsFilter
+        self, project_id: str, filter: tsi.CallsFilter
     ) -> Optional[set[str]]:
         """Process ancestor_ids filter and return the final set of call IDs to filter by.
 
@@ -571,7 +575,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         """Returns a stream of calls that match the given query."""
         # Process ancestor_ids filter if present
         if req.filter is not None:
-            composite_ids = self._determine_composite_call_id_mask(req.project_id, req.filter)
+            composite_ids = self._determine_composite_call_id_mask(
+                req.project_id, req.filter
+            )
             if composite_ids is not None:
                 if not composite_ids:
                     # No descendants found, return early
