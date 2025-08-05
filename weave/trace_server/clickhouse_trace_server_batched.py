@@ -474,7 +474,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                             logger.debug(
                                 f"Top-down approach won for {len(ancestor_ids)} ancestors"
                             )
-                        return result
                     except Exception as e:
                         logger.warning(f"Descendant search approach failed: {e}")
                         # If one fails, wait for the other
@@ -483,9 +482,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                                 return other_future.result(timeout=30)
                             except Exception as e2:
                                 logger.exception(
-                                    f"Both descendant search approaches failed: {e}, {e2}"
+                                    f"Both descendant search approaches failed"
                                 )
                                 raise
+                    else:
+                        return result
 
                 # Should not reach here
                 return set()
