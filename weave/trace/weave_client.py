@@ -1503,7 +1503,7 @@ class WeaveClient:
     ) -> CostCreateRes:
         """Add a cost to the current project.
 
-        Examples:
+        Example:
 
             ```python
             client.add_cost(llm_id="my_expensive_custom_model", prompt_token_cost=1, completion_token_cost=2)
@@ -1523,9 +1523,6 @@ class WeaveClient:
             A CostCreateRes object.
             Which has one field called a list of tuples called ids.
             Each tuple contains the llm_id and the id of the created cost object.
-
-
-
         """
         if effective_date is None:
             effective_date = datetime.datetime.now(datetime.timezone.utc)
