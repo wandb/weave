@@ -60,6 +60,10 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     combine_conditions,
     optimized_project_contains_call_query,
 )
+from weave.trace_server.calls_query_builder.utils import (
+    param_slot,
+    safely_format_sql,
+)
 from weave.trace_server.clickhouse_schema import (
     ALL_CALL_INSERT_COLUMNS,
     ALL_CALL_SELECT_COLUMNS,
@@ -383,15 +387,67 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def _find_descendants(self, ancestor_ids: list[str]) -> set[str]:
         """Returns the set of all descendants of the given ancestor ids."""
-        # TODO: Implement this
-        #  I think there are 2 valid algorithms (and we can't know which one is faster apriori)
-        # 1. Query for the set of trace ids for the ancestors, then query to get all the calls for those trace ids, then build an in-memory tree of the calls, finally filter to only include the descendants
-        #     * Note: this is more performant when the trace is deep, and/or the ancestor ids are near the top of the tree (more data to load into memory)
-        # 2. Iteratively query for direct children of the ancestors, then for the children of the children, etc.
-        #     * Note: this is more performant when the trace is shallow, and/or the ancestor ids are near the bottom of the tree (more DB queries)
-        #
-        # Probably the fastest implementation will dispatch both queries in parallel, take the faster result, and cancel the slower one.
-        return set()
+        if not ancestor_ids:
+            return set()
+        
+        # First, get the trace_ids for all the ancestor calls to limit our search space
+        pb = ParamBuilder()
+        ancestor_trace_query = safely_format_sql(
+            f"""
+            SELECT DISTINCT trace_id 
+            FROM calls_merged 
+            WHERE id IN {param_slot(pb.add_param(ancestor_ids), 'Array(String)')}
+            AND trace_id IS NOT NULL
+            """,
+            logger,
+        )
+        
+        trace_result = self._query(ancestor_trace_query, pb.get_params())
+        if not trace_result.result_rows:
+            return set()
+        
+        trace_ids = [row[0] for row in trace_result.result_rows if row[0] is not None]
+        if not trace_ids:
+            return set()
+        
+        # Now get all calls in those traces to build the parent-child tree
+        pb = ParamBuilder()
+        calls_query = safely_format_sql(
+            f"""
+            SELECT id, parent_id
+            FROM calls_merged 
+            WHERE trace_id IN {param_slot(pb.add_param(trace_ids), 'Array(String)')}
+            AND id IS NOT NULL
+            """,
+            logger,
+        )
+        
+        calls_result = self._query(calls_query, pb.get_params())
+        
+        # Build parent-to-children mapping
+        parent_to_children: dict[str, list[str]] = {}
+        for row in calls_result.result_rows:
+            call_id, parent_id = row[0], row[1]
+            if call_id is None:
+                continue
+            if parent_id is not None:
+                if parent_id not in parent_to_children:
+                    parent_to_children[parent_id] = []
+                parent_to_children[parent_id].append(call_id)
+        
+        # Find all descendants using BFS
+        descendants = set()
+        queue = list(ancestor_ids)
+        
+        while queue:
+            current_id = queue.pop(0)
+            if current_id in parent_to_children:
+                for child_id in parent_to_children[current_id]:
+                    if child_id not in descendants:
+                        descendants.add(child_id)
+                        queue.append(child_id)
+        
+        return descendants
 
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         """Returns a stream of calls that match the given query."""
@@ -435,6 +491,17 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 *[col for col in columns if col not in summary_columns],
                 "summary_dump",
             ]
+
+        # If we have an ancestor_ids filter, we need to get the ids of the calls that are descendants of the given ids
+        if req.filter is not None and req.filter.ancestor_ids is not None:
+            descendants = self._find_descendants(req.filter.ancestor_ids)
+
+            if req.filter.call_ids is not None:
+                current_call_ids = set(req.filter.call_ids)
+                descendants = current_call_ids.union(descendants)
+
+            req.filter.call_ids = list(descendants)
+            req.filter.ancestor_ids = None
 
         if req.expand_columns is not None:
             cq.set_expand_columns(req.expand_columns)
