@@ -355,6 +355,15 @@ class EvaluationLogger(BaseModel):
         ),
     ]
 
+    eval_attributes: Annotated[
+        dict[str, Any],
+        Field(
+            default_factory=dict,
+            description="(Optional): A dictionary of attributes to add to the evaluation call."
+            "These attributes can be used to add additional metadata columns to the Evaluation.",
+        ),
+    ]
+
     _eval_started: bool = PrivateAttr(False)
     _logged_summary: bool = PrivateAttr(False)
     _is_finalized: bool = PrivateAttr(False)
@@ -368,6 +377,10 @@ class EvaluationLogger(BaseModel):
         if self._evaluate_call is None:
             return None
         return self._evaluate_call.ui_url
+
+    @property
+    def attributes(self) -> dict[str, Any]:
+        return self.eval_attributes | IMPERATIVE_EVAL_MARKER
 
     # This private attr is used to keep track of predictions so we can finish
     # them if the user forgot to.
@@ -444,7 +457,7 @@ class EvaluationLogger(BaseModel):
                 "self": self._pseudo_evaluation,
                 "model": self.model,
             },
-            attributes=IMPERATIVE_EVAL_MARKER,
+            attributes=self.attributes,
             use_stack=False,  # Don't push to global stack to prevent nesting
         )
         if self._evaluate_call is None:
