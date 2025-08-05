@@ -356,18 +356,17 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 count=count,
                 total_storage_size_bytes=None,
             )
-        
+
         # If we have an ancestor_ids filter, we need to get the ids of the calls that are ancestors of the given ids
         if req.filter is not None and req.filter.ancestor_ids is not None:
             descendants = self._find_descendants(req.filter.ancestor_ids)
-            
+
             if req.filter.call_ids is not None:
                 current_call_ids = set(req.filter.call_ids)
                 descendants = current_call_ids.union(descendants)
-            
+
             req.filter.call_ids = list(descendants)
             req.filter.ancestor_ids = None
-            
 
         query, columns = build_calls_query_stats_query(req, pb)
 
@@ -381,7 +380,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             count=res_dict.get("count", 0),
             total_storage_size_bytes=res_dict.get("total_storage_size_bytes"),
         )
-    
+
     def _find_descendants(self, ancestor_ids: list[str]) -> set[str]:
         """Returns the set of all descendants of the given ancestor ids."""
         # TODO: Implement this
@@ -391,7 +390,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # 2. Iteratively query for direct children of the ancestors, then for the children of the children, etc.
         #     * Note: this is more performant when the trace is shallow, and/or the ancestor ids are near the bottom of the tree (more DB queries)
         #
-        # A really cool implementation will dispatch both queries in parallel, and take the faster result.
+        # Probably the fastest implementation will dispatch both queries in parallel, take the faster result, and cancel the slower one.
         return set()
 
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
