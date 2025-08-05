@@ -52,7 +52,7 @@ def add(a: int, b: int) -> int:
      return a + b
 
 result, call = add.call(1, 2)
-``` 
+```
 
 ---
 
@@ -76,4 +76,4 @@ def add(a: int, b: int) -> int:
 calls = add.calls()
 for call in calls:
      print(call)
-``` 
+```

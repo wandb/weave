@@ -180,7 +180,7 @@ dataset = weave.Dataset(rows=[{"a": 1, "b": 2}])
 ref = weave.publish(dataset)
 
 dataset2 = weave.get(ref)  # same as dataset!
-``` 
+```
 
 ---
 
@@ -202,7 +202,7 @@ def hello(name: str) -> None:
      print(f"Hello {name}!")
      current_call = weave.require_current_call()
      print(current_call.id)
-``` 
+```
 
 It is also possible to access a Call after the Op has returned. 
 
@@ -211,7 +211,7 @@ If you have the Call's id, perhaps from the UI, you can use the `get_call` metho
 ```python
 client = weave.init("<project>")
 mycall = client.get_call("<call_id>")
-``` 
+```
 
 Alternately, after defining your Op you can use its `call` method. For example: 
 
@@ -222,7 +222,7 @@ def add(a: int, b: int) -> int:
 
 result, call = add.call(1, 2)
 print(call.id)
-``` 
+```
 
 
 
@@ -313,7 +313,7 @@ Context manager for setting attributes on a call.
 ```python
 with weave.attributes({'env': 'production'}):
      print(my_function.call("World"))
-``` 
+```
 
 ---
 
@@ -323,7 +323,7 @@ with weave.attributes({'env': 'production'}):
 
 ```python
 thread(
-    thread_id: 'str | None | object' = <object object at 0x12f8761a0>
+    thread_id: 'str | None | object' = <object object at 0x10d43e1a0>
 ) → Iterator[ThreadContext]
 ```
 
@@ -348,7 +348,7 @@ with weave.thread("custom_thread") as t:
 # Disable threading
 with weave.thread(None) as t:
      result = my_function("input")  # This call will have thread_id=None
-``` 
+```
 
 
 
@@ -382,13 +382,13 @@ This class extends Pydantic's BaseModel to provide Weave-specific functionality 
 
 
 **Examples:**
- ```python
-    # Create a simple object
-    obj = Object(name="my_object", description="A test object")
+```python
+# Create a simple object
+obj = Object(name="my_object", description="A test object")
 
-    # Create an object from a URI
-    obj = Object.from_uri("weave:///entity/project/object:digest")
-    ``` 
+# Create an object from a URI
+obj = Object.from_uri("weave:///entity/project/object:digest")
+```
 
 
 **Pydantic Fields:**
@@ -430,9 +430,9 @@ Create an object instance from a Weave URI.
 
 
 **Examples:**
- ```python
-    obj = MyObject.from_uri("weave:///entity/project/object:digest")
-    ``` 
+```python
+obj = MyObject.from_uri("weave:///entity/project/object:digest")
+```
 
 ---
 
@@ -472,12 +472,12 @@ This validator handles special cases where the input is an ObjectRef or WeaveObj
  This method is called automatically during object creation and validation. It handles cases like: 
 
 ```python
-    # When an ObjectRef is passed
-    obj = MyObject(some_object_ref)
+# When an ObjectRef is passed
+obj = MyObject(some_object_ref)
 
-    # When a WeaveObject is passed
-    obj = MyObject(some_weave_object)
-    ``` 
+# When a WeaveObject is passed
+obj = MyObject(some_weave_object)
+```
 
 
 ---
@@ -508,7 +508,7 @@ dataset_ref = weave.ref('grammar').get()
 
 # Access a specific example
 example_label = dataset_ref.rows[2]['sentence']
-``` 
+```
 
 
 **Pydantic Fields:**
@@ -690,7 +690,7 @@ class YourModel(Model):
          # Model logic goes here
          prediction = self.attribute1 + ' ' + input_data
          return {'pred': prediction}
-``` 
+```
 
 
 **Pydantic Fields:**
@@ -917,7 +917,7 @@ evaluation = Evaluation(
 weave.init('intro-example')
 # Run the evaluation
 asyncio.run(evaluation.evaluate(function_to_evaluate))
-``` 
+```
 
 
 **Pydantic Fields:**
@@ -926,7 +926,7 @@ asyncio.run(evaluation.evaluate(function_to_evaluate))
 - `description`: `typing.Optional[str]`
 - `ref`: `typing.Optional[trace.refs.ObjectRef]`
 - `dataset`: `<class 'flow.dataset.Dataset'>`
-- `scorers`: `typing.Optional[list[typing.Annotated[typing.Union[trace.op.Op, flow.scorer.Scorer], BeforeValidator(func=<function cast_to_scorer at 0x148ebaac0>, json_schema_input_type=PydanticUndefined)]]]`
+- `scorers`: `typing.Optional[list[typing.Annotated[typing.Union[trace.op.Op, flow.scorer.Scorer], BeforeValidator(func=<function cast_to_scorer at 0x10e8bc040>, json_schema_input_type=PydanticUndefined)]]]`
 - `preprocess_model_input`: `typing.Optional[typing.Callable[[dict], dict]]`
 - `trials`: `<class 'int'>`
 - `evaluation_name`: `typing.Union[str, typing.Callable[[trace.weave_client.Call], str], NoneType]`
@@ -1009,7 +1009,7 @@ await evaluation.evaluate(model)  # Run evaluation first
 calls = evaluation.get_evaluate_calls()
 for call in calls:
     print(f"Evaluation run: {call.id} at {call.started_at}")
-``` 
+```
 
 ---
 
@@ -1043,7 +1043,7 @@ for trace_id, calls in score_calls.items():
     for call in calls:
          scorer_name = call.summary.get("weave", {}).get("trace_name")
          print(f"  Scorer: {scorer_name}, Output: {call.output}")
-``` 
+```
 
 ---
 
@@ -1080,7 +1080,7 @@ for trace_id, trace_scores in scores.items():
          print(f"Evaluation run {trace_id}:")
          for scorer_name, outputs in trace_scores.items():
              print(f"  {scorer_name}: {outputs}")
-``` 
+```
 
 Expected output: 
 
@@ -1091,7 +1091,7 @@ Expected output:
     "f1_scorer": [{"f1": 0.78}]
     }
 }
-``` 
+```
 
 ---
 
@@ -1150,12 +1150,12 @@ Each time you log a prediction, you will get back a `ScoreLogger` object. You ca
 
 
 **Example:**
- ```python
-     ev = EvaluationLogger()
-     pred = ev.log_prediction(inputs, output)
-     pred.log_score(scorer_name, score)
-     ev.log_summary(summary)
-    ``` 
+```python
+ev = EvaluationLogger()
+pred = ev.log_prediction(inputs, output)
+pred.log_score(scorer_name, score)
+ev.log_summary(summary)
+```
 
 
 **Pydantic Fields:**
@@ -1712,7 +1712,7 @@ my_monitor = weave.Monitor(
 )
 
 my_monitor.activate()
-``` 
+```
 
 
 **Pydantic Fields:**

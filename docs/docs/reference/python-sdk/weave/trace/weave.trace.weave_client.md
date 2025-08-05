@@ -70,7 +70,7 @@ This property can be used to check the progress of background tasks without bloc
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/weave_client.py#L1498"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/weave_client.py#L1495"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `add_cost`
 
@@ -113,7 +113,7 @@ Add a cost to the current project.
 ```python
 client.add_cost(llm_id="my_expensive_custom_model", prompt_token_cost=1, completion_token_cost=2)
 client.add_cost(llm_id="my_expensive_custom_model", prompt_token_cost=500, completion_token_cost=1000, effective_date=datetime(1998, 10, 3))
-``` 
+```
 
 ---
 
@@ -258,7 +258,7 @@ Fail a call with an exception. This is a convenience method for finish_call.
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/util.py#L1485"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/util.py#L1482"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `feedback`
 
@@ -277,7 +277,7 @@ feedback(
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/weave_client.py#L2099"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/weave_client.py#L2096"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `finish`
 
@@ -320,7 +320,7 @@ Any values present in ``call.summary`` are deep-merged with computed summary sta
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/weave_client.py#L2130"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/weave_client.py#L2127"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `flush`
 
@@ -439,7 +439,7 @@ calls = client.get_calls(
 )
 for call in calls:
     print(call.inputs, call.output)
-``` 
+```
 
 ---
 
@@ -485,7 +485,7 @@ You can also get the evaluation by its "friendly" name: get_evaluation("Evaluati
 client = weave.init("my-project")
 evaluation = client.get_evaluation("weave:///entity/project/object/my-eval:v1")
 print(evaluation.name)
-``` 
+```
 
 ---
 
@@ -516,7 +516,7 @@ evaluations = client.get_evaluations()
 print(f"Found {len(evaluations)} evaluations")
 for eval in evaluations:
     print(f"Evaluation: {eval.name}")
-``` 
+```
 
 ---
 
@@ -545,26 +545,23 @@ Query project for feedback.
 # Note that this still returns a collection, which is expected
 # to contain zero or one item(s).
 client.get_feedback("1B4082A3-4EDA-4BEB-BFEB-2D16ED59AA07")
-
 # Find all feedback objects with a specific reaction.
 client.get_feedback(reaction="👍", limit=10)
-
 # Find all feedback objects with a specific feedback type with
 # mongo-style query.
 from weave.trace_server.interface.query import Query
-
 query = Query(
-     **{
-         "$expr": {
-             "$eq": [
-                 {"$getField": "feedback_type"},
-                 {"$literal": "wandb.reaction.1"},
-             ],
-         }
-     }
+    **{
+        "$expr": {
+            "$eq": [
+                {"$getField": "feedback_type"},
+                {"$literal": "wandb.reaction.1"},
+            ],
+        }
+    }
 )
 client.get_feedback(query=query)
-``` 
+```
 
 
 
@@ -582,7 +579,7 @@ client.get_feedback(query=query)
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/weave_client.py#L1546"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/weave_client.py#L1543"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `purge_costs`
 
@@ -600,7 +597,7 @@ Purge costs from the current project.
 ```python
 client.purge_costs([ids])
 client.purge_costs(ids)
-``` 
+```
 
 
 
@@ -610,7 +607,7 @@ client.purge_costs(ids)
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/weave_client.py#L1571"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/weave_client.py#L1568"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `query_costs`
 
@@ -638,7 +635,7 @@ client.query_costs("1B4082A3-4EDA-4BEB-BFEB-2D16ED59AA07")
 
 # Find all cost objects with a specific reaction.
 client.query_costs(llm_ids=["gpt-4o-mini-2024-07-18"], limit=10)
-``` 
+```
 
 
 
@@ -804,7 +801,7 @@ class ApplyScorerSuccess:
  - <b>`    result`</b>:  Any
 
  - <b>`    score_call`</b>:  Call
-``` 
+```
 
 Example usage: 
 
@@ -812,7 +809,7 @@ Example usage:
 my_scorer = ... # construct a scorer
 prediction, prediction_call = my_op.call(input_data)
 result, score_call = prediction.apply_scorer(my_scorer)
-``` 
+```
 
 ---
 
@@ -889,7 +886,7 @@ Set the display name for the call.
 ```python
 result, call = my_function.call("World")
 call.set_display_name("My Custom Display Name")
-``` 
+```
 
 ---
 

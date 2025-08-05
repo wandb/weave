@@ -67,14 +67,14 @@ Logical AND. All conditions must evaluate to true.
 
 
 **Example:**
- ```
-     {
-         "$and": [
-             {"$eq": [{"$getField": "op_name"}, {"$literal": "predict"}]},
-             {"$gt": [{"$getField": "summary.usage.tokens"}, {"$literal": 1000}]}
-         ]
-     }
-    ``` 
+```
+{
+    "$and": [
+        {"$eq": [{"$getField": "op_name"}, {"$literal": "predict"}]},
+        {"$gt": [{"$getField": "summary.usage.tokens"}, {"$literal": 1000}]}
+    ]
+}
+```
 
 
 **Pydantic Fields:**
@@ -93,15 +93,15 @@ Not part of MongoDB. Weave-specific addition.
 
 
 **Example:**
- ```
-     {
-         "$contains": {
-             "input": {"$getField": "display_name"},
-             "substr": {"$literal": "llm"},
-             "case_insensitive": true
-         }
-     }
-    ``` 
+```
+{
+    "$contains": {
+        "input": {"$getField": "display_name"},
+        "substr": {"$literal": "llm"},
+        "case_insensitive": true
+    }
+}
+```
 
 
 **Pydantic Fields:**
@@ -137,14 +137,14 @@ Convert the input value to a specific type (e.g., `int`, `bool`, `string`).
 
 
 **Example:**
- ```
-     {
-         "$convert": {
-             "input": {"$getField": "inputs.value"},
-             "to": "int"
-         }
-     }
-    ``` 
+```
+{
+    "$convert": {
+        "input": {"$getField": "inputs.value"},
+        "to": "int"
+    }
+}
+```
 
 
 **Pydantic Fields:**
@@ -178,11 +178,11 @@ Equality check between two operands.
 
 
 **Example:**
- ```
-     {
-         "$eq": [{"$getField": "op_name"}, {"$literal": "predict"}]
-     }
-    ``` 
+```
+{
+    "$eq": [{"$getField": "op_name"}, {"$literal": "predict"}]
+}
+```
 
 
 **Pydantic Fields:**
@@ -205,9 +205,9 @@ Only works on fields present in the `CallSchema`, including:
 
 
 **Example:**
- ```
-     {"$getField": "op_name"}
-    ``` 
+```
+{"$getField": "op_name"}
+```
 
 
 **Pydantic Fields:**
@@ -224,11 +224,11 @@ Greater than comparison.
 
 
 **Example:**
- ```
-     {
-         "$gt": [{"$getField": "summary.usage.tokens"}, {"$literal": 100}]
-     }
-    ``` 
+```
+{
+    "$gt": [{"$getField": "summary.usage.tokens"}, {"$literal": 100}]
+}
+```
 
 
 **Pydantic Fields:**
@@ -245,11 +245,11 @@ Greater than or equal comparison.
 
 
 **Example:**
- ```
-     {
-         "$gte": [{"$getField": "summary.usage.tokens"}, {"$literal": 100}]
-     }
-    ``` 
+```
+{
+    "$gte": [{"$getField": "summary.usage.tokens"}, {"$literal": 100}]
+}
+```
 
 
 **Pydantic Fields:**
@@ -268,14 +268,14 @@ Returns true if the left operand is in the list provided as the second operand.
 
 
 **Example:**
- ```
-     {
-         "$in": [
-             {"$getField": "op_name"},
-             [{"$literal": "predict"}, {"$literal": "generate"}]
-         ]
-     }
-    ``` 
+```
+{
+    "$in": [
+        {"$getField": "op_name"},
+        [{"$literal": "predict"}, {"$literal": "generate"}]
+    ]
+}
+```
 
 
 **Pydantic Fields:**
@@ -294,9 +294,9 @@ This can be any standard JSON-serializable value.
 
 
 **Example:**
- ```
-     {"$literal": "predict"}
-    ``` 
+```
+{"$literal": "predict"}
+```
 
 
 **Pydantic Fields:**
@@ -313,13 +313,13 @@ Logical NOT. Inverts the condition.
 
 
 **Example:**
- ```
-     {
-         "$not": [
-             {"$eq": [{"$getField": "op_name"}, {"$literal": "debug"}]}
-         ]
-     }
-    ``` 
+```
+{
+    "$not": [
+        {"$eq": [{"$getField": "op_name"}, {"$literal": "debug"}]}
+    ]
+}
+```
 
 
 **Pydantic Fields:**
@@ -336,14 +336,14 @@ Logical OR. At least one condition must be true.
 
 
 **Example:**
- ```
-     {
-         "$or": [
-             {"$eq": [{"$getField": "op_name"}, {"$literal": "a"}]},
-             {"$eq": [{"$getField": "op_name"}, {"$literal": "b"}]}
-         ]
-     }
-    ``` 
+```
+{
+    "$or": [
+        {"$eq": [{"$getField": "op_name"}, {"$literal": "a"}]},
+        {"$eq": [{"$getField": "op_name"}, {"$literal": "b"}]}
+    ]
+}
+```
 
 
 **Pydantic Fields:**

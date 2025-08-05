@@ -42,7 +42,7 @@ with concurrent.futures.ThreadPoolExecutor() as executor:
          return contexts.pop().run(fn, *args)
 
      executor.map(_wrapped_fn, vals)
-``` 
+```
 
 <a href="https://github.com/wandb/weave/blob/master/weave/trace/util.py#L63"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
@@ -113,7 +113,7 @@ def run_with_context(func, *args, **kwargs):
 
 thread = threading.Thread(target=run_with_context(your_func, *args, **kwargs))
 thread.start()
-``` 
+```
 
 <a href="https://github.com/wandb/weave/blob/master/weave/trace/util.py#L124"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
