@@ -388,7 +388,10 @@ export const SchemaMappingStep: React.FC<SchemaMappingStepProps> = ({
                       value={
                         currentMapping
                           ? {
-                              label: currentMapping.sourceField,
+                              label:
+                                sourceSchema.find(
+                                  f => f.name === currentMapping.sourceField
+                                )?.displayName || currentMapping.sourceField,
                               value: currentMapping.sourceField,
                             }
                           : null
@@ -396,7 +399,7 @@ export const SchemaMappingStep: React.FC<SchemaMappingStepProps> = ({
                       options={[
                         {label: '-- None --', value: ''},
                         ...sourceSchema.map(field => ({
-                          label: field.name,
+                          label: field.displayName || field.name,
                           value: field.name,
                         })),
                       ]}

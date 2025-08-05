@@ -45,6 +45,7 @@ export const FIELD_NAMES = {
   SERVER_VALUE: 'serverValue',
   SELF: 'self',
   MODEL: 'model',
+  OTEL_SPAN: 'otel_span',
 };
 
 // Weave metadata namespace
@@ -53,6 +54,7 @@ export const WEAVE_NAMESPACE = '___weave';
 export interface SchemaField {
   name: string;
   type: string;
+  displayName?: string;
 }
 
 export const inferType = (value: any): string => {
@@ -284,6 +286,19 @@ export const createSourceSchema = (calls: CallData[]): SchemaField[] => {
       }
     }
 
+    // Extract OTEL span field from attributes.otel_span
+    const attributes = call.val.attributes || {};
+    const otelSpan = attributes.otel_span;
+
+    if (otelSpan && typeof otelSpan === 'object') {
+      // Add a single field for the entire OTEL span object
+      allFields.push({
+        name: FIELD_NAMES.OTEL_SPAN,
+        type: 'object',
+        displayName: 'otel span',
+      });
+    }
+
     // Extract feedback fields (annotations, notes, reactions, and runnables) from summary.weave.feedback
     const summary = call.val.summary || {};
     const weave = summary.weave || {};
@@ -448,6 +463,12 @@ export const mapCallsToDatasetRows = (
       return `weave:///${obj.project_id}/call/${obj.digest}`;
     }
 
+    // Special handling for OTEL span field
+    if (path === FIELD_NAMES.OTEL_SPAN) {
+      const attributes = obj.attributes || {};
+      return unwrapRefValue(attributes.otel_span);
+    }
+
     // Special handling for feedback fields (annotations, notes, reactions, and runnables)
     if (isFeedbackField(path)) {
       const summary = obj.summary || {};
@@ -523,6 +544,7 @@ export const mapCallsToDatasetRows = (
       const inputs = call.val.inputs || {};
       const output = call.val.output;
       const summary = call.val.summary || {};
+      const attributes = call.val.attributes || {};
 
       let sourceValue: any;
       if (mapping.sourceField === FIELD_NAMES.OUTPUT) {
@@ -534,6 +556,7 @@ export const mapCallsToDatasetRows = (
             inputs,
             output,
             summary,
+            attributes,
             project_id: call.val.project_id,
             digest: call.digest,
           },
@@ -1029,6 +1052,11 @@ export const generateFieldPreviews = (
         const summary = call.val.summary || {};
         const weave = summary.weave || {};
         value = getFeedbackValue(weave.feedback, field.name);
+      }
+      // Special handling for OTEL span field
+      else if (field.name === FIELD_NAMES.OTEL_SPAN) {
+        const attributes = call.val.attributes || {};
+        value = unwrapRefValue(attributes.otel_span);
       } else {
         // General path resolution for any other fields
         const path = field.name.split('.');

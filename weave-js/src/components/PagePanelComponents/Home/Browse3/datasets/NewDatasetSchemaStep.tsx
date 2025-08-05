@@ -257,7 +257,8 @@ export const NewDatasetSchemaStep: React.FC<NewDatasetSchemaStepProps> = ({
                       whiteSpace: 'nowrap',
                       maxWidth: '100%',
                     }}>
-                    {config.sourceField}
+                    {sourceSchema.find(f => f.name === config.sourceField)
+                      ?.displayName || config.sourceField}
                   </Typography>
                 </DataPreviewTooltip>
               </Box>
