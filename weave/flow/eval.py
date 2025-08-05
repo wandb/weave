@@ -295,7 +295,7 @@ class Evaluation(Object):
             ValueError: If the evaluation has no ref (hasn't been saved/run yet).
 
         Examples:
-        
+
         ```python
         evaluation = Evaluation(dataset=examples, scorers=[scorer])
         await evaluation.evaluate(model)  # Run evaluation first
@@ -383,7 +383,7 @@ class Evaluation(Object):
         ```
 
         Expected output:
-        
+
         ```
         {
             "trace_123": {

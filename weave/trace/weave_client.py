@@ -848,7 +848,7 @@ class WeaveClient:
                 Empty list if no evaluations are found or if all conversions fail.
 
         Examples:
-        
+
         ```python
         client = weave.init("my-project")
         evaluations = client.get_evaluations()
