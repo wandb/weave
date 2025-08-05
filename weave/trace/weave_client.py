@@ -823,10 +823,11 @@ class WeaveClient:
             ValueError: If the URI is invalid or the object cannot be found.
 
         Examples:
-            >>> client = weave.init("my-project")
-            >>> evaluation = client.get_evaluation("weave:///entity/project/object/my-eval:v1")
-            >>> print(evaluation.name)
-            'my-eval'
+            ```python
+            client = weave.init("my-project")
+            evaluation = client.get_evaluation("weave:///entity/project/object/my-eval:v1")
+            print(evaluation.name)
+            ```
         """
         import weave
 
@@ -846,11 +847,13 @@ class WeaveClient:
                 Empty list if no evaluations are found or if all conversions fail.
 
         Examples:
-            >>> client = weave.init("my-project")
-            >>> evaluations = client.get_evaluations()
-            >>> print(f"Found {len(evaluations)} evaluations")
-            >>> for eval in evaluations:
-            ...     print(f"Evaluation: {eval.name}")
+            ```python
+            client = weave.init("my-project")
+            evaluations = client.get_evaluations()
+            print(f"Found {len(evaluations)} evaluations")
+            for eval in evaluations:
+                print(f"Evaluation: {eval.name}")
+            ```
         """
         eval_objs = self._objects(
             filter=ObjectVersionFilter(base_object_classes=["Evaluation"]),
