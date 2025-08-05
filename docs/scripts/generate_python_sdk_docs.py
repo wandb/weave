@@ -70,9 +70,6 @@ def fix_style(text):
     return text
 
 
-
-
-
 def sanitize_markdown(text):
     text = fix_factor(text)
     text = fix_imgs(text)
@@ -101,54 +98,55 @@ def remove_empty_overview_sections(overview):
     )
     return overview
 
+
 def fix_code_fence_indentation(doc_string):
     """
     Fix code fence indentation in markdown documentation.
-    
+
     The docgen produces code fences that are not indented correctly.
     This function fixes that by de-indenting code fences to match the
     indentation of the first line of the code block.
-    
+
     Args:
         doc_string (str): The markdown string containing code fences
-        
+
     Returns:
         str: The markdown string with corrected code fence indentation
     """
-    lines = doc_string.split('\n')
+    lines = doc_string.split("\n")
     result_lines = []
     i = 0
-    
+
     while i < len(lines):
         line = lines[i]
-        
+
         # Check if this line contains an opening code fence
-        fence_match = re.match(r'^(\s*)(```\w*)$', line)
+        fence_match = re.match(r"^(\s*)(```\w*)$", line)
         if fence_match:
             # Found opening code fence
             fence_indent = fence_match.group(1)
             fence_content = fence_match.group(2)
-            
+
             # Find the closing fence
             closing_fence_idx = None
             for j in range(i + 1, len(lines)):
-                if re.match(r'^\s*```\s*$', lines[j]):
+                if re.match(r"^\s*```\s*$", lines[j]):
                     closing_fence_idx = j
                     break
-            
+
             if closing_fence_idx is not None:
                 # Get the code block content
-                code_lines = lines[i + 1:closing_fence_idx]
-                
+                code_lines = lines[i + 1 : closing_fence_idx]
+
                 if code_lines:
                     # Find the minimum indentation of non-empty lines in the code block
-                    min_indent = float('inf')
+                    min_indent = float("inf")
                     for code_line in code_lines:
                         if code_line.strip():  # Non-empty line
                             indent = len(code_line) - len(code_line.lstrip())
                             min_indent = min(min_indent, indent)
-                    
-                    if min_indent != float('inf'):
+
+                    if min_indent != float("inf"):
                         # De-indent the code block to match the minimum indentation
                         deindented_code_lines = []
                         for code_line in code_lines:
@@ -158,20 +156,20 @@ def fix_code_fence_indentation(doc_string):
                             else:
                                 # Keep empty lines as-is
                                 deindented_code_lines.append(code_line)
-                        
+
                         # Add the opening fence (de-indented to match the first line)
                         result_lines.append(fence_content)
-                        
+
                         # Add the de-indented code lines
                         result_lines.extend(deindented_code_lines)
-                        
+
                         # Add the closing fence (de-indented to match)
-                        result_lines.append('```')
-                        
+                        result_lines.append("```")
+
                         # Skip to after the closing fence
                         i = closing_fence_idx + 1
                         continue
-                
+
                 # If we couldn't process the code block properly, keep original
                 result_lines.append(line)
             else:
@@ -180,10 +178,10 @@ def fix_code_fence_indentation(doc_string):
         else:
             # Not a code fence, keep the line as-is
             result_lines.append(line)
-        
+
         i += 1
-    
-    return '\n'.join(result_lines)
+
+    return "\n".join(result_lines)
 
 
 def make_links_relative(text):
@@ -324,7 +322,6 @@ def generate_module_doc_string(module, src_root_path):
         ]
     )
     final = fix_code_fence_indentation(final)
-
 
     return final
 
