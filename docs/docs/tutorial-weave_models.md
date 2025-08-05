@@ -3,7 +3,7 @@ import TabItem from '@theme/TabItem';
 
 # Tutorial: App versioning
 
-Tracking the [inputs, outputs, metadata](/quickstart) as well as [data flowing through your app](/tutorial-tracing_2) is critical to understanding the performance of your system. However **versioning your app over time** is also critical to understand how modifications to your code or application parameters change your outputs. Weave's `Model` class is how these changes can be tracked in Weave.
+Tracking the [inputs, outputs, metadata](/quickstart) as well as [data flowing through your app](/tutorial-tracing_2) is critical to understanding the performance of your system. However **versioning your app over time** is also critical to understand how modifications to your code or application parameters change your outputs. W&B Weave's `Model` class is how these changes can be tracked in Weave.
 
 In this tutorial you'll learn:
 

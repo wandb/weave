@@ -2,7 +2,7 @@
 
 _Evaluation-driven LLM application development_ helps you systematically improve LLM applications by systematically measuring their behavior using consistent, curated examples.
 
-In Weave, the core of the workflow is the _`Evaluation` object_, which defines:
+In W&B Weave, the core of the workflow is the _`Evaluation` object_, which defines:
 
 - A [`Dataset`](../core-types/datasets) or list of dictionaries for test examples.
 - One or more [scoring functions](../evaluation/scorers.md).

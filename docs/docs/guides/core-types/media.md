@@ -3,7 +3,7 @@ import TabItem from '@theme/TabItem';
 
 # Logging media
 
-Weave supports logging and displaying video, images, and audio.
+W&B Weave supports logging and displaying video, images, and audio.
 
 ## Video
 
