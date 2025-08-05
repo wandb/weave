@@ -60,6 +60,6 @@ def test_trace_call_query_filter_ancestor_ids(client):
                 filter=tsi.CallsFilter(ancestor_ids=ancestor_ids),
             )
         )
-        found_ids = set(call.id for call in inner_res.calls)
+        found_ids = {call.id for call in inner_res.calls}
 
         assert found_ids == exp_ids
