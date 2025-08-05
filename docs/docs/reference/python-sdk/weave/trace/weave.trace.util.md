@@ -25,7 +25,7 @@ sidebar_label: util
 ---
 
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/util.py#L40"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/util.py#L39"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `ContextAwareThreadPoolExecutor`
 A ThreadPoolExecutor that runs functions with the context of the caller. 
@@ -42,9 +42,9 @@ with concurrent.futures.ThreadPoolExecutor() as executor:
          return contexts.pop().run(fn, *args)
 
      executor.map(_wrapped_fn, vals)
-```
+``` 
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/util.py#L63"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/util.py#L62"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `__init__`
 
@@ -61,7 +61,7 @@ __init__(*args: 'Any', **kwargs: 'Any') → None
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/util.py#L72"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/util.py#L71"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `map`
 
@@ -80,7 +80,7 @@ map(
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/util.py#L68"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/util.py#L67"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `submit`
 
@@ -95,7 +95,7 @@ submit(fn: 'Callable', *args: 'Any', **kwargs: 'Any') → Any
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/util.py#L100"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/util.py#L99"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `ContextAwareThread`
 A Thread that runs functions with the context of the caller. 
@@ -113,9 +113,9 @@ def run_with_context(func, *args, **kwargs):
 
 thread = threading.Thread(target=run_with_context(your_func, *args, **kwargs))
 thread.start()
-```
+``` 
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/util.py#L124"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/util.py#L123"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `__init__`
 
@@ -166,7 +166,7 @@ This is a non-negative integer. See the get_native_id() function. This represent
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/util.py#L128"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/util.py#L127"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `run`
 
