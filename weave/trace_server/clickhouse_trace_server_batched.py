@@ -482,7 +482,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                             try:
                                 return other_future.result(timeout=30)
                             except Exception as e2:
-                                logger.error(
+                                logger.exception(
                                     f"Both descendant search approaches failed: {e}, {e2}"
                                 )
                                 raise
