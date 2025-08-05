@@ -2,6 +2,7 @@ import _ from 'lodash';
 
 import {OptionalTraceCallSchema} from '../../PlaygroundPage/types';
 import {ChatCompletion, ChatRequest, Choice, Message} from '../types';
+import {parseOtelADKRequest, parseOtelADKResponse} from './parsers/adk';
 
 // OTEL specific keys for finding prompts
 // Must be kept in sync with backend
@@ -107,13 +108,19 @@ export const normalizeOTELChatRequest = (
 ): ChatRequest => {
   // Find prompt value from any of the expected OTEL input keys
   const promptValue = findOTELValue(call.inputs, OTEL_INPUT_KEYS);
+  const defaultValue = {
+    model: 'unknown',
+    messages: [],
+  };
 
   if (!promptValue) {
-    // Fallback with an empty request if no prompt found
-    return {
-      model: 'unknown',
-      messages: [],
-    };
+    return defaultValue;
+  }
+  if (
+    typeof call.inputs === 'object' &&
+    'gcp.vertex.agent.llm_request' in call.inputs
+  ) {
+    return parseOtelADKRequest(promptValue) || defaultValue;
   }
 
   let modelName = call.attributes?.model || 'unknown';
@@ -179,18 +186,28 @@ export const normalizeOTELChatCompletion = (
   request: ChatRequest
 ): ChatCompletion => {
   // Find completion value from any of the expected OTEL output keys
+  const defaultResult = {
+    id: `${request.model}-${Date.now()}`,
+    choices: [],
+    created: Math.floor(Date.now() / 1000),
+    model: request.model,
+    system_fingerprint: '',
+    usage: {prompt_tokens: 0, completion_tokens: 0, total_tokens: 0},
+  };
+  const output = call.output;
+
+  if (!output || !_.isPlainObject(output)) {
+    return defaultResult;
+  }
+
   const completionValue = findOTELValue(call.output, OTEL_OUTPUT_KEYS);
 
   if (!completionValue) {
-    // Return empty completion if no output is found
-    return {
-      id: `${request.model}-${Date.now()}`,
-      choices: [],
-      created: Math.floor(Date.now() / 1000),
-      model: request.model,
-      system_fingerprint: '',
-      usage: {prompt_tokens: 0, completion_tokens: 0, total_tokens: 0},
-    };
+    return defaultResult;
+  }
+
+  if (typeof output === 'object' && 'gcp.vertex.agent.llm_response' in output) {
+    return parseOtelADKResponse(completionValue) || defaultResult;
   }
 
   // Try to extract token usage information
