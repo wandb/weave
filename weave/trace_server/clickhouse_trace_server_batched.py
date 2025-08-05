@@ -358,13 +358,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             )
 
         # Process ancestor_ids filter if present
-        descendants = self._process_ancestor_ids_filter(req.project_id, req.filter)
-        if descendants is not None:
-            if not descendants:
-                # No descendants found, return early
-                return tsi.CallsQueryStatsRes(count=0, total_storage_size_bytes=None)
-            req.filter.call_ids = list(descendants)
-            req.filter.ancestor_ids = None
+        if req.filter is not None:
+            composite_ids = self._determine_composite_call_id_mask(req.project_id, req.filter)
+            if composite_ids is not None:
+                if not composite_ids:
+                    # No descendants found, return early
+                    return tsi.CallsQueryStatsRes(count=0, total_storage_size_bytes=None)
+                req.filter.call_ids = list(composite_ids)
+                req.filter.ancestor_ids = None
 
         query, columns = build_calls_query_stats_query(req, pb)
 
@@ -379,8 +380,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             total_storage_size_bytes=res_dict.get("total_storage_size_bytes"),
         )
 
-    def _process_ancestor_ids_filter(
-        self, project_id: str, filter: Optional[tsi.CallsFilter]
+    def _determine_composite_call_id_mask(
+        self, project_id: str, filter:tsi.CallsFilter
     ) -> Optional[set[str]]:
         """Process ancestor_ids filter and return the final set of call IDs to filter by.
 
@@ -389,7 +390,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             - Empty set if no descendants should be returned (caller should return empty results)
             - Set of descendant IDs to filter by
         """
-        if filter is None or filter.ancestor_ids is None:
+        if filter.ancestor_ids is None:
             return None
 
         if len(filter.ancestor_ids) == 0:
@@ -569,13 +570,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         """Returns a stream of calls that match the given query."""
         # Process ancestor_ids filter if present
-        descendants = self._process_ancestor_ids_filter(req.project_id, req.filter)
-        if descendants is not None:
-            if not descendants:
-                # No descendants found, return early
-                return
-            req.filter.call_ids = list(descendants)
-            req.filter.ancestor_ids = None
+        if req.filter is not None:
+            composite_ids = self._determine_composite_call_id_mask(req.project_id, req.filter)
+            if composite_ids is not None:
+                if not composite_ids:
+                    # No descendants found, return early
+                    return
+                req.filter.call_ids = list(composite_ids)
+                req.filter.ancestor_ids = None
 
         cq = CallsQuery(
             project_id=req.project_id,
