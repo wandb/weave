@@ -7,14 +7,24 @@ logger = logging.getLogger(__name__)
 # Kafka Settings
 
 
-def wf_kafka_broker_host() -> str:
+def kafka_broker_host() -> str:
     """The host of the kafka broker."""
-    return os.environ.get("WF_KAFKA_BROKER_HOST", "localhost")
+    return os.environ.get("KAFKA_BROKER_HOST", "localhost")
 
 
-def wf_kafka_broker_port() -> int:
+def kafka_broker_port() -> int:
     """The port of the kafka broker."""
-    return int(os.environ.get("WF_KAFKA_BROKER_PORT", 9092))
+    return int(os.environ.get("KAFKA_BROKER_PORT", 9092))
+
+
+def kafka_client_user() -> Optional[str]:
+    """The username for the kafka client."""
+    return os.environ.get("KAFKA_CLIENT_USER")
+
+
+def kafka_client_password() -> Optional[str]:
+    """The password for the kafka client."""
+    return os.environ.get("KAFKA_CLIENT_PASSWORD")
 
 
 # Scoring worker settings
@@ -70,10 +80,8 @@ def wf_clickhouse_max_memory_usage() -> Optional[int]:
         return None
     try:
         return int(mem)
-    except ValueError as e:
-        logger.exception(
-            f"WF_CLICKHOUSE_MAX_MEMORY_USAGE value '{mem}' is not a valid. Error: {str(e)}"
-        )
+    except ValueError:
+        logger.exception(f"WF_CLICKHOUSE_MAX_MEMORY_USAGE value '{mem}' is not valid")
         return None
 
 
@@ -84,9 +92,9 @@ def wf_clickhouse_max_execution_time() -> Optional[int]:
         return None
     try:
         return int(time)
-    except ValueError as e:
+    except ValueError:
         logger.exception(
-            f"WF_CLICKHOUSE_MAX_EXECUTION_TIME value '{time}' is not a valid. Error: {str(e)}"
+            f"WF_CLICKHOUSE_MAX_EXECUTION_TIME value '{time}' is not valid"
         )
         return None
 
@@ -117,7 +125,7 @@ def wf_file_storage_project_allow_list() -> Optional[list[str]]:
         project_ids = [pid.strip() for pid in allow_list.split(",") if pid.strip()]
     except Exception as e:
         raise ValueError(
-            f"WF_FILE_STORAGE_PROJECT_ALLOW_LIST is not a valid comma-separated list: {allow_list}. Error: {str(e)}"
+            f"WF_FILE_STORAGE_PROJECT_ALLOW_LIST is not a valid comma-separated list: {allow_list}. Error: {e!s}"
         ) from e
 
     return project_ids
@@ -186,7 +194,7 @@ def wf_file_storage_project_ramp_pct() -> Optional[int]:
         pct = int(pct_str)
     except ValueError as e:
         raise ValueError(
-            f"WF_FILE_STORAGE_PROJECT_RAMP_PCT is not a valid integer: {pct_str}. Error: {str(e)}"
+            f"WF_FILE_STORAGE_PROJECT_RAMP_PCT is not a valid integer: {pct_str}. Error: {e!s}"
         ) from e
 
     if pct < 0 or pct > 100:

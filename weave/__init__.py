@@ -24,6 +24,7 @@ from weave.trace.util import ThreadPoolExecutor as ThreadPoolExecutor
 from weave.type_handlers.Audio.audio import Audio
 from weave.type_handlers.File.file import File
 from weave.type_handlers.Markdown.markdown import Markdown
+from weave.type_wrappers import Content
 
 # Alias for succinct code
 P = EasyPrompt
@@ -41,6 +42,7 @@ __docspec__ = [
     finish,
     op,
     attributes,
+    thread,
     # Re-exported from flow module
     Object,
     Dataset,
@@ -53,6 +55,7 @@ __docspec__ = [
     Scorer,
     AnnotationSpec,
     File,
+    Content,
     Markdown,
     Monitor,
     SavedView,
@@ -64,27 +67,29 @@ __all__ = [
     "AgentState",
     "AnnotationSpec",
     "Audio",
-    "attributes",
+    "Content",
     "Dataset",
     "EasyPrompt",
     "Evaluation",
     "EvaluationLogger",
     "File",
-    "finish",
-    "get",
-    "get_current_call",
-    "init",
     "Markdown",
     "MessagesPrompt",
     "Model",
     "Monitor",
     "Object",
-    "op",
     "Prompt",
-    "publish",
-    "ref",
-    "require_current_call",
     "SavedView",
     "Scorer",
     "StringPrompt",
+    "attributes",
+    "finish",
+    "get",
+    "get_current_call",
+    "init",
+    "op",
+    "publish",
+    "ref",
+    "require_current_call",
+    "thread",
 ]

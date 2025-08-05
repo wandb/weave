@@ -6,7 +6,7 @@ Optimizations should be conservative, not guaranteed to full filter down but sho
    be a superset of results.
 
 Key strategies:
-1. String optimization - Uses LIKE patterns for string fields
+1. Heavy field optimization - Uses LIKE patterns for values in JSON fields (strings, numbers)
 2. ID-based optimization - Uses sortable_datetime column for datetime filtering
 
 Optimization SQL is applied before GROUP BY, reducing memory usage and
@@ -24,6 +24,7 @@ from weave.trace_server.calls_query_builder.utils import (
     param_slot,
 )
 from weave.trace_server.interface import query as tsi_query
+from weave.trace_server.orm import clickhouse_cast
 
 if TYPE_CHECKING:
     from weave.trace_server.calls_query_builder.calls_query_builder import (
@@ -33,7 +34,7 @@ if TYPE_CHECKING:
 
 START_ONLY_CALL_FIELDS = {"started_at", "inputs_dump", "attributes_dump"}
 END_ONLY_CALL_FIELDS = {"ended_at", "output_dump", "summary_dump"}
-STRING_FIELDS_TO_OPTIMIZE = {"inputs_dump", "output_dump", "attributes_dump"}
+HEAVY_FIELDS_TO_OPTIMIZE = {"inputs_dump", "output_dump", "attributes_dump"}
 DATETIME_FIELDS_TO_OPTIMIZE = {"started_at"}
 
 DATETIME_BUFFER_TIME_SECONDS = 60 * 5  # 5 minutes
@@ -49,9 +50,9 @@ def _field_requires_null_check(field: str) -> bool:
     return field in START_ONLY_CALL_FIELDS | END_ONLY_CALL_FIELDS
 
 
-def _can_optimize_string_field(field: str) -> bool:
-    """Returns whether a field can be optimized for string search."""
-    return field in STRING_FIELDS_TO_OPTIMIZE
+def _can_optimize_heavy_field(field: str) -> bool:
+    """Returns whether a field can be optimized for heavy field search."""
+    return field in HEAVY_FIELDS_TO_OPTIMIZE
 
 
 def _can_optimize_datetime_field(field: str) -> bool:
@@ -80,7 +81,7 @@ class QueryOptimizationProcessor(ABC):
         """
         Process an operand and convert it to an optimized SQL condition if possible.
 
-        Ignores leaf operations like Literal, GetField, and Convert.
+        Ignores leaf operations like Literal and GetField.
 
         Args:
             operand: The operand to process
@@ -89,12 +90,27 @@ class QueryOptimizationProcessor(ABC):
             SQL condition string or None if optimization is not possible
         """
         if isinstance(operand, tsi_query.LiteralOperation):
-            return None
+            return self.process_literal(operand)
         elif isinstance(operand, tsi_query.GetFieldOperator):
-            return None
+            return self.process_get_field(operand)
         elif isinstance(operand, tsi_query.ConvertOperation):
-            return None
+            return self.process_convert(operand)
         return apply_processor(self, operand)
+
+    def process_literal(self, operand: tsi_query.LiteralOperation) -> Optional[str]:
+        """Process literal operand"""
+        return None
+
+    def process_get_field(self, operand: tsi_query.GetFieldOperator) -> Optional[str]:
+        """Process get field operand"""
+        return None
+
+    def process_convert(self, operand: tsi_query.ConvertOperation) -> Optional[str]:
+        """Process convert operand"""
+        field = self.process_operand(operand.convert_.input)
+        if field is None:
+            return None
+        return clickhouse_cast(field, operand.convert_.to)
 
     def process_and(self, operation: tsi_query.AndOperation) -> Optional[str]:
         """Process AND operations into optimized SQL."""
@@ -184,25 +200,26 @@ class QueryOptimizationProcessor(ABC):
         return None
 
 
-class StringOptimizationProcessor(QueryOptimizationProcessor):
+class HeavyFieldOptimizationProcessor(QueryOptimizationProcessor):
     """
-    Optimization processor for string operations.
+    Optimization processor for heavy field operations.
 
     This processor creates LIKE-based SQL conditions to optimize queries
-    on string fields before aggregation, reducing memory pressure.
+    on heavy fields (inputs, outputs, attributes) before aggregation, reducing memory pressure.
+    Handles both string and numeric values in JSON fields.
     """
 
     def process_eq(self, operation: tsi_query.EqOperation) -> Optional[str]:
         """
-        Process equality operation on string fields.
+        Process equality operation on heavy fields.
 
-        Creates SQL condition using LIKE patterns for strings in JSON fields.
+        Creates SQL condition using LIKE patterns for values in JSON fields.
         """
         return _create_like_optimized_eq_condition(operation, self.pb, self.table_alias)
 
     def process_contains(self, operation: tsi_query.ContainsOperation) -> Optional[str]:
         """
-        Process contains operation on string fields.
+        Process contains operation on heavy fields.
 
         Creates SQL condition using LIKE patterns for substrings in JSON fields.
         """
@@ -212,18 +229,18 @@ class StringOptimizationProcessor(QueryOptimizationProcessor):
 
     def process_in(self, operation: tsi_query.InOperation) -> Optional[str]:
         """
-        Process IN operation on string fields.
+        Process IN operation on heavy fields.
 
-        Creates SQL conditions using LIKE patterns for multiple string values.
+        Creates SQL conditions using LIKE patterns for multiple values.
         """
         return _create_like_optimized_in_condition(operation, self.pb, self.table_alias)
 
     def process_gt(self, operation: tsi_query.GtOperation) -> Optional[str]:
-        """Not implemented for string optimization."""
+        """Not implemented for heavy field optimization."""
         return None
 
     def process_gte(self, operation: tsi_query.GteOperation) -> Optional[str]:
-        """Not implemented for string optimization."""
+        """Not implemented for heavy field optimization."""
         return None
 
 
@@ -292,7 +309,7 @@ def apply_processor(
 
 
 class OptimizationConditions(BaseModel):
-    str_filter_opt_sql: Optional[str] = None
+    heavy_filter_opt_sql: Optional[str] = None
     sortable_datetime_filters_sql: Optional[str] = None
 
 
@@ -321,10 +338,10 @@ def process_query_to_optimization_sql(
     # Create a single AND operation from all conditions
     and_operation = tsi_query.AndOperation(**{"$and": [c.operand for c in conditions]})
 
-    # Apply string optimization
-    string_processor = StringOptimizationProcessor(param_builder, table_alias)
-    string_result = apply_processor(string_processor, and_operation)
-    string_result_sql = string_processor.finalize_sql(string_result)
+    # Apply heavy field optimization
+    heavy_field_processor = HeavyFieldOptimizationProcessor(param_builder, table_alias)
+    heavy_field_result = apply_processor(heavy_field_processor, and_operation)
+    heavy_field_result_sql = heavy_field_processor.finalize_sql(heavy_field_result)
 
     # Apply sortable_datetime optimization
     sortable_datetime_processor = SortableDatetimeOptimizationProcessor(
@@ -338,9 +355,33 @@ def process_query_to_optimization_sql(
     )
 
     return OptimizationConditions(
-        str_filter_opt_sql=string_result_sql,
+        heavy_filter_opt_sql=heavy_field_result_sql,
         sortable_datetime_filters_sql=sortable_datetime_result_sql,
     )
+
+
+def _create_like_pattern_for_value(value: Union[str, int, float, bool]) -> str:
+    """
+    Creates a LIKE pattern for a value based on its type in JSON format.
+
+    Args:
+        value: The value to create a pattern for
+
+    Returns:
+        LIKE pattern string appropriate for the value type in JSON
+    """
+    if isinstance(value, str):
+        # Boolean string literals are not wrapped in quotes in JSON payloads
+        if value in ("true", "false"):
+            return f"%{value}%"
+        else:
+            return f'%"{value}"%'
+    elif isinstance(value, bool):
+        # Boolean values are serialized as true/false without quotes in JSON
+        return f"%{str(value).lower()}%"
+    else:
+        # Numbers are not quoted in JSON
+        return f"%{value}%"
 
 
 def _create_like_condition(
@@ -405,8 +446,8 @@ def _create_like_optimized_eq_condition(
     if field_operand is None or literal_operand is None:
         return None
 
-    # Return if literal isn't a string
-    if not isinstance(literal_operand.literal_, str):
+    # Return if literal isn't a string, number, or boolean
+    if not isinstance(literal_operand.literal_, (str, int, float, bool)):
         return None
 
     from weave.trace_server.calls_query_builder.calls_query_builder import (
@@ -416,18 +457,14 @@ def _create_like_optimized_eq_condition(
     field = get_field_by_name(field_operand.get_field_).field
     literal_value = literal_operand.literal_
 
-    if not _can_optimize_string_field(field):
+    if not _can_optimize_heavy_field(field):
         return None
 
-    if not literal_value:
-        # Empty string is not a valid value for LIKE optimization
+    if literal_value is None or (isinstance(literal_value, str) and not literal_value):
+        # Empty/None values are not valid for LIKE optimization
         return None
 
-    # Boolean literals are not wrapped in quotes in JSON payloads
-    if literal_value in ("true", "false"):
-        like_pattern = f"%{literal_value}%"
-    else:
-        like_pattern = f'%"{literal_value}"%'
+    like_pattern = _create_like_pattern_for_value(literal_value)
 
     like_condition = _create_like_condition(field, like_pattern, pb, table_alias)
     if _field_requires_null_check(field):
@@ -460,7 +497,7 @@ def _create_like_optimized_contains_condition(
         # Empty string is not a valid value for LIKE optimization
         return None
 
-    if not _can_optimize_string_field(field):
+    if not _can_optimize_heavy_field(field):
         return None
 
     case_insensitive = operation.contains_.case_insensitive or False
@@ -496,21 +533,24 @@ def _create_like_optimized_in_condition(
     )
 
     field = get_field_by_name(operation.in_[0].get_field_).field
-    if not _can_optimize_string_field(field):
+    if not _can_optimize_heavy_field(field):
         return None
 
     # Create OR conditions for each value
     like_conditions: list[str] = []
 
     for value_operand in operation.in_[1]:
-        if (
-            not isinstance(value_operand, tsi_query.LiteralOperation)
-            or not isinstance(value_operand.literal_, str)
-            or not value_operand.literal_
+        if not isinstance(value_operand, tsi_query.LiteralOperation) or not isinstance(
+            value_operand.literal_, (str, int, float, bool)
         ):
             return None
 
-        like_pattern = f'%"{value_operand.literal_}"%'
+        # Skip empty strings
+        if isinstance(value_operand.literal_, str) and not value_operand.literal_:
+            return None
+
+        like_pattern = _create_like_pattern_for_value(value_operand.literal_)
+
         like_condition = _create_like_condition(field, like_pattern, pb, table_alias)
         like_conditions.append(like_condition)
 

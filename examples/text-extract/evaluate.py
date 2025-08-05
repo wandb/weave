@@ -13,7 +13,7 @@ class TextExtractModel(weave.Model):
     model_name: str
     prompt_template: str
 
-    @weave.op()
+    @weave.op
     async def predict(self, doc: str) -> Any:
         client = openai.AsyncClient()
 

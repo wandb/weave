@@ -1,5 +1,4 @@
 import io
-import json
 import logging
 from collections.abc import Iterator
 from typing import Any, Optional, Union, cast
@@ -11,7 +10,17 @@ from weave.trace.settings import max_calls_queue_size, should_enable_disk_fallba
 from weave.trace_server import requests
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
-from weave.utils.retry import _is_retryable_exception, with_retry
+from weave.trace_server_bindings.http_utils import (
+    handle_response_error,
+    log_dropped_call_batch,
+)
+from weave.trace_server_bindings.models import (
+    Batch,
+    EndBatchItem,
+    ServerInfoRes,
+    StartBatchItem,
+)
+from weave.utils.retry import _is_retryable_exception, get_current_retry_id, with_retry
 from weave.wandb_interface import project_creator
 
 logger = logging.getLogger(__name__)
@@ -22,50 +31,9 @@ logger = logging.getLogger(__name__)
 # DEFAULT_TIMEOUT = (DEFAULT_CONNECT_TIMEOUT, DEFAULT_READ_TIMEOUT)
 
 
-class StartBatchItem(BaseModel):
-    mode: str = "start"
-    req: tsi.CallStartReq
-
-
-class EndBatchItem(BaseModel):
-    mode: str = "end"
-    req: tsi.CallEndReq
-
-
-class Batch(BaseModel):
-    batch: list[Union[StartBatchItem, EndBatchItem]]
-
-
-class ServerInfoRes(BaseModel):
-    min_required_weave_python_version: str
-
-
 REMOTE_REQUEST_BYTES_LIMIT = (
     (32 - 1) * 1024 * 1024
 )  # 32 MiB (real limit) - 1 MiB (buffer)
-
-
-def _log_dropped_call_batch(
-    batch: list[Union[StartBatchItem, EndBatchItem]], e: Exception
-) -> None:
-    logger.error(f"Error sending batch of {len(batch)} call events to server")
-    dropped_start_ids = []
-    dropped_end_ids = []
-    for item in batch:
-        if isinstance(item, StartBatchItem):
-            dropped_start_ids.append(item.req.start.id)
-        elif isinstance(item, EndBatchItem):
-            dropped_end_ids.append(item.req.end.id)
-    if dropped_start_ids:
-        logger.error(f"dropped call start ids: {dropped_start_ids}")
-    if dropped_end_ids:
-        logger.error(f"dropped call end ids: {dropped_end_ids}")
-    if isinstance(e, requests.HTTPError) and e.response is not None:
-        logger.error(f"status code: {e.response.status_code}")
-        logger.error(f"reason: {e.response.reason}")
-        logger.error(f"text: {e.response.text}")
-    else:
-        logger.error(f"error: {e}")
 
 
 class RemoteHTTPTraceServer(tsi.TraceServerInterface):
@@ -78,6 +46,8 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         should_batch: bool = False,
         *,
         remote_request_bytes_limit: int = REMOTE_REQUEST_BYTES_LIMIT,
+        auth: Optional[tuple[str, str]] = None,
+        extra_headers: Optional[dict[str, str]] = None,
     ):
         super().__init__()
         self.trace_server_url = trace_server_url
@@ -89,7 +59,8 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
                 max_queue_size=max_calls_queue_size(),
                 enable_disk_fallback=should_enable_disk_fallback(),
             )
-        self._auth: Optional[tuple[str, str]] = None
+        self._auth: Optional[tuple[str, str]] = auth
+        self._extra_headers: Optional[dict[str, str]] = extra_headers
         self.remote_request_bytes_limit = remote_request_bytes_limit
 
     def ensure_project_exists(
@@ -110,23 +81,45 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     def set_auth(self, auth: tuple[str, str]) -> None:
         self._auth = auth
 
+    def _build_dynamic_request_headers(self) -> dict[str, str]:
+        """Build headers for HTTP requests, including extra headers and retry ID."""
+        headers = dict(self._extra_headers) if self._extra_headers else {}
+        if retry_id := get_current_retry_id():
+            headers["X-Weave-Retry-Id"] = retry_id
+        return headers
+
+    def get(self, url: str, *args: Any, **kwargs: Any) -> requests.Response:
+        headers = self._build_dynamic_request_headers()
+
+        return requests.get(
+            self.trace_server_url + url,
+            *args,
+            headers=headers,
+            **kwargs,
+        )
+
+    def post(self, url: str, *args: Any, **kwargs: Any) -> requests.Response:
+        headers = self._build_dynamic_request_headers()
+
+        return requests.post(
+            self.trace_server_url + url,
+            *args,
+            auth=self._auth,
+            headers=headers,
+            **kwargs,
+        )
+
     @with_retry
     def _send_batch_to_server(self, encoded_data: bytes) -> None:
         """Send a batch of data to the server with retry logic.
 
         This method is separated from _flush_calls to avoid recursive retries.
         """
-        r = requests.post(
-            self.trace_server_url + "/call/upsert_batch",
+        r = self.post(
+            "/call/upsert_batch",
             data=encoded_data,  # type: ignore
-            auth=self._auth,
-            # timeout=DEFAULT_TIMEOUT,
         )
-        if r.status_code == 413:
-            # handle 413 explicitly to provide actionable error message
-            reason = json.loads(r.text)["reason"]
-            raise requests.HTTPError(f"413 Client Error: {reason}", response=r)
-        r.raise_for_status()
+        handle_response_error(r, "/call/upsert_batch")
 
     def _flush_calls(
         self,
@@ -175,11 +168,11 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             self._send_batch_to_server(encoded_data)
         except Exception as e:
             if not _is_retryable_exception(e):
-                _log_dropped_call_batch(batch, e)
+                log_dropped_call_batch(batch, e)
             else:
                 # Add items back to the queue for later processing, but only if the processor is still accepting work
                 logger.warning(
-                    f"Batch failed after max retries, requeueing batch with {len(batch)=} for later processing",
+                    f"Batch failed after max retries, requeuing batch with {len(batch)=} for later processing",
                 )
 
                 # only if debug mode
@@ -190,7 +183,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
                             ids.append(f"{item.req.start.id}-start")
                         elif isinstance(item, EndBatchItem):
                             ids.append(f"{item.req.end.id}-end")
-                    logger.debug(f"Requeueing batch with {ids=}")
+                    logger.debug(f"Requeuing batch with {ids=}")
 
                 # Only requeue if the processor is still accepting work
                 if self.call_processor and self.call_processor.is_accepting_new_work():
@@ -214,28 +207,16 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         req: BaseModel,
         stream: bool = False,
     ) -> requests.Response:
-        r = requests.post(
-            self.trace_server_url + url,
+        r = self.post(
+            url,
             # `by_alias` is required since we have Mongo-style properties in the
             # query models that are aliased to conform to start with `$`. Without
             # this, the model_dump will use the internal property names which are
             # not valid for the `model_validate` step.
             data=req.model_dump_json(by_alias=True).encode("utf-8"),
-            auth=self._auth,
             stream=stream,
-            # timeout=DEFAULT_TIMEOUT,
         )
-        if r.status_code == 500:
-            reason_val = r.text
-            try:
-                reason_val = json.dumps(json.loads(reason_val), indent=2)
-            except json.JSONDecodeError:
-                reason_val = f"Reason: {reason_val}"
-            raise requests.HTTPError(
-                f"500 Server Error: Internal Server Error for url: {url}. {reason_val}",
-                response=r,
-            )
-        r.raise_for_status()
+        handle_response_error(r, url)
 
         return r
 
@@ -267,11 +248,10 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
     @with_retry
     def server_info(self) -> ServerInfoRes:
-        r = requests.get(
-            self.trace_server_url + "/server_info",
-            # timeout=DEFAULT_TIMEOUT,
+        r = self.get(
+            "/server_info",
         )
-        r.raise_for_status()
+        handle_response_error(r, "/server_info")
         return ServerInfoRes.model_validate(r.json())
 
     def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
@@ -290,7 +270,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
                 req_as_obj = tsi.CallStartReq.model_validate(req)
             else:
                 req_as_obj = req
-            if req_as_obj.start.id == None or req_as_obj.start.trace_id == None:
+            if req_as_obj.start.id is None or req_as_obj.start.trace_id is None:
                 raise ValueError(
                     "CallStartReq must have id and trace_id when batching."
                 )
@@ -482,7 +462,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     def table_query_stream(
         self, req: tsi.TableQueryReq
     ) -> Iterator[tsi.TableRowSchema]:
-        # Need to manually iterate over this until the stram endpoint is built and shipped.
+        # Need to manually iterate over this until the stream endpoint is built and shipped.
         res = self.table_query(req)
         yield from res.rows
 
@@ -512,25 +492,21 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
     @with_retry
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
-        r = requests.post(
-            self.trace_server_url + "/files/create",
-            auth=self._auth,
+        r = self.post(
+            "/files/create",
             data={"project_id": req.project_id},
             files={"file": (req.name, req.content)},
-            # timeout=DEFAULT_TIMEOUT,
         )
-        r.raise_for_status()
+        handle_response_error(r, "/files/create")
         return tsi.FileCreateRes.model_validate(r.json())
 
     @with_retry
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
-        r = requests.post(
-            self.trace_server_url + "/files/content",
+        r = self.post(
+            "/files/content",
             json={"project_id": req.project_id, "digest": req.digest},
-            auth=self._auth,
-            # timeout=DEFAULT_TIMEOUT,
         )
-        r.raise_for_status()
+        handle_response_error(r, "/files/content")
         # TODO: Should stream to disk rather than to memory
         bytes = io.BytesIO()
         bytes.writelines(r.iter_content())
@@ -625,11 +601,22 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             "/project/stats", req, tsi.ProjectStatsReq, tsi.ProjectStatsRes
         )
 
+    def threads_query_stream(
+        self, req: tsi.ThreadsQueryReq
+    ) -> Iterator[tsi.ThreadSchema]:
+        return self._generic_stream_request(
+            "/threads/stream_query", req, tsi.ThreadsQueryReq, tsi.ThreadSchema
+        )
+
+    def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
+        raise NotImplementedError("evaluate_model is not implemented")
+
+    def evaluation_status(
+        self, req: tsi.EvaluationStatusReq
+    ) -> tsi.EvaluationStatusRes:
+        raise NotImplementedError("evaluation_status is not implemented")
+
 
 __docspec__ = [
     RemoteHTTPTraceServer,
-    ServerInfoRes,
-    StartBatchItem,
-    EndBatchItem,
-    Batch,
 ]

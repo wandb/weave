@@ -499,36 +499,41 @@ export function wrapOpenAI<T extends OpenAIAPI>(openai: T): T {
     },
   });
 
-  const betaChatCompletionsProxy = new Proxy(openai.beta.chat.completions, {
-    get(target, p, receiver) {
-      const targetVal = Reflect.get(target, p, receiver);
-      if (p === 'parse') {
-        return makeOpenAIChatCompletionsOp(
-          targetVal.bind(target),
-          'openai.beta.chat.completions.parse'
-        );
-      }
-      return targetVal;
-    },
-  });
-  const betaChatProxy = new Proxy(openai.beta.chat, {
-    get(target, p, receiver) {
-      const targetVal = Reflect.get(target, p, receiver);
-      if (p === 'completions') {
-        return betaChatCompletionsProxy;
-      }
-      return targetVal;
-    },
-  });
-  const betaProxy = new Proxy(openai.beta, {
-    get(target, p, receiver) {
-      const targetVal = Reflect.get(target, p, receiver);
-      if (p === 'chat') {
-        return betaChatProxy;
-      }
-      return targetVal;
-    },
-  });
+  const hasBetaChatApis = openai.beta.chat != null;
+  let betaProxy: any = null;
+
+  if (hasBetaChatApis) {
+    const betaChatCompletionsProxy = new Proxy(openai.beta.chat.completions, {
+      get(target, p, receiver) {
+        const targetVal = Reflect.get(target, p, receiver);
+        if (p === 'parse') {
+          return makeOpenAIChatCompletionsOp(
+            targetVal.bind(target),
+            'openai.beta.chat.completions.parse'
+          );
+        }
+        return targetVal;
+      },
+    });
+    const betaChatProxy = new Proxy(openai.beta.chat, {
+      get(target, p, receiver) {
+        const targetVal = Reflect.get(target, p, receiver);
+        if (p === 'completions') {
+          return betaChatCompletionsProxy;
+        }
+        return targetVal;
+      },
+    });
+    betaProxy = new Proxy(openai.beta, {
+      get(target, p, receiver) {
+        const targetVal = Reflect.get(target, p, receiver);
+        if (p === 'chat') {
+          return betaChatProxy;
+        }
+        return targetVal;
+      },
+    });
+  }
 
   // Only create responses proxy if responses property exists
   const responsesProxy = openai.responses
@@ -553,7 +558,7 @@ export function wrapOpenAI<T extends OpenAIAPI>(openai: T): T {
       if (p === 'images') {
         return imagesProxy;
       }
-      if (p === 'beta') {
+      if (hasBetaChatApis && p === 'beta') {
         return betaProxy;
       }
       if (p === 'responses' && responsesProxy) {
@@ -563,18 +568,34 @@ export function wrapOpenAI<T extends OpenAIAPI>(openai: T): T {
     },
   });
 }
-function commonPatchOpenAI(exports: any) {
+
+function commonProxy(exports: any) {
   const OriginalOpenAIClass = exports.OpenAI;
-  exports.OpenAI = new Proxy(OriginalOpenAIClass, {
+
+  return new Proxy(OriginalOpenAIClass, {
     construct(target, args, newTarget) {
       const instance = new target(...args);
       return wrapOpenAI(instance);
     },
   });
+}
+function cjsPatchOpenAI(exports: any) {
+  const OpenAIProxy = commonProxy(exports);
+
+  Object.defineProperty(exports, 'OpenAI', OpenAIProxy);
 
   if (exports.default) {
-    exports.default.OpenAI = exports.OpenAI;
+    Object.defineProperty(exports.default, 'OpenAI', OpenAIProxy);
   }
+
+  return exports;
+}
+
+function esmPatchOpenAI(exports: any) {
+  const OpenAIProxy = commonProxy(exports);
+
+  exports.OpenAI = OpenAIProxy;
+  exports.default.OpenAI = OpenAIProxy;
 
   return exports;
 }
@@ -587,11 +608,11 @@ export function instrumentOpenAI() {
     // if we want to support other versions with different implementations,
     // we can add a call of `addInstrumentation()` for each version.
     version: '>= 4.0.0',
-    hook: commonPatchOpenAI,
+    hook: cjsPatchOpenAI,
   });
   addESMInstrumentation({
     moduleName: 'openai',
     version: '>= 4.0.0',
-    hook: commonPatchOpenAI,
+    hook: esmPatchOpenAI,
   });
 }

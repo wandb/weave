@@ -1,11 +1,11 @@
 import inspect
+import math
 import textwrap
 from collections.abc import Sequence
 from dataclasses import dataclass
 from numbers import Number
 from typing import Any, Callable, Optional, Union, cast
 
-import numpy as np
 from pydantic import BaseModel, Field
 from typing_extensions import Self
 
@@ -16,6 +16,13 @@ from weave.trace.op import Op, OpCallError, as_op, is_op
 from weave.trace.op_caller import async_call_op
 from weave.trace.vals import WeaveObject
 from weave.trace.weave_client import Call, sanitize_object_name
+
+try:
+    import numpy as np
+except ImportError:
+    _NUMPY_AVAILABLE = False
+else:
+    _NUMPY_AVAILABLE = True
 
 
 class Scorer(Object):
@@ -32,7 +39,7 @@ class Scorer(Object):
     def score(self, *, output: Any, **kwargs: Any) -> Any:
         raise NotImplementedError
 
-    @weave.op()
+    @weave.op
     def summarize(self, score_rows: list) -> Optional[dict]:
         return auto_summarize(score_rows)
 
@@ -50,7 +57,7 @@ def _validate_scorer_signature(scorer: Union[Callable, Op, Scorer]) -> bool:
     """Validate that the scorer signature does not have both `output` and `model_output`.
 
     Having both `output` and `model_output` in the scorer signature causes
-    issues with scoring because it's ambigious as to which one is the
+    issues with scoring because it's ambiguous as to which one is the
     canonical "output", and which is just a regular kwarg.
     """
     if isinstance(scorer, Scorer):
@@ -70,12 +77,58 @@ def _validate_scorer_signature(scorer: Union[Callable, Op, Scorer]) -> bool:
     return True
 
 
+def variance(data: Sequence[Union[int, float]]) -> float:
+    """
+    Calculate the variance of a sequence of numeric values.
+
+    Args:
+        data (Sequence[Union[int, float]]): A sequence of numeric values.
+
+    Returns:
+        float: The variance of the data. Returns 0 if data has length <= 1.
+
+    Examples:
+        >>> variance([1, 2, 3, 4, 5])
+        2.0
+        >>> variance([1])
+        0
+        >>> variance([])
+        0
+    """
+    if len(data) <= 1:
+        return 0
+
+    mean = sum(data) / len(data)
+    return sum((x - mean) ** 2 for x in data) / len(data)
+
+
 def stderr(data: Sequence[Union[int, float]]) -> float:
-    if len(data) > 1:
-        sample_variance = np.var(data, ddof=1)
+    """
+    Calculate the standard error of the mean for a sequence of numeric values.
+
+    Args:
+        data (Sequence[Union[int, float]]): A sequence of numeric values.
+
+    Returns:
+        float: The standard error of the mean. Returns 0 if data has length <= 1.
+
+    Examples:
+        >>> stderr([1, 2, 3, 4, 5])
+        0.7071067811865476
+        >>> stderr([1])
+        0
+        >>> stderr([])
+        0
+    """
+    if len(data) <= 1:
+        return 0
+
+    if _NUMPY_AVAILABLE:
+        sample_variance = float(np.var(data, ddof=1))
         return float(np.sqrt(sample_variance / len(data)))
     else:
-        return 0
+        sample_variance = variance(data)
+        return float(math.sqrt(sample_variance / len(data)))  # type: ignore
 
 
 def auto_summarize(data: list) -> Optional[dict[str, Any]]:
@@ -106,7 +159,10 @@ def auto_summarize(data: list) -> Optional[dict[str, Any]]:
             "true_fraction": true_count / len(data),
         }
     elif isinstance(val, Number):
-        return {"mean": np.mean(data).item()}
+        if _NUMPY_AVAILABLE:
+            return {"mean": np.mean(data).item()}
+        else:
+            return {"mean": sum(data) / len(data)}
     elif isinstance(val, dict):
         result = {}
         all_keys = list(
@@ -197,7 +253,7 @@ ApplyScorerResult = ApplyScorerSuccess
 
 
 def preparer_scorer_op_args(
-    scorer: Union[Op, Scorer], example: dict, model_output: Any
+    scorer: Union[Op, Scorer], example: dict[str, Any], model_output: Any
 ) -> tuple[Op, dict[str, Any]]:
     # Extract the core components of the scorer
     scorer_attributes = get_scorer_attributes(scorer)
@@ -249,7 +305,7 @@ def preparer_scorer_op_args(
 
         # Build arguments dictionary using column mapping
         for arg in score_arg_names:
-            if arg == "output" or arg == "model_output":
+            if arg in ("output", "model_output", "kwargs"):
                 continue
             if arg in example:
                 score_args[arg] = example[arg]
@@ -320,7 +376,7 @@ def preparer_scorer_op_args(
 
 
 async def apply_scorer_async(
-    scorer: Union[Op, Scorer], example: dict, model_output: Any
+    scorer: Union[Op, Scorer], example: dict[str, Any], model_output: Any
 ) -> ApplyScorerResult:
     """Apply a scoring function to model output and example data asynchronously.
 

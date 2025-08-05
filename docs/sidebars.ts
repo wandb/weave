@@ -44,6 +44,7 @@ const sidebars: SidebarsConfig = {
               id: "guides/tracking/tracing",
             },
             "guides/tracking/costs",
+            "guides/tracking/threads",
             {
               type: "doc",
               label: "Logging Media",
@@ -59,7 +60,8 @@ const sidebars: SidebarsConfig = {
             },
             "guides/tracking/trace-tree",
             "guides/tracking/otel",
-            "guides/tracking/video"
+            "guides/tracking/video",
+            "guides/tracking/trace-plots"
           ]
         },
         {
@@ -201,6 +203,9 @@ const sidebars: SidebarsConfig = {
             "guides/integrations/smolagents",
             "guides/integrations/pydantic_ai",
             "guides/integrations/google_adk",
+            "guides/integrations/agno",
+            "guides/integrations/autogen",
+            "guides/integrations/verdict",
             "guides/integrations/js"
           ],
         },
