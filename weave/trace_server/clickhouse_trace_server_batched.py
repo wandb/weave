@@ -383,7 +383,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self, project_id: str, filter: Optional[tsi.CallsFilter]
     ) -> Optional[set[str]]:
         """Process ancestor_ids filter and return the final set of call IDs to filter by.
-        
+
         Returns:
             - None if no ancestor_ids filter is present (continue normal processing)
             - Empty set if no descendants should be returned (caller should return empty results)
@@ -391,17 +391,17 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         """
         if filter is None or filter.ancestor_ids is None:
             return None
-            
+
         if len(filter.ancestor_ids) == 0:
             # Empty ancestor_ids means no results should be returned
             return set()
-        
+
         descendants = self._find_descendants(project_id, filter.ancestor_ids)
-        
+
         if filter.call_ids is not None:
             current_call_ids = set(filter.call_ids)
             descendants = current_call_ids.union(descendants)
-        
+
         return descendants
 
     def _find_descendants(self, project_id: str, ancestor_ids: list[str]) -> set[str]:
