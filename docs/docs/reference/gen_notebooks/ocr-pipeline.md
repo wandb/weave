@@ -188,9 +188,9 @@ def named_entity_recognation(image_base64, id):
         # 2) parse JSON exactly once
         result = json.loads(output_text)
 
-        print(f"Processed: {str(id)}")
+        print(f"Processed: {id!s}")
     except Exception as e:
-        print(f"Failed to process {str(id)}: {e}")
+        print(f"Failed to process {id!s}: {e}")
     return result
 ```
 
