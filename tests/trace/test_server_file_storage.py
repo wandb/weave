@@ -17,7 +17,7 @@ from moto import mock_aws
 
 from tests.trace.util import client_is_sqlite
 from weave.trace.weave_client import WeaveClient
-from weave.trace_server import clickhouse_trace_server_batched
+from weave.trace_server import clickhouse_trace_server_settings
 from weave.trace_server.trace_server_interface import FileContentReadReq, FileCreateReq
 
 # Test Data Constants
@@ -333,7 +333,7 @@ def test_support_for_variable_length_chunks(client: WeaveClient):
         base_chunk_size // 2,
     ]:
         with mock.patch.object(
-            clickhouse_trace_server_batched, "FILE_CHUNK_SIZE", size
+            clickhouse_trace_server_settings, "FILE_CHUNK_SIZE", size
         ):
             digest = create_and_read_file(large_file)
             assert digest == large_digest
