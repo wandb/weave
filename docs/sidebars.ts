@@ -170,7 +170,6 @@ const sidebars: SidebarsConfig = {
           collapsed: true,
           label: "LLM Providers",
           items: [
-            "guides/integrations/inference",
             "guides/integrations/bedrock",
             "guides/integrations/anthropic",
             "guides/integrations/cerebras",
