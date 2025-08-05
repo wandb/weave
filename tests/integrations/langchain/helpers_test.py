@@ -5,14 +5,14 @@ Tests the usage metadata extraction and processing functions that handle
 different provider formats (OpenAI, Google GenAI, Google Vertex AI, Anthropic).
 """
 
-import pytest
 from unittest.mock import Mock
+
 from weave.integrations.langchain.helpers import (
+    _extract_model_from_flattened_path,
     _extract_usage_data,
+    _normalize_token_counts,
     _reconstruct_usage_data_from_flattened,
     _validate_usage_shape,
-    _normalize_token_counts,
-    _extract_model_from_flattened_path,
 )
 from weave.trace.weave_client import Call
 
