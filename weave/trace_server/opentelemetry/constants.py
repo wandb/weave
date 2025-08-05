@@ -132,7 +132,10 @@ WB_KEYS = {
     # Custom display name for the call in the UI
     "display_name": ["wandb.display_name"],
     "thread_id": ["gcp.vertex.agent.session_id", "wandb.thread_id"],
-    "is_turn": ["gcp.vertex.agent.session_id", "wandb.is_turn"], # We just check if this is truthy so we can reuse session_id
+    "is_turn": [
+        "gcp.vertex.agent.session_id",
+        "wandb.is_turn",
+    ],  # We just check if this is truthy so we can reuse session_id
 }
 
 # These represent fields that are set by a provider which override top level span information
