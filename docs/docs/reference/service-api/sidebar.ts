@@ -25,6 +25,12 @@ const sidebar: SidebarsConfig = {
         },
         {
           type: "doc",
+          id: "reference/service-api/get-caller-location-geolocate-get",
+          label: "Get Caller Location",
+          className: "api-method get",
+        },
+        {
+          type: "doc",
           id: "reference/service-api/server-info-server-info-get",
           label: "Server Info",
           className: "api-method get",
@@ -95,6 +101,25 @@ const sidebar: SidebarsConfig = {
           type: "doc",
           id: "reference/service-api/calls-query-stream-calls-stream-query-post",
           label: "Calls Query Stream",
+          className: "api-method post",
+        },
+      ],
+    },
+    {
+      type: "category",
+      label: "Inference",
+      collapsed: false,
+      items: [
+        {
+          type: "doc",
+          id: "reference/service-api/inference-get-inference-v-1-path-get",
+          label: "Inference Get",
+          className: "api-method get",
+        },
+        {
+          type: "doc",
+          id: "reference/service-api/inference-post-inference-v-1-path-post",
+          label: "Inference Post",
           className: "api-method post",
         },
       ],
@@ -257,6 +282,19 @@ const sidebar: SidebarsConfig = {
           type: "doc",
           id: "reference/service-api/feedback-replace-feedback-replace-post",
           label: "Feedback Replace",
+          className: "api-method post",
+        },
+      ],
+    },
+    {
+      type: "category",
+      label: "Threads",
+      collapsed: false,
+      items: [
+        {
+          type: "doc",
+          id: "reference/service-api/threads-query-stream-threads-stream-query-post",
+          label: "Threads Query Stream",
           className: "api-method post",
         },
       ],
