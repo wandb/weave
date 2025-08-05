@@ -386,7 +386,7 @@ class OrderField(BaseModel):
         field_path = self.field.field
         if field_path.endswith("_dump"):
             field_path = field_path[:-5]
-        if hasattr(self.field, "extra_path"):
+        if hasattr(self.field, "extra_path") and self.field.extra_path:
             field_path += "." + ".".join(self.field.extra_path)
         return field_path
 
