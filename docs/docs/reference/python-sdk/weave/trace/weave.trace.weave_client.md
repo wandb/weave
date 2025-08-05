@@ -70,7 +70,7 @@ This property can be used to check the progress of background tasks without bloc
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/weave_client.py#L1496"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/weave_client.py#L1498"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `add_cost`
 
@@ -90,16 +90,6 @@ Add a cost to the current project.
 
 
 
-**Examples:**
- 
-
-```python
-     client.add_cost(llm_id="my_expensive_custom_model", prompt_token_cost=1, completion_token_cost=2)
-     client.add_cost(llm_id="my_expensive_custom_model", prompt_token_cost=500, completion_token_cost=1000, effective_date=datetime(1998, 10, 3))
-    ``` 
-
-
-
 **Args:**
  
  - <b>`llm_id`</b>:  The ID of the LLM. eg "gpt-4o-mini-2024-07-18" 
@@ -115,9 +105,19 @@ Add a cost to the current project.
 **Returns:**
  A CostCreateRes object. Which has one field called a list of tuples called ids. Each tuple contains the llm_id and the id of the created cost object. 
 
+
+
+**Examples:**
+ 
+
+```python
+client.add_cost(llm_id="my_expensive_custom_model", prompt_token_cost=1, completion_token_cost=2)
+client.add_cost(llm_id="my_expensive_custom_model", prompt_token_cost=500, completion_token_cost=1000, effective_date=datetime(1998, 10, 3))
+``` 
+
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/util.py#L1004"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/util.py#L1005"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `call`
 
@@ -131,7 +131,7 @@ call(call_id: 'str', include_costs: 'bool' = False) → WeaveObject
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/util.py#L958"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/util.py#L959"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `calls`
 
@@ -148,7 +148,7 @@ calls(
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/trace_sentry.py#L1012"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/trace_sentry.py#L1013"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `create_call`
 
@@ -184,7 +184,7 @@ Create, log, and push a call onto the runtime stack.
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/trace_sentry.py#L1347"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/trace_sentry.py#L1348"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `delete_call`
 
@@ -198,7 +198,7 @@ delete_call(call: 'Call') → None
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/trace_sentry.py#L1356"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/trace_sentry.py#L1357"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `delete_calls`
 
@@ -218,7 +218,7 @@ Deleting a call will also delete all of its children.
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/trace_sentry.py#L1372"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/trace_sentry.py#L1373"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `delete_object_version`
 
@@ -232,7 +232,7 @@ delete_object_version(object: 'ObjectRef') → None
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/trace_sentry.py#L1382"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/trace_sentry.py#L1383"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `delete_op_version`
 
@@ -246,7 +246,7 @@ delete_op_version(op: 'OpRef') → None
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/trace_sentry.py#L1342"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/trace_sentry.py#L1343"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `fail_call`
 
@@ -258,7 +258,7 @@ Fail a call with an exception. This is a convenience method for finish_call.
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/util.py#L1483"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/util.py#L1485"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `feedback`
 
@@ -277,7 +277,7 @@ feedback(
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/weave_client.py#L2096"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/weave_client.py#L2099"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `finish`
 
@@ -301,7 +301,7 @@ This method blocks until all currently enqueued jobs are processed, displaying a
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/trace_sentry.py#L1198"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/trace_sentry.py#L1199"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `finish_call`
 
@@ -320,7 +320,7 @@ Any values present in ``call.summary`` are deep-merged with computed summary sta
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/weave_client.py#L2127"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/weave_client.py#L2130"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `flush`
 
@@ -346,7 +346,7 @@ get(ref: 'ObjectRef', objectify: 'bool' = True) → Any
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/trace_sentry.py#L966"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/trace_sentry.py#L967"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `get_call`
 
@@ -428,16 +428,18 @@ Performance Tip: Specify `columns` and use `filter` or `query` to reduce result 
 
 
 
-**Example:**
- ```python
-    calls = client.get_calls(
-         filter=CallsFilter(op_names=["my_op"]),
-         columns=["inputs", "output", "summary"],
-         limit=100,
-    )
-    for call in calls:
-         print(call.inputs, call.output)
-    ``` 
+**Examples:**
+ 
+
+```python
+calls = client.get_calls(
+    filter=CallsFilter(op_names=["my_op"]),
+    columns=["inputs", "output", "summary"],
+    limit=100,
+)
+for call in calls:
+    print(call.inputs, call.output)
+``` 
 
 ---
 
@@ -480,10 +482,10 @@ You can also get the evaluation by its "friendly" name: get_evaluation("Evaluati
  
 
 ```python
-    client = weave.init("my-project")
-    evaluation = client.get_evaluation("weave:///entity/project/object/my-eval:v1")
-    print(evaluation.name)
-    ``` 
+client = weave.init("my-project")
+evaluation = client.get_evaluation("weave:///entity/project/object/my-eval:v1")
+print(evaluation.name)
+``` 
 
 ---
 
@@ -509,16 +511,16 @@ Retrieve all Evaluation objects from the current project.
  
 
 ```python
-    client = weave.init("my-project")
-    evaluations = client.get_evaluations()
-    print(f"Found {len(evaluations)} evaluations")
-    for eval in evaluations:
-         print(f"Evaluation: {eval.name}")
-    ``` 
+client = weave.init("my-project")
+evaluations = client.get_evaluations()
+print(f"Found {len(evaluations)} evaluations")
+for eval in evaluations:
+    print(f"Evaluation: {eval.name}")
+``` 
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/weave_client.py#L1392"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/weave_client.py#L1393"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `get_feedback`
 
@@ -536,31 +538,33 @@ Query project for feedback.
 
 
 **Examples:**
- ```python
-     # Fetch a specific feedback object.
-     # Note that this still returns a collection, which is expected
-     # to contain zero or one item(s).
-     client.get_feedback("1B4082A3-4EDA-4BEB-BFEB-2D16ED59AA07")
+ 
 
-     # Find all feedback objects with a specific reaction.
-     client.get_feedback(reaction="👍", limit=10)
+```python
+# Fetch a specific feedback object.
+# Note that this still returns a collection, which is expected
+# to contain zero or one item(s).
+client.get_feedback("1B4082A3-4EDA-4BEB-BFEB-2D16ED59AA07")
 
-     # Find all feedback objects with a specific feedback type with
-     # mongo-style query.
-     from weave.trace_server.interface.query import Query
+# Find all feedback objects with a specific reaction.
+client.get_feedback(reaction="👍", limit=10)
 
-     query = Query(
-         **{
-             "$expr": {
-                 "$eq": [
-                     {"$getField": "feedback_type"},
-                     {"$literal": "wandb.reaction.1"},
-                 ],
-             }
+# Find all feedback objects with a specific feedback type with
+# mongo-style query.
+from weave.trace_server.interface.query import Query
+
+query = Query(
+     **{
+         "$expr": {
+             "$eq": [
+                 {"$getField": "feedback_type"},
+                 {"$literal": "wandb.reaction.1"},
+             ],
          }
-     )
-     client.get_feedback(query=query)
-    ``` 
+     }
+)
+client.get_feedback(query=query)
+``` 
 
 
 
@@ -578,7 +582,7 @@ Query project for feedback.
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/weave_client.py#L1543"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/weave_client.py#L1546"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `purge_costs`
 
@@ -594,9 +598,9 @@ Purge costs from the current project.
  
 
 ```python
-     client.purge_costs([ids])
-     client.purge_costs(ids)
-    ``` 
+client.purge_costs([ids])
+client.purge_costs(ids)
+``` 
 
 
 
@@ -606,7 +610,7 @@ Purge costs from the current project.
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/weave_client.py#L1568"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/weave_client.py#L1571"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>method</kbd> `query_costs`
 
@@ -627,14 +631,14 @@ Query project for costs.
  
 
 ```python
-     # Fetch a specific cost object.
-     # Note that this still returns a collection, which is expected
-     # to contain zero or one item(s).
-     client.query_costs("1B4082A3-4EDA-4BEB-BFEB-2D16ED59AA07")
+# Fetch a specific cost object.
+# Note that this still returns a collection, which is expected
+# to contain zero or one item(s).
+client.query_costs("1B4082A3-4EDA-4BEB-BFEB-2D16ED59AA07")
 
-     # Find all cost objects with a specific reaction.
-     client.query_costs(llm_ids=["gpt-4o-mini-2024-07-18"], limit=10)
-    ``` 
+# Find all cost objects with a specific reaction.
+client.query_costs(llm_ids=["gpt-4o-mini-2024-07-18"], limit=10)
+``` 
 
 
 

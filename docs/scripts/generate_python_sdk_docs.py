@@ -70,8 +70,20 @@ def fix_style(text):
     return text
 
 
+def fix_code_fence_indentation(text):
+    # The docgen produces code fences that are not indented correctly.
+    # This function fixes that by indenting the code fence.
+    pattern = r"(s+)```"
+    replace = r"```"
+    return re.sub(pattern, replace, text)
+
+
 def sanitize_markdown(text):
-    return fix_style(fix_imgs(fix_factor(text)))
+    text = fix_factor(text)
+    text = fix_code_fence_indentation(text)
+    text = fix_imgs(text)
+    text = fix_style(text)
+    return text
 
 
 def remove_empty_overview_sections(overview):

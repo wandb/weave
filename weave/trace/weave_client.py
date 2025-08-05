@@ -824,11 +824,11 @@ class WeaveClient:
 
         Examples:
 
-            ```python
-            client = weave.init("my-project")
-            evaluation = client.get_evaluation("weave:///entity/project/object/my-eval:v1")
-            print(evaluation.name)
-            ```
+        ```python
+        client = weave.init("my-project")
+        evaluation = client.get_evaluation("weave:///entity/project/object/my-eval:v1")
+        print(evaluation.name)
+        ```
         """
         import weave
 
@@ -849,13 +849,13 @@ class WeaveClient:
 
         Examples:
         
-            ```python
-            client = weave.init("my-project")
-            evaluations = client.get_evaluations()
-            print(f"Found {len(evaluations)} evaluations")
-            for eval in evaluations:
-                print(f"Evaluation: {eval.name}")
-            ```
+        ```python
+        client = weave.init("my-project")
+        evaluations = client.get_evaluations()
+        print(f"Found {len(evaluations)} evaluations")
+        for eval in evaluations:
+            print(f"Evaluation: {eval.name}")
+        ```
         """
         eval_objs = self._objects(
             filter=ObjectVersionFilter(base_object_classes=["Evaluation"]),
@@ -923,16 +923,17 @@ class WeaveClient:
         Returns:
             `CallsIter`: An iterator over `Call` objects. Supports slicing, iteration, and `.to_pandas()`.
 
-        Example:
-            ```python
-            calls = client.get_calls(
-                filter=CallsFilter(op_names=["my_op"]),
-                columns=["inputs", "output", "summary"],
-                limit=100,
-            )
-            for call in calls:
-                print(call.inputs, call.output)
-            ```
+        Examples:
+
+        ```python
+        calls = client.get_calls(
+            filter=CallsFilter(op_names=["my_op"]),
+            columns=["inputs", "output", "summary"],
+            limit=100,
+        )
+        for call in calls:
+            print(call.inputs, call.output)
+        ```
         """
         if filter is None:
             filter = CallsFilter()
@@ -1400,31 +1401,32 @@ class WeaveClient:
         """Query project for feedback.
 
         Examples:
-            ```python
-            # Fetch a specific feedback object.
-            # Note that this still returns a collection, which is expected
-            # to contain zero or one item(s).
-            client.get_feedback("1B4082A3-4EDA-4BEB-BFEB-2D16ED59AA07")
 
-            # Find all feedback objects with a specific reaction.
-            client.get_feedback(reaction="👍", limit=10)
+        ```python
+        # Fetch a specific feedback object.
+        # Note that this still returns a collection, which is expected
+        # to contain zero or one item(s).
+        client.get_feedback("1B4082A3-4EDA-4BEB-BFEB-2D16ED59AA07")
 
-            # Find all feedback objects with a specific feedback type with
-            # mongo-style query.
-            from weave.trace_server.interface.query import Query
+        # Find all feedback objects with a specific reaction.
+        client.get_feedback(reaction="👍", limit=10)
 
-            query = Query(
-                **{
-                    "$expr": {
-                        "$eq": [
-                            {"$getField": "feedback_type"},
-                            {"$literal": "wandb.reaction.1"},
-                        ],
-                    }
+        # Find all feedback objects with a specific feedback type with
+        # mongo-style query.
+        from weave.trace_server.interface.query import Query
+
+        query = Query(
+            **{
+                "$expr": {
+                    "$eq": [
+                        {"$getField": "feedback_type"},
+                        {"$literal": "wandb.reaction.1"},
+                    ],
                 }
-            )
-            client.get_feedback(query=query)
-            ```
+            }
+        )
+        client.get_feedback(query=query)
+        ```
 
         Args:
             query: A mongo-style query expression. For convenience, also accepts a feedback UUID string.
@@ -1505,13 +1507,6 @@ class WeaveClient:
     ) -> CostCreateRes:
         """Add a cost to the current project.
 
-        Examples:
-
-            ```python
-            client.add_cost(llm_id="my_expensive_custom_model", prompt_token_cost=1, completion_token_cost=2)
-            client.add_cost(llm_id="my_expensive_custom_model", prompt_token_cost=500, completion_token_cost=1000, effective_date=datetime(1998, 10, 3))
-            ```
-
         Args:
             llm_id: The ID of the LLM. eg "gpt-4o-mini-2024-07-18"
             prompt_token_cost: The cost per prompt token. eg .0005
@@ -1525,6 +1520,14 @@ class WeaveClient:
             A CostCreateRes object.
             Which has one field called a list of tuples called ids.
             Each tuple contains the llm_id and the id of the created cost object.
+
+        Examples:
+
+        ```python
+        client.add_cost(llm_id="my_expensive_custom_model", prompt_token_cost=1, completion_token_cost=2)
+        client.add_cost(llm_id="my_expensive_custom_model", prompt_token_cost=500, completion_token_cost=1000, effective_date=datetime(1998, 10, 3))
+        ```
+
         """
         if effective_date is None:
             effective_date = datetime.datetime.now(datetime.timezone.utc)
@@ -1545,10 +1548,10 @@ class WeaveClient:
 
         Examples:
 
-            ```python
-            client.purge_costs([ids])
-            client.purge_costs(ids)
-            ```
+        ```python
+        client.purge_costs([ids])
+        client.purge_costs(ids)
+        ```
 
         Args:
             ids: The cost IDs to purge. Can be a single ID or a list of IDs.
@@ -1576,15 +1579,15 @@ class WeaveClient:
 
         Examples:
 
-            ```python
-            # Fetch a specific cost object.
-            # Note that this still returns a collection, which is expected
-            # to contain zero or one item(s).
-            client.query_costs("1B4082A3-4EDA-4BEB-BFEB-2D16ED59AA07")
+        ```python
+        # Fetch a specific cost object.
+        # Note that this still returns a collection, which is expected
+        # to contain zero or one item(s).
+        client.query_costs("1B4082A3-4EDA-4BEB-BFEB-2D16ED59AA07")
 
-            # Find all cost objects with a specific reaction.
-            client.query_costs(llm_ids=["gpt-4o-mini-2024-07-18"], limit=10)
-            ```
+        # Find all cost objects with a specific reaction.
+        client.query_costs(llm_ids=["gpt-4o-mini-2024-07-18"], limit=10)
+        ```
 
         Args:
             query: A mongo-style query expression. For convenience, also accepts a cost UUID string.
