@@ -359,11 +359,19 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         # If we have an ancestor_ids filter, we need to get the ids of the calls that are ancestors of the given ids
         if req.filter is not None and req.filter.ancestor_ids is not None:
-            descendants = self._find_descendants(req.filter.ancestor_ids)
+            if len(req.filter.ancestor_ids) == 0:
+                # Empty ancestor_ids means no results should be returned
+                return tsi.CallsQueryStatsRes(count=0, total_storage_size_bytes=None)
+            
+            descendants = self._find_descendants(req.project_id, req.filter.ancestor_ids)
 
             if req.filter.call_ids is not None:
                 current_call_ids = set(req.filter.call_ids)
                 descendants = current_call_ids.union(descendants)
+            
+            if not descendants:
+                # No descendants found, return early
+                return tsi.CallsQueryStatsRes(count=0, total_storage_size_bytes=None)
 
             req.filter.call_ids = list(descendants)
             req.filter.ancestor_ids = None
@@ -381,20 +389,179 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             total_storage_size_bytes=res_dict.get("total_storage_size_bytes"),
         )
 
-    def _find_descendants(self, ancestor_ids: list[str]) -> set[str]:
-        """Returns the set of all descendants of the given ancestor ids."""
-        # TODO: Implement this
-        #  I think there are 2 valid algorithms (and we can't know which one is faster apriori)
-        # 1. Query for the set of trace ids for the ancestors, then query to get all the calls for those trace ids, then build an in-memory tree of the calls, finally filter to only include the descendants
-        #     * Note: this is more performant when the trace is deep, and/or the ancestor ids are near the top of the tree (more data to load into memory)
-        # 2. Iteratively query for direct children of the ancestors, then for the children of the children, etc.
-        #     * Note: this is more performant when the trace is shallow, and/or the ancestor ids are near the bottom of the tree (more DB queries)
-        #
-        # Probably the fastest implementation will dispatch both queries in parallel, take the faster result, and cancel the slower one.
-        return set()
+    def _find_descendants(self, project_id: str, ancestor_ids: list[str]) -> set[str]:
+        """Returns the set of all descendants of the given ancestor ids.
+        
+        Races two approaches and returns the first to complete:
+        1. Bottom-up: Iteratively query for direct children
+        2. Top-down: Query for trace IDs, then filter in memory
+        
+        Can be controlled via WEAVE_FIND_DESCENDANTS_APPROACH env var:
+        - "race" (default): Race both approaches
+        - "bottom_up": Use only bottom-up approach
+        - "top_down": Use only top-down approach
+        """
+        if not ancestor_ids:
+            return set()
+        
+        import os
+        approach = os.environ.get("WEAVE_FIND_DESCENDANTS_APPROACH", "race").lower()
+        
+        if approach == "bottom_up":
+            logger.debug(f"Using bottom-up approach for {len(ancestor_ids)} ancestors (forced by env)")
+            return self._find_descendants_bottom_up(project_id, ancestor_ids)
+        elif approach == "top_down":
+            logger.debug(f"Using top-down approach for {len(ancestor_ids)} ancestors (forced by env)")
+            return self._find_descendants_top_down(project_id, ancestor_ids)
+        elif approach == "race":
+            # Race both approaches
+            import concurrent.futures
+            
+            with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+                # Submit both approaches
+                bottom_up_future = executor.submit(
+                    self._find_descendants_bottom_up, project_id, ancestor_ids
+                )
+                top_down_future = executor.submit(
+                    self._find_descendants_top_down, project_id, ancestor_ids
+                )
+                
+                # Wait for the first one to complete
+                done, not_done = concurrent.futures.wait(
+                    [bottom_up_future, top_down_future],
+                    return_when=concurrent.futures.FIRST_COMPLETED
+                )
+                
+                # Cancel the slower one
+                for future in not_done:
+                    future.cancel()
+                
+                # Return the result from the first completed
+                for future in done:
+                    try:
+                        result = future.result()
+                        # Log which approach won
+                        if future == bottom_up_future:
+                            logger.debug(f"Bottom-up approach won for {len(ancestor_ids)} ancestors")
+                        else:
+                            logger.debug(f"Top-down approach won for {len(ancestor_ids)} ancestors")
+                        return result
+                    except Exception as e:
+                        logger.warning(f"Descendant search approach failed: {e}")
+                        # If one fails, wait for the other
+                        for other_future in not_done:
+                            try:
+                                return other_future.result(timeout=30)
+                            except Exception as e2:
+                                logger.error(f"Both descendant search approaches failed: {e}, {e2}")
+                                raise
+                
+                # Should not reach here
+                return set()
+        else:
+            raise ValueError(f"Invalid WEAVE_FIND_DESCENDANTS_APPROACH: {approach}. Must be 'race', 'bottom_up', or 'top_down'")
+    
+    def _find_descendants_bottom_up(self, project_id: str, ancestor_ids: list[str]) -> set[str]:
+        """Bottom-up approach: Iteratively query for direct children at each level."""
+        descendants = set()
+        current_level = set(ancestor_ids)
+        
+        # Iteratively query for children at each level
+        while current_level:
+            # Query for calls that have parents in the current level
+            req = tsi.CallsQueryReq(
+                project_id=project_id,
+                filter=tsi.CallsFilter(
+                    parent_ids=list(current_level)
+                ),
+                columns=["id"],  # We only need the IDs
+            )
+            
+            # Get children from this level
+            children = set()
+            for call in self.calls_query_stream(req):
+                if call.id not in descendants:
+                    children.add(call.id)
+                    descendants.add(call.id)
+            
+            # Move to the next level
+            current_level = children
+        
+        return descendants
+    
+    def _find_descendants_top_down(self, project_id: str, ancestor_ids: list[str]) -> set[str]:
+        """Top-down approach: Query for trace IDs, then get all calls and filter in memory."""
+        # First, get the trace IDs for the ancestors
+        trace_ids = set()
+        ancestor_set = set(ancestor_ids)
+        
+        req = tsi.CallsQueryReq(
+            project_id=project_id,
+            filter=tsi.CallsFilter(
+                call_ids=list(ancestor_ids)
+            ),
+            columns=["id", "trace_id"],
+        )
+        
+        for call in self.calls_query_stream(req):
+            trace_ids.add(call.trace_id)
+        
+        if not trace_ids:
+            return set()
+        
+        # Get all calls for those trace IDs
+        req = tsi.CallsQueryReq(
+            project_id=project_id,
+            filter=tsi.CallsFilter(
+                trace_ids=list(trace_ids)
+            ),
+            columns=["id", "parent_id"],
+        )
+        
+        # Build a graph of all calls in these traces
+        calls_by_id = {}
+        children_by_parent = defaultdict(set)
+        
+        for call in self.calls_query_stream(req):
+            calls_by_id[call.id] = call
+            if call.parent_id:
+                children_by_parent[call.parent_id].add(call.id)
+        
+        # Find all descendants of the ancestors
+        descendants = set()
+        to_process = list(ancestor_set)
+        
+        while to_process:
+            current_id = to_process.pop()
+            for child_id in children_by_parent.get(current_id, []):
+                if child_id not in descendants:
+                    descendants.add(child_id)
+                    to_process.append(child_id)
+        
+        return descendants
 
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         """Returns a stream of calls that match the given query."""
+
+        # If we have an ancestor_ids filter, we need to get the ids of the calls that are ancestors of the given ids
+        if req.filter is not None and req.filter.ancestor_ids is not None:
+            if len(req.filter.ancestor_ids) == 0:
+                # Empty ancestor_ids means no results should be returned
+                return
+            
+            descendants = self._find_descendants(req.project_id, req.filter.ancestor_ids)
+
+            if req.filter.call_ids is not None:
+                current_call_ids = set(req.filter.call_ids)
+                descendants = current_call_ids.union(descendants)
+            
+            if not descendants:
+                # No descendants found, return early
+                return
+
+            req.filter.call_ids = list(descendants)
+            req.filter.ancestor_ids = None
+
         cq = CallsQuery(
             project_id=req.project_id,
             include_costs=req.include_costs or False,

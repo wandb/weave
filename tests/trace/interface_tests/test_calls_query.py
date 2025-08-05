@@ -1,11 +1,16 @@
 from collections import defaultdict
 
+import pytest
+
 import weave
 from weave.trace.api import get_current_call
 from weave.trace_server import trace_server_interface as tsi
 
 
-def test_trace_call_query_filter_ancestor_ids(client):
+@pytest.mark.parametrize("approach", ["race", "bottom_up", "top_down"])
+def test_trace_call_query_filter_ancestor_ids(client, approach, monkeypatch):
+    # Set the environment variable for this test run
+    monkeypatch.setenv("WEAVE_FIND_DESCENDANTS_APPROACH", approach)
     descendant_sets = defaultdict(set)
 
     def add_descendants(ancestor_id, descendant_id):
@@ -45,7 +50,7 @@ def test_trace_call_query_filter_ancestor_ids(client):
     root_op()
     root_op()
 
-    no_ancestor_examples = [([], [])]
+    no_ancestor_examples = [([], set())]
     single_ancestor_examples = [
         ([call_id], descendant_sets[call_id]) for call_id in descendant_sets.keys()
     ]
