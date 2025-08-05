@@ -6,7 +6,6 @@ specifications used by the ClickHouse trace server implementation.
 
 from weave.trace_server import environment as wf_env
 
-
 # =============================================================================
 # File and Batch Processing Settings
 # =============================================================================
