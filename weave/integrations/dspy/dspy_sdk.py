@@ -79,9 +79,19 @@ class DSPyPatcher(MultiPatcher):
                     devset_for_dataset = kwargs.get(
                         "devset", getattr(self, "devset", [])
                     )
+                    # Build rich metadata about the DSPy module so it is visible in the Weave UI
+                    module_meta: dict[str, Any] = {
+                        "name": model_name,
+                        "dump_state": getattr(program, "dump_state", lambda: None)(),
+                        "history": getattr(program, "history", None),
+                        "_compiled": getattr(program, "_compiled", None),
+                        "callbacks": [repr(cb) for cb in getattr(program, "callbacks", [])],
+                        "repr": repr(program),
+                    }
+
                     ev = EvaluationLogger(
                         name=f"dspy_{model_name}",
-                        model=model_name,
+                        model=module_meta,
                         dataset=[dict(ex.inputs()) for ex in devset_for_dataset],
                     )
 
@@ -145,6 +155,9 @@ class DSPyPatcher(MultiPatcher):
                         scorer_name = metric.__name__
                     else:
                         scorer_name = metric.__class__.__name__
+
+                    if scorer_name == "method":
+                        scorer_name = "score"
 
                     # Kick off parallel execution
                     indices_examples = list(enumerate(devset))
@@ -224,6 +237,6 @@ def get_dspy_patcher(
             # LM
             get_symbol_patcher("dspy", "LM.forward", base),
         ]
-    )
+    )    
 
     return _dspy_patcher
