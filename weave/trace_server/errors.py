@@ -1,5 +1,6 @@
 import datetime
 import json
+from dataclasses import dataclass
 from typing import Any, Callable, Optional
 
 import requests
@@ -31,19 +32,19 @@ class InvalidRequest(Error):
 
 
 # Clickhouse errors
-class QueryMemoryLimitExceeded(Error):
+class QueryMemoryLimitExceededError(Error):
     """Raised when a query memory limit is exceeded."""
 
     pass
 
 
-class QueryNoCommonType(Error):
+class QueryNoCommonTypeError(Error):
     """Raised when a query has no common type."""
 
     pass
 
 
-class QueryTimeoutExceeded(Error):
+class QueryTimeoutExceededError(Error):
     """Raised when a query timeout is exceeded."""
 
     pass
@@ -112,6 +113,14 @@ def _format_error_to_json_with_extra(
     return result
 
 
+@dataclass
+class ErrorWithStatus:
+    """Base class for errors with a status code."""
+
+    status_code: int
+    message: dict[str, Any]
+
+
 # Error Registry System
 class ErrorDefinition:
     """Represents a single error handler definition."""
@@ -159,23 +168,27 @@ class ErrorRegistry:
         """Get all registered error definitions."""
         return self._definitions.copy()
 
-    def handle_exception(self, exc: Exception) -> tuple[dict[str, Any], int]:
+    def handle_exception(self, exc: Exception) -> ErrorWithStatus:
         """Handle an exception using registered definitions."""
         exc_type = type(exc)
         definition = self.get_definition(exc_type)
 
         if definition:
             error_content = definition.formatter(exc)
-            return error_content, definition.status_code
+            return ErrorWithStatus(
+                status_code=definition.status_code, message=error_content
+            )
 
-        return {"reason": "Internal server error"}, 500
+        return ErrorWithStatus(
+            status_code=500, message={"reason": "Internal server error"}
+        )
 
     def _setup_common_errors(self) -> None:
         """Register common/standard library errors that don't depend on domain-specific modules."""
         # Our own error types
         self.register(InvalidRequest, 400)
         self.register(InvalidExternalRef, 400)
-        self.register(QueryNoCommonType, 400)
+        self.register(QueryNoCommonTypeError, 400)
         self.register(MissingLLMApiKeyError, 400, _format_missing_llm_api_key)
         self.register(InvalidFieldError, 403)
         self.register(NotFoundError, 404)
@@ -183,8 +196,8 @@ class ErrorRegistry:
         self.register(ObjectDeletedError, 404, _format_object_deleted_error)
         self.register(InsertTooLarge, 413)
         self.register(RequestTooLarge, 413, lambda exc: {"reason": "Request too large"})
-        self.register(QueryMemoryLimitExceeded, 502)
-        self.register(QueryTimeoutExceeded, 504)
+        self.register(QueryMemoryLimitExceededError, 502)
+        self.register(QueryTimeoutExceededError, 504)
 
         # Standard library exceptions
         self.register(ValueError, 400)
@@ -218,7 +231,7 @@ def _get_error_registry() -> ErrorRegistry:
     return _error_registry
 
 
-def handle_server_exception(exc: Exception) -> tuple[dict[str, Any], int]:
+def handle_server_exception(exc: Exception) -> ErrorWithStatus:
     """Handle a server exception."""
     registry = _get_error_registry()
     return registry.handle_exception(exc)
@@ -238,9 +251,9 @@ def handle_clickhouse_query_error(e: Exception) -> None:
         e: The original exception from ClickHouse
 
     Raises:
-        QueryMemoryLimitExceeded: When the query exceeds memory limits
-        QueryNoCommonType: When there's a type mismatch in the query
-        QueryTimeoutExceeded: When the query exceeds timeout limits
+        QueryMemoryLimitExceededError: When the query exceeds memory limits
+        QueryNoCommonTypeError: When there's a type mismatch in the query
+        QueryTimeoutExceededError: When the query exceeds timeout limits
         Exception: Re-raises the original exception if no known pattern matches
     """
     error_str = str(e)
@@ -251,18 +264,18 @@ def handle_clickhouse_query_error(e: Exception) -> None:
     )
 
     if "MEMORY_LIMIT_EXCEEDED" in error_str:
-        raise QueryMemoryLimitExceeded(
+        raise QueryMemoryLimitExceededError(
             "Query memory limit exceeded. " + limit_scope_message
         ) from e
     if "NO_COMMON_TYPE" in error_str:
-        raise QueryNoCommonType(
+        raise QueryNoCommonTypeError(
             "No common type between data types in query. "
             "This can occur when comparing types without using the $convert operation. "
             "Example: filtering calls by inputs.integer_value = 1 without using $convert -> "
             "Correct: {$expr: {$eq: [{$convert: {input: {$getField: 'inputs.integer_value'}, to: 'double'}}, {$literal: 1}]}}"
         ) from e
     if "TIMEOUT_EXCEEDED" in error_str:
-        raise QueryTimeoutExceeded(
+        raise QueryTimeoutExceededError(
             "Query timeout exceeded. " + limit_scope_message
         ) from e
 
