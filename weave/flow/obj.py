@@ -162,7 +162,6 @@ class Object(BaseModel):
         Examples:
             This method is called automatically during object creation and validation.
             It handles cases like:
-
             ```python
             # When an ObjectRef is passed
             obj = MyObject(some_object_ref)

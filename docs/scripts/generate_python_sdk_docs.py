@@ -71,10 +71,7 @@ def fix_style(text):
 
 
 def sanitize_markdown(text):
-    text = fix_factor(text)
-    text = fix_imgs(text)
-    text = fix_style(text)
-    return text
+    return fix_style(fix_imgs(fix_factor(text)))
 
 
 def remove_empty_overview_sections(overview):
