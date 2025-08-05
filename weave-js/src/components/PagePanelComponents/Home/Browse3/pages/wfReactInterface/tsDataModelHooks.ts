@@ -2644,7 +2644,7 @@ export const useThreadMessagesLoader = (
       filter: {call_ids: messageIdsState.value},
       sort_by: [{field: 'started_at', direction: 'asc'}],
       limit: 1000,
-      columns: ['id', 'started_at', 'turn_id', 'inputs', 'output'],
+      columns: ['id', 'started_at', 'turn_id', 'inputs', 'output', 'attributes'],
       expand_columns: ['inputs', 'output'], // Server-side ref expansion
     });
 
