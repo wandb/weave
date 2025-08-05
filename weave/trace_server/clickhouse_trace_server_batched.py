@@ -357,24 +357,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 total_storage_size_bytes=None,
             )
 
-        # If we have an ancestor_ids filter, we need to get the ids of the calls that are ancestors of the given ids
-        if req.filter is not None and req.filter.ancestor_ids is not None:
-            if len(req.filter.ancestor_ids) == 0:
-                # Empty ancestor_ids means no results should be returned
-                return tsi.CallsQueryStatsRes(count=0, total_storage_size_bytes=None)
-
-            descendants = self._find_descendants(
-                req.project_id, req.filter.ancestor_ids
-            )
-
-            if req.filter.call_ids is not None:
-                current_call_ids = set(req.filter.call_ids)
-                descendants = current_call_ids.union(descendants)
-
+        # Process ancestor_ids filter if present
+        descendants = self._process_ancestor_ids_filter(req.project_id, req.filter)
+        if descendants is not None:
             if not descendants:
                 # No descendants found, return early
                 return tsi.CallsQueryStatsRes(count=0, total_storage_size_bytes=None)
-
             req.filter.call_ids = list(descendants)
             req.filter.ancestor_ids = None
 
@@ -390,6 +378,31 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             count=res_dict.get("count", 0),
             total_storage_size_bytes=res_dict.get("total_storage_size_bytes"),
         )
+
+    def _process_ancestor_ids_filter(
+        self, project_id: str, filter: Optional[tsi.CallsFilter]
+    ) -> Optional[set[str]]:
+        """Process ancestor_ids filter and return the final set of call IDs to filter by.
+        
+        Returns:
+            - None if no ancestor_ids filter is present (continue normal processing)
+            - Empty set if no descendants should be returned (caller should return empty results)
+            - Set of descendant IDs to filter by
+        """
+        if filter is None or filter.ancestor_ids is None:
+            return None
+            
+        if len(filter.ancestor_ids) == 0:
+            # Empty ancestor_ids means no results should be returned
+            return set()
+        
+        descendants = self._find_descendants(project_id, filter.ancestor_ids)
+        
+        if filter.call_ids is not None:
+            current_call_ids = set(filter.call_ids)
+            descendants = current_call_ids.union(descendants)
+        
+        return descendants
 
     def _find_descendants(self, project_id: str, ancestor_ids: list[str]) -> set[str]:
         """Returns the set of all descendants of the given ancestor ids.
@@ -555,24 +568,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         """Returns a stream of calls that match the given query."""
-        # If we have an ancestor_ids filter, we need to get the ids of the calls that are ancestors of the given ids
-        if req.filter is not None and req.filter.ancestor_ids is not None:
-            if len(req.filter.ancestor_ids) == 0:
-                # Empty ancestor_ids means no results should be returned
-                return
-
-            descendants = self._find_descendants(
-                req.project_id, req.filter.ancestor_ids
-            )
-
-            if req.filter.call_ids is not None:
-                current_call_ids = set(req.filter.call_ids)
-                descendants = current_call_ids.union(descendants)
-
+        # Process ancestor_ids filter if present
+        descendants = self._process_ancestor_ids_filter(req.project_id, req.filter)
+        if descendants is not None:
             if not descendants:
                 # No descendants found, return early
                 return
-
             req.filter.call_ids = list(descendants)
             req.filter.ancestor_ids = None
 
