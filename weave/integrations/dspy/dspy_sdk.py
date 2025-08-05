@@ -58,52 +58,92 @@ class DSPyPatcher(MultiPatcher):
                 @functools.wraps(_orig_call)
                 def _wrapped_call(self, program, *args, **kwargs):
                     """
-                    Wrapped Evaluate.__call__ compatible with DSPy ≤ 0.4.x.
-
-                    Captures full result triples for Weave by *temporarily* forcing
-                    return_outputs & return_all_scores, then re-formats to the user's
-                    originally requested shape.
+                    Patched Evaluate.__call__ that logs a full Weave Evaluation **and**
+                    ensures every program call is nested inside that evaluation so the
+                    full trace is visible in the UI.
                     """
-                    # 0️⃣ Remember what the caller really wanted
+                    from weave.trace.context import call_context  # local import to avoid cycles
+                    from typing import Any
+                    import types
+
+                    # ── 0️⃣  Capture the caller's requested return shape ───────────────────
                     want_outputs = kwargs.get("return_outputs", self.return_outputs)
-                    want_scores = kwargs.get("return_all_scores", self.return_all_scores)
+                    want_scores  = kwargs.get("return_all_scores", self.return_all_scores)
 
-                    # 1️⃣ Guarantee we get full data from DSPy
-                    kwargs_for_call = dict(kwargs)
-                    kwargs_for_call["return_outputs"] = True
-                    kwargs_for_call["return_all_scores"] = True
-
-                    overall, triples, individual = _orig_call(
-                        self, program, *args, **kwargs_for_call
+                    # ── 1️⃣  Create a Weave EvaluationLogger up-front ────────────────────
+                    model_name = getattr(program, "__class__", type(program)).__name__
+                    devset_for_dataset = kwargs.get("devset", getattr(self, "devset", []))
+                    ev = EvaluationLogger(
+                        name=f"dspy_{model_name}",
+                        model=model_name,
+                        dataset=[dict(ex.inputs()) for ex in devset_for_dataset],
                     )
 
-                    # 2️⃣ Weave logging
-                    try:
-                        model_name = getattr(program, "__class__", type(program)).__name__
-                        
-                        ev = EvaluationLogger(
-                            name=f"dspy_{model_name}",
-                            model=model_name,
-                            dataset=[dict(ex.inputs()) for ex, *_ in triples],
-                        )
-                        
-                        scorer_name = (
-                            self.metric.__name__ if callable(self.metric)
-                            else self.metric.__class__.__name__
-                        )
-                        
-                        for example, prediction, score in triples:
-                            pl = ev.log_prediction(inputs=example.inputs(), output=prediction)
-                            pl.log_score(scorer=scorer_name, score=score)
-                            pl.finish()
-                            
-                        ev.log_summary({"mean_score": overall / 100.0})
-                        
-                    except Exception as e:
-                        # Don't let Weave logging errors break DSPy evaluation
-                        print(f"Warning: Failed to log DSPy evaluation to Weave: {e}")
+                    # ── 2️⃣  Prepare parallel executor so that every worker thread
+                    #        inherits the evaluation's call-stack. We'll re-implement
+                    #        DSPy's evaluation loop here so that traces are captured
+                    #        where they belong.
+                    from dspy.utils.parallelizer import ParallelExecutor
 
-                    # 3️⃣ Restore original return contract
+                    devset = kwargs.get("devset", getattr(self, "devset", None)) or self.devset
+                    metric  = kwargs.get("metric", None) or self.metric
+                    num_threads = kwargs.get("num_threads", None) or self.num_threads
+                    display_progress = kwargs.get("display_progress", None) or self.display_progress
+                    failure_score = getattr(self, "failure_score", 0.0)
+
+                    # Falls back so that the return-contract section can work.
+                    return_outputs_flag = kwargs.get("return_outputs", self.return_outputs)
+                    return_scores_flag  = kwargs.get("return_all_scores", self.return_all_scores)
+
+                    executor = ParallelExecutor(
+                        num_threads=num_threads,
+                        disable_progress_bar=not display_progress,
+                        max_errors=getattr(self, "max_errors", 5),
+                        provide_traceback=getattr(self, "provide_traceback", None),
+                        compare_results=True,
+                    )
+
+                    # Will accumulate (example, prediction, score)
+                    _result_triples: list[tuple[Any, Any, float]] = [None] * len(devset)  # type: ignore
+
+                    def _worker(example_and_index):
+                        idx, example = example_and_index
+                        with call_context.set_call_stack([ev._evaluate_call]):
+                            prediction = program(**example.inputs())
+                            _score = metric(example, prediction) if metric else 0.0
+
+                            pl = ev.log_prediction(inputs=example.inputs(), output=prediction)
+                            pl.log_score(scorer=scorer_name, score=_score)
+                            pl.finish()
+                            _result_triples[idx] = (example, prediction, _score)
+                            # Return a 2-tuple to match DSPy's expected shape (prediction, score)
+                            return (prediction, _score)
+
+                    # Determine scorer name once, outside threads
+                    if metric is None:
+                        scorer_name = "score"
+                    elif isinstance(metric, types.FunctionType):
+                        scorer_name = metric.__name__
+                    else:
+                        scorer_name = metric.__class__.__name__
+
+                    # Kick off parallel execution
+                    indices_examples = list(enumerate(devset))
+                    executor.execute(_worker, indices_examples)
+
+                    # Fill in any failed results with default failure_score
+                    for i, triple in enumerate(_result_triples):
+                        if triple is None:
+                            ex = devset[i]
+                            _result_triples[i] = (ex, None, failure_score)  # type: ignore
+
+                    triples = _result_triples  # rename for downstream logic
+                    individual = [s for *_, s in triples]
+                    overall = round(100 * sum(individual) / len(individual), 2)
+
+                    ev.log_summary({"mean_score": overall / 100.0})
+
+                    # ── 3️⃣  Return exactly what the caller expected ─────────────────────
                     if want_outputs and want_scores:
                         return overall, triples, individual
                     if want_outputs:
