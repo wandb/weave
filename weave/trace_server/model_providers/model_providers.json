@@ -1,4 +1,12 @@
 {
+  "openai/gpt-oss-120b": {
+    "litellm_provider": "coreweave",
+    "api_key_name": "WANDB_API_KEY"
+  },
+  "openai/gpt-oss-20b": {
+    "litellm_provider": "coreweave",
+    "api_key_name": "WANDB_API_KEY"
+  },
   "Qwen/Qwen3-235B-A22B-Instruct-2507": {
     "litellm_provider": "coreweave",
     "api_key_name": "WANDB_API_KEY"

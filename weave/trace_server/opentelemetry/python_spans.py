@@ -350,6 +350,15 @@ class Span:
         if display_name and len(display_name) >= MAX_DISPLAY_NAME_LENGTH:
             display_name = shorten_name(display_name, MAX_DISPLAY_NAME_LENGTH)
 
+        thread_id = wandb_attributes.get("thread_id") or None
+        if thread_id is not None and (wandb_attributes.get("is_turn")):
+            turn_id = self.span_id
+        else:
+            turn_id = None
+
+        if display_name and len(display_name) >= MAX_DISPLAY_NAME_LENGTH:
+            display_name = shorten_name(display_name, MAX_DISPLAY_NAME_LENGTH)
+
         if len(op_name) >= MAX_OP_NAME_LENGTH:
             # Since op_name will typically be what is displayed, we don't want to just truncate
             # Create an identifier abbreviation so similar long names can be distinguished
@@ -373,7 +382,10 @@ class Span:
             display_name=display_name,
             wb_user_id=None,
             wb_run_id=None,
+            turn_id=turn_id,
+            thread_id=thread_id,
         )
+
         exception_msg = (
             self.status.message if self.status.code == StatusCode.ERROR else None
         )
