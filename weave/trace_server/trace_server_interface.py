@@ -377,6 +377,10 @@ class CallsFilter(BaseModel):
     trace_roots_only: Optional[bool] = None
     wb_user_ids: Optional[list[str]] = None
     wb_run_ids: Optional[list[str]] = None
+    ancestor_ids: Optional[list[str]] = Field(
+        default=None,
+        description="Filter calls by their ancestor ids. Results will only include calls that are descendants of the calls with the given ids.",
+    )
 
 
 class SortBy(BaseModel):
