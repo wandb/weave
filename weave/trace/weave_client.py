@@ -921,7 +921,7 @@ class WeaveClient:
         Returns:
             `CallsIter`: An iterator over `Call` objects. Supports slicing, iteration, and `.to_pandas()`.
 
-        Examples:
+        Example:
             ```python
             calls = client.get_calls(
                 filter=CallsFilter(op_names=["my_op"]),
@@ -1503,7 +1503,7 @@ class WeaveClient:
     ) -> CostCreateRes:
         """Add a cost to the current project.
 
-        Example:
+        Examples:
 
             ```python
             client.add_cost(llm_id="my_expensive_custom_model", prompt_token_cost=1, completion_token_cost=2)
