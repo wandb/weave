@@ -44,7 +44,7 @@ if not import_failed:
                 inputs=dspy_postprocess_inputs(inputs),
                 display_name=op_name,
             )
-            
+
         def on_module_end(
             self,
             call_id: str,
@@ -52,7 +52,7 @@ if not import_failed:
             exception: Optional[Exception] = None,
         ) -> None:
             gc = weave_client_context.require_weave_client()
-            
+
             # Just finish the call normally - prediction logging is handled by monkey-patching
             if call_id in self._call_map:
                 gc.finish_call(
@@ -64,7 +64,7 @@ if not import_failed:
             call_id: str,
             instance: Any,
             inputs: dict[str, Any],
-        ):
+        ) -> None:
             """A handler triggered when __call__ method of dspy.LM instance is called.
 
             Args:
@@ -89,7 +89,7 @@ if not import_failed:
             call_id: str,
             outputs: dict[str, Any] | None,
             exception: Exception | None = None,
-        ):
+        ) -> None:
             """A handler triggered after __call__ method of dspy.LM instance is executed.
 
             Args:

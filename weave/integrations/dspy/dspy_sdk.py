@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import functools
-import types
 import threading
 from collections.abc import Sequence
+from typing import Any
 
-import weave
 from weave.flow.eval_imperative import EvaluationLogger
 from weave.integrations.dspy.dspy_utils import get_symbol_patcher
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, Patcher
@@ -33,46 +32,53 @@ class DSPyPatcher(MultiPatcher):
 
             if not is_callback_present:
                 dspy.settings.callbacks.append(WeaveCallback())
-            
+
             # Monkey-patch dspy.Evaluate.__call__ for clean evaluation logging
             self._patch_evaluate()
-            
+
         except ImportError:
             pass
-    
-    def _patch_evaluate(self):
+
+    def _patch_evaluate(self: DSPyPatcher) -> None:
         """Monkey-patch dspy.Evaluate.__call__ to replay results into Weave EvaluationLogger."""
         global _evaluate_patched
-        
+
         with _patch_lock:
             if _evaluate_patched:
                 return
-                
+
             try:
-                import dspy
                 from dspy.evaluate import Evaluate
-                
+
                 # Keep reference to original method
-                _orig_call = Evaluate.__call__
-                
-                @functools.wraps(_orig_call)
-                def _wrapped_call(self, program, *args, **kwargs):
+                orig_call = Evaluate.__call__
+
+                @functools.wraps(orig_call)
+                def _wrapped_call(
+                    self: Evaluate, program: Any, *args: Any, **kwargs: Any
+                ) -> Any:
                     """
                     Patched Evaluate.__call__ that logs a full Weave Evaluation **and**
                     ensures every program call is nested inside that evaluation so the
                     full trace is visible in the UI.
                     """
-                    from weave.trace.context import call_context  # local import to avoid cycles
-                    from typing import Any
                     import types
+
+                    from weave.trace.context import (
+                        call_context,  # local import to avoid cycles
+                    )
 
                     # ── 0️⃣  Capture the caller's requested return shape ───────────────────
                     want_outputs = kwargs.get("return_outputs", self.return_outputs)
-                    want_scores  = kwargs.get("return_all_scores", self.return_all_scores)
+                    want_scores = kwargs.get(
+                        "return_all_scores", self.return_all_scores
+                    )
 
                     # ── 1️⃣  Create a Weave EvaluationLogger up-front ────────────────────
                     model_name = getattr(program, "__class__", type(program)).__name__
-                    devset_for_dataset = kwargs.get("devset", getattr(self, "devset", []))
+                    devset_for_dataset = kwargs.get(
+                        "devset", getattr(self, "devset", [])
+                    )
                     ev = EvaluationLogger(
                         name=f"dspy_{model_name}",
                         model=model_name,
@@ -85,15 +91,24 @@ class DSPyPatcher(MultiPatcher):
                     #        where they belong.
                     from dspy.utils.parallelizer import ParallelExecutor
 
-                    devset = kwargs.get("devset", getattr(self, "devset", None)) or self.devset
-                    metric  = kwargs.get("metric", None) or self.metric
+                    devset = (
+                        kwargs.get("devset", getattr(self, "devset", None))
+                        or self.devset
+                    )
+                    metric = kwargs.get("metric", None) or self.metric
                     num_threads = kwargs.get("num_threads", None) or self.num_threads
-                    display_progress = kwargs.get("display_progress", None) or self.display_progress
+                    display_progress = (
+                        kwargs.get("display_progress", None) or self.display_progress
+                    )
                     failure_score = getattr(self, "failure_score", 0.0)
 
                     # Falls back so that the return-contract section can work.
-                    return_outputs_flag = kwargs.get("return_outputs", self.return_outputs)
-                    return_scores_flag  = kwargs.get("return_all_scores", self.return_all_scores)
+                    return_outputs_flag = kwargs.get(
+                        "return_outputs", self.return_outputs
+                    )
+                    return_scores_flag = kwargs.get(
+                        "return_all_scores", self.return_all_scores
+                    )
 
                     executor = ParallelExecutor(
                         num_threads=num_threads,
@@ -104,20 +119,24 @@ class DSPyPatcher(MultiPatcher):
                     )
 
                     # Will accumulate (example, prediction, score)
-                    _result_triples: list[tuple[Any, Any, float]] = [None] * len(devset)  # type: ignore
+                    result_triples: list[tuple[Any, Any, float]] = [None] * len(devset)  # type: ignore
 
-                    def _worker(example_and_index):
+                    def _worker(
+                        example_and_index: tuple[int, Any],
+                    ) -> tuple[Any, float]:
                         idx, example = example_and_index
-                        with call_context.set_call_stack([ev._evaluate_call]):
+                        with call_context.set_call_stack([ev._evaluate_call]):  # type: ignore
                             prediction = program(**example.inputs())
-                            _score = metric(example, prediction) if metric else 0.0
+                            score = metric(example, prediction) if metric else 0.0
 
-                            pl = ev.log_prediction(inputs=example.inputs(), output=prediction)
-                            pl.log_score(scorer=scorer_name, score=_score)
+                            pl = ev.log_prediction(
+                                inputs=example.inputs(), output=prediction
+                            )
+                            pl.log_score(scorer=scorer_name, score=score)
                             pl.finish()
-                            _result_triples[idx] = (example, prediction, _score)
+                            result_triples[idx] = (example, prediction, score)
                             # Return a 2-tuple to match DSPy's expected shape (prediction, score)
-                            return (prediction, _score)
+                            return (prediction, score)
 
                     # Determine scorer name once, outside threads
                     if metric is None:
@@ -132,12 +151,12 @@ class DSPyPatcher(MultiPatcher):
                     executor.execute(_worker, indices_examples)
 
                     # Fill in any failed results with default failure_score
-                    for i, triple in enumerate(_result_triples):
+                    for i, triple in enumerate(result_triples):
                         if triple is None:
                             ex = devset[i]
-                            _result_triples[i] = (ex, None, failure_score)  # type: ignore
+                            result_triples[i] = (ex, None, failure_score)  # type: ignore
 
-                    triples = _result_triples  # rename for downstream logic
+                    triples = result_triples  # rename for downstream logic
                     individual = [s for *_, s in triples]
                     overall = round(100 * sum(individual) / len(individual), 2)
 
@@ -151,11 +170,11 @@ class DSPyPatcher(MultiPatcher):
                     if want_scores:
                         return overall, individual
                     return overall
-                
+
                 # Apply the patch
                 Evaluate.__call__ = _wrapped_call
                 _evaluate_patched = True
-                
+
             except Exception as e:
                 # Don't let patching errors break DSPy integration
                 print(f"Warning: Failed to patch DSPy Evaluate: {e}")
