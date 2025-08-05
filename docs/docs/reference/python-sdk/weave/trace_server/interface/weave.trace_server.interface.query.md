@@ -51,7 +51,7 @@ simplifications:
 - [`query.LiteralOperation`](#class-literaloperation): Represents a constant value in the query language.
 - [`query.NotOperation`](#class-notoperation): Logical NOT. Inverts the condition.
 - [`query.OrOperation`](#class-oroperation): Logical OR. At least one condition must be true.
-- [`query.Query`](#class-query): The top-level object for querying traced calls.
+- [`query.Query`](#class-query)
 
 
 
@@ -123,8 +123,8 @@ Specification for the `$contains` operation.
 
 **Pydantic Fields:**
 
-- `input`: `typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, InOperation, ContainsOperation]`
-- `substr`: `typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, InOperation, ContainsOperation]`
+- `input`: `ForwardRef('Operand')`
+- `substr`: `ForwardRef('Operand')`
 - `case_insensitive`: `typing.Optional[bool]`
 
 ---
@@ -149,7 +149,7 @@ Convert the input value to a specific type (e.g., `int`, `bool`, `string`).
 
 **Pydantic Fields:**
 
-- `$convert`: `<class 'ConvertSpec'>`
+- `$convert`: `ForwardRef('ConvertSpec')`
 
 ---
 
@@ -165,7 +165,7 @@ Specifies conversion details for `$convert`.
 
 **Pydantic Fields:**
 
-- `input`: `typing.Union[LiteralOperation, GetFieldOperator, ConvertOperation, AndOperation, OrOperation, NotOperation, EqOperation, GtOperation, GteOperation, InOperation, ContainsOperation]`
+- `input`: `ForwardRef('Operand')`
 - `to`: `typing.Literal['double', 'string', 'int', 'bool', 'exists']`
 
 ---
@@ -355,35 +355,9 @@ Logical OR. At least one condition must be true.
 <a href="https://github.com/wandb/weave/blob/master/weave/trace_server/interface/query.py#L321"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ## <kbd>class</kbd> `Query`
-The top-level object for querying traced calls. 
-
-The `Query` wraps a single `$expr`, which uses Mongo-style aggregation operators to filter calls. This expression can combine logical conditions, comparisons, type conversions, and string matching. 
 
 
 
-**Examples:**
- ```
-     # Filter calls where op_name == "predict"
-     {
-         "$expr": {
-             "$eq": [
-                 {"$getField": "op_name"},
-                 {"$literal": "predict"}
-             ]
-         }
-     }
-
-     # Filter where a call's display name contains "llm"
-     {
-         "$expr": {
-             "$contains": {
-                 "input": {"$getField": "display_name"},
-                 "substr": {"$literal": "llm"},
-                 "case_insensitive": true
-             }
-         }
-     }
-    ``` 
 
 
 **Pydantic Fields:**
