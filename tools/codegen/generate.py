@@ -171,15 +171,17 @@ def generate_code(
         f"--project={STAINLESS_PROJECT_NAME}",
         f"--config={STAINLESS_CONFIG_PATH}",
         f"--oas={STAINLESS_OAS_PATH}",
-        f"--branch={_random_temp_dir()}",
+        # f"--branch={_random_temp_dir()}",
+        "--branch=main",  # TODO: temporary until fix is deployed by stainless.  Without this, the generated SDK will not work.
         "--pull",
+        "--allow-empty",
     ]
     if python_path:
-        cmd.append(f"--target=python:{python_path}")
+        cmd.append(f"--+target=python:{python_path}")
     if node_path:
-        cmd.append(f"--target=node:{node_path}")
+        cmd.append(f"--+target=node:{node_path}")
     if typescript_path:
-        cmd.append(f"--target=typescript:{typescript_path}")
+        cmd.append(f"--+target=typescript:{typescript_path}")
 
     try:
         subprocess.run(cmd, check=True, timeout=SUBPROCESS_TIMEOUT)
