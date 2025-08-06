@@ -454,21 +454,21 @@ class TestNormalizeTokenCounts:
         """Test OpenAI format normalization."""
         usage_data = {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}
 
-        prompt, completion, total = _normalize_token_counts(usage_data)
+        token_counts = _normalize_token_counts(usage_data)
 
-        assert prompt == 10
-        assert completion == 5
-        assert total == 15
+        assert token_counts.prompt_tokens == 10
+        assert token_counts.completion_tokens == 5
+        assert token_counts.total_tokens == 15
 
     def test_normalize_google_genai_format(self):
         """Test Google GenAI format normalization."""
         usage_data = {"input_tokens": 20, "output_tokens": 7, "total_tokens": 27}
 
-        prompt, completion, total = _normalize_token_counts(usage_data)
+        token_counts = _normalize_token_counts(usage_data)
 
-        assert prompt == 20
-        assert completion == 7
-        assert total == 27
+        assert token_counts.prompt_tokens == 20
+        assert token_counts.completion_tokens == 7
+        assert token_counts.total_tokens == 27
 
     def test_normalize_google_vertex_format(self):
         """Test Google Vertex AI format normalization."""
@@ -478,11 +478,11 @@ class TestNormalizeTokenCounts:
             "total_token_count": 23,
         }
 
-        prompt, completion, total = _normalize_token_counts(usage_data)
+        token_counts = _normalize_token_counts(usage_data)
 
-        assert prompt == 15
-        assert completion == 8
-        assert total == 23
+        assert token_counts.prompt_tokens == 15
+        assert token_counts.completion_tokens == 8
+        assert token_counts.total_tokens == 23
 
     def test_normalize_missing_total_tokens(self):
         """Test normalization when total_tokens is missing."""
@@ -492,31 +492,31 @@ class TestNormalizeTokenCounts:
             # Missing total_tokens
         }
 
-        prompt, completion, total = _normalize_token_counts(usage_data)
+        token_counts = _normalize_token_counts(usage_data)
 
-        assert prompt == 10
-        assert completion == 5
-        assert total == 0  # Default when missing
+        assert token_counts.prompt_tokens == 10
+        assert token_counts.completion_tokens == 5
+        assert token_counts.total_tokens == 0  # Default when missing
 
     def test_normalize_empty_data(self):
         """Test normalization with empty data."""
         usage_data = {}
 
-        prompt, completion, total = _normalize_token_counts(usage_data)
+        token_counts = _normalize_token_counts(usage_data)
 
-        assert prompt == 0
-        assert completion == 0
-        assert total == 0
+        assert token_counts.prompt_tokens == 0
+        assert token_counts.completion_tokens == 0
+        assert token_counts.total_tokens == 0
 
     def test_normalize_handles_none_values(self):
         """Test normalization handles None values gracefully."""
         usage_data = {"prompt_tokens": None, "completion_tokens": 5, "total_tokens": 15}
 
-        prompt, completion, total = _normalize_token_counts(usage_data)
+        token_counts = _normalize_token_counts(usage_data)
 
-        assert prompt == 0  # None defaults to 0
-        assert completion == 5
-        assert total == 15
+        assert token_counts.prompt_tokens == 0  # None defaults to 0
+        assert token_counts.completion_tokens == 5
+        assert token_counts.total_tokens == 15
 
 
 class TestExtractModelFromFlattened:

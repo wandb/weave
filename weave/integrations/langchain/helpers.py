@@ -11,6 +11,7 @@ Supported providers:
 """
 
 from collections import defaultdict
+from dataclasses import dataclass
 from typing import Any, Union
 
 from weave.trace.weave_client import Call
@@ -19,6 +20,13 @@ from weave.trace_server.trace_server_interface import LLMUsageSchema
 from weave.utils.dict_utils import convert_defaultdict_to_dict
 
 ModelName = str
+
+
+@dataclass
+class TokenCounts:
+    prompt_tokens: int
+    completion_tokens: int
+    total_tokens: int
 
 
 def _extract_usage_data(call: Call, output: Any) -> None:
@@ -88,13 +96,10 @@ def _extract_usage_data(call: Call, output: Any) -> None:
                 continue
 
             model = _extract_model_from_flattened_path(flattened, base_path)
-            prompt_tokens, completion_tokens, total_tokens = _normalize_token_counts(
-                usage_data
-            )
-
-            usage_dict[model]["prompt_tokens"] += prompt_tokens
-            usage_dict[model]["completion_tokens"] += completion_tokens
-            usage_dict[model]["total_tokens"] += total_tokens
+            token_counts = _normalize_token_counts(usage_data)
+            usage_dict[model]["prompt_tokens"] += token_counts.prompt_tokens
+            usage_dict[model]["completion_tokens"] += token_counts.completion_tokens
+            usage_dict[model]["total_tokens"] += token_counts.total_tokens
 
         if usage_dict:
             usage = convert_defaultdict_to_dict(usage_dict)
@@ -173,7 +178,7 @@ def _is_valid_usage_shape(usage_data: dict) -> bool:
     return has_openai_tokens or has_genai_tokens or has_vertex_tokens
 
 
-def _normalize_token_counts(usage_data: dict) -> tuple[int, int, int]:
+def _normalize_token_counts(usage_data: dict) -> TokenCounts:
     """
     Normalize token counts from provider-specific fields to standard format.
 
@@ -181,7 +186,7 @@ def _normalize_token_counts(usage_data: dict) -> tuple[int, int, int]:
         usage_data: Dictionary with provider-specific token fields
 
     Returns:
-        Tuple of (prompt_tokens, completion_tokens, total_tokens)
+        TokenCounts dataclass with (prompt_tokens, completion_tokens, total_tokens)
 
     Field mappings:
         OpenAI: prompt_tokens, completion_tokens, total_tokens
@@ -210,7 +215,7 @@ def _normalize_token_counts(usage_data: dict) -> tuple[int, int, int]:
         completion_tokens = usage_data.get("candidates_token_count") or 0
         total_tokens = usage_data.get("total_token_count") or 0
 
-    return prompt_tokens, completion_tokens, total_tokens
+    return TokenCounts(prompt_tokens, completion_tokens, total_tokens)
 
 
 def _extract_model_from_flattened_path(flattened: dict, usage_key_path: str) -> str:
