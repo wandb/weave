@@ -39,15 +39,15 @@ client_settings:
       type: string
       description: Username for HTTP Basic authentication
       nullable: false
-      read_env: USERNAME
+      read_env: WANDB_USERNAME
       auth:
         security_scheme: HTTPBasic
         role: username
-    password:
+    api_key:
       type: string
       description: Password for HTTP Basic authentication
       nullable: false
-      read_env: PASSWORD
+      read_env: WANDB_PASSWORD
       auth:
         security_scheme: HTTPBasic
         role: password
@@ -105,6 +105,8 @@ resources:
     methods:
       health_check: get /health
       server_info: get /server_info
+      geolocate: get /geolocate
+      version: get /version
 
   calls:
     methods:
@@ -133,6 +135,19 @@ resources:
       query: post /table/query
       # query_stream: post /table/query_stream
       query_stats: post /table/query_stats
+      query_stats_batch: post /query_stats_batch
+
+  otel:
+    methods:
+      export_trace: post /otel/v1/traces
+
+  # inference:
+  #   methods:
+  #     chat_completion: post /
+
+  threads:
+    methods:
+      stream_query: /threads/stream_query
 
   refs:
     methods:
@@ -142,6 +157,7 @@ resources:
     methods:
       create: post /file/create
       content: post /file/content
+      query_stats: post /file/query_stats
 
   costs:
     methods:
