@@ -18,6 +18,8 @@ from __future__ import annotations
 
 import json
 import os
+import random
+import string
 import subprocess
 import sys
 import time
@@ -154,19 +156,21 @@ def generate_code(
         sys.exit(1)
 
     cmd = [
-        "node",
-        f"{CODEGEN_BUNDLE_PATH}",
-        f"--org-name={STAINLESS_ORG_NAME}",
-        f"--project-name={STAINLESS_PROJECT_NAME}",
-        f"--config-path={STAINLESS_CONFIG_PATH}",
-        f"--oas-path={STAINLESS_OAS_PATH}",
+        "stl",
+        f"builds",
+        f"create",
+        f"--project={STAINLESS_PROJECT_NAME}",
+        f"--config={STAINLESS_CONFIG_PATH}",
+        f"--oas={STAINLESS_OAS_PATH}",
+        f"--branch=tmp/{''.join(random.choices(string.ascii_letters + string.digits, k=8))}",
+        f"--pull"
     ]
     if python_path:
-        cmd.append(f"--output-python={python_path}")
+        cmd.append(f"--target=python:{python_path}")
     if node_path:
-        cmd.append(f"--output-node={node_path}")
+        cmd.append(f"--target=node:{node_path}")
     if typescript_path:
-        cmd.append(f"--output-typescript={typescript_path}")
+        cmd.append(f"--target=typescript:{typescript_path}")
 
     try:
         subprocess.run(cmd, check=True, timeout=SUBPROCESS_TIMEOUT)
