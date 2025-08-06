@@ -196,8 +196,6 @@ def test_read_deleted_object(client: WeaveClient):
 
     ref_res = client.server.refs_read_batch(
         tsi.RefsReadBatchReq(
-            project_id=client._project_id(),
-            object_ids=["obj_1"],
             refs=[obj1_v2.uri()],
         )
     )
@@ -255,8 +253,6 @@ def test_read_deleted_op(client: WeaveClient):
 
     ref_res = client.server.refs_read_batch(
         tsi.RefsReadBatchReq(
-            project_id=client._project_id(),
-            object_ids=["my_op"],
             refs=[op_ref.uri()],
         )
     )
