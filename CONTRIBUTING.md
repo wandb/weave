@@ -121,16 +121,26 @@ We use pre-commit. You can install with:
 uv tool install pre-commit
 ```
 
-Then run:
+Then run on staged files (default, faster):
+
+```sh
+pre-commit run --hook-stage=pre-push
+```
+
+Or run on all files (slower but more thorough):
 
 ```sh
 pre-commit run --hook-stage=pre-push --all-files
 ```
 
-You can also use the `lint` nox target to run linting.
+You can also use the `lint` nox target to run linting:
 
 ```sh
+# Run on staged files only (default, faster)
 nox -e lint
+
+# Run on all files
+nox -e lint -- --all-files
 ```
 
 ### Building the `weave` package
