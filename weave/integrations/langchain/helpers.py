@@ -194,21 +194,21 @@ def _normalize_token_counts(usage_data: dict) -> tuple[int, int, int]:
 
     # OpenAI format: prompt_tokens, completion_tokens, total_tokens
     if "prompt_tokens" in usage_data and "completion_tokens" in usage_data:
-        prompt_tokens = usage_data.get("prompt_tokens", 0) or 0
-        completion_tokens = usage_data.get("completion_tokens", 0) or 0
-        total_tokens = usage_data.get("total_tokens", 0) or 0
+        prompt_tokens = usage_data.get("prompt_tokens") or 0
+        completion_tokens = usage_data.get("completion_tokens") or 0
+        total_tokens = usage_data.get("total_tokens") or 0
 
     # Google GenAI format: input_tokens, output_tokens, total_tokens
     elif "input_tokens" in usage_data and "output_tokens" in usage_data:
-        prompt_tokens = usage_data.get("input_tokens", 0) or 0
-        completion_tokens = usage_data.get("output_tokens", 0) or 0
-        total_tokens = usage_data.get("total_tokens", 0) or 0
+        prompt_tokens = usage_data.get("input_tokens") or 0
+        completion_tokens = usage_data.get("output_tokens") or 0
+        total_tokens = usage_data.get("total_tokens") or 0
 
     # Google Vertex AI format: prompt_token_count, candidates_token_count, total_token_count
     elif "prompt_token_count" in usage_data and "candidates_token_count" in usage_data:
-        prompt_tokens = usage_data.get("prompt_token_count", 0) or 0
-        completion_tokens = usage_data.get("candidates_token_count", 0) or 0
-        total_tokens = usage_data.get("total_token_count", 0) or 0
+        prompt_tokens = usage_data.get("prompt_token_count") or 0
+        completion_tokens = usage_data.get("candidates_token_count") or 0
+        total_tokens = usage_data.get("total_token_count") or 0
 
     return prompt_tokens, completion_tokens, total_tokens
 
