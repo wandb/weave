@@ -5,7 +5,7 @@ import TabItem from '@theme/TabItem';
 
 :::tip
 For a limited time, the new W&B Inference service is included in your free tier. W&B Inference provides access to leading open-source foundation models via API and the Weave [Playground](./guides/tools/playground.md). 
-- [Developer documentation](./guides/integrations/inference.md)
+- [Developer documentation](https://docs.wandb.ai/guides/inference/)
 - [Product page](https://wandb.ai/site/inference) 
 :::
 
