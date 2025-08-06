@@ -141,10 +141,6 @@ resources:
     methods:
       export_trace: post /otel/v1/traces
 
-  # inference:
-  #   methods:
-  #     chat_completion: post /
-
   threads:
     methods:
       stream_query: /threads/stream_query
