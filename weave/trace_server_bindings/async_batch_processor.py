@@ -7,7 +7,11 @@ from queue import Empty, Full, Queue
 from threading import Event, Lock, Thread
 from typing import Callable, Generic, TypeVar
 
-import sentry_sdk
+try:
+    import sentry_sdk
+    SENTRY_AVAILABLE = True
+except ImportError:
+    SENTRY_AVAILABLE = False
 
 from weave.trace.context.tests_context import get_raise_on_captured_errors
 
@@ -88,7 +92,8 @@ class AsyncBatchProcessor(Generic[T]):
                     item_id = id(item)
                     error_message = f"Queue is full. Dropping item. Item ID: {item_id}. Max queue size: {self.queue.maxsize}"
                     logger.warning(error_message)
-                    sentry_sdk.capture_message(error_message, level="warning")
+                    if SENTRY_AVAILABLE:
+                        sentry_sdk.capture_message(error_message, level="warning")
                     self._write_item_to_disk(item, error_message)
 
     def stop_accepting_new_work_and_flush_queue(self) -> None:
@@ -162,7 +167,8 @@ class AsyncBatchProcessor(Generic[T]):
             f"Item ID: {item_id}, Error: {error}"
         )
         logger.exception(error_message)
-        sentry_sdk.capture_message(error_message, level="error")
+        if SENTRY_AVAILABLE:
+            sentry_sdk.capture_message(error_message, level="error")
         self._write_item_to_disk(item, error_message)
 
     def _process_batch_individually(self, batch: list[T]) -> None:
@@ -211,7 +217,8 @@ class AsyncBatchProcessor(Generic[T]):
         except Exception as e:
             error_message = f"Failed to rotate log file {self.disk_fallback_path}: {e}"
             logger.exception(error_message)
-            sentry_sdk.capture_message(error_message, level="error")
+            if SENTRY_AVAILABLE:
+                sentry_sdk.capture_message(error_message, level="error")
 
     def _write_item_to_disk(self, item: T, error_message: str) -> None:
         """
@@ -248,7 +255,8 @@ class AsyncBatchProcessor(Generic[T]):
         except Exception as e:
             error_message = f"Failed to write dropped item {item_id} to disk: {e}"
             logger.exception(error_message)
-            sentry_sdk.capture_message(error_message, level="error")
+            if SENTRY_AVAILABLE:
+                sentry_sdk.capture_message(error_message, level="error")
 
     def _ensure_health_check_alive(self) -> None:
         """Ensures the health check thread is alive, restarts if needed."""
@@ -259,7 +267,8 @@ class AsyncBatchProcessor(Generic[T]):
                 logger.info("Health check thread successfully revived")
             except Exception as e:
                 logger.exception("Failed to revive health check thread")
-                sentry_sdk.capture_exception(e)
+                if SENTRY_AVAILABLE:
+                    sentry_sdk.capture_exception(e)
 
     def _health_check(self) -> None:
         """Health check thread that monitors and revives the processing thread if it dies."""
@@ -281,7 +290,8 @@ class AsyncBatchProcessor(Generic[T]):
                     logger.info("Processing thread successfully revived")
                 except Exception as e:
                     logger.exception("Failed to revive processing thread")
-                    sentry_sdk.capture_exception(e)
+                    if SENTRY_AVAILABLE:
+                        sentry_sdk.capture_exception(e)
 
 
 def start_thread(target: Callable[[], None]) -> Thread:

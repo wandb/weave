@@ -21,11 +21,18 @@ import sys
 from typing import TYPE_CHECKING, Any, Callable, Literal
 
 if TYPE_CHECKING:
-    from sentry_sdk._types import Event, ExcInfo
+    try:
+        from sentry_sdk._types import Event, ExcInfo
+    except ImportError:
+        Event = Any  # type: ignore
+        ExcInfo = Any  # type: ignore
 
-
-import sentry_sdk  # type: ignore
-import sentry_sdk.utils  # type: ignore
+try:
+    import sentry_sdk  # type: ignore
+    import sentry_sdk.utils  # type: ignore
+    SENTRY_AVAILABLE = True
+except ImportError:
+    SENTRY_AVAILABLE = False
 
 SENTRY_DEFAULT_DSN = "https://99697cf8ca5158250d3dd6cb23cca9b0@o151352.ingest.us.sentry.io/4507019311251456"
 
@@ -58,9 +65,9 @@ class Sentry:
 
         self.dsn = SENTRY_DEFAULT_DSN
 
-        self.hub: sentry_sdk.hub.Hub | None = None
+        self.hub: Any = None  # sentry_sdk.hub.Hub when available
 
-        self._disabled = False
+        self._disabled = False or not SENTRY_AVAILABLE
 
         # ensure we always end the Sentry session
         atexit.register(self.end_session)
@@ -88,6 +95,9 @@ class Sentry:
         to avoid the possibility of interfering with the user's
         own Sentry SDK setup.
         """
+        if not SENTRY_AVAILABLE:
+            return
+            
         from weave import version
 
         client = sentry_sdk.Client(
@@ -109,10 +119,16 @@ class Sentry:
         error = Exception(exc) if isinstance(exc, str) else exc
         # based on self.hub.capture_exception(_exc)
         if error is not None:
-            exc_info = sentry_sdk.utils.exc_info_from_error(error)
+            if SENTRY_AVAILABLE:
+                exc_info = sentry_sdk.utils.exc_info_from_error(error)
+            else:
+                exc_info = sys.exc_info()
         else:
             exc_info = sys.exc_info()
 
+        if not SENTRY_AVAILABLE:
+            return
+            
         event, hint = sentry_sdk.utils.event_from_exception(
             exc_info,
             client_options=self.hub.client.options,  # type: ignore
