@@ -23,7 +23,6 @@ Environment:
 #     "tomlkit==0.13.3",
 #     "PyYAML==6.0.2",
 #     "rich==14.0.0",
-#     "python-multipart==0.0.20"
 # ]
 # ///
 
@@ -84,9 +83,8 @@ def get_openapi_spec(
     if output_file is None:
         output_file = str(Path.cwd() / STAINLESS_OAS_PATH)
 
-    if not _kill_port(WEAVE_PORT):
-        error("Failed to kill process on port 6345")
-        sys.exit(1)
+    # Kill any existing process on the port (if there is one)
+    _kill_port(WEAVE_PORT)
 
     info("Starting server...")
     server = subprocess.Popen(
@@ -198,11 +196,15 @@ def generate_code(
         cmd.append(f"--+target=typescript:{typescript_path}")
 
     try:
-        subprocess.run(cmd, check=True, timeout=SUBPROCESS_TIMEOUT)
+        subprocess.run(
+            cmd, check=True, capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT
+        )
     except subprocess.CalledProcessError as e:
         error(f"Code generation failed with exit code {e.returncode}")
-        if e.output:
-            error(f"Output: {e.output.decode()}")
+        if e.stdout:
+            error(f"Output: {e.stdout}")
+        if e.stderr:
+            error(f"Error output: {e.stderr}")
         sys.exit(1)
     except subprocess.TimeoutExpired:
         error(f"Code generation timed out after {SUBPROCESS_TIMEOUT} seconds")
@@ -344,9 +346,6 @@ def all(
                     error("Config creation aborted")
                     sys.exit(1)
 
-            # Set the python_output in the config
-            cfg["python_output"] = python_output_input
-
             # Replace the template python_output with the provided value
             config_content = config_content.replace(
                 "/path/to/your/local/python/repo", python_output_input
@@ -358,6 +357,12 @@ def all(
                 dst.write(config_content)
 
             info(f"Config file created at: {config_file_path}")
+
+            # Reload the config file to get all values including package_name
+            cfg = _load_config(config_file_path)
+            info(
+                f"Loaded config with package_name: {cfg.get('package_name', 'weave_server_sdk')}"
+            )
         else:
             error(f"Template file not found: {template_path}")
             error(
@@ -426,24 +431,55 @@ def info(text: str):
 def _kill_port(port: int) -> bool:
     """Terminate any process listening on the specified port.
 
-    Executes a shell command to kill the process using the specified port.
-    Returns True if a process was successfully terminated, False otherwise.
+    Returns True if at least one process was successfully terminated, False if no process was found or all kills failed.
     """
-    cmd = f"lsof -i :{port} | grep LISTEN | awk '{{print $2}}' | xargs kill -9"
+    # First, find the process listening on the port
     try:
-        subprocess.run(
-            cmd, shell=True, stderr=subprocess.PIPE, timeout=SUBPROCESS_TIMEOUT
+        # Use lsof to find processes listening on the port
+        result = subprocess.run(
+            ["lsof", "-ti", f":{port}"],
+            capture_output=True,
+            text=True,
+            timeout=SUBPROCESS_TIMEOUT,
+            check=False,
         )
-    except subprocess.CalledProcessError as e:
-        info(f"No process found on port {port}")
-        warning(f"Command failed with error: {e}")
-        return False
     except subprocess.TimeoutExpired:
-        error(f"Timeout while trying to kill process on port {port}")
+        error(f"Timeout while finding processes on port {port}")
         return False
-    else:
-        info(f"Successfully killed process on port {port}")
-        return True
+    except Exception as e:
+        error(f"Unexpected error finding processes on port {port}: {e}")
+        return False
+
+    if result.returncode != 0 or not result.stdout.strip():
+        info(f"No process found listening on port {port}")
+        return False
+
+    # Get the PIDs from the output
+    pids = result.stdout.strip().split("\n")
+    killed_any = False
+
+    # Kill each process
+    for pid in pids:
+        if not pid:
+            continue
+
+        try:
+            subprocess.run(
+                ["kill", "-9", pid],
+                capture_output=True,
+                timeout=SUBPROCESS_TIMEOUT,
+                check=True,
+            )
+            info(f"Killed process {pid} on port {port}")
+            killed_any = True
+        except subprocess.TimeoutExpired:
+            warning(f"Timeout while killing process {pid}")
+        except subprocess.CalledProcessError as e:
+            warning(f"Failed to kill process {pid}: {e}")
+        except Exception as e:
+            warning(f"Unexpected error killing process {pid}: {e}")
+
+    return killed_any
 
 
 def _wait_for_server(
