@@ -392,9 +392,13 @@ def _find_generation_paths(flattened: dict) -> list[str]:
             parts = key.split(".")
             try:
                 gen_idx = parts.index("generations")
+                # Need at least 3 more parts after "generations": Y.Z.something
                 if gen_idx + 2 < len(parts):
-                    generation_path = ".".join(parts[: gen_idx + 3])
-                    generation_paths.add(generation_path)
+                    # Validate that the part after generations.Y is a number (the generation index)
+                    generation_index_part = parts[gen_idx + 2]
+                    if generation_index_part.isdigit():
+                        generation_path = ".".join(parts[: gen_idx + 3])
+                        generation_paths.add(generation_path)
             except (ValueError, IndexError):
                 continue
 
@@ -456,8 +460,10 @@ def _extract_usage_from_generation(
     # Deduplicate candidates
     unique_candidates = list(set(usage_candidates))
 
+    # No usage data found, but still try to extract model name
     if not unique_candidates:
-        return ModelTokenCounts.empty()
+        model = _extract_model_from_flattened_path(flattened, generation_path)
+        return ModelTokenCounts.empty(model)
 
     # Prioritize usage data sources to avoid double-counting:
     # 1. generation_info.usage_metadata (most authoritative, especially for Vertex AI)

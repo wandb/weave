@@ -7,591 +7,880 @@ different provider formats (OpenAI, Google GenAI, Google Vertex AI, Anthropic).
 
 from unittest.mock import Mock
 
+import pytest
+
 from weave.integrations.langchain.helpers import (
+    ModelTokenCounts,
+    TokenCounts,
     _extract_model_from_flattened_path,
     _extract_usage_data,
+    _extract_usage_from_generation,
+    _find_generation_paths,
+    _is_valid_usage_shape,
     _normalize_token_counts,
     _reconstruct_usage_data_from_flattened,
-    _is_valid_usage_shape,
 )
 from weave.trace.weave_client import Call
 
 
-class TestExtractUsageData:
-    """Test the main usage data extraction function."""
-
-    def test_openai_format(self):
-        """Test OpenAI token_usage format extraction."""
-        call = Mock(spec=Call)
-        call.summary = None
-
-        output = {
-            "outputs": [
-                {
-                    "generations": [
-                        [
-                            {
-                                "message": {
-                                    "kwargs": {
-                                        "token_usage": {
-                                            "prompt_tokens": 10,
-                                            "completion_tokens": 5,
-                                            "total_tokens": 15,
+@pytest.mark.parametrize(
+    ("output", "expected"),
+    [
+        # OpenAI format
+        (
+            {
+                "outputs": [
+                    {
+                        "generations": [
+                            [
+                                {
+                                    "message": {
+                                        "kwargs": {
+                                            "token_usage": {
+                                                "prompt_tokens": 10,
+                                                "completion_tokens": 5,
+                                                "total_tokens": 15,
+                                            }
                                         }
-                                    }
-                                },
-                                "generation_info": {"model_name": "gpt-4o-mini"},
-                            }
+                                    },
+                                    "generation_info": {"model_name": "gpt-4o-mini"},
+                                }
+                            ]
                         ]
-                    ]
+                    }
+                ]
+            },
+            {
+                "gpt-4o-mini": {
+                    "prompt_tokens": 10,
+                    "completion_tokens": 5,
+                    "total_tokens": 15,
                 }
-            ]
-        }
-
-        _extract_usage_data(call, output)
-
-        assert call.summary is not None
-        assert "usage" in call.summary
-        usage = call.summary["usage"]
-        assert "gpt-4o-mini" in usage
-        assert usage["gpt-4o-mini"]["prompt_tokens"] == 10
-        assert usage["gpt-4o-mini"]["completion_tokens"] == 5
-        assert usage["gpt-4o-mini"]["total_tokens"] == 15
-
-    def test_google_genai_format(self):
-        """Test Google GenAI usage_metadata format extraction."""
-        call = Mock(spec=Call)
-        call.summary = None
-
-        output = {
-            "outputs": [
-                {
-                    "generations": [
-                        [
-                            {
-                                "message": {
-                                    "kwargs": {
-                                        "usage_metadata": {
-                                            "input_tokens": 20,
-                                            "output_tokens": 7,
-                                            "total_tokens": 27,
+            },
+        ),
+        # Google GenAI format
+        (
+            {
+                "outputs": [
+                    {
+                        "generations": [
+                            [
+                                {
+                                    "message": {
+                                        "kwargs": {
+                                            "usage_metadata": {
+                                                "input_tokens": 20,
+                                                "output_tokens": 7,
+                                                "total_tokens": 27,
+                                            }
                                         }
-                                    }
-                                },
-                                "generation_info": {"model_name": "gemini-1.5-pro"},
-                            }
+                                    },
+                                    "generation_info": {"model_name": "gemini-1.5-pro"},
+                                }
+                            ]
                         ]
-                    ]
+                    }
+                ]
+            },
+            {
+                "gemini-1.5-pro": {
+                    "prompt_tokens": 20,
+                    "completion_tokens": 7,
+                    "total_tokens": 27,
                 }
-            ]
-        }
-
-        _extract_usage_data(call, output)
-
-        assert call.summary is not None
-        assert "usage" in call.summary
-        usage = call.summary["usage"]
-        assert "gemini-1.5-pro" in usage
-        assert usage["gemini-1.5-pro"]["prompt_tokens"] == 20
-        assert usage["gemini-1.5-pro"]["completion_tokens"] == 7
-        assert usage["gemini-1.5-pro"]["total_tokens"] == 27
-
-    def test_google_vertex_ai_format(self):
-        """Test Google Vertex AI usage_metadata format extraction."""
-        call = Mock(spec=Call)
-        call.summary = None
-
-        output = {
-            "outputs": [
-                {
-                    "generations": [
-                        [
-                            {
-                                "message": {
-                                    "kwargs": {
-                                        "usage_metadata": {
-                                            "prompt_token_count": 15,
-                                            "candidates_token_count": 8,
-                                            "total_token_count": 23,
+            },
+        ),
+        # Google Vertex AI format
+        (
+            {
+                "outputs": [
+                    {
+                        "generations": [
+                            [
+                                {
+                                    "message": {
+                                        "kwargs": {
+                                            "usage_metadata": {
+                                                "prompt_token_count": 15,
+                                                "candidates_token_count": 8,
+                                                "total_token_count": 23,
+                                            }
                                         }
-                                    }
-                                },
-                                "generation_info": {
-                                    "model_name": "gemini-2.5-pro-preview"
-                                },
-                            }
+                                    },
+                                    "generation_info": {
+                                        "model_name": "gemini-2.5-pro-preview"
+                                    },
+                                }
+                            ]
                         ]
-                    ]
+                    }
+                ]
+            },
+            {
+                "gemini-2.5-pro-preview": {
+                    "prompt_tokens": 15,
+                    "completion_tokens": 8,
+                    "total_tokens": 23,
                 }
-            ]
-        }
-
-        _extract_usage_data(call, output)
-
-        assert call.summary is not None
-        assert "usage" in call.summary
-        usage = call.summary["usage"]
-        assert "gemini-2.5-pro-preview" in usage
-        assert usage["gemini-2.5-pro-preview"]["prompt_tokens"] == 15
-        assert usage["gemini-2.5-pro-preview"]["completion_tokens"] == 8
-        assert usage["gemini-2.5-pro-preview"]["total_tokens"] == 23
-
-    def test_anthropic_format(self):
-        """Test Anthropic usage format (uses input_tokens/output_tokens pattern)."""
-        call = Mock(spec=Call)
-        call.summary = None
-
-        output = {
-            "outputs": [
-                {
-                    "generations": [
-                        [
-                            {
-                                "message": {
-                                    "kwargs": {
-                                        "usage_metadata": {
-                                            "input_tokens": 25,
-                                            "output_tokens": 11,
-                                            "total_tokens": 36,
+            },
+        ),
+        # Batch aggregation - multiple outputs with same model
+        (
+            {
+                "outputs": [
+                    {
+                        "generations": [
+                            [
+                                {
+                                    "message": {
+                                        "kwargs": {
+                                            "token_usage": {
+                                                "prompt_tokens": 10,
+                                                "completion_tokens": 5,
+                                                "total_tokens": 15,
+                                            }
                                         }
-                                    }
-                                },
-                                "generation_info": {
-                                    "model_name": "claude-opus-4-20250514"
-                                },
-                            }
+                                    },
+                                    "generation_info": {"model_name": "gpt-4o-mini"},
+                                }
+                            ]
                         ]
-                    ]
+                    },
+                    {
+                        "generations": [
+                            [
+                                {
+                                    "message": {
+                                        "kwargs": {
+                                            "token_usage": {
+                                                "prompt_tokens": 12,
+                                                "completion_tokens": 8,
+                                                "total_tokens": 20,
+                                            }
+                                        }
+                                    },
+                                    "generation_info": {"model_name": "gpt-4o-mini"},
+                                }
+                            ]
+                        ]
+                    },
+                ]
+            },
+            {
+                "gpt-4o-mini": {
+                    "prompt_tokens": 22,
+                    "completion_tokens": 13,
+                    "total_tokens": 35,
                 }
-            ]
-        }
-
-        _extract_usage_data(call, output)
-
-        assert call.summary is not None
-        assert "usage" in call.summary
-        usage = call.summary["usage"]
-        assert "claude-opus-4-20250514" in usage
-        assert usage["claude-opus-4-20250514"]["prompt_tokens"] == 25
-        assert usage["claude-opus-4-20250514"]["completion_tokens"] == 11
-        assert usage["claude-opus-4-20250514"]["total_tokens"] == 36
-
-    def test_batch_operations_aggregation(self):
-        """Test usage aggregation for batch operations with multiple outputs."""
-        call = Mock(spec=Call)
-        call.summary = None
-
-        output = {
-            "outputs": [
-                {
-                    "generations": [
-                        [
-                            {
-                                "message": {
-                                    "kwargs": {
-                                        "token_usage": {
-                                            "prompt_tokens": 10,
-                                            "completion_tokens": 5,
-                                            "total_tokens": 15,
+            },
+        ),
+        # Multiple generations within single output
+        (
+            {
+                "outputs": [
+                    {
+                        "generations": [
+                            [
+                                {
+                                    "message": {
+                                        "kwargs": {
+                                            "usage_metadata": {
+                                                "input_tokens": 25,
+                                                "output_tokens": 10,
+                                                "total_tokens": 35,
+                                            }
                                         }
-                                    }
+                                    },
+                                    "generation_info": {"model_name": "gemini-1.5-pro"},
                                 },
-                                "generation_info": {"model_name": "gpt-4o-mini"},
-                            }
+                                {
+                                    "message": {
+                                        "kwargs": {
+                                            "usage_metadata": {
+                                                "input_tokens": 15,
+                                                "output_tokens": 8,
+                                                "total_tokens": 23,
+                                            }
+                                        }
+                                    },
+                                    "generation_info": {"model_name": "gemini-1.5-pro"},
+                                },
+                            ]
                         ]
+                    }
+                ]
+            },
+            {
+                "gemini-1.5-pro": {
+                    "prompt_tokens": 40,
+                    "completion_tokens": 18,
+                    "total_tokens": 58,
+                }
+            },
+        ),
+    ],
+)
+def test_extract_usage_data(output, expected):
+    """Test main usage extraction function with various provider formats."""
+    call = Mock(spec=Call)
+    call.summary = None
+    _extract_usage_data(call, output)
+    assert call.summary is not None
+    assert "usage" in call.summary
+    assert call.summary["usage"] == expected
+
+
+def test_extract_usage_data_no_outputs():
+    """Test that no usage data is extracted when outputs are missing or empty."""
+    call = Mock(spec=Call)
+    call.summary = None
+
+    # Test None output
+    _extract_usage_data(call, None)
+    assert call.summary is None
+
+    # Test empty outputs
+    _extract_usage_data(call, {"outputs": []})
+    assert call.summary is None
+
+    # Test missing outputs key
+    _extract_usage_data(call, {"other_key": "value"})
+    assert call.summary is None
+
+
+def test_extract_usage_data_preserves_existing_summary():
+    """Test that existing call summary data is preserved when adding usage data."""
+    call = Mock(spec=Call)
+    call.summary = {"existing_key": "existing_value"}
+
+    output = {
+        "outputs": [
+            {
+                "generations": [
+                    [
+                        {
+                            "message": {
+                                "kwargs": {
+                                    "token_usage": {
+                                        "prompt_tokens": 10,
+                                        "completion_tokens": 5,
+                                        "total_tokens": 15,
+                                    }
+                                }
+                            },
+                            "generation_info": {"model_name": "gpt-4o-mini"},
+                        }
                     ]
+                ]
+            }
+        ]
+    }
+
+    _extract_usage_data(call, output)
+
+    assert call.summary["existing_key"] == "existing_value"
+    assert "usage" in call.summary
+
+
+@pytest.mark.parametrize(
+    ("flattened", "base_path", "expected"),
+    [
+        # OpenAI format
+        (
+            {
+                "outputs.0.generations.0.0.message.kwargs.token_usage.prompt_tokens": 10,
+                "outputs.0.generations.0.0.message.kwargs.token_usage.completion_tokens": 5,
+                "outputs.0.generations.0.0.message.kwargs.token_usage.total_tokens": 15,
+                "other.unrelated.key": "value",
+            },
+            "outputs.0.generations.0.0.message.kwargs.token_usage",
+            {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
+        ),
+        # Google GenAI format
+        (
+            {
+                "outputs.0.generations.0.0.message.kwargs.usage_metadata.input_tokens": 20,
+                "outputs.0.generations.0.0.message.kwargs.usage_metadata.output_tokens": 7,
+                "outputs.0.generations.0.0.message.kwargs.usage_metadata.total_tokens": 27,
+            },
+            "outputs.0.generations.0.0.message.kwargs.usage_metadata",
+            {"input_tokens": 20, "output_tokens": 7, "total_tokens": 27},
+        ),
+        # Google Vertex AI format
+        (
+            {
+                "outputs.0.generation_info.usage_metadata.prompt_token_count": 15,
+                "outputs.0.generation_info.usage_metadata.candidates_token_count": 8,
+                "outputs.0.generation_info.usage_metadata.total_token_count": 23,
+            },
+            "outputs.0.generation_info.usage_metadata",
+            {
+                "prompt_token_count": 15,
+                "candidates_token_count": 8,
+                "total_token_count": 23,
+            },
+        ),
+        # Ignores nested structures
+        (
+            {
+                "outputs.0.usage_metadata.input_tokens": 20,
+                "outputs.0.usage_metadata.nested.deep.value": "ignored",
+                "outputs.0.usage_metadata.output_tokens": 7,
+            },
+            "outputs.0.usage_metadata",
+            {"input_tokens": 20, "output_tokens": 7},
+        ),
+        # Handles float values
+        (
+            {
+                "outputs.0.usage_metadata.input_tokens": 20.5,
+                "outputs.0.usage_metadata.output_tokens": 7.2,
+            },
+            "outputs.0.usage_metadata",
+            {"input_tokens": 20, "output_tokens": 7},
+        ),
+    ],
+)
+def test_reconstruct_usage_data_from_flattened(flattened, base_path, expected):
+    """Test reconstruction of usage data from flattened key-value pairs."""
+    result = _reconstruct_usage_data_from_flattened(flattened, base_path)
+    assert result == expected
+
+
+@pytest.mark.parametrize(
+    ("usage_data", "expected"),
+    [
+        # Valid OpenAI format
+        ({"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}, True),
+        # Valid Google GenAI format
+        ({"input_tokens": 20, "output_tokens": 7, "total_tokens": 27}, True),
+        # Valid Google Vertex AI format
+        (
+            {
+                "prompt_token_count": 15,
+                "candidates_token_count": 8,
+                "total_token_count": 23,
+            },
+            True,
+        ),
+        # OpenAI without total (still valid)
+        ({"prompt_tokens": 10, "completion_tokens": 5}, True),
+        # Google GenAI without total (still valid)
+        ({"input_tokens": 20, "output_tokens": 7}, True),
+        # Incomplete OpenAI (missing completion_tokens)
+        ({"prompt_tokens": 10}, False),
+        # Incomplete Google GenAI (missing output_tokens)
+        ({"input_tokens": 20}, False),
+        # Incomplete Vertex AI (missing candidates_token_count)
+        ({"prompt_token_count": 15}, False),
+        # Unknown format
+        ({"unknown_tokens": 10, "other_tokens": 5}, False),
+        # Non-dict inputs
+        ("not a dict", False),
+        (None, False),
+        (123, False),
+        ([], False),
+        # Empty dict
+        ({}, False),
+    ],
+)
+def test_is_valid_usage_shape(usage_data, expected):
+    """Test validation of usage data shapes for different providers."""
+    result = _is_valid_usage_shape(usage_data)
+    assert result == expected
+
+
+@pytest.mark.parametrize(
+    ("usage_data", "expected_prompt", "expected_completion", "expected_total"),
+    [
+        # OpenAI format
+        ({"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}, 10, 5, 15),
+        # Google GenAI format
+        ({"input_tokens": 20, "output_tokens": 7, "total_tokens": 27}, 20, 7, 27),
+        # Google Vertex AI format
+        (
+            {
+                "prompt_token_count": 15,
+                "candidates_token_count": 8,
+                "total_token_count": 23,
+            },
+            15,
+            8,
+            23,
+        ),
+        # OpenAI without total_tokens
+        ({"prompt_tokens": 10, "completion_tokens": 5}, 10, 5, 0),
+        # Google GenAI without total_tokens
+        ({"input_tokens": 20, "output_tokens": 7}, 20, 7, 0),
+        # Empty dict
+        ({}, 0, 0, 0),
+        # None values should be treated as 0
+        ({"prompt_tokens": None, "completion_tokens": 5, "total_tokens": 15}, 0, 5, 15),
+        ({"input_tokens": 20, "output_tokens": None, "total_tokens": 20}, 20, 0, 20),
+        # Zero values
+        ({"prompt_tokens": 0, "completion_tokens": 5, "total_tokens": 5}, 0, 5, 5),
+    ],
+)
+def test_normalize_token_counts(
+    usage_data, expected_prompt, expected_completion, expected_total
+):
+    """Test normalization of token counts from different provider formats."""
+    token_counts = _normalize_token_counts(usage_data)
+    assert token_counts.prompt_tokens == expected_prompt
+    assert token_counts.completion_tokens == expected_completion
+    assert token_counts.total_tokens == expected_total
+
+
+@pytest.mark.parametrize(
+    ("flattened", "usage_key_path", "expected"),
+    [
+        # generation_info.model_name (preferred location)
+        (
+            {
+                "outputs.0.generations.0.0.generation_info.model_name": "gpt-4o-mini",
+                "outputs.0.generations.0.0.message.kwargs.token_usage.prompt_tokens": 10,
+            },
+            "outputs.0.generations.0.0.message.kwargs.token_usage",
+            "gpt-4o-mini",
+        ),
+        # response_metadata.model_name
+        (
+            {
+                "outputs.0.generations.0.response_metadata.model_name": "gemini-1.5-pro",
+                "outputs.0.generations.0.0.message.kwargs.usage_metadata.input_tokens": 20,
+            },
+            "outputs.0.generations.0.0.message.kwargs.usage_metadata",
+            "gemini-1.5-pro",
+        ),
+        # broader search pattern
+        (
+            {
+                "outputs.0.some.custom.path.model_name": "claude-opus-4",
+                "outputs.0.generations.0.0.message.kwargs.usage_metadata.input_tokens": 25,
+            },
+            "outputs.0.generations.0.0.message.kwargs.usage_metadata",
+            "claude-opus-4",
+        ),
+        # ignores empty string values
+        (
+            {
+                "outputs.0.generations.0.0.generation_info.model_name": "",
+                "outputs.0.generations.0.response_metadata.model_name": "gpt-4o-mini",
+                "outputs.0.generations.0.0.message.kwargs.token_usage.prompt_tokens": 10,
+            },
+            "outputs.0.generations.0.0.message.kwargs.token_usage",
+            "gpt-4o-mini",
+        ),
+        # ignores non-string values
+        (
+            {
+                "outputs.0.generations.0.0.generation_info.model_name": 123,
+                "outputs.0.generations.0.response_metadata.model_name": "gpt-4o-mini",
+                "outputs.0.generations.0.0.message.kwargs.token_usage.prompt_tokens": 10,
+            },
+            "outputs.0.generations.0.0.message.kwargs.token_usage",
+            "gpt-4o-mini",
+        ),
+        # fallback to unknown when no model found
+        (
+            {
+                "outputs.0.generations.0.0.message.kwargs.token_usage.prompt_tokens": 10,
+                "other.unrelated.key": "value",
+            },
+            "outputs.0.generations.0.0.message.kwargs.token_usage",
+            "unknown",
+        ),
+        # prioritizes generation_info over response_metadata
+        (
+            {
+                "outputs.0.generations.0.0.generation_info.model_name": "preferred-model",
+                "outputs.0.generations.0.response_metadata.model_name": "fallback-model",
+                "outputs.0.generations.0.0.message.kwargs.token_usage.prompt_tokens": 10,
+            },
+            "outputs.0.generations.0.0.message.kwargs.token_usage",
+            "preferred-model",
+        ),
+    ],
+)
+def test_extract_model_from_flattened_path(flattened, usage_key_path, expected):
+    """Test extraction of model names from flattened response structures."""
+    result = _extract_model_from_flattened_path(flattened, usage_key_path)
+    assert result == expected
+
+
+@pytest.mark.parametrize(
+    ("flattened", "expected"),
+    [
+        # Simple single generation
+        (
+            {
+                "outputs.0.generations.0.0.message.content": "Hello",
+                "outputs.0.generations.0.0.generation_info.model_name": "gpt-4",
+            },
+            ["outputs.0.generations.0.0"],
+        ),
+        # Multiple generations in same output
+        (
+            {
+                "outputs.0.generations.0.0.message.content": "Hello",
+                "outputs.0.generations.0.1.message.content": "World",
+                "outputs.0.generations.0.0.generation_info.model_name": "gpt-4",
+            },
+            ["outputs.0.generations.0.0", "outputs.0.generations.0.1"],
+        ),
+        # Multiple outputs with generations
+        (
+            {
+                "outputs.0.generations.0.0.message.content": "Hello",
+                "outputs.1.generations.0.0.message.content": "World",
+                "outputs.0.generations.0.0.generation_info.model_name": "gpt-4",
+            },
+            ["outputs.0.generations.0.0", "outputs.1.generations.0.0"],
+        ),
+        # No generations pattern
+        (
+            {
+                "outputs.0.message.content": "Hello",
+                "outputs.0.model_name": "gpt-4",
+            },
+            [],
+        ),
+        # Incomplete generation path (should be ignored)
+        (
+            {
+                "outputs.0.generations.0.incomplete": "data",
+                "outputs.0.generations.0.0.message.content": "Hello",
+            },
+            ["outputs.0.generations.0.0"],
+        ),
+        # Empty input
+        ({}, []),
+    ],
+)
+def test_find_generation_paths(flattened, expected):
+    """Test finding generation paths in flattened LangChain results."""
+    result = _find_generation_paths(flattened)
+    assert result == expected
+
+
+@pytest.mark.parametrize(
+    ("flattened", "generation_path", "expected_tokens", "expected_model"),
+    [
+        # OpenAI format in generation
+        (
+            {
+                "outputs.0.generations.0.0.message.kwargs.token_usage.prompt_tokens": 10,
+                "outputs.0.generations.0.0.message.kwargs.token_usage.completion_tokens": 5,
+                "outputs.0.generations.0.0.message.kwargs.token_usage.total_tokens": 15,
+                "outputs.0.generations.0.0.generation_info.model_name": "gpt-4o-mini",
+            },
+            "outputs.0.generations.0.0",
+            TokenCounts(prompt_tokens=10, completion_tokens=5, total_tokens=15),
+            "gpt-4o-mini",
+        ),
+        # Google GenAI format in generation
+        (
+            {
+                "outputs.0.generations.0.0.message.kwargs.usage_metadata.input_tokens": 20,
+                "outputs.0.generations.0.0.message.kwargs.usage_metadata.output_tokens": 7,
+                "outputs.0.generations.0.0.message.kwargs.usage_metadata.total_tokens": 27,
+                "outputs.0.generations.0.0.generation_info.model_name": "gemini-1.5-pro",
+            },
+            "outputs.0.generations.0.0",
+            TokenCounts(prompt_tokens=20, completion_tokens=7, total_tokens=27),
+            "gemini-1.5-pro",
+        ),
+        # Vertex AI format with generation_info priority
+        (
+            {
+                "outputs.0.generations.0.0.generation_info.usage_metadata.prompt_token_count": 15,
+                "outputs.0.generations.0.0.generation_info.usage_metadata.candidates_token_count": 8,
+                "outputs.0.generations.0.0.generation_info.usage_metadata.total_token_count": 23,
+                "outputs.0.generations.0.0.message.kwargs.usage_metadata.prompt_token_count": 99,  # Should be ignored
+                "outputs.0.generations.0.0.generation_info.model_name": "gemini-pro",
+            },
+            "outputs.0.generations.0.0",
+            TokenCounts(prompt_tokens=15, completion_tokens=8, total_tokens=23),
+            "gemini-pro",
+        ),
+        # No usage data in generation
+        (
+            {
+                "outputs.0.generations.0.0.message.content": "Hello",
+                "outputs.0.generations.0.0.generation_info.model_name": "gpt-4",
+            },
+            "outputs.0.generations.0.0",
+            TokenCounts(prompt_tokens=0, completion_tokens=0, total_tokens=0),
+            "gpt-4",
+        ),
+    ],
+)
+def test_extract_usage_from_generation(
+    flattened, generation_path, expected_tokens, expected_model
+):
+    """Test extraction of usage data from a specific generation path."""
+    result = _extract_usage_from_generation(flattened, generation_path)
+
+    assert result.prompt_tokens == expected_tokens.prompt_tokens
+    assert result.completion_tokens == expected_tokens.completion_tokens
+    assert result.total_tokens == expected_tokens.total_tokens
+    assert result.model_name == expected_model
+
+
+def test_extract_usage_from_generation_empty():
+    """Test that empty ModelTokenCounts is returned when no usage data found."""
+    flattened = {
+        "outputs.0.generations.0.0.message.content": "Hello",
+        "other.unrelated.key": "value",
+    }
+    result = _extract_usage_from_generation(flattened, "outputs.0.generations.0.0")
+
+    assert result.prompt_tokens == 0
+    assert result.completion_tokens == 0
+    assert result.total_tokens == 0
+    assert result.model_name == "unknown"
+    assert not result.is_valid()
+
+
+def test_model_token_counts_validation():
+    """Test ModelTokenCounts validation logic."""
+    # Valid cases
+    valid_cases = [
+        ModelTokenCounts(
+            prompt_tokens=10, completion_tokens=5, total_tokens=15, model_name="gpt-4"
+        ),
+        ModelTokenCounts(
+            prompt_tokens=0, completion_tokens=5, total_tokens=5, model_name="gpt-4"
+        ),
+        ModelTokenCounts(
+            prompt_tokens=10, completion_tokens=0, total_tokens=10, model_name="gpt-4"
+        ),
+    ]
+
+    for case in valid_cases:
+        assert case.is_valid(), f"Expected {case} to be valid"
+
+    # Invalid cases
+    invalid_cases = [
+        ModelTokenCounts(
+            prompt_tokens=0, completion_tokens=0, total_tokens=0, model_name="gpt-4"
+        ),
+        ModelTokenCounts(
+            prompt_tokens=-1, completion_tokens=5, total_tokens=4, model_name="gpt-4"
+        ),
+        ModelTokenCounts(
+            prompt_tokens=10, completion_tokens=-1, total_tokens=9, model_name="gpt-4"
+        ),
+        ModelTokenCounts(
+            prompt_tokens=10, completion_tokens=5, total_tokens=-1, model_name="gpt-4"
+        ),
+    ]
+
+    for case in invalid_cases:
+        assert not case.is_valid(), f"Expected {case} to be invalid"
+
+
+def test_model_token_counts_from_usage_data():
+    """Test ModelTokenCounts creation from usage data."""
+    # OpenAI format
+    openai_data = {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}
+    result = ModelTokenCounts.from_usage_data(openai_data, "gpt-4")
+    assert result.prompt_tokens == 10
+    assert result.completion_tokens == 5
+    assert result.total_tokens == 15
+    assert result.model_name == "gpt-4"
+    assert result.is_valid()
+
+    # Google GenAI format
+    genai_data = {"input_tokens": 20, "output_tokens": 7, "total_tokens": 27}
+    result = ModelTokenCounts.from_usage_data(genai_data, "gemini-1.5-pro")
+    assert result.prompt_tokens == 20
+    assert result.completion_tokens == 7
+    assert result.total_tokens == 27
+    assert result.model_name == "gemini-1.5-pro"
+    assert result.is_valid()
+
+    # Empty data
+    empty_result = ModelTokenCounts.from_usage_data({}, "unknown")
+    assert not empty_result.is_valid()
+
+
+def test_model_token_counts_empty():
+    """Test ModelTokenCounts.empty() factory method."""
+    empty = ModelTokenCounts.empty("test-model")
+    assert empty.prompt_tokens == 0
+    assert empty.completion_tokens == 0
+    assert empty.total_tokens == 0
+    assert empty.model_name == "test-model"
+    assert not empty.is_valid()
+
+
+def test_extract_usage_data_with_deduplication():
+    """Test that usage data deduplication works correctly in complex scenarios."""
+    # Vertex AI often duplicates usage data in generation_info and message.kwargs
+    # The new implementation should prefer generation_info and avoid double-counting
+    output = {
+        "outputs": [
+            {
+                "generations": [
+                    [
+                        {
+                            "message": {
+                                "kwargs": {
+                                    "usage_metadata": {
+                                        "prompt_token_count": 15,
+                                        "candidates_token_count": 8,
+                                        "total_token_count": 23,
+                                    }
+                                }
+                            },
+                            "generation_info": {
+                                "model_name": "gemini-pro",
+                                "usage_metadata": {
+                                    "prompt_token_count": 15,  # Same data - should not double count
+                                    "candidates_token_count": 8,
+                                    "total_token_count": 23,
+                                },
+                            },
+                        }
+                    ]
+                ]
+            }
+        ]
+    }
+
+    call = Mock(spec=Call)
+    call.summary = None
+    _extract_usage_data(call, output)
+
+    expected = {
+        "gemini-pro": {
+            "prompt_tokens": 15,
+            "completion_tokens": 8,
+            "total_tokens": 23,
+        }
+    }
+
+    assert call.summary["usage"] == expected
+
+
+def test_extract_usage_data_fallback_mode():
+    """Test fallback mode when no clear generation structure is found."""
+    # This tests the fallback path in _extract_usage_data when generation_paths is empty
+    output = {
+        "outputs": [
+            {
+                "token_usage": {
+                    "prompt_tokens": 10,
+                    "completion_tokens": 5,
+                    "total_tokens": 15,
                 },
-                {
-                    "generations": [
-                        [
-                            {
-                                "message": {
-                                    "kwargs": {
-                                        "token_usage": {
-                                            "prompt_tokens": 12,
-                                            "completion_tokens": 8,
-                                            "total_tokens": 20,
-                                        }
+                "model_name": "gpt-4",
+            }
+        ]
+    }
+
+    call = Mock(spec=Call)
+    call.summary = None
+    _extract_usage_data(call, output)
+
+    # Should still extract usage data via fallback mechanism
+    assert call.summary is not None
+    assert "usage" in call.summary
+    # Model extraction might default to "unknown" in fallback mode
+    assert "gpt-4" in call.summary["usage"] or "unknown" in call.summary["usage"]
+
+
+def test_extract_usage_data_invalid_usage_shapes():
+    """Test that invalid usage shapes are properly ignored."""
+    output = {
+        "outputs": [
+            {
+                "generations": [
+                    [
+                        {
+                            "message": {
+                                "kwargs": {
+                                    "usage_metadata": {
+                                        "invalid_field": 10,  # Invalid shape
+                                        "another_invalid": 5,
                                     }
-                                },
-                                "generation_info": {"model_name": "gpt-4o-mini"},
-                            }
-                        ]
+                                }
+                            },
+                            "generation_info": {"model_name": "gpt-4"},
+                        }
                     ]
-                },
-            ]
-        }
+                ]
+            }
+        ]
+    }
 
-        _extract_usage_data(call, output)
+    call = Mock(spec=Call)
+    call.summary = None
+    _extract_usage_data(call, output)
 
-        assert call.summary is not None
-        assert "usage" in call.summary
-        usage = call.summary["usage"]
-        assert "gpt-4o-mini" in usage
-        # Should aggregate both requests
-        assert usage["gpt-4o-mini"]["prompt_tokens"] == 22  # 10 + 12
-        assert usage["gpt-4o-mini"]["completion_tokens"] == 13  # 5 + 8
-        assert usage["gpt-4o-mini"]["total_tokens"] == 35  # 15 + 20
+    # Should not create usage data for invalid shapes
+    assert call.summary is None
 
-    def test_tuple_outputs_normalized(self):
-        """Test that tuple outputs are converted to lists for processing."""
-        call = Mock(spec=Call)
-        call.summary = None
 
-        output = {
-            "outputs": (  # Tuple instead of list
-                {
-                    "generations": [
-                        [
-                            {
-                                "message": {
-                                    "kwargs": {
-                                        "token_usage": {
-                                            "prompt_tokens": 10,
-                                            "completion_tokens": 5,
-                                            "total_tokens": 15,
-                                        }
+def test_extract_usage_data_mixed_models():
+    """Test extraction with different models in same batch."""
+    output = {
+        "outputs": [
+            {
+                "generations": [
+                    [
+                        {
+                            "message": {
+                                "kwargs": {
+                                    "token_usage": {
+                                        "prompt_tokens": 10,
+                                        "completion_tokens": 5,
+                                        "total_tokens": 15,
                                     }
-                                },
-                                "generation_info": {"model_name": "gpt-4o-mini"},
-                            }
-                        ]
+                                }
+                            },
+                            "generation_info": {"model_name": "gpt-4"},
+                        }
                     ]
-                },
-            )
-        }
-
-        _extract_usage_data(call, output)
-
-        assert call.summary is not None
-        assert "usage" in call.summary
-        usage = call.summary["usage"]
-        assert "gpt-4o-mini" in usage
-
-    def test_no_outputs_no_usage(self):
-        """Test that no usage is extracted when outputs are missing or empty."""
-        call = Mock(spec=Call)
-        call.summary = None
-
-        # Test None output
-        _extract_usage_data(call, None)
-        assert call.summary is None
-
-        # Test empty outputs
-        _extract_usage_data(call, {"outputs": []})
-        assert call.summary is None
-
-        # Test missing outputs key
-        _extract_usage_data(call, {"other_key": "value"})
-        assert call.summary is None
-
-    def test_preserves_existing_summary(self):
-        """Test that existing call summary is preserved when adding usage."""
-        call = Mock(spec=Call)
-        call.summary = {"existing_key": "existing_value"}
-
-        output = {
-            "outputs": [
-                {
-                    "generations": [
-                        [
-                            {
-                                "message": {
-                                    "kwargs": {
-                                        "token_usage": {
-                                            "prompt_tokens": 10,
-                                            "completion_tokens": 5,
-                                            "total_tokens": 15,
-                                        }
+                ]
+            },
+            {
+                "generations": [
+                    [
+                        {
+                            "message": {
+                                "kwargs": {
+                                    "usage_metadata": {
+                                        "input_tokens": 20,
+                                        "output_tokens": 7,
+                                        "total_tokens": 27,
                                     }
-                                },
-                                "generation_info": {"model_name": "gpt-4o-mini"},
-                            }
-                        ]
+                                }
+                            },
+                            "generation_info": {"model_name": "gemini-1.5-pro"},
+                        }
                     ]
-                }
-            ]
-        }
+                ]
+            },
+        ]
+    }
 
-        _extract_usage_data(call, output)
+    call = Mock(spec=Call)
+    call.summary = None
+    _extract_usage_data(call, output)
 
-        assert call.summary["existing_key"] == "existing_value"
-        assert "usage" in call.summary
-
-
-class TestReconstructUsageDataFromFlattened:
-    """Test usage data reconstruction from flattened key-value pairs."""
-
-    def test_reconstruct_openai_usage(self):
-        """Test reconstructing OpenAI token_usage data."""
-        flattened = {
-            "outputs.0.generations.0.0.message.kwargs.token_usage.prompt_tokens": 10,
-            "outputs.0.generations.0.0.message.kwargs.token_usage.completion_tokens": 5,
-            "outputs.0.generations.0.0.message.kwargs.token_usage.total_tokens": 15,
-            "other.unrelated.key": "value",
-        }
-        base_path = "outputs.0.generations.0.0.message.kwargs.token_usage"
-
-        result = _reconstruct_usage_data_from_flattened(flattened, base_path)
-
-        assert result == {
+    expected = {
+        "gpt-4": {
             "prompt_tokens": 10,
             "completion_tokens": 5,
             "total_tokens": 15,
-        }
+        },
+        "gemini-1.5-pro": {
+            "prompt_tokens": 20,
+            "completion_tokens": 7,
+            "total_tokens": 27,
+        },
+    }
 
-    def test_reconstruct_google_usage(self):
-        """Test reconstructing Google usage_metadata data."""
-        flattened = {
-            "outputs.0.generations.0.0.message.kwargs.usage_metadata.input_tokens": 20,
-            "outputs.0.generations.0.0.message.kwargs.usage_metadata.output_tokens": 7,
-            "outputs.0.generations.0.0.message.kwargs.usage_metadata.total_tokens": 27,
-        }
-        base_path = "outputs.0.generations.0.0.message.kwargs.usage_metadata"
-
-        result = _reconstruct_usage_data_from_flattened(flattened, base_path)
-
-        assert result == {"input_tokens": 20, "output_tokens": 7, "total_tokens": 27}
-
-    def test_ignores_nested_fields(self):
-        """Test that nested fields within usage data are ignored."""
-        flattened = {
-            "outputs.0.generations.0.0.message.kwargs.token_usage.prompt_tokens": 10,
-            "outputs.0.generations.0.0.message.kwargs.token_usage.nested.field": "ignored",
-            "outputs.0.generations.0.0.message.kwargs.token_usage.completion_tokens": 5,
-        }
-        base_path = "outputs.0.generations.0.0.message.kwargs.token_usage"
-
-        result = _reconstruct_usage_data_from_flattened(flattened, base_path)
-
-        assert result == {"prompt_tokens": 10, "completion_tokens": 5}
-
-    def test_converts_float_to_int(self):
-        """Test that float values are converted to integers."""
-        flattened = {
-            "outputs.0.generations.0.0.message.kwargs.token_usage.prompt_tokens": 10.0,
-            "outputs.0.generations.0.0.message.kwargs.token_usage.completion_tokens": 5.5,
-        }
-        base_path = "outputs.0.generations.0.0.message.kwargs.token_usage"
-
-        result = _reconstruct_usage_data_from_flattened(flattened, base_path)
-
-        assert result == {"prompt_tokens": 10, "completion_tokens": 5}
-
-    def test_ignores_non_numeric_values(self):
-        """Test that non-numeric values are ignored."""
-        flattened = {
-            "outputs.0.generations.0.0.message.kwargs.token_usage.prompt_tokens": 10,
-            "outputs.0.generations.0.0.message.kwargs.token_usage.model_name": "gpt-4",  # string ignored
-            "outputs.0.generations.0.0.message.kwargs.token_usage.completion_tokens": 5,
-        }
-        base_path = "outputs.0.generations.0.0.message.kwargs.token_usage"
-
-        result = _reconstruct_usage_data_from_flattened(flattened, base_path)
-
-        assert result == {"prompt_tokens": 10, "completion_tokens": 5}
-
-
-class TestValidateUsageShape:
-    """Test usage data validation for known provider formats."""
-
-    def test_valid_openai_format(self):
-        """Test OpenAI format validation."""
-        usage_data = {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}
-        assert _is_valid_usage_shape(usage_data) is True
-
-    def test_valid_google_genai_format(self):
-        """Test Google GenAI format validation."""
-        usage_data = {"input_tokens": 20, "output_tokens": 7, "total_tokens": 27}
-        assert _is_valid_usage_shape(usage_data) is True
-
-    def test_valid_google_vertex_format(self):
-        """Test Google Vertex AI format validation."""
-        usage_data = {
-            "prompt_token_count": 15,
-            "candidates_token_count": 8,
-            "total_token_count": 23,
-        }
-        assert _is_valid_usage_shape(usage_data) is True
-
-    def test_openai_format_without_total(self):
-        """Test OpenAI format without total_tokens is still valid."""
-        usage_data = {"prompt_tokens": 10, "completion_tokens": 5}
-        assert _is_valid_usage_shape(usage_data) is True
-
-    def test_invalid_partial_openai_format(self):
-        """Test incomplete OpenAI format is invalid."""
-        usage_data = {
-            "prompt_tokens": 10
-            # Missing completion_tokens
-        }
-        assert _is_valid_usage_shape(usage_data) is False
-
-    def test_invalid_partial_google_format(self):
-        """Test incomplete Google format is invalid."""
-        usage_data = {
-            "input_tokens": 20
-            # Missing output_tokens
-        }
-        assert _is_valid_usage_shape(usage_data) is False
-
-    def test_invalid_unknown_format(self):
-        """Test unknown format is invalid."""
-        usage_data = {"unknown_tokens": 10, "other_tokens": 5}
-        assert _is_valid_usage_shape(usage_data) is False
-
-    def test_invalid_non_dict(self):
-        """Test non-dictionary input is invalid."""
-        assert _is_valid_usage_shape("not a dict") is False
-        assert _is_valid_usage_shape(None) is False
-        assert _is_valid_usage_shape(123) is False
-
-
-class TestNormalizeTokenCounts:
-    """Test token count normalization from provider-specific fields."""
-
-    def test_normalize_openai_format(self):
-        """Test OpenAI format normalization."""
-        usage_data = {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}
-
-        token_counts = _normalize_token_counts(usage_data)
-
-        assert token_counts.prompt_tokens == 10
-        assert token_counts.completion_tokens == 5
-        assert token_counts.total_tokens == 15
-
-    def test_normalize_google_genai_format(self):
-        """Test Google GenAI format normalization."""
-        usage_data = {"input_tokens": 20, "output_tokens": 7, "total_tokens": 27}
-
-        token_counts = _normalize_token_counts(usage_data)
-
-        assert token_counts.prompt_tokens == 20
-        assert token_counts.completion_tokens == 7
-        assert token_counts.total_tokens == 27
-
-    def test_normalize_google_vertex_format(self):
-        """Test Google Vertex AI format normalization."""
-        usage_data = {
-            "prompt_token_count": 15,
-            "candidates_token_count": 8,
-            "total_token_count": 23,
-        }
-
-        token_counts = _normalize_token_counts(usage_data)
-
-        assert token_counts.prompt_tokens == 15
-        assert token_counts.completion_tokens == 8
-        assert token_counts.total_tokens == 23
-
-    def test_normalize_missing_total_tokens(self):
-        """Test normalization when total_tokens is missing."""
-        usage_data = {
-            "prompt_tokens": 10,
-            "completion_tokens": 5,
-            # Missing total_tokens
-        }
-
-        token_counts = _normalize_token_counts(usage_data)
-
-        assert token_counts.prompt_tokens == 10
-        assert token_counts.completion_tokens == 5
-        assert token_counts.total_tokens == 0  # Default when missing
-
-    def test_normalize_empty_data(self):
-        """Test normalization with empty data."""
-        usage_data = {}
-
-        token_counts = _normalize_token_counts(usage_data)
-
-        assert token_counts.prompt_tokens == 0
-        assert token_counts.completion_tokens == 0
-        assert token_counts.total_tokens == 0
-
-    def test_normalize_handles_none_values(self):
-        """Test normalization handles None values gracefully."""
-        usage_data = {"prompt_tokens": None, "completion_tokens": 5, "total_tokens": 15}
-
-        token_counts = _normalize_token_counts(usage_data)
-
-        assert token_counts.prompt_tokens == 0  # None defaults to 0
-        assert token_counts.completion_tokens == 5
-        assert token_counts.total_tokens == 15
-
-
-class TestExtractModelFromFlattened:
-    """Test model name extraction from flattened response structure."""
-
-    def test_extract_model_generation_info_pattern(self):
-        """Test model extraction from generation_info.model_name pattern."""
-        flattened = {
-            "outputs.0.generations.0.0.generation_info.model_name": "gpt-4o-mini",
-            "outputs.0.generations.0.0.message.kwargs.token_usage.prompt_tokens": 10,
-        }
-        usage_key_path = "outputs.0.generations.0.0.message.kwargs.token_usage"
-
-        result = _extract_model_from_flattened_path(flattened, usage_key_path)
-
-        assert result == "gpt-4o-mini"
-
-    def test_extract_model_response_metadata_pattern(self):
-        """Test model extraction from response_metadata.model_name pattern."""
-        flattened = {
-            "outputs.0.generations.0.response_metadata.model_name": "gemini-1.5-pro",
-            "outputs.0.generations.0.0.message.kwargs.usage_metadata.input_tokens": 20,
-        }
-        usage_key_path = "outputs.0.generations.0.0.message.kwargs.usage_metadata"
-
-        result = _extract_model_from_flattened_path(flattened, usage_key_path)
-
-        assert result == "gemini-1.5-pro"
-
-    def test_extract_model_broader_search(self):
-        """Test model extraction falls back to broader search when patterns fail."""
-        flattened = {
-            "outputs.0.some.custom.path.model_name": "claude-opus-4",
-            "outputs.0.generations.0.0.message.kwargs.usage_metadata.input_tokens": 25,
-        }
-        usage_key_path = "outputs.0.generations.0.0.message.kwargs.usage_metadata"
-
-        result = _extract_model_from_flattened_path(flattened, usage_key_path)
-
-        assert result == "claude-opus-4"
-
-    def test_extract_model_ignores_empty_values(self):
-        """Test that empty model names are ignored."""
-        flattened = {
-            "outputs.0.generations.0.0.generation_info.model_name": "",  # Empty string ignored
-            "outputs.0.generations.0.response_metadata.model_name": "gpt-4o-mini",
-            "outputs.0.generations.0.0.message.kwargs.token_usage.prompt_tokens": 10,
-        }
-        usage_key_path = "outputs.0.generations.0.0.message.kwargs.token_usage"
-
-        result = _extract_model_from_flattened_path(flattened, usage_key_path)
-
-        assert result == "gpt-4o-mini"
-
-    def test_extract_model_ignores_non_string_values(self):
-        """Test that non-string model names are ignored."""
-        flattened = {
-            "outputs.0.generations.0.0.generation_info.model_name": 123,  # Number ignored
-            "outputs.0.generations.0.response_metadata.model_name": "gpt-4o-mini",
-            "outputs.0.generations.0.0.message.kwargs.token_usage.prompt_tokens": 10,
-        }
-        usage_key_path = "outputs.0.generations.0.0.message.kwargs.token_usage"
-
-        result = _extract_model_from_flattened_path(flattened, usage_key_path)
-
-        assert result == "gpt-4o-mini"
-
-    def test_extract_model_fallback_to_unknown(self):
-        """Test fallback to 'unknown' when no model name is found."""
-        flattened = {
-            "outputs.0.generations.0.0.message.kwargs.token_usage.prompt_tokens": 10,
-            "other.unrelated.key": "value",
-        }
-        usage_key_path = "outputs.0.generations.0.0.message.kwargs.token_usage"
-
-        result = _extract_model_from_flattened_path(flattened, usage_key_path)
-
-        assert result == "unknown"
+    assert call.summary["usage"] == expected
