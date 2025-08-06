@@ -89,7 +89,7 @@ if not import_failed:
             run_dict["inputs"] = run.inputs.copy() if run.inputs is not None else None
         else:
             run_dict["outputs"] = (
-                run.outputs.copy() if run.outputs is not None else None,
+                run.outputs.copy() if run.outputs is not None else None
             )
 
         run_dict = {k: v for k, v in run_dict.items() if v}

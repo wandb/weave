@@ -118,12 +118,7 @@ def _extract_usage_data(call: Call, output: Any) -> None:
     usage: Union[dict[ModelName, LLMUsageSchema], None] = None
     if output is not None and "outputs" in output and len(output["outputs"]) > 0:
         usage_dict: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
-
-        # Normalize outputs to ensure consistent structure for flattening
-        # Some LangChain versions return outputs as a tuple instead of a list
         normalized_output = dict(output)
-        if isinstance(normalized_output["outputs"], tuple):
-            normalized_output["outputs"] = list(normalized_output["outputs"])
 
         # Responses can have deeply nested structures that vary by provider.
         # We flatten the entire response into dot-separated keys to make searching
