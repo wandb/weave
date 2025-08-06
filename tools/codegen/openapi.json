@@ -1400,7 +1400,8 @@
         "required": [
           "$and"
         ],
-        "title": "AndOperation"
+        "title": "AndOperation",
+        "description": "Logical AND. All conditions must evaluate to true.\n\nExample:\n    ```\n    {\n        \"$and\": [\n            {\"$eq\": [{\"$getField\": \"op_name\"}, {\"$literal\": \"predict\"}]},\n            {\"$gt\": [{\"$getField\": \"summary.usage.tokens\"}, {\"$literal\": 1000}]}\n        ]\n    }\n    ```"
       },
       "Body_file_create_file_create_post": {
         "properties": {
@@ -1472,6 +1473,7 @@
             "title": "Batch"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "batch"
@@ -1507,6 +1509,7 @@
             "$ref": "#/components/schemas/EndedCallSchemaForInsert"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "end"
@@ -1539,8 +1542,33 @@
             ],
             "title": "Include Costs",
             "default": false
+          },
+          "include_storage_size": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Include Storage Size",
+            "default": false
+          },
+          "include_total_storage_size": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Include Total Storage Size",
+            "default": false
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "project_id",
@@ -1607,16 +1635,40 @@
             ],
             "title": "Parent Id"
           },
+          "thread_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thread Id"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Id"
+          },
           "started_at": {
             "type": "string",
             "format": "date-time",
             "title": "Started At"
           },
           "attributes": {
+            "additionalProperties": true,
             "type": "object",
             "title": "Attributes"
           },
           "inputs": {
+            "additionalProperties": true,
             "type": "object",
             "title": "Inputs"
           },
@@ -1653,6 +1705,7 @@
             "title": "Output"
           },
           "summary": {
+            "additionalProperties": true,
             "type": "object"
           },
           "wb_user_id": {
@@ -1677,6 +1730,17 @@
             ],
             "title": "Wb Run Id"
           },
+          "wb_run_step": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wb Run Step"
+          },
           "deleted_at": {
             "anyOf": [
               {
@@ -1688,6 +1752,28 @@
               }
             ],
             "title": "Deleted At"
+          },
+          "storage_size_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Storage Size Bytes"
+          },
+          "total_storage_size_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Storage Size Bytes"
           }
         },
         "type": "object",
@@ -1708,6 +1794,7 @@
             "$ref": "#/components/schemas/StartedCallSchemaForInsert"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "start"
@@ -1766,6 +1853,7 @@
             "description": "Do not set directly. Server will automatically populate this field."
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "project_id",
@@ -1804,6 +1892,7 @@
             "description": "Do not set directly. Server will automatically populate this field."
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "project_id",
@@ -1902,6 +1991,34 @@
             ],
             "title": "Call Ids"
           },
+          "thread_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thread Ids"
+          },
+          "turn_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Ids"
+          },
           "trace_roots_only": {
             "anyOf": [
               {
@@ -1942,6 +2059,7 @@
             "title": "Wb Run Ids"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "title": "CallsFilter"
       },
@@ -2033,6 +2151,32 @@
             "description": "Beta, subject to change. If true, the response will include feedback for each call.",
             "default": false
           },
+          "include_storage_size": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Include Storage Size",
+            "description": "Beta, subject to change. If true, the response will include the storage size for a call.",
+            "default": false
+          },
+          "include_total_storage_size": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Include Total Storage Size",
+            "description": "Beta, subject to change. If true, the response will include the total storage size for a trace.",
+            "default": false
+          },
           "columns": {
             "anyOf": [
               {
@@ -2067,8 +2211,22 @@
                 "inputs.model.prompt"
               ]
             ]
+          },
+          "return_expanded_column_values": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Return Expanded Column Values",
+            "description": "If true, the response will include raw values for expanded columns. If false, the response expand_columns will only be used for filtering and ordering. This is useful for clients that want to resolve refs themselves, e.g. for performance reasons.",
+            "default": true
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "project_id"
@@ -2100,8 +2258,53 @@
                 "type": "null"
               }
             ]
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit"
+          },
+          "include_total_storage_size": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Include Total Storage Size",
+            "default": false
+          },
+          "expand_columns": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expand Columns",
+            "description": "Columns with refs to objects or table rows that require expansion during filtering or ordering.",
+            "examples": [
+              [
+                "inputs.self.message",
+                "inputs.model.prompt"
+              ]
+            ]
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "project_id"
@@ -2113,6 +2316,17 @@
           "count": {
             "type": "integer",
             "title": "Count"
+          },
+          "total_storage_size_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Storage Size Bytes"
           }
         },
         "type": "object",
@@ -2131,7 +2345,8 @@
         "required": [
           "$contains"
         ],
-        "title": "ContainsOperation"
+        "title": "ContainsOperation",
+        "description": "Case-insensitive substring match.\n\nNot part of MongoDB. Weave-specific addition.\n\nExample:\n    ```\n    {\n        \"$contains\": {\n            \"input\": {\"$getField\": \"display_name\"},\n            \"substr\": {\"$literal\": \"llm\"},\n            \"case_insensitive\": true\n        }\n    }\n    ```"
       },
       "ContainsSpec": {
         "properties": {
@@ -2229,7 +2444,8 @@
           "input",
           "substr"
         ],
-        "title": "ContainsSpec"
+        "title": "ContainsSpec",
+        "description": "Specification for the `$contains` operation.\n\n- `input`: The string to search.\n- `substr`: The substring to search for.\n- `case_insensitive`: If true, match is case-insensitive."
       },
       "ConvertOperation": {
         "properties": {
@@ -2241,7 +2457,8 @@
         "required": [
           "$convert"
         ],
-        "title": "ConvertOperation"
+        "title": "ConvertOperation",
+        "description": "Convert the input value to a specific type (e.g., `int`, `bool`, `string`).\n\nExample:\n    ```\n    {\n        \"$convert\": {\n            \"input\": {\"$getField\": \"inputs.value\"},\n            \"to\": \"int\"\n        }\n    }\n    ```"
       },
       "ConvertSpec": {
         "properties": {
@@ -2300,7 +2517,8 @@
           "input",
           "to"
         ],
-        "title": "ConvertSpec"
+        "title": "ConvertSpec",
+        "description": "Specifies conversion details for `$convert`.\n\n- `input`: The operand to convert.\n- `to`: The type to convert to."
       },
       "CostCreateInput": {
         "properties": {
@@ -2364,6 +2582,7 @@
             "description": "The provider of the LLM, e.g. 'openai' or 'mistral'. If not provided, the provider_id will be set to 'default'"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "prompt_token_cost",
@@ -2400,6 +2619,7 @@
             "description": "Do not set directly. Server will automatically populate this field."
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "project_id",
@@ -2446,6 +2666,7 @@
             "$ref": "#/components/schemas/Query"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "project_id",
@@ -2665,6 +2886,7 @@
             ]
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "project_id"
@@ -2824,7 +3046,8 @@
         "required": [
           "$eq"
         ],
-        "title": "EqOperation"
+        "title": "EqOperation",
+        "description": "Equality check between two operands.\n\nExample:\n    ```\n    {\n        \"$eq\": [{\"$getField\": \"op_name\"}, {\"$literal\": \"predict\"}]\n    }\n    ```"
       },
       "FeedbackCreateReq": {
         "properties": {
@@ -2864,6 +3087,7 @@
             ]
           },
           "payload": {
+            "additionalProperties": true,
             "type": "object",
             "title": "Payload",
             "examples": [
@@ -2941,6 +3165,7 @@
             "description": "Do not set directly. Server will automatically populate this field."
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "project_id",
@@ -2966,6 +3191,7 @@
             "title": "Wb User Id"
           },
           "payload": {
+            "additionalProperties": true,
             "type": "object",
             "title": "Payload"
           }
@@ -2992,6 +3218,7 @@
             "$ref": "#/components/schemas/Query"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "project_id",
@@ -3087,6 +3314,7 @@
             ]
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "project_id"
@@ -3097,6 +3325,7 @@
         "properties": {
           "result": {
             "items": {
+              "additionalProperties": true,
               "type": "object"
             },
             "type": "array",
@@ -3147,6 +3376,7 @@
             ]
           },
           "payload": {
+            "additionalProperties": true,
             "type": "object",
             "title": "Payload",
             "examples": [
@@ -3228,6 +3458,7 @@
             "title": "Feedback Id"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "project_id",
@@ -3254,6 +3485,7 @@
             "title": "Wb User Id"
           },
           "payload": {
+            "additionalProperties": true,
             "type": "object",
             "title": "Payload"
           }
@@ -3278,6 +3510,7 @@
             "title": "Digest"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "project_id",
@@ -3309,7 +3542,8 @@
         "required": [
           "$getField"
         ],
-        "title": "GetFieldOperator"
+        "title": "GetFieldOperator",
+        "description": "Access a field on the traced call.\n\nSupports dot notation for nested access, e.g. `summary.usage.tokens`.\n\nOnly works on fields present in the `CallSchema`, including:\n- Top-level fields like `op_name`, `trace_id`, `started_at`\n- Nested fields like `inputs.input_name`, `summary.usage.tokens`, etc.\n\nExample:\n    ```\n    {\"$getField\": \"op_name\"}\n    ```"
       },
       "GtOperation": {
         "properties": {
@@ -3400,7 +3634,8 @@
         "required": [
           "$gt"
         ],
-        "title": "GtOperation"
+        "title": "GtOperation",
+        "description": "Greater than comparison.\n\nExample:\n    ```\n    {\n        \"$gt\": [{\"$getField\": \"summary.usage.tokens\"}, {\"$literal\": 100}]\n    }\n    ```"
       },
       "GteOperation": {
         "properties": {
@@ -3491,7 +3726,8 @@
         "required": [
           "$gte"
         ],
-        "title": "GteOperation"
+        "title": "GteOperation",
+        "description": "Greater than or equal comparison.\n\nExample:\n    ```\n    {\n        \"$gte\": [{\"$getField\": \"summary.usage.tokens\"}, {\"$literal\": 100}]\n    }\n    ```"
       },
       "HTTPValidationError": {
         "properties": {
@@ -3598,7 +3834,8 @@
         "required": [
           "$in"
         ],
-        "title": "InOperation"
+        "title": "InOperation",
+        "description": "Membership check.\n\nReturns true if the left operand is in the list provided as the second operand.\n\nExample:\n    ```\n    {\n        \"$in\": [\n            {\"$getField\": \"op_name\"},\n            [{\"$literal\": \"predict\"}, {\"$literal\": \"generate\"}]\n        ]\n    }\n    ```"
       },
       "LLMUsageSchema": {
         "properties": {
@@ -3711,7 +3948,8 @@
         "required": [
           "$literal"
         ],
-        "title": "LiteralOperation"
+        "title": "LiteralOperation",
+        "description": "Represents a constant value in the query language.\n\nThis can be any standard JSON-serializable value.\n\nExample:\n    ```\n    {\"$literal\": \"predict\"}\n    ```"
       },
       "NotOperation": {
         "properties": {
@@ -3765,7 +4003,8 @@
         "required": [
           "$not"
         ],
-        "title": "NotOperation"
+        "title": "NotOperation",
+        "description": "Logical NOT. Inverts the condition.\n\nExample:\n    ```\n    {\n        \"$not\": [\n            {\"$eq\": [{\"$getField\": \"op_name\"}, {\"$literal\": \"debug\"}]}\n        ]\n    }\n    ```"
       },
       "ObjCreateReq": {
         "properties": {
@@ -3773,6 +4012,7 @@
             "$ref": "#/components/schemas/ObjSchemaForInsert"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "obj"
@@ -3818,6 +4058,7 @@
             "description": "List of digests to delete. If not provided, all digests for the object will be deleted."
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "project_id",
@@ -3932,8 +4173,22 @@
             "title": "Metadata Only",
             "description": "If true, the `val` column is not read from the database and is empty.All other fields are returned.",
             "default": false
+          },
+          "include_storage_size": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Include Storage Size",
+            "description": "If true, the `size_bytes` column is returned.",
+            "default": false
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "project_id"
@@ -3984,6 +4239,7 @@
             "default": false
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "project_id",
@@ -4058,6 +4314,17 @@
             ],
             "title": "Base Object Class"
           },
+          "leaf_object_class": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Leaf Object Class"
+          },
           "val": {
             "title": "Val"
           },
@@ -4072,6 +4339,17 @@
             ],
             "title": "Wb User Id",
             "description": "Do not set directly. Server will automatically populate this field."
+          },
+          "size_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size Bytes"
           }
         },
         "type": "object",
@@ -4170,6 +4448,32 @@
               ]
             ]
           },
+          "leaf_object_classes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Leaf Object Classes",
+            "description": "Filter objects by their leaf classes",
+            "examples": [
+              [
+                "Model"
+              ],
+              [
+                "Dataset"
+              ],
+              [
+                "LLMStructuredCompletionModel"
+              ]
+            ]
+          },
           "object_ids": {
             "anyOf": [
               {
@@ -4223,6 +4527,7 @@
             ]
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "title": "ObjectVersionFilter"
       },
@@ -4274,7 +4579,8 @@
         "required": [
           "$or"
         ],
-        "title": "OrOperation"
+        "title": "OrOperation",
+        "description": "Logical OR. At least one condition must be true.\n\nExample:\n    ```\n    {\n        \"$or\": [\n            {\"$eq\": [{\"$getField\": \"op_name\"}, {\"$literal\": \"a\"}]},\n            {\"$eq\": [{\"$getField\": \"op_name\"}, {\"$literal\": \"b\"}]}\n        ]\n    }\n    ```"
       },
       "Query": {
         "properties": {
@@ -4308,6 +4614,7 @@
             "title": "$Expr"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "$expr"
@@ -4324,6 +4631,7 @@
             "title": "Refs"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "refs"
@@ -4372,6 +4680,7 @@
             "title": "Direction"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "field",
@@ -4433,16 +4742,40 @@
             ],
             "title": "Parent Id"
           },
+          "thread_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thread Id"
+          },
+          "turn_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Id"
+          },
           "started_at": {
             "type": "string",
             "format": "date-time",
             "title": "Started At"
           },
           "attributes": {
+            "additionalProperties": true,
             "type": "object",
             "title": "Attributes"
           },
           "inputs": {
+            "additionalProperties": true,
             "type": "object",
             "title": "Inputs"
           },
@@ -4468,6 +4801,17 @@
               }
             ],
             "title": "Wb Run Id"
+          },
+          "wb_run_step": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wb Run Step"
           }
         },
         "type": "object",
@@ -4488,6 +4832,16 @@
             },
             "type": "object",
             "title": "Usage"
+          },
+          "status_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "propertyNames": {
+              "$ref": "#/components/schemas/TraceStatus"
+            },
+            "type": "object",
+            "title": "Status Counts"
           }
         },
         "additionalProperties": true,
@@ -4509,6 +4863,7 @@
       "TableAppendSpecPayload": {
         "properties": {
           "row": {
+            "additionalProperties": true,
             "type": "object",
             "title": "Row"
           }
@@ -4525,6 +4880,7 @@
             "$ref": "#/components/schemas/TableSchemaForInsert"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "table"
@@ -4571,6 +4927,7 @@
             "title": "Index"
           },
           "row": {
+            "additionalProperties": true,
             "type": "object",
             "title": "Row"
           }
@@ -4698,6 +5055,7 @@
             ]
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "project_id",
@@ -4734,12 +5092,10 @@
           "digest": {
             "type": "string",
             "title": "Digest",
-            "description": "The digest of the table to query",
-            "examples": [
-              "aonareimsvtl13apimtalpa4435rpmgnaemrpgmarltarstaorsnte134avrims"
-            ]
+            "description": "The digest of the table to query"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "project_id",
@@ -4784,6 +5140,7 @@
             ]
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "title": "TableRowFilter"
       },
@@ -4823,6 +5180,7 @@
           },
           "rows": {
             "items": {
+              "additionalProperties": true,
               "type": "object"
             },
             "type": "array",
@@ -4864,6 +5222,7 @@
             "title": "Updates"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "project_id",
@@ -4892,6 +5251,16 @@
           "digest"
         ],
         "title": "TableUpdateRes"
+      },
+      "TraceStatus": {
+        "type": "string",
+        "enum": [
+          "success",
+          "error",
+          "running",
+          "descendant_error"
+        ],
+        "title": "TraceStatus"
       },
       "ValidationError": {
         "properties": {
