@@ -83,6 +83,7 @@ from weave.trace_server.errors import (
     NotFoundError,
     ObjectDeletedError,
     RequestTooLarge,
+    handle_clickhouse_query_error,
 )
 from weave.trace_server.feedback import (
     TABLE_FEEDBACK,
@@ -2217,7 +2218,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     "parameters": parameters,
                 },
             )
-            raise
+            # always raises, optionally with custom error class
+            handle_clickhouse_query_error(e)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._query")
     def _query(
@@ -2246,7 +2248,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 "clickhouse_query_error",
                 extra={"error_str": str(e), "query": query, "parameters": parameters},
             )
-            raise
+            # always raises, optionally with custom error class
+            handle_clickhouse_query_error(e)
 
         logger.info(
             "clickhouse_query",
