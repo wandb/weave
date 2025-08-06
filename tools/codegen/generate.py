@@ -17,13 +17,17 @@ Environment:
 #!/usr/bin/env -S uv run --script
 # /// script
 # dependencies = [
+#     "typer==0.16.0",
 #     "click==8.2.1",
 #     "httpx==0.28.1",
 #     "tomlkit==0.13.3",
 #     "PyYAML==6.0.2",
 #     "rich==14.0.0",
+#     "python-multipart==0.0.20"
 # ]
 # ///
+
+from __future__ import annotations
 
 import json
 import os
@@ -34,13 +38,13 @@ import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any, Callable
 
-import click
 import httpx
 import tomlkit
+import typer
 import yaml
-from rich import print
+from typer import Option
 
 # Server configuration
 WEAVE_PORT = 6345
@@ -58,15 +62,17 @@ CODEGEN_BUNDLE_PATH = f"{CODEGEN_ROOT_RELPATH}/stainless.js"
 STAINLESS_CONFIG_PATH = f"{CODEGEN_ROOT_RELPATH}/openapi.stainless.yml"
 STAINLESS_OAS_PATH = f"{CODEGEN_ROOT_RELPATH}/openapi.json"
 
-
-@click.group()
-def cli() -> None:
-    """Weave code generation tools"""
+# Create the Typer app
+app = typer.Typer(help="Weave code generation tools")
 
 
-@cli.command()  # type: ignore
-@click.option("-o", "--output-file", help="Output file path for the OpenAPI spec")
-def get_openapi_spec(output_file: str | None = None) -> None:
+@app.command()
+def get_openapi_spec(
+    output_file: Annotated[
+        str | None,
+        Option("-o", "--output-file", help="Output file path for the OpenAPI spec"),
+    ] = None,
+) -> None:
     """Retrieve the OpenAPI specification from a temporary FastAPI server.
 
     This command launches a uvicorn server running the trace server application,
@@ -122,14 +128,22 @@ def get_openapi_spec(output_file: str | None = None) -> None:
             server.wait()
 
 
-@cli.command()  # type: ignore
-@click.option("--python-path", help="Path to the Python code generation output")
-@click.option("--node-path", help="Path to the Node.js code generation output")
-@click.option("--typescript-path", help="Path to the TypeScript code generation output")
+@app.command()
 def generate_code(
-    python_path: str | None = None,
-    node_path: str | None = None,
-    typescript_path: str | None = None,
+    python_path: Annotated[
+        str | None,
+        Option("--python-path", help="Path to the Python code generation output"),
+    ] = None,
+    node_path: Annotated[
+        str | None,
+        Option("--node-path", help="Path to the Node.js code generation output"),
+    ] = None,
+    typescript_path: Annotated[
+        str | None,
+        Option(
+            "--typescript-path", help="Path to the TypeScript code generation output"
+        ),
+    ] = None,
 ) -> None:
     """Generate code from the OpenAPI spec using Stainless.
 
@@ -195,12 +209,15 @@ def generate_code(
         sys.exit(1)
 
 
-@cli.command()  # type: ignore
-@click.argument("python_output", type=click.Path(exists=True))
-@click.argument("package_name")
-@click.option("--release", is_flag=True, help="Update to the latest version")
+@app.command()
 def update_pyproject(
-    python_output: str, package_name: str, release: bool = False
+    python_output: Annotated[
+        Path, typer.Argument(help="Path to Python output", exists=True)
+    ],
+    package_name: Annotated[str, typer.Argument(help="Name of the package")],
+    release: Annotated[
+        bool, Option("--release", help="Update to the latest version")
+    ] = False,
 ) -> None:
     """Update the pyproject.toml file with the latest version of the generated code.
 
@@ -208,13 +225,12 @@ def update_pyproject(
     (if --release is specified) or a git SHA reference.
     """
     header("Updating pyproject.toml")
-    path = Path(python_output)
     if release:
-        version = _get_package_version(path)
+        version = _get_package_version(python_output)
         _update_pyproject_toml(package_name, version, True)
         info(f"Updated {package_name} dependency to version: {version}")
     else:
-        repo_info = _get_repo_info(path)
+        repo_info = _get_repo_info(python_output)
         remote_url = repo_info.remote_url
         sha = repo_info.sha
         if not sha:
@@ -224,26 +240,39 @@ def update_pyproject(
         info(f"Updated {package_name} dependency to SHA: {sha}")
 
 
-@cli.command()  # type: ignore
-@click.option(
-    "--config",
-    default=CODEGEN_ROOT_RELPATH + "/generate_config.yaml",
-    help="Path to config file",
-)
-@click.option("--python-output", help="Path for Python code generation output")
-@click.option("--package-name", help="Name of the package to update in pyproject.toml")
-@click.option("--openapi-output", help="Path to save the OpenAPI spec")
-@click.option("--node-output", help="Path for Node.js code generation output")
-@click.option("--typescript-output", help="Path for TypeScript code generation output")
-@click.option("--release", is_flag=True, help="Update to the latest version")
+@app.command()
 def all(
-    config: str,
-    python_output: str | None,
-    package_name: str | None,
-    openapi_output: str | None,
-    node_output: str | None,
-    typescript_output: str | None,
-    release: bool | None,
+    config: Annotated[
+        str, Option("--config", help="Path to config file")
+    ] = CODEGEN_ROOT_RELPATH + "/generate_config.yaml",
+    python_output: Annotated[
+        str | None,
+        Option("--python-output", help="Path for Python code generation output"),
+    ] = None,
+    package_name: Annotated[
+        str | None,
+        Option(
+            "--package-name", help="Name of the package to update in pyproject.toml"
+        ),
+    ] = None,
+    openapi_output: Annotated[
+        str | None,
+        Option("--openapi-output", help="Path to save the OpenAPI spec"),
+    ] = None,
+    node_output: Annotated[
+        str | None,
+        Option("--node-output", help="Path for Node.js code generation output"),
+    ] = None,
+    typescript_output: Annotated[
+        str | None,
+        Option(
+            "--typescript-output", help="Path for TypeScript code generation output"
+        ),
+    ] = None,
+    release: Annotated[
+        bool | None,
+        Option("--release", help="Update to the latest version"),
+    ] = None,
 ) -> None:
     """Run all code generation commands in sequence.
 
@@ -349,15 +378,13 @@ def all(
         error("output_path cannot be None")
         sys.exit(1)
     # Call get_openapi_spec with --output-file argument
-    ctx = click.get_current_context()
-    _format_announce_invoke(ctx, get_openapi_spec, output_file=output_path)
+    _format_announce_invoke(get_openapi_spec, output_file=output_path)
 
     # 2. Generate code
     # Use python_output as python_output
     node_path = _ensure_absolute_path(cfg.get("node_output"))
     typescript_path = _ensure_absolute_path(cfg.get("typescript_output"))
     _format_announce_invoke(
-        ctx,
         generate_code,
         python_path=str_path,
         node_path=node_path,
@@ -367,9 +394,8 @@ def all(
     # 3. Update pyproject.toml
     release = cfg.get("release", False)
     _format_announce_invoke(
-        ctx,
         update_pyproject,
-        python_output=str_path,
+        python_output=Path(str_path),
         package_name=cfg["package_name"],
         release=release,
     )
@@ -380,17 +406,17 @@ def all(
 
 def header(text: str):
     """Display a prominent header"""
-    print(f"[bold blue]╔{'═' * (len(text) + 6)}╗[/bold blue]")
-    print(f"[bold blue]║   {text}   ║[/bold blue]")
-    print(f"[bold blue]╚{'═' * (len(text) + 6)}╝[/bold blue]")
+    print(f"╔{'═' * (len(text) + 6)}╗")
+    print(f"║   {text}   ║")
+    print(f"╚{'═' * (len(text) + 6)}╝")
 
 
 def error(text: str):
-    print(f"[red bold]ERROR:   {text}[/red bold]")
+    print(f"ERROR:   {text}")
 
 
 def warning(text: str):
-    print(f"[yellow]WARNING: {text}[/yellow]")
+    print(f"WARNING: {text}")
 
 
 def info(text: str):
@@ -577,13 +603,11 @@ def _ensure_absolute_path(path: str | None) -> str | None:
     return str(Path.cwd() / p) if not p.is_absolute() else str(p)
 
 
-def _format_announce_invoke(
-    ctx: click.Context, command: click.Command, **kwargs
-) -> None:
-    """Helper to format, announce, and invoke a click command with the given parameters."""
-    cmd = _format_command(command.name, **kwargs)
+def _format_announce_invoke(command: Callable, **kwargs) -> None:
+    """Helper to format, announce, and invoke a command function with the given parameters."""
+    cmd = _format_command(command.__name__, **kwargs)
     _announce_command(cmd)
-    ctx.invoke(command, **kwargs)
+    command(**kwargs)
 
 
 def _load_config(config_path: str | Path) -> dict[str, Any]:
@@ -615,4 +639,4 @@ def _random_temp_dir() -> str:
 
 
 if __name__ == "__main__":
-    cli()
+    app()
