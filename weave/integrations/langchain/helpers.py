@@ -84,7 +84,7 @@ def _extract_usage_data(call: Call, output: Any) -> None:
         # For each usage base path, reconstruct the usage data and extract the model
         for base_path in usage_base_paths:
             usage_data = _reconstruct_usage_data_from_flattened(flattened, base_path)
-            if not _validate_usage_shape(usage_data):
+            if not _is_valid_usage_shape(usage_data):
                 continue
 
             model = _extract_model_from_flattened_path(flattened, base_path)
@@ -139,7 +139,7 @@ def _reconstruct_usage_data_from_flattened(flattened: dict, base_path: str) -> d
     return usage_data
 
 
-def _validate_usage_shape(usage_data: dict) -> bool:
+def _is_valid_usage_shape(usage_data: dict) -> bool:
     """
     Check if usage_data contains expected token fields for known providers.
 

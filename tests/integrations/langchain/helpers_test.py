@@ -12,7 +12,7 @@ from weave.integrations.langchain.helpers import (
     _extract_usage_data,
     _normalize_token_counts,
     _reconstruct_usage_data_from_flattened,
-    _validate_usage_shape,
+    _is_valid_usage_shape,
 )
 from weave.trace.weave_client import Call
 
@@ -398,12 +398,12 @@ class TestValidateUsageShape:
     def test_valid_openai_format(self):
         """Test OpenAI format validation."""
         usage_data = {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}
-        assert _validate_usage_shape(usage_data) is True
+        assert _is_valid_usage_shape(usage_data) is True
 
     def test_valid_google_genai_format(self):
         """Test Google GenAI format validation."""
         usage_data = {"input_tokens": 20, "output_tokens": 7, "total_tokens": 27}
-        assert _validate_usage_shape(usage_data) is True
+        assert _is_valid_usage_shape(usage_data) is True
 
     def test_valid_google_vertex_format(self):
         """Test Google Vertex AI format validation."""
@@ -412,12 +412,12 @@ class TestValidateUsageShape:
             "candidates_token_count": 8,
             "total_token_count": 23,
         }
-        assert _validate_usage_shape(usage_data) is True
+        assert _is_valid_usage_shape(usage_data) is True
 
     def test_openai_format_without_total(self):
         """Test OpenAI format without total_tokens is still valid."""
         usage_data = {"prompt_tokens": 10, "completion_tokens": 5}
-        assert _validate_usage_shape(usage_data) is True
+        assert _is_valid_usage_shape(usage_data) is True
 
     def test_invalid_partial_openai_format(self):
         """Test incomplete OpenAI format is invalid."""
@@ -425,7 +425,7 @@ class TestValidateUsageShape:
             "prompt_tokens": 10
             # Missing completion_tokens
         }
-        assert _validate_usage_shape(usage_data) is False
+        assert _is_valid_usage_shape(usage_data) is False
 
     def test_invalid_partial_google_format(self):
         """Test incomplete Google format is invalid."""
@@ -433,18 +433,18 @@ class TestValidateUsageShape:
             "input_tokens": 20
             # Missing output_tokens
         }
-        assert _validate_usage_shape(usage_data) is False
+        assert _is_valid_usage_shape(usage_data) is False
 
     def test_invalid_unknown_format(self):
         """Test unknown format is invalid."""
         usage_data = {"unknown_tokens": 10, "other_tokens": 5}
-        assert _validate_usage_shape(usage_data) is False
+        assert _is_valid_usage_shape(usage_data) is False
 
     def test_invalid_non_dict(self):
         """Test non-dictionary input is invalid."""
-        assert _validate_usage_shape("not a dict") is False
-        assert _validate_usage_shape(None) is False
-        assert _validate_usage_shape(123) is False
+        assert _is_valid_usage_shape("not a dict") is False
+        assert _is_valid_usage_shape(None) is False
+        assert _is_valid_usage_shape(123) is False
 
 
 class TestNormalizeTokenCounts:
