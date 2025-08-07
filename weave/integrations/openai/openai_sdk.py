@@ -69,7 +69,6 @@ def maybe_unwrap_api_response(value: Any) -> Any:
 
     return value
 
-
 def convert_completion_to_dict(obj: Any) -> dict:
     return {
         "client": {

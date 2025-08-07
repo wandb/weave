@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 
 import weave
 from tests.trace.util import DummyTestException
-from tests.trace_server.conftest import *  # noqa: F401
+from tests.trace_server.conftest import *
 from tests.trace_server.conftest import TEST_ENTITY, get_trace_server_flag
 from weave.trace import autopatch, weave_client, weave_init
 from weave.trace.context.call_context import set_call_stack
@@ -231,7 +231,7 @@ class InMemoryWeaveLogCollector(logging.Handler):
             )
             # Exclude legacy
             and not record.name.startswith("weave.weave_server")
-            and not "legacy" in record.name
+            and "legacy" not in record.name
         ]
 
     def get_error_logs(self):
@@ -330,11 +330,11 @@ def make_server_recorder(server: tsi.TraceServerInterface):  # type: ignore
     class ServerRecorder(type(server)):  # type: ignore
         attribute_access_log: list[str]
 
-        def __init__(self, server: tsi.TraceServerInterface):  # noqa: N804, type: ignore
+        def __init__(self, server: tsi.TraceServerInterface):
             self.server = server
             self.attribute_access_log = []
 
-        def __getattribute__(self, name):  # noqa: N804
+        def __getattribute__(self, name):
             self_server = super().__getattribute__("server")
             access_log = super().__getattribute__("attribute_access_log")
             if name == "server":
@@ -489,3 +489,29 @@ def caching_client_isolation(monkeypatch, tmp_path):
     monkeypatch.setenv("WEAVE_SERVER_CACHE_DIR", str(test_specific_cache_dir))
     return test_specific_cache_dir
     # tmp_path and monkeypatch automatically handle cleanup
+
+
+@pytest.fixture
+def make_evals(client):
+    # First eval
+    ev = weave.EvaluationLogger(model="abc", dataset="def")
+    pred = ev.log_prediction(inputs={"x": 1}, output=2)
+    pred.log_score("score", 3)
+    pred.log_score("score2", 4)
+    pred2 = ev.log_prediction(inputs={"x": 2}, output=3)
+    pred2.log_score("score", 33)
+    pred2.log_score("score2", 44)
+    ev.log_summary(summary={"y": 5})
+
+    # Make a second eval.  Later we will check to see that we don't get this eval's data when querying
+    ev2 = weave.EvaluationLogger(model="ghi", dataset="jkl")
+    pred3 = ev2.log_prediction(inputs={"alpha": 12}, output=34)
+    pred3.log_score("second_score", 56)
+    pred3.log_score("second_score2", 78)
+
+    pred4 = ev2.log_prediction(inputs={"alpha": 34}, output=45)
+    pred4.log_score("second_score", 5656)
+    pred4.log_score("second_score2", 7878)
+    ev2.log_summary(summary={"z": 90})
+
+    return ev._pseudo_evaluation.ref, ev2._pseudo_evaluation.ref

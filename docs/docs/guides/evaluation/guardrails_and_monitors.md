@@ -188,7 +188,7 @@ Learn how to [create a monitor in general](#create-a-monitor) or try out the [en
         - **Judge model**: Select the model that will score your ops. Three types of models are available:
             - [Saved models](../tools/playground.md#saved-models)
             - Models from providers configured by your W&B admin
-            - [W&B Inference models](../integrations/inference.md)
+            - [W&B Inference models](https://docs.wandb.ai/guides/inference/)
         
         For the selected model, configure the following settings:
             - **Configuration name**
@@ -496,7 +496,7 @@ score = scorer.score(output="some text")
 ### Score Analysis
 
 
-For detailed information about querying calls and their scorer results, see our [Score Analysis Guide](./scorers.md#score-analysis) and our [Data Access Guide](/guides/tracking/tracing#querying--exporting-calls).
+For detailed information about querying calls and their scorer results, see our [Score Analysis Guide](./scorers.md#score-analysis) and our [Data Access Guide](/guides/tracking/tracing#querying-and-exporting-calls).
 
 
 ## Production Best Practices

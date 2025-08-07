@@ -19,7 +19,7 @@ def test_weaveobject_access_after_init_termination(client):
     class MyObj(weave.Object):
         val: int
 
-    @weave.op()
+    @weave.op
     def my_op(obj: MyObj) -> None:
         nonlocal my_obj
         my_obj = obj

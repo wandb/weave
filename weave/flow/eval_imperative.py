@@ -22,7 +22,7 @@ from pydantic import (
 import weave
 from weave.flow.dataset import Dataset
 from weave.flow.eval import Evaluation, default_evaluation_display_name
-from weave.flow.model import Model
+from weave.flow.model import MissingInferenceMethodError, Model
 from weave.flow.scorer import Scorer
 from weave.flow.scorer import auto_summarize as auto_summarize_fn
 from weave.flow.util import make_memorable_name
@@ -355,6 +355,15 @@ class EvaluationLogger(BaseModel):
         ),
     ]
 
+    eval_attributes: Annotated[
+        dict[str, Any],
+        Field(
+            default_factory=dict,
+            description="(Optional): A dictionary of attributes to add to the evaluation call."
+            "These attributes can be used to add additional metadata columns to the Evaluation.",
+        ),
+    ]
+
     _eval_started: bool = PrivateAttr(False)
     _logged_summary: bool = PrivateAttr(False)
     _is_finalized: bool = PrivateAttr(False)
@@ -368,6 +377,10 @@ class EvaluationLogger(BaseModel):
         if self._evaluate_call is None:
             return None
         return self._evaluate_call.ui_url
+
+    @property
+    def attributes(self) -> dict[str, Any]:
+        return self.eval_attributes | IMPERATIVE_EVAL_MARKER
 
     # This private attr is used to keep track of predictions so we can finish
     # them if the user forgot to.
@@ -389,12 +402,18 @@ class EvaluationLogger(BaseModel):
         # objects that "look right" to our object saving system.
 
         # --- Setup the model object ---
-        @weave.op(name="Model.predict", enable_code_capture=False)
-        def predict(self: Model, inputs: dict) -> Any:
-            # Get the output from the context variable
-            return current_output.get()
+        # Only modify the predict method if the model doesn't already have one
+        try:
+            assert isinstance(self.model, Model)
+            self.model.get_infer_method()
+        except MissingInferenceMethodError:
 
-        self.model.__dict__["predict"] = MethodType(predict, self.model)
+            @weave.op(name="Model.predict", enable_code_capture=False)
+            def predict(self: Model, inputs: dict) -> Any:
+                # Get the output from the context variable
+                return current_output.get()
+
+            self.model.__dict__["predict"] = MethodType(predict, self.model)
 
         # --- Setup the evaluation object ---
         @weave.op(name="Evaluation.evaluate", enable_code_capture=False)
@@ -438,7 +457,7 @@ class EvaluationLogger(BaseModel):
                 "self": self._pseudo_evaluation,
                 "model": self.model,
             },
-            attributes=IMPERATIVE_EVAL_MARKER,
+            attributes=self.attributes,
             use_stack=False,  # Don't push to global stack to prevent nesting
         )
         if self._evaluate_call is None:
@@ -457,7 +476,9 @@ class EvaluationLogger(BaseModel):
                 # This is best effort.  If we fail, just swallow the error.
                 pass
 
-    def _finalize_evaluation(self, output: Any = None) -> None:
+    def _finalize_evaluation(
+        self, output: Any = None, exception: BaseException | None = None
+    ) -> None:
         """Handles the final steps of the evaluation: cleaning up predictions and finishing the main call."""
         if self._is_finalized:
             return
@@ -473,7 +494,7 @@ class EvaluationLogger(BaseModel):
         wc = require_weave_client()
         # Ensure the call is finished even if there was an error during summarize or elsewhere
         try:
-            wc.finish_call(self._evaluate_call, output=output)
+            wc.finish_call(self._evaluate_call, output=output, exception=exception)
         except Exception:
             # Log error but continue cleanup
             logger.error(
@@ -546,7 +567,7 @@ class EvaluationLogger(BaseModel):
         if summary_data:
             final_summary = summary_data
         if summary is not None:
-            final_summary = {**final_summary, **summary}
+            final_summary = {**final_summary, "output": summary}
 
         # Call the summarize op
         assert self._evaluate_call is not None, (
@@ -565,7 +586,7 @@ class EvaluationLogger(BaseModel):
 
         self._finalize_evaluation(output=final_summary)
 
-    def finish(self) -> None:
+    def finish(self, exception: BaseException | None = None) -> None:
         """Clean up the evaluation resources explicitly without logging a summary.
 
         Ensures all prediction calls and the main evaluation call are finalized.
@@ -575,11 +596,15 @@ class EvaluationLogger(BaseModel):
             return
 
         # Finalize with None output, indicating closure without summary
-        self._finalize_evaluation(output=None)
+        self._finalize_evaluation(output=None, exception=exception)
 
         # Remove from global registry since we've manually finalized
         if self in _active_evaluation_loggers:
             _active_evaluation_loggers.remove(self)
+
+    def fail(self, exception: BaseException) -> None:
+        """Convenience method to fail the evaluation with an exception."""
+        self.finish(exception=exception)
 
     def __del__(self) -> None:
         """Ensure cleanup happens during garbage collection."""

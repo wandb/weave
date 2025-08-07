@@ -39,9 +39,7 @@ from weave.trace.refs import parse_uri
 from weave.trace.vals import MissingSelfInstanceError
 from weave.trace.weave_client import sanitize_object_name
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.clickhouse_trace_server_batched import (
-    ENTITY_TOO_LARGE_PAYLOAD,
-)
+from weave.trace_server.clickhouse_trace_server_settings import ENTITY_TOO_LARGE_PAYLOAD
 from weave.trace_server.errors import InsertTooLarge, InvalidFieldError
 from weave.trace_server.ids import generate_id
 from weave.trace_server.refs_internal import extra_value_quoter
@@ -859,6 +857,80 @@ def test_trace_call_query_offset(client):
         )
 
         assert len(inner_res.calls) == exp_count
+
+
+def test_trace_call_query_timings(client):
+    now = datetime.datetime(2025, 1, 1, 12, 0, 0, tzinfo=datetime.timezone.utc)
+    later = now + datetime.timedelta(seconds=1)
+    even_later = later + datetime.timedelta(seconds=1)
+
+    num_calls = 100
+
+    # Create calls with controlled timing - mock only datetime.datetime.now()
+    call_index = 0
+
+    def mock_now(*args, **kwargs):
+        nonlocal call_index
+        # Each create_call increments the index once at the start
+        # Return the appropriate time based on which call we're processing
+        if call_index <= num_calls - 3:  # calls 0-97 get 'now'
+            return now
+        elif call_index == num_calls - 2:  # call 98 gets 'later'
+            return later
+        else:  # call 99 gets 'even_later'
+            return even_later
+
+    with mock.patch(
+        "weave.trace.weave_client.datetime.datetime"
+    ) as mock_datetime_class:
+        # Mock only the .now() method, keep everything else as-is
+        mock_datetime_class.now = mock.Mock(side_effect=mock_now)
+        # Preserve other datetime functionality
+        mock_datetime_class.side_effect = lambda *args, **kw: datetime.datetime(
+            *args, **kw
+        )
+
+        for i in range(num_calls):
+            call_index = i
+            client.create_call("y", {"a": i})
+
+    def query_server():
+        result = get_client_trace_server(client).calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client),
+                sort_by=[tsi.SortBy(field="started_at", direction="desc")],
+            )
+        )
+        return list(result)
+
+    def query_client(page_size):
+        res = client.get_calls(
+            sort_by=[tsi.SortBy(field="started_at", direction="desc")],
+            page_size=page_size,
+        )
+        return list(res)
+
+    # get all calls, sorted by started_at
+    res = query_server()
+    assert len(res) == num_calls
+    assert res[0].started_at == even_later
+    assert res[1].started_at == later
+    for c in res[2:]:
+        assert c.started_at == now
+
+    ids = [c.id for c in res]
+
+    # indeterminite ordering should always default to the same thing
+    for _i in range(5):
+        tres = query_server()
+        tids = [c.id for c in tres]
+        assert tids == ids
+
+    # page_size 10 to test ordering within pages
+    for _i in range(3):
+        tres = query_client(page_size=10)
+        tids = [c.id for c in tres]
+        assert tids == ids
 
 
 def test_trace_call_sort(client):
@@ -2560,7 +2632,7 @@ def test_call_read_with_unkown_llm(client):
     # Generate a unique LLM ID unlikely to exist
     llm_id_no_cost = f"non_existent_llm_{generate_id()}"
 
-    @weave.op()
+    @weave.op
     def op_with_usage_no_cost(input_val: int) -> dict[str, Any]:
         usage_details = {
             "requests": 1,
@@ -3003,18 +3075,18 @@ def test_calls_stream_column_expansion(client):
 
 
 # Batch size is dynamically increased from 10 to MAX_CALLS_STREAM_BATCH_SIZE (500)
-# in clickhouse_trace_server_batched.py, this test verifies that the dynamic
+# in clickhouse_trace_server_settings.py, this test verifies that the dynamic
 # increase works as expected
 @pytest.mark.parametrize("batch_size", [1, 5, 6])
 def test_calls_stream_column_expansion_dynamic_batch_size(
     client, batch_size, monkeypatch
 ):
     monkeypatch.setattr(
-        "weave.trace_server.clickhouse_trace_server_batched.INITIAL_CALLS_STREAM_BATCH_SIZE",
+        "weave.trace_server.clickhouse_trace_server_settings.INITIAL_CALLS_STREAM_BATCH_SIZE",
         1,
     )
     monkeypatch.setattr(
-        "weave.trace_server.clickhouse_trace_server_batched.MAX_CALLS_STREAM_BATCH_SIZE",
+        "weave.trace_server.clickhouse_trace_server_settings.MAX_CALLS_STREAM_BATCH_SIZE",
         5,
     )
 
@@ -3336,12 +3408,12 @@ def test_large_keys_are_stripped_call(client, caplog, monkeypatch):
         original_insert_call_batch(self, batch)
 
     monkeypatch.setattr(
-        weave.trace_server.clickhouse_trace_server_batched,
+        weave.trace_server.clickhouse_trace_server_settings,
         "CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT",
         10 * 1024,  # 1KB
     )
     monkeypatch.setattr(
-        weave.trace_server.clickhouse_trace_server_batched,
+        weave.trace_server.clickhouse_trace_server_settings,
         "CLICKHOUSE_SINGLE_VALUE_BYTES_LIMIT",
         1 * 1024,  # 1KB
     )
@@ -4342,7 +4414,7 @@ def test_calls_query_stats_with_limit(client):
     # test limit and filter, should use limit but not special optimization
     assert calls_stats(limit=1, filter={"trace_roots_only": True}).count == 1
     # test filter, should not use special optimization
-    assert calls_stats(filter={"trace_id": trace_id}).count == 2
+    assert calls_stats(filter={"trace_ids": [trace_id]}).count == 2
 
     with pytest.raises(ValueError):
         calls_stats(limit=-1)
@@ -4987,6 +5059,65 @@ def test_threads_query_endpoint(client):
     )
     # Should include our threads since they're before this future time
     assert len(before_filter_res) >= 3
+
+    # Test thread_ids filtering
+    # Test filtering by specific thread_ids (single thread)
+    for test_thread_id in thread_ids:
+        thread_ids_filter_res = list(
+            client.server.threads_query_stream(
+                tsi.ThreadsQueryReq(
+                    project_id=get_client_project_id(client),
+                    filter=tsi.ThreadsQueryFilter(thread_ids=[test_thread_id]),
+                )
+            )
+        )
+        # Should find exactly one thread with the specified thread_id
+        assert len(thread_ids_filter_res) == 1
+        assert thread_ids_filter_res[0].thread_id == test_thread_id
+
+    # Test filtering by multiple thread_ids
+    multiple_thread_ids_filter_res = list(
+        client.server.threads_query_stream(
+            tsi.ThreadsQueryReq(
+                project_id=get_client_project_id(client),
+                filter=tsi.ThreadsQueryFilter(thread_ids=thread_ids[:2]),
+            )
+        )
+    )
+    # Should find exactly two threads
+    assert len(multiple_thread_ids_filter_res) == 2
+    found_thread_ids = {t.thread_id for t in multiple_thread_ids_filter_res}
+    assert found_thread_ids == set(thread_ids[:2])
+
+    # Test filtering by non-existent thread_ids
+    nonexistent_filter_res = list(
+        client.server.threads_query_stream(
+            tsi.ThreadsQueryReq(
+                project_id=get_client_project_id(client),
+                filter=tsi.ThreadsQueryFilter(thread_ids=["nonexistent_thread_id"]),
+            )
+        )
+    )
+    assert len(nonexistent_filter_res) == 0
+
+    # Test combining thread_ids filter with other filters
+    combo_thread_filter_res = list(
+        client.server.threads_query_stream(
+            tsi.ThreadsQueryReq(
+                project_id=get_client_project_id(client),
+                limit=1,
+                sort_by=[tsi.SortBy(field="turn_count", direction="desc")],
+                filter=tsi.ThreadsQueryFilter(
+                    thread_ids=["analytics_thread"],
+                    after_datetime=middle_time,
+                ),
+            )
+        )
+    )
+    # Should find at most 1 thread matching the specific thread_ids and time filter
+    assert len(combo_thread_filter_res) <= 1
+    if len(combo_thread_filter_res) == 1:
+        assert combo_thread_filter_res[0].thread_id == "analytics_thread"
 
     # Test combination of parameters
     combo_res = list(

@@ -75,11 +75,11 @@ def cohere_accumulator_v2(acc: dict | None, value: Any) -> NonStreamedChatRespon
         acc.message.content.append(value.delta.message.content.text)  # type: ignore
 
     if value.type == "content-delta":
-        _content = _accumulate_content(
+        content = _accumulate_content(
             acc.message.content[value.index],  # type: ignore
             value.delta.message.content.text,  # type: ignore
         )
-        acc.message.content[value.index] = _content  # type: ignore
+        acc.message.content[value.index] = content  # type: ignore
 
     if value.type == "message-end":
         acc = acc.copy(  # type: ignore
