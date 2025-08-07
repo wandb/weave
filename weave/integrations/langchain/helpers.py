@@ -347,6 +347,22 @@ def _extract_model_from_flattened_path(flattened: dict, usage_key_path: str) -> 
     Common patterns:
         usage at "outputs.0.usage_metadata" → model at "outputs.0.generation_info.model_name"
     """
+
+    # Look for model_name keys that start with the usage path
+    # This handles the most common cases
+    model_name_candidates = [
+        key
+        for key in flattened.keys()
+        if key.startswith(usage_key_path) and key.endswith("model_name")
+    ]
+
+    # Validate candidates and return first valid one
+    for candidate in model_name_candidates:
+        model_name = flattened[candidate]
+        if isinstance(model_name, str) and model_name:
+            return model_name
+
+    # If fast-path didn't work, fall back
     path_parts = usage_key_path.split(".")
 
     # Generate specific candidate paths based on observed provider patterns.
