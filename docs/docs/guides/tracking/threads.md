@@ -1,6 +1,6 @@
 # Threads
 
-With _Threads_, you can track and analyze multi-turn conversations in your LLM applications. Threads group related calls under a shared `thread_id`, allowing you to visualize complete sessions and track conversation-level metrics across turns. You can create threads programmatically, and visualize them in the Weave UI.
+With W&B Weave _Threads_, you can track and analyze multi-turn conversations in your LLM applications. Threads group related calls under a shared `thread_id`, allowing you to visualize complete sessions and track conversation-level metrics across turns. You can create threads programmatically, and visualize them in the Weave UI.
 
 To get started with Threads, do the following:
 

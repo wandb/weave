@@ -1,6 +1,6 @@
 # Comparison
 
-The Weave Comparison feature allows you to visually compare and diff code, traces, prompts, models, and model configurations.  You can compare two objects side-by-side or analyze a larger set of objects to identify differences, patterns, and trends.
+The W&B Weave Comparison feature allows you to visually compare and diff code, traces, prompts, models, and model configurations.  You can compare two objects side-by-side or analyze a larger set of objects to identify differences, patterns, and trends.
 
 This guide covers the steps to start a comparison and the available actions to tailor your comparison view, including baseline comparisons, numeric diff formatting, and more. 
 

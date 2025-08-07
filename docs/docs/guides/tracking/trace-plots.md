@@ -1,6 +1,6 @@
 # Trace Plots
 
-The _trace plots_ tool in Weave allows you to explore, visualize, and debug trace-level metrics (e.g. latency, cost, tokens) using interactive charts. You can use the default trace plots or create your own via the custom trace plot builder.
+The _trace plots_ tool in W&B Weave allows you to explore, visualize, and debug trace-level metrics (e.g. latency, cost, tokens) using interactive charts. You can use the default trace plots or create your own via the custom trace plot builder.
 
 ![Trace plots in action](imgs/plots-example.png)
 
