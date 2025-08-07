@@ -56,7 +56,7 @@ repos:
     rev: v9.1.5
     hooks:
       - id: oxipng
-        args: ["-o", "2", "--strip", "safe", "--alpha"]
+        args: ["-o", "4", "--strip", "safe", "--alpha"]
         exclude: (weave_query|weave-js)
   - repo: local
     hooks:

@@ -20,6 +20,8 @@ FEEDBACK_TAG_NAME = "Feedback"
 COST_TAG_NAME = "Costs"
 COMPLETIONS_TAG_NAME = "Completions"
 ACTIONS_TAG_NAME = "Actions"
+OTEL_TAG_NAME = "OpenTelemetry"
+THREADS_TAG_NAME = "Threads"
 
 
 class AuthParams(NamedTuple):
@@ -127,6 +129,13 @@ def generate_routes(
         service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008  # noqa: B008
     ) -> dict[str, str]:
         return service.read_root()
+
+    @router.post("/otel/v1/trace", tags=[OTEL_TAG_NAME])
+    def export_trace(
+        req: tsi.OtelExportReq,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.OtelExportRes:
+        return service.trace_server_interface.export_trace(req)
 
     @router.post("/call/start", tags=[CALLS_TAG_NAME])
     def call_start(
@@ -425,5 +434,68 @@ def generate_routes(
         service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
     ) -> tsi.CompletionsCreateRes:
         return service.trace_server_interface.completions_create(req)
+
+    @router.post(
+        "/completions/create_stream",
+        tags=[COMPLETIONS_TAG_NAME],
+        include_in_schema=False,
+        response_class=StreamingResponse,
+        responses={
+            200: {
+                "description": "Stream of data in JSONL format",
+                "content": {
+                    "application/jsonl": {
+                        "schema": {
+                            "type": "array",
+                            "items": {"$ref": "#/components/schemas/Schema"},
+                        }
+                    }
+                },
+            }
+        },
+    )
+    def completions_create_stream(
+        req: tsi.CompletionsCreateReq,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> StreamingResponse:
+        return StreamingResponse(
+            service.trace_server_interface.completions_create_stream(req),
+            media_type="application/jsonl",
+        )
+
+    # TODO: This is mislabled in the core impl.  Keeping it the same here for now.
+    @router.post("/project/stats", tags=["project"], include_in_schema=False)
+    def project_stats(
+        req: tsi.ProjectStatsReq,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.ProjectStatsRes:
+        return service.trace_server_interface.project_stats(req)
+
+    @router.post(
+        "/threads/stream_query",
+        tags=[THREADS_TAG_NAME],
+        response_class=StreamingResponse,
+        responses={
+            200: {
+                "description": "Stream of data in JSONL format",
+                "content": {
+                    "application/jsonl": {
+                        "schema": {
+                            "type": "array",
+                            "items": {"$ref": "#/components/schemas/Schema"},
+                        }
+                    }
+                },
+            }
+        },
+    )
+    def threads_query_stream(
+        req: tsi.ThreadsQueryReq,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> StreamingResponse:
+        return StreamingResponse(
+            service.trace_server_interface.threads_query_stream(req),
+            media_type="application/jsonl",
+        )
 
     return router

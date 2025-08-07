@@ -45,6 +45,7 @@ from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
 )
 
 from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
+from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server import environment as wf_env
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
@@ -60,13 +61,17 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     optimized_project_contains_call_query,
 )
 from weave.trace_server.clickhouse_schema import (
+    ALL_CALL_INSERT_COLUMNS,
+    ALL_CALL_SELECT_COLUMNS,
+    REQUIRED_CALL_COLUMNS,
+    CallCHInsertable,
     CallDeleteCHInsertable,
     CallEndCHInsertable,
     CallStartCHInsertable,
     CallUpdateCHInsertable,
     ObjCHInsertable,
     ObjDeleteCHInsertable,
-    SelectableCHCallSchema,
+    ObjRefListType,
     SelectableCHObjSchema,
 )
 from weave.trace_server.constants import COMPLETIONS_CREATE_OP_NAME
@@ -78,6 +83,7 @@ from weave.trace_server.errors import (
     NotFoundError,
     ObjectDeletedError,
     RequestTooLarge,
+    handle_clickhouse_query_error,
 )
 from weave.trace_server.feedback import (
     TABLE_FEEDBACK,
@@ -152,65 +158,6 @@ from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker impo
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-
-FILE_CHUNK_SIZE = 100000
-
-MAX_DELETE_CALLS_COUNT = 1000
-INITIAL_CALLS_STREAM_BATCH_SIZE = 50
-MAX_CALLS_STREAM_BATCH_SIZE = 500
-
-
-CallCHInsertable = Union[
-    CallStartCHInsertable,
-    CallEndCHInsertable,
-    CallDeleteCHInsertable,
-    CallUpdateCHInsertable,
-]
-
-
-all_call_insert_columns = list(
-    CallStartCHInsertable.model_fields.keys()
-    | CallEndCHInsertable.model_fields.keys()
-    | CallDeleteCHInsertable.model_fields.keys()
-    | CallUpdateCHInsertable.model_fields.keys()
-)
-
-all_call_select_columns = list(SelectableCHCallSchema.model_fields.keys())
-all_call_json_columns = ("inputs", "output", "attributes", "summary")
-required_call_columns = ["id", "project_id", "trace_id", "op_name", "started_at"]
-
-
-# Columns in the calls_merged table with special aggregation functions:
-call_select_raw_columns = ["id", "project_id"]  # no aggregation
-call_select_arrays_columns = ["input_refs", "output_refs"]  # array_concat_agg
-call_select_argmax_columns = ["display_name"]  # argMaxMerge
-# all others use `any`
-
-
-all_obj_select_columns = list(SelectableCHObjSchema.model_fields.keys())
-all_obj_insert_columns = list(ObjCHInsertable.model_fields.keys())
-
-# Let's just make everything required for now ... can optimize when we implement column selection
-required_obj_select_columns = list(set(all_obj_select_columns) - set())
-
-ObjRefListType = list[ri.InternalObjectRef]
-
-
-CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT = 3.5 * 1024 * 1024  # 3.5 MiB
-CLICKHOUSE_SINGLE_VALUE_BYTES_LIMIT = 1 * 1024 * 1024  # 1 MiB
-ENTITY_TOO_LARGE_PAYLOAD = '{"_weave": {"error":"<EXCEEDS_LIMITS>"}}'
-
-# https://clickhouse.com/docs/operations/settings/settings#max_memory_usage
-DEFAULT_MAX_MEMORY_USAGE = 16 * 1024 * 1024 * 1024  # 16 GiB
-# https://clickhouse.com/docs/operations/settings/settings#max_execution_time
-DEFAULT_MAX_EXECUTION_TIME = 60 * 1  # 1 minute
-CLICKHOUSE_DEFAULT_QUERY_SETTINGS = {
-    "max_memory_usage": wf_env.wf_clickhouse_max_memory_usage()
-    or DEFAULT_MAX_MEMORY_USAGE,
-    "max_execution_time": wf_env.wf_clickhouse_max_execution_time()
-    or DEFAULT_MAX_EXECUTION_TIME,
-    "function_json_value_return_type_allow_complex": "1",
-}
 
 
 class ClickHouseTraceServer(tsi.TraceServerInterface):
@@ -432,7 +379,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             include_storage_size=req.include_storage_size or False,
             include_total_storage_size=req.include_total_storage_size or False,
         )
-        columns = all_call_select_columns
+        columns = ALL_CALL_SELECT_COLUMNS
         if req.columns:
             # TODO: add support for json extract fields
             # Split out any nested column requests
@@ -446,7 +393,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             # Set columns to user-requested columns, w/ required columns
             # These are all formatted by the CallsQuery, which prevents injection
             # and other attack vectors.
-            columns = list(set(required_call_columns + columns))
+            columns = list(set(REQUIRED_CALL_COLUMNS + columns))
 
         # sort the columns such that similar queries are grouped together
         columns = sorted(columns)
@@ -509,8 +456,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         ref_cache = LRUCache(max_size=1000)
         batch_processor = DynamicBatchProcessor(
-            initial_size=INITIAL_CALLS_STREAM_BATCH_SIZE,
-            max_size=MAX_CALLS_STREAM_BATCH_SIZE,
+            initial_size=ch_settings.INITIAL_CALLS_STREAM_BATCH_SIZE,
+            max_size=ch_settings.MAX_CALLS_STREAM_BATCH_SIZE,
             growth_factor=10,
         )
 
@@ -614,9 +561,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_delete")
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         assert_non_null_wb_user_id(req)
-        if len(req.call_ids) > MAX_DELETE_CALLS_COUNT:
+        if len(req.call_ids) > ch_settings.MAX_DELETE_CALLS_COUNT:
             raise RequestTooLarge(
-                f"Cannot delete more than {MAX_DELETE_CALLS_COUNT} calls at once"
+                f"Cannot delete more than {ch_settings.MAX_DELETE_CALLS_COUNT} calls at once"
             )
 
         if root_span := ddtrace.tracer.current_span():
@@ -1547,8 +1494,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def _file_create_clickhouse(self, req: tsi.FileCreateReq, digest: str) -> None:
         set_root_span_dd_tags({"storage_provider": "clickhouse"})
         chunks = [
-            req.content[i : i + FILE_CHUNK_SIZE]
-            for i in range(0, len(req.content), FILE_CHUNK_SIZE)
+            req.content[i : i + ch_settings.FILE_CHUNK_SIZE]
+            for i in range(0, len(req.content), ch_settings.FILE_CHUNK_SIZE)
         ]
         self._insert(
             "files",
@@ -2015,7 +1962,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         batch_data = []
         for call in calls:
             call_dict = call.model_dump()
-            values = [call_dict.get(col) for col in all_call_insert_columns]
+            values = [call_dict.get(col) for col in ALL_CALL_INSERT_COLUMNS]
             batch_data.append(values)
 
         self._insert_call_batch(batch_data)
@@ -2170,7 +2117,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             self._insert(
                 "call_parts",
                 data=batch,
-                column_names=all_call_insert_columns,
+                column_names=ALL_CALL_INSERT_COLUMNS,
                 settings=settings,
             )
 
@@ -2239,7 +2186,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         """Streams the results of a query from the database."""
         if not settings:
             settings = {}
-        settings.update(CLICKHOUSE_DEFAULT_QUERY_SETTINGS)
+        settings.update(ch_settings.CLICKHOUSE_DEFAULT_QUERY_SETTINGS)
 
         summary = None
         parameters = _process_parameters(parameters)
@@ -2271,7 +2218,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     "parameters": parameters,
                 },
             )
-            raise
+            # always raises, optionally with custom error class
+            handle_clickhouse_query_error(e)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._query")
     def _query(
@@ -2284,7 +2232,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         """Directly queries the database and returns the result."""
         if not settings:
             settings = {}
-        settings.update(CLICKHOUSE_DEFAULT_QUERY_SETTINGS)
+        settings.update(ch_settings.CLICKHOUSE_DEFAULT_QUERY_SETTINGS)
 
         parameters = _process_parameters(parameters)
         try:
@@ -2300,7 +2248,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 "clickhouse_query_error",
                 extra={"error_str": str(e), "query": query, "parameters": parameters},
             )
-            raise
+            # always raises, optionally with custom error class
+            handle_clickhouse_query_error(e)
 
         logger.info(
             "clickhouse_query",
@@ -2357,7 +2306,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def _insert_call(self, ch_call: CallCHInsertable) -> None:
         parameters = ch_call.model_dump()
         row = []
-        for key in all_call_insert_columns:
+        for key in ALL_CALL_INSERT_COLUMNS:
             row.append(parameters.get(key, None))
         self._call_batch.append(row)
         if self._flush_immediately:
@@ -2391,14 +2340,17 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             # If bytes_size > the limit, this item is too large,
             # iterate through the json-dumped item values to find and
             # replace the large values with a placeholder.
-            if bytes_size > CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT:
+            if bytes_size > ch_settings.CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT:
                 stripped_item = []
                 for value in item:
                     # all the values should be json dumps, there are no
                     # non json fields controlled by the user that can
                     # be large enough to strip... (?)
-                    if _num_bytes(value) > CLICKHOUSE_SINGLE_VALUE_BYTES_LIMIT:
-                        stripped_item += [ENTITY_TOO_LARGE_PAYLOAD]
+                    if (
+                        _num_bytes(value)
+                        > ch_settings.CLICKHOUSE_SINGLE_VALUE_BYTES_LIMIT
+                    ):
+                        stripped_item += [ch_settings.ENTITY_TOO_LARGE_PAYLOAD]
                         stripped_count += 1
                     else:
                         stripped_item += [value]
@@ -2791,6 +2743,7 @@ def _build_aggregated_output(
     assistant_acc: list[str],
     tool_calls: list[dict[str, Any]],
     chunk: dict[str, Any],
+    reasoning_content: list[str],
 ) -> dict[str, Any]:
     """Build the aggregated output from accumulated data."""
     current_finish_reason = chunk.get("choices", [{}])[0].get("finish_reason")
@@ -2815,6 +2768,9 @@ def _build_aggregated_output(
                     "role": "assistant",
                     "tool_calls": (cleaned_tool_calls if cleaned_tool_calls else None),
                     "function_call": None,
+                    "reasoning_content": (
+                        "".join(reasoning_content) if reasoning_content else None
+                    ),
                 },
             }
         ],
@@ -2841,6 +2797,7 @@ def _create_tracked_stream_wrapper(
         assistant_acc: list[str] = []
         tool_calls: list[dict[str, Any]] = []
         aggregated_metadata: dict[str, Any] = {}
+        reasoning_content: list[str] = []
 
         try:
             for chunk in chunk_iter:
@@ -2867,14 +2824,25 @@ def _create_tracked_stream_wrapper(
                         if tool_call_delta:
                             _process_tool_call_delta(tool_call_delta, tool_calls)
 
+                        # Handle reasoning content
+                        reasoning_content_delta = delta.get("reasoning_content")
+                        if reasoning_content_delta:
+                            reasoning_content.append(reasoning_content_delta)
+
                 # Build aggregated output
                 aggregated_output = _build_aggregated_output(
-                    aggregated_metadata, assistant_acc, tool_calls, chunk
+                    aggregated_metadata,
+                    assistant_acc,
+                    tool_calls,
+                    chunk,
+                    reasoning_content,
                 )
 
         finally:
             # Handle fallback case for aggregated output
-            if aggregated_output is None and (assistant_acc or tool_calls):
+            if aggregated_output is None and (
+                assistant_acc or tool_calls or reasoning_content
+            ):
                 cleaned_tool_calls = _clean_tool_calls(tool_calls)
                 aggregated_output = {
                     "choices": [
@@ -2888,6 +2856,11 @@ def _create_tracked_stream_wrapper(
                                 ),
                                 "tool_calls": (
                                     cleaned_tool_calls if cleaned_tool_calls else None
+                                ),
+                                "reasoning_content": (
+                                    "".join(reasoning_content)
+                                    if reasoning_content
+                                    else None
                                 ),
                             }
                         }

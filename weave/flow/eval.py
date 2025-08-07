@@ -295,11 +295,13 @@ class Evaluation(Object):
             ValueError: If the evaluation has no ref (hasn't been saved/run yet).
 
         Examples:
-            >>> evaluation = Evaluation(dataset=examples, scorers=[scorer])
-            >>> await evaluation.evaluate(model)  # Run evaluation first
-            >>> calls = evaluation.get_evaluate_calls()
-            >>> for call in calls:
-            ...     print(f"Evaluation run: {call.id} at {call.started_at}")
+            ```python
+            evaluation = Evaluation(dataset=examples, scorers=[scorer])
+            await evaluation.evaluate(model)  # Run evaluation first
+            calls = evaluation.get_evaluate_calls()
+            for call in calls:
+                print(f"Evaluation run: {call.id} at {call.started_at}")
+            ```
         """
         client = require_weave_client()
 
@@ -325,14 +327,16 @@ class Evaluation(Object):
                 calls executed during that run.
 
         Examples:
-            >>> evaluation = Evaluation(dataset=examples, scorers=[accuracy_scorer, f1_scorer])
-            >>> await evaluation.evaluate(model)
-            >>> score_calls = evaluation.get_score_calls()
-            >>> for trace_id, calls in score_calls.items():
-            ...     print(f"Trace {trace_id}: {len(calls)} scorer calls")
-            ...     for call in calls:
-            ...         scorer_name = call.summary.get("weave", {}).get("trace_name")
-            ...         print(f"  Scorer: {scorer_name}, Output: {call.output}")
+            ```python
+            evaluation = Evaluation(dataset=examples, scorers=[accuracy_scorer, f1_scorer])
+            await evaluation.evaluate(model)
+            score_calls = evaluation.get_score_calls()
+            for trace_id, calls in score_calls.items():
+                print(f"Trace {trace_id}: {len(calls)} scorer calls")
+                for call in calls:
+                    scorer_name = call.summary.get("weave", {}).get("trace_name")
+                    print(f"  Scorer: {scorer_name}, Output: {call.output}")
+            ```
         """
         d = {}
         client = require_weave_client()
@@ -364,21 +368,27 @@ class Evaluation(Object):
                 - Values are lists of scorer outputs for that run and scorer
 
         Examples:
-            >>> evaluation = Evaluation(dataset=examples, scorers=[accuracy_scorer, f1_scorer])
-            >>> await evaluation.evaluate(model)
-            >>> scores = evaluation.get_scores()
-            >>> # Access scores by trace and scorer
-            >>> for trace_id, trace_scores in scores.items():
-            ...     print(f"Evaluation run {trace_id}:")
-            ...     for scorer_name, outputs in trace_scores.items():
-            ...         print(f"  {scorer_name}: {outputs}")
-            >>> # Example output structure:
-            >>> # {
-            >>> #   "trace_123": {
-            >>> #     "accuracy_scorer": [{"accuracy": 0.85}],
-            >>> #     "f1_scorer": [{"f1": 0.78}]
-            >>> #   }
-            >>> # }
+            ```python
+            evaluation = Evaluation(dataset=examples, scorers=[accuracy_scorer, f1_scorer])
+            await evaluation.evaluate(model)
+            scores = evaluation.get_scores()
+            # Access scores by trace and scorer
+            for trace_id, trace_scores in scores.items():
+                    print(f"Evaluation run {trace_id}:")
+                    for scorer_name, outputs in trace_scores.items():
+                        print(f"  {scorer_name}: {outputs}")
+            ```
+
+            Expected output:
+
+            ```
+            {
+                "trace_123": {
+                "accuracy_scorer": [{"accuracy": 0.85}],
+                "f1_scorer": [{"f1": 0.78}]
+                }
+            }
+            ```
         """
         score_calls = self.get_score_calls()
         d: dict[str, dict[str, list[Any]]] = {}

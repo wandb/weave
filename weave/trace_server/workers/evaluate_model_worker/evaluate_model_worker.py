@@ -1,7 +1,7 @@
 import asyncio
 from abc import ABC, abstractmethod
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from weave.flow.eval import Evaluation
 from weave.scorers.llm_as_a_judge_scorer import LLMAsAJudgeScorer
@@ -18,6 +18,8 @@ class EvaluateModelArgs(BaseModel):
     model_ref: str
     wb_user_id: str
     evaluation_call_id: str
+
+    model_config = ConfigDict(protected_namespaces=())
 
 
 class EvaluateModelDispatcher(ABC):

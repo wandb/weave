@@ -1722,7 +1722,7 @@ def test_object_version_read(client):
     objs = client.server.objs_query(
         tsi.ObjQueryReq(
             project_id=client._project_id(),
-            object_id=refs[0].name,
+            filter=tsi.ObjectVersionFilter(object_ids=[refs[0].name]),
         )
     ).objs
     assert len(objs) == 10
@@ -1910,7 +1910,7 @@ def test_object_deletion(client):
     versions = client.server.objs_query(
         req=tsi.ObjQueryReq(
             project_id=client._project_id(),
-            names=["my-obj"],
+            filter=tsi.ObjectVersionFilter(object_ids=["my-obj"]),
             sort_by=[tsi.SortBy(field="created_at", direction="desc")],
         )
     )
@@ -1926,7 +1926,7 @@ def test_object_deletion(client):
     versions = client.server.objs_query(
         req=tsi.ObjQueryReq(
             project_id=client._project_id(),
-            names=["my-obj"],
+            filter=tsi.ObjectVersionFilter(object_ids=["my-obj"]),
         )
     )
     assert len(versions.objs) == 0
