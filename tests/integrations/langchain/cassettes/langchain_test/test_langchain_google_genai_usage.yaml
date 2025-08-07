@@ -26,19 +26,21 @@ interactions:
   response:
     body:
       string: "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\":
-        [\n          {\n            \"text\": \"Hmm. Future of AI...  Like a djinn,
-        isn't it? Powerful, unpredictable.  Could be a boon, could be a curse. Depends
-        who's holding the reins, and what they wish for.  Lot of folk fear what they
-        don't understand.  Me? I've seen worse things than a bit of clever metal.
-        \ Still...  best to approach it cautiously. Like a griffin's nest.  Could
-        be full of gold, could be full of teeth.\\n\"\n          }\n        ],\n        \"role\":
-        \"model\"\n      },\n      \"finishReason\": 1,\n      \"avgLogprobs\": -0.1871309460334058\n
-        \   }\n  ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 23,\n    \"candidatesTokenCount\":
-        106,\n    \"totalTokenCount\": 129,\n    \"promptTokensDetails\": [\n      {\n
-        \       \"modality\": 1,\n        \"tokenCount\": 23\n      }\n    ],\n    \"candidatesTokensDetails\":
-        [\n      {\n        \"modality\": 1,\n        \"tokenCount\": 106\n      }\n
+        [\n          {\n            \"text\": \"Hmm. Future of AI... like some new
+        breed of monster, isn't it?  Folk whisper about it, scared. Some see salvation,
+        others doom. Me? I've seen enough prophecies and sorcerous schemes to know
+        things rarely turn out as predicted.  Destiny is a fickle bitch.  Maybe these
+        AI will be helpful, maybe they'll burn the world.  Doesn't matter much to
+        a witcher.  Just another contract, in the end.  Though, I'd wager silver it
+        involves a fair bit of chaos.  And chaos always pays.\\n\"\n          }\n
+        \       ],\n        \"role\": \"model\"\n      },\n      \"finishReason\":
+        1,\n      \"avgLogprobs\": -0.279165893041787\n    }\n  ],\n  \"usageMetadata\":
+        {\n    \"promptTokenCount\": 23,\n    \"candidatesTokenCount\": 119,\n    \"totalTokenCount\":
+        142,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": 1,\n
+        \       \"tokenCount\": 23\n      }\n    ],\n    \"candidatesTokensDetails\":
+        [\n      {\n        \"modality\": 1,\n        \"tokenCount\": 119\n      }\n
         \   ]\n  },\n  \"modelVersion\": \"gemini-1.5-pro-002\",\n  \"responseId\":
-        \"fkqUaL6DF--Bn9kP1JHymQg\"\n}\n"
+        \"DH6UaI3OD8WDn9kPnP-c0Qk\"\n}\n"
     headers:
       Alt-Svc:
       - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
@@ -47,11 +49,11 @@ interactions:
       Content-Type:
       - application/json; charset=UTF-8
       Date:
-      - Thu, 07 Aug 2025 06:41:05 GMT
+      - Thu, 07 Aug 2025 10:21:03 GMT
       Server:
       - scaffolding on HTTPServer2
       Server-Timing:
-      - gfet4t7; dur=4200
+      - gfet4t7; dur=4576
       Transfer-Encoding:
       - chunked
       Vary:
