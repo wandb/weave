@@ -49,7 +49,7 @@ from typer import Option
 WEAVE_PORT = 6345
 SERVER_TIMEOUT = 5  # seconds
 SERVER_CHECK_INTERVAL = 1  # seconds
-SUBPROCESS_TIMEOUT = 30  # seconds
+SUBPROCESS_TIMEOUT = 60  # seconds
 
 # Stainless configuration
 STAINLESS_ORG_NAME = "weights-biases"
@@ -195,16 +195,14 @@ def generate_code(
     if typescript_path:
         cmd.append(f"--+target=typescript:{typescript_path}")
 
+    # Print the command being executed for visibility
+    info(f"Running command: {' '.join(cmd)}")
+
     try:
-        subprocess.run(
-            cmd, check=True, capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT
-        )
+        # Run without capture_output to stream output live to terminal
+        subprocess.run(cmd, check=True, timeout=SUBPROCESS_TIMEOUT)
     except subprocess.CalledProcessError as e:
         error(f"Code generation failed with exit code {e.returncode}")
-        if e.stdout:
-            error(f"Output: {e.stdout}")
-        if e.stderr:
-            error(f"Error output: {e.stderr}")
         sys.exit(1)
     except subprocess.TimeoutExpired:
         error(f"Code generation timed out after {SUBPROCESS_TIMEOUT} seconds")
