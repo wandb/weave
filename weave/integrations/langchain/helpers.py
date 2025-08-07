@@ -11,510 +11,144 @@ Supported providers:
 """
 
 from collections import defaultdict
-from dataclasses import dataclass
-from typing import Any, Union
-
-from weave.flow.util import logger, warn_once
 from weave.trace.weave_client import Call
 from weave.trace_server.opentelemetry.helpers import flatten_attributes
-from weave.trace_server.trace_server_interface import LLMUsageSchema
 from weave.utils.dict_utils import convert_defaultdict_to_dict
-
-ModelName = str
+from weave.trace_server.trace_server_interface import LLMUsageSchema
+from typing import Any, cast
+from dataclasses import dataclass
 
 
 @dataclass
-class TokenCounts:
+class TokenUsage:
     prompt_tokens: int
     completion_tokens: int
     total_tokens: int
 
-    def __post_init__(self):
-        """
-        Validate and normalize token counts after initialization.
 
-        Warns once if any token count is being set to zero due to invalid values,
-        and ensures all token counts are positive.
-        """
-        # Collect invalid fields and warn once
-        invalid_fields = []
-        if self.prompt_tokens < 0:
-            invalid_fields.append(f"prompt_tokens={self.prompt_tokens}")
-        if self.completion_tokens < 0:
-            invalid_fields.append(f"completion_tokens={self.completion_tokens}")
-        if self.total_tokens < 0:
-            invalid_fields.append(f"total_tokens={self.total_tokens}")
-
-        if invalid_fields:
-            warn_once(
-                logger,
-                f"Invalid token count values: {', '.join(invalid_fields)}, setting to 0",
-            )
-            # Normalize negative values to 0
-            if self.prompt_tokens < 0:
-                object.__setattr__(self, "prompt_tokens", 0)
-            if self.completion_tokens < 0:
-                object.__setattr__(self, "completion_tokens", 0)
-            if self.total_tokens < 0:
-                object.__setattr__(self, "total_tokens", 0)
-
-
-@dataclass
-class ModelTokenCounts(TokenCounts):
+def _normalize_usage_metadata(usage_metadata: dict) -> TokenUsage:
     """
-    Token counts with associated model information.
+    Normalize usage metadata from different provider formats to standard format.
 
-    Extends TokenCounts to include model name and provides validation
-    for different provider-specific usage data formats.
+    Args:
+        usage_metadata: Raw usage metadata dictionary from provider
+
+    Returns:
+        Tuple of (prompt_tokens, completion_tokens, total_tokens)
+
     """
+    if not usage_metadata:
+        return TokenUsage(prompt_tokens=0, completion_tokens=0, total_tokens=0)
 
-    model_name: str = "unknown"
+    # Currently Supported formats:
+    # - OpenAI: prompt_tokens, completion_tokens, total_tokens
+    # - Google GenAI: input_tokens, output_tokens, total_tokens
+    # - Google Vertex AI: prompt_token_count, candidates_token_count, total_token_count
 
-    @classmethod
-    def from_usage_data(
-        cls, usage_data: dict, model_name: str = "unknown"
-    ) -> "ModelTokenCounts":
-        """
-        Create ModelTokenCounts from provider-specific usage data.
+    # Try different provider formats
+    variations = {
+        "prompt_tokens": {"prompt_tokens", "input_tokens", "prompt_token_count"},
+        "completion_tokens": {
+            "completion_tokens",
+            "output_tokens",
+            "candidates_token_count",
+        },
+        "total_tokens": {"total_tokens", "total_token_count"},
+    }
+    normalized_usage = {}
+    for key, values in variations.items():
+        for value in values:
+            if value in usage_metadata:
+                normalized_usage[key] = usage_metadata.get(value)
+                break
 
-        Args:
-            usage_data: Dictionary with provider-specific token fields
-            model_name: Name of the model used
+    # Ensure all required fields have default values and handle None values
+    return TokenUsage(
+        prompt_tokens=normalized_usage.get("prompt_tokens") or 0,
+        completion_tokens=normalized_usage.get("completion_tokens") or 0,
+        total_tokens=normalized_usage.get("total_tokens") or 0,
+    )
 
-        Returns:
-            ModelTokenCounts instance with normalized token counts
-        """
-        token_counts = _normalize_token_counts(usage_data)
-        return cls(
-            prompt_tokens=token_counts.prompt_tokens,
-            completion_tokens=token_counts.completion_tokens,
-            total_tokens=token_counts.total_tokens,
-            model_name=model_name,
-        )
 
-    @classmethod
-    def empty(cls, model_name: str = "unknown") -> "ModelTokenCounts":
-        """
-        Create an empty ModelTokenCounts instance.
+def _find_full_model_name(output: Any, partial_model_name: str) -> str:
+    """
+    Find the full model name by searching flattened output for longer model names.
 
-        Args:
-            model_name: Name of the model
+    Args:
+        output: The LangChain output dictionary
+        partial_model_name: The partial model name from ls_model_name
 
-        Returns:
-            ModelTokenCounts with zero token counts
-        """
-        return cls(
-            prompt_tokens=0, completion_tokens=0, total_tokens=0, model_name=model_name
-        )
+    Returns:
+        Full model name if found, otherwise returns the partial model name
+
+    Examples:
+        >>> _find_full_model_name(output, "gemini-1.5-pro")
+        "gemini-1.5-pro-002"  # if found in the flattened output
+    """
+    # Flatten the entire output to search for model names
+    # Look for values that start with the partial model name and are longer
+    if not output or not partial_model_name or partial_model_name == "unknown":
+        return partial_model_name
+
+    flattened = flatten_attributes(output)
+    best_match = partial_model_name
+    for key, value in flattened.items():
+        # we use startswith here to avoid prefix matches like "models/gemini-1.5-pro"
+        # and return if we find a better (longer) match
+        if isinstance(value, str) and value.startswith(partial_model_name):
+            if len(value) > len(best_match):
+                best_match = value
+
+    return best_match
 
 
 def _extract_usage_data(call: Call, output: Any) -> None:
-    """
-    Extract usage metadata from output and attach to call summary.
+    """Simplified usage extraction using consistent LangChain patterns."""
+    if not output or "outputs" not in output:
+        return
+    # Extract model name and type from the langchain metadata directly
+    # One issue here is that model name is not always the full name
+    # in that case we try to find the full model name from the flattened output
 
-    Uses generation-scoped deduplication to prevent double-counting when
-    the same usage data appears in multiple locations within a generation.
-    Flattens nested responses to find usage data anywhere in the structure.
-    Supports multiple providers and batch operations.
+    metadata = output.get("extra", {}).get("metadata", {})
+    partial_model_name = metadata.get("ls_model_name", "unknown")
+    model_type = metadata.get("ls_model_type", "unknown")
 
-    Internally uses ModelTokenCounts for robust token count extraction and
-    validation across different provider formats (OpenAI, Google GenAI, Vertex AI).
+    model_name = _find_full_model_name(output, partial_model_name)
+    usage_dict = defaultdict(lambda: defaultdict(int))
+    generations = output.get("outputs", {}).get("generations", [])
 
-    Args:
-        call: Weave call object to attach usage data to
-        output: Response containing usage metadata
-
-    Example:
-        >>> _extract_usage_data(call, {"outputs": [{"token_usage": {"prompt_tokens": 10}}]})
-        >>> call.summary["usage"]
-        {"gpt-4": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}}
-    """
-    usage: Union[dict[ModelName, LLMUsageSchema], None] = None
-    if output is not None and "outputs" in output and len(output["outputs"]) > 0:
-        usage_dict: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
-        normalized_output = dict(output)
-
-        # Responses can have deeply nested structures that vary by provider.
-        # We flatten the entire response into dot-separated keys to make searching
-        # for usage data ensuring we don't miss it regardless of where it appears.
-        #
-        # Example: {"outputs": [{"metadata": {"usage": {"tokens": 10}}}]}
-        # Becomes: {"outputs.0.metadata.usage.tokens": 10}
-        flattened = flatten_attributes(normalized_output)
-
-        # Find generation boundaries first to prevent double-counting.
-        # Some providers (like Vertex AI) duplicate usage data in multiple locations
-        # within the same generation (e.g., both generation_info.usage_metadata and
-        # message.kwargs.usage_metadata). We need to identify each generation and
-        # extract usage data only once per generation.
-        generation_paths = _find_generation_paths(flattened)
-
-        if generation_paths:
-            # Generation-based extraction (prevents double-counting)
-            for generation_path in generation_paths:
-                model_token_counts = _extract_usage_from_generation(
-                    flattened, generation_path
+    # Extract usage data from generations structure
+    # Choose path based on model type handling for chat and llm models currently
+    for generation_batch in generations:
+        for generation in generation_batch:
+            if model_type == "chat":
+                usage_metadata = (
+                    generation.get("message", {})
+                    .get("kwargs", {})
+                    .get("usage_metadata", {})
                 )
-                if (
-                    model_token_counts.prompt_tokens > 0
-                    or model_token_counts.completion_tokens > 0
-                ):
-                    model = model_token_counts.model_name
-                    usage_dict[model][
-                        "prompt_tokens"
-                    ] += model_token_counts.prompt_tokens
-                    usage_dict[model][
-                        "completion_tokens"
-                    ] += model_token_counts.completion_tokens
-                    usage_dict[model]["total_tokens"] += model_token_counts.total_tokens
-        else:
-            # Fallback to original approach for responses without clear generation structure
-            # This handles edge cases and ensures backward compatibility
-            usage_base_paths = set()
-            for key in flattened.keys():
-                if ("usage_metadata" in key or "token_usage" in key) and key.endswith(
-                    (
-                        ".input_tokens",
-                        ".output_tokens",
-                        ".total_tokens",
-                        ".prompt_tokens",
-                        ".completion_tokens",
-                        ".prompt_token_count",
-                        ".candidates_token_count",
-                        ".total_token_count",
-                    )
-                ):
-                    # Find the last occurrence of usage_metadata or token_usage
-                    if "usage_metadata" in key:
-                        base_path = key[
-                            : key.rfind("usage_metadata") + len("usage_metadata")
-                        ]
-                    else:  # token_usage
-                        base_path = key[: key.rfind("token_usage") + len("token_usage")]
-                    usage_base_paths.add(base_path)
-
-            # For each usage base path, reconstruct the usage data and extract the model
-            for base_path in usage_base_paths:
-                usage_data = _reconstruct_usage_data_from_flattened(
-                    flattened, base_path
+            elif model_type == "llm":
+                usage_metadata = generation.get("generation_info", {}).get(
+                    "usage_metadata", {}
                 )
-                model = _extract_model_from_flattened_path(flattened, base_path)
-                model_token_counts = ModelTokenCounts.from_usage_data(usage_data, model)
+            # or other non-chat models we don't know how to extract usage metadata from
+            else:
+                usage_metadata = {}
 
-                if not (
-                    model_token_counts.prompt_tokens > 0
-                    or model_token_counts.completion_tokens > 0
-                ):
-                    continue
+            # Normalize token counts from provider-specific formats
+            token_usage = _normalize_usage_metadata(usage_metadata)
 
-                usage_dict[model]["prompt_tokens"] += model_token_counts.prompt_tokens
-                usage_dict[model][
+            if token_usage.prompt_tokens > 0 or token_usage.completion_tokens > 0:
+                usage_dict[model_name]["prompt_tokens"] += token_usage.prompt_tokens
+                usage_dict[model_name][
                     "completion_tokens"
-                ] += model_token_counts.completion_tokens
-                usage_dict[model]["total_tokens"] += model_token_counts.total_tokens
+                ] += token_usage.completion_tokens
+                usage_dict[model_name]["total_tokens"] += token_usage.total_tokens
 
-        if usage_dict:
-            usage = convert_defaultdict_to_dict(usage_dict)
-
-    # Attach usage data to call summary
-    if usage is not None:
+    if usage_dict:
         if call.summary is None:
             call.summary = {}
+
+        usage = cast(dict[str, LLMUsageSchema], convert_defaultdict_to_dict(usage_dict))
         call.summary.update({"usage": usage})
-
-
-def _reconstruct_usage_data_from_flattened(flattened: dict, base_path: str) -> dict:
-    """
-    Reconstruct usage data dictionary from flattened key-value pairs.
-
-    Args:
-        flattened: Flattened response dictionary with dot-separated keys
-        base_path: Base path for usage metadata (e.g., "outputs.0.generations.0.0.message.kwargs.usage_metadata")
-
-    Returns:
-        Reconstructed usage data dictionary
-
-    Example:
-        Given flattened data with keys like:
-        "outputs.0.generations.0.0.message.kwargs.usage_metadata.input_tokens": 20
-        "outputs.0.generations.0.0.message.kwargs.usage_metadata.output_tokens": 7
-
-    Returns:
-        {"input_tokens": 20, "output_tokens": 7, "total_tokens": 27}
-    """
-    usage_data = {}
-    base_prefix = base_path + "."
-
-    for key, value in flattened.items():
-        if key.startswith(base_prefix):
-            # Extract the token field name (e.g., "input_tokens" from "base_path.input_tokens")
-            field_name = key[len(base_prefix) :]
-            # Only include direct token fields, not nested structures
-            if "." not in field_name and isinstance(value, (int, float)):
-                usage_data[field_name] = int(value)
-
-    return usage_data
-
-
-def _is_valid_usage_shape(usage_data: dict) -> bool:
-    """
-    Check if usage_data contains expected token fields for known providers.
-
-    Args:
-        usage_data: Dictionary potentially containing usage metadata
-
-    Returns:
-        True if data matches any recognized provider format
-
-    Recognized formats:
-        - OpenAI: "prompt_tokens" + "completion_tokens"
-        - Google GenAI: "input_tokens" + "output_tokens"
-        - Google Vertex AI: "prompt_token_count" + "candidates_token_count"
-    """
-    if not isinstance(usage_data, dict):
-        return False
-
-    # OpenAI format
-    has_openai_tokens = (
-        "prompt_tokens" in usage_data and "completion_tokens" in usage_data
-    )
-
-    # Google GenAI format
-    has_genai_tokens = "input_tokens" in usage_data and "output_tokens" in usage_data
-
-    # Google Vertex AI format
-    has_vertex_tokens = (
-        "prompt_token_count" in usage_data and "candidates_token_count" in usage_data
-    )
-
-    return has_openai_tokens or has_genai_tokens or has_vertex_tokens
-
-
-def _normalize_token_counts(usage_data: dict) -> TokenCounts:
-    """
-    Normalize token counts from provider-specific fields to standard format.
-
-    Args:
-        usage_data: Dictionary with provider-specific token fields
-
-    Returns:
-        TokenCounts dataclass with (prompt_tokens, completion_tokens, total_tokens)
-
-    Field mappings:
-        OpenAI: prompt_tokens, completion_tokens, total_tokens
-        Google GenAI: input_tokens → prompt_tokens, output_tokens → completion_tokens
-        Google Vertex AI: prompt_token_count → prompt_tokens, candidates_token_count → completion_tokens
-    """
-    prompt_tokens = 0
-    completion_tokens = 0
-    total_tokens = 0
-
-    # OpenAI format: prompt_tokens, completion_tokens, total_tokens
-    if "prompt_tokens" in usage_data and "completion_tokens" in usage_data:
-        prompt_tokens = usage_data.get("prompt_tokens") or 0
-        completion_tokens = usage_data.get("completion_tokens") or 0
-        total_tokens = usage_data.get("total_tokens") or 0
-
-    # Google GenAI format: input_tokens, output_tokens, total_tokens
-    elif "input_tokens" in usage_data and "output_tokens" in usage_data:
-        prompt_tokens = usage_data.get("input_tokens") or 0
-        completion_tokens = usage_data.get("output_tokens") or 0
-        total_tokens = usage_data.get("total_tokens") or 0
-
-    # Google Vertex AI format: prompt_token_count, candidates_token_count, total_token_count
-    elif "prompt_token_count" in usage_data and "candidates_token_count" in usage_data:
-        prompt_tokens = usage_data.get("prompt_token_count") or 0
-        completion_tokens = usage_data.get("candidates_token_count") or 0
-        total_tokens = usage_data.get("total_token_count") or 0
-
-    return TokenCounts(prompt_tokens, completion_tokens, total_tokens)
-
-
-def _extract_model_from_flattened_path(flattened: dict, usage_key_path: str) -> str:
-    """
-    Extract model name from flattened response structure.
-
-    Searches for model_name in common locations relative to usage metadata path.
-    Falls back to broader search if targeted patterns fail.
-
-    Args:
-        flattened: Flattened response with dot-separated keys
-        usage_key_path: Key path where usage metadata was found
-
-    Returns:
-        Model name or "unknown" if not found
-
-    Common patterns:
-        usage at "outputs.0.usage_metadata" → model at "outputs.0.generation_info.model_name"
-    """
-
-    # Look for model_name keys that start with the usage path
-    # This handles the most common cases
-    model_name_candidates = [
-        key
-        for key in flattened.keys()
-        if key.startswith(usage_key_path) and key.endswith("model_name")
-    ]
-
-    # Validate candidates and return first valid one
-    for candidate in model_name_candidates:
-        model_name = flattened[candidate]
-        if isinstance(model_name, str) and model_name:
-            return model_name
-
-    # If fast-path didn't work, fall back
-    path_parts = usage_key_path.split(".")
-
-    # Generate specific candidate paths based on observed provider patterns.
-    # We construct paths by replacing the usage-related components with known
-    # model name locations. This handles the most common scenarios where model
-    # names appear in predictable relative locations.
-    # Search all ancestor paths for model_name fields
-    for truncate_count in range(1, len(path_parts) + 1):
-        base_path = path_parts[:-truncate_count]
-        for suffix in ["generation_info.model_name", "response_metadata.model_name"]:
-            candidate = ".".join(base_path + suffix.split("."))
-            if candidate in flattened:
-                model_name = flattened[candidate]
-                if isinstance(model_name, str) and model_name:
-                    return model_name
-
-    # Fallback: search for any key containing model_name in the path hierarchy
-    # If we reach here, we didn't find a specific model_name in the expected
-    # relative locations. We now perform a broader search across the entire
-    # flattened structure to catch edge cases where providers use non-standard
-    # nesting or field arrangements.
-    for prefix_length in range(len(path_parts), 0, -1):
-        prefix = ".".join(path_parts[:prefix_length])
-        for key, value in flattened.items():
-            if (
-                key.startswith(prefix)
-                and "model_name" in key
-                and isinstance(value, str)
-                and value
-            ):
-                return value
-
-    return "unknown"
-
-
-def _find_generation_paths(flattened: dict) -> list[str]:
-    """
-    Find all generation paths in a flattened LangChain result.
-
-    Given a flattened dictionary with keys like:
-        - "outputs.0.generations.0.0.message.kwargs.usage_metadata.input_tokens"
-        - "outputs.0.generations.0.0.generation_info.model_name"
-        - "outputs.0.generations.0.1.message.kwargs.usage_metadata.input_tokens"
-
-        Returns: ["outputs.0.generations.0.0", "outputs.0.generations.0.1"]
-    """
-    # 1. Iterate through all flattened keys looking for "generations" pattern
-    # 2. Split each key by dots and find the "generations" segment index
-    # 3. Ensure the path has the required structure (generations.Y.Z)
-    # 4. Extract the path up to and including the generation index (generations.Y)
-    # 5. Collect unique generation paths and return sorted list
-
-    generation_paths = set()
-    for key in flattened.keys():
-        if "generations" in key:
-            parts = key.split(".")
-            try:
-                gen_idx = parts.index("generations")
-                # Need at least 3 more parts after "generations": Y.Z.something
-                if gen_idx + 2 < len(parts):
-                    # Validate that the part after generations.Y is a number (the generation index)
-                    generation_index_part = parts[gen_idx + 2]
-                    if generation_index_part.isdigit():
-                        generation_path = ".".join(parts[: gen_idx + 3])
-                        generation_paths.add(generation_path)
-            except (ValueError, IndexError):
-                continue
-
-    return sorted(generation_paths)
-
-
-def _extract_usage_from_generation(
-    flattened: dict, generation_path: str
-) -> ModelTokenCounts:
-    """
-    Extract usage data from a specific generation, with deduplication.
-
-    Searches for usage data within the generation scope and returns the
-    best/most complete usage data found, avoiding double-counting when
-    the same usage information appears in multiple locations.
-
-    Args:
-        flattened: Flattened response dictionary with dot-separated keys
-        generation_path: Path to generation (e.g., "outputs.0.generations.0.0")
-
-    Returns:
-        ModelTokenCounts with normalized token counts and model name
-    """
-    # 1. Search for all usage-related keys within the generation scope
-    # 2. Filter keys that end with token count patterns (input_tokens, output_tokens, etc.)
-    # 3. Extract base paths for usage_metadata and token_usage locations
-    # 4. Deduplicate candidates to avoid double-counting
-    # 5. Apply priority order: generation_info > message.kwargs > other locations
-    # 6. Reconstruct usage data and extract model name from preferred source
-
-    generation_prefix = generation_path + "."
-
-    usage_candidates = []
-    for key in flattened.keys():
-        if (
-            key.startswith(generation_prefix)
-            and ("usage_metadata" in key or "token_usage" in key)
-            and key.endswith(
-                (
-                    ".input_tokens",
-                    ".output_tokens",
-                    ".total_tokens",
-                    ".prompt_tokens",
-                    ".completion_tokens",
-                    ".prompt_token_count",
-                    ".candidates_token_count",
-                    ".total_token_count",
-                )
-            )
-        ):
-
-            if "usage_metadata" in key:
-                base_path = key[: key.rfind("usage_metadata") + len("usage_metadata")]
-            else:  # token_usage
-                base_path = key[: key.rfind("token_usage") + len("token_usage")]
-
-            usage_candidates.append(base_path)
-
-    # Deduplicate candidates
-    unique_candidates = list(set(usage_candidates))
-
-    # No usage data found, but still try to extract model name
-    if not unique_candidates:
-        model = _extract_model_from_flattened_path(flattened, generation_path)
-        return ModelTokenCounts.empty(model)
-
-    # Prioritize usage data sources to avoid double-counting:
-    # 1. generation_info.usage_metadata (most authoritative, especially for Vertex AI)
-    # 2. message.kwargs.usage_metadata (common location, normalized from response_metadata)
-    # 3. Other locations (fallback for edge cases)
-
-    preferred_candidate = None
-    for candidate in unique_candidates:
-        if "generation_info.usage_metadata" in candidate:
-            preferred_candidate = candidate
-            break
-
-    if not preferred_candidate:
-        for candidate in unique_candidates:
-            if "message.kwargs.usage_metadata" in candidate:
-                preferred_candidate = candidate
-                break
-
-    if not preferred_candidate:
-        preferred_candidate = unique_candidates[0]
-
-    usage_data = _reconstruct_usage_data_from_flattened(flattened, preferred_candidate)
-    model = _extract_model_from_flattened_path(flattened, preferred_candidate)
-
-    return ModelTokenCounts.from_usage_data(usage_data, model)
