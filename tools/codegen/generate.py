@@ -17,6 +17,7 @@ Environment:
 #!/usr/bin/env -S uv run --script
 # /// script
 # dependencies = [
+#     "typer==0.16.0",
 #     "click==8.2.1",
 #     "httpx==0.28.1",
 #     "tomlkit==0.13.3",
@@ -24,6 +25,8 @@ Environment:
 #     "rich==14.0.0",
 # ]
 # ///
+
+from __future__ import annotations
 
 import json
 import os
@@ -34,19 +37,19 @@ import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any, Callable
 
-import click
 import httpx
 import tomlkit
+import typer
 import yaml
-from rich import print
+from typer import Option
 
 # Server configuration
 WEAVE_PORT = 6345
 SERVER_TIMEOUT = 5  # seconds
 SERVER_CHECK_INTERVAL = 1  # seconds
-SUBPROCESS_TIMEOUT = 30  # seconds
+SUBPROCESS_TIMEOUT = 60  # seconds
 
 # Stainless configuration
 STAINLESS_ORG_NAME = "weights-biases"
@@ -58,15 +61,17 @@ CODEGEN_BUNDLE_PATH = f"{CODEGEN_ROOT_RELPATH}/stainless.js"
 STAINLESS_CONFIG_PATH = f"{CODEGEN_ROOT_RELPATH}/openapi.stainless.yml"
 STAINLESS_OAS_PATH = f"{CODEGEN_ROOT_RELPATH}/openapi.json"
 
-
-@click.group()
-def cli() -> None:
-    """Weave code generation tools"""
+# Create the Typer app
+app = typer.Typer(help="Weave code generation tools")
 
 
-@cli.command()  # type: ignore
-@click.option("-o", "--output-file", help="Output file path for the OpenAPI spec")
-def get_openapi_spec(output_file: str | None = None) -> None:
+@app.command()
+def get_openapi_spec(
+    output_file: Annotated[
+        str | None,
+        Option("-o", "--output-file", help="Output file path for the OpenAPI spec"),
+    ] = None,
+) -> None:
     """Retrieve the OpenAPI specification from a temporary FastAPI server.
 
     This command launches a uvicorn server running the trace server application,
@@ -78,9 +83,8 @@ def get_openapi_spec(output_file: str | None = None) -> None:
     if output_file is None:
         output_file = str(Path.cwd() / STAINLESS_OAS_PATH)
 
-    if not _kill_port(WEAVE_PORT):
-        error("Failed to kill process on port 6345")
-        sys.exit(1)
+    # Kill any existing process on the port (if there is one)
+    _kill_port(WEAVE_PORT)
 
     info("Starting server...")
     server = subprocess.Popen(
@@ -122,14 +126,22 @@ def get_openapi_spec(output_file: str | None = None) -> None:
             server.wait()
 
 
-@cli.command()  # type: ignore
-@click.option("--python-path", help="Path to the Python code generation output")
-@click.option("--node-path", help="Path to the Node.js code generation output")
-@click.option("--typescript-path", help="Path to the TypeScript code generation output")
+@app.command()
 def generate_code(
-    python_path: str | None = None,
-    node_path: str | None = None,
-    typescript_path: str | None = None,
+    python_path: Annotated[
+        str | None,
+        Option("--python-path", help="Path to the Python code generation output"),
+    ] = None,
+    node_path: Annotated[
+        str | None,
+        Option("--node-path", help="Path to the Node.js code generation output"),
+    ] = None,
+    typescript_path: Annotated[
+        str | None,
+        Option(
+            "--typescript-path", help="Path to the TypeScript code generation output"
+        ),
+    ] = None,
 ) -> None:
     """Generate code from the OpenAPI spec using Stainless.
 
@@ -183,24 +195,29 @@ def generate_code(
     if typescript_path:
         cmd.append(f"--+target=typescript:{typescript_path}")
 
+    # Print the command being executed for visibility
+    info(f"Running command: {' '.join(cmd)}")
+
     try:
+        # Run without capture_output to stream output live to terminal
         subprocess.run(cmd, check=True, timeout=SUBPROCESS_TIMEOUT)
     except subprocess.CalledProcessError as e:
         error(f"Code generation failed with exit code {e.returncode}")
-        if e.output:
-            error(f"Output: {e.output.decode()}")
         sys.exit(1)
     except subprocess.TimeoutExpired:
         error(f"Code generation timed out after {SUBPROCESS_TIMEOUT} seconds")
         sys.exit(1)
 
 
-@cli.command()  # type: ignore
-@click.argument("python_output", type=click.Path(exists=True))
-@click.argument("package_name")
-@click.option("--release", is_flag=True, help="Update to the latest version")
+@app.command()
 def update_pyproject(
-    python_output: str, package_name: str, release: bool = False
+    python_output: Annotated[
+        Path, typer.Argument(help="Path to Python output", exists=True)
+    ],
+    package_name: Annotated[str, typer.Argument(help="Name of the package")],
+    release: Annotated[
+        bool, Option("--release", help="Update to the latest version")
+    ] = False,
 ) -> None:
     """Update the pyproject.toml file with the latest version of the generated code.
 
@@ -208,13 +225,12 @@ def update_pyproject(
     (if --release is specified) or a git SHA reference.
     """
     header("Updating pyproject.toml")
-    path = Path(python_output)
     if release:
-        version = _get_package_version(path)
+        version = _get_package_version(python_output)
         _update_pyproject_toml(package_name, version, True)
         info(f"Updated {package_name} dependency to version: {version}")
     else:
-        repo_info = _get_repo_info(path)
+        repo_info = _get_repo_info(python_output)
         remote_url = repo_info.remote_url
         sha = repo_info.sha
         if not sha:
@@ -224,26 +240,39 @@ def update_pyproject(
         info(f"Updated {package_name} dependency to SHA: {sha}")
 
 
-@cli.command()  # type: ignore
-@click.option(
-    "--config",
-    default=CODEGEN_ROOT_RELPATH + "/generate_config.yaml",
-    help="Path to config file",
-)
-@click.option("--python-output", help="Path for Python code generation output")
-@click.option("--package-name", help="Name of the package to update in pyproject.toml")
-@click.option("--openapi-output", help="Path to save the OpenAPI spec")
-@click.option("--node-output", help="Path for Node.js code generation output")
-@click.option("--typescript-output", help="Path for TypeScript code generation output")
-@click.option("--release", is_flag=True, help="Update to the latest version")
+@app.command()
 def all(
-    config: str,
-    python_output: str | None,
-    package_name: str | None,
-    openapi_output: str | None,
-    node_output: str | None,
-    typescript_output: str | None,
-    release: bool | None,
+    config: Annotated[
+        str, Option("--config", help="Path to config file")
+    ] = CODEGEN_ROOT_RELPATH + "/generate_config.yaml",
+    python_output: Annotated[
+        str | None,
+        Option("--python-output", help="Path for Python code generation output"),
+    ] = None,
+    package_name: Annotated[
+        str | None,
+        Option(
+            "--package-name", help="Name of the package to update in pyproject.toml"
+        ),
+    ] = None,
+    openapi_output: Annotated[
+        str | None,
+        Option("--openapi-output", help="Path to save the OpenAPI spec"),
+    ] = None,
+    node_output: Annotated[
+        str | None,
+        Option("--node-output", help="Path for Node.js code generation output"),
+    ] = None,
+    typescript_output: Annotated[
+        str | None,
+        Option(
+            "--typescript-output", help="Path for TypeScript code generation output"
+        ),
+    ] = None,
+    release: Annotated[
+        bool | None,
+        Option("--release", help="Update to the latest version"),
+    ] = None,
 ) -> None:
     """Run all code generation commands in sequence.
 
@@ -315,9 +344,6 @@ def all(
                     error("Config creation aborted")
                     sys.exit(1)
 
-            # Set the python_output in the config
-            cfg["python_output"] = python_output_input
-
             # Replace the template python_output with the provided value
             config_content = config_content.replace(
                 "/path/to/your/local/python/repo", python_output_input
@@ -329,6 +355,12 @@ def all(
                 dst.write(config_content)
 
             info(f"Config file created at: {config_file_path}")
+
+            # Reload the config file to get all values including package_name
+            cfg = _load_config(config_file_path)
+            info(
+                f"Loaded config with package_name: {cfg.get('package_name', 'weave_server_sdk')}"
+            )
         else:
             error(f"Template file not found: {template_path}")
             error(
@@ -349,15 +381,13 @@ def all(
         error("output_path cannot be None")
         sys.exit(1)
     # Call get_openapi_spec with --output-file argument
-    ctx = click.get_current_context()
-    _format_announce_invoke(ctx, get_openapi_spec, output_file=output_path)
+    _format_announce_invoke(get_openapi_spec, output_file=output_path)
 
     # 2. Generate code
     # Use python_output as python_output
     node_path = _ensure_absolute_path(cfg.get("node_output"))
     typescript_path = _ensure_absolute_path(cfg.get("typescript_output"))
     _format_announce_invoke(
-        ctx,
         generate_code,
         python_path=str_path,
         node_path=node_path,
@@ -367,9 +397,8 @@ def all(
     # 3. Update pyproject.toml
     release = cfg.get("release", False)
     _format_announce_invoke(
-        ctx,
         update_pyproject,
-        python_output=str_path,
+        python_output=Path(str_path),
         package_name=cfg["package_name"],
         release=release,
     )
@@ -380,17 +409,17 @@ def all(
 
 def header(text: str):
     """Display a prominent header"""
-    print(f"[bold blue]╔{'═' * (len(text) + 6)}╗[/bold blue]")
-    print(f"[bold blue]║   {text}   ║[/bold blue]")
-    print(f"[bold blue]╚{'═' * (len(text) + 6)}╝[/bold blue]")
+    print(f"╔{'═' * (len(text) + 6)}╗")
+    print(f"║   {text}   ║")
+    print(f"╚{'═' * (len(text) + 6)}╝")
 
 
 def error(text: str):
-    print(f"[red bold]ERROR:   {text}[/red bold]")
+    print(f"ERROR:   {text}")
 
 
 def warning(text: str):
-    print(f"[yellow]WARNING: {text}[/yellow]")
+    print(f"WARNING: {text}")
 
 
 def info(text: str):
@@ -400,24 +429,55 @@ def info(text: str):
 def _kill_port(port: int) -> bool:
     """Terminate any process listening on the specified port.
 
-    Executes a shell command to kill the process using the specified port.
-    Returns True if a process was successfully terminated, False otherwise.
+    Returns True if at least one process was successfully terminated, False if no process was found or all kills failed.
     """
-    cmd = f"lsof -i :{port} | grep LISTEN | awk '{{print $2}}' | xargs kill -9"
+    # First, find the process listening on the port
     try:
-        subprocess.run(
-            cmd, shell=True, stderr=subprocess.PIPE, timeout=SUBPROCESS_TIMEOUT
+        # Use lsof to find processes listening on the port
+        result = subprocess.run(
+            ["lsof", "-ti", f":{port}"],
+            capture_output=True,
+            text=True,
+            timeout=SUBPROCESS_TIMEOUT,
+            check=False,
         )
-    except subprocess.CalledProcessError as e:
-        info(f"No process found on port {port}")
-        warning(f"Command failed with error: {e}")
-        return False
     except subprocess.TimeoutExpired:
-        error(f"Timeout while trying to kill process on port {port}")
+        error(f"Timeout while finding processes on port {port}")
         return False
-    else:
-        info(f"Successfully killed process on port {port}")
-        return True
+    except Exception as e:
+        error(f"Unexpected error finding processes on port {port}: {e}")
+        return False
+
+    if result.returncode != 0 or not result.stdout.strip():
+        info(f"No process found listening on port {port}")
+        return False
+
+    # Get the PIDs from the output
+    pids = result.stdout.strip().split("\n")
+    killed_any = False
+
+    # Kill each process
+    for pid in pids:
+        if not pid:
+            continue
+
+        try:
+            subprocess.run(
+                ["kill", "-9", pid],
+                capture_output=True,
+                timeout=SUBPROCESS_TIMEOUT,
+                check=True,
+            )
+            info(f"Killed process {pid} on port {port}")
+            killed_any = True
+        except subprocess.TimeoutExpired:
+            warning(f"Timeout while killing process {pid}")
+        except subprocess.CalledProcessError as e:
+            warning(f"Failed to kill process {pid}: {e}")
+        except Exception as e:
+            warning(f"Unexpected error killing process {pid}: {e}")
+
+    return killed_any
 
 
 def _wait_for_server(
@@ -577,13 +637,11 @@ def _ensure_absolute_path(path: str | None) -> str | None:
     return str(Path.cwd() / p) if not p.is_absolute() else str(p)
 
 
-def _format_announce_invoke(
-    ctx: click.Context, command: click.Command, **kwargs
-) -> None:
-    """Helper to format, announce, and invoke a click command with the given parameters."""
-    cmd = _format_command(command.name, **kwargs)
+def _format_announce_invoke(command: Callable, **kwargs) -> None:
+    """Helper to format, announce, and invoke a command function with the given parameters."""
+    cmd = _format_command(command.__name__, **kwargs)
     _announce_command(cmd)
-    ctx.invoke(command, **kwargs)
+    command(**kwargs)
 
 
 def _load_config(config_path: str | Path) -> dict[str, Any]:
@@ -615,4 +673,4 @@ def _random_branch_name() -> str:
 
 
 if __name__ == "__main__":
-    cli()
+    app()
