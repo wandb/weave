@@ -129,6 +129,8 @@ langchain = [
   "langchain-google-vertexai>=2.0.24",
   "langchain-google-genai>=2.1.5",
   "langchain-anthropic>=0.3.15",
+  "langchain-cohere>=0.4.5",
+  "langchain-litellm>=0.2.2",
   "chromadb>=0.5.0",
   "pysqlite3",
   "opentelemetry-exporter-otlp",
