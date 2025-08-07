@@ -91,6 +91,18 @@
     "litellm_provider": "openai",
     "api_key_name": "OPENAI_API_KEY"
   },
+  "gpt-5-2025-08-07": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "gpt-5-mini-2025-08-07": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "gpt-5-nano-2025-08-07": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
   "gpt-4o-search-preview-2025-03-11": {
     "litellm_provider": "openai",
     "api_key_name": "OPENAI_API_KEY"
@@ -1471,6 +1483,14 @@
     "litellm_provider": "groq",
     "api_key_name": "GROQ_API_KEY"
   },
+  "groq/openai/gpt-oss-20b": {
+    "litellm_provider": "groq",
+    "api_key_name": "GROQ_API_KEY"
+  },
+  "groq/openai/gpt-oss-120b": {
+    "litellm_provider": "groq",
+    "api_key_name": "GROQ_API_KEY"
+  },
   "claude-3-haiku-20240307": {
     "litellm_provider": "anthropic",
     "api_key_name": "ANTHROPIC_API_KEY"
@@ -1500,6 +1520,10 @@
     "api_key_name": "ANTHROPIC_API_KEY"
   },
   "claude-opus-4-20250514": {
+    "litellm_provider": "anthropic",
+    "api_key_name": "ANTHROPIC_API_KEY"
+  },
+  "claude-opus-4-1-20250805": {
     "litellm_provider": "anthropic",
     "api_key_name": "ANTHROPIC_API_KEY"
   },
@@ -1907,6 +1931,18 @@
     "litellm_provider": "bedrock",
     "api_key_name": "BEDROCK_API_KEY"
   },
+  "openai.gpt-oss-20b-1:0": {
+    "litellm_provider": "bedrock_converse",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "openai.gpt-oss-120b-1:0": {
+    "litellm_provider": "bedrock_converse",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "anthropic.claude-opus-4-1-20250805-v1:0": {
+    "litellm_provider": "bedrock_converse",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
   "anthropic.claude-opus-4-20250514-v1:0": {
     "litellm_provider": "bedrock_converse",
     "api_key_name": "BEDROCK_API_KEY"
@@ -1951,6 +1987,10 @@
     "litellm_provider": "bedrock_converse",
     "api_key_name": "BEDROCK_API_KEY"
   },
+  "us.anthropic.claude-opus-4-1-20250805-v1:0": {
+    "litellm_provider": "bedrock_converse",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
   "us.anthropic.claude-opus-4-20250514-v1:0": {
     "litellm_provider": "bedrock_converse",
     "api_key_name": "BEDROCK_API_KEY"
@@ -1989,6 +2029,10 @@
   },
   "eu.anthropic.claude-3-haiku-20240307-v1:0": {
     "litellm_provider": "bedrock",
+    "api_key_name": "BEDROCK_API_KEY"
+  },
+  "eu.anthropic.claude-opus-4-1-20250805-v1:0": {
+    "litellm_provider": "bedrock_converse",
     "api_key_name": "BEDROCK_API_KEY"
   },
   "eu.anthropic.claude-opus-4-20250514-v1:0": {
