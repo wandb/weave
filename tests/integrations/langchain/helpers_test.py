@@ -639,7 +639,6 @@ def test_extract_usage_from_generation_empty():
     assert result.completion_tokens == 0
     assert result.total_tokens == 0
     assert result.model_name == "unknown"
-    assert not result.is_valid()
 
 
 def test_model_token_counts_validation():
@@ -658,26 +657,26 @@ def test_model_token_counts_validation():
     ]
 
     for case in valid_cases:
-        assert case.is_valid(), f"Expected {case} to be valid"
+        # Check that we have meaningful token counts (prompt or completion tokens > 0)
+        has_meaningful_tokens = case.prompt_tokens > 0 or case.completion_tokens > 0
+        assert has_meaningful_tokens, f"Expected {case} to have meaningful token counts"
 
-    # Invalid cases
-    invalid_cases = [
+    # Cases without meaningful token counts (both prompt and completion tokens are 0)
+    no_meaningful_tokens_cases = [
         ModelTokenCounts(
             prompt_tokens=0, completion_tokens=0, total_tokens=0, model_name="gpt-4"
         ),
         ModelTokenCounts(
-            prompt_tokens=-1, completion_tokens=5, total_tokens=4, model_name="gpt-4"
-        ),
-        ModelTokenCounts(
-            prompt_tokens=10, completion_tokens=-1, total_tokens=9, model_name="gpt-4"
-        ),
-        ModelTokenCounts(
-            prompt_tokens=10, completion_tokens=5, total_tokens=-1, model_name="gpt-4"
+            prompt_tokens=0, completion_tokens=0, total_tokens=1, model_name="gpt-4"
         ),
     ]
 
-    for case in invalid_cases:
-        assert not case.is_valid(), f"Expected {case} to be invalid"
+    for case in no_meaningful_tokens_cases:
+        # Check that we don't have meaningful token counts (no prompt or completion tokens > 0)
+        has_meaningful_tokens = case.prompt_tokens > 0 or case.completion_tokens > 0
+        assert (
+            not has_meaningful_tokens
+        ), f"Expected {case} to not have meaningful token counts"
 
 
 def test_model_token_counts_from_usage_data():
@@ -689,7 +688,8 @@ def test_model_token_counts_from_usage_data():
     assert result.completion_tokens == 5
     assert result.total_tokens == 15
     assert result.model_name == "gpt-4"
-    assert result.is_valid()
+    # Check that we have meaningful token counts (prompt or completion tokens > 0)
+    assert result.prompt_tokens > 0 or result.completion_tokens > 0
 
     # Google GenAI format
     genai_data = {"input_tokens": 20, "output_tokens": 7, "total_tokens": 27}
@@ -698,11 +698,13 @@ def test_model_token_counts_from_usage_data():
     assert result.completion_tokens == 7
     assert result.total_tokens == 27
     assert result.model_name == "gemini-1.5-pro"
-    assert result.is_valid()
+    # Check that we have meaningful token counts (prompt or completion tokens > 0)
+    assert result.prompt_tokens > 0 or result.completion_tokens > 0
 
     # Empty data
     empty_result = ModelTokenCounts.from_usage_data({}, "unknown")
-    assert not empty_result.is_valid()
+    # Check that we don't have meaningful token counts (no prompt or completion tokens > 0)
+    assert not (empty_result.prompt_tokens > 0 or empty_result.completion_tokens > 0)
 
 
 def test_model_token_counts_empty():
@@ -712,7 +714,8 @@ def test_model_token_counts_empty():
     assert empty.completion_tokens == 0
     assert empty.total_tokens == 0
     assert empty.model_name == "test-model"
-    assert not empty.is_valid()
+    # Check that we don't have meaningful token counts (no prompt or completion tokens > 0)
+    assert not (empty.prompt_tokens > 0 or empty.completion_tokens > 0)
 
 
 def test_extract_usage_data_with_deduplication():

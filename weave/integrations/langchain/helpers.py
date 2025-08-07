@@ -14,6 +14,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, Union
 
+from weave.flow.util import logger, warn_once
 from weave.trace.weave_client import Call
 from weave.trace_server.opentelemetry.helpers import flatten_attributes
 from weave.trace_server.trace_server_interface import LLMUsageSchema
@@ -27,6 +28,35 @@ class TokenCounts:
     prompt_tokens: int
     completion_tokens: int
     total_tokens: int
+
+    def __post_init__(self):
+        """
+        Validate and normalize token counts after initialization.
+
+        Warns once if any token count is being set to zero due to invalid values,
+        and ensures all token counts are positive.
+        """
+        # Collect invalid fields and warn once
+        invalid_fields = []
+        if self.prompt_tokens < 0:
+            invalid_fields.append(f"prompt_tokens={self.prompt_tokens}")
+        if self.completion_tokens < 0:
+            invalid_fields.append(f"completion_tokens={self.completion_tokens}")
+        if self.total_tokens < 0:
+            invalid_fields.append(f"total_tokens={self.total_tokens}")
+
+        if invalid_fields:
+            warn_once(
+                logger,
+                f"Invalid token count values: {', '.join(invalid_fields)}, setting to 0",
+            )
+            # Normalize negative values to 0
+            if self.prompt_tokens < 0:
+                object.__setattr__(self, "prompt_tokens", 0)
+            if self.completion_tokens < 0:
+                object.__setattr__(self, "completion_tokens", 0)
+            if self.total_tokens < 0:
+                object.__setattr__(self, "total_tokens", 0)
 
 
 @dataclass
@@ -61,22 +91,6 @@ class ModelTokenCounts(TokenCounts):
             total_tokens=token_counts.total_tokens,
             model_name=model_name,
         )
-
-    def is_valid(self) -> bool:
-        """
-        Check if this ModelTokenCounts instance has valid usage data.
-
-        Returns:
-            True if token counts indicate valid usage data from a recognized provider
-        """
-        # Must have meaningful token counts
-        has_prompt_or_completion = self.prompt_tokens > 0 or self.completion_tokens > 0
-        has_valid_values = (
-            self.prompt_tokens >= 0
-            and self.completion_tokens >= 0
-            and self.total_tokens >= 0
-        )
-        return has_prompt_or_completion and has_valid_values
 
     @classmethod
     def empty(cls, model_name: str = "unknown") -> "ModelTokenCounts":
@@ -141,7 +155,10 @@ def _extract_usage_data(call: Call, output: Any) -> None:
                 model_token_counts = _extract_usage_from_generation(
                     flattened, generation_path
                 )
-                if model_token_counts.is_valid():
+                if (
+                    model_token_counts.prompt_tokens > 0
+                    or model_token_counts.completion_tokens > 0
+                ):
                     model = model_token_counts.model_name
                     usage_dict[model][
                         "prompt_tokens"
@@ -184,7 +201,10 @@ def _extract_usage_data(call: Call, output: Any) -> None:
                 model = _extract_model_from_flattened_path(flattened, base_path)
                 model_token_counts = ModelTokenCounts.from_usage_data(usage_data, model)
 
-                if not model_token_counts.is_valid():
+                if not (
+                    model_token_counts.prompt_tokens > 0
+                    or model_token_counts.completion_tokens > 0
+                ):
                     continue
 
                 usage_dict[model]["prompt_tokens"] += model_token_counts.prompt_tokens
