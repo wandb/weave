@@ -91,18 +91,6 @@
     "litellm_provider": "openai",
     "api_key_name": "OPENAI_API_KEY"
   },
-  "gpt-5-2025-08-07": {
-    "litellm_provider": "openai",
-    "api_key_name": "OPENAI_API_KEY"
-  },
-  "gpt-5-mini-2025-08-07": {
-    "litellm_provider": "openai",
-    "api_key_name": "OPENAI_API_KEY"
-  },
-  "gpt-5-nano-2025-08-07": {
-    "litellm_provider": "openai",
-    "api_key_name": "OPENAI_API_KEY"
-  },
   "gpt-4o-search-preview-2025-03-11": {
     "litellm_provider": "openai",
     "api_key_name": "OPENAI_API_KEY"
@@ -156,6 +144,38 @@
     "api_key_name": "OPENAI_API_KEY"
   },
   "gpt-4o-mini-2024-07-18": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "gpt-5": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "gpt-5-mini": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "gpt-5-nano": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "gpt-5-chat": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "gpt-5-chat-latest": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "gpt-5-2025-08-07": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "gpt-5-mini-2025-08-07": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "gpt-5-nano-2025-08-07": {
     "litellm_provider": "openai",
     "api_key_name": "OPENAI_API_KEY"
   },
@@ -522,6 +542,38 @@
   "gpt-4o-mini-tts": {
     "litellm_provider": "openai",
     "api_key_name": "OPENAI_API_KEY"
+  },
+  "azure/gpt-5": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/gpt-5-2025-08-07": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/gpt-5-mini": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/gpt-5-mini-2025-08-07": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/gpt-5-nano-2025-08-07": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/gpt-5-nano": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/gpt-5-chat": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure/gpt-5-chat-latest": {
+    "litellm_provider": "azure",
+    "api_key_name": "AZURE_API_KEY"
   },
   "azure/gpt-4o-mini-tts": {
     "litellm_provider": "azure",
@@ -1520,6 +1572,10 @@
     "api_key_name": "ANTHROPIC_API_KEY"
   },
   "claude-opus-4-20250514": {
+    "litellm_provider": "anthropic",
+    "api_key_name": "ANTHROPIC_API_KEY"
+  },
+  "claude-opus-4-1": {
     "litellm_provider": "anthropic",
     "api_key_name": "ANTHROPIC_API_KEY"
   },
