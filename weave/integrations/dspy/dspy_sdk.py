@@ -64,17 +64,15 @@ class DSPyPatcher(MultiPatcher):
                     """
                     import types
 
-                    from weave.trace.context import (
-                        call_context,  # local import to avoid cycles
-                    )
+                    from weave.trace.context import call_context
 
-                    # ── 0️⃣  Capture the caller's requested return shape ───────────────────
+                    # Capture the caller's requested return shape
                     want_outputs = kwargs.get("return_outputs", self.return_outputs)
                     want_scores = kwargs.get(
                         "return_all_scores", self.return_all_scores
                     )
 
-                    # ── 1️⃣  Create a Weave EvaluationLogger up-front ────────────────────
+                    # Create a Weave EvaluationLogger
                     model_name = getattr(program, "__class__", type(program)).__name__
                     devset_for_dataset = kwargs.get(
                         "devset", getattr(self, "devset", [])
@@ -85,7 +83,9 @@ class DSPyPatcher(MultiPatcher):
                         "dump_state": getattr(program, "dump_state", lambda: None)(),
                         "history": getattr(program, "history", None),
                         "_compiled": getattr(program, "_compiled", None),
-                        "callbacks": [repr(cb) for cb in getattr(program, "callbacks", [])],
+                        "callbacks": [
+                            repr(cb) for cb in getattr(program, "callbacks", [])
+                        ],
                         "repr": repr(program),
                     }
 
@@ -95,10 +95,10 @@ class DSPyPatcher(MultiPatcher):
                         dataset=[dict(ex.inputs()) for ex in devset_for_dataset],
                     )
 
-                    # ── 2️⃣  Prepare parallel executor so that every worker thread
-                    #        inherits the evaluation's call-stack. We'll re-implement
-                    #        DSPy's evaluation loop here so that traces are captured
-                    #        where they belong.
+                    # Prepare parallel executor so that every worker thread
+                    # inherits the evaluation's call-stack. We'll re-implement
+                    # DSPy's evaluation loop here so that traces are captured
+                    # where they belong.
                     from dspy.utils.parallelizer import ParallelExecutor
 
                     devset = (
@@ -134,12 +134,19 @@ class DSPyPatcher(MultiPatcher):
                             # Increment assert and suggest failures to program's attributes
                             if hasattr(program, "_assert_failures"):
                                 import dspy as _dspy_mod
-                                program._assert_failures += _dspy_mod.settings.get("assert_failures")
+
+                                program._assert_failures += _dspy_mod.settings.get(
+                                    "assert_failures"
+                                )
                             if hasattr(program, "_suggest_failures"):
                                 import dspy as _dspy_mod
-                                program._suggest_failures += _dspy_mod.settings.get("suggest_failures")
+
+                                program._suggest_failures += _dspy_mod.settings.get(
+                                    "suggest_failures"
+                                )
 
                             import dspy as _dspy_mod
+
                             if isinstance(example, _dspy_mod.Example):
                                 serialized_inputs = example.items()
                             else:
@@ -151,9 +158,6 @@ class DSPyPatcher(MultiPatcher):
                                 serialized_pred = prediction.items()
                             else:
                                 serialized_pred = prediction
-
-                            print("serialized_inputs: ", serialized_inputs)
-                            print("serialized_pred: ", serialized_pred)
 
                             pl = ev.log_prediction(
                                 inputs=serialized_inputs, output=serialized_pred
@@ -253,6 +257,6 @@ def get_dspy_patcher(
             # LM
             get_symbol_patcher("dspy", "LM.forward", base),
         ]
-    )    
+    )
 
     return _dspy_patcher
