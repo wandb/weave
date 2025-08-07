@@ -112,14 +112,6 @@ class DSPyPatcher(MultiPatcher):
                     )
                     failure_score = getattr(self, "failure_score", 0.0)
 
-                    # Falls back so that the return-contract section can work.
-                    return_outputs_flag = kwargs.get(
-                        "return_outputs", self.return_outputs
-                    )
-                    return_scores_flag = kwargs.get(
-                        "return_all_scores", self.return_all_scores
-                    )
-
                     executor = ParallelExecutor(
                         num_threads=num_threads,
                         disable_progress_bar=not display_progress,
@@ -132,15 +124,39 @@ class DSPyPatcher(MultiPatcher):
                     result_triples: list[tuple[Any, Any, float]] = [None] * len(devset)  # type: ignore
 
                     def _worker(
-                        example_and_index: tuple[int, Any],
+                        index_and_example: tuple[int, Any],
                     ) -> tuple[Any, float]:
-                        idx, example = example_and_index
+                        idx, example = index_and_example
                         with call_context.set_call_stack([ev._evaluate_call]):  # type: ignore
                             prediction = program(**example.inputs())
                             score = metric(example, prediction) if metric else 0.0
 
+                            # Increment assert and suggest failures to program's attributes
+                            if hasattr(program, "_assert_failures"):
+                                import dspy as _dspy_mod
+                                program._assert_failures += _dspy_mod.settings.get("assert_failures")
+                            if hasattr(program, "_suggest_failures"):
+                                import dspy as _dspy_mod
+                                program._suggest_failures += _dspy_mod.settings.get("suggest_failures")
+
+                            import dspy as _dspy_mod
+                            if isinstance(example, _dspy_mod.Example):
+                                serialized_inputs = example.items()
+                            else:
+                                serialized_inputs = example.inputs()
+
+                            if isinstance(prediction, _dspy_mod.Prediction):
+                                serialized_pred = prediction.items()
+                            elif isinstance(prediction, _dspy_mod.Completions):
+                                serialized_pred = prediction.items()
+                            else:
+                                serialized_pred = prediction
+
+                            print("serialized_inputs: ", serialized_inputs)
+                            print("serialized_pred: ", serialized_pred)
+
                             pl = ev.log_prediction(
-                                inputs=example.inputs(), output=prediction
+                                inputs=serialized_inputs, output=serialized_pred
                             )
                             pl.log_score(scorer=scorer_name, score=score)
                             pl.finish()
