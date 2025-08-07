@@ -9,7 +9,7 @@ interactions:
       Connection:
       - keep-alive
       Content-Length:
-      - '284'
+      - '353'
       Content-Type:
       - application/json
       User-Agent:
@@ -26,19 +26,21 @@ interactions:
   response:
     body:
       string: "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\":
-        [\n          {\n            \"text\": \"Hmm. Future of AI...  Like a djinn,
-        isn't it? Powerful, unpredictable.  Could be a boon, could be a curse. Depends
-        who's holding the reins, and what they wish for.  Lot of folk fear what they
-        don't understand.  Me? I've seen worse things than a bit of clever metal.
-        \ Still...  best to approach it cautiously. Like a griffin's nest.  Could
-        be full of gold, could be full of teeth.\\n\"\n          }\n        ],\n        \"role\":
-        \"model\"\n      },\n      \"finishReason\": 1,\n      \"avgLogprobs\": -0.1871309460334058\n
-        \   }\n  ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 23,\n    \"candidatesTokenCount\":
-        106,\n    \"totalTokenCount\": 129,\n    \"promptTokensDetails\": [\n      {\n
-        \       \"modality\": 1,\n        \"tokenCount\": 23\n      }\n    ],\n    \"candidatesTokensDetails\":
-        [\n      {\n        \"modality\": 1,\n        \"tokenCount\": 106\n      }\n
-        \   ]\n  },\n  \"modelVersion\": \"gemini-1.5-pro-002\",\n  \"responseId\":
-        \"fkqUaL6DF--Bn9kP1JHymQg\"\n}\n"
+        [\n          {\n            \"text\": \"Hmm. *strokes chin, squints* Future,
+        you say? Destiny, like a loaded dice roll.  AI... another mutagen, really.
+        Powerful. Unpredictable.  Could be a boon, like a well-placed Igni against
+        a drowner.  Could just as easily turn into a bloody mess, like a botched Yrden
+        attracting every nekker in the swamp.  Depends who's holding the reins, and
+        what their intentions are. Me? I've seen enough chaos caused by mages and
+        their meddling.  Hope this \\\"AI\\\" doesn't add another layer to the pile
+        of shit I usually have to wade through.  \\n\"\n          }\n        ],\n
+        \       \"role\": \"model\"\n      },\n      \"finishReason\": 1,\n      \"avgLogprobs\":
+        -0.34586229677553532\n    }\n  ],\n  \"usageMetadata\": {\n    \"promptTokenCount\":
+        18,\n    \"candidatesTokenCount\": 135,\n    \"totalTokenCount\": 153,\n    \"promptTokensDetails\":
+        [\n      {\n        \"modality\": 1,\n        \"tokenCount\": 18\n      }\n
+        \   ],\n    \"candidatesTokensDetails\": [\n      {\n        \"modality\":
+        1,\n        \"tokenCount\": 135\n      }\n    ]\n  },\n  \"modelVersion\":
+        \"gemini-1.5-pro-002\",\n  \"responseId\": \"716UaOPMGdCC_NUP7avMWA\"\n}\n"
     headers:
       Alt-Svc:
       - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
@@ -47,11 +49,11 @@ interactions:
       Content-Type:
       - application/json; charset=UTF-8
       Date:
-      - Thu, 07 Aug 2025 06:41:05 GMT
+      - Thu, 07 Aug 2025 08:08:19 GMT
       Server:
       - scaffolding on HTTPServer2
       Server-Timing:
-      - gfet4t7; dur=4200
+      - gfet4t7; dur=5071
       Transfer-Encoding:
       - chunked
       Vary:
