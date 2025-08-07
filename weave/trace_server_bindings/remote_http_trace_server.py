@@ -19,8 +19,6 @@ from weave.trace_server_bindings.http_utils import (
 from weave.trace_server_bindings.models import (
     Batch,
     EndBatchItem,
-    FeedbackBatch,
-    FeedbackBatchItem,
     ServerInfoRes,
     StartBatchItem,
 )
@@ -224,7 +222,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
     def _flush_feedback(
         self,
-        batch: list[FeedbackBatchItem],
+        batch: list[tsi.FeedbackCreateReq],
         *,
         _should_update_batch_size: bool = True,
     ) -> None:
@@ -238,7 +236,11 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         if len(batch) == 0:
             return
 
-        data = FeedbackBatch(batch=batch).model_dump_json()
+        print(">>> flushing feedback:", len(batch))
+
+        # Create the batch request
+        batch_req = tsi.FeedbackCreateBatchReq(batch=batch)
+        data = batch_req.model_dump_json()
         encoded_data = data.encode("utf-8")
         encoded_bytes = len(encoded_data)
 
@@ -627,13 +629,13 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
                 req_as_obj = tsi.FeedbackCreateReq.model_validate(req)
             else:
                 req_as_obj = req
-            
+
             # For feedback batching, we need to generate a temporary ID since the server
             # will provide the actual ID. We'll use a placeholder that gets replaced.
             temp_id = str(uuid.uuid4())
-            
-            self.feedback_processor.enqueue([FeedbackBatchItem(req=req_as_obj)])
-            
+
+            self.feedback_processor.enqueue([req_as_obj])
+
             # Return a response with temporary values - in practice, most feedback creation
             # is fire-and-forget, so the exact response values are less critical than for calls
             return tsi.FeedbackCreateRes(

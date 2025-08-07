@@ -99,6 +99,8 @@ def create_progress_bar_callback() -> Callable[[FlushStatus], None]:
             job_details.append(f"{counts['fastlane_jobs']} file-upload")
         if counts["call_processor_jobs"] > 0:
             job_details.append(f"{counts['call_processor_jobs']} call-batch")
+        if counts["feedback_processor_jobs"] > 0:
+            job_details.append(f"{counts['feedback_processor_jobs']} feedback-batch")
 
         job_details_str = ", ".join(job_details) if job_details else "none"
 

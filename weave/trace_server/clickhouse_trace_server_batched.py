@@ -1840,6 +1840,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         results = []
         rows_to_insert = []
 
+        print('>>>>', len(req.batch))
+
         for feedback_req in req.batch:
             assert_non_null_wb_user_id(feedback_req)
             validate_feedback_create_req(feedback_req, self)
@@ -1885,8 +1887,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 tsi.FeedbackCreateRes(
                     id=feedback_id,
                     created_at=created_at,
-                    wb_user_id=feedback_req.wb_user_id
-                    or "",  # Ensure non-null for response
+                    wb_user_id=feedback_req.wb_user_id,
                     payload=res_payload,
                 )
             )
@@ -1899,6 +1900,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     database_type="clickhouse"
                 )
                 self._insert(TABLE_FEEDBACK.name, prepared.data, prepared.column_names)
+
+        print("returning len: ", len(results))
 
         return tsi.FeedbackCreateBatchRes(res=results)
 

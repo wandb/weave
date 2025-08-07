@@ -329,6 +329,13 @@ class ExternalTraceServer(tsi.TraceServerInterface):
         res.wb_user_id = original_user_id
         return res
 
+    def feedback_create_batch(self, req: tsi.FeedbackCreateBatchReq) -> tsi.FeedbackCreateBatchRes:
+        req.batch = [
+            self._ref_apply(self._internal_trace_server.feedback_create, feedback_req)
+            for feedback_req in req.batch
+        ]
+        return self._ref_apply(self._internal_trace_server.feedback_create_batch, req)
+
     def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
         original_project_id = req.project_id
         req.project_id = self._idc.ext_to_int_project_id(original_project_id)

@@ -478,6 +478,9 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
     def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
         return self._next_trace_server.feedback_create(req)
 
+    def feedback_create_batch(self, req: tsi.FeedbackCreateBatchReq) -> tsi.FeedbackCreateBatchRes:
+        return self._next_trace_server.feedback_create_batch(req)
+
     def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
         return self._next_trace_server.feedback_query(req)
 

@@ -3597,26 +3597,27 @@ def test_feedback_batching(client):
     client.flush()
 
     # Check server logs to verify batching behavior
-    if hasattr(client.server, "attribute_access_log"):
-        log = client.server.attribute_access_log
-        feedback_creates = [l for l in log if l == "feedback_create"]
-        feedback_create_batches = [l for l in log if l == "feedback_create_batch"]
+    assert hasattr(client.server, "attribute_access_log"), 'no access log'
 
-        # For batching servers, we should see batch requests, not individual creates
-        if (
-            isinstance(client.server, RemoteHTTPTraceServer)
-            and client.server.should_batch
-        ):
-            # Should see fewer individual feedback_create calls due to batching
-            # The exact number depends on batching configuration, but should be less than 10
-            assert (
-                len(feedback_creates) < 10
-            ), f"Expected fewer individual creates due to batching, got {len(feedback_creates)}"
-        else:
-            # For non-batching servers, should see individual feedback_create calls
-            assert (
-                len(feedback_creates) >= 10
-            ), f"Expected individual creates for non-batching server, got {len(feedback_creates)}"
+    log = client.server.attribute_access_log
+    feedback_creates = [l for l in log if l == "feedback_create"]
+    feedback_create_batches = [l for l in log if l == "feedback_create_batch"]
+
+    # For batching servers, we should see batch requests, not individual creates
+    if (
+        isinstance(client.server, RemoteHTTPTraceServer)
+        and client.server.should_batch
+    ):
+        # Should see fewer individual feedback_create calls due to batching
+        # The exact number depends on batching configuration, but should be less than 10
+        assert (
+            len(feedback_creates) < 10
+        ), f"Expected fewer individual creates due to batching, got {len(feedback_creates)}"
+    else:
+        # For non-batching servers, should see individual feedback_create calls
+        assert (
+            len(feedback_creates) >= 10
+        ), f"Expected individual creates for non-batching server, got {len(feedback_creates)}"
 
     # Query feedback to verify all items were created
     all_feedback = list(test_call.feedback)
