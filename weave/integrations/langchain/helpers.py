@@ -333,29 +333,22 @@ def _extract_model_from_flattened_path(flattened: dict, usage_key_path: str) -> 
     # We construct paths by replacing the usage-related components with known
     # model name locations. This handles the most common scenarios where model
     # names appear in predictable relative locations.
-    search_patterns = []
-
-    # Generate patterns by truncating at different levels and adding model paths
-    for truncate_count in range(1, min(len(path_parts), 6)):
+    # Search all ancestor paths for model_name fields
+    for truncate_count in range(1, len(path_parts) + 1):
         base_path = path_parts[:-truncate_count]
-        # generation_info patterns
-        search_patterns.append(".".join(base_path + ["generation_info", "model_name"]))
-        # response_metadata patterns
-        search_patterns.append(
-            ".".join(base_path + ["response_metadata", "model_name"])
-        )
+        for suffix in ["generation_info.model_name", "response_metadata.model_name"]:
+            candidate = ".".join(base_path + suffix.split("."))
+            if candidate in flattened:
+                model_name = flattened[candidate]
+                if isinstance(model_name, str) and model_name:
+                    return model_name
 
-    for pattern in search_patterns:
-        if pattern in flattened:
-            model_name = flattened[pattern]
-            if isinstance(model_name, str) and model_name:
-                return model_name
-
-    # If targeted search fails, perform a broader search within the same
-    # general area of the response structure. This catches edge cases where
-    # providers use non-standard nesting or field arrangements.
-    # Try searching with progressively broader prefixes
-    for prefix_length in range(len(path_parts) - 2, 0, -1):
+    # Fallback: search for any key containing model_name in the path hierarchy
+    # If we reach here, we didn't find a specific model_name in the expected
+    # relative locations. We now perform a broader search across the entire
+    # flattened structure to catch edge cases where providers use non-standard
+    # nesting or field arrangements.
+    for prefix_length in range(len(path_parts), 0, -1):
         prefix = ".".join(path_parts[:prefix_length])
         for key, value in flattened.items():
             if (
