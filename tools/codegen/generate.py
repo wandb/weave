@@ -171,7 +171,7 @@ def generate_code(
         f"--project={STAINLESS_PROJECT_NAME}",
         f"--config={STAINLESS_CONFIG_PATH}",
         f"--oas={STAINLESS_OAS_PATH}",
-        # f"--branch={_random_temp_dir()}",
+        # f"--branch={_random_branch_name()}",
         "--branch=main",  # TODO: temporary until fix is deployed by stainless.  Without this, the generated SDK will not work.
         "--pull",
         "--allow-empty",
@@ -608,7 +608,7 @@ def _load_config(config_path: str | Path) -> dict[str, Any]:
         return cfg
 
 
-def _random_temp_dir() -> str:
+def _random_branch_name() -> str:
     ascii_letters_and_digits = string.ascii_letters + string.digits
     random_string = "".join(random.choices(ascii_letters_and_digits, k=16))
     return f"tmp/{random_string}"
