@@ -3,7 +3,7 @@ import TabItem from '@theme/TabItem';
 
 # Datasets
 
-Weave `Dataset`s help you to organize, collect, track, and version examples for LLM application evaluation for easy comparison. You can create and interact with `Dataset`s programmatically and via the UI. 
+W&B Weave `Dataset`s help you to organize, collect, track, and version examples for LLM application evaluation for easy comparison. You can create and interact with `Dataset`s programmatically and via the UI. 
 
 This page describes:
 
