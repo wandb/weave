@@ -407,6 +407,16 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
             "error": log_data["error"],
         }
 
+        # if metrics is not empty, add it to the output
+        if log_data["metrics"]:
+            output["usage"] = {
+                "total_tokens": log_data["metrics"].get("tokens"),
+                "prompt_tokens": log_data["metrics"].get("prompt_tokens"),
+                "completion_tokens": log_data["metrics"].get("completion_tokens"),
+            }
+
+            output["model"] = log_data["metadata"].get("model")
+
         # Add error if present
         if span.error:
             output["error"] = span.error
