@@ -169,6 +169,11 @@ class ThrowingServer(tsi.TraceServerInterface):
     def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
         raise DummyTestException("FAILURE - feedback_create, req:", req)
 
+    def feedback_create_batch(
+        self, req: tsi.FeedbackCreateBatchReq
+    ) -> tsi.FeedbackCreateBatchRes:
+        raise DummyTestException("FAILURE - feedback_create_batch, req:", req)
+
     def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
         raise DummyTestException("FAILURE - feedback_query, req:", req)
 

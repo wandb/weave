@@ -1833,6 +1833,75 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             payload=res_payload,
         )
 
+    def feedback_create_batch(
+        self, req: tsi.FeedbackCreateBatchReq
+    ) -> tsi.FeedbackCreateBatchRes:
+        """Create multiple feedback items in a batch efficiently."""
+        results = []
+        rows_to_insert = []
+
+        for feedback_req in req.batch:
+            assert_non_null_wb_user_id(feedback_req)
+            validate_feedback_create_req(feedback_req, self)
+
+            # Augment emoji with alias (same logic as individual create)
+            res_payload = {}
+            if feedback_req.feedback_type == "wandb.reaction.1":
+                em = feedback_req.payload["emoji"]
+                if emoji.emoji_count(em) != 1:
+                    raise InvalidRequest(
+                        "Value of emoji key in payload must be exactly one emoji"
+                    )
+                feedback_req.payload["alias"] = emoji.demojize(em)
+                detoned = detone_emojis(em)
+                feedback_req.payload["detoned"] = detoned
+                feedback_req.payload["detoned_alias"] = emoji.demojize(detoned)
+                res_payload = feedback_req.payload
+
+            feedback_id = generate_id()
+            created_at = datetime.datetime.now(ZoneInfo("UTC"))
+            payload = _dict_value_to_dump(feedback_req.payload)
+            max_payload = 1 << 20  # 1 MiB
+            if len(payload) > max_payload:
+                raise InvalidRequest("Feedback payload too large")
+
+            row: Row = {
+                "id": feedback_id,
+                "project_id": feedback_req.project_id,
+                "weave_ref": feedback_req.weave_ref,
+                "wb_user_id": feedback_req.wb_user_id,
+                "creator": feedback_req.creator,
+                "feedback_type": feedback_req.feedback_type,
+                "payload": feedback_req.payload,
+                "created_at": created_at,
+                "annotation_ref": feedback_req.annotation_ref,
+                "runnable_ref": feedback_req.runnable_ref,
+                "call_ref": feedback_req.call_ref,
+                "trigger_ref": feedback_req.trigger_ref,
+            }
+            rows_to_insert.append(row)
+
+            results.append(
+                tsi.FeedbackCreateRes(
+                    id=feedback_id,
+                    created_at=created_at,
+                    wb_user_id=feedback_req.wb_user_id
+                    or "",  # Ensure non-null for response
+                    payload=res_payload,
+                )
+            )
+
+        # Batch insert all rows at once
+        if rows_to_insert:
+            # Insert each row individually but in a batch operation
+            for row in rows_to_insert:
+                prepared = TABLE_FEEDBACK.insert(row).prepare(
+                    database_type="clickhouse"
+                )
+                self._insert(TABLE_FEEDBACK.name, prepared.data, prepared.column_names)
+
+        return tsi.FeedbackCreateBatchRes(res=results)
+
     def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
         query = TABLE_FEEDBACK.select()
         query = query.project_id(req.project_id)

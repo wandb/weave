@@ -938,6 +938,14 @@ class FeedbackReplaceRes(FeedbackCreateRes):
     pass
 
 
+class FeedbackCreateBatchReq(BaseModelStrict):
+    batch: list[FeedbackCreateReq]
+
+
+class FeedbackCreateBatchRes(BaseModel):
+    res: list[FeedbackCreateRes]
+
+
 class FileCreateReq(BaseModelStrict):
     project_id: str
     name: str
@@ -1252,6 +1260,7 @@ class TraceServerInterface(Protocol):
 
     # Feedback API
     def feedback_create(self, req: FeedbackCreateReq) -> FeedbackCreateRes: ...
+    def feedback_create_batch(self, req: FeedbackCreateBatchReq) -> FeedbackCreateBatchRes: ...
     def feedback_query(self, req: FeedbackQueryReq) -> FeedbackQueryRes: ...
     def feedback_purge(self, req: FeedbackPurgeReq) -> FeedbackPurgeRes: ...
     def feedback_replace(self, req: FeedbackReplaceReq) -> FeedbackReplaceRes: ...

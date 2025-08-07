@@ -19,5 +19,13 @@ class Batch(BaseModel):
     batch: list[Union[StartBatchItem, EndBatchItem]]
 
 
+class FeedbackBatchItem(BaseModel):
+    req: tsi.FeedbackCreateReq
+
+
+class FeedbackBatch(BaseModel):
+    batch: list[FeedbackBatchItem]
+
+
 class ServerInfoRes(BaseModel):
     min_required_weave_python_version: str

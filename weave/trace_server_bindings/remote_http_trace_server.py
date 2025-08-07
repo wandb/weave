@@ -1,5 +1,7 @@
+import datetime
 import io
 import logging
+import uuid
 from collections.abc import Iterator
 from typing import Any, Optional, Union, cast
 
@@ -17,6 +19,8 @@ from weave.trace_server_bindings.http_utils import (
 from weave.trace_server_bindings.models import (
     Batch,
     EndBatchItem,
+    FeedbackBatch,
+    FeedbackBatchItem,
     ServerInfoRes,
     StartBatchItem,
 )
@@ -53,9 +57,15 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         self.trace_server_url = trace_server_url
         self.should_batch = should_batch
         self.call_processor = None
+        self.feedback_processor = None
         if self.should_batch:
             self.call_processor = AsyncBatchProcessor(
                 self._flush_calls,
+                max_queue_size=max_calls_queue_size(),
+                enable_disk_fallback=should_enable_disk_fallback(),
+            )
+            self.feedback_processor = AsyncBatchProcessor(
+                self._flush_feedback,
                 max_queue_size=max_calls_queue_size(),
                 enable_disk_fallback=should_enable_disk_fallback(),
             )
@@ -199,6 +209,94 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         the underlying call processor. Should be formalized in a client-side interface.
         """
         return self.call_processor
+
+    @with_retry
+    def _send_feedback_batch_to_server(self, encoded_data: bytes) -> None:
+        """Send a batch of feedback data to the server with retry logic.
+
+        This method is separated from _flush_feedback to avoid recursive retries.
+        """
+        r = self.post(
+            "/feedback/create_batch",
+            data=encoded_data,  # type: ignore
+        )
+        handle_response_error(r, "/feedback/create_batch")
+
+    def _flush_feedback(
+        self,
+        batch: list[FeedbackBatchItem],
+        *,
+        _should_update_batch_size: bool = True,
+    ) -> None:
+        """Process a batch of feedback, splitting if necessary and sending to the server.
+
+        This method handles the logic of splitting batches that are too large,
+        but delegates the actual server communication (with retries) to _send_feedback_batch_to_server.
+        """
+        # Feedback processor must be defined for this method
+        assert self.feedback_processor is not None
+        if len(batch) == 0:
+            return
+
+        data = FeedbackBatch(batch=batch).model_dump_json()
+        encoded_data = data.encode("utf-8")
+        encoded_bytes = len(encoded_data)
+
+        # Update target batch size (this allows us to have a dynamic batch size based on the size of the data being sent)
+        estimated_bytes_per_item = encoded_bytes / len(batch)
+        if _should_update_batch_size and estimated_bytes_per_item > 0:
+            target_batch_size = int(
+                self.remote_request_bytes_limit // estimated_bytes_per_item
+            )
+            self.feedback_processor.max_batch_size = max(1, target_batch_size)
+
+        # If the batch is too big, split it in half and process each half
+        if encoded_bytes > self.remote_request_bytes_limit and len(batch) > 1:
+            split_idx = int(len(batch) // 2)
+            self._flush_feedback(batch[:split_idx], _should_update_batch_size=False)
+            self._flush_feedback(batch[split_idx:], _should_update_batch_size=False)
+            return
+
+        # If a single item is over the configured limit we should log a warning
+        # Bytes limit can change based on env so we don't want to actually error here
+        if encoded_bytes > self.remote_request_bytes_limit and len(batch) == 1:
+            logger.warning(
+                f"Single feedback size ({encoded_bytes} bytes) may be too large to send."
+                f"The configured maximum size is {self.remote_request_bytes_limit} bytes."
+            )
+
+        try:
+            self._send_feedback_batch_to_server(encoded_data)
+        except Exception as e:
+            if not _is_retryable_exception(e):
+                log_dropped_call_batch(batch, e)
+            else:
+                # Add items back to the queue for later processing, but only if the processor is still accepting work
+                logger.warning(
+                    f"Feedback batch failed after max retries, requeuing batch with {len(batch)=} for later processing",
+                )
+
+                # only if debug mode
+                if logger.isEnabledFor(logging.DEBUG):
+                    ids = []
+                    for item in batch:
+                        ids.append(f"{item.req.feedback_type}")
+                    logger.debug(f"Requeuing feedback batch with {ids=}")
+
+                # Only requeue if the processor is still accepting work
+                if self.feedback_processor and self.feedback_processor.is_accepting_new_work():
+                    self.feedback_processor.enqueue(batch)
+                else:
+                    logger.exception(
+                        f"Failed to enqueue feedback batch of size {len(batch)} - Processor is shutting down"
+                    )
+
+    def get_feedback_processor(self) -> Union[AsyncBatchProcessor, None]:
+        """
+        Custom method not defined on the formal TraceServerInterface to expose
+        the underlying feedback processor. Should be formalized in a client-side interface.
+        """
+        return self.feedback_processor
 
     @with_retry
     def _generic_request_executor(
@@ -521,8 +619,36 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     def feedback_create(
         self, req: Union[tsi.FeedbackCreateReq, dict[str, Any]]
     ) -> tsi.FeedbackCreateRes:
+        if self.should_batch:
+            assert self.feedback_processor is not None
+
+            req_as_obj: tsi.FeedbackCreateReq
+            if isinstance(req, dict):
+                req_as_obj = tsi.FeedbackCreateReq.model_validate(req)
+            else:
+                req_as_obj = req
+            
+            # For feedback batching, we need to generate a temporary ID since the server
+            # will provide the actual ID. We'll use a placeholder that gets replaced.
+            temp_id = str(uuid.uuid4())
+            
+            self.feedback_processor.enqueue([FeedbackBatchItem(req=req_as_obj)])
+            
+            # Return a response with temporary values - in practice, most feedback creation
+            # is fire-and-forget, so the exact response values are less critical than for calls
+            return tsi.FeedbackCreateRes(
+                id=temp_id,
+                created_at=datetime.datetime.now(datetime.timezone.utc),
+                wb_user_id=req_as_obj.wb_user_id or "",
+                payload=req_as_obj.payload,
+            )
         return self._generic_request(
             "/feedback/create", req, tsi.FeedbackCreateReq, tsi.FeedbackCreateRes
+        )
+
+    def feedback_create_batch(self, req: tsi.FeedbackCreateBatchReq) -> tsi.FeedbackCreateBatchRes:
+        return self._generic_request(
+            "/feedback/create_batch", req, tsi.FeedbackCreateBatchReq, tsi.FeedbackCreateBatchRes
         )
 
     def feedback_query(

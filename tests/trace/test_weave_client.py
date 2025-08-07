@@ -3557,3 +3557,78 @@ def test_get_evaluations(client, make_evals):
 
     assert evs[1].ref.uri() == ref2.uri()
     assert evs[1].dataset.rows[0] == {"dataset_id": "jkl"}
+
+
+def test_feedback_batching(client):
+    """Test that feedback batching works correctly when enabled."""
+    import weave
+    from weave.trace_server_bindings.remote_http_trace_server import (
+        RemoteHTTPTraceServer,
+    )
+
+    # Create a test call to add feedback to
+    @weave.op
+    def test_op(x: int) -> int:
+        return x * 2
+
+    # Execute the operation to create a call
+    result = test_op(5)
+    assert result == 10
+
+    # Get the call to add feedback to
+    calls = list(client.get_calls())
+    assert len(calls) >= 1
+    test_call = calls[0]
+
+    # Clear any existing server logs
+    if hasattr(client.server, "attribute_access_log"):
+        client.server.attribute_access_log = []
+
+    # Create multiple feedback items (more than 3 to test batching)
+    feedback_items = []
+    for i in range(10):
+        feedback = test_call.feedback.add(
+            feedback_type=f"test_feedback_{i}",
+            payload={"score": i, "note": f"Test feedback {i}"},
+        )
+        feedback_items.append(feedback)
+
+    # Flush to ensure all feedback is processed
+    client.flush()
+
+    # Check server logs to verify batching behavior
+    if hasattr(client.server, "attribute_access_log"):
+        log = client.server.attribute_access_log
+        feedback_creates = [l for l in log if l == "feedback_create"]
+        feedback_create_batches = [l for l in log if l == "feedback_create_batch"]
+
+        # For batching servers, we should see batch requests, not individual creates
+        if (
+            isinstance(client.server, RemoteHTTPTraceServer)
+            and client.server.should_batch
+        ):
+            # Should see fewer individual feedback_create calls due to batching
+            # The exact number depends on batching configuration, but should be less than 10
+            assert (
+                len(feedback_creates) < 10
+            ), f"Expected fewer individual creates due to batching, got {len(feedback_creates)}"
+        else:
+            # For non-batching servers, should see individual feedback_create calls
+            assert (
+                len(feedback_creates) >= 10
+            ), f"Expected individual creates for non-batching server, got {len(feedback_creates)}"
+
+    # Query feedback to verify all items were created
+    all_feedback = list(test_call.feedback)
+    created_feedback = [
+        f for f in all_feedback if f.feedback_type.startswith("test_feedback_")
+    ]
+    assert len(created_feedback) == 10
+
+    # Verify the feedback content
+    for i, feedback in enumerate(
+        sorted(created_feedback, key=lambda x: x.feedback_type)
+    ):
+        assert feedback.feedback_type == f"test_feedback_{i}"
+        assert feedback.payload["score"] == i
+        assert feedback.payload["note"] == f"Test feedback {i}"
