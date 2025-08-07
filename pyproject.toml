@@ -87,6 +87,8 @@ trace_server = [
   "openinference-semantic-conventions>=0.1.17",
   # For emoji shortcode support in Feedback
   "emoji>=2.12.1",
+  # ClickHouse support
+  "clickhouse_connect==0.7.0",
 ]
 trace_server_tests = [
   # BYOB - S3

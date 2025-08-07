@@ -83,6 +83,7 @@ from weave.trace_server.errors import (
     NotFoundError,
     ObjectDeletedError,
     RequestTooLarge,
+    handle_clickhouse_query_error,
 )
 from weave.trace_server.feedback import (
     TABLE_FEEDBACK,
@@ -2217,7 +2218,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     "parameters": parameters,
                 },
             )
-            raise
+            # always raises, optionally with custom error class
+            handle_clickhouse_query_error(e)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._query")
     def _query(
@@ -2246,7 +2248,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 "clickhouse_query_error",
                 extra={"error_str": str(e), "query": query, "parameters": parameters},
             )
-            raise
+            # always raises, optionally with custom error class
+            handle_clickhouse_query_error(e)
 
         logger.info(
             "clickhouse_query",
@@ -2740,6 +2743,7 @@ def _build_aggregated_output(
     assistant_acc: list[str],
     tool_calls: list[dict[str, Any]],
     chunk: dict[str, Any],
+    reasoning_content: list[str],
 ) -> dict[str, Any]:
     """Build the aggregated output from accumulated data."""
     current_finish_reason = chunk.get("choices", [{}])[0].get("finish_reason")
@@ -2764,6 +2768,9 @@ def _build_aggregated_output(
                     "role": "assistant",
                     "tool_calls": (cleaned_tool_calls if cleaned_tool_calls else None),
                     "function_call": None,
+                    "reasoning_content": (
+                        "".join(reasoning_content) if reasoning_content else None
+                    ),
                 },
             }
         ],
@@ -2790,6 +2797,7 @@ def _create_tracked_stream_wrapper(
         assistant_acc: list[str] = []
         tool_calls: list[dict[str, Any]] = []
         aggregated_metadata: dict[str, Any] = {}
+        reasoning_content: list[str] = []
 
         try:
             for chunk in chunk_iter:
@@ -2816,14 +2824,25 @@ def _create_tracked_stream_wrapper(
                         if tool_call_delta:
                             _process_tool_call_delta(tool_call_delta, tool_calls)
 
+                        # Handle reasoning content
+                        reasoning_content_delta = delta.get("reasoning_content")
+                        if reasoning_content_delta:
+                            reasoning_content.append(reasoning_content_delta)
+
                 # Build aggregated output
                 aggregated_output = _build_aggregated_output(
-                    aggregated_metadata, assistant_acc, tool_calls, chunk
+                    aggregated_metadata,
+                    assistant_acc,
+                    tool_calls,
+                    chunk,
+                    reasoning_content,
                 )
 
         finally:
             # Handle fallback case for aggregated output
-            if aggregated_output is None and (assistant_acc or tool_calls):
+            if aggregated_output is None and (
+                assistant_acc or tool_calls or reasoning_content
+            ):
                 cleaned_tool_calls = _clean_tool_calls(tool_calls)
                 aggregated_output = {
                     "choices": [
@@ -2837,6 +2856,11 @@ def _create_tracked_stream_wrapper(
                                 ),
                                 "tool_calls": (
                                     cleaned_tool_calls if cleaned_tool_calls else None
+                                ),
+                                "reasoning_content": (
+                                    "".join(reasoning_content)
+                                    if reasoning_content
+                                    else None
                                 ),
                             }
                         }

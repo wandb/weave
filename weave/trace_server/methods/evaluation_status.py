@@ -114,6 +114,6 @@ def evaluation_status(
 
     return tsi.EvaluationStatusRes(
         status=tsi.EvaluationStatusRunning(
-            status="running", completed_rows=completed_rows, total_rows=total_rows
+            completed_rows=completed_rows, total_rows=total_rows
         )
     )
