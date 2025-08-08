@@ -9080,5 +9080,229 @@
       "output": 1.9e-06,
       "created_at": "2025-07-28 10:14:07"
     }
+  ],
+  "gpt-5-2025-08-07": [
+    {
+      "provider": "openai",
+      "input": 1.25e-06,
+      "output": 1e-05,
+      "created_at": "2025-08-07 11:40:33"
+    }
+  ],
+  "gpt-5-mini-2025-08-07": [
+    {
+      "provider": "openai",
+      "input": 2.5e-07,
+      "output": 2e-06,
+      "created_at": "2025-08-07 11:40:33"
+    }
+  ],
+  "gpt-5-nano-2025-08-07": [
+    {
+      "provider": "openai",
+      "input": 5e-08,
+      "output": 4e-07,
+      "created_at": "2025-08-07 11:40:33"
+    }
+  ],
+  "groq/openai/gpt-oss-20b": [
+    {
+      "provider": "groq",
+      "input": 1e-07,
+      "output": 5e-07,
+      "created_at": "2025-08-07 11:40:33"
+    }
+  ],
+  "groq/openai/gpt-oss-120b": [
+    {
+      "provider": "groq",
+      "input": 1.5e-07,
+      "output": 7.5e-07,
+      "created_at": "2025-08-07 11:40:33"
+    }
+  ],
+  "claude-opus-4-1-20250805": [
+    {
+      "provider": "anthropic",
+      "input": 1.5e-05,
+      "output": 7.5e-05,
+      "created_at": "2025-08-07 11:40:33"
+    }
+  ],
+  "vertex_ai/claude-opus-4-1": [
+    {
+      "provider": "vertex_ai-anthropic_models",
+      "input": 1.5e-05,
+      "output": 7.5e-05,
+      "created_at": "2025-08-07 11:40:33"
+    }
+  ],
+  "vertex_ai/claude-opus-4-1@20250805": [
+    {
+      "provider": "vertex_ai-anthropic_models",
+      "input": 1.5e-05,
+      "output": 7.5e-05,
+      "created_at": "2025-08-07 11:40:33"
+    }
+  ],
+  "openrouter/x-ai/grok-4": [
+    {
+      "provider": "openrouter",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-08-07 11:40:33"
+    }
+  ],
+  "openai.gpt-oss-20b-1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 7e-08,
+      "output": 3e-07,
+      "created_at": "2025-08-07 11:40:33"
+    }
+  ],
+  "openai.gpt-oss-120b-1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 1.5e-07,
+      "output": 6e-07,
+      "created_at": "2025-08-07 11:40:33"
+    }
+  ],
+  "anthropic.claude-opus-4-1-20250805-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 1.5e-05,
+      "output": 7.5e-05,
+      "created_at": "2025-08-07 11:40:33"
+    }
+  ],
+  "us.anthropic.claude-opus-4-1-20250805-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 1.5e-05,
+      "output": 7.5e-05,
+      "created_at": "2025-08-07 11:40:33"
+    }
+  ],
+  "eu.anthropic.claude-opus-4-1-20250805-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 1.5e-05,
+      "output": 7.5e-05,
+      "created_at": "2025-08-07 11:40:33"
+    }
+  ],
+  "fireworks_ai/accounts/fireworks/models/glm-4p5": [
+    {
+      "provider": "fireworks_ai",
+      "input": 5.5e-07,
+      "output": 2.19e-06,
+      "created_at": "2025-08-07 11:40:33"
+    }
+  ],
+  "fireworks_ai/accounts/fireworks/models/glm-4p5-air": [
+    {
+      "provider": "fireworks_ai",
+      "input": 2.2e-07,
+      "output": 8.8e-07,
+      "created_at": "2025-08-07 11:40:33"
+    }
+  ],
+  "fireworks_ai/accounts/fireworks/models/gpt-oss-120b": [
+    {
+      "provider": "fireworks_ai",
+      "input": 1.5e-07,
+      "output": 6e-07,
+      "created_at": "2025-08-07 11:40:33"
+    }
+  ],
+  "fireworks_ai/accounts/fireworks/models/gpt-oss-20b": [
+    {
+      "provider": "fireworks_ai",
+      "input": 5e-08,
+      "output": 2e-07,
+      "created_at": "2025-08-07 11:40:33"
+    }
+  ],
+  "oci/meta.llama-4-maverick-17b-128e-instruct-fp8": [
+    {
+      "provider": "oci",
+      "input": 7.2e-07,
+      "output": 7.2e-07,
+      "created_at": "2025-08-07 11:40:33"
+    }
+  ],
+  "oci/meta.llama-4-scout-17b-16e-instruct": [
+    {
+      "provider": "oci",
+      "input": 7.2e-07,
+      "output": 7.2e-07,
+      "created_at": "2025-08-07 11:40:33"
+    }
+  ],
+  "oci/meta.llama-3.3-70b-instruct": [
+    {
+      "provider": "oci",
+      "input": 7.2e-07,
+      "output": 7.2e-07,
+      "created_at": "2025-08-07 11:40:33"
+    }
+  ],
+  "oci/meta.llama-3.2-90b-vision-instruct": [
+    {
+      "provider": "oci",
+      "input": 2e-06,
+      "output": 2e-06,
+      "created_at": "2025-08-07 11:40:33"
+    }
+  ],
+  "oci/meta.llama-3.1-405b-instruct": [
+    {
+      "provider": "oci",
+      "input": 1.068e-05,
+      "output": 1.068e-05,
+      "created_at": "2025-08-07 11:40:33"
+    }
+  ],
+  "oci/xai.grok-4": [
+    {
+      "provider": "oci",
+      "input": 3e-06,
+      "output": 1.5e-07,
+      "created_at": "2025-08-07 11:40:33"
+    }
+  ],
+  "oci/xai.grok-3": [
+    {
+      "provider": "oci",
+      "input": 3e-06,
+      "output": 1.5e-07,
+      "created_at": "2025-08-07 11:40:33"
+    }
+  ],
+  "oci/xai.grok-3-mini": [
+    {
+      "provider": "oci",
+      "input": 3e-07,
+      "output": 5e-07,
+      "created_at": "2025-08-07 11:40:33"
+    }
+  ],
+  "oci/xai.grok-3-fast": [
+    {
+      "provider": "oci",
+      "input": 5e-06,
+      "output": 2.5e-05,
+      "created_at": "2025-08-07 11:40:33"
+    }
+  ],
+  "oci/xai.grok-3-mini-fast": [
+    {
+      "provider": "oci",
+      "input": 6e-07,
+      "output": 4e-06,
+      "created_at": "2025-08-07 11:40:33"
+    }
   ]
 }

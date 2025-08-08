@@ -6,7 +6,7 @@ This feature is only accessible through the Python SDK. All code examples on thi
 
 Creating, evaluating, and refining prompts is a core activity for AI engineers.
 Small changes to a prompt can have big impacts on your application's behavior.
-Weave lets you create prompts, save and retrieve them, and evolve them over time.
+W&B Weave lets you create prompts, save and retrieve them, and evolve them over time.
 
 Weave is unopinionated about how a Prompt is constructed. If your needs are simple you can use our built-in `weave.StringPrompt` or `weave.MessagesPrompt` classes. If your needs are more complex you can subclass those or our base class `weave.Prompt` and override the
 `format` method.
