@@ -36,7 +36,6 @@ from zoneinfo import ZoneInfo
 
 import clickhouse_connect
 import ddtrace
-import emoji
 from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.query import QueryResult
 from clickhouse_connect.driver.summary import QuerySummary
@@ -75,7 +74,6 @@ from weave.trace_server.clickhouse_schema import (
     SelectableCHObjSchema,
 )
 from weave.trace_server.constants import COMPLETIONS_CREATE_OP_NAME
-from weave.trace_server.emoji_util import detone_emojis
 from weave.trace_server.errors import (
     InsertTooLarge,
     InvalidRequest,
@@ -87,6 +85,7 @@ from weave.trace_server.errors import (
 )
 from weave.trace_server.feedback import (
     TABLE_FEEDBACK,
+    process_feedback_payload,
     validate_feedback_create_req,
     validate_feedback_purge_req,
 )
@@ -241,7 +240,18 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         ]
                     )
         # TODO: Actually populate the error fields if call_start_batch fails
-        self.call_start_batch(tsi.CallCreateBatchReq(batch=calls))
+        # Convert the calls to proper batch format
+        batch_items = []
+        for call in calls:
+            if call.get("mode") == "start":
+                batch_items.append(
+                    tsi.CallBatchStartMode(req=tsi.CallStartReq(start=call["req"]))
+                )
+            elif call.get("mode") == "end":
+                batch_items.append(
+                    tsi.CallBatchEndMode(req=tsi.CallEndReq(end=call["req"]))
+                )
+        self.call_start_batch(tsi.CallCreateBatchReq(batch=batch_items))
         return tsi.OtelExportRes()
 
     @contextmanager
@@ -1789,27 +1799,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         assert_non_null_wb_user_id(req)
         validate_feedback_create_req(req, self)
 
-        # Augment emoji with alias.
-        res_payload = {}
-        if req.feedback_type == "wandb.reaction.1":
-            em = req.payload["emoji"]
-            if emoji.emoji_count(em) != 1:
-                raise InvalidRequest(
-                    "Value of emoji key in payload must be exactly one emoji"
-                )
-            req.payload["alias"] = emoji.demojize(em)
-            detoned = detone_emojis(em)
-            req.payload["detoned"] = detoned
-            req.payload["detoned_alias"] = emoji.demojize(detoned)
-            res_payload = req.payload
-
-        feedback_id = generate_id()
+        processed_payload, res_payload = process_feedback_payload(req)
+        feedback_id = req.id or generate_id()
         created_at = datetime.datetime.now(ZoneInfo("UTC"))
         # TODO: Any validation on weave_ref?
-        payload = _dict_value_to_dump(req.payload)
-        max_payload = 1 << 20  # 1 MiB
-        if len(payload) > max_payload:
-            raise InvalidRequest("Feedback payload too large")
         row: Row = {
             "id": feedback_id,
             "project_id": req.project_id,
@@ -1817,7 +1810,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             "wb_user_id": req.wb_user_id,
             "creator": req.creator,
             "feedback_type": req.feedback_type,
-            "payload": req.payload,
+            "payload": processed_payload,
             "created_at": created_at,
             "annotation_ref": req.annotation_ref,
             "runnable_ref": req.runnable_ref,
@@ -1840,33 +1833,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         results = []
         rows_to_insert = []
 
-        print('>>>>', len(req.batch))
-
         for feedback_req in req.batch:
             assert_non_null_wb_user_id(feedback_req)
             validate_feedback_create_req(feedback_req, self)
 
-            # Augment emoji with alias (same logic as individual create)
-            res_payload = {}
-            if feedback_req.feedback_type == "wandb.reaction.1":
-                em = feedback_req.payload["emoji"]
-                if emoji.emoji_count(em) != 1:
-                    raise InvalidRequest(
-                        "Value of emoji key in payload must be exactly one emoji"
-                    )
-                feedback_req.payload["alias"] = emoji.demojize(em)
-                detoned = detone_emojis(em)
-                feedback_req.payload["detoned"] = detoned
-                feedback_req.payload["detoned_alias"] = emoji.demojize(detoned)
-                res_payload = feedback_req.payload
-
-            feedback_id = generate_id()
+            processed_payload, res_payload = process_feedback_payload(feedback_req)
+            feedback_id = feedback_req.id or generate_id()
             created_at = datetime.datetime.now(ZoneInfo("UTC"))
-            payload = _dict_value_to_dump(feedback_req.payload)
-            max_payload = 1 << 20  # 1 MiB
-            if len(payload) > max_payload:
-                raise InvalidRequest("Feedback payload too large")
-
             row: Row = {
                 "id": feedback_id,
                 "project_id": feedback_req.project_id,
@@ -1874,7 +1847,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 "wb_user_id": feedback_req.wb_user_id,
                 "creator": feedback_req.creator,
                 "feedback_type": feedback_req.feedback_type,
-                "payload": feedback_req.payload,
+                "payload": processed_payload,
                 "created_at": created_at,
                 "annotation_ref": feedback_req.annotation_ref,
                 "runnable_ref": feedback_req.runnable_ref,
@@ -1882,7 +1855,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 "trigger_ref": feedback_req.trigger_ref,
             }
             rows_to_insert.append(row)
-
             results.append(
                 tsi.FeedbackCreateRes(
                     id=feedback_id,

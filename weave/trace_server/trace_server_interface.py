@@ -859,6 +859,11 @@ class RefsReadBatchRes(BaseModel):
 
 
 class FeedbackCreateReq(BaseModelStrict):
+    id: Optional[str] = Field(
+        default=None,
+        description="If provided by the client, this ID will be used for the feedback row instead of a server-generated one.",
+        examples=["018f1f2a-9c2b-7d3e-b5a1-8c9d2e4f6a7b"],
+    )
     project_id: str = Field(examples=["entity/project"])
     weave_ref: str = Field(examples=["weave:///entity/project/object/name:digest"])
     creator: Optional[str] = Field(default=None, examples=["Jane Smith"])
@@ -900,6 +905,30 @@ class FeedbackCreateRes(BaseModel):
 
 class Feedback(FeedbackCreateReq):
     id: str
+    project_id: str = Field(examples=["entity/project"])
+    weave_ref: str = Field(examples=["weave:///entity/project/object/name:digest"])
+    creator: Optional[str] = Field(default=None, examples=["Jane Smith"])
+    feedback_type: str = Field(examples=["custom"])
+    payload: dict[str, Any] = Field(
+        examples=[
+            {
+                "key": "value",
+            }
+        ]
+    )
+    annotation_ref: Optional[str] = Field(
+        default=None, examples=["weave:///entity/project/object/name:digest"]
+    )
+    runnable_ref: Optional[str] = Field(
+        default=None, examples=["weave:///entity/project/op/name:digest"]
+    )
+    call_ref: Optional[str] = Field(
+        default=None, examples=["weave:///entity/project/call/call_id"]
+    )
+    trigger_ref: Optional[str] = Field(
+        default=None, examples=["weave:///entity/project/object/name:digest"]
+    )
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
     created_at: datetime.datetime
 
 
@@ -1260,7 +1289,10 @@ class TraceServerInterface(Protocol):
 
     # Feedback API
     def feedback_create(self, req: FeedbackCreateReq) -> FeedbackCreateRes: ...
-    def feedback_create_batch(self, req: FeedbackCreateBatchReq) -> FeedbackCreateBatchRes: ...
+    def feedback_create_batch(
+        self, req: FeedbackCreateBatchReq
+    ) -> FeedbackCreateBatchRes: ...
+
     def feedback_query(self, req: FeedbackQueryReq) -> FeedbackQueryRes: ...
     def feedback_purge(self, req: FeedbackPurgeReq) -> FeedbackPurgeRes: ...
     def feedback_replace(self, req: FeedbackReplaceReq) -> FeedbackReplaceRes: ...

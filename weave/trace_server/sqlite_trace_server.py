@@ -10,21 +10,19 @@ from collections.abc import Iterator
 from typing import Any, Optional, cast
 from zoneinfo import ZoneInfo
 
-import emoji
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
     ExportTraceServiceRequest,
 )
 
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.emoji_util import detone_emojis
 from weave.trace_server.errors import (
-    InvalidRequest,
     NotFoundError,
     ObjectDeletedError,
 )
 from weave.trace_server.feedback import (
     TABLE_FEEDBACK,
+    process_feedback_payload,
     validate_feedback_create_req,
     validate_feedback_purge_req,
 )
@@ -1276,27 +1274,11 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         assert_non_null_wb_user_id(req)
         validate_feedback_create_req(req, self)
 
-        # Augment emoji with alias.
-        res_payload = {}
-        if req.feedback_type == "wandb.reaction.1":
-            em = req.payload["emoji"]
-            if emoji.emoji_count(em) != 1:
-                raise InvalidRequest(
-                    "Value of emoji key in payload must be exactly one emoji"
-                )
-            req.payload["alias"] = emoji.demojize(em)
-            detoned = detone_emojis(em)
-            req.payload["detoned"] = detoned
-            req.payload["detoned_alias"] = emoji.demojize(detoned)
-            res_payload = req.payload
+        processed_payload, res_payload = process_feedback_payload(req)
 
-        feedback_id = generate_id()
+        feedback_id = req.id or generate_id()
         created_at = datetime.datetime.now(ZoneInfo("UTC"))
         # TODO: Any validation on weave_ref?
-        payload = json.dumps(req.payload)
-        max_payload = 1024
-        if len(payload) > max_payload:
-            raise InvalidRequest("Feedback payload too large")
         row: Row = {
             "id": feedback_id,
             "project_id": req.project_id,
@@ -1304,7 +1286,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             "wb_user_id": req.wb_user_id,
             "creator": req.creator,
             "feedback_type": req.feedback_type,
-            "payload": req.payload,
+            "payload": processed_payload,
             "created_at": created_at,
             "annotation_ref": req.annotation_ref,
             "runnable_ref": req.runnable_ref,
@@ -1334,26 +1316,10 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             assert_non_null_wb_user_id(feedback_req)
             validate_feedback_create_req(feedback_req, self)
 
-            # Augment emoji with alias (same logic as individual create)
-            res_payload = {}
-            if feedback_req.feedback_type == "wandb.reaction.1":
-                em = feedback_req.payload["emoji"]
-                if emoji.emoji_count(em) != 1:
-                    raise InvalidRequest(
-                        "Value of emoji key in payload must be exactly one emoji"
-                    )
-                feedback_req.payload["alias"] = emoji.demojize(em)
-                detoned = detone_emojis(em)
-                feedback_req.payload["detoned"] = detoned
-                feedback_req.payload["detoned_alias"] = emoji.demojize(detoned)
-                res_payload = feedback_req.payload
+            processed_payload, res_payload = process_feedback_payload(feedback_req)
 
-            feedback_id = generate_id()
+            feedback_id = feedback_req.id or generate_id()
             created_at = datetime.datetime.now(ZoneInfo("UTC"))
-            payload = json.dumps(feedback_req.payload)
-            max_payload = 1024
-            if len(payload) > max_payload:
-                raise InvalidRequest("Feedback payload too large")
 
             row: Row = {
                 "id": feedback_id,
@@ -1362,7 +1328,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 "wb_user_id": feedback_req.wb_user_id,
                 "creator": feedback_req.creator,
                 "feedback_type": feedback_req.feedback_type,
-                "payload": feedback_req.payload,
+                "payload": processed_payload,
                 "created_at": created_at,
                 "annotation_ref": feedback_req.annotation_ref,
                 "runnable_ref": feedback_req.runnable_ref,

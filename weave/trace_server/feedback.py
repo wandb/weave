@@ -1,7 +1,13 @@
+import json
+from typing import Any
+
+import emoji
 from pydantic import ValidationError
 
+from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.emoji_util import detone_emojis
 from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.interface.builtin_object_classes.annotation_spec import (
     AnnotationSpec,
@@ -39,6 +45,51 @@ TABLE_FEEDBACK = Table(
         Column("trigger_ref", "string", nullable=True),
     ],
 )
+
+
+def process_feedback_payload(
+    feedback_req: tsi.FeedbackCreateReq,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """
+    Process feedback payload and return both the processed payload and response payload.
+
+    Args:
+        feedback_req: The feedback create request.
+
+    Returns:
+        tuple: (processed_payload, response_payload)
+
+    Raises:
+        InvalidRequest: If payload is too large or emoji validation fails.
+
+    Examples:
+        >>> req = FeedbackCreateReq(project_id="test", feedback_type="custom", payload={"key": "value"})
+        >>> processed, response = process_feedback_payload(req)
+        >>> assert processed == {"key": "value"}
+        >>> assert response == {}
+    """
+    # Augment emoji with alias.
+    res_payload = {}
+    processed_payload = feedback_req.payload.copy()
+
+    if feedback_req.feedback_type == "wandb.reaction.1":
+        em = feedback_req.payload["emoji"]
+        if emoji.emoji_count(em) != 1:
+            raise InvalidRequest(
+                "Value of emoji key in payload must be exactly one emoji"
+            )
+        processed_payload["alias"] = emoji.demojize(em)
+        detoned = detone_emojis(em)
+        processed_payload["detoned"] = detoned
+        processed_payload["detoned_alias"] = emoji.demojize(detoned)
+        res_payload = processed_payload
+
+    # Validate payload size
+    payload = json.dumps(processed_payload)
+    if len(payload) > ch_settings.CLICKHOUSE_MAX_FEEDBACK_PAYLOAD_SIZE:
+        raise InvalidRequest("Feedback payload too large")
+
+    return processed_payload, res_payload
 
 
 def validate_feedback_create_req(

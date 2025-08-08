@@ -15,6 +15,7 @@ from pydantic import ValidationError
 
 import weave
 import weave.trace_server.trace_server_interface as tsi
+from tests.conftest import TestOnlyFlushingWeaveClient
 from tests.trace.testutil import ObjectRefStrMatcher
 from tests.trace.util import (
     AnyIntMatcher,
@@ -3559,12 +3560,16 @@ def test_get_evaluations(client, make_evals):
     assert evs[1].dataset.rows[0] == {"dataset_id": "jkl"}
 
 
-def test_feedback_batching(client):
+def test_feedback_batching(network_proxy_client):
     """Test that feedback batching works correctly when enabled."""
-    import weave
-    from weave.trace_server_bindings.remote_http_trace_server import (
-        RemoteHTTPTraceServer,
+    basic_client, remote_client, records = network_proxy_client
+    client = TestOnlyFlushingWeaveClient(
+        entity=basic_client.entity,
+        project=basic_client.project,
+        server=remote_client,
+        ensure_project_exists=False,
     )
+    client.set_autoflush(False)
 
     # Create a test call to add feedback to
     @weave.op
@@ -3575,49 +3580,38 @@ def test_feedback_batching(client):
     result = test_op(5)
     assert result == 10
 
+    client.flush()
+
     # Get the call to add feedback to
-    calls = list(client.get_calls())
-    assert len(calls) >= 1
-    test_call = calls[0]
+    test_call = client.get_calls()[0]
 
     # Clear any existing server logs
-    if hasattr(client.server, "attribute_access_log"):
-        client.server.attribute_access_log = []
+    client.server.attribute_access_log = []
 
     # Create multiple feedback items (more than 3 to test batching)
     feedback_items = []
+    start = time.time()
     for i in range(10):
-        feedback = test_call.feedback.add(
+        id = test_call.feedback.add(
             feedback_type=f"test_feedback_{i}",
             payload={"score": i, "note": f"Test feedback {i}"},
         )
-        feedback_items.append(feedback)
+        assert id is not None
+        feedback_items.append(id)
+
+    # make sure we aren't actually waiting for 10 feedbacks, should be quick
+    assert time.time() - start < 0.2, "Feedback creation took too long"
+    assert client.server.get_feedback_processor() is not None
 
     # Flush to ensure all feedback is processed
     client.flush()
-
-    # Check server logs to verify batching behavior
-    assert hasattr(client.server, "attribute_access_log"), 'no access log'
 
     log = client.server.attribute_access_log
     feedback_creates = [l for l in log if l == "feedback_create"]
     feedback_create_batches = [l for l in log if l == "feedback_create_batch"]
 
-    # For batching servers, we should see batch requests, not individual creates
-    if (
-        isinstance(client.server, RemoteHTTPTraceServer)
-        and client.server.should_batch
-    ):
-        # Should see fewer individual feedback_create calls due to batching
-        # The exact number depends on batching configuration, but should be less than 10
-        assert (
-            len(feedback_creates) < 10
-        ), f"Expected fewer individual creates due to batching, got {len(feedback_creates)}"
-    else:
-        # For non-batching servers, should see individual feedback_create calls
-        assert (
-            len(feedback_creates) >= 10
-        ), f"Expected individual creates for non-batching server, got {len(feedback_creates)}"
+    assert_err = f"Expected 0 feedback creates, got {len(feedback_creates)}"
+    assert len(feedback_creates) == 0, assert_err
 
     # Query feedback to verify all items were created
     all_feedback = list(test_call.feedback)
