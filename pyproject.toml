@@ -70,7 +70,7 @@ stainless = [
   # "weave_server_sdk @ git+https://github.com/wandb/weave-stainless@9f62f9b3422d2afa7ad56f853ff510a81c1abb73",
 
   # TODO: Uncomment when ready to commit to the new bindings.
-  "weave_server_sdk @ git+https://github.com/wandb/weave-stainless.git@ac2f46cfb874accadd358785151c89fee72cd422",
+  "weave_server_sdk @ git+https://github.com/wandb/weave-stainless.git@f46f61ab66f4db577394e363bf5bca84144e76b2",
 ]
 trace_server = [
   "ddtrace>=2.7.0",
