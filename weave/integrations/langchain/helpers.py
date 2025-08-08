@@ -102,7 +102,7 @@ def _find_full_model_name(output: Any, partial_model_name: str) -> str:
     return best_match
 
 
-def _extract_usage_data(call: Call, output: Any) -> None:
+def _extract_usage_data(call: Call, output: dict[str, Any]) -> None:
     """
     Usage extraction using LangChain metadata patterns.
     extracts usage data from the LangChain output and updates the Call object.
