@@ -9304,5 +9304,117 @@
       "output": 4e-06,
       "created_at": "2025-08-07 11:40:33"
     }
+  ],
+  "gpt-5": [
+    {
+      "provider": "openai",
+      "input": 1.25e-06,
+      "output": 1e-05,
+      "created_at": "2025-08-07 14:35:25"
+    }
+  ],
+  "gpt-5-mini": [
+    {
+      "provider": "openai",
+      "input": 2.5e-07,
+      "output": 2e-06,
+      "created_at": "2025-08-07 14:35:25"
+    }
+  ],
+  "gpt-5-nano": [
+    {
+      "provider": "openai",
+      "input": 5e-08,
+      "output": 4e-07,
+      "created_at": "2025-08-07 14:35:25"
+    }
+  ],
+  "gpt-5-chat": [
+    {
+      "provider": "openai",
+      "input": 5e-06,
+      "output": 2e-05,
+      "created_at": "2025-08-07 14:35:25"
+    }
+  ],
+  "gpt-5-chat-latest": [
+    {
+      "provider": "openai",
+      "input": 1.25e-06,
+      "output": 1e-05,
+      "created_at": "2025-08-07 14:35:25"
+    }
+  ],
+  "azure/gpt-5": [
+    {
+      "provider": "azure",
+      "input": 1.25e-06,
+      "output": 1e-05,
+      "created_at": "2025-08-07 14:35:25"
+    }
+  ],
+  "azure/gpt-5-2025-08-07": [
+    {
+      "provider": "azure",
+      "input": 1.25e-06,
+      "output": 1e-05,
+      "created_at": "2025-08-07 14:35:25"
+    }
+  ],
+  "azure/gpt-5-mini": [
+    {
+      "provider": "azure",
+      "input": 2.5e-07,
+      "output": 2e-06,
+      "created_at": "2025-08-07 14:35:25"
+    }
+  ],
+  "azure/gpt-5-mini-2025-08-07": [
+    {
+      "provider": "azure",
+      "input": 2.5e-07,
+      "output": 2e-06,
+      "created_at": "2025-08-07 14:35:25"
+    }
+  ],
+  "azure/gpt-5-nano-2025-08-07": [
+    {
+      "provider": "azure",
+      "input": 5e-08,
+      "output": 4e-07,
+      "created_at": "2025-08-07 14:35:25"
+    }
+  ],
+  "azure/gpt-5-nano": [
+    {
+      "provider": "azure",
+      "input": 5e-08,
+      "output": 4e-07,
+      "created_at": "2025-08-07 14:35:25"
+    }
+  ],
+  "azure/gpt-5-chat": [
+    {
+      "provider": "azure",
+      "input": 5e-06,
+      "output": 2e-05,
+      "created_at": "2025-08-07 14:35:25"
+    }
+  ],
+  "azure/gpt-5-chat-latest": [
+    {
+      "provider": "azure",
+      "input": 1.25e-06,
+      "output": 1e-05,
+      "created_at": "2025-08-07 14:35:25"
+    }
+  ],
+  "claude-opus-4-1": [
+    {
+      "provider": "anthropic",
+      "input": 1.5e-05,
+      "output": 7.5e-05,
+      "created_at": "2025-08-07 14:35:25"
+    }
   ]
 }
