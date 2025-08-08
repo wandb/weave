@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 
 from weave.trace import (
     autopatch,
@@ -12,7 +13,7 @@ from weave.trace import (
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.settings import should_redact_pii, use_server_cache
 from weave.trace_server.trace_server_interface import TraceServerInterface
-from weave.trace_server_bindings import remote_http_trace_server
+from weave.trace_server_bindings import remote_http_trace_server, stainless_trace_server
 from weave.trace_server_bindings.caching_middleware_trace_server import (
     CachingMiddlewareTraceServer,
 )
@@ -207,8 +208,15 @@ def init_weave_disabled() -> InitializedClient:
 def init_weave_get_server(
     api_key: str | None = None,
     should_batch: bool = True,
-) -> remote_http_trace_server.RemoteHTTPTraceServer:
-    res = remote_http_trace_server.RemoteHTTPTraceServer.from_env(should_batch)
+) -> (
+    remote_http_trace_server.RemoteHTTPTraceServer
+    | stainless_trace_server.RemoteHTTPTraceServer
+):
+    if os.getenv("WEAVE_USE_STAINLESS_CLIENT"):
+        logger.info("Using stainless client")
+        res = stainless_trace_server.RemoteHTTPTraceServer.from_env(should_batch)
+    else:
+        res = remote_http_trace_server.RemoteHTTPTraceServer.from_env(should_batch)
     if api_key is not None:
         res.set_auth(("api", api_key))
     return res
