@@ -3,6 +3,7 @@ import datetime
 import httpx
 import pytest
 from pydantic import ValidationError
+from weave_server_sdk import APIStatusError
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
@@ -43,7 +44,6 @@ def trace_server():
 def test_ok(respx_mock, trace_server):
     """Test successful call_start request."""
     call_id = generate_id()
-    # Mock the POST request to the trace server
     route = respx_mock.post("/call/start").mock(
         return_value=httpx.Response(
             status_code=200,
@@ -59,7 +59,6 @@ def test_ok(respx_mock, trace_server):
 def test_400_no_retry(respx_mock, trace_server):
     """Test that 400 errors are not retried."""
     call_id = generate_id()
-    # Mock a 400 response
     respx_mock.post("/call/start").mock(
         return_value=httpx.Response(
             status_code=400,
@@ -68,8 +67,6 @@ def test_400_no_retry(respx_mock, trace_server):
     )
 
     start = generate_start(call_id)
-    # Stainless wraps httpx errors in its own APIStatusError
-    from weave_server_sdk import APIStatusError
 
     with pytest.raises(APIStatusError):
         trace_server.call_start(tsi.CallStartReq(start=start))
