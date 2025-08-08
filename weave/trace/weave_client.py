@@ -2173,8 +2173,16 @@ class WeaveClient:
                 prev_job_counts["call_processor_jobs"]
                 - current_job_counts["call_processor_jobs"],
             )
+            feedback_processor_completed = max(
+                0,
+                prev_job_counts["feedback_processor_jobs"]
+                - current_job_counts["feedback_processor_jobs"],
+            )
             completed_this_iteration = (
-                main_completed + fastlane_completed + call_processor_completed
+                main_completed
+                + fastlane_completed
+                + call_processor_completed
+                + feedback_processor_completed
             )
 
             if completed_this_iteration > 0:

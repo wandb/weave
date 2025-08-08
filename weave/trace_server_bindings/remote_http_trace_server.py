@@ -236,8 +236,6 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         if len(batch) == 0:
             return
 
-        print(">>> flushing feedback:", len(batch))
-
         # Create the batch request
         batch_req = tsi.FeedbackCreateBatchReq(batch=batch)
         data = batch_req.model_dump_json()

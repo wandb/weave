@@ -1894,14 +1894,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         # Batch insert all rows at once
         if rows_to_insert:
-            # Insert each row individually but in a batch operation
+            insert_query = TABLE_FEEDBACK.insert()
             for row in rows_to_insert:
-                prepared = TABLE_FEEDBACK.insert(row).prepare(
-                    database_type="clickhouse"
-                )
-                self._insert(TABLE_FEEDBACK.name, prepared.data, prepared.column_names)
-
-        print("returning len: ", len(results))
+                insert_query.row(row)
+            prepared = insert_query.prepare(database_type="clickhouse")
+            self._insert(TABLE_FEEDBACK.name, prepared.data, prepared.column_names)
 
         return tsi.FeedbackCreateBatchRes(res=results)
 
