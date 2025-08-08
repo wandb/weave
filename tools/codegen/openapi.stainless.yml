@@ -156,6 +156,27 @@ resources:
       purge: post /feedback/purge
       replace: post /feedback/replace
 
+  otel:
+    methods:
+      export: post /otel/v1/trace
+
+  actions:
+    methods:
+      execute_batch: post /actions/execute_batch
+
+  completions:
+    methods:
+      create: post /completions/create
+      create_stream: post /completions/create_stream
+
+  project:
+    methods:
+      stats: post /project/stats
+
+  threads:
+    methods:
+      stream_query: post /threads/stream_query
+
 settings:
   license: Apache-2.0
 
