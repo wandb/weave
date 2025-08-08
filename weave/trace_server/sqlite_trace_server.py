@@ -10,21 +10,19 @@ from collections.abc import Iterator
 from typing import Any, Optional, cast
 from zoneinfo import ZoneInfo
 
-import emoji
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
     ExportTraceServiceRequest,
 )
 
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.emoji_util import detone_emojis
 from weave.trace_server.errors import (
-    InvalidRequest,
     NotFoundError,
     ObjectDeletedError,
 )
 from weave.trace_server.feedback import (
     TABLE_FEEDBACK,
+    process_feedback_payload,
     validate_feedback_create_req,
     validate_feedback_purge_req,
 )
@@ -1276,27 +1274,11 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         assert_non_null_wb_user_id(req)
         validate_feedback_create_req(req, self)
 
-        # Augment emoji with alias.
-        res_payload = {}
-        if req.feedback_type == "wandb.reaction.1":
-            em = req.payload["emoji"]
-            if emoji.emoji_count(em) != 1:
-                raise InvalidRequest(
-                    "Value of emoji key in payload must be exactly one emoji"
-                )
-            req.payload["alias"] = emoji.demojize(em)
-            detoned = detone_emojis(em)
-            req.payload["detoned"] = detoned
-            req.payload["detoned_alias"] = emoji.demojize(detoned)
-            res_payload = req.payload
+        processed_payload, res_payload = process_feedback_payload(req)
 
-        feedback_id = generate_id()
+        feedback_id = req.id or generate_id()
         created_at = datetime.datetime.now(ZoneInfo("UTC"))
         # TODO: Any validation on weave_ref?
-        payload = json.dumps(req.payload)
-        max_payload = 1024
-        if len(payload) > max_payload:
-            raise InvalidRequest("Feedback payload too large")
         row: Row = {
             "id": feedback_id,
             "project_id": req.project_id,
@@ -1304,7 +1286,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             "wb_user_id": req.wb_user_id,
             "creator": req.creator,
             "feedback_type": req.feedback_type,
-            "payload": req.payload,
+            "payload": processed_payload,
             "created_at": created_at,
             "annotation_ref": req.annotation_ref,
             "runnable_ref": req.runnable_ref,
@@ -1322,6 +1304,62 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             wb_user_id=req.wb_user_id,
             payload=res_payload,
         )
+
+    def feedback_create_batch(
+        self, req: tsi.FeedbackCreateBatchReq
+    ) -> tsi.FeedbackCreateBatchRes:
+        """Create multiple feedback items in a batch efficiently."""
+        results = []
+        rows_to_insert = []
+
+        for feedback_req in req.batch:
+            assert_non_null_wb_user_id(feedback_req)
+            validate_feedback_create_req(feedback_req, self)
+
+            processed_payload, res_payload = process_feedback_payload(feedback_req)
+
+            feedback_id = feedback_req.id or generate_id()
+            created_at = datetime.datetime.now(ZoneInfo("UTC"))
+
+            row: Row = {
+                "id": feedback_id,
+                "project_id": feedback_req.project_id,
+                "weave_ref": feedback_req.weave_ref,
+                "wb_user_id": feedback_req.wb_user_id,
+                "creator": feedback_req.creator,
+                "feedback_type": feedback_req.feedback_type,
+                "payload": processed_payload,
+                "created_at": created_at,
+                "annotation_ref": feedback_req.annotation_ref,
+                "runnable_ref": feedback_req.runnable_ref,
+                "call_ref": feedback_req.call_ref,
+                "trigger_ref": feedback_req.trigger_ref,
+            }
+            rows_to_insert.append(row)
+
+            results.append(
+                tsi.FeedbackCreateRes(
+                    id=feedback_id,
+                    created_at=created_at,
+                    wb_user_id=feedback_req.wb_user_id
+                    or "",  # Ensure non-null for response
+                    payload=res_payload,
+                )
+            )
+
+        # Batch insert all rows at once
+        if rows_to_insert:
+            conn, cursor = get_conn_cursor(self.db_path)
+            with self.lock:
+                # Insert each row individually but in a single transaction
+                for row in rows_to_insert:
+                    prepared = TABLE_FEEDBACK.insert(row).prepare(
+                        database_type="sqlite"
+                    )
+                    cursor.executemany(prepared.sql, prepared.data)
+                conn.commit()
+
+        return tsi.FeedbackCreateBatchRes(res=results)
 
     def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
         conn, cursor = get_conn_cursor(self.db_path)
