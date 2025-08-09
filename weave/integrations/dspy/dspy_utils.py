@@ -1,4 +1,5 @@
 import importlib
+import os
 from typing import TYPE_CHECKING, Any, Callable, Union
 
 from pydantic import BaseModel
@@ -61,6 +62,14 @@ def dspy_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
         if dictified_inputs_self["__class__"]["module"] == "__main__":
             dictified_inputs_self["__class__"]["module"] = ""
 
+        # Optionally hide history to reduce trace size
+        if os.getenv("WEAVE_DSPY_HIDE_HISTORY", "false").lower() in (
+            "true",
+            "1",
+            "yes",
+        ):
+            dictified_inputs_self.pop("history", None)
+
         # Serialize the signature of the object if it is a Predict or Adapter
         if isinstance(inputs["self"], (Predict, Adapter)) and hasattr(
             inputs["self"], "signature"
@@ -98,6 +107,7 @@ def dspy_postprocess_outputs(
 ) -> Union[list[Any], dict[str, Any], Any]:
     import numpy as np
     from dspy import Example, Module
+    from litellm import ModelResponse
 
     if isinstance(outputs, Module):
         outputs = outputs.dump_state()
@@ -107,6 +117,9 @@ def dspy_postprocess_outputs(
 
     if isinstance(outputs, np.ndarray):
         outputs = outputs.tolist()
+
+    if isinstance(outputs, ModelResponse):
+        outputs = dictify(outputs)
 
     return dump_dspy_objects(outputs)
 
