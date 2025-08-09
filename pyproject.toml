@@ -36,7 +36,6 @@ requires-python = ">=3.9"
 dynamic = ["version"]
 dependencies = [
   "wandb>=0.17.1",
-  "sentry-sdk>=2.0.0,<3.0.0",
   "pydantic>=2.0.0",
   "packaging>=21.0",          # For version parsing in integrations
   "tenacity>=8.3.0,!=8.4.0",  # Excluding 8.4.0 because it had a bug on import of AsyncRetrying
@@ -71,6 +70,7 @@ dependencies = [
 # this to a separate package. Note, when that happens, we will need to pull along some of the
 #default dependencies as well.
 wandb = ["wandb>=0.17.1"]
+sentry = ["sentry-sdk>=2.0.0,<3.0.0"]
 trace_server = [
   "ddtrace>=2.7.0",
   # BYOB - S3
