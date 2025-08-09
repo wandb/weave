@@ -184,6 +184,7 @@ autogen_tests = [
 
 test = [
   "nox",
+  "sentry-sdk>=2.0.0",
   "pytest>=8.2.0",
   "pytest-asyncio>=0.23.6",
   "pytest-cov>=5.0.0",

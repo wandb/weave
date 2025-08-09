@@ -167,6 +167,11 @@ def init_weave(
         username, entity_name, project_name, read_only=not ensure_project_exists
     )
 
+    # Initialize Sentry with our configuration, but respecting any existing user config
+    # This calls trace_sentry.initialize_sentry() which ensures we don't override a
+    # user's existing Sentry configuration
+    trace_sentry.initialize_sentry()
+
     user_context = {"username": username} if username else None
     trace_sentry.global_trace_sentry.configure_scope(
         {
