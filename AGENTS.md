@@ -25,9 +25,6 @@ _Important:_ For OpenAI Codex agents (most likely you!), your environment does n
   - `weave/` - Python package implementation
   - `weave/trace_server` - Backend server implementation
 - `docs/` - Documentation website
-- `weave-js/` - Frontend code and company components
-  - Entry point: `weave-js/src/components/PagePanelComponents/Home/Browse3.tsx`
-  - Note: Webapp is hosted externally, do not attempt local development
 
 ### Legacy Code
 
