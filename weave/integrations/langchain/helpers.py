@@ -11,12 +11,13 @@ Supported providers:
 """
 
 from collections import defaultdict
+from dataclasses import dataclass
+from typing import Any, cast
+
 from weave.trace.weave_client import Call
 from weave.trace_server.opentelemetry.helpers import flatten_attributes
-from weave.utils.dict_utils import convert_defaultdict_to_dict
 from weave.trace_server.trace_server_interface import LLMUsageSchema
-from typing import Any, cast
-from dataclasses import dataclass
+from weave.utils.dict_utils import convert_defaultdict_to_dict
 
 
 @dataclass
@@ -141,9 +142,9 @@ def _extract_usage_data(call: Call, output: Any) -> None:
 
             if token_usage.prompt_tokens > 0 or token_usage.completion_tokens > 0:
                 usage_dict[model_name]["prompt_tokens"] += token_usage.prompt_tokens
-                usage_dict[model_name][
-                    "completion_tokens"
-                ] += token_usage.completion_tokens
+                usage_dict[model_name]["completion_tokens"] += (
+                    token_usage.completion_tokens
+                )
                 usage_dict[model_name]["total_tokens"] += token_usage.total_tokens
 
     if usage_dict:
