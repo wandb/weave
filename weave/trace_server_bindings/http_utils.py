@@ -1,9 +1,10 @@
 import json
 import logging
-from typing import TYPE_CHECKING, Callable, Optional, Protocol, TypeVar, Union
+from typing import TYPE_CHECKING, Callable, Optional, TypeVar, Union
 
 from weave.trace_server import requests
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 
 if TYPE_CHECKING:
     from weave.trace_server_bindings.models import EndBatchItem, StartBatchItem
@@ -13,19 +14,8 @@ logger = logging.getLogger(__name__)
 # Type variable for batch items
 T = TypeVar("T")
 
-
-class BatchProcessor(Protocol[T]):
-    """Protocol defining the expected interface for batch processor objects."""
-
-    max_batch_size: int
-
-    def enqueue(self, batch: list[T]) -> None:
-        """Add a batch to the processor's queue."""
-        ...
-
-    def is_accepting_new_work(self) -> bool:
-        """Check if the processor is still accepting new work."""
-        ...
+# Use AsyncBatchProcessor as the batch processor type
+BatchProcessor = AsyncBatchProcessor
 
 
 def log_dropped_call_batch(
