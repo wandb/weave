@@ -111,19 +111,20 @@ async def test_evaluation_performance(client: WeaveClient):
 
     log = [l for l in client.server.attribute_access_log if not l.startswith("_")]
 
-    assert log == ["ensure_project_exists", "get_call_processor", "get_call_processor"]
+    gold_log = [
+        "ensure_project_exists",
+        "get_call_processor",
+        "get_call_processor",
+        "get_feedback_processor",
+        "get_feedback_processor",
+    ]
+    assert log == gold_log
 
     with paused_client(client) as client:
         res = await evaluation.evaluate(predict)
         assert res["score"]["true_count"] == 1
         log = [l for l in client.server.attribute_access_log if not l.startswith("_")]
-        assert log == [
-            "ensure_project_exists",
-            "get_call_processor",
-            "get_call_processor",
-            "get_feedback_processor",
-            "get_feedback_processor",
-        ]
+        assert log == gold_log
 
     log = [l for l in client.server.attribute_access_log if not l.startswith("_")]
 

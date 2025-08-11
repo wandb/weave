@@ -85,6 +85,7 @@ from weave.trace_server.errors import (
 )
 from weave.trace_server.feedback import (
     TABLE_FEEDBACK,
+    format_feedback_to_res,
     format_feedback_to_row,
     process_feedback_payload,
     validate_feedback_create_req,
@@ -1794,12 +1795,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         prepared = TABLE_FEEDBACK.insert(row).prepare(database_type="clickhouse")
         self._insert(TABLE_FEEDBACK.name, prepared.data, prepared.column_names)
 
-        return tsi.FeedbackCreateRes(
-            id=row["id"],
-            created_at=row["created_at"],
-            wb_user_id=req.wb_user_id,
-            payload=req.payload,
-        )
+        return format_feedback_to_res(row)
 
     def feedback_create_batch(
         self, req: tsi.FeedbackCreateBatchReq
@@ -1815,15 +1811,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             processed_payload = process_feedback_payload(feedback_req)
             row = format_feedback_to_row(feedback_req, processed_payload)
             rows_to_insert.append(row)
-
-            results.append(
-                tsi.FeedbackCreateRes(
-                    id=feedback_req.id,
-                    created_at=feedback_req.created_at,
-                    wb_user_id=feedback_req.wb_user_id,
-                    payload=processed_payload,
-                )
-            )
+            results.append(format_feedback_to_res(row))
 
         # Batch insert all rows at once
         if rows_to_insert:

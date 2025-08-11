@@ -1277,14 +1277,13 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
         processed_payload = process_feedback_payload(req)
         row = format_feedback_to_row(req, processed_payload)
-        res = format_feedback_to_res(row)
         conn, cursor = get_conn_cursor(self.db_path)
         with self.lock:
             prepared = TABLE_FEEDBACK.insert(row).prepare(database_type="sqlite")
             cursor.executemany(prepared.sql, prepared.data)
             conn.commit()
 
-        return res
+        return format_feedback_to_res(row)
 
     def feedback_create_batch(
         self, req: tsi.FeedbackCreateBatchReq
@@ -1300,9 +1299,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             processed_payload = process_feedback_payload(feedback_req)
             row = format_feedback_to_row(feedback_req, processed_payload)
             rows_to_insert.append(row)
-
-            res = format_feedback_to_res(row)
-            results.append(res)
+            results.append(format_feedback_to_res(row))
 
         # Batch insert all rows at once
         if rows_to_insert:
