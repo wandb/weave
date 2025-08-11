@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 import ddtrace
 from pydantic import BaseModel, ConfigDict
 
-from weave.flow.eval import Evaluation
+from weave.evaluation.eval import Evaluation
 from weave.scorers.llm_as_a_judge_scorer import LLMAsAJudgeScorer
 from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.refs import parse_uri

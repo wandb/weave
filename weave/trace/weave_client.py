@@ -135,7 +135,7 @@ from weave.utils.paginated_iterator import PaginatedIterator
 if TYPE_CHECKING:
     import wandb
 
-    from weave.flow.eval import Evaluation
+    from weave.evaluation.eval import Evaluation
     from weave.flow.scorer import ApplyScorerResult, Scorer
 
 
