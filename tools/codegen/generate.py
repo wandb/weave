@@ -225,10 +225,17 @@ def update_pyproject(
     (if --release is specified) or a git SHA reference.
     """
     header("Updating pyproject.toml")
+
+    # weave_server_sdk always goes under the stainless optional extra
+    optional_extra = "stainless" if package_name == "weave_server_sdk" else None
+
     if release:
         version = _get_package_version(python_output)
-        _update_pyproject_toml(package_name, version, True)
-        info(f"Updated {package_name} dependency to version: {version}")
+        _update_pyproject_toml(package_name, version, True, optional_extra)
+        location = (
+            f"in [{optional_extra}]" if optional_extra else "in main dependencies"
+        )
+        info(f"Updated {package_name} dependency {location} to version: {version}")
     else:
         repo_info = _get_repo_info(python_output)
         remote_url = repo_info.remote_url
@@ -236,8 +243,13 @@ def update_pyproject(
         if not sha:
             error(f"Failed to get git SHA (got: {sha=})")
             sys.exit(1)
-        _update_pyproject_toml(package_name, f"{remote_url}@{sha}", False)
-        info(f"Updated {package_name} dependency to SHA: {sha}")
+        _update_pyproject_toml(
+            package_name, f"{remote_url}@{sha}", False, optional_extra
+        )
+        location = (
+            f"in [{optional_extra}]" if optional_extra else "in main dependencies"
+        )
+        info(f"Updated {package_name} dependency {location} to SHA: {sha}")
 
 
 @app.command()
@@ -550,24 +562,56 @@ def _update_pyproject_toml(
     package: str,
     value: str,
     is_version: bool,
+    optional_extra: str | None = None,
 ) -> None:
     """Update the dependency entry for the given package in the pyproject.toml file.
 
     If is_version is True, the dependency is set to the package version (==version),
     otherwise, it's set to a git SHA reference.
+
+    Args:
+        package: The package name to update.
+        value: The version or git SHA reference.
+        is_version: Whether the value is a version (True) or git SHA (False).
+        optional_extra: If provided, update the dependency in this optional extra
+                        instead of the main dependencies.
     """
     pyproject_path = Path("pyproject.toml")
 
     with open(pyproject_path) as f:
         doc = tomlkit.parse(f.read())
 
-    # Ensure dependencies is a tomlkit array for consistent formatting
-    if not isinstance(doc["project"]["dependencies"], tomlkit.items.Array):
-        dependencies = tomlkit.array()
-        dependencies.extend(doc["project"]["dependencies"])
-        doc["project"]["dependencies"] = dependencies
+    # Determine which dependencies list to update
+    if optional_extra:
+        # Update optional dependencies
+        if "project" not in doc or "optional-dependencies" not in doc["project"]:
+            error("No optional-dependencies section found in pyproject.toml")
+            return
 
-    dependencies = doc["project"]["dependencies"]
+        if optional_extra not in doc["project"]["optional-dependencies"]:
+            error(f"Optional extra '{optional_extra}' not found in pyproject.toml")
+            return
+
+        # Ensure optional dependencies is a tomlkit array for consistent formatting
+        if not isinstance(
+            doc["project"]["optional-dependencies"][optional_extra], tomlkit.items.Array
+        ):
+            dependencies = tomlkit.array()
+            dependencies.extend(doc["project"]["optional-dependencies"][optional_extra])
+            doc["project"]["optional-dependencies"][optional_extra] = dependencies
+
+        dependencies = doc["project"]["optional-dependencies"][optional_extra]
+    else:
+        # Update main dependencies
+        # Ensure dependencies is a tomlkit array for consistent formatting
+        if not isinstance(doc["project"]["dependencies"], tomlkit.items.Array):
+            dependencies = tomlkit.array()
+            dependencies.extend(doc["project"]["dependencies"])
+            doc["project"]["dependencies"] = dependencies
+
+        dependencies = doc["project"]["dependencies"]
+
+    # Update the matching dependency
     for i, dep in enumerate(dependencies):
         if dep.startswith(package):
             if is_version:
