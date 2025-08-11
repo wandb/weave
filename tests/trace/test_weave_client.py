@@ -3562,6 +3562,8 @@ def test_get_evaluations(client, make_evals):
 
 def test_feedback_batching(network_proxy_client):
     """Test that feedback batching works correctly when enabled."""
+    # Set up advanced client that uses the RemoteHttpTraceServer handler
+    # with batching
     basic_client, remote_client, records = network_proxy_client
     client = TestOnlyFlushingWeaveClient(
         entity=basic_client.entity,
@@ -3569,6 +3571,7 @@ def test_feedback_batching(network_proxy_client):
         server=remote_client,
         ensure_project_exists=False,
     )
+    # Disably autoflush so we can manually control
     client.set_autoflush(False)
 
     # Create a test call to add feedback to
@@ -3576,19 +3579,12 @@ def test_feedback_batching(network_proxy_client):
     def test_op(x: int) -> int:
         return x * 2
 
-    # Execute the operation to create a call
     result = test_op(5)
-    assert result == 10
-
     client.flush()
 
-    # Get the call to add feedback to
     test_call = client.get_calls()[0]
-
-    # Clear any existing server logs
     client.server.attribute_access_log = []
 
-    # Create multiple feedback items (more than 3 to test batching)
     feedback_items = []
     start = time.time()
     for i in range(10):
@@ -3608,7 +3604,6 @@ def test_feedback_batching(network_proxy_client):
 
     log = client.server.attribute_access_log
     feedback_creates = [l for l in log if l == "feedback_create"]
-    feedback_create_batches = [l for l in log if l == "feedback_create_batch"]
 
     assert_err = f"Expected 0 feedback creates, got {len(feedback_creates)}"
     assert len(feedback_creates) == 0, assert_err
@@ -3624,6 +3619,9 @@ def test_feedback_batching(network_proxy_client):
     for i, feedback in enumerate(
         sorted(created_feedback, key=lambda x: x.feedback_type)
     ):
+        assert feedback.id in feedback_items, (
+            f"Feedback {i} not found in feedback_items"
+        )
         assert feedback.feedback_type == f"test_feedback_{i}"
         assert feedback.payload["score"] == i
         assert feedback.payload["note"] == f"Test feedback {i}"
