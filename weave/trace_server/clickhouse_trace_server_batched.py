@@ -240,18 +240,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         ]
                     )
         # TODO: Actually populate the error fields if call_start_batch fails
-        # Convert the calls to proper batch format
-        batch_items = []
-        for call in calls:
-            if call.get("mode") == "start":
-                batch_items.append(
-                    tsi.CallBatchStartMode(req=tsi.CallStartReq(start=call["req"].start))
-                )
-            elif call.get("mode") == "end":
-                batch_items.append(
-                    tsi.CallBatchEndMode(req=tsi.CallEndReq(end=call["req"].end))
-                )
-        self.call_start_batch(tsi.CallCreateBatchReq(batch=batch_items))
+        self.call_start_batch(tsi.CallCreateBatchReq(batch=calls))
         return tsi.OtelExportRes()
 
     @contextmanager
