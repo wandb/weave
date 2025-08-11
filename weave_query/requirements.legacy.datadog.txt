@@ -1,2 +1,2 @@
-datadog==0.44.0
+datadog==0.52.1
 ddtrace==1.7.5
