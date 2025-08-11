@@ -500,7 +500,7 @@ def network_proxy_client(client):
         )
         return client.server.feedback_create(req)
 
-    @app.post("/feedback/create_batch")
+    @app.post("/feedback/batch/create")
     def feedback_create_batch(
         req: tsi.FeedbackCreateBatchReq,
     ) -> tsi.FeedbackCreateBatchRes:

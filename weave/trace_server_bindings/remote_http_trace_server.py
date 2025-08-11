@@ -185,10 +185,10 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         This method is separated from _flush_feedback to avoid recursive retries.
         """
         r = self.post(
-            "/feedback/create_batch",
+            "/feedback/batch/create",
             data=encoded_data,  # type: ignore
         )
-        handle_response_error(r, "/feedback/create_batch")
+        handle_response_error(r, "/feedback/batch/create")
 
     def _flush_feedback(
         self,
@@ -584,7 +584,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         self, req: tsi.FeedbackCreateBatchReq
     ) -> tsi.FeedbackCreateBatchRes:
         return self._generic_request(
-            "/feedback/create_batch",
+            "/feedback/batch/create",
             req,
             tsi.FeedbackCreateBatchReq,
             tsi.FeedbackCreateBatchRes,
