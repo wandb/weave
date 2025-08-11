@@ -9,7 +9,7 @@ __version__ = version.VERSION
 from weave.flow.agent import Agent as Agent
 from weave.flow.agent import AgentState as AgentState
 from weave.flow.annotation_spec import AnnotationSpec
-from weave.flow.dataset import Dataset
+from weave.dataset.dataset import Dataset
 from weave.evaluation.eval import Evaluation
 from weave.evaluation.eval_imperative import EvaluationLogger
 from weave.flow.model import Model

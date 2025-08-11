@@ -20,7 +20,7 @@ from pydantic import (
 )
 
 import weave
-from weave.flow.dataset import Dataset
+from weave.dataset.dataset import Dataset
 from weave.evaluation.eval import Evaluation, default_evaluation_display_name
 from weave.flow.model import MissingInferenceMethodError, Model
 from weave.flow.scorer import Scorer
