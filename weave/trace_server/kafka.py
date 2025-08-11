@@ -1,5 +1,5 @@
 import socket
-from typing import Optional
+from typing import Any, Optional
 
 from confluent_kafka import Consumer as ConfluentKafkaConsumer
 from confluent_kafka import Producer as ConfluentKafkaProducer
@@ -17,12 +17,16 @@ CALL_ENDED_TOPIC = "weave.call_ended"
 
 class KafkaProducer(ConfluentKafkaProducer):
     @classmethod
-    def from_env(cls) -> "KafkaProducer":
+    def from_env(cls, additional_config: Optional[dict[str, Any]] = None) -> "KafkaProducer":
+        if additional_config is None:
+            additional_config = {}
+
         config = {
             "bootstrap.servers": _make_broker_host(),
             "client.id": socket.gethostname(),
             "message.timeout.ms": 500,
             **_make_auth_config(),
+            **additional_config,
         }
 
         return cls(config)
@@ -41,7 +45,10 @@ class KafkaProducer(ConfluentKafkaProducer):
 
 class KafkaConsumer(ConfluentKafkaConsumer):
     @classmethod
-    def from_env(cls, group_id: str) -> "KafkaConsumer":
+    def from_env(cls, group_id: str, additional_config: Optional[dict[str, Any]] = None) -> "KafkaConsumer":
+        if additional_config is None:
+            additional_config = {}
+
         config = {
             "bootstrap.servers": _make_broker_host(),
             "client.id": socket.gethostname(),
@@ -49,6 +56,7 @@ class KafkaConsumer(ConfluentKafkaConsumer):
             "auto.offset.reset": "earliest",
             "enable.auto.commit": False,
             **_make_auth_config(),
+            **additional_config,
         }
 
         return cls(config)
