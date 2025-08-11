@@ -245,11 +245,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         for call in calls:
             if call.get("mode") == "start":
                 batch_items.append(
-                    tsi.CallBatchStartMode(req=tsi.CallStartReq(start=call["req"]))
+                    tsi.CallBatchStartMode(req=tsi.CallStartReq(start=call["req"].start))
                 )
             elif call.get("mode") == "end":
                 batch_items.append(
-                    tsi.CallBatchEndMode(req=tsi.CallEndReq(end=call["req"]))
+                    tsi.CallBatchEndMode(req=tsi.CallEndReq(end=call["req"].end))
                 )
         self.call_start_batch(tsi.CallCreateBatchReq(batch=batch_items))
         return tsi.OtelExportRes()

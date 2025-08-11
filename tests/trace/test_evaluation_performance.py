@@ -121,6 +121,8 @@ async def test_evaluation_performance(client: WeaveClient):
             "ensure_project_exists",
             "get_call_processor",
             "get_call_processor",
+            "get_feedback_processor",
+            "get_feedback_processor",
         ]
 
     log = [l for l in client.server.attribute_access_log if not l.startswith("_")]
