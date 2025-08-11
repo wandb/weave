@@ -201,7 +201,7 @@ class ErrorRegistry:
 
         # Standard library exceptions
         self.register(ValueError, 400)
-        self.register(KeyError, 500)
+        self.register(KeyError, 500, lambda exc: {"reason": "Internal backend error"})
 
         self.register(
             requests.exceptions.ReadTimeout, 504, lambda exc: {"reason": "Read timeout"}
