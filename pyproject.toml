@@ -71,6 +71,9 @@ dependencies = [
 # this to a separate package. Note, when that happens, we will need to pull along some of the
 #default dependencies as well.
 wandb = ["wandb>=0.17.1"]
+stainless = [
+  "weave_server_sdk @ git+https://github.com/wandb/weave-stainless.git@3e65c0a8e0adb642bbde81e64f03b333d9d57686",
+]
 trace_server = [
   "ddtrace>=2.7.0",
   # BYOB - S3
@@ -250,8 +253,8 @@ exclude = [
   "weave/clear_cache.py",
 ]
 
-# [tool.hatch.metadata]
-# allow-direct-references = true
+[tool.hatch.metadata]
+allow-direct-references = true
 [tool.pytest.ini_options]
 filterwarnings = [
   # treat warnings as errors
