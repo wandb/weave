@@ -1,6 +1,6 @@
 # Saved Views
 
-In Weave, _saved views_ allow you to customize how you interact with traced function calls and evaluations. By defining a saved view, you can configure filters, sorting, and column visibility to quickly access relevant data.
+In W&B Weave, _saved views_ allow you to customize how you interact with traced function calls and evaluations. By defining a saved view, you can configure filters, sorting, and column visibility to quickly access relevant data.
 
 You can create, modify, and save views directly in the Weave Python SDK or through the UI. The Python SDK provides fine-grained control for programmatic filtering and querying, while the UI makes it easy to explore and save different table configurations in the **Traces** and **Evals** tabs.
 
