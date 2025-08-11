@@ -24,7 +24,9 @@ class KafkaProducer(ConfluentKafkaProducer):
     """
 
     @classmethod
-    def from_env(cls, additional_kafka_config: Optional[dict[str, Any]] = None) -> "KafkaProducer":
+    def from_env(
+        cls, additional_kafka_config: Optional[dict[str, Any]] = None
+    ) -> "KafkaProducer":
         if additional_kafka_config is None:
             additional_kafka_config = {}
 
