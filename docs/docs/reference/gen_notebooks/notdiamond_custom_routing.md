@@ -55,7 +55,7 @@ We start by downloading the dataset we have prepared for this example, then pars
 import random
 
 import weave
-from weave.flow.dataset import Dataset
+from weave.dataset.dataset import Dataset
 from weave.evaluation.eval import EvaluationResults
 from weave.integrations.notdiamond.util import get_model_evals
 
