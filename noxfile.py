@@ -20,6 +20,7 @@ PY39_INCOMPATIBLE_SHARDS = [
     "smolagents",
     "dspy",
     "autogen_tests",
+    "langchain"
 ]
 NUM_TRACE_SERVER_SHARDS = 4
 

@@ -426,9 +426,7 @@ def generate_routes(
     ) -> tsi.ActionsExecuteBatchRes:
         return service.trace_server_interface.actions_execute_batch(req)
 
-    @router.post(
-        "/completions/create", tags=[COMPLETIONS_TAG_NAME], include_in_schema=False
-    )
+    @router.post("/completions/create", tags=[COMPLETIONS_TAG_NAME])
     def completions_create(
         req: tsi.CompletionsCreateReq,
         service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
@@ -438,7 +436,6 @@ def generate_routes(
     @router.post(
         "/completions/create_stream",
         tags=[COMPLETIONS_TAG_NAME],
-        include_in_schema=False,
         response_class=StreamingResponse,
         responses={
             200: {
