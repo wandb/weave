@@ -24,10 +24,7 @@ class KafkaProducer(ConfluentKafkaProducer):
     """
 
     @classmethod
-    def from_env(
-        cls, 
-        additional_kafka_config: Optional[dict[str, Any]] = None
-    ) -> Self:
+    def from_env(cls, additional_kafka_config: Optional[dict[str, Any]] = None) -> Self:
         if additional_kafka_config is None:
             additional_kafka_config = {}
 
@@ -61,6 +58,7 @@ class KafkaConsumer(ConfluentKafkaConsumer):
         group_id (str): The group ID for the consumer.
         additional_kafka_config (Optional[dict[str, Any]]): Additional Kafka configuration to pass to the consumer.
     """
+
     @classmethod
     def from_env(
         cls, group_id: str, additional_kafka_config: Optional[dict[str, Any]] = None
