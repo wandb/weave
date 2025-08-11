@@ -219,7 +219,7 @@ def format_feedback_to_row(
     Examples:
         >>> req = FeedbackCreateReq(project_id="test", feedback_type="custom", payload={"key": "value"})
         >>> processed_payload = {"key": "value"}
-        >>> row = create_feedback_row(req, processed_payload)
+        >>> row = format_feedback_to_row(req, processed_payload)
         >>> assert row["project_id"] == "test"
     """
     feedback_id = feedback_req.id or generate_id()
