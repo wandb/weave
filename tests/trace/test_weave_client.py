@@ -1512,6 +1512,70 @@ def test_table_partitioning(network_proxy_client):
     )
 
 
+def test_table_partitioning_stainless(stainless_network_proxy_client):
+    """
+    This test is specifically testing the correctness
+    of the table partitioning logic in the remote client.
+    In particular, the ability to partition large dataset
+    creation into multiple updates
+    """
+    client, remote_client, records = stainless_network_proxy_client
+    num_rows = 16
+    rows = list(row_gen(num_rows, 1024))
+    exp_digest = "15696550bde28f9231173a085ce107c823e7eab6744a97adaa7da55bc9c93347"
+    row_digests = [
+        "2df5YAp2sqlYyxEpTKsIrUlf9Kc5ZxEkbqtqUnYOLhk",
+        "DMjRIeuM76SCqXqsqehYyfL3KYV5fL0DBr6g4RJ4izA",
+        "f949WksZQdTgf5Ac3cXS5cMuGf0otLvpULOfOsAGiYs",
+        "YaFBweA0HU7w51Sdt8X4uhSmjk7N4WqSfuknmBRpWcc",
+        "BBzLkGZ6fFraXdoFOSjj7p2d1qSiyMXjRnk7Zas2FEA",
+        "i6i1XJ7QecqWkB8MdljoWu35tpjwk8npzFAd67aisB4",
+        "IsjSZ4usQrHUcu0cNtKedBlUWrIW1f4cSDck1lGCSMw",
+        "MkL0DTiDMCW3agkcIeZ5g5VP0MyFuQcVpa1yqGGVZwk",
+        "Vu6S8c4XdXgWNYaAXKqsxuicY6XbYDKLIUkd2M0YPF8",
+        "IkIjQFARp0Qny3AUav18zZuzY4INFXsREPkS3iFCrWo",
+        "E3T6ngUGSpXY9u2l58sb9smleJ7GO2YlYJY0tq2oV5U",
+        "uNmcjBhJyiC6qvJZ0JRlGLpRm68ARrXVYlBgjGRqRdA",
+        "0bzwVP0JFd7Y2W9YmpPUv62aAkyY2RCaFVxMnEfjIqY",
+        "3bZG40U188x6bVfm9aQX2xvYVqlCftD82O4UsDZtRVU",
+        "KW40nfHplo7BDJux0kP8PeYQ95lnOEGaeYfgNtsQ1oE",
+        "u10rDrPoYXl58eQStkQP4dPH6KfmE7I88f0FYI7L9fg",
+    ]
+    remote_client.remote_request_bytes_limit = (
+        100 * 1024
+    )  # very large buffer to ensure a single request
+    res = remote_client.table_create(
+        tsi.TableCreateReq(
+            table=tsi.TableSchemaForInsert(
+                project_id=client._project_id(),
+                rows=rows,
+            )
+        )
+    )
+    assert res.digest == exp_digest
+    assert res.row_digests == row_digests
+    assert len(records) == 1
+
+    remote_client.remote_request_bytes_limit = (
+        4 * 1024
+    )  # Small enough to get multiple updates
+    res = remote_client.table_create(
+        tsi.TableCreateReq(
+            table=tsi.TableSchemaForInsert(
+                project_id=client._project_id(),
+                rows=rows,
+            )
+        )
+    )
+    assert res.digest == exp_digest
+    assert res.row_digests == row_digests
+    assert len(records) == (
+        1  # The first create call,
+        + 1  # the second  create
+        + num_rows / 2  # updates - 2 per batch
+    )
+
+
 def test_summary_tokens_cost(client):
     if client_is_sqlite(client):
         # SQLite does not support costs
