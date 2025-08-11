@@ -1,5 +1,5 @@
 import socket
-from typing import Any, Optional, Self
+from typing import Any, Optional
 
 from confluent_kafka import Consumer as ConfluentKafkaConsumer
 from confluent_kafka import Producer as ConfluentKafkaProducer
@@ -24,7 +24,7 @@ class KafkaProducer(ConfluentKafkaProducer):
     """
 
     @classmethod
-    def from_env(cls, additional_kafka_config: Optional[dict[str, Any]] = None) -> Self:
+    def from_env(cls, additional_kafka_config: Optional[dict[str, Any]] = None) -> "KafkaProducer":
         if additional_kafka_config is None:
             additional_kafka_config = {}
 
@@ -62,7 +62,7 @@ class KafkaConsumer(ConfluentKafkaConsumer):
     @classmethod
     def from_env(
         cls, group_id: str, additional_kafka_config: Optional[dict[str, Any]] = None
-    ) -> Self:
+    ) -> "KafkaConsumer":
         if additional_kafka_config is None:
             additional_kafka_config = {}
 
