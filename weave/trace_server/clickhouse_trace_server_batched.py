@@ -85,6 +85,7 @@ from weave.trace_server.errors import (
 )
 from weave.trace_server.feedback import (
     TABLE_FEEDBACK,
+    format_feedback_to_row,
     process_feedback_payload,
     validate_feedback_create_req,
     validate_feedback_purge_req,
@@ -1788,68 +1789,39 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         assert_non_null_wb_user_id(req)
         validate_feedback_create_req(req, self)
 
-        processed_payload, res_payload = process_feedback_payload(req)
-        feedback_id = req.id or generate_id()
-        created_at = datetime.datetime.now(ZoneInfo("UTC"))
-        # TODO: Any validation on weave_ref?
-        row: Row = {
-            "id": feedback_id,
-            "project_id": req.project_id,
-            "weave_ref": req.weave_ref,
-            "wb_user_id": req.wb_user_id,
-            "creator": req.creator,
-            "feedback_type": req.feedback_type,
-            "payload": processed_payload,
-            "created_at": created_at,
-            "annotation_ref": req.annotation_ref,
-            "runnable_ref": req.runnable_ref,
-            "call_ref": req.call_ref,
-            "trigger_ref": req.trigger_ref,
-        }
+        processed_payload = process_feedback_payload(req)
+        row = format_feedback_to_row(req, processed_payload)
         prepared = TABLE_FEEDBACK.insert(row).prepare(database_type="clickhouse")
         self._insert(TABLE_FEEDBACK.name, prepared.data, prepared.column_names)
+
         return tsi.FeedbackCreateRes(
-            id=feedback_id,
-            created_at=created_at,
+            id=row["id"],
+            created_at=row["created_at"],
             wb_user_id=req.wb_user_id,
-            payload=res_payload,
+            payload=req.payload,
         )
 
     def feedback_create_batch(
         self, req: tsi.FeedbackCreateBatchReq
     ) -> tsi.FeedbackCreateBatchRes:
         """Create multiple feedback items in a batch efficiently."""
-        results = []
         rows_to_insert = []
+        results = []
 
         for feedback_req in req.batch:
             assert_non_null_wb_user_id(feedback_req)
             validate_feedback_create_req(feedback_req, self)
 
-            processed_payload, res_payload = process_feedback_payload(feedback_req)
-            feedback_id = feedback_req.id or generate_id()
-            created_at = datetime.datetime.now(ZoneInfo("UTC"))
-            row: Row = {
-                "id": feedback_id,
-                "project_id": feedback_req.project_id,
-                "weave_ref": feedback_req.weave_ref,
-                "wb_user_id": feedback_req.wb_user_id,
-                "creator": feedback_req.creator,
-                "feedback_type": feedback_req.feedback_type,
-                "payload": processed_payload,
-                "created_at": created_at,
-                "annotation_ref": feedback_req.annotation_ref,
-                "runnable_ref": feedback_req.runnable_ref,
-                "call_ref": feedback_req.call_ref,
-                "trigger_ref": feedback_req.trigger_ref,
-            }
+            processed_payload = process_feedback_payload(feedback_req)
+            row = format_feedback_to_row(feedback_req, processed_payload)
             rows_to_insert.append(row)
+
             results.append(
                 tsi.FeedbackCreateRes(
-                    id=feedback_id,
-                    created_at=created_at,
+                    id=feedback_req.id,
+                    created_at=feedback_req.created_at,
                     wb_user_id=feedback_req.wb_user_id,
-                    payload=res_payload,
+                    payload=processed_payload,
                 )
             )
 

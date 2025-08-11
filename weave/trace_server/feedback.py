@@ -1,5 +1,7 @@
+import datetime
 import json
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import emoji
 from pydantic import ValidationError
@@ -9,6 +11,7 @@ from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.emoji_util import detone_emojis
 from weave.trace_server.errors import InvalidRequest
+from weave.trace_server.ids import generate_id
 from weave.trace_server.interface.builtin_object_classes.annotation_spec import (
     AnnotationSpec,
 )
@@ -21,7 +24,7 @@ from weave.trace_server.interface.feedback_types import (
     feedback_type_is_annotation,
     feedback_type_is_runnable,
 )
-from weave.trace_server.orm import Column, Table
+from weave.trace_server.orm import Column, Row, Table
 from weave.trace_server.refs_internal_server_util import ensure_ref_is_valid
 from weave.trace_server.validation import (
     validate_purge_req_multiple,
@@ -49,27 +52,21 @@ TABLE_FEEDBACK = Table(
 
 def process_feedback_payload(
     feedback_req: tsi.FeedbackCreateReq,
-) -> tuple[dict[str, Any], dict[str, Any]]:
+) -> dict[str, Any]:
     """
-    Process feedback payload and return both the processed payload and response payload.
+    Process feedback payload and return the processed payload.
 
     Args:
         feedback_req: The feedback create request.
 
     Returns:
-        tuple: (processed_payload, response_payload)
-
-    Raises:
-        InvalidRequest: If payload is too large or emoji validation fails.
+        dict[str, Any]: The processed payload.
 
     Examples:
         >>> req = FeedbackCreateReq(project_id="test", feedback_type="custom", payload={"key": "value"})
-        >>> processed, response = process_feedback_payload(req)
+        >>> processed = process_feedback_payload(req)
         >>> assert processed == {"key": "value"}
-        >>> assert response == {}
     """
-    # Augment emoji with alias.
-    res_payload = {}
     processed_payload = feedback_req.payload.copy()
 
     if feedback_req.feedback_type == "wandb.reaction.1":
@@ -82,14 +79,13 @@ def process_feedback_payload(
         detoned = detone_emojis(em)
         processed_payload["detoned"] = detoned
         processed_payload["detoned_alias"] = emoji.demojize(detoned)
-        res_payload = processed_payload
 
     # Validate payload size
     payload = json.dumps(processed_payload)
     if len(payload) > ch_settings.CLICKHOUSE_MAX_FEEDBACK_PAYLOAD_SIZE:
         raise InvalidRequest("Feedback payload too large")
 
-    return processed_payload, res_payload
+    return processed_payload
 
 
 def validate_feedback_create_req(
@@ -204,3 +200,60 @@ def validate_feedback_purge_req(req: tsi.FeedbackPurgeReq) -> None:
         validate_purge_req_multiple(expr["or_"], MESSAGE_INVALID_FEEDBACK_PURGE)
     else:
         raise InvalidRequest(MESSAGE_INVALID_FEEDBACK_PURGE)
+
+
+def format_feedback_to_row(
+    feedback_req: tsi.FeedbackCreateReq,
+    processed_payload: dict[str, Any],
+) -> Row:
+    """
+    Create a feedback row from a feedback request and processed payload.
+
+    Args:
+        feedback_req: The feedback create request.
+        processed_payload: The processed payload from process_feedback_payload.
+
+    Returns:
+        Row: The feedback row ready for insertion.
+
+    Examples:
+        >>> req = FeedbackCreateReq(project_id="test", feedback_type="custom", payload={"key": "value"})
+        >>> processed_payload = {"key": "value"}
+        >>> row = create_feedback_row(req, processed_payload)
+        >>> assert row["project_id"] == "test"
+    """
+    feedback_id = feedback_req.id or generate_id()
+    created_at = datetime.datetime.now(ZoneInfo("UTC"))
+
+    return {
+        "id": feedback_id,
+        "project_id": feedback_req.project_id,
+        "weave_ref": feedback_req.weave_ref,
+        "wb_user_id": feedback_req.wb_user_id,
+        "creator": feedback_req.creator,
+        "feedback_type": feedback_req.feedback_type,
+        "payload": processed_payload,
+        "created_at": created_at,
+        "annotation_ref": feedback_req.annotation_ref,
+        "runnable_ref": feedback_req.runnable_ref,
+        "call_ref": feedback_req.call_ref,
+        "trigger_ref": feedback_req.trigger_ref,
+    }
+
+
+def format_feedback_to_res(row: Row) -> tsi.FeedbackCreateRes:
+    assert row["id"] is not None
+    assert isinstance(row["id"], str)
+    assert row["wb_user_id"] is not None
+    assert isinstance(row["wb_user_id"], str)
+    assert row["created_at"] is not None
+    assert isinstance(row["created_at"], datetime.datetime)
+    assert row["payload"] is not None
+    assert isinstance(row["payload"], dict)
+
+    return tsi.FeedbackCreateRes(
+        id=row["id"],
+        created_at=row["created_at"],
+        wb_user_id=row["wb_user_id"],
+        payload=row["payload"],
+    )
