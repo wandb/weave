@@ -243,7 +243,6 @@ path = "weave/version.py"
 include = ["weave"]
 exclude = [
   "weave_query",
-  "weave-js",
   "examples",
   "tests",
   "docs",
