@@ -106,14 +106,14 @@ anthropic = ["anthropic>=0.18.0"]
 cerebras = ["cerebras-cloud-sdk"]
 cohere = ["cohere>=5.9.1,<5.9.3"]
 # Pin until https://github.com/crewAIInc/crewAI/pull/2553 is released
-crewai = ["crewai>=0.100.1,<=0.108.0", "crewai-tools>=0.38.0"]
-dspy = ["dspy>=2.6.27"]
+crewai = ["crewai>=0.100.1,<=0.108.0", "crewai-tools>=0.38.0", "openai<1.99.0"]
+dspy = ["dspy>=2.6.27", "openai<1.99.0"]
 google_ai_studio = ["google-generativeai>=0.8.3"]
 google_genai = ["google-genai>=1.0.0,<=1.23.0", "pillow>=11.1.0"]
 groq = ["groq>=0.13.0"]
 huggingface = ["huggingface-hub>=0.28.1"]
 smolagents = [
-  "openai>=1.0.0",
+  "openai>=1.0.0,<1.99.0",
   "litellm>=1.58",
   "smolagents>=1.17.0,<1.19.0",
   "huggingface-hub>=0.28.1",
@@ -123,6 +123,7 @@ instructor = [
   "instructor>=1.4.3,<1.7.0; python_version <= '3.9'",
   "instructor>=1.4.3; python_version > '3.9'",
   "google-genai>=1.5.0",
+  "openai<1.99.0",
 ]
 langchain = [
   "langchain-core>=0.2.1",
@@ -131,6 +132,8 @@ langchain = [
   "langchain-google-vertexai>=2.0.24",
   "langchain-google-genai>=2.1.5",
   "langchain-anthropic>=0.3.15",
+  "langchain-cohere>=0.4.5",
+  "langchain-litellm>=0.2.2",
   "chromadb>=0.5.0",
   "pysqlite3",
   "opentelemetry-exporter-otlp",
@@ -140,9 +143,13 @@ langchain_nvidia_ai_endpoints = [
   "langchain-core>=0.2.1",
   "langchain-nvidia-ai-endpoints",
 ]
-litellm = ["litellm>=1.36.1"]
+litellm = ["litellm>=1.36.1", "openai<1.99"]
 # temporary max pin b/c 0.12.50 changes call structure and therefor tests
-llamaindex = ["llama-index>=0.10.35,<0.12.50", "llama-index-core<0.12.50", "openai<1.92.0"]
+llamaindex = [
+  "llama-index>=0.10.35,<0.12.50",
+  "llama-index-core<0.12.50",
+  "openai<1.92.0",
+]
 mistral = ["mistralai>=1.0.0"]
 scorers = [
   "numpy>1.21.0",
@@ -156,7 +163,7 @@ scorers = [
   "pip>=20.0",                    # this is needed for presidio-analyzer to pull the spacy models
   "presidio-analyzer>=2.2.0",
   "presidio-anonymizer>=2.2.0",
-  "huggingface_hub>=0.28.1"
+  "huggingface_hub>=0.28.1",
 ]
 notdiamond = ["notdiamond>=0.3.21", "litellm<=1.49.1"]
 openai = ["openai>=1.0.0,<1.92.0"]
@@ -169,7 +176,11 @@ vertexai = ["vertexai>=1.70.0", "shapely<=2.0.6"] # shapely is busted on 2.0.7
 bedrock = ["boto3", "moto[bedrock]>=5.0.24"]
 verdict = ["verdict>=0.2.3"]
 autogen = ["autogen-agentchat>=0.5.7"]
-autogen_tests = ["autogen-agentchat>=0.5.7", "autogen-ext[openai]>=0.5.7"]
+autogen_tests = [
+  "autogen-agentchat>=0.5.7",
+  "autogen-ext[openai]>=0.5.7",
+  "openai<1.99",
+]
 
 test = [
   "nox",
@@ -232,7 +243,6 @@ path = "weave/version.py"
 include = ["weave"]
 exclude = [
   "weave_query",
-  "weave-js",
   "examples",
   "tests",
   "docs",
