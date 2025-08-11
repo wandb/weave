@@ -1,5 +1,5 @@
 import socket
-from typing import Any, Optional
+from typing import Any, Optional, Self
 
 from confluent_kafka import Consumer as ConfluentKafkaConsumer
 from confluent_kafka import Producer as ConfluentKafkaProducer
@@ -16,19 +16,27 @@ CALL_ENDED_TOPIC = "weave.call_ended"
 
 
 class KafkaProducer(ConfluentKafkaProducer):
+    """
+    Kafka producer for sending messages to the Kafka broker.
+
+    Args:
+        additional_kafka_config (Optional[dict[str, Any]]): Additional Kafka configuration to pass to the producer.
+    """
+
     @classmethod
     def from_env(
-        cls, additional_config: Optional[dict[str, Any]] = None
-    ) -> "KafkaProducer":
-        if additional_config is None:
-            additional_config = {}
+        cls, 
+        additional_kafka_config: Optional[dict[str, Any]] = None
+    ) -> Self:
+        if additional_kafka_config is None:
+            additional_kafka_config = {}
 
         config = {
             "bootstrap.servers": _make_broker_host(),
             "client.id": socket.gethostname(),
             "message.timeout.ms": 500,
             **_make_auth_config(),
-            **additional_config,
+            **additional_kafka_config,
         }
 
         return cls(config)
@@ -46,12 +54,19 @@ class KafkaProducer(ConfluentKafkaProducer):
 
 
 class KafkaConsumer(ConfluentKafkaConsumer):
+    """
+    Kafka consumer for receiving messages from the Kafka broker.
+
+    Args:
+        group_id (str): The group ID for the consumer.
+        additional_kafka_config (Optional[dict[str, Any]]): Additional Kafka configuration to pass to the consumer.
+    """
     @classmethod
     def from_env(
-        cls, group_id: str, additional_config: Optional[dict[str, Any]] = None
-    ) -> "KafkaConsumer":
-        if additional_config is None:
-            additional_config = {}
+        cls, group_id: str, additional_kafka_config: Optional[dict[str, Any]] = None
+    ) -> Self:
+        if additional_kafka_config is None:
+            additional_kafka_config = {}
 
         config = {
             "bootstrap.servers": _make_broker_host(),
@@ -60,7 +75,7 @@ class KafkaConsumer(ConfluentKafkaConsumer):
             "auto.offset.reset": "earliest",
             "enable.auto.commit": False,
             **_make_auth_config(),
-            **additional_config,
+            **additional_kafka_config,
         }
 
         return cls(config)
