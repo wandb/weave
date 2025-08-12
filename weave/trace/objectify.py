@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Protocol, TypeVar, runtime_checkable
 from weave.trace.ref_util import set_ref
 
 if TYPE_CHECKING:
-    from weave.flow.obj import Object
+    from weave.object.obj import Object
     from weave.trace.vals import WeaveObject
 
 T_co = TypeVar("T_co", bound="Object", covariant=True)

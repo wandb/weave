@@ -1798,7 +1798,7 @@ class WeaveClient:
                 return
             remove_ref(obj)
         # Must defer import here to avoid circular import
-        from weave.flow.obj import Object
+        from weave.object.obj import Object
 
         # Case 1: Object:
         # Here we recurse into each of the properties of the object
