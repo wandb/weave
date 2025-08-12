@@ -6,8 +6,8 @@ from weave.trace.api import *
 __version__ = version.VERSION
 
 
-from weave.flow.agent import Agent as Agent
-from weave.flow.agent import AgentState as AgentState
+from weave.agent.agent import Agent as Agent
+from weave.agent.agent import AgentState as AgentState
 from weave.flow.annotation_spec import AnnotationSpec
 from weave.dataset.dataset import Dataset
 from weave.evaluation.eval import Evaluation

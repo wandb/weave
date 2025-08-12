@@ -5,9 +5,9 @@ import openai
 from rich.console import Console
 
 import weave
-from weave.flow.agent import Agent, AgentState
+from weave.agent.agent import Agent, AgentState
 from weave.flow.chat_util import OpenAIStream
-from weave.flow.console import LogEvents
+from weave.agent.console import LogEvents
 from weave.flow.obj import Object
 
 TEACHER_MESSAGE = """Assistant is a teacher.

@@ -2,10 +2,10 @@ import inspect
 import json
 from typing import TYPE_CHECKING, Callable, get_type_hints
 
-from weave.flow.console import LogEvents
+from weave.agent.console import LogEvents
 
 if TYPE_CHECKING:
-    from openai.types.chat import ChatCompletionMessageToolCall, ChatCompletionToolParam
+    pass
 
 
 def generate_json_schema(func: Callable) -> dict:
