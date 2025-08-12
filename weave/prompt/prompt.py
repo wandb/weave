@@ -17,7 +17,7 @@ from weave.trace.api import publish as weave_publish
 from weave.trace.objectify import register_object
 from weave.trace.op import op
 from weave.trace.refs import ObjectRef
-from weave.trace.rich import pydantic_util
+from weave.trace.display.rich import pydantic_util
 from weave.trace.vals import WeaveObject
 
 

@@ -13,7 +13,7 @@ from rich.console import Console
 from rich.table import Table
 
 from weave.trace import util
-from weave.trace.rich import pydantic_util
+from weave.trace.display.rich import pydantic_util
 
 if TYPE_CHECKING:
     import pandas as pd
