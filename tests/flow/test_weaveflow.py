@@ -4,7 +4,7 @@ import numpy as np
 from pydantic import Field
 
 import weave
-from weave.flow.obj import deprecated_field
+from weave.object.obj import deprecated_field
 
 
 def test_weaveflow_op_wandb(client):

@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from typing_extensions import Self
 
 import weave
-from weave.flow.obj import Object
+from weave.object.obj import Object
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import Op, OpCallError, as_op, is_op
 from weave.trace.op_caller import async_call_op

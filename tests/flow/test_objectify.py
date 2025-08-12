@@ -5,7 +5,7 @@ from typing import TypeVar
 import pytest
 
 import weave
-from weave.flow.obj import Object
+from weave.object.obj import Object
 from weave.prompt.prompt import EasyPrompt
 from weave.trace.objectify import register_object
 from weave.trace.refs import RefWithExtra
