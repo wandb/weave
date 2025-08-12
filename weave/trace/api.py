@@ -26,7 +26,7 @@ from weave.trace.settings import (
     should_disable_weave,
 )
 from weave.trace.table import Table
-from weave.trace.term import configure_logger
+from weave.trace.display.term import configure_logger
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface.builtin_object_classes import leaderboard
 
