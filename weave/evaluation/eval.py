@@ -13,7 +13,7 @@ from typing_extensions import Self
 import weave
 from weave.flow import util
 from weave.flow.casting import DatasetLike, ScorerLike
-from weave.flow.dataset import Dataset
+from weave.dataset.dataset import Dataset
 from weave.flow.model import (
     ApplyModelError,
     Model,

@@ -6,7 +6,7 @@ import pytest
 import yaml
 
 import weave
-from weave.flow.eval import EvaluationResults
+from weave.evaluation.eval import EvaluationResults
 from weave.integrations.notdiamond.custom_router import evaluate_router, train_router
 from weave.integrations.notdiamond.util import get_model_evals
 from weave.trace.weave_client import WeaveClient
