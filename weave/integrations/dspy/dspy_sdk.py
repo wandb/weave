@@ -5,7 +5,7 @@ import threading
 from collections.abc import Sequence
 from typing import Any
 
-from weave.flow.eval_imperative import EvaluationLogger
+from weave.evaluation.eval_imperative import EvaluationLogger
 from weave.integrations.dspy.dspy_utils import get_symbol_patcher
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, Patcher
 from weave.trace.autopatch import IntegrationSettings
