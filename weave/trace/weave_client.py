@@ -1142,7 +1142,7 @@ class WeaveClient:
         def send_start_call() -> bool:
             maybe_redacted_inputs_with_refs = inputs_with_refs
             if should_redact_pii():
-                from weave.trace.pii_redaction import redact_pii
+                from weave.utils.pii_redaction import redact_pii
 
                 maybe_redacted_inputs_with_refs = redact_pii(inputs_with_refs)
 
@@ -1304,7 +1304,7 @@ class WeaveClient:
         def send_end_call() -> None:
             maybe_redacted_output_as_refs = output_as_refs
             if should_redact_pii():
-                from weave.trace.pii_redaction import redact_pii
+                from weave.utils.pii_redaction import redact_pii
 
                 maybe_redacted_output_as_refs = redact_pii(output_as_refs)
 
