@@ -7,10 +7,15 @@ from concurrent.futures import ThreadPoolExecutor as _ThreadPoolExecutor
 from contextvars import Context, copy_context
 from functools import partial, wraps
 from threading import Thread as _Thread
-from typing import Any, Callable
+from typing import Any, Callable, TypeGuard, TypeVar
+
+from weave.trace.object_record import ObjectRecord
+from weave.trace.vals import WeaveObject
 
 LOG_ONCE_MESSAGE_SUFFIX = " (subsequent messages of this type will be suppressed)"
 logged_messages = []
+
+C = TypeVar("C")
 
 
 def log_once(log_method: Callable[[str], None], message: str) -> None:
@@ -179,3 +184,19 @@ ThreadPoolExecutor = ContextAwareThreadPoolExecutor
 Thread = ContextAwareThread
 
 __docspec__ = [ThreadPoolExecutor, Thread]
+
+
+def weave_isinstance(obj: Any, cls: type[C] | tuple[type[C], ...]) -> TypeGuard[C]:
+    if isinstance(cls, tuple):
+        return any(weave_isinstance(obj, c) for c in cls)
+    if isinstance(obj, cls):  # type: ignore
+        return True
+    if isinstance(obj, ObjectRecord):
+        return obj._class_name == cls.__name__ or any(
+            b == cls.__name__ for b in obj._bases
+        )
+    if isinstance(obj, WeaveObject):
+        return obj._class_name == cls.__name__ or any(
+            b == cls.__name__ for b in obj._bases
+        )
+    return False
