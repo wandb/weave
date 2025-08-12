@@ -22,7 +22,7 @@ from weave import version
 from weave.chat.chat import Chat
 from weave.chat.inference_models import InferenceModels
 from weave.trace import urls
-from weave.trace.telemetry import trace_sentry
+from weave.telemetry import trace_sentry
 from weave.trace.casting import CallsFilterLike, QueryLike, SortByLike
 from weave.trace.concurrent.futures import FutureExecutor
 from weave.trace.context import call_context
