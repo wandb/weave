@@ -4,7 +4,7 @@ import pytest
 
 import weave
 from weave.flow.casting import cast_to_dataset, cast_to_scorer
-from weave.trace.op import is_op
+from weave.trace.op.op import is_op
 
 
 @pytest.fixture

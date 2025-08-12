@@ -4,7 +4,7 @@ import pytest
 
 import weave
 from weave.flow.scorer import ApplyScorerResult, WeaveScorerResult
-from weave.trace.op import OpCallError
+from weave.trace.op.op import OpCallError
 from weave.trace.refs import CallRef
 from weave.trace.weave_client import Call, Op, WeaveClient
 

@@ -3,8 +3,7 @@ import inspect
 from collections.abc import Coroutine
 from typing import Any, Callable, Union
 
-from weave.trace.op import Op, as_op, is_op
-from weave.trace.weave_client import Call
+from weave.trace.op.op import Op, as_op, is_op
 
 
 def async_call(func: Union[Callable, Op], *args: Any, **kwargs: Any) -> Coroutine:

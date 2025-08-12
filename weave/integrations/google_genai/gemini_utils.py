@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Any, Callable, Optional
 
 import weave
 from weave.trace.autopatch import OpSettings
-from weave.trace.op import _add_accumulator
+from weave.trace.op.op import _add_accumulator
 from weave.trace.serialization.serialize import dictify
 from weave.trace.weave_client import Call
 

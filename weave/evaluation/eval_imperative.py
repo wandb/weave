@@ -28,7 +28,7 @@ from weave.flow.scorer import auto_summarize as auto_summarize_fn
 from weave.flow.util import make_memorable_name
 from weave.trace.context import call_context
 from weave.trace.context.weave_client_context import require_weave_client
-from weave.trace.op import Op
+from weave.trace.op.op import Op
 from weave.trace.weave_client import Call
 
 T = TypeVar("T")

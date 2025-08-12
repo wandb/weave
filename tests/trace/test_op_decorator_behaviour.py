@@ -4,7 +4,7 @@ from typing import Any, Optional, get_type_hints
 import pytest
 
 import weave
-from weave.trace.op import OpCallError, is_op, op
+from weave.trace.op.op import OpCallError, is_op, op
 from weave.trace.refs import ObjectRef, parse_uri
 from weave.trace.vals import MissingSelfInstanceError
 from weave.trace.weave_client import Call

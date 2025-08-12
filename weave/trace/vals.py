@@ -17,7 +17,7 @@ from weave.trace.context.weave_client_context import (
     require_weave_client,
 )
 from weave.trace.object_record import ObjectRecord
-from weave.trace.op import is_op, maybe_bind_method
+from weave.trace.op.op import is_op, maybe_bind_method
 from weave.trace.refs import (
     DICT_KEY_EDGE_NAME,
     LIST_INDEX_EDGE_NAME,

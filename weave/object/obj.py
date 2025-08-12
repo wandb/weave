@@ -13,7 +13,7 @@ from typing_extensions import Self
 
 from weave.trace import api
 from weave.trace.objectify import Objectifyable
-from weave.trace.op import ObjectRef, Op
+from weave.trace.op.op import ObjectRef, Op
 from weave.trace.ref_util import get_ref
 from weave.trace.vals import WeaveObject, pydantic_getattribute
 

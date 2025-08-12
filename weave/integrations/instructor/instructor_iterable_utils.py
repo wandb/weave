@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 import weave
 from weave.trace.autopatch import OpSettings
-from weave.trace.op import _add_accumulator
+from weave.trace.op.op import _add_accumulator
 
 
 def instructor_iterable_accumulator(

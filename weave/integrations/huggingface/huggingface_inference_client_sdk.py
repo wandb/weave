@@ -5,14 +5,11 @@ from typing import TYPE_CHECKING, Any, Callable, Optional, Union
 import weave
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
-from weave.trace.op import _add_accumulator
+from weave.trace.op.op import _add_accumulator
 from weave.trace.serialization.serialize import dictify
 
 if TYPE_CHECKING:
-    from huggingface_hub.inference._generated.types.chat_completion import (
-        ChatCompletionOutput,
-        ChatCompletionStreamOutput,
-    )
+    pass
 
 _huggingface_patcher: Optional[MultiPatcher] = None
 
