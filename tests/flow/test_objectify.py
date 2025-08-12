@@ -6,7 +6,7 @@ import pytest
 
 import weave
 from weave.flow.obj import Object
-from weave.flow.prompt.prompt import EasyPrompt
+from weave.prompt.prompt import EasyPrompt
 from weave.trace.objectify import register_object
 from weave.trace.refs import RefWithExtra
 from weave.trace_server.trace_server_interface import ObjectVersionFilter, ObjQueryReq
