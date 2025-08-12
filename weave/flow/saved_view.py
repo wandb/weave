@@ -12,7 +12,7 @@ from weave.trace.api import ref as weave_ref
 from weave.trace.context import weave_client_context
 from weave.trace.display.grid import Grid
 from weave.trace.refs import ObjectRef, parse_op_uri
-from weave.trace.rich import pydantic_util
+from weave.trace.display.rich import pydantic_util
 from weave.trace.traverse import ObjectPath, get_paths
 from weave.trace.vals import WeaveObject
 from weave.trace.weave_client import CallsIter
