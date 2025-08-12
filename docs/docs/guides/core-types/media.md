@@ -3,7 +3,184 @@ import TabItem from '@theme/TabItem';
 
 # Logging media
 
-W&B Weave supports logging and displaying video, images, and audio.
+Weave supports logging and displaying video, images, audio, PDFs, and CSVs.
+
+## Content API
+
+The Content API is a modern way of handling any data as media objects in Weave. Instead of using specific modules and classes like `PIL.Image` or `moviepy.VideoFileClip`, you can simply import Content from Weave to process base64 data, file paths, raw bytes, or text.
+
+For media with pre-existing support in Weave (such as MP3, MP4, or PNG files), your data will display identically in the web app regardless of which API you use. For certain large file types like videos, using Content provides significant performance improvements.
+
+Additionally, Content introduces special handlers in the web app for media types that don't have legacy API handlers, such as PDF and HTML files.
+
+### Usage
+
+There are two primary ways to use the Content API: type annotations and direct initialization.
+
+Type annotations are usually more ergonomic and automatically detect the proper constructor to use, while direct initialization provides more fine-grained control and lets you take advantage of runtime features of the Content API in your code.
+
+<Tabs groupId="programming-language" queryString>
+  <TabItem value="python" label="Python" default>
+
+    ### Type Annotations
+
+    The Weave Content API is designed to primarily be used through type annotations. Annotations have no runtime side-effects on your code but signal to Weave that traced inputs and outputs should be processed and stored as Content blobs.
+
+    ```python
+    import weave
+    from weave import Content
+    from pathlib import Path
+    from typing import Annotated
+
+    @weave.op
+    def content_annotation(path: Annotated[str, Content]) -> Annotated[bytes, Content]:
+        data = Path(path).read_bytes()
+        return data
+
+    # Both input and output will show up as an MP4 file in Weave
+    # Input is a string and return value is bytes
+    bytes_data = content_annotation('./path/to/your/file.mp4')
+    ```
+
+    ### Direct Initialization
+
+    If you want to take advantage of features such as:
+    - Opening a file with a default application (such as a PDF viewer)
+    - Dumping the model to JSON to upload to your own blob storage (such as S3)
+    - Passing custom metadata to associate with the Content blob (such as the model used to generate it)
+
+    You can initialize content directly from your target type using one of the following methods:
+    - `Content.from_path` - Create from a file path
+    - `Content.from_bytes` - Create from raw bytes
+    - `Content.from_text` - Create from text string
+    - `Content.from_base64` - Create from base64-encoded data
+
+    ```python
+    import weave
+    from weave import Content
+
+    @weave.op
+    def content_initialization(path: str) -> Content:
+        return Content.from_path(path)
+
+    # Input shows up as path string and output as PDF file in Weave
+    content = content_initialization('./path/to/your/file.pdf')
+
+    content.open()  # Opens the file in your PDF viewer
+    content.model_dump()  # Dumps the model attributes to JSON
+    ```
+
+    ### Custom Mimetypes
+
+    The `polyfile-weave` library can detect most binary mimetypes, but custom mimetypes and text documents such as markdown may not be automatically detected.
+
+    #### Custom Mimetypes with Type Annotations
+
+    To manually specify the mimetype or extension of your file from a type annotation, you can pass it as a type parameter to Content:
+
+    ```python
+    import weave
+    from weave import Content
+    from pathlib import Path
+    from typing import Annotated, Literal
+
+    @weave.op
+    def markdown_content(
+        path: Annotated[str, Content[Literal['md']]]
+    ) -> Annotated[str, Content[Literal['text/markdown']]]:
+        return Path(path).read_text()
+
+    markdown_content('path/to/your/document.md')
+    ```
+
+    #### Custom Mimetypes with Direct Initialization
+
+    ```python
+    video_bytes = Path('/path/to/video.mp4').read_bytes()
+
+    # Pass an extension such as 'mp4' or '.mp4' to the extension parameter
+    # (not available for `from_path`)
+    content = Content.from_bytes(video_bytes, extension='.mp4')
+
+    # Pass a mimetype such as 'video/mp4' to the mimetype parameter
+    content = Content.from_bytes(video_bytes, mimetype='video/mp4')
+    ```
+
+    ### Properties
+
+    | Property    | Type             | Description                             |
+    | ----------- | ---------------- | --------------------------------------- |
+    | `data`      | `bytes`          | Raw binary content                      |
+    | `metadata`  | `dict[str, Any]` | Custom metadata dictionary              |
+    | `size`      | `int`            | Size of content in bytes                |
+    | `filename`  | `str`            | Extracted or provided filename          |
+    | `extension` | `str`            | File extension (e.g., `"jpg"`, `"mp3"`) |
+    | `mimetype`  | `str`            | MIME type (e.g., `"image/jpeg"`)        |
+    | `path`      | `str \| None`    | Source file path, if applicable         |
+    | `digest`    | `str`            | SHA256 hash of the content              |
+
+    ### Methods
+
+    - `save(dest: str | Path) -> None`: Save content to a file
+    - `open() -> bool`: Open file using system default application (requires the content to have been saved or loaded from a path)
+    - `as_string() -> str`: Display the data as a string (bytes are decoded using the encoding attribute)
+
+    ### Creation Methods
+
+    #### `Content.from_path(path, mimetype=None, metadata=None)`
+
+    Create Content from a file path:
+
+    ```python
+    content = Content.from_path("assets/photo.jpg")
+    print(content.mimetype, content.size)
+    ```
+
+    #### `Content.from_bytes(data, extension=None, mimetype=None, metadata=None)`
+
+    Create Content from raw bytes:
+
+    ```python
+    content = Content.from_bytes(data_bytes, 
+                                  filename="audio.mp3", 
+                                  mimetype="audio/mpeg")
+    content.save("output.mp3")
+    ```
+
+    #### `Content.from_text(text, extension=None, mimetype=None, metadata=None)`
+
+    Create Content from text:
+
+    ```python
+    content = Content.from_text("Hello, World!", 
+                                mimetype="text/plain")
+    ```
+
+    #### `Content.from_base64(b64_data, extension=None, mimetype=None, metadata=None)`
+
+    Create Content from base64-encoded data:
+
+    ```python
+    content = Content.from_base64(base64_string)
+    print(content.metadata)
+    ```
+
+    ### Adding Custom Metadata
+
+    You can attach custom metadata to any Content object:
+
+    ```python
+    content = Content.from_bytes(data, 
+                                  metadata={"resolution": "1920x1080", 
+                                            "model": "dall-e-3"})
+    print(content.metadata["resolution"])
+    ```
+
+  </TabItem>
+  <TabItem value="typescript" label="TypeScript">
+  This feature is not yet available in TypeScript.
+  </TabItem>
+</Tabs>
 
 ## Video
 
