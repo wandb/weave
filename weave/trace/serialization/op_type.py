@@ -16,7 +16,7 @@ from typing import Any, Callable, TypedDict, get_args, get_origin
 
 from weave.trace import settings
 from weave.trace.context.weave_client_context import get_weave_client
-from weave.trace.ipython import (
+from weave.utils.ipython import (
     ClassNotFoundError,
     get_class_source,
     is_running_interactively,
