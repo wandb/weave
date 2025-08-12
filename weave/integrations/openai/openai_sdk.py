@@ -64,10 +64,16 @@ def openai_on_finish_post_processor(value: ChatCompletionChunk | None) -> dict |
         ChoiceDeltaToolCall,
     )
     from openai.types.chat.chat_completion_message import FunctionCall
+
+    
     from openai.types.chat.chat_completion_message_tool_call import (
         ChatCompletionMessageToolCall,
-        Function,
     )
+
+    try:
+        from openai.types.chat.chat_completion_message_tool_call import Function
+    except:
+        from openai.types.chat.chat_completion_message_function_tool_call import Function
 
     value = maybe_unwrap_api_response(value)
 
