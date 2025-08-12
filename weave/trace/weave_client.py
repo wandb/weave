@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Any, Callable, TypedDict, cast
 import pydantic
 from requests import HTTPError
 
+import weave.trace.env
 from weave import version
 from weave.chat.chat import Chat
 from weave.chat.inference_models import InferenceModels
@@ -456,7 +457,7 @@ class Call:
             entity, project = self.project_id.split("/")
         except ValueError:
             raise ValueError(f"Invalid project_id: {self.project_id}") from None
-        return urls.redirect_call(entity, project, self.id)
+        return weave.trace.env.redirect_call(entity, project, self.id)
 
     @property
     def ref(self) -> CallRef:

@@ -4,6 +4,7 @@ import logging
 from typing import TYPE_CHECKING
 
 import weave
+import weave.trace.env
 from weave.trace import urls
 from weave.utils.pypi_version_check import check_available
 
@@ -108,7 +109,7 @@ def print_init_message(
     if username is not None:
         message += f"Logged in as Weights & Biases user: {username}.\n"
     message += (
-        f"View Weave data at {urls.project_weave_root_url(entity_name, project_name)}"
+        f"View Weave data at {weave.trace.env.project_weave_root_url(entity_name, project_name)}"
     )
     # Cosmetically, if we are in `read_only` mode, we are not logging data, so
     # we should not print the message about logging data.

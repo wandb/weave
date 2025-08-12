@@ -6,6 +6,7 @@ from typing import Any, Literal, TypedDict
 from pydantic import BaseModel
 from rich.table import Table
 
+import weave.trace.env
 from weave.trace import urls
 from weave.trace.api import publish as weave_publish
 from weave.trace.api import ref as weave_ref
@@ -753,7 +754,7 @@ class SavedView:
 
         Note this is the "result" page with traces etc, not the URL for the view object."""
         if self.ref and self.entity and self.project:
-            weave_root = urls.project_weave_root_url(self.entity, self.project)
+            weave_root = weave.trace.env.project_weave_root_url(self.entity, self.project)
             return f"{weave_root}/{self.view_type}?view={self.ref.name}"
         return None
 

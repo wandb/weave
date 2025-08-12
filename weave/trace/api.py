@@ -9,6 +9,7 @@ import warnings
 from collections.abc import Iterator
 from typing import Any, Union, cast
 
+import weave.trace.env
 # TODO: type_handlers is imported here to trigger registration of the image serializer.
 # There is probably a better place for this, but including here for now to get the fix in.
 from weave import type_handlers  # noqa: F401
@@ -159,14 +160,14 @@ def publish(obj: Any, name: str | None = None) -> ObjectRef:
 
     if isinstance(ref, ObjectRef):
         if isinstance(ref, weave_client.OpRef):
-            url = urls.op_version_path(
+            url = weave.trace.env.op_version_path(
                 ref.entity,
                 ref.project,
                 ref.name,
                 ref.digest,
             )
         elif isinstance(obj, leaderboard.Leaderboard):
-            url = urls.leaderboard_path(
+            url = weave.trace.env.leaderboard_path(
                 ref.entity,
                 ref.project,
                 ref.name,
@@ -174,7 +175,7 @@ def publish(obj: Any, name: str | None = None) -> ObjectRef:
         # TODO(gst): once frontend has direct dataset/model links
         # elif isinstance(obj, weave_client.Dataset):
         else:
-            url = urls.object_version_path(
+            url = weave.trace.env.object_version_path(
                 ref.entity,
                 ref.project,
                 ref.name,
