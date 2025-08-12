@@ -21,7 +21,7 @@ from weave.trace.ipython import (
     get_class_source,
     is_running_interactively,
 )
-from weave.trace.op import Op, as_op, is_op
+from weave.trace.op.op import Op, as_op, is_op
 from weave.trace.refs import ObjectRef
 from weave.trace.sanitize import REDACTED_VALUE, should_redact
 from weave.trace.serialization import serializer

@@ -9,7 +9,7 @@ from urllib.parse import urlparse
 import weave
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
-from weave.trace.op import (
+from weave.trace.op.op import (
     Op,
     ProcessedInputs,
     _add_accumulator,

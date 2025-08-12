@@ -15,7 +15,7 @@ from weave.integrations.patcher import (
     SymbolPatcher,
 )
 from weave.trace.autopatch import IntegrationSettings, OpSettings
-from weave.trace.op import Op, ProcessedInputs, _add_accumulator
+from weave.trace.op.op import Op, ProcessedInputs, _add_accumulator
 
 from .config import get_module_patch_configs
 

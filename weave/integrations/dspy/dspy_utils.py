@@ -6,7 +6,7 @@ from pydantic import BaseModel
 import weave
 from weave.integrations.patcher import SymbolPatcher
 from weave.trace.autopatch import OpSettings
-from weave.trace.op import Op
+from weave.trace.op.op import Op
 from weave.trace.serialization.serialize import dictify
 
 if TYPE_CHECKING:

@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, Callable
 import weave
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
-from weave.trace.op import _add_accumulator
+from weave.trace.op.op import _add_accumulator
 from weave.trace.serialization.serialize import dictify
 from weave.trace.util import deprecated
 from weave.trace.weave_client import Call

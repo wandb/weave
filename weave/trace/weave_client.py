@@ -40,7 +40,7 @@ from weave.trace.object_record import (
     pydantic_object_record,
 )
 from weave.trace.objectify import maybe_objectify
-from weave.trace.op import (
+from weave.trace.op.op import (
     Op,
     as_op,
     is_op,
@@ -51,7 +51,7 @@ from weave.trace.op import (
     print_call_link,
     should_skip_tracing_for_op,
 )
-from weave.trace.op import op as op_deco
+from weave.trace.op.op import op as op_deco
 from weave.trace.ref_util import get_ref, remove_ref, set_ref
 from weave.trace.refs import (
     CallRef,
