@@ -3,7 +3,7 @@ from typing import Any, Union
 from presidio_analyzer import AnalyzerEngine
 from presidio_anonymizer import AnonymizerEngine
 
-from weave.trace.telem import trace_sentry
+from weave.trace.telemetry import trace_sentry
 from weave.trace.settings import redact_pii_fields
 
 DEFAULT_REDACTED_FIELDS = [

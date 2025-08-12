@@ -8,7 +8,7 @@ from weave.trace import (
     wandb_termlog_patch,
     weave_client,
 )
-from weave.trace.telem import trace_sentry
+from weave.trace.telemetry import trace_sentry
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.settings import should_redact_pii, use_server_cache
 from weave.trace_server.trace_server_interface import TraceServerInterface
