@@ -9,6 +9,7 @@ from weave.flow.eval_imperative import EvaluationLogger
 from weave.integrations.dspy.dspy_utils import get_symbol_patcher
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, Patcher
 from weave.trace.autopatch import IntegrationSettings
+from weave.trace.serialization.serialize import dictify
 
 _dspy_patcher: MultiPatcher | None = None
 _evaluate_patched = False
@@ -23,7 +24,6 @@ class DSPyPatcher(MultiPatcher):
 
             from weave.integrations.dspy.dspy_callback import WeaveCallback
 
-            # Register callback for URL suppression and basic tracing
             is_callback_present = False
             for callback in dspy.settings.callbacks:
                 if isinstance(callback, WeaveCallback):
@@ -74,33 +74,6 @@ class DSPyPatcher(MultiPatcher):
 
                     # Create a Weave EvaluationLogger
                     model_name = getattr(program, "__class__", type(program)).__name__
-                    devset_for_dataset = kwargs.get(
-                        "devset", getattr(self, "devset", [])
-                    )
-                    # Build rich metadata about the DSPy module so it is visible in the Weave UI
-                    module_meta: dict[str, Any] = {
-                        "name": model_name,
-                        "dump_state": getattr(program, "dump_state", lambda: None)(),
-                        "history": getattr(program, "history", None),
-                        "_compiled": getattr(program, "_compiled", None),
-                        "callbacks": [
-                            repr(cb) for cb in getattr(program, "callbacks", [])
-                        ],
-                        "repr": repr(program),
-                    }
-
-                    ev = EvaluationLogger(
-                        name=f"dspy_{model_name}",
-                        model=module_meta,
-                        dataset=[dict(ex.inputs()) for ex in devset_for_dataset],
-                    )
-
-                    # Prepare parallel executor so that every worker thread
-                    # inherits the evaluation's call-stack. We'll re-implement
-                    # DSPy's evaluation loop here so that traces are captured
-                    # where they belong.
-                    from dspy.utils.parallelizer import ParallelExecutor
-
                     devset = (
                         kwargs.get("devset", getattr(self, "devset", None))
                         or self.devset
@@ -111,12 +84,47 @@ class DSPyPatcher(MultiPatcher):
                         kwargs.get("display_progress", None) or self.display_progress
                     )
                     failure_score = getattr(self, "failure_score", 0.0)
+                    max_errors = getattr(self, "max_errors", 5)
+                    provide_traceback = getattr(self, "provide_traceback", None)
+
+                    raw_dump_state = getattr(program, "dump_state", lambda: None)()
+                    safe_dump_state = dictify(raw_dump_state)
+
+                    module_meta: dict[str, Any] = {
+                        "name": model_name,
+                        "dump_state": safe_dump_state,
+                        "_compiled": getattr(program, "_compiled", None),
+                        "callbacks": [
+                            repr(cb) for cb in getattr(program, "callbacks", [])
+                        ],
+                        "repr": repr(program),
+                        "metric": repr(metric),
+                        "num_threads": num_threads,
+                        "display_progress": display_progress,
+                        "failure_score": failure_score,
+                        "return_outputs": want_outputs,
+                        "return_all_scores": want_scores,
+                        "max_errors": max_errors,
+                        "provide_traceback": provide_traceback,
+                    }
+
+                    ev = EvaluationLogger(
+                        name=f"dspy_{model_name}",
+                        model=module_meta,
+                        dataset=[dict(ex.inputs()) for ex in devset],
+                    )
+
+                    # Prepare parallel executor so that every worker thread
+                    # inherits the evaluation's call-stack. We'll re-implement
+                    # DSPy's evaluation loop here so that traces are captured
+                    # where they belong.
+                    from dspy.utils.parallelizer import ParallelExecutor
 
                     executor = ParallelExecutor(
                         num_threads=num_threads,
                         disable_progress_bar=not display_progress,
-                        max_errors=getattr(self, "max_errors", 5),
-                        provide_traceback=getattr(self, "provide_traceback", None),
+                        max_errors=max_errors,
+                        provide_traceback=provide_traceback,
                         compare_results=True,
                     )
 
