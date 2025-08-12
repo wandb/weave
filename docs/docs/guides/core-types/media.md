@@ -3,7 +3,7 @@ import TabItem from '@theme/TabItem';
 
 # Logging media
 
-Weave supports logging and has dedicated displays for numerous content types such as videos, images, audio files, PDFs, CSVs and HTML.
+W&B Weave supports logging and has dedicated displays for numerous content types such as videos, images, audio files, PDFs, CSVs and HTML.
 
 ## Content API
 
