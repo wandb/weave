@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Callable, get_type_hints
 from weave.agent.console import LogEvents
 
 if TYPE_CHECKING:
-    pass
+    from openai.types.chat import ChatCompletionMessageToolCall, ChatCompletionToolParam
 
 
 def generate_json_schema(func: Callable) -> dict:
