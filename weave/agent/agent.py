@@ -3,7 +3,7 @@ from typing import Any
 from pydantic import Field
 
 import weave
-from weave.flow.chat_util import OpenAIStream
+from weave.agent.chat_util import OpenAIStream
 from weave.agent.console import LogEvents
 from weave.flow.obj import Object
 from weave.agent.tools import chat_call_tool_params, perform_tool_calls

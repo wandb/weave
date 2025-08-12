@@ -6,7 +6,7 @@ from rich.console import Console
 
 import weave
 from weave.agent.agent import Agent, AgentState
-from weave.flow.chat_util import OpenAIStream
+from weave.agent.chat_util import OpenAIStream
 from weave.agent.console import LogEvents
 from weave.flow.obj import Object
 
