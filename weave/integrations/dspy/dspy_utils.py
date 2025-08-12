@@ -38,18 +38,22 @@ def dump_dspy_objects(data: Any) -> Any:
 
     if isinstance(data, Example):
         return data.toDict()
-
     elif isinstance(data, Module):
         return data.dump_state()
-
     elif isinstance(data, np.ndarray):
         return data.tolist()
-
     elif isinstance(data, dict):
-        return {key: dump_dspy_objects(value) for key, value in data.items()}
-
+        processed: dict[Any, Any] = {}
+        for k, v in data.items():
+            new_key = k.__name__ if isinstance(k, type) else k
+            processed[new_key] = dump_dspy_objects(v)
+        return processed
     elif isinstance(data, list):
         return [dump_dspy_objects(item) for item in data]
+    elif isinstance(data, (tuple, set)):
+        return [dump_dspy_objects(item) for item in data]
+    elif isinstance(data, type):
+        return data.__name__
 
     return data
 
@@ -120,6 +124,9 @@ def dspy_postprocess_outputs(
 
     if isinstance(outputs, ModelResponse):
         outputs = dictify(outputs)
+
+    if isinstance(outputs, type):
+        outputs = outputs.__name__
 
     return dump_dspy_objects(outputs)
 
