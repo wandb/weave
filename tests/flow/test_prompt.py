@@ -1,4 +1,4 @@
-from weave.flow.prompt.prompt import MessagesPrompt, StringPrompt
+from weave.prompt.prompt import MessagesPrompt, StringPrompt
 
 
 def test_stringprompt_format():

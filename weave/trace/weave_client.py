@@ -26,7 +26,7 @@ from weave.trace.casting import CallsFilterLike, QueryLike, SortByLike
 from weave.trace.concurrent.futures import FutureExecutor
 from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
-from weave.trace.exception import exception_to_json_str
+from weave.utils.exception import exception_to_json_str
 from weave.trace.feedback import FeedbackQuery, RefFeedbackQuery
 from weave.trace.interface_query_builder import (
     exists_expr,
@@ -135,7 +135,7 @@ from weave.utils.paginated_iterator import PaginatedIterator
 if TYPE_CHECKING:
     import wandb
 
-    from weave.flow.eval import Evaluation
+    from weave.evaluation.eval import Evaluation
     from weave.flow.scorer import ApplyScorerResult, Scorer
 
 
@@ -1145,7 +1145,7 @@ class WeaveClient:
         def send_start_call() -> bool:
             maybe_redacted_inputs_with_refs = inputs_with_refs
             if should_redact_pii():
-                from weave.trace.pii_redaction import redact_pii
+                from weave.utils.pii_redaction import redact_pii
 
                 maybe_redacted_inputs_with_refs = redact_pii(inputs_with_refs)
 
@@ -1307,7 +1307,7 @@ class WeaveClient:
         def send_end_call() -> None:
             maybe_redacted_output_as_refs = output_as_refs
             if should_redact_pii():
-                from weave.trace.pii_redaction import redact_pii
+                from weave.utils.pii_redaction import redact_pii
 
                 maybe_redacted_output_as_refs = redact_pii(output_as_refs)
 
@@ -1801,7 +1801,7 @@ class WeaveClient:
                 return
             remove_ref(obj)
         # Must defer import here to avoid circular import
-        from weave.flow.obj import Object
+        from weave.object.obj import Object
 
         # Case 1: Object:
         # Here we recurse into each of the properties of the object
@@ -2119,7 +2119,7 @@ class WeaveClient:
                       Overrides use_progress_bar.
         """
         if use_progress_bar and callback is None:
-            from weave.trace.client_progress_bar import create_progress_bar_callback
+            from weave.trace.display.client_progress_bar import create_progress_bar_callback
 
             callback = create_progress_bar_callback()
 

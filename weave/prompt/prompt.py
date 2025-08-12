@@ -11,8 +11,8 @@ from pydantic import Field
 from rich.table import Table
 from typing_extensions import Self
 
-from weave.flow.obj import Object
-from weave.flow.prompt.common import ROLE_COLORS, color_role
+from weave.object.obj import Object
+from weave.prompt.common import ROLE_COLORS, color_role
 from weave.trace.api import publish as weave_publish
 from weave.trace.objectify import register_object
 from weave.trace.op import op

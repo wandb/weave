@@ -2026,6 +2026,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if req.wb_user_id is None:
             raise ValueError("wb_user_id is required")
         call_id = generate_id()
+
         self._evaluate_model_dispatcher.dispatch(
             EvaluateModelArgs(
                 project_id=req.project_id,
