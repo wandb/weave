@@ -104,7 +104,11 @@ content = Content.from_bytes(video_bytes, extension='.mp4')
 content = Content.from_bytes(video_bytes, mimetype='video/mp4')
 ```
 
-### Properties
+### Content properties
+
+For a comprehensive list of class attributes and methods view the [Content reference docs](https://weave-docs.wandb.ai/reference/python-sdk/weave/#class-content)
+
+#### Attributes
 
 | Property    | Type             | Description                             |
 | ----------- | ---------------- | --------------------------------------- |
@@ -117,15 +121,15 @@ content = Content.from_bytes(video_bytes, mimetype='video/mp4')
 | `path`      | `str \| None`    | Source file path, if applicable         |
 | `digest`    | `str`            | SHA256 hash of the content              |
 
-### Methods
+#### Utility Methods
 
 - `save(dest: str | Path) -> None`: Save content to a file
 - `open() -> bool`: Open file using system default application (requires the content to have been saved or loaded from a path)
 - `as_string() -> str`: Display the data as a string (bytes are decoded using the encoding attribute)
 
-### Creation Methods
+#### Initialization Methods
 
-#### `Content.from_path(path, mimetype=None, metadata=None)`
+##### `Content.from_path(path, mimetype=None, metadata=None)`
 
 Create Content from a file path:
 
@@ -134,7 +138,7 @@ content = Content.from_path("assets/photo.jpg")
 print(content.mimetype, content.size)
 ```
 
-#### `Content.from_bytes(data, extension=None, mimetype=None, metadata=None)`
+##### `Content.from_bytes(data, extension=None, mimetype=None, metadata=None)`
 
 Create Content from raw bytes:
 
@@ -147,7 +151,7 @@ content = Content.from_bytes(
 content.save("output.mp3")
 ```
 
-#### `Content.from_text(text, extension=None, mimetype=None, metadata=None)`
+##### `Content.from_text(text, extension=None, mimetype=None, metadata=None)`
 
 Create Content from text:
 
@@ -155,7 +159,7 @@ Create Content from text:
 content = Content.from_text("Hello, World!", mimetype="text/plain")
 ```
 
-#### `Content.from_base64(b64_data, extension=None, mimetype=None, metadata=None)`
+##### `Content.from_base64(b64_data, extension=None, mimetype=None, metadata=None)`
 
 Create Content from base64-encoded data:
 
