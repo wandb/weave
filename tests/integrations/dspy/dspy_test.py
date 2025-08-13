@@ -263,7 +263,7 @@ def test_dspy_evaluate(client: WeaveClient) -> None:
     assert call.started_at < call.ended_at
     assert op_name_from_ref(call.op_name) == "dspy.Evaluate"
     output = call.output
-    assert output > 30
+    assert output["score"] > 30
 
 
 @pytest.mark.skip_clickhouse_client

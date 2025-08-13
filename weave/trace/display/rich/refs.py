@@ -7,7 +7,7 @@ from rich.table import Table
 
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.refs import AnyRef, CallRef, parse_uri
-from weave.trace.rich.container import AbstractRichContainer
+from weave.trace.display.rich.container import AbstractRichContainer
 from weave.trace.vals import WeaveObject
 
 
