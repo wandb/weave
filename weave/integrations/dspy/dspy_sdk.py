@@ -41,6 +41,8 @@ class DSPyPatcher(MultiPatcher):
 
     def _patch_evaluate(self: DSPyPatcher) -> None:
         """Monkey-patch dspy.Evaluate.__call__ to replay results into Weave EvaluationLogger."""
+        from dspy.utils.callback import with_callbacks
+
         global _evaluate_patched
 
         with _patch_lock:
@@ -213,7 +215,7 @@ class DSPyPatcher(MultiPatcher):
                     return overall
 
                 # Apply the patch
-                Evaluate.__call__ = _wrapped_call
+                Evaluate.__call__ = with_callbacks(_wrapped_call)
                 _evaluate_patched = True
 
             except Exception as e:
