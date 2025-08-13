@@ -4,7 +4,7 @@ from typing import Any, Generic, Optional, TypeVar
 
 from rich.table import Table
 
-from weave.trace.rich import pydantic_util
+from weave.trace.display.rich import pydantic_util
 
 T = TypeVar("T")
 

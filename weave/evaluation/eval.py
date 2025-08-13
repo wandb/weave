@@ -20,7 +20,7 @@ from weave.flow.model import (
     PreprocessModelInput,
     apply_model_async,
 )
-from weave.flow.obj import Object
+from weave.object.obj import Object
 from weave.flow.scorer import (
     Scorer,
     _has_oldstyle_scorers,
