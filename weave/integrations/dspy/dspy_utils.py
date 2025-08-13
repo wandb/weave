@@ -244,6 +244,9 @@ def dictify(
         for attr in dir(obj):
             if attr.startswith("_"):
                 continue
+            # DSPy 3.x's modules doesn't want to forward to be accessed directly.
+            # Added this to dictify to suppress the warning without updating
+            # weave utils' `dictify` with a similar change.
             if attr == "forward":
                 continue
             if should_redact(attr):
