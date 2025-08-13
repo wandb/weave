@@ -111,7 +111,7 @@ class DSPyPatcher(MultiPatcher):
                     }
 
                     ev = EvaluationLogger(
-                        name=f"dspy_{model_name}",
+                        name=f"dspy_eval_{model_name}",
                         model=module_meta,
                         dataset=[dict(ex.inputs()) for ex in devset],
                     )
