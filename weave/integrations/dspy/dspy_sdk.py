@@ -1,15 +1,19 @@
 from __future__ import annotations
 
+import logging
 import functools
 import threading
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, Callable
 
 from weave.evaluation.eval_imperative import EvaluationLogger
 from weave.integrations.dspy.dspy_utils import get_symbol_patcher
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, Patcher
 from weave.trace.autopatch import IntegrationSettings
-from weave.trace.serialization.serialize import dictify
+from weave.trace.context import call_context
+from weave.integrations.dspy.dspy_utils import dictify
+
+logger = logging.getLogger(__name__)
 
 _dspy_patcher: MultiPatcher | None = None
 _evaluate_patched = False
@@ -41,71 +45,65 @@ class DSPyPatcher(MultiPatcher):
 
     def _patch_evaluate(self: DSPyPatcher) -> None:
         """Monkey-patch dspy.Evaluate.__call__ to replay results into Weave EvaluationLogger."""
-        from dspy.utils.callback import with_callbacks
-
         global _evaluate_patched
 
         with _patch_lock:
             if _evaluate_patched:
                 return
-
             try:
+                import dspy
                 from dspy.evaluate import Evaluate
+                from dspy.evaluate.evaluate import EvaluationResult
+                from dspy.utils.callback import with_callbacks
+                from dspy.utils.parallelizer import ParallelExecutor
 
-                # Keep reference to original method
                 orig_call = Evaluate.__call__
 
                 @functools.wraps(orig_call)
                 def _wrapped_call(
-                    self: Evaluate, program: Any, *args: Any, **kwargs: Any
-                ) -> Any:
-                    """
-                    Patched Evaluate.__call__ that logs a full Weave Evaluation **and**
-                    ensures every program call is nested inside that evaluation so the
-                    full trace is visible in the UI.
-                    """
+                    self: Evaluate,
+                    program: "dspy.Module",
+                    metric: Callable | None = None,
+                    devset: list["dspy.Example"] | None = None,
+                    num_threads: int | None = None,
+                    display_progress: bool | None = None,
+                    display_table: bool | int | None = None,
+                    callback_metadata: dict[str, Any] | None = None,
+                ) -> EvaluationResult:
                     import types
 
-                    from weave.trace.context import call_context
-
-                    # Capture the caller's requested return shape
-                    want_outputs = kwargs.get("return_outputs", self.return_outputs)
-                    want_scores = kwargs.get(
-                        "return_all_scores", self.return_all_scores
-                    )
-
-                    # Create a Weave EvaluationLogger
+                    # Create model metadata for EvaluationLogger
                     model_name = getattr(program, "__class__", type(program)).__name__
-                    devset = (
-                        kwargs.get("devset", getattr(self, "devset", None))
-                        or self.devset
-                    )
-                    metric = kwargs.get("metric", None) or self.metric
-                    num_threads = kwargs.get("num_threads", None) or self.num_threads
-                    display_progress = (
-                        kwargs.get("display_progress", None) or self.display_progress
-                    )
+                    metric = metric if metric is not None else self.metric
+                    devset = devset if devset is not None else self.devset
+                    num_threads = num_threads if num_threads is not None else self.num_threads
+                    display_progress = display_progress if display_progress is not None else self.display_progress
+                    display_table = display_table if display_table is not None else self.display_table
+
+                    if callback_metadata:
+                        logger.debug(f"Evaluate is called with callback metadata: {callback_metadata}")
+
                     failure_score = getattr(self, "failure_score", 0.0)
-                    max_errors = getattr(self, "max_errors", 5)
+                    max_errors = getattr(self, "max_errors", dspy.settings.max_errors)
                     provide_traceback = getattr(self, "provide_traceback", None)
 
-                    raw_dump_state = getattr(program, "dump_state", lambda: None)()
-                    safe_dump_state = dictify(raw_dump_state)
+                    # Serialize the program's state
+                    raw_dump_state = getattr(program, "dump_state", lambda: None)
+                    if callable(raw_dump_state):
+                        raw_dump_state = dictify(raw_dump_state())
 
                     module_meta: dict[str, Any] = {
                         "name": model_name,
-                        "dump_state": safe_dump_state,
+                        "dump_state": raw_dump_state,
                         "_compiled": getattr(program, "_compiled", None),
                         "callbacks": [
                             repr(cb) for cb in getattr(program, "callbacks", [])
                         ],
-                        "repr": repr(program),
-                        "metric": repr(metric),
+                        "program_repr": repr(program),
+                        "metric_repr": repr(metric),
                         "num_threads": num_threads,
                         "display_progress": display_progress,
                         "failure_score": failure_score,
-                        "return_outputs": want_outputs,
-                        "return_all_scores": want_scores,
                         "max_errors": max_errors,
                         "provide_traceback": provide_traceback,
                     }
@@ -116,12 +114,7 @@ class DSPyPatcher(MultiPatcher):
                         dataset=[dict(ex.inputs()) for ex in devset],
                     )
 
-                    # Prepare parallel executor so that every worker thread
-                    # inherits the evaluation's call-stack. We'll re-implement
-                    # DSPy's evaluation loop here so that traces are captured
-                    # where they belong.
-                    from dspy.utils.parallelizer import ParallelExecutor
-
+                    # Prepare parallel executor for evaluation
                     executor = ParallelExecutor(
                         num_threads=num_threads,
                         disable_progress_bar=not display_progress,
@@ -130,89 +123,59 @@ class DSPyPatcher(MultiPatcher):
                         compare_results=True,
                     )
 
-                    # Will accumulate (example, prediction, score)
-                    result_triples: list[tuple[Any, Any, float]] = [None] * len(devset)  # type: ignore
-
-                    def _worker(
-                        index_and_example: tuple[int, Any],
-                    ) -> tuple[Any, float]:
-                        idx, example = index_and_example
+                    def process_item(example: dspy.Example) -> tuple[dspy.Prediction | dspy.Completions, float]:
                         with call_context.set_call_stack([ev._evaluate_call]):  # type: ignore
                             prediction = program(**example.inputs())
-                            score = metric(example, prediction) if metric else 0.0
+                            score = metric(example, prediction)
 
                             # Increment assert and suggest failures to program's attributes
                             if hasattr(program, "_assert_failures"):
-                                import dspy as _dspy_mod
-
-                                program._assert_failures += _dspy_mod.settings.get(
-                                    "assert_failures"
-                                )
+                                program._assert_failures += dspy.settings.get("assert_failures")
                             if hasattr(program, "_suggest_failures"):
-                                import dspy as _dspy_mod
+                                program._suggest_failures += dspy.settings.get("suggest_failures")
 
-                                program._suggest_failures += _dspy_mod.settings.get(
-                                    "suggest_failures"
-                                )
+                            # DSPy expects the inputs to be wrapped in an Example object
+                            serialized_inputs = dictify(example.toDict())
 
-                            import dspy as _dspy_mod
-
-                            if isinstance(example, _dspy_mod.Example):
-                                serialized_inputs = example.items()
-                            else:
-                                serialized_inputs = example.inputs()
-
-                            if isinstance(prediction, _dspy_mod.Prediction):
-                                serialized_pred = prediction.items()
-                            elif isinstance(prediction, _dspy_mod.Completions):
-                                serialized_pred = prediction.items()
-                            else:
-                                serialized_pred = prediction
+                            if isinstance(prediction, dspy.Prediction):
+                                # Prediction is inherited from Example
+                                serialized_pred = dictify(prediction.toDict())
+                            if isinstance(prediction, dspy.Completions):
+                                # Completions exposes the `items` method
+                                serialized_pred = dictify(prediction.items())
 
                             pl = ev.log_prediction(
                                 inputs=serialized_inputs, output=serialized_pred
                             )
                             pl.log_score(scorer=scorer_name, score=score)
                             pl.finish()
-                            result_triples[idx] = (example, prediction, score)
-                            # Return a 2-tuple to match DSPy's expected shape (prediction, score)
-                            return (prediction, score)
+
+                            return prediction, score
 
                     # Determine scorer name once, outside threads
-                    if metric is None:
-                        scorer_name = "score"
-                    elif isinstance(metric, types.FunctionType):
-                        scorer_name = metric.__name__
-                    else:
-                        scorer_name = metric.__class__.__name__
-
+                    scorer_name = metric.__name__ if isinstance(metric, types.FunctionType) else metric.__class__.__name__
                     if scorer_name == "method":
                         scorer_name = "score"
 
                     # Kick off parallel execution
-                    indices_examples = list(enumerate(devset))
-                    executor.execute(_worker, indices_examples)
+                    results = executor.execute(process_item, devset)
+                    assert len(devset) == len(results)
 
-                    # Fill in any failed results with default failure_score
-                    for i, triple in enumerate(result_triples):
-                        if triple is None:
-                            ex = devset[i]
-                            result_triples[i] = (ex, None, failure_score)  # type: ignore
+                    results = [((dspy.Prediction(), failure_score) if r is None else r) for r in results]
+                    results = [(example, prediction, score) for example, (prediction, score) in zip(devset, results, strict=False)]
+                    ncorrect, ntotal = sum(score for *_, score in results), len(devset)
 
-                    triples = result_triples  # rename for downstream logic
-                    individual = [s for *_, s in triples]
-                    overall = round(100 * sum(individual) / len(individual), 2)
+                    logger.info(f"Average Metric: {ncorrect} / {ntotal} ({round(100 * ncorrect / ntotal, 1)}%)")
 
-                    ev.log_summary({"mean_score": overall / 100.0})
+                    ev.log_summary({"Average Metric": ncorrect / ntotal})
 
-                    # ── 3️⃣  Return exactly what the caller expected ─────────────────────
-                    if want_outputs and want_scores:
-                        return overall, triples, individual
-                    if want_outputs:
-                        return overall, triples
-                    if want_scores:
-                        return overall, individual
-                    return overall
+                    if display_table:
+                        logger.warning("We don't support `display_table` via this patched `Evaluate.__call__` method. Set `display_table=False` to disable this warning.")
+
+                    return EvaluationResult(
+                        score=round(100 * ncorrect / ntotal, 2),
+                        results=results,
+                    )
 
                 # Apply the patch
                 Evaluate.__call__ = with_callbacks(_wrapped_call)
@@ -220,7 +183,7 @@ class DSPyPatcher(MultiPatcher):
 
             except Exception as e:
                 # Don't let patching errors break DSPy integration
-                print(f"Warning: Failed to patch DSPy Evaluate: {e}")
+                logger.warning(f"Failed to patch DSPy Evaluate: {e}")
 
 
 def get_dspy_patcher(
