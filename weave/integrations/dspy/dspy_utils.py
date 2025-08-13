@@ -11,7 +11,6 @@ from weave.trace.autopatch import OpSettings
 from weave.trace.op import Op
 from weave.utils.sanitize import REDACTED_VALUE, should_redact
 
-
 if TYPE_CHECKING:
     from dspy.primitives.prediction import Example
 
