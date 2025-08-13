@@ -63,7 +63,7 @@ def test_dspy_language_models(client: WeaveClient) -> None:
     assert result[0].lower() == "this is a test!"
 
     calls = list(client.get_calls())
-    assert len(calls) == 3
+    assert len(calls) == 4
 
     call = calls[0]
     assert call.started_at < call.ended_at
@@ -73,11 +73,18 @@ def test_dspy_language_models(client: WeaveClient) -> None:
 
     call = calls[1]
     assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "dspy.LM.forward"
+    output = call.output
+    assert output["model"] == "gpt-4o-mini-2024-07-18"
+    assert output["choices"][0]["message"]["content"].lower() == "this is a test!"
+
+    call = calls[2]
+    assert call.started_at < call.ended_at
     assert op_name_from_ref(call.op_name) == "litellm.completion"
     output = call.output
     assert output["choices"][0]["message"]["content"].lower() == "this is a test!"
 
-    call = calls[2]
+    call = calls[3]
     assert call.started_at < call.ended_at
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
 
