@@ -460,7 +460,7 @@ def generate_routes(
             media_type="application/jsonl",
         )
 
-    # TODO: This is mislabled in the core impl.  Keeping it the same here for now.
+    # TODO: This is mislabeled in the core impl.  Keeping it the same here for now.
     @router.post("/project/stats", tags=["project"], include_in_schema=False)
     def project_stats(
         req: tsi.ProjectStatsReq,
