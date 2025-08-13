@@ -5,7 +5,8 @@ from collections.abc import Iterator
 from typing import Any, Optional, Union, cast
 from zoneinfo import ZoneInfo
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from pydantic.json_schema import SkipJsonSchema
 
 from weave.trace.env import weave_trace_server_url
 from weave.trace.settings import max_calls_queue_size, should_enable_disk_fallback
@@ -205,7 +206,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             return
 
         def get_item_id(item: tsi.FeedbackCreateReq) -> str:
-            return f"{item.feedback_type}"
+            return f"{item.id}"
 
         def encode_batch(batch: list[tsi.FeedbackCreateReq]) -> bytes:
             batch_req = tsi.FeedbackCreateBatchReq(batch=batch)
@@ -213,7 +214,39 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             return data.encode("utf-8")
 
         def send_feedback_batch(encoded_data: bytes) -> None:
-            self._send_feedback_batch_to_server(encoded_data)
+            try:
+                self._send_feedback_batch_to_server(encoded_data)
+            except requests.HTTPError as e:
+                # If batching endpoint doesn't exist (404) fall back to individual calls
+                if e.response.status_code == 404:
+                    logger.debug(
+                        f"Batching endpoint not available, falling back to individual feedback creation: {e}"
+                    )
+
+                    # Feedback endpoint doesn't support id, created_at, so we need to strip them
+                    class FeedbackCreateReqStripped(tsi.FeedbackCreateReq):
+                        id: SkipJsonSchema[str] = Field(exclude=True)
+                        created_at: SkipJsonSchema[Optional[datetime.datetime]] = Field(
+                            exclude=True, default=None
+                        )
+
+                    # Fall back to individual feedback creation calls
+                    for item in batch:
+                        item_copy = FeedbackCreateReqStripped(**item.model_dump())
+                        try:
+                            self._generic_request(
+                                "/feedback/create",
+                                item_copy,
+                                FeedbackCreateReqStripped,
+                                tsi.FeedbackCreateRes,
+                            )
+                        except Exception as individual_error:
+                            logger.warning(
+                                f"Failed to create individual feedback: {individual_error}"
+                            )
+                else:
+                    # Re-raise server errors (5xx) as they're not client compatibility issues
+                    raise
 
         process_batch_with_retry(
             batch_name="feedback",

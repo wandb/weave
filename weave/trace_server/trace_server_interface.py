@@ -904,32 +904,9 @@ class FeedbackCreateRes(BaseModel):
 
 
 class Feedback(FeedbackCreateReq):
-    id: str
-    project_id: str = Field(examples=["entity/project"])
-    weave_ref: str = Field(examples=["weave:///entity/project/object/name:digest"])
-    creator: Optional[str] = Field(default=None, examples=["Jane Smith"])
-    feedback_type: str = Field(examples=["custom"])
-    payload: dict[str, Any] = Field(
-        examples=[
-            {
-                "key": "value",
-            }
-        ]
-    )
-    annotation_ref: Optional[str] = Field(
-        default=None, examples=["weave:///entity/project/object/name:digest"]
-    )
-    runnable_ref: Optional[str] = Field(
-        default=None, examples=["weave:///entity/project/op/name:digest"]
-    )
-    call_ref: Optional[str] = Field(
-        default=None, examples=["weave:///entity/project/call/call_id"]
-    )
-    trigger_ref: Optional[str] = Field(
-        default=None, examples=["weave:///entity/project/object/name:digest"]
-    )
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
-    created_at: datetime.datetime
+    # Feedback is stricter than the create request, and must always have an id
+    id: str  # type: ignore[reportIncompatibleVariableOverride]
+    created_at: Optional[datetime.datetime] = None
 
 
 class FeedbackQueryReq(BaseModelStrict):
