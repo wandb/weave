@@ -7,25 +7,25 @@ W&B Weave supports logging and has dedicated displays for numerous content types
 
 ## Content API
 
-The Content API is a modern way of handling any data as media objects in Weave. Instead of using specific modules and classes like `PIL.Image` or `moviepy.VideoFileClip`, you can simply import Content from Weave to process base64 data, file paths, raw bytes, or text.
+The Content API handles media objects in Weave. Instead of using specific modules and classes like `PIL.Image` or `moviepy.VideoFileClip`, using the Content API allows you to import content into Weave as base64 data, file paths, raw bytes, or text.
 
-For media with pre-existing support in Weave (such as MP3, MP4, or PNG files), your data will display identically in the web app regardless of which API you use. For certain large file types like videos, using Content provides significant performance improvements.
+The Content API introduces special handlers in the web app for media types that don't have legacy API handlers, such as PDF and HTML files. For media with pre-existing support in Weave (such as MP3, MP4, or PNG files), your data will display identically in the web app regardless of which API you use, however, for certain large file types like videos, using the Content API provides significant performance improvements.
 
-Additionally, Content introduces special handlers in the web app for media types that don't have legacy API handlers, such as PDF and HTML files.
+
 
 :::note
-Content support is currently only available in Python.
+The Content API is only available in Python.
 :::
 
 ### Usage
 
 There are two primary ways to use the Content API: type annotations and direct initialization.
 
-Type annotations are usually more ergonomic and automatically detect the proper constructor to use, while direct initialization provides more fine-grained control and lets you take advantage of runtime features of the Content API in your code.
+Type annotations automatically detect the proper constructor to use, while direct initialization provides more fine-grained control and lets you take advantage of runtime features of the Content API in your code.
 
 ### Type Annotations
 
-The Weave Content API is designed to primarily be used through type annotations. Annotations have no runtime side-effects on your code but signal to Weave that traced inputs and outputs should be processed and stored as Content blobs.
+The Weave Content API is designed to primarily be used through type annotations, which signal to Weave that traced inputs and outputs should be processed and stored as content blobs.
 
 ```python
 import weave
@@ -73,12 +73,9 @@ content.model_dump()  # Dumps the model attributes to JSON
 
 ### Custom Mimetypes
 
-The `polyfile-weave` library can detect most binary mimetypes, but custom mimetypes and text documents such as markdown may not be automatically detected.
+Weave can detect most binary mimetypes, but custom mimetypes and text documents such as markdown may not be automatically detected, requiring you to manually specify the mimetype or extension of your file.
 
 #### Custom Mimetypes with Type Annotations
-
-To manually specify the mimetype or extension of your file from a type annotation, you can pass it as a type parameter to Content:
-
 ```python
 import weave
 from weave import Content
