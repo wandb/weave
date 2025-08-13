@@ -31,7 +31,7 @@ class DSPyPatcher(MultiPatcher):
                     break
 
             if not is_callback_present:
-                dspy.settings.callbacks.append(WeaveCallback())
+                dspy.settings.configure(callbacks=[WeaveCallback()])
 
             # Monkey-patch dspy.Evaluate.__call__ for clean evaluation logging
             self._patch_evaluate()

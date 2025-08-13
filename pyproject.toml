@@ -108,7 +108,7 @@ cerebras = ["cerebras-cloud-sdk"]
 cohere = ["cohere>=5.9.1,<5.9.3"]
 # Pin until https://github.com/crewAIInc/crewAI/pull/2553 is released
 crewai = ["crewai>=0.100.1,<=0.108.0", "crewai-tools>=0.38.0", "openai<1.99.0"]
-dspy = ["dspy>=2.6.27,<3.0.0", "openai<1.99.0"]
+dspy = ["dspy>=3.0.0"]
 google_ai_studio = ["google-generativeai>=0.8.3"]
 google_genai = ["google-genai>=1.0.0,<=1.23.0", "pillow>=11.1.0"]
 groq = ["groq>=0.13.0"]

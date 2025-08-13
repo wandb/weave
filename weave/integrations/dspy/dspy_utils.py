@@ -1,5 +1,6 @@
 import importlib
 import os
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, Callable, Union
 
 from pydantic import BaseModel
@@ -8,7 +9,8 @@ import weave
 from weave.integrations.patcher import SymbolPatcher
 from weave.trace.autopatch import OpSettings
 from weave.trace.op import Op
-from weave.trace.serialization.serialize import dictify
+from weave.utils.sanitize import REDACTED_VALUE, should_redact
+
 
 if TYPE_CHECKING:
     from dspy.primitives.prediction import Example
@@ -151,3 +153,110 @@ def get_op_name_for_callback(instance: Any, inputs: dict[str, Any]) -> str:
         if "dspy." in inputs["self"]["__class__"]["module"]
         else instance_class_name
     )
+
+
+MAX_STR_LEN = 1000
+
+
+def stringify(obj: Any, limit: int = MAX_STR_LEN) -> str:
+    """This is a fallback for objects that we don't have a better way to serialize."""
+    rep = None
+    try:
+        rep = repr(obj)
+    except Exception:
+        try:
+            rep = str(obj)
+        except Exception:
+            rep = f"<{type(obj).__name__}: {id(obj)}>"
+    if isinstance(rep, str) and len(rep) > limit:
+        rep = rep[: limit - 3] + "..."
+    return rep
+
+
+def is_primitive(obj: Any) -> bool:
+    """Check if an object is a known primitive type."""
+    return isinstance(obj, (int, float, str, bool, type(None)))
+
+
+def dictify(
+    obj: Any, maxdepth: int = 0, depth: int = 1, seen: set[int] | None = None
+) -> Any:
+    """Recursively compute a dictionary representation of an object."""
+    if seen is None:
+        seen = set()
+
+    if not is_primitive(obj):
+        obj_id = id(obj)
+        if obj_id in seen:
+            # Avoid infinite recursion with circular references
+            return stringify(obj)
+        else:
+            seen.add(obj_id)
+
+    if maxdepth > 0 and depth > maxdepth:
+        # TODO: If obj at this point is a simple type,
+        #       maybe we should just return it rather than stringify
+        return stringify(obj)
+
+    if is_primitive(obj):
+        return obj
+    elif isinstance(obj, (list, tuple)):
+        return [dictify(v, maxdepth, depth + 1, seen) for v in obj]
+    elif isinstance(obj, dict):
+        dict_result = {}
+        for k, v in obj.items():
+            if isinstance(k, str) and should_redact(k):
+                dict_result[k] = REDACTED_VALUE
+            else:
+                dict_result[k] = dictify(v, maxdepth, depth + 1, seen)
+        return dict_result
+
+    if hasattr(obj, "to_dict"):
+        try:
+            as_dict = obj.to_dict()
+            if isinstance(as_dict, dict):
+                to_dict_result = {}
+                for k, v in as_dict.items():
+                    if isinstance(k, str) and should_redact(k):
+                        to_dict_result[k] = REDACTED_VALUE
+                    elif maxdepth == 0 or depth < maxdepth:
+                        to_dict_result[k] = dictify(v, maxdepth, depth + 1)
+                    else:
+                        to_dict_result[k] = stringify(v)
+                return to_dict_result
+        except Exception:
+            raise ValueError("to_dict failed") from None
+
+    result: dict[Any, Any] = {}
+    result["__class__"] = {
+        "module": obj.__class__.__module__,
+        "qualname": obj.__class__.__qualname__,
+        "name": obj.__class__.__name__,
+    }
+    if isinstance(obj, Sequence) and not isinstance(obj, (str, bytes)):
+        # Custom list-like object
+        try:
+            for i, item in enumerate(obj):
+                result[i] = dictify(item, maxdepth, depth + 1, seen)
+        except Exception:
+            return stringify(obj)
+    else:
+        for attr in dir(obj):
+            if attr.startswith("_"):
+                continue
+            if attr == "forward":
+                continue
+            if should_redact(attr):
+                result[attr] = REDACTED_VALUE
+                continue
+            try:
+                val = getattr(obj, attr)
+                if callable(val):
+                    continue
+                if maxdepth == 0 or depth < maxdepth:
+                    result[attr] = dictify(val, maxdepth, depth + 1, seen)
+                else:
+                    result[attr] = stringify(val)
+            except Exception:
+                return stringify(obj)
+    return result
