@@ -515,3 +515,49 @@ def make_evals(client):
     ev2.log_summary(summary={"z": 90})
 
     return ev._pseudo_evaluation.ref, ev2._pseudo_evaluation.ref
+
+
+@pytest.fixture
+def mock_wandb_api():
+    """Fixture that provides a mocked wandb Api instance."""
+    with patch("weave.compat.wandb.Api") as mock_api_class:
+        mock_api_instance = MagicMock()
+        mock_api_class.return_value = mock_api_instance
+        yield mock_api_instance
+
+
+@pytest.fixture
+def mock_wandb_login():
+    """Fixture that provides a mock for wandb login functionality."""
+    with patch("weave.compat.wandb.login") as mock_login:
+        mock_login.return_value = True
+        yield mock_login
+
+
+@pytest.fixture
+def mock_default_host():
+    """Fixture that mocks _get_default_host to return api.wandb.ai."""
+    with patch(
+        "weave.cli.login._get_default_host",
+        return_value="api.wandb.ai",
+    ):
+        yield
+
+
+@pytest.fixture
+def mock_wandb_context():
+    """Fixture that provides mocked weave wandb context operations."""
+    with (
+        patch("weave.wandb_interface.context.init") as mock_context_init,
+        patch(
+            "weave.wandb_interface.context.get_wandb_api_context"
+        ) as mock_get_context,
+        patch(
+            "weave.wandb_interface.context.set_wandb_api_context"
+        ) as mock_set_context,
+    ):
+        yield {
+            "init": mock_context_init,
+            "get": mock_get_context,
+            "set": mock_set_context,
+        }
