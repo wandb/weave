@@ -21,13 +21,13 @@ from requests import HTTPError
 from weave import version
 from weave.chat.chat import Chat
 from weave.chat.inference_models import InferenceModels
-from weave.trace import urls
 from weave.telemetry import trace_sentry
+from weave.trace import settings, urls
 from weave.trace.casting import CallsFilterLike, QueryLike, SortByLike
 from weave.trace.concurrent.futures import FutureExecutor
+from weave.trace.constants import TRACE_CALL_EMOJI
 from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
-from weave.utils.exception import exception_to_json_str
 from weave.trace.feedback import FeedbackQuery, RefFeedbackQuery
 from weave.trace.interface_query_builder import (
     exists_expr,
@@ -49,7 +49,6 @@ from weave.trace.op import (
     is_tracing_setting_disabled,
     maybe_unbind_method,
     placeholder_call,
-    print_call_link,
     should_skip_tracing_for_op,
 )
 from weave.trace.op import op as op_deco
@@ -64,7 +63,6 @@ from weave.trace.refs import (
     parse_op_uri,
     parse_uri,
 )
-from weave.utils.sanitize import REDACTED_VALUE, should_redact
 from weave.trace.serialization.serialize import (
     from_json,
     isinstance_namedtuple,
@@ -131,7 +129,9 @@ from weave.trace_server.trace_server_interface import (
 )
 from weave.utils.attributes_dict import AttributesDict
 from weave.utils.dict_utils import sum_dict_leaves, zip_dicts
+from weave.utils.exception import exception_to_json_str
 from weave.utils.paginated_iterator import PaginatedIterator
+from weave.utils.sanitize import REDACTED_VALUE, should_redact
 
 if TYPE_CHECKING:
     import wandb
@@ -151,6 +151,11 @@ logger = logging.getLogger(__name__)
 # TODO: should be Call, not WeaveObject
 CallsIter = PaginatedIterator[CallSchema, WeaveObject]
 DEFAULT_CALLS_PAGE_SIZE = 1000
+
+
+def print_call_link(call: Call) -> None:
+    if settings.should_print_call_link():
+        logger.info(f"{TRACE_CALL_EMOJI} {call.ui_url}")
 
 
 def _make_calls_iterator(
@@ -2114,7 +2119,9 @@ class WeaveClient:
                       Overrides use_progress_bar.
         """
         if use_progress_bar and callback is None:
-            from weave.trace.display.client_progress_bar import create_progress_bar_callback
+            from weave.trace.display.client_progress_bar import (
+                create_progress_bar_callback,
+            )
 
             callback = create_progress_bar_callback()
 
