@@ -63,8 +63,7 @@ class Feedbacks(AbstractRichContainer[tsi.Feedback]):
             content = json.dumps(feedback.payload, indent=2)
 
         # TODO: Prettier relative time display?
-        if feedback.created_at is not None:
-            created_at = str(feedback.created_at.replace(tzinfo=None))
+        created_at = str(feedback.created_at.replace(tzinfo=None))
 
         creator = feedback.wb_user_id
         if feedback.creator is not None:

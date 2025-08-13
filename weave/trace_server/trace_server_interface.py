@@ -906,7 +906,7 @@ class FeedbackCreateRes(BaseModel):
 class Feedback(FeedbackCreateReq):
     # Feedback is stricter than the create request, and must always have an id
     id: str  # type: ignore[reportIncompatibleVariableOverride]
-    created_at: Optional[datetime.datetime] = None
+    created_at: datetime.datetime
 
 
 class FeedbackQueryReq(BaseModelStrict):
