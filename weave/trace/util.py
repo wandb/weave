@@ -7,7 +7,9 @@ from concurrent.futures import ThreadPoolExecutor as _ThreadPoolExecutor
 from contextvars import Context, copy_context
 from functools import partial, wraps
 from threading import Thread as _Thread
-from typing import Any, Callable, TypeGuard, TypeVar
+from typing import Any, Callable, TypeVar
+
+from typing_extensions import TypeGuard
 
 from weave.trace.object_record import ObjectRecord
 from weave.trace.vals import WeaveObject
