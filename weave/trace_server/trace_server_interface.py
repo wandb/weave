@@ -1196,6 +1196,84 @@ class EvaluationStatusRes(BaseModel):
     ]
 
 
+# Alert API Models
+class AlertLevel(str, Enum):
+    LOG = "log"
+    OK = "ok"
+    WARN = "warn"
+    ALERT = "alert"
+
+
+class AlertMetricCreateReq(BaseModelStrict):
+    project_id: str
+    alert_ids: list[str]
+    metric_key: str
+    metric_value: float
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class AlertMetricCreateRes(BaseModel):
+    id: str
+
+
+class AlertEventCreateReq(BaseModelStrict):
+    project_id: str
+    alert_ref: str
+    alert_id: str
+    level: AlertLevel
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class AlertEventCreateRes(BaseModel):
+    id: str
+
+
+class AlertMetricsQueryReq(BaseModelStrict):
+    project_id: str
+    metric_keys: Optional[list[str]] = None
+    alert_ids: Optional[list[str]] = None
+    start_time: Optional[datetime.datetime] = None
+    end_time: Optional[datetime.datetime] = None
+    limit: Optional[int] = None
+    offset: Optional[int] = None
+
+
+class AlertMetricSchema(BaseModel):
+    id: str
+    project_id: str
+    alert_ids: list[str]
+    created_at: datetime.datetime
+    metric_key: str
+    metric_value: float
+
+
+class AlertMetricsQueryRes(BaseModel):
+    metrics: list[AlertMetricSchema]
+
+
+class AlertEventsQueryReq(BaseModelStrict):
+    project_id: str
+    alert_ids: Optional[list[str]] = None
+    levels: Optional[list[AlertLevel]] = None
+    start_time: Optional[datetime.datetime] = None
+    end_time: Optional[datetime.datetime] = None
+    limit: Optional[int] = None
+    offset: Optional[int] = None
+
+
+class AlertEventSchema(BaseModel):
+    id: str
+    project_id: str
+    alert_ref: str
+    alert_id: str
+    created_at: datetime.datetime
+    level: AlertLevel
+
+
+class AlertEventsQueryRes(BaseModel):
+    events: list[AlertEventSchema]
+
+
 class TraceServerInterface(Protocol):
     def ensure_project_exists(
         self, entity: str, project: str
@@ -1281,3 +1359,13 @@ class TraceServerInterface(Protocol):
     # Evaluation API
     def evaluate_model(self, req: EvaluateModelReq) -> EvaluateModelRes: ...
     def evaluation_status(self, req: EvaluationStatusReq) -> EvaluationStatusRes: ...
+
+    # Alert API
+    def alert_metric_create(
+        self, req: AlertMetricCreateReq
+    ) -> AlertMetricCreateRes: ...
+    def alert_event_create(self, req: AlertEventCreateReq) -> AlertEventCreateRes: ...
+    def alert_metrics_query(
+        self, req: AlertMetricsQueryReq
+    ) -> AlertMetricsQueryRes: ...
+    def alert_events_query(self, req: AlertEventsQueryReq) -> AlertEventsQueryRes: ...

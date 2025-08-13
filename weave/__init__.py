@@ -10,6 +10,7 @@ from weave.agent.agent import Agent as Agent
 from weave.agent.agent import AgentState as AgentState
 from weave.flow.annotation_spec import AnnotationSpec
 from weave.dataset.dataset import Dataset
+from weave.flow.alert_spec import AlertSpec
 from weave.evaluation.eval import Evaluation
 from weave.evaluation.eval_imperative import EvaluationLogger
 from weave.flow.model import Model
@@ -54,6 +55,7 @@ __docspec__ = [
     EvaluationLogger,
     Scorer,
     AnnotationSpec,
+    AlertSpec,
     File,
     Content,
     Markdown,
@@ -66,6 +68,7 @@ __all__ = [
     "Agent",
     "AgentState",
     "AnnotationSpec",
+    "AlertSpec",
     "Audio",
     "Content",
     "Dataset",
