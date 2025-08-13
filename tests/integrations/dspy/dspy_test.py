@@ -3,8 +3,13 @@ from typing import Literal
 import dspy
 import pytest
 
-from weave.integrations.integration_utilities import op_name_from_ref
+from weave.integrations.integration_utilities import (
+    flatten_calls,
+    flattened_calls_to_names,
+    op_name_from_ref,
+)
 from weave.trace.weave_client import WeaveClient
+from weave.trace_server.trace_server_interface import CallsFilter
 
 SAMPLE_EVAL_DATASET = [
     dspy.Example(
@@ -273,16 +278,53 @@ def test_dspy_evaluate(client: WeaveClient) -> None:
     module = dspy.ChainOfThought("question -> answer: str, explanation: str")
     evaluate = dspy.Evaluate(devset=SAMPLE_EVAL_DATASET, metric=accuracy_metric)
     accuracy = evaluate(module)
-    assert accuracy > 30
+    assert accuracy.score > 30
 
-    calls = list(client.get_calls())
-    assert len(calls) == 22
+    calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
+    assert len(calls) == 1
+    flattened_calls = flatten_calls(calls)
+
+    assert len(flattened_calls) == 32
+    assert flattened_calls_to_names(flattened_calls) == [
+        ("Evaluation.evaluate", 0),
+        ("dspy.ChainOfThought", 1),
+        ("dspy.Predict", 2),
+        ("dspy.ChatAdapter", 3),
+        ("dspy.LM", 4),
+        ("dspy.LM.forward", 5),
+        ("litellm.completion", 6),
+        ("openai.chat.completions.create", 7),
+        ("dspy.ChainOfThought", 1),
+        ("dspy.Predict", 2),
+        ("dspy.ChatAdapter", 3),
+        ("dspy.LM", 4),
+        ("dspy.LM.forward", 5),
+        ("litellm.completion", 6),
+        ("openai.chat.completions.create", 7),
+        ("dspy.ChainOfThought", 1),
+        ("dspy.Predict", 2),
+        ("dspy.ChatAdapter", 3),
+        ("dspy.LM", 4),
+        ("dspy.LM.forward", 5),
+        ("litellm.completion", 6),
+        ("openai.chat.completions.create", 7),
+        ("Evaluation.predict_and_score", 1),
+        ("Model.predict", 2),
+        ("accuracy_metric", 2),
+        ("Evaluation.predict_and_score", 1),
+        ("Model.predict", 2),
+        ("accuracy_metric", 2),
+        ("Evaluation.predict_and_score", 1),
+        ("Model.predict", 2),
+        ("accuracy_metric", 2),
+        ("Evaluation.summarize", 1),
+    ]
 
     call = calls[0]
     assert call.started_at < call.ended_at
-    assert op_name_from_ref(call.op_name) == "dspy.Evaluate"
+    assert op_name_from_ref(call.op_name) == "Evaluation.evaluate"
     output = call.output
-    assert output > 30
+    assert output["output"]["Average Metric"] > 0.3
 
 
 @pytest.mark.skip_clickhouse_client
