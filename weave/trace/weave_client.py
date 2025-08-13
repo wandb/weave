@@ -64,7 +64,7 @@ from weave.trace.refs import (
     parse_op_uri,
     parse_uri,
 )
-from weave.trace.sanitize import REDACTED_VALUE, should_redact
+from weave.utils.sanitize import REDACTED_VALUE, should_redact
 from weave.trace.serialization.serialize import (
     from_json,
     isinstance_namedtuple,
