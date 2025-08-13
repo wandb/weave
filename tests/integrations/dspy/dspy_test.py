@@ -107,7 +107,7 @@ def test_dspy_predict_module(client: WeaveClient) -> None:
     assert "Linus Torvalds" in response.response
 
     calls = list(client.get_calls())
-    assert len(calls) == 5
+    assert len(calls) == 6
 
     call = calls[0]
     assert call.started_at < call.ended_at
@@ -127,9 +127,13 @@ def test_dspy_predict_module(client: WeaveClient) -> None:
 
     call = calls[3]
     assert call.started_at < call.ended_at
-    assert op_name_from_ref(call.op_name) == "litellm.completion"
+    assert op_name_from_ref(call.op_name) == "dspy.LM.forward"
 
     call = calls[4]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "litellm.completion"
+
+    call = calls[5]
     assert call.started_at < call.ended_at
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
 
@@ -154,7 +158,7 @@ def test_dspy_cot(client: WeaveClient) -> None:
     assert response.answer > 0.027
 
     calls = list(client.get_calls())
-    assert len(calls) == 6
+    assert len(calls) == 7
 
     call = calls[0]
     assert call.started_at < call.ended_at
@@ -180,9 +184,13 @@ def test_dspy_cot(client: WeaveClient) -> None:
 
     call = calls[4]
     assert call.started_at < call.ended_at
-    assert op_name_from_ref(call.op_name) == "litellm.completion"
+    assert op_name_from_ref(call.op_name) == "dspy.LM.forward"
 
     call = calls[5]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "litellm.completion"
+
+    call = calls[6]
     assert call.started_at < call.ended_at
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
 
@@ -216,7 +224,7 @@ def test_dspy_custom_module(client: WeaveClient) -> None:
     assert response.confidence > 0.5
 
     calls = list(client.get_calls())
-    assert len(calls) == 5
+    assert len(calls) == 6
 
     call = calls[0]
     assert call.started_at < call.ended_at
@@ -238,9 +246,13 @@ def test_dspy_custom_module(client: WeaveClient) -> None:
 
     call = calls[3]
     assert call.started_at < call.ended_at
-    assert op_name_from_ref(call.op_name) == "litellm.completion"
+    assert op_name_from_ref(call.op_name) == "dspy.LM.forward"
 
     call = calls[4]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "litellm.completion"
+
+    call = calls[5]
     assert call.started_at < call.ended_at
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
 
@@ -330,7 +342,7 @@ def test_dspy_optimizer_bootstrap_fewshot(client: WeaveClient) -> None:
     )
 
     calls = list(client.get_calls())
-    assert len(calls) == 20
+    assert len(calls) == 23
 
     call = calls[0]
     assert call.started_at < call.ended_at
