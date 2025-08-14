@@ -11,16 +11,15 @@ from rich.console import Console
 from typing_extensions import Self
 
 import weave
+from weave.dataset.dataset import Dataset
 from weave.flow import util
 from weave.flow.casting import DatasetLike, ScorerLike
-from weave.dataset.dataset import Dataset
 from weave.flow.model import (
     ApplyModelError,
     Model,
     PreprocessModelInput,
     apply_model_async,
 )
-from weave.object.obj import Object
 from weave.flow.scorer import (
     Scorer,
     _has_oldstyle_scorers,
@@ -28,6 +27,7 @@ from weave.flow.scorer import (
     get_scorer_attributes,
 )
 from weave.flow.util import make_memorable_name, transpose
+from weave.object.obj import Object
 from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.env import get_weave_parallelism
 from weave.trace.objectify import maybe_objectify, register_object
@@ -196,7 +196,7 @@ class Evaluation(Object):
                 model_call.apply_scorer(scorer, example) for scorer in scorers
             ]
             apply_scorer_results = await asyncio.gather(*scorer_tasks)
-            
+
             # Process results and build scores dict
             for scorer, apply_scorer_result in zip(scorers, apply_scorer_results):
                 result = apply_scorer_result.result
