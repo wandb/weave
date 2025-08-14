@@ -6,6 +6,7 @@ with information such as number of likes and downloads and license.
 
 import json
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -14,9 +15,6 @@ import requests
 dir_this = Path(__file__).parent
 file_in = dir_this / "modelsBegin.json"
 file_out = dir_this / "modelsFinal.json"
-
-
-MODELS = json.load(open(file_in))
 
 
 def pick_keys(d: dict[str, Any], keys: dict[str, str]) -> dict[str, Any]:
@@ -89,20 +87,55 @@ def get_hf_info(model_name: str) -> dict[str, Any]:
     return filtered
 
 
+def write_models(file_out: Path, models: dict[str, Any] | list[dict[str, Any]]) -> None:
+    with open(file_out, "w") as f:
+        formatted_json = format_json_compact_arrays(models)
+        f.write(formatted_json)
+        f.write("\n")
+
+
 def main() -> None:
     """
     Main function to augment model data with HuggingFace info and write to a JSON file.
 
     This function iterates over the MODELS list, augments each model with additional
     information from HuggingFace, and writes the resulting list to a JSON file.
+    It also removes the isNew flag from models that are more than one month old.
 
     Examples:
         >>> main()
         Augmenting some-model-id
         JSON file written, you may wish to run prettier on it
     """
+    with open(file_in) as f:
+        models = json.load(f)
+
+    # Check for models older than one month and remove isNew flag
+    current_date = datetime.now(timezone.utc)
+    changes_made = False
+
+    for model in models:
+        if not model.get("isNew"):
+            continue
+        launch_date = model.get("launchDate")
+        if launch_date:
+            try:
+                launch_datetime = datetime.fromisoformat(launch_date.replace('Z', '+00:00'))
+                # Calculate if more than one month old
+                if (current_date - launch_datetime).days > 30:
+                    del model["isNew"]
+                    changes_made = True
+            except (ValueError, TypeError):
+                # Skip models with invalid launch dates
+                continue
+
+    # If changes were made, overwrite the input file
+    if changes_made:
+        write_models(file_in, models)
+        print("Updated input file, removed isNew flags for old models")
+
     models_data: list[dict[str, Any]] = []
-    for model in MODELS:
+    for model in models:
         model_id = model["idHuggingFace"]
         print(f"Augmenting {model_id}")
         # This order puts our fields first, keeps id overriding
@@ -110,11 +143,7 @@ def main() -> None:
         info = {**model, **get_hf_info(model_id), "id": our_id}
         models_data.append(info)
 
-    with open(file_out, "w") as f:
-        formatted_json = format_json_compact_arrays({"models": models_data})
-        f.write(formatted_json)
-        f.write("\n")
-
+    write_models(file_out, {"models": models_data})
     print("JSON file written, you may wish to run prettier on it")
 
 
