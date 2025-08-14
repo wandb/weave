@@ -2071,6 +2071,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     created_at,
                     req.metric_key,
                     req.metric_value,
+                    req.call_id,
                 )
             ],
             column_names=[
@@ -2080,6 +2081,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 "created_at",
                 "metric_key",
                 "metric_value",
+                "call_id",
             ],
         )
 
@@ -2098,8 +2100,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 (
                     req.project_id,
                     event_id,
-                    req.alert_ref,
                     req.alert_id,
+                    req.associated_call_ids,
+                    req.metric_values,
                     created_at,
                     req.level.value,
                 )
@@ -2107,8 +2110,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             column_names=[
                 "project_id",
                 "id",
-                "alert_ref",
                 "alert_id",
+                "associated_call_ids",
+                "metric_values",
                 "created_at",
                 "level",
             ],
@@ -2144,17 +2148,21 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 f"created_at <= {{{pb.add_param(req.end_time.timestamp())}: Float64}}"
             )
 
+        # TODO: break out into query builder
+        # TODO: add streaming
+        # TODO: add pagination + sort
+
         query = f"""
         SELECT id, project_id, alert_ids, created_at, metric_key, metric_value
         FROM alert_metrics
-        WHERE {' AND '.join(conditions)}
-        ORDER BY created_at DESC
+        WHERE {" AND ".join(conditions)}
+        ORDER BY created_at_inv ASC
         """
 
         if req.limit:
-            query += f" LIMIT {req.limit}"
+            query += f" LIMIT {{{pb.add_param(req.limit)}: Int64}}"
         if req.offset:
-            query += f" OFFSET {req.offset}"
+            query += f" OFFSET {{{pb.add_param(req.offset)}: Int64}}"
 
         result = self._query(query, pb.get_params())
 
@@ -2203,16 +2211,16 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             )
 
         query = f"""
-        SELECT id, project_id, alert_ref, alert_id, created_at, level
-        FROM alert_events  
-        WHERE {' AND '.join(conditions)}
+        SELECT id, project_id, alert_id, associated_call_ids, metric_values, created_at, level
+        FROM alert_events
+        WHERE {" AND ".join(conditions)}
         ORDER BY created_at DESC
         """
 
         if req.limit:
-            query += f" LIMIT {req.limit}"
+            query += f" LIMIT {{{pb.add_param(req.limit)}: Int64}}"
         if req.offset:
-            query += f" OFFSET {req.offset}"
+            query += f" OFFSET {{{pb.add_param(req.offset)}: Int64}}"
 
         result = self._query(query, pb.get_params())
 
@@ -2222,10 +2230,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 tsi.AlertEventSchema(
                     id=row[0],
                     project_id=row[1],
-                    alert_ref=row[2],
-                    alert_id=row[3],
-                    created_at=_ensure_datetimes_have_tz_strict(row[4]),
-                    level=tsi.AlertLevel(row[5]),
+                    alert_id=row[2],
+                    associated_call_ids=row[3],
+                    metric_values=row[4],
+                    created_at=_ensure_datetimes_have_tz_strict(row[5]),
+                    level=tsi.AlertLevel(row[6]),
                 )
             )
 

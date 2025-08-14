@@ -1209,6 +1209,7 @@ class AlertMetricCreateReq(BaseModelStrict):
     alert_ids: list[str]
     metric_key: str
     metric_value: float
+    call_id: str
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
@@ -1218,9 +1219,10 @@ class AlertMetricCreateRes(BaseModel):
 
 class AlertEventCreateReq(BaseModelStrict):
     project_id: str
-    alert_ref: str
     alert_id: str
     level: AlertLevel
+    associated_call_ids: list[str]
+    metric_values: list[float]
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
