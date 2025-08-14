@@ -18,6 +18,7 @@ from weave.trace.constants import TRACE_OBJECT_EMOJI
 from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.context.call_context import get_current_call, require_current_call
+from weave.trace.display.term import configure_logger
 from weave.trace.op import PostprocessInputsFunc, PostprocessOutputFunc, as_op, op
 from weave.trace.refs import ObjectRef, parse_uri
 from weave.trace.settings import (
@@ -26,7 +27,6 @@ from weave.trace.settings import (
     should_disable_weave,
 )
 from weave.trace.table import Table
-from weave.trace.display.term import configure_logger
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface.builtin_object_classes import leaderboard
 
@@ -105,29 +105,6 @@ def init(
 
 def get_client() -> weave_client.WeaveClient | None:
     return weave_client_context.get_weave_client()
-
-
-@contextlib.contextmanager
-def remote_client(project_name: str) -> Iterator[weave_init.weave_client.WeaveClient]:
-    inited_client = weave_init.init_weave(project_name)
-    try:
-        yield inited_client.client
-    finally:
-        inited_client.reset()
-
-
-# This is currently an internal interface. We'll expose something like it though ("offline" mode)
-def init_local_client() -> weave_client.WeaveClient:
-    return weave_init.init_local().client
-
-
-@contextlib.contextmanager
-def local_client() -> Iterator[weave_client.WeaveClient]:
-    inited_client = weave_init.init_local()
-    try:
-        yield inited_client.client
-    finally:
-        inited_client.reset()
 
 
 def publish(obj: Any, name: str | None = None) -> ObjectRef:
@@ -240,20 +217,6 @@ def get(uri: str | ObjectRef) -> Any:
     if isinstance(uri, ObjectRef):
         return uri.get()
     return ref(uri).get()
-
-
-def obj_ref(obj: Any) -> ObjectRef | None:
-    return weave_client.get_ref(obj)
-
-
-def output_of(obj: Any) -> weave_client.Call | None:
-    client = weave_client_context.require_weave_client()
-
-    ref = obj_ref(obj)
-    if ref is None:
-        return ref
-
-    return client._ref_output_of(ref)
 
 
 @contextlib.contextmanager
@@ -386,15 +349,10 @@ __all__ = [
     "get_client",
     "get_current_call",
     "init",
-    "init_local_client",
-    "local_client",
-    "obj_ref",
     "op",
-    "output_of",
     "parse_uri",
     "publish",
     "ref",
-    "remote_client",
     "require_current_call",
     "thread",
     "weave_client_context",
