@@ -252,7 +252,8 @@ jobs:
             "13",
             #
           ]
-        nox-shard: [
+        nox-shard:
+          [
             "trace1",
             "trace2",
             "trace3",
@@ -267,8 +268,6 @@ jobs:
             "crewai",
             "dspy",
             "groq",
-            # "huggingface",
-            "google_ai_studio",
             "google_genai",
             "instructor",
             "langchain",
