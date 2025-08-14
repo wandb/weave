@@ -191,8 +191,14 @@ class Evaluation(Object):
 
         scores = {}
         if scorers := self.scorers:
-            for scorer in scorers:
-                apply_scorer_result = await model_call.apply_scorer(scorer, example)
+            # Run all scorer calls in parallel
+            scorer_tasks = [
+                model_call.apply_scorer(scorer, example) for scorer in scorers
+            ]
+            apply_scorer_results = await asyncio.gather(*scorer_tasks)
+            
+            # Process results and build scores dict
+            for scorer, apply_scorer_result in zip(scorers, apply_scorer_results):
                 result = apply_scorer_result.result
                 scorer_attributes = get_scorer_attributes(scorer)
                 scorer_name = scorer_attributes.scorer_name
