@@ -129,18 +129,16 @@ For a comprehensive list of class attributes and methods view the [Content refer
 
 #### Initialization Methods
 
- - `Content.from_path(path, mimetype=None, metadata=None)`
+Create `content` object from a file path:
 
 ```python
-# Create Content from a file path:
 content = Content.from_path("assets/photo.jpg")
 print(content.mimetype, content.size)
 ```
 
- - `Content.from_bytes(data, extension=None, mimetype=None, metadata=None)`
+Create `content` object from raw bytes:
 
 ```python
-# Create Content from raw bytes:
 content = Content.from_bytes(
     data_bytes,
     filename="audio.mp3", 
@@ -149,17 +147,14 @@ content = Content.from_bytes(
 content.save("output.mp3")
 ```
 
- - `Content.from_text(text, extension=None, mimetype=None, metadata=None)`
+Create `content` object from text:
 
 ```python
-# Create Content from text:
 content = Content.from_text("Hello, World!", mimetype="text/plain")
-```
 
- - `Content.from_base64(b64_data, extension=None, mimetype=None, metadata=None)`
+Create `content` object from base64-encoded data:
 
 ```python
-# Create Content from base64-encoded data:
 content = Content.from_base64(base64_string)
 print(content.metadata)
 ```
