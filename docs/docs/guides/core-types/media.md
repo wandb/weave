@@ -151,6 +151,8 @@ Create `content` object from text:
 
 ```python
 content = Content.from_text("Hello, World!", mimetype="text/plain")
+print(content.as_string())
+```
 
 Create `content` object from base64-encoded data:
 
