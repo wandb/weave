@@ -238,6 +238,10 @@ def create_stream_wrapper(
                         )
                     return self
 
+            def __getitem__(self, key: str) -> Any:
+                """Make the wrapper subscriptable by delegating to get method."""
+                return self.get(key)
+
         return _add_accumulator(
             op,
             make_accumulator=lambda _: bedrock_stream_accumulator,
