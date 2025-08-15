@@ -119,7 +119,7 @@ def _extract_usage_data(call: Call, output: Any) -> None:
     model_type = metadata.get("ls_model_type", "unknown")
 
     model_name = _find_full_model_name(output, partial_model_name)
-    usage_dict = defaultdict(lambda: defaultdict(int))
+    usage_dict: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
     generations = output.get("outputs", {}).get("generations", [])
 
     # Extract usage data from generations structure
