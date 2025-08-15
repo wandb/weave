@@ -131,7 +131,7 @@ def generate_routes(
         return service.read_root()
 
     @router.post("/otel/v1/trace", tags=[OTEL_TAG_NAME])
-    def otel_export(
+    def export_trace(
         req: tsi.OtelExportReq,
         service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
     ) -> tsi.OtelExportRes:
