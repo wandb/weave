@@ -93,12 +93,15 @@ def _find_full_model_name(output: Any, partial_model_name: str) -> str:
 
     flattened = flatten_attributes(output)
     best_match = partial_model_name
-    for key, value in flattened.items():
+    for value in flattened.values():
         # we use startswith here to avoid prefix matches like "models/gemini-1.5-pro"
         # and return if we find a better (longer) match
-        if isinstance(value, str) and value.startswith(partial_model_name):
-            if len(value) > len(best_match):
-                best_match = value
+        if (
+            isinstance(value, str)
+            and value.startswith(partial_model_name)
+            and len(value) > len(best_match)
+        ):
+            best_match = value
 
     return best_match
 
