@@ -859,6 +859,11 @@ class RefsReadBatchRes(BaseModel):
 
 
 class FeedbackCreateReq(BaseModelStrict):
+    id: Optional[str] = Field(
+        default=None,
+        description="If provided by the client, this ID will be used for the feedback row instead of a server-generated one.",
+        examples=["018f1f2a-9c2b-7d3e-b5a1-8c9d2e4f6a7b"],
+    )
     project_id: str = Field(examples=["entity/project"])
     weave_ref: str = Field(examples=["weave:///entity/project/object/name:digest"])
     creator: Optional[str] = Field(default=None, examples=["Jane Smith"])
@@ -899,7 +904,8 @@ class FeedbackCreateRes(BaseModel):
 
 
 class Feedback(FeedbackCreateReq):
-    id: str
+    # Feedback is stricter than the create request, and must always have an id
+    id: str  # type: ignore[reportIncompatibleVariableOverride]
     created_at: datetime.datetime
 
 
@@ -936,6 +942,14 @@ class FeedbackReplaceReq(FeedbackCreateReq):
 
 class FeedbackReplaceRes(FeedbackCreateRes):
     pass
+
+
+class FeedbackCreateBatchReq(BaseModelStrict):
+    batch: list[FeedbackCreateReq]
+
+
+class FeedbackCreateBatchRes(BaseModel):
+    res: list[FeedbackCreateRes]
 
 
 class FileCreateReq(BaseModelStrict):
@@ -1252,6 +1266,10 @@ class TraceServerInterface(Protocol):
 
     # Feedback API
     def feedback_create(self, req: FeedbackCreateReq) -> FeedbackCreateRes: ...
+    def feedback_create_batch(
+        self, req: FeedbackCreateBatchReq
+    ) -> FeedbackCreateBatchRes: ...
+
     def feedback_query(self, req: FeedbackQueryReq) -> FeedbackQueryRes: ...
     def feedback_purge(self, req: FeedbackPurgeReq) -> FeedbackPurgeRes: ...
     def feedback_replace(self, req: FeedbackReplaceReq) -> FeedbackReplaceRes: ...

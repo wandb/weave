@@ -87,6 +87,8 @@ def server(request):
 
     if server_.call_processor:
         server_.call_processor.stop_accepting_new_work_and_flush_queue()
+    if server_.feedback_processor:
+        server_.feedback_processor.stop_accepting_new_work_and_flush_queue()
 
 
 @pytest.mark.parametrize("server", ["small_limit"], indirect=True)
