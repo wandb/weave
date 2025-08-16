@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Any, Callable, TypedDict, cast
 import pydantic
 from requests import HTTPError
 
+import weave.trace.env
 from weave import version
 from weave.chat.chat import Chat
 from weave.chat.inference_models import InferenceModels
@@ -34,7 +35,6 @@ from weave.trace.interface_query_builder import (
     get_field_expr,
     literal_expr,
 )
-from weave.trace.isinstance import weave_isinstance
 from weave.trace.object_record import (
     ObjectRecord,
     dataclass_object_record,
@@ -77,7 +77,7 @@ from weave.trace.settings import (
     should_redact_pii,
 )
 from weave.trace.table import Table
-from weave.trace.util import deprecated, log_once
+from weave.trace.util import deprecated, log_once, weave_isinstance
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
 from weave.trace.weave_client_send_file_cache import WeaveClientSendFileCache
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH, MAX_OBJECT_NAME_LENGTH
@@ -462,7 +462,7 @@ class Call:
             entity, project = self.project_id.split("/")
         except ValueError:
             raise ValueError(f"Invalid project_id: {self.project_id}") from None
-        return urls.redirect_call(entity, project, self.id)
+        return weave.trace.env.redirect_call(entity, project, self.id)
 
     @property
     def ref(self) -> CallRef:
