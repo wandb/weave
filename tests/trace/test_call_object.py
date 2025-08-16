@@ -17,7 +17,6 @@ def test_call_to_dict(client):
         "attributes": call.attributes,
         "started_at": call.started_at,
         "ended_at": call.ended_at,
-        "deleted_at": call.deleted_at,
         "id": call.id,
         "parent_id": call.parent_id,
         "trace_id": call.trace_id,

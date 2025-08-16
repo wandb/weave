@@ -134,8 +134,6 @@ class CallSchema(BaseModel):
     wb_run_id: Optional[str] = None
     wb_run_step: Optional[int] = None
 
-    deleted_at: Optional[datetime.datetime] = None
-
     # Size of metadata storage for this call
     storage_size_bytes: Optional[int] = None
 
@@ -207,7 +205,6 @@ class ObjSchema(BaseModel):
     project_id: str
     object_id: str
     created_at: datetime.datetime
-    deleted_at: Optional[datetime.datetime] = None
     digest: str
     version_index: int
     is_latest: int
