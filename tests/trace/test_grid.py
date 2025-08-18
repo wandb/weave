@@ -1,6 +1,6 @@
 import pytest
 
-from weave.trace.grid import Grid, Row
+from weave.trace.display.grid import Grid, Row
 
 
 def test_grid_creation():

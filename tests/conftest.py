@@ -1,12 +1,15 @@
 import contextlib
+import json
 import logging
 import os
 import typing
 from collections.abc import Iterator
+from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import FastAPI
+from fastapi.responses import StreamingResponse
 from fastapi.testclient import TestClient
 
 import weave
@@ -168,6 +171,11 @@ class ThrowingServer(tsi.TraceServerInterface):
 
     def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
         raise DummyTestException("FAILURE - feedback_create, req:", req)
+
+    def feedback_create_batch(
+        self, req: tsi.FeedbackCreateBatchReq
+    ) -> tsi.FeedbackCreateBatchRes:
+        raise DummyTestException("FAILURE - feedback_create_batch, req:", req)
 
     def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
         raise DummyTestException("FAILURE - feedback_query, req:", req)
@@ -441,6 +449,27 @@ def network_proxy_client(client):
 
     records = []
 
+    @app.post("/calls/stream_query")
+    def calls_stream_query(req: tsi.CallsQueryReq):
+        records.append(
+            (
+                "calls_stream_query",
+                req,
+            )
+        )
+
+        def generate():
+            calls = client.server.calls_query_stream(req)
+            for call in calls:
+                # Convert datetime objects to ISO format for JSON serialization
+                call_dict = call.model_dump()
+                for key, value in call_dict.items():
+                    if isinstance(value, datetime):
+                        call_dict[key] = value.isoformat()
+                yield f"{json.dumps(call_dict)}\n"
+
+        return StreamingResponse(generate(), media_type="application/x-ndjson")
+
     @app.post("/table/create")
     def table_create(req: tsi.TableCreateReq) -> tsi.TableCreateRes:
         records.append(
@@ -461,6 +490,28 @@ def network_proxy_client(client):
         )
         return client.server.table_update(req)
 
+    @app.post("/feedback/create")
+    def feedback_create(req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
+        records.append(
+            (
+                "feedback_create",
+                req,
+            )
+        )
+        return client.server.feedback_create(req)
+
+    @app.post("/feedback/batch/create")
+    def feedback_create_batch(
+        req: tsi.FeedbackCreateBatchReq,
+    ) -> tsi.FeedbackCreateBatchRes:
+        records.append(
+            (
+                "feedback_create_batch",
+                req,
+            )
+        )
+        return client.server.feedback_create_batch(req)
+
     with TestClient(app) as c:
 
         def post(url, data=None, json=None, **kwargs):
@@ -471,7 +522,8 @@ def network_proxy_client(client):
         weave.trace_server.requests.post = post
 
         remote_client = remote_http_trace_server.RemoteHTTPTraceServer(
-            trace_server_url=""
+            trace_server_url="",
+            should_batch=True,
         )
         yield (client, remote_client, records)
 

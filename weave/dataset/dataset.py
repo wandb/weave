@@ -7,8 +7,8 @@ from pydantic import field_validator
 from typing_extensions import Self
 
 import weave
-from weave.flow.obj import Object
 from weave.flow.util import short_str
+from weave.object.obj import Object
 from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.objectify import register_object

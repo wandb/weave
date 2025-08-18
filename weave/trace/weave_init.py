@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import logging
 
+from weave.telemetry import trace_sentry
 from weave.trace import (
     autopatch,
     init_message,
-    trace_sentry,
     wandb_termlog_patch,
     weave_client,
 )
@@ -148,7 +148,7 @@ def init_weave(
 
     # This is a temporary event to track the number of users who have enabled PII redaction.
     if should_redact_pii():
-        from weave.trace.pii_redaction import track_pii_redaction_enabled
+        from weave.utils.pii_redaction import track_pii_redaction_enabled
 
         track_pii_redaction_enabled(username or "unknown", entity_name, project_name)
 
