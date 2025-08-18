@@ -4,6 +4,8 @@ It uses the Hugging Face ID for each model to augment each model
 with information such as number of likes and downloads and license.
 """
 
+from __future__ import annotations
+
 import json
 import re
 from datetime import datetime, timezone
