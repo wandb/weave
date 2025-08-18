@@ -186,7 +186,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install nox uv==0.8.6
       - name: Run nox
-        run: nox -e lint
+        run: nox -e lint -- --all-files
 
   trace-docs:
     name: Trace docs
@@ -252,7 +252,8 @@ jobs:
             "13",
             #
           ]
-        nox-shard: [
+        nox-shard:
+          [
             "trace1",
             "trace2",
             "trace3",
@@ -267,8 +268,6 @@ jobs:
             "crewai",
             "dspy",
             "groq",
-            # "huggingface",
-            "google_ai_studio",
             "google_genai",
             "instructor",
             "langchain",

@@ -16,17 +16,17 @@ from typing import Any, Callable, TypedDict, get_args, get_origin
 
 from weave.trace import settings
 from weave.trace.context.weave_client_context import get_weave_client
-from weave.trace.ipython import (
+from weave.trace.op import Op, as_op, is_op
+from weave.trace.refs import ObjectRef
+from weave.trace.serialization import serializer
+from weave.trace.serialization.mem_artifact import MemTraceFilesArtifact
+from weave.trace_server.trace_server_interface_util import str_digest
+from weave.utils.ipython import (
     ClassNotFoundError,
     get_class_source,
     is_running_interactively,
 )
-from weave.trace.op import Op, as_op, is_op
-from weave.trace.refs import ObjectRef
-from weave.trace.sanitize import REDACTED_VALUE, should_redact
-from weave.trace.serialization import serializer
-from weave.trace.serialization.mem_artifact import MemTraceFilesArtifact
-from weave.trace_server.trace_server_interface_util import str_digest
+from weave.utils.sanitize import REDACTED_VALUE, should_redact
 
 logger = logging.getLogger(__name__)
 
