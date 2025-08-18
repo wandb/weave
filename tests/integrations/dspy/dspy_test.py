@@ -428,7 +428,7 @@ def test_dspy_optimizer_bootstrap_fewshot_with_random_search(
     )
 
     calls = list(client.get_calls())
-    assert len(calls) == 23
+    assert len(calls) == 33
 
     call = calls[0]
     assert call.started_at < call.ended_at
