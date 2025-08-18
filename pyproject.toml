@@ -59,16 +59,16 @@ dependencies = [
 
 [project.optional-dependencies]
 wandb = ["wandb>=0.17.1"]
-stainless = [
-  # This dependency will be updated each time we regenerate the trace server bindings.
-  # 1. For normal dev, pin to a SHA and allow direct references.  This will look like:
-  #    weave_server_sdk @ git+https://github.com/wandb/weave-stainless@daf91fdd07535c570eb618b343e2d125f9b09e25
-  # 2. For deploys, pin to a specific version and remove allow-direct-references.  This will look like:
-  #    weave_server_sdk==0.0.1
+# stainless = [
+#   # This dependency will be updated each time we regenerate the trace server bindings.
+#   # 1. For normal dev, pin to a SHA and allow direct references.  This will look like:
+#   #    weave_server_sdk @ git+https://github.com/wandb/weave-stainless@daf91fdd07535c570eb618b343e2d125f9b09e25
+#   # 2. For deploys, pin to a specific version and remove allow-direct-references.  This will look like:
+#   #    weave_server_sdk==0.0.1
 
-  # TODO: Uncomment when ready to commit to the new bindings.
-  "weave_server_sdk @ git+https://github.com/wandb/weave-stainless.git@3e65c0a8e0adb642bbde81e64f03b333d9d57686",
-]
+#   # TODO: Uncomment when ready to commit to the new bindings.
+#   "weave_server_sdk @ git+https://github.com/wandb/weave-stainless.git@3e65c0a8e0adb642bbde81e64f03b333d9d57686",
+# ]
 # `trace_server` is the dependency list of the trace server itself. We eventually will extract
 # this to a separate package. Note, when that happens, we will need to pull along some of the
 # default dependencies as well.
