@@ -351,7 +351,11 @@ ignore = [
   # This is a more involved change, so disabling for now.
   "C901", # https://docs.astral.sh/ruff/rules/complex-structure/
 ]
+extend-select = ["TID"]
 exclude = ["weave_query"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"weave.trace_server" = { msg = "Only trace_server may import from trace_server" }
 
 [tool.ruff.lint.isort]
 known-third-party = ["wandb", "weave_query"]
@@ -368,6 +372,18 @@ exclude = ["weave_query", "rules"]
 [tool.ruff.lint.per-file-ignores]
 "!/weave/trace/**/*.py" = ["T201"]
 "!/tests/**/*.py" = ["RUF059"]
+"weave/trace_server/**" = ["TID251"]
+"weave/chat/**" = ["TID251"]
+"weave/evaluation/**" = ["TID251"]
+"weave/trace_server_bindings/**" = ["TID251"]
+"weave/utils/**" = ["TID251"]
+"weave/trace/**" = ["TID251"]
+"weave/scripts/**" = ["TID251"]
+"weave/scorers/**" = ["TID251"]
+"weave/integrations/**" = ["TID251"]
+"weave/flow/**" = ["TID251"]
+"tests/**" = ["TID251"]
+"docs/**" = ["TID251"]
 
 [tool.pyright]
 include = ["weave"]
