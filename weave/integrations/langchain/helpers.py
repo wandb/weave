@@ -12,10 +12,9 @@ Supported providers:
 
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, cast
+from typing import Any
 
 from weave.trace.weave_client import Call
-from weave.trace_server.trace_server_interface import LLMUsageSchema
 from weave.utils.dict_utils import convert_defaultdict_to_dict, flatten_attributes
 
 
@@ -153,5 +152,5 @@ def _extract_usage_data(call: Call, output: Any) -> None:
         if call.summary is None:
             call.summary = {}
 
-        usage = cast(dict[str, LLMUsageSchema], convert_defaultdict_to_dict(usage_dict))
+        usage = convert_defaultdict_to_dict(usage_dict)
         call.summary.update({"usage": usage})
