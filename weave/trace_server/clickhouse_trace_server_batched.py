@@ -1797,6 +1797,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         return format_feedback_to_res(row)
 
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.feedback_create_batch")
     def feedback_create_batch(
         self, req: tsi.FeedbackCreateBatchReq
     ) -> tsi.FeedbackCreateBatchRes:
