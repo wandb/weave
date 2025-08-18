@@ -126,7 +126,7 @@ class WandbApiAsync:
         # bother.
         client = gql.Client(transport=transport, fetch_schema_from_transport=False)
         session = await client.connect_async(reconnecting=False)  # type: ignore
-        result = await session.execute(query, kwargs)
+        result = await session.execute(query, variable_values=kwargs)
         # Manually reset the connection, bypassing the SSL bug, avoiding ERROR:asyncio:Unclosed client session
         await transport.session.close()
         return result
@@ -155,7 +155,7 @@ class WandbApi:
         # bother.
         client = gql.Client(transport=transport, fetch_schema_from_transport=False)
         session = client.connect_sync()  # type: ignore
-        return session.execute(query, kwargs)
+        return session.execute(query, variable_values=kwargs)
 
     VIEWER_DEFAULT_ENTITY_QUERY = gql.gql(
         """
