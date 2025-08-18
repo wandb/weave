@@ -179,7 +179,6 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         """
         return self.call_processor
 
-    @with_retry
     def _send_feedback_batch_to_server(self, encoded_data: bytes) -> None:
         """Send a batch of feedback data to the server with retry logic.
 
