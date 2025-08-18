@@ -4,7 +4,7 @@ import weave
 from weave.integrations.dspy.dspy_utils import (
     dictify,
     dspy_postprocess_inputs,
-    dump_dspy_objects,
+    dspy_postprocess_outputs,
     get_op_name_for_callback,
 )
 from weave.trace.context import weave_client_context as weave_client_context
@@ -52,11 +52,10 @@ if not import_failed:
             exception: Optional[Exception] = None,
         ) -> None:
             gc = weave_client_context.require_weave_client()
-
             # Just finish the call normally - prediction logging is handled by monkey-patching
             if call_id in self._call_map:
                 gc.finish_call(
-                    self._call_map[call_id], dump_dspy_objects(outputs), exception
+                    self._call_map[call_id], dspy_postprocess_outputs(outputs), exception
                 )
 
         def on_lm_start(
@@ -101,7 +100,7 @@ if not import_failed:
             gc = weave_client_context.require_weave_client()
             if call_id in self._call_map:
                 gc.finish_call(
-                    self._call_map[call_id], dump_dspy_objects(outputs), exception
+                    self._call_map[call_id], dspy_postprocess_outputs(outputs), exception
                 )
 
         def on_tool_start(
@@ -130,5 +129,5 @@ if not import_failed:
             gc = weave_client_context.require_weave_client()
             if call_id in self._call_map:
                 gc.finish_call(
-                    self._call_map[call_id], dump_dspy_objects(outputs), exception
+                    self._call_map[call_id], dspy_postprocess_outputs(outputs), exception
                 )

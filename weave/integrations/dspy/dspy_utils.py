@@ -33,30 +33,30 @@ def get_symbol_patcher(
     )
 
 
-def dump_dspy_objects(data: Any) -> Any:
-    import numpy as np
-    from dspy import Example, Module
+# def dump_dspy_objects(data: Any) -> Any:
+#     import numpy as np
+#     from dspy import Example, Module
 
-    if isinstance(data, Example):
-        return data.toDict()
-    elif isinstance(data, Module):
-        return data.dump_state()
-    elif isinstance(data, np.ndarray):
-        return data.tolist()
-    elif isinstance(data, dict):
-        processed: dict[Any, Any] = {}
-        for k, v in data.items():
-            new_key = k.__name__ if isinstance(k, type) else k
-            processed[new_key] = dump_dspy_objects(v)
-        return processed
-    elif isinstance(data, list):
-        return [dump_dspy_objects(item) for item in data]
-    elif isinstance(data, (tuple, set)):
-        return [dump_dspy_objects(item) for item in data]
-    elif isinstance(data, type):
-        return data.__name__
+#     if isinstance(data, Example):
+#         return data.toDict()
+#     elif isinstance(data, Module):
+#         return data.dump_state()
+#     elif isinstance(data, np.ndarray):
+#         return data.tolist()
+#     elif isinstance(data, dict):
+#         processed: dict[Any, Any] = {}
+#         for k, v in data.items():
+#             new_key = k.__name__ if isinstance(k, type) else k
+#             processed[new_key] = dump_dspy_objects(v)
+#         return processed
+#     elif isinstance(data, list):
+#         return [dump_dspy_objects(item) for item in data]
+#     elif isinstance(data, (tuple, set)):
+#         return [dump_dspy_objects(item) for item in data]
+#     elif isinstance(data, type):
+#         return data.__name__
 
-    return data
+#     return data
 
 
 def dspy_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
@@ -86,12 +86,12 @@ def dspy_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
             else:
                 dictified_inputs_self["signature"] = inputs["self"].signature
 
-        dictified_inputs_self = dump_dspy_objects(dictified_inputs_self)
+        dictified_inputs_self = dictify(dictified_inputs_self)
 
         # Recursively serialize the dspy objects in the devset
         if isinstance(inputs["self"], Evaluate):
             dictified_inputs_self["devset"] = [
-                dump_dspy_objects(example) for example in inputs["self"].devset
+                dictify(example) for example in inputs["self"].devset
             ]
 
             # Convert the metric to a weave op if it is not already one
@@ -104,7 +104,7 @@ def dspy_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
 
         inputs["self"] = dictified_inputs_self
 
-    return dump_dspy_objects(inputs)
+    return dictify(inputs)
 
 
 def dspy_postprocess_outputs(
@@ -129,7 +129,7 @@ def dspy_postprocess_outputs(
     if isinstance(outputs, type):
         outputs = outputs.__name__
 
-    return dump_dspy_objects(outputs)
+    return dictify(outputs)
 
 
 def dspy_wrapper(settings: OpSettings) -> Callable[[Callable], Callable]:
