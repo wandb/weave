@@ -23,7 +23,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          token: ${{ secrets.WANDBMACHINE_GITHUB_TOKEN }}
+          # token: ${{ secrets.WANDBMACHINE_GITHUB_TOKEN }}
           fetch-depth: 0
       - id: setup_git
         run: |
