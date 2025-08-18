@@ -1460,6 +1460,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 # Unpack the results into the target rows
                 row_digest_vals = {r.digest: r.val for r in rows}
                 for index, row_digest in index_digests:
+                    if row_digest not in row_digest_vals:
+                        raise NotFoundError(f"Row digest {row_digest} not found")
                     extra_results[index] = PartialRefResult(
                         remaining_extra=extra_results[index].remaining_extra[2:],
                         val=row_digest_vals[row_digest],

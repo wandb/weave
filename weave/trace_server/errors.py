@@ -192,6 +192,7 @@ class ErrorRegistry:
 
         # Standard library exceptions
         self.register(ValueError, 400)
+        self.register(KeyError, 500, lambda exc: {"reason": "Internal backend error"})
 
         # Requests specific errors
         import requests
