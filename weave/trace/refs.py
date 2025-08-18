@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Any, Union, cast
 
 from weave.trace_server import refs_internal
-from weave.trace_server.errors import ObjectDeletedError
+from weave.trace.exceptions import ObjectDeletedError
 
 DICT_KEY_EDGE_NAME = refs_internal.DICT_KEY_EDGE_NAME
 LIST_INDEX_EDGE_NAME = refs_internal.LIST_INDEX_EDGE_NAME

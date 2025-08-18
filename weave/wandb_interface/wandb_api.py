@@ -15,6 +15,19 @@ from gql.transport.aiohttp import AIOHTTPTransport
 from gql.transport.requests import RequestsHTTPTransport
 from requests.auth import HTTPBasicAuth
 
+# Check gql version for backward compatibility
+# gql 4.0+ changed the execute() method signature:
+#   - gql 3.x: execute(query, variables)  # variables as positional arg
+#   - gql 4.x: execute(query, variable_values=variables)  # keyword-only arg
+# This allows Weave to work with both versions without breaking existing users
+try:
+    from packaging import version
+    GQL_VERSION = version.parse(gql.__version__ if hasattr(gql, '__version__') else '3.0.0')
+    GQL_V4_PLUS = GQL_VERSION >= version.parse('4.0.0')
+except ImportError:
+    # If packaging is not available, assume older version
+    GQL_V4_PLUS = False
+
 try:
     from wandb.sdk.internal.internal_api import _thread_local_api_settings
 except ImportError:
@@ -126,7 +139,11 @@ class WandbApiAsync:
         # bother.
         client = gql.Client(transport=transport, fetch_schema_from_transport=False)
         session = await client.connect_async(reconnecting=False)  # type: ignore
-        result = await session.execute(query, kwargs)
+        # Handle gql 3.x vs 4.x API difference
+        if GQL_V4_PLUS:
+            result = await session.execute(query, variable_values=kwargs)
+        else:
+            result = await session.execute(query, kwargs)
         # Manually reset the connection, bypassing the SSL bug, avoiding ERROR:asyncio:Unclosed client session
         await transport.session.close()
         return result
@@ -155,7 +172,11 @@ class WandbApi:
         # bother.
         client = gql.Client(transport=transport, fetch_schema_from_transport=False)
         session = client.connect_sync()  # type: ignore
-        return session.execute(query, kwargs)
+        # Handle gql 3.x vs 4.x API difference
+        if GQL_V4_PLUS:
+            return session.execute(query, variable_values=kwargs)
+        else:
+            return session.execute(query, kwargs)
 
     VIEWER_DEFAULT_ENTITY_QUERY = gql.gql(
         """

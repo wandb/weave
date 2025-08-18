@@ -12,6 +12,9 @@ from clickhouse_connect.driver.exceptions import (
 )
 from gql.transport.exceptions import TransportQueryError
 
+# Import ObjectDeletedError from the common location
+from weave.trace.exceptions import ObjectDeletedError
+
 
 class Error(Exception):
     """Base class for exceptions in this module."""
@@ -77,12 +80,7 @@ class MissingLLMApiKeyError(Error):
         super().__init__(message)
 
 
-class ObjectDeletedError(Error):
-    """Raised when an object has been deleted."""
-
-    def __init__(self, message: str, deleted_at: datetime.datetime):
-        self.deleted_at = deleted_at
-        super().__init__(message)
+# ObjectDeletedError is now imported from weave.trace.exceptions above
 
 
 class InvalidExternalRef(Error):
