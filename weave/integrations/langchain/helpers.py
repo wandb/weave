@@ -15,9 +15,8 @@ from dataclasses import dataclass
 from typing import Any, cast
 
 from weave.trace.weave_client import Call
-from weave.trace_server.opentelemetry.helpers import flatten_attributes
 from weave.trace_server.trace_server_interface import LLMUsageSchema
-from weave.utils.dict_utils import convert_defaultdict_to_dict
+from weave.utils.dict_utils import convert_defaultdict_to_dict, flatten_attributes
 
 
 @dataclass
