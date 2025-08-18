@@ -3,7 +3,7 @@ from __future__ import annotations
 import importlib
 import os
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, Callable, Union
+from typing import TYPE_CHECKING, Any, Callable
 
 from pydantic import BaseModel
 
@@ -84,8 +84,8 @@ def dspy_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
 
 
 def dspy_postprocess_outputs(
-    outputs: Union[Any, "Example"],
-) -> Union[list[Any], dict[str, Any], Any]:
+    outputs: Any | Example,
+) -> list[Any] | dict[str, Any] | Any:
     import numpy as np
     from dspy import Example, Module
     from litellm import ModelResponse

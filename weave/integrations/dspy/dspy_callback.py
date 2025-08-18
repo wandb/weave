@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
 import weave
 from weave.integrations.dspy.dspy_utils import (
@@ -50,14 +50,16 @@ if not import_failed:
         def on_module_end(
             self,
             call_id: str,
-            outputs: Optional[Any],
-            exception: Optional[Exception] = None,
+            outputs: Any | None,
+            exception: Exception | None = None,
         ) -> None:
             gc = weave_client_context.require_weave_client()
             # Just finish the call normally - prediction logging is handled by monkey-patching
             if call_id in self._call_map:
                 gc.finish_call(
-                    self._call_map[call_id], dspy_postprocess_outputs(outputs), exception
+                    self._call_map[call_id],
+                    dspy_postprocess_outputs(outputs),
+                    exception,
                 )
 
         def on_lm_start(
@@ -88,8 +90,8 @@ if not import_failed:
         def on_lm_end(
             self,
             call_id: str,
-            outputs: Optional[dict[str, Any]],
-            exception: Optional[Exception] = None,
+            outputs: dict[str, Any] | None,
+            exception: Exception | None = None,
         ) -> None:
             """A handler triggered after __call__ method of dspy.LM instance is executed.
 
@@ -102,7 +104,9 @@ if not import_failed:
             gc = weave_client_context.require_weave_client()
             if call_id in self._call_map:
                 gc.finish_call(
-                    self._call_map[call_id], dspy_postprocess_outputs(outputs), exception
+                    self._call_map[call_id],
+                    dspy_postprocess_outputs(outputs),
+                    exception,
                 )
 
         def on_tool_start(
@@ -125,11 +129,13 @@ if not import_failed:
         def on_tool_end(
             self,
             call_id: str,
-            outputs: Optional[dict[str, Any]],
-            exception: Optional[Exception] = None,
+            outputs: dict[str, Any] | None,
+            exception: Exception | None = None,
         ) -> None:
             gc = weave_client_context.require_weave_client()
             if call_id in self._call_map:
                 gc.finish_call(
-                    self._call_map[call_id], dspy_postprocess_outputs(outputs), exception
+                    self._call_map[call_id],
+                    dspy_postprocess_outputs(outputs),
+                    exception,
                 )
