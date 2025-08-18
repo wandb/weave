@@ -1,6 +1,6 @@
 # FAQs
 
-The following page provides answers to common questions about Weave tracing.
+The following page provides answers to common questions about W&B Weave tracing.
 
 ## What information does Weave capture for a function?
 

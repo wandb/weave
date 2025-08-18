@@ -125,14 +125,6 @@ CATEGORIES = [
         matcher=re.compile(r"^weave/trace_server/"),
     ),
     CategoryRule(
-        name="UI",
-        column_header="UI",
-        emoji="🎨",
-        matcher=re.compile(
-            r"^weave-js/src/components/PagePanelComponents/Home/Browse3/"
-        ),
-    ),
-    CategoryRule(
         name="TypeScript SDK",
         column_header="TS",
         emoji="📦",

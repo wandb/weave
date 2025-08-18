@@ -1,6 +1,6 @@
 # Navigate the Trace View
 
-The Weave Trace view is designed to help you make sense of complex execution paths in your LLM and agentic apps. Whether you're debugging an agentic app with dozens of nested calls, or tracking the flow of a single model prediction, the Trace view provides a clear breakdown, while also providing alternate ways to view and understand your application flow.
+The W&B Weave Trace view is designed to help you make sense of complex execution paths in your LLM and agentic apps. Whether you're debugging an agentic app with dozens of nested calls, or tracking the flow of a single model prediction, the Trace view provides a clear breakdown, while also providing alternate ways to view and understand your application flow.
 
 This guide describes how to move through the trace stack, filter and search for ops, switch between visual representations, and more.
 

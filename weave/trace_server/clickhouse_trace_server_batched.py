@@ -36,7 +36,6 @@ from zoneinfo import ZoneInfo
 
 import clickhouse_connect
 import ddtrace
-import emoji
 from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.query import QueryResult
 from clickhouse_connect.driver.summary import QuerySummary
@@ -75,7 +74,6 @@ from weave.trace_server.clickhouse_schema import (
     SelectableCHObjSchema,
 )
 from weave.trace_server.constants import COMPLETIONS_CREATE_OP_NAME
-from weave.trace_server.emoji_util import detone_emojis
 from weave.trace_server.errors import (
     InsertTooLarge,
     InvalidRequest,
@@ -83,9 +81,13 @@ from weave.trace_server.errors import (
     NotFoundError,
     ObjectDeletedError,
     RequestTooLarge,
+    handle_clickhouse_query_error,
 )
 from weave.trace_server.feedback import (
     TABLE_FEEDBACK,
+    format_feedback_to_res,
+    format_feedback_to_row,
+    process_feedback_payload,
     validate_feedback_create_req,
     validate_feedback_purge_req,
 )
@@ -1458,6 +1460,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 # Unpack the results into the target rows
                 row_digest_vals = {r.digest: r.val for r in rows}
                 for index, row_digest in index_digests:
+                    if row_digest not in row_digest_vals:
+                        raise NotFoundError(f"Row digest {row_digest} not found")
                     extra_results[index] = PartialRefResult(
                         remaining_extra=extra_results[index].remaining_extra[2:],
                         val=row_digest_vals[row_digest],
@@ -1788,49 +1792,39 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         assert_non_null_wb_user_id(req)
         validate_feedback_create_req(req, self)
 
-        # Augment emoji with alias.
-        res_payload = {}
-        if req.feedback_type == "wandb.reaction.1":
-            em = req.payload["emoji"]
-            if emoji.emoji_count(em) != 1:
-                raise InvalidRequest(
-                    "Value of emoji key in payload must be exactly one emoji"
-                )
-            req.payload["alias"] = emoji.demojize(em)
-            detoned = detone_emojis(em)
-            req.payload["detoned"] = detoned
-            req.payload["detoned_alias"] = emoji.demojize(detoned)
-            res_payload = req.payload
-
-        feedback_id = generate_id()
-        created_at = datetime.datetime.now(ZoneInfo("UTC"))
-        # TODO: Any validation on weave_ref?
-        payload = _dict_value_to_dump(req.payload)
-        max_payload = 1 << 20  # 1 MiB
-        if len(payload) > max_payload:
-            raise InvalidRequest("Feedback payload too large")
-        row: Row = {
-            "id": feedback_id,
-            "project_id": req.project_id,
-            "weave_ref": req.weave_ref,
-            "wb_user_id": req.wb_user_id,
-            "creator": req.creator,
-            "feedback_type": req.feedback_type,
-            "payload": req.payload,
-            "created_at": created_at,
-            "annotation_ref": req.annotation_ref,
-            "runnable_ref": req.runnable_ref,
-            "call_ref": req.call_ref,
-            "trigger_ref": req.trigger_ref,
-        }
+        processed_payload = process_feedback_payload(req)
+        row = format_feedback_to_row(req, processed_payload)
         prepared = TABLE_FEEDBACK.insert(row).prepare(database_type="clickhouse")
         self._insert(TABLE_FEEDBACK.name, prepared.data, prepared.column_names)
-        return tsi.FeedbackCreateRes(
-            id=feedback_id,
-            created_at=created_at,
-            wb_user_id=req.wb_user_id,
-            payload=res_payload,
-        )
+
+        return format_feedback_to_res(row)
+
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.feedback_create_batch")
+    def feedback_create_batch(
+        self, req: tsi.FeedbackCreateBatchReq
+    ) -> tsi.FeedbackCreateBatchRes:
+        """Create multiple feedback items in a batch efficiently."""
+        rows_to_insert = []
+        results = []
+
+        for feedback_req in req.batch:
+            assert_non_null_wb_user_id(feedback_req)
+            validate_feedback_create_req(feedback_req, self)
+
+            processed_payload = process_feedback_payload(feedback_req)
+            row = format_feedback_to_row(feedback_req, processed_payload)
+            rows_to_insert.append(row)
+            results.append(format_feedback_to_res(row))
+
+        # Batch insert all rows at once
+        if rows_to_insert:
+            insert_query = TABLE_FEEDBACK.insert()
+            for row in rows_to_insert:
+                insert_query.row(row)
+            prepared = insert_query.prepare(database_type="clickhouse")
+            self._insert(TABLE_FEEDBACK.name, prepared.data, prepared.column_names)
+
+        return tsi.FeedbackCreateBatchRes(res=results)
 
     def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
         query = TABLE_FEEDBACK.select()
@@ -2035,6 +2029,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if req.wb_user_id is None:
             raise ValueError("wb_user_id is required")
         call_id = generate_id()
+
         self._evaluate_model_dispatcher.dispatch(
             EvaluateModelArgs(
                 project_id=req.project_id,
@@ -2217,7 +2212,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     "parameters": parameters,
                 },
             )
-            raise
+            # always raises, optionally with custom error class
+            handle_clickhouse_query_error(e)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._query")
     def _query(
@@ -2246,7 +2242,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 "clickhouse_query_error",
                 extra={"error_str": str(e), "query": query, "parameters": parameters},
             )
-            raise
+            # always raises, optionally with custom error class
+            handle_clickhouse_query_error(e)
 
         logger.info(
             "clickhouse_query",
@@ -2740,6 +2737,7 @@ def _build_aggregated_output(
     assistant_acc: list[str],
     tool_calls: list[dict[str, Any]],
     chunk: dict[str, Any],
+    reasoning_content: list[str],
 ) -> dict[str, Any]:
     """Build the aggregated output from accumulated data."""
     current_finish_reason = chunk.get("choices", [{}])[0].get("finish_reason")
@@ -2764,6 +2762,9 @@ def _build_aggregated_output(
                     "role": "assistant",
                     "tool_calls": (cleaned_tool_calls if cleaned_tool_calls else None),
                     "function_call": None,
+                    "reasoning_content": (
+                        "".join(reasoning_content) if reasoning_content else None
+                    ),
                 },
             }
         ],
@@ -2790,6 +2791,7 @@ def _create_tracked_stream_wrapper(
         assistant_acc: list[str] = []
         tool_calls: list[dict[str, Any]] = []
         aggregated_metadata: dict[str, Any] = {}
+        reasoning_content: list[str] = []
 
         try:
             for chunk in chunk_iter:
@@ -2816,14 +2818,25 @@ def _create_tracked_stream_wrapper(
                         if tool_call_delta:
                             _process_tool_call_delta(tool_call_delta, tool_calls)
 
+                        # Handle reasoning content
+                        reasoning_content_delta = delta.get("reasoning_content")
+                        if reasoning_content_delta:
+                            reasoning_content.append(reasoning_content_delta)
+
                 # Build aggregated output
                 aggregated_output = _build_aggregated_output(
-                    aggregated_metadata, assistant_acc, tool_calls, chunk
+                    aggregated_metadata,
+                    assistant_acc,
+                    tool_calls,
+                    chunk,
+                    reasoning_content,
                 )
 
         finally:
             # Handle fallback case for aggregated output
-            if aggregated_output is None and (assistant_acc or tool_calls):
+            if aggregated_output is None and (
+                assistant_acc or tool_calls or reasoning_content
+            ):
                 cleaned_tool_calls = _clean_tool_calls(tool_calls)
                 aggregated_output = {
                     "choices": [
@@ -2837,6 +2850,11 @@ def _create_tracked_stream_wrapper(
                                 ),
                                 "tool_calls": (
                                     cleaned_tool_calls if cleaned_tool_calls else None
+                                ),
+                                "reasoning_content": (
+                                    "".join(reasoning_content)
+                                    if reasoning_content
+                                    else None
                                 ),
                             }
                         }

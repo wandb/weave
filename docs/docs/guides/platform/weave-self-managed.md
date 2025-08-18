@@ -1,13 +1,5 @@
 # W&B Weave Self-Managed
 
-:::important
-Weave on self-managed infrastructure is currently in Private Preview.  
-
-For production environments, W&B strongly recommends using [W&B Dedicated Cloud](https://docs.wandb.ai/guides/hosting/hosting-options/dedicated_cloud), where Weave is Generally Available.  
-
-To deploy a production-grade, self-managed instance, contact `support@wandb.com`.  
-:::
-
 This guide explains how to deploy all the components required to run W&B Weave in a self-managed environment.
 
 A key component of a self-managed Weave deployment is [ClickHouseDB](https://clickhouse.com/), which the Weave application backend relies on.
