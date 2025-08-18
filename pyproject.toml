@@ -107,13 +107,17 @@ anthropic = ["anthropic>=0.18.0"]
 cerebras = ["cerebras-cloud-sdk"]
 cohere = ["cohere>=5.9.1,<5.9.3"]
 # Pin until https://github.com/crewAIInc/crewAI/pull/2553 is released
-crewai = ["crewai>=0.100.1,<=0.108.0", "crewai-tools>=0.38.0", "openai>=1.99.9"]
-dspy = ["dspy>=2.6.27", "litellm[proxy]", "openai>=1.99.9"]
+crewai = [
+  "crewai>=0.100.1,<=0.108.0",
+  "crewai-tools>=0.38.0",
+  "openai>=1.99.9,<1.100.0",
+]
+dspy = ["dspy>=2.6.27", "litellm[proxy]", "openai>=1.99.9,<1.100.0"]
 google_genai = ["google-genai>=1.0.0,<=1.23.0", "pillow>=11.1.0"]
 groq = ["groq>=0.13.0"]
 huggingface = ["huggingface-hub>=0.28.1"]
 smolagents = [
-  "openai>=1.99.9",
+  "openai>=1.99.9,<1.100.0",
   "litellm>=1.58",
   "smolagents>=1.17.0,<1.19.0",
   "huggingface-hub>=0.28.1",
@@ -123,7 +127,7 @@ instructor = [
   "instructor>=1.4.3,<1.7.0; python_version <= '3.9'",
   "instructor>=1.4.3; python_version > '3.9'",
   "google-genai>=1.5.0",
-  "openai>=1.99.9",
+  "openai>=1.99.9,<1.100.0",
 ]
 langchain = [
   "langchain-core>=0.2.1",
@@ -137,18 +141,18 @@ langchain = [
   "chromadb>=0.5.0",
   "pysqlite3",
   "opentelemetry-exporter-otlp",
-  "openai>=1.99.9",
+  "openai>=1.99.9,<1.100.0",
 ]
 langchain_nvidia_ai_endpoints = [
   "langchain-core>=0.2.1",
   "langchain-nvidia-ai-endpoints",
 ]
-litellm = ["litellm>=1.36.1", "openai>=1.99.9"]
+litellm = ["litellm>=1.36.1", "openai>=1.99.9,<1.100.0"]
 # temporary max pin b/c 0.12.50 changes call structure and therefor tests
 llamaindex = [
   "llama-index>=0.10.35,<0.12.50",
   "llama-index-core<0.12.50",
-  "openai>=1.99.9",
+  "openai>=1.99.9,<1.100.0",
 ]
 mistral = ["mistralai>=1.0.0"]
 scorers = [
@@ -166,7 +170,7 @@ scorers = [
   "huggingface_hub>=0.28.1",
 ]
 notdiamond = ["notdiamond>=0.3.21", "litellm<=1.49.1"]
-openai = ["openai>=1.99.9"]
+openai = ["openai>=1.99.9,<1.100.0"]
 openai_agents = ["openai-agents>=0.0.4"]
 pandas-test = ["pandas>=2.2.3"]
 presidio = ["presidio-analyzer==2.2.357", "presidio-anonymizer==2.2.357"]
@@ -179,7 +183,7 @@ autogen = ["autogen-agentchat>=0.5.7"]
 autogen_tests = [
   "autogen-agentchat>=0.5.7",
   "autogen-ext[openai]>=0.5.7",
-  "openai>=1.99.9",
+  "openai>=1.99.9,<1.100.0",
 ]
 
 test = [
