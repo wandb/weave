@@ -38,7 +38,6 @@ from typing import (
 from typing_extensions import ParamSpec
 
 from weave.trace import box, settings
-from weave.trace.constants import TRACE_CALL_EMOJI
 from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.context.call_context import (
@@ -106,11 +105,6 @@ UNINITIALIZED_MSG = "Warning: Traces will not be logged. Call weave.init to log 
 
 
 class DisplayNameFuncError(ValueError): ...
-
-
-def print_call_link(call: Call) -> None:
-    if settings.should_print_call_link():
-        logger.info(f"{TRACE_CALL_EMOJI} {call.ui_url}")
 
 
 @dataclass
