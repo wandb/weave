@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Literal, TypedDict
+from typing import TYPE_CHECKING, Any, Literal, TypedDict
 
 from pydantic import BaseModel
 from rich.table import Table
@@ -10,7 +10,6 @@ from weave.trace import urls
 from weave.trace.api import publish as weave_publish
 from weave.trace.api import ref as weave_ref
 from weave.trace.context import weave_client_context
-from weave.trace.display.grid import Grid
 from weave.trace.display.rich import pydantic_util
 from weave.trace.refs import ObjectRef, parse_op_uri
 from weave.trace.traverse import ObjectPath, get_paths
@@ -22,6 +21,9 @@ from weave.trace_server.interface.builtin_object_classes.saved_view import Colum
 from weave.trace_server.interface.builtin_object_classes.saved_view import (
     SavedView as SavedViewBase,
 )
+
+if TYPE_CHECKING:
+    from weave.trace.display.grid import Grid
 
 KNOWN_COLUMNS = [
     "id",
@@ -884,6 +886,8 @@ class SavedView:
             )
 
     def to_grid(self, limit: int | None = None) -> Grid:
+        from weave.trace.display.grid import Grid
+
         calls = list(self.get_calls(limit=limit))
         columns = self.get_table_columns()
         grid = Grid()
