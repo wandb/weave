@@ -1260,6 +1260,12 @@ def test_refs_read_batch_multi_project(client):
     assert res.vals[2] == {"ab": [3, 4, 5]}
 
 
+def test_refs_read_batch_call_ref(client):
+    call_ref = refs.CallRef(entity="shawn", project="test-project", id="my-call")
+    with pytest.raises(ValueError, match="Call refs not supported"):
+        client.server.refs_read_batch(RefsReadBatchReq(refs=[call_ref.uri()]))
+
+
 def test_large_files(client):
     class CoolCustomThing:
         a: str
