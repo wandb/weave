@@ -241,6 +241,13 @@ class ObjSchemaForInsert(BaseModel):
 class TableSchemaForInsert(BaseModel):
     project_id: str
     rows: list[dict[str, Any]]
+    # Optional field to specify the final order of rows when uploading in parallel
+    # If provided, rows will be reordered before computing the table digest
+    # This enables parallel uploads while maintaining consistent digests
+    row_order: Optional[list[int]] = Field(
+        None,
+        description="Optional list of indices specifying the final order of rows. Enables parallel uploads by allowing rows to be sent in any order.",
+    )
 
 
 class OtelExportReq(BaseModel):
@@ -716,6 +723,13 @@ class TableUpdateReq(BaseModelStrict):
     project_id: str
     base_digest: str
     updates: list[TableUpdateSpec]
+    # Optional field to specify the final order of rows after all updates are applied
+    # This enables parallel uploads during table updates by allowing the final row order
+    # to be specified independently of the update operation order
+    row_order: Optional[list[int]] = Field(
+        None,
+        description="Optional list of indices specifying the final order of rows after all updates. Enables parallel uploads during table updates.",
+    )
 
 
 class TableUpdateRes(BaseModel):

@@ -457,21 +457,41 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
         estimated_bytes = len(req.model_dump_json(by_alias=True).encode("utf-8"))
         if estimated_bytes > self.remote_request_bytes_limit:
+            # Create empty table first
             initialization_req = tsi.TableCreateReq(
                 table=tsi.TableSchemaForInsert(
                     project_id=req.table.project_id,
                     rows=[],
+                    row_order=req.table.row_order,  # Preserve row_order for parallel uploads
                 )
             )
             initialization_res = self.table_create(initialization_req)
 
+            # If row_order is specified, we need to handle parallel uploads differently
+            if req.table.row_order is not None:
+                # For parallel uploads, we need to ensure rows are inserted in the correct order
+                # We'll use insert operations at specific indices
+                updates = []
+                for i, row in enumerate(req.table.rows):
+                    target_index = req.table.row_order[i]
+                    updates.append(
+                        tsi.TableInsertSpec(
+                            insert=tsi.TableInsertSpecPayload(
+                                index=target_index, row=row
+                            )
+                        )
+                    )
+            else:
+                # Standard append operations for sequential uploads
+                updates = [
+                    tsi.TableAppendSpec(append=tsi.TableAppendSpecPayload(row=row))
+                    for row in req.table.rows
+                ]
+
             update_req = tsi.TableUpdateReq(
                 project_id=req.table.project_id,
                 base_digest=initialization_res.digest,
-                updates=[
-                    tsi.TableAppendSpec(append=tsi.TableAppendSpecPayload(row=row))
-                    for row in req.table.rows
-                ],
+                updates=updates,
             )
             update_res = self.table_update(update_req)
 
@@ -499,12 +519,14 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
                 project_id=req.project_id,
                 base_digest=req.base_digest,
                 updates=req.updates[:split_ndx],
+                row_order=req.row_order,  # Preserve row_order for parallel uploads
             )
             first_half_res = self.table_update(first_half_req)
             second_half_req = tsi.TableUpdateReq(
                 project_id=req.project_id,
                 base_digest=first_half_res.digest,
                 updates=req.updates[split_ndx:],
+                row_order=req.row_order,  # Preserve row_order for parallel uploads
             )
             second_half_res = self.table_update(second_half_req)
             all_digests = (

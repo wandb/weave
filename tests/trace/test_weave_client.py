@@ -3631,3 +3631,346 @@ def test_feedback_batching(network_proxy_client):
         assert feedback.feedback_type == f"test_feedback_{i}"
         assert feedback.payload["score"] == i
         assert feedback.payload["note"] == f"Test feedback {i}"
+
+
+def test_table_create_parallel_upload(client):
+    """Test parallel upload functionality using the row_order parameter."""
+    data = [
+        {"val": 1, "name": "Alice"},
+        {"val": 2, "name": "Bob"},
+        {"val": 3, "name": "Charlie"},
+        {"val": 4, "name": "Diana"},
+    ]
+
+    # Test 1: Standard sequential upload (no row_order)
+    sequential_res = client.server.table_create(
+        TableCreateReq(
+            table=TableSchemaForInsert(
+                project_id=client._project_id(),
+                rows=data,
+            )
+        )
+    )
+
+    # Test 2: Parallel upload with rows in different order
+    # Simulate rows being uploaded in parallel in this order: [3, 1, 4, 2]
+    # This maps to: Charlie, Alice, Diana, Bob
+    parallel_row_order = [2, 0, 3, 1]
+    parallel_res = client.server.table_create(
+        TableCreateReq(
+            table=TableSchemaForInsert(
+                project_id=client._project_id(),
+                rows=data,
+                row_order=parallel_row_order,
+            )
+        )
+    )
+
+    # Verify that parallel upload produces different digest (due to different order)
+    assert sequential_res.digest != parallel_res.digest
+
+    # Verify that parallel upload produces consistent results
+    parallel_query = client.server.table_query(
+        TableQueryReq(project_id=client._project_id(), digest=parallel_res.digest)
+    )
+    assert len(parallel_query.rows) == len(data)
+
+    # Check that rows are in the specified order: [Charlie, Alice, Diana, Bob]
+    expected_order = [
+        {"val": 3, "name": "Charlie"},  # index 2
+        {"val": 1, "name": "Alice"},  # index 0
+        {"val": 4, "name": "Diana"},  # index 3
+        {"val": 2, "name": "Bob"},  # index 1
+    ]
+
+    for i, row in enumerate(parallel_query.rows):
+        assert row.val["val"] == expected_order[i]["val"]
+        assert row.val["name"] == expected_order[i]["name"]
+
+    # Test 3: Verify that same row_order produces same digest
+    parallel_res2 = client.server.table_create(
+        TableCreateReq(
+            table=TableSchemaForInsert(
+                project_id=client._project_id(),
+                rows=data,
+                row_order=parallel_row_order,
+            )
+        )
+    )
+    assert parallel_res.digest == parallel_res2.digest
+
+    # Test 4: Verify that different row_order produces different digest
+    different_order = [3, 2, 1, 0]  # Reverse order
+    reverse_res = client.server.table_create(
+        TableCreateReq(
+            table=TableSchemaForInsert(
+                project_id=client._project_id(),
+                rows=data,
+                row_order=different_order,
+            )
+        )
+    )
+    assert reverse_res.digest != parallel_res.digest
+    assert reverse_res.digest != sequential_res.digest
+
+    # Test 5: Verify reverse order produces correct row sequence
+    reverse_query = client.server.table_query(
+        TableQueryReq(project_id=client._project_id(), digest=reverse_res.digest)
+    )
+    expected_reverse = [
+        {"val": 4, "name": "Diana"},  # index 3
+        {"val": 3, "name": "Charlie"},  # index 2
+        {"val": 2, "name": "Bob"},  # index 1
+        {"val": 1, "name": "Alice"},  # index 0
+    ]
+
+    for i, row in enumerate(reverse_query.rows):
+        assert row.val["val"] == expected_reverse[i]["val"]
+        assert row.val["name"] == expected_reverse[i]["name"]
+
+
+def test_table_update_multiple_workers_parallel_upload(client):
+    """Test multiple workers updating the same table concurrently with parallel uploads."""
+    # Create initial table with 2 rows
+    initial_data = [
+        {"id": 1, "name": "Alice", "type": "user"},
+        {"id": 2, "name": "Bob", "type": "user"},
+    ]
+
+    table_create_res = client.server.table_create(
+        TableCreateReq(
+            table=TableSchemaForInsert(
+                project_id=client._project_id(),
+                rows=initial_data,
+            )
+        )
+    )
+    base_digest = table_create_res.digest
+
+    # Simulate Worker 1: Adding 3 new rows at specific positions
+    worker1_updates = [
+        # Insert Charlie at position 1 (between Alice and Bob)
+        tsi.TableInsertSpec(
+            insert=tsi.TableInsertSpecPayload(
+                index=1, row={"id": 3, "name": "Charlie", "type": "admin"}
+            )
+        ),
+        # Append Diana at the end
+        tsi.TableAppendSpec(
+            append=tsi.TableAppendSpecPayload(
+                row={"id": 4, "name": "Diana", "type": "user"}
+            )
+        ),
+        # Insert Eve at position 0 (beginning)
+        tsi.TableInsertSpec(
+            insert=tsi.TableInsertSpecPayload(
+                index=0, row={"id": 5, "name": "Eve", "type": "admin"}
+            )
+        ),
+    ]
+
+    # Worker 1 specifies final desired order: Eve, Alice, Charlie, Bob, Diana
+    # Final indices: [0, 1, 2, 3, 4]
+    worker1_req = tsi.TableUpdateReq(
+        project_id=client._project_id(),
+        base_digest=base_digest,
+        updates=worker1_updates,
+        row_order=[0, 1, 2, 3, 4],  # Eve, Alice, Charlie, Bob, Diana
+    )
+
+    # Simulate Worker 2: Adding 2 different rows with different final order preference
+    worker2_updates = [
+        # Append Frank
+        tsi.TableAppendSpec(
+            append=tsi.TableAppendSpecPayload(
+                row={"id": 6, "name": "Frank", "type": "user"}
+            )
+        ),
+        # Insert Grace at position 2
+        tsi.TableInsertSpec(
+            insert=tsi.TableInsertSpecPayload(
+                index=2, row={"id": 7, "name": "Grace", "type": "admin"}
+            )
+        ),
+    ]
+
+    # Worker 2 specifies different final order: Alice, Bob, Grace, Frank
+    # Final indices: [0, 1, 2, 3]
+    worker2_req = tsi.TableUpdateReq(
+        project_id=client._project_id(),
+        base_digest=base_digest,
+        updates=worker2_updates,
+        row_order=[0, 1, 2, 3],  # Alice, Bob, Grace, Frank
+    )
+
+    # Execute both worker updates
+    worker1_res = client.server.table_update(worker1_req)
+    worker2_res = client.server.table_update(worker2_req)
+
+    # Verify both workers got different digests (different final orders)
+    assert worker1_res.digest != worker2_res.digest
+
+    # Verify Worker 1's result has correct order
+    worker1_query = client.server.table_query(
+        tsi.TableQueryReq(
+            project_id=client._project_id(),
+            digest=worker1_res.digest,
+        )
+    )
+
+    expected_worker1_order = [
+        {"id": 5, "name": "Eve", "type": "admin"},  # position 0
+        {"id": 1, "name": "Alice", "type": "user"},  # position 1
+        {"id": 3, "name": "Charlie", "type": "admin"},  # position 2
+        {"id": 2, "name": "Bob", "type": "user"},  # position 3
+        {"id": 4, "name": "Diana", "type": "user"},  # position 4
+    ]
+
+    assert len(worker1_query.rows) == 5
+    for i, row in enumerate(worker1_query.rows):
+        assert row.val["id"] == expected_worker1_order[i]["id"]
+        assert row.val["name"] == expected_worker1_order[i]["name"]
+        assert row.val["type"] == expected_worker1_order[i]["type"]
+
+    # Verify Worker 2's result has correct order
+    worker2_query = client.server.table_query(
+        tsi.TableQueryReq(
+            project_id=client._project_id(),
+            digest=worker2_res.digest,
+        )
+    )
+
+    expected_worker2_order = [
+        {"id": 1, "name": "Alice", "type": "user"},  # position 0
+        {"id": 2, "name": "Bob", "type": "user"},  # position 1
+        {"id": 7, "name": "Grace", "type": "admin"},  # position 2
+        {"id": 6, "name": "Frank", "type": "user"},  # position 3
+    ]
+
+    assert len(worker2_query.rows) == 4
+    for i, row in enumerate(worker2_query.rows):
+        assert row.val["id"] == expected_worker2_order[i]["id"]
+        assert row.val["name"] == expected_worker2_order[i]["name"]
+        assert row.val["type"] == expected_worker2_order[i]["type"]
+
+
+def test_table_update_parallel_upload(client):
+    """Test parallel upload functionality using table_update with row_order parameter."""
+    # Create initial table with 2 rows
+    initial_data = [
+        {"val": 1, "name": "Alice"},
+        {"val": 2, "name": "Bob"},
+    ]
+
+    table_create_res = client.server.table_create(
+        TableCreateReq(
+            table=TableSchemaForInsert(
+                project_id=client._project_id(),
+                rows=initial_data,
+            )
+        )
+    )
+
+    # Test 1: Standard sequential update (no row_order)
+    sequential_update_req = tsi.TableUpdateReq(
+        project_id=client._project_id(),
+        base_digest=table_create_res.digest,
+        updates=[
+            tsi.TableAppendSpec(
+                append=tsi.TableAppendSpecPayload(row={"val": 3, "name": "Charlie"})
+            ),
+            tsi.TableAppendSpec(
+                append=tsi.TableAppendSpecPayload(row={"val": 4, "name": "Diana"})
+            ),
+        ],
+    )
+    sequential_res = client.server.table_update(sequential_update_req)
+
+    # Test 2: Parallel update with row_order to specify final order
+    # We want the final order to be: [Charlie, Alice, Diana, Bob]
+    # This means: insert Charlie at index 0, insert Diana at index 2
+    parallel_update_req = tsi.TableUpdateReq(
+        project_id=client._project_id(),
+        base_digest=table_create_res.digest,
+        updates=[
+            tsi.TableInsertSpec(
+                insert=tsi.TableInsertSpecPayload(
+                    index=0, row={"val": 3, "name": "Charlie"}
+                )
+            ),
+            tsi.TableInsertSpec(
+                insert=tsi.TableInsertSpecPayload(
+                    index=2, row={"val": 4, "name": "Diana"}
+                )
+            ),
+        ],
+        row_order=[0, 1, 2, 3],  # Final order: [Charlie, Alice, Diana, Bob]
+    )
+    parallel_res = client.server.table_update(parallel_update_req)
+
+    # Verify that parallel update produces different digest (due to different order)
+    assert sequential_res.digest != parallel_res.digest
+
+    # Verify that parallel update produces consistent results
+    parallel_query = client.server.table_query(
+        TableQueryReq(project_id=client._project_id(), digest=parallel_res.digest)
+    )
+    assert len(parallel_query.rows) == 4
+
+    # Check that rows are in the specified order: [Charlie, Alice, Diana, Bob]
+    expected_order = [
+        {"val": 3, "name": "Charlie"},  # index 0
+        {"val": 1, "name": "Alice"},  # index 1
+        {"val": 4, "name": "Diana"},  # index 2
+        {"val": 2, "name": "Bob"},  # index 3
+    ]
+
+    for i, row in enumerate(parallel_query.rows):
+        assert row.val["val"] == expected_order[i]["val"]
+        assert row.val["name"] == expected_order[i]["name"]
+
+    # Test 3: Verify that same row_order produces same digest
+    parallel_res2 = client.server.table_update(parallel_update_req)
+    assert parallel_res.digest == parallel_res2.digest
+
+    # Test 4: Test with different row_order to produce different final order
+    # We want: [Bob, Alice, Charlie, Diana]
+    different_order_req = tsi.TableUpdateReq(
+        project_id=client._project_id(),
+        base_digest=table_create_res.digest,
+        updates=[
+            tsi.TableInsertSpec(
+                insert=tsi.TableInsertSpecPayload(
+                    index=0, row={"val": 3, "name": "Charlie"}
+                )
+            ),
+            tsi.TableInsertSpec(
+                insert=tsi.TableInsertSpecPayload(
+                    index=2, row={"val": 4, "name": "Diana"}
+                )
+            ),
+        ],
+        row_order=[3, 1, 0, 2],  # Final order: [Bob, Alice, Charlie, Diana]
+    )
+    different_order_res = client.server.table_update(different_order_req)
+
+    # Verify different order produces different digest
+    assert different_order_res.digest != parallel_res.digest
+    assert different_order_res.digest != sequential_res.digest
+
+    # Verify the different order produces correct row sequence
+    different_order_query = client.server.table_query(
+        TableQueryReq(
+            project_id=client._project_id(), digest=different_order_res.digest
+        )
+    )
+    expected_different_order = [
+        {"val": 2, "name": "Bob"},  # index 3
+        {"val": 1, "name": "Alice"},  # index 1
+        {"val": 3, "name": "Charlie"},  # index 0
+        {"val": 4, "name": "Diana"},  # index 2
+    ]
+
+    for i, row in enumerate(different_order_query.rows):
+        assert row.val["val"] == expected_different_order[i]["val"]
+        assert row.val["name"] == expected_different_order[i]["name"]

@@ -860,6 +860,20 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         row_digests = [r[1] for r in insert_rows]
 
+        # Handle parallel uploads: reorder row_digests if row_order is specified
+        if req.table.row_order is not None:
+            if len(req.table.row_order) != len(row_digests):
+                raise ValueError(
+                    f"row_order length ({len(req.table.row_order)}) must match rows length ({len(row_digests)})"
+                )
+            # Validate row_order indices are valid
+            if not all(0 <= i < len(row_digests) for i in req.table.row_order):
+                raise ValueError(
+                    f"row_order indices must be between 0 and {len(row_digests) - 1}"
+                )
+            # Reorder row_digests based on the specified order
+            row_digests = [row_digests[i] for i in req.table.row_order]
+
         table_hasher = hashlib.sha256()
         for row_digest in row_digests:
             table_hasher.update(row_digest.encode())
@@ -946,6 +960,20 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 data=new_rows_needed_to_insert,
                 column_names=["project_id", "digest", "refs", "val_dump"],
             )
+
+        # Handle parallel uploads: reorder final_row_digests if row_order is specified
+        if req.row_order is not None:
+            if len(req.row_order) != len(final_row_digests):
+                raise ValueError(
+                    f"row_order length ({len(req.row_order)}) must match final rows length ({len(final_row_digests)})"
+                )
+            # Validate row_order indices are valid
+            if not all(0 <= i < len(final_row_digests) for i in req.row_order):
+                raise ValueError(
+                    f"row_order indices must be between 0 and {len(final_row_digests) - 1}"
+                )
+            # Reorder final_row_digests based on the specified order
+            final_row_digests = [final_row_digests[i] for i in req.row_order]
 
         table_hasher = hashlib.sha256()
         for row_digest in final_row_digests:
