@@ -29,6 +29,7 @@ from weave.trace.constants import TRACE_CALL_EMOJI
 from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.feedback import FeedbackQuery, RefFeedbackQuery
+from weave.trace.init_message import WANDB_AVAILABLE
 from weave.trace.interface_query_builder import (
     exists_expr,
     get_field_expr,
@@ -2337,22 +2338,11 @@ def get_parallelism_settings() -> tuple[int | None, int | None]:
 
 
 def _safe_get_wandb_run() -> wandb.sdk.wandb_run.Run | None:
-    # Check if wandb is installed.  This will pass even if wandb is not installed
-    # if there is a wandb directory in the user's current directory, so the
-    # second check is required.
-    try:
+    if WANDB_AVAILABLE:
         import wandb
-    except (ImportError, ModuleNotFoundError):
-        return None
 
-    # If a wandb directory exists, but wandb is installed, `wandb.run` will raise
-    # AttributeError.  This is an artifact of how python handles imports.
-    try:
-        wandb_run = wandb.run
-    except AttributeError:
-        return None
-
-    return wandb_run
+        return wandb.run
+    return None
 
 
 def safe_current_wb_run_id() -> str | None:
