@@ -40,12 +40,13 @@ Then, create a Weights & Biases (W&B) account at https://wandb.ai and copy your 
 
 To get started with tracking your first project with Weave:
 
-- Import the `weave` library
-- Call `weave.init('project-name')` to start tracking
-  - You will be prompted to log in with your API key if you are not yet logged in on your machine.
-  - To log to a specific W&B Team name, replace `project-name` with `team-name/project-name`
-  - **NOTE:** In automated environments, you can define the environment variable `WANDB_API_KEY` with your API key to login without prompting.
-- Add the `@weave.op()` decorator to the python functions you want to track
+1. Import the `weave` library
+1. Call `weave.init('project-name')` to start tracking
+    - You will be prompted to log in with your API key if you are not yet logged in on your machine.
+    - To log to a specific W&B Team name, replace `project-name` with `team-name/project-name`. If you don't specify a W&B team, your default entity is used. To find or update your default entity, refer to [User Settings](https://docs.wandb.ai/guides/models/app/settings-page/user-settings/#default-team) in the W&B Models documentation.
+    
+    **NOTE:** In automated environments, you can define the environment variable `WANDB_API_KEY` with your API key to login without prompting.
+1. Add the `@weave.op()` decorator to the python functions you want to track
 
 _In this example, we're using openai so you will need to add an OpenAI [API key](https://platform.openai.com/docs/quickstart/step-2-setup-your-api-key)._
 
