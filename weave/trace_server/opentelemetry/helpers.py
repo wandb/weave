@@ -1,4 +1,5 @@
 import base64
+import hashlib
 import json
 import math
 import re
@@ -8,6 +9,7 @@ from decimal import Decimal
 from enum import Enum
 from typing import Any, Optional, Union
 from uuid import UUID
+from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH, MAX_OP_NAME_LENGTH
 
 from opentelemetry.proto.common.v1.common_pb2 import AnyValue, KeyValue
 
@@ -477,3 +479,29 @@ def try_parse_timestamp(x: Any) -> Any:
             return datetime.fromtimestamp(x)
     except (ValueError, TypeError):
         return None
+
+WEAVE_INTERNAL_SCHEME = "weave-trace-internal"
+
+def create_op_ref(
+    span_name: str,
+    project_id: str,
+    digest: str,
+) -> str:
+    uri_prefix = f"{WEAVE_INTERNAL_SCHEME}:///{project_id}/op/"
+    uri_suffix = f":{digest}"
+    ref_len = len(uri_prefix) + len(uri_suffix)
+    max_len_adjusted = MAX_OP_NAME_LENGTH - (ref_len)
+    print(span_name)
+
+    if len(span_name) >= max_len_adjusted:
+        abbrv = "-" + digest[0:4]
+        # Since op_name will typically be what is displayed, we don't want to just truncate
+        # Create an identifier abbreviation so similar long names can be distinguished
+        span_name = shorten_name(
+            span_name,
+            max_len_adjusted,
+            abbrv=abbrv,
+            use_delimiter_in_abbr=False,
+        )
+
+    return f"{uri_prefix}{span_name}{uri_suffix}"

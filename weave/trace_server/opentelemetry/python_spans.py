@@ -6,6 +6,7 @@ trace protocol buffer definitions from opentelemetry.proto.trace.v1.trace_pb2.
 
 import datetime
 import hashlib
+import json
 from binascii import hexlify
 from collections.abc import Iterator
 from dataclasses import dataclass, field
@@ -42,6 +43,7 @@ from weave.trace_server.opentelemetry.attributes import (
     get_weave_usage,
 )
 from weave.trace_server.opentelemetry.helpers import (
+    create_op_ref,
     shorten_name,
     to_json_serializable,
     unflatten_key_values,
@@ -260,6 +262,11 @@ class Span:
             resource=resource,
         )
 
+    @property
+    def digest(self) -> str:
+        bytes_content = json.dumps(self.as_dict(), sort_keys=True).encode("utf-8")
+        return hashlib.md5(bytes_content).hexdigest()
+
     # The full OTEL Span as it is received
     def as_dict(self) -> dict[str, Any]:
         return to_json_serializable(
@@ -343,11 +350,15 @@ class Span:
         if not has_attributes and not has_inputs and not has_outputs and not has_usage:
             attributes = to_json_serializable(self.attributes)
 
-        attributes["otel_span"] = self.as_dict()
-        op_name = self.name
+        span_dict = self.as_dict()
+        attributes["otel_span"] = span_dict
 
         display_name = wandb_attributes.get("display_name")
-        if display_name and len(display_name) >= MAX_DISPLAY_NAME_LENGTH:
+
+        if display_name is None:
+            display_name = self.name
+
+        if len(display_name) >= MAX_DISPLAY_NAME_LENGTH:
             display_name = shorten_name(display_name, MAX_DISPLAY_NAME_LENGTH)
 
         thread_id = wandb_attributes.get("thread_id") or None
@@ -355,20 +366,8 @@ class Span:
             turn_id = self.span_id
         else:
             turn_id = None
+        op_name = create_op_ref(self.name, project_id, self.digest)
 
-        if display_name and len(display_name) >= MAX_DISPLAY_NAME_LENGTH:
-            display_name = shorten_name(display_name, MAX_DISPLAY_NAME_LENGTH)
-
-        if len(op_name) >= MAX_OP_NAME_LENGTH:
-            # Since op_name will typically be what is displayed, we don't want to just truncate
-            # Create an identifier abbreviation so similar long names can be distinguished
-            identifier = hashlib.sha256(op_name.encode("utf-8")).hexdigest()[:4]
-            op_name = shorten_name(
-                op_name,
-                MAX_OP_NAME_LENGTH,
-                abbrv=f":{identifier}",
-                use_delimiter_in_abbr=False,
-            )
 
         start_call = tsi.StartedCallSchemaForInsert(
             project_id=project_id,
