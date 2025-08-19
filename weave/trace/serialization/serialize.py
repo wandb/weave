@@ -46,6 +46,14 @@ def _is_inline_custom_obj(encoded: dict) -> bool:
 def to_json(
     obj: Any, project_id: str, client: WeaveClient, use_dictify: bool = False
 ) -> Any:
+    # CRITICAL FIX: Handle Logger objects before any other processing
+    if isinstance(obj, logging.Logger):
+        return f"<Logger: {obj.name} (level={logging.getLevelName(obj.level)})>"
+
+    # Handle other logging objects
+    if isinstance(obj, (logging.Manager, logging.Handler, logging.Filter)):
+        return f"<{obj.__class__.__name__}: {id(obj)}>"
+
     if isinstance(obj, TableRef):
         return obj.uri()
     elif isinstance(obj, ObjectRef):
@@ -178,6 +186,14 @@ def dictify(
     """Recursively compute a dictionary representation of an object."""
     if seen is None:
         seen = set()
+
+    # CRITICAL FIX: Handle Logger objects explicitly before introspection
+    if isinstance(obj, logging.Logger):
+        return f"<Logger: {obj.name} (level={logging.getLevelName(obj.level)})>"
+
+    # Handle other logging objects that contain loggers
+    if isinstance(obj, (logging.Manager, logging.Handler, logging.Filter)):
+        return f"<{obj.__class__.__name__}: {id(obj)}>"
 
     if not is_primitive(obj):
         obj_id = id(obj)
