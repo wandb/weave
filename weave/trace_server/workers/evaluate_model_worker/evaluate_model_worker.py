@@ -16,6 +16,7 @@ from weave.trace_server.interface.builtin_object_classes.llm_structured_model im
 
 EVALUATE_MODEL_WORKER_MARKER = {"_weave_eval_meta": {"evaluate_model_worker": True}}
 
+
 class EvaluateModelArgs(BaseModel):
     project_id: str
     evaluation_ref: str
