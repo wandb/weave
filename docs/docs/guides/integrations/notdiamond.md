@@ -21,7 +21,7 @@ From here, you can
 
 Weave integrates with [Not Diamond's Python library][python] to [automatically log API calls][ops].
 You only need to run `weave.init()` at the start of your workflow, then continue using the routed
-provider as usual:
+provider as usual. If you don't specify a W&B team when you call `weave.init()`, your default entity is used. To find or update your default entity, refer to [User Settings](https://docs.wandb.ai/guides/models/app/settings-page/user-settings/#default-team) in the W&B Models documentation.
 
 ```python
 from notdiamond import NotDiamond

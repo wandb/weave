@@ -29,7 +29,7 @@ os.environ["ANTHROPIC_API_KEY"] = "<your-anthropic-api-key>"
 
 ## Basic Setup
 
-Initialize Weave at the beginning of your script to start capturing traces.
+Initialize Weave at the beginning of your script to start capturing traces. If you don't specify a W&B team when you call `weave.init()`, your default entity is used. To find or update your default entity, refer to [User Settings](https://docs.wandb.ai/guides/models/app/settings-page/user-settings/#default-team) in the W&B Models documentation.
 
 ```python
 # highlight-next-line

@@ -10,7 +10,7 @@ Weave automatically tracks and logs LLM calls made via the [Cohere Python librar
 
 It's important to store traces of LLM applications in a central database, both during development and in production. You'll use these traces for debugging, and as a dataset that will help you improve your application.
 
-Weave will automatically capture traces for [cohere-python](https://github.com/cohere-ai/cohere-python). You can use the library as usual, start by calling `weave.init()`:
+Weave will automatically capture traces for [cohere-python](https://github.com/cohere-ai/cohere-python). You can use the library as usual, start by calling `weave.init()`. If you don't specify a W&B team when you call `weave.init()`, your default entity is used. To find or update your default entity, refer to [User Settings](https://docs.wandb.ai/guides/models/app/settings-page/user-settings/#default-team) in the W&B Models documentation.
 
 ```python
 import cohere

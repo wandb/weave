@@ -37,7 +37,7 @@ It is recommended that you store sensitive environment variables like your API k
 - **Endpoint:** `https://trace.wandb.ai/otel/v1/traces`
 - **Headers:**
   - `Authorization`: Basic auth using your W&B API key
-  - `project_id`: Your W&B entity/project name (e.g., `myteam/myproject`)
+  - `project_id`: Your W&B entity/project name (e.g., `myteam/myproject`). If you don't specify a W&B team, the project is created in your default entity. To find or update your default entity, refer to [User Settings](https://docs.wandb.ai/guides/models/app/settings-page/user-settings/#default-team) in the W&B Models documentation.
 
 ## Send OTEL traces from Agno to Weave
 

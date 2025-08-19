@@ -6,7 +6,7 @@ Weave automatically tracks and logs LLM calls made via the [Cerebras Cloud SDK](
 
 Tracking LLM calls is crucial for debugging and performance monitoring. Weave helps you do this by automatically capturing traces for the Cerebras Cloud SDK.
 
-Here's an example of how to use Weave with Cerebras:
+Here's an example of how to use Weave with Cerebras. Your W&B entity/project name (e.g., `myteam/myproject`). If you don't specify a W&B team when you call `weave.init()`, your default entity is used. To find or update your default entity, refer to [User Settings](https://docs.wandb.ai/guides/models/app/settings-page/user-settings/#default-team) in the W&B Models documentation.
 
 ```python
 import os

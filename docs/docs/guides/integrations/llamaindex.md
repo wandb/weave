@@ -18,7 +18,7 @@ For a basic usage example, see [Get started](#get-started). For more examples de
 
 ## Get started
 
-To get started, call `weave.init()` in your LLM application. The integration will begin tracing all LlamaIndex operations automatically.
+To get started, call `weave.init()` in your LLM application. The integration will begin tracing all LlamaIndex operations automatically. If you don't specify a W&B team when you call `weave.init()`, your default entity is used. To find or update your default entity, refer to [User Settings](https://docs.wandb.ai/guides/models/app/settings-page/user-settings/#default-team) in the W&B Models documentation.
 
 The example below initializes a Weave project `llamaindex-demo`, sends a prompt to `gpt-4o-mini`, and prints the result.
 

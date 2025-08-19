@@ -1,5 +1,7 @@
 # Smolagents
 
+import DefaultEntityNote from '../../../src/components/DefaultEntityNote.mdx';
+
 :::important
 All code samples shown on this page are in Python.
 :::
@@ -33,7 +35,7 @@ Weave automatically captures traces for [Smolagents](https://huggingface.co/docs
 
 Storing traces of language model applications in a central location is essential during development and production. These traces help with debugging and serve as valuable datasets for improving your application.
 
-Weave automatically captures traces for [Smolagents](https://huggingface.co/docs/smolagents/en/index). To start tracking, initialize Weave by calling `weave.init()`, then use the library as usual.
+Weave automatically captures traces for [Smolagents](https://huggingface.co/docs/smolagents/en/index). To start tracking, initialize Weave by calling `weave.init()`, then use the library as usual. <DefaultEntityNote />
 
 The following example demonstrates how to log inference calls to a tool-using LLM agent with Weave. In this scenario:
 
