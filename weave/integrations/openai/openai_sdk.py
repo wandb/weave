@@ -7,6 +7,20 @@ from typing import TYPE_CHECKING, Any, Callable
 from urllib.parse import urlparse
 
 import weave
+from weave.integrations.openai.gpt_image_utils import (
+    openai_image_edit_wrapper_async,
+    openai_image_edit_wrapper_sync,
+    openai_image_variation_wrapper_async,
+    openai_image_variation_wrapper_sync,
+    openai_image_wrapper_async,
+    openai_image_wrapper_sync,
+)
+from weave.integrations.openai.openai_utils import (
+    openai_accumulator,
+    openai_on_finish_post_processor,
+    openai_on_input_handler,
+    should_use_accumulator,
+)
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.op import (
@@ -17,7 +31,6 @@ from weave.trace.op import (
 )
 
 if TYPE_CHECKING:
-    from openai.types.chat import ChatCompletionChunk
     from openai.types.responses import Response, ResponseStreamEvent
 
 _openai_patcher: MultiPatcher | None = None
@@ -56,258 +69,6 @@ def maybe_unwrap_api_response(value: Any) -> Any:
 
     return value
 
-
-def openai_on_finish_post_processor(value: ChatCompletionChunk | None) -> dict | None:
-    from openai.types.chat import ChatCompletion, ChatCompletionChunk
-    from openai.types.chat.chat_completion_chunk import (
-        ChoiceDeltaFunctionCall,
-        ChoiceDeltaToolCall,
-    )
-    from openai.types.chat.chat_completion_message import FunctionCall
-    from openai.types.chat.chat_completion_message_tool_call import (
-        ChatCompletionMessageToolCall,
-        Function,
-    )
-
-    value = maybe_unwrap_api_response(value)
-
-    def _get_function_call(
-        function_call: ChoiceDeltaFunctionCall | None,
-    ) -> FunctionCall | None:
-        if function_call is None:
-            return function_call
-        if isinstance(function_call, ChoiceDeltaFunctionCall):
-            return FunctionCall(
-                arguments=function_call.arguments,
-                name=function_call.name,
-            )
-        else:
-            return None
-
-    def _get_tool_calls(
-        tool_calls: list[ChoiceDeltaToolCall] | None,
-    ) -> list[ChatCompletionMessageToolCall] | None:
-        if tool_calls is None:
-            return tool_calls
-
-        tool_calls_ = []
-        if isinstance(tool_calls, list):
-            for tool_call in tool_calls:
-                assert isinstance(tool_call, ChoiceDeltaToolCall)
-                tool_calls_.append(
-                    ChatCompletionMessageToolCall(
-                        id=tool_call.id,
-                        type=tool_call.type,
-                        function=Function(
-                            name=tool_call.function.name,
-                            arguments=tool_call.function.arguments,
-                        ),
-                    )
-                )
-        return tool_calls_
-
-    dump = None
-    if isinstance(value, ChatCompletionChunk):
-        dump = ChatCompletion(
-            id=value.id,
-            choices=[
-                {
-                    "index": choice.index,
-                    "message": {
-                        "content": choice.delta.content,
-                        "role": choice.delta.role,
-                        "function_call": _get_function_call(choice.delta.function_call),
-                        "tool_calls": _get_tool_calls(choice.delta.tool_calls),
-                    },
-                    "logprobs": choice.logprobs,
-                    "finish_reason": choice.finish_reason,
-                }
-                for choice in value.choices
-            ],
-            created=value.created,
-            model=value.model,
-            object="chat.completion",
-            system_fingerprint=value.system_fingerprint,
-            usage=value.usage if hasattr(value, "usage") else None,
-        ).model_dump(exclude_unset=True, exclude_none=True)
-    elif not hasattr(value, "model_dump"):
-        return value
-    else:
-        dump = value.model_dump(exclude_unset=True, exclude_none=True)
-    if hasattr(value, "_request_id"):
-        dump["request_id"] = value._request_id
-    return dump
-
-
-def openai_accumulator(
-    acc: ChatCompletionChunk | None,
-    value: ChatCompletionChunk,
-    skip_last: bool = False,
-) -> ChatCompletionChunk:
-    from openai.types.chat import ChatCompletionChunk
-    from openai.types.chat.chat_completion_chunk import (
-        ChoiceDeltaFunctionCall,
-        ChoiceDeltaToolCall,
-        ChoiceDeltaToolCallFunction,
-    )
-
-    def _process_chunk(
-        chunk: ChatCompletionChunk, acc_choices: list[dict] | None = None
-    ) -> list[dict]:
-        """Once the first_chunk is set (acc), take the next chunk and append the message content
-        to the message content of acc or first_chunk.
-        """
-        if acc_choices is None:
-            acc_choices = []
-
-        for chunk_choice in chunk.choices:
-            for _i in range(chunk_choice.index + 1 - len(acc_choices)):
-                acc_choices.append(
-                    {
-                        "index": len(acc_choices),
-                        "delta": {
-                            "content": None,
-                            "function_call": None,
-                            "tool_calls": None,
-                        },
-                        "logprobs": None,
-                        "finish_reason": None,
-                    }
-                )
-            # choice fields
-            choice = acc_choices[chunk_choice.index]
-            if chunk_choice.finish_reason:
-                choice["finish_reason"] = chunk_choice.finish_reason
-            if chunk_choice.logprobs:
-                choice["logprobs"] = chunk_choice.logprobs
-
-            # See https://github.com/openai/openai-python/issues/1677
-            # Per the OpenAI SDK, delta is not Optional. However, the AzureOpenAI service
-            # will return a None delta under some conditions, including when you have enabled
-            # custom content filtering settings with the Asynchronous_filter streaming setting.
-            if chunk_choice.delta is None:
-                continue
-
-            # message
-            if chunk_choice.delta.content:
-                if choice["delta"]["content"] is None:
-                    choice["delta"]["content"] = ""
-                choice["delta"]["content"] += chunk_choice.delta.content  # type: ignore
-            if chunk_choice.delta.role:
-                choice["delta"]["role"] = chunk_choice.delta.role
-
-            # function calling
-            if chunk_choice.delta.function_call:
-                if choice["delta"]["function_call"] is None:
-                    choice["delta"]["function_call"] = ChoiceDeltaFunctionCall(
-                        arguments=chunk_choice.delta.function_call.arguments,
-                        name=chunk_choice.delta.function_call.name,
-                    )
-                else:
-                    choice["delta"]["function_call"]["arguments"] += (
-                        chunk_choice.delta.function_call.arguments
-                    )
-
-            # tool calls
-            if chunk_choice.delta.tool_calls:
-                if choice["delta"]["tool_calls"] is None:
-                    choice["delta"]["tool_calls"] = []
-                    tool_call_delta = chunk_choice.delta.tool_calls[
-                        0
-                    ]  # when streaming, we get one
-                    choice["delta"]["tool_calls"].append(  # type: ignore
-                        ChoiceDeltaToolCall(
-                            id=tool_call_delta.id,
-                            index=tool_call_delta.index,
-                            function=ChoiceDeltaToolCallFunction(
-                                name=tool_call_delta.function.name,  # type: ignore
-                                arguments="",
-                            ),
-                            type=tool_call_delta.type,
-                        )
-                    )
-                else:
-                    tool_call_delta = chunk_choice.delta.tool_calls[0]
-                    if tool_call_delta.index > len(choice["delta"]["tool_calls"]) - 1:
-                        choice["delta"]["tool_calls"].append(
-                            ChoiceDeltaToolCall(
-                                index=tool_call_delta.index,
-                                function=ChoiceDeltaToolCallFunction(
-                                    name=None,
-                                    arguments="",
-                                ),
-                            ).model_dump()
-                        )
-                    tool_call = choice["delta"]["tool_calls"][tool_call_delta.index]
-                    if tool_call_delta.id is not None:
-                        tool_call["id"] = tool_call_delta.id
-                    if tool_call_delta.type is not None:
-                        tool_call["type"] = tool_call_delta.type
-                    if tool_call_delta.function is not None:
-                        if tool_call_delta.function.name is not None:
-                            tool_call["function"]["name"] = (
-                                tool_call_delta.function.name
-                            )
-                        if tool_call_delta.function.arguments is not None:
-                            tool_call["function"]["arguments"] += (
-                                tool_call_delta.function.arguments
-                            )
-
-        return acc_choices
-
-    if acc is None:
-        if hasattr(value, "choices"):
-            output_choices = _process_chunk(value)
-            acc = ChatCompletionChunk(
-                id=value.id,  # Each chunk has the same ID
-                choices=output_choices,
-                created=value.created,  # Each chunk has the same timestamp
-                model=value.model,
-                # The AzureOpenAI service will return an initial chunk with object=''
-                # which causes a pydantic_core._pydantic_core.ValidationError as
-                # the OpenAI SDK requires this literal value.
-                object=value.object or "chat.completion.chunk",
-                system_fingerprint=value.system_fingerprint,
-            )
-            return acc
-        else:
-            raise ValueError("Initial event must contain choices")
-
-    output_choices = _process_chunk(
-        value, [choice.model_dump() for choice in acc.choices]
-    )
-
-    acc = ChatCompletionChunk(
-        id=acc.id,
-        choices=output_choices,
-        created=acc.created,
-        model=acc.model,
-        object=acc.object,
-        system_fingerprint=acc.system_fingerprint,
-    )
-
-    # add usage info
-    if len(value.choices) == 0 and value.usage:
-        acc.usage = value.usage
-        if skip_last:
-            raise StopIteration(acc)
-
-    return acc
-
-
-# Unlike other integrations, streaming is based on input flag
-def should_use_accumulator(inputs: dict) -> bool:
-    return (
-        isinstance(inputs, dict)
-        and bool(inputs.get("stream"))
-        # This is very critical. When `"X-Stainless-Raw-Response` is true, the response
-        # is an APIResponse object. This is very hard to mock/patch for the streaming use
-        # case, so we don't even try.
-        and not inputs.get("extra_headers", {}).get("X-Stainless-Raw-Response")
-        == "true"
-    )
-
-
 def convert_completion_to_dict(obj: Any) -> dict:
     return {
         "client": {
@@ -326,7 +87,7 @@ def completion_instance_check(obj: Any) -> bool:
     )
 
 
-def openai_on_input_handler(
+def openai_on_input_handler_extended(
     func: Op, args: tuple, kwargs: dict
 ) -> ProcessedInputs | None:
     original_args = args
@@ -341,17 +102,14 @@ def openai_on_input_handler(
         args[0] = convert_completion_to_dict(args[0])  # type: ignore[index]
         inputs.update({"self": args[0]})
 
-    if len(args) == 2 and isinstance(args[1], weave.EasyPrompt):
-        original_args = args
-        original_kwargs = kwargs
-        prompt = args[1]
-        args = args[:-1]
-        kwargs.update(prompt.as_dict())
-        inputs.update(
-            {
-                "prompt": prompt,
-            }
-        )
+    # Check for EasyPrompt usage
+    result = openai_on_input_handler(func, tuple(args), kwargs)
+    if result is not None:
+        result.inputs.update(inputs)
+        processed_inputs.args = result.args
+        processed_inputs.kwargs = result.kwargs
+        processed_inputs.inputs = result.inputs
+        return processed_inputs
 
     return ProcessedInputs(
         original_args=original_args,
@@ -387,7 +145,7 @@ def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
         op_kwargs = settings.model_dump()
         op = weave.op(_add_stream_options(fn), **op_kwargs)
 
-        op._set_on_input_handler(openai_on_input_handler)
+        op._set_on_input_handler(openai_on_input_handler_extended)
         return _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: lambda acc, value: openai_accumulator(
@@ -427,7 +185,7 @@ def create_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]
 
         op_kwargs = settings.model_dump()
         op = weave.op(_add_stream_options(fn), **op_kwargs)
-        op._set_on_input_handler(openai_on_input_handler)
+        op._set_on_input_handler(openai_on_input_handler_extended)
         return _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: lambda acc, value: openai_accumulator(
@@ -731,6 +489,24 @@ def get_openai_patcher(
     async_responses_parse_settings = base.model_copy(
         update={"name": base.name or "openai.responses.parse"}
     )
+    images_generate_settings = base.model_copy(
+        update={"name": base.name or "openai.images.generate"}
+    )
+    async_images_generate_settings = base.model_copy(
+        update={"name": base.name or "openai.images.generate"}
+    )
+    images_edit_settings = base.model_copy(
+        update={"name": base.name or "openai.images.edit"}
+    )
+    async_images_edit_settings = base.model_copy(
+        update={"name": base.name or "openai.images.edit"}
+    )
+    images_create_variation_settings = base.model_copy(
+        update={"name": base.name or "openai.images.create_variation"}
+    )
+    async_images_create_variation_settings = base.model_copy(
+        update={"name": base.name or "openai.images.create_variation"}
+    )
 
     _openai_patcher = MultiPatcher(
         [
@@ -799,6 +575,40 @@ def get_openai_patcher(
                 lambda: importlib.import_module("openai.resources.responses"),
                 "AsyncResponses.parse",
                 create_wrapper_responses_async(settings=async_responses_parse_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("openai.resources.images"),
+                "Images.generate",
+                openai_image_wrapper_sync(settings=images_generate_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("openai.resources.images"),
+                "AsyncImages.generate",
+                openai_image_wrapper_async(settings=async_images_generate_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("openai.resources.images"),
+                "Images.edit",
+                openai_image_edit_wrapper_sync(settings=images_edit_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("openai.resources.images"),
+                "AsyncImages.edit",
+                openai_image_edit_wrapper_async(settings=async_images_edit_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("openai.resources.images"),
+                "Images.create_variation",
+                openai_image_variation_wrapper_sync(
+                    settings=images_create_variation_settings
+                ),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("openai.resources.images"),
+                "AsyncImages.create_variation",
+                openai_image_variation_wrapper_async(
+                    settings=async_images_create_variation_settings
+                ),
             ),
         ]
     )
