@@ -118,7 +118,7 @@ def publish(obj: Any, name: str | None = None) -> ObjectRef:
         name: The name to save the object under.
 
     Returns:
-        A Weave reference to the saved object.
+        A Weave Ref to the saved object.
     """
     client = weave_client_context.require_weave_client()
 
@@ -160,19 +160,19 @@ def publish(obj: Any, name: str | None = None) -> ObjectRef:
 
 
 def ref(location: str) -> ObjectRef:
-    """Creates a reference handle to an existing Weave object. This does not directly retrieve 
+    """Creates a Ref to an existing Weave object. This does not directly retrieve
     the object but allows you to pass it to other Weave API functions.
 
     Args:
-        location: A fully-qualified Weave ref URI, or if `weave.init()` has been called, "name:version" or just "name" ("latest" will be used for version in this case).
+        location: A fully-qualified Weave Ref URI, or if `weave.init()` has been called, `name:version` or `name`. If no version is provided, `latest` is used.
 
 
     Returns:
-        A Weave reference to the object.
+        A Weave Ref to the object.
     
     Example: 
 
-    The following example sets a specific model object as a reference and then passes it to 
+    The following example sets a specific model object as a Ref and then passes it to
     the `Evaluation()` class.
 
     ```python

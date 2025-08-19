@@ -37,7 +37,7 @@ The top-level functions and classes for working with Weave.
 
 - [`api.init`](#function-init): Initialize weave tracking, logging to a wandb project.
 - [`api.publish`](#function-publish): Save and version a Python object.
-- [`api.ref`](#function-ref): Creates a reference handle to an existing Weave object. This does not directly retrieve 
+- [`api.ref`](#function-ref): Creates a Ref to an existing Weave object. This does not directly retrieve
 - [`api.get`](#function-get): A convenience function for getting an object from a URI.
 - [`call_context.require_current_call`](#function-require_current_call): Get the Call object for the currently executing Op, within that Op.
 - [`call_context.get_current_call`](#function-get_current_call): Get the Call object for the currently executing Op, within that Op.
@@ -113,7 +113,7 @@ Weave creates a new version of the object if the object's name already exists an
 
 
 **Returns:**
- A Weave reference to the saved object. 
+ A Weave Ref to the saved object. 
 
 ---
 
@@ -125,27 +125,27 @@ Weave creates a new version of the object if the object's name already exists an
 ref(location: 'str') → ObjectRef
 ```
 
-Creates a reference handle to an existing Weave object. This does not directly retrieve  the object but allows you to pass it to other Weave API functions. 
+Creates a Ref to an existing Weave object. This does not directly retrieve the object but allows you to pass it to other Weave API functions. 
 
 
 
 **Args:**
  
- - <b>`location`</b>:  A fully-qualified Weave ref URI, or if `weave.init()` has been called, "name:version" or just "name" ("latest" will be used for version in this case). 
+ - <b>`location`</b>:  A fully-qualified Weave Ref URI, or if `weave.init()` has been called, `name:version` or `name`. If no version is provided, `latest` is used. 
 
 
 
 
 
 **Returns:**
- A Weave reference to the object. 
+ A Weave Ref to the object. 
 
 
 
 **Example:**
  
 
-The following example sets a specific model object as a reference and then passes it to  the `Evaluation()` class. 
+The following example sets a specific model object as a Ref and then passes it to the `Evaluation()` class. 
 
 ```python
 import weave
@@ -346,7 +346,7 @@ with weave.attributes({'env': 'production'}):
 
 ```python
 thread(
-    thread_id: 'str | None | object' = <object object at 0x1090024b0>
+    thread_id: 'str | None | object' = <object object at 0x106eaa4b0>
 ) → Iterator[ThreadContext]
 ```
 
@@ -956,7 +956,7 @@ asyncio.run(evaluation.evaluate(function_to_evaluate))
 - `description`: `typing.Optional[str]`
 - `ref`: `typing.Optional[trace.refs.ObjectRef]`
 - `dataset`: `<class 'dataset.dataset.Dataset'>`
-- `scorers`: `typing.Optional[list[typing.Annotated[typing.Union[trace.op.Op, flow.scorer.Scorer], BeforeValidator(func=<function cast_to_scorer at 0x10befa700>, json_schema_input_type=PydanticUndefined)]]]`
+- `scorers`: `typing.Optional[list[typing.Annotated[typing.Union[trace.op.Op, flow.scorer.Scorer], BeforeValidator(func=<function cast_to_scorer at 0x10ce9e980>, json_schema_input_type=PydanticUndefined)]]]`
 - `preprocess_model_input`: `typing.Optional[typing.Callable[[dict], dict]]`
 - `trials`: `<class 'int'>`
 - `evaluation_name`: `typing.Union[str, typing.Callable[[trace.weave_client.Call], str], NoneType]`
