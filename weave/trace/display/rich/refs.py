@@ -1,14 +1,15 @@
 """Support for a collection of refs."""
 
 from collections.abc import Iterable
-from typing import Optional
-
-from rich.table import Table
+from typing import TYPE_CHECKING, Optional
 
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.display.rich.container import AbstractRichContainer
 from weave.trace.refs import AnyRef, CallRef, parse_uri
 from weave.trace.vals import WeaveObject
+
+if TYPE_CHECKING:
+    from rich.table import Table
 
 
 class Refs(AbstractRichContainer[str]):

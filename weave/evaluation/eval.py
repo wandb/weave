@@ -7,7 +7,6 @@ from itertools import chain, repeat
 from typing import Any, Callable, Literal, Optional, Union
 
 from pydantic import PrivateAttr
-from rich.console import Console
 from typing_extensions import Self
 
 import weave
@@ -37,7 +36,6 @@ from weave.trace.vals import WeaveObject
 from weave.trace.weave_client import Call, CallsIter, get_ref
 from weave.trace_server.trace_server_interface import CallsFilter
 
-console = Console()
 logger = logging.getLogger(__name__)
 
 INVALID_MODEL_ERROR = (
