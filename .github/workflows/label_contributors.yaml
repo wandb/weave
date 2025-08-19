@@ -1,0 +1,14 @@
+name: Label external PRs
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  label-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check PR author
+        if: github.event.pull_request.author_association != 'MEMBER'
+        run: |
+          gh pr edit ${{ github.event.pull_request.number }} --add-label "external-contrib"
