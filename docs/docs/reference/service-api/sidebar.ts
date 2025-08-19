@@ -268,6 +268,12 @@ const sidebar: SidebarsConfig = {
         },
         {
           type: "doc",
+          id: "reference/service-api/feedback-create-batch-feedback-batch-create-post",
+          label: "Feedback Create Batch",
+          className: "api-method post",
+        },
+        {
+          type: "doc",
           id: "reference/service-api/feedback-query-feedback-query-post",
           label: "Feedback Query",
           className: "api-method post",
@@ -295,6 +301,19 @@ const sidebar: SidebarsConfig = {
           type: "doc",
           id: "reference/service-api/threads-query-stream-threads-stream-query-post",
           label: "Threads Query Stream",
+          className: "api-method post",
+        },
+      ],
+    },
+    {
+      type: "category",
+      label: "Evaluations",
+      collapsed: false,
+      items: [
+        {
+          type: "doc",
+          id: "reference/service-api/evaluate-model-evaluations-evaluate-model-post",
+          label: "Evaluate Model",
           className: "api-method post",
         },
       ],
