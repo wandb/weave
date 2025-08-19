@@ -35,13 +35,23 @@ def flatten_calls(
 
     return res
 
-def normalize_scorers_in_flattened(flattened: list[tuple[tsi.CallSchema, int]], scorer_block_start_ndxs: list[int], scorer_order: list[str]) -> list[tuple[tsi.CallSchema, int]]:
+
+def normalize_scorers_in_flattened(
+    flattened: list[tuple[tsi.CallSchema, int]],
+    scorer_block_start_ndxs: list[int],
+    scorer_order: list[str],
+) -> list[tuple[tsi.CallSchema, int]]:
     num_scorer_calls = len(scorer_order)
     res = [*flattened]
     for start_ndx in scorer_block_start_ndxs:
-        got_block = res[start_ndx:start_ndx + num_scorer_calls ]
-        sorted_got_block = sorted(got_block, key=lambda x: scorer_order.index(op_name_from_ref(op_name_from_ref(x[0].op_name))))
-        res[start_ndx:start_ndx + num_scorer_calls ] = sorted_got_block
+        got_block = res[start_ndx : start_ndx + num_scorer_calls]
+        sorted_got_block = sorted(
+            got_block,
+            key=lambda x: scorer_order.index(
+                op_name_from_ref(op_name_from_ref(x[0].op_name))
+            ),
+        )
+        res[start_ndx : start_ndx + num_scorer_calls] = sorted_got_block
     return res
 
 
@@ -95,7 +105,7 @@ async def test_basic_evaluation(client):
 
     flattened_calls = flatten_calls(calls.calls)
     assert len(flattened_calls) == 14
-    
+
     exp = [
         ("Evaluation.evaluate", 0),
         ("Evaluation.predict_and_score", 1),
@@ -113,8 +123,12 @@ async def test_basic_evaluation(client):
         ("Evaluation.summarize", 1),
     ]
 
-    exp_scorer_block_start_ndxs = [i for i, (op_name, _) in enumerate(exp) if op_name == "match_score1"]
-    flattened_calls = normalize_scorers_in_flattened(flattened_calls, exp_scorer_block_start_ndxs, ["match_score1", "match_score2"])
+    exp_scorer_block_start_ndxs = [
+        i for i, (op_name, _) in enumerate(exp) if op_name == "match_score1"
+    ]
+    flattened_calls = normalize_scorers_in_flattened(
+        flattened_calls, exp_scorer_block_start_ndxs, ["match_score1", "match_score2"]
+    )
     got = [(op_name_from_ref(c.op_name), d) for (c, d) in flattened_calls]
 
     assert got == exp
@@ -391,8 +405,12 @@ async def test_evaluation_data_topology(client):
         "MyDictScorerWithCustomBoolSummary.score",
         "MyDictScorerWithCustomDictSummary.score",
     ]
-    exp_scorer_block_start_ndxs = [i for i, (op_name, _) in enumerate(exp) if op_name == "score_int"]
-    flattened = normalize_scorers_in_flattened(flattened, exp_scorer_block_start_ndxs, scorer_order)
+    exp_scorer_block_start_ndxs = [
+        i for i, (op_name, _) in enumerate(exp) if op_name == "score_int"
+    ]
+    flattened = normalize_scorers_in_flattened(
+        flattened, exp_scorer_block_start_ndxs, scorer_order
+    )
 
     # First, let's assert the topology of the calls
 
