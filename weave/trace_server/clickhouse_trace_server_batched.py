@@ -61,7 +61,7 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
 )
 from weave.trace_server.clickhouse_schema import (
     ALL_CALL_INSERT_COLUMNS,
-    ALL_CALL_JSON_COLUMNS,
+    ALL_CALL_JSON_COLUMN_INDICES,
     ALL_CALL_SELECT_COLUMNS,
     REQUIRED_CALL_COLUMNS,
     CallCHInsertable,
@@ -2329,15 +2329,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         stripped_count = 0
         final_batch = []
 
-        # Get the column indices for JSON dump columns
-        json_column_indices = []
-        for i, col_name in enumerate(ALL_CALL_INSERT_COLUMNS):
-            if col_name in ALL_CALL_JSON_COLUMNS:
-                json_column_indices.append(i)
-
         for item in batch:
             # Calculate only JSON dump bytes
-            json_sizes = [(i, _num_bytes(item[i])) for i in json_column_indices]
+            json_sizes = [
+                (i, _num_bytes(item[i])) for i in ALL_CALL_JSON_COLUMN_INDICES
+            ]
             total_json_bytes = sum(size for _, size in json_sizes)
 
             # If JSON columns are under limit, keep as is
@@ -2347,10 +2343,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
             # If over limit, try to optimize by selectively stripping largest JSON values
             stripped_item = list(item)
-            json_sizes.sort(key=lambda x: x[1], reverse=True)
+            sorted_json_sizes = sorted(json_sizes, key=lambda x: x[1], reverse=True)
 
             # Try to get under the limit by replacing largest JSON values
-            for col_idx, size in json_sizes:
+            for col_idx, size in sorted_json_sizes:
                 if (
                     total_json_bytes
                     <= ch_settings.CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT
