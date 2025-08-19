@@ -12,9 +12,12 @@ from weave.integrations.patcher import SymbolPatcher
 from weave.trace.autopatch import OpSettings
 from weave.trace.op import Op
 from weave.utils.sanitize import REDACTED_VALUE, should_redact
+from weave.trace.serialization.serialize import stringify, is_primitive
 
 if TYPE_CHECKING:
     from dspy.primitives.prediction import Example
+
+MAX_STR_LEN = 1000
 
 
 def get_symbol_patcher(
@@ -97,7 +100,7 @@ def dspy_postprocess_outputs(
         outputs = outputs.toDict()
 
     if isinstance(outputs, np.ndarray):
-        outputs = outputs.tolist()
+        outputs = dictify(outputs.tolist())
 
     if isinstance(outputs, ModelResponse):
         outputs = dictify(outputs)
@@ -130,35 +133,15 @@ def get_op_name_for_callback(instance: Any, inputs: dict[str, Any]) -> str:
     )
 
 
-MAX_STR_LEN = 1000
-
-
-def stringify(obj: Any, limit: int = MAX_STR_LEN) -> str:
-    """This is a fallback for objects that we don't have a better way to serialize."""
-    rep = None
-    try:
-        rep = repr(obj)
-    except Exception:
-        try:
-            rep = str(obj)
-        except Exception:
-            rep = f"<{type(obj).__name__}: {id(obj)}>"
-    if isinstance(rep, str) and len(rep) > limit:
-        rep = rep[: limit - 3] + "..."
-    return rep
-
-
-def is_primitive(obj: Any) -> bool:
-    """Check if an object is a known primitive type."""
-    return isinstance(obj, (int, float, str, bool, type(None)))
-
-
 def dictify(
     obj: Any, maxdepth: int = 0, depth: int = 1, seen: set[int] | None = None
 ) -> Any:
     """Recursively compute a dictionary representation of an object."""
     if seen is None:
         seen = set()
+
+    if isinstance(obj, type):
+        return obj.__name__
 
     if not is_primitive(obj):
         obj_id = id(obj)
@@ -180,6 +163,7 @@ def dictify(
     elif isinstance(obj, dict):
         dict_result = {}
         for k, v in obj.items():
+            k = k.__name__ if isinstance(k, type) else k
             if isinstance(k, str) and should_redact(k):
                 dict_result[k] = REDACTED_VALUE
             else:
@@ -192,6 +176,7 @@ def dictify(
             if isinstance(as_dict, dict):
                 to_dict_result = {}
                 for k, v in as_dict.items():
+                    k = k.__name__ if isinstance(k, type) else k
                     if isinstance(k, str) and should_redact(k):
                         to_dict_result[k] = REDACTED_VALUE
                     elif maxdepth == 0 or depth < maxdepth:

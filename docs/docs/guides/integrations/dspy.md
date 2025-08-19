@@ -240,7 +240,7 @@ wandb.init(project=wandb_project)
 
 # add the callback as dspy settings
 # highlight-next-line
-dspy.settings.configure(callbacks=[WandbDSPyCallback()])
+dspy.settings.callbacks.append(WandbDSPyCallback())
 
 gpt4o_mini = dspy.LM('openai/gpt-4o-mini', max_tokens=2000)
 gpt4o = dspy.LM('openai/gpt-4o', max_tokens=2000, cache=True)
