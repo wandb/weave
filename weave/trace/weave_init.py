@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import logging
 
+from weave.compat import wandb
+from weave.telemetry import trace_sentry
 from weave.trace import (
     autopatch,
+    env,
     init_message,
     wandb_termlog_patch,
     weave_client,
 )
-from weave.telemetry import trace_sentry
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.settings import should_redact_pii, use_server_cache
 from weave.trace_server.trace_server_interface import TraceServerInterface
@@ -33,9 +35,7 @@ _current_inited_client: InitializedClient | None = None
 
 
 def get_username() -> str | None:
-    from weave.wandb_interface import wandb_api
-
-    api = wandb_api.get_wandb_api_sync()
+    api = wandb.Api()
     try:
         return api.username()
     except AttributeError:
@@ -46,11 +46,9 @@ class WeaveWandbAuthenticationException(Exception): ...
 
 
 def get_entity_project_from_project_name(project_name: str) -> tuple[str, str]:
-    from weave.wandb_interface import wandb_api
-
     fields = project_name.split("/")
     if len(fields) == 1:
-        api = wandb_api.get_wandb_api_sync()
+        api = wandb.Api()
         entity_name = api.default_entity_name()
         if entity_name is None:
             raise WeaveWandbAuthenticationException(
@@ -100,23 +98,24 @@ def init_weave(
             _current_inited_client.client.finish()
             _current_inited_client.reset()
 
-    from weave.wandb_interface import wandb_api  # type: ignore
+    from weave.wandb_interface import (
+        context as wandb_context_module,  # type: ignore
+    )
 
     # Must init to read ensure we've read auth from the environment, in
     # case we're on a new thread.
-    wandb_api.init()
-    wandb_context = wandb_api.get_wandb_api_context()
+    wandb_context_module.init()
+    wandb_context = wandb_context_module.get_wandb_api_context()
     if wandb_context is None:
-        import wandb
-
-        logger.info(
-            "Please login to Weights & Biases (https://wandb.ai/) to continue..."
-        )
+        url = wandb.app_url(env.wandb_base_url())
+        logger.info(f"Please login to Weights & Biases ({url}) to continue...")
         wandb_termlog_patch.ensure_patched()
         wandb.login(anonymous="never", force=True)  # type: ignore
-        wandb_api.init()
-        wandb_context = wandb_api.get_wandb_api_context()
 
+        wandb_context_module.init()
+        wandb_context = wandb_context_module.get_wandb_api_context()
+
+    # Resolve entity name after authentication is ensured
     entity_name, project_name = get_entity_project_from_project_name(project_name)
     wandb_run_id = weave_client.safe_current_wb_run_id()
     weave_client.check_wandb_run_matches(wandb_run_id, entity_name, project_name)

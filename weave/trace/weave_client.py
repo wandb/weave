@@ -29,6 +29,7 @@ from weave.trace.constants import TRACE_CALL_EMOJI
 from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.feedback import FeedbackQuery, RefFeedbackQuery
+from weave.trace.init_message import WANDB_AVAILABLE
 from weave.trace.interface_query_builder import (
     exists_expr,
     get_field_expr,
@@ -704,6 +705,7 @@ class WeaveClient:
             self.project = resp.project_name
 
         self._server_call_processor = None
+        self._server_feedback_processor = None
         # This is a short-term hack to get around the fact that we are reaching into
         # the underlying implementation of the specific server to get the call processor.
         # The `RemoteHTTPTraceServer` contains a call processor and we use that to control
@@ -713,6 +715,8 @@ class WeaveClient:
         # to define no-ops.
         if hasattr(self.server, "get_call_processor"):
             self._server_call_processor = self.server.get_call_processor()
+        if hasattr(self.server, "get_feedback_processor"):
+            self._server_feedback_processor = self.server.get_feedback_processor()
         self.send_file_cache = WeaveClientSendFileCache()
 
     ################ High Level Convenience Methods ################
@@ -2095,6 +2099,9 @@ class WeaveClient:
         # Add call batch uploads if available
         if self._server_call_processor:
             total += self._server_call_processor.num_outstanding_jobs
+        # Add feedback batch uploads if available
+        if self._server_feedback_processor:
+            total += self._server_feedback_processor.num_outstanding_jobs
         return total
 
     def finish(
@@ -2175,8 +2182,16 @@ class WeaveClient:
                 prev_job_counts["call_processor_jobs"]
                 - current_job_counts["call_processor_jobs"],
             )
+            feedback_processor_completed = max(
+                0,
+                prev_job_counts["feedback_processor_jobs"]
+                - current_job_counts["feedback_processor_jobs"],
+            )
             completed_this_iteration = (
-                main_completed + fastlane_completed + call_processor_completed
+                main_completed
+                + fastlane_completed
+                + call_processor_completed
+                + feedback_processor_completed
             )
 
             if completed_this_iteration > 0:
@@ -2207,6 +2222,7 @@ class WeaveClient:
                 main_jobs=0,
                 fastlane_jobs=0,
                 call_processor_jobs=0,
+                feedback_processor_jobs=0,
                 total_jobs=0,
             ),
             completed_since_last_update=0,
@@ -2226,6 +2242,10 @@ class WeaveClient:
             self._server_call_processor.stop_accepting_new_work_and_flush_queue()
             # Restart call processor processing thread after flushing
             self._server_call_processor.accept_new_work()
+        if self._server_feedback_processor:
+            self._server_feedback_processor.stop_accepting_new_work_and_flush_queue()
+            # Restart feedback processor processing thread after flushing
+            self._server_feedback_processor.accept_new_work()
 
     def _get_pending_jobs(self) -> PendingJobCounts:
         """Get the current number of pending jobs for each type.
@@ -2235,6 +2255,7 @@ class WeaveClient:
                 - main_jobs: Number of pending jobs in the main executor
                 - fastlane_jobs: Number of pending jobs in the fastlane executor
                 - call_processor_jobs: Number of pending jobs in the call processor
+                - feedback_processor_jobs: Number of pending jobs in the feedback processor
                 - total_jobs: Total number of pending jobs
         """
         main_jobs = self.future_executor.num_outstanding_futures
@@ -2244,12 +2265,21 @@ class WeaveClient:
         call_processor_jobs = 0
         if self._server_call_processor:
             call_processor_jobs = self._server_call_processor.num_outstanding_jobs
+        feedback_processor_jobs = 0
+        if self._server_feedback_processor:
+            feedback_processor_jobs = (
+                self._server_feedback_processor.num_outstanding_jobs
+            )
 
         return PendingJobCounts(
             main_jobs=main_jobs,
             fastlane_jobs=fastlane_jobs,
             call_processor_jobs=call_processor_jobs,
-            total_jobs=main_jobs + fastlane_jobs + call_processor_jobs,
+            feedback_processor_jobs=feedback_processor_jobs,
+            total_jobs=main_jobs
+            + fastlane_jobs
+            + call_processor_jobs
+            + feedback_processor_jobs,
         )
 
     def _has_pending_jobs(self) -> bool:
@@ -2267,6 +2297,7 @@ class PendingJobCounts(TypedDict):
     main_jobs: int
     fastlane_jobs: int
     call_processor_jobs: int
+    feedback_processor_jobs: int
     total_jobs: int
 
 
@@ -2307,22 +2338,11 @@ def get_parallelism_settings() -> tuple[int | None, int | None]:
 
 
 def _safe_get_wandb_run() -> wandb.sdk.wandb_run.Run | None:
-    # Check if wandb is installed.  This will pass even if wandb is not installed
-    # if there is a wandb directory in the user's current directory, so the
-    # second check is required.
-    try:
+    if WANDB_AVAILABLE:
         import wandb
-    except (ImportError, ModuleNotFoundError):
-        return None
 
-    # If a wandb directory exists, but wandb is installed, `wandb.run` will raise
-    # AttributeError.  This is an artifact of how python handles imports.
-    try:
-        wandb_run = wandb.run
-    except AttributeError:
-        return None
-
-    return wandb_run
+        return wandb.run
+    return None
 
 
 def safe_current_wb_run_id() -> str | None:
