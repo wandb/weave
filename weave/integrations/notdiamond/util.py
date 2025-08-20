@@ -1,14 +1,12 @@
-from typing import Dict
-
 import pandas as pd
 
 import weave
-from weave.flow.eval import EvaluationResults
+from weave.evaluation.eval import EvaluationResults
 
 
 def get_model_evals(
     file_path: str = "integrations/notdiamond/test_data/humaneval.csv",
-) -> Dict[str, EvaluationResults]:
+) -> dict[str, EvaluationResults]:
     df = pd.read_csv(file_path)
     models = [
         "anthropic/claude-3-5-sonnet-20240620",

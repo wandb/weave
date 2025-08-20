@@ -1,11 +1,15 @@
+from __future__ import annotations
+
 import dataclasses
 import types
 from inspect import getmro, isclass
-from typing import Any, Callable, Union
-
-import pydantic
+from typing import Any, Callable
 
 from weave.trace.op import is_op
+from weave.trace_server.client_server_common.pydantic_util import (
+    PydanticBaseModelGeneral,
+    pydantic_asdict_one_level,
+)
 
 
 class ObjectRecord:
@@ -24,7 +28,7 @@ class ObjectRecord:
             if self._class_name != other._class_name:
                 return False
         else:
-            if other.__class__.__name__ != getattr(self, "_class_name"):
+            if other.__class__.__name__ != self._class_name:
                 return False
         for k, v in self.__dict__.items():
             if k == "_class_name" or k == "_bases":
@@ -33,24 +37,27 @@ class ObjectRecord:
                 return False
         return True
 
-    def map_values(self, fn: Callable) -> "ObjectRecord":
+    def map_values(self, fn: Callable) -> ObjectRecord:
         return ObjectRecord({k: fn(v) for k, v in self.__dict__.items()})
 
+    def unwrap(self) -> dict[str, Any]:
+        # Nasty import to avoid circular import
+        from weave.trace.vals import unwrap
 
-PydanticBaseModelGeneral = Union[pydantic.BaseModel, pydantic.v1.BaseModel]
-
-
-def pydantic_model_fields(obj: PydanticBaseModelGeneral) -> list[str]:
-    if isinstance(obj, pydantic.BaseModel):
-        return obj.model_fields
-    elif isinstance(obj, pydantic.v1.BaseModel):
-        return obj.__fields__
-    else:
-        raise ValueError(f"{obj} is not a pydantic model")
-
-
-def pydantic_asdict_one_level(obj: PydanticBaseModelGeneral) -> dict[str, Any]:
-    return {k: getattr(obj, k) for k in pydantic_model_fields(obj)}
+        unwrapped_one_level = {
+            k: v
+            for k, v in self.__dict__.items()
+            if k
+            not in [
+                "_class_name",
+                "_bases",
+                "map_values",
+                "unwrap",
+                "__repr__",
+                "__eq__",
+            ]
+        }
+        return unwrap(unwrapped_one_level)
 
 
 def class_all_bases_names(cls: type) -> list[str]:
@@ -80,7 +87,7 @@ def dataclass_object_record(obj: Any) -> ObjectRecord:
     for k, v in getmembers(obj, lambda x: is_op(x), lambda e: None):
         attrs[k] = types.MethodType(v, obj)
     attrs["_class_name"] = obj.__class__.__name__
-    attrs["_bases"] = class_all_bases_names(obj.__class__)
+    attrs["_bases"] = class_all_bases_names(obj.__class__)  # type: ignore[arg-type]
     return ObjectRecord(attrs)
 
 

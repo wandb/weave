@@ -1,0 +1,72 @@
+interactions:
+- request:
+    body: ''
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '284'
+      Content-Type:
+      - application/json
+      User-Agent:
+      - python-requests/2.32.4
+      x-goog-api-client:
+      - langchain-google-genai/2.1.9-ChatGoogleGenerativeAI:models/gemini-1.5-pro
+        gl-python/3.11.11 grpc/1.74.0 gax/2.25.1 gccl/2.1.9-ChatGoogleGenerativeAI:models/gemini-1.5-pro
+      x-goog-api-key:
+      - SUPER_FAKE_API_KEY
+      x-goog-request-params:
+      - model=models/gemini-1.5-pro
+    method: POST
+    uri: https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?%24alt=json%3Benum-encoding%3Dint
+  response:
+    body:
+      string: "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\":
+        [\n          {\n            \"text\": \"Hmm. Future of AI... like some new
+        breed of monster, isn't it?  Folk whisper about it, scared. Some see salvation,
+        others doom. Me? I've seen enough prophecies and sorcerous schemes to know
+        things rarely turn out as predicted.  Destiny is a fickle bitch.  Maybe these
+        AI will be helpful, maybe they'll burn the world.  Doesn't matter much to
+        a witcher.  Just another contract, in the end.  Though, I'd wager silver it
+        involves a fair bit of chaos.  And chaos always pays.\\n\"\n          }\n
+        \       ],\n        \"role\": \"model\"\n      },\n      \"finishReason\":
+        1,\n      \"avgLogprobs\": -0.279165893041787\n    }\n  ],\n  \"usageMetadata\":
+        {\n    \"promptTokenCount\": 23,\n    \"candidatesTokenCount\": 119,\n    \"totalTokenCount\":
+        142,\n    \"promptTokensDetails\": [\n      {\n        \"modality\": 1,\n
+        \       \"tokenCount\": 23\n      }\n    ],\n    \"candidatesTokensDetails\":
+        [\n      {\n        \"modality\": 1,\n        \"tokenCount\": 119\n      }\n
+        \   ]\n  },\n  \"modelVersion\": \"gemini-1.5-pro-002\",\n  \"responseId\":
+        \"DH6UaI3OD8WDn9kPnP-c0Qk\"\n}\n"
+    headers:
+      Alt-Svc:
+      - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json; charset=UTF-8
+      Date:
+      - Thu, 07 Aug 2025 10:21:03 GMT
+      Server:
+      - scaffolding on HTTPServer2
+      Server-Timing:
+      - gfet4t7; dur=4576
+      Transfer-Encoding:
+      - chunked
+      Vary:
+      - Origin
+      - X-Origin
+      - Referer
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - SAMEORIGIN
+      X-XSS-Protection:
+      - '0'
+    status:
+      code: 200
+      message: OK
+version: 1

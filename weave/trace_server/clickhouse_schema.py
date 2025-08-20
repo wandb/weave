@@ -1,8 +1,9 @@
 import datetime
-import typing
+from typing import Optional, Union
 
 from pydantic import BaseModel, Field, field_validator
 
+from weave.trace_server import refs_internal as ri
 from weave.trace_server import validation
 
 
@@ -10,19 +11,20 @@ class CallStartCHInsertable(BaseModel):
     project_id: str
     id: str
     trace_id: str
-    parent_id: typing.Optional[str] = None
+    parent_id: Optional[str] = None
+    thread_id: Optional[str] = None
+    turn_id: Optional[str] = None
     op_name: str
     started_at: datetime.datetime
     attributes_dump: str
     inputs_dump: str
-    input_refs: typing.List[str]
-    output_refs: typing.List[str] = Field(
-        default_factory=list
-    )  # sadly, this is required
-    display_name: typing.Optional[str] = None
+    input_refs: list[str]
+    output_refs: list[str] = Field(default_factory=list)  # sadly, this is required
+    display_name: Optional[str] = None
 
-    wb_user_id: typing.Optional[str] = None
-    wb_run_id: typing.Optional[str] = None
+    wb_user_id: Optional[str] = None
+    wb_run_id: Optional[str] = None
+    wb_run_step: Optional[int] = None
 
     _project_id_v = field_validator("project_id")(validation.project_id_validator)
     _id_v = field_validator("id")(validation.call_id_validator)
@@ -34,19 +36,18 @@ class CallStartCHInsertable(BaseModel):
     _display_name_v = field_validator("display_name")(validation.display_name_validator)
     _wb_user_id_v = field_validator("wb_user_id")(validation.wb_user_id_validator)
     _wb_run_id_v = field_validator("wb_run_id")(validation.wb_run_id_validator)
+    _wb_run_step_v = field_validator("wb_run_step")(validation.wb_run_step_validator)
 
 
 class CallEndCHInsertable(BaseModel):
     project_id: str
     id: str
     ended_at: datetime.datetime
-    exception: typing.Optional[str] = None
+    exception: Optional[str] = None
     summary_dump: str
     output_dump: str
-    input_refs: typing.List[str] = Field(
-        default_factory=list
-    )  # sadly, this is required
-    output_refs: typing.List[str]
+    input_refs: list[str] = Field(default_factory=list)  # sadly, this is required
+    output_refs: list[str]
 
     _project_id_v = field_validator("project_id")(validation.project_id_validator)
     _id_v = field_validator("id")(validation.call_id_validator)
@@ -62,8 +63,8 @@ class CallDeleteCHInsertable(BaseModel):
     deleted_at: datetime.datetime
 
     # required types
-    input_refs: typing.List[str] = Field(default_factory=list)
-    output_refs: typing.List[str] = Field(default_factory=list)
+    input_refs: list[str] = Field(default_factory=list)
+    output_refs: list[str] = Field(default_factory=list)
 
     _project_id_v = field_validator("project_id")(validation.project_id_validator)
     _id_v = field_validator("id")(validation.call_id_validator)
@@ -78,11 +79,11 @@ class CallUpdateCHInsertable(BaseModel):
     wb_user_id: str
 
     # update types
-    display_name: typing.Optional[str] = None
+    display_name: Optional[str] = None
 
     # required types
-    input_refs: typing.List[str] = Field(default_factory=list)
-    output_refs: typing.List[str] = Field(default_factory=list)
+    input_refs: list[str] = Field(default_factory=list)
+    output_refs: list[str] = Field(default_factory=list)
 
     _project_id_v = field_validator("project_id")(validation.project_id_validator)
     _id_v = field_validator("id")(validation.call_id_validator)
@@ -100,54 +101,103 @@ class SelectableCHCallSchema(BaseModel):
     id: str
 
     op_name: str
-    display_name: typing.Optional[str] = None
+    display_name: Optional[str] = None
 
     trace_id: str
-    parent_id: typing.Optional[str] = None
+    parent_id: Optional[str] = None
+    thread_id: Optional[str] = None
+    turn_id: Optional[str] = None
 
     started_at: datetime.datetime
-    ended_at: typing.Optional[datetime.datetime] = None
-    exception: typing.Optional[str] = None
+    ended_at: Optional[datetime.datetime] = None
+    exception: Optional[str] = None
 
     # attributes and inputs are required on call schema, but can be
     # optionally selected when querying
-    attributes_dump: typing.Optional[str] = None
-    inputs_dump: typing.Optional[str] = None
+    attributes_dump: Optional[str] = None
+    inputs_dump: Optional[str] = None
 
-    output_dump: typing.Optional[str] = None
-    summary_dump: typing.Optional[str] = None
+    output_dump: Optional[str] = None
+    summary_dump: Optional[str] = None
 
-    input_refs: typing.List[str]
-    output_refs: typing.List[str]
+    input_refs: list[str]
+    output_refs: list[str]
 
-    wb_user_id: typing.Optional[str] = None
-    wb_run_id: typing.Optional[str] = None
+    wb_user_id: Optional[str] = None
+    wb_run_id: Optional[str] = None
+    wb_run_step: Optional[int] = None
 
-    deleted_at: typing.Optional[datetime.datetime] = None
+    deleted_at: Optional[datetime.datetime] = None
 
 
 class ObjCHInsertable(BaseModel):
     project_id: str
+    wb_user_id: Optional[str] = None
     kind: str
-    base_object_class: typing.Optional[str]
+    base_object_class: Optional[str]
+    leaf_object_class: Optional[str]
     object_id: str
-    refs: typing.List[str]
+    refs: list[str]
     val_dump: str
     digest: str
 
+    _wb_user_id_v = field_validator("wb_user_id")(validation.wb_user_id_validator)
     _project_id_v = field_validator("project_id")(validation.project_id_validator)
     _object_id_v = field_validator("object_id")(validation.object_id_validator)
     _refs = field_validator("refs")(validation.refs_list_validator)
+
+
+class ObjDeleteCHInsertable(ObjCHInsertable):
+    deleted_at: datetime.datetime
+    created_at: datetime.datetime
 
 
 class SelectableCHObjSchema(BaseModel):
     project_id: str
     object_id: str
     created_at: datetime.datetime
-    refs: typing.List[str]
+    wb_user_id: Optional[str] = None
+    refs: list[str]
     val_dump: str
     kind: str
-    base_object_class: typing.Optional[str]
+    base_object_class: Optional[str]
+    leaf_object_class: Optional[str]
     digest: str
     version_index: int
     is_latest: int
+    deleted_at: Optional[datetime.datetime] = None
+    size_bytes: Optional[int] = None
+
+
+CallCHInsertable = Union[
+    CallStartCHInsertable,
+    CallEndCHInsertable,
+    CallDeleteCHInsertable,
+    CallUpdateCHInsertable,
+]
+
+ObjRefListType = list[ri.InternalObjectRef]
+
+
+ALL_CALL_INSERT_COLUMNS = sorted(
+    CallStartCHInsertable.model_fields.keys()
+    | CallEndCHInsertable.model_fields.keys()
+    | CallDeleteCHInsertable.model_fields.keys()
+    | CallUpdateCHInsertable.model_fields.keys()
+)
+
+ALL_CALL_SELECT_COLUMNS = list(SelectableCHCallSchema.model_fields.keys())
+ALL_CALL_JSON_COLUMNS = ("inputs", "output", "attributes", "summary")
+REQUIRED_CALL_COLUMNS = ["id", "project_id", "trace_id", "op_name", "started_at"]
+
+# Columns in the calls_merged table with special aggregation functions:
+CALL_SELECT_RAW_COLUMNS = ["id", "project_id"]  # no aggregation
+CALL_SELECT_ARRAYS_COLUMNS = ["input_refs", "output_refs"]  # array_concat_agg
+CALL_SELECT_ARGMAX_COLUMNS = ["display_name"]  # argMaxMerge
+# all others use `any`
+
+ALL_OBJ_SELECT_COLUMNS = list(SelectableCHObjSchema.model_fields.keys())
+ALL_OBJ_INSERT_COLUMNS = list(ObjCHInsertable.model_fields.keys())
+
+# Let's just make everything required for now ... can optimize when we implement column selection
+REQUIRED_OBJ_SELECT_COLUMNS = list(set(ALL_OBJ_SELECT_COLUMNS))

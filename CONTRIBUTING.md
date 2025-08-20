@@ -15,7 +15,7 @@
 ## Issues
 1. Check the [issues](https://github.com/wandb/weave/issues) and [PRs](https://github.com/wandb/weave/pulls) to see if the feature/bug has already been requested/fixed. If not, [open an issue](https://github.com/wandb/weave/issues/new/choose). This helps us keep track of feature requests and bugs!
 2. If you're having issues, the best way we can help is when you can share a reproducible example.
-   1. In general, it's helpful use this format:
+   1. In general, it's helpful to use this format:
       ```
       <short description of the issue>
       <link to your project>
@@ -121,16 +121,26 @@ We use pre-commit. You can install with:
 uv tool install pre-commit
 ```
 
-Then run:
+Then run on staged files (default, faster):
+
+```sh
+pre-commit run --hook-stage=pre-push
+```
+
+Or run on all files (slower but more thorough):
 
 ```sh
 pre-commit run --hook-stage=pre-push --all-files
 ```
 
-You can also use the `lint` nox target to run linting.
+You can also use the `lint` nox target to run linting:
 
 ```sh
+# Run on staged files only (default, faster)
 nox -e lint
+
+# Run on all files
+nox -e lint -- --all-files
 ```
 
 ### Building the `weave` package

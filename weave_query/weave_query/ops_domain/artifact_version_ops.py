@@ -640,10 +640,21 @@ def file_(
     art_local = _artifact_version_to_wb_artifact(artifactVersion)
     return art_local.path_info(path)  # type: ignore
 
+@op(
+    name="artifactVersion-_files_refine_output_type",
+    hidden=True,
+    output_type=types.TypeType(),
+    plugins=wb_gql_op_plugin(lambda inputs, inner: static_art_file_gql),
+)
+def _files_refine_output_type(artifactVersion: wdt.ArtifactVersion):
+    art_local = _artifact_version_to_wb_artifact(artifactVersion)
+    return types.TypeRegistry.type_of(artifact_wandb.FilesystemArtifactFileIterator(art_local))
+
 
 @op(
     name="artifactVersion-files",
     plugins=wb_gql_op_plugin(lambda inputs, inner: static_art_file_gql),
+    refine_output_type=_files_refine_output_type,
 )
 def files(
     artifactVersion: wdt.ArtifactVersion,

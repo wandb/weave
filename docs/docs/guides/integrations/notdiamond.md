@@ -50,7 +50,7 @@ according to eval performance for specialized use cases.
 Start by training a custom router:
 
 ```python
-from weave.flow.eval import EvaluationResults
+from weave.evaluation.eval import EvaluationResults
 from weave.integrations.notdiamond.custom_router import train_router
 
 # Build an Evaluation on gpt-4o and Claude 3.5 Sonnet
@@ -68,7 +68,6 @@ preference_id = train_router(
     response_column="actual",
     language="en",
     maximize=True,
-    api_key=api_key,
 )
 ```
 

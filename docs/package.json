@@ -16,9 +16,11 @@
   },
   "dependencies": {
     "@docusaurus/core": "^3.4.0",
+    "@docusaurus/plugin-client-redirects": "3.4.0",
     "@docusaurus/plugin-google-gtag": "^3.4.0",
     "@docusaurus/plugin-google-tag-manager": "^3.4.0",
     "@docusaurus/preset-classic": "^3.4.0",
+    "@docusaurus/theme-mermaid": "3.4.0",
     "@easyops-cn/docusaurus-search-local": "^0.44.4",
     "@laxels/docusaurus-plugin-segment": "^1.0.6",
     "@mdx-js/react": "^3.0.0",
@@ -52,5 +54,6 @@
   },
   "engines": {
     "node": ">=18.0"
-  }
+  },
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }

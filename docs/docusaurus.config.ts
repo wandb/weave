@@ -1,7 +1,7 @@
-import { themes as prismThemes } from "prism-react-renderer";
-import type { Config } from "@docusaurus/types";
 import type * as Preset from "@docusaurus/preset-classic";
+import type { Config } from "@docusaurus/types";
 import type * as OpenApiPlugin from "docusaurus-plugin-openapi-docs";
+import { themes as prismThemes } from "prism-react-renderer";
 
 const config: Config = {
   title: "W&B Weave",
@@ -28,6 +28,10 @@ const config: Config = {
   i18n: {
     defaultLocale: "en",
     locales: ["en"],
+  },
+
+  markdown: {
+    mermaid: true,
   },
 
   presets: [
@@ -108,7 +112,22 @@ const config: Config = {
         anonymizeIP: true,
       },
     ],
-    'plugin-image-zoom',
+    "plugin-image-zoom",
+    [
+      '@docusaurus/plugin-client-redirects',
+      {
+        redirects: [
+          {
+            from: ['/guides/evaluation/imperative_evaluations'],
+            to: '/guides/evaluation/evaluation_logger',
+          },
+          {
+            from: ['/guides/integrations/inference'],
+            to: 'https://docs.wandb.ai/guides/inference/',
+          },
+        ]  
+      },
+    ],
   ],
 
   themes: [
@@ -120,12 +139,13 @@ const config: Config = {
       },
     ],
     "docusaurus-theme-openapi-docs",
+    "@docusaurus/theme-mermaid",
   ],
   themeConfig: {
     // Replace with your project's social card
     image: "img/logo-large-padded.png",
     navbar: {
-      title: "Weave",
+      title: "W&B Weave",
       logo: {
         alt: "My Site Logo",
         src: "img/logo.svg",
@@ -155,6 +175,11 @@ const config: Config = {
             },
             {
               type: "docSidebar",
+              sidebarId: "typescriptSdkSidebar",
+              label: "TypeScript SDK",
+            },
+            {
+              type: "docSidebar",
               sidebarId: "serviceApiSidebar",
               label: "Service API",
             },
@@ -180,28 +205,20 @@ const config: Config = {
           position: "right",
         },
         {
-          to: "https://wandb.ai/home",
+          to: "https://wandb.ai/quickstart?product=weave",
           label: "Open App",
           position: "right",
           className: "button button--secondary button--med margin-right--sm",
         },
-      ],
-    },
-    footer: {
-      style: "dark",
-      links: [
         {
-          title: "Docs",
+          position: "left",
+          label: "Community",
+          type: "dropdown",
           items: [
             {
-              label: "Documentation",
-              to: "/quickstart",
+              label: "LLM Courses",
+              href: "https://www.wandb.courses/",
             },
-          ],
-        },
-        {
-          title: "Community",
-          items: [
             {
               label: "Forum",
               href: "https://community.wandb.ai",
@@ -212,17 +229,10 @@ const config: Config = {
             },
           ],
         },
-        {
-          title: "Github",
-          items: [
-            {
-              label: "Weave",
-              href: "https://github.com/wandb/weave",
-            },
-          ],
-        },
       ],
-      copyright: `Weave by W&B`,
+    },
+    footer: {
+      copyright: `Made with ❤️ by Weights & Biases`,
     },
     prism: {
       // theme: prismThemes.nightOwl,
@@ -239,7 +249,7 @@ const config: Config = {
     },
     imageZoom: {
       // CSS selector to apply the plugin to
-      selector: 'img.zoomable',
+      selector: "img.zoomable",
       // Optional medium-zoom options
       // see: https://www.npmjs.com/package/medium-zoom#options
       options: {},

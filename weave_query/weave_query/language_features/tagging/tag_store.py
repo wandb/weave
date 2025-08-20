@@ -77,6 +77,27 @@ def with_tag_store_state(
     _OBJ_TAGS_MEM_MAP.reset(tag_store_token)
 
 
+@contextmanager
+def with_tags_stripped_from_objects(objs: list[typing.Any]) -> typing.Iterator[None]:
+    current_state = _current_obj_tag_mem_map()
+    if current_state is None:
+        raise errors.WeaveInternalError("No tag store context")
+
+    new_state = current_state.copy()
+
+    for obj in objs:
+        objid = get_id(obj)
+        if objid in new_state:
+            del new_state[objid]
+
+    new_mem_map = _OBJ_TAGS_MEM_MAP.get().copy()
+    new_mem_map[_OBJ_TAGS_CURR_NODE_ID.get()] = new_state
+
+    tag_store_token = _OBJ_TAGS_MEM_MAP.set(new_mem_map)
+    yield
+    _OBJ_TAGS_MEM_MAP.reset(tag_store_token)
+
+
 # sets the current node with optionally merged in parent tags
 @contextmanager
 def set_curr_node(node_id: int, parent_node_ids: list[int]) -> typing.Iterator[None]:

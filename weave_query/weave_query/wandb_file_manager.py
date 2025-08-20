@@ -4,6 +4,7 @@
 
 import datetime
 import json
+import logging
 import typing
 import urllib
 from urllib import parse
@@ -16,7 +17,6 @@ from weave_query import environment as weave_env
 from weave_query import filesystem, artifact_wandb, cache, errors, wandb_api, engine_trace, weave_http
 
 tracer = engine_trace.tracer()  # type: ignore
-
 
 def _file_path(
     uri: typing.Union[
@@ -66,6 +66,17 @@ def _local_path_and_download_url(
     else:
         # TODO: storage_region
         storage_region = "default"
+        if isinstance(art_uri, artifact_wandb.WeaveWBArtifactURI):
+            return file_path, "{}/artifactsV2/{}/{}/{}/{}/{}/{}/{}".format(
+                base_url,
+                storage_region,
+                entity_name,
+                urllib.parse.quote(art_uri.project_name),
+                urllib.parse.quote(art_uri.name),
+                urllib.parse.quote(manifest_entry.get("birthArtifactID", "")),  # type: ignore
+                md5_hex,
+                urllib.parse.quote(file_name),
+                )
         # For artifactsV2 (which is all artifacts now), the file download handler ignores the entity
         # parameter while parsing the url, and fetches the files directly via the artifact id
         # Refer to: https://github.com/wandb/core/blob/7cfee1cd07ddc49fe7ba70ce3d213d2a11bd4456/services/gorilla/api/handler/artifacts.go#L179
@@ -100,9 +111,13 @@ class WandbFileManagerAsync:
         ],
     ) -> str:
         assert uri.version is not None
-        if isinstance(uri, artifact_wandb.WeaveWBArtifactURI):
-            return f"wandb_file_manager/{uri.entity_name}/{uri.project_name}/{uri.name}/manifest-{uri.version}.json"
-        return f"wandb_file_manager/{uri.path_root}/{uri.artifact_id}/{uri.name}/manifest-{uri.version}.json"
+
+        if isinstance(uri, artifact_wandb.WeaveWBArtifactByIDURI):
+            return f"wandb_file_manager/{uri.path_root}/{uri.artifact_id}/{uri.name}/manifest-{uri.version}.json"
+        elif uri.extra:
+            return f"wandb_file_manager/{uri.entity_name}/{uri.project_name}/{uri.name}/manifest-{uri.version}-{uri.extra[0]}.json"
+        return f"wandb_file_manager/{uri.entity_name}/{uri.project_name}/{uri.name}/manifest-{uri.version}.json"
+
 
     async def _manifest(
         self,
@@ -295,6 +310,8 @@ class WandbFileManager:
         assert uri.version is not None
         if isinstance(uri, artifact_wandb.WeaveWBArtifactByIDURI):
             return f"wandb_file_manager/{uri.path_root}/{uri.artifact_id}/{uri.name}/manifest-{uri.version}.json"
+        elif uri.extra:
+            return f"wandb_file_manager/{uri.entity_name}/{uri.project_name}/{uri.name}/manifest-{uri.version}-{uri.extra[0]}.json"
         return f"wandb_file_manager/{uri.entity_name}/{uri.project_name}/{uri.name}/manifest-{uri.version}.json"
 
     def _manifest(

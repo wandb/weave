@@ -6,14 +6,14 @@ from typing import Any
 import openai
 
 import weave
-from weave.flow.scorer import MultiTaskBinaryClassificationF1
+from weave.scorers import MultiTaskBinaryClassificationF1
 
 
 class TextExtractModel(weave.Model):
     model_name: str
     prompt_template: str
 
-    @weave.op()
+    @weave.op
     async def predict(self, doc: str) -> Any:
         client = openai.AsyncClient()
 

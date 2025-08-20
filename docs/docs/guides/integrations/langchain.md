@@ -1,5 +1,9 @@
 # LangChain
 
+<a target="_blank" href="https://colab.research.google.com/github/wandb/examples/blob/master/weave/docs/quickstart_langchain.ipynb">
+  <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
+</a>
+
 Weave is designed to make tracking and logging all calls made through the [LangChain Python library](https://github.com/langchain-ai/langchain) effortless.
 
 When working with LLMs, debugging is inevitable. Whether a model call fails, an output is misformatted, or nested model calls create confusion, pinpointing issues can be challenging. LangChain applications often consist of multiple steps and LLM call invocations, making it crucial to understand the inner workings of your chains and agents.
@@ -29,6 +33,34 @@ output = llm_chain.invoke({"number": 2})
 
 print(output)
 ```
+
+## Tracking Call Metadata
+
+To track metadata from your LangChain calls, you can use the [`weave.attributes`](https://weave-docs.wandb.ai/reference/python-sdk/weave/#function-attributes) context manager. This context manager allows you to set custom metadata for a specific block of code, such as a chain or a single request.
+
+```python
+import weave
+from langchain_core.prompts import PromptTemplate
+from langchain_openai import ChatOpenAI
+
+# Initialize Weave with your project name
+# highlight-next-line
+weave.init("langchain_demo")
+
+llm = ChatOpenAI()
+prompt = PromptTemplate.from_template("1 + {number} = ")
+
+llm_chain = prompt | llm
+
+# highlight-next-line
+with weave.attributes({"my_awesome_attribute": "value"}):
+    output = llm_chain.invoke()
+
+print(output)
+```
+Weave automatically tracks the metadat against the trace of the LangChain call. You can view the metadata in the Weave web interface as shown below:
+
+[![langchain_attributes.png](imgs/langchain_attributes.png)](https://wandb.ai/parambharat/langchain_demo/weave/traces?cols=%7B%22attributes.weave.client_version%22%3Afalse%2C%22attributes.weave.os_name%22%3Afalse%2C%22attributes.weave.os_release%22%3Afalse%2C%22attributes.weave.os_version%22%3Afalse%2C%22attributes.weave.source%22%3Afalse%2C%22attributes.weave.sys_version%22%3Afalse%7D)
 
 ## Traces
 
@@ -196,7 +228,7 @@ Evaluations help you measure the performance of your models. By using the [`weav
 
 ```python
 
-from weave.flow.scorer import MultiTaskBinaryClassificationF1
+from weave.scorers import MultiTaskBinaryClassificationF1
 
 sentences = [
     "There are many fruits that were found on the recently discovered planet Goocrux. There are neoskizzles that grow there, which are purple and taste like candy.",
@@ -215,8 +247,8 @@ examples = [
 ]
 
 @weave.op()
-def fruit_name_score(target: dict, model_output: dict) -> dict:
-    return {"correct": target["fruit"] == model_output["fruit"]}
+def fruit_name_score(target: dict, output: dict) -> dict:
+    return {"correct": target["fruit"] == output["fruit"]}
 
 
 evaluation = weave.Evaluation(

@@ -2,7 +2,7 @@ import json
 import subprocess
 
 import weave
-from weave.flow.agent import Agent, AgentState
+from weave.agent.agent import Agent, AgentState
 
 SYSTEM_MESSAGE = """Assistant is an automonmous agent.
 Agent likes to explore it's world, using any means necessary.
@@ -13,7 +13,7 @@ Agent documents its learnings in a file call "journal.txt".
 LENGTH_LIMIT = 1000
 
 
-@weave.op()
+@weave.op
 def run_command(command: str) -> str:
     """Run a shell command and return its output.
 
@@ -26,8 +26,7 @@ def run_command(command: str) -> str:
     try:
         completed_process = subprocess.run(
             command,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
             text=True,
             shell=True,
         )

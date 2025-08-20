@@ -1,13 +1,14 @@
 import os
+from collections.abc import Generator
 from importlib.metadata import version
-from typing import Any, Generator
+from typing import Any
 
 import litellm
 import pytest
 from packaging.version import parse as version_parse
 
 import weave
-from weave.integrations.litellm.litellm import litellm_patcher
+from weave.integrations.litellm.litellm import get_litellm_patcher
 
 # This PR:
 # https://github.com/BerriAI/litellm/commit/fe2aa706e8ff4edbcd109897e5da6b83ef6ad693
@@ -32,14 +33,14 @@ def patch_litellm(request: Any) -> Generator[None, None, None]:
     # For some reason pytest's import procedure causes the patching
     # to fail in prod mode. Specifically, the patches get run twice
     # despite the fact that the patcher is a singleton.
-    weave_server_flag = request.config.getoption("--weave-server")
+    weave_server_flag = request.config.getoption("--trace-server")
     if weave_server_flag == ("prod"):
         yield
         return
 
-    litellm_patcher.attempt_patch()
+    get_litellm_patcher().attempt_patch()
     yield
-    litellm_patcher.undo_patch()
+    get_litellm_patcher().undo_patch()
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
@@ -60,10 +61,11 @@ def test_litellm_quickstart(
     exp = """Hello! I'm just a computer program, so I don't have feelings, but I'm here to help you. How can I assist you today?"""
 
     assert all_content == exp
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 2
     call = calls[0]
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     output = call.output
     assert output["choices"][0]["message"]["content"] == exp
     assert output["choices"][0]["finish_reason"] == "stop"
@@ -101,10 +103,11 @@ async def test_litellm_quickstart_async(
     exp = """Hello! I'm just a computer program, so I don't have feelings, but I'm here to help you with whatever you need. How can I assist you today?"""
 
     assert all_content == exp
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 2
     call = calls[0]
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     output = call.output
     assert output["choices"][0]["message"]["content"] == exp
     assert output["choices"][0]["finish_reason"] == "stop"
@@ -147,10 +150,11 @@ def test_litellm_quickstart_stream(
     exp = """Hello! I'm just a computer program, so I don't have feelings, but I'm here to help you. How can I assist you today?"""
 
     assert all_content == exp
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 2
     call = calls[0]
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     output = call.output
     assert output["choices"][0]["message"]["content"] == exp
     assert output["choices"][0]["finish_reason"] == "stop"
@@ -195,10 +199,11 @@ async def test_litellm_quickstart_stream_async(
     exp = """Hello! I'm just a computer program, so I don't have feelings, but I'm here and ready to assist you with any questions or tasks you may have. How can I help you today?"""
 
     assert all_content == exp
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 2
     call = calls[0]
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     output = call.output
     assert output["choices"][0]["message"]["content"] == exp
     assert output["choices"][0]["finish_reason"] == "stop"
@@ -225,7 +230,6 @@ async def test_litellm_quickstart_stream_async(
     filter_headers=["authorization", "x-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost"],
 )
-@pytest.mark.asyncio
 def test_model_predict(
     client: weave.trace.weave_client.WeaveClient, patch_litellm: None
 ) -> None:
@@ -233,7 +237,7 @@ def test_model_predict(
         model: str
         temperature: float
 
-        @weave.op()
+        @weave.op
         def predict(self, text: str, target_language: str) -> str:
             response = litellm.completion(
                 api_key=os.environ.get("ANTHROPIC_API_KEY", "sk-ant-DUMMY_API_KEY"),

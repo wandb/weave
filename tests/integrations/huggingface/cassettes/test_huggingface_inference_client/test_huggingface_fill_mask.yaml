@@ -1,0 +1,1376 @@
+interactions:
+- request:
+    body: ''
+    headers:
+      accept:
+      - '*/*'
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      host:
+      - raw.githubusercontent.com
+      user-agent:
+      - python-httpx/0.28.1
+    method: GET
+    uri: https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json
+  response:
+    body:
+      string: !!binary |
+        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
+    headers:
+      Accept-Ranges:
+      - bytes
+      Access-Control-Allow-Origin:
+      - '*'
+      Cache-Control:
+      - max-age=300
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Length:
+      - '18905'
+      Content-Security-Policy:
+      - default-src 'none'; style-src 'unsafe-inline'; sandbox
+      Content-Type:
+      - text/plain; charset=utf-8
+      Cross-Origin-Resource-Policy:
+      - cross-origin
+      Date:
+      - Tue, 01 Apr 2025 14:30:16 GMT
+      ETag:
+      - W/"a377223ddc96fabaf7905fda409159d74165d81f634ab1c9e78e194ff84f508a"
+      Expires:
+      - Tue, 01 Apr 2025 14:35:16 GMT
+      Source-Age:
+      - '43'
+      Strict-Transport-Security:
+      - max-age=31536000
+      Vary:
+      - Authorization,Accept-Encoding,Origin
+      Via:
+      - 1.1 varnish
+      X-Cache:
+      - HIT
+      X-Cache-Hits:
+      - '1'
+      X-Content-Type-Options:
+      - nosniff
+      X-Fastly-Request-ID:
+      - ca320ea186d76edabeff83850f8f161bafbf1d8e
+      X-Frame-Options:
+      - deny
+      X-GitHub-Request-Id:
+      - 3E9F:3BCA26:14827D:3644FF:67EB6C36
+      X-Served-By:
+      - cache-maa10244-MAA
+      X-Timer:
+      - S1743517817.542941,VS0,VE2
+      X-XSS-Protection:
+      - 1; mode=block
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      X-Amzn-Trace-Id:
+      - 56a9d005-5d9f-486c-b9ba-18fd0a2843df
+      user-agent:
+      - unknown/None; hf_hub/0.30.1; python/3.11.10
+    method: GET
+    uri: https://huggingface.co/api/tasks
+  response:
+    body:
+      string: "{\"any-to-any\":{\"datasets\":[],\"demo\":{\"inputs\":[],\"outputs\":[]},\"isPlaceholder\":true,\"metrics\":[],\"models\":[],\"spaces\":[],\"summary\":\"\",\"widgetModels\":[],\"id\":\"any-to-any\",\"label\":\"Any-to-Any\",\"libraries\":[\"transformers\"]},\"audio-classification\":{\"datasets\":[{\"description\":\"A
+        benchmark of 10 different audio tasks.\",\"id\":\"s3prl/superb\"},{\"description\":\"A
+        dataset of YouTube clips and their sound categories.\",\"id\":\"agkphysics/AudioSet\"}],\"demo\":{\"inputs\":[{\"filename\":\"audio.wav\",\"type\":\"audio\"}],\"outputs\":[{\"data\":[{\"label\":\"Up\",\"score\":0.2},{\"label\":\"Down\",\"score\":0.8}],\"type\":\"chart\"}]},\"metrics\":[{\"description\":\"\",\"id\":\"accuracy\"},{\"description\":\"\",\"id\":\"recall\"},{\"description\":\"\",\"id\":\"precision\"},{\"description\":\"\",\"id\":\"f1\"}],\"models\":[{\"description\":\"An
+        easy-to-use model for command recognition.\",\"id\":\"speechbrain/google_speech_command_xvector\"},{\"description\":\"An
+        emotion recognition model.\",\"id\":\"ehcalabres/wav2vec2-lg-xlsr-en-speech-emotion-recognition\"},{\"description\":\"A
+        language identification model.\",\"id\":\"facebook/mms-lid-126\"}],\"spaces\":[{\"description\":\"An
+        application that can classify music into different genre.\",\"id\":\"kurianbenoy/audioclassification\"}],\"summary\":\"Audio
+        classification is the task of assigning a label or class to a given audio.
+        It can be used for recognizing which command a user is giving or the emotion
+        of a statement, as well as identifying a speaker.\",\"widgetModels\":[\"MIT/ast-finetuned-audioset-10-10-0.4593\"],\"youtubeId\":\"KWwzcmG98Ds\",\"id\":\"audio-classification\",\"label\":\"Audio
+        Classification\",\"libraries\":[\"speechbrain\",\"transformers\",\"transformers.js\"]},\"audio-to-audio\":{\"datasets\":[{\"description\":\"512-element
+        X-vector embeddings of speakers from CMU ARCTIC dataset.\",\"id\":\"Matthijs/cmu-arctic-xvectors\"}],\"demo\":{\"inputs\":[{\"filename\":\"input.wav\",\"type\":\"audio\"}],\"outputs\":[{\"filename\":\"label-0.wav\",\"type\":\"audio\"},{\"filename\":\"label-1.wav\",\"type\":\"audio\"}]},\"metrics\":[{\"description\":\"The
+        Signal-to-Noise ratio is the relationship between the target signal level
+        and the background noise level. It is calculated as the logarithm of the target
+        signal divided by the background noise, in decibels.\",\"id\":\"snri\"},{\"description\":\"The
+        Signal-to-Distortion ratio is the relationship between the target signal and
+        the sum of noise, interference, and artifact errors\",\"id\":\"sdri\"}],\"models\":[{\"description\":\"A
+        speech enhancement model.\",\"id\":\"ResembleAI/resemble-enhance\"},{\"description\":\"A
+        model that can change the voice in a speech recording.\",\"id\":\"microsoft/speecht5_vc\"}],\"spaces\":[{\"description\":\"An
+        application for speech separation.\",\"id\":\"younver/speechbrain-speech-separation\"},{\"description\":\"An
+        application for audio style transfer.\",\"id\":\"nakas/audio-diffusion_style_transfer\"}],\"summary\":\"Audio-to-Audio
+        is a family of tasks in which the input is an audio and the output is one
+        or multiple generated audios. Some example tasks are speech enhancement and
+        source separation.\",\"widgetModels\":[\"speechbrain/sepformer-wham\"],\"youtubeId\":\"iohj7nCCYoM\",\"id\":\"audio-to-audio\",\"label\":\"Audio-to-Audio\",\"libraries\":[\"asteroid\",\"fairseq\",\"speechbrain\"]},\"audio-text-to-text\":{\"datasets\":[],\"demo\":{\"inputs\":[],\"outputs\":[]},\"isPlaceholder\":true,\"metrics\":[],\"models\":[],\"spaces\":[],\"summary\":\"\",\"widgetModels\":[],\"id\":\"audio-text-to-text\",\"label\":\"Audio-Text-to-Text\",\"libraries\":[]},\"automatic-speech-recognition\":{\"datasets\":[{\"description\":\"31,175
+        hours of multilingual audio-text dataset in 108 languages.\",\"id\":\"mozilla-foundation/common_voice_17_0\"},{\"description\":\"Multilingual
+        and diverse audio dataset with 101k hours of audio.\",\"id\":\"amphion/Emilia-Dataset\"},{\"description\":\"A
+        dataset with 44.6k hours of English speaker data and 6k hours of other language
+        speakers.\",\"id\":\"parler-tts/mls_eng\"},{\"description\":\"A multilingual
+        audio dataset with 370K hours of audio.\",\"id\":\"espnet/yodas\"}],\"demo\":{\"inputs\":[{\"filename\":\"input.flac\",\"type\":\"audio\"}],\"outputs\":[{\"label\":\"Transcript\",\"content\":\"Going
+        along slushy country roads and speaking to damp audiences in...\",\"type\":\"text\"}]},\"metrics\":[{\"description\":\"\",\"id\":\"wer\"},{\"description\":\"\",\"id\":\"cer\"}],\"models\":[{\"description\":\"A
+        powerful ASR model by OpenAI.\",\"id\":\"openai/whisper-large-v3\"},{\"description\":\"A
+        good generic speech model by MetaAI for fine-tuning.\",\"id\":\"facebook/w2v-bert-2.0\"},{\"description\":\"An
+        end-to-end model that performs ASR and Speech Translation by MetaAI.\",\"id\":\"facebook/seamless-m4t-v2-large\"},{\"description\":\"A
+        powerful multilingual ASR and Speech Translation model by Nvidia.\",\"id\":\"nvidia/canary-1b\"},{\"description\":\"Powerful
+        speaker diarization model.\",\"id\":\"pyannote/speaker-diarization-3.1\"}],\"spaces\":[{\"description\":\"A
+        powerful general-purpose speech recognition application.\",\"id\":\"hf-audio/whisper-large-v3\"},{\"description\":\"Latest
+        ASR model from Useful Sensors.\",\"id\":\"mrfakename/Moonshinex\"},{\"description\":\"A
+        high quality speech and text translation model by Meta.\",\"id\":\"facebook/seamless_m4t\"},{\"description\":\"A
+        powerful multilingual ASR and Speech Translation model by Nvidia\",\"id\":\"nvidia/canary-1b\"}],\"summary\":\"Automatic
+        Speech Recognition (ASR), also known as Speech to Text (STT), is the task
+        of transcribing a given audio to text. It has many applications, such as voice
+        user interfaces.\",\"widgetModels\":[\"openai/whisper-large-v3\"],\"youtubeId\":\"TksaY_FDgnk\",\"id\":\"automatic-speech-recognition\",\"label\":\"Automatic
+        Speech Recognition\",\"libraries\":[\"espnet\",\"nemo\",\"speechbrain\",\"transformers\",\"transformers.js\"]},\"depth-estimation\":{\"datasets\":[{\"description\":\"NYU
+        Depth V2 Dataset: Video dataset containing both RGB and depth sensor data.\",\"id\":\"sayakpaul/nyu_depth_v2\"},{\"description\":\"Monocular
+        depth estimation benchmark based without noise and errors.\",\"id\":\"depth-anything/DA-2K\"}],\"demo\":{\"inputs\":[{\"filename\":\"depth-estimation-input.jpg\",\"type\":\"img\"}],\"outputs\":[{\"filename\":\"depth-estimation-output.png\",\"type\":\"img\"}]},\"metrics\":[],\"models\":[{\"description\":\"Cutting-edge
+        depth estimation model.\",\"id\":\"depth-anything/Depth-Anything-V2-Large\"},{\"description\":\"A
+        strong monocular depth estimation model.\",\"id\":\"jingheya/lotus-depth-g-v1-0\"},{\"description\":\"A
+        depth estimation model that predicts depth in videos.\",\"id\":\"tencent/DepthCrafter\"},{\"description\":\"A
+        robust depth estimation model.\",\"id\":\"apple/DepthPro-hf\"}],\"spaces\":[{\"description\":\"An
+        application that predicts the depth of an image and then reconstruct the 3D
+        model as voxels.\",\"id\":\"radames/dpt-depth-estimation-3d-voxels\"},{\"description\":\"An
+        application for bleeding-edge depth estimation.\",\"id\":\"akhaliq/depth-pro\"},{\"description\":\"An
+        application on cutting-edge depth estimation in videos.\",\"id\":\"tencent/DepthCrafter\"},{\"description\":\"A
+        human-centric depth estimation application.\",\"id\":\"facebook/sapiens-depth\"}],\"summary\":\"Depth
+        estimation is the task of predicting depth of the objects present in an image.\",\"widgetModels\":[\"\"],\"youtubeId\":\"\",\"id\":\"depth-estimation\",\"label\":\"Depth
+        Estimation\",\"libraries\":[\"transformers\",\"transformers.js\"]},\"document-question-answering\":{\"datasets\":[{\"description\":\"Largest
+        document understanding dataset.\",\"id\":\"HuggingFaceM4/Docmatix\"},{\"description\":\"Dataset
+        from the 2020 DocVQA challenge. The documents are taken from the UCSF Industry
+        Documents Library.\",\"id\":\"eliolio/docvqa\"}],\"demo\":{\"inputs\":[{\"label\":\"Question\",\"content\":\"What
+        is the idea behind the consumer relations efficiency team?\",\"type\":\"text\"},{\"filename\":\"document-question-answering-input.png\",\"type\":\"img\"}],\"outputs\":[{\"label\":\"Answer\",\"content\":\"Balance
+        cost efficiency with quality customer service\",\"type\":\"text\"}]},\"metrics\":[{\"description\":\"The
+        evaluation metric for the DocVQA challenge is the Average Normalized Levenshtein
+        Similarity (ANLS). This metric is flexible to character regognition errors
+        and compares the predicted answer with the ground truth answer.\",\"id\":\"anls\"},{\"description\":\"Exact
+        Match is a metric based on the strict character match of the predicted answer
+        and the right answer. For answers predicted correctly, the Exact Match will
+        be 1. Even if only one character is different, Exact Match will be 0\",\"id\":\"exact-match\"}],\"models\":[{\"description\":\"A
+        robust document question answering model.\",\"id\":\"impira/layoutlm-document-qa\"},{\"description\":\"A
+        document question answering model specialized in invoices.\",\"id\":\"impira/layoutlm-invoices\"},{\"description\":\"A
+        special model for OCR-free document question answering.\",\"id\":\"microsoft/udop-large\"},{\"description\":\"A
+        powerful model for document question answering.\",\"id\":\"google/pix2struct-docvqa-large\"}],\"spaces\":[{\"description\":\"A
+        robust document question answering application.\",\"id\":\"impira/docquery\"},{\"description\":\"An
+        application that can answer questions from invoices.\",\"id\":\"impira/invoices\"},{\"description\":\"An
+        application to compare different document question answering models.\",\"id\":\"merve/compare_docvqa_models\"}],\"summary\":\"Document
+        Question Answering (also known as Document Visual Question Answering) is the
+        task of answering questions on document images. Document question answering
+        models take a (document, question) pair as input and return an answer in natural
+        language. Models usually rely on multi-modal features, combining text, position
+        of words (bounding-boxes) and image.\",\"widgetModels\":[\"impira/layoutlm-invoices\"],\"youtubeId\":\"\",\"id\":\"document-question-answering\",\"label\":\"Document
+        Question Answering\",\"libraries\":[\"transformers\",\"transformers.js\"]},\"visual-document-retrieval\":{\"datasets\":[],\"demo\":{\"inputs\":[],\"outputs\":[]},\"isPlaceholder\":true,\"metrics\":[],\"models\":[],\"spaces\":[],\"summary\":\"\",\"widgetModels\":[],\"id\":\"visual-document-retrieval\",\"label\":\"Visual
+        Document Retrieval\",\"libraries\":[\"transformers\"]},\"feature-extraction\":{\"datasets\":[{\"description\":\"Wikipedia
+        dataset containing cleaned articles of all languages. Can be used to train
+        `feature-extraction` models.\",\"id\":\"wikipedia\"}],\"demo\":{\"inputs\":[{\"label\":\"Input\",\"content\":\"India,
+        officially the Republic of India, is a country in South Asia.\",\"type\":\"text\"}],\"outputs\":[{\"table\":[[\"Dimension
+        1\",\"Dimension 2\",\"Dimension 3\"],[\"2.583383083343506\",\"2.757075071334839\",\"0.9023529887199402\"],[\"8.29393482208252\",\"1.1071064472198486\",\"2.03399395942688\"],[\"-0.7754912972450256\",\"-1.647324562072754\",\"-0.6113331913948059\"],[\"0.07087723910808563\",\"1.5942802429199219\",\"1.4610432386398315\"]],\"type\":\"tabular\"}]},\"metrics\":[],\"models\":[{\"description\":\"A
+        powerful feature extraction model for natural language processing tasks.\",\"id\":\"thenlper/gte-large\"},{\"description\":\"A
+        strong feature extraction model for retrieval.\",\"id\":\"Alibaba-NLP/gte-Qwen1.5-7B-instruct\"}],\"spaces\":[{\"description\":\"A
+        leaderboard to rank text feature extraction models based on a benchmark.\",\"id\":\"mteb/leaderboard\"},{\"description\":\"A
+        leaderboard to rank best feature extraction models based on human feedback.\",\"id\":\"mteb/arena\"}],\"summary\":\"Feature
+        extraction is the task of extracting features learnt in a model.\",\"widgetModels\":[\"facebook/bart-base\"],\"id\":\"feature-extraction\",\"label\":\"Feature
+        Extraction\",\"libraries\":[\"sentence-transformers\",\"transformers\",\"transformers.js\"]},\"fill-mask\":{\"datasets\":[{\"description\":\"A
+        common dataset that is used to train models for many languages.\",\"id\":\"wikipedia\"},{\"description\":\"A
+        large English dataset with text crawled from the web.\",\"id\":\"c4\"}],\"demo\":{\"inputs\":[{\"label\":\"Input\",\"content\":\"The
+        <mask> barked at me\",\"type\":\"text\"}],\"outputs\":[{\"type\":\"chart\",\"data\":[{\"label\":\"wolf\",\"score\":0.487},{\"label\":\"dog\",\"score\":0.061},{\"label\":\"cat\",\"score\":0.058},{\"label\":\"fox\",\"score\":0.047},{\"label\":\"squirrel\",\"score\":0.025}]}]},\"metrics\":[{\"description\":\"Cross
+        Entropy is a metric that calculates the difference between two probability
+        distributions. Each probability distribution is the distribution of predicted
+        words\",\"id\":\"cross_entropy\"},{\"description\":\"Perplexity is the exponential
+        of the cross-entropy loss. It evaluates the probabilities assigned to the
+        next word by the model. Lower perplexity indicates better performance\",\"id\":\"perplexity\"}],\"models\":[{\"description\":\"State-of-the-art
+        masked language model.\",\"id\":\"answerdotai/ModernBERT-large\"},{\"description\":\"A
+        multilingual model trained on 100 languages.\",\"id\":\"FacebookAI/xlm-roberta-base\"}],\"spaces\":[],\"summary\":\"Masked
+        language modeling is the task of masking some of the words in a sentence and
+        predicting which words should replace those masks. These models are useful
+        when we want to get a statistical understanding of the language in which the
+        model is trained in.\",\"widgetModels\":[\"distilroberta-base\"],\"youtubeId\":\"mqElG5QJWUg\",\"id\":\"fill-mask\",\"label\":\"Fill-Mask\",\"libraries\":[\"transformers\",\"transformers.js\"]},\"image-classification\":{\"datasets\":[{\"description\":\"Benchmark
+        dataset used for image classification with images that belong to 100 classes.\",\"id\":\"cifar100\"},{\"description\":\"Dataset
+        consisting of images of garments.\",\"id\":\"fashion_mnist\"}],\"demo\":{\"inputs\":[{\"filename\":\"image-classification-input.jpeg\",\"type\":\"img\"}],\"outputs\":[{\"type\":\"chart\",\"data\":[{\"label\":\"Egyptian
+        cat\",\"score\":0.514},{\"label\":\"Tabby cat\",\"score\":0.193},{\"label\":\"Tiger
+        cat\",\"score\":0.068}]}]},\"metrics\":[{\"description\":\"\",\"id\":\"accuracy\"},{\"description\":\"\",\"id\":\"recall\"},{\"description\":\"\",\"id\":\"precision\"},{\"description\":\"\",\"id\":\"f1\"}],\"models\":[{\"description\":\"A
+        strong image classification model.\",\"id\":\"google/vit-base-patch16-224\"},{\"description\":\"A
+        robust image classification model.\",\"id\":\"facebook/deit-base-distilled-patch16-224\"},{\"description\":\"A
+        strong image classification model.\",\"id\":\"facebook/convnext-large-224\"}],\"spaces\":[{\"description\":\"A
+        leaderboard to evaluate different image classification models.\",\"id\":\"timm/leaderboard\"}],\"summary\":\"Image
+        classification is the task of assigning a label or class to an entire image.
+        Images are expected to have only one class for each image. Image classification
+        models take an image as input and return a prediction about which class the
+        image belongs to.\",\"widgetModels\":[\"google/vit-base-patch16-224\"],\"youtubeId\":\"tjAIM7BOYhw\",\"id\":\"image-classification\",\"label\":\"Image
+        Classification\",\"libraries\":[\"keras\",\"timm\",\"transformers\",\"transformers.js\"]},\"image-feature-extraction\":{\"datasets\":[{\"description\":\"ImageNet-1K
+        is a image classification dataset in which images are used to train image-feature-extraction
+        models.\",\"id\":\"imagenet-1k\"}],\"demo\":{\"inputs\":[{\"filename\":\"mask-generation-input.png\",\"type\":\"img\"}],\"outputs\":[{\"table\":[[\"Dimension
+        1\",\"Dimension 2\",\"Dimension 3\"],[\"0.21236686408519745\",\"1.0919708013534546\",\"0.8512550592422485\"],[\"0.809657871723175\",\"-0.18544459342956543\",\"-0.7851548194885254\"],[\"1.3103108406066895\",\"-0.2479034662246704\",\"-0.9107287526130676\"],[\"1.8536205291748047\",\"-0.36419737339019775\",\"0.09717650711536407\"]],\"type\":\"tabular\"}]},\"metrics\":[],\"models\":[{\"description\":\"A
+        powerful image feature extraction model.\",\"id\":\"timm/vit_large_patch14_dinov2.lvd142m\"},{\"description\":\"A
+        strong image feature extraction model.\",\"id\":\"nvidia/MambaVision-T-1K\"},{\"description\":\"A
+        robust image feature extraction model.\",\"id\":\"facebook/dino-vitb16\"},{\"description\":\"Cutting-edge
+        image feature extraction model.\",\"id\":\"apple/aimv2-large-patch14-336-distilled\"},{\"description\":\"Strong
+        image feature extraction model that can be used on images and documents.\",\"id\":\"OpenGVLab/InternViT-6B-448px-V1-2\"}],\"spaces\":[{\"description\":\"A
+        leaderboard to evaluate different image-feature-extraction models on classification
+        performances\",\"id\":\"timm/leaderboard\"}],\"summary\":\"Image feature extraction
+        is the task of extracting features learnt in a computer vision model.\",\"widgetModels\":[],\"id\":\"image-feature-extraction\",\"label\":\"Image
+        Feature Extraction\",\"libraries\":[\"timm\",\"transformers\"]},\"image-segmentation\":{\"datasets\":[{\"description\":\"Scene
+        segmentation dataset.\",\"id\":\"scene_parse_150\"}],\"demo\":{\"inputs\":[{\"filename\":\"image-segmentation-input.jpeg\",\"type\":\"img\"}],\"outputs\":[{\"filename\":\"image-segmentation-output.png\",\"type\":\"img\"}]},\"metrics\":[{\"description\":\"Average
+        Precision (AP) is the Area Under the PR Curve (AUC-PR). It is calculated for
+        each semantic class separately\",\"id\":\"Average Precision\"},{\"description\":\"Mean
+        Average Precision (mAP) is the overall average of the AP values\",\"id\":\"Mean
+        Average Precision\"},{\"description\":\"Intersection over Union (IoU) is the
+        overlap of segmentation masks. Mean IoU is the average of the IoU of all semantic
+        classes\",\"id\":\"Mean Intersection over Union\"},{\"description\":\"AP\u03B1
+        is the Average Precision at the IoU threshold of a \u03B1 value, for example,
+        AP50 and AP75\",\"id\":\"AP\u03B1\"}],\"models\":[{\"description\":\"Solid
+        semantic segmentation model trained on ADE20k.\",\"id\":\"openmmlab/upernet-convnext-small\"},{\"description\":\"Background
+        removal model.\",\"id\":\"briaai/RMBG-1.4\"},{\"description\":\"A multipurpose
+        image segmentation model for high resolution images.\",\"id\":\"ZhengPeng7/BiRefNet\"},{\"description\":\"Powerful
+        human-centric image segmentation model.\",\"id\":\"facebook/sapiens-seg-1b\"},{\"description\":\"Panoptic
+        segmentation model trained on the COCO (common objects) dataset.\",\"id\":\"facebook/mask2former-swin-large-coco-panoptic\"}],\"spaces\":[{\"description\":\"A
+        semantic segmentation application that can predict unseen instances out of
+        the box.\",\"id\":\"facebook/ov-seg\"},{\"description\":\"One of the strongest
+        segmentation applications.\",\"id\":\"jbrinkma/segment-anything\"},{\"description\":\"A
+        human-centric segmentation model.\",\"id\":\"facebook/sapiens-pose\"},{\"description\":\"An
+        instance segmentation application to predict neuronal cell types from microscopy
+        images.\",\"id\":\"rashmi/sartorius-cell-instance-segmentation\"},{\"description\":\"An
+        application that segments videos.\",\"id\":\"ArtGAN/Segment-Anything-Video\"},{\"description\":\"An
+        panoptic segmentation application built for outdoor environments.\",\"id\":\"segments/panoptic-segment-anything\"}],\"summary\":\"Image
+        Segmentation divides an image into segments where each pixel in the image
+        is mapped to an object. This task has multiple variants such as instance segmentation,
+        panoptic segmentation and semantic segmentation.\",\"widgetModels\":[\"nvidia/segformer-b0-finetuned-ade-512-512\"],\"youtubeId\":\"dKE8SIt9C-w\",\"id\":\"image-segmentation\",\"label\":\"Image
+        Segmentation\",\"libraries\":[\"transformers\",\"transformers.js\"]},\"image-to-image\":{\"datasets\":[{\"description\":\"Synthetic
+        dataset, for image relighting\",\"id\":\"VIDIT\"},{\"description\":\"Multiple
+        images of celebrities, used for facial expression translation\",\"id\":\"huggan/CelebA-faces\"},{\"description\":\"12M
+        image-caption pairs.\",\"id\":\"Spawning/PD12M\"}],\"demo\":{\"inputs\":[{\"filename\":\"image-to-image-input.jpeg\",\"type\":\"img\"}],\"outputs\":[{\"filename\":\"image-to-image-output.png\",\"type\":\"img\"}]},\"isPlaceholder\":false,\"metrics\":[{\"description\":\"Peak
+        Signal to Noise Ratio (PSNR) is an approximation of the human perception,
+        considering the ratio of the absolute intensity with respect to the variations.
+        Measured in dB, a high value indicates a high fidelity.\",\"id\":\"PSNR\"},{\"description\":\"Structural
+        Similarity Index (SSIM) is a perceptual metric which compares the luminance,
+        contrast and structure of two images. The values of SSIM range between -1
+        and 1, and higher values indicate closer resemblance to the original image.\",\"id\":\"SSIM\"},{\"description\":\"Inception
+        Score (IS) is an analysis of the labels predicted by an image classification
+        model when presented with a sample of the generated images.\",\"id\":\"IS\"}],\"models\":[{\"description\":\"An
+        image-to-image model to improve image resolution.\",\"id\":\"fal/AuraSR-v2\"},{\"description\":\"A
+        model that increases the resolution of an image.\",\"id\":\"keras-io/super-resolution\"},{\"description\":\"A
+        model for applying edits to images through image controls.\",\"id\":\"Yuanshi/OminiControl\"},{\"description\":\"A
+        model that generates images based on segments in the input image and the text
+        prompt.\",\"id\":\"mfidabel/controlnet-segment-anything\"},{\"description\":\"Strong
+        model for inpainting and outpainting.\",\"id\":\"black-forest-labs/FLUX.1-Fill-dev\"},{\"description\":\"Strong
+        model for image editing using depth maps.\",\"id\":\"black-forest-labs/FLUX.1-Depth-dev-lora\"}],\"spaces\":[{\"description\":\"Image
+        enhancer application for low light.\",\"id\":\"keras-io/low-light-image-enhancement\"},{\"description\":\"Style
+        transfer application.\",\"id\":\"keras-io/neural-style-transfer\"},{\"description\":\"An
+        application that generates images based on segment control.\",\"id\":\"mfidabel/controlnet-segment-anything\"},{\"description\":\"Image
+        generation application that takes image control and text prompt.\",\"id\":\"hysts/ControlNet\"},{\"description\":\"Colorize
+        any image using this app.\",\"id\":\"ioclab/brightness-controlnet\"},{\"description\":\"Edit
+        images with instructions.\",\"id\":\"timbrooks/instruct-pix2pix\"}],\"summary\":\"Image-to-image
+        is the task of transforming an input image through a variety of possible manipulations
+        and enhancements, such as super-resolution, image inpainting, colorization,
+        and more.\",\"widgetModels\":[\"stabilityai/stable-diffusion-2-inpainting\"],\"youtubeId\":\"\",\"id\":\"image-to-image\",\"label\":\"Image-to-Image\",\"libraries\":[\"diffusers\",\"transformers\",\"transformers.js\"]},\"image-text-to-text\":{\"datasets\":[{\"description\":\"Instructions
+        composed of image and text.\",\"id\":\"liuhaotian/LLaVA-Instruct-150K\"},{\"description\":\"Collection
+        of image-text pairs on scientific topics.\",\"id\":\"DAMO-NLP-SG/multimodal_textbook\"},{\"description\":\"A
+        collection of datasets made for model fine-tuning.\",\"id\":\"HuggingFaceM4/the_cauldron\"},{\"description\":\"Screenshots
+        of websites with their HTML/CSS codes.\",\"id\":\"HuggingFaceM4/WebSight\"}],\"demo\":{\"inputs\":[{\"filename\":\"image-text-to-text-input.png\",\"type\":\"img\"},{\"label\":\"Text
+        Prompt\",\"content\":\"Describe the position of the bee in detail.\",\"type\":\"text\"}],\"outputs\":[{\"label\":\"Answer\",\"content\":\"The
+        bee is sitting on a pink flower, surrounded by other flowers. The bee is positioned
+        in the center of the flower, with its head and front legs sticking out.\",\"type\":\"text\"}]},\"metrics\":[],\"models\":[{\"description\":\"Small
+        and efficient yet powerful vision language model.\",\"id\":\"HuggingFaceTB/SmolVLM-Instruct\"},{\"description\":\"A
+        screenshot understanding model used to control computers.\",\"id\":\"microsoft/OmniParser-v2.0\"},{\"description\":\"Cutting-edge
+        vision language model.\",\"id\":\"allenai/Molmo-7B-D-0924\"},{\"description\":\"Small
+        yet powerful model.\",\"id\":\"vikhyatk/moondream2\"},{\"description\":\"Strong
+        image-text-to-text model.\",\"id\":\"Qwen/Qwen2.5-VL-7B-Instruct\"},{\"description\":\"Image-text-to-text
+        model with agentic capabilities.\",\"id\":\"microsoft/Magma-8B\"},{\"description\":\"Strong
+        image-text-to-text model focused on documents.\",\"id\":\"allenai/olmOCR-7B-0225-preview\"},{\"description\":\"Small
+        yet strong image-text-to-text model.\",\"id\":\"ibm-granite/granite-vision-3.2-2b\"}],\"spaces\":[{\"description\":\"Leaderboard
+        to evaluate vision language models.\",\"id\":\"opencompass/open_vlm_leaderboard\"},{\"description\":\"Vision
+        language models arena, where models are ranked by votes of users.\",\"id\":\"WildVision/vision-arena\"},{\"description\":\"Powerful
+        vision-language model assistant.\",\"id\":\"akhaliq/Molmo-7B-D-0924\"},{\"description\":\"Powerful
+        vision language assistant that can understand multiple images.\",\"id\":\"HuggingFaceTB/SmolVLM2\"},{\"description\":\"An
+        application for chatting with an image-text-to-text model.\",\"id\":\"GanymedeNil/Qwen2-VL-7B\"},{\"description\":\"An
+        application that parses screenshots into actions.\",\"id\":\"showlab/ShowUI\"},{\"description\":\"An
+        application that detects gaze.\",\"id\":\"moondream/gaze-demo\"}],\"summary\":\"Image-text-to-text
+        models take in an image and text prompt and output text. These models are
+        also called vision-language models, or VLMs. The difference from image-to-text
+        models is that these models take an additional text input, not restricting
+        the model to certain use cases like image captioning, and may also be trained
+        to accept a conversation as input.\",\"widgetModels\":[\"Qwen/Qwen2-VL-7B-Instruct\"],\"youtubeId\":\"IoGaGfU1CIg\",\"id\":\"image-text-to-text\",\"label\":\"Image-Text-to-Text\",\"libraries\":[\"transformers\"]},\"image-to-text\":{\"datasets\":[{\"description\":\"Dataset
+        from 12M image-text of Reddit\",\"id\":\"red_caps\"},{\"description\":\"Dataset
+        from 3.3M images of Google\",\"id\":\"datasets/conceptual_captions\"}],\"demo\":{\"inputs\":[{\"filename\":\"savanna.jpg\",\"type\":\"img\"}],\"outputs\":[{\"label\":\"Detailed
+        description\",\"content\":\"a herd of giraffes and zebras grazing in a field\",\"type\":\"text\"}]},\"metrics\":[],\"models\":[{\"description\":\"A
+        robust image captioning model.\",\"id\":\"Salesforce/blip2-opt-2.7b\"},{\"description\":\"A
+        powerful and accurate image-to-text model that can also localize concepts
+        in images.\",\"id\":\"microsoft/kosmos-2-patch14-224\"},{\"description\":\"A
+        strong optical character recognition model.\",\"id\":\"facebook/nougat-base\"},{\"description\":\"A
+        powerful model that lets you have a conversation with the image.\",\"id\":\"llava-hf/llava-1.5-7b-hf\"}],\"spaces\":[{\"description\":\"An
+        application that compares various image captioning models.\",\"id\":\"nielsr/comparing-captioning-models\"},{\"description\":\"A
+        robust image captioning application.\",\"id\":\"flax-community/image-captioning\"},{\"description\":\"An
+        application that transcribes handwritings into text.\",\"id\":\"nielsr/TrOCR-handwritten\"},{\"description\":\"An
+        application that can caption images and answer questions about a given image.\",\"id\":\"Salesforce/BLIP\"},{\"description\":\"An
+        application that can caption images and answer questions with a conversational
+        agent.\",\"id\":\"Salesforce/BLIP2\"},{\"description\":\"An image captioning
+        application that demonstrates the effect of noise on captions.\",\"id\":\"johko/capdec-image-captioning\"}],\"summary\":\"Image
+        to text models output a text from a given image. Image captioning or optical
+        character recognition can be considered as the most common applications of
+        image to text.\",\"widgetModels\":[\"Salesforce/blip-image-captioning-large\"],\"youtubeId\":\"\",\"id\":\"image-to-text\",\"label\":\"Image-to-Text\",\"libraries\":[\"transformers\",\"transformers.js\"]},\"keypoint-detection\":{\"datasets\":[{\"description\":\"A
+        dataset of hand keypoints of over 500k examples.\",\"id\":\"Vincent-luo/hagrid-mediapipe-hands\"}],\"demo\":{\"inputs\":[{\"filename\":\"keypoint-detection-input.png\",\"type\":\"img\"}],\"outputs\":[{\"filename\":\"keypoint-detection-output.png\",\"type\":\"img\"}]},\"metrics\":[],\"models\":[{\"description\":\"A
+        robust keypoint detection model.\",\"id\":\"magic-leap-community/superpoint\"},{\"description\":\"A
+        robust keypoint matching model.\",\"id\":\"magic-leap-community/superglue_outdoor\"},{\"description\":\"Strong
+        keypoint detection model used to detect human pose.\",\"id\":\"facebook/sapiens-pose-1b\"},{\"description\":\"Powerful
+        keypoint detection model used to detect human pose.\",\"id\":\"usyd-community/vitpose-plus-base\"}],\"spaces\":[{\"description\":\"An
+        application that detects hand keypoints in real-time.\",\"id\":\"datasciencedojo/Hand-Keypoint-Detection-Realtime\"},{\"description\":\"An
+        application to try a universal keypoint detection model.\",\"id\":\"merve/SuperPoint\"}],\"summary\":\"Keypoint
+        detection is the task of identifying meaningful distinctive points or features
+        in an image.\",\"widgetModels\":[],\"youtubeId\":\"\",\"id\":\"keypoint-detection\",\"label\":\"Keypoint
+        Detection\",\"libraries\":[\"transformers\"]},\"mask-generation\":{\"datasets\":[{\"description\":\"Widely
+        used benchmark dataset for multiple Vision tasks.\",\"id\":\"merve/coco2017\"},{\"description\":\"Medical
+        Imaging dataset of the Human Brain for segmentation and mask generating tasks\",\"id\":\"rocky93/BraTS_segmentation\"}],\"demo\":{\"inputs\":[{\"filename\":\"mask-generation-input.png\",\"type\":\"img\"}],\"outputs\":[{\"filename\":\"mask-generation-output.png\",\"type\":\"img\"}]},\"metrics\":[{\"description\":\"IoU
+        is used to measure the overlap between predicted mask and the ground truth
+        mask.\",\"id\":\"Intersection over Union (IoU)\"}],\"models\":[{\"description\":\"Small
+        yet powerful mask generation model.\",\"id\":\"Zigeng/SlimSAM-uniform-50\"},{\"description\":\"Very
+        strong mask generation model.\",\"id\":\"facebook/sam2-hiera-large\"}],\"spaces\":[{\"description\":\"An
+        application that combines a mask generation model with a zero-shot object
+        detection model for text-guided image segmentation.\",\"id\":\"merve/OWLSAM2\"},{\"description\":\"An
+        application that compares the performance of a large and a small mask generation
+        model.\",\"id\":\"merve/slimsam\"},{\"description\":\"An application based
+        on an improved mask generation model.\",\"id\":\"SkalskiP/segment-anything-model-2\"},{\"description\":\"An
+        application to remove objects from videos using mask generation models.\",\"id\":\"SkalskiP/SAM_and_ProPainter\"}],\"summary\":\"Mask
+        generation is the task of generating masks that identify a specific object
+        or region of interest in a given image. Masks are often used in segmentation
+        tasks, where they provide a precise way to isolate the object of interest
+        for further processing or analysis.\",\"widgetModels\":[],\"youtubeId\":\"\",\"id\":\"mask-generation\",\"label\":\"Mask
+        Generation\",\"libraries\":[\"transformers\"]},\"object-detection\":{\"datasets\":[{\"description\":\"Widely
+        used benchmark dataset for multiple vision tasks.\",\"id\":\"merve/coco2017\"},{\"description\":\"Multi-task
+        computer vision benchmark.\",\"id\":\"merve/pascal-voc\"}],\"demo\":{\"inputs\":[{\"filename\":\"object-detection-input.jpg\",\"type\":\"img\"}],\"outputs\":[{\"filename\":\"object-detection-output.jpg\",\"type\":\"img\"}]},\"metrics\":[{\"description\":\"The
+        Average Precision (AP) metric is the Area Under the PR Curve (AUC-PR). It
+        is calculated for each class separately\",\"id\":\"Average Precision\"},{\"description\":\"The
+        Mean Average Precision (mAP) metric is the overall average of the AP values\",\"id\":\"Mean
+        Average Precision\"},{\"description\":\"The AP\u03B1 metric is the Average
+        Precision at the IoU threshold of a \u03B1 value, for example, AP50 and AP75\",\"id\":\"AP\u03B1\"}],\"models\":[{\"description\":\"Solid
+        object detection model pre-trained on the COCO 2017 dataset.\",\"id\":\"facebook/detr-resnet-50\"},{\"description\":\"Accurate
+        object detection model.\",\"id\":\"IDEA-Research/dab-detr-resnet-50\"},{\"description\":\"Fast
+        and accurate object detection model.\",\"id\":\"PekingU/rtdetr_v2_r50vd\"},{\"description\":\"Object
+        detection model for low-lying objects.\",\"id\":\"StephanST/WALDO30\"}],\"spaces\":[{\"description\":\"Leaderboard
+        to compare various object detection models across several metrics.\",\"id\":\"hf-vision/object_detection_leaderboard\"},{\"description\":\"An
+        application that contains various object detection models to try from.\",\"id\":\"Gradio-Blocks/Object-Detection-With-DETR-and-YOLOS\"},{\"description\":\"A
+        cutting-edge object detection application.\",\"id\":\"sunsmarterjieleaf/yolov12\"},{\"description\":\"An
+        object tracking, segmentation and inpainting application.\",\"id\":\"VIPLab/Track-Anything\"},{\"description\":\"Very
+        fast object tracking application based on object detection.\",\"id\":\"merve/RT-DETR-tracking-coco\"}],\"summary\":\"Object
+        Detection models allow users to identify objects of certain defined classes.
+        Object detection models receive an image as input and output the images with
+        bounding boxes and labels on detected objects.\",\"widgetModels\":[\"facebook/detr-resnet-50\"],\"youtubeId\":\"WdAeKSOpxhw\",\"id\":\"object-detection\",\"label\":\"Object
+        Detection\",\"libraries\":[\"transformers\",\"transformers.js\",\"ultralytics\"]},\"video-classification\":{\"datasets\":[{\"description\":\"Benchmark
+        dataset used for video classification with videos that belong to 400 classes.\",\"id\":\"kinetics400\"}],\"demo\":{\"inputs\":[{\"filename\":\"video-classification-input.gif\",\"type\":\"img\"}],\"outputs\":[{\"type\":\"chart\",\"data\":[{\"label\":\"Playing
+        Guitar\",\"score\":0.514},{\"label\":\"Playing Tennis\",\"score\":0.193},{\"label\":\"Cooking\",\"score\":0.068}]}]},\"metrics\":[{\"description\":\"\",\"id\":\"accuracy\"},{\"description\":\"\",\"id\":\"recall\"},{\"description\":\"\",\"id\":\"precision\"},{\"description\":\"\",\"id\":\"f1\"}],\"models\":[{\"description\":\"Strong
+        Video Classification model trained on the Kinetics 400 dataset.\",\"id\":\"google/vivit-b-16x2-kinetics400\"},{\"description\":\"Strong
+        Video Classification model trained on the Kinetics 400 dataset.\",\"id\":\"microsoft/xclip-base-patch32\"}],\"spaces\":[{\"description\":\"An
+        application that classifies video at different timestamps.\",\"id\":\"nateraw/lavila\"},{\"description\":\"An
+        application that classifies video.\",\"id\":\"fcakyon/video-classification\"}],\"summary\":\"Video
+        classification is the task of assigning a label or class to an entire video.
+        Videos are expected to have only one class for each video. Video classification
+        models take a video as input and return a prediction about which class the
+        video belongs to.\",\"widgetModels\":[],\"youtubeId\":\"\",\"id\":\"video-classification\",\"label\":\"Video
+        Classification\",\"libraries\":[\"transformers\"]},\"question-answering\":{\"datasets\":[{\"description\":\"A
+        famous question answering dataset based on English articles from Wikipedia.\",\"id\":\"squad_v2\"},{\"description\":\"A
+        dataset of aggregated anonymized actual queries issued to the Google search
+        engine.\",\"id\":\"natural_questions\"}],\"demo\":{\"inputs\":[{\"label\":\"Question\",\"content\":\"Which
+        name is also used to describe the Amazon rainforest in English?\",\"type\":\"text\"},{\"label\":\"Context\",\"content\":\"The
+        Amazon rainforest, also known in English as Amazonia or the Amazon Jungle\",\"type\":\"text\"}],\"outputs\":[{\"label\":\"Answer\",\"content\":\"Amazonia\",\"type\":\"text\"}]},\"metrics\":[{\"description\":\"Exact
+        Match is a metric based on the strict character match of the predicted answer
+        and the right answer. For answers predicted correctly, the Exact Match will
+        be 1. Even if only one character is different, Exact Match will be 0\",\"id\":\"exact-match\"},{\"description\":\"
+        The F1-Score metric is useful if we value both false positives and false negatives
+        equally. The F1-Score is calculated on each word in the predicted sequence
+        against the correct answer\",\"id\":\"f1\"}],\"models\":[{\"description\":\"A
+        robust baseline model for most question answering domains.\",\"id\":\"deepset/roberta-base-squad2\"},{\"description\":\"Small
+        yet robust model that can answer questions.\",\"id\":\"distilbert/distilbert-base-cased-distilled-squad\"},{\"description\":\"A
+        special model that can answer questions from tables.\",\"id\":\"google/tapas-base-finetuned-wtq\"}],\"spaces\":[{\"description\":\"An
+        application that can answer a long question from Wikipedia.\",\"id\":\"deepset/wikipedia-assistant\"}],\"summary\":\"Question
+        Answering models can retrieve the answer to a question from a given text,
+        which is useful for searching for an answer in a document. Some question answering
+        models can generate answers without context!\",\"widgetModels\":[\"deepset/roberta-base-squad2\"],\"youtubeId\":\"ajPx5LwJD-I\",\"id\":\"question-answering\",\"label\":\"Question
+        Answering\",\"libraries\":[\"adapter-transformers\",\"allennlp\",\"transformers\",\"transformers.js\"]},\"reinforcement-learning\":{\"datasets\":[{\"description\":\"A
+        curation of widely used datasets for Data Driven Deep Reinforcement Learning
+        (D4RL)\",\"id\":\"edbeeching/decision_transformer_gym_replay\"}],\"demo\":{\"inputs\":[{\"label\":\"State\",\"content\":\"Red
+        traffic light, pedestrians are about to pass.\",\"type\":\"text\"}],\"outputs\":[{\"label\":\"Action\",\"content\":\"Stop
+        the car.\",\"type\":\"text\"},{\"label\":\"Next State\",\"content\":\"Yellow
+        light, pedestrians have crossed.\",\"type\":\"text\"}]},\"metrics\":[{\"description\":\"Accumulated
+        reward across all time steps discounted by a factor that ranges between 0
+        and 1 and determines how much the agent optimizes for future relative to immediate
+        rewards. Measures how good is the policy ultimately found by a given algorithm
+        considering uncertainty over the future.\",\"id\":\"Discounted Total Reward\"},{\"description\":\"Average
+        return obtained after running the policy for a certain number of evaluation
+        episodes. As opposed to total reward, mean reward considers how much reward
+        a given algorithm receives while learning.\",\"id\":\"Mean Reward\"},{\"description\":\"Measures
+        how good a given algorithm is after a predefined time. Some algorithms may
+        be guaranteed to converge to optimal behavior across many time steps. However,
+        an agent that reaches an acceptable level of optimality after a given time
+        horizon may be preferable to one that ultimately reaches optimality but takes
+        a long time.\",\"id\":\"Level of Performance After Some Time\"}],\"models\":[{\"description\":\"A
+        Reinforcement Learning model trained on expert data from the Gym Hopper environment\",\"id\":\"edbeeching/decision-transformer-gym-hopper-expert\"},{\"description\":\"A
+        PPO agent playing seals/CartPole-v0 using the stable-baselines3 library and
+        the RL Zoo.\",\"id\":\"HumanCompatibleAI/ppo-seals-CartPole-v0\"}],\"spaces\":[{\"description\":\"An
+        application for a cute puppy agent learning to catch a stick.\",\"id\":\"ThomasSimonini/Huggy\"},{\"description\":\"An
+        application to play Snowball Fight with a reinforcement learning agent.\",\"id\":\"ThomasSimonini/SnowballFight\"}],\"summary\":\"Reinforcement
+        learning is the computational approach of learning from action by interacting
+        with an environment through trial and error and receiving rewards (negative
+        or positive) as feedback\",\"widgetModels\":[],\"youtubeId\":\"q0BiUn5LiBc\",\"id\":\"reinforcement-learning\",\"label\":\"Reinforcement
+        Learning\",\"libraries\":[\"transformers\",\"stable-baselines3\",\"ml-agents\",\"sample-factory\"]},\"sentence-similarity\":{\"datasets\":[{\"description\":\"Bing
+        queries with relevant passages from various web sources.\",\"id\":\"microsoft/ms_marco\"}],\"demo\":{\"inputs\":[{\"label\":\"Source
+        sentence\",\"content\":\"Machine learning is so easy.\",\"type\":\"text\"},{\"label\":\"Sentences
+        to compare to\",\"content\":\"Deep learning is so straightforward.\",\"type\":\"text\"},{\"label\":\"\",\"content\":\"This
+        is so difficult, like rocket science.\",\"type\":\"text\"},{\"label\":\"\",\"content\":\"I
+        can't believe how much I struggled with this.\",\"type\":\"text\"}],\"outputs\":[{\"type\":\"chart\",\"data\":[{\"label\":\"Deep
+        learning is so straightforward.\",\"score\":0.623},{\"label\":\"This is so
+        difficult, like rocket science.\",\"score\":0.413},{\"label\":\"I can't believe
+        how much I struggled with this.\",\"score\":0.256}]}]},\"metrics\":[{\"description\":\"Reciprocal
+        Rank is a measure used to rank the relevancy of documents given a set of documents.
+        Reciprocal Rank is the reciprocal of the rank of the document retrieved, meaning,
+        if the rank is 3, the Reciprocal Rank is 0.33. If the rank is 1, the Reciprocal
+        Rank is 1\",\"id\":\"Mean Reciprocal Rank\"},{\"description\":\"The similarity
+        of the embeddings is evaluated mainly on cosine similarity. It is calculated
+        as the cosine of the angle between two vectors. It is particularly useful
+        when your texts are not the same length\",\"id\":\"Cosine Similarity\"}],\"models\":[{\"description\":\"This
+        model works well for sentences and paragraphs and can be used for clustering/grouping
+        and semantic searches.\",\"id\":\"sentence-transformers/all-mpnet-base-v2\"},{\"description\":\"A
+        multilingual robust sentence similarity model.\",\"id\":\"BAAI/bge-m3\"},{\"description\":\"A
+        robust sentence similarity model.\",\"id\":\"HIT-TMG/KaLM-embedding-multilingual-mini-instruct-v1.5\"}],\"spaces\":[{\"description\":\"An
+        application that leverages sentence similarity to answer questions from YouTube
+        videos.\",\"id\":\"Gradio-Blocks/Ask_Questions_To_YouTube_Videos\"},{\"description\":\"An
+        application that retrieves relevant PubMed abstracts for a given online article
+        which can be used as further references.\",\"id\":\"Gradio-Blocks/pubmed-abstract-retriever\"},{\"description\":\"An
+        application that leverages sentence similarity to summarize text.\",\"id\":\"nickmuchi/article-text-summarizer\"},{\"description\":\"A
+        guide that explains how Sentence Transformers can be used for semantic search.\",\"id\":\"sentence-transformers/Sentence_Transformers_for_semantic_search\"}],\"summary\":\"Sentence
+        Similarity is the task of determining how similar two texts are. Sentence
+        similarity models convert input texts into vectors (embeddings) that capture
+        semantic information and calculate how close (similar) they are between them.
+        This task is particularly useful for information retrieval and clustering/grouping.\",\"widgetModels\":[\"BAAI/bge-small-en-v1.5\"],\"youtubeId\":\"VCZq5AkbNEU\",\"id\":\"sentence-similarity\",\"label\":\"Sentence
+        Similarity\",\"libraries\":[\"sentence-transformers\",\"spacy\",\"transformers.js\"]},\"summarization\":{\"canonicalId\":\"text2text-generation\",\"datasets\":[{\"description\":\"News
+        articles in five different languages along with their summaries. Widely used
+        for benchmarking multilingual summarization models.\",\"id\":\"mlsum\"},{\"description\":\"English
+        conversations and their summaries. Useful for benchmarking conversational
+        agents.\",\"id\":\"samsum\"}],\"demo\":{\"inputs\":[{\"label\":\"Input\",\"content\":\"The
+        tower is 324 metres (1,063 ft) tall, about the same height as an 81-storey
+        building, and the tallest structure in Paris. Its base is square, measuring
+        125 metres (410 ft) on each side. It was the first structure to reach a height
+        of 300 metres. Excluding transmitters, the Eiffel Tower is the second tallest
+        free-standing structure in France after the Millau Viaduct.\",\"type\":\"text\"}],\"outputs\":[{\"label\":\"Output\",\"content\":\"The
+        tower is 324 metres (1,063 ft) tall, about the same height as an 81-storey
+        building. It was the first structure to reach a height of 300 metres.\",\"type\":\"text\"}]},\"metrics\":[{\"description\":\"The
+        generated sequence is compared against its summary, and the overlap of tokens
+        are counted. ROUGE-N refers to overlap of N subsequent tokens, ROUGE-1 refers
+        to overlap of single tokens and ROUGE-2 is the overlap of two subsequent tokens.\",\"id\":\"rouge\"}],\"models\":[{\"description\":\"A
+        strong summarization model trained on English news articles. Excels at generating
+        factual summaries.\",\"id\":\"facebook/bart-large-cnn\"},{\"description\":\"A
+        summarization model trained on medical articles.\",\"id\":\"Falconsai/medical_summarization\"}],\"spaces\":[{\"description\":\"An
+        application that can summarize long paragraphs.\",\"id\":\"pszemraj/summarize-long-text\"},{\"description\":\"A
+        much needed summarization application for terms and conditions.\",\"id\":\"ml6team/distilbart-tos-summarizer-tosdr\"},{\"description\":\"An
+        application that summarizes long documents.\",\"id\":\"pszemraj/document-summarization\"},{\"description\":\"An
+        application that can detect errors in abstractive summarization.\",\"id\":\"ml6team/post-processing-summarization\"}],\"summary\":\"Summarization
+        is the task of producing a shorter version of a document while preserving
+        its important information. Some models can extract text from the original
+        input, while other models can generate entirely new text.\",\"widgetModels\":[\"facebook/bart-large-cnn\"],\"youtubeId\":\"yHnr5Dk2zCI\",\"id\":\"summarization\",\"label\":\"Summarization\",\"libraries\":[\"transformers\",\"transformers.js\"]},\"table-question-answering\":{\"datasets\":[{\"description\":\"The
+        WikiTableQuestions dataset is a large-scale dataset for the task of question
+        answering on semi-structured tables.\",\"id\":\"wikitablequestions\"},{\"description\":\"WikiSQL
+        is a dataset of 80654 hand-annotated examples of questions and SQL queries
+        distributed across 24241 tables from Wikipedia.\",\"id\":\"wikisql\"}],\"demo\":{\"inputs\":[{\"table\":[[\"Rank\",\"Name\",\"No.of
+        reigns\",\"Combined days\"],[\"1\",\"lou Thesz\",\"3\",\"3749\"],[\"2\",\"Ric
+        Flair\",\"8\",\"3103\"],[\"3\",\"Harley Race\",\"7\",\"1799\"]],\"type\":\"tabular\"},{\"label\":\"Question\",\"content\":\"What
+        is the number of reigns for Harley Race?\",\"type\":\"text\"}],\"outputs\":[{\"label\":\"Result\",\"content\":\"7\",\"type\":\"text\"}]},\"metrics\":[{\"description\":\"Checks
+        whether the predicted answer(s) is the same as the ground-truth answer(s).\",\"id\":\"Denotation
+        Accuracy\"}],\"models\":[{\"description\":\"A table question answering model
+        that is capable of neural SQL execution, i.e., employ TAPEX to execute a SQL
+        query on a given table.\",\"id\":\"microsoft/tapex-base\"},{\"description\":\"A
+        robust table question answering model.\",\"id\":\"google/tapas-base-finetuned-wtq\"}],\"spaces\":[{\"description\":\"An
+        application that answers questions based on table CSV files.\",\"id\":\"katanaml/table-query\"}],\"summary\":\"Table
+        Question Answering (Table QA) is the answering a question about an information
+        on a given table.\",\"widgetModels\":[\"google/tapas-base-finetuned-wtq\"],\"id\":\"table-question-answering\",\"label\":\"Table
+        Question Answering\",\"libraries\":[\"transformers\"]},\"tabular-classification\":{\"datasets\":[{\"description\":\"A
+        comprehensive curation of datasets covering all benchmarks.\",\"id\":\"inria-soda/tabular-benchmark\"}],\"demo\":{\"inputs\":[{\"table\":[[\"Glucose\",\"Blood
+        Pressure \",\"Skin Thickness\",\"Insulin\",\"BMI\"],[\"148\",\"72\",\"35\",\"0\",\"33.6\"],[\"150\",\"50\",\"30\",\"0\",\"35.1\"],[\"141\",\"60\",\"29\",\"1\",\"39.2\"]],\"type\":\"tabular\"}],\"outputs\":[{\"table\":[[\"Diabetes\"],[\"1\"],[\"1\"],[\"0\"]],\"type\":\"tabular\"}]},\"metrics\":[{\"description\":\"\",\"id\":\"accuracy\"},{\"description\":\"\",\"id\":\"recall\"},{\"description\":\"\",\"id\":\"precision\"},{\"description\":\"\",\"id\":\"f1\"}],\"models\":[{\"description\":\"Breast
+        cancer prediction model based on decision trees.\",\"id\":\"scikit-learn/cancer-prediction-trees\"}],\"spaces\":[{\"description\":\"An
+        application that can predict defective products on a production line.\",\"id\":\"scikit-learn/tabular-playground\"},{\"description\":\"An
+        application that compares various tabular classification techniques on different
+        datasets.\",\"id\":\"scikit-learn/classification\"}],\"summary\":\"Tabular
+        classification is the task of classifying a target category (a group) based
+        on set of attributes.\",\"widgetModels\":[\"scikit-learn/tabular-playground\"],\"youtubeId\":\"\",\"id\":\"tabular-classification\",\"label\":\"Tabular
+        Classification\",\"libraries\":[\"sklearn\"]},\"tabular-regression\":{\"datasets\":[{\"description\":\"A
+        comprehensive curation of datasets covering all benchmarks.\",\"id\":\"inria-soda/tabular-benchmark\"}],\"demo\":{\"inputs\":[{\"table\":[[\"Car
+        Name\",\"Horsepower\",\"Weight\"],[\"ford torino\",\"140\",\"3,449\"],[\"amc
+        hornet\",\"97\",\"2,774\"],[\"toyota corolla\",\"65\",\"1,773\"]],\"type\":\"tabular\"}],\"outputs\":[{\"table\":[[\"MPG
+        (miles per gallon)\"],[\"17\"],[\"18\"],[\"31\"]],\"type\":\"tabular\"}]},\"metrics\":[{\"description\":\"\",\"id\":\"mse\"},{\"description\":\"Coefficient
+        of determination (or R-squared) is a measure of how well the model fits the
+        data. Higher R-squared is considered a better fit.\",\"id\":\"r-squared\"}],\"models\":[{\"description\":\"Fish
+        weight prediction based on length measurements and species.\",\"id\":\"scikit-learn/Fish-Weight\"}],\"spaces\":[{\"description\":\"An
+        application that can predict weight of a fish based on set of attributes.\",\"id\":\"scikit-learn/fish-weight-prediction\"}],\"summary\":\"Tabular
+        regression is the task of predicting a numerical value given a set of attributes.\",\"widgetModels\":[\"scikit-learn/Fish-Weight\"],\"youtubeId\":\"\",\"id\":\"tabular-regression\",\"label\":\"Tabular
+        Regression\",\"libraries\":[\"sklearn\"]},\"text-classification\":{\"datasets\":[{\"description\":\"A
+        widely used dataset used to benchmark multiple variants of text classification.\",\"id\":\"nyu-mll/glue\"},{\"description\":\"A
+        text classification dataset used to benchmark natural language inference models\",\"id\":\"stanfordnlp/snli\"}],\"demo\":{\"inputs\":[{\"label\":\"Input\",\"content\":\"I
+        love Hugging Face!\",\"type\":\"text\"}],\"outputs\":[{\"type\":\"chart\",\"data\":[{\"label\":\"POSITIVE\",\"score\":0.9},{\"label\":\"NEUTRAL\",\"score\":0.1},{\"label\":\"NEGATIVE\",\"score\":0}]}]},\"metrics\":[{\"description\":\"\",\"id\":\"accuracy\"},{\"description\":\"\",\"id\":\"recall\"},{\"description\":\"\",\"id\":\"precision\"},{\"description\":\"The
+        F1 metric is the harmonic mean of the precision and recall. It can be calculated
+        as: F1 = 2 * (precision * recall) / (precision + recall)\",\"id\":\"f1\"}],\"models\":[{\"description\":\"A
+        robust model trained for sentiment analysis.\",\"id\":\"distilbert/distilbert-base-uncased-finetuned-sst-2-english\"},{\"description\":\"A
+        sentiment analysis model specialized in financial sentiment.\",\"id\":\"ProsusAI/finbert\"},{\"description\":\"A
+        sentiment analysis model specialized in analyzing tweets.\",\"id\":\"cardiffnlp/twitter-roberta-base-sentiment-latest\"},{\"description\":\"A
+        model that can classify languages.\",\"id\":\"papluca/xlm-roberta-base-language-detection\"},{\"description\":\"A
+        model that can classify text generation attacks.\",\"id\":\"meta-llama/Prompt-Guard-86M\"}],\"spaces\":[{\"description\":\"An
+        application that can classify financial sentiment.\",\"id\":\"IoannisTr/Tech_Stocks_Trading_Assistant\"},{\"description\":\"A
+        dashboard that contains various text classification tasks.\",\"id\":\"miesnerjacob/Multi-task-NLP\"},{\"description\":\"An
+        application that analyzes user reviews in healthcare.\",\"id\":\"spacy/healthsea-demo\"}],\"summary\":\"Text
+        Classification is the task of assigning a label or class to a given text.
+        Some use cases are sentiment analysis, natural language inference, and assessing
+        grammatical correctness.\",\"widgetModels\":[\"distilbert/distilbert-base-uncased-finetuned-sst-2-english\"],\"youtubeId\":\"leNG9fN9FQU\",\"id\":\"text-classification\",\"label\":\"Text
+        Classification\",\"libraries\":[\"adapter-transformers\",\"setfit\",\"spacy\",\"transformers\",\"transformers.js\"]},\"text-generation\":{\"datasets\":[{\"description\":\"Multilingual
+        dataset used to evaluate text generation models.\",\"id\":\"CohereForAI/Global-MMLU\"},{\"description\":\"High
+        quality multilingual data used to train text-generation models.\",\"id\":\"HuggingFaceFW/fineweb-2\"},{\"description\":\"Truly
+        open-source, curated and cleaned dialogue dataset.\",\"id\":\"HuggingFaceH4/ultrachat_200k\"},{\"description\":\"A
+        reasoning dataset.\",\"id\":\"open-r1/OpenThoughts-114k-math\"},{\"description\":\"A
+        multilingual instruction dataset with preference ratings on responses.\",\"id\":\"allenai/tulu-3-sft-mixture\"},{\"description\":\"A
+        large synthetic dataset for alignment of text generation models.\",\"id\":\"HuggingFaceTB/smoltalk\"},{\"description\":\"A
+        dataset made for training text generation models solving math questions.\",\"id\":\"HuggingFaceTB/finemath\"}],\"demo\":{\"inputs\":[{\"label\":\"Input\",\"content\":\"Once
+        upon a time,\",\"type\":\"text\"}],\"outputs\":[{\"label\":\"Output\",\"content\":\"Once
+        upon a time, we knew that our ancestors were on the verge of extinction. The
+        great explorers and poets of the Old World, from Alexander the Great to Chaucer,
+        are dead and gone. A good many of our ancient explorers and poets have\",\"type\":\"text\"}]},\"metrics\":[{\"description\":\"Cross
+        Entropy is a metric that calculates the difference between two probability
+        distributions. Each probability distribution is the distribution of predicted
+        words\",\"id\":\"Cross Entropy\"},{\"description\":\"The Perplexity metric
+        is the exponential of the cross-entropy loss. It evaluates the probabilities
+        assigned to the next word by the model. Lower perplexity indicates better
+        performance\",\"id\":\"Perplexity\"}],\"models\":[{\"description\":\"A text-generation
+        model trained to follow instructions.\",\"id\":\"google/gemma-2-2b-it\"},{\"description\":\"Smaller
+        variant of one of the most powerful models.\",\"id\":\"deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B\"},{\"description\":\"Very
+        powerful text generation model trained to follow instructions.\",\"id\":\"meta-llama/Meta-Llama-3.1-8B-Instruct\"},{\"description\":\"Powerful
+        text generation model by Microsoft.\",\"id\":\"microsoft/phi-4\"},{\"description\":\"A
+        very powerful model with reasoning capabilities.\",\"id\":\"simplescaling/s1.1-32B\"},{\"description\":\"Strong
+        conversational model that supports very long instructions.\",\"id\":\"Qwen/Qwen2.5-7B-Instruct-1M\"},{\"description\":\"Text
+        generation model used to write code.\",\"id\":\"Qwen/Qwen2.5-Coder-32B-Instruct\"},{\"description\":\"Powerful
+        reasoning based open large language model.\",\"id\":\"deepseek-ai/DeepSeek-R1\"}],\"spaces\":[{\"description\":\"A
+        leaderboard to compare different open-source text generation models based
+        on various benchmarks.\",\"id\":\"open-llm-leaderboard/open_llm_leaderboard\"},{\"description\":\"A
+        leaderboard for comparing chain-of-thought performance of models.\",\"id\":\"logikon/open_cot_leaderboard\"},{\"description\":\"An
+        text generation based application based on a very powerful LLaMA2 model.\",\"id\":\"ysharma/Explore_llamav2_with_TGI\"},{\"description\":\"An
+        text generation based application to converse with Zephyr model.\",\"id\":\"HuggingFaceH4/zephyr-chat\"},{\"description\":\"A
+        leaderboard that ranks text generation models based on blind votes from people.\",\"id\":\"lmsys/chatbot-arena-leaderboard\"},{\"description\":\"An
+        chatbot to converse with a very powerful text generation model.\",\"id\":\"mlabonne/phixtral-chat\"}],\"summary\":\"Generating
+        text is the task of generating new text given another text. These models can,
+        for example, fill in incomplete text or paraphrase.\",\"widgetModels\":[\"mistralai/Mistral-Nemo-Instruct-2407\"],\"youtubeId\":\"e9gNEAlsOvU\",\"id\":\"text-generation\",\"label\":\"Text
+        Generation\",\"libraries\":[\"transformers\",\"transformers.js\"]},\"text-ranking\":{\"datasets\":[{\"description\":\"Bing
+        queries with relevant passages from various web sources.\",\"id\":\"microsoft/ms_marco\"}],\"demo\":{\"inputs\":[{\"label\":\"Source
+        sentence\",\"content\":\"Machine learning is so easy.\",\"type\":\"text\"},{\"label\":\"Sentences
+        to compare to\",\"content\":\"Deep learning is so straightforward.\",\"type\":\"text\"},{\"label\":\"\",\"content\":\"This
+        is so difficult, like rocket science.\",\"type\":\"text\"},{\"label\":\"\",\"content\":\"I
+        can't believe how much I struggled with this.\",\"type\":\"text\"}],\"outputs\":[{\"type\":\"chart\",\"data\":[{\"label\":\"Deep
+        learning is so straightforward.\",\"score\":2.2006407},{\"label\":\"This is
+        so difficult, like rocket science.\",\"score\":-6.2634873},{\"label\":\"I
+        can't believe how much I struggled with this.\",\"score\":-10.251488}]}]},\"metrics\":[{\"description\":\"Discounted
+        Cumulative Gain (DCG) measures the gain, or usefulness, of search results
+        discounted by their position. The normalization is done by dividing the DCG
+        by the ideal DCG, which is the DCG of the perfect ranking.\",\"id\":\"Normalized
+        Discounted Cumulative Gain\"},{\"description\":\"Reciprocal Rank is a measure
+        used to rank the relevancy of documents given a set of documents. Reciprocal
+        Rank is the reciprocal of the rank of the document retrieved, meaning, if
+        the rank is 3, the Reciprocal Rank is 0.33. If the rank is 1, the Reciprocal
+        Rank is 1\",\"id\":\"Mean Reciprocal Rank\"},{\"description\":\"Mean Average
+        Precision (mAP) is the overall average of the Average Precision (AP) values,
+        where AP is the Area Under the PR Curve (AUC-PR)\",\"id\":\"Mean Average Precision\"}],\"models\":[{\"description\":\"An
+        extremely efficient text ranking model trained on a web search dataset.\",\"id\":\"cross-encoder/ms-marco-MiniLM-L6-v2\"},{\"description\":\"A
+        strong multilingual text reranker model.\",\"id\":\"Alibaba-NLP/gte-multilingual-reranker-base\"},{\"description\":\"An
+        efficient text ranking model that punches above its weight.\",\"id\":\"Alibaba-NLP/gte-reranker-modernbert-base\"}],\"spaces\":[],\"summary\":\"Text
+        Ranking is the task of ranking a set of texts based on their relevance to
+        a query. Text ranking models are trained on large datasets of queries and
+        relevant documents to learn how to rank documents based on their relevance
+        to the query. This task is particularly useful for search engines and information
+        retrieval systems.\",\"widgetModels\":[\"cross-encoder/ms-marco-MiniLM-L6-v2\"],\"youtubeId\":\"\",\"id\":\"text-ranking\",\"label\":\"Text
+        Ranking\",\"libraries\":[\"sentence-transformers\",\"transformers\"]},\"text-to-image\":{\"datasets\":[{\"description\":\"RedCaps
+        is a large-scale dataset of 12M image-text pairs collected from Reddit.\",\"id\":\"red_caps\"},{\"description\":\"Conceptual
+        Captions is a dataset consisting of ~3.3M images annotated with captions.\",\"id\":\"conceptual_captions\"},{\"description\":\"12M
+        image-caption pairs.\",\"id\":\"Spawning/PD12M\"}],\"demo\":{\"inputs\":[{\"label\":\"Input\",\"content\":\"A
+        city above clouds, pastel colors, Victorian style\",\"type\":\"text\"}],\"outputs\":[{\"filename\":\"image.jpeg\",\"type\":\"img\"}]},\"metrics\":[{\"description\":\"The
+        Inception Score (IS) measure assesses diversity and meaningfulness. It uses
+        a generated image sample to predict its label. A higher score signifies more
+        diverse and meaningful images.\",\"id\":\"IS\"},{\"description\":\"The Fr\xE9chet
+        Inception Distance (FID) calculates the distance between distributions between
+        synthetic and real samples. A lower FID score indicates better similarity
+        between the distributions of real and generated images.\",\"id\":\"FID\"},{\"description\":\"R-precision
+        assesses how the generated image aligns with the provided text description.
+        It uses the generated images as queries to retrieve relevant text descriptions.
+        The top 'r' relevant descriptions are selected and used to calculate R-precision
+        as r/R, where 'R' is the number of ground truth descriptions associated with
+        the generated images. A higher R-precision value indicates a better model.\",\"id\":\"R-Precision\"}],\"models\":[{\"description\":\"One
+        of the most powerful image generation models that can generate realistic outputs.\",\"id\":\"black-forest-labs/FLUX.1-dev\"},{\"description\":\"A
+        powerful yet fast image generation model.\",\"id\":\"latent-consistency/lcm-lora-sdxl\"},{\"description\":\"Text-to-image
+        model for photorealistic generation.\",\"id\":\"Kwai-Kolors/Kolors\"},{\"description\":\"A
+        powerful text-to-image model.\",\"id\":\"stabilityai/stable-diffusion-3-medium-diffusers\"}],\"spaces\":[{\"description\":\"A
+        powerful text-to-image application.\",\"id\":\"stabilityai/stable-diffusion-3-medium\"},{\"description\":\"A
+        text-to-image application to generate comics.\",\"id\":\"jbilcke-hf/ai-comic-factory\"},{\"description\":\"An
+        application to match multiple custom image generation models.\",\"id\":\"multimodalart/flux-lora-lab\"},{\"description\":\"A
+        powerful yet very fast image generation application.\",\"id\":\"latent-consistency/lcm-lora-for-sdxl\"},{\"description\":\"A
+        gallery to explore various text-to-image models.\",\"id\":\"multimodalart/LoraTheExplorer\"},{\"description\":\"An
+        application for `text-to-image`, `image-to-image` and image inpainting.\",\"id\":\"ArtGAN/Stable-Diffusion-ControlNet-WebUI\"},{\"description\":\"An
+        application to generate realistic images given photos of a person and a prompt.\",\"id\":\"InstantX/InstantID\"}],\"summary\":\"Text-to-image
+        is the task of generating images from input text. These pipelines can also
+        be used to modify and edit images based on text prompts.\",\"widgetModels\":[\"black-forest-labs/FLUX.1-dev\"],\"youtubeId\":\"\",\"id\":\"text-to-image\",\"label\":\"Text-to-Image\",\"libraries\":[\"diffusers\"]},\"text-to-speech\":{\"canonicalId\":\"text-to-audio\",\"datasets\":[{\"description\":\"10K
+        hours of multi-speaker English dataset.\",\"id\":\"parler-tts/mls_eng_10k\"},{\"description\":\"Multi-speaker
+        English dataset.\",\"id\":\"mythicinfinity/libritts_r\"},{\"description\":\"Multi-lingual
+        dataset.\",\"id\":\"facebook/multilingual_librispeech\"}],\"demo\":{\"inputs\":[{\"label\":\"Input\",\"content\":\"I
+        love audio models on the Hub!\",\"type\":\"text\"}],\"outputs\":[{\"filename\":\"audio.wav\",\"type\":\"audio\"}]},\"metrics\":[{\"description\":\"The
+        Mel Cepstral Distortion (MCD) metric is used to calculate the quality of generated
+        speech.\",\"id\":\"mel cepstral distortion\"}],\"models\":[{\"description\":\"A
+        prompt based, powerful TTS model.\",\"id\":\"parler-tts/parler-tts-large-v1\"},{\"description\":\"A
+        powerful TTS model that supports English and Chinese.\",\"id\":\"SWivid/F5-TTS\"},{\"description\":\"A
+        massively multi-lingual TTS model.\",\"id\":\"fishaudio/fish-speech-1.5\"},{\"description\":\"A
+        powerful TTS model.\",\"id\":\"OuteAI/OuteTTS-0.1-350M\"},{\"description\":\"Small
+        yet powerful TTS model.\",\"id\":\"hexgrad/Kokoro-82M\"}],\"spaces\":[{\"description\":\"An
+        application for generate high quality speech in different languages.\",\"id\":\"hexgrad/Kokoro-TTS\"},{\"description\":\"A
+        multilingual text-to-speech application.\",\"id\":\"fishaudio/fish-speech-1\"},{\"description\":\"An
+        application that generates speech in different styles in English and Chinese.\",\"id\":\"mrfakename/E2-F5-TTS\"},{\"description\":\"An
+        application that synthesizes emotional speech for diverse speaker prompts.\",\"id\":\"parler-tts/parler-tts-expresso\"},{\"description\":\"An
+        application that generates podcast episodes.\",\"id\":\"ngxson/kokoro-podcast-generator\"}],\"summary\":\"Text-to-Speech
+        (TTS) is the task of generating natural sounding speech given text input.
+        TTS models can be extended to have a single model that generates speech for
+        multiple speakers and multiple languages.\",\"widgetModels\":[\"suno/bark\"],\"youtubeId\":\"NW62DpzJ274\",\"id\":\"text-to-speech\",\"label\":\"Text-to-Speech\",\"libraries\":[\"espnet\",\"tensorflowtts\",\"transformers\",\"transformers.js\"]},\"text-to-video\":{\"datasets\":[{\"description\":\"Microsoft
+        Research Video to Text is a large-scale dataset for open domain video captioning\",\"id\":\"iejMac/CLIP-MSR-VTT\"},{\"description\":\"UCF101
+        Human Actions dataset consists of 13,320 video clips from YouTube, with 101
+        classes.\",\"id\":\"quchenyuan/UCF101-ZIP\"},{\"description\":\"A high-quality
+        dataset for human action recognition in YouTube videos.\",\"id\":\"nateraw/kinetics\"},{\"description\":\"A
+        dataset of video clips of humans performing pre-defined basic actions with
+        everyday objects.\",\"id\":\"HuggingFaceM4/something_something_v2\"},{\"description\":\"This
+        dataset consists of text-video pairs and contains noisy samples with irrelevant
+        video descriptions\",\"id\":\"HuggingFaceM4/webvid\"},{\"description\":\"A
+        dataset of short Flickr videos for the temporal localization of events with
+        descriptions.\",\"id\":\"iejMac/CLIP-DiDeMo\"}],\"demo\":{\"inputs\":[{\"label\":\"Input\",\"content\":\"Darth
+        Vader is surfing on the waves.\",\"type\":\"text\"}],\"outputs\":[{\"filename\":\"text-to-video-output.gif\",\"type\":\"img\"}]},\"metrics\":[{\"description\":\"Inception
+        Score uses an image classification model that predicts class labels and evaluates
+        how distinct and diverse the images are. A higher score indicates better video
+        generation.\",\"id\":\"is\"},{\"description\":\"Frechet Inception Distance
+        uses an image classification model to obtain image embeddings. The metric
+        compares mean and standard deviation of the embeddings of real and generated
+        images. A smaller score indicates better video generation.\",\"id\":\"fid\"},{\"description\":\"Frechet
+        Video Distance uses a model that captures coherence for changes in frames
+        and the quality of each frame. A smaller score indicates better video generation.\",\"id\":\"fvd\"},{\"description\":\"CLIPSIM
+        measures similarity between video frames and text using an image-text similarity
+        model. A higher score indicates better video generation.\",\"id\":\"clipsim\"}],\"models\":[{\"description\":\"A
+        strong model for consistent video generation.\",\"id\":\"tencent/HunyuanVideo\"},{\"description\":\"A
+        text-to-video model with high fidelity motion and strong prompt adherence.\",\"id\":\"Lightricks/LTX-Video\"},{\"description\":\"A
+        text-to-video model focusing on physics-aware applications like robotics.\",\"id\":\"nvidia/Cosmos-1.0-Diffusion-7B-Text2World\"},{\"description\":\"A
+        robust model for video generation.\",\"id\":\"Wan-AI/Wan2.1-T2V-1.3B\"}],\"spaces\":[{\"description\":\"An
+        application that generates video from text.\",\"id\":\"VideoCrafter/VideoCrafter\"},{\"description\":\"Consistent
+        video generation application.\",\"id\":\"Wan-AI/Wan2.1\"},{\"description\":\"A
+        cutting edge video generation application.\",\"id\":\"Pyramid-Flow/pyramid-flow\"}],\"summary\":\"Text-to-video
+        models can be used in any application that requires generating consistent
+        sequence of images from text. \",\"widgetModels\":[\"Wan-AI/Wan2.1-T2V-14B\"],\"id\":\"text-to-video\",\"label\":\"Text-to-Video\",\"libraries\":[\"diffusers\"]},\"token-classification\":{\"datasets\":[{\"description\":\"A
+        widely used dataset useful to benchmark named entity recognition models.\",\"id\":\"eriktks/conll2003\"},{\"description\":\"A
+        multilingual dataset of Wikipedia articles annotated for named entity recognition
+        in over 150 different languages.\",\"id\":\"unimelb-nlp/wikiann\"}],\"demo\":{\"inputs\":[{\"label\":\"Input\",\"content\":\"My
+        name is Omar and I live in Z\xFCrich.\",\"type\":\"text\"}],\"outputs\":[{\"text\":\"My
+        name is Omar and I live in Z\xFCrich.\",\"tokens\":[{\"type\":\"PERSON\",\"start\":11,\"end\":15},{\"type\":\"GPE\",\"start\":30,\"end\":36}],\"type\":\"text-with-tokens\"}]},\"metrics\":[{\"description\":\"\",\"id\":\"accuracy\"},{\"description\":\"\",\"id\":\"recall\"},{\"description\":\"\",\"id\":\"precision\"},{\"description\":\"\",\"id\":\"f1\"}],\"models\":[{\"description\":\"A
+        robust performance model to identify people, locations, organizations and
+        names of miscellaneous entities.\",\"id\":\"dslim/bert-base-NER\"},{\"description\":\"A
+        strong model to identify people, locations, organizations and names in multiple
+        languages.\",\"id\":\"FacebookAI/xlm-roberta-large-finetuned-conll03-english\"},{\"description\":\"A
+        token classification model specialized on medical entity recognition.\",\"id\":\"blaze999/Medical-NER\"},{\"description\":\"Flair
+        models are typically the state of the art in named entity recognition tasks.\",\"id\":\"flair/ner-english\"}],\"spaces\":[{\"description\":\"An
+        application that can recognizes entities, extracts noun chunks and recognizes
+        various linguistic features of each token.\",\"id\":\"spacy/gradio_pipeline_visualizer\"}],\"summary\":\"Token
+        classification is a natural language understanding task in which a label is
+        assigned to some tokens in a text. Some popular token classification subtasks
+        are Named Entity Recognition (NER) and Part-of-Speech (PoS) tagging. NER models
+        could be trained to identify specific entities in a text, such as dates, individuals
+        and places; and PoS tagging would identify, for example, which words in a
+        text are verbs, nouns, and punctuation marks.\",\"widgetModels\":[\"FacebookAI/xlm-roberta-large-finetuned-conll03-english\"],\"youtubeId\":\"wVHdVlPScxA\",\"id\":\"token-classification\",\"label\":\"Token
+        Classification\",\"libraries\":[\"adapter-transformers\",\"flair\",\"spacy\",\"span-marker\",\"stanza\",\"transformers\",\"transformers.js\"]},\"translation\":{\"canonicalId\":\"text2text-generation\",\"datasets\":[{\"description\":\"A
+        dataset of copyright-free books translated into 16 different languages.\",\"id\":\"Helsinki-NLP/opus_books\"},{\"description\":\"An
+        example of translation between programming languages. This dataset consists
+        of functions in Java and C#.\",\"id\":\"google/code_x_glue_cc_code_to_code_trans\"}],\"demo\":{\"inputs\":[{\"label\":\"Input\",\"content\":\"My
+        name is Omar and I live in Z\xFCrich.\",\"type\":\"text\"}],\"outputs\":[{\"label\":\"Output\",\"content\":\"Mein
+        Name ist Omar und ich wohne in Z\xFCrich.\",\"type\":\"text\"}]},\"metrics\":[{\"description\":\"BLEU
+        score is calculated by counting the number of shared single or subsequent
+        tokens between the generated sequence and the reference. Subsequent n tokens
+        are called \u201Cn-grams\u201D. Unigram refers to a single token while bi-gram
+        refers to token pairs and n-grams refer to n subsequent tokens. The score
+        ranges from 0 to 1, where 1 means the translation perfectly matched and 0
+        did not match at all\",\"id\":\"bleu\"},{\"description\":\"\",\"id\":\"sacrebleu\"}],\"models\":[{\"description\":\"Very
+        powerful model that can translate many languages between each other, especially
+        low-resource languages.\",\"id\":\"facebook/nllb-200-1.3B\"},{\"description\":\"A
+        general-purpose Transformer that can be used to translate from English to
+        German, French, or Romanian.\",\"id\":\"google-t5/t5-base\"}],\"spaces\":[{\"description\":\"An
+        application that can translate between 100 languages.\",\"id\":\"Iker/Translate-100-languages\"},{\"description\":\"An
+        application that can translate between many languages.\",\"id\":\"Geonmo/nllb-translation-demo\"}],\"summary\":\"Translation
+        is the task of converting text from one language to another.\",\"widgetModels\":[\"facebook/mbart-large-50-many-to-many-mmt\"],\"youtubeId\":\"1JvfrvZgi6c\",\"id\":\"translation\",\"label\":\"Translation\",\"libraries\":[\"transformers\",\"transformers.js\"]},\"unconditional-image-generation\":{\"datasets\":[{\"description\":\"The
+        CIFAR-100 dataset consists of 60000 32x32 colour images in 100 classes, with
+        600 images per class.\",\"id\":\"cifar100\"},{\"description\":\"Multiple images
+        of celebrities, used for facial expression translation.\",\"id\":\"CelebA\"}],\"demo\":{\"inputs\":[{\"label\":\"Seed\",\"content\":\"42\",\"type\":\"text\"},{\"label\":\"Number
+        of images to generate:\",\"content\":\"4\",\"type\":\"text\"}],\"outputs\":[{\"filename\":\"unconditional-image-generation-output.jpeg\",\"type\":\"img\"}]},\"metrics\":[{\"description\":\"The
+        inception score (IS) evaluates the quality of generated images. It measures
+        the diversity of the generated images (the model predictions are evenly distributed
+        across all possible labels) and their 'distinction' or 'sharpness' (the model
+        confidently predicts a single label for each image).\",\"id\":\"Inception
+        score (IS)\"},{\"description\":\"The Fr\xE9chet Inception Distance (FID) evaluates
+        the quality of images created by a generative model by calculating the distance
+        between feature vectors for real and generated images.\",\"id\":\"Fre\u0107het
+        Inception Distance (FID)\"}],\"models\":[{\"description\":\"High-quality image
+        generation model trained on the CIFAR-10 dataset. It synthesizes images of
+        the ten classes presented in the dataset using diffusion probabilistic models,
+        a class of latent variable models inspired by considerations from nonequilibrium
+        thermodynamics.\",\"id\":\"google/ddpm-cifar10-32\"},{\"description\":\"High-quality
+        image generation model trained on the 256x256 CelebA-HQ dataset. It synthesizes
+        images of faces using diffusion probabilistic models, a class of latent variable
+        models inspired by considerations from nonequilibrium thermodynamics.\",\"id\":\"google/ddpm-celebahq-256\"}],\"spaces\":[{\"description\":\"An
+        application that can generate realistic faces.\",\"id\":\"CompVis/celeba-latent-diffusion\"}],\"summary\":\"Unconditional
+        image generation is the task of generating images with no condition in any
+        context (like a prompt text or another image). Once trained, the model will
+        create images that resemble its training data distribution.\",\"widgetModels\":[\"\"],\"youtubeId\":\"\",\"id\":\"unconditional-image-generation\",\"label\":\"Unconditional
+        Image Generation\",\"libraries\":[\"diffusers\"]},\"video-text-to-text\":{\"datasets\":[{\"description\":\"Multiple-choice
+        questions and answers about videos.\",\"id\":\"lmms-lab/Video-MME\"},{\"description\":\"A
+        dataset of instructions and question-answer pairs about videos.\",\"id\":\"lmms-lab/VideoChatGPT\"},{\"description\":\"Large
+        video understanding dataset.\",\"id\":\"HuggingFaceFV/finevideo\"}],\"demo\":{\"inputs\":[{\"filename\":\"video-text-to-text-input.gif\",\"type\":\"img\"},{\"label\":\"Text
+        Prompt\",\"content\":\"What is happening in this video?\",\"type\":\"text\"}],\"outputs\":[{\"label\":\"Answer\",\"content\":\"The
+        video shows a series of images showing a fountain with water jets and a variety
+        of colorful flowers and butterflies in the background.\",\"type\":\"text\"}]},\"metrics\":[],\"models\":[{\"description\":\"A
+        robust video-text-to-text model.\",\"id\":\"Vision-CAIR/LongVU_Qwen2_7B\"},{\"description\":\"Strong
+        video-text-to-text model with reasoning capabilities.\",\"id\":\"GoodiesHere/Apollo-LMMs-Apollo-7B-t32\"},{\"description\":\"Strong
+        video-text-to-text model.\",\"id\":\"HuggingFaceTB/SmolVLM2-2.2B-Instruct\"}],\"spaces\":[{\"description\":\"An
+        application to chat with a video-text-to-text model.\",\"id\":\"llava-hf/video-llava\"},{\"description\":\"A
+        leaderboard for various video-text-to-text models.\",\"id\":\"opencompass/openvlm_video_leaderboard\"},{\"description\":\"An
+        application to generate highlights from a video.\",\"id\":\"HuggingFaceTB/SmolVLM2-HighlightGenerator\"}],\"summary\":\"Video-text-to-text
+        models take in a video and a text prompt and output text. These models are
+        also called video-language models.\",\"widgetModels\":[\"\"],\"youtubeId\":\"\",\"id\":\"video-text-to-text\",\"label\":\"Video-Text-to-Text\",\"libraries\":[\"transformers\"]},\"visual-question-answering\":{\"datasets\":[{\"description\":\"A
+        widely used dataset containing questions (with answers) about images.\",\"id\":\"Graphcore/vqa\"},{\"description\":\"A
+        dataset to benchmark visual reasoning based on text in images.\",\"id\":\"facebook/textvqa\"}],\"demo\":{\"inputs\":[{\"filename\":\"elephant.jpeg\",\"type\":\"img\"},{\"label\":\"Question\",\"content\":\"What
+        is in this image?\",\"type\":\"text\"}],\"outputs\":[{\"type\":\"chart\",\"data\":[{\"label\":\"elephant\",\"score\":0.97},{\"label\":\"elephants\",\"score\":0.06},{\"label\":\"animal\",\"score\":0.003}]}]},\"isPlaceholder\":false,\"metrics\":[{\"description\":\"\",\"id\":\"accuracy\"},{\"description\":\"Measures
+        how much a predicted answer differs from the ground truth based on the difference
+        in their semantic meaning.\",\"id\":\"wu-palmer similarity\"}],\"models\":[{\"description\":\"A
+        visual question answering model trained to convert charts and plots to text.\",\"id\":\"google/deplot\"},{\"description\":\"A
+        visual question answering model trained for mathematical reasoning and chart
+        derendering from images.\",\"id\":\"google/matcha-base\"},{\"description\":\"A
+        strong visual question answering that answers questions from book covers.\",\"id\":\"google/pix2struct-ocrvqa-large\"}],\"spaces\":[{\"description\":\"An
+        application that compares visual question answering models across different
+        tasks.\",\"id\":\"merve/pix2struct\"},{\"description\":\"An application that
+        can answer questions based on images.\",\"id\":\"nielsr/vilt-vqa\"},{\"description\":\"An
+        application that can caption images and answer questions about a given image.
+        \",\"id\":\"Salesforce/BLIP\"},{\"description\":\"An application that can
+        caption images and answer questions about a given image. \",\"id\":\"vumichien/Img2Prompt\"}],\"summary\":\"Visual
+        Question Answering is the task of answering open-ended questions based on
+        an image. They output natural language responses to natural language questions.\",\"widgetModels\":[\"dandelin/vilt-b32-finetuned-vqa\"],\"youtubeId\":\"\",\"id\":\"visual-question-answering\",\"label\":\"Visual
+        Question Answering\",\"libraries\":[\"transformers\",\"transformers.js\"]},\"zero-shot-classification\":{\"datasets\":[{\"description\":\"A
+        widely used dataset used to benchmark multiple variants of text classification.\",\"id\":\"nyu-mll/glue\"},{\"description\":\"The
+        Multi-Genre Natural Language Inference (MultiNLI) corpus is a crowd-sourced
+        collection of 433k sentence pairs annotated with textual entailment information.\",\"id\":\"nyu-mll/multi_nli\"},{\"description\":\"FEVER
+        is a publicly available dataset for fact extraction and verification against
+        textual sources.\",\"id\":\"fever/fever\"}],\"demo\":{\"inputs\":[{\"label\":\"Text
+        Input\",\"content\":\"Dune is the best movie ever.\",\"type\":\"text\"},{\"label\":\"Candidate
+        Labels\",\"content\":\"CINEMA, ART, MUSIC\",\"type\":\"text\"}],\"outputs\":[{\"type\":\"chart\",\"data\":[{\"label\":\"CINEMA\",\"score\":0.9},{\"label\":\"ART\",\"score\":0.1},{\"label\":\"MUSIC\",\"score\":0}]}]},\"metrics\":[],\"models\":[{\"description\":\"Powerful
+        zero-shot text classification model.\",\"id\":\"facebook/bart-large-mnli\"},{\"description\":\"Cutting-edge
+        zero-shot multilingual text classification model.\",\"id\":\"MoritzLaurer/ModernBERT-large-zeroshot-v2.0\"},{\"description\":\"Zero-shot
+        text classification model that can be used for topic and sentiment classification.\",\"id\":\"knowledgator/gliclass-modern-base-v2.0-init\"}],\"spaces\":[],\"summary\":\"Zero-shot
+        text classification is a task in natural language processing where a model
+        is trained on a set of labeled examples but is then able to classify new examples
+        from previously unseen classes.\",\"widgetModels\":[\"facebook/bart-large-mnli\"],\"id\":\"zero-shot-classification\",\"label\":\"Zero-Shot
+        Classification\",\"libraries\":[\"transformers\",\"transformers.js\"]},\"zero-shot-image-classification\":{\"datasets\":[{\"description\":\"\",\"id\":\"\"}],\"demo\":{\"inputs\":[{\"filename\":\"image-classification-input.jpeg\",\"type\":\"img\"},{\"label\":\"Classes\",\"content\":\"cat,
+        dog, bird\",\"type\":\"text\"}],\"outputs\":[{\"type\":\"chart\",\"data\":[{\"label\":\"Cat\",\"score\":0.664},{\"label\":\"Dog\",\"score\":0.329},{\"label\":\"Bird\",\"score\":0.008}]}]},\"metrics\":[{\"description\":\"Computes
+        the number of times the correct label appears in top K labels predicted\",\"id\":\"top-K
+        accuracy\"}],\"models\":[{\"description\":\"Multilingual image classification
+        model for 80 languages.\",\"id\":\"visheratin/mexma-siglip\"},{\"description\":\"Strong
+        zero-shot image classification model.\",\"id\":\"google/siglip2-base-patch16-224\"},{\"description\":\"Robust
+        zero-shot image classification model.\",\"id\":\"intfloat/mmE5-mllama-11b-instruct\"},{\"description\":\"Powerful
+        zero-shot image classification model supporting 94 languages.\",\"id\":\"jinaai/jina-clip-v2\"},{\"description\":\"Strong
+        image classification model for biomedical domain.\",\"id\":\"microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224\"}],\"spaces\":[{\"description\":\"An
+        application that leverages zero-shot image classification to find best captions
+        to generate an image. \",\"id\":\"pharma/CLIP-Interrogator\"},{\"description\":\"An
+        application to compare different zero-shot image classification models. \",\"id\":\"merve/compare_clip_siglip\"}],\"summary\":\"Zero-shot
+        image classification is the task of classifying previously unseen classes
+        during training of a model.\",\"widgetModels\":[\"google/siglip-so400m-patch14-224\"],\"youtubeId\":\"\",\"id\":\"zero-shot-image-classification\",\"label\":\"Zero-Shot
+        Image Classification\",\"libraries\":[\"transformers\",\"transformers.js\"]},\"zero-shot-object-detection\":{\"datasets\":[],\"demo\":{\"inputs\":[{\"filename\":\"zero-shot-object-detection-input.jpg\",\"type\":\"img\"},{\"label\":\"Classes\",\"content\":\"cat,
+        dog, bird\",\"type\":\"text\"}],\"outputs\":[{\"filename\":\"zero-shot-object-detection-output.jpg\",\"type\":\"img\"}]},\"metrics\":[{\"description\":\"The
+        Average Precision (AP) metric is the Area Under the PR Curve (AUC-PR). It
+        is calculated for each class separately\",\"id\":\"Average Precision\"},{\"description\":\"The
+        Mean Average Precision (mAP) metric is the overall average of the AP values\",\"id\":\"Mean
+        Average Precision\"},{\"description\":\"The AP\u03B1 metric is the Average
+        Precision at the IoU threshold of a \u03B1 value, for example, AP50 and AP75\",\"id\":\"AP\u03B1\"}],\"models\":[{\"description\":\"Solid
+        zero-shot object detection model.\",\"id\":\"IDEA-Research/grounding-dino-base\"},{\"description\":\"Cutting-edge
+        zero-shot object detection model.\",\"id\":\"google/owlv2-base-patch16-ensemble\"}],\"spaces\":[{\"description\":\"A
+        demo to try the state-of-the-art zero-shot object detection model, OWLv2.\",\"id\":\"merve/owlv2\"},{\"description\":\"A
+        demo that combines a zero-shot object detection and mask generation model
+        for zero-shot segmentation.\",\"id\":\"merve/OWLSAM\"}],\"summary\":\"Zero-shot
+        object detection is a computer vision task to detect objects and their classes
+        in images, without any prior training or knowledge of the classes. Zero-shot
+        object detection models receive an image as input, as well as a list of candidate
+        classes, and output the bounding boxes and labels where the objects have been
+        detected.\",\"widgetModels\":[],\"youtubeId\":\"\",\"id\":\"zero-shot-object-detection\",\"label\":\"Zero-Shot
+        Object Detection\",\"libraries\":[\"transformers\",\"transformers.js\"]},\"text-to-3d\":{\"datasets\":[{\"description\":\"A
+        large dataset of over 10 million 3D objects.\",\"id\":\"allenai/objaverse-xl\"},{\"description\":\"Descriptive
+        captions for 3D objects in Objaverse.\",\"id\":\"tiange/Cap3D\"}],\"demo\":{\"inputs\":[{\"label\":\"Prompt\",\"content\":\"a
+        cat statue\",\"type\":\"text\"}],\"outputs\":[{\"label\":\"Result\",\"content\":\"text-to-3d-3d-output-filename.glb\",\"type\":\"text\"}]},\"metrics\":[],\"models\":[{\"description\":\"Text-to-3D
+        mesh model by OpenAI\",\"id\":\"openai/shap-e\"},{\"description\":\"Generative
+        3D gaussian splatting model.\",\"id\":\"ashawkey/LGM\"}],\"spaces\":[{\"description\":\"Text-to-3D
+        demo with mesh outputs.\",\"id\":\"hysts/Shap-E\"},{\"description\":\"Text/image-to-3D
+        demo with splat outputs.\",\"id\":\"ashawkey/LGM\"}],\"summary\":\"Text-to-3D
+        models take in text input and produce 3D output.\",\"widgetModels\":[],\"youtubeId\":\"\",\"id\":\"text-to-3d\",\"label\":\"Text-to-3D\",\"libraries\":[\"diffusers\"]},\"image-to-3d\":{\"datasets\":[{\"description\":\"A
+        large dataset of over 10 million 3D objects.\",\"id\":\"allenai/objaverse-xl\"},{\"description\":\"A
+        dataset of isolated object images for evaluating image-to-3D models.\",\"id\":\"dylanebert/iso3d\"}],\"demo\":{\"inputs\":[{\"filename\":\"image-to-3d-image-input.png\",\"type\":\"img\"}],\"outputs\":[{\"label\":\"Result\",\"content\":\"image-to-3d-3d-output-filename.glb\",\"type\":\"text\"}]},\"metrics\":[],\"models\":[{\"description\":\"Fast
+        image-to-3D mesh model by Tencent.\",\"id\":\"TencentARC/InstantMesh\"},{\"description\":\"Fast
+        image-to-3D mesh model by StabilityAI\",\"id\":\"stabilityai/TripoSR\"},{\"description\":\"A
+        scaled up image-to-3D mesh model derived from TripoSR.\",\"id\":\"hwjiang/Real3D\"},{\"description\":\"Consistent
+        image-to-3d generation model.\",\"id\":\"stabilityai/stable-point-aware-3d\"}],\"spaces\":[{\"description\":\"Leaderboard
+        to evaluate image-to-3D models.\",\"id\":\"dylanebert/3d-arena\"},{\"description\":\"Image-to-3D
+        demo with mesh outputs.\",\"id\":\"TencentARC/InstantMesh\"},{\"description\":\"Image-to-3D
+        demo.\",\"id\":\"stabilityai/stable-point-aware-3d\"},{\"description\":\"Image-to-3D
+        demo with mesh outputs.\",\"id\":\"hwjiang/Real3D\"},{\"description\":\"Image-to-3D
+        demo with splat outputs.\",\"id\":\"dylanebert/LGM-mini\"}],\"summary\":\"Image-to-3D
+        models take in image input and produce 3D output.\",\"widgetModels\":[],\"youtubeId\":\"\",\"id\":\"image-to-3d\",\"label\":\"Image-to-3D\",\"libraries\":[\"diffusers\"]}}"
+    headers:
+      Access-Control-Allow-Origin:
+      - https://huggingface.co
+      Access-Control-Expose-Headers:
+      - X-Repo-Commit,X-Request-Id,X-Error-Code,X-Error-Message,X-Total-Count,ETag,Link,Accept-Ranges,Content-Range,X-Xet-Access-Token,X-Xet-Token-Expiration,X-Xet-Refresh-Route,X-Xet-Cas-Url,X-Xet-Hash
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '79354'
+      Content-Type:
+      - application/json; charset=utf-8
+      Date:
+      - Tue, 01 Apr 2025 14:30:18 GMT
+      ETag:
+      - W/"135fa-B7z9Sp2nYHc3xCXdl1ThPWRM3TY"
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Vary:
+      - Origin
+      Via:
+      - 1.1 ef213e23c4cd5d06f69359a5aa13b592.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - XjLmXOOifuI0RcPafa_F6HwQyij9TalysOaeee-dxEX4Z_kD5oQ8JQ==
+      X-Amz-Cf-Pop:
+      - MAA51-P3
+      X-Cache:
+      - Miss from cloudfront
+      X-Powered-By:
+      - huggingface-moon
+      X-Request-Id:
+      - Root=1-67ebf87a-5160237a54159a4716ee8e22;56a9d005-5d9f-486c-b9ba-18fd0a2843df
+      cross-origin-opener-policy:
+      - same-origin
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      X-Amzn-Trace-Id:
+      - 7327d52b-22e1-4ca6-a8e4-1586f9b96af0
+      user-agent:
+      - unknown/None; hf_hub/0.30.1; python/3.11.10
+    method: GET
+    uri: https://huggingface.co/api/models/distilroberta-base
+  response:
+    body:
+      string: Temporary Redirect. Redirecting to /api/models/distilbert/distilroberta-base
+    headers:
+      Access-Control-Allow-Origin:
+      - https://huggingface.co
+      Access-Control-Expose-Headers:
+      - X-Repo-Commit,X-Request-Id,X-Error-Code,X-Error-Message,X-Total-Count,ETag,Link,Accept-Ranges,Content-Range,X-Xet-Access-Token,X-Xet-Token-Expiration,X-Xet-Refresh-Route,X-Xet-Cas-Url,X-Xet-Hash
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '76'
+      Content-Type:
+      - text/plain; charset=utf-8
+      Date:
+      - Tue, 01 Apr 2025 14:30:19 GMT
+      Location:
+      - /api/models/distilbert/distilroberta-base
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Vary:
+      - Origin, Accept
+      Via:
+      - 1.1 ab8ea6deedbd5a43d4532a9469070864.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - QiywT24LZ9wWv1I4GHLzlPBpOaWaG9QsJ1kQeo_93_7IhVsewQtcZw==
+      X-Amz-Cf-Pop:
+      - MAA51-P3
+      X-Cache:
+      - Miss from cloudfront
+      X-Powered-By:
+      - huggingface-moon
+      X-Request-Id:
+      - Root=1-67ebf87b-1968ade26fc964944c4fd8b9;7327d52b-22e1-4ca6-a8e4-1586f9b96af0
+      cross-origin-opener-policy:
+      - same-origin
+    status:
+      code: 307
+      message: Temporary Redirect
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      X-Amzn-Trace-Id:
+      - 7327d52b-22e1-4ca6-a8e4-1586f9b96af0
+      user-agent:
+      - unknown/None; hf_hub/0.30.1; python/3.11.10
+    method: GET
+    uri: https://huggingface.co/api/models/distilbert/distilroberta-base
+  response:
+    body:
+      string: '{"_id":"621ffdc036468d709f174349","id":"distilbert/distilroberta-base","private":false,"pipeline_tag":"fill-mask","library_name":"transformers","tags":["transformers","pytorch","tf","jax","rust","safetensors","roberta","fill-mask","exbert","en","dataset:openwebtext","arxiv:1910.01108","arxiv:1910.09700","license:apache-2.0","autotrain_compatible","endpoints_compatible","region:us"],"downloads":1946741,"likes":151,"modelId":"distilbert/distilroberta-base","author":"distilbert","sha":"fb53ab8802853c8e4fbdbcd0529f21fc6f459b2b","lastModified":"2024-02-19T11:09:58.000Z","gated":false,"disabled":false,"mask_token":"<mask>","widgetData":[{"text":"Paris
+        is the <mask> of France."},{"text":"The goal of life is <mask>."}],"model-index":null,"config":{"architectures":["RobertaForMaskedLM"],"model_type":"roberta","tokenizer_config":{}},"cardData":{"language":"en","tags":["exbert"],"license":"apache-2.0","datasets":["openwebtext"]},"transformersInfo":{"auto_model":"AutoModelForMaskedLM","pipeline_tag":"fill-mask","processor":"AutoTokenizer"},"siblings":[{"rfilename":".gitattributes"},{"rfilename":"README.md"},{"rfilename":"config.json"},{"rfilename":"dict.txt"},{"rfilename":"flax_model.msgpack"},{"rfilename":"merges.txt"},{"rfilename":"model.safetensors"},{"rfilename":"pytorch_model.bin"},{"rfilename":"rust_model.ot"},{"rfilename":"tf_model.h5"},{"rfilename":"tokenizer.json"},{"rfilename":"tokenizer_config.json"},{"rfilename":"vocab.json"}],"spaces":["exbert-project/exbert","society-ethics/model-card-regulatory-check","sasha/BiasDetection","sasha/WinoBiasCheck","ccolas/TastyPiano","amsterdamNLP/attention-rollout","vanessbut/tldr_keywords","anonymous8/Rapid-Textual-Adversarial-Defense","Rimi98/NegativeCommentClassifier","xmadai/1bit_llama3_instruct_xmad_qa_batch","xmadai/1bit_llama3_instruct_xmad_chatbot","sheikhDeep/multilabel-motionpicture-plot-genre-classifier","Rimi98/Relax-Teacher","g0blas/paper_task_suggestion","tdnathmlenthusiast/online-course-categorize-system","g0blas/blog_tags_classifier","CjangCjengh/Prompt-Compression-Toolbox","sychonic/new_space","KLeedrug/EMO_AI_alpha","DiViorg/RECModel","danielacthomas2001/AI-Project-1","msideadman/multilabel-book-genre-classifier","JKJanosko/Toxicity-Analysis","miknad2319/Milestone-3","rexarski/climate-plus-demo","KamrusSamad/multilabel-imdb-movie-genre-classifier","TazinMorshed/Story_Classifier","Madhana/LanguageModelQADemo","Rimi98/AppClassifier","Naosher/song-genres-classifier","KLeedrug/EMO-catcher-alpha","nasrin2023ripa/rainbow-genres-cover-ml-classifier","homeway/PromptCARE","nelbarman053/multilabel-book-genre-classifier___2","aryadytm/fake-news-prediction","Shoaib-33/Mutilabel-Tv-Series-Classifier","NifulIslam/IEEE-Keyword-Prediction","abir0/Manuscript-Matcher","sanjid/News_Classifier","mhdhrubo/movie-genre_classifier","minhaj-ripon/multilabel-game-genre-classifier","Sadihsn/StackOverflow_Question_Classifier","MdRiad/Cartoon_Classifier","niloycste68/Multi-Label-Quotes-Classifier","myte/tc-video-game","mmchowdhury/Quote_Classifier","MdTanvirHossain/QA_Classifier","nasrin2023ripa/multilabel-book-genre-classifier","minhaj-ripon/Game_Classifier","minhaj-ripon/Game_Genre_Classifier","karths/types_issues","mynul-islam-madhurjo/Anime-Genre-Classifier","Somoresh/movie-genre-classifier","Tabas34/paper_classifier","myte/ev-entertainment-genre","myte/ev-entertainment-category","sanjid/Food-ingredient-Classifier","sanjid/Food-Origin-classifier-distiltrobertabase","adamtayzzz/test_skim","JerryLiJinyi/Prompt-Compression-Toolbox","IoriU/anime_space_predictor","deniandriancode/kansei","PFEemp2024/DCWIR-Demo","Lawvanya/ev-entertainment-genre","PFEemp2024/DCWIR-Offcial-Demo","simon-clmtd/exbert","arafat2345/multilabel-book-genre-classifier","Armanul/multilabel_dataset_classifier","BengaliNLP/bertspace","waddaheaven/multilabel-movie-genre-classifier","arafat2345/Multilabel-Book-Genre-Classification-System","arafat2345/classifying-book-plot-summaries-into-multiple-genres","zzarif/Multilabel-Scifi-Tags-Classifier","Aston-xMAD/1bit_llama3_instruct_xmad_chatbot","mirosuzz/articles_segmentation","soothsayer1221/Music-Genre-Classifier","Rezuwan/film_genre_classifier","Gyaneshere/BiasDetection","AavV4/RLmodel"],"createdAt":"2022-03-02T23:29:04.000Z","safetensors":{"parameters":{"F32":82760793},"total":82760793},"inference":"warm","usedStorage":1966814128}'
+    headers:
+      Access-Control-Allow-Origin:
+      - https://huggingface.co
+      Access-Control-Expose-Headers:
+      - X-Repo-Commit,X-Request-Id,X-Error-Code,X-Error-Message,X-Total-Count,ETag,Link,Accept-Ranges,Content-Range,X-Xet-Access-Token,X-Xet-Token-Expiration,X-Xet-Refresh-Route,X-Xet-Cas-Url,X-Xet-Hash
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '4351'
+      Content-Type:
+      - application/json; charset=utf-8
+      Date:
+      - Tue, 01 Apr 2025 14:30:19 GMT
+      ETag:
+      - W/"10ff-BTmSK1ywZ/sBFuI26temelGkomo"
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Vary:
+      - Origin
+      Via:
+      - 1.1 a29f9f1ff42721dbcda7f3bae04962a0.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - rOnunZovzFqLROTAn1aI-4nWlkh3gPCqdKagJY0Omc6YHTFwdjXMmg==
+      X-Amz-Cf-Pop:
+      - MAA51-P3
+      X-Cache:
+      - Miss from cloudfront
+      X-Powered-By:
+      - huggingface-moon
+      X-Request-Id:
+      - Root=1-67ebf87b-17b9a5067bb53f9f76944a76;7327d52b-22e1-4ca6-a8e4-1586f9b96af0
+      cross-origin-opener-policy:
+      - same-origin
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"inputs": "The goal of life is <mask>.", "parameters": {}}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '59'
+      Content-Type:
+      - application/json
+      X-Amzn-Trace-Id:
+      - 029b1d06-d8b2-47f0-884d-12e80a03326f
+      user-agent:
+      - unknown/None; hf_hub/0.30.1; python/3.11.10
+    method: POST
+    uri: https://router.huggingface.co/hf-inference/models/distilroberta-base
+  response:
+    body:
+      string: '[{"score":0.06832392513751984,"token":45075,"token_str":" immortality","sequence":"The
+        goal of life is immortality."},{"score":0.06822273880243301,"token":11098,"token_str":"
+        happiness","sequence":"The goal of life is happiness."},{"score":0.032912302762269974,"token":14314,"token_str":"
+        yours","sequence":"The goal of life is yours."},{"score":0.025098653510212898,"token":25342,"token_str":"
+        simplicity","sequence":"The goal of life is simplicity."},{"score":0.024168511852622032,"token":22211,"token_str":"
+        liberation","sequence":"The goal of life is liberation."}]'
+    headers:
+      Access-Control-Allow-Origin:
+      - '*'
+      Access-Control-Expose-Headers:
+      - X-Repo-Commit,X-Request-Id,X-Error-Code,X-Error-Message,X-Total-Count,ETag,Link,Accept-Ranges,Content-Range,X-Xet-Access-Token,X-Xet-Token-Expiration,X-Xet-Refresh-Route,X-Xet-Cas-Url,X-Xet-Hash
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '569'
+      Content-Type:
+      - application/json
+      Date:
+      - Tue, 01 Apr 2025 14:30:20 GMT
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Via:
+      - 1.1 99aaa3f4dcd93b032cdd0e97438fa24a.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - 0VVMdQzjEy635P-IaKwpITT0OVaPfuyengIPjpRfTqewI8u990H9Mg==
+      X-Amz-Cf-Pop:
+      - HYD57-P1
+      X-Cache:
+      - Miss from cloudfront
+      X-Powered-By:
+      - huggingface-moon
+      X-Robots-Tag:
+      - none
+      access-control-allow-credentials:
+      - 'true'
+      cross-origin-opener-policy:
+      - same-origin
+      vary:
+      - Origin, Access-Control-Request-Method, Access-Control-Request-Headers
+      x-compute-time:
+      - '0.058'
+      x-compute-type:
+      - cache
+      x-inference-id:
+      - 7McZoC7AyOljZqDSVHN1M
+      x-request-id:
+      - Root=1-67ebf87c-2f99b9c460b2d1156274bc15;029b1d06-d8b2-47f0-884d-12e80a03326f
+      x-sha:
+      - fb53ab8802853c8e4fbdbcd0529f21fc6f459b2b
+    status:
+      code: 200
+      message: OK
+version: 1

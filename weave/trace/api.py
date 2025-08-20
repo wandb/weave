@@ -1,20 +1,25 @@
 """The top-level functions for Weave Trace API."""
 
-import contextlib
-import os
-import threading
-import time
-from typing import Any, Iterator, Optional, Union
+from __future__ import annotations
 
-# TODO: type_serializers is imported here to trigger registration of the image serializer.
+import contextlib
+import logging
+import sys
+import warnings
+from collections.abc import Iterator
+from typing import Any, Union, cast
+
+# TODO: type_handlers is imported here to trigger registration of the image serializer.
 # There is probably a better place for this, but including here for now to get the fix in.
-from weave import type_serializers  # noqa: F401
-from weave.trace import urls, util, weave_client, weave_init
+from weave import type_handlers  # noqa: F401
+from weave.trace import urls, weave_client, weave_init
+from weave.trace.autopatch import AutopatchSettings
 from weave.trace.constants import TRACE_OBJECT_EMOJI
 from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.context.call_context import get_current_call, require_current_call
-from weave.trace.op import as_op, op
+from weave.trace.display.term import configure_logger
+from weave.trace.op import PostprocessInputsFunc, PostprocessOutputFunc, as_op, op
 from weave.trace.refs import ObjectRef, parse_uri
 from weave.trace.settings import (
     UserSettings,
@@ -22,12 +27,27 @@ from weave.trace.settings import (
     should_disable_weave,
 )
 from weave.trace.table import Table
+from weave.trace_server.ids import generate_id
+from weave.trace_server.interface.builtin_object_classes import leaderboard
+
+logger = logging.getLogger(__name__)
+
+# Sentinel object to distinguish between "not provided" (auto-generate) and explicit None (disable)
+_AUTO_GENERATE = object()
+
+_global_postprocess_inputs: PostprocessInputsFunc | None = None
+_global_postprocess_output: PostprocessOutputFunc | None = None
+_global_attributes: dict[str, Any] = {}
 
 
 def init(
     project_name: str,
     *,
-    settings: Optional[Union[UserSettings, dict[str, Any]]] = None,
+    settings: UserSettings | dict[str, Any] | None = None,
+    autopatch_settings: AutopatchSettings | None = None,
+    global_postprocess_inputs: PostprocessInputsFunc | None = None,
+    global_postprocess_output: PostprocessOutputFunc | None = None,
+    global_attributes: dict[str, Any] | None = None,
 ) -> weave_client.WeaveClient:
     """Initialize weave tracking, logging to a wandb project.
 
@@ -39,42 +59,55 @@ def init(
 
     Args:
         project_name: The name of the Weights & Biases project to log to.
+        settings: Configuration for the Weave client generally.
+        autopatch_settings: Configuration for autopatch integrations, e.g. openai
+        global_postprocess_inputs: A function that will be applied to all inputs of all ops.
+        global_postprocess_output: A function that will be applied to all outputs of all ops.
+        global_attributes: A dictionary of attributes that will be applied to all traces.
+
+    NOTE: Global postprocessing settings are applied to all ops after each op's own
+    postprocessing.  The order is always:
+    1. Op-specific postprocessing
+    2. Global postprocessing
 
     Returns:
         A Weave client.
     """
+    configure_logger()
+
+    if sys.version_info < (3, 10):
+        warnings.warn(
+            "Python 3.9 will reach end of life in October 2025, after which weave will drop support for it.  Please upgrade to Python 3.10 or later!",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
     parse_and_apply_settings(settings)
+
+    global _global_postprocess_inputs
+    global _global_postprocess_output
+    global _global_attributes
+
+    _global_postprocess_inputs = global_postprocess_inputs
+    _global_postprocess_output = global_postprocess_output
+    _global_attributes = global_attributes or {}
 
     if should_disable_weave():
         return weave_init.init_weave_disabled().client
 
-    return weave_init.init_weave(project_name).client
+    initialized_client = weave_init.init_weave(
+        project_name,
+        autopatch_settings=autopatch_settings,
+    )
+
+    return initialized_client.client
 
 
-@contextlib.contextmanager
-def remote_client(project_name: str) -> Iterator[weave_init.weave_client.WeaveClient]:
-    inited_client = weave_init.init_weave(project_name)
-    try:
-        yield inited_client.client
-    finally:
-        inited_client.reset()
+def get_client() -> weave_client.WeaveClient | None:
+    return weave_client_context.get_weave_client()
 
 
-# This is currently an internal interface. We'll expose something like it though ("offline" mode)
-def init_local_client() -> weave_client.WeaveClient:
-    return weave_init.init_local().client
-
-
-@contextlib.contextmanager
-def local_client() -> Iterator[weave_client.WeaveClient]:
-    inited_client = weave_init.init_local()
-    try:
-        yield inited_client.client
-    finally:
-        inited_client.reset()
-
-
-def publish(obj: Any, name: Optional[str] = None) -> weave_client.ObjectRef:
+def publish(obj: Any, name: str | None = None) -> ObjectRef:
     """Save and version a python object.
 
     If an object with name already exists, and the content hash of obj does
@@ -101,13 +134,19 @@ def publish(obj: Any, name: Optional[str] = None) -> weave_client.ObjectRef:
 
     ref = client._save_object(obj, save_name, "latest")
 
-    if isinstance(ref, weave_client.ObjectRef):
+    if isinstance(ref, ObjectRef):
         if isinstance(ref, weave_client.OpRef):
             url = urls.op_version_path(
                 ref.entity,
                 ref.project,
                 ref.name,
                 ref.digest,
+            )
+        elif isinstance(obj, leaderboard.Leaderboard):
+            url = urls.leaderboard_path(
+                ref.entity,
+                ref.project,
+                ref.name,
             )
         # TODO(gst): once frontend has direct dataset/model links
         # elif isinstance(obj, weave_client.Dataset):
@@ -118,11 +157,11 @@ def publish(obj: Any, name: Optional[str] = None) -> weave_client.ObjectRef:
                 ref.name,
                 ref.digest,
             )
-        print(f"{TRACE_OBJECT_EMOJI} Published to {url}")
+        logger.info(f"{TRACE_OBJECT_EMOJI} Published to {url}")
     return ref
 
 
-def ref(location: str) -> weave_client.ObjectRef:
+def ref(location: str) -> ObjectRef:
     """Construct a Ref to a Weave object.
 
     TODO: what happens if obj does not exist
@@ -134,7 +173,7 @@ def ref(location: str) -> weave_client.ObjectRef:
     Returns:
         A weave Ref to the object.
     """
-    if not "://" in location:
+    if "://" not in location:
         client = weave_client_context.get_weave_client()
         if not client:
             raise ValueError("Call weave.init() first, or pass a fully qualified uri")
@@ -148,23 +187,36 @@ def ref(location: str) -> weave_client.ObjectRef:
         location = str(client._ref_uri(name, version, "obj"))
 
     uri = parse_uri(location)
-    if not isinstance(uri, weave_client.ObjectRef):
-        raise ValueError("Expected an object ref")
+    if not isinstance(uri, ObjectRef):
+        raise TypeError("Expected an object ref")
     return uri
 
 
-def obj_ref(obj: Any) -> Optional[weave_client.ObjectRef]:
-    return weave_client.get_ref(obj)
+def get(uri: str | ObjectRef) -> Any:
+    """A convenience function for getting an object from a URI.
 
+    Many objects logged by Weave are automatically registered with the Weave
+    server. This function allows you to retrieve those objects by their URI.
 
-def output_of(obj: Any) -> Optional[weave_client.Call]:
-    client = weave_client_context.require_weave_client()
+    Args:
+        uri: A fully-qualified weave ref URI.
 
-    ref = obj_ref(obj)
-    if ref is None:
-        return ref
+    Returns:
+        The object.
 
-    return client._ref_output_of(ref)
+    Example:
+
+    ```python
+    weave.init("weave_get_example")
+    dataset = weave.Dataset(rows=[{"a": 1, "b": 2}])
+    ref = weave.publish(dataset)
+
+    dataset2 = weave.get(ref)  # same as dataset!
+    ```
+    """
+    if isinstance(uri, ObjectRef):
+        return uri.get()
+    return ref(uri).get()
 
 
 @contextlib.contextmanager
@@ -189,51 +241,83 @@ def attributes(attributes: dict[str, Any]) -> Iterator:
         call_context.call_attributes.reset(token)
 
 
-def serve(
-    model_ref: ObjectRef,
-    method_name: Optional[str] = None,
-    auth_entity: Optional[str] = None,
-    port: int = 9996,
-    thread: bool = False,
-) -> str:
-    import uvicorn
+class ThreadContext:
+    """Context object providing access to current thread and turn information."""
 
-    from weave.trace.serve_fastapi import object_method_app
-    from weave.wandb_interface import wandb_api
+    def __init__(self, thread_id: str | None):
+        """Initialize ThreadContext with the specified thread_id.
 
-    client = weave_client_context.require_weave_client()
-    # if not isinstance(
-    #     client, _graph_client_wandb_art_st.GraphClientWandbArtStreamTable
-    # ):
-    #     raise ValueError("serve currently only supports wandb client")
+        Args:
+            thread_id: The thread identifier for this context, or None if disabled.
+        """
+        self._thread_id = thread_id
 
-    print(f"Serving {model_ref}")
-    print(f"🥐 Server docs and playground at http://localhost:{port}/docs")
-    print()
-    os.environ["PROJECT_NAME"] = f"{client.entity}/{client.project}"
-    os.environ["MODEL_REF"] = str(model_ref)
+    @property
+    def thread_id(self) -> str | None:
+        """Get the thread_id for this context.
 
-    wandb_api_ctx = wandb_api.get_wandb_api_context()
-    app = object_method_app(model_ref, method_name=method_name, auth_entity=auth_entity)
-    trace_attrs = call_context.call_attributes.get()
+        Returns:
+            The thread identifier, or None if thread tracking is disabled.
+        """
+        return self._thread_id
 
-    def run() -> None:
-        # This function doesn't return, because uvicorn.run does not return.
-        with wandb_api.wandb_api_context(wandb_api_ctx):
-            with attributes(trace_attrs):
-                uvicorn.run(app, host="0.0.0.0", port=port)
+    @property
+    def turn_id(self) -> str | None:
+        """Get the current turn_id from the active context.
 
-    if util.is_notebook():
-        thread = True
-    if thread:
-        t = threading.Thread(target=run, daemon=True)
-        t.start()
-        time.sleep(1)
-        return "http://localhost:%d" % port
+        Returns:
+            The current turn_id if set, None otherwise.
+        """
+        return call_context.get_turn_id()
+
+
+@contextlib.contextmanager
+def thread(thread_id: str | None | object = _AUTO_GENERATE) -> Iterator[ThreadContext]:
+    """
+    Context manager for setting thread_id on calls within the context.
+
+    Examples:
+
+    ```python
+    # Auto-generate thread_id
+    with weave.thread() as t:
+        print(f"Thread ID: {t.thread_id}")
+        result = my_function("input")  # This call will have the auto-generated thread_id
+        print(f"Current turn: {t.turn_id}")
+
+    # Explicit thread_id
+    with weave.thread("custom_thread") as t:
+        result = my_function("input")  # This call will have thread_id="custom_thread"
+
+    # Disable threading
+    with weave.thread(None) as t:
+        result = my_function("input")  # This call will have thread_id=None
+    ```
+
+    Args:
+        thread_id: The thread identifier to associate with calls in this context.
+                  If not provided, a UUID v7 will be auto-generated.
+                  If None, thread tracking will be disabled.
+
+    Yields:
+        ThreadContext: An object providing access to thread_id and current turn_id.
+    """
+    # Determine actual thread_id to use
+    actual_thread_id: str | None
+    if thread_id is _AUTO_GENERATE:
+        # No argument provided - auto-generate
+        actual_thread_id = generate_id()
     else:
-        # Run should never return
-        run()
-    raise ValueError("Should not reach here")
+        # Explicit thread_id (string or None)
+        actual_thread_id = cast(Union[str, None], thread_id)
+
+    # Create context object
+    context = ThreadContext(actual_thread_id)
+
+    with call_context.set_thread_id(actual_thread_id):
+        # Reset turn lineage when entering new thread context
+        call_context.set_turn_id(None)
+        yield context
 
 
 def finish() -> None:
@@ -244,6 +328,10 @@ def finish() -> None:
     """
     weave_init.finish()
 
+    # Flush any remaining calls
+    if wc := weave_client_context.get_weave_client():
+        wc.finish()
+
 
 # As of this writing, most important symbols are
 # re-exported in __init__.py.
@@ -251,23 +339,21 @@ def finish() -> None:
 
 
 __all__ = [
-    "init",
-    "remote_client",
-    "local_client",
-    "init_local_client",
+    "ObjectRef",
+    "Table",
+    "ThreadContext",
     "as_op",
+    "attributes",
+    "finish",
+    "get",
+    "get_client",
+    "get_current_call",
+    "init",
+    "op",
+    "parse_uri",
     "publish",
     "ref",
-    "obj_ref",
-    "output_of",
-    "attributes",
-    "serve",
-    "finish",
-    "op",
-    "Table",
-    "ObjectRef",
-    "parse_uri",
-    "get_current_call",
-    "weave_client_context",
     "require_current_call",
+    "thread",
+    "weave_client_context",
 ]

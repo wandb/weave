@@ -1,5 +1,9 @@
 # MistralAI
 
+<a target="_blank" href="https://colab.research.google.com/github/wandb/examples/blob/master/weave/docs/quickstart_mistral.ipynb">
+  <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
+</a>
+
 Weave automatically tracks and logs LLM calls made via the [MistralAI Python library](https://github.com/mistralai/client-python). 
 
 > We support the new Mistral v1.0 SDK, check the migration guide [here](https://github.com/mistralai/client-python/blob/main/MIGRATION.md)

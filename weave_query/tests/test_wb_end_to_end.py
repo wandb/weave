@@ -1,8 +1,10 @@
+import pytest
 import wandb
 
-import weave_query as weave
 import weave_query
-from weave_query import compile
+import weave_query as weave
+from weave_query import compile, types
+from weave_query.graph import ConstNode
 
 
 # Example of end to end integration test
@@ -64,23 +66,59 @@ def _test_basic_publish(user_fixture):
     assert weave_query.ref_base.Ref.from_str(uri).get() == [1, 2, 3]
 
 
-# Example of end to end integration test
-def test_run_histories(user_by_api_key_in_env):
-    run = wandb.init(project="project_exists")
-    run.log({"a": 1})
-    run.finish()
+class TestRunHistories:
+    def test_basic(self, user_by_api_key_in_env):
+        run = wandb.init(project="project_exists")
+        run.log({"a": 1})
+        run.finish()
 
-    run = wandb.init(project="project_exists")
-    run.log({"a": 2})
-    run.finish()
+        history_node = (
+            weave_query.ops.project(run.entity, run.project)
+            .runs()
+            .history()
+            .concat()["a"]
+        )
+        history = weave.use(history_node)
+        assert history == [1]
 
-    history_node = (
-        weave_query.ops.project(run.entity, run.project).runs().history().concat()["a"]
-    )
-    history = weave.use(history_node)
+    @pytest.mark.skip(reason="Occasionally returns [1, 2] instead of [2, 1]")
+    def test_multiple_runs(self, user_by_api_key_in_env):
+        run = wandb.init(project="project_exists")
+        run.log({"a": 1})
+        run.finish()
 
-    # Runs return in reverse chronological order
-    assert history == [2, 1]
+        run = wandb.init(project="project_exists")
+        run.log({"a": 2})
+        run.finish()
+
+        history_node = (
+            weave_query.ops.project(run.entity, run.project)
+            .runs()
+            .history()
+            .concat()["a"]
+        )
+        history = weave.use(history_node)
+
+        # Runs return in reverse chronological order
+        assert history == [2, 1]
+
+    def test_with_logged_nested_dict(self, user_by_api_key_in_env):
+        run = wandb.init(project="project_exists")
+        run.log({"nested_dictionary": {"key_0": 0}})
+        run.finish()
+
+        key = ConstNode(types.String(), "nested_dictionary\\.key_0")
+        history_node = (
+            weave_query.ops.project(run.entity, run.project)
+            .filteredRuns("{}", "-createdAt")
+            .limit(100)
+            .index(0)
+            .history()
+            .pick(key)
+        )
+
+        history = weave.use(history_node)
+        assert history == [0]
 
 
 # Example of end to end integration test

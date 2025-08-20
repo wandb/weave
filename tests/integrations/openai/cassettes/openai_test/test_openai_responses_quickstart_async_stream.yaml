@@ -1,0 +1,317 @@
+interactions:
+- request:
+    body: '{"input":"Write a one-sentence bedtime story about a unicorn.","model":"gpt-4o-2024-08-06","stream":true}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - '105'
+      content-type:
+      - application/json
+      host:
+      - api.openai.com
+      user-agent:
+      - AsyncOpenAI/Python 1.66.3
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - async:asyncio
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.66.3
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.9
+    method: POST
+    uri: https://api.openai.com/v1/responses
+  response:
+    body:
+      string: 'event: response.created
+
+        data: {"type":"response.created","response":{"id":"resp_67d98518df3c8192ad6c88dac43a4b6e02e91fc379202b82","object":"response","created_at":1742308632,"status":"in_progress","error":null,"incomplete_details":null,"instructions":null,"max_output_tokens":null,"model":"gpt-4o-2024-08-06","output":[],"parallel_tool_calls":true,"previous_response_id":null,"reasoning":{"effort":null,"generate_summary":null},"store":true,"temperature":1.0,"text":{"format":{"type":"text"}},"tool_choice":"auto","tools":[],"top_p":1.0,"truncation":"disabled","usage":null,"user":null,"metadata":{}}}
+
+
+        event: response.in_progress
+
+        data: {"type":"response.in_progress","response":{"id":"resp_67d98518df3c8192ad6c88dac43a4b6e02e91fc379202b82","object":"response","created_at":1742308632,"status":"in_progress","error":null,"incomplete_details":null,"instructions":null,"max_output_tokens":null,"model":"gpt-4o-2024-08-06","output":[],"parallel_tool_calls":true,"previous_response_id":null,"reasoning":{"effort":null,"generate_summary":null},"store":true,"temperature":1.0,"text":{"format":{"type":"text"}},"tool_choice":"auto","tools":[],"top_p":1.0,"truncation":"disabled","usage":null,"user":null,"metadata":{}}}
+
+
+        event: response.output_item.added
+
+        data: {"type":"response.output_item.added","output_index":0,"item":{"type":"message","id":"msg_67d985197190819295a3bce051b107fe02e91fc379202b82","status":"in_progress","role":"assistant","content":[]}}
+
+
+        event: response.content_part.added
+
+        data: {"type":"response.content_part.added","item_id":"msg_67d985197190819295a3bce051b107fe02e91fc379202b82","output_index":0,"content_index":0,"part":{"type":"output_text","text":"","annotations":[]}}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d985197190819295a3bce051b107fe02e91fc379202b82","output_index":0,"content_index":0,"delta":"Under"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d985197190819295a3bce051b107fe02e91fc379202b82","output_index":0,"content_index":0,"delta":"
+        the"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d985197190819295a3bce051b107fe02e91fc379202b82","output_index":0,"content_index":0,"delta":"
+        silver"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d985197190819295a3bce051b107fe02e91fc379202b82","output_index":0,"content_index":0,"delta":"
+        glow"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d985197190819295a3bce051b107fe02e91fc379202b82","output_index":0,"content_index":0,"delta":"
+        of"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d985197190819295a3bce051b107fe02e91fc379202b82","output_index":0,"content_index":0,"delta":"
+        the"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d985197190819295a3bce051b107fe02e91fc379202b82","output_index":0,"content_index":0,"delta":"
+        moon"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d985197190819295a3bce051b107fe02e91fc379202b82","output_index":0,"content_index":0,"delta":","}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d985197190819295a3bce051b107fe02e91fc379202b82","output_index":0,"content_index":0,"delta":"
+        a"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d985197190819295a3bce051b107fe02e91fc379202b82","output_index":0,"content_index":0,"delta":"
+        gentle"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d985197190819295a3bce051b107fe02e91fc379202b82","output_index":0,"content_index":0,"delta":"
+        unicorn"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d985197190819295a3bce051b107fe02e91fc379202b82","output_index":0,"content_index":0,"delta":"
+        softly"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d985197190819295a3bce051b107fe02e91fc379202b82","output_index":0,"content_index":0,"delta":"
+        tread"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d985197190819295a3bce051b107fe02e91fc379202b82","output_index":0,"content_index":0,"delta":"ed"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d985197190819295a3bce051b107fe02e91fc379202b82","output_index":0,"content_index":0,"delta":"
+        through"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d985197190819295a3bce051b107fe02e91fc379202b82","output_index":0,"content_index":0,"delta":"
+        the"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d985197190819295a3bce051b107fe02e91fc379202b82","output_index":0,"content_index":0,"delta":"
+        st"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d985197190819295a3bce051b107fe02e91fc379202b82","output_index":0,"content_index":0,"delta":"arl"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d985197190819295a3bce051b107fe02e91fc379202b82","output_index":0,"content_index":0,"delta":"it"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d985197190819295a3bce051b107fe02e91fc379202b82","output_index":0,"content_index":0,"delta":"
+        meadow"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d985197190819295a3bce051b107fe02e91fc379202b82","output_index":0,"content_index":0,"delta":","}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d985197190819295a3bce051b107fe02e91fc379202b82","output_index":0,"content_index":0,"delta":"
+        where"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d985197190819295a3bce051b107fe02e91fc379202b82","output_index":0,"content_index":0,"delta":"
+        dreams"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d985197190819295a3bce051b107fe02e91fc379202b82","output_index":0,"content_index":0,"delta":"
+        bloss"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d985197190819295a3bce051b107fe02e91fc379202b82","output_index":0,"content_index":0,"delta":"omed"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d985197190819295a3bce051b107fe02e91fc379202b82","output_index":0,"content_index":0,"delta":"
+        like"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d985197190819295a3bce051b107fe02e91fc379202b82","output_index":0,"content_index":0,"delta":"
+        the"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d985197190819295a3bce051b107fe02e91fc379202b82","output_index":0,"content_index":0,"delta":"
+        flowers"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d985197190819295a3bce051b107fe02e91fc379202b82","output_index":0,"content_index":0,"delta":"
+        beneath"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d985197190819295a3bce051b107fe02e91fc379202b82","output_index":0,"content_index":0,"delta":"
+        her"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d985197190819295a3bce051b107fe02e91fc379202b82","output_index":0,"content_index":0,"delta":"
+        ho"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d985197190819295a3bce051b107fe02e91fc379202b82","output_index":0,"content_index":0,"delta":"oves"}
+
+
+        event: response.output_text.delta
+
+        data: {"type":"response.output_text.delta","item_id":"msg_67d985197190819295a3bce051b107fe02e91fc379202b82","output_index":0,"content_index":0,"delta":"."}
+
+
+        event: response.output_text.done
+
+        data: {"type":"response.output_text.done","item_id":"msg_67d985197190819295a3bce051b107fe02e91fc379202b82","output_index":0,"content_index":0,"text":"Under
+        the silver glow of the moon, a gentle unicorn softly treaded through the starlit
+        meadow, where dreams blossomed like the flowers beneath her hooves."}
+
+
+        event: response.content_part.done
+
+        data: {"type":"response.content_part.done","item_id":"msg_67d985197190819295a3bce051b107fe02e91fc379202b82","output_index":0,"content_index":0,"part":{"type":"output_text","text":"Under
+        the silver glow of the moon, a gentle unicorn softly treaded through the starlit
+        meadow, where dreams blossomed like the flowers beneath her hooves.","annotations":[]}}
+
+
+        event: response.output_item.done
+
+        data: {"type":"response.output_item.done","output_index":0,"item":{"type":"message","id":"msg_67d985197190819295a3bce051b107fe02e91fc379202b82","status":"completed","role":"assistant","content":[{"type":"output_text","text":"Under
+        the silver glow of the moon, a gentle unicorn softly treaded through the starlit
+        meadow, where dreams blossomed like the flowers beneath her hooves.","annotations":[]}]}}
+
+
+        event: response.completed
+
+        data: {"type":"response.completed","response":{"id":"resp_67d98518df3c8192ad6c88dac43a4b6e02e91fc379202b82","object":"response","created_at":1742308632,"status":"completed","error":null,"incomplete_details":null,"instructions":null,"max_output_tokens":null,"model":"gpt-4o-2024-08-06","output":[{"type":"message","id":"msg_67d985197190819295a3bce051b107fe02e91fc379202b82","status":"completed","role":"assistant","content":[{"type":"output_text","text":"Under
+        the silver glow of the moon, a gentle unicorn softly treaded through the starlit
+        meadow, where dreams blossomed like the flowers beneath her hooves.","annotations":[]}]}],"parallel_tool_calls":true,"previous_response_id":null,"reasoning":{"effort":null,"generate_summary":null},"store":true,"temperature":1.0,"text":{"format":{"type":"text"}},"tool_choice":"auto","tools":[],"top_p":1.0,"truncation":"disabled","usage":{"input_tokens":36,"input_tokens_details":{"cached_tokens":0},"output_tokens":34,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":70},"user":null,"metadata":{}}}
+
+
+        '
+    headers:
+      CF-RAY:
+      - 9225777afc0aab87-YYZ
+      Connection:
+      - keep-alive
+      Content-Type:
+      - text/event-stream; charset=utf-8
+      Date:
+      - Tue, 18 Mar 2025 14:37:12 GMT
+      Server:
+      - cloudflare
+      Set-Cookie:
+      - __cf_bm=qkyq9HgDPqTaHxCjOssUj6_TxCd5QSC6ixuU2Ig7TVg-1742308632-1.0.1.1-5q93hK.O5FIeawaW7zkR8gwRODepGluAf9RPUw8VtfDb_PFvC7Eu8uWsGK2OjIRfNifFH8sY0P6WbkNKrpntIvf47UdwDcCQ9pOKs82UNUw;
+        path=/; expires=Tue, 18-Mar-25 15:07:12 GMT; domain=.api.openai.com; HttpOnly;
+        Secure; SameSite=None
+      - _cfuvid=oqhUy_jxB81sA.xveFy2m9SRoaM4Srz0kRLTt5d5SKQ-1742308632984-0.0.1.1-604800000;
+        path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '85'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-request-id:
+      - req_8fc6522ffe3f610b5c8f16b34a1c2ac9
+    status:
+      code: 200
+      message: OK
+version: 1

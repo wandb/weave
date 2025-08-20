@@ -5,7 +5,10 @@ from pyarrow import compute as pc
 
 from weave_query import weave_types as types
 from weave_query.arrow import convert
-from weave_query.arrow.arrow import offsets_starting_at_zero
+from weave_query.arrow.arrow import (
+    offsets_starting_at_zero,
+    safe_list_array_from_arrays
+)
 from weave_query.language_features.tagging import (
     process_opdef_output_type,
     tag_store,
@@ -30,10 +33,11 @@ def recursively_encode_pyarrow_strings_as_dictionaries(array: pa.Array) -> pa.Ar
             mask=pa.compute.invert(array.is_valid()),
         )
     elif pa.types.is_list(array.type):
-        return pa.ListArray.from_arrays(
-            offsets_starting_at_zero(array),
+        new_offsets = offsets_starting_at_zero(array)
+        return safe_list_array_from_arrays(
+            new_offsets,
             recursively_encode_pyarrow_strings_as_dictionaries(array.flatten()),
-            mask=pa.compute.invert(array.is_valid()),
+            mask=pa.compute.invert(array.is_valid())
         )
     elif array.type == pa.string():
         return pc.dictionary_encode(array)

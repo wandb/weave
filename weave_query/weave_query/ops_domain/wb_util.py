@@ -58,12 +58,16 @@ def escape_artifact_path(artifact_path: str) -> str:
     prefix = "wandb-client-artifact://"
     if artifact_path.startswith(prefix):
         artifact_path = artifact_path[len(prefix) :]
-        if ":" in artifact_path:
-            name, version_path = artifact_path.split(":", 1)
-            version, path = version_path.split("/", 1)
+        parts = artifact_path.split("/", 1)
+        name_version = parts[0]
+        path = parts[1] if len(parts) > 1 else ""
+
+        if ":" in name_version:
+            name, version = name_version.split(":", 1)
         else:
+            name = name_version
             version = None
-            name, path = artifact_path.split("/", 1)
+
         path = parse.quote(path, safe="")
         version_string = f":{version}" if version is not None else ""
         artifact_path = f"{prefix}{name}{version_string}/{path}"
@@ -91,6 +95,11 @@ def _process_run_dict_item(val, run_path: typing.Optional[RunPath] = None):
                 return _filesystem_artifact_file_from_artifact_path(artifact_path)
             elif "path" in val and run_path is not None:
                 return _filesystem_runfiles_from_run_path(run_path, val["path"])
+
+        if val["_type"] == "incremental-table-file":
+            if "artifact_path" in val:
+                artifact_path = escape_artifact_path(val["artifact_path"])
+                return _filesystem_artifact_file_from_artifact_path(artifact_path)
 
         if val["_type"] in ["joined-table", "partitioned-table"]:
             return _filesystem_artifact_file_from_artifact_path(val["artifact_path"])

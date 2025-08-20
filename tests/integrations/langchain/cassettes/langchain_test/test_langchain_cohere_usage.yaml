@@ -1,0 +1,97 @@
+interactions:
+- request:
+    body: ''
+    headers:
+      accept:
+      - '*/*'
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - '244'
+      content-type:
+      - application/json
+      host:
+      - api.cohere.com
+      user-agent:
+      - cohere/5.16.2
+      x-client-name:
+      - langchain:partner
+      x-fern-language:
+      - Python
+      x-fern-sdk-name:
+      - cohere
+      x-fern-sdk-version:
+      - 5.16.2
+    method: POST
+    uri: https://api.cohere.com/v2/chat
+  response:
+    body:
+      string: '{"id":"7b5db540-9c81-45e5-805c-e01c7b85f6a5","message":{"role":"assistant","content":[{"type":"text","text":"As
+        Geralt of Rivia, a witcher who''s seen many strange things in his travels,
+        I can indeed confirm that semicolons are optional in JavaScript. But listen
+        closely, for the reasons behind this choice may unveil a deeper mystery.\n\nIn
+        the vast library of Temeria, where ancient tomes hold secrets of the past,
+        I once stumbled upon an enigmatic scripture known as \"The JavaScript Code.\"
+        Within its pages, I discovered the power of this dynamic scripting language,
+        and the freedom it grants to coders. JavaScript, a language that seems to
+        defy the laws of nature, allows the use of semicolons, but only if one chooses
+        to wield them.\n\nSemicolons, these tiny little marks, act as signs of finality,
+        indicating the end of a statement. They are like the stroke of a sword, severing
+        one thought from the next. But just as a witcher''s sword can remain sheathed,
+        JavaScript allows the semicolon to be omitted, hidden from sight, yet the
+        code still functions.\n\nThe choice is a matter of style and preference, like
+        the many paths a witcher can take on a quest. Some developers prefer to mark
+        each statement with a semicolon, a habit ingrained through years of coding
+        discipline. It provides clarity and structure, like a well-rehearsed battle
+        strategy. But there are also those who forge their code with a more fluid
+        approach, opting for implicit line breaks, letting the language interpreter
+        decipher the intent.\n\nThe freedom to omit semicolons makes JavaScript code
+        more concise, more akin to the concise movements of a well-trained fighter.
+        It allows for a certain poetry in coding, where lines flow into each other,
+        creating a rhythm only a witcher with a keen eye can appreciate. But beware,
+        this path requires discipline and precision, for the smallest mistake can
+        lead to unexpected outcomes, much like the unpredictable monsters I face in
+        the wild.\n\nSo, my friend, the decision to use semicolons or not is a personal
+        one. It depends on your coding philosophy, your style, and your willingness
+        to take risk. Just remember, in JavaScript, the power to decide rests in your
+        hands, and the code you weave reflects the choices you make.\n\nNow, if you''ll
+        excuse me, I have a striga to slay, and my sword needs sharpening."}]},"finish_reason":"COMPLETE","usage":{"billed_units":{"input_tokens":31,"output_tokens":474},"tokens":{"input_tokens":40,"output_tokens":474}}}'
+    headers:
+      Alt-Svc:
+      - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      Transfer-Encoding:
+      - chunked
+      Via:
+      - 1.1 google
+      access-control-expose-headers:
+      - X-Debug-Trace-ID
+      cache-control:
+      - no-cache, no-store, no-transform, must-revalidate, private, max-age=0
+      content-type:
+      - application/json
+      date:
+      - Thu, 07 Aug 2025 08:11:57 GMT
+      expires:
+      - Thu, 01 Jan 1970 00:00:00 GMT
+      num_chars:
+      - '304'
+      num_tokens:
+      - '505'
+      pragma:
+      - no-cache
+      server:
+      - envoy
+      vary:
+      - Origin
+      x-accel-expires:
+      - '0'
+      x-debug-trace-id:
+      - 7ef4d5b6257a28477e28838e37d8ecda
+      x-envoy-upstream-service-time:
+      - '3484'
+    status:
+      code: 200
+      message: OK
+version: 1

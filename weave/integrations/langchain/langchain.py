@@ -31,17 +31,20 @@ This approach allows for more flexible runtime configuration while still respect
 
 import datetime
 import json
+import logging
 from contextlib import contextmanager
 from contextvars import ContextVar
 from uuid import UUID
 
+from weave.flow.util import warn_once
 from weave.integrations.integration_utilities import (
     make_pythonic_function_name,
     truncate_op_name,
 )
+from weave.integrations.langchain.helpers import _extract_usage_data
+from weave.integrations.patcher import Patcher
 from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
-from weave.trace.patcher import Patcher
 from weave.trace.weave_client import Call
 
 import_failed = False
@@ -55,9 +58,12 @@ try:
 except ImportError:
     import_failed = True
 
-from typing import Any, Dict, Generator, List, Optional
+from collections.abc import Generator
+from typing import Any, Optional
 
 RUNNABLE_SEQUENCE_NAME = "RunnableSequence"
+
+logger = logging.getLogger(__name__)
 
 if not import_failed:
 
@@ -83,27 +89,40 @@ if not import_failed:
             run_dict["inputs"] = run.inputs.copy() if run.inputs is not None else None
         else:
             run_dict["outputs"] = (
-                run.outputs.copy() if run.outputs is not None else None,
+                run.outputs.copy() if run.outputs is not None else None
             )
 
         run_dict = {k: v for k, v in run_dict.items() if v}
         return run_dict
 
-    class WeaveTracer(BaseTracer):
+    class WeaveTracer(BaseTracer):  # pyright: ignore[reportRedeclaration]
         run_inline: bool = True
 
         def __init__(self, **kwargs: Any) -> None:
-            self._call_map: Dict[str, Call] = {}
+            self.wc = None
+            if wc := weave_client_context.get_weave_client():
+                self.wc = wc
+            else:
+                warn_once(
+                    logger,
+                    "Weave client not initialized. Langchain tracing will be a no-op. "
+                    "Please call `weave.init(<project_name>)` to enable tracing.",
+                )
+
+            self._call_map: dict[str, Call] = {}
             self.latest_run: Optional[Run] = None
-            self.gc = weave_client_context.require_weave_client()
             super().__init__()
 
         def _persist_run(self, run: Run) -> None:
+            if self.wc is None:
+                return
             run_ = run.copy()
             self.latest_run = run_
 
         def _persist_run_single(self, run: Run) -> None:
             """Persist a run."""
+            if self.wc is None:
+                return
             run_dict = _run_to_dict(run, as_input=True)
 
             """Now we must determine the parent_run to associate this call with.
@@ -160,7 +179,7 @@ if not import_failed:
 
                 # First, there needs to be something on the stack.
                 if wv_current_run is not None:
-                    attrs = wv_current_run.attributes or {}
+                    attrs = call_context.call_attributes.get()
                     # Now, the major condition:
                     if (
                         # 1. Both runs must be of type `RunnableSequence`
@@ -168,7 +187,7 @@ if not import_failed:
                         # 2. Both us and the sibling run must have empty parents (i think
                         # this condition will always be true, else we would have a parent
                         # run already, but trying to be safe here)
-                        and attrs.get("parent_run_id") == lc_parent_run_id == None
+                        and attrs.get("parent_run_id") == lc_parent_run_id is None
                     ):
                         # Now, we know that Langchain has confused us. And we want to set the
                         # parent to the current Weave Run's parent. So, if that parent is
@@ -179,24 +198,34 @@ if not import_failed:
                         if wv_current_run.parent_id is None:
                             use_stack = False
                         else:
-                            # Note: this is implemented as a network call - it would be much nice
-                            # to refactor `create_call` such that it could accept a parent_id instead
-                            # of an entire Parent object.
-                            parent_run = self.gc.get_call(wv_current_run.parent_id)
+                            # Hack in memory parent call to satisfy `create_call` without actually
+                            # getting the parent.
+                            parent_run = Call(
+                                id=wv_current_run.parent_id,
+                                trace_id=wv_current_run.trace_id,
+                                _op_name="",
+                                project_id="",
+                                parent_id=None,
+                                inputs={},
+                            )
 
             fn_name = make_pythonic_function_name(run.name)
             complete_op_name = f"langchain.{run.run_type.capitalize()}.{fn_name}"
             complete_op_name = truncate_op_name(complete_op_name)
-            call = self.gc.create_call(
-                # Make sure to add the run name once the UI issue is figured out
-                complete_op_name,
-                inputs=run_dict["inputs"],
-                parent=parent_run,
-                attributes={
+            call_attrs = call_context.call_attributes.get()
+            call_attrs.update(
+                {
                     "lc_id": str(run.id),
                     "parent_run_id": lc_parent_run_id,
                     "lc_name": run.name,
-                },
+                }
+            )
+            call = self.wc.create_call(
+                # Make sure to add the run name once the UI issue is figured out
+                complete_op_name,
+                inputs=run_dict.get("inputs", {}),
+                parent=parent_run,
+                attributes=call_attrs,
                 display_name=f"langchain.{run.run_type.capitalize()}.{run.name}",
                 use_stack=use_stack,
             )
@@ -206,30 +235,34 @@ if not import_failed:
 
         def _finish_run(self, run: Run) -> None:
             """Finish a run."""
-            # If the event is in the call map, finish the call.
+            if self.wc is None:
+                return
             run_id = str(run.id)
             if run_id in self._call_map:
                 # Finish the call.
                 call = self._call_map.pop(run_id)
                 run_dict = _run_to_dict(run, as_input=False)
-                self.gc.finish_call(call, run_dict)
+                _extract_usage_data(call, run_dict)
+                self.wc.finish_call(call, run_dict)
 
         def _update_run_error(self, run: Run) -> None:
-            call = self._call_map.pop(str(run.id))
+            call = self._call_map.pop(str(run.id), None)
+            if self.wc is None:
+                return
             if call:
-                self.gc.finish_call(
+                self.wc.finish_call(
                     call, _run_to_dict(run), exception=Exception(run.error)
                 )
 
         def on_chat_model_start(
             self,
-            serialized: Dict[str, Any],
-            messages: List[List[BaseMessage]],
+            serialized: dict[str, Any],
+            messages: list[list[BaseMessage]],
             *,
             run_id: UUID,
-            tags: Optional[List[str]] = None,
+            tags: Optional[list[str]] = None,
             parent_run_id: Optional[UUID] = None,
-            metadata: Optional[Dict[str, Any]] = None,
+            metadata: Optional[dict[str, Any]] = None,
             name: Optional[str] = None,
             **kwargs: Any,
         ) -> Run:
@@ -256,48 +289,78 @@ if not import_failed:
             return chat_model_run
 
         def _on_llm_start(self, run: Run) -> None:
+            if self.wc is None:
+                return
             self._persist_run_single(run)
 
         def _on_llm_end(self, run: Run) -> None:
+            if self.wc is None:
+                return
             self._finish_run(run)
 
         def _on_llm_error(self, run: Run) -> None:
+            if self.wc is None:
+                return
             self._update_run_error(run)
 
         def _on_chat_model_start(self, run: Run) -> None:
+            if self.wc is None:
+                return
             self._persist_run_single(run)
 
         def _on_chat_model_end(self, run: Run) -> None:
+            if self.wc is None:
+                return
             self._finish_run(run)
 
         def _on_chat_model_error(self, run: Run) -> None:
+            if self.wc is None:
+                return
             self._update_run_error(run)
 
         def _on_chain_start(self, run: Run) -> None:
+            if self.wc is None:
+                return
             self._persist_run_single(run)
 
         def _on_chain_end(self, run: Run) -> None:
+            if self.wc is None:
+                return
             self._finish_run(run)
 
         def _on_chain_error(self, run: Run) -> None:
+            if self.wc is None:
+                return
             self._update_run_error(run)
 
         def _on_tool_start(self, run: Run) -> None:
+            if self.wc is None:
+                return
             self._persist_run_single(run)
 
         def _on_tool_end(self, run: Run) -> None:
+            if self.wc is None:
+                return
             self._finish_run(run)
 
         def _on_tool_error(self, run: Run) -> None:
+            if self.wc is None:
+                return
             self._update_run_error(run)
 
         def _on_retriever_start(self, run: Run) -> None:
+            if self.wc is None:
+                return
             self._persist_run_single(run)
 
         def _on_retriever_end(self, run: Run) -> None:
+            if self.wc is None:
+                return
             self._finish_run(run)
 
         def _on_retriever_error(self, run: Run) -> None:
+            if self.wc is None:
+                return
             self._update_run_error(run)
 
 else:
@@ -352,9 +415,10 @@ class LangchainPatcher(Patcher):
             register_configure_hook(
                 weave_tracing_callback_var, True, WeaveTracer, "WEAVE_TRACE_LANGCHAIN"
             )
-            return True
         except Exception:
             return False
+        else:
+            return True
 
     def undo_patch(self) -> bool:
         if not hasattr(self, "original_trace_state"):
@@ -367,10 +431,10 @@ class LangchainPatcher(Patcher):
             else:
                 os.environ["WEAVE_TRACE_LANGCHAIN"] = self.original_trace_state
             weave_tracing_callback_var.set(None)
-
-            return True
         except Exception:
             return False
+        else:
+            return True
 
 
 langchain_patcher = LangchainPatcher()

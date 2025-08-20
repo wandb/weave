@@ -5,7 +5,7 @@ from weave.trace_server.orm import ParamBuilder
 # Constants for table and column names
 TABLE_ROWS_ALIAS = "tr"
 VAL_DUMP_COLUMN_NAME = "val_dump"
-ROW_ORDER_COLUMN_NAME = "row_order"
+ROW_ORDER_COLUMN_NAME = "original_index"
 
 
 def make_natural_sort_table_query(
@@ -36,21 +36,22 @@ def make_natural_sort_table_query(
             row_digests_selection = f"arraySlice({row_digests_selection}, 1 + {{{pb.add_param(offset)}: Int64}}, {{{pb.add_param(limit)}: Int64}})"
 
     query = f"""
-    SELECT DISTINCT tr.digest, tr.val_dump, t.row_order
+    SELECT DISTINCT tr.digest, tr.val_dump, t.original_index + {{{pb.add_param(offset or 0)}: Int64}} - 1 as original_index
     FROM table_rows tr
     INNER JOIN (
-        SELECT row_digest, row_number() OVER () AS row_order
+        SELECT row_digest, original_index
         FROM (
-            SELECT {row_digests_selection} as row_digests
+            SELECT {row_digests_selection} as row_digests,
+                   arrayEnumerate(row_digests) as original_indices
             FROM tables
             WHERE project_id = {{{project_id_name}: String}}
             AND digest = {{{digest_name}: String}}
             LIMIT 1
         )
-        ARRAY JOIN row_digests AS row_digest
+        ARRAY JOIN row_digests AS row_digest, original_indices AS original_index
     ) AS t ON tr.digest = t.row_digest
     WHERE tr.project_id = {{{project_id_name}: String}}
-    ORDER BY row_order ASC
+    ORDER BY original_index ASC
     """
 
     return query
@@ -62,7 +63,7 @@ def make_standard_table_query(
     pb: ParamBuilder,
     *,
     # using the `sql_safe_*` prefix is a way to signal to the caller
-    # that these strings should have been santized by the caller.
+    # that these strings should have been sanitized by the caller.
     sql_safe_conditions: Optional[list[str]] = None,
     sql_safe_sort_clause: Optional[str] = None,
     limit: Optional[int] = None,
@@ -88,20 +89,21 @@ def make_standard_table_query(
     )
 
     query = f"""
-    SELECT tr.digest, tr.val_dump, tr.row_order FROM
+    SELECT tr.digest, tr.val_dump, tr.original_index FROM
     (
-        SELECT DISTINCT tr.digest, tr.val_dump, t.row_order
+        SELECT DISTINCT tr.digest, tr.val_dump, t.row_index as original_index
         FROM table_rows tr
         INNER JOIN (
-            SELECT row_digest, row_number() OVER () AS row_order
+            SELECT row_digest, original_index - 1 as row_index
             FROM (
-                SELECT row_digests
+                SELECT row_digests,
+                       arrayEnumerate(row_digests) as original_indices
                 FROM tables
                 WHERE project_id = {{{project_id_name}: String}}
                 AND digest = {{{digest_name}: String}}
                 LIMIT 1
             )
-            ARRAY JOIN row_digests AS row_digest
+            ARRAY JOIN row_digests AS row_digest, original_indices AS original_index
         ) AS t ON tr.digest = t.row_digest
         WHERE tr.project_id = {{{project_id_name}: String}}
         {sql_safe_filter_clause}
@@ -109,5 +111,31 @@ def make_standard_table_query(
     {sql_safe_sort_clause}
     {sql_safe_limit}
     {sql_safe_offset}
+    """
+    return query
+
+
+def make_table_stats_query_with_storage_size(
+    project_id: str,
+    table_digests: list[str],
+    pb: ParamBuilder,
+) -> str:
+    """Generate a query for table stats with storage size and length(num of rows)."""
+    project_id_name = pb.add_param(project_id)
+    digest_ids = pb.add_param(table_digests)
+
+    query = f"""
+    SELECT tb_digest, any(length), sum(size_bytes) FROM
+    (
+        SELECT digest as tb_digest, length(row_digests) as length, row_digests
+        FROM tables
+        WHERE project_id = {{{project_id_name}: String}} AND digest in {{{digest_ids}: Array(String)}}
+    ) AS sub ARRAY JOIN row_digests as row_digest
+    LEFT JOIN
+    (
+        SELECT * FROM table_rows_stats WHERE table_rows_stats.project_id = {{{project_id_name}: String}}
+    ) as table_rows_stats ON table_rows_stats.digest = row_digest
+
+    GROUP BY tb_digest
     """
     return query

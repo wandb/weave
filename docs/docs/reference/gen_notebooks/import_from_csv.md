@@ -237,10 +237,10 @@ To do this, we fetch all conversations from W&B through our simple query API and
 weave_ref_for_conversation_op = "weave:///wandb-smle/import-weave-traces-cookbook/op/Conversation:tzUhDyzVm5bqQsuqh5RT4axEXSosyLIYZn9zbRyenaw"
 filter = weave.trace_server.trace_server_interface.CallsFilter(
     op_names=[weave_ref_for_conversation_op],
-    )
+  )
 
 # We execute the query
-conversation_traces = weave_client.get_calls(filter)
+conversation_traces = weave_client.get_calls(filter=filter)
 
 rows = []
 

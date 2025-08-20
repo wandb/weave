@@ -1,7 +1,8 @@
 from collections import Counter
+from collections.abc import Generator
 from contextlib import contextmanager
 from threading import Lock
-from typing import Any, Generator
+from typing import Any
 
 import PIL
 import pytest
@@ -67,32 +68,32 @@ def build_evaluation():
         {
             "question": "What is the capital of France?",
             "expected": "Paris",
-            "img": PIL.Image.new("RGB", (100, 100)),
+            "img": PIL.Image.new("RGB", (100, 100), color="red"),
         },
         {
             "question": "Who wrote 'To Kill a Mockingbird'?",
             "expected": "Harper Lee",
-            "img": PIL.Image.new("RGB", (100, 100)),
+            "img": PIL.Image.new("RGB", (100, 100), color="green"),
         },
         {
             "question": "What is the square root of 64?",
             "expected": "8",
-            "img": PIL.Image.new("RGB", (100, 100)),
+            "img": PIL.Image.new("RGB", (100, 100), color="blue"),
         },
         {
             "question": "What is the thing you say when you don't know something?",
             "expected": "I don't know",
-            "img": PIL.Image.new("RGB", (100, 100)),
+            "img": PIL.Image.new("RGB", (100, 100), color="yellow"),
         },
     ]
 
-    @weave.op()
+    @weave.op
     def predict(question: str):
         return "I don't know"
 
-    @weave.op()
-    def score(question: str, expected: str, model_output: str):
-        return model_output == expected
+    @weave.op
+    def score(question: str, expected: str, output: str):
+        return output == expected
 
     evaluation = weave.Evaluation(
         name="My Evaluation",
@@ -110,13 +111,20 @@ async def test_evaluation_performance(client: WeaveClient):
 
     log = [l for l in client.server.attribute_access_log if not l.startswith("_")]
 
-    assert log == ["ensure_project_exists"]
+    gold_log = [
+        "ensure_project_exists",
+        "get_call_processor",
+        "get_call_processor",
+        "get_feedback_processor",
+        "get_feedback_processor",
+    ]
+    assert log == gold_log
 
     with paused_client(client) as client:
         res = await evaluation.evaluate(predict)
         assert res["score"]["true_count"] == 1
         log = [l for l in client.server.attribute_access_log if not l.startswith("_")]
-        assert log == ["ensure_project_exists"]
+        assert log == gold_log
 
     log = [l for l in client.server.attribute_access_log if not l.startswith("_")]
 
@@ -128,15 +136,18 @@ async def test_evaluation_performance(client: WeaveClient):
         counts
         == {
             "ensure_project_exists": 1,
+            "get_call_processor": 2,
+            "get_feedback_processor": 2,
             "table_create": 2,  # dataset and score results
             "obj_create": 9,  # Evaluate Op, Score Op, Predict and Score Op, Summarize Op, predict Op, PIL Image Serializer, Eval Results DS, MainDS, Evaluation Object
             "file_create": 10,  # 4 images, 6 ops
             "call_start": 14,  # Eval, summary, 4 predict and score sequences of 3 calls each
             "call_end": 14,  # Eval, summary, 4 predict and score sequences of 3 calls each
+            "feedback_create": 4,  # 4 predict feedbacks
         }
     )
 
-    calls = client.calls()
+    calls = client.get_calls()
     objects = client._objects()
 
     assert (
@@ -157,10 +168,10 @@ async def test_evaluation_resilience(
         with pytest.raises(DummyTestException):
             res = await evaluation.evaluate(predict)
 
-    client_with_throwing_server._flush()
+    client_with_throwing_server.finish()
 
     logs = log_collector.get_error_logs()
-    ag_res = Counter([k.split(", req:")[0] for k in set([l.msg for l in logs])])
+    ag_res = Counter([k.split(", req:")[0] for k in {l.msg for l in logs}])
     assert len(ag_res) == 2
     assert ag_res["Task failed: DummyTestException: ('FAILURE - obj_create"] <= 2
     assert ag_res["Task failed: DummyTestException: ('FAILURE - file_create"] <= 2
@@ -170,10 +181,10 @@ async def test_evaluation_resilience(
         res = await evaluation.evaluate(predict)
         assert res["score"]["true_count"] == 1
 
-    client_with_throwing_server._flush()
+    client_with_throwing_server.finish()
 
     logs = log_collector.get_error_logs()
-    ag_res = Counter([k.split(", req:")[0] for k in set([l.msg for l in logs])])
+    ag_res = Counter([k.split(", req:")[0] for k in {l.msg for l in logs}])
     # Tim: This is very specific and intentiaion, please don't change
     # this unless you are sure that is the expected behavior.
     # For some reason with high parallelism, some logs are not captured,

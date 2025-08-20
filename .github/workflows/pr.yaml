@@ -30,7 +30,11 @@ jobs:
           scopes: |
             ui
             weave
+            weave_ts
             weave_query
+            app
+            dev
+            deps
           wip: false
           requireScope: true
           validateSingleCommit: false

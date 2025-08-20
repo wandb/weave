@@ -21,6 +21,7 @@ If True, prints a link to the Weave UI when calling a weave op.
 
 import os
 from contextvars import ContextVar
+from pathlib import Path
 from typing import Any, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, PrivateAttr
@@ -36,30 +37,61 @@ SETTINGS_PREFIX = "WEAVE_"
 class UserSettings(BaseModel):
     """User configuration for Weave.
 
-    All configs can be overrided with environment variables.  The precedence is
+    All configs can be overridden with environment variables.  The precedence is
     environment variables > `weave.trace.settings.UserSettings`."""
 
     disabled: bool = False
     """Toggles Weave tracing.
-    
+
     If True, all weave ops will behave like regular functions.
-    Can be overrided with the environment variable `WEAVE_DISABLED`"""
+    Can be overridden with the environment variable `WEAVE_DISABLED`"""
 
     print_call_link: bool = True
     """Toggles link printing to the terminal.
 
     If True, prints a link to the Weave UI when calling a weave op.
-    Can be overrided with the environment variable `WEAVE_PRINT_CALL_LINK`"""
+    Can be overridden with the environment variable `WEAVE_PRINT_CALL_LINK`"""
+
+    log_level: str = "INFO"
+    """Toggles the log level.
+
+    Controls the log level of the weave logger.
+    Valid values are: DEBUG, INFO, WARNING, ERROR, CRITICAL
+    Can be overridden with the environment variable `WEAVE_LOG_LEVEL`"""
 
     capture_code: bool = True
     """Toggles code capture for ops.
-    
+
     If True, saves code for ops so they can be reloaded for later use.
-    Can be overrided with the environment variable `WEAVE_CAPTURE_CODE`
-    
+    Can be overridden with the environment variable `WEAVE_CAPTURE_CODE`
+
     WARNING: Switching between `save_code=True` and `save_code=False` mid-script
-    may lead to unexpected behaviour.  Make sure this is only set once at the start!
+    may lead to unexpected behavior.  Make sure this is only set once at the start!
     """
+
+    redact_pii: bool = False
+    """Toggles PII redaction using Microsoft Presidio.
+
+    If True, redacts PII from trace data before sending to the server.
+    Can be overridden with the environment variable `WEAVE_REDACT_PII`
+    """
+
+    redact_pii_fields: list[str] = []
+    """List of fields to redact.
+
+    If redact_pii is True, this list of fields will be redacted.
+    If redact_pii is False, this list is ignored.
+    If this list is left empty, the default fields will be redacted.
+
+    A list of supported fields can be found here: https://microsoft.github.io/presidio/supported_entities/
+    Can be overridden with the environment variable `WEAVE_REDACT_PII_FIELDS`
+    """
+
+    capture_client_info: bool = True
+    """Toggles capture of client information (Python version, SDK version) for ops."""
+
+    capture_system_info: bool = True
+    """Toggles capture of system information (OS name and version) for ops."""
 
     client_parallelism: Optional[int] = None
     """
@@ -71,6 +103,69 @@ class UserSettings(BaseModel):
     but can be useful for debugging.
 
     This cannot be changed after the client has been initialized.
+    """
+
+    use_server_cache: bool = True
+    """
+    Toggles caching of server responses, defaults to True
+
+    If True, caches server responses to disk at `WEAVE_SERVER_CACHE_DIR`.
+    Can be overridden with the environment variable `WEAVE_USE_SERVER_CACHE`
+    """
+
+    server_cache_size_limit: int = 1_000_000_000
+    """
+    Sets the size limit in bytes for the server cache, defaults to 1GB (1_000_000_000 bytes).
+    Ignored if `use_server_cache` is False.
+
+    Can be overridden with the environment variable `WEAVE_SERVER_CACHE_SIZE_LIMIT`
+    """
+
+    server_cache_dir: Optional[str] = None
+    """
+    Sets the directory for the server cache, defaults to None (temporary cache)
+    Ignored if `use_server_cache` is False.
+
+    Can be overridden with the environment variable `WEAVE_SERVER_CACHE_DIR`
+    """
+
+    scorers_dir: str = str(Path.home() / ".cache" / "wandb" / "weave-scorers")
+    """
+    Sets the directory for the scorers model checkpoints. Defaults to
+    ~/.cache/wandb/weave-scorers.
+
+    Can be overridden with the environment variable `WEAVE_SCORERS_DIR`
+
+    """
+    max_calls_queue_size: int = 100_000
+    """
+    Sets the maximum size of the calls queue.  Defaults to 100_000.
+    Setting a value of 0 means the queue can grow unbounded.
+
+    Can be overridden with the environment variable `WEAVE_MAX_CALLS_QUEUE_SIZE`
+    """
+
+    retry_max_interval: float = 60 * 5  # 5 min
+    """
+    Sets the maximum interval between retries.  Defaults to 5 minutes.
+
+    Can be overridden with the environment variable `WEAVE_RETRY_MAX_INTERVAL`
+    """
+
+    retry_max_attempts: int = 3
+    """
+    Sets the maximum number of retries.  Defaults to 3.
+
+    Can be overridden with the environment variable `WEAVE_RETRY_MAX_ATTEMPTS`
+    """
+
+    enable_disk_fallback: bool = True
+    """
+    Toggles disk fallback for dropped items.
+
+    If True, items that fail to be processed or are dropped due to queue limits
+    will be written to disk as a fallback instead of being lost.
+    Can be overridden with the environment variable `WEAVE_ENABLE_DISK_FALLBACK`
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -99,23 +194,87 @@ def should_print_call_link() -> bool:
     return _should("print_call_link")
 
 
+def log_level() -> str:
+    return _optional_str("log_level") or "INFO"
+
+
 def should_capture_code() -> bool:
     return _should("capture_code")
+
+
+def should_capture_client_info() -> bool:
+    return _should("capture_client_info")
+
+
+def should_capture_system_info() -> bool:
+    return _should("capture_system_info")
 
 
 def client_parallelism() -> Optional[int]:
     return _optional_int("client_parallelism")
 
 
+def should_redact_pii() -> bool:
+    return _should("redact_pii")
+
+
+def redact_pii_fields() -> list[str]:
+    return _list_str("redact_pii_fields")
+
+
+def use_server_cache() -> bool:
+    return _should("use_server_cache")
+
+
+def server_cache_size_limit() -> int:
+    return _optional_int("server_cache_size_limit") or 1_000_000_000
+
+
+def server_cache_dir() -> Optional[str]:
+    return _optional_str("server_cache_dir")
+
+
+def scorers_dir() -> str:
+    return _optional_str("scorers_dir")  # type: ignore
+
+
+def max_calls_queue_size() -> int:
+    max_queue_size = _optional_int("max_calls_queue_size")
+    if max_queue_size is None:
+        return 100_000
+    return max_queue_size
+
+
+def retry_max_attempts() -> int:
+    """Returns the maximum number of retry attempts."""
+    max_attempts = _optional_int("retry_max_attempts")
+    if max_attempts is None:
+        return 3
+    return max_attempts
+
+
+def retry_max_interval() -> float:
+    """Returns the maximum interval between retries in seconds."""
+    max_interval = _optional_float("retry_max_interval")
+    if max_interval is None:
+        return 60 * 5  # 5 minutes
+    return max_interval
+
+
+def should_enable_disk_fallback() -> bool:
+    """Returns whether disk fallback should be enabled for dropped items."""
+    return _should("enable_disk_fallback")
+
+
 def parse_and_apply_settings(
     settings: Optional[Union[UserSettings, dict[str, Any]]] = None,
 ) -> None:
-    if settings is None:
-        user_settings = UserSettings()
-    if isinstance(settings, dict):
-        user_settings = UserSettings.model_validate(settings)
     if isinstance(settings, UserSettings):
         user_settings = settings
+    elif isinstance(settings, dict):
+        user_settings = UserSettings.model_validate(settings)
+    else:
+        user_settings = UserSettings()
 
     user_settings.apply()
 
@@ -139,6 +298,24 @@ def _should(name: str) -> bool:
 def _optional_int(name: str) -> Optional[int]:
     if env := os.getenv(f"{SETTINGS_PREFIX}{name.upper()}"):
         return int(env)
+    return _context_vars[name].get()
+
+
+def _list_str(name: str) -> list[str]:
+    if env := os.getenv(f"{SETTINGS_PREFIX}{name.upper()}"):
+        return env.split(",")
+    return _context_vars[name].get() or []
+
+
+def _optional_str(name: str) -> Optional[str]:
+    if env := os.getenv(f"{SETTINGS_PREFIX}{name.upper()}"):
+        return env
+    return _context_vars[name].get()
+
+
+def _optional_float(name: str) -> Optional[float]:
+    if env := os.getenv(f"{SETTINGS_PREFIX}{name.upper()}"):
+        return float(env)
     return _context_vars[name].get()
 
 

@@ -1,20 +1,26 @@
 # When we push commits, fire off a `weave-package-updated`
 # repository dispatch event to wandb/core
 
-name: Notify wandb/core
+name: Notify wandb/core of branch push
+run-name: Notify wandb/core - push to ${{ github.event.ref }}
 
 on:
   push:
     branches:
-      - '**'
+      - "**"
   workflow_dispatch:
+
+permissions:
+  packages: write
 
 jobs:
   check-which-tests-to-run:
     uses: ./.github/workflows/check-which-tests-to-run.yaml
+
   notify-wandb-core:
-    needs: check-which-tests-to-run
+    needs: [check-which-tests-to-run]
     runs-on: ubuntu-latest
+
     steps:
       - name: Repository dispatch
         uses: peter-evans/repository-dispatch@v2
@@ -22,4 +28,10 @@ jobs:
           token: ${{ secrets.WANDB_CORE_ACCESS_TOKEN }}
           repository: wandb/core
           event-type: weave-package-updated
-          client-payload: '{"ref_name": "${{ github.ref_name }}", "sha": "${{ github.sha }}", "run_weave_js_tests": ${{ needs.check-which-tests-to-run.outputs.weave_js_tests }}, "run_weave_query_tests": ${{ needs.check-which-tests-to-run.outputs.weave_query_tests }}, "run_trace_server_tests": ${{ needs.check-which-tests-to-run.outputs.trace_server_tests }}}'
+          client-payload: |-
+            {
+              "ref_name": "${{ github.ref_name }}",
+              "sha": "${{ github.sha }}",
+              "run_weave_query_tests": ${{ needs.check-which-tests-to-run.outputs.weave_query_tests }},
+              "run_trace_server_tests": ${{ needs.check-which-tests-to-run.outputs.trace_server_tests }}
+            }

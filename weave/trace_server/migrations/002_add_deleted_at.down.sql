@@ -6,7 +6,8 @@ This migration undoes adding the `deleted_at` column to:
 
 ALTER TABLE object_versions DROP COLUMN deleted_at;
 
-CREATE OR REPLACE VIEW object_versions_deduped as
+DROP VIEW object_versions_deduped;
+CREATE VIEW object_versions_deduped as
     SELECT project_id,
         object_id,
         created_at,

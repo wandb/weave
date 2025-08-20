@@ -19,9 +19,34 @@ const sidebar: SidebarsConfig = {
         },
         {
           type: "doc",
+          id: "reference/service-api/read-version-version-get",
+          label: "Read Version",
+          className: "api-method get",
+        },
+        {
+          type: "doc",
+          id: "reference/service-api/get-caller-location-geolocate-get",
+          label: "Get Caller Location",
+          className: "api-method get",
+        },
+        {
+          type: "doc",
           id: "reference/service-api/server-info-server-info-get",
           label: "Server Info",
           className: "api-method get",
+        },
+      ],
+    },
+    {
+      type: "category",
+      label: "OpenTelemetry",
+      collapsed: false,
+      items: [
+        {
+          type: "doc",
+          id: "reference/service-api/export-trace-otel-v-1-traces-post",
+          label: "Export Trace",
+          className: "api-method post",
         },
       ],
     },
@@ -82,6 +107,25 @@ const sidebar: SidebarsConfig = {
     },
     {
       type: "category",
+      label: "Inference",
+      collapsed: false,
+      items: [
+        {
+          type: "doc",
+          id: "reference/service-api/inference-get-inference-v-1-path-get",
+          label: "Inference Get",
+          className: "api-method get",
+        },
+        {
+          type: "doc",
+          id: "reference/service-api/inference-post-inference-v-1-path-post",
+          label: "Inference Post",
+          className: "api-method post",
+        },
+      ],
+    },
+    {
+      type: "category",
       label: "Objects",
       collapsed: false,
       items: [
@@ -101,6 +145,12 @@ const sidebar: SidebarsConfig = {
           type: "doc",
           id: "reference/service-api/objs-query-objs-query-post",
           label: "Objs Query",
+          className: "api-method post",
+        },
+        {
+          type: "doc",
+          id: "reference/service-api/obj-delete-obj-delete-post",
+          label: "Obj Delete",
           className: "api-method post",
         },
       ],
@@ -134,6 +184,12 @@ const sidebar: SidebarsConfig = {
           label: "Table Query Stats",
           className: "api-method post",
         },
+        {
+          type: "doc",
+          id: "reference/service-api/table-query-stats-batch-table-query-stats-batch-post",
+          label: "Table Query Stats Batch",
+          className: "api-method post",
+        },
       ],
     },
     {
@@ -164,6 +220,12 @@ const sidebar: SidebarsConfig = {
           type: "doc",
           id: "reference/service-api/file-content-file-content-post",
           label: "File Content",
+          className: "api-method post",
+        },
+        {
+          type: "doc",
+          id: "reference/service-api/files-stats-files-query-stats-post",
+          label: "Files Stats",
           className: "api-method post",
         },
       ],
@@ -214,6 +276,25 @@ const sidebar: SidebarsConfig = {
           type: "doc",
           id: "reference/service-api/feedback-purge-feedback-purge-post",
           label: "Feedback Purge",
+          className: "api-method post",
+        },
+        {
+          type: "doc",
+          id: "reference/service-api/feedback-replace-feedback-replace-post",
+          label: "Feedback Replace",
+          className: "api-method post",
+        },
+      ],
+    },
+    {
+      type: "category",
+      label: "Threads",
+      collapsed: false,
+      items: [
+        {
+          type: "doc",
+          id: "reference/service-api/threads-query-stream-threads-stream-query-post",
+          label: "Threads Query Stream",
           className: "api-method post",
         },
       ],

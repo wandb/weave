@@ -83,7 +83,7 @@ weave.init(PROJECT)
 
 client = OpenAI()
 response = client.chat.completions.create(
-    model="gpt-3.5-turbo-1106",
+    model="gpt-4o-mini",
     messages=[
         {
             "role": "system",
@@ -153,7 +153,7 @@ def correct_grammar(user_input):
 
     stripped = strip_user_input(user_input)
     response = client.chat.completions.create(
-        model="gpt-3.5-turbo-1106",
+        model="gpt-4o-mini",
         messages=[
             {
                 "role": "system",
@@ -198,7 +198,7 @@ def correct_grammar(user_input):
 
     stripped = strip_user_input(user_input)
     response = client.chat.completions.create(
-        model="gpt-3.5-turbo-1106",
+        model="gpt-4o-mini",
         messages=[
             {
                 "role": "system",
@@ -282,7 +282,7 @@ class OpenAIGrammarCorrector(weave.Model):
 
 
 corrector = OpenAIGrammarCorrector(
-    openai_model_name="gpt-3.5-turbo-1106",
+    openai_model_name="gpt-4o-mini",
     system_message="You are a grammar checker, correct the following user input.",
 )
 
@@ -307,8 +307,8 @@ dataset = weave.Dataset(
         },
         {"user_input": "  I write good   ", "expected": "I write well"},
         {
-            "user_input": "  GPT-3 is smartest AI model.   ",
-            "expected": "GPT-3 is the smartest AI model.",
+            "user_input": "  GPT-4 is smartest AI model.   ",
+            "expected": "GPT-4 is the smartest AI model.",
         },
     ],
 )
@@ -331,7 +331,7 @@ import weave
 weave.init(PROJECT)
 
 corrector = OpenAIGrammarCorrector(
-    openai_model_name="gpt-3.5-turbo-1106",
+    openai_model_name="gpt-4o-mini",
     system_message="You are a grammar checker, correct the following user input.",
 )
 
@@ -373,9 +373,9 @@ from weave import Evaluation
 
 # Define any custom scoring function
 @weave.op()
-def exact_match(expected: str, model_output: dict) -> dict:
+def exact_match(expected: str, output: dict) -> dict:
     # Here is where you'd define the logic to score the model output
-    return {"match": expected == model_output}
+    return {"match": expected == output}
 
 
 # Score your examples using scoring functions

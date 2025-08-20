@@ -163,6 +163,8 @@ def _convert_client_id_to_server_id(art_id: str) -> str:
                 "clientID": art_id,
             },
         )
+    if not (res and res['clientIDMapping']):
+        raise errors.WeaveArtifactCollectionNotFound
     return b64_to_hex_id(res["clientIDMapping"]["serverID"])
 
 
@@ -226,7 +228,7 @@ def _collection_and_alias_id_mapping_to_uri(
             # never uploaded, so the client id doesn't exist in the W&B server.
 
             collection = None
-            logging.warn(
+            logging.warning(
                 f"Artifact collection with client id {client_collection_id} not present in W&B server."
             )
 
@@ -992,7 +994,7 @@ class WeaveWBArtifactURI(uris.WeaveURI):
 
     @property
     def resolved_artifact_uri(self) -> "WeaveWBArtifactURI":
-        if self.version and likely_commit_hash(self.version):
+        if self.version and (likely_commit_hash(self.version) or is_valid_version_index(self.version)):
             return self
         if self._resolved_artifact_uri is None:
             path = f"{self.entity_name}/{self.project_name}/{self.name}"
@@ -1031,7 +1033,7 @@ class WeaveWBLoggedArtifactURI(uris.WeaveURI):
         fragment: str,
     ):
         path = parse.unquote(path.strip("/"))
-        spl_netloc = netloc.split(":")
+        spl_netloc = netloc.split(":", 1)
         if len(spl_netloc) == 1:
             name = spl_netloc[0]
             version = None
@@ -1206,7 +1208,7 @@ class WeaveWBArtifactByIDURI(uris.WeaveURI):
 
 
 # This is a wrapper around an artifact that acts like a list of files.
-# It fetchs a file from the manifest on __getItem__ and can return a count without fetching all files
+# It fetches a file from the manifest on __getItem__ and can return a count without fetching all files
 @dataclasses.dataclass
 class FilesystemArtifactFileIterator(list[artifact_fs.FilesystemArtifactFile]):
     data: list[str]

@@ -1,5 +1,6 @@
 import os
-from typing import Generator, List, Tuple
+from collections.abc import Generator
+from unittest.mock import patch
 
 import pytest
 import tiktoken
@@ -10,6 +11,7 @@ from weave.integrations.integration_utilities import (
     flatten_calls,
     op_name_from_ref,
 )
+from weave.trace.context import call_context
 from weave.trace.weave_client import Call, WeaveClient
 from weave.trace_server import trace_server_interface as tsi
 
@@ -18,11 +20,11 @@ from weave.trace_server import trace_server_interface as tsi
 def ensure_tiktoken_file() -> Generator[None, None, None]:
     enc = tiktoken.get_encoding("cl100k_base")
     enc.encode("Test")
-    yield
+    return
 
 
 def assert_ends_and_errors(calls: list[tuple[Call, int]]) -> None:
-    for call, depth in calls:
+    for call, _depth in calls:
         assert call.ended_at is not None
         assert call.exception is None
 
@@ -59,9 +61,7 @@ def test_simple_chain_invoke(
 
     api_key = os.environ.get("OPENAI_API_KEY", "sk-1234567890abcdef1234567890abcdef")
 
-    llm = ChatOpenAI(
-        model_name="gpt-3.5-turbo", openai_api_key=api_key, temperature=0.0
-    )
+    llm = ChatOpenAI(model_name="gpt-4o-mini", openai_api_key=api_key, temperature=0.0)
     prompt = PromptTemplate.from_template("1 + {number} = ")
     long_str = (
         "really_massive_name_that_is_longer_than_max_characters_which_would_be_crazy"
@@ -74,8 +74,43 @@ def test_simple_chain_invoke(
     llm_chain = prompt | llm
     _ = llm_chain.invoke({"number": 2})
 
-    calls = list(client.calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
     assert_correct_calls_for_chain_invoke(calls, exp_name)
+
+    call = calls[0]
+    # Assert that the call has usage metadata
+    assert call.summary is not None
+    assert "usage" in call.summary
+    assert "gpt-4o-mini-2024-07-18" in call.summary["usage"].unwrap()
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+    before_record_request=filter_body,
+)
+def test_simple_chain_invoke_no_client(client) -> None:
+    """If no client is available, we should not trace the call, and also not crash."""
+    from langchain_core.prompts import PromptTemplate
+    from langchain_openai import ChatOpenAI
+
+    client.finish()
+
+    api_key = os.environ.get("OPENAI_API_KEY", "sk-1234567890abcdef1234567890abcdef")
+
+    llm = ChatOpenAI(model_name="gpt-4o-mini", openai_api_key=api_key, temperature=0.0)
+    prompt = PromptTemplate.from_template("1 + {number} = ")
+    long_str = (
+        "really_massive_name_that_is_longer_than_max_characters_which_would_be_crazy"
+    )
+    name = long_str + long_str
+    prompt.name = name
+
+    exp_name = "really_massive_name_that_is_longer_than_max_characte_ff6e_at_is_longer_than_max_characters_which_would_be_crazy"
+
+    llm_chain = prompt | llm
+    _ = llm_chain.invoke({"number": 2})
 
 
 @pytest.mark.skip_clickhouse_client
@@ -85,7 +120,6 @@ def test_simple_chain_invoke(
     before_record_request=filter_body,
 )
 @pytest.mark.asyncio
-@pytest.mark.skip  # TODO: remove this once the langchain issue is fixed
 async def test_simple_chain_ainvoke(
     client: WeaveClient,
 ) -> None:
@@ -94,15 +128,13 @@ async def test_simple_chain_ainvoke(
 
     api_key = os.environ.get("OPENAI_API_KEY", "sk-1234567890abcdef1234567890abcdef")
 
-    llm = ChatOpenAI(
-        model_name="gpt-3.5-turbo", openai_api_key=api_key, temperature=0.0
-    )
+    llm = ChatOpenAI(model_name="gpt-4o-mini", openai_api_key=api_key, temperature=0.0)
     prompt = PromptTemplate.from_template("1 + {number} = ")
 
     llm_chain = prompt | llm
     _ = await llm_chain.ainvoke({"number": 2})
 
-    calls = list(client.calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
     assert_correct_calls_for_chain_invoke(calls)
 
 
@@ -120,16 +152,14 @@ def test_simple_chain_stream(
 
     api_key = os.environ.get("OPENAI_API_KEY", "sk-1234567890abcdef1234567890abcdef")
 
-    llm = ChatOpenAI(
-        model_name="gpt-3.5-turbo", openai_api_key=api_key, temperature=0.0
-    )
+    llm = ChatOpenAI(model_name="gpt-4o-mini", openai_api_key=api_key, temperature=0.0)
     prompt = PromptTemplate.from_template("1 + {number} = ")
 
     llm_chain = prompt | llm
     for _ in llm_chain.stream({"number": 2}):
         pass
 
-    calls = list(client.calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
     assert_correct_calls_for_chain_invoke(calls)
 
 
@@ -140,7 +170,6 @@ def test_simple_chain_stream(
     before_record_request=filter_body,
 )
 @pytest.mark.asyncio
-@pytest.mark.skip
 async def test_simple_chain_astream(
     client: WeaveClient,
 ) -> None:
@@ -149,16 +178,14 @@ async def test_simple_chain_astream(
 
     api_key = os.environ.get("OPENAI_API_KEY", "sk-1234567890abcdef1234567890abcdef")
 
-    llm = ChatOpenAI(
-        model_name="gpt-3.5-turbo", openai_api_key=api_key, temperature=0.0
-    )
+    llm = ChatOpenAI(model_name="gpt-4o-mini", openai_api_key=api_key, temperature=0.0)
     prompt = PromptTemplate.from_template("1 + {number} = ")
 
     llm_chain = prompt | llm
     async for _ in llm_chain.astream({"number": 2}):
         pass
 
-    calls = list(client.calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
     assert_correct_calls_for_chain_invoke(calls)
 
 
@@ -189,23 +216,19 @@ def assert_correct_calls_for_chain_batch(calls: list[Call]) -> None:
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
-def test_simple_chain_batch(
-    client: WeaveClient,
-) -> None:
+def test_simple_chain_batch(client: WeaveClient) -> None:
     from langchain_core.prompts import PromptTemplate
     from langchain_openai import ChatOpenAI
 
     api_key = os.environ.get("OPENAI_API_KEY", "sk-1234567890abcdef1234567890abcdef")
 
-    llm = ChatOpenAI(
-        model_name="gpt-3.5-turbo", openai_api_key=api_key, temperature=0.0
-    )
+    llm = ChatOpenAI(model_name="gpt-4o-mini", openai_api_key=api_key, temperature=0.0)
     prompt = PromptTemplate.from_template("1 + {number} = ")
 
     llm_chain = prompt | llm
     _ = llm_chain.batch([{"number": 2}, {"number": 3}])
 
-    calls = list(client.calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
     assert_correct_calls_for_chain_batch(calls)
 
 
@@ -216,7 +239,6 @@ def test_simple_chain_batch(
     before_record_request=filter_body,
 )
 @pytest.mark.asyncio
-@pytest.mark.skip  # TODO: remove this once the langchain issue is fixed
 async def test_simple_chain_abatch(
     client: WeaveClient,
 ) -> None:
@@ -225,15 +247,13 @@ async def test_simple_chain_abatch(
 
     api_key = os.environ.get("OPENAI_API_KEY", "sk-1234567890abcdef1234567890abcdef")
 
-    llm = ChatOpenAI(
-        model_name="gpt-3.5-turbo", openai_api_key=api_key, temperature=0.0
-    )
+    llm = ChatOpenAI(model_name="gpt-4o-mini", openai_api_key=api_key, temperature=0.0)
     prompt = PromptTemplate.from_template("1 + {number} = ")
 
     llm_chain = prompt | llm
     _ = await llm_chain.abatch([{"number": 2}, {"number": 3}])
 
-    calls = list(client.calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
     assert_correct_calls_for_chain_batch(calls)
 
 
@@ -265,44 +285,59 @@ def assert_correct_calls_for_chain_batch_from_op(calls: list[Call]) -> None:
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
 )
-def test_simple_chain_batch_inside_op(
-    client: WeaveClient,
-) -> None:
+def test_simple_chain_batch_inside_op(client: WeaveClient) -> None:
     # This test is the same as test_simple_chain_batch, but ensures things work when nested in an op
     from langchain_core.prompts import PromptTemplate
     from langchain_openai import ChatOpenAI
 
     api_key = os.environ.get("OPENAI_API_KEY", "sk-1234567890abcdef1234567890abcdef")
 
-    llm = ChatOpenAI(
-        model_name="gpt-3.5-turbo", openai_api_key=api_key, temperature=0.0
-    )
+    llm = ChatOpenAI(model_name="gpt-4o-mini", openai_api_key=api_key, temperature=0.0)
     prompt = PromptTemplate.from_template("1 + {number} = ")
 
     llm_chain = prompt | llm
 
-    @weave.op()
+    @weave.op
     def run_batch(batch: list) -> None:
         _ = llm_chain.batch(batch)
 
+        # assert call stack is properly constructed, during runtime
+        parent = call_context.get_current_call()
+        assert parent is not None
+        assert "run_batch" in parent.op_name
+        assert parent.parent_id is None
+        assert len(parent.children()) == 2
+        for child in parent.children():
+            assert "langchain.Chain.RunnableSequence" in child.op_name
+            assert child.parent_id == parent.id
+
+            grandchildren = child.children()
+            assert len(grandchildren) == 2
+            assert "langchain.Prompt.PromptTemplate" in grandchildren[0].op_name
+            assert grandchildren[0].parent_id == child.id
+            assert "langchain.Llm.ChatOpenAI" in grandchildren[1].op_name
+            assert grandchildren[1].parent_id == child.id
+
     run_batch([{"number": 2}, {"number": 3}])
 
-    calls = list(client.calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
     assert_correct_calls_for_chain_batch_from_op(calls)
 
 
 def assert_correct_calls_for_rag_chain(calls: list[Call]) -> None:
     flattened = flatten_calls(calls)
-    assert len(flattened) == 10
+    assert len(flattened) == 12
     assert_ends_and_errors(flattened)
 
     got = [(op_name_from_ref(c.op_name), d) for (c, d) in flattened]
 
     exp = [
+        ("openai.embeddings.create", 0),
         ("langchain.Chain.RunnableSequence", 0),
         ("langchain.Chain.RunnableParallel_context_question", 1),
         ("langchain.Chain.RunnableSequence", 2),
         ("langchain.Retriever.VectorStoreRetriever", 3),
+        ("openai.embeddings.create", 4),
         ("langchain.Chain.format_docs", 3),
         ("langchain.Chain.RunnablePassthrough", 2),  # Potential position
         ("langchain.Prompt.ChatPromptTemplate", 1),
@@ -315,11 +350,13 @@ def assert_correct_calls_for_rag_chain(calls: list[Call]) -> None:
     # allowing for variation in the order of execution. As a result,
     # `RunnablePassthrough` may appear in one of two possible positions.
     exp_2 = [
+        ("openai.embeddings.create", 0),
         ("langchain.Chain.RunnableSequence", 0),
         ("langchain.Chain.RunnableParallel_context_question", 1),
         ("langchain.Chain.RunnablePassthrough", 2),  # Potential position
         ("langchain.Chain.RunnableSequence", 2),
         ("langchain.Retriever.VectorStoreRetriever", 3),
+        ("openai.embeddings.create", 4),
         ("langchain.Chain.format_docs", 3),
         ("langchain.Prompt.ChatPromptTemplate", 1),
         ("langchain.Llm.ChatOpenAI", 1),
@@ -357,8 +394,6 @@ def fix_chroma_ci() -> Generator[None, None, None]:
     before_record_request=filter_body,
 )
 def test_simple_rag_chain(client: WeaveClient, fix_chroma_ci: None) -> None:
-    from typing import List
-
     from langchain.text_splitter import RecursiveCharacterTextSplitter
     from langchain_community.document_loaders import TextLoader
     from langchain_community.vectorstores import Chroma
@@ -389,11 +424,9 @@ def test_simple_rag_chain(client: WeaveClient, fix_chroma_ci: None) -> None:
         "Question: {question}\nContext: {context}\nAnswer:"
     )
 
-    llm = ChatOpenAI(
-        model_name="gpt-3.5-turbo", openai_api_key=api_key, temperature=0.0
-    )
+    llm = ChatOpenAI(model_name="gpt-4o-mini", openai_api_key=api_key, temperature=0.0)
 
-    def format_docs(documents: List[Document]) -> str:
+    def format_docs(documents: list[Document]) -> str:
         return "\n\n".join(doc.page_content for doc in documents)
 
     # Chain
@@ -408,7 +441,7 @@ def test_simple_rag_chain(client: WeaveClient, fix_chroma_ci: None) -> None:
         input="What is the essay about?",
     )
 
-    calls = list(client.calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
     assert_correct_calls_for_rag_chain(calls)
 
 
@@ -471,9 +504,7 @@ def test_agent_run_with_tools(
 
     api_key = os.environ.get("OPENAI_API_KEY", "sk-1234567890abcdef1234567890abcdef")
 
-    llm = ChatOpenAI(
-        model_name="gpt-3.5-turbo", openai_api_key=api_key, temperature=0.0
-    )
+    llm = ChatOpenAI(model_name="gpt-4o-mini", openai_api_key=api_key, temperature=0.0)
 
     tools = [calculator]
     functions = [convert_to_openai_tool(t) for t in tools]
@@ -491,7 +522,7 @@ def test_agent_run_with_tools(
 
     llm_with_tools = llm.bind(tools=functions)
 
-    def _format_chat_history(chat_history: List[Tuple[str, str]]) -> List:
+    def _format_chat_history(chat_history: list[tuple[str, str]]) -> list:
         buffer = []
         for human, ai in chat_history:
             buffer.append(HumanMessage(content=human))
@@ -513,7 +544,7 @@ def test_agent_run_with_tools(
 
     class AgentInput(BaseModel):
         input: str
-        chat_history: List[Tuple[str, str]] = Field(
+        chat_history: list[tuple[str, str]] = Field(
             ...,
             extra={"widget": {"type": "chat", "input": "input", "output": "output"}},
         )
@@ -525,7 +556,7 @@ def test_agent_run_with_tools(
     _ = agent_executor.invoke(
         {"input": "What is 3 times 4 ?", "chat_history": []},
     )
-    calls = list(client.calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
     assert_correct_calls_for_agent_with_tool(calls)
 
 
@@ -589,9 +620,7 @@ def test_agent_run_with_function_call(
 
     api_key = os.environ.get("OPENAI_API_KEY", "sk-1234567890abcdef1234567890abcdef")
 
-    llm = ChatOpenAI(
-        model_name="gpt-3.5-turbo", openai_api_key=api_key, temperature=0.0
-    )
+    llm = ChatOpenAI(model_name="gpt-4o-mini", openai_api_key=api_key, temperature=0.0)
 
     tools = [calculator]
     functions = [convert_to_openai_function(t) for t in tools]
@@ -609,7 +638,7 @@ def test_agent_run_with_function_call(
 
     llm_with_tools = llm.bind(functions=functions)
 
-    def _format_chat_history(chat_history: List[Tuple[str, str]]) -> List:
+    def _format_chat_history(chat_history: list[tuple[str, str]]) -> list:
         buffer = []
         for human, ai in chat_history:
             buffer.append(HumanMessage(content=human))
@@ -631,7 +660,7 @@ def test_agent_run_with_function_call(
 
     class AgentInput(BaseModel):
         input: str
-        chat_history: List[Tuple[str, str]] = Field(
+        chat_history: list[tuple[str, str]] = Field(
             ...,
             extra={"widget": {"type": "chat", "input": "input", "output": "output"}},
         )
@@ -643,5 +672,246 @@ def test_agent_run_with_function_call(
     _ = agent_executor.invoke(
         {"input": "What is 3 times 4 ?", "chat_history": []},
     )
-    calls = list(client.calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
     assert_correct_calls_for_agent_with_function_call(calls)
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+    before_record_request=filter_body,
+)
+def test_weave_attributes_in_call(client: WeaveClient) -> None:
+    from langchain_core.prompts import PromptTemplate
+    from langchain_openai import ChatOpenAI
+
+    api_key = os.environ.get("OPENAI_API_KEY", "sk-1234567890abcdef1234567890abcdef")
+
+    llm = ChatOpenAI(model_name="gpt-4o-mini", openai_api_key=api_key, temperature=0.0)
+    prompt = PromptTemplate.from_template("1 + {number} = ")
+
+    llm_chain = prompt | llm
+    with weave.attributes({"call_attr": 1}):
+        _ = llm_chain.invoke({"number": 2})
+
+    calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    assert len(calls) > 0
+    call_attrs = calls[0].attributes
+    assert call_attrs["call_attr"] == 1
+    assert "lc_id" in call_attrs
+    assert "parent_run_id" in call_attrs
+    assert "lc_name" in call_attrs
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key", "x-goog-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai", "*.googleapis.com"],
+    before_record_request=filter_body,
+    match_on=["method", "scheme", "path", "query"],
+)
+def test_langchain_google_vertexai_usage(client: WeaveClient) -> None:
+    from google.auth.credentials import AnonymousCredentials
+    from langchain_google_vertexai import ChatVertexAI
+
+    with patch(
+        "google.auth.default", return_value=(AnonymousCredentials(), "wandb-qa")
+    ):
+        llm = ChatVertexAI(
+            model="gemini-2.5-pro-preview-05-06",
+            temperature=0,
+            max_tokens=None,
+            max_retries=2,
+            api_transport="rest",
+            credentials=AnonymousCredentials(),
+        )
+
+        messages = [
+            (
+                "system",
+                "Talk like Geralt of Rivia.",
+            ),
+            ("human", "What do you do?"),
+        ]
+
+        llm.invoke(messages)
+
+    calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    assert len(calls) > 0
+    call = calls[0]
+    # Assert that the call has usage metadata
+    assert call.summary is not None
+    assert "usage" in call.summary
+    assert "gemini-2.5-pro-preview-05-06" in call.summary["usage"].unwrap()
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+    before_record_request=filter_body,
+    match_on=["method", "scheme", "path", "query"],
+)
+def test_langchain_google_genai_usage(client: WeaveClient) -> None:
+    from langchain_google_genai import GoogleGenerativeAI
+
+    llm = GoogleGenerativeAI(
+        model="gemini-1.5-pro",
+        transport="rest",
+        google_api_key="SUPER_FAKE_API_KEY",
+    )
+
+    llm.invoke(
+        [
+            ("system", "Talk like Geralt of Rivia."),
+            ("human", "what do you think about the future of AI?"),
+        ]
+    )
+
+    calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    assert len(calls) > 0
+    call = calls[0]
+    # Assert that the call has usage metadata
+    assert call.summary is not None
+    assert "usage" in call.summary
+    assert "gemini-1.5-pro-002" in call.summary["usage"].unwrap()
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+    before_record_request=filter_body,
+    match_on=["method", "scheme", "path", "query"],
+)
+def test_langchain_google_chat_genai_usage(client: WeaveClient) -> None:
+    from langchain_google_genai import ChatGoogleGenerativeAI
+
+    llm = ChatGoogleGenerativeAI(
+        model="gemini-1.5-pro",
+        transport="rest",
+        google_api_key="SUPER_FAKE_API_KEY",
+    )
+
+    llm.invoke(
+        [
+            ("system", "Talk like Geralt of Rivia."),
+            ("human", "what do you think about the future of AI?"),
+        ]
+    )
+
+    calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    assert len(calls) > 0
+    call = calls[0]
+    # Assert that the call has usage metadata
+    assert call.summary is not None
+    assert "usage" in call.summary
+    assert "gemini-1.5-pro-002" in call.summary["usage"].unwrap()
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+    before_record_request=filter_body,
+)
+def test_langchain_anthropic_usage(client: WeaveClient) -> None:
+    from langchain_anthropic import ChatAnthropic
+
+    model = ChatAnthropic(
+        model="claude-opus-4-20250514",
+        anthropic_api_key="sk-ant-api03-fake-key",
+    )
+
+    model.invoke(
+        [
+            (
+                "system",
+                "Talk like Geralt of Rivia.",
+            ),
+            (
+                "human",
+                "Are semicolons optional in JavaScript? You should also reasonate why as a witcher, you know about JavaScript.",
+            ),
+        ]
+    )
+
+    calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    assert len(calls) > 0
+    call = calls[0]
+    # Assert that the call has usage metadata
+    assert call.summary is not None
+    assert "usage" in call.summary
+    assert "claude-opus-4-20250514" in call.summary["usage"].unwrap()
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+    before_record_request=filter_body,
+)
+def test_langchain_cohere_usage(client: WeaveClient) -> None:
+    from langchain_cohere import ChatCohere
+
+    model = ChatCohere(
+        model="command-r",
+        cohere_api_key="SUPER_FAKE_API_KEY",
+    )
+
+    model.invoke(
+        [
+            (
+                "system",
+                "Talk like Geralt of Rivia.",
+            ),
+            (
+                "human",
+                "Are semicolons optional in JavaScript? You should also reasonate why as a witcher, you know about JavaScript.",
+            ),
+        ]
+    )
+
+    calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    assert len(calls) > 0
+    call = calls[0]
+    # Assert that the call has usage metadata
+    assert call.summary is not None
+    assert "usage" in call.summary
+    assert "command-r" in call.summary["usage"].unwrap()
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+    before_record_request=filter_body,
+)
+def test_langchain_litellm_usage(client: WeaveClient) -> None:
+    from langchain_litellm import ChatLiteLLM
+
+    model = ChatLiteLLM(
+        model="gpt-4.1-mini",
+    )
+
+    model.invoke(
+        [
+            (
+                "system",
+                "Talk like Geralt of Rivia.",
+            ),
+            (
+                "human",
+                "Are semicolons optional in JavaScript? You should also reasonate why as a witcher, you know about JavaScript.",
+            ),
+        ]
+    )
+
+    calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
+    assert len(calls) > 0
+    call = calls[0]
+    # Assert that the call has usage metadata
+    assert call.summary is not None
+    assert "usage" in call.summary
+    assert "gpt-4.1-mini" in call.summary["usage"].unwrap()

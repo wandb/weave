@@ -1,10 +1,10 @@
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any, Optional, Union
 
 import pandas as pd
 from notdiamond.toolkit.custom_router import CustomRouter
 
 import weave
-from weave.flow.eval import EvaluationResults
+from weave.evaluation.eval import EvaluationResults
 
 
 @weave.op(
@@ -20,7 +20,7 @@ def train_router(
     api_key: Optional[str] = None,
 ) -> CustomRouter:
     """Currently only supports EvaluationResults with a single score column."""
-    router_dataset: Dict[str, pd.DataFrame] = {}
+    router_dataset: dict[str, pd.DataFrame] = {}
 
     for model, eval_results in model_evals.items():
         if isinstance(model, weave.Model):
@@ -49,8 +49,8 @@ def evaluate_router(
     response_column: str,
     preference_id: str,
     api_key: Optional[str] = None,
-) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    router_dataset: Dict[str, pd.DataFrame] = {}
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    router_dataset: dict[str, pd.DataFrame] = {}
 
     for model, dataset in model_datasets.items():
         score_column, model_df = _build_dataframe(model, dataset)
@@ -78,12 +78,13 @@ def evaluate_router(
         )
 
     model_results = _get_model_results(best_provider)
-    nd_results = _get_model_results("notdiamond")
+    not_diamond_results = _get_model_results("notdiamond")
 
     class _DummyEvalModel(weave.Model):
         model_results: pd.DataFrame
 
-        def predict(self, prompt: str) -> Dict[str, Any]:
+        @weave.op
+        def predict(self, prompt: str) -> dict[str, Any]:
             response, score = self.model_results[
                 self.model_results[prompt_column] == prompt
             ][["response", "score"]].values[0]
@@ -92,26 +93,26 @@ def evaluate_router(
     class BestRoutedModel(_DummyEvalModel):
         model_name: str
 
-        @weave.op()
-        def predict(self, prompt: str) -> Dict[str, Any]:
+        @weave.op
+        def predict(self, prompt: str) -> dict[str, Any]:
             return super().predict(prompt)
 
     class NotDiamondRoutedModel(_DummyEvalModel):
-        @weave.op()
-        def predict(self, prompt: str) -> Dict[str, Any]:
+        @weave.op
+        def predict(self, prompt: str) -> dict[str, Any]:
             return super().predict(prompt)
 
     best_provider_model = BestRoutedModel(
         model_name=best_provider, model_results=model_results
     )
-    nd_model = NotDiamondRoutedModel(model_results=nd_results)
+    not_diamond_model = NotDiamondRoutedModel(model_results=not_diamond_results)
 
-    return best_provider_model, nd_model
+    return best_provider_model, not_diamond_model
 
 
 def _get_score_column(
     model: str, scores: dict, score_col_name: Optional[str] = None
-) -> Tuple[str, float]:
+) -> tuple[str, float]:
     """
     Extract a single score from the nested `scores` column.
         - raise for multiple scores
@@ -123,29 +124,29 @@ def _get_score_column(
         )
 
     score_column, score_val = next(iter(scores.items()))
-    _nd_score_column = f"{score_column}_score"
-    if score_col_name is not None and _nd_score_column != score_col_name:
+    not_diamond_score_column = f"{score_column}_score"
+    if score_col_name is not None and not_diamond_score_column != score_col_name:
         raise ValueError(
-            f"Multiple eval scores for {model}: {score_col_name} and {_nd_score_column}. "
+            f"Multiple eval scores for {model}: {score_col_name} and {not_diamond_score_column}. "
             "Please specify a single score column."
         )
 
-    return _nd_score_column, score_val
+    return not_diamond_score_column, score_val
 
 
 def _build_dataframe(
     model: str, dataset: Union[EvaluationResults, weave.Dataset]
-) -> Tuple[str, pd.DataFrame]:
+) -> tuple[str, pd.DataFrame]:
     df_rows = []
     score_col_name = None
     for row in dataset.rows:
-        _df_row = dict()
+        df_row = {}
         for col, val in row.items():
             if col == "scores":
                 col, val = _get_score_column(model, val, score_col_name=score_col_name)
                 score_col_name = score_col_name or col
-            _df_row[col] = val
-        df_rows.append(_df_row)
+            df_row[col] = val
+        df_rows.append(df_row)
 
     if score_col_name is None:
         raise ValueError(f"No score column found for {model}. Is this correct?")

@@ -1,7 +1,8 @@
 import copy
 import datetime
 from collections import OrderedDict, defaultdict
-from typing import Any, Dict, Optional, Tuple, cast
+from collections.abc import Iterator
+from typing import Any, Optional, cast
 
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
@@ -31,12 +32,17 @@ def make_feedback_query_req(
     feedback_query_req = tsi.FeedbackQueryReq(
         project_id=project_id,
         fields=[
+            "id",
             "feedback_type",
             "weave_ref",
             "payload",
             "creator",
             "created_at",
             "wb_user_id",
+            "runnable_ref",
+            "call_ref",
+            "trigger_ref",
+            "annotation_ref",
         ],
         query=query,
     )
@@ -64,7 +70,7 @@ def hydrate_calls_with_feedback(
 
 
 def make_derived_summary_fields(
-    summary: Dict[str, Any],
+    summary: dict[str, Any],
     op_name: str,
     started_at: Optional[datetime.datetime] = None,
     ended_at: Optional[datetime.datetime] = None,
@@ -84,6 +90,8 @@ def make_derived_summary_fields(
         status = tsi.TraceStatus.ERROR
     elif ended_at is None:
         status = tsi.TraceStatus.RUNNING
+    elif summary.get("status_counts", {}).get(tsi.TraceStatus.ERROR, 0) > 0:
+        status = tsi.TraceStatus.DESCENDANT_ERROR
     weave_summary["status"] = status
 
     if ended_at and started_at:
@@ -112,7 +120,7 @@ def empty_str_to_none(val: Optional[str]) -> Optional[str]:
     return val if val != "" else None
 
 
-def get_nested_key(d: Dict[str, Any], col: str) -> Optional[Any]:
+def get_nested_key(d: dict[str, Any], col: str) -> Optional[Any]:
     """
     Get a nested key from a dict. None if not found.
 
@@ -134,7 +142,7 @@ def get_nested_key(d: Dict[str, Any], col: str) -> Optional[Any]:
     return _get(curr, keys[-1])
 
 
-def set_nested_key(d: Dict[str, Any], col: str, val: Any) -> None:
+def set_nested_key(d: dict[str, Any], col: str, val: Any) -> None:
     """
     Set a nested key in a dict.
 
@@ -156,7 +164,7 @@ def set_nested_key(d: Dict[str, Any], col: str, val: Any) -> None:
 
 
 class LRUCache(OrderedDict):
-    def __init__(self, max_size: int = 1000, *args: Any, **kwargs: Dict[str, Any]):
+    def __init__(self, max_size: int = 1000, *args: Any, **kwargs: dict[str, Any]):
         self.max_size = max_size
         super().__init__(*args, **kwargs)
 
@@ -166,7 +174,34 @@ class LRUCache(OrderedDict):
         super().__setitem__(key, value)
 
 
-def digest_is_version_like(digest: str) -> Tuple[bool, int]:
+class DynamicBatchProcessor:
+    """Helper class to handle dynamic batch processing with growing batch sizes."""
+
+    def __init__(self, initial_size: int, max_size: int, growth_factor: int):
+        self.batch_size = initial_size
+        self.max_size = max_size
+        self.growth_factor = growth_factor
+
+    def make_batches(self, iterator: Iterator[Any]) -> Iterator[list[Any]]:
+        batch = []
+
+        for item in iterator:
+            batch.append(item)
+
+            if len(batch) >= self.batch_size:
+                yield batch
+
+                batch = []
+                self.batch_size = self._compute_batch_size()
+
+        if batch:
+            yield batch
+
+    def _compute_batch_size(self) -> int:
+        return min(self.max_size, self.batch_size * self.growth_factor)
+
+
+def digest_is_version_like(digest: str) -> tuple[bool, int]:
     """
     Check if a digest is a version like string.
 
@@ -180,3 +215,15 @@ def digest_is_version_like(digest: str) -> Tuple[bool, int]:
         return (True, int(digest[1:]))
     except ValueError:
         return (False, -1)
+
+
+MAX_FILTER_LENGTH = 1000
+
+
+def assert_parameter_length_less_than_max(
+    param_name: str, arr_len: int, max_length: int = MAX_FILTER_LENGTH
+) -> None:
+    if arr_len > max_length:
+        raise ValueError(
+            f"Parameter: '{param_name}' request length is greater than max length ({max_length}). Actual length: {arr_len}"
+        )

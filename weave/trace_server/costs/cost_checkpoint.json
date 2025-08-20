@@ -13,6 +13,12 @@
       "input": 5e-06,
       "output": 1.5e-05,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "openai",
+      "input": 2.5e-06,
+      "output": 1e-05,
+      "created_at": "2024-12-18 09:00:21"
     }
   ],
   "gpt-4o-mini": [
@@ -37,6 +43,12 @@
       "input": 3e-06,
       "output": 1.2e-05,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "openai",
+      "input": 1.1e-06,
+      "output": 4.4e-06,
+      "created_at": "2025-02-07 09:59:48"
     }
   ],
   "o1-mini-2024-09-12": [
@@ -373,6 +385,12 @@
       "input": 3e-06,
       "output": 1.2e-05,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "azure",
+      "input": 1.21e-06,
+      "output": 4.84e-06,
+      "created_at": "2025-03-24 09:26:55"
     }
   ],
   "azure/o1-mini-2024-09-12": [
@@ -381,6 +399,18 @@
       "input": 3e-06,
       "output": 1.2e-05,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "azure",
+      "input": 1.21e-06,
+      "output": 4.84e-06,
+      "created_at": "2025-03-24 09:26:55"
+    },
+    {
+      "provider": "azure",
+      "input": 1.1e-06,
+      "output": 4.4e-06,
+      "created_at": "2025-05-07 11:01:51"
     }
   ],
   "azure/o1-preview": [
@@ -405,6 +435,12 @@
       "input": 5e-06,
       "output": 1.5e-05,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "azure",
+      "input": 2.5e-06,
+      "output": 1e-05,
+      "created_at": "2025-03-24 09:26:55"
     }
   ],
   "azure/gpt-4o-2024-08-06": [
@@ -413,6 +449,12 @@
       "input": 2.75e-06,
       "output": 1.1e-05,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "azure",
+      "input": 2.5e-06,
+      "output": 1e-05,
+      "created_at": "2025-03-24 09:26:55"
     }
   ],
   "azure/global-standard/gpt-4o-2024-08-06": [
@@ -789,6 +831,12 @@
       "input": 1e-06,
       "output": 3e-06,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "mistral",
+      "input": 1e-07,
+      "output": 3e-07,
+      "created_at": "2025-03-24 09:26:55"
     }
   ],
   "mistral/mistral-small-latest": [
@@ -797,6 +845,12 @@
       "input": 1e-06,
       "output": 3e-06,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "mistral",
+      "input": 1e-07,
+      "output": 3e-07,
+      "created_at": "2025-03-24 09:26:55"
     }
   ],
   "mistral/mistral-medium": [
@@ -813,6 +867,12 @@
       "input": 2.7e-06,
       "output": 8.1e-06,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "mistral",
+      "input": 4e-07,
+      "output": 2e-06,
+      "created_at": "2025-06-02 13:06:48"
     }
   ],
   "mistral/mistral-medium-2312": [
@@ -829,6 +889,12 @@
       "input": 3e-06,
       "output": 9e-06,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "mistral",
+      "input": 2e-06,
+      "output": 6e-06,
+      "created_at": "2025-01-13 16:54:01"
     }
   ],
   "mistral/mistral-large-2402": [
@@ -1405,6 +1471,18 @@
       "input": 5e-06,
       "output": 1.5e-05,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 7.8125e-08,
+      "output": 3.125e-07,
+      "created_at": "2024-11-01 09:09:13"
+    },
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 1.25e-06,
+      "output": 5e-06,
+      "created_at": "2024-12-18 09:00:21"
     }
   ],
   "gemini-1.5-pro-002": [
@@ -1413,6 +1491,18 @@
       "input": 5e-06,
       "output": 1.5e-05,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 7.8125e-08,
+      "output": 3.125e-07,
+      "created_at": "2024-11-01 09:09:13"
+    },
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 1.25e-06,
+      "output": 5e-06,
+      "created_at": "2024-12-18 09:00:21"
     }
   ],
   "gemini-1.5-pro-001": [
@@ -1421,6 +1511,18 @@
       "input": 5e-06,
       "output": 1.5e-05,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 7.8125e-08,
+      "output": 3.125e-07,
+      "created_at": "2024-11-01 09:09:13"
+    },
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 1.25e-06,
+      "output": 5e-06,
+      "created_at": "2024-12-18 09:00:21"
     }
   ],
   "gemini-1.5-pro-preview-0514": [
@@ -1429,6 +1531,12 @@
       "input": 5e-06,
       "output": 1.5e-05,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 7.8125e-08,
+      "output": 3.125e-07,
+      "created_at": "2024-11-01 09:09:13"
     }
   ],
   "gemini-1.5-pro-preview-0215": [
@@ -1437,6 +1545,12 @@
       "input": 5e-06,
       "output": 1.5e-05,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 7.8125e-08,
+      "output": 3.125e-07,
+      "created_at": "2024-11-01 09:09:13"
     }
   ],
   "gemini-1.5-pro-preview-0409": [
@@ -1445,6 +1559,12 @@
       "input": 5e-06,
       "output": 1.5e-05,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 7.8125e-08,
+      "output": 3.125e-07,
+      "created_at": "2024-11-01 09:09:13"
     }
   ],
   "gemini-1.5-flash": [
@@ -1453,6 +1573,18 @@
       "input": 5e-07,
       "output": 1.5e-06,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 4.688e-09,
+      "output": 4.6875e-09,
+      "created_at": "2024-11-01 09:09:13"
+    },
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 7.5e-08,
+      "output": 3e-07,
+      "created_at": "2024-12-18 09:00:21"
     }
   ],
   "gemini-1.5-flash-exp-0827": [
@@ -1461,6 +1593,12 @@
       "input": 5e-07,
       "output": 1.5e-06,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 4.688e-09,
+      "output": 4.6875e-09,
+      "created_at": "2024-11-01 09:09:13"
     }
   ],
   "gemini-1.5-flash-002": [
@@ -1469,6 +1607,18 @@
       "input": 5e-07,
       "output": 1.5e-06,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 4.688e-09,
+      "output": 4.6875e-09,
+      "created_at": "2024-11-01 09:09:13"
+    },
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 7.5e-08,
+      "output": 3e-07,
+      "created_at": "2024-12-18 09:00:21"
     }
   ],
   "gemini-1.5-flash-001": [
@@ -1477,6 +1627,18 @@
       "input": 5e-07,
       "output": 1.5e-06,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 4.688e-09,
+      "output": 4.6875e-09,
+      "created_at": "2024-11-01 09:09:13"
+    },
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 7.5e-08,
+      "output": 3e-07,
+      "created_at": "2024-12-18 09:00:21"
     }
   ],
   "gemini-1.5-flash-preview-0514": [
@@ -1485,6 +1647,18 @@
       "input": 5e-07,
       "output": 1.5e-06,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 4.688e-09,
+      "output": 4.6875e-09,
+      "created_at": "2024-11-01 09:09:13"
+    },
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 7.5e-08,
+      "output": 4.6875e-09,
+      "created_at": "2024-12-18 09:00:21"
     }
   ],
   "gemini-pro-experimental": [
@@ -1509,6 +1683,12 @@
       "input": 2.5e-07,
       "output": 5e-07,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "vertex_ai-vision-models",
+      "input": 5e-07,
+      "output": 1.5e-06,
+      "created_at": "2025-02-07 09:59:48"
     }
   ],
   "gemini-1.0-pro-vision": [
@@ -1517,6 +1697,12 @@
       "input": 2.5e-07,
       "output": 5e-07,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "vertex_ai-vision-models",
+      "input": 5e-07,
+      "output": 1.5e-06,
+      "created_at": "2025-02-07 09:59:48"
     }
   ],
   "gemini-1.0-pro-vision-001": [
@@ -1525,6 +1711,12 @@
       "input": 2.5e-07,
       "output": 5e-07,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "vertex_ai-vision-models",
+      "input": 5e-07,
+      "output": 1.5e-06,
+      "created_at": "2025-02-07 09:59:48"
     }
   ],
   "vertex_ai/claude-3-sonnet@20240229": [
@@ -1597,6 +1789,12 @@
       "input": 3e-06,
       "output": 9e-06,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "vertex_ai-mistral_models",
+      "input": 2e-06,
+      "output": 6e-06,
+      "created_at": "2025-01-13 16:54:01"
     }
   ],
   "vertex_ai/mistral-large@2407": [
@@ -1605,6 +1803,12 @@
       "input": 3e-06,
       "output": 9e-06,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "vertex_ai-mistral_models",
+      "input": 2e-06,
+      "output": 6e-06,
+      "created_at": "2025-01-13 16:54:01"
     }
   ],
   "vertex_ai/mistral-nemo@latest": [
@@ -1613,6 +1817,12 @@
       "input": 3e-06,
       "output": 3e-06,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "vertex_ai-mistral_models",
+      "input": 1.5e-07,
+      "output": 1.5e-07,
+      "created_at": "2025-01-13 16:54:01"
     }
   ],
   "vertex_ai/jamba-1.5-mini@001": [
@@ -1669,6 +1879,12 @@
       "input": 1e-06,
       "output": 3e-06,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "vertex_ai-mistral_models",
+      "input": 2e-07,
+      "output": 6e-07,
+      "created_at": "2025-01-13 16:54:01"
     }
   ],
   "vertex_ai/codestral@2405": [
@@ -1677,6 +1893,12 @@
       "input": 1e-06,
       "output": 3e-06,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "vertex_ai-mistral_models",
+      "input": 2e-07,
+      "output": 6e-07,
+      "created_at": "2025-01-13 16:54:01"
     }
   ],
   "text-embedding-004": [
@@ -1685,6 +1907,12 @@
       "input": 6.25e-09,
       "output": 0.0,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "vertex_ai-embedding-models",
+      "input": 1e-07,
+      "output": 0.0,
+      "created_at": "2024-12-18 09:00:21"
     }
   ],
   "text-multilingual-embedding-002": [
@@ -1693,6 +1921,12 @@
       "input": 6.25e-09,
       "output": 0.0,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "vertex_ai-embedding-models",
+      "input": 1e-07,
+      "output": 0.0,
+      "created_at": "2024-12-18 09:00:21"
     }
   ],
   "textembedding-gecko": [
@@ -1701,6 +1935,12 @@
       "input": 6.25e-09,
       "output": 0.0,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "vertex_ai-embedding-models",
+      "input": 1e-07,
+      "output": 0.0,
+      "created_at": "2024-12-18 09:00:21"
     }
   ],
   "textembedding-gecko-multilingual": [
@@ -1709,6 +1949,12 @@
       "input": 6.25e-09,
       "output": 0.0,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "vertex_ai-embedding-models",
+      "input": 1e-07,
+      "output": 0.0,
+      "created_at": "2024-12-18 09:00:21"
     }
   ],
   "textembedding-gecko-multilingual@001": [
@@ -1717,6 +1963,12 @@
       "input": 6.25e-09,
       "output": 0.0,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "vertex_ai-embedding-models",
+      "input": 1e-07,
+      "output": 0.0,
+      "created_at": "2024-12-18 09:00:21"
     }
   ],
   "textembedding-gecko@001": [
@@ -1725,6 +1977,12 @@
       "input": 6.25e-09,
       "output": 0.0,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "vertex_ai-embedding-models",
+      "input": 1e-07,
+      "output": 0.0,
+      "created_at": "2024-12-18 09:00:21"
     }
   ],
   "textembedding-gecko@003": [
@@ -1733,6 +1991,12 @@
       "input": 6.25e-09,
       "output": 0.0,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "vertex_ai-embedding-models",
+      "input": 1e-07,
+      "output": 0.0,
+      "created_at": "2024-12-18 09:00:21"
     }
   ],
   "text-embedding-preview-0409": [
@@ -2365,6 +2629,12 @@
       "input": 5e-06,
       "output": 1.5e-05,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "openrouter",
+      "input": 2.5e-06,
+      "output": 1e-05,
+      "created_at": "2025-04-14 09:41:48"
     }
   ],
   "openrouter/openai/gpt-4o-2024-05-13": [
@@ -3061,6 +3331,12 @@
       "input": 1.63e-06,
       "output": 5.51e-06,
       "created_at": "2024-10-08 08:45:39"
+    },
+    {
+      "provider": "bedrock",
+      "input": 8e-07,
+      "output": 2.4e-06,
+      "created_at": "2025-01-30 08:14:14"
     }
   ],
   "bedrock/us-east-1/anthropic.claude-instant-v1": [
@@ -4381,6 +4657,4764 @@
       "input": 1.2999e-07,
       "output": 0.0,
       "created_at": "2024-10-08 08:45:39"
+    }
+  ],
+  "gpt-4o-audio-preview": [
+    {
+      "provider": "openai",
+      "input": 2.5e-06,
+      "output": 1e-05,
+      "created_at": "2024-11-01 09:09:13"
+    }
+  ],
+  "gpt-4o-audio-preview-2024-10-01": [
+    {
+      "provider": "openai",
+      "input": 2.5e-06,
+      "output": 1e-05,
+      "created_at": "2024-11-01 09:09:13"
+    }
+  ],
+  "azure/gpt-4o-2024-05-13": [
+    {
+      "provider": "azure",
+      "input": 5e-06,
+      "output": 1.5e-05,
+      "created_at": "2024-11-01 09:09:13"
+    }
+  ],
+  "azure/gpt-4o-mini-2024-07-18": [
+    {
+      "provider": "azure",
+      "input": 1.65e-07,
+      "output": 6.6e-07,
+      "created_at": "2024-11-01 09:09:13"
+    }
+  ],
+  "azure_ai/Meta-Llama-3.1-8B-Instruct": [
+    {
+      "provider": "azure_ai",
+      "input": 3e-07,
+      "output": 6.1e-07,
+      "created_at": "2024-11-01 09:09:13"
+    }
+  ],
+  "azure_ai/Meta-Llama-3.1-70B-Instruct": [
+    {
+      "provider": "azure_ai",
+      "input": 2.68e-06,
+      "output": 3.54e-06,
+      "created_at": "2024-11-01 09:09:13"
+    }
+  ],
+  "azure_ai/Meta-Llama-3.1-405B-Instruct": [
+    {
+      "provider": "azure_ai",
+      "input": 5.33e-06,
+      "output": 1.6e-05,
+      "created_at": "2024-11-01 09:09:13"
+    }
+  ],
+  "xai/grok-beta": [
+    {
+      "provider": "xai",
+      "input": 5e-06,
+      "output": 1.5e-05,
+      "created_at": "2024-11-01 09:09:13"
+    }
+  ],
+  "claude-3-5-sonnet-20241022": [
+    {
+      "provider": "anthropic",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2024-11-01 09:09:13"
+    }
+  ],
+  "vertex_ai/claude-3-5-sonnet-v2@20241022": [
+    {
+      "provider": "vertex_ai-anthropic_models",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2024-11-01 09:09:13"
+    }
+  ],
+  "anthropic/claude-3-5-sonnet-20241022": [
+    {
+      "provider": "anthropic",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2024-11-01 09:09:13"
+    }
+  ],
+  "amazon.titan-embed-image-v1": [
+    {
+      "provider": "bedrock",
+      "input": 8e-07,
+      "output": 0.0,
+      "created_at": "2024-11-01 09:09:13"
+    }
+  ],
+  "anthropic.claude-3-5-sonnet-20241022-v2:0": [
+    {
+      "provider": "bedrock",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2024-11-01 09:09:13"
+    }
+  ],
+  "us.anthropic.claude-3-5-sonnet-20241022-v2:0": [
+    {
+      "provider": "bedrock",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2024-11-01 09:09:13"
+    }
+  ],
+  "eu.anthropic.claude-3-5-sonnet-20241022-v2:0": [
+    {
+      "provider": "bedrock",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2024-11-01 09:09:13"
+    }
+  ],
+  "meta.llama3-2-1b-instruct-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 1e-07,
+      "output": 1e-07,
+      "created_at": "2024-11-01 09:09:13"
+    }
+  ],
+  "us.meta.llama3-2-1b-instruct-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 1e-07,
+      "output": 1e-07,
+      "created_at": "2024-11-01 09:09:13"
+    }
+  ],
+  "eu.meta.llama3-2-1b-instruct-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 1.3e-07,
+      "output": 1.3e-07,
+      "created_at": "2024-11-01 09:09:13"
+    }
+  ],
+  "meta.llama3-2-3b-instruct-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 1.5e-07,
+      "output": 1.5e-07,
+      "created_at": "2024-11-01 09:09:13"
+    }
+  ],
+  "us.meta.llama3-2-3b-instruct-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 1.5e-07,
+      "output": 1.5e-07,
+      "created_at": "2024-11-01 09:09:13"
+    }
+  ],
+  "eu.meta.llama3-2-3b-instruct-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 1.9e-07,
+      "output": 1.9e-07,
+      "created_at": "2024-11-01 09:09:13"
+    }
+  ],
+  "meta.llama3-2-11b-instruct-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 3.5e-07,
+      "output": 3.5e-07,
+      "created_at": "2024-11-01 09:09:13"
+    }
+  ],
+  "us.meta.llama3-2-11b-instruct-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 3.5e-07,
+      "output": 3.5e-07,
+      "created_at": "2024-11-01 09:09:13"
+    }
+  ],
+  "meta.llama3-2-90b-instruct-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 2e-06,
+      "output": 2e-06,
+      "created_at": "2024-11-01 09:09:13"
+    }
+  ],
+  "us.meta.llama3-2-90b-instruct-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 2e-06,
+      "output": 2e-06,
+      "created_at": "2024-11-01 09:09:13"
+    }
+  ],
+  "voyage/voyage-finance-2": [
+    {
+      "provider": "voyage",
+      "input": 1.2e-07,
+      "output": 0.0,
+      "created_at": "2024-11-01 09:09:13"
+    }
+  ],
+  "gpt-4o-mini-audio-preview-2024-12-17": [
+    {
+      "provider": "openai",
+      "input": 1.5e-07,
+      "output": 6e-07,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "o1": [
+    {
+      "provider": "openai",
+      "input": 1.5e-05,
+      "output": 6e-05,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "o1-2024-12-17": [
+    {
+      "provider": "openai",
+      "input": 1.5e-05,
+      "output": 6e-05,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "gpt-4o-2024-11-20": [
+    {
+      "provider": "openai",
+      "input": 2.5e-06,
+      "output": 1e-05,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "gpt-4o-realtime-preview-2024-10-01": [
+    {
+      "provider": "openai",
+      "input": 5e-06,
+      "output": 2e-05,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "gpt-4o-realtime-preview": [
+    {
+      "provider": "openai",
+      "input": 5e-06,
+      "output": 2e-05,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "gpt-4o-realtime-preview-2024-12-17": [
+    {
+      "provider": "openai",
+      "input": 5e-06,
+      "output": 2e-05,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "gpt-4o-mini-realtime-preview": [
+    {
+      "provider": "openai",
+      "input": 6e-07,
+      "output": 2.4e-06,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "gpt-4o-mini-realtime-preview-2024-12-17": [
+    {
+      "provider": "openai",
+      "input": 6e-07,
+      "output": 2.4e-06,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "ft:gpt-4o-2024-11-20": [
+    {
+      "provider": "openai",
+      "input": 3.75e-06,
+      "output": 1.5e-05,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "azure/gpt-4o-2024-11-20": [
+    {
+      "provider": "azure",
+      "input": 2.75e-06,
+      "output": 1.1e-05,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "azure/global-standard/gpt-4o-2024-11-20": [
+    {
+      "provider": "azure",
+      "input": 2.5e-06,
+      "output": 1e-05,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "azure_ai/mistral-large-2407": [
+    {
+      "provider": "azure_ai",
+      "input": 2e-06,
+      "output": 6e-06,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "azure_ai/ministral-3b": [
+    {
+      "provider": "azure_ai",
+      "input": 4e-08,
+      "output": 4e-08,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "azure_ai/Llama-3.2-11B-Vision-Instruct": [
+    {
+      "provider": "azure_ai",
+      "input": 3.7e-07,
+      "output": 3.7e-07,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "azure_ai/Llama-3.3-70B-Instruct": [
+    {
+      "provider": "azure_ai",
+      "input": 7.1e-07,
+      "output": 7.1e-07,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "azure_ai/Llama-3.2-90B-Vision-Instruct": [
+    {
+      "provider": "azure_ai",
+      "input": 2.04e-06,
+      "output": 2.04e-06,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "azure_ai/Phi-3.5-mini-instruct": [
+    {
+      "provider": "azure_ai",
+      "input": 1.3e-07,
+      "output": 5.2e-07,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "azure_ai/Phi-3.5-vision-instruct": [
+    {
+      "provider": "azure_ai",
+      "input": 1.3e-07,
+      "output": 5.2e-07,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "azure_ai/Phi-3.5-MoE-instruct": [
+    {
+      "provider": "azure_ai",
+      "input": 1.6e-07,
+      "output": 6.4e-07,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "azure_ai/Phi-3-mini-4k-instruct": [
+    {
+      "provider": "azure_ai",
+      "input": 1.3e-07,
+      "output": 5.2e-07,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "azure_ai/Phi-3-mini-128k-instruct": [
+    {
+      "provider": "azure_ai",
+      "input": 1.3e-07,
+      "output": 5.2e-07,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "azure_ai/Phi-3-small-8k-instruct": [
+    {
+      "provider": "azure_ai",
+      "input": 1.5e-07,
+      "output": 6e-07,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "azure_ai/Phi-3-small-128k-instruct": [
+    {
+      "provider": "azure_ai",
+      "input": 1.5e-07,
+      "output": 6e-07,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "azure_ai/Phi-3-medium-4k-instruct": [
+    {
+      "provider": "azure_ai",
+      "input": 1.7e-07,
+      "output": 6.8e-07,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "azure_ai/Phi-3-medium-128k-instruct": [
+    {
+      "provider": "azure_ai",
+      "input": 1.7e-07,
+      "output": 6.8e-07,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "groq/llama-3.3-70b-versatile": [
+    {
+      "provider": "groq",
+      "input": 5.9e-07,
+      "output": 7.9e-07,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "groq/llama-3.3-70b-specdec": [
+    {
+      "provider": "groq",
+      "input": 5.9e-07,
+      "output": 9.9e-07,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "groq/llama-3.2-1b-preview": [
+    {
+      "provider": "groq",
+      "input": 4e-08,
+      "output": 4e-08,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "groq/llama-3.2-3b-preview": [
+    {
+      "provider": "groq",
+      "input": 6e-08,
+      "output": 6e-08,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "groq/llama-3.2-11b-text-preview": [
+    {
+      "provider": "groq",
+      "input": 1.8e-07,
+      "output": 1.8e-07,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "groq/llama-3.2-11b-vision-preview": [
+    {
+      "provider": "groq",
+      "input": 1.8e-07,
+      "output": 1.8e-07,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "groq/llama-3.2-90b-text-preview": [
+    {
+      "provider": "groq",
+      "input": 9e-07,
+      "output": 9e-07,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "groq/llama-3.2-90b-vision-preview": [
+    {
+      "provider": "groq",
+      "input": 9e-07,
+      "output": 9e-07,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "claude-3-5-haiku-20241022": [
+    {
+      "provider": "anthropic",
+      "input": 1e-06,
+      "output": 5e-06,
+      "created_at": "2024-12-18 09:00:21"
+    },
+    {
+      "provider": "anthropic",
+      "input": 8e-07,
+      "output": 4e-06,
+      "created_at": "2025-03-03 16:02:46"
+    }
+  ],
+  "gemini-2.0-flash-exp": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2024-12-18 09:00:21"
+    },
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 1.5e-07,
+      "output": 6e-07,
+      "created_at": "2025-05-07 11:01:51"
+    }
+  ],
+  "vertex_ai/claude-3-sonnet": [
+    {
+      "provider": "vertex_ai-anthropic_models",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "vertex_ai/claude-3-5-sonnet": [
+    {
+      "provider": "vertex_ai-anthropic_models",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "vertex_ai/claude-3-5-sonnet-v2": [
+    {
+      "provider": "vertex_ai-anthropic_models",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "vertex_ai/claude-3-haiku": [
+    {
+      "provider": "vertex_ai-anthropic_models",
+      "input": 2.5e-07,
+      "output": 1.25e-06,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "vertex_ai/claude-3-5-haiku": [
+    {
+      "provider": "vertex_ai-anthropic_models",
+      "input": 1e-06,
+      "output": 5e-06,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "vertex_ai/claude-3-5-haiku@20241022": [
+    {
+      "provider": "vertex_ai-anthropic_models",
+      "input": 1e-06,
+      "output": 5e-06,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "vertex_ai/claude-3-opus": [
+    {
+      "provider": "vertex_ai-anthropic_models",
+      "input": 1.5e-05,
+      "output": 7.5e-05,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "text-embedding-005": [
+    {
+      "provider": "vertex_ai-embedding-models",
+      "input": 1e-07,
+      "output": 0.0,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "gemini/gemini-1.5-flash-8b": [
+    {
+      "provider": "gemini",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "gemini/gemini-exp-1114": [
+    {
+      "provider": "gemini",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "gemini/gemini-exp-1206": [
+    {
+      "provider": "gemini",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "rerank-v3.5": [
+    {
+      "provider": "cohere",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "openrouter/anthropic/claude-3-5-haiku": [
+    {
+      "provider": "openrouter",
+      "input": 1e-06,
+      "output": 5e-06,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "openrouter/anthropic/claude-3-5-haiku-20241022": [
+    {
+      "provider": "openrouter",
+      "input": 1e-06,
+      "output": 5e-06,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "openrouter/qwen/qwen-2.5-coder-32b-instruct": [
+    {
+      "provider": "openrouter",
+      "input": 1.8e-07,
+      "output": 1.8e-07,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "amazon.nova-micro-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 3.5e-08,
+      "output": 1.4e-07,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "amazon.nova-lite-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 6e-08,
+      "output": 2.4e-07,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "amazon.nova-pro-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 8e-07,
+      "output": 3.2e-06,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "anthropic.claude-3-5-haiku-20241022-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 1e-06,
+      "output": 5e-06,
+      "created_at": "2024-12-18 09:00:21"
+    },
+    {
+      "provider": "bedrock",
+      "input": 8e-07,
+      "output": 4e-06,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "us.anthropic.claude-3-5-haiku-20241022-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 1e-06,
+      "output": 5e-06,
+      "created_at": "2024-12-18 09:00:21"
+    },
+    {
+      "provider": "bedrock",
+      "input": 8e-07,
+      "output": 4e-06,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "eu.anthropic.claude-3-5-haiku-20241022-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 1e-06,
+      "output": 5e-06,
+      "created_at": "2024-12-18 09:00:21"
+    },
+    {
+      "provider": "bedrock",
+      "input": 2.5e-07,
+      "output": 1.25e-06,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "us.meta.llama3-1-8b-instruct-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 2.2e-07,
+      "output": 2.2e-07,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "us.meta.llama3-1-70b-instruct-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 9.9e-07,
+      "output": 9.9e-07,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "us.meta.llama3-1-405b-instruct-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 5.32e-06,
+      "output": 1.6e-05,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "together_ai/meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo": [
+    {
+      "provider": "together_ai",
+      "input": 1.8e-07,
+      "output": 1.8e-07,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "together_ai/meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo": [
+    {
+      "provider": "together_ai",
+      "input": 8.8e-07,
+      "output": 8.8e-07,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "together_ai/meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo": [
+    {
+      "provider": "together_ai",
+      "input": 3.5e-06,
+      "output": 3.5e-06,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "deepinfra/meta-llama/Meta-Llama-3.1-405B-Instruct": [
+    {
+      "provider": "deepinfra",
+      "input": 9e-07,
+      "output": 9e-07,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "fireworks_ai/accounts/fireworks/models/qwen2p5-coder-32b-instruct": [
+    {
+      "provider": "fireworks_ai",
+      "input": 9e-07,
+      "output": 9e-07,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "databricks/meta-llama-3.3-70b-instruct": [
+    {
+      "provider": "databricks",
+      "input": 1.00002e-06,
+      "output": 2.99999e-06,
+      "created_at": "2024-12-18 09:00:21"
+    }
+  ],
+  "omni-moderation-latest": [
+    {
+      "provider": "openai",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "omni-moderation-latest-intents": [
+    {
+      "provider": "openai",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "omni-moderation-2024-09-26": [
+    {
+      "provider": "openai",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "gpt-4o-audio-preview-2024-12-17": [
+    {
+      "provider": "openai",
+      "input": 2.5e-06,
+      "output": 1e-05,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "azure/o1": [
+    {
+      "provider": "azure",
+      "input": 1.5e-05,
+      "output": 6e-05,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "mistral/mistral-large-2411": [
+    {
+      "provider": "mistral",
+      "input": 2e-06,
+      "output": 6e-06,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "mistral/pixtral-large-latest": [
+    {
+      "provider": "mistral",
+      "input": 2e-06,
+      "output": 6e-06,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "mistral/pixtral-large-2411": [
+    {
+      "provider": "mistral",
+      "input": 2e-06,
+      "output": 6e-06,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "deepseek/deepseek-chat": [
+    {
+      "provider": "deepseek",
+      "input": 1.4e-07,
+      "output": 2.8e-07,
+      "created_at": "2025-01-13 16:54:01"
+    },
+    {
+      "provider": "deepseek",
+      "input": 2.7e-07,
+      "output": 1.1e-06,
+      "created_at": "2025-02-07 09:59:48"
+    }
+  ],
+  "deepseek/deepseek-coder": [
+    {
+      "provider": "deepseek",
+      "input": 1.4e-07,
+      "output": 2.8e-07,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "friendliai/meta-llama-3.1-8b-instruct": [
+    {
+      "provider": "friendliai",
+      "input": 1e-07,
+      "output": 1e-07,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "friendliai/meta-llama-3.1-70b-instruct": [
+    {
+      "provider": "friendliai",
+      "input": 6e-07,
+      "output": 6e-07,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "gemini/gemini-2.0-flash-exp": [
+    {
+      "provider": "gemini",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "vertex_ai/mistral-large@2411-001": [
+    {
+      "provider": "vertex_ai-mistral_models",
+      "input": 2e-06,
+      "output": 6e-06,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "vertex_ai/mistral-large-2411": [
+    {
+      "provider": "vertex_ai-mistral_models",
+      "input": 2e-06,
+      "output": 6e-06,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "command-r7b-12-2024": [
+    {
+      "provider": "cohere_chat",
+      "input": 1.5e-07,
+      "output": 3.75e-08,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "openrouter/deepseek/deepseek-chat": [
+    {
+      "provider": "openrouter",
+      "input": 1.4e-07,
+      "output": 2.8e-07,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "openrouter/openai/o1": [
+    {
+      "provider": "openrouter",
+      "input": 1.5e-05,
+      "output": 6e-05,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "meta.llama3-3-70b-instruct-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 7.2e-07,
+      "output": 7.2e-07,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "fireworks_ai/accounts/fireworks/models/deepseek-v3": [
+    {
+      "provider": "fireworks_ai",
+      "input": 9e-07,
+      "output": 9e-07,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "voyage/voyage-3-large": [
+    {
+      "provider": "voyage",
+      "input": 1.8e-07,
+      "output": 0.0,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "voyage/voyage-3": [
+    {
+      "provider": "voyage",
+      "input": 6e-08,
+      "output": 0.0,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "voyage/voyage-3-lite": [
+    {
+      "provider": "voyage",
+      "input": 2e-08,
+      "output": 0.0,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "voyage/voyage-code-3": [
+    {
+      "provider": "voyage",
+      "input": 1.8e-07,
+      "output": 0.0,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "voyage/voyage-multimodal-3": [
+    {
+      "provider": "voyage",
+      "input": 1.2e-07,
+      "output": 0.0,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "voyage/rerank-2": [
+    {
+      "provider": "voyage",
+      "input": 5e-08,
+      "output": 0.0,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "voyage/rerank-2-lite": [
+    {
+      "provider": "voyage",
+      "input": 2e-08,
+      "output": 0.0,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "sambanova/Meta-Llama-3.1-8B-Instruct": [
+    {
+      "provider": "sambanova",
+      "input": 1e-07,
+      "output": 2e-07,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "sambanova/Meta-Llama-3.1-70B-Instruct": [
+    {
+      "provider": "sambanova",
+      "input": 6e-07,
+      "output": 1.2e-06,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "sambanova/Meta-Llama-3.1-405B-Instruct": [
+    {
+      "provider": "sambanova",
+      "input": 5e-06,
+      "output": 1e-05,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "sambanova/Meta-Llama-3.2-1B-Instruct": [
+    {
+      "provider": "sambanova",
+      "input": 4e-07,
+      "output": 8e-07,
+      "created_at": "2025-01-13 16:54:01"
+    },
+    {
+      "provider": "sambanova",
+      "input": 4e-08,
+      "output": 8e-08,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "sambanova/Meta-Llama-3.2-3B-Instruct": [
+    {
+      "provider": "sambanova",
+      "input": 8e-07,
+      "output": 1.6e-06,
+      "created_at": "2025-01-13 16:54:01"
+    },
+    {
+      "provider": "sambanova",
+      "input": 8e-08,
+      "output": 1.6e-07,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "sambanova/Qwen2.5-Coder-32B-Instruct": [
+    {
+      "provider": "sambanova",
+      "input": 1.5e-06,
+      "output": 3e-06,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "sambanova/Qwen2.5-72B-Instruct": [
+    {
+      "provider": "sambanova",
+      "input": 2e-06,
+      "output": 4e-06,
+      "created_at": "2025-01-13 16:54:01"
+    }
+  ],
+  "deepseek/deepseek-reasoner": [
+    {
+      "provider": "deepseek",
+      "input": 5.5e-07,
+      "output": 2.19e-06,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "xai/grok-2-vision-1212": [
+    {
+      "provider": "xai",
+      "input": 2e-06,
+      "output": 1e-05,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "xai/grok-2-vision-latest": [
+    {
+      "provider": "xai",
+      "input": 2e-06,
+      "output": 1e-05,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "xai/grok-2-vision": [
+    {
+      "provider": "xai",
+      "input": 2e-06,
+      "output": 1e-05,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "xai/grok-vision-beta": [
+    {
+      "provider": "xai",
+      "input": 5e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "xai/grok-2-1212": [
+    {
+      "provider": "xai",
+      "input": 2e-06,
+      "output": 1e-05,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "xai/grok-2": [
+    {
+      "provider": "xai",
+      "input": 2e-06,
+      "output": 1e-05,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "xai/grok-2-latest": [
+    {
+      "provider": "xai",
+      "input": 2e-06,
+      "output": 1e-05,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "gemini-2.0-flash-thinking-exp": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "gemini/gemini-2.0-flash-thinking-exp": [
+    {
+      "provider": "gemini",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "openrouter/deepseek/deepseek-r1": [
+    {
+      "provider": "openrouter",
+      "input": 5.5e-07,
+      "output": 2.19e-06,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "ai21.jamba-1-5-large-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 2e-06,
+      "output": 8e-06,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "ai21.jamba-1-5-mini-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 2e-07,
+      "output": 4e-07,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "us.amazon.nova-micro-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 3.5e-08,
+      "output": 1.4e-07,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "us.amazon.nova-lite-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 6e-08,
+      "output": 2.4e-07,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "us.amazon.nova-pro-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 8e-07,
+      "output": 3.2e-06,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "together_ai/meta-llama/Llama-3.3-70B-Instruct-Turbo": [
+    {
+      "provider": "together_ai",
+      "input": 8.8e-07,
+      "output": 8.8e-07,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "together_ai/meta-llama/Llama-3.3-70B-Instruct-Turbo-Free": [
+    {
+      "provider": "together_ai",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "fireworks_ai/accounts/fireworks/models/llama-v3p1-8b-instruct": [
+    {
+      "provider": "fireworks_ai",
+      "input": 1e-07,
+      "output": 1e-07,
+      "created_at": "2025-01-30 08:14:14"
+    }
+  ],
+  "o3-mini": [
+    {
+      "provider": "openai",
+      "input": 1.1e-06,
+      "output": 4.4e-06,
+      "created_at": "2025-02-07 09:59:48"
+    }
+  ],
+  "o3-mini-2025-01-31": [
+    {
+      "provider": "openai",
+      "input": 1.1e-06,
+      "output": 4.4e-06,
+      "created_at": "2025-02-07 09:59:48"
+    }
+  ],
+  "azure/o3-mini-2025-01-31": [
+    {
+      "provider": "azure",
+      "input": 1.1e-06,
+      "output": 4.4e-06,
+      "created_at": "2025-02-07 09:59:48"
+    }
+  ],
+  "azure/o3-mini": [
+    {
+      "provider": "azure",
+      "input": 1.1e-06,
+      "output": 4.4e-06,
+      "created_at": "2025-02-07 09:59:48"
+    }
+  ],
+  "azure_ai/deepseek-r1": [
+    {
+      "provider": "azure_ai",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2025-02-07 09:59:48"
+    },
+    {
+      "provider": "azure_ai",
+      "input": 1.35e-06,
+      "output": 5.4e-06,
+      "created_at": "2025-03-24 09:26:55"
+    }
+  ],
+  "groq/deepseek-r1-distill-llama-70b": [
+    {
+      "provider": "groq",
+      "input": 7.5e-07,
+      "output": 9.9e-07,
+      "created_at": "2025-02-07 09:59:48"
+    }
+  ],
+  "gemini/gemini-2.0-flash": [
+    {
+      "provider": "gemini",
+      "input": 1e-07,
+      "output": 4e-07,
+      "created_at": "2025-02-07 09:59:48"
+    }
+  ],
+  "gemini-2.0-flash-001": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 1.5e-07,
+      "output": 6e-07,
+      "created_at": "2025-02-07 09:59:48"
+    }
+  ],
+  "gemini-2.0-flash-thinking-exp-01-21": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2025-02-07 09:59:48"
+    }
+  ],
+  "gemini/gemini-2.0-flash-001": [
+    {
+      "provider": "gemini",
+      "input": 1e-07,
+      "output": 4e-07,
+      "created_at": "2025-02-07 09:59:48"
+    }
+  ],
+  "gemini/gemini-2.0-flash-lite-preview-02-05": [
+    {
+      "provider": "gemini",
+      "input": 7.5e-08,
+      "output": 3e-07,
+      "created_at": "2025-02-07 09:59:48"
+    }
+  ],
+  "vertex_ai/codestral-2501": [
+    {
+      "provider": "vertex_ai-mistral_models",
+      "input": 2e-07,
+      "output": 6e-07,
+      "created_at": "2025-02-07 09:59:48"
+    }
+  ],
+  "azure/o1-2024-12-17": [
+    {
+      "provider": "azure",
+      "input": 1.5e-05,
+      "output": 6e-05,
+      "created_at": "2025-02-10 09:20:27"
+    }
+  ],
+  "azure/gpt-3.5-turbo-0125": [
+    {
+      "provider": "azure",
+      "input": 5e-07,
+      "output": 1.5e-06,
+      "created_at": "2025-02-24 11:54:56"
+    }
+  ],
+  "azure/gpt-3.5-turbo": [
+    {
+      "provider": "azure",
+      "input": 5e-07,
+      "output": 1.5e-06,
+      "created_at": "2025-02-24 11:54:56"
+    }
+  ],
+  "cerebras/llama3.3-70b": [
+    {
+      "provider": "cerebras",
+      "input": 8.5e-07,
+      "output": 1.2e-06,
+      "created_at": "2025-02-24 11:54:56"
+    }
+  ],
+  "gemini-2.0-pro-exp-02-05": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2025-02-24 11:54:56"
+    },
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 1.25e-06,
+      "output": 1e-05,
+      "created_at": "2025-04-14 09:41:48"
+    }
+  ],
+  "openrouter/google/gemini-2.0-flash-001": [
+    {
+      "provider": "openrouter",
+      "input": 1e-07,
+      "output": 4e-07,
+      "created_at": "2025-02-24 11:54:56"
+    }
+  ],
+  "amazon.rerank-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2025-02-24 11:54:56"
+    }
+  ],
+  "cohere.rerank-v3-5:0": [
+    {
+      "provider": "bedrock",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2025-02-24 11:54:56"
+    }
+  ],
+  "us.meta.llama3-3-70b-instruct-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 7.2e-07,
+      "output": 7.2e-07,
+      "created_at": "2025-02-24 11:54:56"
+    }
+  ],
+  "perplexity/sonar": [
+    {
+      "provider": "perplexity",
+      "input": 1e-06,
+      "output": 1e-06,
+      "created_at": "2025-02-24 11:54:56"
+    }
+  ],
+  "perplexity/sonar-pro": [
+    {
+      "provider": "perplexity",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-02-24 11:54:56"
+    }
+  ],
+  "jina-reranker-v2-base-multilingual": [
+    {
+      "provider": "jina_ai",
+      "input": 1.8e-08,
+      "output": 1.8e-08,
+      "created_at": "2025-02-24 11:54:56"
+    }
+  ],
+  "claude-3-7-sonnet-20250219": [
+    {
+      "provider": "anthropic",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-02-24 13:09:33"
+    }
+  ],
+  "anthropic.claude-3-7-sonnet-20250219-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-02-24 13:09:33"
+    }
+  ],
+  "gpt-4.5-preview": [
+    {
+      "provider": "openai",
+      "input": 7.5e-05,
+      "output": 0.00015,
+      "created_at": "2025-03-03 16:02:46"
+    }
+  ],
+  "gpt-4.5-preview-2025-02-27": [
+    {
+      "provider": "openai",
+      "input": 7.5e-05,
+      "output": 0.00015,
+      "created_at": "2025-03-03 16:02:46"
+    }
+  ],
+  "azure_ai/Phi-4": [
+    {
+      "provider": "azure_ai",
+      "input": 1.25e-07,
+      "output": 5e-07,
+      "created_at": "2025-03-03 16:02:46"
+    }
+  ],
+  "claude-3-5-haiku-latest": [
+    {
+      "provider": "anthropic",
+      "input": 1e-06,
+      "output": 5e-06,
+      "created_at": "2025-03-03 16:02:46"
+    }
+  ],
+  "claude-3-opus-latest": [
+    {
+      "provider": "anthropic",
+      "input": 1.5e-05,
+      "output": 7.5e-05,
+      "created_at": "2025-03-03 16:02:46"
+    }
+  ],
+  "claude-3-5-sonnet-latest": [
+    {
+      "provider": "anthropic",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-03-03 16:02:46"
+    }
+  ],
+  "claude-3-7-sonnet-latest": [
+    {
+      "provider": "anthropic",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-03-03 16:02:46"
+    }
+  ],
+  "vertex_ai/claude-3-7-sonnet@20250219": [
+    {
+      "provider": "vertex_ai-anthropic_models",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-03-03 16:02:46"
+    }
+  ],
+  "openrouter/anthropic/claude-3.7-sonnet": [
+    {
+      "provider": "openrouter",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-03-03 16:02:46"
+    }
+  ],
+  "openrouter/anthropic/claude-3.7-sonnet:beta": [
+    {
+      "provider": "openrouter",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-03-03 16:02:46"
+    }
+  ],
+  "bedrock/invoke/anthropic.claude-3-5-sonnet-20240620-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-03-03 16:02:46"
+    }
+  ],
+  "us.anthropic.claude-3-7-sonnet-20250219-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-03-03 16:02:46"
+    }
+  ],
+  "gpt-4o-search-preview-2025-03-11": [
+    {
+      "provider": "openai",
+      "input": 2.5e-06,
+      "output": 1e-05,
+      "created_at": "2025-03-24 09:26:55"
+    }
+  ],
+  "gpt-4o-search-preview": [
+    {
+      "provider": "openai",
+      "input": 2.5e-06,
+      "output": 1e-05,
+      "created_at": "2025-03-24 09:26:55"
+    }
+  ],
+  "gpt-4o-mini-search-preview-2025-03-11": [
+    {
+      "provider": "openai",
+      "input": 1.5e-07,
+      "output": 6e-07,
+      "created_at": "2025-03-24 09:26:55"
+    }
+  ],
+  "gpt-4o-mini-search-preview": [
+    {
+      "provider": "openai",
+      "input": 1.5e-07,
+      "output": 6e-07,
+      "created_at": "2025-03-24 09:26:55"
+    }
+  ],
+  "o1-pro": [
+    {
+      "provider": "openai",
+      "input": 0.00015,
+      "output": 0.0006,
+      "created_at": "2025-03-24 09:26:55"
+    }
+  ],
+  "o1-pro-2025-03-19": [
+    {
+      "provider": "openai",
+      "input": 0.00015,
+      "output": 0.0006,
+      "created_at": "2025-03-24 09:26:55"
+    }
+  ],
+  "azure/gpt-4o-mini-realtime-preview-2024-12-17": [
+    {
+      "provider": "azure",
+      "input": 6e-07,
+      "output": 2.4e-06,
+      "created_at": "2025-03-24 09:26:55"
+    }
+  ],
+  "azure/eu/gpt-4o-mini-realtime-preview-2024-12-17": [
+    {
+      "provider": "azure",
+      "input": 6.6e-07,
+      "output": 2.64e-06,
+      "created_at": "2025-03-24 09:26:55"
+    }
+  ],
+  "azure/us/gpt-4o-mini-realtime-preview-2024-12-17": [
+    {
+      "provider": "azure",
+      "input": 6.6e-07,
+      "output": 2.64e-06,
+      "created_at": "2025-03-24 09:26:55"
+    }
+  ],
+  "azure/gpt-4o-realtime-preview-2024-10-01": [
+    {
+      "provider": "azure",
+      "input": 5e-06,
+      "output": 2e-05,
+      "created_at": "2025-03-24 09:26:55"
+    }
+  ],
+  "azure/us/gpt-4o-realtime-preview-2024-10-01": [
+    {
+      "provider": "azure",
+      "input": 5.5e-06,
+      "output": 2.2e-05,
+      "created_at": "2025-03-24 09:26:55"
+    }
+  ],
+  "azure/eu/gpt-4o-realtime-preview-2024-10-01": [
+    {
+      "provider": "azure",
+      "input": 5.5e-06,
+      "output": 2.2e-05,
+      "created_at": "2025-03-24 09:26:55"
+    }
+  ],
+  "azure/us/o3-mini-2025-01-31": [
+    {
+      "provider": "azure",
+      "input": 1.21e-06,
+      "output": 4.84e-06,
+      "created_at": "2025-03-24 09:26:55"
+    }
+  ],
+  "azure/eu/o3-mini-2025-01-31": [
+    {
+      "provider": "azure",
+      "input": 1.21e-06,
+      "output": 4.84e-06,
+      "created_at": "2025-03-24 09:26:55"
+    }
+  ],
+  "azure/us/o1-mini-2024-09-12": [
+    {
+      "provider": "azure",
+      "input": 1.21e-06,
+      "output": 4.84e-06,
+      "created_at": "2025-03-24 09:26:55"
+    }
+  ],
+  "azure/eu/o1-mini-2024-09-12": [
+    {
+      "provider": "azure",
+      "input": 1.21e-06,
+      "output": 4.84e-06,
+      "created_at": "2025-03-24 09:26:55"
+    }
+  ],
+  "azure/us/o1-2024-12-17": [
+    {
+      "provider": "azure",
+      "input": 1.65e-05,
+      "output": 6.6e-05,
+      "created_at": "2025-03-24 09:26:55"
+    }
+  ],
+  "azure/eu/o1-2024-12-17": [
+    {
+      "provider": "azure",
+      "input": 1.65e-05,
+      "output": 6.6e-05,
+      "created_at": "2025-03-24 09:26:55"
+    }
+  ],
+  "azure/us/o1-preview-2024-09-12": [
+    {
+      "provider": "azure",
+      "input": 1.65e-05,
+      "output": 6.6e-05,
+      "created_at": "2025-03-24 09:26:55"
+    }
+  ],
+  "azure/eu/o1-preview-2024-09-12": [
+    {
+      "provider": "azure",
+      "input": 1.65e-05,
+      "output": 6.6e-05,
+      "created_at": "2025-03-24 09:26:55"
+    }
+  ],
+  "azure/gpt-4.5-preview": [
+    {
+      "provider": "azure",
+      "input": 7.5e-05,
+      "output": 0.00015,
+      "created_at": "2025-03-24 09:26:55"
+    }
+  ],
+  "azure/global/gpt-4o-2024-11-20": [
+    {
+      "provider": "azure",
+      "input": 2.5e-06,
+      "output": 1e-05,
+      "created_at": "2025-03-24 09:26:55"
+    }
+  ],
+  "azure/global/gpt-4o-2024-08-06": [
+    {
+      "provider": "azure",
+      "input": 2.5e-06,
+      "output": 1e-05,
+      "created_at": "2025-03-24 09:26:55"
+    }
+  ],
+  "azure/us/gpt-4o-2024-11-20": [
+    {
+      "provider": "azure",
+      "input": 2.75e-06,
+      "output": 1.1e-05,
+      "created_at": "2025-03-24 09:26:55"
+    }
+  ],
+  "azure/eu/gpt-4o-2024-11-20": [
+    {
+      "provider": "azure",
+      "input": 2.75e-06,
+      "output": 1.1e-05,
+      "created_at": "2025-03-24 09:26:55"
+    }
+  ],
+  "azure/us/gpt-4o-2024-08-06": [
+    {
+      "provider": "azure",
+      "input": 2.75e-06,
+      "output": 1.1e-05,
+      "created_at": "2025-03-24 09:26:55"
+    }
+  ],
+  "azure/eu/gpt-4o-2024-08-06": [
+    {
+      "provider": "azure",
+      "input": 2.75e-06,
+      "output": 1.1e-05,
+      "created_at": "2025-03-24 09:26:55"
+    }
+  ],
+  "azure/us/gpt-4o-mini-2024-07-18": [
+    {
+      "provider": "azure",
+      "input": 1.65e-07,
+      "output": 6.6e-07,
+      "created_at": "2025-03-24 09:26:55"
+    }
+  ],
+  "azure/eu/gpt-4o-mini-2024-07-18": [
+    {
+      "provider": "azure",
+      "input": 1.65e-07,
+      "output": 6.6e-07,
+      "created_at": "2025-03-24 09:26:55"
+    }
+  ],
+  "azure_ai/deepseek-v3": [
+    {
+      "provider": "azure_ai",
+      "input": 1.14e-06,
+      "output": 4.56e-06,
+      "created_at": "2025-03-24 09:26:55"
+    }
+  ],
+  "azure_ai/mistral-nemo": [
+    {
+      "provider": "azure_ai",
+      "input": 1.5e-07,
+      "output": 1.5e-07,
+      "created_at": "2025-03-24 09:26:55"
+    }
+  ],
+  "azure_ai/mistral-small-2503": [
+    {
+      "provider": "azure_ai",
+      "input": 1e-06,
+      "output": 3e-06,
+      "created_at": "2025-03-24 09:26:55"
+    }
+  ],
+  "azure_ai/Phi-4-mini-instruct": [
+    {
+      "provider": "azure_ai",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2025-03-24 09:26:55"
+    },
+    {
+      "provider": "azure_ai",
+      "input": 7.5e-08,
+      "output": 3e-07,
+      "created_at": "2025-04-14 09:41:48"
+    }
+  ],
+  "azure_ai/Phi-4-multimodal-instruct": [
+    {
+      "provider": "azure_ai",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2025-03-24 09:26:55"
+    },
+    {
+      "provider": "azure_ai",
+      "input": 8e-08,
+      "output": 0.00032,
+      "created_at": "2025-04-14 09:41:48"
+    },
+    {
+      "provider": "azure_ai",
+      "input": 8e-08,
+      "output": 3.2e-07,
+      "created_at": "2025-04-16 12:41:13"
+    }
+  ],
+  "gemini/gemini-2.0-pro-exp-02-05": [
+    {
+      "provider": "gemini",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2025-03-24 09:26:55"
+    }
+  ],
+  "gemini/gemini-2.0-flash-thinking-exp-01-21": [
+    {
+      "provider": "gemini",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2025-03-24 09:26:55"
+    }
+  ],
+  "gemini/gemma-3-27b-it": [
+    {
+      "provider": "gemini",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2025-03-24 09:26:55"
+    }
+  ],
+  "gemini/learnlm-1.5-pro-experimental": [
+    {
+      "provider": "gemini",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2025-03-24 09:26:55"
+    }
+  ],
+  "text-embedding-large-exp-03-07": [
+    {
+      "provider": "vertex_ai-embedding-models",
+      "input": 1e-07,
+      "output": 0.0,
+      "created_at": "2025-03-24 09:26:55"
+    }
+  ],
+  "jamba-large-1.6": [
+    {
+      "provider": "ai21",
+      "input": 2e-06,
+      "output": 8e-06,
+      "created_at": "2025-03-24 09:26:55"
+    }
+  ],
+  "jamba-mini-1.6": [
+    {
+      "provider": "ai21",
+      "input": 2e-07,
+      "output": 4e-07,
+      "created_at": "2025-03-24 09:26:55"
+    }
+  ],
+  "eu.amazon.nova-micro-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 4.6e-08,
+      "output": 1.84e-07,
+      "created_at": "2025-03-24 09:26:55"
+    }
+  ],
+  "eu.amazon.nova-lite-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 7.8e-08,
+      "output": 3.12e-07,
+      "created_at": "2025-03-24 09:26:55"
+    }
+  ],
+  "eu.amazon.nova-pro-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 1.05e-06,
+      "output": 4.2e-06,
+      "created_at": "2025-03-24 09:26:55"
+    }
+  ],
+  "us.deepseek.r1-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 1.35e-06,
+      "output": 5.4e-06,
+      "created_at": "2025-03-24 09:26:55"
+    }
+  ],
+  "gpt-4o-transcribe": [
+    {
+      "provider": "openai",
+      "input": 2.5e-06,
+      "output": 1e-05,
+      "created_at": "2025-04-04 09:04:12"
+    }
+  ],
+  "gpt-4o-mini-transcribe": [
+    {
+      "provider": "openai",
+      "input": 1.25e-06,
+      "output": 5e-06,
+      "created_at": "2025-04-04 09:04:12"
+    }
+  ],
+  "gemini-2.5-pro-exp-03-25": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2025-04-04 09:04:12"
+    },
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 1.25e-06,
+      "output": 1e-05,
+      "created_at": "2025-04-14 09:41:48"
+    }
+  ],
+  "gemini-2.0-flash": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 1e-07,
+      "output": 4e-07,
+      "created_at": "2025-04-04 09:04:12"
+    }
+  ],
+  "gemini-2.0-flash-lite": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 7.5e-08,
+      "output": 3e-07,
+      "created_at": "2025-04-04 09:04:12"
+    }
+  ],
+  "gemini/gemini-2.0-flash-lite": [
+    {
+      "provider": "gemini",
+      "input": 7.5e-08,
+      "output": 3e-07,
+      "created_at": "2025-04-04 09:04:12"
+    }
+  ],
+  "vertex_ai/mistral-small-2503@001": [
+    {
+      "provider": "vertex_ai-mistral_models",
+      "input": 1e-06,
+      "output": 3e-06,
+      "created_at": "2025-04-04 09:04:12"
+    }
+  ],
+  "vertex_ai/mistral-small-2503": [
+    {
+      "provider": "vertex_ai-mistral_models",
+      "input": 1e-06,
+      "output": 3e-06,
+      "created_at": "2025-04-04 09:04:12"
+    }
+  ],
+  "multimodalembedding": [
+    {
+      "provider": "vertex_ai-embedding-models",
+      "input": 8e-07,
+      "output": 0.0,
+      "created_at": "2025-04-04 09:04:12"
+    }
+  ],
+  "multimodalembedding@001": [
+    {
+      "provider": "vertex_ai-embedding-models",
+      "input": 8e-07,
+      "output": 0.0,
+      "created_at": "2025-04-04 09:04:12"
+    }
+  ],
+  "databricks/databricks-claude-3-7-sonnet": [
+    {
+      "provider": "databricks",
+      "input": 2.5e-06,
+      "output": 0.00017857,
+      "created_at": "2025-04-04 09:04:12"
+    },
+    {
+      "provider": "databricks",
+      "input": 2.5e-06,
+      "output": 1.7857e-05,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "databricks/databricks-meta-llama-3-3-70b-instruct": [
+    {
+      "provider": "databricks",
+      "input": 1.00002e-06,
+      "output": 2.99999e-06,
+      "created_at": "2025-04-04 09:04:12"
+    }
+  ],
+  "watsonx/ibm/granite-3-8b-instruct": [
+    {
+      "provider": "watsonx",
+      "input": 0.0002,
+      "output": 0.0002,
+      "created_at": "2025-04-14 09:41:48"
+    }
+  ],
+  "azure/gpt-4o-realtime-preview-2024-12-17": [
+    {
+      "provider": "azure",
+      "input": 5e-06,
+      "output": 2e-05,
+      "created_at": "2025-04-14 09:41:48"
+    }
+  ],
+  "azure/us/gpt-4o-realtime-preview-2024-12-17": [
+    {
+      "provider": "azure",
+      "input": 5.5e-06,
+      "output": 2.2e-05,
+      "created_at": "2025-04-14 09:41:48"
+    }
+  ],
+  "azure/eu/gpt-4o-realtime-preview-2024-12-17": [
+    {
+      "provider": "azure",
+      "input": 5.5e-06,
+      "output": 2.2e-05,
+      "created_at": "2025-04-14 09:41:48"
+    }
+  ],
+  "azure_ai/mistral-large-latest": [
+    {
+      "provider": "azure_ai",
+      "input": 2e-06,
+      "output": 6e-06,
+      "created_at": "2025-04-14 09:41:48"
+    }
+  ],
+  "xai/grok-3-beta": [
+    {
+      "provider": "xai",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-04-14 09:41:48"
+    }
+  ],
+  "xai/grok-3-fast-beta": [
+    {
+      "provider": "xai",
+      "input": 5e-06,
+      "output": 2.5e-05,
+      "created_at": "2025-04-14 09:41:48"
+    }
+  ],
+  "xai/grok-3-fast-latest": [
+    {
+      "provider": "xai",
+      "input": 5e-06,
+      "output": 2.5e-05,
+      "created_at": "2025-04-14 09:41:48"
+    }
+  ],
+  "xai/grok-3-mini-beta": [
+    {
+      "provider": "xai",
+      "input": 3e-07,
+      "output": 5e-07,
+      "created_at": "2025-04-14 09:41:48"
+    }
+  ],
+  "xai/grok-3-mini-fast-beta": [
+    {
+      "provider": "xai",
+      "input": 6e-07,
+      "output": 4e-06,
+      "created_at": "2025-04-14 09:41:48"
+    }
+  ],
+  "xai/grok-3-mini-fast-latest": [
+    {
+      "provider": "xai",
+      "input": 6e-07,
+      "output": 4e-06,
+      "created_at": "2025-04-14 09:41:48"
+    }
+  ],
+  "gemini-2.0-flash-lite-001": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 7.5e-08,
+      "output": 3e-07,
+      "created_at": "2025-04-14 09:41:48"
+    }
+  ],
+  "gemini/gemini-2.5-pro-preview-03-25": [
+    {
+      "provider": "gemini",
+      "input": 1.25e-06,
+      "output": 1e-05,
+      "created_at": "2025-04-14 09:41:48"
+    }
+  ],
+  "mistralai/mistral-small-3.1-24b-instruct": [
+    {
+      "provider": "openrouter",
+      "input": 1e-07,
+      "output": 3e-07,
+      "created_at": "2025-04-14 09:41:48"
+    }
+  ],
+  "openrouter/openai/o3-mini": [
+    {
+      "provider": "openrouter",
+      "input": 1.1e-06,
+      "output": 4.4e-06,
+      "created_at": "2025-04-14 09:41:48"
+    }
+  ],
+  "openrouter/openai/o3-mini-high": [
+    {
+      "provider": "openrouter",
+      "input": 1.1e-06,
+      "output": 4.4e-06,
+      "created_at": "2025-04-14 09:41:48"
+    }
+  ],
+  "gpt-4.1": [
+    {
+      "provider": "openai",
+      "input": 2e-06,
+      "output": 8e-06,
+      "created_at": "2025-04-14 12:39:15"
+    }
+  ],
+  "gpt-4.1-2025-04-14": [
+    {
+      "provider": "openai",
+      "input": 2e-06,
+      "output": 8e-06,
+      "created_at": "2025-04-14 12:39:15"
+    }
+  ],
+  "gpt-4.1-mini": [
+    {
+      "provider": "openai",
+      "input": 4e-07,
+      "output": 1.6e-06,
+      "created_at": "2025-04-14 12:39:15"
+    }
+  ],
+  "gpt-4.1-mini-2025-04-14": [
+    {
+      "provider": "openai",
+      "input": 4e-07,
+      "output": 1.6e-06,
+      "created_at": "2025-04-14 12:39:15"
+    }
+  ],
+  "gpt-4.1-nano": [
+    {
+      "provider": "openai",
+      "input": 1e-07,
+      "output": 4e-07,
+      "created_at": "2025-04-14 12:39:15"
+    }
+  ],
+  "gpt-4.1-nano-2025-04-14": [
+    {
+      "provider": "openai",
+      "input": 1e-07,
+      "output": 4e-07,
+      "created_at": "2025-04-14 12:39:15"
+    }
+  ],
+  "o3": [
+    {
+      "provider": "openai",
+      "input": 1e-05,
+      "output": 4e-05,
+      "created_at": "2025-04-16 12:44:16"
+    },
+    {
+      "provider": "openai",
+      "input": 2e-06,
+      "output": 8e-06,
+      "created_at": "2025-06-12 11:16:03"
+    }
+  ],
+  "o3-2025-04-16": [
+    {
+      "provider": "openai",
+      "input": 1e-05,
+      "output": 4e-05,
+      "created_at": "2025-04-16 12:44:16"
+    },
+    {
+      "provider": "openai",
+      "input": 2e-06,
+      "output": 8e-06,
+      "created_at": "2025-06-12 11:16:03"
+    }
+  ],
+  "o4-mini": [
+    {
+      "provider": "openai",
+      "input": 1.1e-06,
+      "output": 4.4e-06,
+      "created_at": "2025-04-16 12:44:16"
+    }
+  ],
+  "o4-mini-2025-04-16": [
+    {
+      "provider": "openai",
+      "input": 1.1e-06,
+      "output": 4.4e-06,
+      "created_at": "2025-04-16 12:44:16"
+    }
+  ],
+  "azure/computer-use-preview": [
+    {
+      "provider": "azure",
+      "input": 3e-06,
+      "output": 1.2e-05,
+      "created_at": "2025-04-21 09:02:31"
+    }
+  ],
+  "azure/gpt-4o-audio-preview-2024-12-17": [
+    {
+      "provider": "azure",
+      "input": 2.5e-06,
+      "output": 1e-05,
+      "created_at": "2025-04-21 09:02:31"
+    }
+  ],
+  "azure/gpt-4o-mini-audio-preview-2024-12-17": [
+    {
+      "provider": "azure",
+      "input": 2.5e-06,
+      "output": 1e-05,
+      "created_at": "2025-04-21 09:02:31"
+    }
+  ],
+  "azure/gpt-4.1": [
+    {
+      "provider": "azure",
+      "input": 2e-06,
+      "output": 8e-06,
+      "created_at": "2025-04-21 09:02:31"
+    }
+  ],
+  "azure/gpt-4.1-2025-04-14": [
+    {
+      "provider": "azure",
+      "input": 2e-06,
+      "output": 8e-06,
+      "created_at": "2025-04-21 09:02:31"
+    }
+  ],
+  "azure/gpt-4.1-mini": [
+    {
+      "provider": "azure",
+      "input": 4e-07,
+      "output": 1.6e-06,
+      "created_at": "2025-04-21 09:02:31"
+    }
+  ],
+  "azure/gpt-4.1-mini-2025-04-14": [
+    {
+      "provider": "azure",
+      "input": 4e-07,
+      "output": 1.6e-06,
+      "created_at": "2025-04-21 09:02:31"
+    }
+  ],
+  "azure/gpt-4.1-nano": [
+    {
+      "provider": "azure",
+      "input": 1e-07,
+      "output": 4e-07,
+      "created_at": "2025-04-21 09:02:31"
+    }
+  ],
+  "azure/gpt-4.1-nano-2025-04-14": [
+    {
+      "provider": "azure",
+      "input": 1e-07,
+      "output": 4e-07,
+      "created_at": "2025-04-21 09:02:31"
+    }
+  ],
+  "azure/o3": [
+    {
+      "provider": "azure",
+      "input": 1e-05,
+      "output": 4e-05,
+      "created_at": "2025-04-21 09:02:31"
+    },
+    {
+      "provider": "azure",
+      "input": 2e-06,
+      "output": 8e-06,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "azure/o3-2025-04-16": [
+    {
+      "provider": "azure",
+      "input": 1e-05,
+      "output": 4e-05,
+      "created_at": "2025-04-21 09:02:31"
+    }
+  ],
+  "azure/o4-mini": [
+    {
+      "provider": "azure",
+      "input": 1.1e-06,
+      "output": 4.4e-06,
+      "created_at": "2025-04-21 09:02:31"
+    }
+  ],
+  "azure/o4-mini-2025-04-16": [
+    {
+      "provider": "azure",
+      "input": 1.1e-06,
+      "output": 4.4e-06,
+      "created_at": "2025-04-21 09:02:31"
+    }
+  ],
+  "gemini/gemini-2.5-flash-preview-04-17": [
+    {
+      "provider": "gemini",
+      "input": 1.5e-07,
+      "output": 6e-07,
+      "created_at": "2025-04-21 09:02:31"
+    }
+  ],
+  "gemini-2.5-flash-preview-04-17": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 1.5e-07,
+      "output": 6e-07,
+      "created_at": "2025-04-21 09:02:31"
+    }
+  ],
+  "gemini-2.5-pro-preview-03-25": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 1.25e-06,
+      "output": 1e-05,
+      "created_at": "2025-04-21 09:02:31"
+    }
+  ],
+  "computer-use-preview": [
+    {
+      "provider": "azure",
+      "input": 3e-06,
+      "output": 1.2e-05,
+      "created_at": "2025-05-07 11:01:51"
+    }
+  ],
+  "gpt-4o-mini-tts": [
+    {
+      "provider": "openai",
+      "input": 2.5e-06,
+      "output": 1e-05,
+      "created_at": "2025-05-07 11:01:51"
+    }
+  ],
+  "gemini/gemini-2.5-pro-exp-03-25": [
+    {
+      "provider": "gemini",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2025-05-07 11:01:51"
+    }
+  ],
+  "gemini-2.5-pro-preview-05-06": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 1.25e-06,
+      "output": 1e-05,
+      "created_at": "2025-05-07 11:01:51"
+    }
+  ],
+  "gemini/gemini-2.5-pro-preview-05-06": [
+    {
+      "provider": "gemini",
+      "input": 1.25e-06,
+      "output": 1e-05,
+      "created_at": "2025-05-07 11:01:51"
+    }
+  ],
+  "vertex_ai/meta/llama-4-scout-17b-16e-instruct-maas": [
+    {
+      "provider": "vertex_ai-llama_models",
+      "input": 2.5e-07,
+      "output": 7e-07,
+      "created_at": "2025-05-07 11:01:51"
+    }
+  ],
+  "vertex_ai/meta/llama-4-scout-17b-128e-instruct-maas": [
+    {
+      "provider": "vertex_ai-llama_models",
+      "input": 2.5e-07,
+      "output": 7e-07,
+      "created_at": "2025-05-07 11:01:51"
+    }
+  ],
+  "vertex_ai/meta/llama-4-maverick-17b-128e-instruct-maas": [
+    {
+      "provider": "vertex_ai-llama_models",
+      "input": 3.5e-07,
+      "output": 1.15e-06,
+      "created_at": "2025-05-07 11:01:51"
+    }
+  ],
+  "vertex_ai/meta/llama-4-maverick-17b-16e-instruct-maas": [
+    {
+      "provider": "vertex_ai-llama_models",
+      "input": 3.5e-07,
+      "output": 1.15e-06,
+      "created_at": "2025-05-07 11:01:51"
+    }
+  ],
+  "command-a-03-2025": [
+    {
+      "provider": "cohere_chat",
+      "input": 2.5e-06,
+      "output": 1e-05,
+      "created_at": "2025-05-07 11:01:51"
+    }
+  ],
+  "us.amazon.nova-premier-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 2.5e-06,
+      "output": 1.25e-05,
+      "created_at": "2025-05-07 11:01:51"
+    }
+  ],
+  "meta.llama4-maverick-17b-instruct-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 2.4e-07,
+      "output": 9.7e-07,
+      "created_at": "2025-05-07 11:01:51"
+    }
+  ],
+  "us.meta.llama4-maverick-17b-instruct-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 2.4e-07,
+      "output": 9.7e-07,
+      "created_at": "2025-05-07 11:01:51"
+    }
+  ],
+  "meta.llama4-scout-17b-instruct-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 1.7e-07,
+      "output": 6.6e-07,
+      "created_at": "2025-05-07 11:01:51"
+    }
+  ],
+  "us.meta.llama4-scout-17b-instruct-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 1.7e-07,
+      "output": 6.6e-07,
+      "created_at": "2025-05-07 11:01:51"
+    }
+  ],
+  "perplexity/sonar-deep-research": [
+    {
+      "provider": "perplexity",
+      "input": 2e-06,
+      "output": 8e-06,
+      "created_at": "2025-05-07 11:01:51"
+    }
+  ],
+  "fireworks_ai/accounts/fireworks/models/deepseek-r1": [
+    {
+      "provider": "fireworks_ai",
+      "input": 3e-06,
+      "output": 8e-06,
+      "created_at": "2025-05-07 11:01:51"
+    }
+  ],
+  "fireworks_ai/accounts/fireworks/models/deepseek-r1-basic": [
+    {
+      "provider": "fireworks_ai",
+      "input": 5.5e-07,
+      "output": 2.19e-06,
+      "created_at": "2025-05-07 11:01:51"
+    }
+  ],
+  "fireworks_ai/accounts/fireworks/models/llama-v3p1-405b-instruct": [
+    {
+      "provider": "fireworks_ai",
+      "input": 3e-06,
+      "output": 3e-06,
+      "created_at": "2025-05-07 11:01:51"
+    }
+  ],
+  "fireworks_ai/accounts/fireworks/models/llama4-maverick-instruct-basic": [
+    {
+      "provider": "fireworks_ai",
+      "input": 2.2e-07,
+      "output": 8.8e-07,
+      "created_at": "2025-05-07 11:01:51"
+    }
+  ],
+  "fireworks_ai/accounts/fireworks/models/llama4-scout-instruct-basic": [
+    {
+      "provider": "fireworks_ai",
+      "input": 1.5e-07,
+      "output": 6e-07,
+      "created_at": "2025-05-07 11:01:51"
+    }
+  ],
+  "fireworks-ai-up-to-4b": [
+    {
+      "provider": "fireworks_ai",
+      "input": 2e-07,
+      "output": 2e-07,
+      "created_at": "2025-05-07 11:01:51"
+    }
+  ],
+  "fireworks-ai-4.1b-to-16b": [
+    {
+      "provider": "fireworks_ai",
+      "input": 2e-07,
+      "output": 2e-07,
+      "created_at": "2025-05-07 11:01:51"
+    }
+  ],
+  "fireworks-ai-above-16b": [
+    {
+      "provider": "fireworks_ai",
+      "input": 9e-07,
+      "output": 9e-07,
+      "created_at": "2025-05-07 11:01:51"
+    }
+  ],
+  "azure/gpt-4o-mini-tts": [
+    {
+      "provider": "azure",
+      "input": 2.5e-06,
+      "output": 1e-05,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "azure_ai/deepseek-v3-0324": [
+    {
+      "provider": "azure_ai",
+      "input": 1.14e-06,
+      "output": 4.56e-06,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "azure_ai/mistral-medium-2505": [
+    {
+      "provider": "azure_ai",
+      "input": 4e-07,
+      "output": 2e-06,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "azure_ai/Llama-4-Scout-17B-16E-Instruct": [
+    {
+      "provider": "azure_ai",
+      "input": 2e-07,
+      "output": 7.8e-07,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "azure_ai/Llama-4-Maverick-17B-128E-Instruct-FP8": [
+    {
+      "provider": "azure_ai",
+      "input": 1.41e-06,
+      "output": 3.5e-07,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "azure_ai/embed-v-4-0": [
+    {
+      "provider": "azure_ai",
+      "input": 1.2e-07,
+      "output": 0.0,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "xai/grok-3": [
+    {
+      "provider": "xai",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "groq/llama-guard-3-8b": [
+    {
+      "provider": "groq",
+      "input": 2e-07,
+      "output": 2e-07,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "groq/meta-llama/llama-4-scout-17b-16e-instruct": [
+    {
+      "provider": "groq",
+      "input": 1.1e-07,
+      "output": 3.4e-07,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "groq/meta-llama/llama-4-maverick-17b-128e-instruct": [
+    {
+      "provider": "groq",
+      "input": 2e-07,
+      "output": 6e-07,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "groq/mistral-saba-24b": [
+    {
+      "provider": "groq",
+      "input": 7.9e-07,
+      "output": 7.9e-07,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "groq/qwen-qwq-32b": [
+    {
+      "provider": "groq",
+      "input": 2.9e-07,
+      "output": 3.9e-07,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "cerebras/llama-3.3-70b": [
+    {
+      "provider": "cerebras",
+      "input": 8.5e-07,
+      "output": 1.2e-06,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "claude-opus-4-20250514": [
+    {
+      "provider": "anthropic",
+      "input": 1.5e-05,
+      "output": 7.5e-05,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "claude-sonnet-4-20250514": [
+    {
+      "provider": "anthropic",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "gemini/gemini-2.5-flash-preview-tts": [
+    {
+      "provider": "gemini",
+      "input": 1.5e-07,
+      "output": 6e-07,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "gemini/gemini-2.5-flash-preview-05-20": [
+    {
+      "provider": "gemini",
+      "input": 1.5e-07,
+      "output": 6e-07,
+      "created_at": "2025-05-23 11:53:31"
+    },
+    {
+      "provider": "gemini",
+      "input": 3e-07,
+      "output": 2.5e-06,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "gemini-2.5-flash-preview-05-20": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 1.5e-07,
+      "output": 6e-07,
+      "created_at": "2025-05-23 11:53:31"
+    },
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 3e-07,
+      "output": 2.5e-06,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "gemini-2.0-flash-preview-image-generation": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 1e-07,
+      "output": 4e-07,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "gemini-2.5-pro-preview-tts": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 1.25e-06,
+      "output": 1e-05,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "gemini/gemini-2.0-flash-preview-image-generation": [
+    {
+      "provider": "gemini",
+      "input": 1e-07,
+      "output": 4e-07,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "gemini/gemini-2.5-pro-preview-tts": [
+    {
+      "provider": "gemini",
+      "input": 1.25e-06,
+      "output": 1e-05,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "vertex_ai/claude-opus-4@20250514": [
+    {
+      "provider": "vertex_ai-anthropic_models",
+      "input": 1.5e-05,
+      "output": 7.5e-05,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "vertex_ai/claude-sonnet-4@20250514": [
+    {
+      "provider": "vertex_ai-anthropic_models",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "anthropic.claude-opus-4-20250514-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 1.5e-05,
+      "output": 7.5e-05,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "anthropic.claude-sonnet-4-20250514-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "us.anthropic.claude-opus-4-20250514-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 1.5e-05,
+      "output": 7.5e-05,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "us.anthropic.claude-sonnet-4-20250514-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "eu.anthropic.claude-3-7-sonnet-20250219-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "eu.anthropic.claude-opus-4-20250514-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 1.5e-05,
+      "output": 7.5e-05,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "eu.anthropic.claude-sonnet-4-20250514-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "perplexity/sonar-reasoning": [
+    {
+      "provider": "perplexity",
+      "input": 1e-06,
+      "output": 5e-06,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "perplexity/sonar-reasoning-pro": [
+    {
+      "provider": "perplexity",
+      "input": 2e-06,
+      "output": 8e-06,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "databricks/databricks-llama-4-maverick": [
+    {
+      "provider": "databricks",
+      "input": 5e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "sambanova/Llama-4-Maverick-17B-128E-Instruct": [
+    {
+      "provider": "sambanova",
+      "input": 6.3e-07,
+      "output": 1.8e-06,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "sambanova/Llama-4-Scout-17B-16E-Instruct": [
+    {
+      "provider": "sambanova",
+      "input": 4e-07,
+      "output": 7e-07,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "sambanova/Meta-Llama-3.3-70B-Instruct": [
+    {
+      "provider": "sambanova",
+      "input": 6e-07,
+      "output": 1.2e-06,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "sambanova/Meta-Llama-Guard-3-8B": [
+    {
+      "provider": "sambanova",
+      "input": 3e-07,
+      "output": 3e-07,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "sambanova/Qwen3-32B": [
+    {
+      "provider": "sambanova",
+      "input": 4e-07,
+      "output": 8e-07,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "sambanova/QwQ-32B": [
+    {
+      "provider": "sambanova",
+      "input": 5e-07,
+      "output": 1e-06,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "sambanova/Qwen2-Audio-7B-Instruct": [
+    {
+      "provider": "sambanova",
+      "input": 5e-07,
+      "output": 0.0001,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "sambanova/DeepSeek-R1-Distill-Llama-70B": [
+    {
+      "provider": "sambanova",
+      "input": 7e-07,
+      "output": 1.4e-06,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "sambanova/DeepSeek-R1": [
+    {
+      "provider": "sambanova",
+      "input": 5e-06,
+      "output": 7e-06,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "sambanova/DeepSeek-V3-0324": [
+    {
+      "provider": "sambanova",
+      "input": 3e-06,
+      "output": 4.5e-06,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "nscale/meta-llama/Llama-4-Scout-17B-16E-Instruct": [
+    {
+      "provider": "nscale",
+      "input": 9e-08,
+      "output": 2.9e-07,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "nscale/Qwen/Qwen2.5-Coder-3B-Instruct": [
+    {
+      "provider": "nscale",
+      "input": 1e-08,
+      "output": 3e-08,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "nscale/Qwen/Qwen2.5-Coder-7B-Instruct": [
+    {
+      "provider": "nscale",
+      "input": 1e-08,
+      "output": 3e-08,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "nscale/Qwen/Qwen2.5-Coder-32B-Instruct": [
+    {
+      "provider": "nscale",
+      "input": 6e-08,
+      "output": 2e-07,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "nscale/Qwen/QwQ-32B": [
+    {
+      "provider": "nscale",
+      "input": 1.8e-07,
+      "output": 2e-07,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "nscale/deepseek-ai/DeepSeek-R1-Distill-Llama-70B": [
+    {
+      "provider": "nscale",
+      "input": 3.75e-07,
+      "output": 3.75e-07,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "nscale/deepseek-ai/DeepSeek-R1-Distill-Llama-8B": [
+    {
+      "provider": "nscale",
+      "input": 2.5e-08,
+      "output": 2.5e-08,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "nscale/deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B": [
+    {
+      "provider": "nscale",
+      "input": 9e-08,
+      "output": 9e-08,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "nscale/deepseek-ai/DeepSeek-R1-Distill-Qwen-7B": [
+    {
+      "provider": "nscale",
+      "input": 2e-07,
+      "output": 2e-07,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "nscale/deepseek-ai/DeepSeek-R1-Distill-Qwen-14B": [
+    {
+      "provider": "nscale",
+      "input": 7e-08,
+      "output": 7e-08,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "nscale/deepseek-ai/DeepSeek-R1-Distill-Qwen-32B": [
+    {
+      "provider": "nscale",
+      "input": 1.5e-07,
+      "output": 1.5e-07,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "nscale/mistralai/mixtral-8x22b-instruct-v0.1": [
+    {
+      "provider": "nscale",
+      "input": 6e-07,
+      "output": 6e-07,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "nscale/meta-llama/Llama-3.1-8B-Instruct": [
+    {
+      "provider": "nscale",
+      "input": 3e-08,
+      "output": 3e-08,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "nscale/meta-llama/Llama-3.3-70B-Instruct": [
+    {
+      "provider": "nscale",
+      "input": 2e-07,
+      "output": 2e-07,
+      "created_at": "2025-05-23 11:53:31"
+    }
+  ],
+  "gpt-4o-mini-audio-preview": [
+    {
+      "provider": "openai",
+      "input": 1.5e-07,
+      "output": 6e-07,
+      "created_at": "2025-06-02 13:06:48"
+    }
+  ],
+  "mistral/mistral-medium-2505": [
+    {
+      "provider": "mistral",
+      "input": 4e-07,
+      "output": 2e-06,
+      "created_at": "2025-06-02 13:06:48"
+    }
+  ],
+  "mistral/devstral-small-2505": [
+    {
+      "provider": "mistral",
+      "input": 1e-07,
+      "output": 3e-07,
+      "created_at": "2025-06-02 13:06:48"
+    }
+  ],
+  "embed-v4.0": [
+    {
+      "provider": "cohere",
+      "input": 1.2e-07,
+      "output": 0.0,
+      "created_at": "2025-06-02 13:06:48"
+    }
+  ],
+  "gpt-4o-audio-preview-2025-06-03": [
+    {
+      "provider": "openai",
+      "input": 2.5e-06,
+      "output": 1e-05,
+      "created_at": "2025-06-12 11:16:03"
+    }
+  ],
+  "codex-mini-latest": [
+    {
+      "provider": "openai",
+      "input": 1.5e-06,
+      "output": 6e-06,
+      "created_at": "2025-06-12 11:16:03"
+    }
+  ],
+  "o3-pro": [
+    {
+      "provider": "openai",
+      "input": 2e-05,
+      "output": 8e-05,
+      "created_at": "2025-06-12 11:16:03"
+    }
+  ],
+  "o3-pro-2025-06-10": [
+    {
+      "provider": "openai",
+      "input": 2e-05,
+      "output": 8e-05,
+      "created_at": "2025-06-12 11:16:03"
+    }
+  ],
+  "azure/codex-mini-latest": [
+    {
+      "provider": "azure",
+      "input": 1.5e-06,
+      "output": 6e-06,
+      "created_at": "2025-06-12 11:16:03"
+    }
+  ],
+  "mistral/magistral-medium-2506": [
+    {
+      "provider": "mistral",
+      "input": 2e-06,
+      "output": 5e-06,
+      "created_at": "2025-06-12 11:16:03"
+    }
+  ],
+  "mistral/magistral-small-2506": [
+    {
+      "provider": "mistral",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2025-06-12 11:16:03"
+    },
+    {
+      "provider": "mistral",
+      "input": 5e-07,
+      "output": 1.5e-06,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "cerebras/qwen-3-32b": [
+    {
+      "provider": "cerebras",
+      "input": 4e-07,
+      "output": 8e-07,
+      "created_at": "2025-06-12 11:16:03"
+    }
+  ],
+  "claude-4-opus-20250514": [
+    {
+      "provider": "anthropic",
+      "input": 1.5e-05,
+      "output": 7.5e-05,
+      "created_at": "2025-06-12 11:16:03"
+    }
+  ],
+  "claude-4-sonnet-20250514": [
+    {
+      "provider": "anthropic",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-06-12 11:16:03"
+    }
+  ],
+  "gemini-2.5-pro-preview-06-05": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 1.25e-06,
+      "output": 1e-05,
+      "created_at": "2025-06-12 11:16:03"
+    }
+  ],
+  "gemini/gemini-2.5-pro-preview-06-05": [
+    {
+      "provider": "gemini",
+      "input": 1.25e-06,
+      "output": 1e-05,
+      "created_at": "2025-06-12 11:16:03"
+    }
+  ],
+  "vertex_ai/claude-opus-4": [
+    {
+      "provider": "vertex_ai-anthropic_models",
+      "input": 1.5e-05,
+      "output": 7.5e-05,
+      "created_at": "2025-06-12 11:16:03"
+    }
+  ],
+  "vertex_ai/claude-sonnet-4": [
+    {
+      "provider": "vertex_ai-anthropic_models",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-06-12 11:16:03"
+    }
+  ],
+  "gemini-embedding-001": [
+    {
+      "provider": "vertex_ai-embedding-models",
+      "input": 1.5e-07,
+      "output": 0.0,
+      "created_at": "2025-06-12 11:16:03"
+    }
+  ],
+  "fireworks_ai/accounts/fireworks/models/llama-v3p2-90b-vision-instruct": [
+    {
+      "provider": "fireworks_ai",
+      "input": 9e-07,
+      "output": 9e-07,
+      "created_at": "2025-06-12 11:16:03"
+    }
+  ],
+  "fireworks_ai/accounts/fireworks/models/deepseek-r1-0528": [
+    {
+      "provider": "fireworks_ai",
+      "input": 3e-06,
+      "output": 8e-06,
+      "created_at": "2025-06-12 11:16:03"
+    }
+  ],
+  "o3-deep-research": [
+    {
+      "provider": "openai",
+      "input": 1e-05,
+      "output": 4e-05,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "o3-deep-research-2025-06-26": [
+    {
+      "provider": "openai",
+      "input": 1e-05,
+      "output": 4e-05,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "o4-mini-deep-research": [
+    {
+      "provider": "openai",
+      "input": 2e-06,
+      "output": 8e-06,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "o4-mini-deep-research-2025-06-26": [
+    {
+      "provider": "openai",
+      "input": 2e-06,
+      "output": 8e-06,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "azure/o3-pro": [
+    {
+      "provider": "azure",
+      "input": 2e-05,
+      "output": 8e-05,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "azure/o3-pro-2025-06-10": [
+    {
+      "provider": "azure",
+      "input": 2e-05,
+      "output": 8e-05,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "azure/gpt-4o-transcribe": [
+    {
+      "provider": "azure",
+      "input": 2.5e-06,
+      "output": 1e-05,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "azure/gpt-4o-mini-transcribe": [
+    {
+      "provider": "azure",
+      "input": 1.25e-06,
+      "output": 5e-06,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "azure/codex-mini": [
+    {
+      "provider": "azure",
+      "input": 1.5e-06,
+      "output": 6e-06,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "mistral/magistral-medium-latest": [
+    {
+      "provider": "mistral",
+      "input": 2e-06,
+      "output": 5e-06,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "mistral/magistral-small-latest": [
+    {
+      "provider": "mistral",
+      "input": 5e-07,
+      "output": 1.5e-06,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "deepseek/deepseek-r1": [
+    {
+      "provider": "deepseek",
+      "input": 5.5e-07,
+      "output": 2.19e-06,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "deepseek/deepseek-v3": [
+    {
+      "provider": "deepseek",
+      "input": 2.7e-07,
+      "output": 1.1e-06,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "xai/grok-3-latest": [
+    {
+      "provider": "xai",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "xai/grok-3-mini": [
+    {
+      "provider": "xai",
+      "input": 3e-07,
+      "output": 5e-07,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "xai/grok-3-mini-latest": [
+    {
+      "provider": "xai",
+      "input": 3e-07,
+      "output": 5e-07,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "xai/grok-3-mini-fast": [
+    {
+      "provider": "xai",
+      "input": 6e-07,
+      "output": 4e-06,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "gemini-2.5-pro": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 1.25e-06,
+      "output": 1e-05,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "gemini/gemini-2.5-pro": [
+    {
+      "provider": "gemini",
+      "input": 1.25e-06,
+      "output": 1e-05,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "gemini/gemini-2.5-flash": [
+    {
+      "provider": "gemini",
+      "input": 3e-07,
+      "output": 2.5e-06,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "gemini-2.5-flash": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 3e-07,
+      "output": 2.5e-06,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "gemini/gemini-2.5-flash-lite-preview-06-17": [
+    {
+      "provider": "gemini",
+      "input": 1e-07,
+      "output": 4e-07,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "gemini-2.5-flash-lite-preview-06-17": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 1e-07,
+      "output": 4e-07,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "openrouter/deepseek/deepseek-r1-0528": [
+    {
+      "provider": "openrouter",
+      "input": 5e-07,
+      "output": 2.15e-06,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "openrouter/google/gemini-2.5-pro": [
+    {
+      "provider": "openrouter",
+      "input": 1.25e-06,
+      "output": 1e-05,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "openrouter/google/gemini-2.5-flash": [
+    {
+      "provider": "openrouter",
+      "input": 3e-07,
+      "output": 2.5e-06,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "openrouter/anthropic/claude-sonnet-4": [
+    {
+      "provider": "openrouter",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "openrouter/mistralai/mistral-small-3.1-24b-instruct": [
+    {
+      "provider": "openrouter",
+      "input": 1e-07,
+      "output": 3e-07,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "openrouter/mistralai/mistral-small-3.2-24b-instruct": [
+    {
+      "provider": "openrouter",
+      "input": 1e-07,
+      "output": 3e-07,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "apac.amazon.nova-micro-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 3.7e-08,
+      "output": 1.48e-07,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "apac.amazon.nova-lite-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 6.3e-08,
+      "output": 2.52e-07,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "apac.amazon.nova-pro-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 8.4e-07,
+      "output": 3.36e-06,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "apac.anthropic.claude-3-haiku-20240307-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 2.5e-07,
+      "output": 1.25e-06,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "apac.anthropic.claude-3-sonnet-20240229-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "apac.anthropic.claude-3-5-sonnet-20240620-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "apac.anthropic.claude-3-5-sonnet-20241022-v2:0": [
+    {
+      "provider": "bedrock",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "apac.anthropic.claude-sonnet-4-20250514-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-07-03 03:07:28"
+    }
+  ],
+  "watsonx/mistralai/mistral-large": [
+    {
+      "provider": "watsonx",
+      "input": 3e-06,
+      "output": 1e-05,
+      "created_at": "2025-07-07 12:22:29"
+    }
+  ],
+  "azure_ai/cohere-rerank-v3.5": [
+    {
+      "provider": "azure_ai",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2025-07-07 12:22:29"
+    }
+  ],
+  "azure/o3-deep-research": [
+    {
+      "provider": "azure",
+      "input": 1e-05,
+      "output": 4e-05,
+      "created_at": "2025-07-17 13:41:31"
+    }
+  ],
+  "mistral/devstral-small-2507": [
+    {
+      "provider": "mistral",
+      "input": 1e-07,
+      "output": 3e-07,
+      "created_at": "2025-07-17 13:41:31"
+    }
+  ],
+  "mistral/devstral-medium-2507": [
+    {
+      "provider": "mistral",
+      "input": 4e-07,
+      "output": 2e-06,
+      "created_at": "2025-07-17 13:41:31"
+    }
+  ],
+  "xai/grok-4": [
+    {
+      "provider": "xai",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-07-17 13:41:31"
+    }
+  ],
+  "xai/grok-4-0709": [
+    {
+      "provider": "xai",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-07-17 13:41:31"
+    }
+  ],
+  "xai/grok-4-latest": [
+    {
+      "provider": "xai",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-07-17 13:41:31"
+    }
+  ],
+  "groq/moonshotai-kimi-k2-instruct": [
+    {
+      "provider": "groq",
+      "input": 1e-06,
+      "output": 3e-06,
+      "created_at": "2025-07-17 13:41:31"
+    }
+  ],
+  "jamba-large-1.7": [
+    {
+      "provider": "ai21",
+      "input": 2e-06,
+      "output": 8e-06,
+      "created_at": "2025-07-17 13:41:31"
+    }
+  ],
+  "jamba-mini-1.7": [
+    {
+      "provider": "ai21",
+      "input": 2e-07,
+      "output": 4e-07,
+      "created_at": "2025-07-17 13:41:31"
+    }
+  ],
+  "eu.mistral.pixtral-large-2502-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 2e-06,
+      "output": 6e-06,
+      "created_at": "2025-07-17 13:41:31"
+    }
+  ],
+  "us.mistral.pixtral-large-2502-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 2e-06,
+      "output": 6e-06,
+      "created_at": "2025-07-17 13:41:31"
+    }
+  ],
+  "together_ai/meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8": [
+    {
+      "provider": "together_ai",
+      "input": 2.7e-07,
+      "output": 8.5e-07,
+      "created_at": "2025-07-17 13:41:31"
+    }
+  ],
+  "together_ai/meta-llama/Llama-4-Scout-17B-16E-Instruct": [
+    {
+      "provider": "together_ai",
+      "input": 1.8e-07,
+      "output": 5.9e-07,
+      "created_at": "2025-07-17 13:41:31"
+    }
+  ],
+  "together_ai/deepseek-ai/DeepSeek-V3": [
+    {
+      "provider": "together_ai",
+      "input": 1.25e-06,
+      "output": 1.25e-06,
+      "created_at": "2025-07-17 13:41:31"
+    }
+  ],
+  "together_ai/deepseek-ai/DeepSeek-R1": [
+    {
+      "provider": "together_ai",
+      "input": 3e-06,
+      "output": 7e-06,
+      "created_at": "2025-07-17 13:41:31"
+    }
+  ],
+  "together_ai/moonshotai/Kimi-K2-Instruct": [
+    {
+      "provider": "together_ai",
+      "input": 1e-06,
+      "output": 3e-06,
+      "created_at": "2025-07-17 13:41:31"
+    }
+  ],
+  "moonshot/kimi-k2-0711-preview": [
+    {
+      "provider": "moonshot",
+      "input": 6e-07,
+      "output": 2.5e-06,
+      "created_at": "2025-07-17 13:41:31"
+    }
+  ],
+  "gpt-4o-realtime-preview-2025-06-03": [
+    {
+      "provider": "openai",
+      "input": 5e-06,
+      "output": 2e-05,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "azure_ai/grok-3": [
+    {
+      "provider": "azure_ai",
+      "input": 3.3e-06,
+      "output": 1.65e-05,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "azure_ai/global/grok-3": [
+    {
+      "provider": "azure_ai",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "azure_ai/global/grok-3-mini": [
+    {
+      "provider": "azure_ai",
+      "input": 2.5e-07,
+      "output": 1.27e-06,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "azure_ai/grok-3-mini": [
+    {
+      "provider": "azure_ai",
+      "input": 2.75e-07,
+      "output": 1.38e-06,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "azure_ai/jais-30b-chat": [
+    {
+      "provider": "azure_ai",
+      "input": 0.0032,
+      "output": 0.00971,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "groq/qwen/qwen3-32b": [
+    {
+      "provider": "groq",
+      "input": 2.9e-07,
+      "output": 5.9e-07,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "groq/moonshotai/kimi-k2-instruct": [
+    {
+      "provider": "groq",
+      "input": 1e-06,
+      "output": 3e-06,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "gemini/gemini-2.0-flash-live-001": [
+    {
+      "provider": "gemini",
+      "input": 3.5e-07,
+      "output": 1.5e-06,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "gemini/gemini-2.5-flash-lite": [
+    {
+      "provider": "gemini",
+      "input": 1e-07,
+      "output": 4e-07,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "gemini-2.5-flash-lite": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 1e-07,
+      "output": 4e-07,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "gemini-2.0-flash-live-preview-04-09": [
+    {
+      "provider": "vertex_ai-language-models",
+      "input": 5e-07,
+      "output": 2e-06,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "vertex_ai/meta/llama-3.1-8b-instruct-maas": [
+    {
+      "provider": "vertex_ai-llama_models",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "vertex_ai/meta/llama-3.1-70b-instruct-maas": [
+    {
+      "provider": "vertex_ai-llama_models",
+      "input": 0.0,
+      "output": 0.0,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "vertex_ai/meta/llama-3.1-405b-instruct-maas": [
+    {
+      "provider": "vertex_ai-llama_models",
+      "input": 5e-06,
+      "output": 1.6e-05,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "openrouter/bytedance/ui-tars-1.5-7b": [
+    {
+      "provider": "openrouter",
+      "input": 1e-07,
+      "output": 2e-07,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "openrouter/qwen/qwen-vl-plus": [
+    {
+      "provider": "openrouter",
+      "input": 2.1e-07,
+      "output": 6.3e-07,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "openrouter/qwen/qwen3-coder": [
+    {
+      "provider": "openrouter",
+      "input": 1e-06,
+      "output": 5e-06,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "openrouter/switchpoint/router": [
+    {
+      "provider": "openrouter",
+      "input": 8.5e-07,
+      "output": 3.4e-06,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "fireworks_ai/accounts/fireworks/models/kimi-k2-instruct": [
+    {
+      "provider": "fireworks_ai",
+      "input": 6e-07,
+      "output": 2.5e-06,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "v0/v0-1.0-md": [
+    {
+      "provider": "v0",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "v0/v0-1.5-md": [
+    {
+      "provider": "v0",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "v0/v0-1.5-lg": [
+    {
+      "provider": "v0",
+      "input": 1.5e-05,
+      "output": 7.5e-05,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "lambda_ai/deepseek-llama3.3-70b": [
+    {
+      "provider": "lambda_ai",
+      "input": 2e-07,
+      "output": 6e-07,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "lambda_ai/deepseek-r1-0528": [
+    {
+      "provider": "lambda_ai",
+      "input": 2e-07,
+      "output": 6e-07,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "lambda_ai/deepseek-r1-671b": [
+    {
+      "provider": "lambda_ai",
+      "input": 8e-07,
+      "output": 8e-07,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "lambda_ai/deepseek-v3-0324": [
+    {
+      "provider": "lambda_ai",
+      "input": 2e-07,
+      "output": 6e-07,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "lambda_ai/hermes3-405b": [
+    {
+      "provider": "lambda_ai",
+      "input": 8e-07,
+      "output": 8e-07,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "lambda_ai/hermes3-70b": [
+    {
+      "provider": "lambda_ai",
+      "input": 1.2e-07,
+      "output": 3e-07,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "lambda_ai/hermes3-8b": [
+    {
+      "provider": "lambda_ai",
+      "input": 2.5e-08,
+      "output": 4e-08,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "lambda_ai/lfm-40b": [
+    {
+      "provider": "lambda_ai",
+      "input": 1e-07,
+      "output": 2e-07,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "lambda_ai/lfm-7b": [
+    {
+      "provider": "lambda_ai",
+      "input": 2.5e-08,
+      "output": 4e-08,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "lambda_ai/llama-4-maverick-17b-128e-instruct-fp8": [
+    {
+      "provider": "lambda_ai",
+      "input": 5e-08,
+      "output": 1e-07,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "lambda_ai/llama-4-scout-17b-16e-instruct": [
+    {
+      "provider": "lambda_ai",
+      "input": 5e-08,
+      "output": 1e-07,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "lambda_ai/llama3.1-405b-instruct-fp8": [
+    {
+      "provider": "lambda_ai",
+      "input": 8e-07,
+      "output": 8e-07,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "lambda_ai/llama3.1-70b-instruct-fp8": [
+    {
+      "provider": "lambda_ai",
+      "input": 1.2e-07,
+      "output": 3e-07,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "lambda_ai/llama3.1-8b-instruct": [
+    {
+      "provider": "lambda_ai",
+      "input": 2.5e-08,
+      "output": 4e-08,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "lambda_ai/llama3.1-nemotron-70b-instruct-fp8": [
+    {
+      "provider": "lambda_ai",
+      "input": 1.2e-07,
+      "output": 3e-07,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "lambda_ai/llama3.2-11b-vision-instruct": [
+    {
+      "provider": "lambda_ai",
+      "input": 1.5e-08,
+      "output": 2.5e-08,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "lambda_ai/llama3.2-3b-instruct": [
+    {
+      "provider": "lambda_ai",
+      "input": 1.5e-08,
+      "output": 2.5e-08,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "lambda_ai/llama3.3-70b-instruct-fp8": [
+    {
+      "provider": "lambda_ai",
+      "input": 1.2e-07,
+      "output": 3e-07,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "lambda_ai/qwen25-coder-32b-instruct": [
+    {
+      "provider": "lambda_ai",
+      "input": 5e-08,
+      "output": 1e-07,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "lambda_ai/qwen3-32b-fp8": [
+    {
+      "provider": "lambda_ai",
+      "input": 5e-08,
+      "output": 1e-07,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "hyperbolic/moonshotai/Kimi-K2-Instruct": [
+    {
+      "provider": "hyperbolic",
+      "input": 2e-06,
+      "output": 2e-06,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "hyperbolic/deepseek-ai/DeepSeek-R1-0528": [
+    {
+      "provider": "hyperbolic",
+      "input": 2.5e-07,
+      "output": 2.5e-07,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "hyperbolic/Qwen/Qwen3-235B-A22B": [
+    {
+      "provider": "hyperbolic",
+      "input": 2e-06,
+      "output": 2e-06,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "hyperbolic/deepseek-ai/DeepSeek-V3-0324": [
+    {
+      "provider": "hyperbolic",
+      "input": 4e-07,
+      "output": 4e-07,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "hyperbolic/Qwen/QwQ-32B": [
+    {
+      "provider": "hyperbolic",
+      "input": 2e-07,
+      "output": 2e-07,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "hyperbolic/deepseek-ai/DeepSeek-R1": [
+    {
+      "provider": "hyperbolic",
+      "input": 4e-07,
+      "output": 4e-07,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "hyperbolic/deepseek-ai/DeepSeek-V3": [
+    {
+      "provider": "hyperbolic",
+      "input": 2e-07,
+      "output": 2e-07,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "hyperbolic/meta-llama/Llama-3.3-70B-Instruct": [
+    {
+      "provider": "hyperbolic",
+      "input": 1.2e-07,
+      "output": 3e-07,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "hyperbolic/Qwen/Qwen2.5-Coder-32B-Instruct": [
+    {
+      "provider": "hyperbolic",
+      "input": 1.2e-07,
+      "output": 3e-07,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "hyperbolic/meta-llama/Llama-3.2-3B-Instruct": [
+    {
+      "provider": "hyperbolic",
+      "input": 1.2e-07,
+      "output": 3e-07,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "hyperbolic/Qwen/Qwen2.5-72B-Instruct": [
+    {
+      "provider": "hyperbolic",
+      "input": 1.2e-07,
+      "output": 3e-07,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "hyperbolic/meta-llama/Meta-Llama-3-70B-Instruct": [
+    {
+      "provider": "hyperbolic",
+      "input": 1.2e-07,
+      "output": 3e-07,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "hyperbolic/NousResearch/Hermes-3-Llama-3.1-70B": [
+    {
+      "provider": "hyperbolic",
+      "input": 1.2e-07,
+      "output": 3e-07,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "hyperbolic/meta-llama/Meta-Llama-3.1-405B-Instruct": [
+    {
+      "provider": "hyperbolic",
+      "input": 1.2e-07,
+      "output": 3e-07,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "hyperbolic/meta-llama/Meta-Llama-3.1-8B-Instruct": [
+    {
+      "provider": "hyperbolic",
+      "input": 1.2e-07,
+      "output": 3e-07,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "hyperbolic/meta-llama/Meta-Llama-3.1-70B-Instruct": [
+    {
+      "provider": "hyperbolic",
+      "input": 1.2e-07,
+      "output": 3e-07,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "bedrock/us-gov-east-1/amazon.titan-embed-text-v1": [
+    {
+      "provider": "bedrock",
+      "input": 1e-07,
+      "output": 0.0,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "bedrock/us-gov-east-1/amazon.titan-embed-text-v2:0": [
+    {
+      "provider": "bedrock",
+      "input": 2e-07,
+      "output": 0.0,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "bedrock/us-gov-east-1/amazon.titan-text-express-v1": [
+    {
+      "provider": "bedrock",
+      "input": 1.3e-06,
+      "output": 1.7e-06,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "bedrock/us-gov-east-1/amazon.titan-text-lite-v1": [
+    {
+      "provider": "bedrock",
+      "input": 3e-07,
+      "output": 4e-07,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "bedrock/us-gov-east-1/amazon.titan-text-premier-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 5e-07,
+      "output": 1.5e-06,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "bedrock/us-gov-east-1/anthropic.claude-3-5-sonnet-20240620-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 3.6e-06,
+      "output": 1.8e-05,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "bedrock/us-gov-east-1/anthropic.claude-3-haiku-20240307-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 3e-07,
+      "output": 1.5e-06,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "bedrock/us-gov-east-1/meta.llama3-70b-instruct-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 2.65e-06,
+      "output": 3.5e-06,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "bedrock/us-gov-east-1/meta.llama3-8b-instruct-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 3e-07,
+      "output": 2.65e-06,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "bedrock/us-gov-west-1/amazon.titan-embed-text-v1": [
+    {
+      "provider": "bedrock",
+      "input": 1e-07,
+      "output": 0.0,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "bedrock/us-gov-west-1/amazon.titan-embed-text-v2:0": [
+    {
+      "provider": "bedrock",
+      "input": 2e-07,
+      "output": 0.0,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "bedrock/us-gov-west-1/amazon.titan-text-express-v1": [
+    {
+      "provider": "bedrock",
+      "input": 1.3e-06,
+      "output": 1.7e-06,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "bedrock/us-gov-west-1/amazon.titan-text-lite-v1": [
+    {
+      "provider": "bedrock",
+      "input": 3e-07,
+      "output": 4e-07,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "bedrock/us-gov-west-1/amazon.titan-text-premier-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 5e-07,
+      "output": 1.5e-06,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "bedrock/us-gov-west-1/anthropic.claude-3-5-sonnet-20240620-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 3.6e-06,
+      "output": 1.8e-05,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "bedrock/us-gov-west-1/anthropic.claude-3-haiku-20240307-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 3e-07,
+      "output": 1.5e-06,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "bedrock/us-gov-west-1/meta.llama3-70b-instruct-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 2.65e-06,
+      "output": 3.5e-06,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "bedrock/us-gov-west-1/meta.llama3-8b-instruct-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 3e-07,
+      "output": 2.65e-06,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "bedrock/us-gov-east-1/amazon.nova-pro-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 9.6e-07,
+      "output": 3.84e-06,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "bedrock/us-gov-west-1/amazon.nova-pro-v1:0": [
+    {
+      "provider": "bedrock",
+      "input": 9.6e-07,
+      "output": 3.84e-06,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "moonshot/moonshot-v1-8k": [
+    {
+      "provider": "moonshot",
+      "input": 2e-07,
+      "output": 2e-06,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "moonshot/moonshot-v1-32k": [
+    {
+      "provider": "moonshot",
+      "input": 1e-06,
+      "output": 3e-06,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "moonshot/moonshot-v1-128k": [
+    {
+      "provider": "moonshot",
+      "input": 2e-06,
+      "output": 5e-06,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "moonshot/moonshot-v1-auto": [
+    {
+      "provider": "moonshot",
+      "input": 2e-06,
+      "output": 5e-06,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "moonshot/moonshot-v1-32k-0430": [
+    {
+      "provider": "moonshot",
+      "input": 1e-06,
+      "output": 3e-06,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "moonshot/moonshot-v1-128k-0430": [
+    {
+      "provider": "moonshot",
+      "input": 2e-06,
+      "output": 5e-06,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "moonshot/moonshot-v1-8k-0430": [
+    {
+      "provider": "moonshot",
+      "input": 2e-07,
+      "output": 2e-06,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "moonshot/kimi-latest": [
+    {
+      "provider": "moonshot",
+      "input": 2e-06,
+      "output": 5e-06,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "moonshot/kimi-latest-8k": [
+    {
+      "provider": "moonshot",
+      "input": 2e-07,
+      "output": 2e-06,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "moonshot/kimi-latest-32k": [
+    {
+      "provider": "moonshot",
+      "input": 1e-06,
+      "output": 3e-06,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "moonshot/kimi-latest-128k": [
+    {
+      "provider": "moonshot",
+      "input": 2e-06,
+      "output": 5e-06,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "moonshot/kimi-thinking-preview": [
+    {
+      "provider": "moonshot",
+      "input": 3e-05,
+      "output": 3e-05,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "moonshot/moonshot-v1-8k-vision-preview": [
+    {
+      "provider": "moonshot",
+      "input": 2e-07,
+      "output": 2e-06,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "moonshot/moonshot-v1-32k-vision-preview": [
+    {
+      "provider": "moonshot",
+      "input": 1e-06,
+      "output": 3e-06,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "moonshot/moonshot-v1-128k-vision-preview": [
+    {
+      "provider": "moonshot",
+      "input": 2e-06,
+      "output": 5e-06,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "morph/morph-v3-fast": [
+    {
+      "provider": "morph",
+      "input": 8e-07,
+      "output": 1.2e-06,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "morph/morph-v3-large": [
+    {
+      "provider": "morph",
+      "input": 9e-07,
+      "output": 1.9e-06,
+      "created_at": "2025-07-28 10:14:07"
+    }
+  ],
+  "gpt-5-2025-08-07": [
+    {
+      "provider": "openai",
+      "input": 1.25e-06,
+      "output": 1e-05,
+      "created_at": "2025-08-07 11:40:33"
+    }
+  ],
+  "gpt-5-mini-2025-08-07": [
+    {
+      "provider": "openai",
+      "input": 2.5e-07,
+      "output": 2e-06,
+      "created_at": "2025-08-07 11:40:33"
+    }
+  ],
+  "gpt-5-nano-2025-08-07": [
+    {
+      "provider": "openai",
+      "input": 5e-08,
+      "output": 4e-07,
+      "created_at": "2025-08-07 11:40:33"
+    }
+  ],
+  "groq/openai/gpt-oss-20b": [
+    {
+      "provider": "groq",
+      "input": 1e-07,
+      "output": 5e-07,
+      "created_at": "2025-08-07 11:40:33"
+    }
+  ],
+  "groq/openai/gpt-oss-120b": [
+    {
+      "provider": "groq",
+      "input": 1.5e-07,
+      "output": 7.5e-07,
+      "created_at": "2025-08-07 11:40:33"
+    }
+  ],
+  "claude-opus-4-1-20250805": [
+    {
+      "provider": "anthropic",
+      "input": 1.5e-05,
+      "output": 7.5e-05,
+      "created_at": "2025-08-07 11:40:33"
+    }
+  ],
+  "vertex_ai/claude-opus-4-1": [
+    {
+      "provider": "vertex_ai-anthropic_models",
+      "input": 1.5e-05,
+      "output": 7.5e-05,
+      "created_at": "2025-08-07 11:40:33"
+    }
+  ],
+  "vertex_ai/claude-opus-4-1@20250805": [
+    {
+      "provider": "vertex_ai-anthropic_models",
+      "input": 1.5e-05,
+      "output": 7.5e-05,
+      "created_at": "2025-08-07 11:40:33"
+    }
+  ],
+  "openrouter/x-ai/grok-4": [
+    {
+      "provider": "openrouter",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-08-07 11:40:33"
+    }
+  ],
+  "openai.gpt-oss-20b-1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 7e-08,
+      "output": 3e-07,
+      "created_at": "2025-08-07 11:40:33"
+    }
+  ],
+  "openai.gpt-oss-120b-1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 1.5e-07,
+      "output": 6e-07,
+      "created_at": "2025-08-07 11:40:33"
+    }
+  ],
+  "anthropic.claude-opus-4-1-20250805-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 1.5e-05,
+      "output": 7.5e-05,
+      "created_at": "2025-08-07 11:40:33"
+    }
+  ],
+  "us.anthropic.claude-opus-4-1-20250805-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 1.5e-05,
+      "output": 7.5e-05,
+      "created_at": "2025-08-07 11:40:33"
+    }
+  ],
+  "eu.anthropic.claude-opus-4-1-20250805-v1:0": [
+    {
+      "provider": "bedrock_converse",
+      "input": 1.5e-05,
+      "output": 7.5e-05,
+      "created_at": "2025-08-07 11:40:33"
+    }
+  ],
+  "fireworks_ai/accounts/fireworks/models/glm-4p5": [
+    {
+      "provider": "fireworks_ai",
+      "input": 5.5e-07,
+      "output": 2.19e-06,
+      "created_at": "2025-08-07 11:40:33"
+    }
+  ],
+  "fireworks_ai/accounts/fireworks/models/glm-4p5-air": [
+    {
+      "provider": "fireworks_ai",
+      "input": 2.2e-07,
+      "output": 8.8e-07,
+      "created_at": "2025-08-07 11:40:33"
+    }
+  ],
+  "fireworks_ai/accounts/fireworks/models/gpt-oss-120b": [
+    {
+      "provider": "fireworks_ai",
+      "input": 1.5e-07,
+      "output": 6e-07,
+      "created_at": "2025-08-07 11:40:33"
+    }
+  ],
+  "fireworks_ai/accounts/fireworks/models/gpt-oss-20b": [
+    {
+      "provider": "fireworks_ai",
+      "input": 5e-08,
+      "output": 2e-07,
+      "created_at": "2025-08-07 11:40:33"
+    }
+  ],
+  "oci/meta.llama-4-maverick-17b-128e-instruct-fp8": [
+    {
+      "provider": "oci",
+      "input": 7.2e-07,
+      "output": 7.2e-07,
+      "created_at": "2025-08-07 11:40:33"
+    }
+  ],
+  "oci/meta.llama-4-scout-17b-16e-instruct": [
+    {
+      "provider": "oci",
+      "input": 7.2e-07,
+      "output": 7.2e-07,
+      "created_at": "2025-08-07 11:40:33"
+    }
+  ],
+  "oci/meta.llama-3.3-70b-instruct": [
+    {
+      "provider": "oci",
+      "input": 7.2e-07,
+      "output": 7.2e-07,
+      "created_at": "2025-08-07 11:40:33"
+    }
+  ],
+  "oci/meta.llama-3.2-90b-vision-instruct": [
+    {
+      "provider": "oci",
+      "input": 2e-06,
+      "output": 2e-06,
+      "created_at": "2025-08-07 11:40:33"
+    }
+  ],
+  "oci/meta.llama-3.1-405b-instruct": [
+    {
+      "provider": "oci",
+      "input": 1.068e-05,
+      "output": 1.068e-05,
+      "created_at": "2025-08-07 11:40:33"
+    }
+  ],
+  "oci/xai.grok-4": [
+    {
+      "provider": "oci",
+      "input": 3e-06,
+      "output": 1.5e-07,
+      "created_at": "2025-08-07 11:40:33"
+    }
+  ],
+  "oci/xai.grok-3": [
+    {
+      "provider": "oci",
+      "input": 3e-06,
+      "output": 1.5e-07,
+      "created_at": "2025-08-07 11:40:33"
+    }
+  ],
+  "oci/xai.grok-3-mini": [
+    {
+      "provider": "oci",
+      "input": 3e-07,
+      "output": 5e-07,
+      "created_at": "2025-08-07 11:40:33"
+    }
+  ],
+  "oci/xai.grok-3-fast": [
+    {
+      "provider": "oci",
+      "input": 5e-06,
+      "output": 2.5e-05,
+      "created_at": "2025-08-07 11:40:33"
+    }
+  ],
+  "oci/xai.grok-3-mini-fast": [
+    {
+      "provider": "oci",
+      "input": 6e-07,
+      "output": 4e-06,
+      "created_at": "2025-08-07 11:40:33"
+    }
+  ],
+  "gpt-5": [
+    {
+      "provider": "openai",
+      "input": 1.25e-06,
+      "output": 1e-05,
+      "created_at": "2025-08-07 14:35:25"
+    }
+  ],
+  "gpt-5-mini": [
+    {
+      "provider": "openai",
+      "input": 2.5e-07,
+      "output": 2e-06,
+      "created_at": "2025-08-07 14:35:25"
+    }
+  ],
+  "gpt-5-nano": [
+    {
+      "provider": "openai",
+      "input": 5e-08,
+      "output": 4e-07,
+      "created_at": "2025-08-07 14:35:25"
+    }
+  ],
+  "gpt-5-chat": [
+    {
+      "provider": "openai",
+      "input": 5e-06,
+      "output": 2e-05,
+      "created_at": "2025-08-07 14:35:25"
+    }
+  ],
+  "gpt-5-chat-latest": [
+    {
+      "provider": "openai",
+      "input": 1.25e-06,
+      "output": 1e-05,
+      "created_at": "2025-08-07 14:35:25"
+    }
+  ],
+  "azure/gpt-5": [
+    {
+      "provider": "azure",
+      "input": 1.25e-06,
+      "output": 1e-05,
+      "created_at": "2025-08-07 14:35:25"
+    }
+  ],
+  "azure/gpt-5-2025-08-07": [
+    {
+      "provider": "azure",
+      "input": 1.25e-06,
+      "output": 1e-05,
+      "created_at": "2025-08-07 14:35:25"
+    }
+  ],
+  "azure/gpt-5-mini": [
+    {
+      "provider": "azure",
+      "input": 2.5e-07,
+      "output": 2e-06,
+      "created_at": "2025-08-07 14:35:25"
+    }
+  ],
+  "azure/gpt-5-mini-2025-08-07": [
+    {
+      "provider": "azure",
+      "input": 2.5e-07,
+      "output": 2e-06,
+      "created_at": "2025-08-07 14:35:25"
+    }
+  ],
+  "azure/gpt-5-nano-2025-08-07": [
+    {
+      "provider": "azure",
+      "input": 5e-08,
+      "output": 4e-07,
+      "created_at": "2025-08-07 14:35:25"
+    }
+  ],
+  "azure/gpt-5-nano": [
+    {
+      "provider": "azure",
+      "input": 5e-08,
+      "output": 4e-07,
+      "created_at": "2025-08-07 14:35:25"
+    }
+  ],
+  "azure/gpt-5-chat": [
+    {
+      "provider": "azure",
+      "input": 5e-06,
+      "output": 2e-05,
+      "created_at": "2025-08-07 14:35:25"
+    }
+  ],
+  "azure/gpt-5-chat-latest": [
+    {
+      "provider": "azure",
+      "input": 1.25e-06,
+      "output": 1e-05,
+      "created_at": "2025-08-07 14:35:25"
+    }
+  ],
+  "claude-opus-4-1": [
+    {
+      "provider": "anthropic",
+      "input": 1.5e-05,
+      "output": 7.5e-05,
+      "created_at": "2025-08-07 14:35:25"
     }
   ]
 }

@@ -1,0 +1,2187 @@
+{
+  "$defs": {
+    "ActionSpec": {
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "config": {
+          "discriminator": {
+            "mapping": {
+              "contains_words": "#/$defs/ContainsWordsActionConfig",
+              "llm_judge": "#/$defs/LlmJudgeActionConfig"
+            },
+            "propertyName": "action_type"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/LlmJudgeActionConfig"
+            },
+            {
+              "$ref": "#/$defs/ContainsWordsActionConfig"
+            }
+          ],
+          "title": "Config"
+        }
+      },
+      "required": [
+        "config"
+      ],
+      "title": "ActionSpec",
+      "type": "object"
+    },
+    "AndOperation": {
+      "description": "Logical AND. All conditions must evaluate to true.\n\nExample:\n    ```\n    {\n        \"$and\": [\n            {\"$eq\": [{\"$getField\": \"op_name\"}, {\"$literal\": \"predict\"}]},\n            {\"$gt\": [{\"$getField\": \"summary.usage.tokens\"}, {\"$literal\": 1000}]}\n        ]\n    }\n    ```",
+      "properties": {
+        "$and": {
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/LiteralOperation"
+              },
+              {
+                "$ref": "#/$defs/GetFieldOperator"
+              },
+              {
+                "$ref": "#/$defs/ConvertOperation"
+              },
+              {
+                "title": "AndOperation"
+              },
+              {
+                "$ref": "#/$defs/OrOperation"
+              },
+              {
+                "$ref": "#/$defs/NotOperation"
+              },
+              {
+                "$ref": "#/$defs/EqOperation"
+              },
+              {
+                "$ref": "#/$defs/GtOperation"
+              },
+              {
+                "$ref": "#/$defs/GteOperation"
+              },
+              {
+                "$ref": "#/$defs/InOperation"
+              },
+              {
+                "$ref": "#/$defs/ContainsOperation"
+              }
+            ]
+          },
+          "title": "$And",
+          "type": "array"
+        }
+      },
+      "required": [
+        "$and"
+      ],
+      "title": "AndOperation",
+      "type": "object"
+    },
+    "AnnotationSpec": {
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "field_schema": {
+          "default": {},
+          "description": "Expected to be valid JSON Schema. Can be provided as a dict, a Pydantic model class, a tuple of a primitive type and a Pydantic Field, or primitive type",
+          "examples": [
+            {
+              "maxLength": 100,
+              "type": "string"
+            },
+            {
+              "maximum": 100,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "maximum": 100,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "enum": [
+                "option1",
+                "option2"
+              ],
+              "type": "string"
+            }
+          ],
+          "title": "Field Schema",
+          "type": "object"
+        },
+        "unique_among_creators": {
+          "default": false,
+          "title": "Unique Among Creators",
+          "type": "boolean"
+        },
+        "op_scope": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "examples": [
+            [
+              "weave:///entity/project/op/name:digest"
+            ],
+            [
+              "weave:///entity/project/op/name:*"
+            ]
+          ],
+          "title": "Op Scope"
+        }
+      },
+      "title": "AnnotationSpec",
+      "type": "object"
+    },
+    "CallsFilter": {
+      "additionalProperties": false,
+      "properties": {
+        "op_names": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Op Names"
+        },
+        "input_refs": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Input Refs"
+        },
+        "output_refs": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Output Refs"
+        },
+        "parent_ids": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parent Ids"
+        },
+        "trace_ids": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Trace Ids"
+        },
+        "call_ids": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Call Ids"
+        },
+        "thread_ids": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Thread Ids"
+        },
+        "turn_ids": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Turn Ids"
+        },
+        "trace_roots_only": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Trace Roots Only"
+        },
+        "wb_user_ids": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Wb User Ids"
+        },
+        "wb_run_ids": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Wb Run Ids"
+        }
+      },
+      "title": "CallsFilter",
+      "type": "object"
+    },
+    "ChartConfig": {
+      "properties": {
+        "x_axis": {
+          "title": "XAxis",
+          "type": "string"
+        },
+        "y_axis": {
+          "title": "YAxis",
+          "type": "string"
+        },
+        "plot_type": {
+          "anyOf": [
+            {
+              "enum": [
+                "scatter",
+                "line",
+                "bar"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Plot Type"
+        },
+        "bin_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bin Count"
+        },
+        "aggregation": {
+          "anyOf": [
+            {
+              "enum": [
+                "average",
+                "sum",
+                "min",
+                "max",
+                "p95",
+                "p99"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Aggregation"
+        },
+        "group_keys": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Group Keys"
+        },
+        "custom_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Custom Name"
+        }
+      },
+      "required": [
+        "x_axis",
+        "y_axis"
+      ],
+      "title": "ChartConfig",
+      "type": "object"
+    },
+    "Column": {
+      "properties": {
+        "path": {
+          "anyOf": [
+            {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Path"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        }
+      },
+      "title": "Column",
+      "type": "object"
+    },
+    "ContainsOperation": {
+      "description": "Case-insensitive substring match.\n\nNot part of MongoDB. Weave-specific addition.\n\nExample:\n    ```\n    {\n        \"$contains\": {\n            \"input\": {\"$getField\": \"display_name\"},\n            \"substr\": {\"$literal\": \"llm\"},\n            \"case_insensitive\": true\n        }\n    }\n    ```",
+      "properties": {
+        "$contains": {
+          "$ref": "#/$defs/ContainsSpec"
+        }
+      },
+      "required": [
+        "$contains"
+      ],
+      "title": "ContainsOperation",
+      "type": "object"
+    },
+    "ContainsSpec": {
+      "description": "Specification for the `$contains` operation.\n\n- `input`: The string to search.\n- `substr`: The substring to search for.\n- `case_insensitive`: If true, match is case-insensitive.",
+      "properties": {
+        "input": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LiteralOperation"
+            },
+            {
+              "$ref": "#/$defs/GetFieldOperator"
+            },
+            {
+              "$ref": "#/$defs/ConvertOperation"
+            },
+            {
+              "title": "AndOperation"
+            },
+            {
+              "$ref": "#/$defs/OrOperation"
+            },
+            {
+              "$ref": "#/$defs/NotOperation"
+            },
+            {
+              "$ref": "#/$defs/EqOperation"
+            },
+            {
+              "$ref": "#/$defs/GtOperation"
+            },
+            {
+              "$ref": "#/$defs/GteOperation"
+            },
+            {
+              "$ref": "#/$defs/InOperation"
+            },
+            {
+              "title": "ContainsOperation"
+            }
+          ],
+          "title": "Input"
+        },
+        "substr": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LiteralOperation"
+            },
+            {
+              "$ref": "#/$defs/GetFieldOperator"
+            },
+            {
+              "$ref": "#/$defs/ConvertOperation"
+            },
+            {
+              "title": "AndOperation"
+            },
+            {
+              "$ref": "#/$defs/OrOperation"
+            },
+            {
+              "$ref": "#/$defs/NotOperation"
+            },
+            {
+              "$ref": "#/$defs/EqOperation"
+            },
+            {
+              "$ref": "#/$defs/GtOperation"
+            },
+            {
+              "$ref": "#/$defs/GteOperation"
+            },
+            {
+              "$ref": "#/$defs/InOperation"
+            },
+            {
+              "title": "ContainsOperation"
+            }
+          ],
+          "title": "Substr"
+        },
+        "case_insensitive": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": false,
+          "title": "Case Insensitive"
+        }
+      },
+      "required": [
+        "input",
+        "substr"
+      ],
+      "title": "ContainsSpec",
+      "type": "object"
+    },
+    "ContainsWordsActionConfig": {
+      "properties": {
+        "action_type": {
+          "const": "contains_words",
+          "default": "contains_words",
+          "title": "Action Type",
+          "type": "string"
+        },
+        "target_words": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Target Words",
+          "type": "array"
+        }
+      },
+      "required": [
+        "target_words"
+      ],
+      "title": "ContainsWordsActionConfig",
+      "type": "object"
+    },
+    "ConvertOperation": {
+      "description": "Convert the input value to a specific type (e.g., `int`, `bool`, `string`).\n\nExample:\n    ```\n    {\n        \"$convert\": {\n            \"input\": {\"$getField\": \"inputs.value\"},\n            \"to\": \"int\"\n        }\n    }\n    ```",
+      "properties": {
+        "$convert": {
+          "$ref": "#/$defs/ConvertSpec"
+        }
+      },
+      "required": [
+        "$convert"
+      ],
+      "title": "ConvertOperation",
+      "type": "object"
+    },
+    "ConvertSpec": {
+      "description": "Specifies conversion details for `$convert`.\n\n- `input`: The operand to convert.\n- `to`: The type to convert to.",
+      "properties": {
+        "input": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LiteralOperation"
+            },
+            {
+              "$ref": "#/$defs/GetFieldOperator"
+            },
+            {
+              "title": "ConvertOperation"
+            },
+            {
+              "title": "AndOperation"
+            },
+            {
+              "$ref": "#/$defs/OrOperation"
+            },
+            {
+              "$ref": "#/$defs/NotOperation"
+            },
+            {
+              "$ref": "#/$defs/EqOperation"
+            },
+            {
+              "$ref": "#/$defs/GtOperation"
+            },
+            {
+              "$ref": "#/$defs/GteOperation"
+            },
+            {
+              "$ref": "#/$defs/InOperation"
+            },
+            {
+              "title": "ContainsOperation"
+            }
+          ],
+          "title": "Input"
+        },
+        "to": {
+          "enum": [
+            "double",
+            "string",
+            "int",
+            "bool",
+            "exists"
+          ],
+          "title": "To",
+          "type": "string"
+        }
+      },
+      "required": [
+        "input",
+        "to"
+      ],
+      "title": "ConvertSpec",
+      "type": "object"
+    },
+    "EqOperation": {
+      "description": "Equality check between two operands.\n\nExample:\n    ```\n    {\n        \"$eq\": [{\"$getField\": \"op_name\"}, {\"$literal\": \"predict\"}]\n    }\n    ```",
+      "properties": {
+        "$eq": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/LiteralOperation"
+                },
+                {
+                  "$ref": "#/$defs/GetFieldOperator"
+                },
+                {
+                  "title": "ConvertOperation"
+                },
+                {
+                  "title": "AndOperation"
+                },
+                {
+                  "$ref": "#/$defs/OrOperation"
+                },
+                {
+                  "$ref": "#/$defs/NotOperation"
+                },
+                {
+                  "title": "EqOperation"
+                },
+                {
+                  "$ref": "#/$defs/GtOperation"
+                },
+                {
+                  "$ref": "#/$defs/GteOperation"
+                },
+                {
+                  "$ref": "#/$defs/InOperation"
+                },
+                {
+                  "title": "ContainsOperation"
+                }
+              ]
+            },
+            {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/LiteralOperation"
+                },
+                {
+                  "$ref": "#/$defs/GetFieldOperator"
+                },
+                {
+                  "title": "ConvertOperation"
+                },
+                {
+                  "title": "AndOperation"
+                },
+                {
+                  "$ref": "#/$defs/OrOperation"
+                },
+                {
+                  "$ref": "#/$defs/NotOperation"
+                },
+                {
+                  "title": "EqOperation"
+                },
+                {
+                  "$ref": "#/$defs/GtOperation"
+                },
+                {
+                  "$ref": "#/$defs/GteOperation"
+                },
+                {
+                  "$ref": "#/$defs/InOperation"
+                },
+                {
+                  "title": "ContainsOperation"
+                }
+              ]
+            }
+          ],
+          "title": "$Eq",
+          "type": "array"
+        }
+      },
+      "required": [
+        "$eq"
+      ],
+      "title": "EqOperation",
+      "type": "object"
+    },
+    "GetFieldOperator": {
+      "description": "Access a field on the traced call.\n\nSupports dot notation for nested access, e.g. `summary.usage.tokens`.\n\nOnly works on fields present in the `CallSchema`, including:\n- Top-level fields like `op_name`, `trace_id`, `started_at`\n- Nested fields like `inputs.input_name`, `summary.usage.tokens`, etc.\n\nExample:\n    ```\n    {\"$getField\": \"op_name\"}\n    ```",
+      "properties": {
+        "$getField": {
+          "title": "$Getfield",
+          "type": "string"
+        }
+      },
+      "required": [
+        "$getField"
+      ],
+      "title": "GetFieldOperator",
+      "type": "object"
+    },
+    "GtOperation": {
+      "description": "Greater than comparison.\n\nExample:\n    ```\n    {\n        \"$gt\": [{\"$getField\": \"summary.usage.tokens\"}, {\"$literal\": 100}]\n    }\n    ```",
+      "properties": {
+        "$gt": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/LiteralOperation"
+                },
+                {
+                  "$ref": "#/$defs/GetFieldOperator"
+                },
+                {
+                  "title": "ConvertOperation"
+                },
+                {
+                  "title": "AndOperation"
+                },
+                {
+                  "$ref": "#/$defs/OrOperation"
+                },
+                {
+                  "$ref": "#/$defs/NotOperation"
+                },
+                {
+                  "title": "EqOperation"
+                },
+                {
+                  "title": "GtOperation"
+                },
+                {
+                  "$ref": "#/$defs/GteOperation"
+                },
+                {
+                  "$ref": "#/$defs/InOperation"
+                },
+                {
+                  "title": "ContainsOperation"
+                }
+              ]
+            },
+            {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/LiteralOperation"
+                },
+                {
+                  "$ref": "#/$defs/GetFieldOperator"
+                },
+                {
+                  "title": "ConvertOperation"
+                },
+                {
+                  "title": "AndOperation"
+                },
+                {
+                  "$ref": "#/$defs/OrOperation"
+                },
+                {
+                  "$ref": "#/$defs/NotOperation"
+                },
+                {
+                  "title": "EqOperation"
+                },
+                {
+                  "title": "GtOperation"
+                },
+                {
+                  "$ref": "#/$defs/GteOperation"
+                },
+                {
+                  "$ref": "#/$defs/InOperation"
+                },
+                {
+                  "title": "ContainsOperation"
+                }
+              ]
+            }
+          ],
+          "title": "$Gt",
+          "type": "array"
+        }
+      },
+      "required": [
+        "$gt"
+      ],
+      "title": "GtOperation",
+      "type": "object"
+    },
+    "GteOperation": {
+      "description": "Greater than or equal comparison.\n\nExample:\n    ```\n    {\n        \"$gte\": [{\"$getField\": \"summary.usage.tokens\"}, {\"$literal\": 100}]\n    }\n    ```",
+      "properties": {
+        "$gte": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/LiteralOperation"
+                },
+                {
+                  "$ref": "#/$defs/GetFieldOperator"
+                },
+                {
+                  "title": "ConvertOperation"
+                },
+                {
+                  "title": "AndOperation"
+                },
+                {
+                  "$ref": "#/$defs/OrOperation"
+                },
+                {
+                  "$ref": "#/$defs/NotOperation"
+                },
+                {
+                  "title": "EqOperation"
+                },
+                {
+                  "title": "GtOperation"
+                },
+                {
+                  "title": "GteOperation"
+                },
+                {
+                  "$ref": "#/$defs/InOperation"
+                },
+                {
+                  "title": "ContainsOperation"
+                }
+              ]
+            },
+            {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/LiteralOperation"
+                },
+                {
+                  "$ref": "#/$defs/GetFieldOperator"
+                },
+                {
+                  "title": "ConvertOperation"
+                },
+                {
+                  "title": "AndOperation"
+                },
+                {
+                  "$ref": "#/$defs/OrOperation"
+                },
+                {
+                  "$ref": "#/$defs/NotOperation"
+                },
+                {
+                  "title": "EqOperation"
+                },
+                {
+                  "title": "GtOperation"
+                },
+                {
+                  "title": "GteOperation"
+                },
+                {
+                  "$ref": "#/$defs/InOperation"
+                },
+                {
+                  "title": "ContainsOperation"
+                }
+              ]
+            }
+          ],
+          "title": "$Gte",
+          "type": "array"
+        }
+      },
+      "required": [
+        "$gte"
+      ],
+      "title": "GteOperation",
+      "type": "object"
+    },
+    "InOperation": {
+      "description": "Membership check.\n\nReturns true if the left operand is in the list provided as the second operand.\n\nExample:\n    ```\n    {\n        \"$in\": [\n            {\"$getField\": \"op_name\"},\n            [{\"$literal\": \"predict\"}, {\"$literal\": \"generate\"}]\n        ]\n    }\n    ```",
+      "properties": {
+        "$in": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/LiteralOperation"
+                },
+                {
+                  "$ref": "#/$defs/GetFieldOperator"
+                },
+                {
+                  "title": "ConvertOperation"
+                },
+                {
+                  "title": "AndOperation"
+                },
+                {
+                  "$ref": "#/$defs/OrOperation"
+                },
+                {
+                  "$ref": "#/$defs/NotOperation"
+                },
+                {
+                  "title": "EqOperation"
+                },
+                {
+                  "title": "GtOperation"
+                },
+                {
+                  "title": "GteOperation"
+                },
+                {
+                  "title": "InOperation"
+                },
+                {
+                  "title": "ContainsOperation"
+                }
+              ]
+            },
+            {
+              "items": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/LiteralOperation"
+                  },
+                  {
+                    "$ref": "#/$defs/GetFieldOperator"
+                  },
+                  {
+                    "title": "ConvertOperation"
+                  },
+                  {
+                    "title": "AndOperation"
+                  },
+                  {
+                    "$ref": "#/$defs/OrOperation"
+                  },
+                  {
+                    "$ref": "#/$defs/NotOperation"
+                  },
+                  {
+                    "title": "EqOperation"
+                  },
+                  {
+                    "title": "GtOperation"
+                  },
+                  {
+                    "title": "GteOperation"
+                  },
+                  {
+                    "title": "InOperation"
+                  },
+                  {
+                    "title": "ContainsOperation"
+                  }
+                ]
+              },
+              "type": "array"
+            }
+          ],
+          "title": "$In",
+          "type": "array"
+        }
+      },
+      "required": [
+        "$in"
+      ],
+      "title": "InOperation",
+      "type": "object"
+    },
+    "LLMStructuredCompletionModel": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObjectRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "llm_model_id": {
+          "title": "Llm Model Id",
+          "type": "string"
+        },
+        "default_params": {
+          "$ref": "#/$defs/LLMStructuredCompletionModelDefaultParams"
+        }
+      },
+      "required": [
+        "llm_model_id"
+      ],
+      "title": "LLMStructuredCompletionModel",
+      "type": "object"
+    },
+    "LLMStructuredCompletionModelDefaultParams": {
+      "properties": {
+        "messages_template": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/Message"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Messages Template"
+        },
+        "temperature": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Temperature"
+        },
+        "top_p": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Top P"
+        },
+        "max_tokens": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Tokens"
+        },
+        "presence_penalty": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Presence Penalty"
+        },
+        "frequency_penalty": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Frequency Penalty"
+        },
+        "stop": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Stop"
+        },
+        "n_times": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "N Times"
+        },
+        "functions": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Functions"
+        },
+        "response_format": {
+          "anyOf": [
+            {
+              "enum": [
+                "json_object",
+                "json_schema",
+                "text"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Response Format"
+        }
+      },
+      "title": "LLMStructuredCompletionModelDefaultParams",
+      "type": "object"
+    },
+    "Leaderboard": {
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "columns": {
+          "items": {
+            "$ref": "#/$defs/LeaderboardColumn"
+          },
+          "title": "Columns",
+          "type": "array"
+        }
+      },
+      "required": [
+        "columns"
+      ],
+      "title": "Leaderboard",
+      "type": "object"
+    },
+    "LeaderboardColumn": {
+      "properties": {
+        "evaluation_object_ref": {
+          "title": "Evaluation Object Ref",
+          "type": "string"
+        },
+        "scorer_name": {
+          "title": "Scorer Name",
+          "type": "string"
+        },
+        "summary_metric_path": {
+          "title": "Summary Metric Path",
+          "type": "string"
+        },
+        "should_minimize": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Should Minimize"
+        }
+      },
+      "required": [
+        "evaluation_object_ref",
+        "scorer_name",
+        "summary_metric_path"
+      ],
+      "title": "LeaderboardColumn",
+      "type": "object"
+    },
+    "LiteralOperation": {
+      "description": "Represents a constant value in the query language.\n\nThis can be any standard JSON-serializable value.\n\nExample:\n    ```\n    {\"$literal\": \"predict\"}\n    ```",
+      "properties": {
+        "$literal": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "additionalProperties": {
+                "title": "LiteralOperation"
+              },
+              "type": "object"
+            },
+            {
+              "items": {
+                "title": "LiteralOperation"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "$Literal"
+        }
+      },
+      "required": [
+        "$literal"
+      ],
+      "title": "LiteralOperation",
+      "type": "object"
+    },
+    "LlmJudgeActionConfig": {
+      "properties": {
+        "action_type": {
+          "const": "llm_judge",
+          "default": "llm_judge",
+          "title": "Action Type",
+          "type": "string"
+        },
+        "model": {
+          "enum": [
+            "gpt-4o",
+            "gpt-4o-mini"
+          ],
+          "title": "Model",
+          "type": "string"
+        },
+        "prompt": {
+          "title": "Prompt",
+          "type": "string"
+        },
+        "response_schema": {
+          "title": "Response Schema",
+          "type": "object"
+        }
+      },
+      "required": [
+        "model",
+        "prompt",
+        "response_schema"
+      ],
+      "title": "LlmJudgeActionConfig",
+      "type": "object"
+    },
+    "Message": {
+      "description": "A message in a conversation with an LLM.\n\nAttributes:\n    role: The role of the message's author. Can be: system, user, assistant, function or tool.\n    content: The contents of the message. Required for all messages, but may be null for assistant messages with function calls.\n    name: The name of the author of the message. Required if role is \"function\". Must match the name of the function represented in content.\n          Can contain characters (a-z, A-Z, 0-9), and underscores, with a maximum length of 64 characters.\n    function_call: The name and arguments of a function that should be called, as generated by the model.\n    tool_call_id: Tool call that this message is responding to.",
+      "properties": {
+        "role": {
+          "title": "Role",
+          "type": "string"
+        },
+        "content": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Content"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "function_call": {
+          "anyOf": [
+            {
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Function Call"
+        },
+        "tool_call_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tool Call Id"
+        }
+      },
+      "required": [
+        "role"
+      ],
+      "title": "Message",
+      "type": "object"
+    },
+    "NotOperation": {
+      "description": "Logical NOT. Inverts the condition.\n\nExample:\n    ```\n    {\n        \"$not\": [\n            {\"$eq\": [{\"$getField\": \"op_name\"}, {\"$literal\": \"debug\"}]}\n        ]\n    }\n    ```",
+      "properties": {
+        "$not": {
+          "maxItems": 1,
+          "minItems": 1,
+          "prefixItems": [
+            {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/LiteralOperation"
+                },
+                {
+                  "$ref": "#/$defs/GetFieldOperator"
+                },
+                {
+                  "title": "ConvertOperation"
+                },
+                {
+                  "title": "AndOperation"
+                },
+                {
+                  "$ref": "#/$defs/OrOperation"
+                },
+                {
+                  "title": "NotOperation"
+                },
+                {
+                  "title": "EqOperation"
+                },
+                {
+                  "title": "GtOperation"
+                },
+                {
+                  "title": "GteOperation"
+                },
+                {
+                  "title": "InOperation"
+                },
+                {
+                  "title": "ContainsOperation"
+                }
+              ]
+            }
+          ],
+          "title": "$Not",
+          "type": "array"
+        }
+      },
+      "required": [
+        "$not"
+      ],
+      "title": "NotOperation",
+      "type": "object"
+    },
+    "ObjectRef": {
+      "properties": {
+        "entity": {
+          "title": "Entity",
+          "type": "string"
+        },
+        "project": {
+          "title": "Project",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "_digest": {
+          "title": "Digest",
+          "type": "string"
+        },
+        "_extra": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Extra",
+          "type": "array"
+        }
+      },
+      "required": [
+        "entity",
+        "project",
+        "name",
+        "_digest"
+      ],
+      "title": "ObjectRef",
+      "type": "object"
+    },
+    "OrOperation": {
+      "description": "Logical OR. At least one condition must be true.\n\nExample:\n    ```\n    {\n        \"$or\": [\n            {\"$eq\": [{\"$getField\": \"op_name\"}, {\"$literal\": \"a\"}]},\n            {\"$eq\": [{\"$getField\": \"op_name\"}, {\"$literal\": \"b\"}]}\n        ]\n    }\n    ```",
+      "properties": {
+        "$or": {
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/LiteralOperation"
+              },
+              {
+                "$ref": "#/$defs/GetFieldOperator"
+              },
+              {
+                "title": "ConvertOperation"
+              },
+              {
+                "title": "AndOperation"
+              },
+              {
+                "title": "OrOperation"
+              },
+              {
+                "title": "NotOperation"
+              },
+              {
+                "title": "EqOperation"
+              },
+              {
+                "title": "GtOperation"
+              },
+              {
+                "title": "GteOperation"
+              },
+              {
+                "title": "InOperation"
+              },
+              {
+                "title": "ContainsOperation"
+              }
+            ]
+          },
+          "title": "$Or",
+          "type": "array"
+        }
+      },
+      "required": [
+        "$or"
+      ],
+      "title": "OrOperation",
+      "type": "object"
+    },
+    "Pin": {
+      "properties": {
+        "left": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Left",
+          "type": "array"
+        },
+        "right": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Right",
+          "type": "array"
+        }
+      },
+      "required": [
+        "left",
+        "right"
+      ],
+      "title": "Pin",
+      "type": "object"
+    },
+    "Provider": {
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "base_url": {
+          "title": "Base Url",
+          "type": "string"
+        },
+        "api_key_name": {
+          "title": "Api Key Name",
+          "type": "string"
+        },
+        "extra_headers": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Extra Headers",
+          "type": "object"
+        },
+        "return_type": {
+          "$ref": "#/$defs/ProviderReturnType",
+          "default": "openai"
+        }
+      },
+      "required": [
+        "base_url",
+        "api_key_name"
+      ],
+      "title": "Provider",
+      "type": "object"
+    },
+    "ProviderModel": {
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "provider": {
+          "title": "Provider",
+          "type": "string"
+        },
+        "max_tokens": {
+          "title": "Max Tokens",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "provider",
+        "max_tokens"
+      ],
+      "title": "ProviderModel",
+      "type": "object"
+    },
+    "ProviderReturnType": {
+      "enum": [
+        "openai"
+      ],
+      "title": "ProviderReturnType",
+      "type": "string"
+    },
+    "Query": {
+      "additionalProperties": false,
+      "properties": {
+        "$expr": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AndOperation"
+            },
+            {
+              "$ref": "#/$defs/OrOperation"
+            },
+            {
+              "$ref": "#/$defs/NotOperation"
+            },
+            {
+              "$ref": "#/$defs/EqOperation"
+            },
+            {
+              "$ref": "#/$defs/GtOperation"
+            },
+            {
+              "$ref": "#/$defs/GteOperation"
+            },
+            {
+              "$ref": "#/$defs/InOperation"
+            },
+            {
+              "$ref": "#/$defs/ContainsOperation"
+            }
+          ],
+          "title": "$Expr"
+        }
+      },
+      "required": [
+        "$expr"
+      ],
+      "title": "Query",
+      "type": "object"
+    },
+    "SavedView": {
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "view_type": {
+          "title": "View Type",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "definition": {
+          "$ref": "#/$defs/SavedViewDefinition"
+        }
+      },
+      "required": [
+        "view_type",
+        "label",
+        "definition"
+      ],
+      "title": "SavedView",
+      "type": "object"
+    },
+    "SavedViewDefinition": {
+      "properties": {
+        "filter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CallsFilter"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "query": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Query"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "cols": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "boolean"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cols"
+        },
+        "columns": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/Column"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Columns"
+        },
+        "pin": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Pin"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "sort_by": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/SortBy"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sort By"
+        },
+        "page_size": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Page Size"
+        },
+        "charts": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/ChartConfig"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Charts"
+        }
+      },
+      "title": "SavedViewDefinition",
+      "type": "object"
+    },
+    "SortBy": {
+      "additionalProperties": false,
+      "properties": {
+        "field": {
+          "title": "Field",
+          "type": "string"
+        },
+        "direction": {
+          "enum": [
+            "asc",
+            "desc"
+          ],
+          "title": "Direction",
+          "type": "string"
+        }
+      },
+      "required": [
+        "field",
+        "direction"
+      ],
+      "title": "SortBy",
+      "type": "object"
+    },
+    "TestOnlyExample": {
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "primitive": {
+          "title": "Primitive",
+          "type": "integer"
+        },
+        "nested_base_model": {
+          "$ref": "#/$defs/TestOnlyNestedBaseModel"
+        },
+        "nested_base_object": {
+          "title": "Nested Base Object",
+          "type": "string"
+        }
+      },
+      "required": [
+        "primitive",
+        "nested_base_model",
+        "nested_base_object"
+      ],
+      "title": "TestOnlyExample",
+      "type": "object"
+    },
+    "TestOnlyInheritedBaseObject": {
+      "description": "A builtin object that inherits from another builtin object for testing inheritance.",
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "b": {
+          "title": "B",
+          "type": "integer"
+        },
+        "c": {
+          "title": "C",
+          "type": "integer"
+        },
+        "additional_field": {
+          "default": "default_value",
+          "title": "Additional Field",
+          "type": "string"
+        }
+      },
+      "required": [
+        "b",
+        "c"
+      ],
+      "title": "TestOnlyInheritedBaseObject",
+      "type": "object"
+    },
+    "TestOnlyNestedBaseModel": {
+      "properties": {
+        "a": {
+          "title": "A",
+          "type": "integer"
+        },
+        "aliased_property_alias": {
+          "title": "Aliased Property Alias",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "a",
+        "aliased_property_alias"
+      ],
+      "title": "TestOnlyNestedBaseModel",
+      "type": "object"
+    },
+    "TestOnlyNestedBaseObject": {
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "b": {
+          "title": "B",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "b"
+      ],
+      "title": "TestOnlyNestedBaseObject",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "TestOnlyExample": {
+      "$ref": "#/$defs/TestOnlyExample"
+    },
+    "TestOnlyNestedBaseObject": {
+      "$ref": "#/$defs/TestOnlyNestedBaseObject"
+    },
+    "TestOnlyInheritedBaseObject": {
+      "$ref": "#/$defs/TestOnlyInheritedBaseObject"
+    },
+    "Leaderboard": {
+      "$ref": "#/$defs/Leaderboard"
+    },
+    "ActionSpec": {
+      "$ref": "#/$defs/ActionSpec"
+    },
+    "AnnotationSpec": {
+      "$ref": "#/$defs/AnnotationSpec"
+    },
+    "Provider": {
+      "$ref": "#/$defs/Provider"
+    },
+    "ProviderModel": {
+      "$ref": "#/$defs/ProviderModel"
+    },
+    "SavedView": {
+      "$ref": "#/$defs/SavedView"
+    },
+    "LLMStructuredCompletionModel": {
+      "$ref": "#/$defs/LLMStructuredCompletionModel"
+    },
+    "ChartConfig": {
+      "$ref": "#/$defs/ChartConfig"
+    }
+  },
+  "required": [
+    "TestOnlyExample",
+    "TestOnlyNestedBaseObject",
+    "TestOnlyInheritedBaseObject",
+    "Leaderboard",
+    "ActionSpec",
+    "AnnotationSpec",
+    "Provider",
+    "ProviderModel",
+    "SavedView",
+    "LLMStructuredCompletionModel",
+    "ChartConfig"
+  ],
+  "title": "CompositeBaseObject",
+  "type": "object"
+}

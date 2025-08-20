@@ -1,0 +1,70 @@
+interactions:
+- request:
+    body: ''
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '353'
+      Content-Type:
+      - application/json
+      User-Agent:
+      - python-requests/2.32.4
+      x-goog-api-client:
+      - langchain-google-genai/2.1.9-ChatGoogleGenerativeAI:models/gemini-1.5-pro
+        gl-python/3.11.11 grpc/1.74.0 gax/2.25.1 gccl/2.1.9-ChatGoogleGenerativeAI:models/gemini-1.5-pro
+      x-goog-api-key:
+      - SUPER_FAKE_API_KEY
+      x-goog-request-params:
+      - model=models/gemini-1.5-pro
+    method: POST
+    uri: https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?%24alt=json%3Benum-encoding%3Dint
+  response:
+    body:
+      string: "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"parts\":
+        [\n          {\n            \"text\": \"Hmm. *strokes chin, squints*  Future
+        of... AI, you say?  Like a djinn bottled, isn't it? Powerful magic, but unpredictable.
+        Could build a better world, could burn it all down.  Depends who holds the
+        cork, and what they wish for.  Me? I've seen enough mages and their meddling
+        to know...  best to be cautious.  And have a silver sword handy.  Just in
+        case.\\n\"\n          }\n        ],\n        \"role\": \"model\"\n      },\n
+        \     \"finishReason\": 1,\n      \"avgLogprobs\": -0.20206137498219809\n
+        \   }\n  ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 18,\n    \"candidatesTokenCount\":
+        96,\n    \"totalTokenCount\": 114,\n    \"promptTokensDetails\": [\n      {\n
+        \       \"modality\": 1,\n        \"tokenCount\": 18\n      }\n    ],\n    \"candidatesTokensDetails\":
+        [\n      {\n        \"modality\": 1,\n        \"tokenCount\": 96\n      }\n
+        \   ]\n  },\n  \"modelVersion\": \"gemini-1.5-pro-002\",\n  \"responseId\":
+        \"Kn6UaLGtOMWDn9kPnP-c0Qk\"\n}\n"
+    headers:
+      Alt-Svc:
+      - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json; charset=UTF-8
+      Date:
+      - Thu, 07 Aug 2025 10:21:33 GMT
+      Server:
+      - scaffolding on HTTPServer2
+      Server-Timing:
+      - gfet4t7; dur=3224
+      Transfer-Encoding:
+      - chunked
+      Vary:
+      - Origin
+      - X-Origin
+      - Referer
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - SAMEORIGIN
+      X-XSS-Protection:
+      - '0'
+    status:
+      code: 200
+      message: OK
+version: 1

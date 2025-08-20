@@ -5,7 +5,7 @@ import json
 import os
 import threading
 from time import time
-from typing import Any, Dict, Optional, Union
+from typing import Any, Optional, Union
 
 from requests import HTTPError as HTTPError
 from requests import PreparedRequest, Response, Session
@@ -133,6 +133,9 @@ class LoggingHTTPAdapter(HTTPAdapter):
     # Actual signature is:
     # self, request, stream=False, timeout=None, verify=True, cert=None, proxies=None
     def send(self, request: PreparedRequest, **kwargs: Any) -> Response:  # type: ignore
+        if os.environ.get("WEAVE_DEBUG_HTTP") != "1":
+            return super().send(request, **kwargs)
+
         console.print(Text("-" * 21, style=STYLE_DIVIDER_REQUEST))
         pprint_prepared_request(request)
         start_time = time()
@@ -148,21 +151,20 @@ class LoggingHTTPAdapter(HTTPAdapter):
 
 
 session = Session()
-if os.environ.get("WEAVE_DEBUG_HTTP") == "1":
-    adapter = LoggingHTTPAdapter()
-    session.mount("http://", adapter)
-    session.mount("https://", adapter)
+adapter = LoggingHTTPAdapter()
+session.mount("http://", adapter)
+session.mount("https://", adapter)
 
 
-def get(url: str, params: Optional[Dict[str, str]] = None, **kwargs: Any) -> Response:
+def get(url: str, params: Optional[dict[str, str]] = None, **kwargs: Any) -> Response:
     """Send a GET request with optional logging."""
     return session.get(url, params=params, **kwargs)
 
 
 def post(
     url: str,
-    data: Optional[Union[Dict[str, Any], str]] = None,
-    json: Optional[Dict[str, Any]] = None,
+    data: Optional[Union[dict[str, Any], str]] = None,
+    json: Optional[dict[str, Any]] = None,
     **kwargs: Any,
 ) -> Response:
     """Send a POST request with optional logging."""

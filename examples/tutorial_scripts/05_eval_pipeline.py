@@ -11,7 +11,7 @@ class ExtractFruitsModel(weave.Model):
     model_name: str
     prompt_template: str
 
-    @weave.op()
+    @weave.op
     async def predict(self, sentence: str) -> dict:
         client = openai.AsyncClient()
 
@@ -60,12 +60,12 @@ examples = [
 ]
 
 import weave
-from weave.flow.scorer import MultiTaskBinaryClassificationF1
+from weave.scorers import MultiTaskBinaryClassificationF1
 
 
-@weave.op()
-def fruit_name_score(target: dict, model_output: dict) -> dict:
-    return {"correct": target["fruit"] == model_output["fruit"]}
+@weave.op
+def fruit_name_score(target: dict, output: dict) -> dict:
+    return {"correct": target["fruit"] == output["fruit"]}
 
 
 evaluation = weave.Evaluation(

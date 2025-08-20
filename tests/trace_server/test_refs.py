@@ -24,14 +24,16 @@ def test_isdescended_from():
     assert b.is_descended_from(a) == True
 
 
-def string_with_every_char(disallowed_chars=[]):
+def string_with_every_char(disallowed_chars=None):
+    if disallowed_chars is None:
+        disallowed_chars = []
     char_codes = list(range(256))
     random.shuffle(char_codes)
     return "".join(chr(i) for i in char_codes if chr(i) not in disallowed_chars)
 
 
 def test_ref_parsing_external_invalid():
-    with pytest.raises(Exception):
+    with pytest.raises(refs_internal.InvalidInternalRef):
         ref_start = refs.ObjectRef(
             entity="entity",
             project="project",
@@ -59,7 +61,7 @@ def test_ref_parsing_external_sanitized():
 
 
 def test_ref_parsing_internal_invalid():
-    with pytest.raises(Exception):
+    with pytest.raises(refs_internal.InvalidInternalRef):
         ref_start = refs_internal.InternalObjectRef(
             project_id="project",
             name=string_with_every_char(),

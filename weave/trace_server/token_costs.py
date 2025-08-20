@@ -21,7 +21,8 @@ DUMMY_LLM_ID = "weave_dummy_llm_id"
 DUMMY_LLM_USAGE = (
     '{"requests": 0, "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}'
 )
-DUMMY_LLM_USAGE_TUPLE = (DUMMY_LLM_ID, DUMMY_LLM_USAGE)
+ESCAPED_DUMMY_LLM_USAGE = DUMMY_LLM_USAGE.replace('"', '\\"')
+
 
 # Org is currently not implemented
 PRICING_LEVELS = {"ORG": "org", "PROJECT": "project", "DEFAULT": "default"}
@@ -70,8 +71,14 @@ def get_calls_merged_columns() -> list[Column]:
     return columns
 
 
-def calls_merged_table(table_alias: str) -> Table:
-    return Table(table_alias, get_calls_merged_columns())
+def get_optional_join_field_columns() -> list[Column]:
+    return [
+        # These two columns are added here, because the ORM will validate that
+        # the table contains those columns in case any of the storage size column
+        # is included.
+        Column(name="storage_size_bytes", type="float"),
+        Column(name="total_storage_size_bytes", type="float"),
+    ]
 
 
 # SELECT
@@ -122,10 +129,12 @@ def get_llm_usage(param_builder: ParamBuilder, table_alias: str) -> PreparedSele
     # This arrayJoin is used to split the usage data into rows each usage instance their own row
     # Here to handle the case where usage_raw is empty, we use a dummy tuple, to ensure that we always have a row
     # We wont return a cost object in the final select if we have a dummy llm_id
+    # Note: The dummy tuple needs explicit string formatting for ClickHouse array literal syntax.
+    # We escape the inner JSON quotes for the SQL string literal.
     kv = f"""arrayJoin(
-                if(usage_raw != '',
+                if(usage_raw != '' and usage_raw != '{{}}',
                 JSONExtractKeysAndValuesRaw(usage_raw),
-                [{DUMMY_LLM_USAGE_TUPLE}])
+                [('{DUMMY_LLM_ID}', '{ESCAPED_DUMMY_LLM_USAGE}')])
             ) AS kv"""
     llm_id = "kv.1 AS llm_id"
     requests = "JSONExtractInt(kv.2, 'requests') AS requests"
@@ -219,9 +228,9 @@ def get_ranked_prices(
             END,
             CASE
                 -- Order by pricing level then by effective_date
-                -- WHEN {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level = '{PRICING_LEVELS['ORG']}' AND {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id = ORG_PARAM THEN 1
-                WHEN {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level = '{PRICING_LEVELS['PROJECT']}' AND {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id = '{project_id}' THEN 2
-                WHEN {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level = '{PRICING_LEVELS['DEFAULT']}' AND {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id = '{DEFAULT_PRICING_LEVEL_ID}' THEN 3
+                -- WHEN {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level = '{PRICING_LEVELS["ORG"]}' AND {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id = ORG_PARAM THEN 1
+                WHEN {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level = '{PRICING_LEVELS["PROJECT"]}' AND {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id = '{project_id}' THEN 2
+                WHEN {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level = '{PRICING_LEVELS["DEFAULT"]}' AND {LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id = '{DEFAULT_PRICING_LEVEL_ID}' THEN 3
                 ELSE 4
             END,
             {LLM_TOKEN_PRICES_TABLE_NAME}.effective_date DESC
@@ -236,9 +245,43 @@ def get_ranked_prices(
             tsi.Query(
                 **{
                     "$expr": {
-                        "$eq": [
-                            {"$getField": f"{llm_usage_table_alias}.llm_id"},
-                            {"$getField": f"{LLM_TOKEN_PRICES_TABLE_NAME}.llm_id"},
+                        "$and": [
+                            {
+                                "$eq": [
+                                    {"$getField": f"{llm_usage_table_alias}.llm_id"},
+                                    {
+                                        "$getField": f"{LLM_TOKEN_PRICES_TABLE_NAME}.llm_id"
+                                    },
+                                ]
+                            },
+                            {
+                                "$or": [
+                                    {
+                                        "$eq": [
+                                            {
+                                                "$getField": f"{LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id"
+                                            },
+                                            {"$literal": project_id},
+                                        ]
+                                    },
+                                    {
+                                        "$eq": [
+                                            {
+                                                "$getField": f"{LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id"
+                                            },
+                                            {"$literal": DEFAULT_PRICING_LEVEL_ID},
+                                        ]
+                                    },
+                                    {
+                                        "$eq": [
+                                            {
+                                                "$getField": f"{LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id"
+                                            },
+                                            {"$literal": ""},
+                                        ]
+                                    },
+                                ]
+                            },
                         ]
                     }
                 }
@@ -348,8 +391,9 @@ def final_call_select_with_cost(
         )
     """
 
+    # If no cost was found dont add a costs object
     summary_dump_snippet = f"""
-    if( any(llm_id) = '{DUMMY_LLM_ID}',
+    if( any(llm_id) = '{DUMMY_LLM_ID}' or any(llm_token_prices.id) == '',
     any(summary_dump),
     concat(
         left(any(summary_dump), length(any(summary_dump)) - 1),
@@ -367,7 +411,12 @@ def final_call_select_with_cost(
     ]
 
     ranked_price_table = Table(
-        price_table_alias, [*get_calls_merged_columns(), *usage_with_costs_fields]
+        price_table_alias,
+        [
+            *get_calls_merged_columns(),
+            *get_optional_join_field_columns(),
+            *usage_with_costs_fields,
+        ],
     )
 
     final_query = (
@@ -428,12 +477,12 @@ def cost_query(
         ranked_prices AS ({get_ranked_prices(pb, "llm_usage", project_id).sql})
 
         -- Final Select, which just selects the correct fields, and adds a costs object
-        {final_call_select_with_cost(pb, 'ranked_prices', select_fields, order_fields).sql}
+        {final_call_select_with_cost(pb, "ranked_prices", select_fields, order_fields).sql}
     """
     return raw_sql
 
 
-# This is a temporary workaround for the issue of clickhouse not allowing the use of parametes in row_number() over function
+# This is a temporary workaround for the issue of clickhouse not allowing the use of parameters in row_number() over function
 # Use a parameter when this is fixed
 # This checks that a project_id is a valid base64 encoded string, that follows the pattern "ProjectInternalId: <number>"
 def is_project_id_sql_injection_safe(project_id: str) -> None:
@@ -452,7 +501,7 @@ def is_project_id_sql_injection_safe(project_id: str) -> None:
 
         raise ValueError("Invalid project_id", project_id)
     except Exception:
-        raise ValueError("Invalid project_id", project_id)
+        raise ValueError("Invalid project_id", project_id) from None
 
 
 MESSAGE_INVALID_COST_PURGE = "Can only purge costs by specifying one or more cost ids"

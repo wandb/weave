@@ -13,6 +13,7 @@ class TestInsertCosts(unittest.TestCase):
     def setUp(self):
         # Initialize common variables for the tests
         self.client = MagicMock()
+        self.target_db = "default"
         self.sample_costs_json = {
             "llm_model_1": [
                 {
@@ -160,7 +161,7 @@ class TestInsertCosts(unittest.TestCase):
         }
 
         # Call the function
-        insert_costs.insert_costs(self.client)
+        insert_costs.insert_costs(self.client, self.target_db)
 
         # Assertions
         mock_load_json.assert_called_once()
@@ -182,7 +183,7 @@ class TestInsertCosts(unittest.TestCase):
         mock_load_json.side_effect = e
 
         # Call the function
-        insert_costs.insert_costs(self.client)
+        insert_costs.insert_costs(self.client, self.target_db)
 
         # Assertions
         mock_load_json.assert_called_once()
@@ -202,7 +203,7 @@ class TestInsertCosts(unittest.TestCase):
         mock_filter_costs.side_effect = e
 
         # Call the function
-        insert_costs.insert_costs(self.client)
+        insert_costs.insert_costs(self.client, self.target_db)
 
         # Assertions
         mock_load_json.assert_called_once()
@@ -225,7 +226,7 @@ class TestInsertCosts(unittest.TestCase):
         mock_insert_db.side_effect = e
 
         # Call the function
-        insert_costs.insert_costs(self.client)
+        insert_costs.insert_costs(self.client, self.target_db)
 
         # Assertions
         mock_load_json.assert_called_once()
@@ -247,7 +248,7 @@ class TestInsertCosts(unittest.TestCase):
         mock_filter_costs.return_value = {}
 
         # Call the function
-        insert_costs.insert_costs(self.client)
+        insert_costs.insert_costs(self.client, self.target_db)
 
         # Assertions
         mock_load_json.assert_called_once()

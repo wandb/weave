@@ -3,15 +3,19 @@ import inspect
 import logging
 import operator
 import typing
-from typing import Any, Generator, Iterator, Literal, Optional, SupportsIndex, Union
+from collections.abc import Generator, Iterator, Sequence
+from copy import deepcopy
+from typing import Any, Literal, Optional, SupportsIndex, Union
 
 from pydantic import BaseModel
 from pydantic import v1 as pydantic_v1
 
 from weave.trace import box
 from weave.trace.context.tests_context import get_raise_on_captured_errors
-from weave.trace.context.weave_client_context import get_weave_client
-from weave.trace.errors import InternalError
+from weave.trace.context.weave_client_context import (
+    get_weave_client,
+    require_weave_client,
+)
 from weave.trace.object_record import ObjectRecord
 from weave.trace.op import is_op, maybe_bind_method
 from weave.trace.refs import (
@@ -19,20 +23,26 @@ from weave.trace.refs import (
     LIST_INDEX_EDGE_NAME,
     OBJECT_ATTR_EDGE_NAME,
     TABLE_ROW_ID_EDGE_NAME,
+    DeletedRef,
     ObjectRef,
     RefWithExtra,
     TableRef,
 )
-from weave.trace.serialize import from_json
+from weave.trace.serialization.serialize import from_json
 from weave.trace.table import Table
+from weave.trace_server.errors import ObjectDeletedError
 from weave.trace_server.trace_server_interface import (
     ObjReadReq,
     TableQueryReq,
+    TableQueryStatsReq,
     TableRowFilter,
     TraceServerInterface,
 )
+from weave.utils.iterators import ThreadSafeLazyList
 
 logger = logging.getLogger(__name__)
+
+REMOTE_ITER_PAGE_SIZE = 100
 
 
 @dataclasses.dataclass
@@ -82,6 +92,21 @@ def make_mutation(
         raise ValueError(f"Unknown operation: {operation}")
 
 
+def unwrap(val: Any) -> Any:
+    if isinstance(val, Traceable):
+        return val.unwrap()
+    elif isinstance(val, ObjectRecord):
+        return val.unwrap()
+    elif isinstance(val, dict):
+        return {k: unwrap(v) for k, v in val.items()}
+    elif isinstance(val, list):
+        return [unwrap(v) for v in val]
+    elif isinstance(val, tuple):
+        return tuple(unwrap(v) for v in val)
+    else:
+        return val
+
+
 class Traceable:
     ref: Optional[RefWithExtra]
     mutations: Optional[list[Mutation]] = None
@@ -111,7 +136,7 @@ class Traceable:
 
     def save(self) -> ObjectRef:
         if not isinstance(self.ref, ObjectRef):
-            raise ValueError("Can only save from object refs")
+            raise TypeError("Can only save from object refs")
         if self.root is not self:
             raise ValueError("Can only save from root object")
         if self.mutations is None:
@@ -122,9 +147,17 @@ class Traceable:
         raise NotImplementedError("Traceable.save not implemented")
         # return self.server.mutate(self.ref, mutations)
 
+    def unwrap(self) -> Any: ...
+
 
 def pydantic_getattribute(self: BaseModel, name: str) -> Any:
     attribute = object.__getattribute__(self, name)
+
+    # Starting in pydantic 2.10.0, this handling is needed otherwise getattribute will
+    # infinitely recurse.
+    if name.startswith("__") and name.endswith("__"):
+        return attribute
+
     if name not in object.__getattribute__(self, "model_fields"):
         return attribute
     if name == "ref":
@@ -195,6 +228,17 @@ class WeaveObject(Traceable):
         self.root = root or self
         self.parent = parent
 
+    def __deepcopy__(self, memo: dict) -> "WeaveObject":
+        val_copy = deepcopy(self._val, memo)
+        res = WeaveObject(
+            val_copy,
+            ref=self.ref,  # maybe this should be zero'd?
+            server=self.server,
+            root=self.root,
+        )
+        memo[id(self)] = res
+        return res
+
     def __getattribute__(self, __name: str) -> Any:
         try:
             return object.__getattribute__(self, __name)
@@ -239,17 +283,25 @@ class WeaveObject(Traceable):
     def __eq__(self, other: Any) -> bool:
         return self._val == other
 
+    def unwrap(self) -> Any:
+        return unwrap(self._val)
+
 
 class WeaveTable(Traceable):
-    filter: TableRowFilter
+    filter: Optional[TableRowFilter] = None
+    _known_length: Optional[int] = None
+    _rows: Optional[Sequence[dict]] = None
+    # _prefetched_rows is a local cache of rows that can be used to
+    # avoid a remote call. Should only be used by internal code.
+    _prefetched_rows: Optional[list[dict]] = None
 
     def __init__(
         self,
-        table_ref: Optional[TableRef],
-        ref: Optional[RefWithExtra],
         server: TraceServerInterface,
-        filter: TableRowFilter,
-        root: Optional[Traceable],
+        table_ref: Optional[TableRef] = None,
+        ref: Optional[RefWithExtra] = None,
+        filter: Optional[TableRowFilter] = None,
+        root: Optional[Traceable] = None,
         parent: Optional[Traceable] = None,
     ) -> None:
         self.table_ref = table_ref
@@ -258,14 +310,9 @@ class WeaveTable(Traceable):
         self.server = server
         self.root = root or self
         self.parent = parent
-        self._rows: Optional[list[dict]] = None
-
-        # _prefetched_rows is a local cache of rows that can be used to
-        # avoid a remote call. Should only be used by internal code.
-        self._prefetched_rows: Optional[list[dict]] = None
 
     @property
-    def rows(self) -> list[dict]:
+    def rows(self) -> Sequence[dict]:
         if self._rows is None:
             should_local_iter = (
                 self.ref is not None
@@ -274,18 +321,31 @@ class WeaveTable(Traceable):
                 and self._prefetched_rows is not None
             )
             if should_local_iter:
-                self._rows = list(self._local_iter_with_remote_fallback())
+                self._rows = ThreadSafeLazyList(self._local_iter_with_remote_fallback())
             else:
-                self._rows = list(self._remote_iter())
+                self._rows = ThreadSafeLazyList(self._remote_iter())
         return self._rows
 
     @rows.setter
-    def rows(self, value: list[dict]) -> None:
+    def rows(self, value: Sequence[dict]) -> None:
         if not all(isinstance(row, dict) for row in value):
             raise ValueError("All table rows must be dicts")
 
         self._rows = value
         self._mark_dirty()
+
+    def _inefficiently_materialize_rows_as_list(self) -> list[dict]:
+        # This method is named `inefficiently` to warn callers that
+        # it should be avoided. We have this nasty paradigm where sometimes
+        # a WeaveTable needs to act like a list, but it is actually a remote
+        # table. This method will force iteration through the remote data
+        # and materialize it into a list. Any uses of this are signs of a design
+        # problem arising from a remote table clashing with the need to feel like
+        # a local list.
+        if not isinstance(self.rows, list):
+            self._rows = list(iter(self.rows))
+            self._known_length = len(self._rows)
+        return typing.cast(list[dict], self.rows)
 
     def set_prefetched_rows(self, prefetched_rows: list[dict]) -> None:
         """Sets the rows to a local cache of rows that can be used to
@@ -302,14 +362,54 @@ class WeaveTable(Traceable):
         self._prefetched_rows = prefetched_rows
 
     def __len__(self) -> int:
-        return len(self.rows)
+        # This should be a single query
+        if self._known_length is not None:
+            return self._known_length
+
+        # Condition 1: we already have all the rows in memory
+        if self._prefetched_rows is not None:
+            self._known_length = len(self._prefetched_rows)
+            return self._known_length
+
+        # Condition 2: we have the row digests and they are a list
+        if (
+            self.table_ref is not None
+            and self.table_ref._row_digests is not None
+            and isinstance(self.table_ref._row_digests, list)
+        ):
+            self._known_length = len(self.table_ref._row_digests)
+            return self._known_length
+
+        # Condition 3: We don't know the length, in which case we can get it from the server
+        if self.table_ref is not None:
+            self._known_length = self._fetch_remote_length()
+            return self._known_length
+
+        # Finally, if we have no table ref, we can still get the length
+        # by materializing the rows as a list. I actually think this
+        # can never happen, but it is here for completeness.
+        rows_as_list = self._inefficiently_materialize_rows_as_list()
+        return len(rows_as_list)
+
+    def _fetch_remote_length(self) -> int:
+        if self.table_ref is None:
+            raise ValueError("Cannot fetch remote length of table without table ref")
+
+        response = self.server.table_query_stats(
+            TableQueryStatsReq(
+                project_id=self.table_ref.project_id, digest=self.table_ref.digest
+            )
+        )
+        return response.count
 
     def __eq__(self, other: Any) -> bool:
-        return self.rows == other
+        rows = self._inefficiently_materialize_rows_as_list()
+        return rows == other
 
     def _mark_dirty(self) -> None:
         self.table_ref = None
         self._prefetched_rows = None
+        self._known_length = None
         super()._mark_dirty()
 
     def _local_iter_with_remote_fallback(self) -> Generator[dict, None, None]:
@@ -350,46 +450,60 @@ class WeaveTable(Traceable):
                 yield from self._remote_iter()
                 return
 
-        for ndx, row in enumerate(self._prefetched_rows):
+        for i, _ in enumerate(self._prefetched_rows):
             next_id_future = wc.future_executor.defer(
-                lambda ndx_closure=ndx: cached_table_ref.row_digests[ndx_closure]
+                lambda closure=i: cached_table_ref.row_digests[closure]
             )
             new_ref = self.ref.with_item(next_id_future)
-            val = self._prefetched_rows[ndx]
-            res = from_json(
-                val, self.table_ref.entity + "/" + self.table_ref.project, self.server
-            )
+            val = self._prefetched_rows[i]
+            res = from_json(val, self.table_ref.project_id, self.server)
             res = make_trace_obj(res, new_ref, self.server, self.root)
             yield res
 
     def _remote_iter(self) -> Generator[dict, None, None]:
-        page_index = 0
-        page_size = 100
-        while True:
-            if self.table_ref is None:
-                break
+        if self.table_ref is None:
+            return
 
+        wc = require_weave_client()
+
+        page_index = 0
+        page_size = REMOTE_ITER_PAGE_SIZE
+        while True:
             response = self.server.table_query(
                 TableQueryReq(
-                    project_id=f"{self.table_ref.entity}/{self.table_ref.project}",
+                    project_id=self.table_ref.project_id,
                     digest=self.table_ref.digest,
                     offset=page_index * page_size,
                     limit=page_size,
-                    # filter=self.filter,
+                    filter=self.filter,
                 )
             )
 
-            if self._prefetched_rows is not None and len(response.rows) != len(
-                self._prefetched_rows
-            ):
-                if get_raise_on_captured_errors():
-                    raise
-                logger.error(
-                    f"Expected length of response rows ({len(response.rows)}) to match prefetched rows ({len(self._prefetched_rows)}). Ignoring prefetched rows."
-                )
-                self._prefetched_rows = None
+            # When paginating through large datasets, we need special handling for prefetched rows
+            # on the first page. This is because prefetched_rows contains ALL rows, while each
+            # response page contains at most page_size rows.
+            if page_index == 0 and self._prefetched_rows is not None:
+                response_rows_len = len(response.rows)
+                prefetched_rows_len = len(self._prefetched_rows)
 
-            for ndx, item in enumerate(response.rows):
+                # There are two valid scenarios:
+                # 1. The response rows exactly match prefetched rows (small dataset, no pagination needed)
+                # 2. We're paginating a large dataset (response has page_size rows, prefetched has more)
+                #
+                # Any other mismatch indicates an inconsistency that should be handled by
+                # discarding the prefetched rows and relying solely on server responses.
+                if response_rows_len != prefetched_rows_len and not (
+                    response_rows_len == page_size and prefetched_rows_len > page_size
+                ):
+                    msg = f"Expected length of response rows ({response_rows_len}) to match prefetched rows ({prefetched_rows_len}). Ignoring prefetched rows."
+                    if get_raise_on_captured_errors():
+                        raise ValueError(msg)
+                    logger.debug(msg)
+                    self._prefetched_rows = None
+
+            # Process rows in parallel using the weave client's future executor
+            futures = []
+            for i, item in enumerate(response.rows):
                 new_ref = self.ref.with_item(item.digest) if self.ref else None
                 # Here, we use the raw rows if they exist, otherwise we use the
                 # rows from the server. This is a temporary trick to ensure
@@ -400,15 +514,28 @@ class WeaveTable(Traceable):
                 val = (
                     item.val
                     if self._prefetched_rows is None
-                    else self._prefetched_rows[ndx]
+                    else self._prefetched_rows[page_index * page_size + i]
                 )
-                res = from_json(
-                    val,
-                    self.table_ref.entity + "/" + self.table_ref.project,
-                    self.server,
+
+                def process_row(val: Any, new_ref: RefWithExtra) -> Any:
+                    if not self.table_ref:
+                        # Should never happen, we need table_ref to remote_iter
+                        return None
+                    return make_trace_obj(
+                        from_json(val, self.table_ref.project_id, self.server),
+                        new_ref,
+                        self.server,
+                        self.root,
+                    )
+
+                future = wc.future_executor.defer(
+                    lambda v=val, r=new_ref: process_row(v, r)
                 )
-                res = make_trace_obj(res, new_ref, self.server, self.root)
-                yield res
+                futures.append(future)
+
+            # Yield results as they complete
+            for future in futures:
+                yield future.result()
 
             if len(response.rows) < page_size:
                 break
@@ -416,7 +543,11 @@ class WeaveTable(Traceable):
             page_index += 1
 
     def __getitem__(self, key: Union[int, slice, str]) -> Any:
-        rows = self.rows
+        # TODO: ideally we would have some sort of intelligent
+        # LRU style caching that allows us to minimize materialization
+        # of the rows as a list.
+        rows = self._inefficiently_materialize_rows_as_list()
+
         if isinstance(key, (int, slice)):
             return rows[key]
 
@@ -430,14 +561,19 @@ class WeaveTable(Traceable):
         return iter(self.rows)
 
     def append(self, val: dict) -> None:
+        rows = self._inefficiently_materialize_rows_as_list()
         if not isinstance(val, dict):
-            raise ValueError("Can only append dicts to tables")
+            raise TypeError("Can only append dicts to tables")
         self._mark_dirty()
-        self.rows.append(val)
+        rows.append(val)
 
     def pop(self, index: int) -> None:
+        rows = self._inefficiently_materialize_rows_as_list()
         self._mark_dirty()
-        self.rows.pop(index)
+        rows.pop(index)
+
+    def unwrap(self) -> Any:
+        return unwrap(list(self.rows))
 
 
 class WeaveList(Traceable, list):
@@ -456,9 +592,21 @@ class WeaveList(Traceable, list):
         self.parent = parent
         super().__init__(*args)
 
+    def __deepcopy__(self, memo: dict) -> "WeaveList":
+        items_copy = [deepcopy(item, memo) for item in self]
+        res = WeaveList(
+            items_copy,
+            server=self.server,
+            ref=self.ref,  # maybe this should be zero'd?
+            root=self.root,
+            parent=self.parent,
+        )
+        memo[id(self)] = res
+        return res
+
     def __getitem__(self, i: Union[SupportsIndex, slice]) -> Any:
         if isinstance(i, slice):
-            raise ValueError("Slices not yet supported")
+            raise TypeError("Slices not yet supported")
         index = operator.index(i)
         new_ref = self.ref.with_index(index) if self.ref else None
         index_val = super().__getitem__(index)
@@ -466,7 +614,7 @@ class WeaveList(Traceable, list):
 
     def __setitem__(self, i: Union[SupportsIndex, slice], value: Any) -> None:
         if isinstance(i, slice):
-            raise ValueError("Slices not yet supported")
+            raise TypeError("Slices not yet supported")
         if (index := operator.index(i)) >= len(self):
             raise IndexError("list assignment index out of range")
 
@@ -503,6 +651,9 @@ class WeaveList(Traceable, list):
                 return False
         return True
 
+    def unwrap(self) -> Any:
+        return unwrap(list(self))
+
 
 class WeaveDict(Traceable, dict):
     def __init__(
@@ -520,6 +671,18 @@ class WeaveDict(Traceable, dict):
         self.root = root if root is not None else self
         self.parent = parent
         super().__init__(*args, **kwargs)
+
+    def __deepcopy__(self, memo: dict) -> "WeaveDict":
+        items_copy = {k: deepcopy(v, memo) for k, v in self.items()}
+        res = WeaveDict(
+            items_copy,
+            server=self.server,
+            ref=self.ref,  # maybe this should be zero'd?
+            root=self.root,
+            parent=self.parent,
+        )
+        memo[id(self)] = res
+        return res
 
     def __getitem__(self, key: str) -> Any:
         new_ref = self.ref.with_key(key) if self.ref else None
@@ -573,6 +736,12 @@ class WeaveDict(Traceable, dict):
                 return False
         return True
 
+    def unwrap(self) -> Any:
+        return unwrap(dict(self.items()))
+
+
+class InternalError(Exception): ...
+
 
 def make_trace_obj(
     val: Any,
@@ -593,19 +762,25 @@ def make_trace_obj(
         # directly attach a ref, or to our Boxed classes. We should use Traceable
         # for all of these, but for now we need to check for the ref attribute.
         return val
-    # Derefence val and create the appropriate wrapper object
+    # Dereference val and create the appropriate wrapper object
     extra: tuple[str, ...] = ()
     if isinstance(val, ObjectRef):
         new_ref = val
         extra = val.extra
-        read_res = server.obj_read(
-            ObjReadReq(
-                project_id=f"{val.entity}/{val.project}",
-                object_id=val.name,
-                digest=val.digest,
+        try:
+            project_id = f"{val.entity}/{val.project}"
+            read_res = server.obj_read(
+                ObjReadReq(
+                    project_id=project_id,
+                    object_id=val.name,
+                    digest=val.digest,
+                )
             )
-        )
-        val = from_json(read_res.obj.val, val.entity + "/" + val.project, server)
+            val = from_json(read_res.obj.val, project_id, server)
+        except ObjectDeletedError as e:
+            # encountered a deleted object, return DeletedRef, warn and continue
+            val = DeletedRef(ref=new_ref, deleted_at=e.deleted_at, error=e)
+            logger.warning(f"Could not read deleted object: {new_ref}")
 
     if isinstance(val, Table):
         val_ref = val.ref
@@ -658,11 +833,20 @@ def make_trace_obj(
 
             # need to deref if we encounter these
             if isinstance(val, TableRef):
+                table_row_filter = TableRowFilter()
+                if (
+                    len(extra) == 4
+                    and extra[0] == OBJECT_ATTR_EDGE_NAME
+                    and extra[1] == "rows"
+                    and extra[2] == TABLE_ROW_ID_EDGE_NAME
+                ):
+                    table_row_filter.row_digests = [extra[3]]
+
                 val = WeaveTable(
                     table_ref=val,
                     ref=new_ref,
                     server=server,
-                    filter=TableRowFilter(),
+                    filter=table_row_filter,
                     root=root,
                     parent=parent,
                 )
@@ -703,7 +887,7 @@ def make_trace_obj(
     if isinstance(box_val, pydantic_v1.BaseModel) or is_op(val):
         box_val.__dict__["ref"] = new_ref
     elif box_val is None or isinstance(box_val, bool):
-        # We intentionally don't box None and bools because it's imposible to
+        # We intentionally don't box None and bools because it's impossible to
         # make them behave like the underlying True/False/None objects in python.
         # This is unlike other objects (dict, list, int) that can be inherited
         # from and compared.
@@ -714,7 +898,7 @@ def make_trace_obj(
 
         pass
     else:
-        if hasattr(box_val, "ref"):
+        if hasattr(box_val, "ref") and not isinstance(box_val, DeletedRef):
             setattr(box_val, "ref", new_ref)
     return box_val
 

@@ -28,7 +28,7 @@ jobs:
 
     # if: github.ref == 'refs/heads/master' || needs.check-which-tests-to-run.outputs.weave_query_tests
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 2
 
@@ -81,11 +81,16 @@ jobs:
         env:
           CI: 1
           WANDB_ENABLE_TEST_CONTAINER: true
+          LOGGING_ENABLED: true
         ports:
-          - '8080:8080'
-          - '8083:8083'
-          - '9015:9015'
-        options: --health-cmd "curl --fail http://localhost:8080/healthz || exit 1" --health-interval=5s --health-timeout=3s
+          - "8080:8080"
+          - "8083:8083"
+          - "9015:9015"
+        options: >-
+          --health-cmd "wget -q -O /dev/null http://localhost:8080/healthz || exit 1"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-start-period=10s
     outputs:
       tests_should_run: ${{ steps.test_check.outputs.tests_should_run }}
     steps:
@@ -136,42 +141,34 @@ jobs:
         with:
           jobs: ${{ toJSON(needs) }}
 
-  # ==== Weave UI Jobs ====
-  weavejs-lint-compile:
-    name: WeaveJS Lint and Compile
+  weave-ts-sdk-lint:
+    name: Weave TS SDK Lint
     runs-on: ubuntu-latest
     needs:
       - check-which-tests-to-run
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Check if lint and compile should run
+      - name: Check if lint should run
         id: check_run
         run: |
-          if [[ "${{ github.ref }}" == "refs/heads/master" || "${{ needs.check-which-tests-to-run.outputs.weave_js_tests }}" == "true" ]]; then
-            echo "Lint and compile should run"
-            echo "should_lint_and_compile=true" >> $GITHUB_OUTPUT
+          if [[ "${{ github.ref }}" == "refs/heads/master" || "${{ needs.check-which-tests-to-run.outputs.weave_ts_sdk_tests }}" == "true" ]]; then
+            echo "Lint should run"
+            echo "should_lint=true" >> $GITHUB_OUTPUT
           else
-            echo "Lint and compile should not run"
-            echo "should_lint_and_compile=false" >> $GITHUB_OUTPUT
+            echo "Lint should not run"
+            echo "should_lint=false" >> $GITHUB_OUTPUT
           fi
-      - uses: actions/setup-node@v1
-        if: steps.check_run.outputs.should_lint_and_compile == 'true'
+      - uses: pnpm/action-setup@v4
         with:
-          node-version: '18.x'
-      - name: Run WeaveJS Lint and Compile
-        if: steps.check_run.outputs.should_lint_and_compile == 'true'
+          version: 10.8.1
+      - name: Run Weave TS SDK Lint
+        if: steps.check_run.outputs.should_lint == 'true'
         run: |
-          set -e
-          cd weave-js
-          yarn install --frozen-lockfile
-          yarn generate
-          yarn eslint --max-warnings=0
-          yarn tslint
-          yarn prettier
-          yarn run tsc
+          cd sdks/node
+          pnpm install --frozen-lockfile
+          pnpm run prettier-check
 
   # ==== Trace Jobs ====
   lint:
@@ -179,7 +176,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v5
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -187,9 +184,9 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install nox uv
+          pip install nox uv==0.8.6
       - name: Run nox
-        run: nox -e lint
+        run: nox -e lint -- --all-files
 
   trace-docs:
     name: Trace docs
@@ -197,7 +194,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v5
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
@@ -207,38 +204,83 @@ jobs:
       - name: Run docs
         run: make docs
 
-  trace-tests:
-    name: Trace nox tests
+  trace_no_server:
+    name: Trace non-trace server tests
     timeout-minutes: 10
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version-major: ['3']
+        python-version-major: ["3"]
         python-version-minor: [
-            '9',
-            '10',
-            '11',
-            '12',
-            '13',
+            "9",
+            "10",
+            "11",
+            "12",
+            "13",
+            #
+          ]
+        nox-shard: ["trace_no_server"]
+      fail-fast: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Set up Python ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install nox uv==0.8.6
+      - name: Run nox (Non Trace Server)
+        run: |
+          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
+            -m "not trace_server"
+
+  trace-tests:
+    name: Trace nox tests
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version-major: ["3"]
+        python-version-minor: [
+            "9",
+            "10",
+            "11",
+            "12",
+            "13",
             #
           ]
         nox-shard:
           [
-            'trace',
-            'trace_server',
-            'anthropic',
-            'cerebras',
-            'cohere',
-            'dspy',
-            'groq',
-            'instructor',
-            'langchain',
-            'litellm',
-            'llamaindex',
-            'mistral0',
-            'mistral1',
-            'notdiamond',
-            'openai',
+            "trace1",
+            "trace2",
+            "trace3",
+            "trace4",
+            "flow",
+            "trace_server",
+            "trace_server_bindings",
+            "anthropic",
+            "bedrock",
+            "cerebras",
+            "cohere",
+            "crewai",
+            "dspy",
+            "groq",
+            "google_genai",
+            "instructor",
+            "langchain",
+            "litellm",
+            "llamaindex",
+            "mistral",
+            "notdiamond",
+            "openai",
+            "vertexai",
+            "pandas-test",
+            "mcp",
+            "smolagents",
+            "autogen_tests",
           ]
       fail-fast: false
     services:
@@ -250,19 +292,37 @@ jobs:
         env:
           CI: 1
           WANDB_ENABLE_TEST_CONTAINER: true
+          LOGGING_ENABLED: true
         ports:
-          - '8080:8080'
-          - '8083:8083'
-          - '9015:9015'
-        options: --health-cmd "curl --fail http://localhost:8080/healthz || exit 1" --health-interval=5s --health-timeout=3s
+          - "8080:8080"
+          - "8083:8083"
+          - "9015:9015"
+        options: >-
+          --health-cmd "wget -q -O /dev/null http://localhost:8080/healthz || exit 1"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-start-period=10s
+      azurite:
+        image: mcr.microsoft.com/azure-storage/azurite
+        ports:
+          - "10000:10000"
       weave_clickhouse:
-        image: clickhouse/clickhouse-server
+        image: clickhouse/clickhouse-server:25.4
+        env:
+          CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+          CLICKHOUSE_USER: default
+          CLICKHOUSE_PASSWORD: ""
+          CLICKHOUSE_DB: default
         ports:
-          - '8123:8123'
+          - "8123:8123"
         options: --health-cmd "wget -nv -O- 'http://localhost:8123/ping' || exit 1" --health-interval=5s --health-timeout=3s
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v5
+      - name: Enable debug logging
+        run: echo "ACTIONS_STEP_DEBUG=true" >> $GITHUB_ENV
+      - name: Install SQLite dev package
+        run: sudo apt update && sudo apt install -y libsqlite3-dev
       - name: Set up Python ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
         uses: actions/setup-python@v5
         with:
@@ -270,27 +330,37 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install nox uv
-      - name: Run nox (Clickhouse Only)
-        env:
-          WEAVE_SENTRY_ENV: ci
-          CI: 1
-          WB_SERVER_HOST: http://wandbservice
-          WF_CLICKHOUSE_HOST: localhost
-          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
-        run: |
-          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
-            -m "weave_client and not skip_clickhouse_client" \
-            --weave-server=clickhouse
-      - name: Run nox
+          pip install nox uv==0.8.6
+      - name: Run nox (Sqlite Trace Server)
         env:
           WEAVE_SENTRY_ENV: ci
           CI: 1
           WB_SERVER_HOST: http://wandbservice
           WF_CLICKHOUSE_HOST: weave_clickhouse
           WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
+          WANDB_API_KEY: ${{ secrets.WANDB_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          DD_TRACE_ENABLED: false
         run: |
-          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')"
+          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
+            -m "trace_server" \
+            --trace-server=sqlite
+      - name: Run nox (Clickhouse Trace Server)
+        env:
+          WEAVE_SENTRY_ENV: ci
+          CI: 1
+          WB_SERVER_HOST: http://wandbservice
+          WF_CLICKHOUSE_HOST: localhost
+          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
+          DD_TRACE_ENABLED: false
+          OPENAI_API_KEY: dummyapikey
+        run: |
+          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
+            -m "trace_server and not skip_clickhouse_client"
   trace-tests-matrix-check: # This job does nothing and is only used for the branch protection
     if: always()
 

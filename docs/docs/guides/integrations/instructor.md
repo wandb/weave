@@ -1,5 +1,9 @@
 # Instructor
 
+<a target="_blank" href="https://colab.research.google.com/github/wandb/examples/blob/master/weave/docs/quickstart_instructor.ipynb">
+  <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
+</a>
+
 [Instructor](https://python.useinstructor.com/) is a lightweight library that makes it easy to get structured data like JSON from LLMs.
 
 ## Tracing

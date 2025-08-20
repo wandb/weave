@@ -201,8 +201,8 @@ First, we need to create a simple weave evaluation scoring function that tells w
 
 ```python
 @weave.op()
-def weave_evaluation_scorer(answer: str, model_output: Output) -> dict:
-    return {"match": int(answer.lower() == model_output["answer"].lower())}
+def weave_evaluation_scorer(answer: str, output: Output) -> dict:
+    return {"match": int(answer.lower() == output["answer"].lower())}
 ```
 
 Next, we can simply define the evaluation and run it.

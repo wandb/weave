@@ -1,11 +1,25 @@
-import typing
+from __future__ import annotations
 
-from weave.trace import autopatch, errors, init_message, trace_sentry, weave_client
+import logging
+
+from weave.compat import wandb
+from weave.telemetry import trace_sentry
+from weave.trace import (
+    autopatch,
+    env,
+    init_message,
+    wandb_termlog_patch,
+    weave_client,
+)
 from weave.trace.context import weave_client_context as weave_client_context
-from weave.trace_server import sqlite_trace_server
+from weave.trace.settings import should_redact_pii, use_server_cache
+from weave.trace_server.trace_server_interface import TraceServerInterface
 from weave.trace_server_bindings import remote_http_trace_server
+from weave.trace_server_bindings.caching_middleware_trace_server import (
+    CachingMiddlewareTraceServer,
+)
 
-_current_inited_client = None
+logger = logging.getLogger(__name__)
 
 
 class InitializedClient:
@@ -17,25 +31,27 @@ class InitializedClient:
         weave_client_context.set_weave_client_global(None)
 
 
-def get_username() -> typing.Optional[str]:
-    from weave.wandb_interface import wandb_api
+_current_inited_client: InitializedClient | None = None
 
-    api = wandb_api.get_wandb_api_sync()
+
+def get_username() -> str | None:
+    api = wandb.Api()
     try:
         return api.username()
     except AttributeError:
         return None
 
 
-def get_entity_project_from_project_name(project_name: str) -> tuple[str, str]:
-    from weave.wandb_interface import wandb_api
+class WeaveWandbAuthenticationException(Exception): ...
 
+
+def get_entity_project_from_project_name(project_name: str) -> tuple[str, str]:
     fields = project_name.split("/")
     if len(fields) == 1:
-        api = wandb_api.get_wandb_api_sync()
+        api = wandb.Api()
         entity_name = api.default_entity_name()
         if entity_name is None:
-            raise errors.WeaveWandbAuthenticationException(
+            raise WeaveWandbAuthenticationException(
                 'weave init requires wandb. Run "wandb login"'
             )
         project_name = fields[0]
@@ -47,6 +63,8 @@ def get_entity_project_from_project_name(project_name: str) -> tuple[str, str]:
         )
     if not entity_name:
         raise ValueError("entity_name must be non-empty")
+    if not project_name:
+        raise ValueError("project_name must be non-empty")
 
     return entity_name, project_name
 
@@ -62,7 +80,9 @@ Args:
 
 
 def init_weave(
-    project_name: str, ensure_project_exists: bool = True
+    project_name: str,
+    ensure_project_exists: bool = True,
+    autopatch_settings: autopatch.AutopatchSettings | None = None,
 ) -> InitializedClient:
     global _current_inited_client
     if _current_inited_client is not None:
@@ -74,22 +94,28 @@ def init_weave(
         ):
             return _current_inited_client
         else:
+            # Flush any pending calls before switching to a new project
+            _current_inited_client.client.finish()
             _current_inited_client.reset()
 
-    from weave.wandb_interface import wandb_api  # type: ignore
+    from weave.wandb_interface import (
+        context as wandb_context_module,  # type: ignore
+    )
 
     # Must init to read ensure we've read auth from the environment, in
     # case we're on a new thread.
-    wandb_api.init()
-    wandb_context = wandb_api.get_wandb_api_context()
+    wandb_context_module.init()
+    wandb_context = wandb_context_module.get_wandb_api_context()
     if wandb_context is None:
-        import wandb
-
-        print("Please login to Weights & Biases (https://wandb.ai/) to continue:")
+        url = wandb.app_url(env.wandb_base_url())
+        logger.info(f"Please login to Weights & Biases ({url}) to continue...")
+        wandb_termlog_patch.ensure_patched()
         wandb.login(anonymous="never", force=True)  # type: ignore
-        wandb_api.init()
-        wandb_context = wandb_api.get_wandb_api_context()
 
+        wandb_context_module.init()
+        wandb_context = wandb_context_module.get_wandb_api_context()
+
+    # Resolve entity name after authentication is ensured
     entity_name, project_name = get_entity_project_from_project_name(project_name)
     wandb_run_id = weave_client.safe_current_wb_run_id()
     weave_client.check_wandb_run_matches(wandb_run_id, entity_name, project_name)
@@ -99,29 +125,32 @@ def init_weave(
         api_key = wandb_context.api_key
 
     remote_server = init_weave_get_server(api_key)
-    # from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
+    server: TraceServerInterface = remote_server
+    if use_server_cache():
+        server = CachingMiddlewareTraceServer.from_env(server)
 
-    # server = ClickHouseTraceServer(host="localhost")
     client = weave_client.WeaveClient(
-        entity_name, project_name, remote_server, ensure_project_exists
+        entity_name, project_name, server, ensure_project_exists
     )
+
     # If the project name was formatted by init, update the project name
     project_name = client.project
 
     _current_inited_client = InitializedClient(client)
-    # entity_name, project_name = get_entity_project_from_project_name(project_name)
-    # from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
-
-    # client = weave_client.WeaveClient(ClickHouseTraceServer(host="localhost"))
-
-    # init_client = InitializedClient(client)  # type: ignore
 
     # autopatching is only supported for the wandb client, because OpenAI calls are not
     # logged in local mode currently. When that's fixed, this autopatch call can be
     # moved to InitializedClient.__init__
-    autopatch.autopatch()
+    autopatch.autopatch(autopatch_settings)
 
     username = get_username()
+
+    # This is a temporary event to track the number of users who have enabled PII redaction.
+    if should_redact_pii():
+        from weave.utils.pii_redaction import track_pii_redaction_enabled
+
+        track_pii_redaction_enabled(username or "unknown", entity_name, project_name)
+
     try:
         min_required_version = (
             remote_server.server_info().min_required_weave_python_version
@@ -175,7 +204,7 @@ def init_weave_disabled() -> InitializedClient:
 
 
 def init_weave_get_server(
-    api_key: typing.Optional[str] = None,
+    api_key: str | None = None,
     should_batch: bool = True,
 ) -> remote_http_trace_server.RemoteHTTPTraceServer:
     res = remote_http_trace_server.RemoteHTTPTraceServer.from_env(should_batch)
@@ -185,6 +214,8 @@ def init_weave_get_server(
 
 
 def init_local() -> InitializedClient:
+    from weave.trace_server import sqlite_trace_server
+
     server = sqlite_trace_server.SqliteTraceServer("weave.db")
     server.setup_tables()
     client = weave_client.WeaveClient("none", "none", server)

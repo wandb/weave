@@ -42,7 +42,7 @@ def test_validate_purge_req_one():
     assert str(e.value) == "Expected value of type <class 'tuple'>, got <class 'dict'>"
 
     with pytest.raises(InvalidRequest) as e:
-        validation.validate_purge_req_one({"eq_": tuple([{"get_field_": "id"}])})
+        validation.validate_purge_req_one({"eq_": ({"get_field_": "id"},)})
     assert str(e.value) == validation.MESSAGE_INVALID_PURGE
 
     with pytest.raises(InvalidRequest) as e:
@@ -55,7 +55,7 @@ def test_validate_purge_req_one():
     )
 
     validation.validate_purge_req_one(
-        {"eq_": tuple([{"get_field_": "id"}, {"literal_": "bar"}])}
+        {"eq_": ({"get_field_": "id"}, {"literal_": "bar"})}
     )
 
     with pytest.raises(InvalidRequest) as e:
@@ -76,22 +76,18 @@ def test_validate_purge_req_one():
 
     validation.validate_purge_req_one(
         {
-            "in_": tuple(
-                [
-                    {"get_field_": "id"},
-                    [{"literal_": "foo"}],
-                ]
+            "in_": (
+                {"get_field_": "id"},
+                [{"literal_": "foo"}],
             )
         },
         operator="in_",
     )
     validation.validate_purge_req_one(
         {
-            "in_": tuple(
-                [
-                    {"get_field_": "id"},
-                    [{"literal_": "bar"}, {"literal_": "foo"}],
-                ]
+            "in_": (
+                {"get_field_": "id"},
+                [{"literal_": "bar"}, {"literal_": "foo"}],
             )
         },
         operator="in_",
@@ -118,7 +114,7 @@ def test_validate_purge_req_multiple():
 
     validation.validate_purge_req_multiple(
         [
-            {"eq_": tuple([{"get_field_": "id"}, {"literal_": "bar"}])},
-            {"eq_": tuple([{"get_field_": "id"}, {"literal_": "bar"}])},
+            {"eq_": ({"get_field_": "id"}, {"literal_": "bar"})},
+            {"eq_": ({"get_field_": "id"}, {"literal_": "bar"})},
         ]
     )

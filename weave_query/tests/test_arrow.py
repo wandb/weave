@@ -17,6 +17,8 @@ from weave_query import (
     ops,
     storage,
     weave_internal,
+    artifact_local,
+    artifact_fs,
 )
 
 # If you're thinking of import vectorize here, don't! Put your
@@ -1790,6 +1792,13 @@ def test_flatten_handles_tagged_lists():
         for i in expected
     ]
 
+def test_flatten_handles_union_return_type():
+    data = [None, [{"a": 1}, {"b": 2}, {"c": 3}]]
+    awl = arrow.to_arrow(data)
+    node = weave.save(awl)
+    flattened = node.flatten()
+    assert weave.use(flattened).object_type == awl.object_type
+
 
 def test_keys_ops():
     awl = arrow.to_arrow([{"a": 1}, {"a": 1, "b": 2, "c": 2}, {"c": 3}])
@@ -1812,3 +1821,57 @@ def test_repeat_0():
     repeated = constructors.repeat(data, 0)
     assert len(repeated) == 0
     assert repeated.type == pa.struct({"a": pa.int64()})
+
+
+def test_arrow_tagged_union():
+
+    art = artifact_local.LocalArtifact("test_arrow_tagged_union")
+
+    with art.new_file("hello.txt") as f:
+        f.write("hello")
+
+    with art.new_file("world.dat") as f:
+        f.write("world")
+
+    art.save()
+
+    art_dir = art.path_info("")
+    assert weave.type_of(art_dir) == artifact_fs.FilesystemArtifactDirType()
+    files = art_dir.files
+
+    exp_art_file1_type = artifact_fs.FilesystemArtifactFileType(
+        extension=weave.types.Const(weave.types.String(), "txt"),
+        wbObjectType=weave.types.NoneType(),
+    )
+
+    exp_art_file2_type = artifact_fs.FilesystemArtifactFileType(
+        extension=weave.types.Const(weave.types.String(), "dat"),
+        wbObjectType=weave.types.NoneType(),
+    )
+
+    assert exp_art_file1_type == weave.type_of(files["hello.txt"])
+    assert exp_art_file2_type == weave.type_of(files["world.dat"])
+
+    tags = {"top": "level"}
+    tag_store.add_tags(files["hello.txt"], tags)
+    tag_store.add_tags(files["world.dat"], tags)
+
+    f1e = files["hello.txt"]
+    f2e = files["world.dat"]
+
+    expected = [f1e, f2e]
+
+    # this should not fail, it was failing in https://wandb.atlassian.net/browse/WB-21076
+    tagged_union_arrow = arrow.to_arrow(expected)
+
+    result = tagged_union_arrow.to_pylist_tagged()
+
+    f1a = result[0]
+    f2a = result[1]
+
+    with f1a.open() as a, f1e.open() as e:
+        assert a.read() == e.read()
+
+    with f2a.open() as a, f2e.open() as e:
+        assert a.read() == e.read()
+

@@ -25,12 +25,19 @@ Defines the Op protocol and related functions.
 ---
 
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/op.py#L303"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/op.py#L1134"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>function</kbd> `call`
 
 ```python
-call(op: Op, *args: Any, **kwargs: Any) → tuple[Any, 'Call']
+call(
+    op: 'Op',
+    *args: 'Any',
+    __weave: 'WeaveKwargs | None' = None,
+    __should_raise: 'bool' = False,
+    __require_explicit_finish: 'bool' = False,
+    **kwargs: 'Any'
+) → tuple[Any, Call] | Coroutine[Any, Any, tuple[Any, Call]]
 ```
 
 Executes the op and returns both the result and a Call representing the execution. 
@@ -45,16 +52,16 @@ def add(a: int, b: int) -> int:
      return a + b
 
 result, call = add.call(1, 2)
-``` 
+```
 
 ---
 
-<a href="https://github.com/wandb/weave/blob/master/weave/trace/op.py#L324"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
+<a href="https://github.com/wandb/weave/blob/master/weave/trace/op.py#L1181"><img align="right" src="https://img.shields.io/badge/-source-cccccc?style=flat-square" /></a>
 
 ### <kbd>function</kbd> `calls`
 
 ```python
-calls(op: Op) → CallsIter
+calls(op: 'Op') → CallsIter
 ```
 
 Get an iterator over all calls to this op. 
@@ -69,4 +76,4 @@ def add(a: int, b: int) -> int:
 calls = add.calls()
 for call in calls:
      print(call)
-``` 
+```

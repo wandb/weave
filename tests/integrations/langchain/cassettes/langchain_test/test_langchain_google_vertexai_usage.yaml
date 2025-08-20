@@ -1,0 +1,127 @@
+interactions:
+  - request:
+      body: ""
+      headers:
+        Accept:
+          - "*/*"
+        Accept-Encoding:
+          - gzip, deflate, zstd
+        Connection:
+          - keep-alive
+        Content-Length:
+          - "268"
+        Content-Type:
+          - application/x-www-form-urlencoded
+        User-Agent:
+          - python-requests/2.32.3
+        x-goog-api-client:
+          - gl-python/3.12.9 auth/2.38.0 cred-type/u
+      method: POST
+      uri: https://oauth2.googleapis.com/token
+    response:
+      body:
+        string: "{\n  \"access_token\": \"reacted\",\n
+          \ \"expires_in\": 3599,\n  \"scope\": \"https://www.googleapis.com/auth/userinfo.email
+          https://www.googleapis.com/auth/sqlservice.login openid https://www.googleapis.com/auth/cloud-platform\",\n
+          \ \"token_type\": \"Bearer\",\n  \"id_token\": \"reacted\"\n}"
+      headers:
+        Alt-Svc:
+          - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+        Cache-Control:
+          - no-cache, no-store, max-age=0, must-revalidate
+        Content-Encoding:
+          - gzip
+        Content-Type:
+          - application/json; charset=utf-8
+        Date:
+          - Tue, 03 Jun 2025 03:12:12 GMT
+        Expires:
+          - Mon, 01 Jan 1990 00:00:00 GMT
+        Pragma:
+          - no-cache
+        Server:
+          - scaffolding on HTTPServer2
+        Transfer-Encoding:
+          - chunked
+        Vary:
+          - Origin
+          - X-Origin
+          - Referer
+        X-Content-Type-Options:
+          - nosniff
+        X-Frame-Options:
+          - SAMEORIGIN
+        X-XSS-Protection:
+          - "0"
+      status:
+        code: 200
+        message: OK
+  - request:
+      body: ""
+      headers:
+        Accept:
+          - "*/*"
+        Accept-Encoding:
+          - gzip, deflate, zstd
+        Connection:
+          - keep-alive
+        Content-Length:
+          - "349"
+        Content-Type:
+          - application/json
+        User-Agent:
+          - python-requests/2.32.3
+        x-goog-api-client:
+          - langchain-google-vertexai/2.0.24-langchain-google-vertexai/2.0.24-ChatVertexAI_gemini-2.5-pro-preview-05-06
+            gl-python/3.12.9 grpc/1.71.0 gax/2.24.2 gccl/2.0.24-langchain-google-vertexai/2.0.24-ChatVertexAI_gemini-2.5-pro-preview-05-06
+            cred-type/u
+        x-goog-request-params:
+          - model=projects/wandb-qa/locations/us-central1/publishers/google/models/gemini-2.5-pro-preview-05-06
+        x-goog-user-project:
+          - wandb-qa
+      method: POST
+      uri: https://us-central1-aiplatform.googleapis.com/v1beta1/projects/wandb-qa/locations/us-central1/publishers/google/models/gemini-2.5-pro-preview-05-06:generateContent?%24alt=json%3Benum-encoding%3Dint
+    response:
+      body:
+        string:
+          "{\n  \"candidates\": [\n    {\n      \"content\": {\n        \"role\":
+          \"model\",\n        \"parts\": [\n          {\n            \"text\": \"Hmm.
+          What do I do?\\n\\nI'm a Witcher. Means I kill monsters. Things that prey
+          on folk, things that crawl out of the shadows when decent people are asleep.
+          Got two swords for it \u2013 steel for humans, if they're stupid enough to
+          deserve it, silver for the beasts.\\n\\nTravel the Path, take contracts. Sometimes
+          for coin, sometimes because... well, someone's gotta deal with the filth.
+          Not a popular profession, but it's mine.\"\n          }\n        ]\n      },\n
+          \     \"finishReason\": 1,\n      \"avgLogprobs\": -1.5626811218261718\n    }\n
+          \ ],\n  \"usageMetadata\": {\n    \"promptTokenCount\": 13,\n    \"candidatesTokenCount\":
+          100,\n    \"totalTokenCount\": 1101,\n    \"trafficType\": 1,\n    \"promptTokensDetails\":
+          [\n      {\n        \"modality\": 1,\n        \"tokenCount\": 13\n      }\n
+          \   ],\n    \"candidatesTokensDetails\": [\n      {\n        \"modality\":
+          1,\n        \"tokenCount\": 100\n      }\n    ],\n    \"thoughtsTokenCount\":
+          988\n  },\n  \"modelVersion\": \"gemini-2.5-pro-preview-05-06\",\n  \"createTime\":
+          \"2025-06-03T03:12:12.647960Z\",\n  \"responseId\": \"DGg-aJjGJ_jqld8PpP6_qAk\"\n}\n"
+      headers:
+        Alt-Svc:
+          - h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+        Content-Type:
+          - application/json; charset=UTF-8
+        Date:
+          - Tue, 03 Jun 2025 03:12:23 GMT
+        Server:
+          - scaffolding on HTTPServer2
+        Transfer-Encoding:
+          - chunked
+        Vary:
+          - Origin
+          - X-Origin
+          - Referer
+        X-Content-Type-Options:
+          - nosniff
+        X-Frame-Options:
+          - SAMEORIGIN
+        X-XSS-Protection:
+          - "0"
+      status:
+        code: 200
+        message: OK
+version: 1

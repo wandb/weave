@@ -1,6 +1,14 @@
 # Anthropic
 
+<a target="_blank" href="https://colab.research.google.com/github/wandb/examples/blob/master/weave/docs/quickstart_anthropic.ipynb">
+  <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
+</a>
+
 Weave automatically tracks and logs LLM calls made via the [Anthropic Python library](https://github.com/anthropics/anthropic-sdk-python), after `weave.init()` is called.
+
+:::note
+Do you want to experiment with Anthropic models on Weave without any set up? Try the [LLM Playground](../tools/playground.md).
+:::
 
 ## Traces
 
