@@ -111,10 +111,6 @@ def _register_default_viewers() -> None:
 
     register_viewer("print", PrintViewer)
 
-    from weave.trace.display.viewers.logger_viewer import LoggerViewer
-
-    register_viewer("logger", LoggerViewer)
-
 
 # Public API classes that delegate to the viewer
 class Console:
