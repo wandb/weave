@@ -1,5 +1,7 @@
 # CrewAI
 
+import DefaultEntityNote from '../../../src/components/DefaultEntityNote.mdx';
+
 <a target="_blank" href="https://github.com/wandb/examples/blob/master/weave/docs/quickstart_crewai.ipynb">
   <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
 </a>
@@ -19,7 +21,7 @@ You need to install CrewAI ([more details](https://docs.crewai.com/installation)
 pip install crewai weave
 ```
 
-Now we will create a CrewAI Crew and trace the execution using Weave. To get started, simply call `weave.init()` at the beginning of your script. The argument in `weave.init()` is a project name where the traces will be logged. If you don't specify a W&B team when you call `weave.init()`, your default entity is used. To find or update your default entity, refer to [User Settings](https://docs.wandb.ai/guides/models/app/settings-page/user-settings/#default-team) in the W&B Models documentation.
+Now we will create a CrewAI Crew and trace the execution using Weave. To get started, simply call `weave.init()` at the beginning of your script. The argument in `weave.init()` is a project name where the traces will be logged. <DefaultEntityNote />
 
 ```python
 import weave

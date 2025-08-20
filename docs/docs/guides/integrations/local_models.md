@@ -1,10 +1,12 @@
 # Local Models
 
+import DefaultEntityNote from '../../../src/components/DefaultEntityNote.mdx';
+
 Many developers download and run open source models like LLama-3, Mixtral, Gemma, Phi and more locally. There are quite a few ways of running these models locally and Weave supports a few of them out of the box, as long as they support OpenAI SDK compatibility.
 
 ## Wrap local model functions with `@weave.op()`
 
-You can easily integrate Weave with any LLM yourself simply by initializing Weave with `weave.init('<your-project-name>')` and then wrapping the calls to your LLMs with `weave.op()`. If you don't specify a W&B team when you call `weave.init()`, your default entity is used. To find or update your default entity, refer to [User Settings](https://docs.wandb.ai/guides/models/app/settings-page/user-settings/#default-team) in the W&B Models documentation. See our guide on [tracing](/guides/tracking/tracing) for more details.
+You can easily integrate Weave with any LLM yourself simply by initializing Weave with `weave.init('<your-project-name>')` and then wrapping the calls to your LLMs with `weave.op()`. <DefaultEntityNote /> See our guide on [tracing](/guides/tracking/tracing) for more details.
 
 ## Updating your OpenAI SDK code to use local models
 

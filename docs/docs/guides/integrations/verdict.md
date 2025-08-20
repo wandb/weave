@@ -1,5 +1,7 @@
 # Verdict
 
+import DefaultEntityNote from '../../../src/components/DefaultEntityNote.mdx';
+
 <a target="_blank" href="https://github.com/wandb/examples/blob/master/weave/docs/quickstart_verdict.ipynb">
   <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
 </a>
@@ -12,7 +14,7 @@ Weave simplifies this process by automatically capturing traces for your [Verdic
 
 ## Getting Started
 
-To get started, simply call `weave.init(project=...)` at the beginning of your script. Use the `project` argument to log to a specific W&B Team name with `team-name/project-name` or do `project-name` to log to your default team/entity. If you don't specify a W&B Team, your default entity is used. To find or update your default entity, refer to [User Settings](https://docs.wandb.ai/guides/models/app/settings-page/user-settings/#default-team) in the W&B Models documentation.
+To get started, simply call `weave.init(project=...)` at the beginning of your script. Use the `project` argument to log to a specific W&B Team name with `team-name/project-name` or do `project-name` to log to your default team/entity. <DefaultEntityNote />
 
 ```python
 import weave
