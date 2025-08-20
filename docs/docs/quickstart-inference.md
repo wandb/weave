@@ -221,7 +221,7 @@ In the Weave UI, you can:
 
 ## Available models
 
-For a complete list of available models, see the [Available Models section](https://docs.wandb.ai/guides/inference/models/) in the W&B Inference reference documentation.
+For a complete list of available models, see the [Available Models section](https://docs.wandb.ai/guides/inference/models/) in the W&B Inference documentation.
 
 ## Next steps
 
