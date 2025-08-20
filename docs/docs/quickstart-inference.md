@@ -252,6 +252,8 @@ W&B Inference has concurrency limits per project. If you hit rate limits:
 - Add delays between calls
 - Consider upgrading your plan for higher limits
 
+For more details, see the [limits documentation for W&B Inference](https://docs.wandb.ai/guides/inference/usage-limits/).
+
 </details>
 
 <details>
