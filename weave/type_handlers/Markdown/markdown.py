@@ -13,7 +13,7 @@ except ImportError:
     RICH_MARKDOWN_AVAILABLE = False
 
     # Create a dummy Markdown class for when rich is not available
-    class Markdown:
+    class Markdown:  # type: ignore[no-redef]
         def __init__(self, markup: str, code_theme: str = "ansi_dark", **kwargs: Any):
             self.markup = markup
             self.code_theme = code_theme

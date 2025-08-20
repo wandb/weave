@@ -7,6 +7,8 @@ of the expected interface.
 
 from typing import Any, Optional, Protocol, Union, runtime_checkable
 
+from typing_extensions import Self
+
 from weave.trace.display.types import Style
 
 
@@ -97,7 +99,7 @@ class ProgressProtocol(Protocol):
         """Stop the progress bar."""
         ...
 
-    def __enter__(self) -> "ProgressProtocol":
+    def __enter__(self) -> Self:
         """Context manager entry."""
         ...
 

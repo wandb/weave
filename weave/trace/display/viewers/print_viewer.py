@@ -3,6 +3,8 @@
 import sys
 from typing import Any, Optional, Union
 
+from typing_extensions import Self
+
 from weave.trace.display.protocols import (
     CaptureContextProtocol,
     ConsoleProtocol,
@@ -17,11 +19,11 @@ from weave.trace.display.types import Style
 class CaptureContext:
     """Context manager for capturing output."""
 
-    def __init__(self):
-        self._original_stdout = None
-        self._capture_buffer = None
+    def __init__(self) -> None:
+        self._original_stdout: Any = None
+        self._capture_buffer: Any = None
 
-    def __enter__(self):
+    def __enter__(self) -> Self:
         import io
 
         self._original_stdout = sys.stdout
@@ -29,7 +31,7 @@ class CaptureContext:
         sys.stdout = self._capture_buffer
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         sys.stdout = self._original_stdout
 
     def get(self) -> str:
@@ -256,11 +258,13 @@ class PrintProgress:
                 file=self._file,
             )
 
-    def __enter__(self):
+    def __enter__(self) -> Self:
+        """Context manager entry."""
         self.start()
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        """Context manager exit."""
         self.stop()
 
 

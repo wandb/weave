@@ -405,8 +405,8 @@ class EasyPrompt(UserList, Prompt):
             tables.append(self.values_table(title="Parameters"))
         if self.config:
             tables.append(self.config_table(title="Config"))
-        tables = [pydantic_util.table_to_str(t) for t in tables]
-        return "\n".join(tables)
+        table_strings = [pydantic_util.table_to_str(t) for t in tables]
+        return "\n".join(table_strings)
 
     def __str__(self) -> str:
         """Return a single prompt string when str() is called on the object."""

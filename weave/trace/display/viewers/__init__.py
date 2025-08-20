@@ -7,7 +7,7 @@ This package contains various viewer implementations for the display abstraction
 __all__ = ["PrintViewer"]
 
 try:
-    from weave.trace.display.viewers.rich_viewer import RichViewer
+    from weave.trace.display.viewers.rich_viewer import RichViewer  # noqa: F401
 
     __all__.append("RichViewer")
 except ImportError:
@@ -16,6 +16,3 @@ except ImportError:
 from weave.trace.display.viewers.print_viewer import PrintViewer
 
 __all__.append("PrintViewer")
-
-# Logger viewer is optional and should be imported explicitly if needed
-# from weave.trace.display.viewers.logger_viewer import LoggerViewer

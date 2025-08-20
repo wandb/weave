@@ -10,6 +10,8 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any
 
+from typing_extensions import Self
+
 from weave.trace.display.protocols import (
     CaptureContextProtocol,
     ProgressProtocol,
@@ -21,7 +23,7 @@ from weave.trace.display.protocols import (
 from weave.trace.display.types import Style
 
 # Global viewer registry and configuration
-_viewer_registry: dict[str, type[ViewerProtocol]] = {}
+_viewer_registry: dict[str, Any] = {}
 _current_viewer: ViewerProtocol | None = None
 _default_viewer_name = "auto"  # Will try rich first, then fallback to print
 
@@ -35,7 +37,7 @@ class ViewerType(Enum):
 
 
 # Viewer registration and configuration
-def register_viewer(name: str, viewer_class: type[ViewerProtocol]) -> None:
+def register_viewer(name: str, viewer_class: Any) -> None:
     """Register a viewer implementation.
 
     Args:
@@ -262,11 +264,12 @@ class Progress:
         """Stop the progress bar."""
         self._progress.stop()
 
-    def __enter__(self):
+    def __enter__(self) -> Self:
         """Context manager entry."""
-        return self._progress.__enter__()
+        self._progress.__enter__()
+        return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """Context manager exit."""
         return self._progress.__exit__(exc_type, exc_val, exc_tb)
 

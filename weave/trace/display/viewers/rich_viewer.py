@@ -2,6 +2,8 @@
 
 from typing import Any, Optional, Union
 
+from typing_extensions import Self
+
 from weave.trace.display.protocols import (
     CaptureContextProtocol,
     ConsoleProtocol,
@@ -176,11 +178,11 @@ class RichProgress:
     def stop(self) -> None:
         self._progress.stop()
 
-    def __enter__(self):
+    def __enter__(self) -> Self:
         self.start()
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         self.stop()
 
 

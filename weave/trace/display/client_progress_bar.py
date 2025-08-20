@@ -32,6 +32,8 @@ def create_progress_bar_callback() -> Callable[[FlushStatus], None]:
 
     # Create a task for tracking progress
     task_id = None
+    current_total = 0
+    first_update = True
 
     def progress_callback(status: FlushStatus) -> None:
         """Update the progress bar based on the flush status.
@@ -39,7 +41,7 @@ def create_progress_bar_callback() -> Callable[[FlushStatus], None]:
         Args:
             status: The current flush status.
         """
-        nonlocal task_id
+        nonlocal task_id, current_total, first_update
 
         counts = status["job_counts"]
 
@@ -51,11 +53,13 @@ def create_progress_bar_callback() -> Callable[[FlushStatus], None]:
                 return
 
             # Print initial message
-            if not progress.live.is_started:
+            if first_update:
                 logger.info(f"Flushing {counts['total_jobs']} pending tasks...")
+                first_update = False
 
             # Create the task
             task_id = progress.add_task("Flushing tasks", total=counts["total_jobs"])
+            current_total = counts["total_jobs"]
 
         # If there are no more pending jobs, complete the progress bar
         if not status["has_pending_jobs"]:
@@ -68,8 +72,9 @@ def create_progress_bar_callback() -> Callable[[FlushStatus], None]:
             return
 
         # If new jobs were added, update the total
-        if status["max_total_jobs"] > progress.tasks[task_id].total:
+        if status["max_total_jobs"] > current_total:
             progress.update(task_id, total=status["max_total_jobs"])
+            current_total = status["max_total_jobs"]
 
         # Update progress bar with completed jobs
         if status["completed_since_last_update"] > 0:
