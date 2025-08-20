@@ -2312,9 +2312,18 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         try:
             self._insert_call_batch(self._call_batch)
         except InsertTooLarge:
-            logger.info("Retrying with large objects stripped.")
-            batch = self._strip_large_values(self._call_batch)
-            self._insert_call_batch(batch)
+            logger.info(
+                "Retrying with large objects stripped and inserting one by one."
+            )
+            stripped_batch = self._strip_large_values(self._call_batch)
+            # Insert rows one at a time after stripping large values
+            for row in stripped_batch:
+                self._insert(
+                    "call_parts",
+                    data=[row],
+                    column_names=ALL_CALL_INSERT_COLUMNS,
+                    settings={},
+                )
 
         self._call_batch = []
 
@@ -2324,7 +2333,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         Iterate through the batch and replace large JSON values with placeholders.
 
         Only considers JSON dump columns and ensures their combined size stays under
-        the 3.5MB limit by selectively replacing the largest values.
+        the limit by selectively replacing the largest values.
         """
         stripped_count = 0
         final_batch = []
