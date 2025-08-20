@@ -123,7 +123,7 @@ const config: Config = {
           },
           {
             from: ['/guides/integrations/inference'],
-            to: '/guides/tools/inference',
+            to: 'https://docs.wandb.ai/guides/inference/',
           },
         ]  
       },

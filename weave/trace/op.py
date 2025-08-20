@@ -38,7 +38,6 @@ from typing import (
 from typing_extensions import ParamSpec
 
 from weave.trace import box, settings
-from weave.trace.constants import TRACE_CALL_EMOJI
 from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.context.call_context import (
@@ -108,11 +107,6 @@ UNINITIALIZED_MSG = "Warning: Traces will not be logged. Call weave.init to log 
 class DisplayNameFuncError(ValueError): ...
 
 
-def print_call_link(call: Call) -> None:
-    if settings.should_print_call_link():
-        logger.info(f"{TRACE_CALL_EMOJI} {call.ui_url}")
-
-
 @dataclass
 class ProcessedInputs:
     # What the user passed to the function
@@ -165,6 +159,7 @@ def _apply_fn_defaults_to_inputs(
 class WeaveKwargs(TypedDict):
     display_name: str | None
     attributes: dict[str, Any]
+    call_id: str | None
 
 
 def setup_dunder_weave_dict(d: WeaveKwargs | None = None) -> WeaveKwargs:
@@ -352,6 +347,7 @@ def _create_call(
 
     call_time_display_name = __weave.get("display_name") if __weave else None
     call_attrs = __weave.get("attributes") if __weave else None
+    preferred_call_id = __weave.get("call_id") if __weave else None
 
     # If/When we do memoization, this would be a good spot
 
@@ -371,6 +367,7 @@ def _create_call(
         # Very important for `call_time_display_name` to take precedence over `func.call_display_name`
         display_name=call_time_display_name or func.call_display_name,
         attributes=attributes,
+        _call_id_override=preferred_call_id,
     )
 
 

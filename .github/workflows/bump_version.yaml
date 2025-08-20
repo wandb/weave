@@ -21,9 +21,8 @@ jobs:
       contents: "write"
       id-token: "write"
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v5
         with:
-          token: ${{ secrets.WANDBMACHINE_GITHUB_TOKEN }}
           fetch-depth: 0
       - id: setup_git
         run: |

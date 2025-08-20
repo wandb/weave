@@ -39,9 +39,7 @@ from weave.trace.refs import parse_uri
 from weave.trace.vals import MissingSelfInstanceError
 from weave.trace.weave_client import sanitize_object_name
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.clickhouse_trace_server_batched import (
-    ENTITY_TOO_LARGE_PAYLOAD,
-)
+from weave.trace_server.clickhouse_trace_server_settings import ENTITY_TOO_LARGE_PAYLOAD
 from weave.trace_server.errors import InsertTooLarge, InvalidFieldError
 from weave.trace_server.ids import generate_id
 from weave.trace_server.refs_internal import extra_value_quoter
@@ -3077,18 +3075,18 @@ def test_calls_stream_column_expansion(client):
 
 
 # Batch size is dynamically increased from 10 to MAX_CALLS_STREAM_BATCH_SIZE (500)
-# in clickhouse_trace_server_batched.py, this test verifies that the dynamic
+# in clickhouse_trace_server_settings.py, this test verifies that the dynamic
 # increase works as expected
 @pytest.mark.parametrize("batch_size", [1, 5, 6])
 def test_calls_stream_column_expansion_dynamic_batch_size(
     client, batch_size, monkeypatch
 ):
     monkeypatch.setattr(
-        "weave.trace_server.clickhouse_trace_server_batched.INITIAL_CALLS_STREAM_BATCH_SIZE",
+        "weave.trace_server.clickhouse_trace_server_settings.INITIAL_CALLS_STREAM_BATCH_SIZE",
         1,
     )
     monkeypatch.setattr(
-        "weave.trace_server.clickhouse_trace_server_batched.MAX_CALLS_STREAM_BATCH_SIZE",
+        "weave.trace_server.clickhouse_trace_server_settings.MAX_CALLS_STREAM_BATCH_SIZE",
         5,
     )
 
@@ -3410,12 +3408,12 @@ def test_large_keys_are_stripped_call(client, caplog, monkeypatch):
         original_insert_call_batch(self, batch)
 
     monkeypatch.setattr(
-        weave.trace_server.clickhouse_trace_server_batched,
+        weave.trace_server.clickhouse_trace_server_settings,
         "CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT",
         10 * 1024,  # 1KB
     )
     monkeypatch.setattr(
-        weave.trace_server.clickhouse_trace_server_batched,
+        weave.trace_server.clickhouse_trace_server_settings,
         "CLICKHOUSE_SINGLE_VALUE_BYTES_LIMIT",
         1 * 1024,  # 1KB
     )

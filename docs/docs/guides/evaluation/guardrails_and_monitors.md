@@ -11,7 +11,7 @@ Building production LLM applications? Two questions likely keep you up at night:
 1. How do you ensure your LLMs generate safe, appropriate content?
 2. How do you measure and improve output quality over time?
 
-Weave's unified scoring system answers both questions through a simple yet powerful framework. Whether you need active safety controls (guardrails) or passive quality monitoring, this guide will show you how to implement robust evaluation systems for your LLM applications.
+W&B Weave's unified scoring system answers both questions through a simple yet powerful framework. Whether you need active safety controls (guardrails) or passive quality monitoring, this guide will show you how to implement robust evaluation systems for your LLM applications.
 
 The foundation of Weave's evaluation system is the [**Scorer**](./scorers.md) - a component that evaluates your function's inputs and outputs to measure quality, safety, or any other metric you care about. Scorers are versatile and can be used in two ways:
 
@@ -188,7 +188,7 @@ Learn how to [create a monitor in general](#create-a-monitor) or try out the [en
         - **Judge model**: Select the model that will score your ops. Three types of models are available:
             - [Saved models](../tools/playground.md#saved-models)
             - Models from providers configured by your W&B admin
-            - [W&B Inference models](../tools/inference.md)
+            - [W&B Inference models](https://docs.wandb.ai/guides/inference/models/)
         
         For the selected model, configure the following settings:
             - **Configuration name**
@@ -496,7 +496,7 @@ score = scorer.score(output="some text")
 ### Score Analysis
 
 
-For detailed information about querying calls and their scorer results, see our [Score Analysis Guide](./scorers.md#score-analysis) and our [Data Access Guide](/guides/tracking/tracing#querying--exporting-calls).
+For detailed information about querying calls and their scorer results, see our [Score Analysis Guide](./scorers.md#score-analysis) and our [Data Access Guide](/guides/tracking/tracing#querying-and-exporting-calls).
 
 
 ## Production Best Practices

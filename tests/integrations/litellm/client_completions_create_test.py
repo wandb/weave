@@ -62,6 +62,7 @@ def test_completions_create(client):
                 "audio_tokens": None,
                 "reasoning_tokens": 0,
                 "rejected_prediction_tokens": None,
+                "text_tokens": None,
             },
             "prompt_tokens_details": {
                 "accepted_prediction_tokens": None,

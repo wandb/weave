@@ -4,12 +4,10 @@ slug: /
 
 # W&B Weave
 
-:::tip[New to Weave? Start with W&B Inference]
-Try Weave with our Inference service. No external API keys needed.
-
-**[Get Started with W&B Inference](/quickstart-inference)**
-
-[Explore in Playground](./guides/tools/playground.md#access-the-playground) | [View all models](./guides/tools/inference.md#available-models)
+:::tip
+For a limited time, the new W&B Inference service is included in your free tier. W&B Inference provides access to leading open-source foundation models via API and the Weave [Playground](./guides/tools/playground.md). 
+- [Developer documentation](https://docs.wandb.ai/guides/inference/)
+- [Product page](https://wandb.ai/site/inference) 
 :::
 
 Weights & Biases (W&B) Weave is a framework for tracking, experimenting with, evaluating, deploying, and improving LLM-based applications. Designed for flexibility and scalability, Weave supports every stage of your LLM application development workflow:
@@ -17,7 +15,7 @@ Weights & Biases (W&B) Weave is a framework for tracking, experimenting with, ev
 - **Tracing & Monitoring**: [Track LLM calls and application logic](./guides/tracking/) to debug and analyze production systems.
 - **Systematic Iteration**: Refine and iterate on [prompts](./guides/core-types/prompts.md), [datasets](./guides/core-types/datasets.md), and [models](./guides/core-types/models.md).
 - **Experimentation**: Experiment with different models and prompts in the [LLM Playground](./guides/tools/playground.md). 
-- **Evaluation**: Use custom or [pre-built scorers](./guides/evaluation/scorers#predefined-scorers) alongside our [comparison tools](./guides/tools/comparison.md) to systematically assess and enhance application performance.
+- **Evaluation**: Use custom or [pre-built scorers](./guides/evaluation/builtin_scorers.mdx) alongside our [comparison tools](./guides/tools/comparison.md) to systematically assess and enhance application performance.
 - **Guardrails**: Protect your application with [pre- and post-safeguards](./guides/evaluation/guardrails_and_monitors.md) for content moderation, prompt safety, and more.
 
 Integrate Weave with your existing development stack via the:

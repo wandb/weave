@@ -4,13 +4,13 @@
 In most cases, all you need to do is call `weave.init()` at the top of your script or program in order for Weave to automatically patch and track any of these libraries!
 :::
 
-Weave provides automatic logging integrations for popular LLM providers and orchestration frameworks. These integrations allow you to seamlessly trace calls made through various libraries, enhancing your ability to monitor and analyze your AI applications.
+W&B Weave provides automatic logging integrations for popular LLM providers and orchestration frameworks. These integrations allow you to seamlessly trace calls made through various libraries, enhancing your ability to monitor and analyze your AI applications.
 
 ## LLM Providers
 
 LLM providers are the vendors that offer access to large language models for generating predictions. Weave integrates with these providers to log and trace the interactions with their APIs:
 
-- **[W&B Inference Service](/guides/tools/inference)**
+- **[W&B Inference Service](https://docs.wandb.ai/guides/inference/)**
 - **[Amazon Bedrock](/guides/integrations/bedrock)**
 - **[Anthropic](/guides/integrations/anthropic)**
 - **[Cerebras](/guides/integrations/cerebras)**
