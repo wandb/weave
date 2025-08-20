@@ -1118,6 +1118,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if any(isinstance(r, ri.InternalTableRef) for r in parsed_raw_refs):
             raise ValueError("Table refs not supported")
 
+        # Business logic to ensure that we don't have raw CallRefs (not allowed)
+        if any(isinstance(r, ri.InternalCallRef) for r in parsed_raw_refs):
+            raise ValueError(
+                "Call refs not supported in batch read, use calls_query_stream"
+            )
+
         parsed_refs = cast(ObjRefListType, parsed_raw_refs)
         vals = self._parsed_refs_read_batch(parsed_refs)
 

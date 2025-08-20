@@ -1221,6 +1221,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         parsed_refs = [ri.parse_internal_uri(r) for r in req.refs]
         if any(isinstance(r, ri.InternalTableRef) for r in parsed_refs):
             raise ValueError("Table refs not supported")
+        if any(isinstance(r, ri.InternalCallRef) for r in parsed_refs):
+            raise ValueError("Call refs not supported")
         parsed_obj_refs = cast(list[ri.InternalObjectRef], parsed_refs)
 
         def read_ref(r: ri.InternalObjectRef) -> Any:
