@@ -2,6 +2,7 @@
 # We store up to 3 historical costs for each model
 import json
 import os
+import sys
 from datetime import datetime
 from decimal import Decimal
 from typing import TypedDict
@@ -84,9 +85,9 @@ def fetch_models_begin_costs() -> dict[str, CostDetails]:
     """
     Fetches costs from modelsBegin.json and converts them to the expected format.
 
-    Converts from cents per billion tokens to cost per token:
-    - priceCentsPerBillionTokensInput ÷ 100,000,000,000 = input cost per token
-    - priceCentsPerBillionTokensOutput ÷ 100,000,000,000 = output cost per token
+    Converts from cents per billion tokens to dollars per token:
+    - priceCentsPerBillionTokensInput / 100,000,000,000 = input cost per token
+    - priceCentsPerBillionTokensOutput / 100,000,000,000 = output cost per token
 
     Returns:
         dict[str, CostDetails]: Dictionary of model costs keyed by model ID.
@@ -96,24 +97,29 @@ def fetch_models_begin_costs() -> dict[str, CostDetails]:
         >>> len(costs) > 0
         True
     """
-    models_begin_path = os.path.join(os.path.dirname(__file__), MODELS_BEGIN_FILE)
+    models_begin_path = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), MODELS_BEGIN_FILE)
+    )
 
     if not os.path.exists(models_begin_path):
         print(f"modelsBegin.json not found at {models_begin_path}, skipping")
-        return {}
+        sys.exit(1)
 
     try:
         with open(models_begin_path) as f:
             models_data = json.load(f)
     except (json.JSONDecodeError, OSError) as e:
         print(f"Failed to read modelsBegin.json: {e}")
-        return {}
+        sys.exit(1)
 
     costs: dict[str, CostDetails] = {}
     current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     for model in models_data:
         if not isinstance(model, dict):
+            print(
+                f"Warning: Skipping non-dict entry in modelsBegin.json: {type(model)}"
+            )
             continue
 
         model_id_playground = model.get("idPlayground")
@@ -121,11 +127,20 @@ def fetch_models_begin_costs() -> dict[str, CostDetails]:
         input_cents_per_billion = model.get("priceCentsPerBillionTokensInput")
         output_cents_per_billion = model.get("priceCentsPerBillionTokensOutput")
 
-        if (
-            not model_id_playground
-            or input_cents_per_billion is None
-            or output_cents_per_billion is None
-        ):
+        if not model_id_playground:
+            print(
+                f"Warning: Skipping model with missing idPlayground: {model.get('id', 'unknown')}"
+            )
+            continue
+        if input_cents_per_billion is None:
+            print(
+                f"Warning: Skipping model {model_id_playground} with missing priceCentsPerBillionTokensInput"
+            )
+            continue
+        if output_cents_per_billion is None:
+            print(
+                f"Warning: Skipping model {model_id_playground} with missing priceCentsPerBillionTokensOutput"
+            )
             continue
 
         # Convert from cents per billion tokens to cost per token
@@ -183,8 +198,10 @@ def main(file_name: str = COST_FILE) -> None:
     # Merge litellm costs and modelsBegin costs
     all_new_costs = {**new_costs, **models_begin_costs}
     print(
-        f"Total new costs: {len(all_new_costs)} ({len(new_costs)} from litellm, {len(models_begin_costs)} from modelsBegin.json)"
+        f"Total costs: {len(all_new_costs)} ({len(new_costs)} from litellm, {len(models_begin_costs)} from modelsBegin.json)"
     )
+
+    new_costs_count = 0
 
     for k, v in all_new_costs.items():
         if k not in costs:
@@ -193,6 +210,7 @@ def main(file_name: str = COST_FILE) -> None:
             # If the new cost is different from the last cost, we store it
             costs[k][-1]["input"] != v["input"] or costs[k][-1]["output"] != v["output"]
         ):
+            new_costs_count += 1
             # We store up to 3 historical costs for each model
             if len(costs[k]) < HISTORICAL_COSTS:
                 costs[k].append(v)
@@ -208,7 +226,9 @@ def main(file_name: str = COST_FILE) -> None:
     except Exception as e:
         print("Failed to write updated costs to file:", e)
 
-    print(sum_costs(costs), "costs written to", file_path)
+    print(
+        f"{new_costs_count} new costs written to {file_path} ({sum_costs(costs)} total costs)"
+    )
 
 
 if __name__ == "__main__":
