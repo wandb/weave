@@ -1,51 +1,37 @@
-"""Display abstraction layer that can dispatch to rich or standard print.
+"""Display abstraction layer with pluggable viewer system.
 
-This module provides a unified interface for display operations, automatically
-falling back to standard print functions when rich is not available.
+This module provides a unified interface for display operations with
+a pluggable viewer system that allows users to configure their preferred
+display method (rich, print, logger, etc.).
 """
 
 from __future__ import annotations
 
 import sys
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Optional, Union
+from enum import Enum
+from typing import Any, Dict, Optional, Type, Union
 
-# Try to import rich components, but make them optional
-try:
-    from rich.console import Console as RichConsole
-    from rich.padding import Padding
-    from rich.progress import (
-        BarColumn,
-        SpinnerColumn,
-        TaskProgressColumn,
-        TextColumn,
-        TimeElapsedColumn,
-    )
-    from rich.progress import (
-        Progress as RichProgress,
-    )
-    from rich.syntax import Syntax
-    from rich.table import Table as RichTable
-    from rich.text import Text as RichText
+# Global viewer registry and configuration
+_viewer_registry: Dict[str, Type[BaseViewer]] = {}
+_current_viewer: Optional[BaseViewer] = None
+_default_viewer_name = "auto"  # Will try rich first, then fallback to print
 
-    RICH_AVAILABLE = True
-except ImportError:
-    RICH_AVAILABLE = False
-    # Create dummy types for type checking
-    RichConsole = Any
-    RichProgress = Any
-    RichTable = Any
-    RichText = Any
-    Syntax = Any
-    Padding = Any
+
+class ViewerType(Enum):
+    """Enumeration of available viewer types."""
+
+    RICH = "rich"
+    PRINT = "print"
+    AUTO = "auto"
 
 
 @dataclass
 class Style:
     """Style configuration for console output.
 
-    When rich is available, these map to rich styles.
-    When rich is not available, they are ignored or mapped to basic ANSI codes.
+    Used by viewers to apply styling to text output.
     """
 
     color: Optional[str] = None
@@ -53,24 +39,8 @@ class Style:
     italic: bool = False
     underline: bool = False
 
-    def to_rich_style(self) -> str:
-        """Convert to rich style string."""
-        if not RICH_AVAILABLE:
-            return ""
-
-        parts = []
-        if self.color:
-            parts.append(self.color)
-        if self.bold:
-            parts.append("bold")
-        if self.italic:
-            parts.append("italic")
-        if self.underline:
-            parts.append("underline")
-        return " ".join(parts)
-
     def to_ansi(self, text: str) -> str:
-        """Apply basic ANSI codes to text (fallback when rich is not available)."""
+        """Apply basic ANSI codes to text (fallback for non-rich viewers)."""
         if not any([self.color, self.bold, self.italic, self.underline]):
             return text
 
@@ -101,38 +71,25 @@ class Style:
         return text
 
 
-class Console:
-    """Console abstraction that dispatches to rich.Console or standard print.
+class BaseViewer(ABC):
+    """Abstract base class for display viewers.
 
-    This class provides a unified interface for console output operations,
-    automatically falling back to standard print when rich is not available.
+    All viewer implementations must inherit from this class and implement
+    the required display methods.
     """
 
-    def __init__(
-        self,
-        file: Any = None,
-        force_terminal: Optional[bool] = None,
-        emoji: bool = True,
-        **kwargs: Any,
-    ):
-        """Initialize the console.
+    def __init__(self, file: Any = None, emoji: bool = True, **kwargs: Any):
+        """Initialize the viewer.
 
         Args:
             file: Output file stream (defaults to stdout).
-            force_terminal: Force terminal mode.
             emoji: Enable emoji support.
-            **kwargs: Additional arguments passed to rich.Console if available.
+            **kwargs: Additional viewer-specific arguments.
         """
         self._file = file or sys.stdout
         self._emoji = emoji
 
-        if RICH_AVAILABLE:
-            self._rich_console: Optional[RichConsole] = RichConsole(
-                file=file, force_terminal=force_terminal, emoji=emoji, **kwargs
-            )
-        else:
-            self._rich_console = None
-
+    @abstractmethod
     def print(
         self,
         *objects: Any,
@@ -141,80 +98,150 @@ class Console:
         style: Optional[Union[str, Style]] = None,
         **kwargs: Any,
     ) -> None:
-        """Print to the console with optional styling.
+        """Print to the output with optional styling."""
+        pass
 
-        Args:
-            *objects: Objects to print.
-            sep: Separator between objects.
-            end: String to append after.
-            style: Style to apply (ignored if rich is not available).
-            **kwargs: Additional arguments passed to rich.print if available.
-        """
-        if self._rich_console:
-            # Convert Style to rich style string
-            if isinstance(style, Style):
-                kwargs["style"] = style.to_rich_style()
-            elif style:
-                kwargs["style"] = style
-
-            self._rich_console.print(*objects, sep=sep, end=end, **kwargs)
-        else:
-            # Fallback to standard print
-            output = sep.join(str(obj) for obj in objects)
-
-            # Apply basic ANSI styling if Style object provided
-            if isinstance(style, Style):
-                output = style.to_ansi(output)
-
-            print(output, end=end, file=self._file)
-
+    @abstractmethod
     def rule(self, title: str = "", style: Optional[Union[str, Style]] = None) -> None:
-        """Print a horizontal rule.
+        """Print a horizontal rule."""
+        pass
 
-        Args:
-            title: Optional title for the rule.
-            style: Style to apply.
-        """
-        if self._rich_console:
-            if isinstance(style, Style):
-                style = style.to_rich_style()
-            self._rich_console.rule(title, style=style)
-        else:
-            # Simple fallback rule
-            width = 80  # Default width
-            if title:
-                padding = (width - len(title) - 2) // 2
-                rule = "─" * padding + f" {title} " + "─" * padding
-            else:
-                rule = "─" * width
-
-            if isinstance(style, Style):
-                rule = style.to_ansi(rule)
-
-            print(rule, file=self._file)
-
+    @abstractmethod
     def clear(self) -> None:
-        """Clear the console."""
-        if self._rich_console:
-            self._rich_console.clear()
-        else:
-            # ANSI clear screen
-            print("\033[2J\033[H", end="", file=self._file)
+        """Clear the display."""
+        pass
 
+    @abstractmethod
+    def create_table(
+        self, title: Optional[str] = None, show_header: bool = True, **kwargs: Any
+    ) -> TableInterface:
+        """Create a table object."""
+        pass
+
+    @abstractmethod
+    def create_progress(
+        self, console: Optional[Console] = None, **kwargs: Any
+    ) -> ProgressInterface:
+        """Create a progress bar object."""
+        pass
+
+    @abstractmethod
+    def create_syntax(
+        self,
+        code: str,
+        lexer: str,
+        theme: str = "ansi_dark",
+        line_numbers: bool = False,
+    ) -> SyntaxInterface:
+        """Create a syntax highlighting object."""
+        pass
+
+    @abstractmethod
+    def create_text(
+        self, text: str = "", style: Optional[Union[str, Style]] = None
+    ) -> TextInterface:
+        """Create a styled text object."""
+        pass
+
+    @abstractmethod
+    def indent(self, content: str, amount: int) -> str:
+        """Indent content by the specified amount."""
+        pass
+
+    @abstractmethod
     def capture(self) -> CaptureContext:
-        """Capture console output.
+        """Create a capture context for capturing output."""
+        pass
 
-        Returns:
-            A context manager for capturing output.
-        """
-        if self._rich_console:
-            return self._rich_console.capture()
-        else:
-            return CaptureContext()
+
+# Interface classes for display objects
+class TableInterface(ABC):
+    """Interface for table objects."""
+
+    @abstractmethod
+    def add_column(
+        self,
+        header: str,
+        justify: str = "left",
+        style: Optional[str] = None,
+        **kwargs: Any,
+    ) -> None:
+        """Add a column to the table."""
+        pass
+
+    @abstractmethod
+    def add_row(self, *values: Any) -> None:
+        """Add a row to the table."""
+        pass
+
+    @abstractmethod
+    def to_string(self, console: Optional[Console] = None) -> str:
+        """Convert the table to a string."""
+        pass
+
+
+class ProgressInterface(ABC):
+    """Interface for progress bar objects."""
+
+    @abstractmethod
+    def add_task(
+        self, description: str, total: Optional[float] = None, **kwargs: Any
+    ) -> int:
+        """Add a task to the progress bar."""
+        pass
+
+    @abstractmethod
+    def update(
+        self,
+        task_id: int,
+        advance: Optional[float] = None,
+        completed: Optional[float] = None,
+        total: Optional[float] = None,
+        **kwargs: Any,
+    ) -> None:
+        """Update a task's progress."""
+        pass
+
+    @abstractmethod
+    def start(self) -> None:
+        """Start the progress bar."""
+        pass
+
+    @abstractmethod
+    def stop(self) -> None:
+        """Stop the progress bar."""
+        pass
+
+    def __enter__(self):
+        """Context manager entry."""
+        self.start()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit."""
+        self.stop()
+
+
+class SyntaxInterface(ABC):
+    """Interface for syntax highlighting objects."""
+
+    @abstractmethod
+    def to_string(self, console: Optional[Console] = None) -> str:
+        """Convert to string representation."""
+        pass
+
+
+class TextInterface(ABC):
+    """Interface for styled text objects."""
+
+    @abstractmethod
+    def __str__(self) -> str:
+        """Get string representation."""
+        pass
 
 
 class CaptureContext:
-    """Context manager for capturing console output (fallback implementation)."""
+    """Context manager for capturing output."""
 
     def __init__(self):
         self._original_stdout = None
@@ -238,80 +265,101 @@ class CaptureContext:
         return ""
 
 
-class Text:
-    """Text abstraction that can use rich.Text or plain strings.
-
-    This class provides styled text functionality, falling back to
-    plain strings with optional ANSI codes when rich is not available.
-    """
-
-    def __init__(self, text: str = "", style: Optional[Union[str, Style]] = None):
-        """Initialize the text object.
-
-        Args:
-            text: The text content.
-            style: Style to apply to the text.
-        """
-        self._text = text
-        self._style = style
-
-        if RICH_AVAILABLE and RichText:
-            if isinstance(style, Style):
-                style = style.to_rich_style()
-            self._rich_text: Optional[RichText] = RichText(text, style=style)
-        else:
-            self._rich_text = None
-
-    def __str__(self) -> str:
-        """Get string representation."""
-        if self._rich_text:
-            return str(self._rich_text)
-        elif isinstance(self._style, Style):
-            return self._style.to_ansi(self._text)
-        else:
-            return self._text
-
-    def __repr__(self) -> str:
-        """Get repr string."""
-        return f"Text({self._text!r}, style={self._style!r})"
-
-
-class Table:
-    """Table abstraction that can use rich.Table or format as plain text.
-
-    This class provides table functionality, falling back to simple
-    text-based table formatting when rich is not available.
-    """
+# Rich viewer implementation
+class RichViewer(BaseViewer):
+    """Viewer implementation using the rich library."""
 
     def __init__(
         self,
-        title: Optional[str] = None,
-        show_header: bool = True,
-        header_style: Optional[str] = None,
+        file: Any = None,
+        emoji: bool = True,
+        force_terminal: Optional[bool] = None,
         **kwargs: Any,
     ):
-        """Initialize the table.
+        super().__init__(file=file, emoji=emoji, **kwargs)
+        from rich.console import Console as RichConsole
 
-        Args:
-            title: Optional table title.
-            show_header: Whether to show column headers.
-            header_style: Style for headers (rich only).
-            **kwargs: Additional arguments for rich.Table.
-        """
-        self.title = title
-        self.show_header = show_header
-        self._columns: list[dict[str, Any]] = []
-        self._rows: list[list[str]] = []
+        self._console = RichConsole(
+            file=file, force_terminal=force_terminal, emoji=emoji, **kwargs
+        )
 
-        if RICH_AVAILABLE and RichTable:
-            self._rich_table: Optional[RichTable] = RichTable(
-                title=title,
-                show_header=show_header,
-                header_style=header_style,
-                **kwargs,
-            )
-        else:
-            self._rich_table = None
+    def print(
+        self,
+        *objects: Any,
+        sep: str = " ",
+        end: str = "\n",
+        style: Optional[Union[str, Style]] = None,
+        **kwargs: Any,
+    ) -> None:
+        if isinstance(style, Style):
+            kwargs["style"] = self._style_to_rich(style)
+        elif style:
+            kwargs["style"] = style
+        self._console.print(*objects, sep=sep, end=end, **kwargs)
+
+    def rule(self, title: str = "", style: Optional[Union[str, Style]] = None) -> None:
+        if isinstance(style, Style):
+            style = self._style_to_rich(style)
+        self._console.rule(title, style=style)
+
+    def clear(self) -> None:
+        self._console.clear()
+
+    def create_table(
+        self, title: Optional[str] = None, show_header: bool = True, **kwargs: Any
+    ) -> TableInterface:
+        return RichTable(title=title, show_header=show_header, **kwargs)
+
+    def create_progress(
+        self, console: Optional[Console] = None, **kwargs: Any
+    ) -> ProgressInterface:
+        return RichProgress(console=self._console, **kwargs)
+
+    def create_syntax(
+        self,
+        code: str,
+        lexer: str,
+        theme: str = "ansi_dark",
+        line_numbers: bool = False,
+    ) -> SyntaxInterface:
+        return RichSyntax(code, lexer, theme=theme, line_numbers=line_numbers)
+
+    def create_text(
+        self, text: str = "", style: Optional[Union[str, Style]] = None
+    ) -> TextInterface:
+        return RichText(text, style=style)
+
+    def indent(self, content: str, amount: int) -> str:
+        from rich.padding import Padding
+
+        return Padding.indent(content, amount)
+
+    def capture(self) -> CaptureContext:
+        return self._console.capture()
+
+    def _style_to_rich(self, style: Style) -> str:
+        """Convert Style object to rich style string."""
+        parts = []
+        if style.color:
+            parts.append(style.color)
+        if style.bold:
+            parts.append("bold")
+        if style.italic:
+            parts.append("italic")
+        if style.underline:
+            parts.append("underline")
+        return " ".join(parts)
+
+
+class RichTable(TableInterface):
+    """Rich table implementation."""
+
+    def __init__(
+        self, title: Optional[str] = None, show_header: bool = True, **kwargs: Any
+    ):
+        from rich.table import Table as RichTableBase
+
+        self._table = RichTableBase(title=title, show_header=show_header, **kwargs)
 
     def add_column(
         self,
@@ -320,55 +368,228 @@ class Table:
         style: Optional[str] = None,
         **kwargs: Any,
     ) -> None:
-        """Add a column to the table.
-
-        Args:
-            header: Column header text.
-            justify: Column justification (left, right, center).
-            style: Column style (rich only).
-            **kwargs: Additional arguments for rich.Table.add_column.
-        """
-        self._columns.append(
-            {
-                "header": header,
-                "justify": justify,
-                "style": style,
-            }
-        )
-
-        if self._rich_table:
-            self._rich_table.add_column(header, justify=justify, style=style, **kwargs)
+        self._table.add_column(header, justify=justify, style=style, **kwargs)
 
     def add_row(self, *values: Any) -> None:
-        """Add a row to the table.
-
-        Args:
-            *values: Values for each column in the row.
-        """
-        self._rows.append([str(v) for v in values])
-
-        if self._rich_table:
-            self._rich_table.add_row(*values)
+        self._table.add_row(*values)
 
     def to_string(self, console: Optional[Console] = None) -> str:
-        """Convert the table to a string.
-
-        Args:
-            console: Console to use for rendering (rich only).
-
-        Returns:
-            String representation of the table.
-        """
-        if self._rich_table and console and console._rich_console:
-            with console.capture() as capture:
-                console.print(self._rich_table)
+        if (
+            console
+            and hasattr(console, "_viewer")
+            and isinstance(console._viewer, RichViewer)
+        ):
+            with console._viewer._console.capture() as capture:
+                console._viewer._console.print(self._table)
             return capture.get().strip()
         else:
-            # Fallback to simple text table
-            return self._format_text_table()
+            # Fallback to basic string representation
+            from rich.console import Console as RichConsole
 
-    def _format_text_table(self) -> str:
-        """Format table as plain text."""
+            temp_console = RichConsole()
+            with temp_console.capture() as capture:
+                temp_console.print(self._table)
+            return capture.get().strip()
+
+
+class RichProgress(ProgressInterface):
+    """Rich progress bar implementation."""
+
+    def __init__(self, console: Any, **kwargs: Any):
+        from rich.progress import (
+            BarColumn,
+            Progress,
+            SpinnerColumn,
+            TaskProgressColumn,
+            TextColumn,
+            TimeElapsedColumn,
+        )
+
+        # Default columns if not specified
+        columns = kwargs.pop("columns", None)
+        if not columns:
+            columns = (
+                SpinnerColumn(),
+                TextColumn("[bold blue]{task.description}"),
+                BarColumn(),
+                TaskProgressColumn(),
+                TimeElapsedColumn(),
+            )
+
+        self._progress = Progress(*columns, console=console, **kwargs)
+
+    def add_task(
+        self, description: str, total: Optional[float] = None, **kwargs: Any
+    ) -> int:
+        return self._progress.add_task(description, total=total, **kwargs)
+
+    def update(
+        self,
+        task_id: int,
+        advance: Optional[float] = None,
+        completed: Optional[float] = None,
+        total: Optional[float] = None,
+        **kwargs: Any,
+    ) -> None:
+        self._progress.update(
+            task_id, advance=advance, completed=completed, total=total, **kwargs
+        )
+
+    def start(self) -> None:
+        self._progress.start()
+
+    def stop(self) -> None:
+        self._progress.stop()
+
+
+class RichSyntax(SyntaxInterface):
+    """Rich syntax highlighting implementation."""
+
+    def __init__(
+        self,
+        code: str,
+        lexer: str,
+        theme: str = "ansi_dark",
+        line_numbers: bool = False,
+    ):
+        from rich.syntax import Syntax
+
+        self._syntax = Syntax(code, lexer, theme=theme, line_numbers=line_numbers)
+
+    def to_string(self, console: Optional[Console] = None) -> str:
+        if (
+            console
+            and hasattr(console, "_viewer")
+            and isinstance(console._viewer, RichViewer)
+        ):
+            with console._viewer._console.capture() as capture:
+                console._viewer._console.print(self._syntax)
+            return capture.get().strip()
+        else:
+            from rich.console import Console as RichConsole
+
+            temp_console = RichConsole()
+            with temp_console.capture() as capture:
+                temp_console.print(self._syntax)
+            return capture.get().strip()
+
+
+class RichText(TextInterface):
+    """Rich text implementation."""
+
+    def __init__(self, text: str = "", style: Optional[Union[str, Style]] = None):
+        from rich.text import Text as RichTextBase
+
+        if isinstance(style, Style):
+            style = self._style_to_rich(style)
+        self._text = RichTextBase(text, style=style)
+
+    def __str__(self) -> str:
+        return str(self._text)
+
+    def _style_to_rich(self, style: Style) -> str:
+        """Convert Style object to rich style string."""
+        parts = []
+        if style.color:
+            parts.append(style.color)
+        if style.bold:
+            parts.append("bold")
+        if style.italic:
+            parts.append("italic")
+        if style.underline:
+            parts.append("underline")
+        return " ".join(parts)
+
+
+# Print viewer implementation (fallback)
+class PrintViewer(BaseViewer):
+    """Viewer implementation using standard print functions."""
+
+    def print(
+        self,
+        *objects: Any,
+        sep: str = " ",
+        end: str = "\n",
+        style: Optional[Union[str, Style]] = None,
+        **kwargs: Any,
+    ) -> None:
+        output = sep.join(str(obj) for obj in objects)
+        if isinstance(style, Style):
+            output = style.to_ansi(output)
+        print(output, end=end, file=self._file)
+
+    def rule(self, title: str = "", style: Optional[Union[str, Style]] = None) -> None:
+        width = 80  # Default width
+        if title:
+            padding = (width - len(title) - 2) // 2
+            rule = "─" * padding + f" {title} " + "─" * padding
+        else:
+            rule = "─" * width
+
+        if isinstance(style, Style):
+            rule = style.to_ansi(rule)
+
+        print(rule, file=self._file)
+
+    def clear(self) -> None:
+        # ANSI clear screen
+        print("\033[2J\033[H", end="", file=self._file)
+
+    def create_table(
+        self, title: Optional[str] = None, show_header: bool = True, **kwargs: Any
+    ) -> TableInterface:
+        return PrintTable(title=title, show_header=show_header)
+
+    def create_progress(
+        self, console: Optional[Console] = None, **kwargs: Any
+    ) -> ProgressInterface:
+        return PrintProgress(console=console)
+
+    def create_syntax(
+        self,
+        code: str,
+        lexer: str,
+        theme: str = "ansi_dark",
+        line_numbers: bool = False,
+    ) -> SyntaxInterface:
+        return PrintSyntax(code, lexer, line_numbers=line_numbers)
+
+    def create_text(
+        self, text: str = "", style: Optional[Union[str, Style]] = None
+    ) -> TextInterface:
+        return PrintText(text, style=style)
+
+    def indent(self, content: str, amount: int) -> str:
+        indent_str = " " * amount
+        lines = content.split("\n")
+        return "\n".join(indent_str + line if line else line for line in lines)
+
+    def capture(self) -> CaptureContext:
+        return CaptureContext()
+
+
+class PrintTable(TableInterface):
+    """Print-based table implementation."""
+
+    def __init__(self, title: Optional[str] = None, show_header: bool = True):
+        self.title = title
+        self.show_header = show_header
+        self._columns: list[dict[str, Any]] = []
+        self._rows: list[list[str]] = []
+
+    def add_column(
+        self,
+        header: str,
+        justify: str = "left",
+        style: Optional[str] = None,
+        **kwargs: Any,
+    ) -> None:
+        self._columns.append({"header": header, "justify": justify, "style": style})
+
+    def add_row(self, *values: Any) -> None:
+        self._rows.append([str(v) for v in values])
+
+    def to_string(self, console: Optional[Console] = None) -> str:
         if not self._columns:
             return ""
 
@@ -424,79 +645,26 @@ class Table:
         return "\n".join(lines)
 
 
-class Progress:
-    """Progress bar abstraction that can use rich.Progress or simple text output.
+class PrintProgress(ProgressInterface):
+    """Print-based progress bar implementation."""
 
-    This class provides progress bar functionality, falling back to simple
-    percentage-based progress updates when rich is not available.
-    """
-
-    def __init__(
-        self,
-        *columns: Any,
-        console: Optional[Console] = None,
-        refresh_per_second: float = 10,
-        **kwargs: Any,
-    ):
-        """Initialize the progress bar.
-
-        Args:
-            *columns: Progress bar columns (rich only).
-            console: Console to use for output.
-            refresh_per_second: Refresh rate (rich only).
-            **kwargs: Additional arguments for rich.Progress.
-        """
-        self.console = console or Console()
+    def __init__(self, console: Optional[Console] = None):
+        self.console = console or get_console()
         self._tasks: dict[int, dict[str, Any]] = {}
         self._next_task_id = 0
-
-        if RICH_AVAILABLE and RichProgress:
-            # If no columns specified, use defaults
-            if not columns:
-                columns = (
-                    SpinnerColumn(),
-                    TextColumn("[bold blue]{task.description}"),
-                    BarColumn(),
-                    TaskProgressColumn(),
-                    TimeElapsedColumn(),
-                )
-
-            self._rich_progress: Optional[RichProgress] = RichProgress(
-                *columns,
-                console=console._rich_console
-                if console and console._rich_console
-                else None,
-                refresh_per_second=refresh_per_second,
-                **kwargs,
-            )
-        else:
-            self._rich_progress = None
 
     def add_task(
         self, description: str, total: Optional[float] = None, **kwargs: Any
     ) -> int:
-        """Add a task to the progress bar.
-
-        Args:
-            description: Task description.
-            total: Total number of steps.
-            **kwargs: Additional arguments for rich.Progress.add_task.
-
-        Returns:
-            Task ID.
-        """
-        if self._rich_progress:
-            return self._rich_progress.add_task(description, total=total, **kwargs)
-        else:
-            task_id = self._next_task_id
-            self._next_task_id += 1
-            self._tasks[task_id] = {
-                "description": description,
-                "total": total or 100,
-                "completed": 0,
-            }
-            self._print_progress(task_id)
-            return task_id
+        task_id = self._next_task_id
+        self._next_task_id += 1
+        self._tasks[task_id] = {
+            "description": description,
+            "total": total or 100,
+            "completed": 0,
+        }
+        self._print_progress(task_id)
+        return task_id
 
     def update(
         self,
@@ -506,51 +674,25 @@ class Progress:
         total: Optional[float] = None,
         **kwargs: Any,
     ) -> None:
-        """Update a task's progress.
-
-        Args:
-            task_id: ID of the task to update.
-            advance: Amount to advance the progress.
-            completed: Set the completed amount directly.
-            total: Update the total amount.
-            **kwargs: Additional arguments for rich.Progress.update.
-        """
-        if self._rich_progress:
-            self._rich_progress.update(
-                task_id, advance=advance, completed=completed, total=total, **kwargs
-            )
-        else:
-            if task_id in self._tasks:
-                task = self._tasks[task_id]
-                if total is not None:
-                    task["total"] = total
-                if completed is not None:
-                    task["completed"] = completed
-                if advance is not None:
-                    task["completed"] += advance
-                self._print_progress(task_id)
+        if task_id in self._tasks:
+            task = self._tasks[task_id]
+            if total is not None:
+                task["total"] = total
+            if completed is not None:
+                task["completed"] = completed
+            if advance is not None:
+                task["completed"] += advance
+            self._print_progress(task_id)
 
     def start(self) -> None:
-        """Start the progress bar."""
-        if self._rich_progress:
-            self._rich_progress.start()
+        pass  # No-op for print viewer
 
     def stop(self) -> None:
-        """Stop the progress bar."""
-        if self._rich_progress:
-            self._rich_progress.stop()
-        else:
-            # Print final state for all tasks
-            for task_id in self._tasks:
-                self._print_progress(task_id, final=True)
+        # Print final state for all tasks
+        for task_id in self._tasks:
+            self._print_progress(task_id, final=True)
 
     def _print_progress(self, task_id: int, final: bool = False) -> None:
-        """Print progress for text-based fallback.
-
-        Args:
-            task_id: Task ID to print progress for.
-            final: Whether this is the final update.
-        """
         if task_id not in self._tasks:
             return
 
@@ -565,21 +707,257 @@ class Progress:
             f"({task['completed']}/{task['total']})"
         )
 
+
+class PrintSyntax(SyntaxInterface):
+    """Print-based syntax highlighting implementation."""
+
+    def __init__(self, code: str, lexer: str, line_numbers: bool = False):
+        self.code = code
+        self.line_numbers = line_numbers
+
+    def to_string(self, console: Optional[Console] = None) -> str:
+        if self.line_numbers:
+            lines = self.code.split("\n")
+            width = len(str(len(lines)))
+            numbered_lines = [
+                f"{i + 1:>{width}} | {line}" for i, line in enumerate(lines)
+            ]
+            return "\n".join(numbered_lines)
+        return self.code
+
+
+class PrintText(TextInterface):
+    """Print-based text implementation."""
+
+    def __init__(self, text: str = "", style: Optional[Union[str, Style]] = None):
+        self._text = text
+        self._style = style
+
+    def __str__(self) -> str:
+        if isinstance(self._style, Style):
+            return self._style.to_ansi(self._text)
+        return self._text
+
+    def __repr__(self) -> str:
+        return f"Text({self._text!r}, style={self._style!r})"
+
+
+# Viewer registration and configuration
+def register_viewer(name: str, viewer_class: Type[BaseViewer]) -> None:
+    """Register a viewer implementation.
+
+    Args:
+        name: Name of the viewer (e.g., "rich", "print", "logger").
+        viewer_class: The viewer class to register.
+    """
+    _viewer_registry[name] = viewer_class
+
+
+def set_viewer(name: str, **kwargs: Any) -> None:
+    """Set the current viewer by name.
+
+    Args:
+        name: Name of the viewer to use.
+        **kwargs: Additional arguments to pass to the viewer constructor.
+    """
+    global _current_viewer
+
+    if name == "auto":
+        # Auto-detect: try rich first, fallback to print
+        try:
+            _current_viewer = _create_rich_viewer(**kwargs)
+        except ImportError:
+            _current_viewer = PrintViewer(**kwargs)
+    elif name in _viewer_registry:
+        _current_viewer = _viewer_registry[name](**kwargs)
+    else:
+        raise ValueError(f"Unknown viewer: {name}")
+
+
+def get_viewer() -> BaseViewer:
+    """Get the current viewer instance.
+
+    Returns:
+        The current viewer instance.
+    """
+    global _current_viewer
+
+    if _current_viewer is None:
+        set_viewer(_default_viewer_name)
+
+    return _current_viewer
+
+
+def _create_rich_viewer(**kwargs: Any) -> RichViewer:
+    """Create a rich viewer, raising ImportError if rich is not available."""
+    try:
+        import rich  # noqa: F401
+
+        return RichViewer(**kwargs)
+    except ImportError:
+        raise ImportError("Rich library is not available")
+
+
+# Register default viewers
+register_viewer("rich", RichViewer)
+register_viewer("print", PrintViewer)
+
+
+# Public API classes that delegate to the viewer
+class Console:
+    """Console abstraction that delegates to the configured viewer.
+
+    This class provides a unified interface for console output operations,
+    using the configured viewer for actual display operations.
+    """
+
+    def __init__(
+        self,
+        file: Any = None,
+        force_terminal: Optional[bool] = None,
+        emoji: bool = True,
+        viewer: Optional[str] = None,
+        **kwargs: Any,
+    ):
+        """Initialize the console.
+
+        Args:
+            file: Output file stream (defaults to stdout).
+            force_terminal: Force terminal mode.
+            emoji: Enable emoji support.
+            viewer: Specific viewer to use (overrides global setting).
+            **kwargs: Additional arguments passed to the viewer.
+        """
+        if viewer:
+            # Create a specific viewer for this console
+            if viewer == "auto":
+                try:
+                    self._viewer = _create_rich_viewer(
+                        file=file, emoji=emoji, force_terminal=force_terminal, **kwargs
+                    )
+                except ImportError:
+                    self._viewer = PrintViewer(file=file, emoji=emoji, **kwargs)
+            elif viewer in _viewer_registry:
+                self._viewer = _viewer_registry[viewer](
+                    file=file, emoji=emoji, **kwargs
+                )
+            else:
+                raise ValueError(f"Unknown viewer: {viewer}")
+        else:
+            # Use the global viewer
+            self._viewer = get_viewer()
+
+    def print(
+        self,
+        *objects: Any,
+        sep: str = " ",
+        end: str = "\n",
+        style: Optional[Union[str, Style]] = None,
+        **kwargs: Any,
+    ) -> None:
+        """Print to the console with optional styling."""
+        self._viewer.print(*objects, sep=sep, end=end, style=style, **kwargs)
+
+    def rule(self, title: str = "", style: Optional[Union[str, Style]] = None) -> None:
+        """Print a horizontal rule."""
+        self._viewer.rule(title, style=style)
+
+    def clear(self) -> None:
+        """Clear the console."""
+        self._viewer.clear()
+
+    def capture(self) -> CaptureContext:
+        """Capture console output."""
+        return self._viewer.capture()
+
+
+class Table:
+    """Table abstraction that delegates to the configured viewer."""
+
+    def __init__(
+        self,
+        title: Optional[str] = None,
+        show_header: bool = True,
+        header_style: Optional[str] = None,
+        **kwargs: Any,
+    ):
+        """Initialize the table."""
+        viewer = get_viewer()
+        self._table = viewer.create_table(
+            title=title, show_header=show_header, **kwargs
+        )
+
+    def add_column(
+        self,
+        header: str,
+        justify: str = "left",
+        style: Optional[str] = None,
+        **kwargs: Any,
+    ) -> None:
+        """Add a column to the table."""
+        self._table.add_column(header, justify=justify, style=style, **kwargs)
+
+    def add_row(self, *values: Any) -> None:
+        """Add a row to the table."""
+        self._table.add_row(*values)
+
+    def to_string(self, console: Optional[Console] = None) -> str:
+        """Convert the table to a string."""
+        return self._table.to_string(console)
+
+
+class Progress:
+    """Progress bar abstraction that delegates to the configured viewer."""
+
+    def __init__(
+        self,
+        *columns: Any,
+        console: Optional[Console] = None,
+        refresh_per_second: float = 10,
+        **kwargs: Any,
+    ):
+        """Initialize the progress bar."""
+        viewer = get_viewer()
+        self._progress = viewer.create_progress(console=console, **kwargs)
+
+    def add_task(
+        self, description: str, total: Optional[float] = None, **kwargs: Any
+    ) -> int:
+        """Add a task to the progress bar."""
+        return self._progress.add_task(description, total=total, **kwargs)
+
+    def update(
+        self,
+        task_id: int,
+        advance: Optional[float] = None,
+        completed: Optional[float] = None,
+        total: Optional[float] = None,
+        **kwargs: Any,
+    ) -> None:
+        """Update a task's progress."""
+        self._progress.update(
+            task_id, advance=advance, completed=completed, total=total, **kwargs
+        )
+
+    def start(self) -> None:
+        """Start the progress bar."""
+        self._progress.start()
+
+    def stop(self) -> None:
+        """Stop the progress bar."""
+        self._progress.stop()
+
     def __enter__(self):
         """Context manager entry."""
-        self.start()
-        return self
+        return self._progress.__enter__()
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Context manager exit."""
-        self.stop()
+        return self._progress.__exit__(exc_type, exc_val, exc_tb)
 
 
 class SyntaxHighlight:
-    """Syntax highlighting abstraction.
-
-    Uses rich.Syntax when available, falls back to plain text.
-    """
+    """Syntax highlighting abstraction that delegates to the configured viewer."""
 
     def __init__(
         self,
@@ -588,74 +966,52 @@ class SyntaxHighlight:
         theme: str = "ansi_dark",
         line_numbers: bool = False,
     ):
-        """Initialize syntax highlighting.
-
-        Args:
-            code: Code to highlight.
-            lexer: Language/lexer name.
-            theme: Color theme (rich only).
-            line_numbers: Whether to show line numbers.
-        """
-        self.code = code
-        self.lexer = lexer
-        self.line_numbers = line_numbers
-
-        if RICH_AVAILABLE and Syntax:
-            self._rich_syntax: Optional[Syntax] = Syntax(
-                code, lexer, theme=theme, line_numbers=line_numbers
-            )
-        else:
-            self._rich_syntax = None
+        """Initialize syntax highlighting."""
+        viewer = get_viewer()
+        self._syntax = viewer.create_syntax(
+            code, lexer, theme=theme, line_numbers=line_numbers
+        )
 
     def to_string(self, console: Optional[Console] = None) -> str:
-        """Convert to string representation.
+        """Convert to string representation."""
+        return self._syntax.to_string(console)
 
-        Args:
-            console: Console to use for rendering.
 
-        Returns:
-            Highlighted code string.
-        """
-        if self._rich_syntax and console and console._rich_console:
-            with console.capture() as capture:
-                console.print(self._rich_syntax)
-            return capture.get().strip()
-        else:
-            # Fallback: plain text with optional line numbers
-            if self.line_numbers:
-                lines = self.code.split("\n")
-                width = len(str(len(lines)))
-                numbered_lines = [
-                    f"{i + 1:>{width}} | {line}" for i, line in enumerate(lines)
-                ]
-                return "\n".join(numbered_lines)
-            return self.code
+class Text:
+    """Text abstraction that delegates to the configured viewer."""
+
+    def __init__(self, text: str = "", style: Optional[Union[str, Style]] = None):
+        """Initialize the text object."""
+        viewer = get_viewer()
+        self._text_obj = viewer.create_text(text, style=style)
+
+    def __str__(self) -> str:
+        """Get string representation."""
+        return str(self._text_obj)
+
+    def __repr__(self) -> str:
+        """Get repr string."""
+        return (
+            repr(self._text_obj)
+            if hasattr(self._text_obj, "__repr__")
+            else str(self._text_obj)
+        )
 
 
 class PaddingWrapper:
-    """Padding abstraction for indenting content.
-
-    Uses rich.Padding when available, falls back to manual indentation.
-    """
+    """Padding abstraction for indenting content."""
 
     @staticmethod
     def indent(content: str, amount: int) -> str:
-        """Indent content by the specified amount.
+        """Indent content by the specified amount."""
+        viewer = get_viewer()
+        return viewer.indent(content, amount)
 
-        Args:
-            content: Content to indent.
-            amount: Number of spaces to indent.
 
-        Returns:
-            Indented content.
-        """
-        if RICH_AVAILABLE and Padding:
-            return Padding.indent(content, amount)
-        else:
-            # Manual indentation
-            indent_str = " " * amount
-            lines = content.split("\n")
-            return "\n".join(indent_str + line if line else line for line in lines)
+# Helper function for getting console instance
+def get_console() -> Console:
+    """Get the default console instance."""
+    return console
 
 
 # Create default console instance
