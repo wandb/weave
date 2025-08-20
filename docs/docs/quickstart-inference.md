@@ -235,7 +235,6 @@ For a complete list of available models with specifications, context windows, pr
 
 ## Next steps
 
-After completing this guide:
 
 - **Use the Playground**: [Try models interactively](guides/tools/playground.md#access-the-playground) in the Weave Playground
 - **Build evaluations**: Learn about [systematic evaluation](guides/core-types/evaluations.md) of your LLM applications
