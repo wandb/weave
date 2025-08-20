@@ -12,7 +12,7 @@ Full Weave `together` python package support is currently in development
 
 While full Weave support for the `together` python package is currently in development, Together supports the OpenAI SDK compatibility ([docs](https://docs.together.ai/docs/openai-api-compatibility)) which Weave automatically detects and integrates with.
 
-To switch to using the Together API, simply switch out the API key to your [Together API](https://docs.together.ai/docs/get-started#access-your-api-key) key, `base_url` to `https://api.together.xyz/v1`, and model to one of their [chat models](https://docs.together.ai/docs/inference-models#chat-models). When you call `weave.init()`, provide a project name for your traces. <DefaultEntityNote variant="inline" />
+To switch to using the Together API, replace the API key with your [Together API](https://docs.together.ai/docs/get-started#access-your-api-key) key, set `base_url` to `https://api.together.xyz/v1`, and set the model to one of their [chat models](https://docs.together.ai/docs/inference-models#chat-models). When you call `weave.init()`, provide a project name for your traces. <DefaultEntityNote variant="inline" />
 
 ```python
 import os

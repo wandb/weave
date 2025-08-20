@@ -8,7 +8,7 @@ Weave automatically tracks and logs LLM calls made via the [Cerebras Cloud SDK](
 
 Tracking LLM calls is crucial for debugging and performance monitoring. Weave helps you do this by automatically capturing traces for the Cerebras Cloud SDK.
 
-Here's an example of how to use Weave with Cerebras:
+Here's an example of how to use Weave with Cerebras. This example specifies the `cerebras_speedster` project:
 
 ```python
 import os
