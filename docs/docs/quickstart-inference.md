@@ -219,8 +219,6 @@ In the Weave UI, you can:
 - Analyze latency and performance metrics
 - Compare different runs
 
-![Weave Traces View](guides/tools/imgs/image.png)
-
 ## Available models
 
 For a complete list of available models, see the [Available Models section](https://docs.wandb.ai/guides/inference/models/) in the W&B Inference reference documentation.
