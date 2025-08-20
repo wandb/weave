@@ -21,7 +21,7 @@ You need to install CrewAI ([more details](https://docs.crewai.com/installation)
 pip install crewai weave
 ```
 
-Now we will create a CrewAI Crew and trace the execution using Weave. To get started, simply call `weave.init()` at the beginning of your script. The argument in `weave.init()` is a project name where the traces will be logged. <DefaultEntityNote />
+Now we will create a CrewAI Crew and trace the execution using Weave. To get started, call `weave.init()` at the beginning of your script. The argument in `weave.init()` is a project name where the traces will be logged. <DefaultEntityNote />
 
 ```python
 import weave

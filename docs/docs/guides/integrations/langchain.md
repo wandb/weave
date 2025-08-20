@@ -15,7 +15,7 @@ Weave simplifies this process by automatically capturing traces for your [LangCh
 
 ## Getting Started
 
-To get started, simply call `weave.init()` at the beginning of your script. The argument in weave.init() is a project name that will help you organize your traces. <DefaultEntityNote />
+To get started, call `weave.init()` at the beginning of your script. The argument in weave.init() is a project name that will help you organize your traces. <DefaultEntityNote />
 
 ```python
 import weave

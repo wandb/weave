@@ -14,7 +14,7 @@ Weave simplifies this process by automatically capturing traces for your [Verdic
 
 ## Getting Started
 
-To get started, simply call `weave.init(project=...)` at the beginning of your script. Use the `project` argument to log to a specific W&B Team name with `team-name/project-name`.
+To get started, call `weave.init(project=...)` at the beginning of your script. Use the `project` argument to log to a specific W&B Team name with `team-name/project-name`.
 
 ```python
 import weave

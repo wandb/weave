@@ -6,7 +6,7 @@ Many developers download and run open source models like LLama-3, Mixtral, Gemma
 
 ## Wrap local model functions with `@weave.op()`
 
-You can easily integrate Weave with any LLM yourself simply by initializing Weave with `weave.init('<your-project-name>')` and then wrapping the calls to your LLMs with `weave.op()`. See our guide on [tracing](/guides/tracking/tracing) for more details.
+You can integrate Weave with any LLM yourself by initializing Weave with `weave.init('<your-project-name>')` and then wrapping the calls to your LLMs with `weave.op()`. See our guide on [tracing](/guides/tracking/tracing) for more details.
 
 <DefaultEntityNote />
 
