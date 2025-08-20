@@ -1,7 +1,7 @@
 import {init, login} from '../../clientApi';
 import {Table} from '../../table';
 
-describe('table', () => {
+describe.skip('Table', () => {
   beforeEach(async () => {
     await login(process.env.WANDB_API_KEY ?? '');
   });

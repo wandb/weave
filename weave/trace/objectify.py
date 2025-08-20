@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Protocol, TypeVar, runtime_checkable
 
+from weave.trace.ref_util import set_ref
+
 if TYPE_CHECKING:
-    from weave.flow.obj import Object
+    from weave.object.obj import Object
     from weave.trace.vals import WeaveObject
 
 T_co = TypeVar("T_co", bound="Object", covariant=True)
@@ -35,6 +37,6 @@ def maybe_objectify(obj: WeaveObject) -> T_co | WeaveObject:
 
     res = cls.from_obj(obj)
     if ref := getattr(obj, "ref", None):
-        res.ref = ref
+        set_ref(res, ref)
 
     return res

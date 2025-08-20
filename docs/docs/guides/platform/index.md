@@ -1,6 +1,6 @@
 # Platform & Security
 
-Weave is available on the following deployment options:
+W&B Weave is available on the following deployment options:
 
 - **[W&B SaaS Cloud](https://docs.wandb.ai/guides/hosting/hosting-options/saas_cloud):** A multi-tenant, fully-managed platform deployed in W&B's Google Cloud Platform (GCP) account in a North America region.
 - **[W&B Dedicated Cloud](https://docs.wandb.ai/guides/hosting/hosting-options/dedicated_cloud):** Generally available on AWS and in preview on GCP and Azure. 
@@ -11,7 +11,7 @@ Weave is available on the following deployment options:
 Use the identity and access management capabilities for secure authentication and effective authorization in your [W&B Organization](https://docs.wandb.ai/guides/hosting/iam/org_team_struct#organization). The following capabilities are available for Weave users depending on your deployment option and [pricing plan](https://wandb.ai/site/pricing/):
 
 - **Authenticate using Single-Sign On (SSO):** Options include public identity providers like Google and Github, as well as enterprise providers such as Okta, Azure Active Directory, and others, [using OIDC](https://docs.wandb.ai/guides/technical-faq/general#does-wb-support-sso-for-saas).
-- **[Team-based logical separation](https://docs.wandb.ai/guides/hosting/iam/manage-organization/#add-and-manage-teams):** Each team may correspond to a business unit, department, or project team within your organization.
+- **[Team-based logical separation](https://docs.wandb.ai/guides/models/app/settings-page/teams/):** Each team may correspond to a business unit, department, or project team within your organization.
 - **Use W&B projects to organize initiatives:** Organize initiatives within teams and configure the required [visibility scope](https://docs.wandb.ai/guides/hosting/restricted-projects), including the `restricted` scope for sensitive collaborations.
 - **Role-based access control:** Configure access at the [team](https://docs.wandb.ai/guides/hosting/iam/manage-organization#assign-or-update-a-team-members-role) or [project](https://docs.wandb.ai/guides/hosting/iam/restricted-projects#project-level-roles) level to ensure users access data on a need-to-know basis.
 - **Scoped service accounts:** Automate Gen AI workflows using service accounts scoped to your organization or team.

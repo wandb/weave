@@ -11,11 +11,17 @@ def project_id_validator(s: str) -> str:
 
 
 def call_id_validator(s: str) -> str:
-    return validation_util.require_uuid(s)
+    try:
+        return validation_util.require_otel_span_id(s)
+    except validation_util.CHValidationError:
+        return validation_util.require_uuid(s)
 
 
 def trace_id_validator(s: str) -> str:
-    return validation_util.require_uuid(s)
+    try:
+        return validation_util.require_otel_trace_id(s)
+    except validation_util.CHValidationError:
+        return validation_util.require_uuid(s)
 
 
 def parent_id_validator(s: Optional[str]) -> Optional[str]:
@@ -58,6 +64,16 @@ def wb_run_id_validator(s: Optional[str]) -> Optional[str]:
     return s
 
 
+def wb_run_step_validator(s: Optional[int]) -> Optional[int]:
+    if s is None:
+        return None
+    if not isinstance(s, int):
+        raise TypeError("wb_run_step must be an int")
+    if s < 0:
+        raise ValueError("wb_run_step must be non-negative")
+    return s
+
+
 def _validate_object_name_charset(name: str) -> None:
     # Object names must be alphanumeric with dashes
     invalid_chars = re.findall(r"[^\w._-]", name)
@@ -85,7 +101,7 @@ MESSAGE_INVALID_PURGE = "Can only purge by specifying one or more ids"
 
 
 # Validate a dictionary only has one specific key
-def validate_dict_one_key(d: dict, key: str, typ: type) -> Any:
+def validate_dict_one_key(d: dict, key: str, _type: type) -> Any:
     if not isinstance(d, dict):
         raise InvalidRequest(f"Expected a dictionary, got {d}")
     keys = list(d.keys())
@@ -94,8 +110,8 @@ def validate_dict_one_key(d: dict, key: str, typ: type) -> Any:
     if keys[0] != key:
         raise InvalidRequest(f"Expected key {key}, got {keys[0]}")
     val = d[key]
-    if not isinstance(val, typ):
-        raise InvalidRequest(f"Expected value of type {typ}, got {type(val)}")
+    if not isinstance(val, _type):
+        raise InvalidRequest(f"Expected value of type {_type}, got {type(val)}")
     return val
 
 

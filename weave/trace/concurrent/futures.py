@@ -79,6 +79,11 @@ class FutureExecutor:
         self._in_thread_context = ContextVar("in_deferred_context", default=False)
         atexit.register(self._shutdown)
 
+    @property
+    def num_outstanding_futures(self) -> int:
+        with self._active_futures_lock:
+            return len(self._active_futures)
+
     def defer(self, f: Callable[..., T], *args: Any, **kwargs: Any) -> Future[T]:
         """
         Defer a function to be executed in a thread pool.
@@ -244,7 +249,7 @@ class FutureExecutor:
             res = f(*args, **kwargs)
             fut.set_result(res)
         except Exception as e:
-            logger.exception(f"Task failed: {_format_exception(e)}")
+            logger.exception(f"Task failed: {_format_exception(e)}")  # noqa: TRY401
             fut.set_exception(e)
         return fut
 

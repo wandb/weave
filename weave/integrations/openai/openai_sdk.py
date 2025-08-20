@@ -1,19 +1,28 @@
 from __future__ import annotations
 
 import importlib
+import logging
 from functools import wraps
 from typing import TYPE_CHECKING, Any, Callable
+from urllib.parse import urlparse
 
 import weave
+from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
-from weave.trace.op import Op, ProcessedInputs
-from weave.trace.op_extensions.accumulator import add_accumulator
-from weave.trace.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
+from weave.trace.op import (
+    Op,
+    ProcessedInputs,
+    _add_accumulator,
+    _default_on_input_handler,
+)
 
 if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionChunk
+    from openai.types.responses import Response, ResponseStreamEvent
 
 _openai_patcher: MultiPatcher | None = None
+
+logger = logging.getLogger(__name__)
 
 
 def maybe_unwrap_api_response(value: Any) -> Any:
@@ -81,11 +90,11 @@ def openai_on_finish_post_processor(value: ChatCompletionChunk | None) -> dict |
         if tool_calls is None:
             return tool_calls
 
-        _tool_calls = []
+        tool_calls_ = []
         if isinstance(tool_calls, list):
             for tool_call in tool_calls:
                 assert isinstance(tool_call, ChoiceDeltaToolCall)
-                _tool_calls.append(
+                tool_calls_.append(
                     ChatCompletionMessageToolCall(
                         id=tool_call.id,
                         type=tool_call.type,
@@ -95,7 +104,7 @@ def openai_on_finish_post_processor(value: ChatCompletionChunk | None) -> dict |
                         ),
                     )
                 )
-        return _tool_calls
+        return tool_calls_
 
     dump = None
     if isinstance(value, ChatCompletionChunk):
@@ -143,13 +152,16 @@ def openai_accumulator(
     )
 
     def _process_chunk(
-        chunk: ChatCompletionChunk, acc_choices: list[dict] = []
+        chunk: ChatCompletionChunk, acc_choices: list[dict] | None = None
     ) -> list[dict]:
         """Once the first_chunk is set (acc), take the next chunk and append the message content
         to the message content of acc or first_chunk.
         """
+        if acc_choices is None:
+            acc_choices = []
+
         for chunk_choice in chunk.choices:
-            for i in range(chunk_choice.index + 1 - len(acc_choices)):
+            for _i in range(chunk_choice.index + 1 - len(acc_choices)):
                 acc_choices.append(
                     {
                         "index": len(acc_choices),
@@ -168,6 +180,13 @@ def openai_accumulator(
                 choice["finish_reason"] = chunk_choice.finish_reason
             if chunk_choice.logprobs:
                 choice["logprobs"] = chunk_choice.logprobs
+
+            # See https://github.com/openai/openai-python/issues/1677
+            # Per the OpenAI SDK, delta is not Optional. However, the AzureOpenAI service
+            # will return a None delta under some conditions, including when you have enabled
+            # custom content filtering settings with the Asynchronous_filter streaming setting.
+            if chunk_choice.delta is None:
+                continue
 
             # message
             if chunk_choice.delta.content:
@@ -244,7 +263,10 @@ def openai_accumulator(
                 choices=output_choices,
                 created=value.created,  # Each chunk has the same timestamp
                 model=value.model,
-                object=value.object,
+                # The AzureOpenAI service will return an initial chunk with object=''
+                # which causes a pydantic_core._pydantic_core.ValidationError as
+                # the OpenAI SDK requires this literal value.
+                object=value.object or "chat.completion.chunk",
                 system_fingerprint=value.system_fingerprint,
             )
             return acc
@@ -286,26 +308,58 @@ def should_use_accumulator(inputs: dict) -> bool:
     )
 
 
+def convert_completion_to_dict(obj: Any) -> dict:
+    return {
+        "client": {
+            "base_url": str(obj._client._base_url),
+            "version": obj._client._version,
+        },
+    }
+
+
+def completion_instance_check(obj: Any) -> bool:
+    return (
+        hasattr(obj, "messages")
+        and hasattr(obj, "_client")
+        and hasattr(obj._client, "_base_url")
+        and hasattr(obj._client, "_version")
+    )
+
+
 def openai_on_input_handler(
     func: Op, args: tuple, kwargs: dict
 ) -> ProcessedInputs | None:
+    original_args = args
+    original_kwargs = kwargs
+
+    processed_inputs = _default_on_input_handler(func, tuple(args), kwargs)
+    inputs = processed_inputs.inputs
+
+    args = list(args)  # type: ignore[assignment]
+    if len(args) > 0 and completion_instance_check(args[0]):
+        # This will be the `self` argument to the function, convert it to a dict
+        args[0] = convert_completion_to_dict(args[0])  # type: ignore[index]
+        inputs.update({"self": args[0]})
+
     if len(args) == 2 and isinstance(args[1], weave.EasyPrompt):
         original_args = args
         original_kwargs = kwargs
         prompt = args[1]
         args = args[:-1]
         kwargs.update(prompt.as_dict())
-        inputs = {
-            "prompt": prompt,
-        }
-        return ProcessedInputs(
-            original_args=original_args,
-            original_kwargs=original_kwargs,
-            args=args,
-            kwargs=kwargs,
-            inputs=inputs,
+        inputs.update(
+            {
+                "prompt": prompt,
+            }
         )
-    return None
+
+    return ProcessedInputs(
+        original_args=original_args,
+        original_kwargs=original_kwargs,
+        args=tuple(args),
+        kwargs=kwargs,
+        inputs=inputs,
+    )
 
 
 def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
@@ -314,10 +368,14 @@ def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
 
         def _add_stream_options(fn: Callable) -> Callable:
             @wraps(fn)
-            def _wrapper(*args: Any, **kwargs: Any) -> Any:
+            def _wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
                 if kwargs.get("stream") and kwargs.get("stream_options") is None:
-                    kwargs["stream_options"] = {"include_usage": True}
-                return fn(*args, **kwargs)
+                    completion = self
+                    base_url = str(completion._client._base_url)
+                    # Only set stream_options if it targets the OpenAI endpoints
+                    if urlparse(base_url).hostname == "api.openai.com":
+                        kwargs["stream_options"] = {"include_usage": True}
+                return fn(self, *args, **kwargs)
 
             return _wrapper
 
@@ -328,8 +386,9 @@ def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
 
         op_kwargs = settings.model_dump()
         op = weave.op(_add_stream_options(fn), **op_kwargs)
+
         op._set_on_input_handler(openai_on_input_handler)
-        return add_accumulator(
+        return _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: lambda acc, value: openai_accumulator(
                 acc, value, skip_last=not _openai_stream_options_is_set(inputs)
@@ -350,10 +409,14 @@ def create_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]
 
         def _add_stream_options(fn: Callable) -> Callable:
             @wraps(fn)
-            async def _wrapper(*args: Any, **kwargs: Any) -> Any:
+            async def _wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
                 if kwargs.get("stream") and kwargs.get("stream_options") is None:
-                    kwargs["stream_options"] = {"include_usage": True}
-                return await fn(*args, **kwargs)
+                    completion = self
+                    base_url = str(completion._client._base_url)
+                    # Only set stream_options if it targets the OpenAI endpoints
+                    if urlparse(base_url).hostname == "api.openai.com":
+                        kwargs["stream_options"] = {"include_usage": True}
+                return await fn(self, *args, **kwargs)
 
             return _wrapper
 
@@ -365,13 +428,253 @@ def create_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]
         op_kwargs = settings.model_dump()
         op = weave.op(_add_stream_options(fn), **op_kwargs)
         op._set_on_input_handler(openai_on_input_handler)
-        return add_accumulator(
+        return _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: lambda acc, value: openai_accumulator(
                 acc, value, skip_last=not _openai_stream_options_is_set(inputs)
             ),
             should_accumulate=should_use_accumulator,
             on_finish_post_processor=openai_on_finish_post_processor,
+        )
+
+    return wrapper
+
+
+def _pad_output(acc: Response, value: ResponseStreamEvent) -> Response:
+    if len(acc.output) <= value.output_index:
+        missing_len = value.output_index - len(acc.output) + 1
+        acc.output.extend([""] * missing_len)
+    return acc
+
+
+### Responses API
+def responses_accumulator(acc: Response | None, value: ResponseStreamEvent) -> Response:
+    from openai.types.responses import (
+        Response,
+        ResponseAudioDeltaEvent,
+        ResponseAudioDoneEvent,
+        ResponseAudioTranscriptDeltaEvent,
+        ResponseAudioTranscriptDoneEvent,
+        ResponseCodeInterpreterCallCodeDeltaEvent,
+        ResponseCodeInterpreterCallCodeDoneEvent,
+        ResponseCodeInterpreterCallCompletedEvent,
+        ResponseCodeInterpreterCallInProgressEvent,
+        ResponseCodeInterpreterCallInterpretingEvent,
+        ResponseCompletedEvent,
+        ResponseContentPartAddedEvent,
+        ResponseContentPartDoneEvent,
+        ResponseCreatedEvent,
+        ResponseErrorEvent,
+        ResponseFailedEvent,
+        ResponseFileSearchCallCompletedEvent,
+        ResponseFileSearchCallInProgressEvent,
+        ResponseFileSearchCallSearchingEvent,
+        ResponseFunctionCallArgumentsDeltaEvent,
+        ResponseFunctionCallArgumentsDoneEvent,
+        ResponseIncompleteEvent,
+        ResponseInProgressEvent,
+        ResponseOutputItemAddedEvent,
+        ResponseOutputItemDoneEvent,
+        ResponseRefusalDeltaEvent,
+        ResponseRefusalDoneEvent,
+        ResponseTextDeltaEvent,
+        ResponseTextDoneEvent,
+        ResponseWebSearchCallCompletedEvent,
+        ResponseWebSearchCallInProgressEvent,
+        ResponseWebSearchCallSearchingEvent,
+    )
+
+    # ResponseOutputTextAnnotationAddedEvent was introduced in openai 1.80.0
+    is_new_sdk = False
+    try:
+        from openai.types.responses import ResponseOutputTextAnnotationAddedEvent
+
+        is_new_sdk = True
+    except ImportError:
+        pass
+
+    if acc is None:
+        acc = Response(
+            id="",
+            created_at=0,
+            model="",
+            object="response",
+            output=[],
+            parallel_tool_calls=False,
+            tool_choice="auto",
+            tools=[],
+        )
+
+    # 1. "Response" object events, either at the start or end of a slice of the stream
+    if isinstance(
+        value,
+        (
+            ResponseCreatedEvent,
+            ResponseInProgressEvent,
+            ResponseIncompleteEvent,
+            ResponseCompletedEvent,
+            ResponseFailedEvent,
+        ),
+    ):
+        # In the happy path, the final event is ResponseCompletedEvent with a fully
+        # populated response object.  This is the most faithful representation, so
+        # just use this if available.
+
+        # As an MVP this alone is probably sufficient for the streaming case (assuming
+        # the user does not close the stream mid-response).
+        acc = value.response
+
+    # 2. "Delta" events, which are streamed parts appended to an InProgressEvent
+    # 2a. Events with an output_index
+    elif isinstance(
+        value,
+        (
+            ResponseCodeInterpreterCallCodeDeltaEvent,
+            ResponseFunctionCallArgumentsDeltaEvent,
+            ResponseRefusalDeltaEvent,
+            ResponseTextDeltaEvent,
+        ),
+    ):
+        acc = _pad_output(acc, value)
+
+        acc.output[value.output_index] += value.delta
+
+    # 2b. Events without an output_index
+    elif isinstance(
+        value,
+        (
+            ResponseAudioDeltaEvent,
+            ResponseAudioTranscriptDeltaEvent,
+        ),
+    ):
+        # Not obvious how to handle these since there is no output_index
+        if not acc.output:
+            acc.output = [""]
+
+        if value.delta is None:
+            # This is likely the case where not all event types are available in the SDK (ResponseOutputTextAnnotationAddedEvent)
+            logger.warning(
+                "Some responses could not be processed with your current version of the OpenAI SDK. Please upgrade to the latest version."
+            )
+        else:
+            acc.output[0] += value.delta
+
+    elif is_new_sdk:
+        if isinstance(value, ResponseOutputTextAnnotationAddedEvent):
+            # Not obvious how to handle this since there is no delta
+            ...
+
+    # Everything else
+    elif isinstance(
+        value,
+        (
+            ResponseContentPartAddedEvent,
+            ResponseErrorEvent,
+            ResponseOutputItemAddedEvent,
+        ),
+    ):
+        ...
+
+    # 3. No-op events: these are not needed for the accumulator
+    # 3a. "Done" events
+    elif isinstance(
+        value,
+        (
+            ResponseAudioDoneEvent,
+            ResponseAudioTranscriptDoneEvent,
+            ResponseCodeInterpreterCallCodeDoneEvent,
+            ResponseContentPartDoneEvent,
+            ResponseFunctionCallArgumentsDoneEvent,
+            ResponseOutputItemDoneEvent,
+            ResponseRefusalDoneEvent,
+            ResponseTextDoneEvent,
+        ),
+    ):
+        pass  # Nothing to do here
+
+    # 3b. "Tool Completed" events
+    elif isinstance(
+        value,
+        (
+            ResponseCodeInterpreterCallCompletedEvent,
+            ResponseFileSearchCallCompletedEvent,
+            ResponseWebSearchCallCompletedEvent,
+        ),
+    ):
+        pass  # Nothing to do here
+
+    # 3c. "Tool In Progress" events
+    elif isinstance(
+        value,
+        (
+            ResponseCodeInterpreterCallInProgressEvent,
+            ResponseFileSearchCallInProgressEvent,
+            ResponseWebSearchCallInProgressEvent,
+        ),
+    ):
+        pass  # Nothing to do here
+
+    # 3d. "Tool Action" events
+    elif isinstance(
+        value,
+        (
+            ResponseCodeInterpreterCallInterpretingEvent,
+            ResponseFileSearchCallSearchingEvent,
+            ResponseWebSearchCallSearchingEvent,
+        ),
+    ):
+        pass  # Nothing to do here
+
+    return acc
+
+
+def should_use_responses_accumulator(inputs: dict) -> bool:
+    return isinstance(inputs, dict) and inputs.get("stream") is True
+
+
+def create_wrapper_responses_sync(
+    settings: OpSettings,
+) -> Callable[[Callable], Callable]:
+    def wrapper(fn: Callable) -> Callable:
+        op_kwargs = settings.model_dump()
+
+        @wraps(fn)
+        def _inner(*args: Any, **kwargs: Any) -> Any:
+            return fn(*args, **kwargs)
+
+        op = weave.op(_inner, **op_kwargs)
+        op._set_on_input_handler(openai_on_input_handler)
+        return _add_accumulator(
+            op,  # type: ignore
+            make_accumulator=lambda inputs: lambda acc, value: responses_accumulator(
+                acc, value
+            ),
+            should_accumulate=should_use_responses_accumulator,
+            on_finish_post_processor=lambda value: value,
+        )
+
+    return wrapper
+
+
+def create_wrapper_responses_async(
+    settings: OpSettings,
+) -> Callable[[Callable], Callable]:
+    def wrapper(fn: Callable) -> Callable:
+        op_kwargs = settings.model_dump()
+
+        @wraps(fn)
+        async def _inner(*args: Any, **kwargs: Any) -> Any:
+            return await fn(*args, **kwargs)
+
+        op = weave.op(_inner, **op_kwargs)
+        op._set_on_input_handler(openai_on_input_handler)
+        return _add_accumulator(
+            op,  # type: ignore
+            make_accumulator=lambda inputs: lambda acc, value: responses_accumulator(
+                acc, value
+            ),
+            should_accumulate=should_use_responses_accumulator,
+            on_finish_post_processor=lambda value: value,
         )
 
     return wrapper
@@ -415,6 +718,18 @@ def get_openai_patcher(
     )
     async_embeddings_create_settings = base.model_copy(
         update={"name": base.name or "openai.embeddings.create"}
+    )
+    responses_create_settings = base.model_copy(
+        update={"name": base.name or "openai.responses.create"}
+    )
+    async_responses_create_settings = base.model_copy(
+        update={"name": base.name or "openai.responses.create"}
+    )
+    responses_parse_settings = base.model_copy(
+        update={"name": base.name or "openai.responses.parse"}
+    )
+    async_responses_parse_settings = base.model_copy(
+        update={"name": base.name or "openai.responses.parse"}
     )
 
     _openai_patcher = MultiPatcher(
@@ -462,6 +777,28 @@ def get_openai_patcher(
                 lambda: importlib.import_module("openai.resources.embeddings"),
                 "AsyncEmbeddings.create",
                 create_wrapper_async(settings=async_embeddings_create_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("openai.resources.responses"),
+                "Responses.create",
+                create_wrapper_responses_sync(settings=responses_create_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("openai.resources.responses"),
+                "AsyncResponses.create",
+                create_wrapper_responses_async(
+                    settings=async_responses_create_settings
+                ),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("openai.resources.responses"),
+                "Responses.parse",
+                create_wrapper_responses_sync(settings=responses_parse_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("openai.resources.responses"),
+                "AsyncResponses.parse",
+                create_wrapper_responses_async(settings=async_responses_parse_settings),
             ),
         ]
     )

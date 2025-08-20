@@ -1,0 +1,102 @@
+interactions:
+- request:
+    body: '{"input":"What was a positive news story from today?","model":"gpt-4o-2024-08-06","tools":[{"type":"web_search_preview"}]}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - '122'
+      content-type:
+      - application/json
+      host:
+      - api.openai.com
+      user-agent:
+      - OpenAI/Python 1.66.3
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.66.3
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.9
+    method: POST
+    uri: https://api.openai.com/v1/responses
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAA9xW34sjNwx+379CzPXKHSTZmcmvSaCUPpQ+HS3sthzsLYPGVhJ3PfZgy8nmjv3f
+        iyeTZLK7LW3pvZRAYPRJsvRJtvTlCiBRMllC4sg35WwuF0UxT6ckiyJb5AWO52k2n4tiPJ6PZZpW
+        RTZb0bSYzFdiJYpkEB3Y6ncSfHRijaeDXDhCJllixLL5JB+ni0lRtJhn5OCjjbB1o4lJHozIOeuS
+        JZigdStQ5qhRSmJU2l+inl0QrKy5kNf4WNrATeCS7QM9A60kHc9eNzyc2GGe5pNhWgzTWZdQa5gs
+        4e4KAOBL+w+Q8L6haLajqvSETmxKgVq3Rq3CgcqdPxKZZR2R1WQi8kpMkCbVbLqoXiWydfEaMS32
+        NHg9mJq8xzU9D6L262MU40qMJ20UcpWlosryapHTPJv+syhOoLO6PRm9V57R8BkS1jCZM3X9iC+i
+        PtaGHs/WB4UoWUJyayXuB/AhsgxZMYA8zacD+DE42xAaqNE9EHugx4acIiNIAkJjvWK1JfDBrQnQ
+        w0/kajSgcVfjAzkPjaMGHUlgC1vLBNYAgldro1ZKoGFY2y05U5Nh8A0ZqcwaomiDQY/gdqM8oGEl
+        VBPbGyQJ5ZU1UFnro4A3BBScBazsluCbbJQuAI0E0rRtTbqgKmsk7BVp6aNfgpvbnz9+hFmagjJd
+        quCsJ6j2kI7mbwdt2jEeNFC8BWXiHfMEHIPaE7oBxBI49By1doo3gDB5C9LZJjqNsd18+wtM07RL
+        RdKWtG3adB2tNAn2sHZ216bdsKqVr2MqgaGxsboKNZCwxtZKgGdVBx081IQ+OPLn0Efw7s5RYHJ+
+        JGx9/27D3Pjl9fVutxv1gOuultdrbSvUw+5zuHPYhGaYxfs5HabjYVZcfx+4Lr0NTtB3tiGD6v37
+        Tyb+3rw5N8eHrjlu2i74YUMowa6OtN8ci/qbZVp+MkO4i5YD8GzFgwenPAEejTQaGSM6Wp9aIjbP
+        18oJLi8FGmMZj4/cXQ+6vF4XVyw4XQp1MLtwd7zhjktlJD0mS5hMxy80yMgTPp1OX+DBtW/oVyHg
+        Zbys+PDq/NtSJRcenwb/PYmzbP6XJM5n+f+MxN7X/dVz6UESv+7bqdqgQ61Jl2ytbgdnbGZ2gQ6w
+        o62ywZfHJaJsB9lpaMeHzhpl1smyK1dCq5V13FMCSNZkyCFT6UNdo9t36FVX8sSzddQ/l6luokVo
+        xdko7aTtGOoOWllX4/m71x+t3inRwxGH/DZWicOYDGyTE+D/1lrRkkG73kDu1o04Xx+59OpzN/yl
+        CvVZLXhypbbi0K/LXl+fTsGmcfZR1cjUa5BEKN5fMNnN82C4JTH59aav7mh9OOGZAauaPltDZ9rP
+        LXFuBbZN2fTZdsGcYk6k8ljp40IY2u3mVAplLna6cV4MXgK9TfHEskCxIXm2TPtbVfJ8V8zT7DXk
+        Ncenxvwz32wZ9Rmc5otTq8R6XWymxCiRMfp/unr6AwAA//8DAKkpOB+gCwAA
+    headers:
+      CF-RAY:
+      - 92258c5ddfdca22e-YYZ
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Tue, 18 Mar 2025 14:51:33 GMT
+      Server:
+      - cloudflare
+      Set-Cookie:
+      - __cf_bm=FM6IaFAu_0W_qB0DF02if9zwryFRqXn7gl9rOUqriig-1742309493-1.0.1.1-y_SvKb3gRUs3dFtPWE55Lifoelidfv778Z_NBwUOIckk5HhrCS9xuK155_dPDM9RvTUN.3OHEtz_KR9kh2qMJgSGeruF3HrA.DYeINo6qqg;
+        path=/; expires=Tue, 18-Mar-25 15:21:33 GMT; domain=.api.openai.com; HttpOnly;
+        Secure; SameSite=None
+      - _cfuvid=ZrHsObsVHTFyRX02MN7Gr83vuyyuzl3pyl2hS.CpSKo-1742309493123-0.0.1.1-604800000;
+        path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '4717'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-request-id:
+      - req_c0ff9990e8571bcbcc483b3111c52192
+    status:
+      code: 200
+      message: OK
+version: 1

@@ -1,1 +1,4 @@
 weave_query/weave_query/frontend/** linguist-generated=true
+*.png binary
+*.jpg binary
+*.gif binary

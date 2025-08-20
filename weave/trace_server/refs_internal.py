@@ -66,7 +66,7 @@ def validate_extra(extra: list[str]) -> None:
                 except ValueError:
                     raise InvalidInternalRef(
                         f"Invalid list edge value at index {i}: {extra}"
-                    )
+                    ) from None
             pass
 
 
@@ -173,14 +173,6 @@ def parse_internal_uri(
             raise InvalidInternalRef(f"Invalid URI: {uri}. Must have at least 2 parts")
         project_id, kind = parts[:2]
         remaining = parts[2:]
-    elif uri.startswith(f"{WEAVE_SCHEME}:///"):
-        path = uri[len(f"{WEAVE_SCHEME}:///") :]
-        parts = path.split("/")
-        if len(parts) < 3:
-            raise InvalidInternalRef(f"Invalid URI: {uri}. Must have at least 3 parts")
-        entity, project, kind = parts[:3]
-        project_id = f"{entity}/{project}"
-        remaining = parts[3:]
     elif uri.startswith(f"{ARTIFACT_REF_SCHEME}:///"):
         path = uri[len(f"{ARTIFACT_REF_SCHEME}:///") :]
         parts = path.split("/")

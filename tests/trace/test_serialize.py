@@ -1,4 +1,15 @@
-from weave.trace.serialize import dictify, fallback_encode
+import openai
+from pydantic import BaseModel
+
+import weave
+from weave.trace.object_record import pydantic_object_record
+from weave.trace.serialization.op_type import _replace_memory_address
+from weave.trace.serialization.serialize import (
+    dictify,
+    fallback_encode,
+    is_pydantic_model_class,
+    to_json,
+)
 
 
 def test_dictify_simple() -> None:
@@ -7,7 +18,7 @@ def test_dictify_simple() -> None:
         y: int
 
         # This should be ignored
-        def sum() -> int:
+        def sum(self) -> int:
             return self.x + self.y
 
     pt = Point()
@@ -199,3 +210,120 @@ def test_dictify_sanitizes_nested() -> None:
             "api_key": "REDACTED",
         },
     }
+
+
+def test_is_pydantic_model_class() -> None:
+    """We expect is_pydantic_model_class to return True for Pydantic model classes, and False otherwise.
+    Notably it should return False for instances of Pydantic model classes."""
+    assert not is_pydantic_model_class(int)
+    assert not is_pydantic_model_class(str)
+    assert not is_pydantic_model_class(list)
+    assert not is_pydantic_model_class(dict)
+    assert not is_pydantic_model_class(tuple)
+    assert not is_pydantic_model_class(set)
+    assert not is_pydantic_model_class(None)
+    assert not is_pydantic_model_class(42)
+    assert not is_pydantic_model_class("foo")
+    assert not is_pydantic_model_class({})
+    assert not is_pydantic_model_class([])
+
+    class CalendarEvent(BaseModel):
+        name: str
+        date: str
+        participants: list[str]
+
+    event = CalendarEvent(name="Test", date="2024-01-01", participants=["Alice", "Bob"])
+    assert not is_pydantic_model_class(event)
+    assert is_pydantic_model_class(CalendarEvent)
+
+
+def test_to_json_pydantic_class(client) -> None:
+    """We expect to_json to return the Pydantic schema for the class."""
+
+    class CalendarEvent(BaseModel):
+        name: str
+        date: str
+        participants: list[str]
+
+    project_id = "entity/project"
+    serialized = to_json(CalendarEvent, project_id, client, use_dictify=False)
+    assert serialized == {
+        "properties": {
+            "name": {"title": "Name", "type": "string"},
+            "date": {"title": "Date", "type": "string"},
+            "participants": {
+                "items": {"type": "string"},
+                "title": "Participants",
+                "type": "array",
+            },
+        },
+        "required": ["name", "date", "participants"],
+        "title": "CalendarEvent",
+        "type": "object",
+    }
+
+
+def test_to_json_object_excludes_ref(client) -> None:
+    class MyObj(weave.Object):
+        @weave.op
+        def predict(self, x: int) -> int:
+            return x
+
+    obj = MyObj()
+    obj_rec = pydantic_object_record(obj)
+    serialized = to_json(obj_rec, client._project_id(), client)
+    assert "ref" not in serialized
+
+
+def test_to_json_function_with_memory_address_in_op(client) -> None:
+    openai_client = openai.OpenAI(api_key="fake_key")
+
+    @weave.op
+    def log_me(x: int) -> int:
+        myclient = openai_client
+        return x
+
+    log_me(1)
+    log_me(1)
+
+    assert len(log_me.calls()) == 2
+
+    @weave.op
+    def log_me(x: int) -> int:
+        myclient = openai_client
+        return x
+
+    log_me(1)
+
+    # same op!
+    assert len(log_me.calls()) == 3
+
+    # now make a new client
+    openai_client = openai.OpenAI(api_key="fake_key")
+
+    @weave.op
+    def log_me(x: int) -> int:
+        myclient = openai_client
+        return x
+
+    log_me(1)
+
+    # this should still be the same op!
+    assert len(log_me.calls()) == 4
+
+
+def test__replace_memory_address() -> None:
+    # Test with memory addresses of different lengths
+    assert (
+        _replace_memory_address("<Function object at 0x1234>")
+        == "<Function object at 0x0000>"
+    )
+    assert _replace_memory_address("<Class at 0xdeadbeef>") == "<Class at 0x00000000>"
+
+    # Test with multiple memory addresses
+    assert (
+        _replace_memory_address("<Object at 0x1234> and <Object at 0xabcd>")
+        == "<Object at 0x0000> and <Object at 0x0000>"
+    )
+    # Test with no memory addresses
+    assert _replace_memory_address("No memory address here") == "No memory address here"

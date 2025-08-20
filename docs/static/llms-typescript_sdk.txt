@@ -1,0 +1,1743 @@
+<!--- Docs: TypeScript SDK -->
+<!--- Readme -->
+
+# Readme
+
+**weave** • **Docs**
+
+***
+
+# weave
+
+## Classes
+
+- [Dataset](classes/Dataset.md)
+- [Evaluation](classes/Evaluation.md)
+- [WeaveClient](classes/WeaveClient.md)
+- [WeaveObject](classes/WeaveObject.md)
+
+## Interfaces
+
+- [CallSchema](interfaces/CallSchema.md)
+- [CallsFilter](interfaces/CallsFilter.md)
+
+## Type Aliases
+
+- [Op](type-aliases/Op.md)
+
+## Functions
+
+- [init](functions/init.md)
+- [login](functions/login.md)
+- [op](functions/op.md)
+- [requireCurrentCallStackEntry](functions/requireCurrentCallStackEntry.md)
+- [requireCurrentChildSummary](functions/requireCurrentChildSummary.md)
+- [weaveAudio](functions/weaveAudio.md)
+- [weaveImage](functions/weaveImage.md)
+- [wrapOpenAI](functions/wrapOpenAI.md)
+
+[Source](https://weave-docs.wandb.ai/reference/typescript-sdk/weave/README)
+
+<!--- Docs: TypeScript SDK -->
+<!--- Weaveclient -->
+
+# Weaveclient
+
+[**weave**](../README.md) • **Docs**
+
+***
+
+[weave](../README.md) / WeaveClient
+
+# Class: WeaveClient
+
+## Constructors
+
+### new WeaveClient()
+
+> **new WeaveClient**(`traceServerApi`, `wandbServerApi`, `projectId`, `settings`): [`WeaveClient`](WeaveClient.md)
+
+#### Parameters
+
+• **traceServerApi**: `Api`\
+
+• **wandbServerApi**: `WandbServerApi`
+
+• **projectId**: `string`
+
+• **settings**: `Settings` = `...`
+
+#### Returns
+
+[`WeaveClient`](WeaveClient.md)
+
+#### Defined in
+
+[weaveClient.ts:82](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveClient.ts#L82)
+
+## Properties
+
+### projectId
+
+> **projectId**: `string`
+
+#### Defined in
+
+[weaveClient.ts:85](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveClient.ts#L85)
+
+***
+
+### settings
+
+> **settings**: `Settings`
+
+#### Defined in
+
+[weaveClient.ts:86](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveClient.ts#L86)
+
+***
+
+### traceServerApi
+
+> **traceServerApi**: `Api`\
+
+#### Defined in
+
+[weaveClient.ts:83](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveClient.ts#L83)
+
+## Methods
+
+### createCall()
+
+> **createCall**(`opRef`, `params`, `parameterNames`, `thisArg`, `currentCall`, `parentCall`, `startTime`, `displayName`?): `Promise`\
+
+#### Parameters
+
+• **opRef**: `any`
+
+• **params**: `any`[]
+
+• **parameterNames**: `ParameterNamesOption`
+
+• **thisArg**: `any`
+
+• **currentCall**: `CallStackEntry`
+
+• **parentCall**: `undefined` \| `CallStackEntry`
+
+• **startTime**: `Date`
+
+• **displayName?**: `string`
+
+#### Returns
+
+`Promise`\
+
+#### Defined in
+
+[weaveClient.ts:610](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveClient.ts#L610)
+
+***
+
+### finishCall()
+
+> **finishCall**(`result`, `currentCall`, `parentCall`, `summarize`, `endTime`, `startCallPromise`): `Promise`\
+
+#### Parameters
+
+• **result**: `any`
+
+• **currentCall**: `CallStackEntry`
+
+• **parentCall**: `undefined` \| `CallStackEntry`
+
+• **summarize**: `undefined` \| (`result`) => `Record`\
+
+• **endTime**: `Date`
+
+• **startCallPromise**: `Promise`\
+
+#### Returns
+
+`Promise`\
+
+#### Defined in
+
+[weaveClient.ts:648](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveClient.ts#L648)
+
+***
+
+### finishCallWithException()
+
+> **finishCallWithException**(`error`, `currentCall`, `parentCall`, `endTime`, `startCallPromise`): `Promise`\
+
+#### Parameters
+
+• **error**: `any`
+
+• **currentCall**: `CallStackEntry`
+
+• **parentCall**: `undefined` \| `CallStackEntry`
+
+• **endTime**: `Date`
+
+• **startCallPromise**: `Promise`\
+
+#### Returns
+
+`Promise`\
+
+#### Defined in
+
+[weaveClient.ts:677](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveClient.ts#L677)
+
+***
+
+### get()
+
+> **get**(`ref`): `Promise`\
+
+#### Parameters
+
+• **ref**: `ObjectRef`
+
+#### Returns
+
+`Promise`\
+
+#### Defined in
+
+[weaveClient.ts:229](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveClient.ts#L229)
+
+***
+
+### getCalls()
+
+> **getCalls**(`filter`, `includeCosts`, `limit`): `Promise`\
+
+#### Parameters
+
+• **filter**: [`CallsFilter`](../interfaces/CallsFilter.md) = `{}`
+
+• **includeCosts**: `boolean` = `false`
+
+• **limit**: `number` = `1000`
+
+#### Returns
+
+`Promise`\
+
+#### Defined in
+
+[weaveClient.ts:172](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveClient.ts#L172)
+
+***
+
+### getCallsIterator()
+
+> **getCallsIterator**(`filter`, `includeCosts`, `limit`): `AsyncIterableIterator`\
+
+#### Parameters
+
+• **filter**: [`CallsFilter`](../interfaces/CallsFilter.md) = `{}`
+
+• **includeCosts**: `boolean` = `false`
+
+• **limit**: `number` = `1000`
+
+#### Returns
+
+`AsyncIterableIterator`\
+
+#### Defined in
+
+[weaveClient.ts:184](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveClient.ts#L184)
+
+***
+
+### getCallStack()
+
+> **getCallStack**(): `CallStack`
+
+#### Returns
+
+`CallStack`
+
+#### Defined in
+
+[weaveClient.ts:537](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveClient.ts#L537)
+
+***
+
+### publish()
+
+> **publish**(`obj`, `objId`?): `Promise`\
+
+#### Parameters
+
+• **obj**: `any`
+
+• **objId?**: `string`
+
+#### Returns
+
+`Promise`\
+
+#### Defined in
+
+[weaveClient.ts:160](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveClient.ts#L160)
+
+***
+
+### pushNewCall()
+
+> **pushNewCall**(): `object`
+
+#### Returns
+
+`object`
+
+##### currentCall
+
+> **currentCall**: `CallStackEntry`
+
+##### newStack
+
+> **newStack**: `CallStack`
+
+##### parentCall?
+
+> `optional` **parentCall**: `CallStackEntry`
+
+#### Defined in
+
+[weaveClient.ts:541](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveClient.ts#L541)
+
+***
+
+### runWithCallStack()
+
+> **runWithCallStack**\(`callStack`, `fn`): `T`
+
+#### Type Parameters
+
+• **T**
+
+#### Parameters
+
+• **callStack**: `CallStack`
+
+• **fn**
+
+#### Returns
+
+`T`
+
+#### Defined in
+
+[weaveClient.ts:545](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveClient.ts#L545)
+
+***
+
+### saveOp()
+
+> **saveOp**(`op`, `objId`?): `Promise`\
+
+#### Parameters
+
+• **op**: [`Op`](../type-aliases/Op.md)\ `any`\>
+
+• **objId?**: `string`
+
+#### Returns
+
+`Promise`\
+
+#### Defined in
+
+[weaveClient.ts:575](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveClient.ts#L575)
+
+***
+
+### waitForBatchProcessing()
+
+> **waitForBatchProcessing**(): `Promise`\
+
+#### Returns
+
+`Promise`\
+
+#### Defined in
+
+[weaveClient.ts:103](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveClient.ts#L103)
+
+[Source](https://weave-docs.wandb.ai/reference/typescript-sdk/weave/classes/WeaveClient)
+
+<!--- Docs: TypeScript SDK -->
+<!--- Dataset -->
+
+# Dataset
+
+[**weave**](../README.md) • **Docs**
+
+***
+
+[weave](../README.md) / Dataset
+
+# Class: Dataset\
+
+Dataset object with easy saving and automatic versioning
+
+## Example
+
+```ts
+// Create a dataset
+const dataset = new Dataset({
+  id: 'grammar-dataset',
+  rows: [
+    { id: '0', sentence: "He no likes ice cream.", correction: "He doesn't like ice cream." },
+    { id: '1', sentence: "She goed to the store.", correction: "She went to the store." },
+    { id: '2', sentence: "They plays video games all day.", correction: "They play video games all day." }
+  ]
+})
+
+// Access a specific example
+const exampleLabel = dataset.getRow(2).sentence;
+
+// Save the dataset
+const ref = await dataset.save()
+```
+
+## Extends
+
+- [`WeaveObject`](WeaveObject.md)
+
+## Type Parameters
+
+• **R** *extends* `DatasetRow`
+
+## Constructors
+
+### new Dataset()
+
+> **new Dataset**\(`parameters`): [`Dataset`](Dataset.md)\
+
+#### Parameters
+
+• **parameters**: `DatasetParameters`\
+
+#### Returns
+
+[`Dataset`](Dataset.md)\
+
+#### Overrides
+
+[`WeaveObject`](WeaveObject.md).[`constructor`](WeaveObject.md#constructors)
+
+#### Defined in
+
+[dataset.ts:51](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/dataset.ts#L51)
+
+## Properties
+
+### \_\_savedRef?
+
+> `optional` **\_\_savedRef**: `ObjectRef` \| `Promise`\
+
+#### Inherited from
+
+[`WeaveObject`](WeaveObject.md).[`__savedRef`](WeaveObject.md#__savedref)
+
+#### Defined in
+
+[weaveObject.ts:49](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveObject.ts#L49)
+
+***
+
+### \_baseParameters
+
+> `protected` **\_baseParameters**: `WeaveObjectParameters`
+
+#### Inherited from
+
+[`WeaveObject`](WeaveObject.md).[`_baseParameters`](WeaveObject.md#_baseparameters)
+
+#### Defined in
+
+[weaveObject.ts:51](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveObject.ts#L51)
+
+***
+
+### rows
+
+> **rows**: `Table`\
+
+#### Defined in
+
+[dataset.ts:49](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/dataset.ts#L49)
+
+## Accessors
+
+### description
+
+> `get` **description**(): `undefined` \| `string`
+
+#### Returns
+
+`undefined` \| `string`
+
+#### Inherited from
+
+[`WeaveObject`](WeaveObject.md).[`description`](WeaveObject.md#description)
+
+#### Defined in
+
+[weaveObject.ts:89](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveObject.ts#L89)
+
+***
+
+### id
+
+> `get` **id**(): `string`
+
+#### Returns
+
+`string`
+
+#### Inherited from
+
+[`WeaveObject`](WeaveObject.md).[`id`](WeaveObject.md#id)
+
+#### Defined in
+
+[weaveObject.ts:85](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveObject.ts#L85)
+
+***
+
+### length
+
+> `get` **length**(): `number`
+
+#### Returns
+
+`number`
+
+#### Defined in
+
+[dataset.ts:64](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/dataset.ts#L64)
+
+## Methods
+
+### \[asyncIterator\]()
+
+> **\[asyncIterator\]**(): `AsyncIterator`\
+
+#### Returns
+
+`AsyncIterator`\
+
+#### Defined in
+
+[dataset.ts:68](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/dataset.ts#L68)
+
+***
+
+### className()
+
+> **className**(): `any`
+
+#### Returns
+
+`any`
+
+#### Inherited from
+
+[`WeaveObject`](WeaveObject.md).[`className`](WeaveObject.md#classname)
+
+#### Defined in
+
+[weaveObject.ts:53](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveObject.ts#L53)
+
+***
+
+### getRow()
+
+> **getRow**(`index`): `R`
+
+#### Parameters
+
+• **index**: `number`
+
+#### Returns
+
+`R`
+
+#### Defined in
+
+[dataset.ts:74](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/dataset.ts#L74)
+
+***
+
+### save()
+
+> **save**(): `Promise`\
+
+#### Returns
+
+`Promise`\
+
+#### Defined in
+
+[dataset.ts:60](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/dataset.ts#L60)
+
+***
+
+### saveAttrs()
+
+> **saveAttrs**(): `object`
+
+#### Returns
+
+`object`
+
+#### Inherited from
+
+[`WeaveObject`](WeaveObject.md).[`saveAttrs`](WeaveObject.md#saveattrs)
+
+#### Defined in
+
+[weaveObject.ts:57](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveObject.ts#L57)
+
+[Source](https://weave-docs.wandb.ai/reference/typescript-sdk/weave/classes/Dataset)
+
+<!--- Docs: TypeScript SDK -->
+<!--- Weaveobject -->
+
+# Weaveobject
+
+[**weave**](../README.md) • **Docs**
+
+***
+
+[weave](../README.md) / WeaveObject
+
+# Class: WeaveObject
+
+## Extended by
+
+- [`Dataset`](Dataset.md)
+- [`Evaluation`](Evaluation.md)
+
+## Constructors
+
+### new WeaveObject()
+
+> **new WeaveObject**(`_baseParameters`): [`WeaveObject`](WeaveObject.md)
+
+#### Parameters
+
+• **\_baseParameters**: `WeaveObjectParameters`
+
+#### Returns
+
+[`WeaveObject`](WeaveObject.md)
+
+#### Defined in
+
+[weaveObject.ts:51](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveObject.ts#L51)
+
+## Properties
+
+### \_\_savedRef?
+
+> `optional` **\_\_savedRef**: `ObjectRef` \| `Promise`\
+
+#### Defined in
+
+[weaveObject.ts:49](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveObject.ts#L49)
+
+***
+
+### \_baseParameters
+
+> `protected` **\_baseParameters**: `WeaveObjectParameters`
+
+#### Defined in
+
+[weaveObject.ts:51](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveObject.ts#L51)
+
+## Accessors
+
+### description
+
+> `get` **description**(): `undefined` \| `string`
+
+#### Returns
+
+`undefined` \| `string`
+
+#### Defined in
+
+[weaveObject.ts:89](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveObject.ts#L89)
+
+***
+
+### id
+
+> `get` **id**(): `string`
+
+#### Returns
+
+`string`
+
+#### Defined in
+
+[weaveObject.ts:85](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveObject.ts#L85)
+
+## Methods
+
+### className()
+
+> **className**(): `any`
+
+#### Returns
+
+`any`
+
+#### Defined in
+
+[weaveObject.ts:53](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveObject.ts#L53)
+
+***
+
+### saveAttrs()
+
+> **saveAttrs**(): `object`
+
+#### Returns
+
+`object`
+
+#### Defined in
+
+[weaveObject.ts:57](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveObject.ts#L57)
+
+[Source](https://weave-docs.wandb.ai/reference/typescript-sdk/weave/classes/WeaveObject)
+
+<!--- Docs: TypeScript SDK -->
+<!--- Evaluation -->
+
+# Evaluation
+
+[**weave**](../README.md) • **Docs**
+
+***
+
+[weave](../README.md) / Evaluation
+
+# Class: Evaluation\
+
+Sets up an evaluation which includes a set of scorers and a dataset.
+
+Calling evaluation.evaluate(model) will pass in rows form a dataset into a model matching
+the names of the columns of the dataset to the argument names in model.predict.
+
+Then it will call all of the scorers and save the results in weave.
+
+## Example
+
+```ts
+// Collect your examples into a dataset
+const dataset = new weave.Dataset({
+  id: 'my-dataset',
+  rows: [
+    { question: 'What is the capital of France?', expected: 'Paris' },
+    { question: 'Who wrote "To Kill a Mockingbird"?', expected: 'Harper Lee' },
+    { question: 'What is the square root of 64?', expected: '8' },
+  ],
+});
+
+// Define any custom scoring function
+const scoringFunction = weave.op(function isEqual({ modelOutput, datasetRow }) {
+  return modelOutput == datasetRow.expected;
+});
+
+// Define the function to evaluate
+const model = weave.op(async function alwaysParisModel({ question }) {
+  return 'Paris';
+});
+
+// Start evaluating
+const evaluation = new weave.Evaluation({
+  id: 'my-evaluation',
+  dataset: dataset,
+  scorers: [scoringFunction],
+});
+
+const results = await evaluation.evaluate({ model });
+```
+
+## Extends
+
+- [`WeaveObject`](WeaveObject.md)
+
+## Type Parameters
+
+• **R** *extends* `DatasetRow`
+
+• **E** *extends* `DatasetRow`
+
+• **M**
+
+## Constructors
+
+### new Evaluation()
+
+> **new Evaluation**\(`parameters`): [`Evaluation`](Evaluation.md)\
+
+#### Parameters
+
+• **parameters**: `EvaluationParameters`\
+
+#### Returns
+
+[`Evaluation`](Evaluation.md)\
+
+#### Overrides
+
+[`WeaveObject`](WeaveObject.md).[`constructor`](WeaveObject.md#constructors)
+
+#### Defined in
+
+[evaluation.ts:148](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/evaluation.ts#L148)
+
+## Properties
+
+### \_\_savedRef?
+
+> `optional` **\_\_savedRef**: `ObjectRef` \| `Promise`\
+
+#### Inherited from
+
+[`WeaveObject`](WeaveObject.md).[`__savedRef`](WeaveObject.md#__savedref)
+
+#### Defined in
+
+[weaveObject.ts:49](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveObject.ts#L49)
+
+***
+
+### \_baseParameters
+
+> `protected` **\_baseParameters**: `WeaveObjectParameters`
+
+#### Inherited from
+
+[`WeaveObject`](WeaveObject.md).[`_baseParameters`](WeaveObject.md#_baseparameters)
+
+#### Defined in
+
+[weaveObject.ts:51](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveObject.ts#L51)
+
+## Accessors
+
+### description
+
+> `get` **description**(): `undefined` \| `string`
+
+#### Returns
+
+`undefined` \| `string`
+
+#### Inherited from
+
+[`WeaveObject`](WeaveObject.md).[`description`](WeaveObject.md#description)
+
+#### Defined in
+
+[weaveObject.ts:89](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveObject.ts#L89)
+
+***
+
+### id
+
+> `get` **id**(): `string`
+
+#### Returns
+
+`string`
+
+#### Inherited from
+
+[`WeaveObject`](WeaveObject.md).[`id`](WeaveObject.md#id)
+
+#### Defined in
+
+[weaveObject.ts:85](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveObject.ts#L85)
+
+## Methods
+
+### className()
+
+> **className**(): `any`
+
+#### Returns
+
+`any`
+
+#### Inherited from
+
+[`WeaveObject`](WeaveObject.md).[`className`](WeaveObject.md#classname)
+
+#### Defined in
+
+[weaveObject.ts:53](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveObject.ts#L53)
+
+***
+
+### evaluate()
+
+> **evaluate**(`__namedParameters`): `Promise`\\>
+
+#### Parameters
+
+• **\_\_namedParameters**
+
+• **\_\_namedParameters.maxConcurrency?**: `number` = `5`
+
+• **\_\_namedParameters.model**: `WeaveCallable`\ `Promise`\\>
+
+• **\_\_namedParameters.nTrials?**: `number` = `1`
+
+#### Returns
+
+`Promise`\\>
+
+#### Defined in
+
+[evaluation.ts:163](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/evaluation.ts#L163)
+
+***
+
+### predictAndScore()
+
+> **predictAndScore**(`__namedParameters`): `Promise`\
+
+#### Parameters
+
+• **\_\_namedParameters**
+
+• **\_\_namedParameters.columnMapping?**: `ColumnMapping`\
+
+• **\_\_namedParameters.example**: `R`
+
+• **\_\_namedParameters.model**: `WeaveCallable`\ `Promise`\\>
+
+#### Returns
+
+`Promise`\
+
+##### model\_latency
+
+> **model\_latency**: `number` = `modelLatency`
+
+##### model\_output
+
+> **model\_output**: `any` = `modelOutput`
+
+##### model\_success
+
+> **model\_success**: `boolean` = `!modelError`
+
+##### scores
+
+> **scores**: `object`
+
+###### Index Signature
+
+ \[`key`: `string`\]: `any`
+
+#### Defined in
+
+[evaluation.ts:232](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/evaluation.ts#L232)
+
+***
+
+### saveAttrs()
+
+> **saveAttrs**(): `object`
+
+#### Returns
+
+`object`
+
+#### Inherited from
+
+[`WeaveObject`](WeaveObject.md).[`saveAttrs`](WeaveObject.md#saveattrs)
+
+#### Defined in
+
+[weaveObject.ts:57](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/weaveObject.ts#L57)
+
+[Source](https://weave-docs.wandb.ai/reference/typescript-sdk/weave/classes/Evaluation)
+
+<!--- Docs: TypeScript SDK -->
+<!--- Op -->
+
+# Op
+
+[**weave**](../README.md) • **Docs**
+
+***
+
+[weave](../README.md) / Op
+
+# Type Alias: Op\
+
+> **Op**\: `object` & `T`
+
+## Type declaration
+
+### \_\_boundThis?
+
+> `optional` **\_\_boundThis**: [`WeaveObject`](../classes/WeaveObject.md)
+
+### \_\_isOp
+
+> **\_\_isOp**: `true`
+
+### \_\_name
+
+> **\_\_name**: `string`
+
+### \_\_savedRef?
+
+> `optional` **\_\_savedRef**: `OpRef` \| `Promise`\
+
+### \_\_wrappedFunction
+
+> **\_\_wrappedFunction**: `T`
+
+## Type Parameters
+
+• **T** *extends* (...`args`) => `any`
+
+## Defined in
+
+[opType.ts:6](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/opType.ts#L6)
+
+[Source](https://weave-docs.wandb.ai/reference/typescript-sdk/weave/type-aliases/Op)
+
+<!--- Docs: TypeScript SDK -->
+<!--- Requirecurrentcallstackentry -->
+
+# Requirecurrentcallstackentry
+
+[**weave**](../README.md) • **Docs**
+
+***
+
+[weave](../README.md) / requireCurrentCallStackEntry
+
+# Function: requireCurrentCallStackEntry()
+
+> **requireCurrentCallStackEntry**(): `CallStackEntry`
+
+## Returns
+
+`CallStackEntry`
+
+## Defined in
+
+[clientApi.ts:119](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/clientApi.ts#L119)
+
+[Source](https://weave-docs.wandb.ai/reference/typescript-sdk/weave/functions/requireCurrentCallStackEntry)
+
+<!--- Docs: TypeScript SDK -->
+<!--- Weaveaudio -->
+
+# Weaveaudio
+
+[**weave**](../README.md) • **Docs**
+
+***
+
+[weave](../README.md) / weaveAudio
+
+# Function: weaveAudio()
+
+> **weaveAudio**(`options`): `WeaveAudio`
+
+Create a new WeaveAudio object
+
+## Parameters
+
+• **options**: `WeaveAudioInput`
+
+The options for this media type
+   - data: The raw audio data as a Buffer
+   - audioType: (Optional) The type of audio file, currently only 'wav' is supported
+
+## Returns
+
+`WeaveAudio`
+
+## Example
+
+```ts
+const audioBuffer = fs.readFileSync('path/to/audio.wav');
+const weaveAudio = weaveAudio({ data: audioBuffer });
+```
+
+## Defined in
+
+[media.ts:62](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/media.ts#L62)
+
+[Source](https://weave-docs.wandb.ai/reference/typescript-sdk/weave/functions/weaveAudio)
+
+<!--- Docs: TypeScript SDK -->
+<!--- Weaveimage -->
+
+# Weaveimage
+
+[**weave**](../README.md) • **Docs**
+
+***
+
+[weave](../README.md) / weaveImage
+
+# Function: weaveImage()
+
+> **weaveImage**(`options`): `WeaveImage`
+
+Create a new WeaveImage object
+
+## Parameters
+
+• **options**: `WeaveImageInput`
+
+The options for this media type
+   - data: The raw image data as a Buffer
+   - imageType: (Optional) The type of image file, currently only 'png' is supported
+
+## Returns
+
+`WeaveImage`
+
+## Example
+
+```ts
+const imageBuffer = fs.readFileSync('path/to/image.png');
+const weaveImage = weaveImage({ data: imageBuffer });
+```
+
+## Defined in
+
+[media.ts:28](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/media.ts#L28)
+
+[Source](https://weave-docs.wandb.ai/reference/typescript-sdk/weave/functions/weaveImage)
+
+<!--- Docs: TypeScript SDK -->
+<!--- Op -->
+
+# Op
+
+[**weave**](../README.md) • **Docs**
+
+***
+
+[weave](../README.md) / op
+
+# Function: op()
+
+## op(fn, options)
+
+> **op**\(`fn`, `options`?): [`Op`](../type-aliases/Op.md)\ `Promise`\\>\>\>
+
+A wrapper to weave op-ify a function or method that works on sync and async functions.
+
+Wrapped functions:
+ 1. Take the same inputs and return the same outputs as the original function.
+ 2. Will automatically track calls in the Weave UI.
+
+If you don't call `weave.init` then the function will behave as if it were not wrapped.
+
+### Type Parameters
+
+• **T** *extends* (...`args`) => `any`
+
+### Parameters
+
+• **fn**: `T`
+
+The function to wrap
+
+• **options?**: `OpOptions`\
+
+Optional configs like call and param naming
+
+### Returns
+
+[`Op`](../type-aliases/Op.md)\ `Promise`\\>\>\>
+
+The wrapped function
+
+### Example
+
+```ts
+// Basic usage
+
+const client = await weave.init({ project: 'my-project' });
+const oaiClient = weave.wrapOpenAI(new OpenAI());
+
+const extract = weave.op(async function extract() {
+  return await oaiClient.chat.completions.create({
+    model: 'gpt-4-turbo',
+    messages: [{ role: 'user', content: 'Create a user as JSON' }],
+  });
+});
+
+await extract();
+
+// You can also wrap methods by passing the object as the first argument.
+// This will bind the method to the object and wrap it with op.
+class MyModel {
+  private oaiClient: OpenAI;
+
+  constructor() {
+    this.oaiClient = weave.wrapOpenAI(new OpenAI());
+    this.invoke = weave.op(this, this.invoke);
+  }
+
+  async invoke() {
+    return await this.oaiClient.chat.completions.create({
+      model: 'gpt-4-turbo',
+      messages: [{ role: 'user', content: 'Create a user as JSON' }],
+    });
+  }
+}
+
+const model = new MyModel();
+const res = await model.invoke();
+```
+
+### Defined in
+
+[op.ts:58](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/op.ts#L58)
+
+## op(thisArg, fn, options)
+
+> **op**\(`thisArg`, `fn`, `options`?): [`Op`](../type-aliases/Op.md)\ `Promise`\\>\>\>
+
+### Type Parameters
+
+• **T** *extends* (...`args`) => `any`
+
+### Parameters
+
+• **thisArg**: `any`
+
+• **fn**: `T`
+
+• **options?**: `OpOptions`\
+
+### Returns
+
+[`Op`](../type-aliases/Op.md)\ `Promise`\\>\>\>
+
+### Defined in
+
+[op.ts:62](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/op.ts#L62)
+
+[Source](https://weave-docs.wandb.ai/reference/typescript-sdk/weave/functions/op)
+
+<!--- Docs: TypeScript SDK -->
+<!--- Login -->
+
+# Login
+
+[**weave**](../README.md) • **Docs**
+
+***
+
+[weave](../README.md) / login
+
+# Function: login()
+
+> **login**(`apiKey`, `host`?): `Promise`\
+
+Log in to Weights & Biases (W&B) using the provided API key.
+This function saves the credentials to your netrc file for future use.
+
+## Parameters
+
+• **apiKey**: `string`
+
+Your W&B API key.
+
+• **host?**: `string` = `defaultHost`
+
+(Optional) The host name (usually only needed if you're using a custom W&B server).
+
+## Returns
+
+`Promise`\
+
+## Throws
+
+If the API key is not specified or if the connection to the weave trace server cannot be verified.
+
+## Defined in
+
+[clientApi.ts:22](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/clientApi.ts#L22)
+
+[Source](https://weave-docs.wandb.ai/reference/typescript-sdk/weave/functions/login)
+
+<!--- Docs: TypeScript SDK -->
+<!--- Init -->
+
+# Init
+
+[**weave**](../README.md) • **Docs**
+
+***
+
+[weave](../README.md) / init
+
+# Function: init()
+
+> **init**(`project`, `settings`?): `Promise`\
+
+Initialize the Weave client, which is required for weave tracing to work.
+
+## Parameters
+
+• **project**: `string`
+
+The W&B project name (can be project or entity/project).
+
+• **settings?**: `Settings`
+
+(Optional) Weave tracing settings
+
+## Returns
+
+`Promise`\
+
+A promise that resolves to the initialized Weave client.
+
+## Throws
+
+If the initialization fails
+
+## Defined in
+
+[clientApi.ts:57](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/clientApi.ts#L57)
+
+[Source](https://weave-docs.wandb.ai/reference/typescript-sdk/weave/functions/init)
+
+<!--- Docs: TypeScript SDK -->
+<!--- Wrapopenai -->
+
+# Wrapopenai
+
+[**weave**](../README.md) • **Docs**
+
+***
+
+[weave](../README.md) / wrapOpenAI
+
+# Function: wrapOpenAI()
+
+> **wrapOpenAI**\(`openai`): `T`
+
+Wraps the OpenAI API to enable function tracing for OpenAI calls.
+
+## Type Parameters
+
+• **T** *extends* `OpenAIAPI`
+
+## Parameters
+
+• **openai**: `T`
+
+## Returns
+
+`T`
+
+## Example
+
+```ts
+const openai = wrapOpenAI(new OpenAI());
+const result = await openai.chat.completions.create({
+  model: 'gpt-3.5-turbo',
+  messages: [{ role: 'user', content: 'Hello, world!' }]
+});
+```
+
+## Defined in
+
+[integrations/openai.ts:159](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/integrations/openai.ts#L159)
+
+[Source](https://weave-docs.wandb.ai/reference/typescript-sdk/weave/functions/wrapOpenAI)
+
+<!--- Docs: TypeScript SDK -->
+<!--- Requirecurrentchildsummary -->
+
+# Requirecurrentchildsummary
+
+[**weave**](../README.md) • **Docs**
+
+***
+
+[weave](../README.md) / requireCurrentChildSummary
+
+# Function: requireCurrentChildSummary()
+
+> **requireCurrentChildSummary**(): `object`
+
+## Returns
+
+`object`
+
+## Defined in
+
+[clientApi.ts:131](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/clientApi.ts#L131)
+
+[Source](https://weave-docs.wandb.ai/reference/typescript-sdk/weave/functions/requireCurrentChildSummary)
+
+<!--- Docs: TypeScript SDK -->
+<!--- Callsfilter -->
+
+# Callsfilter
+
+[**weave**](../README.md) • **Docs**
+
+***
+
+[weave](../README.md) / CallsFilter
+
+# Interface: CallsFilter
+
+CallsFilter
+
+## Properties
+
+### call\_ids?
+
+> `optional` **call\_ids**: `null` \| `string`[]
+
+Call Ids
+
+#### Defined in
+
+[generated/traceServerApi.ts:197](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L197)
+
+***
+
+### input\_refs?
+
+> `optional` **input\_refs**: `null` \| `string`[]
+
+Input Refs
+
+#### Defined in
+
+[generated/traceServerApi.ts:189](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L189)
+
+***
+
+### op\_names?
+
+> `optional` **op\_names**: `null` \| `string`[]
+
+Op Names
+
+#### Defined in
+
+[generated/traceServerApi.ts:187](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L187)
+
+***
+
+### output\_refs?
+
+> `optional` **output\_refs**: `null` \| `string`[]
+
+Output Refs
+
+#### Defined in
+
+[generated/traceServerApi.ts:191](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L191)
+
+***
+
+### parent\_ids?
+
+> `optional` **parent\_ids**: `null` \| `string`[]
+
+Parent Ids
+
+#### Defined in
+
+[generated/traceServerApi.ts:193](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L193)
+
+***
+
+### trace\_ids?
+
+> `optional` **trace\_ids**: `null` \| `string`[]
+
+Trace Ids
+
+#### Defined in
+
+[generated/traceServerApi.ts:195](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L195)
+
+***
+
+### trace\_roots\_only?
+
+> `optional` **trace\_roots\_only**: `null` \| `boolean`
+
+Trace Roots Only
+
+#### Defined in
+
+[generated/traceServerApi.ts:199](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L199)
+
+***
+
+### wb\_run\_ids?
+
+> `optional` **wb\_run\_ids**: `null` \| `string`[]
+
+Wb Run Ids
+
+#### Defined in
+
+[generated/traceServerApi.ts:203](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L203)
+
+***
+
+### wb\_user\_ids?
+
+> `optional` **wb\_user\_ids**: `null` \| `string`[]
+
+Wb User Ids
+
+#### Defined in
+
+[generated/traceServerApi.ts:201](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L201)
+
+[Source](https://weave-docs.wandb.ai/reference/typescript-sdk/weave/interfaces/CallsFilter)
+
+<!--- Docs: TypeScript SDK -->
+<!--- Callschema -->
+
+# Callschema
+
+[**weave**](../README.md) • **Docs**
+
+***
+
+[weave](../README.md) / CallSchema
+
+# Interface: CallSchema
+
+CallSchema
+
+## Properties
+
+### attributes
+
+> **attributes**: `object`
+
+Attributes
+
+#### Defined in
+
+[generated/traceServerApi.ts:119](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L119)
+
+***
+
+### deleted\_at?
+
+> `optional` **deleted\_at**: `null` \| `string`
+
+Deleted At
+
+#### Defined in
+
+[generated/traceServerApi.ts:134](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L134)
+
+***
+
+### display\_name?
+
+> `optional` **display\_name**: `null` \| `string`
+
+Display Name
+
+#### Defined in
+
+[generated/traceServerApi.ts:108](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L108)
+
+***
+
+### ended\_at?
+
+> `optional` **ended\_at**: `null` \| `string`
+
+Ended At
+
+#### Defined in
+
+[generated/traceServerApi.ts:123](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L123)
+
+***
+
+### exception?
+
+> `optional` **exception**: `null` \| `string`
+
+Exception
+
+#### Defined in
+
+[generated/traceServerApi.ts:125](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L125)
+
+***
+
+### id
+
+> **id**: `string`
+
+Id
+
+#### Defined in
+
+[generated/traceServerApi.ts:102](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L102)
+
+***
+
+### inputs
+
+> **inputs**: `object`
+
+Inputs
+
+#### Defined in
+
+[generated/traceServerApi.ts:121](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L121)
+
+***
+
+### op\_name
+
+> **op\_name**: `string`
+
+Op Name
+
+#### Defined in
+
+[generated/traceServerApi.ts:106](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L106)
+
+***
+
+### output?
+
+> `optional` **output**: `null`
+
+Output
+
+#### Defined in
+
+[generated/traceServerApi.ts:127](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L127)
+
+***
+
+### parent\_id?
+
+> `optional` **parent\_id**: `null` \| `string`
+
+Parent Id
+
+#### Defined in
+
+[generated/traceServerApi.ts:112](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L112)
+
+***
+
+### project\_id
+
+> **project\_id**: `string`
+
+Project Id
+
+#### Defined in
+
+[generated/traceServerApi.ts:104](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L104)
+
+***
+
+### started\_at
+
+> **started\_at**: `string`
+
+Started At
+
+#### Format
+
+date-time
+
+#### Defined in
+
+[generated/traceServerApi.ts:117](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L117)
+
+***
+
+### summary?
+
+> `optional` **summary**: `object`
+
+#### Defined in
+
+[generated/traceServerApi.ts:128](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L128)
+
+***
+
+### trace\_id
+
+> **trace\_id**: `string`
+
+Trace Id
+
+#### Defined in
+
+[generated/traceServerApi.ts:110](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L110)
+
+***
+
+### wb\_run\_id?
+
+> `optional` **wb\_run\_id**: `null` \| `string`
+
+Wb Run Id
+
+#### Defined in
+
+[generated/traceServerApi.ts:132](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L132)
+
+***
+
+### wb\_user\_id?
+
+> `optional` **wb\_user\_id**: `null` \| `string`
+
+Wb User Id
+
+#### Defined in
+
+[generated/traceServerApi.ts:130](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L130)
+
+[Source](https://weave-docs.wandb.ai/reference/typescript-sdk/weave/interfaces/CallSchema)

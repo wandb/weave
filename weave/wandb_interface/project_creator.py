@@ -5,22 +5,11 @@ import logging
 from collections.abc import Iterator
 from contextlib import contextmanager
 
-import wandb
-from wandb import errors as wandb_errors
-from wandb.sdk.internal.internal_api import Api as InternalApi
-from wandb.sdk.internal.internal_api import logger as wandb_logger
+from weave.compat import wandb
+from weave.compat.wandb import WANDB_AVAILABLE, wandb_logger
 
 
-class AuthenticationError(wandb_errors.AuthenticationError):
-    pass
-
-
-class CommError(wandb_errors.CommError):
-    pass
-
-
-class UnableToCreateProject(Exception):
-    pass
+class UnableToCreateProjectError(Exception): ...
 
 
 logger = logging.getLogger(__name__)
@@ -30,10 +19,12 @@ logger = logging.getLogger(__name__)
 def wandb_logging_disabled() -> Iterator[None]:
     original_termerror = wandb.termerror
     wandb.termerror = lambda *args, **kwargs: None
-    original_log_level = wandb_logger.getEffectiveLevel()
-    wandb_logger.setLevel(logging.CRITICAL)
+    if WANDB_AVAILABLE:
+        original_log_level = wandb_logger.getEffectiveLevel()
+        wandb_logger.setLevel(logging.CRITICAL)
     yield None
-    wandb_logger.setLevel(original_log_level)
+    if WANDB_AVAILABLE:
+        wandb_logger.setLevel(original_log_level)
     wandb.termerror = original_termerror
 
 
@@ -49,30 +40,45 @@ def _ensure_project_exists(entity_name: str, project_name: str) -> dict[str, str
     characters. Adheres to trace_server_interface.EnsureProjectExistsRes
     """
     wandb_logging_disabled()
-    api = InternalApi({"entity": entity_name, "project": project_name})
-    # Since `UpsertProject` will fail if the user does not have permission to create a project
-    # we must first check if the project exists
-    project = api.project(entity=entity_name, project=project_name)
-    if project is None:
-        exception = None
-        try:
-            project = api.upsert_project(entity=entity_name, project=project_name)
-        except Exception as e:
-            exception = e
-        if project is None:
-            if exception is not None:
-                logger.error(f"Unable to access `{entity_name}/{project_name}`.")
-                logger.error(exception.message)
+    api = wandb.Api()
 
-                # Re-throw to not confuse the user with deep stack traces
-                if isinstance(exception, wandb_errors.AuthenticationError):
-                    raise AuthenticationError(exception.message)
-                elif isinstance(exception, wandb_errors.CommError):
-                    raise CommError(exception.message)
-                else:
-                    raise exception
-            else:
-                raise UnableToCreateProject(
-                    f"Failed to create project {entity_name}/{project_name}"
-                )
+    # Check if the project already exists
+    project_response = api.project(entity_name, project_name)
+    if project_response is not None and project_response.get("project") is not None:
+        return _format_project_result(project_response["project"])
+
+    # Try to create the project
+    exception = None
+    try:
+        project_response = api.upsert_project(entity=entity_name, project=project_name)
+    except Exception as e:
+        exception = e
+
+    if (
+        project_response is not None
+        and project_response.get("upsertModel") is not None
+        and project_response["upsertModel"].get("model") is not None
+    ):
+        return _format_project_result(project_response["upsertModel"]["model"])
+
+    # Project creation failed
+    if exception is None:
+        raise UnableToCreateProjectError(
+            f"Failed to create project {entity_name}/{project_name}"
+        )
+
+    # Log and re-raise with clean exception types
+    logger.error(f"Unable to access `{entity_name}/{project_name}`.")
+    logger.error(str(exception))
+
+    if isinstance(exception, (wandb.AuthenticationError, wandb.CommError)):
+        # Suppress the stack trace for these exceptions to minimize noise for users
+        cls = exception.__class__
+        raise cls(str(exception)) from None
+
+    raise exception
+
+
+def _format_project_result(project: dict) -> dict[str, str]:
+    """Convert project dict to the expected result format."""
     return {"project_name": project["name"]}

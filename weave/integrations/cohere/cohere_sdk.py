@@ -5,9 +5,9 @@ from functools import wraps
 from typing import TYPE_CHECKING, Any, Callable
 
 import weave
+from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
-from weave.trace.op_extensions.accumulator import add_accumulator
-from weave.trace.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
+from weave.trace.op import _add_accumulator
 
 if TYPE_CHECKING:
     from cohere.types.non_streamed_chat_response import NonStreamedChatResponse
@@ -27,10 +27,13 @@ def cohere_accumulator(acc: dict | None, value: Any) -> NonStreamedChatResponse:
         acc = {}
 
     # we wait for the last event
-    if hasattr(value, "event_type"):
-        if value.event_type == "stream-end" and value.is_finished:
-            if value.response:
-                acc = value.response
+    if (
+        hasattr(value, "event_type")
+        and value.event_type == "stream-end"
+        and value.is_finished
+        and value.response
+    ):
+        acc = value.response
     return acc
 
 
@@ -64,16 +67,19 @@ def cohere_accumulator_v2(acc: dict | None, value: Any) -> NonStreamedChatRespon
     if value is None:
         return acc
 
-    if value.type == "content-start" and value.delta.message.content.type == "text":
-        if len(acc.message.content) == value.index:  # type: ignore
-            acc.message.content.append(value.delta.message.content.text)  # type: ignore
+    if (
+        value.type == "content-start"
+        and value.delta.message.content.type == "text"
+        and len(acc.message.content) == value.index  # type: ignore
+    ):
+        acc.message.content.append(value.delta.message.content.text)  # type: ignore
 
     if value.type == "content-delta":
-        _content = _accumulate_content(
+        content = _accumulate_content(
             acc.message.content[value.index],  # type: ignore
             value.delta.message.content.text,  # type: ignore
         )
-        acc.message.content[value.index] = _content  # type: ignore
+        acc.message.content[value.index] = content  # type: ignore
 
     if value.type == "message-end":
         acc = acc.copy(  # type: ignore
@@ -167,7 +173,7 @@ def cohere_stream_wrapper(settings: OpSettings) -> Callable:
     def wrapper(fn: Callable) -> Callable:
         op_kwargs = settings.model_dump()
         op = weave.op(fn, **op_kwargs)
-        return add_accumulator(op, lambda inputs: cohere_accumulator)
+        return _add_accumulator(op, lambda inputs: cohere_accumulator)
 
     return wrapper
 
@@ -176,7 +182,7 @@ def cohere_stream_wrapper_v2(settings: OpSettings) -> Callable:
     def wrapper(fn: Callable) -> Callable:
         op_kwargs = settings.model_dump()
         op = weave.op(fn, **op_kwargs)
-        return add_accumulator(op, lambda inputs: cohere_accumulator_v2)
+        return _add_accumulator(op, lambda inputs: cohere_accumulator_v2)
 
     return wrapper
 

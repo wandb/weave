@@ -1,13 +1,13 @@
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# App versioning
+# Tutorial: App versioning
 
-Tracking the [inputs, outputs, metadata](/quickstart) as well as [data flowing through your app](/tutorial-tracing_2) is critical to understanding the performance of your system. However **versioning your app over time** is also critical to understand how modifications to your code or app attributes change your outputs. Weave's `Model` class is how these changes can be tracked in Weave.
+Tracking the [inputs, outputs, metadata](/quickstart) as well as [data flowing through your app](/tutorial-tracing_2) is critical to understanding the performance of your system. However **versioning your app over time** is also critical to understand how modifications to your code or application parameters change your outputs. W&B Weave's `Model` class is how these changes can be tracked in Weave.
 
 In this tutorial you'll learn:
 
-- How to use Weave `Model` to track and version your app and its attributes.
+- How to use Weave `Model` to track and version your application and its parameters.
 - How to export, modify and re-use a Weave `Model` already logged.
 
 ## Using `weave.Model`
@@ -18,15 +18,15 @@ The `weave.Model` class is currently only supported in Python.
 
 :::
 
-Using Weave `Model`s means that attributes such as model vendor ids, prompts, temperature, and more are stored and versioned when they change.
+Using Weave `Model`s means that parameters such as model vendor ids, prompts, temperature, and more are stored and versioned when they change.
 
 To create a `Model` in Weave, you need the following:
 
 - a class that inherits from `weave.Model`
-- type definitions on all class attributes
+- type definitions on all class fields
 - a typed `invoke` function with the `@weave.op()` decorator
 
-When you change the class attributes or the code that defines your model, **these changes will be logged and the version will be updated**. This ensures that you can compare the generations across different versions of your app.
+When you change the class fields or the code that defines your model, **these changes will be logged and the version will be updated**. This ensures that you can compare the generations across different versions of your app.
 
 In the example below, the **model name, temperature and system prompt will be tracked and versioned**:
 
@@ -118,7 +118,7 @@ Now you can instantiate and call the model with `invoke`:
   </TabItem>
 </Tabs>
 
-Now after calling `.invoke` you can see the trace in Weave **now tracks the model attributes as well as the code** for the model functions that have been decorated with `weave.op()`. You can see the model is also versioned, "v21" in this case, and if you click on the model **you can see all of the calls** that have used that version of the model
+Now after calling `.invoke` you can see the trace in Weave **now tracks the model parameters as well as the code** for the model functions that have been decorated with `weave.op()`. You can see the model is also versioned, "v21" in this case, and if you click on the model **you can see all of the calls** that have used that version of the model
 
 ![Re-using a weave model](../static/img/tutorial-model_invoke3.png)
 
@@ -126,7 +126,7 @@ Now after calling `.invoke` you can see the trace in Weave **now tracks the mode
 
 - You can use `predict` instead of `invoke` for the name of the function in your Weave `Model` if you prefer.
 - If you want other class methods to be tracked by weave they need to be wrapped in `weave.op()`
-- Attributes starting with an underscore are ignored by weave and won't be logged
+- Parameters starting with an underscore are ignored by weave and won't be logged
 
 ## Exporting and re-using a logged `weave.Model`
 

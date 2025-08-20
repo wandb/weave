@@ -1,7 +1,7 @@
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Track data flows and app metadata
+# Tutorial: Track Application Logic
 
 In the [Track LLM inputs & outputs](/quickstart) tutorial, the basics of tracking the inputs and outputs of your LLMs was covered.
 
@@ -12,7 +12,7 @@ In this tutorial you will learn how to:
 
 ## Tracking nested function calls
 
-LLM-powered applications can contain multiple LLMs calls and additional data processing and validation logic that is important to monitor. Even deep nested call structures common in many apps, Weave will keep track of the parent-child relationships in nested functions as long as `weave.op()` is added to every function you'd like to track.
+LLM-powered applications can contain multiple LLMs calls and additional data processing and validation logic that is important to monitor. Even deep nested call structures common in many apps, W&B Weave will keep track of the parent-child relationships in nested functions as long as `weave.op()` is added to every function you'd like to track.
 
 Building on our [basic tracing example](/quickstart), we will now add additional logic to count the returned items from our LLM and wrap them all in a higher level function. We'll then add `weave.op()` to trace every function, its call order and its parent-child relationship:
 
@@ -87,7 +87,7 @@ Building on our [basic tracing example](/quickstart), we will now add additional
     import OpenAI from 'openai';
     import * as weave from 'weave';
 
-    const openai = weave.wrapOpenAI(new OpenAI());
+    const openai = new OpenAI();
 
     const extractDinos = weave.op(async (sentence: string) => {
       const response = await openai.chat.completions.create({
@@ -175,7 +175,7 @@ Continuing our example from above:
 :::note
 It's recommended to use metadata tracking to track metadata at run time, e.g. user ids or whether or not the call is part of the development process or is in production etc.
 
-To track system attributes, such as a System Prompt, we recommend using [weave Models](guides/core-types/models)
+To track system settings, such as a System Prompt, we recommend using [weave Models](guides/core-types/models)
 :::
 
 ## What's next?

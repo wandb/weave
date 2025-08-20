@@ -5,6 +5,7 @@ from pyarrow import compute as pc
 
 from weave_query import weave_types as types
 from weave_query import graph
+from weave_query.arrow.list_ import ArrowWeaveList
 
 
 # Reimplementation of Weave0 `toSafeCall` which
@@ -72,3 +73,26 @@ def equal(lhs: pa.Array, rhs: typing.Union[pa.Array, pa.Scalar]) -> pa.Array:
     result = pc.replace_with_mask(result, both_null, True)
     result = pc.replace_with_mask(result, one_null, False)
     return result
+
+
+def handle_dictionary_array(
+    self: ArrowWeaveList,
+    operation: typing.Callable,
+    output_type: types.Type,
+    *args,
+    **kwargs,
+) -> ArrowWeaveList:
+    if isinstance(self._arrow_data, pa.DictionaryArray):
+        return ArrowWeaveList(
+            pa.DictionaryArray.from_arrays(
+                self._arrow_data.indices,
+                operation(self._arrow_data.dictionary, *args, **kwargs),
+            ),
+            output_type,
+            self._artifact,
+        )
+    return ArrowWeaveList(
+        operation(self._arrow_data, *args, **kwargs),
+        output_type,
+        self._artifact,
+    )

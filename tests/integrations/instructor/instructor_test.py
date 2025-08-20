@@ -49,7 +49,7 @@ def test_instructor_openai(
         messages=[{"role": "user", "content": "My name is John and I am 20 years old"}],
     )
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 2
 
     call = calls[0]
@@ -58,6 +58,45 @@ def test_instructor_openai(
     output = call.output
     assert output.person_name == "John"
     assert output.age == 20
+
+    call = calls[1]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
+    output = call.output
+    output_arguments = json.loads(
+        output["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"]
+    )
+    assert "person_name" in output_arguments
+    assert "age" in output_arguments
+    assert "John" in output_arguments["person_name"]
+    assert output_arguments["age"] == 20
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization", "x-api-key"],
+    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
+def test_instructor_openai_with_completion(
+    client: weave.trace.weave_client.WeaveClient,
+) -> None:
+    import instructor
+    from openai import OpenAI
+
+    api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
+    lm_client = instructor.from_openai(OpenAI(api_key=api_key))
+    person = lm_client.chat.completions.create_with_completion(
+        model="gpt-3.5-turbo",
+        response_model=Person,
+        messages=[{"role": "user", "content": "My name is John and I am 20 years old"}],
+    )
+
+    calls = list(client.get_calls())
+    assert len(calls) == 2
+
+    call = calls[0]
+    assert call.started_at < call.ended_at
+    assert op_name_from_ref(call.op_name) == "Instructor.create_with_completion"
 
     call = calls[1]
     assert call.started_at < call.ended_at
@@ -97,7 +136,7 @@ def test_instructor_openai_async(
 
     asyncio.run(extract_person("My name is John and I am 20 years old"))
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 2
 
     call = calls[0]
@@ -150,7 +189,7 @@ def test_instructor_iterable(
         ],
     )
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 2
 
     call = calls[0]
@@ -210,7 +249,7 @@ def test_instructor_iterable_sync_stream(
     )
     _ = list(users)
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 2
 
     call = calls[0]
@@ -264,11 +303,12 @@ def test_instructor_iterable_async_stream(
 
     asyncio.run(print_iterable_results())
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 2
 
     call = calls[0]
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     assert call.started_at < call.ended_at
     assert op_name_from_ref(call.op_name) == "AsyncInstructor.create"
     output = call.output
@@ -278,7 +318,8 @@ def test_instructor_iterable_async_stream(
     assert output[1].age == 30
 
     call = calls[1]
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     assert call.started_at < call.ended_at
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
 
@@ -327,11 +368,12 @@ list of speakers.
     )
     _ = list(extraction_stream)
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 2
 
     call = calls[0]
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     assert call.started_at < call.ended_at
     assert op_name_from_ref(call.op_name) == "Instructor.create_partial"
     output = call.output
@@ -346,7 +388,8 @@ list of speakers.
     assert output.users[2].twitter == "@CodeMaster2023"
 
     call = calls[1]
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     assert call.started_at < call.ended_at
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
 
@@ -399,11 +442,12 @@ list of speakers.
 
     _ = asyncio.run(fetch_results(text_block))
 
-    calls = list(client.calls())
+    calls = list(client.get_calls())
     assert len(calls) == 2
 
     call = calls[0]
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     assert call.started_at < call.ended_at
     assert op_name_from_ref(call.op_name) == "AsyncInstructor.create_partial"
     output = call.output
@@ -418,6 +462,7 @@ list of speakers.
     assert output.users[2].twitter == "@CodeMaster2023"
 
     call = calls[1]
-    assert call.exception is None and call.ended_at is not None
+    assert call.exception is None
+    assert call.ended_at is not None
     assert call.started_at < call.ended_at
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"

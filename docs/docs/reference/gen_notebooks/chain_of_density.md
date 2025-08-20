@@ -353,8 +353,8 @@ For our evaluation, we'll use an LLM-as-a-judge approach. This technique involve
 ```python
 # Define the scorer function
 @weave.op()
-def quality_scorer(instruction: str, model_output: dict) -> dict:
-    result = evaluate_summary(model_output["final_summary"], instruction)
+def quality_scorer(instruction: str, output: dict) -> dict:
+    result = evaluate_summary(output["final_summary"], instruction)
     return result
 ```
 

@@ -1,27 +1,23 @@
-import base64
 import contextlib
+import json
 import logging
 import os
-import subprocess
-import time
 import typing
-import urllib
 from collections.abc import Iterator
+from datetime import datetime
+from unittest.mock import MagicMock, patch
 
 import pytest
-import requests
 from fastapi import FastAPI
+from fastapi.responses import StreamingResponse
 from fastapi.testclient import TestClient
 
 import weave
 from tests.trace.util import DummyTestException
+from tests.trace_server.conftest import *
+from tests.trace_server.conftest import TEST_ENTITY, get_trace_server_flag
 from weave.trace import autopatch, weave_client, weave_init
-from weave.trace_server import (
-    clickhouse_trace_server_batched,
-    external_to_internal_trace_server_adapter,
-    sqlite_trace_server,
-)
-from weave.trace_server import environment as ts_env
+from weave.trace.context.call_context import set_call_stack
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings import remote_http_trace_server
 from weave.trace_server_bindings.caching_middleware_trace_server import (
@@ -32,20 +28,66 @@ from weave.trace_server_bindings.caching_middleware_trace_server import (
 os.environ["WANDB_ERROR_REPORTING"] = "false"
 
 
-def pytest_addoption(parser):
-    parser.addoption(
-        "--weave-server",
-        action="store",
-        default="sqlite",
-        help="Specify the client object to use: sqlite or clickhouse",
-    )
+@pytest.fixture(autouse=True)
+def patch_kafka_producer():
+    """
+    Patch the Kafka producer. Without this, attempt to connect to the brokers will fail.
+    This is ok but this introduces a `message.timeout.ms` (500ms) delay in each test.
+
+    If a test needs to test the Kafka producer, they should orride this patch explicitly.
+    """
+    with patch(
+        "weave.trace_server.clickhouse_trace_server_batched.KafkaProducer.from_env",
+        return_value=MagicMock(),
+    ):
+        yield
 
 
-def pytest_collection_modifyitems(config, items):
-    # Add the weave_client marker to all tests that have a client fixture
-    for item in items:
-        if "client" in item.fixturenames or "client_creator" in item.fixturenames:
-            item.add_marker(pytest.mark.weave_client)
+@pytest.fixture(autouse=True)
+def disable_datadog():
+    """
+    Disables Datadog logging and tracing for tests.
+
+    This prevents Datadog from polluting test logs with messages like
+    'failed to send, dropping 1 traces to intake at...'
+    """
+    # Save original values to restore later
+    original_dd_env = os.environ.get("DD_ENV")
+    original_dd_trace = os.environ.get("DD_TRACE_ENABLED")
+
+    # Disable Datadog
+    os.environ["DD_ENV"] = "none"
+    os.environ["DD_TRACE_ENABLED"] = "false"
+
+    # Silence Datadog loggers
+    dd_loggers = [
+        "ddtrace",
+        "ddtrace.writer",
+        "ddtrace.api",
+        "ddtrace.internal",
+        "datadog",
+        "datadog.dogstatsd",
+        "datadog.api",
+    ]
+
+    original_levels = {}
+    for logger_name in dd_loggers:
+        logger = logging.getLogger(logger_name)
+        original_levels[logger_name] = logger.level
+        logger.setLevel(logging.CRITICAL)  # Only show critical errors
+
+    yield
+
+    # Restore original values
+    if original_dd_env is not None:
+        os.environ["DD_ENV"] = original_dd_env
+    elif "DD_ENV" in os.environ:
+        del os.environ["DD_ENV"]
+
+    if original_dd_trace is not None:
+        os.environ["DD_TRACE_ENABLED"] = original_dd_trace
+    elif "DD_TRACE_ENABLED" in os.environ:
+        del os.environ["DD_TRACE_ENABLED"]
 
 
 def pytest_sessionfinish(session, exitstatus):
@@ -130,14 +172,27 @@ class ThrowingServer(tsi.TraceServerInterface):
     def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
         raise DummyTestException("FAILURE - feedback_create, req:", req)
 
+    def feedback_create_batch(
+        self, req: tsi.FeedbackCreateBatchReq
+    ) -> tsi.FeedbackCreateBatchRes:
+        raise DummyTestException("FAILURE - feedback_create_batch, req:", req)
+
     def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
         raise DummyTestException("FAILURE - feedback_query, req:", req)
 
     def feedback_purge(self, req: tsi.FeedbackPurgeReq) -> tsi.FeedbackPurgeRes:
         raise DummyTestException("FAILURE - feedback_purge, req:", req)
 
+    def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
+        raise DummyTestException("FAILURE - evaluate_model, req:", req)
 
-@pytest.fixture()
+    def evaluation_status(
+        self, req: tsi.EvaluationStatusReq
+    ) -> tsi.EvaluationStatusRes:
+        raise DummyTestException("FAILURE - evaluation_status, req:", req)
+
+
+@pytest.fixture
 def client_with_throwing_server(client):
     curr_server = client.server
     client.server = ThrowingServer()
@@ -145,205 +200,6 @@ def client_with_throwing_server(client):
         yield client
     finally:
         client.server = curr_server
-
-
-@pytest.fixture(scope="session")
-def clickhouse_server():
-    server_up = _check_server_up(
-        ts_env.wf_clickhouse_host(), ts_env.wf_clickhouse_port()
-    )
-    if not server_up:
-        pytest.fail("clickhouse server is not running")
-
-
-@pytest.fixture(scope="session")
-def clickhouse_trace_server(clickhouse_server):
-    clickhouse_trace_server = (
-        clickhouse_trace_server_batched.ClickHouseTraceServer.from_env(
-            use_async_insert=False
-        )
-    )
-    clickhouse_trace_server._run_migrations()
-    yield clickhouse_trace_server
-
-
-def _check_server_health(
-    base_url: str, endpoint: str, num_retries: int = 1, sleep_time: int = 1
-) -> bool:
-    for _ in range(num_retries):
-        try:
-            response = requests.get(urllib.parse.urljoin(base_url, endpoint))
-            if response.status_code == 200:
-                return True
-            time.sleep(sleep_time)
-        except requests.exceptions.ConnectionError:
-            time.sleep(sleep_time)
-
-    print(
-        f"Server not healthy @ {urllib.parse.urljoin(base_url, endpoint)}: no response"
-    )
-    return False
-
-
-def _check_server_up(host, port) -> bool:
-    base_url = f"http://{host}:{port}/"
-    endpoint = "ping"
-
-    def server_healthy(num_retries=1):
-        return _check_server_health(
-            base_url=base_url, endpoint=endpoint, num_retries=num_retries
-        )
-
-    if server_healthy():
-        return True
-
-    if os.environ.get("CI") != "true":
-        print("CI is not true, not starting clickhouse server")
-
-        subprocess.Popen(
-            [
-                "docker",
-                "run",
-                "-d",
-                "--rm",
-                "-e",
-                "CLICKHOUSE_DB=default",
-                "-e",
-                "CLICKHOUSE_USER=default",
-                "-e",
-                "CLICKHOUSE_PASSWORD=",
-                "-e",
-                "CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1",
-                "-p",
-                f"{port}:8123",
-                "--name",
-                "weave-python-test-clickhouse-server",
-                "--ulimit",
-                "nofile=262144:262144",
-                "clickhouse/clickhouse-server",
-            ]
-        )
-
-    # wait for the server to start
-    return server_healthy(num_retries=30)
-
-
-class TwoWayMapping:
-    def __init__(self):
-        self._ext_to_int_map = {}
-        self._int_to_ext_map = {}
-
-        # Useful for testing to ensure caching is working
-        self.stats = {
-            "ext_to_int": {
-                "hits": 0,
-                "misses": 0,
-            },
-            "int_to_ext": {
-                "hits": 0,
-                "misses": 0,
-            },
-        }
-
-    def ext_to_int(self, key, default=None):
-        if key not in self._ext_to_int_map:
-            if default is None:
-                raise ValueError(f"Key {key} not found")
-            if default in self._int_to_ext_map:
-                raise ValueError(f"Default {default} already in use")
-            self._ext_to_int_map[key] = default
-            self._int_to_ext_map[default] = key
-            self.stats["ext_to_int"]["misses"] += 1
-        else:
-            self.stats["ext_to_int"]["hits"] += 1
-        return self._ext_to_int_map[key]
-
-    def int_to_ext(self, key, default):
-        if key not in self._int_to_ext_map:
-            if default is None:
-                raise ValueError(f"Key {key} not found")
-            if default in self._ext_to_int_map:
-                raise ValueError(f"Default {default} already in use")
-            self._int_to_ext_map[key] = default
-            self._ext_to_int_map[default] = key
-            self.stats["int_to_ext"]["misses"] += 1
-        else:
-            self.stats["int_to_ext"]["hits"] += 1
-        return self._int_to_ext_map[key]
-
-
-def b64(s: str) -> str:
-    # Base64 encode the string
-    return base64.b64encode(s.encode("ascii")).decode("ascii")
-
-
-class DummyIdConverter(external_to_internal_trace_server_adapter.IdConverter):
-    def __init__(self):
-        self._project_map = TwoWayMapping()
-        self._run_map = TwoWayMapping()
-        self._user_map = TwoWayMapping()
-
-    def ext_to_int_project_id(self, project_id: str) -> str:
-        return self._project_map.ext_to_int(project_id, b64(project_id))
-
-    def int_to_ext_project_id(self, project_id: str) -> typing.Optional[str]:
-        return self._project_map.int_to_ext(project_id, b64(project_id))
-
-    def ext_to_int_run_id(self, run_id: str) -> str:
-        return self._run_map.ext_to_int(run_id, b64(run_id) + ":" + run_id)
-
-    def int_to_ext_run_id(self, run_id: str) -> str:
-        exp = run_id.split(":")[1]
-        return self._run_map.int_to_ext(run_id, exp)
-
-    def ext_to_int_user_id(self, user_id: str) -> str:
-        return self._user_map.ext_to_int(user_id, b64(user_id))
-
-    def int_to_ext_user_id(self, user_id: str) -> str:
-        return self._user_map.int_to_ext(user_id, b64(user_id))
-
-
-class TestOnlyUserInjectingExternalTraceServer(
-    external_to_internal_trace_server_adapter.ExternalTraceServer
-):
-    def __init__(
-        self,
-        internal_trace_server: tsi.TraceServerInterface,
-        id_converter: external_to_internal_trace_server_adapter.IdConverter,
-        user_id: str,
-    ):
-        super().__init__(internal_trace_server, id_converter)
-        self._user_id = user_id
-
-    def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
-        req.start.wb_user_id = self._user_id
-        return super().call_start(req)
-
-    def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
-        req.wb_user_id = self._user_id
-        return super().calls_delete(req)
-
-    def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
-        req.wb_user_id = self._user_id
-        return super().call_update(req)
-
-    def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
-        req.wb_user_id = self._user_id
-        return super().feedback_create(req)
-
-    def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
-        req.wb_user_id = self._user_id
-        return super().cost_create(req)
-
-    def actions_execute_batch(
-        self, req: tsi.ActionsExecuteBatchReq
-    ) -> tsi.ActionsExecuteBatchRes:
-        req.wb_user_id = self._user_id
-        return super().actions_execute_batch(req)
-
-    def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
-        req.obj.wb_user_id = self._user_id
-        return super().obj_create(req)
 
 
 # https://docs.pytest.org/en/7.1.x/example/simple.html#pytest-current-test-environment-variable
@@ -362,14 +218,14 @@ class InMemoryWeaveLogCollector(logging.Handler):
             self.log_records[curr_test] = []
         self.log_records[curr_test].append(record)
 
-    def get_error_logs(self):
+    def _get_logs(self, levelname: str):
         curr_test = get_test_name()
         logs = self.log_records.get(curr_test, [])
 
         return [
             record
             for record in logs
-            if record.levelname == "ERROR"
+            if record.levelname == levelname
             and record.name.startswith("weave")
             # (Tim) For some reason that i cannot figure out, there is some test that
             # a) is trying to connect to the PROD trace server
@@ -383,16 +239,25 @@ class InMemoryWeaveLogCollector(logging.Handler):
             )
             # Exclude legacy
             and not record.name.startswith("weave.weave_server")
-            and not "legacy" in record.name
+            and "legacy" not in record.name
         ]
+
+    def get_error_logs(self):
+        return self._get_logs("ERROR")
+
+    def get_warning_logs(self):
+        return self._get_logs("WARNING")
 
 
 @pytest.fixture
-def log_collector():
+def log_collector(request):
     handler = InMemoryWeaveLogCollector()
     logger = logging.getLogger()  # Get your specific logger here if needed
     logger.addHandler(handler)
-    logger.setLevel(logging.ERROR)  # Set the level to capture all logs
+    if hasattr(request, "param") and request.param == "warning":
+        logger.setLevel(logging.WARNING)
+    else:
+        logger.setLevel(logging.ERROR)
     yield handler
     logger.removeHandler(handler)  # Clean up after the test
 
@@ -473,7 +338,7 @@ def make_server_recorder(server: tsi.TraceServerInterface):  # type: ignore
     class ServerRecorder(type(server)):  # type: ignore
         attribute_access_log: list[str]
 
-        def __init__(self, server: tsi.TraceServerInterface):  # type: ignore
+        def __init__(self, server: tsi.TraceServerInterface):
             self.server = server
             self.attribute_access_log = []
 
@@ -493,56 +358,46 @@ def make_server_recorder(server: tsi.TraceServerInterface):  # type: ignore
 
 
 def create_client(
-    request, autopatch_settings: typing.Optional[autopatch.AutopatchSettings] = None
+    request,
+    trace_server,
+    autopatch_settings: typing.Optional[autopatch.AutopatchSettings] = None,
+    global_attributes: typing.Optional[dict[str, typing.Any]] = None,
 ) -> weave_init.InitializedClient:
-    inited_client = None
-    weave_server_flag = request.config.getoption("--weave-server")
-    server: tsi.TraceServerInterface
-    entity = "shawn"
-    project = "test-project"
-    if weave_server_flag == "sqlite":
-        sqlite_server = sqlite_trace_server.SqliteTraceServer(
-            "file::memory:?cache=shared"
-        )
-        sqlite_server.drop_tables()
-        sqlite_server.setup_tables()
-        server = TestOnlyUserInjectingExternalTraceServer(
-            sqlite_server, DummyIdConverter(), entity
-        )
-    elif weave_server_flag == "clickhouse":
-        ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer.from_env()
-        ch_server.ch_client.command("DROP DATABASE IF EXISTS db_management")
-        ch_server.ch_client.command("DROP DATABASE IF EXISTS default")
-        ch_server._run_migrations()
-        server = TestOnlyUserInjectingExternalTraceServer(
-            ch_server, DummyIdConverter(), entity
-        )
-    elif weave_server_flag.startswith("http"):
-        remote_server = remote_http_trace_server.RemoteHTTPTraceServer(
-            weave_server_flag
-        )
-        server = remote_server
-    elif weave_server_flag == ("prod"):
-        inited_client = weave_init.init_weave("dev_testing")
+    trace_server_flag = get_trace_server_flag(request)
+    if trace_server_flag == "prod":
+        # Note: this is only for local dev testing and should be removed
+        return weave_init.init_weave("dev_testing")
+    elif trace_server_flag == "http":
+        server = remote_http_trace_server.RemoteHTTPTraceServer(trace_server_flag)
+    else:
+        server = trace_server
 
-    if inited_client is None:
-        # This is disabled by default, but we explicitly enable it here for testing
-        os.environ["WEAVE_USE_SERVER_CACHE"] = "true"
-        server = CachingMiddlewareTraceServer.from_env(server)
-        client = TestOnlyFlushingWeaveClient(
-            entity, project, make_server_recorder(server)
-        )
-        inited_client = weave_init.InitializedClient(client)
-        autopatch.autopatch(autopatch_settings)
+    # Removing this as it lead to passing tests that were not passing in prod!
+    # Keeping off for now until it is the default behavior.
+    # os.environ["WEAVE_USE_SERVER_CACHE"] = "true"
+    caching_server = CachingMiddlewareTraceServer.from_env(server)
+    client = TestOnlyFlushingWeaveClient(
+        TEST_ENTITY, "test-project", make_server_recorder(caching_server)
+    )
+    inited_client = weave_init.InitializedClient(client)
+    autopatch.autopatch(autopatch_settings)
+    if global_attributes is not None:
+        weave.trace.api._global_attributes = global_attributes
 
     return inited_client
 
 
-@pytest.fixture()
-def client(request):
+@pytest.fixture
+def zero_stack():
+    with set_call_stack([]):
+        yield
+
+
+@pytest.fixture
+def client(zero_stack, request, trace_server):
     """This is the standard fixture used everywhere in tests to test end to end
     client functionality"""
-    inited_client = create_client(request)
+    inited_client = create_client(request, trace_server)
     try:
         yield inited_client.client
     finally:
@@ -550,20 +405,32 @@ def client(request):
         autopatch.reset_autopatch()
 
 
-@pytest.fixture()
-def client_creator(request):
+@pytest.fixture
+def client_creator(zero_stack, request, trace_server):
     """This fixture is useful for delaying the creation of the client (ex. when you want to set settings first)"""
 
     @contextlib.contextmanager
-    def client(autopatch_settings: typing.Optional[autopatch.AutopatchSettings] = None):
-        inited_client = create_client(request, autopatch_settings)
+    def client(
+        autopatch_settings: typing.Optional[autopatch.AutopatchSettings] = None,
+        global_attributes: typing.Optional[dict[str, typing.Any]] = None,
+        settings: typing.Optional[weave.trace.settings.UserSettings] = None,
+    ):
+        if settings is not None:
+            weave.trace.settings.parse_and_apply_settings(settings)
+        inited_client = create_client(
+            request, trace_server, autopatch_settings, global_attributes
+        )
         try:
             yield inited_client.client
         finally:
             inited_client.reset()
             autopatch.reset_autopatch()
+            weave.trace.api._global_attributes = {}
+            weave.trace.settings.parse_and_apply_settings(
+                weave.trace.settings.UserSettings()
+            )
 
-    yield client
+    return client
 
 
 @pytest.fixture
@@ -581,6 +448,27 @@ def network_proxy_client(client):
     app = FastAPI()
 
     records = []
+
+    @app.post("/calls/stream_query")
+    def calls_stream_query(req: tsi.CallsQueryReq):
+        records.append(
+            (
+                "calls_stream_query",
+                req,
+            )
+        )
+
+        def generate():
+            calls = client.server.calls_query_stream(req)
+            for call in calls:
+                # Convert datetime objects to ISO format for JSON serialization
+                call_dict = call.model_dump()
+                for key, value in call_dict.items():
+                    if isinstance(value, datetime):
+                        call_dict[key] = value.isoformat()
+                yield f"{json.dumps(call_dict)}\n"
+
+        return StreamingResponse(generate(), media_type="application/x-ndjson")
 
     @app.post("/table/create")
     def table_create(req: tsi.TableCreateReq) -> tsi.TableCreateRes:
@@ -602,6 +490,28 @@ def network_proxy_client(client):
         )
         return client.server.table_update(req)
 
+    @app.post("/feedback/create")
+    def feedback_create(req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
+        records.append(
+            (
+                "feedback_create",
+                req,
+            )
+        )
+        return client.server.feedback_create(req)
+
+    @app.post("/feedback/batch/create")
+    def feedback_create_batch(
+        req: tsi.FeedbackCreateBatchReq,
+    ) -> tsi.FeedbackCreateBatchRes:
+        records.append(
+            (
+                "feedback_create_batch",
+                req,
+            )
+        )
+        return client.server.feedback_create_batch(req)
+
     with TestClient(app) as c:
 
         def post(url, data=None, json=None, **kwargs):
@@ -612,8 +522,94 @@ def network_proxy_client(client):
         weave.trace_server.requests.post = post
 
         remote_client = remote_http_trace_server.RemoteHTTPTraceServer(
-            trace_server_url=""
+            trace_server_url="",
+            should_batch=True,
         )
         yield (client, remote_client, records)
 
         weave.trace_server.requests.post = orig_post
+
+
+@pytest.fixture(autouse=True)
+def caching_client_isolation(monkeypatch, tmp_path):
+    """Isolate cache directories for each test to prevent cross-test contamination."""
+    test_specific_cache_dir = (
+        tmp_path / f"weave_cache_{get_test_name().replace('/', '_').replace('::', '_')}"
+    )
+    test_specific_cache_dir.mkdir(parents=True, exist_ok=True)
+
+    monkeypatch.setenv("WEAVE_SERVER_CACHE_DIR", str(test_specific_cache_dir))
+    return test_specific_cache_dir
+    # tmp_path and monkeypatch automatically handle cleanup
+
+
+@pytest.fixture
+def make_evals(client):
+    # First eval
+    ev = weave.EvaluationLogger(model="abc", dataset="def")
+    pred = ev.log_prediction(inputs={"x": 1}, output=2)
+    pred.log_score("score", 3)
+    pred.log_score("score2", 4)
+    pred2 = ev.log_prediction(inputs={"x": 2}, output=3)
+    pred2.log_score("score", 33)
+    pred2.log_score("score2", 44)
+    ev.log_summary(summary={"y": 5})
+
+    # Make a second eval.  Later we will check to see that we don't get this eval's data when querying
+    ev2 = weave.EvaluationLogger(model="ghi", dataset="jkl")
+    pred3 = ev2.log_prediction(inputs={"alpha": 12}, output=34)
+    pred3.log_score("second_score", 56)
+    pred3.log_score("second_score2", 78)
+
+    pred4 = ev2.log_prediction(inputs={"alpha": 34}, output=45)
+    pred4.log_score("second_score", 5656)
+    pred4.log_score("second_score2", 7878)
+    ev2.log_summary(summary={"z": 90})
+
+    return ev._pseudo_evaluation.ref, ev2._pseudo_evaluation.ref
+
+
+@pytest.fixture
+def mock_wandb_api():
+    """Fixture that provides a mocked wandb Api instance."""
+    with patch("weave.compat.wandb.Api") as mock_api_class:
+        mock_api_instance = MagicMock()
+        mock_api_class.return_value = mock_api_instance
+        yield mock_api_instance
+
+
+@pytest.fixture
+def mock_wandb_login():
+    """Fixture that provides a mock for wandb login functionality."""
+    with patch("weave.compat.wandb.login") as mock_login:
+        mock_login.return_value = True
+        yield mock_login
+
+
+@pytest.fixture
+def mock_default_host():
+    """Fixture that mocks _get_default_host to return api.wandb.ai."""
+    with patch(
+        "weave.cli.login._get_default_host",
+        return_value="api.wandb.ai",
+    ):
+        yield
+
+
+@pytest.fixture
+def mock_wandb_context():
+    """Fixture that provides mocked weave wandb context operations."""
+    with (
+        patch("weave.wandb_interface.context.init") as mock_context_init,
+        patch(
+            "weave.wandb_interface.context.get_wandb_api_context"
+        ) as mock_get_context,
+        patch(
+            "weave.wandb_interface.context.set_wandb_api_context"
+        ) as mock_set_context,
+    ):
+        yield {
+            "init": mock_context_init,
+            "get": mock_get_context,
+            "set": mock_set_context,
+        }

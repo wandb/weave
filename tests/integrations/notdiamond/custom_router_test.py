@@ -6,7 +6,7 @@ import pytest
 import yaml
 
 import weave
-from weave.flow.eval import EvaluationResults
+from weave.evaluation.eval import EvaluationResults
 from weave.integrations.notdiamond.custom_router import evaluate_router, train_router
 from weave.integrations.notdiamond.util import get_model_evals
 from weave.trace.weave_client import WeaveClient
@@ -69,8 +69,8 @@ def test_train_router(
         preference_id=preference_id,
     )
 
-    assert len(list(client.calls())) > 0
-    nd_calls = [call for call in client.calls() if "train_router" in call.op_name]
+    assert len(list(client.get_calls())) > 0
+    nd_calls = [call for call in client.get_calls() if "train_router" in call.op_name]
     assert len(nd_calls) == 1
 
     # confirm router was trained
@@ -91,6 +91,8 @@ def test_evaluate_router(
         api_key=api_key,
     )
 
-    assert len(list(client.calls())) > 0
-    nd_calls = [call for call in client.calls() if "evaluate_router" in call.op_name]
+    assert len(list(client.get_calls())) > 0
+    nd_calls = [
+        call for call in client.get_calls() if "evaluate_router" in call.op_name
+    ]
     assert len(nd_calls) == 1

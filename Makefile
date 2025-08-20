@@ -21,4 +21,7 @@ prepare-release: docs build
 
 synchronize-base-object-schemas:
 	cd weave && make generate_base_object_schemas && \
-	cd ../weave-js && yarn generate-schemas
+	cd ../../../../frontends/weave && yarn generate-schemas
+
+generate-bindings:
+	uv run tools/codegen/generate.py $(ARGS)

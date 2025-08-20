@@ -1,7 +1,7 @@
 from concurrent.futures import Future
 
 import weave
-from weave.trace.weave_client import get_ref
+from weave.trace.ref_util import get_ref
 from weave.trace_server import trace_server_interface as tsi
 
 

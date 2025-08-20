@@ -23,7 +23,7 @@ PROVIDERS = {
     },
     "gemini": {
         "models": ["gemini/gemini-2.0-flash"],
-        "env_key": "GOOGLE_API_KEY",
+        "env_key": "GEMINI_API_KEY",
     },
 }
 

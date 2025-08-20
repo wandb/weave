@@ -4,13 +4,13 @@ import importlib
 from typing import Callable
 
 import weave
+from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
-from weave.trace.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 
 _notdiamond_patcher: MultiPatcher | None = None
 
 
-def nd_wrapper(settings: OpSettings) -> Callable[[Callable], Callable]:
+def not_diamond_wrapper(settings: OpSettings) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
         op_kwargs = settings.model_dump()
         op = weave.op(fn, **op_kwargs)

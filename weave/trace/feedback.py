@@ -10,10 +10,10 @@ from rich.table import Table
 
 from weave.trace import util
 from weave.trace.context import weave_client_context as weave_client_context
+from weave.trace.display.rich import pydantic_util
+from weave.trace.display.rich.container import AbstractRichContainer
+from weave.trace.display.rich.refs import Refs
 from weave.trace.refs import parse_object_uri, parse_uri
-from weave.trace.rich import pydantic_util
-from weave.trace.rich.container import AbstractRichContainer
-from weave.trace.rich.refs import Refs
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.interface.query import Query
 
@@ -46,9 +46,9 @@ class Feedbacks(AbstractRichContainer[tsi.Feedback]):
     def _item_to_row(self, item: tsi.Feedback) -> list:
         feedback = item
 
-        typ = feedback.feedback_type
-        display_type = typ
-        if typ == "wandb.reaction.1":
+        type_ = feedback.feedback_type
+        display_type = type_
+        if type_ == "wandb.reaction.1":
             display_type = "reaction"
             if util.is_notebook():
                 # TODO: Emojis mess up table alignment in Jupyter 😢
@@ -56,7 +56,7 @@ class Feedbacks(AbstractRichContainer[tsi.Feedback]):
                 content = feedback.payload["alias"]
             else:
                 content = feedback.payload["emoji"]
-        elif typ == "wandb.note.1":
+        elif type_ == "wandb.note.1":
             display_type = "note"
             content = feedback.payload["note"]
         else:
@@ -207,7 +207,7 @@ class RefFeedbackQuery(FeedbackQuery):
             except TypeError:
                 raise TypeError(
                     "annotation_ref must be a valid object ref, eg weave:///<entity>/<project>/object/<name>:<digest>"
-                )
+                ) from None
             freq.annotation_ref = annotation_ref
         response = self.client.server.feedback_create(freq)
         self.feedbacks = None  # Clear cache

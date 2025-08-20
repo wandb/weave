@@ -5,7 +5,7 @@ import TabItem from '@theme/TabItem';
 
 Retrieval Augmented Generation (RAG) is a common way of building Generative AI applications that have access to custom knowledge bases.
 
-In this example, we'll show an example that has a retrieval step to get documents. By tracking this, you can debug your app and see what documents were pulled into the LLM context.
+In this example, we'll show how W&B Weave can track a RAG application that has a retrieval step to get documents. By tracking this, you can debug your app and see what documents were pulled into the LLM context.
 We'll also show how to evaluate it using an LLM judge.
 
 ![Evals hero](../static/img/evals-hero.png)
@@ -177,7 +177,7 @@ Next, we wrap our retrieval function `get_most_relevant_document` with a `weave.
             modelName?: string;
             articleEmbeddings: Article[];
         }) {
-            this.openai = weave.wrapOpenAI(new OpenAI());
+            this.openai = new OpenAI();
             this.systemMessage = config.systemMessage;
             this.modelName = config.modelName || "gpt-3.5-turbo-1106";
             this.articleEmbeddings = config.articleEmbeddings;
@@ -322,7 +322,6 @@ On a high-level the steps to create custom Scorer are quite simple:
   <TabItem value="python" label="Python" default>
     ```python
     from weave import Scorer
-    from weave import WeaveList
 
     class CorrectnessLLMJudge(Scorer):
         prompt: str
@@ -360,10 +359,10 @@ On a high-level the steps to create custom Scorer are quite simple:
             return {"correct": evaluation}
 
         @weave.op()
-        def summarize(self, score_rows: WeaveList) -> Optional[dict]:
+        def summarize(self, score_rows: list) -> Optional[dict]:
             """Aggregate all the scores that are calculated for each row by the scoring function.
             Args:
-                - score_rows: a WeaveList object, nested dict of metrics and scores
+                - score_rows: a list of dicts. Each dict has metrics and scores
             Returns:
                 - nested dict with the same structure as the input"""
 
@@ -622,7 +621,7 @@ Here, we show the code in it's entirety.
             modelName?: string;
             articleEmbeddings: Article[];
         }) {
-            this.openai = weave.wrapOpenAI(new OpenAI());
+            this.openai = new OpenAI();
             this.systemMessage = config.systemMessage;
             this.modelName = config.modelName || "gpt-3.5-turbo-1106";
             this.articleEmbeddings = config.articleEmbeddings;

@@ -1,11 +1,9 @@
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Evaluation Metrics
+# Scoring Overview
 
-## Evaluations in Weave
-
-In Weave, Scorers are used to evaluate AI outputs and return evaluation metrics. They take the AI's output, analyze it, and return a dictionary of results. Scorers can use your input data as reference if needed and can also output extra information, such as explanations or reasonings from the evaluation.
+In W&B Weave, Scorers are used to evaluate AI outputs and return evaluation metrics. They take the AI's output, analyze it, and return a dictionary of results. Scorers can use your input data as reference if needed and can also output extra information, such as explanations or reasonings from the evaluation.
 
 <Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
@@ -25,11 +23,12 @@ In Weave, Scorers are used to evaluate AI outputs and return evaluation metrics.
 ## Create your own Scorers
 
 :::tip[Ready-to-Use Scorers]
-While this guide shows you how to create custom scorers, Weave comes with a variety of [predefined scorers](./builtin_scorers.mdx) that you can use right away, including:
+While this guide shows you how to create custom scorers, Weave comes with a variety of [predefined scorers](./builtin_scorers.mdx) and [local SLM scorers](./weave_local_scorers.md) that you can use right away, including:
 - [Hallucination detection](./builtin_scorers.mdx#hallucinationfreescorer)
 - [Summarization quality](./builtin_scorers.mdx#summarizationscorer)
 - [Embedding similarity](./builtin_scorers.mdx#embeddingsimilarityscorer)
-- [Relevancy evaluation](./builtin_scorers.mdx#ragas---contextrelevancyscorer)
+- [Toxicity detection (local)](./weave_local_scorers.md#weavetoxicityscorerv1)
+- [Context Relevance scoring (local)](./weave_local_scorers.md#weavecontextrelevancescorerv1)
 - And more!
 :::
 
@@ -188,7 +187,7 @@ While this guide shows you how to create custom scorers, Weave comes with a vari
     class SummarizationScorer(Scorer):
 
         @weave.op
-        def score(output, text) -> dict:
+        def score(self, output, text) -> dict:
             """
                 output: output summary from a LLM summarization system
                 text: the text being summarised
@@ -288,8 +287,8 @@ While this guide shows you how to create custom scorers, Weave comes with a vari
         """
 
         @weave.op
-        def score(output, target):
-            return {"match": if output == target}
+        def score(self, output, target):
+            return {"match": output == target}
 
         def summarize(self, score_rows: list) -> dict:
             full_match = all(row["match"] for row in score_rows)
@@ -316,7 +315,7 @@ While this guide shows you how to create custom scorers, Weave comes with a vari
 
 To apply scorers to your Weave ops, you'll need to use the `.call()` method which provides access to both the operation's result and its tracking information. This allows you to associate scorer results with specific calls in Weave's database.
 
-For more information on how to use the `.call()` method, see the [Calling Ops](../tracking/tracing.mdx#calling-ops#getting-a-handle-to-the-call-object-during-execution) guide.
+For more information on how to use the `.call()` method, see the [Calling Ops](../tracking/tracing.mdx#getting-a-handle-to-the-call-object-during-execution) guide.
 
 <Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
@@ -354,6 +353,18 @@ For more information on how to use the `.call()` method, see the [Calling Ops](.
     ```
   </TabItem>
 </Tabs>
+
+### Use `preprocess_model_input` 
+
+You can use the `preprocess_model_input` parameter to modify dataset examples before they reach your model during evaluation. 
+
+:::important
+The `preprocess_model_input` function only transforms inputs before they are passed to the model’s prediction function.
+
+Scorer functions always receive the original dataset examples, without any preprocessing applied.
+:::
+
+For usage information and an example, see [Using `preprocess_model_input` to format dataset rows before evaluating](../core-types/evaluations.md#format-dataset-rows-before-evaluating).
 
 ## Score Analysis
 

@@ -3,10 +3,10 @@ from functools import wraps
 from typing import TYPE_CHECKING, Any, Callable, Optional, Union
 
 import weave
+from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
-from weave.trace.op_extensions.accumulator import add_accumulator
-from weave.trace.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
-from weave.trace.serialize import dictify
+from weave.trace.op import _add_accumulator
+from weave.trace.serialization.serialize import dictify
 
 if TYPE_CHECKING:
     from huggingface_hub.inference._generated.types.chat_completion import (
@@ -79,7 +79,7 @@ def huggingface_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Calla
             op_kwargs["postprocess_inputs"] = huggingface_postprocess_inputs
 
         op = weave.op(fn, **op_kwargs)
-        return add_accumulator(
+        return _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: huggingface_accumulator,
             should_accumulate=lambda inputs: isinstance(inputs, dict)
@@ -103,7 +103,7 @@ def huggingface_wrapper_async(settings: OpSettings) -> Callable[[Callable], Call
             op_kwargs["postprocess_inputs"] = huggingface_postprocess_inputs
 
         op = weave.op(_fn_wrapper(fn), **op_kwargs)
-        return add_accumulator(
+        return _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: huggingface_accumulator,
             should_accumulate=lambda inputs: isinstance(inputs, dict)

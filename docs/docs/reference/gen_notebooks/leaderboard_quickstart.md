@@ -306,7 +306,7 @@ We can also generate a leaderboard directly from Python:
 
 ```python
 from weave.flow import leaderboard
-from weave.trace.weave_client import get_ref
+from weave.trace.ref_util import get_ref
 
 spec = leaderboard.Leaderboard(
     name="Zip Code World Knowledge",

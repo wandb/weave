@@ -1,9 +1,8 @@
 interactions:
 - request:
-    body: '{"model": "meta-llama/Llama-3.2-11B-Vision-Instruct", "max_tokens": 500,
-      "seed": 42, "stream": true, "messages": [{"role": "user", "content": [{"type":
-      "image_url", "image_url": {"url": "https://cdn.britannica.com/61/93061-050-99147DCE/Statue-of-Liberty-Island-New-York-Bay.jpg"}},
-      {"type": "text", "text": "Describe this image in one sentence."}]}]}'
+    body: '{"model": "meta-llama/Meta-Llama-3-8B-Instruct", "max_tokens": 500, "seed":
+      42, "stream": true, "messages": [{"role": "user", "content": "What is the capital
+      of France?"}]}'
     headers:
       Accept:
       - '*/*'
@@ -12,95 +11,44 @@ interactions:
       Connection:
       - keep-alive
       Content-Length:
-      - '350'
+      - '172'
       Content-Type:
       - application/json
       X-Amzn-Trace-Id:
-      - b31ad586-a8cd-46d7-8a54-cf1ddaa9a282
+      - f2217c94-8c3a-4b16-8c09-4bd07424853a
       user-agent:
-      - unknown/None; hf_hub/0.28.1; python/3.12.8
+      - unknown/None; hf_hub/0.30.1; python/3.11.10
     method: POST
-    uri: https://api-inference.huggingface.co/models/meta-llama/Llama-3.2-11B-Vision-Instruct/v1/chat/completions
+    uri: https://router.huggingface.co/hf-inference/models/meta-llama/Meta-Llama-3-8B-Instruct/v1/chat/completions
   response:
     body:
-      string: 'data: {"object":"chat.completion.chunk","id":"","created":1738819667,"model":"meta-llama/Llama-3.2-11B-Vision-Instruct","system_fingerprint":"2.4.1-sha-d2ed52f","choices":[{"index":0,"delta":{"role":"assistant","content":"The"},"logprobs":null,"finish_reason":null}],"usage":null}
+      string: 'data: {"object":"chat.completion.chunk","id":"","created":1743516994,"model":"meta-llama/Meta-Llama-3-8B-Instruct","system_fingerprint":"3.2.1-native","choices":[{"index":0,"delta":{"role":"assistant","content":"The"},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"object":"chat.completion.chunk","id":"","created":1738819668,"model":"meta-llama/Llama-3.2-11B-Vision-Instruct","system_fingerprint":"2.4.1-sha-d2ed52f","choices":[{"index":0,"delta":{"role":"assistant","content":"
-        Statue"},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"object":"chat.completion.chunk","id":"","created":1743516994,"model":"meta-llama/Meta-Llama-3-8B-Instruct","system_fingerprint":"3.2.1-native","choices":[{"index":0,"delta":{"role":"assistant","content":"
+        capital"},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"object":"chat.completion.chunk","id":"","created":1738819669,"model":"meta-llama/Llama-3.2-11B-Vision-Instruct","system_fingerprint":"2.4.1-sha-d2ed52f","choices":[{"index":0,"delta":{"role":"assistant","content":"
+        data: {"object":"chat.completion.chunk","id":"","created":1743516994,"model":"meta-llama/Meta-Llama-3-8B-Instruct","system_fingerprint":"3.2.1-native","choices":[{"index":0,"delta":{"role":"assistant","content":"
         of"},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"object":"chat.completion.chunk","id":"","created":1738819669,"model":"meta-llama/Llama-3.2-11B-Vision-Instruct","system_fingerprint":"2.4.1-sha-d2ed52f","choices":[{"index":0,"delta":{"role":"assistant","content":"
-        Liberty"},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"object":"chat.completion.chunk","id":"","created":1743516994,"model":"meta-llama/Meta-Llama-3-8B-Instruct","system_fingerprint":"3.2.1-native","choices":[{"index":0,"delta":{"role":"assistant","content":"
+        France"},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"object":"chat.completion.chunk","id":"","created":1738819669,"model":"meta-llama/Llama-3.2-11B-Vision-Instruct","system_fingerprint":"2.4.1-sha-d2ed52f","choices":[{"index":0,"delta":{"role":"assistant","content":"
-        stands"},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"object":"chat.completion.chunk","id":"","created":1743516994,"model":"meta-llama/Meta-Llama-3-8B-Instruct","system_fingerprint":"3.2.1-native","choices":[{"index":0,"delta":{"role":"assistant","content":"
+        is"},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"object":"chat.completion.chunk","id":"","created":1738819669,"model":"meta-llama/Llama-3.2-11B-Vision-Instruct","system_fingerprint":"2.4.1-sha-d2ed52f","choices":[{"index":0,"delta":{"role":"assistant","content":"
-        tall"},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"object":"chat.completion.chunk","id":"","created":1743516994,"model":"meta-llama/Meta-Llama-3-8B-Instruct","system_fingerprint":"3.2.1-native","choices":[{"index":0,"delta":{"role":"assistant","content":"
+        Paris"},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"object":"chat.completion.chunk","id":"","created":1738819669,"model":"meta-llama/Llama-3.2-11B-Vision-Instruct","system_fingerprint":"2.4.1-sha-d2ed52f","choices":[{"index":0,"delta":{"role":"assistant","content":"
-        in"},"logprobs":null,"finish_reason":null}],"usage":null}
+        data: {"object":"chat.completion.chunk","id":"","created":1743516994,"model":"meta-llama/Meta-Llama-3-8B-Instruct","system_fingerprint":"3.2.1-native","choices":[{"index":0,"delta":{"role":"assistant","content":"."},"logprobs":null,"finish_reason":null}],"usage":null}
 
 
-        data: {"object":"chat.completion.chunk","id":"","created":1738819669,"model":"meta-llama/Llama-3.2-11B-Vision-Instruct","system_fingerprint":"2.4.1-sha-d2ed52f","choices":[{"index":0,"delta":{"role":"assistant","content":"
-        the"},"logprobs":null,"finish_reason":null}],"usage":null}
-
-
-        data: {"object":"chat.completion.chunk","id":"","created":1738819670,"model":"meta-llama/Llama-3.2-11B-Vision-Instruct","system_fingerprint":"2.4.1-sha-d2ed52f","choices":[{"index":0,"delta":{"role":"assistant","content":"
-        foreground"},"logprobs":null,"finish_reason":null}],"usage":null}
-
-
-        data: {"object":"chat.completion.chunk","id":"","created":1738819670,"model":"meta-llama/Llama-3.2-11B-Vision-Instruct","system_fingerprint":"2.4.1-sha-d2ed52f","choices":[{"index":0,"delta":{"role":"assistant","content":","},"logprobs":null,"finish_reason":null}],"usage":null}
-
-
-        data: {"object":"chat.completion.chunk","id":"","created":1738819670,"model":"meta-llama/Llama-3.2-11B-Vision-Instruct","system_fingerprint":"2.4.1-sha-d2ed52f","choices":[{"index":0,"delta":{"role":"assistant","content":"
-        with"},"logprobs":null,"finish_reason":null}],"usage":null}
-
-
-        data: {"object":"chat.completion.chunk","id":"","created":1738819670,"model":"meta-llama/Llama-3.2-11B-Vision-Instruct","system_fingerprint":"2.4.1-sha-d2ed52f","choices":[{"index":0,"delta":{"role":"assistant","content":"
-        the"},"logprobs":null,"finish_reason":null}],"usage":null}
-
-
-        data: {"object":"chat.completion.chunk","id":"","created":1738819670,"model":"meta-llama/Llama-3.2-11B-Vision-Instruct","system_fingerprint":"2.4.1-sha-d2ed52f","choices":[{"index":0,"delta":{"role":"assistant","content":"
-        New"},"logprobs":null,"finish_reason":null}],"usage":null}
-
-
-        data: {"object":"chat.completion.chunk","id":"","created":1738819670,"model":"meta-llama/Llama-3.2-11B-Vision-Instruct","system_fingerprint":"2.4.1-sha-d2ed52f","choices":[{"index":0,"delta":{"role":"assistant","content":"
-        York"},"logprobs":null,"finish_reason":null}],"usage":null}
-
-
-        data: {"object":"chat.completion.chunk","id":"","created":1738819670,"model":"meta-llama/Llama-3.2-11B-Vision-Instruct","system_fingerprint":"2.4.1-sha-d2ed52f","choices":[{"index":0,"delta":{"role":"assistant","content":"
-        City"},"logprobs":null,"finish_reason":null}],"usage":null}
-
-
-        data: {"object":"chat.completion.chunk","id":"","created":1738819670,"model":"meta-llama/Llama-3.2-11B-Vision-Instruct","system_fingerprint":"2.4.1-sha-d2ed52f","choices":[{"index":0,"delta":{"role":"assistant","content":"
-        skyline"},"logprobs":null,"finish_reason":null}],"usage":null}
-
-
-        data: {"object":"chat.completion.chunk","id":"","created":1738819670,"model":"meta-llama/Llama-3.2-11B-Vision-Instruct","system_fingerprint":"2.4.1-sha-d2ed52f","choices":[{"index":0,"delta":{"role":"assistant","content":"
-        in"},"logprobs":null,"finish_reason":null}],"usage":null}
-
-
-        data: {"object":"chat.completion.chunk","id":"","created":1738819670,"model":"meta-llama/Llama-3.2-11B-Vision-Instruct","system_fingerprint":"2.4.1-sha-d2ed52f","choices":[{"index":0,"delta":{"role":"assistant","content":"
-        the"},"logprobs":null,"finish_reason":null}],"usage":null}
-
-
-        data: {"object":"chat.completion.chunk","id":"","created":1738819671,"model":"meta-llama/Llama-3.2-11B-Vision-Instruct","system_fingerprint":"2.4.1-sha-d2ed52f","choices":[{"index":0,"delta":{"role":"assistant","content":"
-        background"},"logprobs":null,"finish_reason":null}],"usage":null}
-
-
-        data: {"object":"chat.completion.chunk","id":"","created":1738819671,"model":"meta-llama/Llama-3.2-11B-Vision-Instruct","system_fingerprint":"2.4.1-sha-d2ed52f","choices":[{"index":0,"delta":{"role":"assistant","content":"."},"logprobs":null,"finish_reason":null}],"usage":null}
-
-
-        data: {"object":"chat.completion.chunk","id":"","created":1738819671,"model":"meta-llama/Llama-3.2-11B-Vision-Instruct","system_fingerprint":"2.4.1-sha-d2ed52f","choices":[{"index":0,"delta":{"role":"assistant","content":""},"logprobs":null,"finish_reason":"stop"}],"usage":null}
+        data: {"object":"chat.completion.chunk","id":"","created":1743516994,"model":"meta-llama/Meta-Llama-3-8B-Instruct","system_fingerprint":"3.2.1-native","choices":[{"index":0,"delta":{"role":"assistant","content":""},"logprobs":null,"finish_reason":"stop"}],"usage":null}
 
 
         data: [DONE]
@@ -108,38 +56,46 @@ interactions:
 
         '
     headers:
+      Access-Control-Allow-Origin:
+      - '*'
+      Access-Control-Expose-Headers:
+      - X-Repo-Commit,X-Request-Id,X-Error-Code,X-Error-Message,X-Total-Count,ETag,Link,Accept-Ranges,Content-Range,X-Xet-Access-Token,X-Xet-Token-Expiration,X-Xet-Refresh-Route,X-Xet-Cas-Url,X-Xet-Hash
       Connection:
       - keep-alive
+      Content-Length:
+      - '2199'
       Content-Type:
       - text/event-stream
       Date:
-      - Thu, 06 Feb 2025 05:27:47 GMT
-      Transfer-Encoding:
-      - chunked
+      - Tue, 01 Apr 2025 14:29:39 GMT
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Via:
+      - 1.1 d5d2eb8f4091d7aa52ca959e8a97a7fc.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - TOIcWJEY7pEgh0ahg4ap_DS40qugL_eWDMMdw8UF9YkD8m_FAgBydQ==
+      X-Amz-Cf-Pop:
+      - HYD57-P1
+      X-Cache:
+      - Miss from cloudfront
+      X-Powered-By:
+      - huggingface-moon
+      X-Robots-Tag:
+      - none
       access-control-allow-credentials:
       - 'true'
-      access-control-allow-origin:
-      - '*'
-      cache-control:
-      - no-cache
+      cross-origin-opener-policy:
+      - same-origin
       vary:
-      - origin, access-control-request-method, access-control-request-headers, Origin,
-        Access-Control-Request-Method, Access-Control-Request-Headers
-      - origin, access-control-request-method, access-control-request-headers
-      x-accel-buffering:
-      - 'no'
-      x-compute-characters:
-      - '365'
+      - Origin, Access-Control-Request-Method, Access-Control-Request-Headers
       x-compute-type:
-      - 4-a10-g
-      x-proxied-host:
-      - internal.api-inference.huggingface.co
-      x-proxied-path:
-      - /v1/chat/completions
+      - cache
+      x-inference-id:
+      - HFsfHDlmKDfe0QN6zq-iS
       x-request-id:
-      - g-aoFp
+      - Root=1-67ebf853-2d8a762b41d6e1b15e33d313;f2217c94-8c3a-4b16-8c09-4bd07424853a
       x-sha:
-      - 9eb2daaa8597bf192a8b0e73f848f3a102794df5
+      - 5f0b02c75b57c5855da9ae460ce51323ea669d8a
     status:
       code: 200
       message: OK

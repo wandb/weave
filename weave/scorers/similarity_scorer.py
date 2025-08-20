@@ -2,14 +2,14 @@ from collections.abc import Sequence
 from typing import Any
 
 import numpy as np
-from litellm import aembedding
 from pydantic import Field
 
 import weave
 from weave.scorers.default_models import OPENAI_DEFAULT_EMBEDDING_MODEL
+from weave.scorers.scorer_types import LLMScorer
 
 
-class EmbeddingSimilarityScorer(weave.Scorer):
+class EmbeddingSimilarityScorer(LLMScorer):
     """
     Computes the cosine similarity between the embeddings of a model output and a target text.
 
@@ -28,11 +28,9 @@ class EmbeddingSimilarityScorer(weave.Scorer):
     threshold: float = Field(0.5, description="The threshold for the similarity score")
 
     @weave.op
-    async def score(self, output: str, target: str) -> Any:
+    async def score(self, *, output: str, target: str, **kwargs: Any) -> Any:
         # Ensure the threshold is within the valid range for cosine similarity.
-        assert (
-            self.threshold >= -1 and self.threshold <= 1
-        ), "`threshold` should be between -1 and 1"
+        assert -1 <= self.threshold <= 1, "`threshold` should be between -1 and 1"
 
         model_embedding, target_embedding = await self._compute_embeddings(
             output, target
@@ -42,7 +40,7 @@ class EmbeddingSimilarityScorer(weave.Scorer):
     async def _compute_embeddings(
         self, output: str, target: str
     ) -> tuple[list[float], list[float]]:
-        embeddings = await aembedding(self.model_id, [output, target])
+        embeddings = await self._aembedding(self.model_id, [output, target])
         return embeddings.data[0]["embedding"], embeddings.data[1]["embedding"]
 
     def _cosine_similarity(self, vec1: Sequence[float], vec2: Sequence[float]) -> dict:

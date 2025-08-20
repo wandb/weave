@@ -1,132 +1,217 @@
 # Contributing to Weave Documentation
 
-## Guidelines
+Thanks for contributing to Weave Docs 💛! 
+
+## Contribution guidelines
 
 - Ensure tone and style is consistent with existing documentation.
-- Ensure that the `sidebar.ts` file is updated if adding new pages
+- Update the `sidebar.ts` file if you add new pages.
+- **Always run** `make docs` before submitting a PR to ensure all auto-generated docs are fresh.
+- When moving a page from one location to another e.g. moving from `https://weave-docs.wandb.ai/old_url` to `https://weave-docs.wandb.ai/new_url`, always [add redirects as described here](#moving-pages-and-redirects).
 
-## Installation
+## Setup
 
-Satisfy the following dependencies to create, build, and locally serve Weave Docs on your local machine:
+Set up your environment to build and serve the Weave documentation locally:
 
-- (Recommended) Install [`nvm`](https://github.com/nvm-sh/nvm) to manage your node.js versions.
-- Install [Node.js](https://nodejs.org/en/download/) version 18.0.0.
-  ```node
-  nvm install 18.0.0
-  ```
-- Install Yarn. It is recommended to install Yarn through the [npm package manager](http://npmjs.org/), which comes bundled with [Node.js](https://nodejs.org/) when you install it on your system.
-  ```yarn
-  npm install --global yarn
-  ```
-- Make sure your python environment is setup by running the following from the repro root:
-  - `pip install -r requirements.dev.txt`
-  - `pip install -e .`
-- Run `playwright install`
-- Install an IDE (e.g. VS Code) or Text Editor (e.g. Sublime)
+1. (Recommended) Install [`nvm`](https://github.com/nvm-sh/nvm) to manage Node.js versions.
+2. Install [Node.js](https://nodejs.org/en/download/) version 18.0.0.
+    ```bash
+    nvm install 18.0.0
+    ```
+3. Install Yarn:
+    ```bash
+    npm install --global yarn
+    ```
+4. Set up your Python environment, including the docs dependencies:
+    ```bash
+    pip install -e ".[docs]"
+    ```
+5. Install Playwright:
+    ```bash
+    playwright install
+    ```
+6. Build and run the docs locally:
+    ```bash
+    cd docs
+    yarn install
+    yarn start
+    ```
 
-&nbsp;
-
-Build and run the docs locally to test that all edits, links etc are working. After you have forked and cloned wandb/weave:
-
-```
-cd docs
-
-yarn install
-```
-
-Then test that you can build and run the docs locally:
-
-```
-yarn start
-```
-
-This will return the port number where you can preview your changes to the docs.
+In successful `yarn start` output, you'll see a port number where you can preview your changes.
 
 ## How to edit the docs locally
 
-1. Navigate to your local GitHub repo of `weave` and pull the latest changes from master:
+1. Navigate to your local `weave` repo and pull the latest changes:
+   ```bash
+   cd docs
+   git pull origin master
+   ```
+2. Create a feature branch off `master`:
+   ```bash
+   git checkout -b <your-feature-branch>
+   ```
+3. Start a local preview:
+   ```bash
+   yarn start
+   ```
+4. Preview and review your changes in the docs UI.
+   > When moving a page from one location to another e.g. moving from `https://weave-docs.wandb.ai/old_url` to `https://weave-docs.wandb.ai/new_url`, always [add redirects as described here](#moving-pages-and-redirects).
+5. Run `make docs` to regenerate API and notebook docs. 
+
+    > Our CI builds and deploys the current state of the documentation but does not automatically regenerate API or notebook docs. If you skip `make docs`, stale or missing docs might be deployed. For more information, see [`make docs`](#make-docs).
+
+6. Commit the changes:
+   ```bash
+   git commit -m 'docs(weave): Useful commit message.'
+   ```
+7. Push your branch:
+   ```bash
+   git push origin <your-feature-branch>
+   ```
+8. Open a pull request to the Weave repository.
+9. A Weave team member will review your pull request and either approve, deny, or request changes / more information.
+
+## `make docs`
+
+The `make docs` command will:
+
+- Generate fresh API reference docs (Python and TypeScript).
+- Convert notebooks into Markdown docs.
+- Build the docs locally to catch issues.
+
+When to run `make docs`:
+
+- On any Python, Service, SDK, or docs-related changes.
+- Always run before opening a documentation pull request.
+
+## Moving pages and redirects
+
+When moving a page from one location to another e.g. moving from `https://weave-docs.wandb.ai/old_url` to `https://weave-docs.wandb.ai/new_url`, always add redirects. To add and test a redirect, follow these steps:
+
+1. Open `docs/docusaurus.config.ts`
+2. Find `redirects`:
+
+   ```typescript
+   {
+    redirects: [
+        {
+           from: ['/guides/evaluation/imperative_evaluations'],
+           to: '/guides/evaluation/evaluation_logger',
+        },
+      ]  
+    },
+   ```
+3. Add a new redirect object to the `redirects` list and save the file:
+
+   ```typescript
+   {
+    redirects: [
+        {
+           from: ['/guides/evaluation/imperative_evaluations'],
+           to: '/guides/evaluation/evaluation_logger',
+        },
+        {
+           from: ['/old_url'],
+           to: '/new_url',
+        }
+      ]  
+    },
+   ```
+4. Test the build. Note that you can't test redirects when running `yarn start`:
+   ```bash
+   yarn build
+   yarn serve
+   ```
+5. Navigate to the local site build e.g. `http://localhost:3000/`
+6. Manually confirm that the redirect works e.g. `http://localhost:3000/old_url` redirects to `http://localhost:3000/new_url`
+7. Complete all steps described in [How to edit the docs locally](#how-to-edit-the-docs-locally).
+
+## Doc generation details
+
+### Python SDK doc generation
+
+- Script: `docs/scripts/generate_python_sdk_docs.py`
+- Output: `docs/reference/python-sdk`
+- Uses `lazydocs`.
+
+> Tip: Add triple-quoted (`"""`) docstrings to modules, classes, and functions.
+
+### Service doc generation
+
+- Script: `docs/scripts/generate_service_api_spec.py`
+- Output: `docs/reference/service-api`
+- Based on `openapi.json` and FastAPI docs.
+
+### Notebook doc generation
+
+- Script: `docs/scripts/generate_notebooks.py`
+- Converts `.ipynb` files from `docs/notebooks` to Markdown in `docs/reference/gen_notebooks`.
+
+You can convert a single notebook by running the below while in the `weave/docs` directory:
 
 ```bash
-cd docs
-git pull origin main
+python scripts/generate_notebooks.py path/to/your_notebook.ipynb
 ```
 
-2. Create a feature branch off of `main`.
+To add Docusaurus metadata to a notebook, include:
 
-```bash
-git checkout -b <your-feature-branch>
-```
-
-3. In a new terminal, start a local preview of the docs with `yarn start`.
-
-```bash
-yarn start
-```
-
-This will return the port number where you can preview your changes to the docs.
-
-4. Make your changes on the new branch.
-5. Check your changes are rendered correctly.
-
-6. Commit the changes to the branch.
-
-```bash
-git commit -m 'chore(docs): Useful commit message.'
-```
-
-7. Push the branch to GitHub.
-
-```bash
-git push origin <your-feature-branch>
-```
-
-8. Open a pull request from the new branch to the original repo.
-
-## DocGen
-
-Currently, we have 3 forms of doc generation:
-
-1. Python Doc Gen
-2. Service Doc Gen
-3. Notebook Doc Gen
-
-Assuming you have node and python packages installed, these can all be generated by running `make generate_reference_docs`.
-
-Let's review some details about each process:
-
-### Python Doc Gen
-
-See: `docs/scripts/generate_python_sdk_docs.py` and `./docs/reference/python-sdk`
-
-Python doc gen uses `lazydocs` as the core library for building markdown docs from our symbols. There are a few things to keep in mind:
-
-1. `docs/scripts/generate_python_sdk_docs.py` contains an allow-list of modules to document. Since the Weave codebase is massive, it is far easier to just select what modules are useful for docs.
-2. If the file does now have a `__docspec__` list of symbols, all non-underscore symbols will be documented. However, if it does have a `__docspec__`, that will further narrow the symbols to just that selection.
-3. Documentation itself:
-   1. Module-level: Put a triple double quote (""") comment as the first line of the module to add module-level documentation
-   2. Classes: Put a triple double quote (""") comment as the first line of the class to add class-level docs
-   3. Methods / Functions: Put a triple double quote (""") comment as the first line of the implementation to add method/function-level docs
-      1. Currently attributes are not automatically documented. Instead, use the @property pattern.
-      2. `BaseModel`. For classes that inherit from `BaseModel`, we create a special field list automatically to overcome this limitation.
-
-### Service Doc Gen
-
-See `docs/scripts/generate_service_api_spec.py` and `./docs/reference/service-api`
-
-Service doc generation loads the `openapi.json` file describing the server, processes it, then uses the `docusaurus-plugin-openapi-docs` plugin to generate markdown files from that specification.
-
-To improve docs, basically follow FastAPI's instructions to create good Swagger docs by adding field-level and endpoint-level documentation using their APIs. Assuming you have made some changes, `docs/scripts/generate_service_api_spec.py` needs a server to point to. You can either deploy to prod, or run the server locally and point to it in `docs/scripts/generate_service_api_spec.py`. From there, `docs/scripts/generate_service_api_spec.py` will download the spec, clean it up, and build the docs!
-
-### Notebook Doc Gen
-
-See `docs/scripts/generate_notebooks.py`, `./docs/notebooks`, and `./docs/reference/gen_notebooks`.
-
-This script will load all notebooks in `./docs/notebooks`, transforming them into viable markdown docs in `./docs/reference/gen_notebooks` which can be referenced by docusaurus just like any other markdown file. If you need header metadata, you can add a markdown block at the top of your notebook with:
-
-```
+```markdown
 <!-- docusaurus_head_meta::start
 ---
-title: Head Metadata
+title: My Notebook Title
 ---
 docusaurus_head_meta::end -->
 ```
+
+### Playground model list sync
+
+The model list in [`playground.md`](https://weave-docs.wandb.ai/guides/tools/playground#select-an-llm) is updated by running:
+
+```bash
+make update_playground_models
+```
+
+This regenerates the model list section automatically.
+
+
+### LLM context doc generation
+
+To make Weave documentation usable by AI tools like Cursor, GPT, or Claude, we generate special machine-readable files that summarize the full documentation set.
+
+- Script: `docs/scripts/generate_llmstxt.py`
+
+This script produces two types of files:
+
+* `llms-full.txt`: A single Markdown file with all documentation content.
+* `llms-full.json`: A structured JSON file for use in RAG pipelines or embeddings.
+* Optionally: Per-category `.txt` files (e.g., `llms-integrations.txt`, `llms-api.txt`). These are useful for asking targeted questions, as `llms-full.txt` is too large for most context windows.
+
+#### Usage
+
+Run the script from the project root:
+
+```bash
+python docs/scripts/generate_llmstxt.py
+```
+
+This will generate:
+
+* `static/llms-full.txt`
+* `static/llms-full.json`
+
+To also generate per-category `.txt` files (recommended for LLM tools like Cursor with context limits):
+
+```bash
+python docs/scripts/generate_llmstxt.py --categories
+```
+
+These files can be used by developers and agents to quickly access documentation content without navigating the full site.
+
+> **Important:** These files are not used by the docs site directly but may be used in downstream applications or LLM pipelines.
+
+#### Regeneration checklist
+
+Run this script if:
+
+- You’ve added or edited any docs that should be used by an LLM.
+- You want to verify how your content will be surfaced in tools like Cursor or GPT.

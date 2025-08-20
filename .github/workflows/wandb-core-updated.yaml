@@ -11,12 +11,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout weave
-        uses: actions/checkout@v3
+        uses: actions/checkout@v5
         with:
           ref: master
           fetch-depth: 1
       - name: Checkout wandb/core
-        uses: actions/checkout@v3
+        uses: actions/checkout@v5
         with:
           path: .wandb_core
           submodules: false

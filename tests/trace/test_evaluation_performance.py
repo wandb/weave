@@ -68,30 +68,30 @@ def build_evaluation():
         {
             "question": "What is the capital of France?",
             "expected": "Paris",
-            "img": PIL.Image.new("RGB", (100, 100)),
+            "img": PIL.Image.new("RGB", (100, 100), color="red"),
         },
         {
             "question": "Who wrote 'To Kill a Mockingbird'?",
             "expected": "Harper Lee",
-            "img": PIL.Image.new("RGB", (100, 100)),
+            "img": PIL.Image.new("RGB", (100, 100), color="green"),
         },
         {
             "question": "What is the square root of 64?",
             "expected": "8",
-            "img": PIL.Image.new("RGB", (100, 100)),
+            "img": PIL.Image.new("RGB", (100, 100), color="blue"),
         },
         {
             "question": "What is the thing you say when you don't know something?",
             "expected": "I don't know",
-            "img": PIL.Image.new("RGB", (100, 100)),
+            "img": PIL.Image.new("RGB", (100, 100), color="yellow"),
         },
     ]
 
-    @weave.op()
+    @weave.op
     def predict(question: str):
         return "I don't know"
 
-    @weave.op()
+    @weave.op
     def score(question: str, expected: str, output: str):
         return output == expected
 
@@ -111,13 +111,20 @@ async def test_evaluation_performance(client: WeaveClient):
 
     log = [l for l in client.server.attribute_access_log if not l.startswith("_")]
 
-    assert log == ["ensure_project_exists"]
+    gold_log = [
+        "ensure_project_exists",
+        "get_call_processor",
+        "get_call_processor",
+        "get_feedback_processor",
+        "get_feedback_processor",
+    ]
+    assert log == gold_log
 
     with paused_client(client) as client:
         res = await evaluation.evaluate(predict)
         assert res["score"]["true_count"] == 1
         log = [l for l in client.server.attribute_access_log if not l.startswith("_")]
-        assert log == ["ensure_project_exists"]
+        assert log == gold_log
 
     log = [l for l in client.server.attribute_access_log if not l.startswith("_")]
 
@@ -129,6 +136,8 @@ async def test_evaluation_performance(client: WeaveClient):
         counts
         == {
             "ensure_project_exists": 1,
+            "get_call_processor": 2,
+            "get_feedback_processor": 2,
             "table_create": 2,  # dataset and score results
             "obj_create": 9,  # Evaluate Op, Score Op, Predict and Score Op, Summarize Op, predict Op, PIL Image Serializer, Eval Results DS, MainDS, Evaluation Object
             "file_create": 10,  # 4 images, 6 ops
@@ -138,7 +147,7 @@ async def test_evaluation_performance(client: WeaveClient):
         }
     )
 
-    calls = client.calls()
+    calls = client.get_calls()
     objects = client._objects()
 
     assert (
@@ -159,7 +168,7 @@ async def test_evaluation_resilience(
         with pytest.raises(DummyTestException):
             res = await evaluation.evaluate(predict)
 
-    client_with_throwing_server.flush()
+    client_with_throwing_server.finish()
 
     logs = log_collector.get_error_logs()
     ag_res = Counter([k.split(", req:")[0] for k in {l.msg for l in logs}])
@@ -172,7 +181,7 @@ async def test_evaluation_resilience(
         res = await evaluation.evaluate(predict)
         assert res["score"]["true_count"] == 1
 
-    client_with_throwing_server.flush()
+    client_with_throwing_server.finish()
 
     logs = log_collector.get_error_logs()
     ag_res = Counter([k.split(", req:")[0] for k in {l.msg for l in logs}])

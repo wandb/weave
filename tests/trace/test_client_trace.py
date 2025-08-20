@@ -9,10 +9,11 @@ from collections import defaultdict, namedtuple
 from contextlib import contextmanager
 from contextvars import copy_context
 from dataclasses import dataclass
-from typing import Any, Callable
+from decimal import Decimal
+from typing import Any, Callable, Optional
+from unittest import mock
 
 import pytest
-import wandb
 from pydantic import BaseModel, ValidationError
 
 import weave
@@ -22,27 +23,50 @@ from tests.trace.util import (
     FuzzyDateTimeMatcher,
     MaybeStringMatcher,
     client_is_sqlite,
+    get_info_loglines,
+)
+from tests.trace_server.conftest_lib.trace_server_external_adapter import (
+    DummyIdConverter,
 )
 from weave import Thread, ThreadPoolExecutor
 from weave.trace import weave_client
+from weave.trace.context.call_context import require_current_call
 from weave.trace.context.weave_client_context import (
     get_weave_client,
     set_weave_client_global,
 )
+from weave.trace.refs import parse_uri
 from weave.trace.vals import MissingSelfInstanceError
 from weave.trace.weave_client import sanitize_object_name
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.clickhouse_trace_server_batched import ENTITY_TOO_LARGE_PAYLOAD
-from weave.trace_server.errors import InvalidFieldError
+from weave.trace_server.clickhouse_trace_server_settings import ENTITY_TOO_LARGE_PAYLOAD
+from weave.trace_server.errors import InsertTooLarge, InvalidFieldError
 from weave.trace_server.ids import generate_id
 from weave.trace_server.refs_internal import extra_value_quoter
+from weave.trace_server.token_costs import COST_OBJECT_NAME
 from weave.trace_server.trace_server_interface_util import (
     TRACE_REF_SCHEME,
     WILDCARD_ARTIFACT_VERSION_AND_PATH,
     extract_refs_from_values,
 )
+from weave.trace_server.validation_util import CHValidationError
 
 ## Hacky interface compatibility helpers
+
+
+def extract_weave_refs_from_value(value):
+    """Extract all strings that start with 'weave:///' from a value."""
+    refs = []
+    if isinstance(value, str) and value.startswith("weave:///"):
+        refs.append(value)
+    elif isinstance(value, dict):
+        for v in value.values():
+            refs.extend(extract_weave_refs_from_value(v))
+    elif isinstance(value, list):
+        for v in value:
+            refs.extend(extract_weave_refs_from_value(v))
+    return refs
+
 
 ClientType = weave_client.WeaveClient
 
@@ -94,11 +118,15 @@ def test_simple_op(client):
         exception=None,
         output=6,
         summary={
+            "status_counts": {
+                "success": 1,
+                "error": 0,
+            },
             "weave": {
                 "status": "success",
                 "trace_name": "my_op",
                 "latency_ms": AnyIntMatcher(),
-            }
+            },
         },
         attributes={
             "weave": {
@@ -108,21 +136,15 @@ def test_simple_op(client):
                 "os_version": platform.version(),
                 "os_release": platform.release(),
                 "sys_version": sys.version,
+                "python": {
+                    "type": "function",
+                },
             },
         },
         started_at=DatetimeMatcher(),
         ended_at=DatetimeMatcher(),
         deleted_at=None,
     )
-
-
-def test_dataset(client):
-    from weave.flow.dataset import Dataset
-
-    d = Dataset(rows=[{"a": 5, "b": 6}, {"a": 7, "b": 10}])
-    ref = weave.publish(d)
-    d2 = weave.ref(ref.uri()).get()
-    assert list(d2.rows) == list(d2.rows)
 
 
 def test_trace_server_call_start_and_end(client):
@@ -173,8 +195,13 @@ def test_trace_server_call_start_and_end(client):
         },
         "wb_user_id": MaybeStringMatcher(client.entity),
         "wb_run_id": None,
+        "wb_run_step": None,
         "deleted_at": None,
         "display_name": None,
+        "storage_size_bytes": None,
+        "total_storage_size_bytes": None,
+        "thread_id": None,
+        "turn_id": None,
     }
 
     end = tsi.EndedCallSchemaForInsert(
@@ -219,8 +246,13 @@ def test_trace_server_call_start_and_end(client):
         },
         "wb_user_id": MaybeStringMatcher(client.entity),
         "wb_run_id": None,
+        "wb_run_step": None,
         "deleted_at": None,
         "display_name": None,
+        "storage_size_bytes": None,
+        "total_storage_size_bytes": None,
+        "thread_id": None,
+        "turn_id": None,
     }
 
 
@@ -262,11 +294,7 @@ class OpCallSpec(BaseModel):
     run_calls: int
 
 
-def simple_line_call_bootstrap(init_wandb: bool = False) -> OpCallSpec:
-    # @weave.type()
-    # class Number:
-    #     value: int
-
+def simple_line_call_bootstrap() -> OpCallSpec:
     class Number(weave.Object):
         value: int
 
@@ -329,12 +357,8 @@ def simple_line_call_bootstrap(init_wandb: bool = False) -> OpCallSpec:
 
     num_calls = 5
     run_calls = 0
-    if init_wandb:
-        run = wandb.init()
     for i in range(num_calls):
         liner(Number(value=i), i, i)
-    if init_wandb:
-        run.finish()
     result["liner"].num_calls += num_calls
     result["adder"].num_calls += num_calls
     result["multiplier"].num_calls += num_calls
@@ -442,11 +466,15 @@ def test_trace_call_query_filter_input_object_version_refs(client):
     res = get_all_calls_asserting_finished(client, call_spec)
 
     input_object_version_refs = unique_vals(
-        [ref for call in res.calls for ref in extract_refs_from_values(call.inputs)]
+        [
+            ref
+            for call in res.calls
+            for ref in extract_weave_refs_from_value(call.inputs)
+        ]
     )
     assert len(input_object_version_refs) > 3  # > 3
 
-    for input_object_version_refs, exp_count in [
+    for input_refs, exp_count in [
         # Test the None case
         (None, call_spec.total_calls),
         # Test the empty list case
@@ -459,7 +487,7 @@ def test_trace_call_query_filter_input_object_version_refs(client):
                     call
                     for call in res.calls
                     if has_any(
-                        extract_refs_from_values(call.inputs),
+                        extract_weave_refs_from_value(call.inputs),
                         input_object_version_refs[:1],
                     )
                 ]
@@ -473,7 +501,7 @@ def test_trace_call_query_filter_input_object_version_refs(client):
                     call
                     for call in res.calls
                     if has_any(
-                        extract_refs_from_values(call.inputs),
+                        extract_weave_refs_from_value(call.inputs),
                         input_object_version_refs[:3],
                     )
                 ]
@@ -483,11 +511,65 @@ def test_trace_call_query_filter_input_object_version_refs(client):
         inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
                 project_id=get_client_project_id(client),
-                filter=tsi.CallsFilter(input_refs=input_object_version_refs),
+                filter=tsi.CallsFilter(input_refs=input_refs),
             )
         )
 
         assert len(inner_res.calls) == exp_count
+
+
+def test_trace_call_wb_run_step_query(client):
+    full_wb_run_id = f"{client.entity}/{client.project}/test-run"
+    from weave.trace import weave_client
+
+    step_counter = iter(range(100))
+    with (
+        mock.patch.object(
+            weave_client, "safe_current_wb_run_id", return_value=full_wb_run_id
+        ),
+        mock.patch.object(  # noqa: PT008
+            weave_client, "safe_current_wb_run_step", lambda: next(step_counter)
+        ),
+    ):
+        call_spec = simple_line_call_bootstrap()
+
+    server = get_client_trace_server(client)
+    res = server.calls_query(
+        tsi.CallsQueryReq(project_id=get_client_project_id(client))
+    )
+    steps = {c.wb_run_step for c in res.calls}
+    assert steps == set(range(call_spec.total_calls))
+
+    query = tsi.Query(
+        **{"$expr": {"$eq": [{"$getField": "wb_run_step"}, {"$literal": 0}]}}
+    )
+    res = server.calls_query(
+        tsi.CallsQueryReq(project_id=get_client_project_id(client), query=query)
+    )
+    assert len(res.calls) == 1
+
+    compare_step = call_spec.total_calls - 2
+    range_query = tsi.Query(
+        **{
+            "$expr": {
+                "$gte": [{"$getField": "wb_run_step"}, {"$literal": compare_step}]
+            }
+        }
+    )
+    res = server.calls_query(
+        tsi.CallsQueryReq(project_id=get_client_project_id(client), query=range_query)
+    )
+    assert len(res.calls) == 2
+
+    res = server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=get_client_project_id(client),
+            sort_by=[tsi.SortBy(field="wb_run_step", direction="desc")],
+        )
+    )
+    exp_steps = list(range(call_spec.total_calls))[::-1]
+    found_steps = [c.wb_run_step for c in res.calls]
+    assert found_steps == exp_steps
 
 
 def test_trace_call_query_filter_output_object_version_refs(client):
@@ -496,11 +578,15 @@ def test_trace_call_query_filter_output_object_version_refs(client):
     res = get_all_calls_asserting_finished(client, call_spec)
 
     output_object_version_refs = unique_vals(
-        [ref for call in res.calls for ref in extract_refs_from_values(call.output)]
+        [
+            ref
+            for call in res.calls
+            for ref in extract_weave_refs_from_value(call.output)
+        ]
     )
     assert len(output_object_version_refs) > 3
 
-    for output_object_version_refs, exp_count in [
+    for output_refs, exp_count in [
         # Test the None case
         (None, call_spec.total_calls),
         # Test the empty list case
@@ -513,7 +599,7 @@ def test_trace_call_query_filter_output_object_version_refs(client):
                     call
                     for call in res.calls
                     if has_any(
-                        extract_refs_from_values(call.output),
+                        extract_weave_refs_from_value(call.output),
                         output_object_version_refs[:1],
                     )
                 ]
@@ -527,7 +613,7 @@ def test_trace_call_query_filter_output_object_version_refs(client):
                     call
                     for call in res.calls
                     if has_any(
-                        extract_refs_from_values(call.output),
+                        extract_weave_refs_from_value(call.output),
                         output_object_version_refs[:3],
                     )
                 ]
@@ -537,7 +623,7 @@ def test_trace_call_query_filter_output_object_version_refs(client):
         inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
                 project_id=get_client_project_id(client),
-                filter=tsi.CallsFilter(output_refs=output_object_version_refs),
+                filter=tsi.CallsFilter(output_refs=output_refs),
             )
         )
 
@@ -554,7 +640,7 @@ def test_trace_call_query_filter_parent_ids(client):
     )
     assert len(parent_ids) > 3
 
-    for parent_ids, exp_count in [
+    for parent_id_list, exp_count in [
         # Test the None case
         (None, call_spec.total_calls),
         # Test the empty list case
@@ -573,7 +659,7 @@ def test_trace_call_query_filter_parent_ids(client):
         inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
                 project_id=get_client_project_id(client),
-                filter=tsi.CallsFilter(parent_ids=parent_ids),
+                filter=tsi.CallsFilter(parent_ids=parent_id_list),
             )
         )
 
@@ -587,7 +673,7 @@ def test_trace_call_query_filter_trace_ids(client):
 
     trace_ids = [call.trace_id for call in res.calls]
 
-    for trace_ids, exp_count in [
+    for trace_id_list, exp_count in [
         # Test the None case
         (None, call_spec.total_calls),
         # Test the empty list case
@@ -600,7 +686,7 @@ def test_trace_call_query_filter_trace_ids(client):
         inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
                 project_id=get_client_project_id(client),
-                filter=tsi.CallsFilter(trace_ids=trace_ids),
+                filter=tsi.CallsFilter(trace_ids=trace_id_list),
             )
         )
 
@@ -614,7 +700,7 @@ def test_trace_call_query_filter_call_ids(client):
 
     call_ids = [call.id for call in res.calls]
 
-    for call_ids, exp_count in [
+    for call_id_list, exp_count in [
         # Test the None case
         (None, call_spec.total_calls),
         # Test the empty list case
@@ -627,7 +713,7 @@ def test_trace_call_query_filter_call_ids(client):
         inner_res = get_client_trace_server(client).calls_query(
             tsi.CallsQueryReq(
                 project_id=get_client_project_id(client),
-                filter=tsi.CallsFilter(call_ids=call_ids),
+                filter=tsi.CallsFilter(call_ids=call_id_list),
             )
         )
 
@@ -649,6 +735,82 @@ def test_trace_call_query_filter_trace_roots_only(client):
             tsi.CallsQueryReq(
                 project_id=get_client_project_id(client),
                 filter=tsi.CallsFilter(trace_roots_only=trace_roots_only),
+            )
+        )
+
+        assert len(inner_res.calls) == exp_count
+
+
+def test_trace_call_query_filter_wb_run_ids(client):
+    full_wb_run_id_1 = f"{client.entity}/{client.project}/test-run-1"
+    full_wb_run_id_2 = f"{client.entity}/{client.project}/test-run-2"
+    from weave.trace import weave_client
+
+    with mock.patch.object(
+        weave_client, "safe_current_wb_run_id", return_value=full_wb_run_id_1
+    ):
+        call_spec_1 = simple_line_call_bootstrap()
+    with mock.patch.object(
+        weave_client, "safe_current_wb_run_id", return_value=full_wb_run_id_2
+    ):
+        call_spec_2 = simple_line_call_bootstrap()
+    call_spec_3 = simple_line_call_bootstrap()
+
+    total_calls = (
+        call_spec_1.total_calls + call_spec_2.total_calls + call_spec_3.total_calls
+    )
+
+    for wb_run_ids, exp_count in [
+        (None, total_calls),
+        ([], total_calls),
+        ([full_wb_run_id_1], call_spec_1.total_calls),
+        (
+            [full_wb_run_id_1, full_wb_run_id_2],
+            call_spec_1.total_calls + call_spec_2.total_calls,
+        ),
+        ([f"{client.entity}/{client.project}/NOT_A_RUN"], 0),
+    ]:
+        inner_res = get_client_trace_server(client).calls_query(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client),
+                filter=tsi.CallsFilter(wb_run_ids=wb_run_ids),
+            )
+        )
+
+        assert len(inner_res.calls) == exp_count
+
+
+def test_trace_call_query_filter_wb_user_ids(client):
+    call_spec_1 = simple_line_call_bootstrap()
+
+    # OMG! How ugly is this?! The layers of testing servers is nasty
+    client.server.server._next_trace_server._user_id = "second_user"
+    call_spec_2 = simple_line_call_bootstrap()
+
+    # OMG! How ugly is this?! The layers of testing servers is nasty
+    client.server.server._next_trace_server._user_id = "third_user"
+    call_spec_3 = simple_line_call_bootstrap()
+
+    for wb_user_ids, exp_count in [
+        (
+            None,
+            call_spec_1.total_calls + call_spec_2.total_calls + call_spec_3.total_calls,
+        ),
+        (
+            [],
+            call_spec_1.total_calls + call_spec_2.total_calls + call_spec_3.total_calls,
+        ),
+        (["second_user"], call_spec_2.total_calls),
+        (
+            ["second_user", "third_user"],
+            call_spec_2.total_calls + call_spec_3.total_calls,
+        ),
+        (["NOT_A_USER"], 0),
+    ]:
+        inner_res = get_client_trace_server(client).calls_query(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client),
+                filter=tsi.CallsFilter(wb_user_ids=wb_user_ids),
             )
         )
 
@@ -695,6 +857,80 @@ def test_trace_call_query_offset(client):
         )
 
         assert len(inner_res.calls) == exp_count
+
+
+def test_trace_call_query_timings(client):
+    now = datetime.datetime(2025, 1, 1, 12, 0, 0, tzinfo=datetime.timezone.utc)
+    later = now + datetime.timedelta(seconds=1)
+    even_later = later + datetime.timedelta(seconds=1)
+
+    num_calls = 100
+
+    # Create calls with controlled timing - mock only datetime.datetime.now()
+    call_index = 0
+
+    def mock_now(*args, **kwargs):
+        nonlocal call_index
+        # Each create_call increments the index once at the start
+        # Return the appropriate time based on which call we're processing
+        if call_index <= num_calls - 3:  # calls 0-97 get 'now'
+            return now
+        elif call_index == num_calls - 2:  # call 98 gets 'later'
+            return later
+        else:  # call 99 gets 'even_later'
+            return even_later
+
+    with mock.patch(
+        "weave.trace.weave_client.datetime.datetime"
+    ) as mock_datetime_class:
+        # Mock only the .now() method, keep everything else as-is
+        mock_datetime_class.now = mock.Mock(side_effect=mock_now)
+        # Preserve other datetime functionality
+        mock_datetime_class.side_effect = lambda *args, **kw: datetime.datetime(
+            *args, **kw
+        )
+
+        for i in range(num_calls):
+            call_index = i
+            client.create_call("y", {"a": i})
+
+    def query_server():
+        result = get_client_trace_server(client).calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client),
+                sort_by=[tsi.SortBy(field="started_at", direction="desc")],
+            )
+        )
+        return list(result)
+
+    def query_client(page_size):
+        res = client.get_calls(
+            sort_by=[tsi.SortBy(field="started_at", direction="desc")],
+            page_size=page_size,
+        )
+        return list(res)
+
+    # get all calls, sorted by started_at
+    res = query_server()
+    assert len(res) == num_calls
+    assert res[0].started_at == even_later
+    assert res[1].started_at == later
+    for c in res[2:]:
+        assert c.started_at == now
+
+    ids = [c.id for c in res]
+
+    # indeterminite ordering should always default to the same thing
+    for _i in range(5):
+        tres = query_server()
+        tids = [c.id for c in tres]
+        assert tids == ids
+
+    # page_size 10 to test ordering within pages
+    for _i in range(3):
+        tres = query_client(page_size=10)
+        tids = [c.id for c in tres]
+        assert tids == ids
 
 
 def test_trace_call_sort(client):
@@ -1279,6 +1515,9 @@ def test_attributes_on_ops(client):
             "os_version": platform.version(),
             "os_release": platform.release(),
             "sys_version": sys.version,
+            "python": {
+                "type": "function",
+            },
         },
     }
 
@@ -1381,8 +1620,8 @@ def test_bound_op_retrieval_no_self(client):
         a: int
 
         @weave.op
-        def op_with_custom_type(me, v):
-            return me.a + v
+        def op_with_custom_type(self, v):
+            return self.a + v
 
     obj = CustomTypeWithoutSelf(a=1)
     obj_ref = weave.publish(obj)
@@ -1400,7 +1639,7 @@ def test_dataset_row_ref(client):
     d2 = weave.ref(ref.uri()).get()
 
     inner = d2.rows[0]["a"]
-    exp_ref = "weave:///shawn/test-project/object/Dataset:tiRVKBWTP7LOwjBEqe79WFS7HEibm1WG8nfe94VWZBo/attr/rows/id/XfhC9dNA5D4taMvhKT4MKN2uce7F56Krsyv4Q6mvVMA/key/a"
+    exp_ref = "weave:///shawn/test-project/object/Dataset:0xTDJ6hEmsx8Wg9H75y42bL2WgvW5l4IXjuhHcrMh7A/attr/rows/id/XfhC9dNA5D4taMvhKT4MKN2uce7F56Krsyv4Q6mvVMA/key/a"
     assert inner == 5
     assert inner.ref.uri() == exp_ref
     gotten = weave.ref(exp_ref).get()
@@ -1693,14 +1932,14 @@ def test_mapped_execution(client, mapper):
     @weave.op
     def op_a(a: int) -> int:
         events.append("A(S):" + str(a))
-        time.sleep(0.3)
+        time.sleep(0.03)
         events.append("A(E):" + str(a))
         return a
 
     @weave.op
     def op_b(b: int) -> int:
         events.append("B(S):" + str(b))
-        time.sleep(0.2)
+        time.sleep(0.02)
         res = op_a(b)
         events.append("B(E):" + str(b))
         return res
@@ -1708,7 +1947,7 @@ def test_mapped_execution(client, mapper):
     @weave.op
     def op_c(c: int) -> int:
         events.append("C(S):" + str(c))
-        time.sleep(0.1)
+        time.sleep(0.01)
         res = op_b(c)
         events.append("C(E):" + str(c))
         return res
@@ -2183,6 +2422,28 @@ def test_call_query_stream_columns(client):
     assert calls[0].attributes == {}
     assert calls[0].inputs == {"a": 0, "b": 0}
 
+    # now get summary
+    calls2 = client.server.calls_query_stream(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+            columns=["id", "summary"],
+        )
+    )
+    calls2 = list(calls2)
+    assert len(calls2) == 2
+    # assert derived summary fields are included when getting summary
+    assert calls2[0].summary["weave"]["status"] == "success"
+    assert isinstance(calls2[0].summary["weave"]["latency_ms"], int)
+    assert calls2[0].summary["weave"]["trace_name"] == "calculate"
+    # this means other fields on the call should be set
+    assert calls2[0].started_at is not None
+    assert calls2[0].ended_at is not None
+    assert calls2[0].op_name is not None
+    # but not other big fields
+    assert calls2[0].attributes == {}
+    assert calls2[0].inputs == {}
+    assert calls2[0].output is None
+
 
 def test_call_query_stream_columns_with_costs(client):
     if client_is_sqlite(client):
@@ -2212,7 +2473,32 @@ def test_call_query_stream_columns_with_costs(client):
     calls = list(calls)
     assert len(calls) == 2
     assert calls[0].summary is not None
+    # Costs should be None because we don't have a cost entry for test_model
+    assert calls[0].summary.get("weave").get("costs") is None
+
+    client.add_cost(
+        "test_model",
+        Decimal("0.00001"),
+        Decimal("0.00003"),
+        datetime.datetime.now(tz=datetime.timezone.utc),
+    )
+
+    calls = client.server.calls_query_stream(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+            columns=["id", "summary"],
+            include_costs=True,
+        )
+    )
+    calls = list(calls)
+    assert len(calls) == 2
+    assert calls[0].summary is not None
     assert calls[0].summary.get("weave").get("costs") is not None
+
+    # also assert that derived summary fields are included when getting costs
+    assert calls[0].summary["weave"]["status"] == "success"
+    assert calls[0].summary["weave"]["latency_ms"] > 0
+    assert "calculate" in calls[0].summary["weave"]["trace_name"]
 
     # This should not happen, users should not request summary_dump
     # Test that costs are returned if we include the summary_dump field
@@ -2256,6 +2542,138 @@ def test_call_query_stream_columns_with_costs(client):
     assert calls[0].summary.get("weave", {}).get("costs") is None
 
 
+def test_read_call_start_with_cost(client):
+    if client_is_sqlite(client):
+        # dont run this test for sqlite
+        return
+
+    project_id = client._project_id()
+    call_id = generate_id()
+    trace_id = generate_id()
+    llm_id = "test-model-v1"  # Price needed for potential joins, even if no usage
+    start_time = datetime.datetime.now(tz=datetime.timezone.utc)
+    price_effective_date = start_time - datetime.timedelta(days=1)
+
+    # --- 1. Insert Prerequisite Data ---
+    cost_data = {
+        llm_id: {
+            "prompt_token_cost": Decimal("0.00001"),  # Cost per token
+            "completion_token_cost": Decimal("0.00003"),  # Cost per token
+            "effective_date": price_effective_date,
+        }
+    }
+    cost_res = client.server.cost_create(
+        tsi.CostCreateReq(
+            project_id=project_id,
+            costs=cost_data,
+            wb_user_id="test_user",  # Assuming a user ID is needed
+        )
+    )
+    price_id = cost_res.ids[0][0]
+
+    # Insert a call record with summary_dump=None
+    call_start_data = tsi.StartedCallSchemaForInsert(
+        project_id=project_id,
+        id=call_id,
+        trace_id=trace_id,
+        op_name="test_op_null_summary",
+        display_name="Test Operation Null Summary",
+        started_at=start_time,
+        inputs={"arg1": "no summary"},
+        summary_dump=None,  # Explicitly set to None
+        attributes={},
+    )
+    client.server.call_start(tsi.CallStartReq(start=call_start_data))
+
+    # --- 2. Call call_read with include_costs=True ---
+    res = client.server.call_read(
+        tsi.CallReadReq(
+            project_id=project_id,
+            id=call_id,
+            include_costs=True,  # Request cost calculation
+        )
+    )
+
+    # --- 3. Assert Results ---
+    assert res.call is not None, "Expected call record to be found"
+    assert res.call.id == call_id
+
+    # The summary dump should exist but be null or an empty object initially.
+    # The cost query should handle this gracefully and *not* add a costs object.
+    summary = res.call.summary
+    assert isinstance(summary, dict), "Expected summary_dump to be a dictionary"
+
+    if summary is None:
+        # If call_read returns None summary, this is fine for this case.
+        pass
+    elif isinstance(summary, dict):
+        # Check that the costs object was NOT added
+        assert COST_OBJECT_NAME not in summary.get("weave", {}), (
+            f"Did not expect '{COST_OBJECT_NAME}' key in summary['weave'] when initial summary was null/empty"
+        )
+    else:
+        pytest.fail(f"summary_dump was not None or dict: {type(summary)} {summary}")
+
+    # --- 4. Cleanup ---
+    client.server.calls_delete(
+        tsi.CallsDeleteReq(project_id=project_id, call_ids=[call_id])
+    )
+    client.purge_costs(price_id)
+
+
+def test_call_read_with_unkown_llm(client):
+    """Tests that if an op reports usage for an LLM ID that has no cost entry
+    in the database, the cost calculation handles it gracefully (by not adding cost info).
+    """
+    if client_is_sqlite(client):
+        # dont run this test for sqlite
+        return
+
+    # Generate a unique LLM ID unlikely to exist
+    llm_id_no_cost = f"non_existent_llm_{generate_id()}"
+
+    @weave.op
+    def op_with_usage_no_cost(input_val: int) -> dict[str, Any]:
+        usage_details = {
+            "requests": 1,
+            "prompt_tokens": 15,
+            "completion_tokens": 25,
+            "total_tokens": 40,
+        }
+        # WeaveClient should automatically extract 'usage' from the return dict
+        # and place it into the call's summary.
+        return {
+            "output_val": input_val * 3,
+            "usage": usage_details,
+            "model": llm_id_no_cost,
+        }
+
+    op_with_usage_no_cost(10)
+
+    calls = client.server.calls_query_stream(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+            columns=["id", "summary", "output_dump"],
+            include_costs=True,
+        )
+    )
+    calls = list(calls)
+    assert len(calls) == 1
+    assert calls[0].output["output_val"] == 30
+    assert calls[0].summary is not None
+
+    summary = calls[0].summary
+    # Basic checks on the summary
+    assert summary is not None
+    assert "usage" in summary
+    assert llm_id_no_cost in summary["usage"]
+    assert summary["usage"][llm_id_no_cost]["prompt_tokens"] == 15
+
+    # Check the cost calculation part
+    assert "weave" in summary
+    assert "costs" not in summary["weave"]
+
+
 @pytest.mark.skip("Not implemented: filter / sort through refs")
 def test_sort_and_filter_through_refs(client):
     @weave.op
@@ -2296,7 +2714,7 @@ def test_sort_and_filter_through_refs(client):
         {"a": test_obj({"b": test_obj({"c": test_obj({"d": values[7]})})})},
     )
 
-    for first, last, sort_by in [
+    for first, _last, sort_by in [
         (0, 21, [tsi.SortBy(field="inputs.val.a.b.c.d", direction="asc")]),
         (21, 0, [tsi.SortBy(field="inputs.val.a.b.c.d", direction="desc")]),
         (0, 21, [tsi.SortBy(field="output.a.b.c.d", direction="asc")]),
@@ -2312,7 +2730,7 @@ def test_sort_and_filter_through_refs(client):
         assert inner_res.calls[0].inputs["label"] == first
         assert inner_res.calls[1].inputs["label"] == first
 
-    for first, last, count, query in [
+    for _first, _last, count, query in [
         (
             6,
             21,
@@ -2438,13 +2856,25 @@ def test_call_has_client_version(client):
 def test_user_cannot_modify_call_weave_dict(client):
     @weave.op
     def test():
+        call = require_current_call()
+
+        # allowed in this context
+        call.attributes["test"] = 123
+
+        with pytest.raises(KeyError):
+            call.attributes["weave"] = {"anything": "blah"}
+
+        with pytest.raises(KeyError):
+            call.attributes["weave"]["anything"] = "blah"
+
         return 1
 
     _, call = test.call()
 
-    call.attributes["test"] = 123
+    with pytest.raises(TypeError):
+        call.attributes["test"] = 123
 
-    with pytest.raises(KeyError):
+    with pytest.raises(TypeError):
         call.attributes["weave"] = {"anything": "blah"}
 
     with pytest.raises(KeyError):
@@ -2478,7 +2908,7 @@ def test_calls_iter_cached(client):
     calls = func.calls()
 
     elapsed_times = []
-    for i in range(3):
+    for _ in range(3):
         start_time = time.time()
         c = calls[0]
         end_time = time.time()
@@ -2545,9 +2975,8 @@ def test_model_save(client):
 
     assert len(inner_res.objs) == 1
     expected_predict_op = inner_res.objs[0].val["predict"]
-    assert isinstance(expected_predict_op, str) and expected_predict_op.startswith(
-        "weave:///"
-    )
+    assert isinstance(expected_predict_op, str)
+    assert expected_predict_op.startswith("weave:///")
 
 
 def test_calls_stream_column_expansion(client):
@@ -2585,7 +3014,7 @@ def test_calls_stream_column_expansion(client):
         )
     )
 
-    call_result = list(res)[0]
+    call_result = next(iter(res))
     assert call_result.output == nested_ref.uri()
 
     # output is dereffed
@@ -2597,7 +3026,7 @@ def test_calls_stream_column_expansion(client):
         )
     )
 
-    call_result = list(res)[0]
+    call_result = next(iter(res))
     assert call_result.output["b"] == simple_ref.uri()
 
     # expand 2 refs, should be {"b": {"a": ref}}
@@ -2608,7 +3037,7 @@ def test_calls_stream_column_expansion(client):
             expand_columns=["output", "output.b"],
         )
     )
-    call_result = list(res)[0]
+    call_result = next(iter(res))
     assert call_result.output["b"]["a"] == ref.uri()
 
     # expand 3 refs, should be {"b": {"a": {"id": 123}}}
@@ -2619,7 +3048,7 @@ def test_calls_stream_column_expansion(client):
             expand_columns=["output", "output.b", "output.b.a"],
         )
     )
-    call_result = list(res)[0]
+    call_result = next(iter(res))
     assert call_result.output["b"]["a"]["id"] == "123"
 
     # incomplete expansion columns, output should be un expanded
@@ -2630,7 +3059,7 @@ def test_calls_stream_column_expansion(client):
             expand_columns=["output.b"],
         )
     )
-    call_result = list(res)[0]
+    call_result = next(iter(res))
     assert call_result.output == nested_ref.uri()
 
     # non-existent column, should be un expanded
@@ -2641,15 +3070,26 @@ def test_calls_stream_column_expansion(client):
             expand_columns=["output.b", "output.zzzz"],
         )
     )
-    call_result = list(res)[0]
+    call_result = next(iter(res))
     assert call_result.output == nested_ref.uri()
 
 
 # Batch size is dynamically increased from 10 to MAX_CALLS_STREAM_BATCH_SIZE (500)
-# in clickhouse_trace_server_batched.py, this test verifies that the dynamic
+# in clickhouse_trace_server_settings.py, this test verifies that the dynamic
 # increase works as expected
-@pytest.mark.parametrize("batch_size", [1, 10, 100, 110])
-def test_calls_stream_column_expansion_dynamic_batch_size(client, batch_size):
+@pytest.mark.parametrize("batch_size", [1, 5, 6])
+def test_calls_stream_column_expansion_dynamic_batch_size(
+    client, batch_size, monkeypatch
+):
+    monkeypatch.setattr(
+        "weave.trace_server.clickhouse_trace_server_settings.INITIAL_CALLS_STREAM_BATCH_SIZE",
+        1,
+    )
+    monkeypatch.setattr(
+        "weave.trace_server.clickhouse_trace_server_settings.MAX_CALLS_STREAM_BATCH_SIZE",
+        5,
+    )
+
     @weave.op
     def test_op(x):
         return x
@@ -2738,7 +3178,7 @@ def test_object_with_char_over_limit(client):
             }
         }
     )
-    with pytest.raises(Exception):
+    with pytest.raises(CHValidationError):
         client.server.obj_create(create_req)
 
 
@@ -2766,7 +3206,7 @@ def test_objects_and_keys_with_special_characters(client):
         exp_key
         == "n-a_m.e%3A%20%2F%2B_%28%29%7B%7D%7C%22%27%3C%3E%21%40%24%5E%26%2A%23%3A%2C.%5B%5D-%3D%3B~%60100"
     )
-    exp_digest = "iVLhViJ3vm8vMMo3Qj35mK7GiyP8jv3OJqasIGXjN0s"
+    exp_digest = "O66Mk7g91rlAUtcGYOFR1Y2Wk94YyPXJy2UEAzDQcYM"
 
     exp_obj_ref = f"{ref_base}/object/{exp_name}:{exp_digest}"
     assert obj.ref.uri() == exp_obj_ref
@@ -2797,8 +3237,8 @@ def test_objects_and_keys_with_special_characters(client):
 
 
 def test_calls_stream_feedback(client):
-    BATCH_SIZE = 10
-    num_calls = BATCH_SIZE + 1
+    batch_size = 10
+    num_calls = batch_size + 1
 
     @weave.op
     def test_call(x):
@@ -2948,13 +3388,43 @@ def test_inline_pydantic_basemodel_generates_no_refs_in_object(client):
     assert len(res.objs) == 1  # Just the weave object, and not the pydantic model
 
 
-def test_large_keys_are_stripped_call(client, caplog):
+def test_large_keys_are_stripped_call(client, caplog, monkeypatch):
     is_sqlite = client_is_sqlite(client)
     if is_sqlite:
         # no need to strip in sqlite
         return
 
-    data = {"dictionary": {f"{i}": i for i in range(300_000)}}
+    original_insert_call_batch = weave.trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer._insert_call_batch
+
+    # Patch _insert_call_batch to raise InsertTooLarge
+    def mock_insert_call_batch(self, batch):
+        # mock raise insert error
+        if len(str(batch)) > 10 * 1024:
+            raise InsertTooLarge(
+                "Database insertion failed. Record too large. "
+                "A likely cause is that a single row or cell exceeded "
+                "the limit. If logging images, save them as `Image.PIL`."
+            )
+        original_insert_call_batch(self, batch)
+
+    monkeypatch.setattr(
+        weave.trace_server.clickhouse_trace_server_settings,
+        "CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT",
+        10 * 1024,  # 1KB
+    )
+    monkeypatch.setattr(
+        weave.trace_server.clickhouse_trace_server_settings,
+        "CLICKHOUSE_SINGLE_VALUE_BYTES_LIMIT",
+        1 * 1024,  # 1KB
+    )
+    monkeypatch.setattr(
+        weave.trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer,
+        "_insert_call_batch",
+        mock_insert_call_batch,
+    )
+
+    # Use a smaller dictionary that will still exceed our new 10KB limit
+    data = {"dictionary": {f"{i}": i for i in range(10_000)}}
 
     @weave.op
     def test_op_dict(input_data: dict):
@@ -3231,7 +3701,7 @@ def test_op_sampling_child_follows_parent(client):
         parent_calls += 1
         return child_op(x)
 
-    num_runs = 100
+    num_runs = 5
     for i in range(num_runs):
         parent_op(i)
 
@@ -3255,3 +3725,2025 @@ def test_calls_len(client):
 
     assert len(test.calls()) == 2
     assert len(client.get_calls()) == 2
+
+
+def test_calls_query_multiple_dupe_select_columns(client, capsys, caplog):
+    @weave.op
+    def test():
+        return {"a": {"b": {"c": {"d": 1}}}}
+
+    test()
+    test()
+
+    calls = client.get_calls(
+        columns=[
+            "output",
+            "output.a",
+            "output.a.b",
+            "output.a.b.c",
+            "output.a.b.c.d",
+        ]
+    )
+
+    assert len(calls) == 2
+    assert calls[0].output == {"a": {"b": {"c": {"d": 1}}}}
+    assert calls[0].output["a"] == {"b": {"c": {"d": 1}}}
+    assert calls[0].output["a"]["b"] == {"c": {"d": 1}}
+    assert calls[0].output["a"]["b"]["c"] == {"d": 1}
+    assert calls[0].output["a"]["b"]["c"]["d"] == 1
+
+    # now make sure we don't make duplicate selects
+    if client_is_sqlite(client):
+        select_queries = [
+            line
+            for line in capsys.readouterr().out.split("\n")
+            if line.startswith("QUERY SELECT")
+        ]
+        for query in select_queries:
+            assert query.count("output") == 1
+    else:
+        select_query = get_info_loglines(caplog, "clickhouse_stream_query", ["query"])[
+            0
+        ]
+        assert (
+            select_query["query"].count("any(calls_merged.output_dump) AS output_dump")
+            == 1
+        )
+
+
+def test_calls_stream_heavy_condition_aggregation_parts(client):
+    def _make_query(field: str, value: str) -> tsi.CallsQueryRes:
+        query = {
+            "$in": [
+                {"$getField": field},
+                [{"$literal": value}],
+            ]
+        }
+        res = get_client_trace_server(client).calls_query_stream(
+            tsi.CallsQueryReq.model_validate(
+                {
+                    "project_id": get_client_project_id(client),
+                    "query": {"$expr": query},
+                }
+            )
+        )
+        return list(res)
+
+    call_id = generate_id()
+    trace_id = generate_id()
+    parent_id = generate_id()
+    start = tsi.StartedCallSchemaForInsert(
+        project_id=client._project_id(),
+        id=call_id,
+        op_name="test_name",
+        trace_id=trace_id,
+        parent_id=parent_id,
+        started_at=datetime.datetime.now(tz=datetime.timezone.utc)
+        - datetime.timedelta(seconds=1),
+        attributes={"a": 5},
+        inputs={"param": {"value1": "hello"}},
+    )
+    client.server.call_start(tsi.CallStartReq(start=start))
+
+    res = _make_query("inputs.param.value1", "hello")
+    assert len(res) == 1
+    assert res[0].inputs["param"]["value1"] == "hello"
+    assert not res[0].output
+
+    end = tsi.EndedCallSchemaForInsert(
+        project_id=client._project_id(),
+        id=call_id,
+        ended_at=datetime.datetime.now(tz=datetime.timezone.utc),
+        summary={"c": 5},
+        output={"d": 5},
+    )
+    client.server.call_end(tsi.CallEndReq(end=end))
+
+    res = _make_query("inputs.param.value1", "hello")
+    assert len(res) == 1
+    assert res[0].inputs["param"]["value1"] == "hello"
+    assert res[0].output["d"] == 5
+
+
+def test_call_stream_query_heavy_query_batch(client):
+    # start 10 calls
+    call_ids = []
+    project_id = get_client_project_id(client)
+    for _ in range(10):
+        call_id = generate_id()
+        call_ids.append(call_id)
+        trace_id = generate_id()
+        parent_id = generate_id()
+        start = tsi.StartedCallSchemaForInsert(
+            project_id=project_id,
+            id=call_id,
+            op_name="test_name",
+            trace_id=trace_id,
+            parent_id=parent_id,
+            started_at=datetime.datetime.now(tz=datetime.timezone.utc)
+            - datetime.timedelta(seconds=1),
+            attributes={"a": 5, "empty": "", "null": None},
+            inputs={"param": {"value1": "hello"}},
+        )
+        client.server.call_start(tsi.CallStartReq(start=start))
+
+    # end 10 calls
+    for i in range(10):
+        call_id = generate_id()
+        trace_id = generate_id()
+        parent_id = generate_id()
+        end = tsi.EndedCallSchemaForInsert(
+            project_id=project_id,
+            id=call_ids[i],
+            ended_at=datetime.datetime.now(tz=datetime.timezone.utc),
+            summary={"c": 5},
+            output={"d": 5, "e": "f", "result": {"message": "completed"}},
+        )
+        client.server.call_end(tsi.CallEndReq(end=end))
+
+    # filter by output
+    output_query = {
+        "project_id": project_id,
+        "query": {
+            "$expr": {
+                "$eq": [
+                    {"$getField": "output.e"},
+                    {"$literal": "f"},
+                ]
+            }
+        },
+    }
+    res = client.server.calls_query_stream(
+        tsi.CallsQueryReq.model_validate(output_query)
+    )
+    assert len(list(res)) == 10
+    for call in res:
+        assert call.attributes["a"] == 5
+
+    # now query for inputs by string. This should be okay,
+    # because we don't filter out started_at is NULL
+    input_string_query = {
+        "project_id": project_id,
+        "query": {
+            "$expr": {
+                "$and": [
+                    {
+                        "$eq": [
+                            {"$getField": "inputs.param.value1"},
+                            {"$literal": "hello"},
+                        ]
+                    },
+                    {
+                        "$contains": {
+                            "input": {"$getField": "output.result.message"},
+                            "substr": {"$literal": "COMPleted"},
+                            "case_insensitive": True,
+                        }
+                    },
+                ]
+            }
+        },
+    }
+    res = client.server.calls_query_stream(
+        tsi.CallsQueryReq.model_validate(input_string_query)
+    )
+    assert len(list(res)) == 10
+    for call in res:
+        assert call.inputs["param"]["value1"] == "hello"
+        assert call.output["d"] == 5
+        assert call.output["result"]["message"] == "COMPLETED"
+
+    # Now lets add a light filter, which
+    # changes how we filter out calls. Make sure that still works
+    input_string_query["filter"] = {"op_names": ["test_name"]}
+    res = client.server.calls_query_stream(
+        tsi.CallsQueryReq.model_validate(input_string_query)
+    )
+    assert len(list(res)) == 10
+    for call in res:
+        assert call.inputs["param"]["value1"] == "helslo"
+        assert call.output["d"] == 5
+
+    # now try to filter by the empty attribute string
+    query = {
+        "project_id": project_id,
+        "query": {
+            "$expr": {"$eq": [{"$getField": "attributes.empty"}, {"$literal": ""}]}
+        },
+    }
+    res = client.server.calls_query_stream(tsi.CallsQueryReq.model_validate(query))
+    assert len(list(res)) == 10
+    for call in res:
+        assert call.attributes["empty"] == ""
+
+
+@pytest.fixture
+def clickhouse_client(client):
+    if client_is_sqlite(client):
+        return None
+    return client.server._next_trace_server.ch_client
+
+
+def test_calls_query_with_storage_size_clickhouse(client, clickhouse_client):
+    """Test querying calls with storage size information"""
+    if client_is_sqlite(client):
+        pytest.skip("Skipping test for sqlite clients")
+
+    @weave.op
+    def test_op(x: dict):
+        return x
+
+    # Create a call with some data
+    result = test_op({"data": "x" * 1000})
+
+    # This is a best effort to achive consistency in the calls_merged_stats table.
+    # due to some race condition/optimizations in clickhouse, there is a chance
+    # that the calls_merged_stats table is not updated in time for the query below
+    # to return the correct results.
+    clickhouse_client.command(
+        "OPTIMIZE TABLE calls_merged_stats FINAL",
+    )
+
+    # Query with storage size
+    calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client), include_storage_size=True
+            )
+        )
+    )
+    assert len(calls) == 1
+    call = calls[0]
+
+    # Verify storage size is present, despite that the race condition
+    # that the calls_merged_stats table is not updated in time, and we are unable to
+    # verify the value against an expected value.
+    assert call.storage_size_bytes is not None
+
+
+def test_calls_query_with_total_storage_size_clickhouse(client, clickhouse_client):
+    """Test querying calls with total storage size"""
+    if client_is_sqlite(client):
+        pytest.skip("Skipping test for sqlite clients")
+
+    @weave.op
+    def parent_op(x: dict):
+        return child_op(x)  # Call child op to create a trace
+
+    @weave.op
+    def child_op(x: dict):
+        return x
+
+    # Create a call with nested structure
+    parent_op({"data": "x" * 1000})
+
+    # This is a best effort to achive consistency in the calls_merged_stats table.
+    # due to some race condition/optimizations in clickhouse, there is a chance
+    # that the calls_merged_stats table is not updated in time for the query below
+    # to return the correct results.
+    clickhouse_client.command(
+        "OPTIMIZE TABLE calls_merged_stats FINAL",
+    )
+
+    # Query with total storage size
+    calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client),
+                include_total_storage_size=True,
+            )
+        )
+    )
+    assert len(calls) == 2  # Parent and child calls
+
+    # Find parent and child calls
+    parent_call = next(c for c in calls if c.parent_id is None)
+    child_call = next(c for c in calls if c.parent_id is not None)
+
+    # Verify that both parent and child calls are present
+    assert parent_call is not None
+    assert child_call is not None
+
+    # Verify the total storage size is present, despite that the race condition
+    # that the calls_merged_stats table is not updated in time, and we are unable to
+    # verify the value against an expected value.
+    assert (
+        parent_call.total_storage_size_bytes is not None
+    )  # Parent should have total size
+    assert child_call.storage_size_bytes is None
+    assert (
+        child_call.total_storage_size_bytes is None
+    )  # Child should not have total size
+
+
+def test_calls_query_with_both_storage_sizes_clickhouse(client, clickhouse_client):
+    """Test querying calls with total storage size"""
+    if client_is_sqlite(client):
+        pytest.skip("Skipping test for sqlite clients")
+
+    @weave.op
+    def parent_op(x: dict):
+        return child_op(x)  # Call child op to create a trace
+
+    @weave.op
+    def child_op(x: dict):
+        return x
+
+    # Create a call with nested structure
+    parent_op({"data": "x" * 1000})
+
+    # This is a best effort to achive consistency in the calls_merged_stats table.
+    # due to some race condition/optimizations in clickhouse, there is a chance
+    # that the calls_merged_stats table is not updated in time for the query below
+    # to return the correct results.
+    clickhouse_client.command(
+        "OPTIMIZE TABLE calls_merged_stats FINAL",
+    )
+
+    # Query with total storage size
+    calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client),
+                include_storage_size=True,
+                include_total_storage_size=True,
+            )
+        )
+    )
+
+    assert len(calls) == 2  # Parent and child calls
+
+    # Find parent and child calls
+    parent_call = next(c for c in calls if c.parent_id is None)
+    child_call = next(c for c in calls if c.parent_id is not None)
+
+    # Verify that both parent and child calls are present
+    assert parent_call is not None
+    assert child_call is not None
+
+    # Verify the storage sizes are present, despite that the race condition
+    # that the calls_merged_stats table is not updated in time, and we are unable to
+    # verify the value against an expected value.
+    assert parent_call.storage_size_bytes is not None
+    assert parent_call.total_storage_size_bytes is not None
+    assert child_call.storage_size_bytes is not None
+    # Child should not have total size
+    assert child_call.total_storage_size_bytes is None
+
+
+def test_calls_hydrated(client):
+    nested = {"hi": {"there": {"foo": "bar"}}}
+    nested_ref = weave.publish(nested)
+
+    @weave.op
+    def nest(input_ref: str):
+        my_obj = {
+            "woahhhh": input_ref,
+        }
+        ref = weave.publish(my_obj)
+        return ref
+
+    nest(nested_ref)
+    nest(nested_ref)
+    nest(nested_ref)
+
+    calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client),
+                columns=["inputs", "output", "output.woahhhh"],
+                expand_columns=[
+                    "inputs",
+                    "inputs.input_ref",
+                    "output",
+                    "output.woahhhh",
+                ],
+            )
+        )
+    )
+
+    assert len(calls) == 3
+    assert calls[0].output["woahhhh"]["hi"]["there"]["foo"] == "bar"
+    assert calls[0].inputs["input_ref"]["hi"]["there"]["foo"] == "bar"
+    assert calls[1].output["woahhhh"]["hi"]["there"]["foo"] == "bar"
+    assert calls[1].inputs["input_ref"]["hi"]["there"]["foo"] == "bar"
+    assert calls[2].output["woahhhh"]["hi"]["there"]["foo"] == "bar"
+    assert calls[2].inputs["input_ref"]["hi"]["there"]["foo"] == "bar"
+
+
+def test_obj_query_with_storage_size_clickhouse(client):
+    """Test querying objects with storage size information"""
+    if client_is_sqlite(client):
+        pytest.skip("Skipping test for sqlite clients")
+
+    # Create a test object with some data to ensure it has size
+    dataset = weave.Dataset(name="test_dataset", rows=[{"key": "value" * 1000}])
+    weave.publish(dataset)
+
+    # Query the object with storage size included
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=get_client_project_id(client),
+            include_storage_size=True,
+            filter={"object_ids": ["test_dataset"]},
+        )
+    )
+
+    assert len(res.objs) == 1
+    queried_obj = res.objs[0]
+
+    # Verify that storage size is present
+    assert queried_obj.size_bytes is not None
+    assert queried_obj.size_bytes == 257  # Should have some size due to the test data
+
+    # Test that a table is created and its size is correct
+    table_ref = parse_uri(queried_obj.val["rows"])
+    res = client.server.table_query_stats_batch(
+        tsi.TableQueryStatsBatchReq(
+            project_id=client._project_id(),
+            digests=[table_ref.digest],
+            include_storage_size=True,
+        )
+    )
+
+    assert res.tables[0].storage_size_bytes == 5011
+
+    # Query without storage size (default behavior)
+    res_without_size = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=get_client_project_id(client),
+            filter={"object_ids": ["test_dataset"]},
+        )
+    )
+
+    assert len(res_without_size.objs) == 1
+    queried_obj_without_size = res_without_size.objs[0]
+
+    # Verify that storage size is not included when not requested
+    assert queried_obj_without_size.size_bytes is None
+
+
+def test_call_query_stream_with_costs_and_storage_size(client, clickhouse_client):
+    if client_is_sqlite(client):
+        # dont run this test for sqlite
+        return
+
+    @weave.op
+    def child_op(a: int, b: int) -> dict[str, Any]:
+        return {
+            "result": {"a + b": a + b},
+            "not result": 123,
+            "usage": {"prompt_tokens": 10, "completion_tokens": 10},
+            "model": "test_model",
+        }
+
+    @weave.op
+    def parent_op(x: dict):
+        return child_op(x["a"], x["b"])  # Call child op to create a trace
+
+    parent_op({"a": 1, "b": 2})
+
+    # This is a best effort to achive consistency in the calls_merged_stats table.
+    # due to some race condition/optimizations in clickhouse, there is a chance
+    # that the calls_merged_stats table is not updated in time for the query below
+    # to return the correct results.
+    clickhouse_client.command(
+        "OPTIMIZE TABLE calls_merged FINAL",
+    )
+    clickhouse_client.command(
+        "OPTIMIZE TABLE calls_merged_stats FINAL",
+    )
+
+    # Test that "include_costs" and "include_total_storage_size" can be used together
+    calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client),
+                columns=["id", "summary", "total_storage_size_bytes"],
+                include_costs=True,
+                include_total_storage_size=True,
+            )
+        )
+    )
+
+    assert len(calls) == 2
+
+    # Find parent and child calls
+    parent_call = next(c for c in calls if "parent_op" in c.op_name)
+    child_call = next(c for c in calls if "child_op" in c.op_name)
+
+    # Verify that both parent and child calls are present
+    assert parent_call is not None
+    assert child_call is not None
+
+    assert parent_call.summary["usage"] is not None
+    assert child_call.summary["usage"] is not None
+
+    assert parent_call.total_storage_size_bytes is not None
+    assert child_call.storage_size_bytes is None
+
+
+def test_call_query_stream_with_invalid_filter_field(client):
+    if client_is_sqlite(client):
+        # dont run this test for sqlite
+        return
+
+    with pytest.raises(InvalidFieldError):
+        res = get_client_trace_server(client).calls_query(
+            tsi.CallsQueryReq.model_validate(
+                {
+                    "project_id": get_client_project_id(client),
+                    "query": {
+                        "$expr": {
+                            "$contains": {
+                                "input": {"$getField": "total_storage_size_bytes"},
+                                "substr": {"$literal": "2025-04-11T05:56:12.957Z"},
+                            }
+                        }
+                    },
+                }
+            )
+        )
+
+
+@pytest.mark.parametrize(
+    "obj",
+    [
+        weave.Dataset(rows=[{"a": 1, "b": 2}]),
+        weave.Evaluation(dataset=weave.Dataset(rows=[{"a": 1, "b": 2}])),
+    ],
+)
+def test_get_object_from_uri(client, obj):
+    ref = weave.publish(obj)
+    uri = ref.uri()
+
+    assert weave.get(uri) == obj
+
+
+def test_get_object_from_uri_non_registered_object(client):
+    class MyModel(weave.Model):
+        a: int
+        b: float = 2.0
+
+        @weave.op
+        def predict(self, x: int) -> int:
+            return x + 1
+
+    model = MyModel(name="example", description="fancy", a=1)
+    ref = weave.publish(model)
+    uri = ref.uri()
+
+    res = weave.get(uri)
+    assert res.name == "example"
+    assert res.description == "fancy"
+    assert res.a == 1
+    assert res.b == 2.0
+    assert res._class_name == "MyModel"
+    assert res._bases == ["Model", "Object", "BaseModel"]
+    assert res.predict(5) == 6
+
+
+def test_dedupe_ref_in_calls_stream(client):
+    nested_obj = {"nested": 123}
+    nested_ref = weave.publish(nested_obj)
+
+    obj = {
+        "my_dataset1": nested_ref,
+        "my_dataset2": nested_ref,
+        "my_dataset3": nested_ref,
+        "my_dataset4": nested_ref,
+        "my_dataset5": nested_ref,
+        "ref_list": {
+            "1": nested_ref,
+            "2": nested_ref,
+            "3": nested_ref,
+        },
+    }
+    obj_ref = weave.publish(obj)
+
+    @weave.op
+    def log():
+        return obj_ref
+
+    log()
+
+    def call_stream(columns, expand_columns):
+        return list(
+            client.server.calls_query_stream(
+                tsi.CallsQueryReq(
+                    project_id=client._project_id(),
+                    columns=columns,
+                    expand_columns=expand_columns,
+                )
+            )
+        )
+
+    calls_hydrated = call_stream(columns=["output"], expand_columns=["output"])
+    assert len(calls_hydrated) == 1
+    assert calls_hydrated[0].output == {
+        "_ref": obj_ref.uri(),
+        "my_dataset1": nested_ref.uri(),
+        "my_dataset2": nested_ref.uri(),
+        "my_dataset3": nested_ref.uri(),
+        "my_dataset4": nested_ref.uri(),
+        "my_dataset5": nested_ref.uri(),
+        "ref_list": {
+            "1": nested_ref.uri(),
+            "2": nested_ref.uri(),
+            "3": nested_ref.uri(),
+        },
+    }
+
+    cols = [
+        "output",
+        "output.my_dataset1",
+        "output.my_dataset2",
+        "output.my_dataset3",
+        "output.my_dataset4",
+        "output.my_dataset5",
+        "output.ref_list",
+        "output.ref_list.1",
+        "output.ref_list.2",
+        "output.ref_list.3",
+    ]
+    nested_obj_with_ref = {"nested": 123, "_ref": nested_ref.uri()}
+    calls_all_columns = call_stream(columns=cols, expand_columns=cols)
+    assert len(calls_all_columns) == 1
+    assert calls_all_columns[0].output["my_dataset1"] == nested_obj_with_ref
+    assert calls_all_columns[0].output["my_dataset2"] == nested_obj_with_ref
+    assert calls_all_columns[0].output["my_dataset3"] == nested_obj_with_ref
+    assert calls_all_columns[0].output["my_dataset4"] == nested_obj_with_ref
+    assert calls_all_columns[0].output["my_dataset5"] == nested_obj_with_ref
+    assert calls_all_columns[0].output["ref_list"] == {
+        "1": nested_obj_with_ref,
+        "2": nested_obj_with_ref,
+        "3": nested_obj_with_ref,
+    }
+
+
+def test_calls_query_stats_with_limit(client):
+    def calls_stats(limit=None, filter=None, include_total_storage_size=False):
+        return client.server.calls_query_stats(
+            tsi.CallsQueryStatsReq(
+                project_id=get_client_project_id(client),
+                limit=limit,
+                filter=filter,
+                include_total_storage_size=include_total_storage_size,
+            )
+        )
+
+    @weave.op
+    def child_op():
+        return 1
+
+    @weave.op
+    def parent_op():
+        return child_op()
+
+    assert calls_stats().count == 0
+
+    parent_op()
+    assert calls_stats().count == 2
+
+    trace_id = client.get_calls()[0].trace_id
+
+    # test limit, uses special optimization
+    assert calls_stats(limit=1).count == 1
+    # test limit, does not use special optimization
+    assert calls_stats(limit=2).count == 2
+    # test limit and filter, should use limit but not special optimization
+    assert calls_stats(limit=1, filter={"trace_roots_only": True}).count == 1
+    # test filter, should not use special optimization
+    assert calls_stats(filter={"trace_ids": [trace_id]}).count == 2
+
+    with pytest.raises(ValueError):
+        calls_stats(limit=-1)
+
+    # Test that the query works with include_total_storage_size
+    result = calls_stats(limit=1, include_total_storage_size=True)
+    assert result.count == 1
+    assert result.total_storage_size_bytes is not None
+
+
+def test_calls_query_stats_total_storage_size_clickhouse(client, clickhouse_client):
+    """Test querying calls with total storage size"""
+    if client_is_sqlite(client):
+        pytest.skip("Skipping test for sqlite clients")
+
+    @weave.op
+    def parent_op(x: dict):
+        return child_op(x)  # Call child op to create a trace
+
+    @weave.op
+    def child_op(x: dict):
+        return x
+
+    # Create a call with nested structure
+    parent_op({"data": "x" * 1000})
+
+    # This is a best effort to achive consistency in the calls_merged_stats table.
+    # due to some race condition/optimizations in clickhouse, there is a chance
+    # that the calls_merged_stats table is not updated in time for the query below
+    # to return the correct results.
+    clickhouse_client.command(
+        "OPTIMIZE TABLE calls_merged_stats FINAL",
+    )
+
+    # Query with total storage size
+    result = client.server.calls_query_stats(
+        tsi.CallsQueryStatsReq(
+            project_id=get_client_project_id(client),
+            include_total_storage_size=True,
+        )
+    )
+
+    print(result)
+    assert result is not None
+    assert result.count == 2
+    # Unfortunate that we can't assert the exact value here, because of the
+    # uncertainty of the clickhouse materialized view merging moment.
+    assert result.total_storage_size_bytes is not None
+
+
+def test_project_stats_clickhouse(client, clickhouse_client):
+    if client_is_sqlite(client):
+        pytest.skip("Skipping test for sqlite clients")
+
+    project_id = get_client_project_id(client)
+    internal_project_id = DummyIdConverter().ext_to_int_project_id(project_id)
+
+    # Insert test data directly into stats tables
+    attr_size = 100
+    inputs_size = 200
+    output_size = 300
+    summary_size = 400
+    trace_size = attr_size + inputs_size + output_size + summary_size
+    object_size = 5678
+    file_size = 4321
+    table_size = 1234  # New test data for table storage size
+
+    # directly insert into stats tables to avoid materialized views's consistency issue
+    # Insert into calls_merged_stats
+    clickhouse_client.command(
+        f"INSERT INTO calls_merged_stats (project_id, attributes_size_bytes, inputs_size_bytes, output_size_bytes, summary_size_bytes) "
+        f"VALUES ('{internal_project_id}', {attr_size}, {inputs_size}, {output_size}, {summary_size})"
+    )
+    # Insert into object_versions_stats
+    clickhouse_client.command(
+        f"INSERT INTO object_versions_stats (project_id, size_bytes) VALUES ('{internal_project_id}', {object_size})"
+    )
+    # Insert into files_stats
+    clickhouse_client.command(
+        f"INSERT INTO files_stats (project_id, size_bytes) VALUES ('{internal_project_id}', {file_size})"
+    )
+    # Insert into table_rows_stats
+    clickhouse_client.command(
+        f"INSERT INTO table_rows_stats (project_id, size_bytes) VALUES ('{internal_project_id}', {table_size})"
+    )
+
+    # Query project stats with all storage sizes included
+    res = client.server.project_stats(tsi.ProjectStatsReq(project_id=project_id))
+
+    # Assert the result fields match the inserted values
+    assert res.trace_storage_size_bytes == trace_size
+    assert res.objects_storage_size_bytes == object_size
+    assert res.tables_storage_size_bytes == table_size
+    assert res.files_storage_size_bytes == file_size
+
+    # test that requesting with none of the include_* params returns an error
+    with pytest.raises(ValueError):
+        client.server.project_stats(
+            tsi.ProjectStatsReq(
+                project_id=project_id,
+                include_trace_storage_size=False,
+                include_object_storage_size=False,
+                include_table_storage_size=False,
+                include_file_storage_size=False,
+            )
+        )
+
+
+def test_calls_query_with_descendant_error(client):
+    class TestException(Exception):
+        pass
+
+    @weave.op
+    def child_op(val: int):
+        if val == 0:
+            raise TestException("Error")
+        return val
+
+    @weave.op
+    def parent_op(val: int):
+        if val == 1:
+            raise TestException("Error")
+        try:
+            return child_op(val)
+        except TestException as e:
+            return val
+
+    try:
+        parent_op(0)
+    except TestException as e:
+        pass
+
+    try:
+        parent_op(1)
+    except TestException as e:
+        pass
+
+    try:
+        parent_op(2)
+    except TestException as e:
+        pass
+
+    calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client),
+                sort_by=[{"field": "started_at", "direction": "asc"}],
+            )
+        )
+    )
+
+    assert len(calls) == 5
+    assert "parent_op" in calls[0].op_name
+    assert calls[0].inputs["val"] == 0
+    assert calls[0].summary["weave"]["status"] == tsi.TraceStatus.DESCENDANT_ERROR
+
+    assert "child_op" in calls[1].op_name
+    assert calls[1].inputs["val"] == 0
+    assert calls[1].summary["weave"]["status"] == tsi.TraceStatus.ERROR
+
+    assert "parent_op" in calls[2].op_name
+    assert calls[2].inputs["val"] == 1
+    assert calls[2].summary["weave"]["status"] == tsi.TraceStatus.ERROR
+
+    assert "parent_op" in calls[3].op_name
+    assert calls[3].inputs["val"] == 2
+    assert calls[3].summary["weave"]["status"] == tsi.TraceStatus.SUCCESS
+
+    assert "child_op" in calls[4].op_name
+    assert calls[4].inputs["val"] == 2
+    assert calls[4].summary["weave"]["status"] == tsi.TraceStatus.SUCCESS
+
+    calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client),
+                sort_by=[{"field": "summary.weave.status", "direction": "asc"}],
+            )
+        )
+    )
+
+    assert len(calls) == 5
+    assert [c.summary["weave"]["status"] for c in calls] == [
+        tsi.TraceStatus.DESCENDANT_ERROR,
+        tsi.TraceStatus.ERROR,
+        tsi.TraceStatus.ERROR,
+        tsi.TraceStatus.SUCCESS,
+        tsi.TraceStatus.SUCCESS,
+    ]
+
+    calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client),
+                sort_by=[{"field": "summary.weave.status", "direction": "desc"}],
+            )
+        )
+    )
+
+    assert len(calls) == 5
+    assert [c.summary["weave"]["status"] for c in calls] == [
+        tsi.TraceStatus.SUCCESS,
+        tsi.TraceStatus.SUCCESS,
+        tsi.TraceStatus.ERROR,
+        tsi.TraceStatus.ERROR,
+        tsi.TraceStatus.DESCENDANT_ERROR,
+    ]
+
+    for status, count in [
+        (tsi.TraceStatus.DESCENDANT_ERROR, 1),
+        (tsi.TraceStatus.ERROR, 2),
+        (tsi.TraceStatus.SUCCESS, 2),
+    ]:
+        calls = list(
+            client.server.calls_query_stream(
+                tsi.CallsQueryReq(
+                    project_id=get_client_project_id(client),
+                    query={
+                        "$expr": {
+                            "$eq": [
+                                {"$getField": "summary.weave.status"},
+                                {"$literal": status},
+                            ]
+                        }
+                    },
+                )
+            )
+        )
+
+        assert len(calls) == count
+
+
+def test_thread_context_with_weave_api(client):
+    """Test thread context using the weave.thread() API with ThreadContext."""
+    import weave
+    from weave.trace.context import call_context
+
+    # Test default thread_id is None (using internal context for verification)
+    assert call_context.get_thread_id() is None
+
+    # Test using weave.thread context manager with ThreadContext
+    with weave.thread("api_thread_1") as t:
+        # Use ThreadContext object to access thread_id
+        assert t.thread_id == "api_thread_1"
+        assert (
+            call_context.get_thread_id() == "api_thread_1"
+        )  # Verify internal consistency
+
+        # Test nested context with ThreadContext
+        with weave.thread("api_thread_2") as inner_t:
+            assert inner_t.thread_id == "api_thread_2"
+            assert t.thread_id == "api_thread_1"  # Outer context unchanged
+            assert call_context.get_thread_id() == "api_thread_2"
+
+        # Should revert to parent context
+        assert t.thread_id == "api_thread_1"
+        assert call_context.get_thread_id() == "api_thread_1"
+
+    # Should revert to None
+    assert call_context.get_thread_id() is None
+
+
+def test_thread_id_in_calls(client):
+    """Test that thread_id is properly captured in call records, including auto-generation."""
+    import weave
+
+    @weave.op
+    def test_op_with_thread(x: int) -> int:
+        return x * 2
+
+    @weave.op
+    def test_op_without_thread(x: int) -> int:
+        return x * 3
+
+    @weave.op
+    def test_op_auto_thread(x: int) -> int:
+        return x * 4
+
+    # Call without thread context
+    result1 = test_op_without_thread(5)
+    assert result1 == 15
+
+    # Call with explicit thread context
+    with weave.thread("test_thread_id") as t:
+        assert t.thread_id == "test_thread_id"
+        result2 = test_op_with_thread(5)
+        assert result2 == 10
+
+    # Call with auto-generated thread_id
+    auto_thread_id = None
+    with weave.thread() as t:
+        auto_thread_id = t.thread_id
+        assert auto_thread_id is not None
+        assert isinstance(auto_thread_id, str)
+        assert len(auto_thread_id) > 20  # Should be UUID v7
+        result3 = test_op_auto_thread(5)
+        assert result3 == 20
+
+    # Get the calls to verify thread_id
+    calls = client.get_calls()
+
+    # Find our calls (most recent first)
+    auto_call = None
+    thread_call = None
+    no_thread_call = None
+
+    for call in calls:
+        if "test_op_auto_thread" in call.op_name:
+            auto_call = call
+        elif "test_op_with_thread" in call.op_name:
+            thread_call = call
+        elif "test_op_without_thread" in call.op_name:
+            no_thread_call = call
+
+    assert auto_call is not None
+    assert thread_call is not None
+    assert no_thread_call is not None
+
+    # Verify thread_id values
+    assert auto_call.thread_id == auto_thread_id  # Should match auto-generated ID
+    assert thread_call.thread_id == "test_thread_id"
+    assert no_thread_call.thread_id is None
+
+
+def test_thread_id_inheritance(client):
+    """Test that thread_id is inherited by child calls, demonstrated via ThreadContext."""
+    import weave
+
+    @weave.op
+    def child_op(x: int) -> int:
+        return x + 1
+
+    @weave.op
+    def parent_op(x: int) -> int:
+        return child_op(x) * 2
+
+    # Call with thread context, using ThreadContext to demonstrate inheritance
+    inherited_thread_id = None
+    with weave.thread("inherited_thread") as t:
+        inherited_thread_id = t.thread_id
+        assert inherited_thread_id == "inherited_thread"
+
+        # Both parent and child calls should inherit this thread_id
+        result = parent_op(10)
+        assert result == 22  # (10 + 1) * 2
+
+        # ThreadContext shows the current thread_id throughout execution
+        assert t.thread_id == "inherited_thread"
+
+    # Get the calls to verify thread_id inheritance
+    calls = client.get_calls()
+
+    # Find our calls
+    parent_call = None
+    child_call = None
+
+    for call in calls:
+        if "parent_op" in call.op_name:
+            parent_call = call
+        elif "child_op" in call.op_name:
+            child_call = call
+
+    assert parent_call is not None
+    assert child_call is not None
+
+    # Both should have the same thread_id that was shown in ThreadContext
+    assert parent_call.thread_id == inherited_thread_id
+    assert child_call.thread_id == inherited_thread_id
+    assert parent_call.thread_id == "inherited_thread"
+    assert child_call.thread_id == "inherited_thread"
+
+
+def test_thread_id_query_filtering(client):
+    """Test that calls can be filtered by thread_id."""
+    import weave
+
+    @weave.op
+    def query_test_op(value: str) -> str:
+        return f"processed_{value}"
+
+    # Create calls with different thread_ids
+    with weave.thread("filter_thread_1"):
+        query_test_op("value1")
+
+    with weave.thread("filter_thread_2"):
+        query_test_op("value2")
+
+    query_test_op("value3")  # No thread context
+
+    # Query calls by thread_id using the server interface
+    if hasattr(client.server, "calls_query"):
+        # Test filtering by thread_id
+        res1 = client.server.calls_query(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client),
+                query={
+                    "$expr": {
+                        "$eq": [
+                            {"$getField": "thread_id"},
+                            {"$literal": "filter_thread_1"},
+                        ]
+                    }
+                },
+            )
+        )
+
+        # Should find the call with filter_thread_1
+        thread1_calls = [
+            call for call in res1.calls if call.thread_id == "filter_thread_1"
+        ]
+        assert len(thread1_calls) >= 1
+
+        # Query all calls and verify thread_id values
+        all_calls_res = client.server.calls_query(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client),
+            )
+        )
+
+        # Find our test calls by op_name pattern
+        our_test_calls = [
+            call for call in all_calls_res.calls if "query_test_op" in call.op_name
+        ]
+
+        # Verify we have calls with both thread_ids and None
+        thread_ids_found = {call.thread_id for call in our_test_calls}
+        assert "filter_thread_1" in thread_ids_found, (
+            f"Should find filter_thread_1, got: {thread_ids_found}"
+        )
+        assert "filter_thread_2" in thread_ids_found, (
+            f"Should find filter_thread_2, got: {thread_ids_found}"
+        )
+        assert None in thread_ids_found, (
+            f"Should find None thread_id, got: {thread_ids_found}"
+        )
+
+
+def test_thread_context_error_handling(client):
+    """Test that ThreadContext is properly managed even when exceptions occur."""
+    import weave
+    from weave.trace.context import call_context
+
+    @weave.op
+    def failing_op(should_fail: bool) -> str:
+        if should_fail:
+            raise ValueError("Test exception")
+        return "success"
+
+    # Test that thread context is properly restored after exception
+    assert call_context.get_thread_id() is None
+
+    # Test ThreadContext behavior during exception
+    exception_thread_context = None
+    try:
+        with weave.thread("exception_thread") as t:
+            exception_thread_context = t
+            assert t.thread_id == "exception_thread"
+            assert call_context.get_thread_id() == "exception_thread"
+            failing_op(True)  # This will raise an exception
+    except ValueError:
+        pass  # Expected
+
+    # Verify ThreadContext maintained its state even after exception
+    assert exception_thread_context.thread_id == "exception_thread"
+
+    # Thread context should be restored to None after exiting context
+    assert call_context.get_thread_id() is None
+
+    # Test successful call after exception with auto-generated thread
+    recovery_thread_id = None
+    with weave.thread() as t:  # Use auto-generation
+        recovery_thread_id = t.thread_id
+        assert recovery_thread_id is not None
+        assert len(recovery_thread_id) > 20  # Should be auto-generated UUID v7
+
+        result = failing_op(False)
+        assert result == "success"
+        assert t.thread_id == recovery_thread_id  # ThreadContext consistent
+
+    assert call_context.get_thread_id() is None
+
+
+def test_threads_query_endpoint(client):
+    """Test the threads_query endpoint (/threads/query) functionality."""
+    import datetime
+
+    import weave
+    from weave.trace_server import trace_server_interface as tsi
+
+    # Create some test operations
+    @weave.op
+    def thread_test_op(value: str) -> str:
+        return f"processed_{value}"
+
+    @weave.op
+    def multi_call_op(thread_name: str) -> list[str]:
+        results = []
+        for i in range(3):
+            results.append(thread_test_op(f"{thread_name}_call_{i}"))
+        return results
+
+    # Test that we start with no threads (if this is a fresh client)
+    initial_threads = list(
+        client.server.threads_query_stream(
+            tsi.ThreadsQueryReq(project_id=get_client_project_id(client))
+        )
+    )
+    initial_count = len(initial_threads)
+
+    assert initial_count == 0, f"Expected 0 threads, got {initial_count}"
+
+    # Create calls with different thread_ids
+    thread_ids = ["analytics_thread", "processing_thread", "validation_thread"]
+
+    for i, thread_id in enumerate(thread_ids):
+        with weave.thread(thread_id):
+            # Create multiple calls per thread to test turn_count
+            multi_call_op(f"thread_{i}")
+            thread_test_op(f"single_call_{i}")
+
+    # Create some calls without thread_ids
+    thread_test_op("no_thread_1")
+    thread_test_op("no_thread_2")
+
+    # Test basic threads query
+    threads_res = list(
+        client.server.threads_query_stream(
+            tsi.ThreadsQueryReq(project_id=get_client_project_id(client))
+        )
+    )
+
+    # Should have found our new threads
+    assert len(threads_res) >= 3  # At least our 3 threads
+
+    # Find our specific threads
+    our_threads = {
+        thread.thread_id: thread
+        for thread in threads_res
+        if thread.thread_id in thread_ids
+    }
+    assert len(our_threads) == 3, f"Expected 3 threads, got {len(our_threads)}"
+
+    # Test that each thread has the correct turn_count
+    # Each thread should have 2 distinct turns:
+    # 1) multi_call_op() turn (with 3 nested calls)
+    # 2) thread_test_op("single_call_i") turn
+    for thread_id, thread in our_threads.items():
+        assert thread.thread_id == thread_id
+        assert thread.turn_count >= 2, (
+            f"Thread {thread_id} should have at least 2 turns, got {thread.turn_count}"
+        )
+        assert thread.start_time is not None
+        assert thread.last_updated is not None
+        assert isinstance(thread.start_time, datetime.datetime)
+        assert isinstance(thread.last_updated, datetime.datetime)
+
+    # Test limit parameter
+    limited_res = list(
+        client.server.threads_query_stream(
+            tsi.ThreadsQueryReq(project_id=get_client_project_id(client), limit=2)
+        )
+    )
+    assert len(limited_res) == 2
+
+    # Test offset parameter
+    offset_res = list(
+        client.server.threads_query_stream(
+            tsi.ThreadsQueryReq(
+                project_id=get_client_project_id(client), limit=1, offset=1
+            )
+        )
+    )
+    assert len(offset_res) == 1
+
+    # Test sorting by thread_id
+    sorted_res = list(
+        client.server.threads_query_stream(
+            tsi.ThreadsQueryReq(
+                project_id=get_client_project_id(client),
+                sort_by=[tsi.SortBy(field="thread_id", direction="asc")],
+            )
+        )
+    )
+    thread_ids_sorted = [t.thread_id for t in sorted_res]
+    assert thread_ids_sorted == sorted(thread_ids_sorted)
+
+    # Test sorting by turn_count descending
+    count_sorted_res = list(
+        client.server.threads_query_stream(
+            tsi.ThreadsQueryReq(
+                project_id=get_client_project_id(client),
+                sort_by=[tsi.SortBy(field="turn_count", direction="desc")],
+            )
+        )
+    )
+    turn_counts = [t.turn_count for t in count_sorted_res]
+    assert turn_counts == sorted(turn_counts, reverse=True)
+
+    # Test sorting by last_updated descending (most recent first)
+    time_sorted_res = list(
+        client.server.threads_query_stream(
+            tsi.ThreadsQueryReq(
+                project_id=get_client_project_id(client),
+                sort_by=[tsi.SortBy(field="last_updated", direction="desc")],
+            )
+        )
+    )
+    last_updated_times = [t.last_updated for t in time_sorted_res]
+    # Verify times are in descending order
+    for i in range(len(last_updated_times) - 1):
+        assert last_updated_times[i] >= last_updated_times[i + 1]
+
+    # Test datetime filtering
+    # Get a timestamp from the middle of our test
+    middle_time = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(
+        seconds=5
+    )
+
+    after_filter_res = list(
+        client.server.threads_query_stream(
+            tsi.ThreadsQueryReq(
+                project_id=get_client_project_id(client),
+                filter=tsi.ThreadsQueryFilter(after_datetime=middle_time),
+            )
+        )
+    )
+    # Should still include our recent threads
+    recent_thread_ids = {t.thread_id for t in after_filter_res}
+    assert any(tid in recent_thread_ids for tid in thread_ids)
+
+    # Test filtering for very recent data (should include our threads)
+    very_recent_time = datetime.datetime.now(
+        datetime.timezone.utc
+    ) + datetime.timedelta(minutes=1)
+    before_filter_res = list(
+        client.server.threads_query_stream(
+            tsi.ThreadsQueryReq(
+                project_id=get_client_project_id(client),
+                filter=tsi.ThreadsQueryFilter(before_datetime=very_recent_time),
+            )
+        )
+    )
+    # Should include our threads since they're before this future time
+    assert len(before_filter_res) >= 3
+
+    # Test thread_ids filtering
+    # Test filtering by specific thread_ids (single thread)
+    for test_thread_id in thread_ids:
+        thread_ids_filter_res = list(
+            client.server.threads_query_stream(
+                tsi.ThreadsQueryReq(
+                    project_id=get_client_project_id(client),
+                    filter=tsi.ThreadsQueryFilter(thread_ids=[test_thread_id]),
+                )
+            )
+        )
+        # Should find exactly one thread with the specified thread_id
+        assert len(thread_ids_filter_res) == 1
+        assert thread_ids_filter_res[0].thread_id == test_thread_id
+
+    # Test filtering by multiple thread_ids
+    multiple_thread_ids_filter_res = list(
+        client.server.threads_query_stream(
+            tsi.ThreadsQueryReq(
+                project_id=get_client_project_id(client),
+                filter=tsi.ThreadsQueryFilter(thread_ids=thread_ids[:2]),
+            )
+        )
+    )
+    # Should find exactly two threads
+    assert len(multiple_thread_ids_filter_res) == 2
+    found_thread_ids = {t.thread_id for t in multiple_thread_ids_filter_res}
+    assert found_thread_ids == set(thread_ids[:2])
+
+    # Test filtering by non-existent thread_ids
+    nonexistent_filter_res = list(
+        client.server.threads_query_stream(
+            tsi.ThreadsQueryReq(
+                project_id=get_client_project_id(client),
+                filter=tsi.ThreadsQueryFilter(thread_ids=["nonexistent_thread_id"]),
+            )
+        )
+    )
+    assert len(nonexistent_filter_res) == 0
+
+    # Test combining thread_ids filter with other filters
+    combo_thread_filter_res = list(
+        client.server.threads_query_stream(
+            tsi.ThreadsQueryReq(
+                project_id=get_client_project_id(client),
+                limit=1,
+                sort_by=[tsi.SortBy(field="turn_count", direction="desc")],
+                filter=tsi.ThreadsQueryFilter(
+                    thread_ids=["analytics_thread"],
+                    after_datetime=middle_time,
+                ),
+            )
+        )
+    )
+    # Should find at most 1 thread matching the specific thread_ids and time filter
+    assert len(combo_thread_filter_res) <= 1
+    if len(combo_thread_filter_res) == 1:
+        assert combo_thread_filter_res[0].thread_id == "analytics_thread"
+
+    # Test combination of parameters
+    combo_res = list(
+        client.server.threads_query_stream(
+            tsi.ThreadsQueryReq(
+                project_id=get_client_project_id(client),
+                limit=5,
+                offset=0,
+                sort_by=[tsi.SortBy(field="turn_count", direction="desc")],
+                filter=tsi.ThreadsQueryFilter(after_datetime=middle_time),
+            )
+        )
+    )
+    assert len(combo_res) <= 5
+
+    # Verify that the ThreadSchema fields are properly populated
+    for thread in combo_res:
+        assert isinstance(thread.thread_id, str)
+        assert isinstance(thread.turn_count, int)
+        assert thread.turn_count > 0
+        assert isinstance(thread.start_time, datetime.datetime)
+        assert isinstance(thread.last_updated, datetime.datetime)
+        assert thread.start_time <= thread.last_updated
+
+
+def test_threads_query_aggregation_fields(client):
+    """Test the new aggregation fields in threads query: first_turn_id, last_turn_id, and duration percentiles."""
+    is_sqlite = client_is_sqlite(client)
+    if is_sqlite:
+        # SQLite does not support sorting over mixed types in a column, so we skip this test
+        return
+
+    import time
+
+    import weave
+    from weave.trace_server import trace_server_interface as tsi
+
+    @weave.op
+    def quick_op(value: str) -> str:
+        """Fast operation for testing timing."""
+        time.sleep(0.01)  # 10ms
+        return f"quick_{value}"
+
+    @weave.op
+    def medium_op(value: str) -> str:
+        """Medium speed operation for testing timing."""
+        time.sleep(0.05)  # 50ms
+        return f"medium_{value}"
+
+    @weave.op
+    def slow_op(value: str) -> str:
+        """Slow operation for testing timing."""
+        time.sleep(0.1)  # 100ms
+        return f"slow_{value}"
+
+    # Create a thread with multiple calls having different durations
+    # This will give us a good distribution for percentile testing
+    test_thread_id = "timing_test_thread"
+    call_results = []
+
+    with weave.thread(test_thread_id):
+        # Create calls with varying durations to test percentiles
+        # Order: quick, medium, slow, quick, medium to create a distribution
+        call_results.append(quick_op("1"))  # ~10ms - first chronologically
+        time.sleep(0.01)  # Small gap between calls to ensure different timestamps
+        call_results.append(medium_op("2"))  # ~50ms
+        time.sleep(0.01)
+        call_results.append(slow_op("3"))  # ~100ms
+        time.sleep(0.01)
+        call_results.append(quick_op("4"))  # ~10ms
+        time.sleep(0.01)
+        call_results.append(medium_op("5"))  # ~50ms - last chronologically
+
+    # Verify our operations executed correctly
+    assert call_results == ["quick_1", "medium_2", "slow_3", "quick_4", "medium_5"]
+
+    # Query threads to get the aggregation data
+    threads_res = list(
+        client.server.threads_query_stream(
+            tsi.ThreadsQueryReq(project_id=get_client_project_id(client))
+        )
+    )
+
+    # Find our test thread
+    test_thread = None
+    for thread in threads_res:
+        if thread.thread_id == test_thread_id:
+            test_thread = thread
+            break
+
+    assert test_thread is not None, f"Could not find thread {test_thread_id}"
+
+    # Test basic aggregation fields exist
+    assert hasattr(test_thread, "first_turn_id")
+    assert hasattr(test_thread, "last_turn_id")
+    assert hasattr(test_thread, "p50_turn_duration_ms")
+    assert hasattr(test_thread, "p99_turn_duration_ms")
+
+    # Test that aggregation fields have valid values
+    assert test_thread.first_turn_id is not None
+    assert test_thread.last_turn_id is not None
+    assert isinstance(test_thread.first_turn_id, str)
+    assert isinstance(test_thread.last_turn_id, str)
+
+    # Duration percentiles should be numeric and reasonable
+    assert test_thread.p50_turn_duration_ms is not None
+    assert test_thread.p99_turn_duration_ms is not None
+    assert isinstance(test_thread.p50_turn_duration_ms, (int, float))
+    assert isinstance(test_thread.p99_turn_duration_ms, (int, float))
+
+    # Test duration percentile ranges (should be between our min and max expected durations)
+    # We expect roughly: quick_op ~10ms, medium_op ~50ms, slow_op ~100ms
+    assert 5 <= test_thread.p50_turn_duration_ms <= 200  # Reasonable range for P50
+    assert 5 <= test_thread.p99_turn_duration_ms <= 200  # Reasonable range for P99
+    assert (
+        test_thread.p50_turn_duration_ms <= test_thread.p99_turn_duration_ms
+    )  # P99 >= P50
+
+    # Verify first_turn_id and last_turn_id point to actual calls
+    all_calls = client.get_calls()
+
+    first_call = None
+    latest_call = None
+    thread_calls = []
+
+    for call in all_calls:
+        if call.thread_id == test_thread_id:
+            thread_calls.append(call)
+            if call.id == test_thread.first_turn_id:
+                first_call = call
+            if call.id == test_thread.last_turn_id:
+                latest_call = call
+
+    assert first_call is not None, (
+        f"Could not find first_turn_id {test_thread.first_turn_id}"
+    )
+    assert latest_call is not None, (
+        f"Could not find last_turn_id {test_thread.last_turn_id}"
+    )
+
+    # Test that first_turn_id has the earliest start_time
+    earliest_start = min(call.started_at for call in thread_calls)
+    assert first_call.started_at == earliest_start
+
+    # Test that last_turn_id has the latest end_time (last_updated)
+    latest_end = max(call.ended_at for call in thread_calls if call.ended_at)
+    assert latest_call.ended_at == latest_end
+
+    # Test that we have the expected number of turn calls (5 operations)
+    assert test_thread.turn_count == 5, (
+        f"Expected 5 turns, got {test_thread.turn_count}"
+    )
+
+    # Test sorting by the new duration percentile fields
+    # Test sorting by p50_turn_duration_ms
+    sorted_by_p50 = list(
+        client.server.threads_query_stream(
+            tsi.ThreadsQueryReq(
+                project_id=get_client_project_id(client),
+                sort_by=[tsi.SortBy(field="p50_turn_duration_ms", direction="desc")],
+            )
+        )
+    )
+    assert len(sorted_by_p50) >= 1
+
+    # Test sorting by p99_turn_duration_ms
+    sorted_by_p99 = list(
+        client.server.threads_query_stream(
+            tsi.ThreadsQueryReq(
+                project_id=get_client_project_id(client),
+                sort_by=[tsi.SortBy(field="p99_turn_duration_ms", direction="asc")],
+            )
+        )
+    )
+    assert len(sorted_by_p99) >= 1
+
+    # Verify our test thread appears in sorting results
+    def find_test_thread_in_results(results):
+        for thread in results:
+            if thread.thread_id == test_thread_id:
+                return thread
+        return None
+
+    assert find_test_thread_in_results(sorted_by_p50) is not None
+    assert find_test_thread_in_results(sorted_by_p99) is not None
+
+
+def test_turn_id_functionality(client):
+    """Test that turn_id is properly assigned for turn calls and descendants."""
+    import weave
+
+    @weave.op
+    def child_op(x: int) -> int:
+        return x + 1
+
+    @weave.op
+    def turn_op_a(x: int) -> int:
+        return child_op(x) * 2
+
+    @weave.op
+    def turn_op_b(x: int) -> int:
+        return x * 3
+
+    @weave.op
+    def turn_op_c(x: int) -> int:
+        return child_op(x) * 4
+
+    # Test with thread context - sibling turns
+    with weave.thread("test_turns"):
+        result_a = turn_op_a(10)  # Should be a turn
+        result_b = turn_op_b(5)  # Should be a turn
+        result_c = turn_op_c(3)  # Should be a turn
+
+    assert result_a == 22  # (10 + 1) * 2
+    assert result_b == 15  # 5 * 3
+    assert result_c == 16  # (3 + 1) * 4
+
+    # Get calls and verify turn_id assignments
+    calls = client.get_calls()
+
+    turn_a_call = None
+    turn_b_call = None
+    turn_c_call = None
+    child_calls = []
+
+    for call in calls:
+        if "turn_op_a" in call.op_name:
+            turn_a_call = call
+        elif "turn_op_b" in call.op_name:
+            turn_b_call = call
+        elif "turn_op_c" in call.op_name:
+            turn_c_call = call
+        elif "child_op" in call.op_name:
+            child_calls.append(call)
+
+    # Verify turn calls have their own ID as turn_id
+    assert turn_a_call.turn_id == turn_a_call.id
+    assert turn_b_call.turn_id == turn_b_call.id
+    assert turn_c_call.turn_id == turn_c_call.id
+
+    # Verify all have the same thread_id
+    assert turn_a_call.thread_id == "test_turns"
+    assert turn_b_call.thread_id == "test_turns"
+    assert turn_c_call.thread_id == "test_turns"
+
+    # Verify child calls inherit turn_id from their parents
+    for child_call in child_calls:
+        assert child_call.thread_id == "test_turns"
+        # Child should inherit turn_id from its parent turn
+        parent_turn_id = None
+        for call in calls:
+            if call.id == child_call.parent_id:
+                parent_turn_id = call.turn_id
+                break
+        assert child_call.turn_id == parent_turn_id
+
+
+def test_nested_thread_contexts_turn_lineage(client):
+    """Test that nested thread contexts properly cut off turn lineage."""
+    import weave
+
+    @weave.op
+    def child_op(x: int) -> int:
+        return x + 1
+
+    @weave.op
+    def outer_turn_a(x: int) -> int:
+        return child_op(x) * 2
+
+    @weave.op
+    def inner_turn_b(x: int) -> int:
+        return x * 3
+
+    @weave.op
+    def inner_turn_c(x: int) -> int:
+        return child_op(x) * 4
+
+    @weave.op
+    def outer_turn_d(x: int) -> int:
+        return x * 5
+
+    # Test nested thread contexts
+    with weave.thread("outer_thread"):
+        result_a = outer_turn_a(10)  # Should be turn in outer_thread
+
+        with weave.thread("inner_thread"):
+            result_b = inner_turn_b(5)  # Should be turn in inner_thread
+            result_c = inner_turn_c(3)  # Should be turn in inner_thread
+
+        result_d = outer_turn_d(2)  # Should be turn in outer_thread again
+
+    assert result_a == 22  # (10 + 1) * 2
+    assert result_b == 15  # 5 * 3
+    assert result_c == 16  # (3 + 1) * 4
+    assert result_d == 10  # 2 * 5
+
+    # Get calls and verify turn_id assignments
+    calls = client.get_calls()
+
+    outer_a_call = None
+    inner_b_call = None
+    inner_c_call = None
+    outer_d_call = None
+    child_calls = []
+
+    for call in calls:
+        if "outer_turn_a" in call.op_name:
+            outer_a_call = call
+        elif "inner_turn_b" in call.op_name:
+            inner_b_call = call
+        elif "inner_turn_c" in call.op_name:
+            inner_c_call = call
+        elif "outer_turn_d" in call.op_name:
+            outer_d_call = call
+        elif "child_op" in call.op_name:
+            child_calls.append(call)
+
+    # Verify all turn calls have their own ID as turn_id
+    assert outer_a_call.turn_id == outer_a_call.id
+    assert inner_b_call.turn_id == inner_b_call.id
+    assert inner_c_call.turn_id == inner_c_call.id
+    assert outer_d_call.turn_id == outer_d_call.id
+
+    # Verify thread_id assignments
+    assert outer_a_call.thread_id == "outer_thread"
+    assert inner_b_call.thread_id == "inner_thread"
+    assert inner_c_call.thread_id == "inner_thread"
+    assert outer_d_call.thread_id == "outer_thread"
+
+    # Verify turn lineage is properly cut off - each thread creates new turns
+    # outer_turn_A and outer_turn_D should have different turn_ids
+    assert outer_a_call.turn_id != outer_d_call.turn_id
+    # inner_turn_B and inner_turn_C should have different turn_ids
+    assert inner_b_call.turn_id != inner_c_call.turn_id
+
+    # Verify child calls inherit turn_id from their parent turns
+    for child_call in child_calls:
+        parent_turn_id = None
+        for call in calls:
+            if call.id == child_call.parent_id:
+                parent_turn_id = call.turn_id
+                break
+        assert child_call.turn_id == parent_turn_id
+
+
+def test_thread_id_none_turn_id_none(client):
+    """Test that when thread_id is None, turn_id is also None."""
+    import weave
+    from weave.trace.context import call_context
+
+    @weave.op
+    def child_op(x: int) -> int:
+        return x + 1
+
+    @weave.op
+    def turn_op_a(x: int) -> int:
+        return child_op(x) * 2
+
+    @weave.op
+    def op_outside_thread(x: int) -> int:
+        return x * 3
+
+    # First, create a call within a thread context to set up turn context
+    with weave.thread("test_thread"):
+        result_a = turn_op_a(10)  # Should be a turn with turn_id
+
+    # After exiting thread context, both thread_id and turn_id should be None
+    assert call_context.get_thread_id() is None
+    assert call_context.get_turn_id() is None
+
+    # Now make a call outside any thread context
+    # This should have thread_id = None and turn_id = None
+    result_outside = op_outside_thread(5)
+
+    assert result_a == 22  # (10 + 1) * 2
+    assert result_outside == 15  # 5 * 3
+
+    # Get calls and verify turn_id/thread_id assignments
+    calls = client.get_calls()
+
+    turn_a_call = None
+    outside_call = None
+    child_call = None
+
+    for call in calls:
+        if "turn_op_a" in call.op_name:
+            turn_a_call = call
+        elif "op_outside_thread" in call.op_name:
+            outside_call = call
+        elif "child_op" in call.op_name:
+            child_call = call
+
+    # Verify the turn call has proper thread_id and turn_id
+    assert turn_a_call.thread_id == "test_thread"
+    assert turn_a_call.turn_id == turn_a_call.id
+
+    # Verify the child call inherits from its parent turn
+    assert child_call.thread_id == "test_thread"
+    assert child_call.turn_id == turn_a_call.turn_id
+
+    # Verify the call outside thread context has both None
+    assert outside_call.thread_id is None
+    assert outside_call.turn_id is None
+
+
+def test_nested_thread_disable_with_none(client):
+    """Test that ThreadContext properly shows thread_id=None when threading is disabled."""
+    import weave
+    from weave.trace.context import call_context
+
+    @weave.op
+    def turn_a(x: int) -> int:
+        return x * 2
+
+    @weave.op
+    def op_disabled_threading(x: int) -> int:
+        return x * 3
+
+    @weave.op
+    def turn_c(x: int) -> int:
+        return x * 4
+
+    # Test the realistic edge case: nested thread with thread_id=None
+    main_thread_context = None
+    disabled_thread_context = None
+
+    with weave.thread("main_thread") as t:
+        main_thread_context = t
+        assert t.thread_id == "main_thread"
+        result_a = turn_a(10)  # Should be a turn with turn_id
+
+        # Verify we're in thread context (turn_id is reset after call finishes)
+        assert call_context.get_thread_id() == "main_thread"
+
+        with weave.thread(None) as disabled_t:  # Explicitly disable thread tracking
+            disabled_thread_context = disabled_t
+            # ThreadContext shows None for disabled threading
+            assert disabled_t.thread_id is None
+            assert disabled_t.turn_id is None
+
+            # Verify thread context is disabled
+            assert call_context.get_thread_id() is None
+            assert call_context.get_turn_id() is None
+
+            result_b = op_disabled_threading(5)  # Should have no thread_id or turn_id
+
+        # Back in main thread - should create a new turn
+        # ThreadContext shows we're back in main thread
+        assert t.thread_id == "main_thread"
+        result_c = turn_c(3)  # Should be a new turn
+
+    # Verify ThreadContext objects maintained correct state throughout
+    assert main_thread_context.thread_id == "main_thread"
+    assert disabled_thread_context.thread_id is None
+
+    assert result_a == 20  # 10 * 2
+    assert result_b == 15  # 5 * 3
+    assert result_c == 12  # 3 * 4
+
+    # Get calls and verify assignments
+    calls = client.get_calls()
+
+    turn_a_call = None
+    disabled_call = None
+    turn_c_call = None
+
+    for call in calls:
+        if "turn_a" in call.op_name:
+            turn_a_call = call
+        elif "op_disabled_threading" in call.op_name:
+            disabled_call = call
+        elif "turn_c" in call.op_name:
+            turn_c_call = call
+
+    # Verify first turn has proper thread_id and turn_id
+    assert turn_a_call.thread_id == "main_thread"
+    assert turn_a_call.turn_id == turn_a_call.id
+
+    # Verify disabled call has both None (the edge case shown via ThreadContext)
+    assert disabled_call.thread_id is None
+    assert disabled_call.turn_id is None
+
+    # Verify third turn is a new turn in the main thread
+    assert turn_c_call.thread_id == "main_thread"
+    assert turn_c_call.turn_id == turn_c_call.id
+
+    # Verify the two turns in main_thread have different turn_ids
+    assert turn_a_call.turn_id != turn_c_call.turn_id
+
+
+def test_thread_api_with_auto_generation(client):
+    """Test the thread API with ThreadContext and auto-generation."""
+    import weave
+
+    @weave.op
+    def test_op(x: int) -> int:
+        return x * 2
+
+    # Test 1: Auto-generated thread_id
+    with weave.thread() as t:
+        assert t.thread_id is not None
+        assert isinstance(t.thread_id, str)
+        # Should be a valid UUID v7 format (starts with time-based prefix)
+        assert len(t.thread_id) > 20  # UUID v7 should be longer than 20 chars
+
+        result1 = test_op(10)
+        # turn_id is reset after turn call finishes, so it will be None here
+        # We'll verify turn assignment by checking the call data later
+
+    # Test 2: Explicit thread_id
+    with weave.thread("custom_thread_123") as t:
+        assert t.thread_id == "custom_thread_123"
+        result2 = test_op(20)
+        # turn_id is reset after turn call finishes
+
+    # Test 3: Disabled threading (explicit None)
+    with weave.thread(None) as t:
+        assert t.thread_id is None
+        result3 = test_op(30)
+        assert t.turn_id is None  # Should always be None when threading disabled
+
+    # Verify results
+    assert result1 == 20
+    assert result2 == 40
+    assert result3 == 60
+
+    # Get calls and verify thread assignments
+    calls = client.get_calls()
+
+    auto_call = None
+    custom_call = None
+    disabled_call = None
+
+    for call in calls:
+        if call.inputs.get("x") == 10:
+            auto_call = call
+        elif call.inputs.get("x") == 20:
+            custom_call = call
+        elif call.inputs.get("x") == 30:
+            disabled_call = call
+
+    # Verify auto-generated thread call
+    assert auto_call.thread_id is not None
+    assert len(auto_call.thread_id) > 20  # Should be UUID v7
+    assert auto_call.turn_id == auto_call.id  # Should be a turn
+
+    # Verify custom thread call
+    assert custom_call.thread_id == "custom_thread_123"
+    assert custom_call.turn_id == custom_call.id  # Should be a turn
+
+    # Verify disabled thread call
+    assert disabled_call.thread_id is None
+    assert disabled_call.turn_id is None
+
+
+def test_calls_query_filter_contains_in_message_array(client):
+    @weave.op
+    def op1(extra_message: Optional[str] = None):
+        messages = ["hello", "world"]
+        if extra_message:
+            messages.append(extra_message)
+        return {"messages": messages}
+
+    op1()
+    op1("extra")
+    op1("extra2")
+
+    calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(project_id=get_client_project_id(client))
+        )
+    )
+    assert len(calls) == 3
+
+    # Test $contains with substring search in the JSON-serialized output
+    calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client),
+                query={
+                    "$expr": {
+                        "$contains": {
+                            "input": {"$getField": "output.messages"},
+                            "substr": {"$literal": "hello"},
+                        }
+                    }
+                },
+            )
+        )
+    )
+    assert len(calls) == 3
+
+    calls = list(
+        client.server.calls_query_stream(
+            tsi.CallsQueryReq(
+                project_id=get_client_project_id(client),
+                query={
+                    "$expr": {
+                        "$contains": {
+                            "input": {"$getField": "output.messages"},
+                            "substr": {"$literal": "extra2"},
+                        }
+                    }
+                },
+            )
+        )
+    )
+    assert len(calls) == 1
+
+    # Test exact match with $eq
+    # TODO: this test breaks due to string optimization and how JSON is stored
+    # on disk with spaces after items in a list. When we remove pre-where string
+    # optimization, this test should be able to pass!
+    # calls = list(
+    #     client.server.calls_query_stream(
+    #         tsi.CallsQueryReq(
+    #             project_id=get_client_project_id(client),
+    #             query={
+    #                 "$expr": {
+    #                     "$eq": [
+    #                         {"$getField": "output.messages"},
+    #                         {"$literal": '["hello","world"]'},
+    #                     ]
+    #                 }
+    #             },
+    #         )
+    #     )
+    # )
+    # assert len(calls) == 1

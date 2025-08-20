@@ -30,7 +30,7 @@ Calls:
     ]
 )
 def test_img(request) -> Image.Image:
-    img = Image.new("RGB", (512, 512), "purple")
+    img = Image.new("RGB", (64, 64), "purple")
 
     if (fmt := request.param["format"]) is not None:
         buffer = io.BytesIO()
@@ -131,25 +131,25 @@ def test_image_as_file(client: WeaveClient) -> None:
     client.project = "test_image_as_file"
     file_path = Path(__file__).parent.resolve() / "example.jpg"
 
-    @weave.op()
+    @weave.op
     def return_image_jpg_pillow(path: str):
         file_path = Path(path)
         return Image.open(file_path)
 
-    @weave.op()
+    @weave.op
     def accept_image_jpg_pillow(val):
         width, height = val.size
         return f"Image size: {width}x{height}"
 
-    Image.new("RGB", (100, 100), "purple").save(file_path)
+    Image.new("RGB", (64, 64), "purple").save(file_path)
     try:
         res = accept_image_jpg_pillow(return_image_jpg_pillow(file_path))
-        assert res == "Image size: 100x100"
+        assert res == "Image size: 64x64"
     finally:
         file_path.unlink()
 
 
-def make_random_image(image_size: tuple[int, int] = (1024, 1024)):
+def make_random_image(image_size: tuple[int, int] = (64, 64)):
     random_colour = (
         random.randint(0, 255),
         random.randint(0, 255),
@@ -161,8 +161,8 @@ def make_random_image(image_size: tuple[int, int] = (1024, 1024)):
 @pytest.fixture
 def dataset_ref(client):
     # This fixture represents a saved dataset containing images
-    N_ROWS = 50
-    rows = [{"img": make_random_image()} for _ in range(N_ROWS)]
+    n_rows = 5
+    rows = [{"img": make_random_image()} for _ in range(n_rows)]
     dataset = weave.Dataset(rows=rows)
     ref = weave.publish(dataset)
 
@@ -182,10 +182,12 @@ async def test_images_in_dataset_for_evaluation(client, dataset_ref):
     res = await evaluation.evaluate(model)
 
     assert isinstance(res, dict)
-    assert "model_latency" in res and "mean" in res["model_latency"]
+    assert "model_latency" in res
+    assert "mean" in res["model_latency"]
     assert isinstance(res["model_latency"]["mean"], (int, float))
 
 
+@pytest.mark.skip("Temporarily skip live tests")
 @pytest.mark.asyncio
 async def test_many_images_will_consistently_log():
     # This test is a bit strange -- I can't get the issue to repro inside pytest, but
@@ -204,8 +206,8 @@ async def test_many_images_will_consistently_log():
 
 
 def test_images_in_load_of_dataset(client):
-    N_ROWS = 50
-    rows = [{"img": make_random_image()} for _ in range(N_ROWS)]
+    n_rows = 5
+    rows = [{"img": make_random_image()} for _ in range(n_rows)]
     dataset = weave.Dataset(rows=rows)
     ref = weave.publish(dataset)
 

@@ -1,18 +1,18 @@
 import inspect
+import logging
 import textwrap
 import time
 import traceback
 from dataclasses import dataclass
 from typing import Any, Callable, Optional, Union
 
-from rich import print
-
-from weave.flow.obj import Object
-from weave.trace.errors import OpCallError
+from weave.object.obj import Object
 from weave.trace.isinstance import weave_isinstance
-from weave.trace.op import Op, as_op, is_op
+from weave.trace.op import Op, OpCallError, as_op, is_op
 from weave.trace.op_caller import async_call_op
 from weave.trace.weave_client import Call
+
+logger = logging.getLogger(__name__)
 
 INFER_METHOD_NAMES = {"predict", "infer", "forward", "invoke"}
 
@@ -164,10 +164,10 @@ async def apply_model_async(
             c. construct Evaluation with a preprocess_model_input function that accepts a dataset example and returns a dict with keys expected by {model_predict_fn_name}
             """
         )
-        raise OpCallError(message)
+        raise OpCallError(message) from e
     except Exception:
-        print("model_output failed")
-        traceback.print_exc()
+        logger.info("model_output failed")
+        logger.info(traceback.format_exc())
         return ApplyModelError(model_latency=time.time() - model_start_time)
 
     return ApplyModelSuccess(

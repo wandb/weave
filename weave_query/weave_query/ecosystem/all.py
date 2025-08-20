@@ -25,7 +25,6 @@ ALL_MODULES = (
     "wandb",
     "scenario",
     "shawn",
-    "replicate",
     "openai",
     # By declares a weave type for the python type "type" and causes problems
     # with op serialization

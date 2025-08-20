@@ -39,7 +39,8 @@ def hallucination_scorer(monkeypatch):
         return Response(choices=[Choice(message=Message(content=json.dumps(content)))])
 
     monkeypatch.setattr(
-        "weave.scorers.hallucination_scorer.acompletion", _mock_acompletion
+        "weave.scorers.hallucination_scorer.HallucinationFreeScorer._acompletion",
+        _mock_acompletion,
     )
 
     return HallucinationFreeScorer(
@@ -51,10 +52,10 @@ def hallucination_scorer(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_hallucination_scorer_score(hallucination_scorer):
-    output = "John's favorite cheese is cheddar."
     context = "John likes various types of cheese."
+    output = "John's favorite cheese is cheddar."
     result = await hallucination_scorer.score(output=output, context=context)
-    # we should be able to do this validation
+
     _ = HallucinationResponse.model_validate(result)
 
     assert result["has_hallucination"] == True
@@ -87,6 +88,7 @@ async def test_hallucination_scorer_eval(hallucination_scorer):
 
 @pytest.mark.asyncio
 async def test_hallucination_scorer_eval2(hallucination_scorer):
+    """Test that the hallucination scorer can be used with a column map in an evaluation."""
     dataset = [
         {
             "input": "John likes various types of cheese.",
@@ -102,7 +104,7 @@ async def test_hallucination_scorer_eval2(hallucination_scorer):
     def model(input):
         return "The person's favorite cheese is cheddar."
 
-    hallucination_scorer.column_map = {"context": "input", "output": "other_col"}
+    hallucination_scorer.column_map = {"context": "input"}
 
     evaluation = weave.Evaluation(
         dataset=dataset,

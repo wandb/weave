@@ -1,7 +1,7 @@
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Guardrails and Monitors
+# Online Evaluation: Guardrails and Monitors
 
 ![Feedback](./../../../static/img/guardrails_scorers.png)
 
@@ -11,7 +11,7 @@ Building production LLM applications? Two questions likely keep you up at night:
 1. How do you ensure your LLMs generate safe, appropriate content?
 2. How do you measure and improve output quality over time?
 
-Weave's unified scoring system answers both questions through a simple yet powerful framework. Whether you need active safety controls (guardrails) or passive quality monitoring, this guide will show you how to implement robust evaluation systems for your LLM applications.
+W&B Weave's unified scoring system answers both questions through a simple yet powerful framework. Whether you need active safety controls (guardrails) or passive quality monitoring, this guide will show you how to implement robust evaluation systems for your LLM applications.
 
 The foundation of Weave's evaluation system is the [**Scorer**](./scorers.md) - a component that evaluates your function's inputs and outputs to measure quality, safety, or any other metric you care about. Scorers are versatile and can be used in two ways:
 
@@ -29,7 +29,6 @@ While this guide shows you how to create custom scorers, Weave comes with a vari
 - [Embedding similarity](./builtin_scorers.mdx#embeddingsimilarityscorer)
 - [Relevancy evaluation](./builtin_scorers.mdx#ragas---contextrelevancyscorer)
 - And more!
-
 
 ### Guardrails vs. Monitors: When to Use Each
 
@@ -67,7 +66,7 @@ result, call = generate_text.call(input)  # Now you can use the call object with
 :::tip Why Use `.call()`?
 The Call object is essential for associating the score with the call in the database. While you can directly call the scoring function, this would not be associated with the call, and therefore not searchable, filterable, or exportable for later analysis.
 
-For more details about Call objects, see our [Calls guide section on Call objects](../tracking/tracing.mdx#getting-a-handle-to-the-call-object-during-execution).
+For more details about Call objects, see the [Calls guide section on Call objects](../tracking/tracing.mdx#getting-a-handle-to-the-call-object-during-execution).
 :::
 
 ## Getting Started with Scorers
@@ -100,7 +99,7 @@ result, call = generate_text.call("Say hello")
 await call.apply_scorer(LengthScorer())
 ```
 
-## Using Scorers as Guardrails
+## Using Scorers as Guardrails {#using-scorers-as-guardrails}
 
 Guardrails act as safety checks that run before allowing LLM output to reach users. Here's a practical example:
 
@@ -146,37 +145,224 @@ When applying scorers:
 - You can view scorer results in the UI or query them via the API
 :::
 
-## Using Scorers as Monitors
+## Using Scorers as monitors {#using-scorers-as-monitors}
 
-Monitors help track quality metrics over time without blocking operations. This is useful for:
-- Identifying quality trends
-- Detecting model drift
-- Gathering data for model improvements
+:::important
+This feature is only available in Multi-Tenant (MT) SaaS deployments.
+:::
+
+If you want to track quality metrics without writing scoring logic into your app, you can use _monitors_.
+
+A monitor is a background process that:
+- Watches one or more specified functions decorated with `weave.op` 
+- Scores a subset of calls using an _LLM-as-a-judge_ scorer, which is an LLM model with a specific prompt tailored to the ops you want to score 
+- Runs automatically each time the specified `weave.op` is called, no need to manually call `.apply_scorer()`
+
+Monitors are ideal for:
+- Evaluating and tracking production behavior
+- Catching regressions or drift
+- Collecting real-world performance data over time
+
+Learn how to [create a monitor in general](#create-a-monitor) or try out the [end-to-end example of creating a truthfulness monitor](#example-create-a-truthfulness-monitor).
+
+### Create a monitor
+
+1. From the left menu, select the **Monitors** tab.
+2. From the monitors page, click **New Monitor**.
+3. In the drawer, configure the monitor:
+   - **Name**: Valid monitor names must start with a letter or number and can only contain letters, numbers, hyphens, and underscores.
+   - **Description** *(optional)*: Explain what the monitor does.
+   - **Active monitor** toggle: Turn the monitor on or off. 
+   - **Calls to monitor**:
+        - **Operations**: Choose one or more `@weave.op`s to monitor. 
+            :::important
+            You must log at least one trace for an Op for it to appear in the list of available operations.
+            :::
+        - **Filter** *(optional)*: Narrow down which op columns are eligible for monitoring (e.g., `max_tokens` or `top_p`)
+        - **Sampling rate**: The percentage of calls to be scored, between 0% and 100% (e.g., 10%)
+            :::tip 
+            A lower sampling rate is useful for controlling costs, as each scoring call has a cost associated with it.
+            :::
+   - **LLM-as-a-Judge configuration**: 
+        - **Scorer name**: Valid scorer names must start with a letter or number and can only contain letters, numbers, hyphens, and underscores.
+        - **Judge model**: Select the model that will score your ops. Three types of models are available:
+            - [Saved models](../tools/playground.md#saved-models)
+            - Models from providers configured by your W&B admin
+            - [W&B Inference models](https://docs.wandb.ai/guides/inference/)
+        
+        For the selected model, configure the following settings:
+            - **Configuration name**
+            - **System prompt**
+            - **Response format**
+        - **Scoring prompt**: The prompt used by the LLM-as-a-judge to score your ops. “You can reference `{output}`, individual inputs (like `{foo}`), and `{inputs}` as a dictionary. [For more information, see prompt variables](#prompt-variables).”
+4. Click **Create Monitor**. Weave will automatically begin monitoring and scoring calls that match the specified criteria. You can view monitor details in the **Monitors** tab.
+
+### Example: Create a truthfulness monitor
+
+In the following example, you'll create:
+- The `weave.op` to be monitored, `generate_statement`. This function outputs statements that either returns the input `ground_truth` statement (e.g. `"The Earth revolves around the Sun."`), or generates a statement that is incorrect based on the `ground_truth` (e.g. `"The Earth revolves around Saturn."`)
+- A monitor, `truthfulness-monitor`, to evaluate the truthfulness of the generated statements.
+
+1. Define `generate_statement`:
+   ```python
+    import weave
+    import random
+    import openai
+
+    # Replace my-team/my-weave-project with your Weave team and project name 
+    weave.init("my-team/my-weave-project")
+
+    client = openai.OpenAI() 
+
+    @weave.op()
+    def generate_statement(ground_truth: str) -> str:
+        if random.random() < 0.5:
+            response = openai.ChatCompletion.create(
+                model="gpt-4.1",
+                messages=[
+                    {
+                        "role": "user",
+                        "content": f"Generate a statement that is incorrect based on this fact: {ground_truth}"
+                    }
+                ]
+            )
+            return response.choices[0].message["content"]
+        else:
+            return ground_truth
+   ```
+2. Execute the code for `generate_statement`to log a trace. The `generate_statement` op will not appear in the Op dropdown unless it was logged at least once. 
+2. In the Weave UI, navigate to **Monitors**.
+3. From the monitors page, click **New Monitor**.
+4. Configure the monitor as follows:
+    - **Name**: `truthfulness-monitor`  
+    - **Description**:  
+    `A monitor to evaluate the truthfulness of statements generated by an LLM.`
+    - **Active monitor** toggle:  
+    Toggle **on** to begin scoring calls as soon as the monitor is created.
+    ![Creating a monitor part 1](img/monitors-ui-1.png)
+    - **Calls to Monitor**:
+        - **Operations**: `generate_statement`.
+        - **Filter** *(optional)*:  None applied in this example, but could be used to scope monitoring by arguments like `temperature` or `max_tokens`.
+        - **Sampling rate**:  
+        Set to `100%` to score every call.
+        ![Creating a monitor part 2](img/monitors-ui-2.png)
+    - **LLM-as-a-Judge Configuration**:
+        - **Scorer name**: `truthfulness-scorer`  
+        - **Judge model**:  
+        `o3-mini-2025-01-31`
+        - **Model settings**:
+        - **LLM ID**: `o3-mini-2025-01-31`
+        - **Configuration name**: `truthfulness-scorer-judge-model`
+        - **System prompt**:  
+            `You are an impartial AI judge. Your task is to evaluate the truthfulness of statements.`
+        - **Response format**: `json_object`
+        - **Scoring prompt**:  
+            ```text
+            Evaluate whether the output statement is accurate based on the input statement.
+
+            This is the input statement: {ground_truth}
+
+            This is the output statement: {output}
+
+            The response should be a JSON object with the following fields:
+            - is_true: a boolean stating whether the output statement is true or false based on the input statement.
+            - reasoning: your reasoning as to why the statement is true or false.
+            ```
+            ![Creating a monitor part 3](img/monitors-ui-3.png)
+5. Click **Create Monitor**. The `truthfulness-monitor` is ready to start monitoring.
+6. Generate statements for evaluation by the monitor with true and easily verifiable `ground_truth` statements such as `"Water freezes at 0 degrees Celsius."`.
+    ```python
+    generate_statement("The Earth revolves around the Sun.")
+    generate_statement("Water freezes at 0 degrees Celsius.")
+    generate_statement("The Great Wall of China was built over several centuries, with construction beginning as early as the 7th century BCE.")
+    ```
+7. In the Weave UI, navigate to the **Traces** tab.
+8. From the list of available traces, select any trace for **LLMAsAJudgeScorer.score**. 
+9. Inspect the trace to see the monitor in action. For this example, the monitor correctly evaluated the `output` (in this instance, equivalent to the `ground_truth`) as `true` and provided sound `reasoning`.
+    ![Monitor trace](img/monitors-4.png)
+
+### Prompt variables {#prompt-variables}
+
+In scoring prompts, you can reference multiple variables from your op. These values are automatically extracted from your function call when the scorer runs. Consider the following example function:
 
 ```python
-import weave
-from weave import Scorer
-from weave.scorers import ValidJSONScorer, ValidXMLScorer
+@weave.op
+def my_function(foo: str, bar: str) -> str:
+    return f"{foo} and {bar}"
+```
 
-import random
+In this case, the following variables are accessible:
+
+| Variable     | Description                                           |
+|--------------|-------------------------------------------------------|
+| `{foo}`      | The value of the input argument `foo`                |
+| `{bar}`      | The value of the input argument `bar`                |
+| `{inputs}`   | A JSON dictionary of all input arguments             |
+| `{output}`   | The result returned by your op                       |
+
+For example:
+
+```text
+Input foo: {foo}
+Input bar: {bar}
+Output: {output}
+```
+
+If your op has other arguments, they’ll all be available by name.
+
+## AWS Bedrock Guardrails
+
+The `BedrockGuardrailScorer` uses AWS Bedrock's guardrail feature to detect and filter content based on configured policies. It calls the `apply_guardrail` API to apply the guardrail to the content.
+
+To use the `BedrockGuardrailScorer`, you need the following:
+- An AWS account with Bedrock access
+- An AWS account with access to Bedrock
+- A configured guardrail in the AWS Bedrock console
+- The `boto3` Python package
+
+:::tip
+You don't need to create your own Bedrock client—Weave creates it for you.  To specify a region, pass the `bedrock_runtime_kwargs` parameter to the scorer.
+:::
+
+For more details on creating a guardrail, see the [Bedrock guardrails notebook](https://github.com/aws-samples/amazon-bedrock-samples/blob/main/responsible_ai/bedrock-guardrails/guardrails-api.ipynb).
+```python
+import weave
+import boto3
+from weave.scorers.bedrock_guardrails import BedrockGuardrailScorer
+
+# Initialize Weave
+weave.init("my_app")
+
+# Create a guardrail scorer
+guardrail_scorer = BedrockGuardrailScorer(
+    guardrail_id="your-guardrail-id",  # Replace "your-guardrail-id" with your guardrail ID
+    guardrail_version="DRAFT",          # Use guardrail_version to use a specific guardrail version
+    source="INPUT",                             # Can be "INPUT" or "OUTPUT"
+    bedrock_runtime_kwargs={"region_name": "us-east-1"}  # AWS region
+)
 
 @weave.op
 def generate_text(prompt: str) -> str:
-    """Generate text using an LLM."""
-    return "Generated response..."
+    # Add your text generation logic here
+    return "Generated text..."
 
-async def generate_with_monitoring(prompt: str) -> str:
-    # Get both the result and tracking information
+# Use the guardrail as a safety check
+async def generate_safe_text(prompt: str) -> str:
     result, call = generate_text.call(prompt)
     
-    # Sample monitoring (only monitor 10% of calls)
-    if random.random() < 0.1:
-        # Monitor multiple aspects asynchronously
-        await call.apply_scorer(ValidJSONScorer())
-        await call.apply_scorer(ValidXMLScorer())
+    # Apply the guardrail
+    score = await call.apply_scorer(guardrail_scorer)
+    
+    # Check if the content passed the guardrail
+    if not score.result.passed:
+        # Use the modified output if available
+        if score.result.metadata.get("modified_output"):
+            return score.result.metadata["modified_output"]
+        return "I cannot generate that content due to content policy restrictions."
     
     return result
 ```
+
 
 ## Implementation Details
 
@@ -310,7 +496,7 @@ score = scorer.score(output="some text")
 ### Score Analysis
 
 
-For detailed information about querying calls and their scorer results, see our [Score Analysis Guide](./scorers.md#score-analysis) and our [Data Access Guide](/guides/tracking/tracing#querying--exporting-calls).
+For detailed information about querying calls and their scorer results, see our [Score Analysis Guide](./scorers.md#score-analysis) and our [Data Access Guide](/guides/tracking/tracing#querying-and-exporting-calls).
 
 
 ## Production Best Practices

@@ -4,7 +4,7 @@ from weave.scorers import ValidJSONScorer
 
 
 @pytest.mark.parametrize(
-    "output, expected_result",
+    ("output", "expected_result"),
     [
         ('{"city": "San Francisco", "country": "USA"}', True),
         ('{"city": "San Francisco", "country": "USA"', False),
@@ -17,5 +17,5 @@ from weave.scorers import ValidJSONScorer
 )
 def test_json_scorer(output, expected_result):
     scorer = ValidJSONScorer()
-    result = scorer.score(output)
+    result = scorer.score(output=output)
     assert result["json_valid"] is expected_result

@@ -70,7 +70,7 @@ class AnnotationSpec(base_object_def.BaseObject):
 
         if temp_field_tuple is not None:
             # Create a temporary model to leverage Pydantic's schema generation
-            TempModel = create_model("TempModel", field=temp_field_tuple)
+            TempModel = create_model("TempModel", field=temp_field_tuple)  # noqa: N806
 
             schema = TempModel.model_json_schema()["properties"]["field"]
 
@@ -90,7 +90,7 @@ class AnnotationSpec(base_object_def.BaseObject):
         return data
 
     @field_validator("field_schema")
-    def validate_field_schema(cls, schema: dict[str, Any]) -> dict[str, Any]:
+    def validate_field_schema(cls, schema: dict[str, Any]) -> dict[str, Any]:  # noqa: N805
         # Validate the schema
         try:
             jsonschema.validate(None, schema)

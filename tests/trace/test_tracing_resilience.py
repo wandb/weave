@@ -7,7 +7,6 @@ We should never be breaking the user's program with an error.
 # TODO: Test code capture resilience
 # TODO: Test postprocess input/output resilience
 from collections import Counter
-from typing import Callable
 
 import pytest
 
@@ -15,12 +14,17 @@ import weave
 from tests.trace.util import DummyTestException
 from weave.trace.context import call_context
 from weave.trace.context.tests_context import raise_on_captured_errors
-from weave.trace.op_extensions.accumulator import add_accumulator
-from weave.trace.patcher import MultiPatcher, SymbolPatcher
+from weave.trace.op import _add_accumulator
 
 
 def assert_no_current_call():
     assert call_context.get_current_call() is None
+
+
+def reset_call_context():
+    """Force reset the call context to an empty stack."""
+    token = call_context._call_stack.set([])
+    call_context._call_stack.reset(token)
 
 
 def test_resilience_to_user_code_errors(client):
@@ -62,50 +66,17 @@ def test_resilience_to_server_errors(client_with_throwing_server, log_collector)
     assert res == "hello"
 
     assert_no_current_call()
+    client_with_throwing_server.flush()
 
     logs = log_collector.get_error_logs()
     ag_res = Counter([k.split(", req:")[0] for k in {l.msg for l in logs}])
-    # Tim: This is very specific and intentiaion, please don't change
+    # Tim: This is very specific and intentional, please don't change
     # this unless you are sure that is the expected behavior
     assert ag_res == {
         "Task failed: DummyTestException: ('FAILURE - call_end": 1,
         "Task failed: DummyTestException: ('FAILURE - file_create": 1,
         "Task failed: DummyTestException: ('FAILURE - obj_create": 1,
     }
-
-
-@pytest.mark.disable_logging_error_check
-def test_resilience_to_patcher_errors(client, log_collector):
-    class Module:
-        def method(self):
-            return 0
-
-    def custom_patcher(m: Callable):
-        raise DummyTestException("FAILURE!")
-
-    def do_test():
-        test_patcher = MultiPatcher(
-            [
-                SymbolPatcher(
-                    lambda: Module,
-                    "method",
-                    custom_patcher,
-                )
-            ]
-        )
-
-        test_patcher.attempt_patch()
-
-        return Module().method()
-
-    res = do_test()
-    assert res == 0
-
-    assert_no_current_call()
-
-    logs = log_collector.get_error_logs()
-    assert len(logs) == 1
-    assert logs[0].msg.startswith("Failed to patch")
 
 
 @pytest.mark.disable_logging_error_check
@@ -179,14 +150,15 @@ def test_resilience_to_accumulator_make_accumulator_errors(client, log_collector
         def make_accumulator(*args, **kwargs):
             raise DummyTestException("FAILURE!")
 
-        add_accumulator(simple_op, make_accumulator=make_accumulator)
+        _add_accumulator(simple_op, make_accumulator=make_accumulator)
 
         return simple_op()
 
     # The user's exception should be raised - even if we're capturing errors
     with raise_on_captured_errors(True):
         with pytest.raises(DummyTestException):
-            do_test()
+            # Consume the generator to trigger the make_accumulator call
+            list(do_test())
 
     # We should gracefully handle the error and return a value
     res = do_test()
@@ -214,14 +186,16 @@ async def test_resilience_to_accumulator_make_accumulator_errors_async(
         def make_accumulator(*args, **kwargs):
             raise DummyTestException("FAILURE!")
 
-        add_accumulator(simple_op, make_accumulator=make_accumulator)
+        _add_accumulator(simple_op, make_accumulator=make_accumulator)
 
         return simple_op()
 
     # The user's exception should be raised - even if we're capturing errors
     with raise_on_captured_errors(True):
         with pytest.raises(DummyTestException):
-            await do_test()
+            # Consume the generator to trigger the make_accumulator call
+            res = await do_test()
+            l = [item async for item in res]
 
     # We should gracefully handle the error and return a value
     res = await do_test()
@@ -247,7 +221,7 @@ def test_resilience_to_accumulator_accumulation_errors(client, log_collector):
 
             return accumulate
 
-        add_accumulator(simple_op, make_accumulator=make_accumulator)
+        _add_accumulator(simple_op, make_accumulator=make_accumulator)
 
         return simple_op()
 
@@ -287,7 +261,7 @@ async def test_resilience_to_accumulator_accumulation_errors_async(
 
             return accumulate
 
-        add_accumulator(simple_op, make_accumulator=make_accumulator)
+        _add_accumulator(simple_op, make_accumulator=make_accumulator)
 
         return simple_op()
 
@@ -326,7 +300,7 @@ def test_resilience_to_accumulator_should_accumulate_errors(client, log_collecto
         def should_accumulate(*args, **kwargs):
             raise DummyTestException("FAILURE!")
 
-        add_accumulator(
+        _add_accumulator(
             simple_op,
             make_accumulator=make_accumulator,
             should_accumulate=should_accumulate,
@@ -371,7 +345,7 @@ async def test_resilience_to_accumulator_should_accumulate_errors_async(
         def should_accumulate(*args, **kwargs):
             raise DummyTestException("FAILURE!")
 
-        add_accumulator(
+        _add_accumulator(
             simple_op,
             make_accumulator=make_accumulator,
             should_accumulate=should_accumulate,
@@ -382,7 +356,9 @@ async def test_resilience_to_accumulator_should_accumulate_errors_async(
     # The user's exception should be raised - even if we're capturing errors
     with raise_on_captured_errors(True):
         with pytest.raises(DummyTestException):
-            await do_test()
+            # Consume the generator
+            gen = await do_test()
+            _ = [i async for i in gen]
 
     # We should gracefully handle the error and return a value
     res = await do_test()
@@ -418,7 +394,7 @@ def test_resilience_to_accumulator_on_finish_post_processor_errors(
         def on_finish_post_processor(*args, **kwargs):
             raise DummyTestException("FAILURE!")
 
-        add_accumulator(
+        _add_accumulator(
             simple_op,
             make_accumulator=make_accumulator,
             on_finish_post_processor=on_finish_post_processor,
@@ -429,6 +405,7 @@ def test_resilience_to_accumulator_on_finish_post_processor_errors(
     # The user's exception should be raised - even if we're capturing errors
     with raise_on_captured_errors(True):
         with pytest.raises(DummyTestException):
+            # Consume the generator to trigger the make_accumulator call
             list(do_test())
 
     # We should gracefully handle the error and return a value
@@ -464,7 +441,7 @@ async def test_resilience_to_accumulator_on_finish_post_processor_errors_async(
         def on_finish_post_processor(*args, **kwargs):
             raise DummyTestException("FAILURE!")
 
-        add_accumulator(
+        _add_accumulator(
             simple_op,
             make_accumulator=make_accumulator,
             on_finish_post_processor=on_finish_post_processor,
@@ -475,6 +452,7 @@ async def test_resilience_to_accumulator_on_finish_post_processor_errors_async(
     # The user's exception should be raised - even if we're capturing errors
     with raise_on_captured_errors(True):
         with pytest.raises(DummyTestException):
+            # Consume the generator to trigger the make_accumulator call
             res = await do_test()
             l = [item async for item in res]
 
@@ -492,18 +470,10 @@ async def test_resilience_to_accumulator_on_finish_post_processor_errors_async(
 
 def test_resilience_to_accumulator_internal_errors(client):
     def do_test():
-        @weave.op
+        @weave.op(accumulator=lambda *args, **kwargs: {})
         def simple_op():
             yield 1
             raise DummyTestException("FAILURE!")
-
-        def make_accumulator(*args, **kwargs):
-            def accumulate(*args, **kwargs):
-                return {}
-
-            return accumulate
-
-        add_accumulator(simple_op, make_accumulator=make_accumulator)
 
         return simple_op()
 
@@ -522,18 +492,10 @@ def test_resilience_to_accumulator_internal_errors(client):
 @pytest.mark.asyncio
 async def test_resilience_to_accumulator_internal_errors_async(client):
     async def do_test():
-        @weave.op
+        @weave.op(accumulator=lambda *args, **kwargs: {})
         async def simple_op():
             yield 1
             raise DummyTestException("FAILURE!")
-
-        def make_accumulator(*args, **kwargs):
-            def accumulate(*args, **kwargs):
-                return {}
-
-            return accumulate
-
-        add_accumulator(simple_op, make_accumulator=make_accumulator)
 
         return simple_op()
 
@@ -543,9 +505,7 @@ async def test_resilience_to_accumulator_internal_errors_async(client):
             res = await do_test()
             l = [item async for item in res]
 
-    # User errors should still be raised
-    with pytest.raises(DummyTestException):
-        res = await do_test()
-        l = [item async for item in res]
-
-    assert_no_current_call()
+    with raise_on_captured_errors(False):
+        with pytest.raises(DummyTestException):
+            res = await do_test()
+            l = [item async for item in res]

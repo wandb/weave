@@ -18,6 +18,7 @@ directive @accessibleIf(
   cond: String
   restrictEvenAdmins: Boolean
 ) on FIELD_DEFINITION
+directive @internal(method: String!) repeatable on OBJECT | INTERFACE
 
 type Query {
   user(id: ID, userName: String): User
@@ -236,6 +237,12 @@ type ParquetHistory {
   parquetUrls: [String!]!
 }
 
+type RunTag @internal(method: "ProjectID() teams.ProjectID") {
+  id: ID!
+  name: String!
+  colorIndex: Int!
+}
+
 type Run implements Node {
   createdAt: DateTime!
   name: String!
@@ -254,6 +261,9 @@ type Run implements Node {
   historyKeys: JSON
   computeSeconds: Duration!
   parquetHistory(liveKeys: [String!]!): ParquetHistory!
+  notes: String
+  state: String
+  tagColors: [RunTag!]!
 }
 
 type RunConnection {
@@ -319,6 +329,7 @@ type Entity implements Node {
     collectionTypes: [ArtifactCollectionType!]
   ): ArtifactCollectionConnection
   secrets: [Secret!]!
+  members: [Member!]!
 }
 
 type EntityConnection {
@@ -737,4 +748,10 @@ interface Error {
 enum ErrorSeverity {
   WARN
   ERROR
+}
+
+type Member {
+  role: String
+  username: String
+  id: String
 }

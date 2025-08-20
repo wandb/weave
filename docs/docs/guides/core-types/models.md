@@ -3,14 +3,14 @@ import TabItem from '@theme/TabItem';
 
 # Models
 
+A `Model` in W&B Weave is a combination of data (which can include configuration, trained model weights, or other information) and code that defines how the model operates. By structuring your code to be compatible with this API, you benefit from a structured way to version your application so you can more systematically keep track of your experiments.
+
 <Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
-    A `Model` is a combination of data (which can include configuration, trained model weights, or other information) and code that defines how the model operates. By structuring your code to be compatible with this API, you benefit from a structured way to version your application so you can more systematically keep track of your experiments.
-
     To create a model in Weave, you need the following:
 
     - a class that inherits from `weave.Model`
-    - type definitions on all attributes
+    - type definitions on all parameters
     - a typed `predict` function with `@weave.op()` decorator
 
     ```python
@@ -42,7 +42,7 @@ import TabItem from '@theme/TabItem';
 
     ## Automatic versioning of models
 
-    When you change the attributes or the code that defines your model, these changes will be logged and the version will be updated.
+    When you change the parameters or the code that defines your model, these changes will be logged and the version will be updated.
     This ensures that you can compare the predictions across different versions of your model. Use this to iterate on prompts or to try the latest LLM and compare predictions across different settings.
 
     For example, here we create a new model:

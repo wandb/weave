@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import importlib
 
+from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings
-from weave.trace.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 
 from .instructor_iterable_utils import instructor_wrapper_async, instructor_wrapper_sync
 from .instructor_partial_utils import instructor_wrapper_partial
@@ -36,6 +36,9 @@ def get_instructor_patcher(
     async_create_partial_settings = base.model_copy(
         update={"name": base.name or "AsyncInstructor.create_partial"}
     )
+    create_completion_settings = base.model_copy(
+        update={"name": base.name or "Instructor.create_with_completion"}
+    )
 
     _instructor_patcher = MultiPatcher(
         [
@@ -43,6 +46,11 @@ def get_instructor_patcher(
                 lambda: importlib.import_module("instructor.client"),
                 "Instructor.create",
                 instructor_wrapper_sync(create_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("instructor.client"),
+                "Instructor.create_with_completion",
+                instructor_wrapper_sync(create_completion_settings),
             ),
             SymbolPatcher(
                 lambda: importlib.import_module("instructor.client"),

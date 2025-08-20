@@ -1,0 +1,448 @@
+interactions:
+- request:
+    body: '{"input":[{"content":"who was the first president of the united states?","role":"user"}],"model":"gpt-4o","include":[],"instructions":"You
+      determine which agent to use based on the user''s homework question","stream":false,"tools":[{"name":"transfer_to_history_tutor","parameters":{"additionalProperties":false,"type":"object","properties":{},"required":[]},"strict":true,"type":"function","description":"Handoff
+      to the History Tutor agent to handle the request. Specialist agent for historical
+      questions"},{"name":"transfer_to_math_tutor","parameters":{"additionalProperties":false,"type":"object","properties":{},"required":[]},"strict":true,"type":"function","description":"Handoff
+      to the Math Tutor agent to handle the request. Specialist agent for math questions"}]}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - '770'
+      content-type:
+      - application/json
+      host:
+      - api.openai.com
+      user-agent:
+      - Agents/Python 0.0.0
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - async:asyncio
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.66.3
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.9
+    method: POST
+    uri: https://api.openai.com/v1/responses
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAA9RVsW7bMBDd/RWEli5JINuyrXgrumRp0aJBmjYIhBN5sthQpEoemwSG/70gJVty
+        66JFOnUx5Ht3R/K9x+N2wlgiRbJmiUXXFsuVyKt0lWEFeT69nEE1W/EqF0vgPK+qNEVcCJHxMsfl
+        bH5ZJmehgSm/Iqd9E6MddnFuEQhFAQGbrrLZbJUu8jRijoC8CzXcNK1CQtEVobXGJmumvVIxIPU+
+        oxBIIJU7Rh1Zz0kaHbt9Np4JJLSN1Mgea8lrBhvUxMgw75CV4FAwoxnVGAL2lWO1afDR2Af2zaML
+        rbqtNPBUGE+tp4LMA+qjhRsjUIUVNy2dZ+Z8ls6y8zQ/T5c9KbEwWbO7CWOMbeMvYwk9txjKKq/j
+        rgsOSsWSCHdiVHwvxeJSZGmQIl/Mc56nkIkyzcpsflKK2CI0LLo+8fP2y2u5fOc/XM8+bW7c7VO6
+        dG9ub0ocKjQ0cU9kQbsKbUGmqKUjY58L8mTskAp24xvUFMne7gbglKAR200Yu4+UtGBBKVQFGaPi
+        uUM+WY8dbPG7NN4Vexd1hzgwbhGc0VJvknVPZ4JVZSyNkhhLNqjRAmHhfNOAfe7RCWO73nnG4nhd
+        wqYNFT6GpxdpH32iYaHK2AaG/yMdY97hoN0S3flqI3lMAU8mOQDuz54YWBXouJVtDK5ZcgVamKoK
+        Xg72veo0YtdBo8HmNWihMGZYjJa+YB9b5BKUdNTnVcayTmPJQR2c717kiqBsE26dG1EU3CKEDF1B
+        vbemRUsSQ0YFyuHZkLY/fz9IRkg7LtvuRkg4mbQYHHJ334d3IzdaGUdSUHkywv6Z87dA9YsJb0Lx
+        X1Idcv9Hng/XnUxbtOMbZb3msKdVSAel2k9972CDw3WT+mjozqers1+B0XOwHWYfr1EMlelY++Tn
+        YT7NTgGn+h5mz+9akyFQox3Pp4dpEB6Zo5cDCQQQRKYnux8AAAD//wMAmd7yCIQHAAA=
+    headers:
+      CF-RAY:
+      - 9221d67a5f217114-YYZ
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Tue, 18 Mar 2025 04:03:01 GMT
+      Server:
+      - cloudflare
+      Set-Cookie:
+      - __cf_bm=HDzaVYulwHR_R9HSxKqxbSczB6wMNNLM6kiuq33dtt0-1742270581-1.0.1.1-luMG9ImXVGW.gmxurLn8iP_IIglUjFh3UIHr2trvYsdhnUeWkLp1t1eESFACAQBvIFUpYZXUg1oQl.sRyTQV8.tjgJwvgRuFzzR5FAAHoE8;
+        path=/; expires=Tue, 18-Mar-25 04:33:01 GMT; domain=.api.openai.com; HttpOnly;
+        Secure; SameSite=None
+      - _cfuvid=w9nmghjfiG727DO5RnTtUqvu5A3RuwoUmSyGF7wO2Zk-1742270581745-0.0.1.1-604800000;
+        path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '783'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-request-id:
+      - req_cc16a1d38a539dd2700d7362d0c0e0a5
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"input":[{"content":"who was the first president of the united states?","role":"user"}],"model":"gpt-4o","include":[],"instructions":"Check
+      if the user is asking about homework.","stream":false,"text":{"format":{"type":"json_schema","name":"final_output","schema":{"properties":{"is_homework":{"title":"Is
+      Homework","type":"boolean"},"reasoning":{"title":"Reasoning","type":"string"}},"required":["is_homework","reasoning"],"title":"HomeworkOutput","type":"object","additionalProperties":false},"strict":true}},"tools":[]}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - '523'
+      content-type:
+      - application/json
+      host:
+      - api.openai.com
+      user-agent:
+      - Agents/Python 0.0.0
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - async:asyncio
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.66.3
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.9
+    method: POST
+    uri: https://api.openai.com/v1/responses
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAA3RVTW/jOAy951cQOieFnaZJmutedk+7WMxtUhi0RduayJJHoncmKPLfF5I/Yqft
+        JYj5xA89PlLvKwChpDiBcOTbbH+QxzI57KhMkmP6us1L3B0PqXzJt2kid2lCeyl3+RGLXOYpkViH
+        ADb/QQWPQazxg71whEwyw4Clh912e0hejknEPCN3PvgUtmk1McneiZyzTpzAdFpHgzLjiUwSo9J+
+        iXp2XcHKmhjtj5qKC6gSuCboPDlQHtBflKkAc9sx1LahX9Zdnvp8Df7ObMdtxxnbC5lF9MZK0iFs
+        1fJmZzfbZLvbJMdNsh9uHh3FCb6vAADe4y+A4GtLwa0h77Hq6YhAz3Xjq5Hql32+PQaqj6+7522e
+        p/v08PwqsfyU6hjjK+oi6KyOmdF75RkN36HCGiZzr3Ze8aLqkQ76fffuDwTLCcT7WSifjUSexYld
+        R+uzcITeGmWqszidxbea4GdHPvQmdMGzQ1XVXFr3C50ENBJKLLhDvYbCNo01+hp6RRKUAZJdgcEX
+        NXhiVqbyoNWFoFaerbtCodF78k/wrQ7hu6oizx4Uh2zhpL5O3d440kGMT2dxW14KjbGMo4C+v03Y
+        bfjXW8LXW2x6iw61Jp2xtTorUEdFRgoi7Og/ZTufjcOQxaZPmppIEqeBfkFlaR3PDgGIigw5ZMp8
+        1zTorgO6ArgNA2QdzfMyNW3w6KI5fUoGa2zZkKi0rsH796znP7w1mS9qavCuGEm+cKoN3CyKAxAG
+        m+hXKoN6GKCZRPtAp5m+ROtsS44V+YU9DMVdSw9QKFBxr+i/PPw5nlo/nBkukVurCY2YobdFrz9y
+        /zHPv9OZL7J4dgGdJ1l9kk44+tkpR3IxcA/X/aK6yfo2izdVONLw95L1+QT3G3mGoJSqH6Z/5n0o
+        UXtaPdQebxgXehDXpP5ed73oa6uKfs90bMUE9BM0fLZZOxei60w/z8FNKo+5Hnd+F5fkpFJlFtv4
+        db/+aJ+9BZOWCyxqknfHZDW7lnhc8s/7z4DP4k59+So0W0Z9B9Pn7URXeIIWLwoxSuQ4G7fV7X8A
+        AAD//wMASt5oTIEHAAA=
+    headers:
+      CF-RAY:
+      - 9221d67a5ea3ac31-YYZ
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Tue, 18 Mar 2025 04:03:02 GMT
+      Server:
+      - cloudflare
+      Set-Cookie:
+      - __cf_bm=PSuGBu.a5J.rjKmbVuliRYI3TELmf2jSqu1nuqZG_.Q-1742270582-1.0.1.1-vrKe0whVA4akOViYQBTIJU.T6K9_RF30CuKtcA1SPGW85gCy95WAHwy3_O9GzUbsJFFzafZk1OnNqPr0ypp02MQeN.3WqbWhcwd6yxh8AZA;
+        path=/; expires=Tue, 18-Mar-25 04:33:02 GMT; domain=.api.openai.com; HttpOnly;
+        Secure; SameSite=None
+      - _cfuvid=i.bMt1gdJwYlGjEG6z0JLaElyl9o9ZwznjjKjFqRNss-1742270582203-0.0.1.1-604800000;
+        path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '1256'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-request-id:
+      - req_9518e0f93eb24f595133401b3b4b5408
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"input":[{"content":"who was the first president of the united states?","role":"user"},{"id":"fc_67d8f0759d4081928538c80a4db04b430ee5dd4cb8e6239b","arguments":"{}","call_id":"call_XZAi6NuQT2WgVsXx06sCXVbe","name":"transfer_to_history_tutor","type":"function_call","status":"completed"},{"call_id":"call_XZAi6NuQT2WgVsXx06sCXVbe","output":"{''assistant'':
+      ''History Tutor''}","type":"function_call_output"}],"model":"gpt-4o","include":[],"instructions":"You
+      provide assistance with historical queries. Explain important events and context
+      clearly.","stream":false,"tools":[]}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - '571'
+      content-type:
+      - application/json
+      cookie:
+      - __cf_bm=PSuGBu.a5J.rjKmbVuliRYI3TELmf2jSqu1nuqZG_.Q-1742270582-1.0.1.1-vrKe0whVA4akOViYQBTIJU.T6K9_RF30CuKtcA1SPGW85gCy95WAHwy3_O9GzUbsJFFzafZk1OnNqPr0ypp02MQeN.3WqbWhcwd6yxh8AZA;
+        _cfuvid=i.bMt1gdJwYlGjEG6z0JLaElyl9o9ZwznjjKjFqRNss-1742270582203-0.0.1.1-604800000
+      host:
+      - api.openai.com
+      user-agent:
+      - Agents/Python 0.0.0
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - async:asyncio
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.66.3
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.9
+    method: POST
+    uri: https://api.openai.com/v1/responses
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAA3RVTY/jNgy9z68gfM4ETiYfTm7Fou0ei26LRbGzMBiJjtXKkktRmQkW898LyY6T
+        bGcvQcQnPj6SIv3tAaAwuthDwRT6erPVVVNuN2tcr6rFblk9LRpVVgdc73S5eqKSaK31Sh0q2iyf
+        dodilgj84W9SciHxLtBgV0wopGtM2GK7Wi635bpaZiwISgzJR/mutySkBydi9lzswUVrs8G4y41a
+        k6Cx4R4NwlGJ8S6z/eUj9OxPRhNgCCYIOkXwYqSF1gTxbBRa+DcSGwpz+Pm1t2gcmK73LOgE6ERO
+        AqDToLwTehVQlpDteT4o7PC19lH6KLX4f8jd6em8JpuEHHt5XPnHZblcPZbVY7kZa5Udiz18eQAA
+        +JZ/AQo595TcOgoBj0MBMzB0pwvHqTkHpCo157Be6WVZrajCHR0W+t3mZI4fFTuD7G2OfKmWXKGc
+        v7uqvVV8p/pSDnq9eg8XkmUPxR8tQWM4CPzGFIwmJ+AbkJbgT2eENHwSFArwggF+Jc9Hgs8YWuOO
+        4t0cPhIE4hNpaNh3sNhWOxAPi+1umzvVWzyTBgTFURm0kLIC43KEnzpKXXfwO528jemtIJ/hM/Is
+        45qxEeOOk6L5pzl88C6IkXx7lmMkiILgwZrQdmMGDjOdhaM/EbtsNlfPML9JA0wA3wg5YGqImXTK
+        AUNmfi5+QWmJE+lHE+CDj074/FyAjpTutSaAJdTEoTU96MhJcnIdNDzHZbnYBWg8dyjmRHAm5DDP
+        bP1YdXWGQAIdunOyKUqdCDMwTtmoL4QjhXdJDILCg3EkUxF6RiVGUUJTV3LpnD2DvHgQ4i7M718B
+        OucFLzP65euEvY3/Bks6fc1T0iOjtWRr8d7WCm0eeuFIA8x0Mj6G+rJv6jwl0xAyYfDOuGOxH99r
+        QU3jWW4uARRHcsQoVIfYdcjnEX0AeBt3lGe6jSvU9ckjZvNiXo7W/MbHQEPtpvPNkOR7U6JDiCG/
+        1hs1zGAUX0zAUKzx2Nf9bUyOTuWKJjdtAh7sZYPGvEAmQcbdbapqPfu//WazTrIVqpb01bEcpI/e
+        3y/A3eY94D3eqTk/ohYvaK/golpM5YqB7r4NHQlqFEz8bw9v/wEAAP//AwCitwqwzwYAAA==
+    headers:
+      CF-RAY:
+      - 9221d6833e697114-YYZ
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Tue, 18 Mar 2025 04:03:04 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '2435'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-request-id:
+      - req_3d00a3ff13996886f3833e87caa35784
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"data":[{"object":"trace","id":"trace_1ab5bd2f3bd54272bd73fd8d8a7cd852","workflow_name":"Agent
+      workflow","group_id":null,"metadata":null},{"object":"trace.span","id":"span_1e44ab53f21c445b806ad924","trace_id":"trace_1ab5bd2f3bd54272bd73fd8d8a7cd852","parent_id":"span_7667e7c5ff7c4eaaa62c38dc","started_at":"2025-03-18T04:03:00.779649+00:00","ended_at":"2025-03-18T04:03:01.794891+00:00","span_data":{"type":"response","response_id":"resp_67d8f074efa88192af27cf8d6acc8ff00ee5dd4cb8e6239b"},"error":null},{"object":"trace.span","id":"span_b6a3c878a7e849f38627e59a","trace_id":"trace_1ab5bd2f3bd54272bd73fd8d8a7cd852","parent_id":"span_7667e7c5ff7c4eaaa62c38dc","started_at":"2025-03-18T04:03:01.810169+00:00","ended_at":"2025-03-18T04:03:01.812869+00:00","span_data":{"type":"handoff","from_agent":"Triage
+      Agent","to_agent":"History Tutor"},"error":null},{"object":"trace.span","id":"span_8e1c549154a748b099628ff2","trace_id":"trace_1ab5bd2f3bd54272bd73fd8d8a7cd852","parent_id":"span_b1984e593eda4692a3183ce0","started_at":"2025-03-18T04:03:00.781844+00:00","ended_at":"2025-03-18T04:03:02.231198+00:00","span_data":{"type":"response","response_id":"resp_67d8f074ef008192bfa4871d5b210d410e6dd4b8acbdb1ee"},"error":null},{"object":"trace.span","id":"span_b1984e593eda4692a3183ce0","trace_id":"trace_1ab5bd2f3bd54272bd73fd8d8a7cd852","parent_id":"span_171654fb373c488fb10a59c5","started_at":"2025-03-18T04:03:00.768830+00:00","ended_at":"2025-03-18T04:03:02.238774+00:00","span_data":{"type":"agent","name":"Guardrail
+      check","handoffs":[],"tools":[],"output_type":"HomeworkOutput"},"error":null},{"object":"trace.span","id":"span_171654fb373c488fb10a59c5","trace_id":"trace_1ab5bd2f3bd54272bd73fd8d8a7cd852","parent_id":"span_7667e7c5ff7c4eaaa62c38dc","started_at":"2025-03-18T04:03:00.766081+00:00","ended_at":"2025-03-18T04:03:02.239789+00:00","span_data":{"type":"guardrail","name":"homework_guardrail","triggered":false},"error":null},{"object":"trace.span","id":"span_7667e7c5ff7c4eaaa62c38dc","trace_id":"trace_1ab5bd2f3bd54272bd73fd8d8a7cd852","parent_id":null,"started_at":"2025-03-18T04:03:00.764209+00:00","ended_at":"2025-03-18T04:03:02.241161+00:00","span_data":{"type":"agent","name":"Triage
+      Agent","handoffs":["History Tutor","Math Tutor"],"tools":[],"output_type":"str"},"error":null},{"object":"trace.span","id":"span_95d013d25cd545fc939c1187","trace_id":"trace_1ab5bd2f3bd54272bd73fd8d8a7cd852","parent_id":"span_a8c36ecc40a54441998f4d51","started_at":"2025-03-18T04:03:02.243541+00:00","ended_at":"2025-03-18T04:03:04.846259+00:00","span_data":{"type":"response","response_id":"resp_67d8f0765a548192831fc08ba59d043e0ee5dd4cb8e6239b"},"error":null},{"object":"trace.span","id":"span_a8c36ecc40a54441998f4d51","trace_id":"trace_1ab5bd2f3bd54272bd73fd8d8a7cd852","parent_id":null,"started_at":"2025-03-18T04:03:02.242207+00:00","ended_at":"2025-03-18T04:03:04.859339+00:00","span_data":{"type":"agent","name":"History
+      Tutor","handoffs":[],"tools":[],"output_type":"str"},"error":null},{"object":"trace","id":"trace_2fa1b11ea411418584c0d2adf1615c15","workflow_name":"Agent
+      workflow","group_id":null,"metadata":null}]}'
+    headers:
+      accept:
+      - '*/*'
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - '3130'
+      content-type:
+      - application/json
+      host:
+      - api.openai.com
+      openai-beta:
+      - traces=v1
+      user-agent:
+      - python-httpx/0.28.1
+    method: POST
+    uri: https://api.openai.com/v1/traces/ingest
+  response:
+    body:
+      string: ''
+    headers:
+      CF-RAY:
+      - 9221d698a946a223-YYZ
+      Connection:
+      - keep-alive
+      Date:
+      - Tue, 18 Mar 2025 04:03:05 GMT
+      Server:
+      - cloudflare
+      Set-Cookie:
+      - __cf_bm=TEkJxtu3qYrTgA5q8QshQkFRlLyo2E_VpjQl7atwEx4-1742270585-1.0.1.1-mHdcGT2H8f4eWxOQWIPclKW5IPa3ulHLqkzq8hVXn_J2O6wP_ACnTHICu5_44Wi.aHeQhg.8zxTEsxKNaHLe7WZrETi0dnya3.MCNDc1kAM;
+        path=/; expires=Tue, 18-Mar-25 04:33:05 GMT; domain=.api.openai.com; HttpOnly;
+        Secure; SameSite=None
+      - _cfuvid=pd_obuq4UhlYM54ZLS2Jb8wlbz9Gq0Fy38x6ATZVo9Q-1742270585987-0.0.1.1-604800000;
+        path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
+      X-Content-Type-Options:
+      - nosniff
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '167'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-request-id:
+      - req_0a49d9e7ef029ef4272318f57edfb4fa
+    status:
+      code: 204
+      message: No Content
+- request:
+    body: '{"input":[{"content":"what is life","role":"user"}],"model":"gpt-4o","include":[],"instructions":"Check
+      if the user is asking about homework.","stream":false,"text":{"format":{"type":"json_schema","name":"final_output","schema":{"properties":{"is_homework":{"title":"Is
+      Homework","type":"boolean"},"reasoning":{"title":"Reasoning","type":"string"}},"required":["is_homework","reasoning"],"title":"HomeworkOutput","type":"object","additionalProperties":false},"strict":true}},"tools":[]}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, zstd
+      connection:
+      - keep-alive
+      content-length:
+      - '486'
+      content-type:
+      - application/json
+      cookie:
+      - __cf_bm=PSuGBu.a5J.rjKmbVuliRYI3TELmf2jSqu1nuqZG_.Q-1742270582-1.0.1.1-vrKe0whVA4akOViYQBTIJU.T6K9_RF30CuKtcA1SPGW85gCy95WAHwy3_O9GzUbsJFFzafZk1OnNqPr0ypp02MQeN.3WqbWhcwd6yxh8AZA;
+        _cfuvid=i.bMt1gdJwYlGjEG6z0JLaElyl9o9ZwznjjKjFqRNss-1742270582203-0.0.1.1-604800000
+      host:
+      - api.openai.com
+      user-agent:
+      - Agents/Python 0.0.0
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - async:asyncio
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.66.3
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.9
+    method: POST
+    uri: https://api.openai.com/v1/responses
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAA3RVyY7jOAy95ysIXfpSVYizOrn2ZeY0g8HcOgWDkehYHVlyS/R0Nwr594HkJXaq
+        6mLYfOKix0f6bQEgtBJHEJ5CU+z2Ki+X+7w87Dd5dlhhhtlO7anE3Xa7krjcbOR2u84PWbbeyzOJ
+        pxjAnb+T5CGIs6G3S0/IpAqMWLbfrFb75TbfJCwwchuij3R1Y4hJdU7kvfPiCLY1Jhm0HU4Uihi1
+        CXM0sG8la2dTtK8VySvoErgiaAN50AEwXLW9AJ5dy1C5mn46f33p8tX4q3AtNy0X7K5kZ9Frp8jE
+        sJeGnzfuebVcbZ6X+fNy1988OYojfFsAALylJ4Dg3w1Ft5pCwEtHRwI6rutwGag+7Na5jFSfs3Jd
+        7kta036nSso/pDrF+Iy6BHpnUmYMQQdGy3dIOstk79VOK55VPdBBv+7e3YFoOYJ4OwkdioHIkziW
+        aAI9nYQnDM5qezmJ40n8WxH8aCnE5sCXnxVybIbRJX2JL02ljQuuqbREA9qCRW49AVoFylEA6xi0
+        VVoiRyugREW1lsAYruD82EqIt73Ymiy/nMRtXjRa6xgHgXx7HbFb/9ZZ4tdramqDHo0hU7BzppBo
+        kuLYt9TBnv7Trg3FIPYiNXXUzMiBOPb0CipL53lyCEBcyJJHpiK0dY3+d48uAG79gDhP07xMdRM9
+        2mTOXpa9NbWkT1Q6X+P9e9LT78HZIsiKarwrQlGQXjeRm1lxAMJinfxKbdH0AzKRYBfoONGPaLxr
+        yLOmMLNH0d+18gDFAjV3iv0zwB/DqaeHM/0lzs4ZQism6G3W6/fcv8/zz3jmkyyBfUSnSRYfpBOe
+        frTak5oN1MN1P6lutL5O4o0VDjT8NWd9OqHdxp0gqJSOfUTz97QPaTAXD7WnG6aFHcU1qr/TXSf6
+        ymnZ7ZGWnRiBboL6z6ZopkL0rZXYS0koHfBshp3epiU4qlTb2bbND0/v7ZNdP2pZoqxI3R2Xi8m1
+        xOMSX28+Aj6KO/bls9DsGM0dzFbrka74i5n9MYhRIafZuC1u/wMAAP//AwDLdEeGYQcAAA==
+    headers:
+      CF-RAY:
+      - 9221d693bafcac31-YYZ
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json
+      Date:
+      - Tue, 18 Mar 2025 04:03:06 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      alt-svc:
+      - h3=":443"; ma=86400
+      cf-cache-status:
+      - DYNAMIC
+      openai-organization:
+      - wandb
+      openai-processing-ms:
+      - '1011'
+      openai-version:
+      - '2020-10-01'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-request-id:
+      - req_7a49232413dfe84b8d37cec36648f2b8
+    status:
+      code: 200
+      message: OK
+version: 1

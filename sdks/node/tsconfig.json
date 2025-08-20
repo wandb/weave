@@ -14,21 +14,16 @@
     "declaration": true,
     "declarationMap": true,
     "rootDir": "src",
-    "tsBuildInfoFile": "dist/.tsbuildinfo"
+    "tsBuildInfoFile": "dist/.tsbuildinfo",
+    "allowJs": true,
+    "resolveJsonModule": true
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "types/**/*"],
   "exclude": [
     "examples",
     "dist",
     "node_modules",
-    "src/integrations/checkOpenai.ts"
+    "src/integrations/checkOpenai.ts",
+    "src/__tests__/**/*"
   ]
-  // "references": [
-  //   {
-  //     "path": "./src/tsconfig.src.json"
-  //   },
-  //   {
-  //     "path": "./examples/tsconfig.examples.json"
-  //   }
-  // ]
 }
