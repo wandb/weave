@@ -1,9 +1,11 @@
 from datetime import datetime, timezone
 
+import rich.markdown
 from PIL import Image
 
 import weave
 from weave.trace.serialization.custom_objs import (
+    KNOWN_TYPES,
     decode_custom_files_obj,
     decode_custom_inline_obj,
     encode_custom_obj,
@@ -48,29 +50,29 @@ def test_inline_custom_obj(client):
     assert decoded == dt_with_tz
 
 
-# def test_inline_custom_obj_needs_load_op(client):
-#     """Test the condition that the current version of the SDK doesn't know how to load the object.
+def test_inline_custom_obj_needs_load_op(client):
+    """Test the condition that the current version of the SDK doesn't know how to load the object.
 
-#     In that case we fallback to the saved load op."""
-#     md = rich.markdown.Markdown("# Hello")
+    In that case we fallback to the saved load op."""
+    md = rich.markdown.Markdown("# Hello")
 
-#     @weave.op
-#     def return_markdown(md):
-#         return md
+    @weave.op
+    def return_markdown(md):
+        return md
 
-#     _, call = return_markdown.call(md)
-#     client.flush()
+    _, call = return_markdown.call(md)
+    client.flush()
 
-#     # Temporarily modify KNOWN_TYPES to remove markdown
-#     global KNOWN_TYPES
-#     original_known_types = KNOWN_TYPES.copy()
-#     KNOWN_TYPES.remove("rich.markdown.Markdown")
-#     try:
-#         loaded = client.get_call(call.id)
-#         loaded_markdown = loaded.inputs["md"]
-#         assert isinstance(loaded_markdown, rich.markdown.Markdown)
-#     finally:
-#         KNOWN_TYPES = original_known_types
+    # Temporarily modify KNOWN_TYPES to remove markdown
+    global KNOWN_TYPES
+    original_known_types = KNOWN_TYPES.copy()
+    KNOWN_TYPES.remove("rich.markdown.Markdown")
+    try:
+        loaded = client.get_call(call.id)
+        loaded_markdown = loaded.inputs["md"]
+        assert isinstance(loaded_markdown, rich.markdown.Markdown)
+    finally:
+        KNOWN_TYPES = original_known_types
 
 
 def test_no_extra_calls_created(client):

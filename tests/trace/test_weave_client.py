@@ -2037,21 +2037,21 @@ def test_global_attributes_with_call_attributes(client_creator):
         assert call.attributes["env"] == "override"
 
 
-# def test_flush_progress_bar(client):
-#     client.set_autoflush(False)
+def test_flush_progress_bar(client):
+    client.set_autoflush(False)
 
-#     @weave.op
-#     def op_1():
-#         time.sleep(0.01)
+    @weave.op
+    def op_1():
+        time.sleep(0.01)
 
-#     op_1()
+    op_1()
 
-#     # flush with progress bar
-#     client.finish(use_progress_bar=True)
+    # flush with progress bar
+    client.finish(use_progress_bar=True)
 
-#     # make sure there are no pending jobs
-#     assert client._get_pending_jobs()["total_jobs"] == 0
-#     assert client._has_pending_jobs() == False
+    # make sure there are no pending jobs
+    assert client._get_pending_jobs()["total_jobs"] == 0
+    assert client._has_pending_jobs() == False
 
 
 def test_flush_callback(client):
