@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 import ddtrace
 from pydantic import BaseModel, ConfigDict
 
+import weave
 from weave.evaluation.eval import Evaluation
 from weave.scorers.llm_as_a_judge_scorer import LLMAsAJudgeScorer
 from weave.trace.context.weave_client_context import require_weave_client
@@ -12,6 +13,8 @@ from weave.trace.weave_client import WeaveClient
 from weave.trace_server.interface.builtin_object_classes.llm_structured_model import (
     LLMStructuredCompletionModel,
 )
+
+EVALUATE_MODEL_WORKER_MARKER = {"_weave_eval_meta": {"evaluate_model_worker": True}}
 
 
 class EvaluateModelArgs(BaseModel):
@@ -87,8 +90,9 @@ def _run_evaluation(
     loaded_model: LLMStructuredCompletionModel,
     evaluation_call_id: str,
 ) -> None:
-    return asyncio.run(
-        loaded_evaluation.evaluate(
-            loaded_model, __weave={"call_id": evaluation_call_id}
+    with weave.attributes(EVALUATE_MODEL_WORKER_MARKER):
+        return asyncio.run(
+            loaded_evaluation.evaluate(
+                loaded_model, __weave={"call_id": evaluation_call_id}
+            )
         )
-    )
