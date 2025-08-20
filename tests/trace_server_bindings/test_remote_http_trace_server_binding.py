@@ -11,7 +11,7 @@ import pytest
 import requests
 import tenacity
 
-from weave.trace.term import configure_logger
+from weave.trace.display.term import configure_logger
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
 from weave.trace_server_bindings.remote_http_trace_server import (
@@ -87,6 +87,8 @@ def server(request):
 
     if server_.call_processor:
         server_.call_processor.stop_accepting_new_work_and_flush_queue()
+    if server_.feedback_processor:
+        server_.feedback_processor.stop_accepting_new_work_and_flush_queue()
 
 
 @pytest.mark.parametrize("server", ["small_limit"], indirect=True)

@@ -1,13 +1,5 @@
 # W&B Weave Self-Managed
 
-:::important
-Weave on self-managed infrastructure is currently in Private Preview.  
-
-For production environments, W&B strongly recommends using [W&B Dedicated Cloud](https://docs.wandb.ai/guides/hosting/hosting-options/dedicated_cloud), where Weave is Generally Available.  
-
-To deploy a production-grade, self-managed instance, contact `support@wandb.com`.  
-:::
-
 This guide explains how to deploy all the components required to run W&B Weave in a self-managed environment.
 
 A key component of a self-managed Weave deployment is [ClickHouseDB](https://clickhouse.com/), which the Weave application backend relies on.
@@ -63,7 +55,7 @@ Modify the following parameters:
 - `auth.password`
 - S3 bucket-related configurations
 
-W&B recommends keeping the `clusterName` value in `values.yaml` set to `weave_cluster`.  This is the expected cluster name when W&B Weave runs the database migration. If you need to use a different name, see the [Setting `clusterName`](#setting-clustername) section for more information.
+W&B recommends keeping the `clusterName` value in `values.yaml` set to `weave_cluster`.  This is the expected cluster name when W&B Weave runs the database migration. If you need to use a different name, see step 3 in the [Deploy Weave](#4-deploy-weave) section for more information.
 
 ```yaml
 ## @param clusterName ClickHouse cluster name

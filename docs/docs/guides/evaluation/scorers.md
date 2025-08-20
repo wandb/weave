@@ -3,7 +3,7 @@ import TabItem from '@theme/TabItem';
 
 # Scoring Overview
 
-In Weave, Scorers are used to evaluate AI outputs and return evaluation metrics. They take the AI's output, analyze it, and return a dictionary of results. Scorers can use your input data as reference if needed and can also output extra information, such as explanations or reasonings from the evaluation.
+In W&B Weave, Scorers are used to evaluate AI outputs and return evaluation metrics. They take the AI's output, analyze it, and return a dictionary of results. Scorers can use your input data as reference if needed and can also output extra information, such as explanations or reasonings from the evaluation.
 
 <Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
@@ -315,7 +315,7 @@ While this guide shows you how to create custom scorers, Weave comes with a vari
 
 To apply scorers to your Weave ops, you'll need to use the `.call()` method which provides access to both the operation's result and its tracking information. This allows you to associate scorer results with specific calls in Weave's database.
 
-For more information on how to use the `.call()` method, see the [Calling Ops](../tracking/tracing#calling-ops#getting-a-handle-to-the-call-object-during-execution) guide.
+For more information on how to use the `.call()` method, see the [Calling Ops](../tracking/tracing.mdx#getting-a-handle-to-the-call-object-during-execution) guide.
 
 <Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
@@ -364,7 +364,7 @@ The `preprocess_model_input` function only transforms inputs before they are pas
 Scorer functions always receive the original dataset examples, without any preprocessing applied.
 :::
 
-For usage information and an example, see [Using `preprocess_model_input` to format dataset rows before evaluating](../core-types/evaluations.md#using-preprocess_model_input-to-format-dataset-rows-before-evaluating).
+For usage information and an example, see [Using `preprocess_model_input` to format dataset rows before evaluating](../core-types/evaluations.md#format-dataset-rows-before-evaluating).
 
 ## Score Analysis
 

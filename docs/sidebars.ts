@@ -44,6 +44,7 @@ const sidebars: SidebarsConfig = {
               id: "guides/tracking/tracing",
             },
             "guides/tracking/costs",
+            "guides/tracking/threads",
             {
               type: "doc",
               label: "Logging Media",
@@ -169,7 +170,6 @@ const sidebars: SidebarsConfig = {
           collapsed: true,
           label: "LLM Providers",
           items: [
-            "guides/integrations/inference",
             "guides/integrations/bedrock",
             "guides/integrations/anthropic",
             "guides/integrations/cerebras",
@@ -202,6 +202,7 @@ const sidebars: SidebarsConfig = {
             "guides/integrations/smolagents",
             "guides/integrations/pydantic_ai",
             "guides/integrations/google_adk",
+            "guides/integrations/agno",
             "guides/integrations/autogen",
             "guides/integrations/verdict",
             "guides/integrations/js"

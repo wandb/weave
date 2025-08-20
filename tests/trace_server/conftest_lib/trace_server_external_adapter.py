@@ -1,5 +1,6 @@
 import base64
 import typing
+from typing import Optional
 
 from weave.trace_server import (
     external_to_internal_trace_server_adapter,
@@ -110,6 +111,13 @@ class TestOnlyUserInjectingExternalTraceServer(
         req.wb_user_id = self._user_id
         return super().feedback_create(req)
 
+    def feedback_create_batch(
+        self, req: tsi.FeedbackCreateBatchReq
+    ) -> tsi.FeedbackCreateBatchRes:
+        for feedback_req in req.batch:
+            feedback_req.wb_user_id = self._user_id
+        return super().feedback_create_batch(req)
+
     def cost_create(self, req: tsi.CostCreateReq) -> tsi.CostCreateRes:
         req.wb_user_id = self._user_id
         return super().cost_create(req)
@@ -130,10 +138,14 @@ class TestOnlyUserInjectingExternalTraceServer(
 
 
 def externalize_trace_server(
-    trace_server: tsi.TraceServerInterface, user_id: str = "test_user"
+    trace_server: tsi.TraceServerInterface,
+    user_id: str = "test_user",
+    id_converter: Optional[
+        external_to_internal_trace_server_adapter.IdConverter
+    ] = None,
 ) -> TestOnlyUserInjectingExternalTraceServer:
     return TestOnlyUserInjectingExternalTraceServer(
         trace_server,
-        DummyIdConverter(),
+        id_converter or DummyIdConverter(),
         user_id,
     )

@@ -5,15 +5,15 @@ import TabItem from '@theme/TabItem';
 
 :::tip
 For a limited time, the new W&B Inference service is included in your free tier. W&B Inference provides access to leading open-source foundation models via API and the Weave [Playground](./guides/tools/playground.md). 
-- [Developer documentation](./guides/integrations/inference.md)
+- [Developer documentation](https://docs.wandb.ai/guides/inference/)
 - [Product page](https://wandb.ai/site/inference) 
 :::
 
 <!-- TODO: Update wandb.me/weave-quickstart to match this new link -->
 
-Follow these steps to track your first call or <a class="vertical-align-colab-button" target="_blank" href="http://wandb.me/weave_colab"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
+W&B Weave makes it easy to track and evaluate your LLM applications. Follow these steps to track your first call or <a class="vertical-align-colab-button" target="_blank" href="http://wandb.me/weave_colab"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
 
-## 1. Install Weave and create an API Key
+## 1. Install W&B Weave and create an API Key
 
 **Install weave**
 
@@ -141,7 +141,7 @@ Calls made to OpenAI, Anthropic and [many more LLM libraries](./guides/integrati
 
 ## 4. See traces of your application in your project
 
-🎉 Congrats! Now, every time you call this function, weave will automatically capture the input & output data and log any changes made to the code.
+🎉 Congrats! Now, every time you call this function, Weave will automatically capture the input & output data and log any changes made to the code.
 
 ![Weave Trace Outputs 1](../static/img/tutorial_trace_1.png)
 

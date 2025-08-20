@@ -15,6 +15,7 @@ from pydantic import ValidationError
 
 import weave
 import weave.trace_server.trace_server_interface as tsi
+from tests.conftest import TestOnlyFlushingWeaveClient
 from tests.trace.testutil import ObjectRefStrMatcher
 from tests.trace.util import (
     AnyIntMatcher,
@@ -1259,6 +1260,12 @@ def test_refs_read_batch_multi_project(client):
     assert res.vals[2] == {"ab": [3, 4, 5]}
 
 
+def test_refs_read_batch_call_ref(client):
+    call_ref = refs.CallRef(entity="shawn", project="test-project", id="my-call")
+    with pytest.raises(ValueError, match="Call refs not supported"):
+        client.server.refs_read_batch(RefsReadBatchReq(refs=[call_ref.uri()]))
+
+
 def test_large_files(client):
     class CoolCustomThing:
         a: str
@@ -1722,7 +1729,7 @@ def test_object_version_read(client):
     objs = client.server.objs_query(
         tsi.ObjQueryReq(
             project_id=client._project_id(),
-            object_id=refs[0].name,
+            filter=tsi.ObjectVersionFilter(object_ids=[refs[0].name]),
         )
     ).objs
     assert len(objs) == 10
@@ -1910,7 +1917,7 @@ def test_object_deletion(client):
     versions = client.server.objs_query(
         req=tsi.ObjQueryReq(
             project_id=client._project_id(),
-            names=["my-obj"],
+            filter=tsi.ObjectVersionFilter(object_ids=["my-obj"]),
             sort_by=[tsi.SortBy(field="created_at", direction="desc")],
         )
     )
@@ -1926,7 +1933,7 @@ def test_object_deletion(client):
     versions = client.server.objs_query(
         req=tsi.ObjQueryReq(
             project_id=client._project_id(),
-            names=["my-obj"],
+            filter=tsi.ObjectVersionFilter(object_ids=["my-obj"]),
         )
     )
     assert len(versions.objs) == 0
@@ -3538,89 +3545,89 @@ def test_no_400_on_invalid_refs(client):
     assert server_call.id == id
 
 
-def test_sum_dict_leaves_list_of_dicts(client):
-    """Test that sum_dict_leaves correctly handles lists of dictionaries."""
-    dicts = [
-        {"a": 1, "b": "hello", "c": 2},
-        {"a": 3, "b": "world", "c": 4},
-        {"a": 5, "b": "!", "c": 6},
+def test_get_evaluation(client, make_evals):
+    ref, _ = make_evals
+    ev = client.get_evaluation(ref.uri())
+    assert isinstance(ev, Evaluation)
+    assert ev.ref.uri() == ref.uri()
+
+
+def test_get_evaluations(client, make_evals):
+    ref, ref2 = make_evals
+    evs = client.get_evaluations()
+    assert len(evs) == 2
+    assert isinstance(evs[0], Evaluation)
+    assert isinstance(evs[1], Evaluation)
+
+    assert evs[0].ref.uri() == ref.uri()
+    assert evs[0].dataset.rows[0] == {"dataset_id": "def"}
+
+    assert evs[1].ref.uri() == ref2.uri()
+    assert evs[1].dataset.rows[0] == {"dataset_id": "jkl"}
+
+
+def test_feedback_batching(network_proxy_client):
+    """Test that feedback batching works correctly when enabled."""
+    # Set up advanced client that uses the RemoteHttpTraceServer handler
+    # with batching
+    basic_client, remote_client, records = network_proxy_client
+    client = TestOnlyFlushingWeaveClient(
+        entity=basic_client.entity,
+        project=basic_client.project,
+        server=remote_client,
+        ensure_project_exists=False,
+    )
+    # Disably autoflush so we can manually control
+    client.set_autoflush(False)
+
+    # Create a test call to add feedback to
+    @weave.op
+    def test_op(x: int) -> int:
+        return x * 2
+
+    result = test_op(5)
+    client.flush()
+
+    test_call = client.get_calls()[0]
+    client.server.attribute_access_log = []
+
+    feedback_items = []
+    start = time.time()
+    for i in range(10):
+        id = test_call.feedback.add(
+            feedback_type=f"test_feedback_{i}",
+            payload={"score": i, "note": f"Test feedback {i}"},
+        )
+        assert id is not None
+        feedback_items.append(id)
+
+    # make sure we aren't actually waiting for 10 feedbacks, should be quick
+    assert time.time() - start < 0.2, "Feedback creation took too long"
+    assert client.server.get_feedback_processor() is not None
+
+    # Flush to ensure all feedback is processed
+    client.flush()
+
+    log = client.server.attribute_access_log
+    feedback_creates = [l for l in log if l == "feedback_create"]
+
+    assert_err = f"Expected 0 feedback creates, got {len(feedback_creates)}"
+    assert len(feedback_creates) == 0, assert_err
+
+    # Query feedback to verify all items were created
+    all_feedback = list(test_call.feedback)
+    created_feedback = [
+        f for f in all_feedback if f.feedback_type.startswith("test_feedback_")
     ]
-    result = weave_client.sum_dict_leaves(dicts)
-    assert result == {"a": 9, "b": ["hello", "world", "!"], "c": 12}
+    assert len(created_feedback) == 10
 
-    # Test with nested dictionaries in the list
-    dicts = [
-        {"a": {"x": 1, "y": 2}, "b": 3},
-        {"a": {"x": 4, "y": 5}, "b": 6},
-        {"a": {"x": 7, "y": 8}, "b": 9},
-    ]
-    result = weave_client.sum_dict_leaves(dicts)
-    assert result == {"a": {"x": 12, "y": 15}, "b": 18}
-
-    # Test with empty list
-    assert weave_client.sum_dict_leaves([]) == {}
-
-    # Test with list containing empty dictionaries
-    assert weave_client.sum_dict_leaves([{}]) == {}
-
-    # Test with None values
-    dicts = [
-        {"a": 1, "b": None, "c": 2},
-        {"a": 3, "b": None, "c": 4},
-        {"a": 5, "b": None, "c": 6},
-    ]
-    result = weave_client.sum_dict_leaves(dicts)
-    assert result == {"a": 9, "c": 12}
-
-
-def test_sum_dict_leaves_mixed_types(client):
-    """Test that sum_dict_leaves correctly handles dictionaries where the same key has different types."""
-    dicts = [
-        {"a": 1, "b": "hello", "c": 2},
-        {"a": "world", "b": 3, "c": 4},
-        {"a": 5, "b": "!", "c": "test"},
-    ]
-    result = weave_client.sum_dict_leaves(dicts)
-    # When a key has mixed types, all values should be collected in a list
-    assert result == {"a": [1, "world", 5], "b": ["hello", 3, "!"], "c": [2, 4, "test"]}
-
-    # Test with nested dictionaries having mixed types
-    dicts = [
-        {"a": {"x": 1, "y": "hello"}, "b": 3},
-        {"a": {"x": "world", "y": 2}, "b": "test"},
-        {"a": {"x": 5, "y": 3}, "b": 6},
-    ]
-    result = weave_client.sum_dict_leaves(dicts)
-    assert result == {
-        "a": {"x": [1, "world", 5], "y": ["hello", 2, 3]},
-        "b": [3, "test", 6],
-    }
-
-
-def test_sum_dict_leaves_deep_nested(client):
-    """Test that sum_dict_leaves correctly handles deeply nested dictionaries (2 levels) with mixed types."""
-    dicts = [
-        {
-            "level1": {"level2": {"a": 1, "b": "hello", "c": {"x": 2, "y": "world"}}},
-            "top": 10,
-        },
-        {
-            "level1": {"level2": {"a": "test", "b": 3, "c": {"x": "deep", "y": 4}}},
-            "top": "mixed",
-        },
-        {
-            "level1": {"level2": {"a": 5, "b": "!", "c": {"x": 6, "y": "nested"}}},
-            "top": 20,
-        },
-    ]
-    result = weave_client.sum_dict_leaves(dicts)
-    assert result == {
-        "level1": {
-            "level2": {
-                "a": [1, "test", 5],
-                "b": ["hello", 3, "!"],
-                "c": {"x": [2, "deep", 6], "y": ["world", 4, "nested"]},
-            }
-        },
-        "top": [10, "mixed", 20],
-    }
+    # Verify the feedback content
+    for i, feedback in enumerate(
+        sorted(created_feedback, key=lambda x: x.feedback_type)
+    ):
+        assert feedback.id in feedback_items, (
+            f"Feedback {i} not found in feedback_items"
+        )
+        assert feedback.feedback_type == f"test_feedback_{i}"
+        assert feedback.payload["score"] == i
+        assert feedback.payload["note"] == f"Test feedback {i}"

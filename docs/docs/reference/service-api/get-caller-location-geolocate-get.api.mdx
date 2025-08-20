@@ -1,0 +1,532 @@
+---
+id: get-caller-location-geolocate-get
+title: "Get Caller Location"
+description: "Lookup the geographic location of a user based on their IP address."
+sidebar_label: "Get Caller Location"
+hide_title: true
+hide_table_of_contents: true
+api: eJzNVsFy2zYQ/RUMzhrJcXPSzW1T1zNp66nV9uB0NCtySSKBAARYKtZw9O/dBSmJkmw3k+mhJ5HgAvv2vbdYdZqgTnr+qB8wbkyB+u+JLjEV0QQy3um5fu/9pzYoalDV6OsIoTGFsr4ACVC+UqDahFGtIGGpeIlDTVR39wrKMmJK0w/ug1s0Jqmb+zuFTyZRUpWPqsRVW9fG1Sq0MfiESYEr1Rq2ynlSK1SwAWNhZVGZfK6qWmojTvVE+4AxQ7grGWWNtCzAWozLPbQlw83PyE/EOwJEWCNhlII77fiFd5rAn4xU+rnFuOWXiJ9bE5GPrcAmnOhUNLgGPe80uO1vVd5N2yC7E0XGr3eTw4prrdW7CxqPdCjy6gBtwiRU0FrKy4U16GhEHaPBJ1gHi1mkN9Pr6XfTtyISGbKS7i5w8v8ml4Dmh+BdknSdvr66kp/Twx/aouDoqrXq9yGYURbeER+XOQrBml6C2ccke7oRgyGKcGT6DEz+/JzLk9rOS+OU3m7YZ0fcE7GfwDmxlLCyd8KzyvnVRyzoRO5HXRmLS+NKfJIP4GpcJoJIvEaHFXTlyfsQEU4DQmaldRS3y8KXOBbtdpBEsH2FdRxXtu7bDVa+pdwJ4w6U9zEhv3rHHVMpzm/LfS+VYv21cVwpc8O94r9I0YfsK+8tghvxfzPEnAP6q0HOGM/SKm7w4VTxF2ds5UIQVYyrMKIrcuMOJhy6a8dYXlOEeXyeOHaC3u1k+9vr60ub/gnWlD1B72L08ds9yrzxJZTdSrhOlwGM6OTrV1wSbB+sMbLYx/IhRtiO2H9/dIhep/q1RvmF6Yca9eGwl0MzGWohX/+NeqmrTz3EjYQ40tuz+3IZP/b0PZdsH/LzYnF/cWCvLd/XjR8u+HyFU8Mvs8Odxms8ezb7O72NLJRuiEKaz2YUgS33hWfKagomd1bCoo2Gtg8idi+fZP8ekilGtMkJerj4c2/k74wnByNE1u6V6D5A8LPzfY4cSv0JEvEU5GjB3Fv1avpmeiWH8wikNWQzDsPpFkn9kMeaOtjhrBu7o6//t7N64InwiWbBgsmezlp1g6SP+igpy9QwE7LYdYL0j2h3O1nuJ7QIXZokqY4z+kVOvnnwPgv6E273/xk2YFsJyL7aQDQCiMFJSzcIpViEkfY7bnhoBhrturiB5JSD22/fLdg+/wD2AFGg
+sidebar_class_name: "get api-method"
+info_path: reference/service-api/fastapi
+custom_edit_url: null
+---
+
+import ApiTabs from "@theme/ApiTabs";
+import DiscriminatorTabs from "@theme/DiscriminatorTabs";
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import SecuritySchemes from "@theme/ApiExplorer/SecuritySchemes";
+import MimeTabs from "@theme/MimeTabs";
+import ParamsItem from "@theme/ParamsItem";
+import ResponseSamples from "@theme/ResponseSamples";
+import SchemaItem from "@theme/SchemaItem";
+import SchemaTabs from "@theme/SchemaTabs";
+import Markdown from "@theme/Markdown";
+import Heading from "@theme/Heading";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Get Caller Location"}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"get"}
+  path={"/geolocate"}
+>
+  
+</MethodEndpoint>
+
+
+
+Lookup the geographic location of a user based on their IP address.
+
+This API exists for debugging purposes and may not be available in the future.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+  children={"Request"}
+>
+</Heading>
+
+<details
+  style={{"marginBottom":"1rem"}}
+  className={"openapi-markdown__details"}
+  data-collapsed={false}
+  open={true}
+>
+  <summary
+    style={{}}
+  >
+    <h3
+      className={"openapi-markdown__details-summary-header-params"}
+    >
+      Query Parameters
+    </h3>
+  </summary><div>
+    <ul>
+      <ParamsItem
+        className={"paramsItem"}
+        param={{"name":"ip","in":"query","required":false,"schema":{"anyOf":[{"type":"string"},{"type":"null"}],"description":"IP address to geolocate, defaults to client IP address","examples":["1.2.3.4"],"title":"Ip"},"description":"IP address to geolocate, defaults to client IP address"}}
+      >
+        
+      </ParamsItem>
+    </ul>
+  </div>
+</details><div>
+  <div>
+    <ApiTabs
+      label={undefined}
+      id={undefined}
+    >
+      <TabItem
+        label={"200"}
+        value={"200"}
+      >
+        <div>
+          
+          
+          Successful Response
+          
+          
+        </div><div>
+          <MimeTabs
+            className={"openapi-tabs__mime"}
+            schemaType={"response"}
+          >
+            <TabItem
+              label={"application/json"}
+              value={"application/json"}
+            >
+              <SchemaTabs
+                className={"openapi-tabs__schema"}
+              >
+                <TabItem
+                  label={"Schema"}
+                  value={"Schema"}
+                >
+                  <details
+                    style={{}}
+                    className={"openapi-markdown__details response"}
+                    data-collapsed={false}
+                    open={true}
+                  >
+                    <summary
+                      style={{}}
+                      className={"openapi-markdown__details-summary-response"}
+                    >
+                      <strong>
+                        Schema
+                      </strong>
+                    </summary><div
+                      style={{"textAlign":"left","marginLeft":"1rem"}}
+                    >
+                      
+                    </div><ul
+                      style={{"marginLeft":"1rem"}}
+                    >
+                      <SchemaItem
+                        collapsible={false}
+                        name={"ip"}
+                        required={true}
+                        schemaName={"Ip (string)"}
+                        qualifierMessage={undefined}
+                        schema={{"type":"string","title":"Ip","description":"Resolved IP address, useful for debugging"}}
+                      >
+                        
+                      </SchemaItem><SchemaItem
+                        collapsible={true}
+                        className={"schemaItem"}
+                      >
+                        <details
+                          style={{}}
+                          className={"openapi-markdown__details"}
+                        >
+                          <summary
+                            style={{}}
+                          >
+                            <strong>
+                              location
+                            </strong><span
+                              style={{"opacity":"0.6"}}
+                            >
+                               object
+                            </span>
+                          </summary><div
+                            style={{"marginLeft":"1rem"}}
+                          >
+                            <div
+                              style={{"marginTop":".5rem","marginBottom":".5rem"}}
+                            >
+                              
+                              
+                              Information about the location of the IP address, None if could not be determined
+                              
+                              
+                            </div>
+                          </div><div>
+                            <span
+                              className={"badge badge--info"}
+                            >
+                              anyOf
+                            </span><SchemaTabs>
+                              <TabItem
+                                label={"Geolocation"}
+                                value={"0-item-properties"}
+                              >
+                                <SchemaItem
+                                  collapsible={false}
+                                  name={"file_index"}
+                                  required={true}
+                                  schemaName={"File Index (integer)"}
+                                  qualifierMessage={undefined}
+                                  schema={{"type":"integer","title":"File Index","description":"row in CSV file"}}
+                                >
+                                  
+                                </SchemaItem><SchemaItem
+                                  collapsible={false}
+                                  name={"range_start_int"}
+                                  required={true}
+                                  schemaName={"Range Start Int (integer)"}
+                                  qualifierMessage={undefined}
+                                  schema={{"type":"integer","title":"Range Start Int","description":"Start of IP range as integer"}}
+                                >
+                                  
+                                </SchemaItem><SchemaItem
+                                  collapsible={false}
+                                  name={"range_end_int"}
+                                  required={true}
+                                  schemaName={"Range End Int (integer)"}
+                                  qualifierMessage={undefined}
+                                  schema={{"type":"integer","title":"Range End Int","description":"End of IP range as integer"}}
+                                >
+                                  
+                                </SchemaItem><SchemaItem
+                                  collapsible={false}
+                                  name={"range_start_ip"}
+                                  required={true}
+                                  schemaName={"Range Start Ip (string)"}
+                                  qualifierMessage={undefined}
+                                  schema={{"type":"string","title":"Range Start Ip","description":"Start of IP range in dotted decimal notation"}}
+                                >
+                                  
+                                </SchemaItem><SchemaItem
+                                  collapsible={false}
+                                  name={"range_end_ip"}
+                                  required={true}
+                                  schemaName={"Range End Ip (string)"}
+                                  qualifierMessage={undefined}
+                                  schema={{"type":"string","title":"Range End Ip","description":"End of IP range in dotted decimal notation"}}
+                                >
+                                  
+                                </SchemaItem><SchemaItem
+                                  collapsible={false}
+                                  name={"country_code"}
+                                  required={true}
+                                  schemaName={"Country Code (string)"}
+                                  qualifierMessage={undefined}
+                                  schema={{"type":"string","title":"Country Code","description":"2-letter country code in ISO 3166-1 Alpha 2 format"}}
+                                >
+                                  
+                                </SchemaItem><SchemaItem
+                                  collapsible={true}
+                                  className={"schemaItem"}
+                                >
+                                  <details
+                                    style={{}}
+                                    className={"openapi-markdown__details"}
+                                  >
+                                    <summary
+                                      style={{}}
+                                    >
+                                      <strong>
+                                        country_name
+                                      </strong><span
+                                        style={{"opacity":"0.6"}}
+                                      >
+                                         object
+                                      </span>
+                                    </summary><div
+                                      style={{"marginLeft":"1rem"}}
+                                    >
+                                      <div
+                                        style={{"marginTop":".5rem","marginBottom":".5rem"}}
+                                      >
+                                        
+                                        
+                                        Country name, None if could not be determined
+                                        
+                                        
+                                      </div>
+                                    </div><div>
+                                      <span
+                                        className={"badge badge--info"}
+                                      >
+                                        anyOf
+                                      </span><SchemaTabs>
+                                        <TabItem
+                                          label={"MOD1"}
+                                          value={"0-item-properties"}
+                                        >
+                                          <div
+                                            style={{"marginTop":".5rem","marginBottom":".5rem"}}
+                                          >
+                                            
+                                            
+                                            string
+                                            
+                                            
+                                          </div>
+                                        </TabItem>
+                                      </SchemaTabs>
+                                    </div>
+                                  </details>
+                                </SchemaItem>
+                              </TabItem>
+                            </SchemaTabs>
+                          </div>
+                        </details>
+                      </SchemaItem><SchemaItem
+                        collapsible={false}
+                        name={"allowed"}
+                        required={false}
+                        schemaName={"Allowed (boolean)"}
+                        qualifierMessage={undefined}
+                        schema={{"type":"boolean","title":"Allowed","description":"Whether the IP address is allowed to be used for inference.","default":false}}
+                      >
+                        
+                      </SchemaItem>
+                    </ul>
+                  </details>
+                </TabItem><TabItem
+                  label={"Example (from schema)"}
+                  value={"Example (from schema)"}
+                >
+                  <ResponseSamples
+                    responseExample={"{\n  \"ip\": \"string\",\n  \"location\": {},\n  \"allowed\": false\n}"}
+                    language={"json"}
+                  >
+                    
+                  </ResponseSamples>
+                </TabItem>
+              </SchemaTabs>
+            </TabItem>
+          </MimeTabs>
+        </div>
+      </TabItem><TabItem
+        label={"422"}
+        value={"422"}
+      >
+        <div>
+          
+          
+          Validation Error
+          
+          
+        </div><div>
+          <MimeTabs
+            className={"openapi-tabs__mime"}
+            schemaType={"response"}
+          >
+            <TabItem
+              label={"application/json"}
+              value={"application/json"}
+            >
+              <SchemaTabs
+                className={"openapi-tabs__schema"}
+              >
+                <TabItem
+                  label={"Schema"}
+                  value={"Schema"}
+                >
+                  <details
+                    style={{}}
+                    className={"openapi-markdown__details response"}
+                    data-collapsed={false}
+                    open={true}
+                  >
+                    <summary
+                      style={{}}
+                      className={"openapi-markdown__details-summary-response"}
+                    >
+                      <strong>
+                        Schema
+                      </strong>
+                    </summary><div
+                      style={{"textAlign":"left","marginLeft":"1rem"}}
+                    >
+                      
+                    </div><ul
+                      style={{"marginLeft":"1rem"}}
+                    >
+                      <SchemaItem
+                        collapsible={true}
+                        className={"schemaItem"}
+                      >
+                        <details
+                          style={{}}
+                          className={"openapi-markdown__details"}
+                        >
+                          <summary
+                            style={{}}
+                          >
+                            <span
+                              className={"openapi-schema__container"}
+                            >
+                              <strong
+                                className={"openapi-schema__property"}
+                              >
+                                detail
+                              </strong><span
+                                className={"openapi-schema__name"}
+                              >
+                                 object[]
+                              </span>
+                            </span>
+                          </summary><div
+                            style={{"marginLeft":"1rem"}}
+                          >
+                            <li>
+                              <div
+                                style={{"fontSize":"var(--ifm-code-font-size)","opacity":"0.6","marginLeft":"-.5rem","paddingBottom":".5rem"}}
+                              >
+                                Array [
+                              </div>
+                            </li><SchemaItem
+                              collapsible={true}
+                              className={"schemaItem"}
+                            >
+                              <details
+                                style={{}}
+                                className={"openapi-markdown__details"}
+                              >
+                                <summary
+                                  style={{}}
+                                >
+                                  <span
+                                    className={"openapi-schema__container"}
+                                  >
+                                    <strong
+                                      className={"openapi-schema__property"}
+                                    >
+                                      loc
+                                    </strong><span
+                                      className={"openapi-schema__name"}
+                                    >
+                                       object[]
+                                    </span><span
+                                      className={"openapi-schema__divider"}
+                                    >
+                                      
+                                    </span><span
+                                      className={"openapi-schema__required"}
+                                    >
+                                      required
+                                    </span>
+                                  </span>
+                                </summary><div
+                                  style={{"marginLeft":"1rem"}}
+                                >
+                                  <li>
+                                    <div
+                                      style={{"fontSize":"var(--ifm-code-font-size)","opacity":"0.6","marginLeft":"-.5rem","paddingBottom":".5rem"}}
+                                    >
+                                      Array [
+                                    </div>
+                                  </li><div>
+                                    <span
+                                      className={"badge badge--info"}
+                                    >
+                                      anyOf
+                                    </span><SchemaTabs>
+                                      <TabItem
+                                        label={"MOD1"}
+                                        value={"0-item-properties"}
+                                      >
+                                        <div
+                                          style={{"marginTop":".5rem","marginBottom":".5rem"}}
+                                        >
+                                          
+                                          
+                                          string
+                                          
+                                          
+                                        </div>
+                                      </TabItem><TabItem
+                                        label={"MOD2"}
+                                        value={"1-item-properties"}
+                                      >
+                                        <div
+                                          style={{"marginTop":".5rem","marginBottom":".5rem"}}
+                                        >
+                                          
+                                          
+                                          integer
+                                          
+                                          
+                                        </div>
+                                      </TabItem>
+                                    </SchemaTabs>
+                                  </div><li>
+                                    <div
+                                      style={{"fontSize":"var(--ifm-code-font-size)","opacity":"0.6","marginLeft":"-.5rem"}}
+                                    >
+                                      ]
+                                    </div>
+                                  </li>
+                                </div>
+                              </details>
+                            </SchemaItem><SchemaItem
+                              collapsible={false}
+                              name={"msg"}
+                              required={true}
+                              schemaName={"Message (string)"}
+                              qualifierMessage={undefined}
+                              schema={{"type":"string","title":"Message"}}
+                            >
+                              
+                            </SchemaItem><SchemaItem
+                              collapsible={false}
+                              name={"type"}
+                              required={true}
+                              schemaName={"Error Type (string)"}
+                              qualifierMessage={undefined}
+                              schema={{"type":"string","title":"Error Type"}}
+                            >
+                              
+                            </SchemaItem><li>
+                              <div
+                                style={{"fontSize":"var(--ifm-code-font-size)","opacity":"0.6","marginLeft":"-.5rem"}}
+                              >
+                                ]
+                              </div>
+                            </li>
+                          </div>
+                        </details>
+                      </SchemaItem>
+                    </ul>
+                  </details>
+                </TabItem><TabItem
+                  label={"Example (from schema)"}
+                  value={"Example (from schema)"}
+                >
+                  <ResponseSamples
+                    responseExample={"{\n  \"detail\": [\n    {\n      \"loc\": [\n        \"string\",\n        0\n      ],\n      \"msg\": \"string\",\n      \"type\": \"string\"\n    }\n  ]\n}"}
+                    language={"json"}
+                  >
+                    
+                  </ResponseSamples>
+                </TabItem>
+              </SchemaTabs>
+            </TabItem>
+          </MimeTabs>
+        </div>
+      </TabItem>
+    </ApiTabs>
+  </div>
+</div>
+      
