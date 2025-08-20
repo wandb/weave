@@ -136,7 +136,11 @@ class ViewerProtocol(Protocol):
         ...
 
     def create_table(
-        self, title: Optional[str] = None, show_header: bool = True, **kwargs: Any
+        self,
+        title: Optional[str] = None,
+        show_header: bool = True,
+        header_style: Optional[str] = None,
+        **kwargs: Any,
     ) -> TableProtocol:
         """Create a table object."""
         ...

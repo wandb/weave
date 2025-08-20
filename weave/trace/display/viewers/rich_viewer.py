@@ -56,9 +56,13 @@ class RichViewer:
         self._console.clear()
 
     def create_table(
-        self, title: Optional[str] = None, show_header: bool = True, **kwargs: Any
+        self,
+        title: Optional[str] = None,
+        show_header: bool = True,
+        header_style: Optional[str] = None,
+        **kwargs: Any,
     ) -> TableProtocol:
-        return RichTable(title=title, show_header=show_header, **kwargs)
+        return RichTable(title=title, show_header=show_header, header_style=header_style, **kwargs)
 
     def create_progress(
         self, console: Optional[ConsoleProtocol] = None, **kwargs: Any
@@ -92,11 +96,17 @@ class RichTable:
     """Rich table implementation."""
 
     def __init__(
-        self, title: Optional[str] = None, show_header: bool = True, **kwargs: Any
+        self,
+        title: Optional[str] = None,
+        show_header: bool = True,
+        header_style: Optional[str] = None,
+        **kwargs: Any,
     ):
         from rich.table import Table as RichTableBase
 
-        self._table = RichTableBase(title=title, show_header=show_header, **kwargs)
+        self._table = RichTableBase(
+            title=title, show_header=show_header, header_style=header_style, **kwargs
+        )
 
     def add_column(
         self,

@@ -186,7 +186,7 @@ class Table:
         """Initialize the table."""
         viewer = get_viewer()
         self._table: TableProtocol = viewer.create_table(
-            title=title, show_header=show_header, **kwargs
+            title=title, show_header=show_header, header_style=header_style, **kwargs
         )
 
     def add_column(

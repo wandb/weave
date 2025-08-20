@@ -79,9 +79,15 @@ class PrintViewer:
         print("\033[2J\033[H", end="", file=self._file)
 
     def create_table(
-        self, title: Optional[str] = None, show_header: bool = True, **kwargs: Any
+        self,
+        title: Optional[str] = None,
+        show_header: bool = True,
+        header_style: Optional[str] = None,
+        **kwargs: Any,
     ) -> TableProtocol:
-        return PrintTable(title=title, show_header=show_header)
+        return PrintTable(
+            title=title, show_header=show_header, header_style=header_style, **kwargs
+        )
 
     def create_progress(
         self, console: Optional[ConsoleProtocol] = None, **kwargs: Any
@@ -114,9 +120,16 @@ class PrintViewer:
 class PrintTable:
     """Print-based table implementation."""
 
-    def __init__(self, title: Optional[str] = None, show_header: bool = True):
+    def __init__(
+        self,
+        title: Optional[str] = None,
+        show_header: bool = True,
+        header_style: Optional[str] = None,
+        **kwargs: Any,
+    ):
         self.title = title
         self.show_header = show_header
+        self.header_style = header_style
         self._columns: list[dict[str, Any]] = []
         self._rows: list[list[str]] = []
 
