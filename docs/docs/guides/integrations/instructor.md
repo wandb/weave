@@ -12,7 +12,7 @@ import DefaultEntityNote from '../../../src/components/DefaultEntityNote.mdx';
 
 It’s important to store traces of language model applications in a central location, both during development and in production. These traces can be useful for debugging, and as a dataset that will help you improve your application.
 
-Weave will automatically capture traces for [Instructor](https://python.useinstructor.com/). To start tracking, calling `weave.init(project_name="<YOUR-WANDB-PROJECT-NAME>")` and use the library as normal. <DefaultEntityNote />.
+Weave will automatically capture traces for [Instructor](https://python.useinstructor.com/). To start tracking, call `weave.init(project_name="<YOUR-WANDB-PROJECT-NAME>")` and use the library as normal. <DefaultEntityNote />.
 
 ```python
 import instructor

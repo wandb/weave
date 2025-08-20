@@ -12,7 +12,9 @@ For the latest tutorials, visit [Weights & Biases on Amazon Web Services](https:
 
 ## Traces
 
-Weave will automatically capture traces for Bedrock API calls. You can use the Bedrock client as usual after initializing Weave and patching the client. <DefaultEntityNote />
+Weave will automatically capture traces for Bedrock API calls after you initialize Weave and patch the client.
+
+To use the Bedrock API:
 
 ```python
 import weave
@@ -43,7 +45,9 @@ response_dict = json.loads(response.get('body').read())
 print(response_dict["content"][0]["text"])
 ```
 
-of using the `converse` API:
+<DefaultEntityNote />
+
+To use the `converse` API:
 
 ```python
 messages = [{"role": "user", "content": [{"text": "What is the capital of France?"}]}]

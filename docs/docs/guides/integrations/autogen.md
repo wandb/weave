@@ -31,7 +31,7 @@ os.environ["ANTHROPIC_API_KEY"] = "<your-anthropic-api-key>"
 
 ## Basic Setup
 
-Initialize Weave at the beginning of your script to start capturing traces. <DefaultEntityNote />
+Initialize Weave at the beginning of your script to start capturing traces.
 
 ```python
 # highlight-next-line
@@ -39,6 +39,8 @@ import weave
 # highlight-next-line
 weave.init("autogen-demo")
 ```
+
+<DefaultEntityNote />
 
 ## Tracing a Simple Model Client
 

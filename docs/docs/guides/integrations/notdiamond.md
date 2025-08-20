@@ -1,5 +1,7 @@
 # Not Diamond ¬◇
 
+import DefaultEntityNote from '../../../src/components/DefaultEntityNote.mdx';
+
 When building complex LLM workflows users may need to prompt different models according to accuracy,
 cost, or call latency. Users can use [Not Diamond][nd] to route prompts in these workflows to the
 right model for their needs, helping maximize accuracy while saving on model costs.
@@ -21,7 +23,7 @@ From here, you can
 
 Weave integrates with [Not Diamond's Python library][python] to [automatically log API calls][ops].
 You only need to run `weave.init()` at the start of your workflow, then continue using the routed
-provider as usual. If you don't specify a W&B team when you call `weave.init()`, your default entity is used. To find or update your default entity, refer to [User Settings](https://docs.wandb.ai/guides/models/app/settings-page/user-settings/#default-team) in the W&B Models documentation.
+provider as usual:
 
 ```python
 from notdiamond import NotDiamond
@@ -41,6 +43,8 @@ session_id, provider = client.chat.completions.model_select(
 print("LLM called: ", provider.provider)  # openai, anthropic, etc
 print("Provider model: ", provider.model) # gpt-4o, claude-3-5-sonnet-20240620, etc
 ```
+
+<DefaultEntityNote />
 
 ## Custom routing
 

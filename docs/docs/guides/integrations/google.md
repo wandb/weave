@@ -27,7 +27,7 @@ We also have support for the deprecated [Google AI Python SDK for the Gemini API
 
 ## Get started
 
-Weave will automatically capture traces for [Google GenAI SDK](https://github.com/googleapis/python-genai). To start tracking, calling `weave.init(project_name="<YOUR-WANDB-PROJECT-NAME>")` and use the library as normal. <DefaultEntityNote />.
+Weave will automatically capture traces for [Google GenAI SDK](https://github.com/googleapis/python-genai). To start tracking, call `weave.init(project_name="<YOUR-WANDB-PROJECT-NAME>")` and use the library as normal. <DefaultEntityNote />.
 
 ```python
 import os
@@ -45,7 +45,7 @@ response = google_client.models.generate_content(
 
 [![dspy_trace.png](imgs/google-genai-trace.png)](https://wandb.ai/geekyrakshit/google-genai/weave/traces)
 
-Weave will also automatically capture traces for [Vertex APIs](https://github.com/googleapis/python-aiplatform/tree/main/vertexai/generative_models). To start tracking, calling `weave.init(project_name="<YOUR-WANDB-PROJECT-NAME>")` and use the library as normal. <DefaultEntityNote />.
+Weave will also automatically capture traces for [Vertex APIs](https://github.com/googleapis/python-aiplatform/tree/main/vertexai/generative_models). To start tracking, call `weave.init(project_name="<YOUR-WANDB-PROJECT-NAME>")` and use the library as normal.
 
 ```python
 import vertexai
