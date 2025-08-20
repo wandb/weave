@@ -7,7 +7,6 @@ display method (rich, print, logger, etc.).
 
 from __future__ import annotations
 
-from enum import Enum
 from typing import Any
 
 from typing_extensions import Self
@@ -26,14 +25,6 @@ from weave.trace.display.types import Style
 _viewer_registry: dict[str, Any] = {}
 _current_viewer: ViewerProtocol | None = None
 _default_viewer_name = "auto"  # Will try rich first, then fallback to print
-
-
-class ViewerType(Enum):
-    """Enumeration of available viewer types."""
-
-    RICH = "rich"
-    PRINT = "print"
-    AUTO = "auto"
 
 
 # Viewer registration and configuration
@@ -344,7 +335,6 @@ __all__ = [
     "SyntaxHighlight",
     "Table",
     "Text",
-    "ViewerType",
     "console",
     "get_viewer",
     "register_viewer",
