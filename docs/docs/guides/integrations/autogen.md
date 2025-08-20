@@ -1,4 +1,6 @@
 # AutoGen
+
+import DefaultEntityNote from '../../../src/components/DefaultEntityNote.mdx';
 <!-- TODO: Add a Colab notebook for this guide with a badge link here. -->
 
 AutoGen is a framework from Microsoft for building AI agents and applications. It simplifies the creation of complex multi-agent systems, offering components for conversational AI (`AgentChat`), core multi-agent functionalities (`Core`), and integrations with external services (`Extensions`). AutoGen also provides a `Studio` for no-code agent prototyping. For more details, visit the [official AutoGen documentation](https://microsoft.github.io/autogen/stable//index.html).
@@ -29,7 +31,7 @@ os.environ["ANTHROPIC_API_KEY"] = "<your-anthropic-api-key>"
 
 ## Basic Setup
 
-Initialize Weave at the beginning of your script to start capturing traces. If you don't specify a W&B team when you call `weave.init()`, your default entity is used. To find or update your default entity, refer to [User Settings](https://docs.wandb.ai/guides/models/app/settings-page/user-settings/#default-team) in the W&B Models documentation.
+Initialize Weave at the beginning of your script to start capturing traces. <DefaultEntityNote />
 
 ```python
 # highlight-next-line
