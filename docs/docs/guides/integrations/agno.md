@@ -1,5 +1,7 @@
 # Agno
 
+import DefaultEntityNote from '../../../src/components/DefaultEntityNote.mdx';
+
 You can trace [Agno](https://docs.agno.com/) agent and tool calls in Weave using [OpenTelemetry (OTEL)](https://opentelemetry.io/). Agno is a Python framework for building multi-agent systems with shared memory, knowledge, and reasoning. It's designed to be lightweight, model-agnostic, and highly performant, supporting multi-modal capabilities including text, image, audio, and video processing.
 
 This guide explains how to trace Agno agent and tool calls using OTEL, and visualize those traces in Weave. You'll learn how to install the required dependencies, configure an OTEL tracer to send data to Weave, and instrument your Agno agents and tools.
@@ -37,7 +39,7 @@ It is recommended that you store sensitive environment variables like your API k
 - **Endpoint:** `https://trace.wandb.ai/otel/v1/traces`
 - **Headers:**
   - `Authorization`: Basic auth using your W&B API key
-  - `project_id`: Your W&B entity/project name (e.g., `myteam/myproject`). If you don't specify a W&B team, the project is created in your default entity. To find or update your default entity, refer to [User Settings](https://docs.wandb.ai/guides/models/app/settings-page/user-settings/#default-team) in the W&B Models documentation.
+  - `project_id`: Your W&B entity/project name (e.g., `myteam/myproject`). <DefaultEntityNote />
 
 ## Send OTEL traces from Agno to Weave
 
