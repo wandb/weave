@@ -53,18 +53,28 @@ console = display.Console(viewer="print")  # Always uses print
 
 ```python
 from weave.trace.display import display
+from weave.trace.display.protocols import TableProtocol, ProgressProtocol
+from weave.trace.display.types import Style
 
-class MyCustomViewer(display.BaseViewer):
+class MyCustomViewer:
+    """Custom viewer implementation."""
+    
     def print(self, *objects, sep=" ", end="\n", style=None, **kwargs):
         # Custom implementation
         output = sep.join(str(obj) for obj in objects)
+        if isinstance(style, Style):
+            output = style.to_ansi(output)
         print(f"[CUSTOM] {output}", end=end)
-
+    
     def rule(self, title="", style=None):
         # Custom rule implementation
         print(f"=== {title} ===")
-
-    # ... implement other required methods ...
+    
+    def create_table(self, title=None, show_header=True, **kwargs) -> TableProtocol:
+        # Return an object that implements TableProtocol
+        return MyCustomTable(title, show_header)
+    
+    # ... implement other required protocol methods ...
 
 # Register the custom viewer
 display.register_viewer("custom", MyCustomViewer)
@@ -93,48 +103,68 @@ display.set_viewer("custom")
 - **Features**: Routes all output through Python's logging system
 - **Use Case**: Applications that prefer structured logging
 
-## Viewer Interface
+## Architecture
 
-All viewers must implement the `BaseViewer` abstract class:
+### Module Structure
+
+```
+weave/trace/display/
+├── display.py           # Main API and delegation logic
+├── protocols.py         # Protocol definitions for type safety
+├── types.py            # Common types (Style, etc.)
+├── viewers/
+│   ├── __init__.py
+│   ├── rich_viewer.py  # Rich library implementation
+│   ├── print_viewer.py # Fallback print implementation
+│   └── logger_viewer.py # Example logger implementation
+└── README.md
+```
+
+### Viewer Protocol
+
+All viewers must implement the `ViewerProtocol` defined in `protocols.py`. Using protocols provides better type checking and clear interface documentation:
 
 ```python
-class BaseViewer(ABC):
-    @abstractmethod
-    def print(self, *objects, sep=" ", end="\n", style=None, **kwargs):
+@runtime_checkable
+class ViewerProtocol(Protocol):
+    def print(self, *objects, sep=" ", end="\n", style=None, **kwargs) -> None:
         """Print to the output with optional styling."""
-
-    @abstractmethod
-    def rule(self, title="", style=None):
+        ...
+        
+    def rule(self, title="", style=None) -> None:
         """Print a horizontal rule."""
-
-    @abstractmethod
-    def clear(self):
+        ...
+        
+    def clear(self) -> None:
         """Clear the display."""
-
-    @abstractmethod
-    def create_table(self, title=None, show_header=True, **kwargs):
+        ...
+        
+    def create_table(self, title=None, show_header=True, **kwargs) -> TableProtocol:
         """Create a table object."""
-
-    @abstractmethod
-    def create_progress(self, console=None, **kwargs):
+        ...
+        
+    def create_progress(self, console=None, **kwargs) -> ProgressProtocol:
         """Create a progress bar object."""
-
-    @abstractmethod
-    def create_syntax(self, code, lexer, theme="ansi_dark", line_numbers=False):
+        ...
+        
+    def create_syntax(self, code, lexer, theme="ansi_dark", line_numbers=False) -> SyntaxProtocol:
         """Create a syntax highlighting object."""
-
-    @abstractmethod
-    def create_text(self, text="", style=None):
+        ...
+        
+    def create_text(self, text="", style=None) -> TextProtocol:
         """Create a styled text object."""
-
-    @abstractmethod
-    def indent(self, content, amount):
+        ...
+        
+    def indent(self, content, amount) -> str:
         """Indent content by the specified amount."""
-
-    @abstractmethod
-    def capture(self):
+        ...
+        
+    def capture(self) -> CaptureContextProtocol:
         """Create a capture context for capturing output."""
+        ...
 ```
+
+Similar protocols exist for `TableProtocol`, `ProgressProtocol`, `SyntaxProtocol`, and `TextProtocol`.
 
 ## Display Objects
 

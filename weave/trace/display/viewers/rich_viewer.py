@@ -1,0 +1,233 @@
+"""Rich library viewer implementation."""
+
+from typing import Any, Optional, Union
+
+from weave.trace.display.protocols import (
+    CaptureContextProtocol,
+    ConsoleProtocol,
+    ProgressProtocol,
+    SyntaxProtocol,
+    TableProtocol,
+    TextProtocol,
+)
+from weave.trace.display.types import Style
+
+
+class RichViewer:
+    """Viewer implementation using the rich library."""
+
+    def __init__(
+        self,
+        file: Any = None,
+        emoji: bool = True,
+        force_terminal: Optional[bool] = None,
+        **kwargs: Any,
+    ):
+        from rich.console import Console as RichConsole
+
+        self._file = file
+        self._emoji = emoji
+        self._console = RichConsole(
+            file=file, force_terminal=force_terminal, emoji=emoji, **kwargs
+        )
+
+    def print(
+        self,
+        *objects: Any,
+        sep: str = " ",
+        end: str = "\n",
+        style: Optional[Union[str, Style]] = None,
+        **kwargs: Any,
+    ) -> None:
+        if isinstance(style, Style):
+            kwargs["style"] = style.to_rich_style()
+        elif style:
+            kwargs["style"] = style
+        self._console.print(*objects, sep=sep, end=end, **kwargs)
+
+    def rule(self, title: str = "", style: Optional[Union[str, Style]] = None) -> None:
+        if isinstance(style, Style):
+            style = style.to_rich_style()
+        self._console.rule(title, style=style)
+
+    def clear(self) -> None:
+        self._console.clear()
+
+    def create_table(
+        self, title: Optional[str] = None, show_header: bool = True, **kwargs: Any
+    ) -> TableProtocol:
+        return RichTable(title=title, show_header=show_header, **kwargs)
+
+    def create_progress(
+        self, console: Optional[ConsoleProtocol] = None, **kwargs: Any
+    ) -> ProgressProtocol:
+        return RichProgress(console=self._console, **kwargs)
+
+    def create_syntax(
+        self,
+        code: str,
+        lexer: str,
+        theme: str = "ansi_dark",
+        line_numbers: bool = False,
+    ) -> SyntaxProtocol:
+        return RichSyntax(code, lexer, theme=theme, line_numbers=line_numbers)
+
+    def create_text(
+        self, text: str = "", style: Optional[Union[str, Style]] = None
+    ) -> TextProtocol:
+        return RichText(text, style=style)
+
+    def indent(self, content: str, amount: int) -> str:
+        from rich.padding import Padding
+
+        return Padding.indent(content, amount)
+
+    def capture(self) -> CaptureContextProtocol:
+        return self._console.capture()
+
+
+class RichTable:
+    """Rich table implementation."""
+
+    def __init__(
+        self, title: Optional[str] = None, show_header: bool = True, **kwargs: Any
+    ):
+        from rich.table import Table as RichTableBase
+
+        self._table = RichTableBase(title=title, show_header=show_header, **kwargs)
+
+    def add_column(
+        self,
+        header: str,
+        justify: str = "left",
+        style: Optional[str] = None,
+        **kwargs: Any,
+    ) -> None:
+        self._table.add_column(header, justify=justify, style=style, **kwargs)
+
+    def add_row(self, *values: Any) -> None:
+        self._table.add_row(*values)
+
+    def to_string(self, console: Optional[ConsoleProtocol] = None) -> str:
+        if (
+            console
+            and hasattr(console, "_viewer")
+            and isinstance(console._viewer, RichViewer)
+        ):
+            with console._viewer._console.capture() as capture:
+                console._viewer._console.print(self._table)
+            return capture.get().strip()
+        else:
+            # Fallback to basic string representation
+            from rich.console import Console as RichConsole
+
+            temp_console = RichConsole()
+            with temp_console.capture() as capture:
+                temp_console.print(self._table)
+            return capture.get().strip()
+
+
+class RichProgress:
+    """Rich progress bar implementation."""
+
+    def __init__(self, console: Any, **kwargs: Any):
+        from rich.progress import (
+            BarColumn,
+            Progress,
+            SpinnerColumn,
+            TaskProgressColumn,
+            TextColumn,
+            TimeElapsedColumn,
+        )
+
+        # Default columns if not specified
+        columns = kwargs.pop("columns", None)
+        if not columns:
+            columns = (
+                SpinnerColumn(),
+                TextColumn("[bold blue]{task.description}"),
+                BarColumn(),
+                TaskProgressColumn(),
+                TimeElapsedColumn(),
+            )
+
+        self._progress = Progress(*columns, console=console, **kwargs)
+
+    def add_task(
+        self, description: str, total: Optional[float] = None, **kwargs: Any
+    ) -> int:
+        return self._progress.add_task(description, total=total, **kwargs)
+
+    def update(
+        self,
+        task_id: int,
+        advance: Optional[float] = None,
+        completed: Optional[float] = None,
+        total: Optional[float] = None,
+        **kwargs: Any,
+    ) -> None:
+        self._progress.update(
+            task_id, advance=advance, completed=completed, total=total, **kwargs
+        )
+
+    def start(self) -> None:
+        self._progress.start()
+
+    def stop(self) -> None:
+        self._progress.stop()
+
+    def __enter__(self):
+        self.start()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.stop()
+
+
+class RichSyntax:
+    """Rich syntax highlighting implementation."""
+
+    def __init__(
+        self,
+        code: str,
+        lexer: str,
+        theme: str = "ansi_dark",
+        line_numbers: bool = False,
+    ):
+        from rich.syntax import Syntax
+
+        self._syntax = Syntax(code, lexer, theme=theme, line_numbers=line_numbers)
+
+    def to_string(self, console: Optional[ConsoleProtocol] = None) -> str:
+        if (
+            console
+            and hasattr(console, "_viewer")
+            and isinstance(console._viewer, RichViewer)
+        ):
+            with console._viewer._console.capture() as capture:
+                console._viewer._console.print(self._syntax)
+            return capture.get().strip()
+        else:
+            from rich.console import Console as RichConsole
+
+            temp_console = RichConsole()
+            with temp_console.capture() as capture:
+                temp_console.print(self._syntax)
+            return capture.get().strip()
+
+
+class RichText:
+    """Rich text implementation."""
+
+    def __init__(self, text: str = "", style: Optional[Union[str, Style]] = None):
+        from rich.text import Text as RichTextBase
+
+        if isinstance(style, Style):
+            style = style.to_rich_style()
+        self._text = RichTextBase(text, style=style)
+
+    def __str__(self) -> str:
+        return str(self._text)
+
+    def __repr__(self) -> str:
+        return repr(self._text)

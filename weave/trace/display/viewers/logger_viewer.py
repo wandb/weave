@@ -5,20 +5,22 @@ making it useful for applications that prefer logging over direct console output
 """
 
 import logging
+import sys
 from typing import Any, Optional, Union
 
-from weave.trace.display.display import (
-    BaseViewer,
-    CaptureContext,
-    ProgressInterface,
-    Style,
-    SyntaxInterface,
-    TableInterface,
-    TextInterface,
+from weave.trace.display.protocols import (
+    CaptureContextProtocol,
+    ConsoleProtocol,
+    ProgressProtocol,
+    SyntaxProtocol,
+    TableProtocol,
+    TextProtocol,
 )
+from weave.trace.display.types import Style
+from weave.trace.display.viewers.print_viewer import CaptureContext
 
 
-class LoggerViewer(BaseViewer):
+class LoggerViewer:
     """Viewer implementation that outputs through Python's logging system."""
 
     def __init__(
@@ -34,7 +36,8 @@ class LoggerViewer(BaseViewer):
             level: Default logging level for output.
             **kwargs: Additional arguments (passed to parent).
         """
-        super().__init__(**kwargs)
+        self._file = kwargs.get("file", sys.stdout)
+        self._emoji = kwargs.get("emoji", True)
         self.logger = logger or logging.getLogger()
         self.level = level
 
@@ -76,13 +79,13 @@ class LoggerViewer(BaseViewer):
 
     def create_table(
         self, title: Optional[str] = None, show_header: bool = True, **kwargs: Any
-    ) -> TableInterface:
+    ) -> TableProtocol:
         """Create a logger-based table."""
         return LoggerTable(self.logger, self.level, title, show_header)
 
     def create_progress(
         self, console: Optional[Any] = None, **kwargs: Any
-    ) -> ProgressInterface:
+    ) -> ProgressProtocol:
         """Create a logger-based progress tracker."""
         return LoggerProgress(self.logger, self.level)
 
@@ -92,13 +95,13 @@ class LoggerViewer(BaseViewer):
         lexer: str,
         theme: str = "ansi_dark",
         line_numbers: bool = False,
-    ) -> SyntaxInterface:
+    ) -> SyntaxProtocol:
         """Create a logger-based syntax object."""
         return LoggerSyntax(self.logger, self.level, code, lexer, line_numbers)
 
     def create_text(
         self, text: str = "", style: Optional[Union[str, Style]] = None
-    ) -> TextInterface:
+    ) -> TextProtocol:
         """Create a logger-based text object."""
         return LoggerText(self.logger, self.level, text, style)
 
@@ -108,12 +111,12 @@ class LoggerViewer(BaseViewer):
         lines = content.split("\n")
         return "\n".join(indent_str + line if line else line for line in lines)
 
-    def capture(self) -> CaptureContext:
+    def capture(self) -> CaptureContextProtocol:
         """Return a capture context (uses default implementation)."""
         return CaptureContext()
 
 
-class LoggerTable(TableInterface):
+class LoggerTable:
     """Logger-based table implementation."""
 
     def __init__(
@@ -144,7 +147,7 @@ class LoggerTable(TableInterface):
         """Add a row to the table."""
         self._rows.append([str(v) for v in values])
 
-    def to_string(self, console: Optional[Any] = None) -> str:
+    def to_string(self, console: Optional[ConsoleProtocol] = None) -> str:
         """Convert table to string and log it."""
         lines = []
 
@@ -164,7 +167,7 @@ class LoggerTable(TableInterface):
         return output
 
 
-class LoggerProgress(ProgressInterface):
+class LoggerProgress:
     """Logger-based progress implementation."""
 
     def __init__(self, logger: logging.Logger, level: int):
@@ -240,7 +243,7 @@ class LoggerProgress(ProgressInterface):
             )
 
 
-class LoggerSyntax(SyntaxInterface):
+class LoggerSyntax:
     """Logger-based syntax highlighting implementation."""
 
     def __init__(
@@ -257,7 +260,7 @@ class LoggerSyntax(SyntaxInterface):
         self.lexer = lexer
         self.line_numbers = line_numbers
 
-    def to_string(self, console: Optional[Any] = None) -> str:
+    def to_string(self, console: Optional[ConsoleProtocol] = None) -> str:
         """Convert to string."""
         lines = [f"Code ({self.lexer}):"]
 
@@ -274,7 +277,7 @@ class LoggerSyntax(SyntaxInterface):
         return output
 
 
-class LoggerText(TextInterface):
+class LoggerText:
     """Logger-based text implementation."""
 
     def __init__(
