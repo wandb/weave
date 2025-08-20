@@ -62,7 +62,9 @@ class RichViewer:
         header_style: Optional[str] = None,
         **kwargs: Any,
     ) -> TableProtocol:
-        return RichTable(title=title, show_header=show_header, header_style=header_style, **kwargs)
+        return RichTable(
+            title=title, show_header=show_header, header_style=header_style, **kwargs
+        )
 
     def create_progress(
         self, console: Optional[ConsoleProtocol] = None, **kwargs: Any
@@ -84,9 +86,11 @@ class RichViewer:
         return RichText(text, style=style)
 
     def indent(self, content: str, amount: int) -> str:
-        from rich.padding import Padding
-
-        return Padding.indent(content, amount)
+        # Rich's Padding.indent returns a Padding object, but we need a string
+        # So we'll manually indent the content
+        indent_str = " " * amount
+        lines = content.split("\n")
+        return "\n".join(indent_str + line if line else line for line in lines)
 
     def capture(self) -> CaptureContextProtocol:
         return self._console.capture()
@@ -118,7 +122,20 @@ class RichTable:
         self._table.add_column(header, justify=justify, style=style, **kwargs)
 
     def add_row(self, *values: Any) -> None:
-        self._table.add_row(*values)
+        # Convert any weave Table objects to their Rich representation
+        processed_values = []
+        for value in values:
+            # Check if this is a weave Table object
+            if hasattr(value, "_table") and hasattr(value._table, "_table"):
+                # If it's a RichTable, use the underlying Rich table
+                if isinstance(value._table, RichTable):
+                    processed_values.append(value._table._table)
+                else:
+                    # Otherwise convert to string
+                    processed_values.append(value.to_string())
+            else:
+                processed_values.append(value)
+        self._table.add_row(*processed_values)
 
     def to_string(self, console: Optional[ConsoleProtocol] = None) -> str:
         if (

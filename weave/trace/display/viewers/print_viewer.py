@@ -143,7 +143,15 @@ class PrintTable:
         self._columns.append({"header": header, "justify": justify, "style": style})
 
     def add_row(self, *values: Any) -> None:
-        self._rows.append([str(v) for v in values])
+        # Convert any weave Table objects to their string representation
+        processed_values = []
+        for value in values:
+            # Check if this is a weave Table object with to_string method
+            if hasattr(value, "to_string") and callable(value.to_string):
+                processed_values.append(value.to_string())
+            else:
+                processed_values.append(str(value))
+        self._rows.append(processed_values)
 
     def to_string(self, console: Optional[ConsoleProtocol] = None) -> str:
         if not self._columns:
