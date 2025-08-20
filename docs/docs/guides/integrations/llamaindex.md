@@ -20,7 +20,7 @@ For a basic usage example, see [Get started](#get-started). For more examples de
 
 ## Get started
 
-To get started, call `weave.init()` in your LLM application. The integration will begin tracing all LlamaIndex operations automatically. <DefaultEntityNote />
+To get started, call `weave.init()` in your LLM application. The integration will begin tracing all LlamaIndex operations automatically.
 
 The example below initializes a Weave project `llamaindex-demo`, sends a prompt to `gpt-4o-mini`, and prints the result.
 
@@ -36,6 +36,8 @@ llm = OpenAI(model="gpt-4o-mini")
 response = llm.complete("William Shakespeare is ")
 print(response)
 ```
+
+<DefaultEntityNote />
 
 ![LlamaIndex Demo](imgs/llamaindex/simple_trace.png)
 

@@ -12,7 +12,7 @@ Weave automatically tracks and logs LLM calls made via the [Cohere Python librar
 
 It's important to store traces of LLM applications in a central database, both during development and in production. You'll use these traces for debugging, and as a dataset that will help you improve your application.
 
-Weave will automatically capture traces for [cohere-python](https://github.com/cohere-ai/cohere-python). You can use the library as usual, start by calling `weave.init()`. <DefaultEntityNote />
+Weave will automatically capture traces for [cohere-python](https://github.com/cohere-ai/cohere-python). You can use the library as usual, start by calling `weave.init()`.
 
 ```python
 import cohere
@@ -32,6 +32,9 @@ response = co.chat(
 )
 print(response.text)
 ```
+
+<DefaultEntityNote />
+
 A powerful feature of cohere models is using [connectors](https://docs.cohere.com/docs/overview-rag-connectors#using-connectors-to-create-grounded-generations) enabling you to make requests to other API on the endpoint side. The response will then contain the generated text with citation elements that link to the documents returned from the connector. 
 
 [![cohere_trace.png](imgs/cohere_trace.png)](https://wandb.ai/capecape/cohere_dev/weave/calls)

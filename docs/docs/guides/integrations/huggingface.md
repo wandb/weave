@@ -22,7 +22,7 @@ Do you want to experiment with Hugging Face Hub and Weave without any of the set
 
 The `huggingface_hub` Python library provides a unified interface to run inference across multiple services for models hosted on the Hub. You can invoke these models using the [`InferenceClient`](https://huggingface.co/docs/huggingface_hub/en/package_reference/inference_client).
 
-Weave will automatically capture traces for [`InferenceClient`](https://huggingface.co/docs/huggingface_hub/en/package_reference/inference_client). To start tracking, calling `weave.init()` and use the library as normal. <DefaultEntityNote />.
+Weave will automatically capture traces for [`InferenceClient`](https://huggingface.co/docs/huggingface_hub/en/package_reference/inference_client). To start tracking, call `weave.init()` and use the library as normal.
 
 ## Prerequisites
 
@@ -45,7 +45,7 @@ Weave will automatically capture traces for [`InferenceClient`](https://huggingf
 
 Storing traces of language model applications in a central location is essential during development and production. These traces help with debugging and serve as valuable datasets for improving your application.
 
-Weave automatically captures traces for the [`InferenceClient`](https://huggingface.co/docs/huggingface_hub/en/package_reference/inference_client). To start tracking, initialize Weave by calling `weave.init()`, then use the library as usual. <DefaultEntityNote />
+Weave automatically captures traces for the [`InferenceClient`](https://huggingface.co/docs/huggingface_hub/en/package_reference/inference_client). To start tracking, initialize Weave by calling `weave.init()`, then use the library as usual.
 
 The following example demonstrates how to log inference calls to the Hugging Face Hub using Weave:
 
@@ -78,6 +78,8 @@ response = huggingface_client.chat_completion(
     seed=42,
 )
 ```
+
+<DefaultEntityNote />
 
 After the code shown above runs, Weave tracks and logs all LLM calls made with the Hugging Face Inference Client. You can view these traces in the Weave web interface.
 
