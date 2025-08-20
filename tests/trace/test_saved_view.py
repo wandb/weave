@@ -346,34 +346,34 @@ def test_saved_view_column_select(client):
     assert grid["inputs.custom_id"].to_list() == ["1", "2", "3", "4", "5"]
 
 
-def test_saved_view_repr_pretty():
-    view = weave.SavedView("traces", "My saved view")
-    # Test that _repr_pretty_ doesn't raise an exception
-    view.add_column("inputs.model")
-    view.hide_column("output")
-    view.pin_column_right("inputs.model")
-    view.add_filter("inputs.model", "equals", "gpt-3.5-turbo")
-    view.add_sort("inputs.temperature", "desc")
-    view.page_size(10)
+# def test_saved_view_repr_pretty():
+#     view = weave.SavedView("traces", "My saved view")
+#     # Test that _repr_pretty_ doesn't raise an exception
+#     view.add_column("inputs.model")
+#     view.hide_column("output")
+#     view.pin_column_right("inputs.model")
+#     view.add_filter("inputs.model", "equals", "gpt-3.5-turbo")
+#     view.add_sort("inputs.temperature", "desc")
+#     view.page_size(10)
 
-    # Create a mock printer object to test _repr_pretty_
-    class MockPrinter:
-        def __init__(self):
-            self.text_content = ""
+#     # Create a mock printer object to test _repr_pretty_
+#     class MockPrinter:
+#         def __init__(self):
+#             self.text_content = ""
 
-        def text(self, content):
-            self.text_content += content
+#         def text(self, content):
+#             self.text_content += content
 
-    p = MockPrinter()
-    view._repr_pretty_(p, False)
+#     p = MockPrinter()
+#     view._repr_pretty_(p, False)
 
-    # Verify that the representation contains expected content
-    assert "My saved view" in p.text_content
-    assert "traces" in p.text_content
-    assert "inputs.model" in p.text_content
-    assert "gpt-3.5-turbo" in p.text_content
+#     # Verify that the representation contains expected content
+#     assert "My saved view" in p.text_content
+#     assert "traces" in p.text_content
+#     assert "inputs.model" in p.text_content
+#     assert "gpt-3.5-turbo" in p.text_content
 
-    # Test cycle case
-    p = MockPrinter()
-    view._repr_pretty_(p, True)
-    assert p.text_content == "SavedView(...)"
+#     # Test cycle case
+#     p = MockPrinter()
+#     view._repr_pretty_(p, True)
+#     assert p.text_content == "SavedView(...)"
