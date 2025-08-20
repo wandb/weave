@@ -181,7 +181,7 @@ Weave automatically logs videos using [`moviepy`](https://zulko.github.io/moviep
 Video support is currently only available in Python.
 :::
 
-For usage information, see [Video Support](../tracking/video).
+For usage information, see [Video Support](/guides/tracking/video.md).
 
 ## Images
 
