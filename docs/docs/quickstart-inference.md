@@ -3,9 +3,7 @@ import TabItem from '@theme/TabItem';
 
 # Get started with W&B Inference
 
-This guide shows you how to use W&B Weave with W&B Inference. You can build and trace LLM applications without setting up your own infrastructure or managing API keys from multiple providers.
-
-W&B Inference helps you learn Weave faster because you can start immediately without obtaining API keys from other providers. You get access to multiple models in one place, making it easier to compare their behavior. Your usage is automatically tracked, so you can see Weave's tracing features in action. You work with the same models and APIs you might use in production.
+This guide shows you how to use W&B Weave with [W&B Inference](https://docs.wandb.ai/guides/inference/). Using W&B Inference, you can build and trace LLM applications using live open-source models without setting up your own infrastructure or managing API keys from multiple providers. Just obtain your W&B API key and use it to interact with [all models hosted by W&B Inference](https://docs.wandb.ai/guides/inference/models/).
 
 ## What you'll learn
 
@@ -18,21 +16,17 @@ In this guide, you'll:
 
 ## Prerequisites
 
-Before you begin, you need:
-- A [W&B account](https://app.wandb.ai/login?signup=true)
-- Python 3.8 or later
+Before you begin, you need a [W&B account](https://app.wandb.ai/login?signup=true) and an API key from from [https://wandb.ai/authorize](https://wandb.ai/authorize).
 
-## Step 1: Install Weave
-
-Install the required libraries:
+Then, in a Python environment running version 3.8 or later, install the required libraries: 
 
 ```bash
 pip install weave openai
 ```
 
-Get your W&B API key from [https://wandb.ai/authorize](https://wandb.ai/authorize).
+The `openai` library is installed because you use the standard `openai` client to interact with W&B Inference, regardless of which hosted model you're actually calling. This allows you to swap between supported models by only changing the slug, and make use of any existing code you have that was written to use the OpenAI API. 
 
-## Step 2: Trace your first LLM call
+## Step 1: Trace your first LLM call
 
 Start with a simple example that uses Llama 3.1-8B through W&B Inference. 
 
@@ -55,7 +49,7 @@ client = openai.OpenAI(
     project="my-first-weave-project",  # Required for usage tracking
 )
 
-# Decorate your function to enable tracing
+# Decorate your function to enable tracing; use the standard OpenAI client
 @weave.op()
 def ask_llama(question: str) -> str:
     response = client.chat.completions.create(
@@ -72,7 +66,7 @@ result = ask_llama("What are the benefits of using W&B Weave for LLM development
 print(result)
 ```
 
-## Step 3: Build a text summarization application
+## Step 2: Build a text summarization application
 
 Create a simple summarization app that shows how Weave traces nested operations:
 
@@ -126,7 +120,7 @@ print("Key Points:", result["key_points"])
 print("\nSummary:", result["summary"])
 ```
 
-## Step 4: Compare multiple models
+## Step 3: Compare multiple models
 
 W&B Inference provides access to multiple models. Compare their performance:
 
@@ -159,7 +153,7 @@ print("DeepSeek V3 response:")
 print(deepseek_model.predict(test_question))
 ```
 
-## Step 5: Evaluate model performance
+## Step 4: Evaluate model performance
 
 Evaluate how well different models perform on a Q&A task:
 
@@ -229,12 +223,9 @@ In the Weave UI, you can:
 
 ## Available models
 
-W&B Inference provides access to a variety of state-of-the-art models for different use cases. 
-
-For a complete list of available models with specifications, context windows, pricing, and usage limits, see the [Available Models section](guides/tools/inference.md#available-models) in the W&B Inference reference documentation.
+For a complete list of available models, see the [Available Models section](https://docs.wandb.ai/guides/inference/models/) in the W&B Inference reference documentation.
 
 ## Next steps
-
 
 - **Use the Playground**: [Try models interactively](guides/tools/playground.md#access-the-playground) in the Weave Playground
 - **Build evaluations**: Learn about [systematic evaluation](guides/core-types/evaluations.md) of your LLM applications
@@ -266,11 +257,6 @@ W&B Inference has concurrency limits per project. If you hit rate limits:
 <details>
 <summary>Running out of credits</summary>
 
-The free tier includes limited credits. If you run out of credits, to continue using W&B Inference:
-- Free users: [Upgrade to Pro](https://wandb.ai/subscriptions).
-- Pro users: Usage is billed monthly after free credits.
-- Enterprise users: Contact your account team.
-
-See the [pricing and limits documentation](/guides/tools/inference.md#usage-information-and-limits) for details.
+The free tier includes limited credits. See the [usage and limits documentation](https://docs.wandb.ai/guides/inference/usage-limits/) for details.
 
 </details>
