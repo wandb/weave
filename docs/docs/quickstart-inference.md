@@ -1,7 +1,7 @@
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Get started with W&B Inference
+# Learn Weave with W&B Inference
 
 This guide shows you how to use W&B Weave with [W&B Inference](https://docs.wandb.ai/guides/inference/). Using W&B Inference, you can build and trace LLM applications using live open-source models without setting up your own infrastructure or managing API keys from multiple providers. Just obtain your W&B API key and use it to interact with [all models hosted by W&B Inference](https://docs.wandb.ai/guides/inference/models/).
 
