@@ -7,16 +7,7 @@ tasks in the WeaveClient.
 import logging
 from typing import Callable
 
-from rich.console import Console
-from rich.progress import (
-    BarColumn,
-    Progress,
-    SpinnerColumn,
-    TaskProgressColumn,
-    TextColumn,
-    TimeElapsedColumn,
-)
-
+from weave.trace.display import display
 from weave.trace.weave_client import FlushStatus
 
 logger = logging.getLogger(__name__)
@@ -28,19 +19,12 @@ def create_progress_bar_callback() -> Callable[[FlushStatus], None]:
     Returns:
         A callback function that can be passed to WeaveClient._flush.
     """
-    console = Console()
+    console = display.Console()
 
     # Create a progress bar instance
-    progress = Progress(
-        SpinnerColumn(),
-        TextColumn("[bold blue]{task.description}"),
-        BarColumn(bar_width=None, complete_style="magenta"),
-        TaskProgressColumn(),
-        TimeElapsedColumn(),
+    progress = display.Progress(
         console=console,
         refresh_per_second=10,
-        expand=True,
-        transient=False,
     )
 
     # Start the progress display

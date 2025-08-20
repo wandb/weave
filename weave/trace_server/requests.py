@@ -10,11 +10,10 @@ from typing import Any, Optional, Union
 from requests import HTTPError as HTTPError
 from requests import PreparedRequest, Response, Session
 from requests.adapters import HTTPAdapter
-from rich.console import Console
-from rich.syntax import Syntax
-from rich.text import Text
 
-console = Console()
+from weave.trace.display import display
+
+console = display.Console()
 
 # See https://rich.readthedocs.io/en/stable/appendix/colors.html
 STYLE_LABEL = "bold slate_blue3"
@@ -45,7 +44,7 @@ def pprint_header(header: tuple[str, str]) -> None:
     if key == "Authorization":
         value = "<Redacted>"
     console.print(f"  {key}: ", end="", style=STYLE_HEADER_KEY)
-    console.print(Text(value, style=STYLE_HEADER_VALUE))
+    console.print(display.Text(value, style=STYLE_HEADER_VALUE))
 
 
 def guess_content_type(request: PreparedRequest) -> str:
@@ -65,44 +64,50 @@ def pprint_json(text: str) -> None:
     try:
         json_body = json.loads(text)
         pretty_json = json.dumps(json_body, indent=4)
-        body_syntax = Syntax(pretty_json, "json", theme=THEME_JSON, line_numbers=True)
-        console.print(body_syntax)
+        body_syntax = display.SyntaxHighlight(
+            pretty_json, "json", theme=THEME_JSON, line_numbers=True
+        )
+        console.print(body_syntax.to_string(console))
     except json.JSONDecodeError:
-        console.print(Text("  Invalid JSON", style=STYLE_ERROR))
-        console.print(Text(text, style=STYLE_ERROR))
+        console.print(display.Text("  Invalid JSON", style=STYLE_ERROR))
+        console.print(display.Text(text, style=STYLE_ERROR))
 
 
 def pprint_prepared_request(prepared_request: PreparedRequest) -> None:
     """Pretty print a PreparedRequest."""
-    time_text = Text(
+    time_text = display.Text(
         datetime.datetime.now().strftime("%H:%M:%S.%f"), style=STYLE_METADATA
     )
-    thread_text = Text(str(threading.get_ident()), style=STYLE_METADATA)
-    method_text = Text(f"{prepared_request.method}", style=STYLE_METHOD)
-    url_text = Text(f"{prepared_request.url}", style=STYLE_URL)
-    console.print(Text("Time: ", style=STYLE_LABEL) + time_text)
-    console.print(Text("Thread ID: ", style=STYLE_LABEL) + thread_text)
-    console.print(Text("Method: ", style=STYLE_LABEL) + method_text)
-    console.print(Text("URL: ", style=STYLE_LABEL) + url_text)
+    thread_text = display.Text(str(threading.get_ident()), style=STYLE_METADATA)
+    method_text = display.Text(f"{prepared_request.method}", style=STYLE_METHOD)
+    url_text = display.Text(f"{prepared_request.url}", style=STYLE_URL)
+    console.print(display.Text("Time: ", style=STYLE_LABEL), time_text)
+    console.print(display.Text("Thread ID: ", style=STYLE_LABEL), thread_text)
+    console.print(display.Text("Method: ", style=STYLE_LABEL), method_text)
+    console.print(display.Text("URL: ", style=STYLE_LABEL), url_text)
 
-    console.print(Text("Headers:", style=STYLE_LABEL))
+    console.print(display.Text("Headers:", style=STYLE_LABEL))
     for header in prepared_request.headers.items():
         pprint_header(header)
 
-    console.print(Text("Body:", style=STYLE_LABEL))
+    console.print(display.Text("Body:", style=STYLE_LABEL))
     if prepared_request.body:
         content_type = guess_content_type(prepared_request)
         if content_type == "application/json":
             pprint_json(decode_str(prepared_request.body))
         elif content_type and content_type.startswith("multipart/form-data"):
-            console.print(Text(decode_str(prepared_request.body), style=STYLE_BODY))
+            console.print(
+                display.Text(decode_str(prepared_request.body), style=STYLE_BODY)
+            )
         elif isinstance(prepared_request.body, str):
             console.print(f"{prepared_request.body}", style=STYLE_BODY)
         else:
             # TODO: Can we do something safer?
-            console.print(Text(decode_str(prepared_request.body), style=STYLE_BODY))
+            console.print(
+                display.Text(decode_str(prepared_request.body), style=STYLE_BODY)
+            )
     else:
-        console.print(Text("  None", style=STYLE_NONE))
+        console.print(display.Text("  None", style=STYLE_NONE))
 
 
 def pprint_response(response: Response) -> None:
@@ -112,19 +117,19 @@ def pprint_response(response: Response) -> None:
         status_style = STYLE_STATUS_SUCCESS
     elif response.status_code >= 400:
         status_style = STYLE_STATUS_ERROR
-    status_code_text = Text(f"{response.status_code}", style=status_style)
-    reason_text = Text(f"{response.reason}", style=status_style)
-    console.print(Text("Status Code: ", style=STYLE_LABEL) + status_code_text)
-    console.print(Text("Reason: ", style=STYLE_LABEL) + reason_text)
-    console.print(Text("Headers:", style=STYLE_LABEL))
+    status_code_text = display.Text(f"{response.status_code}", style=status_style)
+    reason_text = display.Text(f"{response.reason}", style=status_style)
+    console.print(display.Text("Status Code: ", style=STYLE_LABEL), status_code_text)
+    console.print(display.Text("Reason: ", style=STYLE_LABEL), reason_text)
+    console.print(display.Text("Headers:", style=STYLE_LABEL))
     for header in response.headers.items():
         pprint_header(header)
 
-    console.print(Text("Body:", style=STYLE_LABEL))
+    console.print(display.Text("Body:", style=STYLE_LABEL))
     if response.headers.get("Content-Type") == "application/json":
         pprint_json(response.text)
     elif response.text:
-        console.print(Text(response.text, style=STYLE_BODY))
+        console.print(display.Text(response.text, style=STYLE_BODY))
     else:
         console.print("  None", style=STYLE_NONE)
 
@@ -136,15 +141,17 @@ class LoggingHTTPAdapter(HTTPAdapter):
         if os.environ.get("WEAVE_DEBUG_HTTP") != "1":
             return super().send(request, **kwargs)
 
-        console.print(Text("-" * 21, style=STYLE_DIVIDER_REQUEST))
+        console.print(display.Text("-" * 21, style=STYLE_DIVIDER_REQUEST))
         pprint_prepared_request(request)
         start_time = time()
         response = super().send(request, **kwargs)
         elapsed_time = time() - start_time
-        console.print(Text("----- Response below -----", style=STYLE_DIVIDER_RESPONSE))
         console.print(
-            Text("Elapsed Time: ", style=STYLE_LABEL)
-            + Text(f"{elapsed_time:.2f} seconds", style=STYLE_METADATA)
+            display.Text("----- Response below -----", style=STYLE_DIVIDER_RESPONSE)
+        )
+        console.print(
+            display.Text("Elapsed Time: ", style=STYLE_LABEL),
+            display.Text(f"{elapsed_time:.2f} seconds", style=STYLE_METADATA),
         )
         pprint_response(response)
         return response

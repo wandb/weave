@@ -6,10 +6,9 @@ import json
 from collections.abc import Iterable, Iterator
 from typing import Any
 
-from rich.table import Table
-
 from weave.trace import util
 from weave.trace.context import weave_client_context as weave_client_context
+from weave.trace.display import display
 from weave.trace.display.rich import pydantic_util
 from weave.trace.display.rich.container import AbstractRichContainer
 from weave.trace.display.rich.refs import Refs
@@ -34,7 +33,7 @@ class Feedbacks(AbstractRichContainer[tsi.Feedback]):
         uris = list(dict.fromkeys(feedback.weave_ref for feedback in self.items))
         return Refs(uris)
 
-    def _add_table_columns(self, table: Table) -> None:
+    def _add_table_columns(self, table: display.Table) -> None:
         if self.show_refs:
             table.add_column("Ref", overflow="fold")
         table.add_column("Type", justify="center")
