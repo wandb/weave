@@ -218,6 +218,52 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._kafka_producer = KafkaProducer.from_env()
         return self._kafka_producer
 
+    def _create_otel_op(
+        self, span_name: str, span_digest: str, span_dict: dict, project_id: str
+    ) -> None:
+        """Create an op in object_versions table for an OTEL span."""
+        # Create the op object structure
+        op_content = {"name": span_name, "digest": span_digest, "span_data": span_dict}
+
+        # Create the op value following the Weave Op structure
+        op_val = {
+            "_type": "CustomWeaveType",
+            "weave_type": {"type": "Op"},
+            "files": {"obj.py": str_digest(json.dumps(op_content))},
+        }
+
+        # Process the object value
+        processed_result = process_incoming_object_val(op_val)
+        processed_val = processed_result["val"]
+        json_val = json.dumps(processed_val)
+        digest = str_digest(json_val)
+
+        # Create the object ID from span name and digest
+        object_id = f"otel_{span_name}_{span_digest[:8]}"
+        # Truncate if needed to respect object_id limits
+        if len(object_id) > 128:
+            object_id = object_id[:128]
+
+        # Create the insertable object
+        ch_obj = ObjCHInsertable(
+            project_id=project_id,
+            object_id=object_id,
+            wb_user_id=None,
+            kind="op",
+            base_object_class=processed_result["base_object_class"],
+            leaf_object_class=processed_result["leaf_object_class"],
+            refs=extract_refs_from_values(processed_val),
+            val_dump=json_val,
+            digest=digest,
+        )
+
+        # Insert into object_versions table
+        self._insert(
+            "object_versions",
+            data=[list(ch_obj.model_dump().values())],
+            column_names=list(ch_obj.model_fields.keys()),
+        )
+
     def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
         if not isinstance(req.traces, ExportTraceServiceRequest):
             raise TypeError(
@@ -228,6 +274,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         ]
 
         calls = []
+        ops_to_create = []
+
         for resource_spans in traces_data:
             for scope_spans in resource_spans.scope_spans:
                 for span in scope_spans.spans:
@@ -241,6 +289,30 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                             {"mode": "end", "req": tsi.CallEndReq(end=end_call)},
                         ]
                     )
+
+                    # Collect op creation info
+                    ops_to_create.append(
+                        {
+                            "name": span.name,
+                            "digest": span.digest,
+                            "span_dict": span.as_dict(),
+                        }
+                    )
+
+        # Create ops in object_versions table
+        for op_info in ops_to_create:
+            try:
+                self._create_otel_op(
+                    op_info["name"],
+                    op_info["digest"],
+                    op_info["span_dict"],
+                    req.project_id,
+                )
+            except Exception as e:
+                logger.warning(
+                    f"Failed to create op for OTEL span {op_info['name']}: {e}"
+                )
+
         # TODO: Actually populate the error fields if call_start_batch fails
         self.call_start_batch(tsi.CallCreateBatchReq(batch=calls))
         return tsi.OtelExportRes()
