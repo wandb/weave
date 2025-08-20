@@ -58,22 +58,22 @@ from weave.trace.display.types import Style
 
 class MyCustomViewer:
     """Custom viewer implementation."""
-    
+
     def print(self, *objects, sep=" ", end="\n", style=None, **kwargs):
         # Custom implementation
         output = sep.join(str(obj) for obj in objects)
         if isinstance(style, Style):
             output = style.to_ansi(output)
         print(f"[CUSTOM] {output}", end=end)
-    
+
     def rule(self, title="", style=None):
         # Custom rule implementation
         print(f"=== {title} ===")
-    
+
     def create_table(self, title=None, show_header=True, **kwargs) -> TableProtocol:
         # Return an object that implements TableProtocol
         return MyCustomTable(title, show_header)
-    
+
     # ... implement other required protocol methods ...
 
 # Register the custom viewer
@@ -130,35 +130,35 @@ class ViewerProtocol(Protocol):
     def print(self, *objects, sep=" ", end="\n", style=None, **kwargs) -> None:
         """Print to the output with optional styling."""
         ...
-        
+
     def rule(self, title="", style=None) -> None:
         """Print a horizontal rule."""
         ...
-        
+
     def clear(self) -> None:
         """Clear the display."""
         ...
-        
+
     def create_table(self, title=None, show_header=True, **kwargs) -> TableProtocol:
         """Create a table object."""
         ...
-        
+
     def create_progress(self, console=None, **kwargs) -> ProgressProtocol:
         """Create a progress bar object."""
         ...
-        
+
     def create_syntax(self, code, lexer, theme="ansi_dark", line_numbers=False) -> SyntaxProtocol:
         """Create a syntax highlighting object."""
         ...
-        
+
     def create_text(self, text="", style=None) -> TextProtocol:
         """Create a styled text object."""
         ...
-        
+
     def indent(self, content, amount) -> str:
         """Indent content by the specified amount."""
         ...
-        
+
     def capture(self) -> CaptureContextProtocol:
         """Create a capture context for capturing output."""
         ...

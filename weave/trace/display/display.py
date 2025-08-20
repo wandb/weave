@@ -8,7 +8,7 @@ display method (rich, print, logger, etc.).
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 from weave.trace.display.protocols import (
     CaptureContextProtocol,
@@ -108,6 +108,10 @@ def _register_default_viewers() -> None:
     from weave.trace.display.viewers.print_viewer import PrintViewer
 
     register_viewer("print", PrintViewer)
+
+    from weave.trace.display.viewers.logger_viewer import LoggerViewer
+
+    register_viewer("logger", LoggerViewer)
 
 
 # Public API classes that delegate to the viewer
