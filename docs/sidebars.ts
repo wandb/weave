@@ -160,7 +160,7 @@ const sidebars: SidebarsConfig = {
           collapsed: true,
           label: "Tools & Utilities",
           link: { type: "doc", id: "guides/tools/index" },
-          items: ["guides/tools/inference", "guides/tools/serve", "guides/tools/deploy", "guides/tracking/otel"],
+          items: ["guides/tools/serve", "guides/tools/deploy", "guides/tracking/otel"],
         },
       ],
     },
