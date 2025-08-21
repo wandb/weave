@@ -199,7 +199,7 @@ def register_primitive_handlers():
     
     # Namedtuples (check function needed since they're tuple subclasses)
     register(
-        tuple,  # Base type
+        object,  # Use object as base type when using check_func
         serialize_namedtuple,
         deserialize_namedtuple,
         priority=60,  # Higher than regular tuples
