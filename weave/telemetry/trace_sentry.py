@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING, Any, Callable, Literal
 
 if TYPE_CHECKING:
     from sentry_sdk._types import ExcInfo
+    from sentry_sdk.hub import Hub
 
 # Try to import sentry_sdk, but make it optional
 try:
@@ -65,7 +66,7 @@ class Sentry:
 
         self.dsn = SENTRY_DEFAULT_DSN
 
-        self.hub: sentry_sdk.hub.Hub | None = None
+        self.hub: Hub | None = None
 
         # Disable if sentry is not available
         self._disabled = not SENTRY_AVAILABLE
