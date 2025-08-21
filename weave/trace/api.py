@@ -20,7 +20,7 @@ from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.context.call_context import get_current_call, require_current_call
 from weave.trace.display.term import configure_logger
 from weave.trace.op import PostprocessInputsFunc, PostprocessOutputFunc, as_op, op
-from weave.trace.refs import ObjectRef, parse_uri
+from weave.trace.refs import ObjectRef, Ref
 from weave.trace.settings import (
     UserSettings,
     parse_and_apply_settings,
@@ -186,10 +186,10 @@ def ref(location: str) -> ObjectRef:
             name, version = location.split(":")
         location = str(client._ref_uri(name, version, "obj"))
 
-    uri = parse_uri(location)
-    if not isinstance(uri, ObjectRef):
+    ref = Ref.parse_uri(location)
+    if not isinstance(ref, ObjectRef):
         raise TypeError("Expected an object ref")
-    return uri
+    return ref
 
 
 def get(uri: str | ObjectRef) -> Any:
@@ -350,7 +350,6 @@ __all__ = [
     "get_current_call",
     "init",
     "op",
-    "parse_uri",
     "publish",
     "ref",
     "require_current_call",

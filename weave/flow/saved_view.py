@@ -12,7 +12,7 @@ from weave.trace.api import ref as weave_ref
 from weave.trace.context import weave_client_context
 from weave.trace.display.grid import Grid
 from weave.trace.display.rich import pydantic_util
-from weave.trace.refs import ObjectRef, parse_op_uri
+from weave.trace.refs import ObjectRef, OpRef
 from weave.trace.traverse import ObjectPath, get_paths
 from weave.trace.vals import WeaveObject
 from weave.trace.weave_client import CallsIter
@@ -481,7 +481,7 @@ def render_status(value: Any) -> str:
 
 def render_cell(path: ObjectPath, value: Any) -> str:
     if path.elements[0] == "op_name":
-        op_ref = parse_op_uri(value)
+        op_ref = OpRef.parse_uri(value)
         return op_ref.name
     if path == ObjectPath(["summary", "weave", "status"]):
         return render_status(value)
