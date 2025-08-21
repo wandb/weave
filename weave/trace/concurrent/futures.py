@@ -74,7 +74,7 @@ class FutureExecutor:
             self._executor = ContextAwareThreadPoolExecutor(
                 max_workers=max_workers, thread_name_prefix=thread_name_prefix
             )
-        self._active_futures: list[Future] = []
+        self._active_futures: set[Future] = set()
         self._active_futures_lock = Lock()
         self._in_thread_context = ContextVar("in_deferred_context", default=False)
         atexit.register(self._shutdown)
@@ -181,11 +181,10 @@ class FutureExecutor:
     def _future_done_callback(self, future: Future) -> None:
         """Callback for when a future is done to remove it from the active futures list."""
         with self._active_futures_lock:
-            if future in self._active_futures:
-                self._active_futures.remove(future)
-                exception = future.exception()
-                if exception:
-                    logger.error(f"Task failed: {_format_exception(exception)}")
+            self._active_futures.discard(future)
+
+        if exception := future.exception():
+            logger.error(f"Task failed: {_format_exception(exception)}")
 
     def _shutdown(self) -> None:
         """Shutdown the thread pool executor. Should only be called when the program is exiting."""
@@ -235,7 +234,7 @@ class FutureExecutor:
             return self._execute_directly(wrapped, *args, **kwargs)
 
         with self._active_futures_lock:
-            self._active_futures.append(future)
+            self._active_futures.add(future)
         future.add_done_callback(self._future_done_callback)
 
         return future
