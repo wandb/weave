@@ -6,6 +6,8 @@ from dataclasses import asdict, dataclass, fields
 from datetime import datetime
 from typing import Any, Union, cast
 
+from typing_extensions import Self
+
 from weave.trace_server import refs_internal
 from weave.trace_server.errors import ObjectDeletedError
 
@@ -27,14 +29,14 @@ class Ref:
     def as_param_dict(self) -> dict:
         return asdict(self)
 
-    def __deepcopy__(self, memo: dict) -> Ref:
+    def __deepcopy__(self, memo: dict) -> Self:
         d = {f.name: getattr(self, f.name) for f in fields(self)}
         res = self.__class__(**d)
         memo[id(self)] = res
         return res
 
     @classmethod
-    def parse_uri(cls, uri: str) -> AnyRef:
+    def parse_uri(cls, uri: str) -> Self:
         if not uri.startswith("weave:///"):
             raise ValueError(f"Invalid URI: {uri}")
         path = uri[len("weave:///") :]
@@ -47,7 +49,9 @@ class Ref:
             return TableRef(entity=entity, project=project, _digest=remaining[0])
         extra = tuple(urllib.parse.unquote(r) for r in remaining[1:])
         if kind == "call":
-            return CallRef(entity=entity, project=project, id=remaining[0], _extra=extra)
+            return CallRef(
+                entity=entity, project=project, id=remaining[0], _extra=extra
+            )
         elif kind == "object":
             name, version = parse_name_version(remaining[0])
             return ObjectRef(
@@ -62,7 +66,7 @@ class Ref:
             raise ValueError(f"Unknown ref kind: {kind}")
 
     @classmethod
-    def maybe_parse_uri(cls, s: str) -> AnyRef | None:
+    def maybe_parse_uri(cls, s: str) -> Self | None:
         try:
             return cls.parse_uri(s)
         except ValueError:
@@ -124,7 +128,7 @@ class TableRef(Ref):
         return f"weave:///{self.entity}/{self.project}/table/{self.digest}"
 
     @classmethod
-    def parse_uri(cls, uri: str) -> TableRef:
+    def parse_uri(cls, uri: str) -> Self:
         if not isinstance(parsed := Ref.parse_uri(uri), TableRef):
             raise TypeError(f"URI is not for a Table: {uri}")
         return parsed
@@ -132,21 +136,21 @@ class TableRef(Ref):
 
 @dataclass(frozen=True)
 class RefWithExtra(Ref):
-    def with_extra(self, extra: tuple[str | Future[str], ...]) -> RefWithExtra:
+    def with_extra(self, extra: tuple[str | Future[str], ...]) -> Self:
         params = self.as_param_dict()
         params["_extra"] = self._extra + tuple(extra)  # type: ignore
         return self.__class__(**params)
 
-    def with_key(self, key: str) -> RefWithExtra:
+    def with_key(self, key: str) -> Self:
         return self.with_extra((DICT_KEY_EDGE_NAME, key))
 
-    def with_attr(self, attr: str) -> RefWithExtra:
+    def with_attr(self, attr: str) -> Self:
         return self.with_extra((OBJECT_ATTR_EDGE_NAME, attr))
 
-    def with_index(self, index: int) -> RefWithExtra:
+    def with_index(self, index: int) -> Self:
         return self.with_extra((LIST_INDEX_EDGE_NAME, str(index)))
 
-    def with_item(self, item_digest: str | Future[str]) -> RefWithExtra:
+    def with_item(self, item_digest: str | Future[str]) -> Self:
         return self.with_extra((TABLE_ROW_ID_EDGE_NAME, item_digest))
 
 
@@ -253,7 +257,7 @@ class ObjectRef(RefWithExtra):
             gc.delete_object_version(self)
 
     @classmethod
-    def parse_uri(cls, uri: str) -> ObjectRef:
+    def parse_uri(cls, uri: str) -> Self:
         if not isinstance(parsed := Ref.parse_uri(uri), ObjectRef):
             raise TypeError(f"URI is not for an Object: {uri}")
         return parsed
@@ -275,7 +279,7 @@ class OpRef(ObjectRef):
             gc.delete_op_version(self)
 
     @classmethod
-    def parse_uri(cls, uri: str) -> OpRef:
+    def parse_uri(cls, uri: str) -> Self:
         if not isinstance(parsed := Ref.parse_uri(uri), OpRef):
             raise TypeError(f"URI is not for an Op: {uri}")
         return parsed
@@ -307,7 +311,7 @@ class CallRef(RefWithExtra):
         return u
 
     @classmethod
-    def parse_uri(cls, uri: str) -> CallRef:
+    def parse_uri(cls, uri: str) -> Self:
         if not isinstance(parsed := Ref.parse_uri(uri), CallRef):
             raise TypeError(f"URI is not for a Call: {uri}")
         return parsed
@@ -334,4 +338,3 @@ def parse_name_version(name_version: str) -> tuple[str, str]:
         name, version = name_version.rsplit(":", maxsplit=1)
         return name, version
     return name_version, "latest"
-
