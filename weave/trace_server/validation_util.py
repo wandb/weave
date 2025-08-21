@@ -3,10 +3,7 @@ import uuid
 from typing import Optional
 
 from weave.trace_server import refs_internal
-
-
-class CHValidationError(Exception):
-    pass
+from weave.trace_server.errors import CHValidationError
 
 
 def require_otel_trace_id(s: str) -> str:

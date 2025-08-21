@@ -88,6 +88,10 @@ class ProjectNotFound(Error):
     pass
 
 
+class CHValidationError(Exception):
+    pass
+
+
 def _format_error_to_json_with_extra(
     exc: Exception, extra_fields: Optional[dict[str, Any]] = None
 ) -> dict[str, Any]:
@@ -182,6 +186,7 @@ class ErrorRegistry:
         self.register(QueryNoCommonTypeError, 400)
         self.register(MissingLLMApiKeyError, 400, _format_missing_llm_api_key)
         self.register(InvalidFieldError, 403)
+        self.register(CHValidationError, 403)
         self.register(NotFoundError, 404)
         self.register(ProjectNotFound, 404)
         self.register(ObjectDeletedError, 404, _format_object_deleted_error)
