@@ -115,10 +115,10 @@ article = draft_article(topic="World Cup 2002")
 
 When you run `dspy.Evaluate`, weave automatically logs:
 
-- Aggregated metrics for the evaluation run and per-sample scores you return from your metrics,
-- Per-sample inputs/outputs to full execution traces for deep debugging,
+- Aggregated metrics and per-sample scores for the evaluation run
+- Per-sample inputs/outputs and full execution traces for deep debugging
 - Token usage, latency, and cost tracking when Weave is initialized before model calls
-- Model configuration and metadata for richer side-by-side comparisons
+- Model configuration and metadata for side-by-side comparisons
 
 To run the example below do:
 
