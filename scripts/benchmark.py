@@ -1,8 +1,3 @@
-"""Weave Benchmark Runner
-
-A typer app for selecting and running benchmarks from the benchmarks/ directory.
-"""
-
 #!/usr/bin/env -S uv run --script
 # /// script
 # dependencies = [
@@ -10,6 +5,10 @@ A typer app for selecting and running benchmarks from the benchmarks/ directory.
 #     "typer==0.16.0",
 # ]
 # ///
+"""Weave Benchmark Runner
+
+A typer app for selecting and running benchmarks from the benchmarks/ directory.
+"""
 from __future__ import annotations
 
 import subprocess

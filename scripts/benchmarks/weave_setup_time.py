@@ -1,5 +1,3 @@
-"""Benchmark Weave import and initialization time."""
-
 #!/usr/bin/env -S uv run --script
 # /// script
 # dependencies = [
@@ -7,6 +5,7 @@
 #     "rich==14.0.0",
 # ]
 # ///
+"""Benchmark Weave import and initialization time."""
 
 import argparse
 import os

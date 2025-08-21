@@ -1,5 +1,3 @@
-"""Benchmark Weave overhead on OpenAI API calls."""
-
 #!/usr/bin/env -S uv run --script
 # /// script
 # dependencies = [
@@ -8,6 +6,7 @@
 #     "rich==14.0.0",
 # ]
 # ///
+"""Benchmark Weave overhead on OpenAI API calls."""
 from __future__ import annotations
 
 import argparse
