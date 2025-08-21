@@ -5,7 +5,7 @@ from typing import Annotated, Any, Union
 from pydantic import BeforeValidator
 
 import weave
-from weave.flow.dataset import Dataset
+from weave.dataset.dataset import Dataset
 from weave.flow.scorer import Scorer, _validate_scorer_signature
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import Op, as_op, is_op

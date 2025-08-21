@@ -1,11 +1,12 @@
 import asyncio
 import inspect
+import json
 from typing import Callable, TypedDict
 
 import pytest
 
 import weave
-from weave.flow.eval_imperative import EvaluationLogger, Model, Scorer
+from weave.evaluation.eval_imperative import EvaluationLogger, Model, Scorer
 from weave.integrations.integration_utilities import op_name_from_call
 from weave.trace.context import call_context
 from weave.trace_server.trace_server_interface import ObjectVersionFilter
@@ -476,6 +477,21 @@ def test_evaluation_no_auto_summarize(client):
     assert summarize_call.output == {"output": {}}
 
 
+def test_evaluation_fail_with_exception(client):
+    ev = weave.EvaluationLogger()
+    ex = ValueError("test")
+    ev.fail(exception=ex)
+    client.flush()
+
+    calls = client.get_calls()
+    assert len(calls) == 1
+    finish_call = calls[0]
+    assert finish_call.output is None
+    assert finish_call.exception == json.dumps(
+        {"type": "ValueError", "message": "test"}
+    )
+
+
 def test_evaluation_no_auto_summarize_with_custom_dict(client):
     ev = weave.EvaluationLogger()
     pred = ev.log_prediction(inputs={"a": 1, "b": 2}, output=3)
@@ -580,3 +596,12 @@ def test_evaluation_logger_model_with_different_inference_method_names(client):
         )
         pred.finish()
         ev.finish()
+
+
+def test_evaluation_logger_with_custom_attributes(client):
+    ev = weave.EvaluationLogger(eval_attributes={"custom_attribute": "value"})
+    ev.finish()
+    client.flush()
+
+    calls = client.get_calls()
+    assert calls[0].attributes["custom_attribute"] == "value"

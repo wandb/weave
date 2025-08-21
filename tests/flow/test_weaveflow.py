@@ -4,7 +4,7 @@ import numpy as np
 from pydantic import Field
 
 import weave
-from weave.flow.obj import deprecated_field
+from weave.object.obj import deprecated_field
 
 
 def test_weaveflow_op_wandb(client):
@@ -169,7 +169,7 @@ def test_construct_eval_with_dataset_get(client):
     dataset = client.save(
         weave.Dataset(rows=[{"x": 1, "y": 3}, {"x": 2, "y": 16}]), "my-dataset"
     )
-    ref = weave.obj_ref(dataset)
+    ref = dataset.ref
     assert ref is not None
     dataset2 = weave.ref(ref.uri()).get()
     weave.Evaluation(dataset=dataset2)

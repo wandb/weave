@@ -113,6 +113,15 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
             return self._next_trace_server.get_call_processor()
         return None
 
+    def get_feedback_processor(self) -> AsyncBatchProcessor | None:
+        """
+        Custom method not defined on the formal TraceServerInterface to expose
+        the underlying feedback processor. Should be formalized in a client-side interface.
+        """
+        if hasattr(self._next_trace_server, "get_feedback_processor"):
+            return self._next_trace_server.get_feedback_processor()
+        return None
+
     @classmethod
     def from_env(cls, next_trace_server: tsi.TraceServerInterface) -> Self:
         cache_dir = server_cache_dir()
@@ -477,6 +486,11 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
 
     def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
         return self._next_trace_server.feedback_create(req)
+
+    def feedback_create_batch(
+        self, req: tsi.FeedbackCreateBatchReq
+    ) -> tsi.FeedbackCreateBatchRes:
+        return self._next_trace_server.feedback_create_batch(req)
 
     def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
         return self._next_trace_server.feedback_query(req)

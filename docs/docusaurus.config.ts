@@ -121,6 +121,10 @@ const config: Config = {
             from: ['/guides/evaluation/imperative_evaluations'],
             to: '/guides/evaluation/evaluation_logger',
           },
+          {
+            from: ['/guides/integrations/inference'],
+            to: 'https://docs.wandb.ai/guides/inference/',
+          },
         ]  
       },
     ],
@@ -201,7 +205,7 @@ const config: Config = {
           position: "right",
         },
         {
-          to: "https://wandb.ai/home",
+          to: "https://wandb.ai/quickstart?product=weave",
           label: "Open App",
           position: "right",
           className: "button button--secondary button--med margin-right--sm",

@@ -9,11 +9,9 @@ nox.options.stop_on_first_error = True
 
 SUPPORTED_PYTHON_VERSIONS = ["3.9", "3.10", "3.11", "3.12", "3.13"]
 PY313_INCOMPATIBLE_SHARDS = [
-    "anthropic",
     "cohere",
     "dspy",
     "notdiamond",
-    "crewai",
 ]
 PY39_INCOMPATIBLE_SHARDS = [
     "crewai",
@@ -22,6 +20,7 @@ PY39_INCOMPATIBLE_SHARDS = [
     "smolagents",
     "dspy",
     "autogen_tests",
+    "langchain",
 ]
 NUM_TRACE_SERVER_SHARDS = 4
 
@@ -30,6 +29,8 @@ NUM_TRACE_SERVER_SHARDS = 4
 def lint(session):
     session.install("pre-commit", "jupyter")
     dry_run = session.posargs and "dry-run" in session.posargs
+    all_files = session.posargs and "--all-files" in session.posargs
+
     if dry_run:
         session.run(
             "pre-commit",
@@ -39,8 +40,12 @@ def lint(session):
             "--files",
             "./weave/__init__.py",
         )
-    else:
+    elif all_files:
+        # Allow running on all files if explicitly requested
         session.run("pre-commit", "run", "--hook-stage=pre-push", "--all-files")
+    else:
+        # Default: run only on staged files for faster execution
+        session.run("pre-commit", "run", "--hook-stage=pre-push")
 
 
 trace_server_shards = [f"trace{i}" for i in range(1, NUM_TRACE_SERVER_SHARDS + 1)]

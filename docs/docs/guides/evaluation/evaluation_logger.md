@@ -1,6 +1,6 @@
 # `EvaluationLogger`
 
-The `EvaluationLogger` provides a flexible, incremental way to log evaluation data directly from your Python code. You don't need deep knowledge of Weave's internal data types; simply instantiate a logger and use its methods (`log_prediction`, `log_score`, `log_summary`) to record evaluation steps.
+The `EvaluationLogger` provides a flexible, incremental way to log evaluation data directly from your Python code. You don't need deep knowledge of W&B Weave's internal data types; simply instantiate a logger and use its methods (`log_prediction`, `log_score`, `log_summary`) to record evaluation steps.
 
 This approach is particularly helpful in complex workflows where the entire dataset or all scorers might not be defined upfront.
 

@@ -15,6 +15,7 @@ from pydantic import ValidationError
 
 import weave
 import weave.trace_server.trace_server_interface as tsi
+from tests.conftest import TestOnlyFlushingWeaveClient
 from tests.trace.testutil import ObjectRefStrMatcher
 from tests.trace.util import (
     AnyIntMatcher,
@@ -1259,6 +1260,12 @@ def test_refs_read_batch_multi_project(client):
     assert res.vals[2] == {"ab": [3, 4, 5]}
 
 
+def test_refs_read_batch_call_ref(client):
+    call_ref = refs.CallRef(entity="shawn", project="test-project", id="my-call")
+    with pytest.raises(ValueError, match="Call refs not supported"):
+        client.server.refs_read_batch(RefsReadBatchReq(refs=[call_ref.uri()]))
+
+
 def test_large_files(client):
     class CoolCustomThing:
         a: str
@@ -1722,7 +1729,7 @@ def test_object_version_read(client):
     objs = client.server.objs_query(
         tsi.ObjQueryReq(
             project_id=client._project_id(),
-            object_id=refs[0].name,
+            filter=tsi.ObjectVersionFilter(object_ids=[refs[0].name]),
         )
     ).objs
     assert len(objs) == 10
@@ -1910,7 +1917,7 @@ def test_object_deletion(client):
     versions = client.server.objs_query(
         req=tsi.ObjQueryReq(
             project_id=client._project_id(),
-            names=["my-obj"],
+            filter=tsi.ObjectVersionFilter(object_ids=["my-obj"]),
             sort_by=[tsi.SortBy(field="created_at", direction="desc")],
         )
     )
@@ -1926,7 +1933,7 @@ def test_object_deletion(client):
     versions = client.server.objs_query(
         req=tsi.ObjQueryReq(
             project_id=client._project_id(),
-            names=["my-obj"],
+            filter=tsi.ObjectVersionFilter(object_ids=["my-obj"]),
         )
     )
     assert len(versions.objs) == 0
@@ -3557,3 +3564,70 @@ def test_get_evaluations(client, make_evals):
 
     assert evs[1].ref.uri() == ref2.uri()
     assert evs[1].dataset.rows[0] == {"dataset_id": "jkl"}
+
+
+def test_feedback_batching(network_proxy_client):
+    """Test that feedback batching works correctly when enabled."""
+    # Set up advanced client that uses the RemoteHttpTraceServer handler
+    # with batching
+    basic_client, remote_client, records = network_proxy_client
+    client = TestOnlyFlushingWeaveClient(
+        entity=basic_client.entity,
+        project=basic_client.project,
+        server=remote_client,
+        ensure_project_exists=False,
+    )
+    # Disably autoflush so we can manually control
+    client.set_autoflush(False)
+
+    # Create a test call to add feedback to
+    @weave.op
+    def test_op(x: int) -> int:
+        return x * 2
+
+    result = test_op(5)
+    client.flush()
+
+    test_call = client.get_calls()[0]
+    client.server.attribute_access_log = []
+
+    feedback_items = []
+    start = time.time()
+    for i in range(10):
+        id = test_call.feedback.add(
+            feedback_type=f"test_feedback_{i}",
+            payload={"score": i, "note": f"Test feedback {i}"},
+        )
+        assert id is not None
+        feedback_items.append(id)
+
+    # make sure we aren't actually waiting for 10 feedbacks, should be quick
+    assert time.time() - start < 0.2, "Feedback creation took too long"
+    assert client.server.get_feedback_processor() is not None
+
+    # Flush to ensure all feedback is processed
+    client.flush()
+
+    log = client.server.attribute_access_log
+    feedback_creates = [l for l in log if l == "feedback_create"]
+
+    assert_err = f"Expected 0 feedback creates, got {len(feedback_creates)}"
+    assert len(feedback_creates) == 0, assert_err
+
+    # Query feedback to verify all items were created
+    all_feedback = list(test_call.feedback)
+    created_feedback = [
+        f for f in all_feedback if f.feedback_type.startswith("test_feedback_")
+    ]
+    assert len(created_feedback) == 10
+
+    # Verify the feedback content
+    for i, feedback in enumerate(
+        sorted(created_feedback, key=lambda x: x.feedback_type)
+    ):
+        assert feedback.id in feedback_items, (
+            f"Feedback {i} not found in feedback_items"
+        )
+        assert feedback.feedback_type == f"test_feedback_{i}"
+        assert feedback.payload["score"] == i
+        assert feedback.payload["note"] == f"Test feedback {i}"

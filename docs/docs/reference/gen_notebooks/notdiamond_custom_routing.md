@@ -51,13 +51,12 @@ We start by downloading the dataset we have prepared for this example, then pars
 !curl -L "https://drive.google.com/uc?export=download&id=1q1zNZHioy9B7M-WRjsJPkfvFosfaHX38" -o humaneval.csv
 ```
 
-
 ```python
 import random
 
 import weave
-from weave.flow.dataset import Dataset
-from weave.flow.eval import EvaluationResults
+from weave.dataset.dataset import Dataset
+from weave.evaluation.eval import EvaluationResults
 from weave.integrations.notdiamond.util import get_model_evals
 
 pct_train = 0.8

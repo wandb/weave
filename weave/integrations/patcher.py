@@ -33,7 +33,8 @@ class MultiPatcher(Patcher):
         all_successful = True
         for patcher in self.patchers:
             try:
-                all_successful = all_successful and patcher.attempt_patch()
+                result = patcher.attempt_patch()
+                all_successful = all_successful and result
             except Exception as e:
                 if get_raise_on_captured_errors():
                     raise

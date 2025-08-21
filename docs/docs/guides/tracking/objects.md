@@ -5,7 +5,7 @@ import TabItem from '@theme/TabItem';
 
 ## Publishing an object
 
-Weave's serialization layer saves and versions objects.
+W&B Weave's serialization layer saves and versions objects.
 
 <Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>

@@ -26,7 +26,7 @@ jobs:
       trace_server_tests: ${{ steps.trace_server.outputs.run_tests }}
       weave_ts_sdk_tests: ${{ steps.weave_ts_sdk.outputs.run_tests }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
           fetch-tags: true

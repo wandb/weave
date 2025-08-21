@@ -20,7 +20,7 @@ If you prefer a manual approach, you can modify the `pageSize` query parameter i
 
 ## Server response caching
 
-Weave provides server response caching to improve performance when making repeated queries or working with limited network bandwidth. While currently disabled by default, this feature is expected to become the default behavior in a future release.
+W&B Weave provides server response caching to improve performance when making repeated queries or working with limited network bandwidth. While currently disabled by default, this feature is expected to become the default behavior in a future release.
 
 ### When to use caching
 

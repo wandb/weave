@@ -28,7 +28,7 @@ jobs:
 
     # if: github.ref == 'refs/heads/master' || needs.check-which-tests-to-run.outputs.weave_query_tests
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 2
 
@@ -147,7 +147,7 @@ jobs:
     needs:
       - check-which-tests-to-run
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - name: Check if lint should run
@@ -176,7 +176,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v5
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -184,9 +184,9 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install nox uv
+          pip install nox uv==0.8.6
       - name: Run nox
-        run: nox -e lint
+        run: nox -e lint -- --all-files
 
   trace-docs:
     name: Trace docs
@@ -194,7 +194,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v5
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
@@ -223,7 +223,7 @@ jobs:
       fail-fast: false
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v5
       - name: Set up Python ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
         uses: actions/setup-python@v5
         with:
@@ -231,7 +231,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install nox uv
+          pip install nox uv==0.8.6
       - name: Run nox (Non Trace Server)
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
@@ -252,7 +252,8 @@ jobs:
             "13",
             #
           ]
-        nox-shard: [
+        nox-shard:
+          [
             "trace1",
             "trace2",
             "trace3",
@@ -267,8 +268,6 @@ jobs:
             "crewai",
             "dspy",
             "groq",
-            # "huggingface",
-            "google_ai_studio",
             "google_genai",
             "instructor",
             "langchain",
@@ -319,7 +318,7 @@ jobs:
         options: --health-cmd "wget -nv -O- 'http://localhost:8123/ping' || exit 1" --health-interval=5s --health-timeout=3s
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v5
       - name: Enable debug logging
         run: echo "ACTIONS_STEP_DEBUG=true" >> $GITHUB_ENV
       - name: Install SQLite dev package
@@ -331,7 +330,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install nox uv
+          pip install nox uv==0.8.6
       - name: Run nox (Sqlite Trace Server)
         env:
           WEAVE_SENTRY_ENV: ci

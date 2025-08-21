@@ -5,7 +5,7 @@ import TabItem from '@theme/TabItem';
 
 Retrieval Augmented Generation (RAG) is a common way of building Generative AI applications that have access to custom knowledge bases.
 
-In this example, we'll show an example that has a retrieval step to get documents. By tracking this, you can debug your app and see what documents were pulled into the LLM context.
+In this example, we'll show how W&B Weave can track a RAG application that has a retrieval step to get documents. By tracking this, you can debug your app and see what documents were pulled into the LLM context.
 We'll also show how to evaluate it using an LLM judge.
 
 ![Evals hero](../static/img/evals-hero.png)
