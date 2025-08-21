@@ -4,9 +4,9 @@ import logging
 import traceback
 from datetime import datetime
 from itertools import chain, repeat
-from typing import Any, Callable, Literal, Optional, Union
+from typing import Annotated, Any, Callable, Literal, Optional, Union
 
-from pydantic import PrivateAttr
+from pydantic import Field, PrivateAttr
 from rich.console import Console
 from typing_extensions import Self
 
@@ -69,6 +69,13 @@ class Evaluation(Object):
     If you want to preprocess the rows from the dataset you can pass in a function
     to preprocess_model_input.
 
+    Args:
+        dataset: The dataset to evaluate on
+        scorers: List of scoring functions to apply
+        preprocess_model_input: Optional function to preprocess examples before passing to model
+        trials: Number of times to run each example (default: 1)
+        parallelism: Maximum number of concurrent evaluations (default: uses WEAVE_PARALLELISM env var or 20)
+
     Examples:
 
     ```python
@@ -106,6 +113,7 @@ class Evaluation(Object):
     scorers: Optional[list[ScorerLike]] = None
     preprocess_model_input: Optional[PreprocessModelInput] = None
     trials: int = 1
+    parallelism: Annotated[Optional[int], Field(gt=0)] = None
 
     # Custom evaluation name for display in the UI.  This is the same API as passing a
     # custom `call_display_name` to `weave.op` (see that for more details).
@@ -254,9 +262,10 @@ class Evaluation(Object):
         rows = dataset.rows
         num_rows = len(rows) * self.trials
 
+        parallelism = self.parallelism or get_weave_parallelism()
         trial_rows = chain.from_iterable(repeat(rows, self.trials))
         async for index, _example, eval_row in util.async_foreach(
-            trial_rows, eval_example, get_weave_parallelism()
+            trial_rows, eval_example, parallelism
         ):
             n_complete += 1
             logger.info(f"Evaluated {n_complete} of {num_rows} examples")
@@ -427,9 +436,13 @@ def evaluate(
     model: Union[Op, Model],
     scorers: Optional[list[Union[Callable, Scorer]]] = None,
     preprocess_model_input: Optional[PreprocessModelInput] = None,
+    parallelism: Optional[int] = None,
 ) -> dict:
     eval = Evaluation(
-        dataset=dataset, scorers=scorers, preprocess_model_input=preprocess_model_input
+        dataset=dataset,
+        scorers=scorers,
+        preprocess_model_input=preprocess_model_input,
+        parallelism=parallelism,
     )
     return asyncio.run(eval.evaluate(model))
 
