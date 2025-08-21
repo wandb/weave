@@ -17,11 +17,6 @@ import site
 import sys
 from typing import TYPE_CHECKING, Any, Callable, Literal
 
-if TYPE_CHECKING:
-    from sentry_sdk._types import Event, ExcInfo
-    from sentry_sdk.hub import Hub
-
-# Try to import sentry_sdk, but make it optional
 try:
     import sentry_sdk  # type: ignore
     import sentry_sdk.utils  # type: ignore
@@ -30,6 +25,10 @@ try:
 except ImportError:
     SENTRY_AVAILABLE = False
     sentry_sdk = None  # type: ignore
+
+if TYPE_CHECKING:
+    from sentry_sdk._types import Event, ExcInfo
+    from sentry_sdk.hub import Hub
 
 
 SENTRY_DEFAULT_DSN = "https://99697cf8ca5158250d3dd6cb23cca9b0@o151352.ingest.us.sentry.io/4507019311251456"
