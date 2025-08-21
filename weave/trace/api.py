@@ -93,14 +93,12 @@ def init(
     _global_attributes = global_attributes or {}
 
     if should_disable_weave():
-        return weave_init.init_weave_disabled().client
+        return weave_init.init_weave_disabled()
 
-    initialized_client = weave_init.init_weave(
+    return weave_init.init_weave(
         project_name,
         autopatch_settings=autopatch_settings,
     )
-
-    return initialized_client.client
 
 
 def get_client() -> weave_client.WeaveClient | None:
