@@ -1,6 +1,8 @@
-# Display Abstraction Layer
+# Display Module
 
-The display abstraction layer provides a unified interface for console output with a pluggable viewer system. This allows users to configure their preferred display method (rich, print, logger, etc.) without changing their code.
+The display module provides a unified interface for console output with a pluggable viewer system. This allows users to configure their preferred display method (rich, print, etc.) without changing their code.
+
+The APIs are primarily intended for internal use by the weave library. `set_viewer` is the only public API and allows users to configure their preferred viewer.
 
 ## Features
 
@@ -97,32 +99,11 @@ display.set_viewer("custom")
 - **Features**: Basic print output with ANSI color support
 - **Requirements**: None (built-in)
 
-### Logger Viewer (Example)
-
-- **Name**: `"logger"` (when registered)
-- **Features**: Routes all output through Python's logging system
-- **Use Case**: Applications that prefer structured logging
-
 ## Architecture
-
-### Module Structure
-
-```
-weave/trace/display/
-├── display.py           # Main API and delegation logic
-├── protocols.py         # Protocol definitions for type safety
-├── types.py            # Common types (Style, etc.)
-├── viewers/
-│   ├── __init__.py
-│   ├── rich_viewer.py  # Rich library implementation
-│   ├── print_viewer.py # Fallback print implementation
-│   └── logger_viewer.py # Example logger implementation
-└── README.md
-```
 
 ### Viewer Protocol
 
-All viewers must implement the `ViewerProtocol` defined in `protocols.py`. Using protocols provides better type checking and clear interface documentation:
+All viewers must implement the `ViewerProtocol` defined in `protocols.py`.
 
 ```python
 @runtime_checkable
@@ -176,32 +157,3 @@ The abstraction layer provides several display objects that work with any viewer
 - **Text**: Styled text
 - **SyntaxHighlight**: Code syntax highlighting
 - **PaddingWrapper**: Text indentation utilities
-
-## Benefits
-
-1. **Flexibility**: Switch between output methods without code changes
-2. **Testing**: Easy to mock or capture output for testing
-3. **Compatibility**: Works in environments where rich is not available
-4. **Extensibility**: Add new output methods as needed
-5. **Future-proof**: New viewers can be added without breaking existing code
-
-## Migration from Direct Rich Usage
-
-If you're currently using rich directly:
-
-```python
-# Before (direct rich usage)
-from rich.console import Console
-from rich.table import Table
-
-console = Console()
-console.print("Hello")
-
-# After (display abstraction)
-from weave.trace.display import display
-
-console = display.Console()
-console.print("Hello")
-```
-
-The API is designed to be similar to rich, making migration straightforward.

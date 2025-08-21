@@ -11,6 +11,7 @@ from typing import Any, Callable
 
 from typing_extensions import Self
 
+from weave.trace import settings
 from weave.trace.display.protocols import (
     CaptureContextProtocol,
     ProgressProtocol,
@@ -25,10 +26,8 @@ from weave.trace.display.types import Style
 # Instead, we use a callable that returns a ViewerProtocol
 ViewerFactory = Callable[..., ViewerProtocol]
 
-# Global viewer registry and configuration
+# Global viewer registry
 _viewer_registry: dict[str, ViewerFactory] = {}
-_current_viewer: ViewerProtocol | None = None
-_default_viewer_name = "auto"
 
 
 # Viewer registration and configuration
@@ -61,37 +60,26 @@ def _get_auto_viewer(**kwargs: Any) -> ViewerProtocol:
         return PrintViewer(**kwargs)
 
 
-def set_viewer(name: str, **kwargs: Any) -> None:
-    """Set the current viewer by name.
+def get_viewer(name: str | None = None, **kwargs: Any) -> ViewerProtocol:
+    """Get a viewer instance.
 
     Args:
-        name: Name of the viewer to use.
+        name: Optional name of the viewer to use. If None, uses the setting from weave.trace.settings.
         **kwargs: Additional arguments to pass to the viewer constructor.
-    """
-    global _current_viewer
-
-    if name == "auto":
-        _current_viewer = _get_auto_viewer(**kwargs)
-    elif name in _viewer_registry:
-        viewer_class = _viewer_registry[name]
-        _current_viewer = viewer_class(**kwargs)
-    else:
-        raise ValueError(f"Unknown viewer: {name}")
-
-
-def get_viewer() -> ViewerProtocol:
-    """Get the current viewer instance.
 
     Returns:
-        The current viewer instance.
+        A new viewer instance.
     """
-    global _current_viewer
+    if name is None:
+        name = settings.display_viewer()
 
-    if _current_viewer is None:
-        set_viewer(_default_viewer_name)
-
-    assert _current_viewer is not None  # Set by set_viewer above
-    return _current_viewer
+    if name == "auto":
+        return _get_auto_viewer(**kwargs)
+    elif name in _viewer_registry:
+        viewer_class = _viewer_registry[name]
+        return viewer_class(**kwargs)
+    else:
+        raise ValueError(f"Unknown viewer: {name}")
 
 
 # Public API classes that delegate to the viewer
@@ -119,24 +107,15 @@ class Console:
             viewer: Specific viewer to use (overrides global setting).
             **kwargs: Additional arguments passed to the viewer.
         """
-        if viewer:
-            # Create a specific viewer for this console
-            if viewer == "auto":
-                kwargs = {
-                    "file": file,
-                    "emoji": emoji,
-                    "force_terminal": force_terminal,
-                    **kwargs,
-                }
-                self._viewer = _get_auto_viewer(**kwargs)
-            elif viewer in _viewer_registry:
-                viewer_class = _viewer_registry[viewer]
-                self._viewer = viewer_class(file=file, emoji=emoji, **kwargs)
-            else:
-                raise ValueError(f"Unknown viewer: {viewer}")
-        else:
-            # Use the global viewer
-            self._viewer = get_viewer()
+        # Prepare viewer kwargs
+        viewer_kwargs = {
+            "file": file,
+            "emoji": emoji,
+            "force_terminal": force_terminal,
+            **kwargs,
+        }
+        # Create viewer (either specific or from settings)
+        self._viewer = get_viewer(viewer, **viewer_kwargs)
 
     def print(
         self,
@@ -343,5 +322,6 @@ __all__ = [
     "console",
     "get_viewer",
     "register_viewer",
-    "set_viewer",
+    "reset_viewer",  # Deprecated
+    "set_viewer",  # Deprecated
 ]
