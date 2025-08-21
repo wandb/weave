@@ -164,10 +164,7 @@ After the run completes, click on the generated Weave URL and navigate to **Eval
 
 ### Compare evaluation runs
 
-Evaluation logging enables both holistic and sample-wise comparisons:
-
-- Holistic: compare aggregate metrics and model metadata across evaluation runs
-- Sample-wise: page through the same dataset example to see how different models/pipelines performed
+When viewing evaluation logs, Weave supports both holistic and sample-wise comparisons. Holistic compares aggregate metrics and model metadata across evaluation runs. Sample-wise allows you to page through different models and pipelines that run an evaluation using the same dataset to compare how they performed.
 
 From the Evals tab, select multiple evals and click Compare. See [EvaluationLogger (Comparisons section)](../evaluation/evaluation_logger.md#log-and-compare-multiple-evaluations) and the general [Comparison](../tools/comparison.md) guide for details on the comparison UI and controls.
 
