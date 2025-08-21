@@ -213,7 +213,7 @@ For optimizers that use `dspy.Evaluate` under the hood (ex: MIPROv2), you can op
 Using both W&B Models and Weave to improve your DSPy optimization workflow is experimental. 
 :::
 
-To use this feature first install `wandb` sdk.
+To use this feature first install the `wandb` package.
 
 ```bash
 pip install wandb
