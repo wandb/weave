@@ -1,3 +1,6 @@
+---
+title: Introduction to Evaluations
+---
 
 
 :::tip[This is a notebook]
@@ -7,6 +10,10 @@
 <a href="https://github.com/wandb/weave/blob/master/docs/./notebooks/Intro_to_Weave_Hello_Eval.ipynb" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link button button--secondary button--med margin-right--sm notebook-cta-button"><div><img src="https://upload.wikimedia.org/wikipedia/commons/9/91/Octicons-mark-github.svg" alt="View in Github" height="15px" /><div>View in Github</div></div></a>
 
 :::
+
+
+
+<!--- @wandbcode{feedback-colab} -->
 
 
 # Introduction to Evaluations

@@ -1,6 +1,6 @@
-
-## title: Code Generation
-
+---
+title: Develop a Code Generation Pipeline
+---
 
 
 :::tip[This is a notebook]
@@ -12,7 +12,9 @@
 :::
 
 
-## 
+
+<!--- @wandbcode{feedback-colab} -->
+
 
 # Code Generation using Weave and OpenAI
 

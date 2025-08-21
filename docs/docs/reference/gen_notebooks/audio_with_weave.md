@@ -1,6 +1,6 @@
-
-## title: Log Audio With Weave
-
+---
+title: Log Audio With Weave
+---
 
 
 :::tip[This is a notebook]
@@ -12,7 +12,7 @@
 :::
 
 
-## 
+
 <!--- @wandbcode{feedback-colab} -->
 
 
