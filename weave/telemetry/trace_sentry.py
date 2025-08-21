@@ -21,7 +21,7 @@ import sys
 from typing import TYPE_CHECKING, Any, Callable, Literal
 
 if TYPE_CHECKING:
-    from sentry_sdk._types import ExcInfo
+    from sentry_sdk._types import Event, ExcInfo
     from sentry_sdk.hub import Hub
 
 # Try to import sentry_sdk, but make it optional
@@ -147,6 +147,9 @@ class Sentry:
     def start_session(self) -> None:
         """Start a new session."""
         # get the current client and scope
+        if not SENTRY_AVAILABLE or self.hub is None:
+            return
+
         _, scope = self.hub._stack[-1]
         session = scope._session
 
@@ -158,6 +161,9 @@ class Sentry:
     def end_session(self) -> None:
         """End the current session."""
         # get the current client and scope
+        if not SENTRY_AVAILABLE or self.hub is None:
+            return
+
         client, scope = self.hub._stack[-1]
         session = scope._session
 
@@ -168,6 +174,9 @@ class Sentry:
     @_safe_noop
     def mark_session(self, status: SessionStatus | None = None) -> None:
         """Mark the current session with a status."""
+        if not SENTRY_AVAILABLE or self.hub is None:
+            return
+
         _, scope = self.hub._stack[-1]
         session = scope._session
 
@@ -186,6 +195,9 @@ class Sentry:
         all events sent from this thread. It also tries to start a session
         if one doesn't already exist for this thread.
         """
+        if not SENTRY_AVAILABLE or self.hub is None:
+            return
+
         with self.hub.configure_scope() as scope:
             if tags is not None:
                 for tag in tags:
@@ -225,7 +237,7 @@ class Sentry:
         if not SENTRY_AVAILABLE or self.hub is None:
             return
 
-        event_data: dict[str, Any] = {
+        event_data: Event = {
             "message": event_name,
             "level": "info",
             "tags": tags or {},
