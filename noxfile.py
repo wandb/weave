@@ -166,6 +166,7 @@ def tests(session, shard):
         "--strict-markers",
         "--cov=weave",
         "--cov-report=html",
+        "--cov-report=xml",
         "--cov-branch",
     ]
 
