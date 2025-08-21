@@ -19,6 +19,7 @@ _DEBUG_AUTOPATCH = os.environ.get("WEAVE_DEBUG_AUTOPATCH", "").lower() in ("1", 
 
 # Track which integrations have been patched
 _patched_integrations = set()
+_deferred_integrations = {}  # Maps integration names to their configs for deferred patching
 _patch_lock = threading.Lock()
 
 # Global settings for autopatching
@@ -260,12 +261,110 @@ def _lazy_load_and_unpatch(integration_name: str):
         _patched_integrations.discard(integration_name)
 
 
+def _setup_deferred_patch(integration_name: str, config: dict):
+    """Set up deferred patching for an integration."""
+    global _deferred_integrations
+    
+    with _patch_lock:
+        if integration_name not in _deferred_integrations:
+            _deferred_integrations[integration_name] = config
+            if _DEBUG_AUTOPATCH:
+                print(f"[WEAVE AUTOPATCH] Set up deferred patching for {integration_name}")
+            
+            # Install hooks to trigger patching on actual use
+            _install_sdk_hooks(integration_name, config)
+
+
+def _install_sdk_hooks(integration_name: str, config: dict):
+    """Install hooks on SDK modules to trigger patching on actual use."""
+    trigger_modules = config.get("trigger_modules", [])
+    
+    for module_name in trigger_modules:
+        if module_name in sys.modules:
+            module = sys.modules[module_name]
+            
+            # Check if we already installed hooks
+            if hasattr(module, '_weave_deferred_patch_installed'):
+                continue
+            
+            # Get the original __getattr__ if it exists
+            original_getattr = getattr(module, '__getattr__', None)
+            
+            def make_getattr_hook(integration_name, module_name):
+                def lazy_patch_getattr(name):
+                    # List of attributes that trigger patching
+                    trigger_attrs = {
+                        'openai': ['OpenAI', 'AsyncOpenAI', 'Client', 'AsyncClient'],
+                        'anthropic': ['Anthropic', 'AsyncAnthropic', 'Client', 'AsyncClient'],
+                        'cohere': ['Client', 'AsyncClient', 'Cohere', 'AsyncCohere'],
+                    }
+                    
+                    # Check if this attribute access should trigger patching
+                    if name in trigger_attrs.get(integration_name, []):
+                        if _DEBUG_AUTOPATCH:
+                            print(f"[WEAVE AUTOPATCH] Access to {module_name}.{name} triggering patch for {integration_name}")
+                        _trigger_deferred_patch_if_needed(integration_name)
+                    
+                    # Call the original __getattr__ if it exists
+                    if original_getattr:
+                        return original_getattr(name)
+                    else:
+                        # Default behavior - look up the attribute normally
+                        try:
+                            return getattr(module, name)
+                        except AttributeError:
+                            raise AttributeError(f"module '{module_name}' has no attribute '{name}'")
+                
+                return lazy_patch_getattr
+            
+            # Install the hook
+            module.__getattr__ = make_getattr_hook(integration_name, module_name)
+            module._weave_deferred_patch_installed = True
+            
+            if _DEBUG_AUTOPATCH:
+                print(f"[WEAVE AUTOPATCH] Installed SDK hook on {module_name} for {integration_name}")
+
+
+def _trigger_deferred_patch_if_needed(integration_name: str):
+    """Trigger deferred patch if it's set up and not yet patched."""
+    global _deferred_integrations, _autopatch_settings
+    
+    if integration_name not in _deferred_integrations:
+        return
+    
+    if integration_name in _patched_integrations:
+        return
+    
+    config = _deferred_integrations[integration_name]
+    
+    # Get the settings for this integration
+    settings_attr = config.get("settings_attr", integration_name)
+    if integration_name in ["mcp_server", "mcp_client"]:
+        settings_attr = "mcp"
+    
+    integration_settings = getattr(_autopatch_settings, settings_attr, None)
+    
+    # Only patch if enabled
+    if integration_settings and integration_settings.enabled:
+        if _DEBUG_AUTOPATCH:
+            print(f"[WEAVE AUTOPATCH] Triggering deferred patch for {integration_name}")
+        _lazy_load_and_patch(integration_name, integration_settings)
+        # Remove from deferred list once patched
+        _deferred_integrations.pop(integration_name, None)
+
+
 def _check_and_patch_if_needed(called_from_init=False):
-    """Check if any libraries that need patching have been imported and patch them."""
+    """Check if any libraries that need patching have been imported and patch them.
+    
+    This now defers patching to avoid loading integration modules unnecessarily.
+    """
     global _autopatch_settings
     
     if _autopatch_settings is None or _autopatch_settings.disable_autopatch:
         return
+    
+    # For certain integrations, we want to defer patching to avoid import overhead
+    deferred_integrations = {"openai", "anthropic", "cohere"}
     
     # Check each integration to see if its trigger modules are imported
     for integration_name, config in _INTEGRATION_CONFIGS.items():
@@ -281,9 +380,20 @@ def _check_and_patch_if_needed(called_from_init=False):
                     if called_from_init:
                         # This is problematic - library was imported before weave.init()
                         print(f"[WEAVE AUTOPATCH] WARNING: {trigger_module} was already imported before weave.init()!")
-                        print(f"[WEAVE AUTOPATCH]          This means patching happens immediately instead of on-demand.")
-                        print(f"[WEAVE AUTOPATCH]          Consider importing {trigger_module} after weave.init() for better performance.")
+                        if integration_name in deferred_integrations:
+                            print(f"[WEAVE AUTOPATCH]          Deferring patch for {integration_name} to avoid import overhead.")
+                        else:
+                            print(f"[WEAVE AUTOPATCH]          This means patching happens immediately instead of on-demand.")
+                            print(f"[WEAVE AUTOPATCH]          Consider importing {trigger_module} after weave.init() for better performance.")
                     print(f"[WEAVE AUTOPATCH] Detected {trigger_module} import, checking if {integration_name} should be patched")
+                
+                # For deferred integrations, set up a hook instead of patching immediately
+                if integration_name in deferred_integrations and called_from_init:
+                    if _DEBUG_AUTOPATCH:
+                        print(f"[WEAVE AUTOPATCH] Deferring {integration_name} patch to first use")
+                    # Mark for deferred patching
+                    _setup_deferred_patch(integration_name, config)
+                    break
                 
                 # The library is imported, check if we should patch it
                 settings_attr = config.get("settings_attr", integration_name)
@@ -328,8 +438,18 @@ class WeaveImportHook:
             module = importlib.import_module(fullname)
             sys.modules[fullname] = module
             
-            # After the module is imported, check if we need to patch anything
-            _check_and_patch_if_needed(called_from_init=False)
+            # Check if this is a deferred integration that needs patching
+            deferred_integrations = {"openai", "anthropic", "cohere"}
+            
+            # Find which integration this module belongs to
+            for integration_name, config in _INTEGRATION_CONFIGS.items():
+                if fullname in config.get("trigger_modules", []) and integration_name in deferred_integrations:
+                    # Don't patch immediately, just mark for deferred patching
+                    _setup_deferred_patch(integration_name, config)
+                    break
+            else:
+                # For non-deferred integrations, check if we need to patch
+                _check_and_patch_if_needed(called_from_init=False)
             
             return module
         finally:
@@ -380,9 +500,31 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     _check_and_patch_if_needed(called_from_init=True)
 
 
+def trigger_deferred_patches() -> None:
+    """Manually trigger all deferred patches.
+    
+    This is useful when you want to ensure all integrations are patched
+    before starting to use them, avoiding the lazy loading overhead.
+    """
+    # Create a copy of the deferred integrations to avoid modifying while iterating
+    deferred = list(_deferred_integrations.keys())
+    
+    for integration_name in deferred:
+        _trigger_deferred_patch_if_needed(integration_name)
+
+
+def ensure_integration_patched(integration_name: str) -> None:
+    """Ensure a specific integration is patched.
+    
+    This is called automatically when using the SDK, but can also be
+    called manually to force patching of a specific integration.
+    """
+    _trigger_deferred_patch_if_needed(integration_name)
+
+
 def reset_autopatch() -> None:
     """Reset autopatch by unpatching all patched integrations and removing the import hook."""
-    global _autopatch_settings
+    global _autopatch_settings, _deferred_integrations
     
     # Remove the import hook
     if _import_hook in sys.meta_path:
@@ -394,6 +536,9 @@ def reset_autopatch() -> None:
     
     for integration_name in patched:
         _lazy_load_and_unpatch(integration_name)
+    
+    # Clear deferred integrations
+    _deferred_integrations.clear()
     
     # Clear the settings
     _autopatch_settings = None
