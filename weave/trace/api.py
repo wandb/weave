@@ -186,10 +186,10 @@ def ref(location: str) -> ObjectRef:
             name, version = location.split(":")
         location = str(client._ref_uri(name, version, "obj"))
 
-    uri = Ref.parse_uri(location)
-    if not isinstance(uri, ObjectRef):
+    ref = Ref.parse_uri(location)
+    if not isinstance(ref, ObjectRef):
         raise TypeError("Expected an object ref")
-    return uri
+    return ref
 
 
 def get(uri: str | ObjectRef) -> Any:

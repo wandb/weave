@@ -4,7 +4,7 @@ from collections.abc import Iterable
 from concurrent.futures import Future
 from typing import Any, Union
 
-from weave.trace.refs import OpRef, Ref
+from weave.trace.refs import OpRef
 from weave.trace.weave_client import Call, CallsIter
 from weave.trace_server.constants import MAX_OP_NAME_LENGTH
 
@@ -83,9 +83,8 @@ def flatten_calls(calls: Union[Iterable[Call], CallsIter], *, depth: int = 0) ->
 def flattened_calls_to_names(flattened_calls: list) -> list:
     lst = []
     for call, depth in flattened_calls:
-        ref = Ref.parse_uri(call.op_name)
-        assert isinstance(ref, OpRef)
-        lst.append((ref.name, depth))
+        op_ref = OpRef.parse_uri(call.op_name)
+        lst.append((op_ref.name, depth))
     return lst
 
 

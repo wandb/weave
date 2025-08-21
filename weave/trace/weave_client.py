@@ -1695,12 +1695,8 @@ class WeaveClient:
         - Should we somehow include supervision (ie. the ground truth) in the payload?
         """
         # Parse the refs (acts as validation)
-        call_ref = Ref.parse_uri(weave_ref_uri)
-        if not isinstance(call_ref, CallRef):
-            raise TypeError(f"Invalid call ref: {weave_ref_uri}")
-        scorer_call_ref = Ref.parse_uri(call_ref_uri)
-        if not isinstance(scorer_call_ref, CallRef):
-            raise TypeError(f"Invalid scorer call ref: {call_ref_uri}")
+        call_ref = CallRef.parse_uri(weave_ref_uri)  # noqa: RUF100
+        scorer_call_ref = CallRef.parse_uri(call_ref_uri)  # # noqa: RUF100
         runnable_ref = Ref.parse_uri(runnable_ref_uri)
         if not isinstance(runnable_ref, (OpRef, ObjectRef)):
             raise TypeError(f"Invalid scorer op ref: {runnable_ref_uri}")
