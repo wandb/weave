@@ -210,7 +210,7 @@ optimized_module = optimizer.compile(
 For optimizers that use `dspy.Evaluate` under the hood (ex: MIPROv2), you can optionally [initialize a `wandb` run](https://docs.wandb.ai/guides/track/create-an-experiment/) which will log the evaluation metrics over time as a line chart and log the evolution of the program signature as [W&B Tables](https://docs.wandb.ai/guides/models/tables/).
 
 :::info This is an experimental feature
-Bringing both W&B Models and Weave to improve your DSPy optimization workflow is experimental. We will keep improving the integration.
+Using both W&B Models and Weave to improve your DSPy optimization workflow is experimental. 
 :::
 
 To use this feature first install `wandb` sdk.
