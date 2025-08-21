@@ -183,8 +183,8 @@ class FutureExecutor:
         with self._active_futures_lock:
             self._active_futures.discard(future)
 
-        if exception := future.exception():
-            logger.error(f"Task failed: {_format_exception(exception)}")
+            if exception := future.exception():
+                logger.error(f"Task failed: {_format_exception(exception)}")
 
     def _shutdown(self) -> None:
         """Shutdown the thread pool executor. Should only be called when the program is exiting."""
