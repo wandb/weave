@@ -127,16 +127,19 @@ OnOutputHandlerType = Callable[[Any, FinishCallbackType, dict], Any]
 # Call, original function output, exception if occurred
 OnFinishHandlerType = Callable[["Call", Any, Optional[BaseException]], None]
 
+# Cache sentinel values as a frozenset for O(1) lookups
+_SENTINEL_VALUES = frozenset({
+    None,
+    Ellipsis,
+    OPENAI_NOT_GIVEN,
+    COHERE_NOT_GIVEN,
+    ANTHROPIC_NOT_GIVEN,
+    CEREBRAS_NOT_GIVEN,
+})
+
 
 def _value_is_sentinel(param: Any) -> bool:
-    return param.default in (
-        None,
-        Ellipsis,
-        OPENAI_NOT_GIVEN,
-        COHERE_NOT_GIVEN,
-        ANTHROPIC_NOT_GIVEN,
-        CEREBRAS_NOT_GIVEN,
-    )
+    return param.default in _SENTINEL_VALUES
 
 
 def _apply_fn_defaults_to_inputs(
