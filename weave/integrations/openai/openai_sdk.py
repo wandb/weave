@@ -392,35 +392,24 @@ def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
                 return True
             return False
 
-        # Create a stateful accumulator that handles conditional accumulation
+        # Create a stateful accumulator for streaming responses
         def native_accumulator(acc: Any, value: Any) -> Any:
-            # Get the current call context to access inputs
-            try:
-                from weave.trace.context import call_context
-                current_call = call_context.get_current_call()
-                if current_call and hasattr(current_call, 'inputs'):
-                    inputs = current_call.inputs
-                    # Only accumulate if streaming is enabled
-                    if not should_use_accumulator(inputs):
-                        # Non-streaming mode: just return the value
-                        # Post-processing will be handled by postprocess_output
-                        return value
-                    # Streaming mode: use the OpenAI accumulator
-                    skip_last = not _openai_stream_options_is_set(inputs)
-                    return openai_accumulator(acc, value, skip_last=skip_last)
-            except StopIteration as e:
-                # The accumulator signals completion with StopIteration
-                # Return the accumulated value for post-processing
-                return e.value
-            except Exception:
-                # Fallback if we can't get the call context
-                pass
+            # This accumulator is only called when we're iterating over a stream
+            # The op framework only calls it for iterators/generators
+            from weave.trace.context import call_context
+            current_call = call_context.get_current_call()
+            skip_last = False
+            if current_call and hasattr(current_call, 'inputs'):
+                inputs = current_call.inputs
+                # Check if stream_options is set to determine skip_last
+                skip_last = not _openai_stream_options_is_set(inputs)
             
-            # Default: use accumulator without skipping
-            return openai_accumulator(acc, value, skip_last=False)
+            # Use the OpenAI accumulator for streaming
+            # It will raise StopIteration when appropriate (e.g., to skip the last chunk)
+            return openai_accumulator(acc, value, skip_last=skip_last)
 
         # Custom postprocess_inputs to handle OpenAI-specific input processing
-        def postprocess_inputs_func(inputs: dict) -> dict:
+        def openai_postprocess_inputs(inputs: dict) -> dict:
             # Handle completion instance conversion
             if 'self' in inputs and completion_instance_check(inputs['self']):
                 inputs['self'] = convert_completion_to_dict(inputs['self'])
@@ -433,10 +422,22 @@ def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
             return inputs
 
         op_kwargs = settings.model_dump()
+        
+        # Chain postprocess_inputs if user provided one
+        user_postprocess_inputs = op_kwargs.get('postprocess_inputs')
+        if user_postprocess_inputs:
+            def chained_postprocess_inputs(inputs: dict) -> dict:
+                # First apply OpenAI processing
+                inputs = openai_postprocess_inputs(inputs)
+                # Then apply user's processing
+                return user_postprocess_inputs(inputs)
+            op_kwargs['postprocess_inputs'] = chained_postprocess_inputs
+        else:
+            op_kwargs['postprocess_inputs'] = openai_postprocess_inputs
+        
         # Set the accumulator directly on the op
         op_kwargs['accumulator'] = native_accumulator
-        # Set the postprocess functions using public API
-        op_kwargs['postprocess_inputs'] = postprocess_inputs_func
+        # Set postprocess_output
         op_kwargs['postprocess_output'] = openai_on_finish_post_processor
         
         op = weave.op(_add_stream_options(fn), **op_kwargs)
@@ -473,35 +474,24 @@ def create_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]
                 return True
             return False
 
-        # Create a stateful accumulator that handles conditional accumulation
+        # Create a stateful accumulator for streaming responses
         def native_accumulator(acc: Any, value: Any) -> Any:
-            # Get the current call context to access inputs
-            try:
-                from weave.trace.context import call_context
-                current_call = call_context.get_current_call()
-                if current_call and hasattr(current_call, 'inputs'):
-                    inputs = current_call.inputs
-                    # Only accumulate if streaming is enabled
-                    if not should_use_accumulator(inputs):
-                        # Non-streaming mode: just return the value
-                        # Post-processing will be handled by postprocess_output
-                        return value
-                    # Streaming mode: use the OpenAI accumulator
-                    skip_last = not _openai_stream_options_is_set(inputs)
-                    return openai_accumulator(acc, value, skip_last=skip_last)
-            except StopIteration as e:
-                # The accumulator signals completion with StopIteration
-                # Return the accumulated value for post-processing
-                return e.value
-            except Exception:
-                # Fallback if we can't get the call context
-                pass
+            # This accumulator is only called when we're iterating over a stream
+            # The op framework only calls it for iterators/generators
+            from weave.trace.context import call_context
+            current_call = call_context.get_current_call()
+            skip_last = False
+            if current_call and hasattr(current_call, 'inputs'):
+                inputs = current_call.inputs
+                # Check if stream_options is set to determine skip_last
+                skip_last = not _openai_stream_options_is_set(inputs)
             
-            # Default: use accumulator without skipping
-            return openai_accumulator(acc, value, skip_last=False)
+            # Use the OpenAI accumulator for streaming
+            # It will raise StopIteration when appropriate (e.g., to skip the last chunk)
+            return openai_accumulator(acc, value, skip_last=skip_last)
 
         # Custom postprocess_inputs to handle OpenAI-specific input processing
-        def postprocess_inputs_func(inputs: dict) -> dict:
+        def openai_postprocess_inputs(inputs: dict) -> dict:
             # Handle completion instance conversion
             if 'self' in inputs and completion_instance_check(inputs['self']):
                 inputs['self'] = convert_completion_to_dict(inputs['self'])
@@ -514,10 +504,22 @@ def create_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]
             return inputs
 
         op_kwargs = settings.model_dump()
+        
+        # Chain postprocess_inputs if user provided one
+        user_postprocess_inputs = op_kwargs.get('postprocess_inputs')
+        if user_postprocess_inputs:
+            def chained_postprocess_inputs(inputs: dict) -> dict:
+                # First apply OpenAI processing
+                inputs = openai_postprocess_inputs(inputs)
+                # Then apply user's processing
+                return user_postprocess_inputs(inputs)
+            op_kwargs['postprocess_inputs'] = chained_postprocess_inputs
+        else:
+            op_kwargs['postprocess_inputs'] = openai_postprocess_inputs
+        
         # Set the accumulator directly on the op
         op_kwargs['accumulator'] = native_accumulator
-        # Set the postprocess functions using public API
-        op_kwargs['postprocess_inputs'] = postprocess_inputs_func
+        # Set postprocess_output
         op_kwargs['postprocess_output'] = openai_on_finish_post_processor
         
         op = weave.op(_add_stream_options(fn), **op_kwargs)
