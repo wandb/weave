@@ -149,12 +149,11 @@ ALLOW_MIXED_PROJECT_REFS = False
 logger = logging.getLogger(__name__)
 
 
-# TODO: should be Call, not WeaveObject
-CallsIter = PaginatedIterator[CallSchema, WeaveObject]
+CallsIter = PaginatedIterator[CallSchema, "Call"]
 DEFAULT_CALLS_PAGE_SIZE = 1000
 
 
-def print_call_link(call: Call) -> None:
+def print_call_link(call: "Call") -> None:
     if settings.should_print_call_link():
         logger.info(f"{TRACE_CALL_EMOJI} {call.ui_url}")
 
@@ -199,8 +198,7 @@ def _make_calls_iterator(
             )
         )
 
-    # TODO: Should be Call, not WeaveObject
-    def transform_func(call: CallSchema) -> WeaveObject:
+    def transform_func(call: CallSchema) -> Call:
         entity, project = project_id.split("/")
         return make_client_call(entity, project, call, server)
 
@@ -621,7 +619,7 @@ class NoOpCall(Call):
 
 def make_client_call(
     entity: str, project: str, server_call: CallSchema, server: TraceServerInterface
-) -> WeaveObject:
+) -> Call:
     if (call_id := server_call.id) is None:
         raise ValueError("Call ID is None")
 
@@ -646,7 +644,9 @@ def make_client_call(
     if isinstance(call.attributes, AttributesDict):
         call.attributes.freeze()
     ref = CallRef(entity, project, call_id)
-    return WeaveObject(call, ref, server, None)
+    # Set the ref on the call for future reference
+    set_ref(call, ref)
+    return call
 
 
 RESERVED_SUMMARY_USAGE_KEY = "usage"
