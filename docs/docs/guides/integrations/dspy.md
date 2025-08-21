@@ -275,5 +275,3 @@ DSPy often includes a verbose `history` in calls, which can increase ingestion v
 ```bash
 export WEAVE_DSPY_HIDE_HISTORY=true
 ```
-
-Accepted truthy values are `true`, `1`, or `yes`.
