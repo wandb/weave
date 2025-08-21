@@ -38,7 +38,7 @@ classify = dspy.Predict("sentence -> sentiment")
 classify(sentence="it's a charming and often affecting journey.")
 ```
 
-![dspy_trace.png](imgs/dspy/dspy-trace.png)]
+![dspy_trace.png](imgs/dspy/dspy-trace.png)
 
 Weave logs all LM calls in your DSPy program, providing details about inputs, outputs, latency of each component, token counts, cost and more.
 
