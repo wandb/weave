@@ -8,23 +8,18 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from weave.trace.weave_client import WeaveClient
 
-_global_weave_client: WeaveClient | None = None
-lock = threading.Lock()
+# Thread-local storage for per-thread clients
+_thread_local = threading.local()
 
 
 def set_weave_client_global(client: WeaveClient | None) -> None:
-    global _global_weave_client
-
-    # These outer guards are to avoid expensive lock acquisition
-    if client is not None and _global_weave_client is None:
-        with lock:
-            if _global_weave_client is None:
-                _global_weave_client = client
-
-    elif client is None and _global_weave_client is not None:
-        with lock:
-            if _global_weave_client is not None:
-                _global_weave_client = client
+    """Sets the client for the current thread.
+    
+    Note: Despite the name, this now sets a thread-local client.
+    The name is kept for backwards compatibility.
+    Each thread must call weave.init() to get its own client.
+    """
+    _thread_local.client = client
 
 
 # This is no longer a concept, but should be
@@ -33,9 +28,14 @@ def set_weave_client_global(client: WeaveClient | None) -> None:
 
 
 def get_weave_client() -> WeaveClient | None:
-    # if (context_client := context_state._graph_client.get()) is not None:
-    #     return context_client
-    return _global_weave_client
+    """Gets the WeaveClient for the current thread.
+    
+    Returns the thread-local client if set, otherwise returns None.
+    Each thread must have its own client.
+    """
+    return getattr(_thread_local, 'client', None)
+
+
 
 
 class WeaveInitError(Exception): ...
@@ -43,7 +43,7 @@ class WeaveInitError(Exception): ...
 
 def require_weave_client() -> WeaveClient:
     if (client := get_weave_client()) is None:
-        raise WeaveInitError("You must call `weave.init(<project_name>)` first")
+        raise WeaveInitError("You must call `weave.init(<project_name>)` in this thread first")
     return client
 
 
@@ -67,7 +67,7 @@ def with_weave_client(
     current_client = get_weave_client()
     if entity is None and project is None:
         if required and current_client is None:
-            raise WeaveInitError("You must call `weave.init(<project_name>)` first")
+            raise WeaveInitError("You must call `weave.init(<project_name>)` in this thread first")
         yield current_client
     else:
         from weave.trace.weave_init import init_weave
@@ -77,4 +77,5 @@ def with_weave_client(
             client = init_weave(scoped_name, ensure_project_exists=False)
             yield client
         finally:
-            set_weave_client_global(current_client)
+            # Restore the previous thread-local client
+            _thread_local.client = current_client
