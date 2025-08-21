@@ -4,9 +4,9 @@ import logging
 import traceback
 from datetime import datetime
 from itertools import chain, repeat
-from typing import Any, Callable, Literal, Optional, Union
+from typing import Annotated, Any, Callable, Literal, Optional, Union
 
-from pydantic import PrivateAttr
+from pydantic import Field, PrivateAttr
 from rich.console import Console
 from typing_extensions import Self
 
@@ -113,7 +113,7 @@ class Evaluation(Object):
     scorers: Optional[list[ScorerLike]] = None
     preprocess_model_input: Optional[PreprocessModelInput] = None
     trials: int = 1
-    parallelism: Optional[int] = None
+    parallelism: Annotated[Optional[int], Field(gt=0)] = None
 
     # Custom evaluation name for display in the UI.  This is the same API as passing a
     # custom `call_display_name` to `weave.op` (see that for more details).
@@ -262,12 +262,7 @@ class Evaluation(Object):
         rows = dataset.rows
         num_rows = len(rows) * self.trials
 
-        # Use provided parallelism or fall back to environment setting
-        parallelism = (
-            self.parallelism
-            if self.parallelism is not None
-            else get_weave_parallelism()
-        )
+        parallelism = self.parallelism or get_weave_parallelism()
         trial_rows = chain.from_iterable(repeat(rows, self.trials))
         async for index, _example, eval_row in util.async_foreach(
             trial_rows, eval_example, parallelism
