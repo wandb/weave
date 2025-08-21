@@ -235,7 +235,16 @@ jobs:
       - name: Run nox (Non Trace Server)
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
-            -m "not trace_server"
+            -m "not trace_server" \
+            --cov-report=xml
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./tests/coverage.xml
+          flags: trace-no-server
+          name: trace-no-server-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   trace-tests:
     name: Trace nox tests
@@ -348,7 +357,8 @@ jobs:
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
             -m "trace_server" \
-            --trace-server=sqlite
+            --trace-server=sqlite \
+            --cov-report=xml
       - name: Run nox (Clickhouse Trace Server)
         env:
           WEAVE_SENTRY_ENV: ci
@@ -360,7 +370,16 @@ jobs:
           OPENAI_API_KEY: dummyapikey
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
-            -m "trace_server and not skip_clickhouse_client"
+            -m "trace_server and not skip_clickhouse_client" \
+            --cov-report=xml
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./tests/coverage.xml
+          flags: trace-tests
+          name: trace-tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}-${{ matrix.nox-shard }}
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
   trace-tests-matrix-check: # This job does nothing and is only used for the branch protection
     if: always()
 
