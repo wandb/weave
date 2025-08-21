@@ -4,7 +4,7 @@
   <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
 </a>
 
-[DSPy](https://dspy.ai/) is a framework for algorithmically optimizing LM prompts and weights, especially when LMs are used one or more times within a pipeline. Using the DSPy Weave integration, Weave will automatically tracks and log calls made using DSPy modules and functions.
+[DSPy](https://dspy.ai/) is a framework for algorithmically optimizing LM prompts and weights, especially when LMs are used one or more times within a pipeline. Using the DSPy Weave integration, Weave will automatically track and log calls made using DSPy modules and functions.
 
 :::note Support for DSPy 3.x
 The DSPy Weave integration supports DSPy version 3.x. Features like Evaluation and Optimization are not supported for versions below 3.x.
