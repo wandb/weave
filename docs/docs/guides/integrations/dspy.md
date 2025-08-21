@@ -175,7 +175,7 @@ From the Evals tab, select multiple evals and click **Compare**. See [Evaluation
 
 ## Optimization
 
-One of the most powerful offering by DSPy is their optimization module. You can use the integration to log the traces and get more of out of your optimization workflow.
+DSPy features a powerful [optimization module](https://dspy.ai/learn/optimization/overview/) that helps tune the prompts or weights in your program. Using the DSPy Weave integration, Weave will log traces as you optimize to help you get more out of your optimization workflow. 
 
 ```python
 import os
