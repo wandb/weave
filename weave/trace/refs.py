@@ -35,8 +35,8 @@ class Ref:
         memo[id(self)] = res
         return res
 
-    @classmethod
-    def parse_uri(cls, uri: str) -> Self:
+    @staticmethod
+    def parse_uri(uri: str) -> AnyRef:
         if not uri.startswith("weave:///"):
             raise ValueError(f"Invalid URI: {uri}")
         path = uri[len("weave:///") :]
@@ -65,10 +65,10 @@ class Ref:
         else:
             raise ValueError(f"Unknown ref kind: {kind}")
 
-    @classmethod
-    def maybe_parse_uri(cls, s: str) -> Self | None:
+    @staticmethod
+    def maybe_parse_uri(s: str) -> AnyRef | None:
         try:
-            return cls.parse_uri(s)
+            return Ref.parse_uri(s)
         except ValueError:
             return None
 
@@ -129,8 +129,8 @@ class TableRef(Ref):
 
     @classmethod
     def parse_uri(cls, uri: str) -> Self:
-        if not isinstance(parsed := Ref.parse_uri(uri), TableRef):
-            raise TypeError(f"URI is not for a Table: {uri}")
+        if not isinstance(parsed := Ref.parse_uri(uri), cls):
+            raise TypeError(f"URI is not for a {cls.__name__}: {uri}")
         return parsed
 
 
@@ -258,8 +258,8 @@ class ObjectRef(RefWithExtra):
 
     @classmethod
     def parse_uri(cls, uri: str) -> Self:
-        if not isinstance(parsed := Ref.parse_uri(uri), ObjectRef):
-            raise TypeError(f"URI is not for an Object: {uri}")
+        if not isinstance(parsed := Ref.parse_uri(uri), cls):
+            raise TypeError(f"URI is not for an {cls.__name__}: {uri}")
         return parsed
 
 
@@ -280,8 +280,8 @@ class OpRef(ObjectRef):
 
     @classmethod
     def parse_uri(cls, uri: str) -> Self:
-        if not isinstance(parsed := Ref.parse_uri(uri), OpRef):
-            raise TypeError(f"URI is not for an Op: {uri}")
+        if not isinstance(parsed := Ref.parse_uri(uri), cls):
+            raise TypeError(f"URI is not for an {cls.__name__}: {uri}")
         return parsed
 
 
@@ -312,8 +312,8 @@ class CallRef(RefWithExtra):
 
     @classmethod
     def parse_uri(cls, uri: str) -> Self:
-        if not isinstance(parsed := Ref.parse_uri(uri), CallRef):
-            raise TypeError(f"URI is not for a Call: {uri}")
+        if not isinstance(parsed := Ref.parse_uri(uri), cls):
+            raise TypeError(f"URI is not for a {cls.__name__}: {uri}")
         return parsed
 
 
