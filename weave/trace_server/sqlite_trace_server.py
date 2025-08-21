@@ -998,20 +998,6 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
             row_digests = [r[1] for r in insert_rows]
 
-            # Handle parallel uploads: reorder row_digests if row_order is specified
-            if req.table.row_order is not None:
-                if len(req.table.row_order) != len(row_digests):
-                    raise ValueError(
-                        f"row_order length ({len(req.table.row_order)}) must match rows length ({len(row_digests)})"
-                    )
-                # Validate row_order indices are valid
-                if not all(0 <= i < len(row_digests) for i in req.table.row_order):
-                    raise ValueError(
-                        f"row_order indices must be between 0 and {len(row_digests) - 1}"
-                    )
-                # Reorder row_digests based on the specified order
-                row_digests = [row_digests[i] for i in req.table.row_order]
-
             table_hasher = hashlib.sha256()
             for row_digest in row_digests:
                 table_hasher.update(row_digest.encode())
@@ -1024,6 +1010,27 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             conn.commit()
 
         return tsi.TableCreateRes(digest=digest, row_digests=row_digests)
+
+    def table_create_from_digests(
+        self, req: tsi.TableCreateFromDigestsReq
+    ) -> tsi.TableCreateRes:
+        """Create a table by specifying row digests, instead actual rows"""
+        conn, cursor = get_conn_cursor(self.db_path)
+
+        # Calculate table digest from row digests
+        table_hasher = hashlib.sha256()
+        for row_digest in req.row_digests:
+            table_hasher.update(row_digest.encode())
+        digest = table_hasher.hexdigest()
+
+        with self.lock:
+            cursor.execute(
+                "INSERT OR IGNORE INTO tables (project_id, digest, row_digests) VALUES (?, ?, ?)",
+                (req.project_id, digest, json.dumps(req.row_digests)),
+            )
+            conn.commit()
+
+        return tsi.TableCreateRes(digest=digest, row_digests=req.row_digests)
 
     def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
         conn, cursor = get_conn_cursor(self.db_path)
@@ -1085,20 +1092,6 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 "INSERT OR IGNORE INTO table_rows (project_id, digest, val) VALUES (?, ?, ?)",
                 new_rows_needed_to_insert,
             )
-
-            # Handle parallel uploads: reorder final_row_digests if row_order is specified
-            if req.row_order is not None:
-                if len(req.row_order) != len(final_row_digests):
-                    raise ValueError(
-                        f"row_order length ({len(req.row_order)}) must match final rows length ({len(final_row_digests)})"
-                    )
-                # Validate row_order indices are valid
-                if not all(0 <= i < len(final_row_digests) for i in req.row_order):
-                    raise ValueError(
-                        f"row_order indices must be between 0 and {len(final_row_digests) - 1}"
-                    )
-                # Reorder final_row_digests based on the specified order
-                final_row_digests = [final_row_digests[i] for i in req.row_order]
 
             table_hasher = hashlib.sha256()
             for row_digest in final_row_digests:
@@ -1237,62 +1230,6 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             tables.append(tsi.TableStatsRow(count=count, digest=digest))
 
         return tsi.TableQueryStatsBatchRes(tables=tables)
-
-    def table_merge(self, req: tsi.TablesMergeReq) -> tsi.TablesMergeRes:
-        """Merge multiple tables into a single table.
-        Takes digests of tables and merges them into a single table.
-        The tables must have the same row_digests.
-        The new table will have the same row_digests as the first table.
-        """
-        conn, cursor = get_conn_cursor(self.db_path)
-
-        # First, get all the tables and their row_digests
-        placeholders = ",".join(["?" for _ in req.digests])
-        query = f"""
-        SELECT digest, row_digests
-        FROM tables
-        WHERE project_id = ? AND digest IN ({placeholders})
-        ORDER BY CASE 
-        """
-
-        # Build the ORDER BY clause to preserve the order of input digests
-        for i, digest in enumerate(req.digests):
-            query += f" WHEN digest = ? THEN {i}"
-        query += " ELSE 999999 END"
-
-        parameters = [req.project_id] + req.digests + req.digests
-        cursor.execute(query, parameters)
-        query_result = cursor.fetchall()
-
-        if len(query_result) == 0:
-            raise NotFoundError(f"Tables {req.digests} not found")
-        if len(query_result) == 1:
-            # If we only have one table, just return it as-is
-            return tsi.TablesMergeRes(
-                digest=query_result[0][0], row_digests=json.loads(query_result[0][1])
-            )
-
-        # Get all row digests from all tables, preserving order
-        all_row_digests = []
-        for row in query_result:
-            table_row_digests = json.loads(row[1])
-            all_row_digests.extend(table_row_digests)
-
-        # Create a new table digest from the combined row digests
-        table_hasher = hashlib.sha256()
-        for row_digest in all_row_digests:
-            table_hasher.update(row_digest.encode())
-        new_digest = table_hasher.hexdigest()
-
-        # Insert the new merged table
-        with self.lock:
-            cursor.execute(
-                "INSERT OR IGNORE INTO tables (project_id, digest, row_digests) VALUES (?, ?, ?)",
-                (req.project_id, new_digest, json.dumps(all_row_digests)),
-            )
-            conn.commit()
-
-        return tsi.TablesMergeRes(digest=new_digest, row_digests=all_row_digests)
 
     def refs_read_batch(self, req: tsi.RefsReadBatchReq) -> tsi.RefsReadBatchRes:
         # TODO: This reads one ref at a time, it should read them in batches

@@ -489,23 +489,15 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
                 # Fallback: create single chunk with all rows
                 chunks = [req.table.rows]
 
-            # Log chunking info for debugging
-            total_chunk_rows = sum(len(chunk) for chunk in chunks)
-            logger.info(
-                f"Split {len(req.table.rows)} rows into {len(chunks)} chunks (total: {total_chunk_rows})"
-            )
-
             # Validate that chunking didn't create duplicates
+            total_chunk_rows = sum(len(chunk) for chunk in chunks)
             if total_chunk_rows != len(req.table.rows):
                 raise RuntimeError(
                     f"Chunking error: expected {len(req.table.rows)} rows, got {total_chunk_rows}"
                 )
 
-            for i, chunk in enumerate(chunks):
-                logger.debug(f"Chunk {i}: {len(chunk)} rows")
-
             # Create tables in parallel while preserving order
-            with ThreadPoolExecutor(max_workers=min(len(chunks), 16)) as executor:
+            with ThreadPoolExecutor(max_workers=min(len(chunks), 32)) as executor:
                 # Submit all futures and track their order
                 futures = []
                 for i, chunk in enumerate(chunks):
@@ -516,10 +508,12 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
                 # Collect results in order
                 table_digests = [None] * len(chunks)
+                all_row_digests = []
                 for chunk_index, future in futures:
                     try:
                         result = future.result()
                         table_digests[chunk_index] = result.digest
+                        all_row_digests.extend(result.row_digests)
                     except Exception as e:
                         logger.error(f"Failed to create table chunk {chunk_index}: {e}")
                         raise
@@ -530,18 +524,18 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
                 # Log the digests we're about to merge
                 logger.info(
-                    f"Created {len(table_digests)} table chunks, digests: {table_digests}"
+                    f"Created {len(table_digests)} table chunks, with # rows: {len(req.table.rows)}"
                 )
 
-            # Merge all tables using the table/merge endpoint
-            merge_req = tsi.TablesMergeReq(
-                project_id=req.table.project_id, digests=table_digests
+            # Create combined table using the table/create_from_digests endpoint
+            create_req = tsi.TableCreateFromDigestsReq(
+                project_id=req.table.project_id, row_digests=all_row_digests
             )
-            merge_res = self.table_merge(merge_req)
+            create_res = self.table_create_from_digests(create_req)
 
             return tsi.TableCreateRes(
-                digest=merge_res.digest,
-                row_digests=merge_res.row_digests,
+                digest=create_res.digest,
+                row_digests=create_req.row_digests,
             )
         else:
             return self._generic_request(
@@ -624,16 +618,19 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             "/table/query_stats", req, tsi.TableQueryStatsReq, tsi.TableQueryStatsRes
         )
 
-    def table_merge(
-        self, req: Union[tsi.TablesMergeReq, dict[str, Any]]
-    ) -> tsi.TablesMergeRes:
-        """Merge multiple tables into a single table using the table/merge endpoint."""
+    def table_create_from_digests(
+        self, req: Union[tsi.TableCreateFromDigestsReq, dict[str, Any]]
+    ) -> tsi.TableCreateRes:
+        """Create a table by specifying row digests instead of actual rows."""
         if isinstance(req, dict):
-            req = tsi.TablesMergeReq.model_validate(req)
-        req = cast(tsi.TablesMergeReq, req)
+            req = tsi.TableCreateFromDigestsReq.model_validate(req)
+        req = cast(tsi.TableCreateFromDigestsReq, req)
 
         return self._generic_request(
-            "/table/merge", req, tsi.TablesMergeReq, tsi.TablesMergeRes
+            "/table/create_from_digests",
+            req,
+            tsi.TableCreateFromDigestsReq,
+            tsi.TableCreateRes,
         )
 
     def table_query_stats_batch(

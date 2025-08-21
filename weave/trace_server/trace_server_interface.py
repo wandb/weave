@@ -243,16 +243,6 @@ class TableSchemaForInsert(BaseModel):
     rows: list[dict[str, Any]]
 
 
-class TablesMergeReq(BaseModel):
-    project_id: str
-    digests: list[str]
-
-
-class TablesMergeRes(BaseModel):
-    digest: str
-    row_digests: list[str]
-
-
 class OtelExportReq(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     project_id: str
@@ -641,6 +631,11 @@ class ObjQueryRes(BaseModel):
 
 class TableCreateReq(BaseModelStrict):
     table: TableSchemaForInsert
+
+
+class TableCreateFromDigestsReq(BaseModelStrict):
+    project_id: str
+    row_digests: list[str]
 
 
 """
@@ -1258,6 +1253,10 @@ class TraceServerInterface(Protocol):
 
     # Table API
     def table_create(self, req: TableCreateReq) -> TableCreateRes: ...
+    def table_create_from_digests(
+        self, req: TableCreateFromDigestsReq
+    ) -> TableCreateRes: ...
+
     def table_update(self, req: TableUpdateReq) -> TableUpdateRes: ...
     def table_query(self, req: TableQueryReq) -> TableQueryRes: ...
     def table_query_stream(self, req: TableQueryReq) -> Iterator[TableRowSchema]: ...

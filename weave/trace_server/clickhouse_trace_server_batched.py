@@ -869,7 +869,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             "tables",
             data=[(req.table.project_id, digest, row_digests)],
             column_names=["project_id", "digest", "row_digests"],
-            settings={"async_insert": "1", "wait_for_async_insert": "0"}
         )
         return tsi.TableCreateRes(digest=digest, row_digests=row_digests)
 
@@ -960,71 +959,24 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
         return tsi.TableUpdateRes(digest=digest, updated_row_digests=updated_digests)
 
-    def table_merge(self, req: tsi.TablesMergeReq) -> tsi.TablesMergeRes:
-        """Takes digests of tables and merges them into a single table.
-        The tables must have the same row_digests.
-        The new table will have the same row_digests as the first table.
-        """
-        # Validate that digests is not empty
-        if not req.digests:
-            raise ValueError("Cannot merge tables: digests list is empty")
-
-        table_sql = """
-            WITH {digests:Array(String)} AS digests_arr
-            SELECT groupArray(10000000)(elem) AS row_digests
-            FROM
-            (
-                SELECT elem
-                FROM
-                (
-                    SELECT
-                        any(elem) AS elem,
-                        digest,
-                        pos
-                        FROM tables
-                        ARRAY JOIN
-                        row_digests AS elem,
-                        arrayEnumerate(row_digests) AS pos
-                    WHERE project_id = {project_id:String}
-                        AND digest IN digests_arr
-                    GROUP BY digest, pos
-            )
-            ORDER BY indexOf(digests_arr, digest), pos
-        )
-        """
-        tables = self.ch_client.query(
-            table_sql,
-            parameters={"project_id": req.project_id, "digests": req.digests},
-        )
-
-        # If we only have one table, just return it as-is
-        if len(req.digests) == 1:
-            return tsi.TablesMergeRes(
-                digest=req.digests[0], row_digests=tables.result_rows[0][0]
-            )
-        if len(tables.result_rows) == 0:
-            raise NotFoundError(f"Tables {req.digests} not found")
-        if len(tables.result_rows) != 1:
-            raise ValueError(
-                f"Expected exactly 1 result row from groupArray, got {len(tables.result_rows)}"
-            )
-
-        # Get all combined row digests from the groupArray query
-        all_digests = tables.result_rows[0][0]
+    def table_create_from_digests(
+        self, req: tsi.TableCreateFromDigestsReq
+    ) -> tsi.TableCreateRes:
+        """Create a table by specifying row digests, instead actual rows"""
+        # Calculate table digest from row digests
         table_hasher = hashlib.sha256()
-        for row_digest in all_digests:
+        for row_digest in req.row_digests:
             table_hasher.update(row_digest.encode())
         digest = table_hasher.hexdigest()
 
-        # create new table with all tables.table_rows concattenated
-        new_table = [(req.project_id, digest, all_digests)]
+        # Insert into tables table
         self._insert(
             "tables",
-            data=new_table,
+            data=[(req.project_id, digest, req.row_digests)],
             column_names=["project_id", "digest", "row_digests"],
         )
 
-        return tsi.TablesMergeRes(digest=digest, row_digests=all_digests)
+        return tsi.TableCreateRes(digest=digest, row_digests=[])
 
     def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
         rows = list(self.table_query_stream(req))
