@@ -158,7 +158,7 @@ evaluate = dspy.Evaluate(
 result = evaluate(module)
 ```
 
-After the run completes, click on the weave url and navigate to the Evals view to see the evaluation summary, metrics, and per-sample rows. You can drill into any row to inspect the full trace and artifacts that produced that output.
+After the run completes, click on the generated Weave URL and navigate to **Evals** to see the evaluation summary, metrics, and per-sample rows. You can drill into any row to inspect the full trace and the artifacts that produced that output.
 
 ![](imgs/dspy/dspy_eval.png)
 
