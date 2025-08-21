@@ -10,7 +10,7 @@ This file is a trimmed down version of the original WandB Sentry module.
 
 from __future__ import annotations
 
-__all__ = ("Sentry",)
+__all__ = ("SENTRY_AVAILABLE", "Sentry", "sentry_sdk")
 
 
 import atexit
@@ -21,11 +21,18 @@ import sys
 from typing import TYPE_CHECKING, Any, Callable, Literal
 
 if TYPE_CHECKING:
-    from sentry_sdk._types import Event, ExcInfo
+    from sentry_sdk._types import ExcInfo
 
+# Try to import sentry_sdk, but make it optional
+try:
+    import sentry_sdk  # type: ignore
+    import sentry_sdk.utils  # type: ignore
 
-import sentry_sdk  # type: ignore
-import sentry_sdk.utils  # type: ignore
+    SENTRY_AVAILABLE = True
+except ImportError:
+    SENTRY_AVAILABLE = False
+    sentry_sdk = None  # type: ignore
+
 
 SENTRY_DEFAULT_DSN = "https://99697cf8ca5158250d3dd6cb23cca9b0@o151352.ingest.us.sentry.io/4507019311251456"
 
@@ -60,7 +67,8 @@ class Sentry:
 
         self.hub: sentry_sdk.hub.Hub | None = None
 
-        self._disabled = False
+        # Disable if sentry is not available
+        self._disabled = not SENTRY_AVAILABLE
 
         # ensure we always end the Sentry session
         atexit.register(self.end_session)
@@ -137,7 +145,6 @@ class Sentry:
     @_safe_noop
     def start_session(self) -> None:
         """Start a new session."""
-        assert self.hub is not None
         # get the current client and scope
         _, scope = self.hub._stack[-1]
         session = scope._session
@@ -149,7 +156,6 @@ class Sentry:
     @_safe_noop
     def end_session(self) -> None:
         """End the current session."""
-        assert self.hub is not None
         # get the current client and scope
         client, scope = self.hub._stack[-1]
         session = scope._session
@@ -161,7 +167,6 @@ class Sentry:
     @_safe_noop
     def mark_session(self, status: SessionStatus | None = None) -> None:
         """Mark the current session with a status."""
-        assert self.hub is not None
         _, scope = self.hub._stack[-1]
         session = scope._session
 
@@ -180,8 +185,6 @@ class Sentry:
         all events sent from this thread. It also tries to start a session
         if one doesn't already exist for this thread.
         """
-        assert self.hub is not None
-
         with self.hub.configure_scope() as scope:
             if tags is not None:
                 for tag in tags:
@@ -218,9 +221,10 @@ class Sentry:
         username: str | None = None,
     ) -> None:
         """Track an event to Sentry."""
-        assert self.hub is not None
+        if not SENTRY_AVAILABLE or self.hub is None:
+            return
 
-        event_data: Event = {
+        event_data: dict[str, Any] = {
             "message": event_name,
             "level": "info",
             "tags": tags or {},
