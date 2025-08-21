@@ -869,6 +869,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             "tables",
             data=[(req.table.project_id, digest, row_digests)],
             column_names=["project_id", "digest", "row_digests"],
+            settings={"async_insert": "1", "wait_for_async_insert": "0"}
         )
         return tsi.TableCreateRes(digest=digest, row_digests=row_digests)
 
@@ -964,9 +965,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         The tables must have the same row_digests.
         The new table will have the same row_digests as the first table.
         """
-        # First, get the tables
-        print(f">>>>> table_merge: merging {len(req.digests)} tables: {req.digests}")
-
         # Validate that digests is not empty
         if not req.digests:
             raise ValueError("Cannot merge tables: digests list is empty")
@@ -994,7 +992,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             ORDER BY indexOf(digests_arr, digest), pos
         )
         """
-        tables = self._query(
+        tables = self.ch_client.query(
             table_sql,
             parameters={"project_id": req.project_id, "digests": req.digests},
         )
@@ -1004,7 +1002,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             return tsi.TablesMergeRes(
                 digest=req.digests[0], row_digests=tables.result_rows[0][0]
             )
-
         if len(tables.result_rows) == 0:
             raise NotFoundError(f"Tables {req.digests} not found")
         if len(tables.result_rows) != 1:

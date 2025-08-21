@@ -1,5 +1,7 @@
 import datetime
 import io
+import threading
+import time
 import logging
 from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -457,7 +459,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         estimated_bytes = len(req.model_dump_json(by_alias=True).encode("utf-8"))
         if estimated_bytes > self.remote_request_bytes_limit:
             # Split rows into chunks aiming for 1MB size
-            target_chunk_bytes = 1 * 1024 * 1024  # 1MB
+            target_chunk_bytes = 1 * 1024 * 1024  # 2MB
             chunks = []
             current_chunk = []
             current_chunk_bytes = 0
@@ -505,22 +507,21 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             # Create tables in parallel while preserving order
             with ThreadPoolExecutor(max_workers=min(len(chunks), 16)) as executor:
                 # Submit all futures and track their order
-                future_to_index = {}
+                futures = []
                 for i, chunk in enumerate(chunks):
                     future = executor.submit(
-                        self._create_table_chunk, req.table.project_id, chunk
+                        self._create_table_chunk, req.table.project_id, chunk, i
                     )
-                    future_to_index[future] = i
+                    futures.append((i, future))
 
                 # Collect results in order
                 table_digests = [None] * len(chunks)
-                for future in as_completed(future_to_index):
+                for chunk_index, future in futures:
                     try:
                         result = future.result()
-                        chunk_index = future_to_index[future]
                         table_digests[chunk_index] = result.digest
                     except Exception as e:
-                        logger.error(f"Failed to create table chunk: {e}")
+                        logger.error(f"Failed to create table chunk {chunk_index}: {e}")
                         raise
 
                 # Safety check: ensure we have digests to merge
@@ -538,8 +539,6 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             )
             merge_res = self.table_merge(merge_req)
 
-            print("merge_res", merge_res.digest, "len", len(merge_res.row_digests))
-
             return tsi.TableCreateRes(
                 digest=merge_res.digest,
                 row_digests=merge_res.row_digests,
@@ -550,7 +549,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             )
 
     def _create_table_chunk(
-        self, project_id: str, rows: list[dict[str, Any]]
+        self, project_id: str, rows: list[dict[str, Any]], index: int
     ) -> tsi.TableCreateRes:
         """Create a single table chunk with the given rows."""
         chunk_req = tsi.TableCreateReq(
@@ -559,9 +558,15 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
                 rows=rows,
             )
         )
-        return self._generic_request(
+        start = time.time()
+        r = self._generic_request(
             "/table/create", chunk_req, tsi.TableCreateReq, tsi.TableCreateRes
         )
+        end = time.time()
+        print(
+            f">>>>> index: {index} [{threading.current_thread().name}] rows: {len(rows)} bytes: {len(chunk_req.model_dump_json(by_alias=True).encode('utf-8')) / 1024} time: {end - start}"
+        )
+        return r
 
     def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
         """Similar to `calls/batch_upsert`, we can dynamically adjust the payload size
