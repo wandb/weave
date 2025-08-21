@@ -80,8 +80,7 @@ def init_weave(
         # TODO: Prob should move into settings
         if (
             _current_client.project == project_name
-            and _current_client.ensure_project_exists
-            == ensure_project_exists
+            and _current_client.ensure_project_exists == ensure_project_exists
         ):
             return _current_client
         else:

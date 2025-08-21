@@ -17,8 +17,8 @@ from tests.trace.util import DummyTestException
 from tests.trace_server.conftest import *
 from tests.trace_server.conftest import TEST_ENTITY, get_trace_server_flag
 from weave.trace import autopatch, weave_client, weave_init
-from weave.trace.context.call_context import set_call_stack
 from weave.trace.context import weave_client_context
+from weave.trace.context.call_context import set_call_stack
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings import remote_http_trace_server
 from weave.trace_server_bindings.caching_middleware_trace_server import (
