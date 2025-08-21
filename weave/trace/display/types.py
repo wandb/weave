@@ -1,7 +1,8 @@
 """Common types for the display system."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass
@@ -11,7 +12,7 @@ class Style:
     Used by viewers to apply styling to text output.
     """
 
-    color: Optional[str] = None
+    color: str | None = None
     bold: bool = False
     italic: bool = False
     underline: bool = False

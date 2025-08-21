@@ -82,7 +82,6 @@ def get_viewer(name: str | None = None, **kwargs: Any) -> ViewerProtocol:
         raise ValueError(f"Unknown viewer: {name}")
 
 
-# Public API classes that delegate to the viewer
 class Console:
     """Console abstraction that delegates to the configured viewer.
 
@@ -281,7 +280,6 @@ class PaddingWrapper:
         return viewer.indent(content, amount)
 
 
-# Helper function for getting console instance
 def get_console() -> Console:
     """Get the default console instance."""
     return console
@@ -299,10 +297,10 @@ def _register_viewers() -> None:
     # Register rich viewer if available
     try:
         from weave.trace.display.viewers import rich_viewer
-
-        rich_viewer.register()
     except ImportError:
         pass  # Rich viewer not available
+    else:
+        rich_viewer.register()
 
 
 # Register viewers and create default console
@@ -310,7 +308,6 @@ _register_viewers()
 console = Console()
 
 
-# Re-export common types for convenience
 __all__ = [
     "Console",
     "PaddingWrapper",
@@ -322,6 +319,4 @@ __all__ = [
     "console",
     "get_viewer",
     "register_viewer",
-    "reset_viewer",  # Deprecated
-    "set_viewer",  # Deprecated
 ]

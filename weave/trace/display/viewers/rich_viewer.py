@@ -1,6 +1,8 @@
 """Rich library viewer implementation."""
 
-from typing import Any, Optional, Union
+from __future__ import annotations
+
+from typing import Any
 
 from typing_extensions import Self
 
@@ -22,7 +24,7 @@ class RichViewer:
         self,
         file: Any = None,
         emoji: bool = True,
-        force_terminal: Optional[bool] = None,
+        force_terminal: bool | None = None,
         **kwargs: Any,
     ):
         from rich.console import Console as RichConsole
@@ -38,7 +40,7 @@ class RichViewer:
         *objects: Any,
         sep: str = " ",
         end: str = "\n",
-        style: Optional[Union[str, Style]] = None,
+        style: str | Style | None = None,
         **kwargs: Any,
     ) -> None:
         if isinstance(style, Style):
@@ -47,7 +49,7 @@ class RichViewer:
             kwargs["style"] = style
         self._console.print(*objects, sep=sep, end=end, **kwargs)
 
-    def rule(self, title: str = "", style: Optional[Union[str, Style]] = None) -> None:
+    def rule(self, title: str = "", style: str | Style | None = None) -> None:
         if isinstance(style, Style):
             style = style.to_rich_style()
         self._console.rule(title, style=style)
@@ -57,9 +59,9 @@ class RichViewer:
 
     def create_table(
         self,
-        title: Optional[str] = None,
+        title: str | None = None,
         show_header: bool = True,
-        header_style: Optional[str] = None,
+        header_style: str | None = None,
         **kwargs: Any,
     ) -> TableProtocol:
         return RichTable(
@@ -67,7 +69,7 @@ class RichViewer:
         )
 
     def create_progress(
-        self, console: Optional[ConsoleProtocol] = None, **kwargs: Any
+        self, console: ConsoleProtocol | None = None, **kwargs: Any
     ) -> ProgressProtocol:
         return RichProgress(console=self._console, **kwargs)
 
@@ -81,7 +83,7 @@ class RichViewer:
         return RichSyntax(code, lexer, theme=theme, line_numbers=line_numbers)
 
     def create_text(
-        self, text: str = "", style: Optional[Union[str, Style]] = None
+        self, text: str = "", style: str | Style | None = None
     ) -> TextProtocol:
         return RichText(text, style=style)
 
@@ -101,9 +103,9 @@ class RichTable:
 
     def __init__(
         self,
-        title: Optional[str] = None,
+        title: str | None = None,
         show_header: bool = True,
-        header_style: Optional[str] = None,
+        header_style: str | None = None,
         **kwargs: Any,
     ):
         from rich.table import Table as RichTableBase
@@ -116,7 +118,7 @@ class RichTable:
         self,
         header: str,
         justify: str = "left",
-        style: Optional[str] = None,
+        style: str | None = None,
         **kwargs: Any,
     ) -> None:
         self._table.add_column(header, justify=justify, style=style, **kwargs)
@@ -137,7 +139,7 @@ class RichTable:
                 processed_values.append(value)
         self._table.add_row(*processed_values)
 
-    def to_string(self, console: Optional[ConsoleProtocol] = None) -> str:
+    def to_string(self, console: ConsoleProtocol | None = None) -> str:
         if (
             console
             and hasattr(console, "_viewer")
@@ -183,16 +185,16 @@ class RichProgress:
         self._progress = Progress(*columns, console=console, **kwargs)
 
     def add_task(
-        self, description: str, total: Optional[float] = None, **kwargs: Any
+        self, description: str, total: float | None = None, **kwargs: Any
     ) -> int:
         return self._progress.add_task(description, total=total, **kwargs)
 
     def update(
         self,
         task_id: int,
-        advance: Optional[float] = None,
-        completed: Optional[float] = None,
-        total: Optional[float] = None,
+        advance: float | None = None,
+        completed: float | None = None,
+        total: float | None = None,
         **kwargs: Any,
     ) -> None:
         self._progress.update(
@@ -227,7 +229,7 @@ class RichSyntax:
 
         self._syntax = Syntax(code, lexer, theme=theme, line_numbers=line_numbers)
 
-    def to_string(self, console: Optional[ConsoleProtocol] = None) -> str:
+    def to_string(self, console: ConsoleProtocol | None = None) -> str:
         if (
             console
             and hasattr(console, "_viewer")
@@ -248,7 +250,7 @@ class RichSyntax:
 class RichText:
     """Rich text implementation."""
 
-    def __init__(self, text: str = "", style: Optional[Union[str, Style]] = None):
+    def __init__(self, text: str = "", style: str | Style | None = None):
         from rich.text import Text as RichTextBase
 
         if isinstance(style, Style):

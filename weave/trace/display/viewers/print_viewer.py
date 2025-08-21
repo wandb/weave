@@ -1,7 +1,9 @@
 """Print-based viewer implementation (fallback)."""
 
+from __future__ import annotations
+
 import sys
-from typing import Any, Optional, Union
+from typing import Any
 
 from typing_extensions import Self
 
@@ -53,7 +55,7 @@ class PrintViewer:
         *objects: Any,
         sep: str = " ",
         end: str = "\n",
-        style: Optional[Union[str, Style]] = None,
+        style: str | Style | None = None,
         **kwargs: Any,
     ) -> None:
         output = sep.join(str(obj) for obj in objects)
@@ -61,7 +63,7 @@ class PrintViewer:
             output = style.to_ansi(output)
         print(output, end=end, file=self._file)
 
-    def rule(self, title: str = "", style: Optional[Union[str, Style]] = None) -> None:
+    def rule(self, title: str = "", style: str | Style | None = None) -> None:
         width = 80  # Default width
         if title:
             padding = (width - len(title) - 2) // 2
@@ -80,9 +82,9 @@ class PrintViewer:
 
     def create_table(
         self,
-        title: Optional[str] = None,
+        title: str | None = None,
         show_header: bool = True,
-        header_style: Optional[str] = None,
+        header_style: str | None = None,
         **kwargs: Any,
     ) -> TableProtocol:
         return PrintTable(
@@ -90,7 +92,7 @@ class PrintViewer:
         )
 
     def create_progress(
-        self, console: Optional[ConsoleProtocol] = None, **kwargs: Any
+        self, console: ConsoleProtocol | None = None, **kwargs: Any
     ) -> ProgressProtocol:
         return PrintProgress(console=console, file=self._file)
 
@@ -104,7 +106,7 @@ class PrintViewer:
         return PrintSyntax(code, lexer, line_numbers=line_numbers)
 
     def create_text(
-        self, text: str = "", style: Optional[Union[str, Style]] = None
+        self, text: str = "", style: str | Style | None = None
     ) -> TextProtocol:
         return PrintText(text, style=style)
 
@@ -122,9 +124,9 @@ class PrintTable:
 
     def __init__(
         self,
-        title: Optional[str] = None,
+        title: str | None = None,
         show_header: bool = True,
-        header_style: Optional[str] = None,
+        header_style: str | None = None,
         **kwargs: Any,
     ):
         self.title = title
@@ -137,7 +139,7 @@ class PrintTable:
         self,
         header: str,
         justify: str = "left",
-        style: Optional[str] = None,
+        style: str | None = None,
         **kwargs: Any,
     ) -> None:
         self._columns.append({"header": header, "justify": justify, "style": style})
@@ -153,7 +155,7 @@ class PrintTable:
                 processed_values.append(str(value))
         self._rows.append(processed_values)
 
-    def to_string(self, console: Optional[ConsoleProtocol] = None) -> str:
+    def to_string(self, console: ConsoleProtocol | None = None) -> str:
         if not self._columns:
             return ""
 
@@ -212,14 +214,14 @@ class PrintTable:
 class PrintProgress:
     """Print-based progress bar implementation."""
 
-    def __init__(self, console: Optional[ConsoleProtocol] = None, file: Any = None):
+    def __init__(self, console: ConsoleProtocol | None = None, file: Any = None):
         self.console = console
         self._file = file or sys.stdout
         self._tasks: dict[int, dict[str, Any]] = {}
         self._next_task_id = 0
 
     def add_task(
-        self, description: str, total: Optional[float] = None, **kwargs: Any
+        self, description: str, total: float | None = None, **kwargs: Any
     ) -> int:
         task_id = self._next_task_id
         self._next_task_id += 1
@@ -234,9 +236,9 @@ class PrintProgress:
     def update(
         self,
         task_id: int,
-        advance: Optional[float] = None,
-        completed: Optional[float] = None,
-        total: Optional[float] = None,
+        advance: float | None = None,
+        completed: float | None = None,
+        total: float | None = None,
         **kwargs: Any,
     ) -> None:
         if task_id in self._tasks:
@@ -297,7 +299,7 @@ class PrintSyntax:
         self.lexer = lexer
         self.line_numbers = line_numbers
 
-    def to_string(self, console: Optional[ConsoleProtocol] = None) -> str:
+    def to_string(self, console: ConsoleProtocol | None = None) -> str:
         if self.line_numbers:
             lines = self.code.split("\n")
             width = len(str(len(lines)))
@@ -311,7 +313,7 @@ class PrintSyntax:
 class PrintText:
     """Print-based text implementation."""
 
-    def __init__(self, text: str = "", style: Optional[Union[str, Style]] = None):
+    def __init__(self, text: str = "", style: str | Style | None = None):
         self._text = text
         self._style = style
 
