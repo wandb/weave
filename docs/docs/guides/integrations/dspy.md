@@ -262,7 +262,7 @@ optimized_module = optimizer.compile(module, trainset=dataset.train, **compile_k
 print(optimized_module)
 ```
 
-Running this program will give you both the W&B run and Weave URLs. You can click on the W&B run url to check out the logged metrics and W&B Table. You can click on the "Overview" tab of the run page to find out the traces associated with this optimization run.
+Running this program will generate both W&B run and Weave URLs. You can click on the W&B run URL to view the logged metrics and the W&B Table. You can then click on the **Overview** tab of the run page to see the traces associated with the optimization run.
 
 ![](imgs/dspy/dspy_models_weave.png)
 
