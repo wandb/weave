@@ -626,4 +626,6 @@ def fully_qualified_opname(wrap_fn: Callable) -> str:
     return "file://" + op_module_file + "." + wrap_fn.__name__
 
 
-serializer.register_serializer(Op, save_instance, load_instance, is_op)
+# Registration moved to handlers/ops.py
+# The old registration is kept here for backward compatibility but will be removed
+# serializer.register_serializer(Op, save_instance, load_instance, is_op)

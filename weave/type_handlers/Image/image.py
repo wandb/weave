@@ -66,5 +66,7 @@ def load(artifact: MemTraceFilesArtifact, name: str) -> Image.Image:
 
 
 def register() -> None:
-    if dependencies_met:
-        serializer.register_serializer(Image.Image, save, load)
+    # Registration moved to weave.trace.serialization.handlers.image
+    # if dependencies_met:
+    #     serializer.register_serializer(Image.Image, save, load)
+    pass

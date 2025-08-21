@@ -20,4 +20,6 @@ def load(encoded: str) -> datetime.datetime:
 
 
 def register() -> None:
-    serializer.register_serializer(datetime.datetime, save, load)
+    # Registration moved to weave.trace.serialization.handlers.media
+    # serializer.register_serializer(datetime.datetime, save, load)
+    pass

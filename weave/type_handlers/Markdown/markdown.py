@@ -26,4 +26,6 @@ def load(encoded: SerializedMarkdown) -> Markdown:
 
 
 def register() -> None:
-    serializer.register_serializer(Markdown, save, load)
+    # Registration moved to weave.trace.serialization.handlers.media
+    # serializer.register_serializer(Markdown, save, load)
+    pass
