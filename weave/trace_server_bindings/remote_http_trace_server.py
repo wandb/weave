@@ -459,7 +459,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         estimated_bytes = len(req.model_dump_json(by_alias=True).encode("utf-8"))
         if estimated_bytes > self.remote_request_bytes_limit:
             # Split rows into chunks aiming for 1MB size
-            target_chunk_bytes = 1 * 1024 * 1024  # 2MB
+            target_chunk_bytes = 10 * 1024 * 1024  # 2MB
             chunks = []
             current_chunk = []
             current_chunk_bytes = 0
