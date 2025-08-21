@@ -1,10 +1,9 @@
 import datetime
 import io
+import logging
 import threading
 import time
-import logging
 from collections.abc import Iterator
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Optional, Union, cast
 from zoneinfo import ZoneInfo
 
@@ -18,6 +17,7 @@ from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.http_utils import (
+    TableChunkManager,
     handle_response_error,
     log_dropped_call_batch,
     log_dropped_feedback_batch,
@@ -449,6 +449,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         self, req: Union[tsi.TableCreateReq, dict[str, Any]]
     ) -> tsi.TableCreateRes:
         """Create tables in parallel and merge them using the table/merge endpoint.
+
         When the request is too large, we split it into smaller chunks and create
         them concurrently, then merge the results.
         """
@@ -456,91 +457,34 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             req = tsi.TableCreateReq.model_validate(req)
         req = cast(tsi.TableCreateReq, req)
 
-        estimated_bytes = len(req.model_dump_json(by_alias=True).encode("utf-8"))
-        if estimated_bytes > self.remote_request_bytes_limit:
-            # Split rows into chunks aiming for 1MB size
-            target_chunk_bytes = 10 * 1024 * 1024  # 2MB
-            chunks = []
-            current_chunk = []
-            current_chunk_bytes = 0
-
-            for row in req.table.rows:
-                row_bytes = len(str(row).encode("utf-8"))
-
-                # If adding this row would exceed target and we have rows in current chunk
-                if (
-                    current_chunk_bytes + row_bytes > target_chunk_bytes
-                    and current_chunk
-                ):
-                    chunks.append(current_chunk)
-                    current_chunk = [row]
-                    current_chunk_bytes = row_bytes
-                else:
-                    current_chunk.append(row)
-                    current_chunk_bytes += row_bytes
-
-            # Add the last chunk if it has rows
-            if current_chunk:
-                chunks.append(current_chunk)
-
-            # Ensure we have at least one chunk and no empty chunks
-            chunks = [chunk for chunk in chunks if chunk]
-            if not chunks:
-                # Fallback: create single chunk with all rows
-                chunks = [req.table.rows]
-
-            # Validate that chunking didn't create duplicates
-            total_chunk_rows = sum(len(chunk) for chunk in chunks)
-            if total_chunk_rows != len(req.table.rows):
-                raise RuntimeError(
-                    f"Chunking error: expected {len(req.table.rows)} rows, got {total_chunk_rows}"
-                )
-
-            # Create tables in parallel while preserving order
-            with ThreadPoolExecutor(max_workers=min(len(chunks), 32)) as executor:
-                # Submit all futures and track their order
-                futures = []
-                for i, chunk in enumerate(chunks):
-                    future = executor.submit(
-                        self._create_table_chunk, req.table.project_id, chunk, i
-                    )
-                    futures.append((i, future))
-
-                # Collect results in order
-                table_digests = [None] * len(chunks)
-                all_row_digests = []
-                for chunk_index, future in futures:
-                    try:
-                        result = future.result()
-                        table_digests[chunk_index] = result.digest
-                        all_row_digests.extend(result.row_digests)
-                    except Exception as e:
-                        logger.error(f"Failed to create table chunk {chunk_index}: {e}")
-                        raise
-
-                # Safety check: ensure we have digests to merge
-                if not all(digest is not None for digest in table_digests):
-                    raise RuntimeError("Not all table chunks were created successfully")
-
-                # Log the digests we're about to merge
-                logger.info(
-                    f"Created {len(table_digests)} table chunks, with # rows: {len(req.table.rows)}"
-                )
-
-            # Create combined table using the table/create_from_digests endpoint
-            create_req = tsi.TableCreateFromDigestsReq(
-                project_id=req.table.project_id, row_digests=all_row_digests
-            )
-            create_res = self.table_create_from_digests(create_req)
-
-            return tsi.TableCreateRes(
-                digest=create_res.digest,
-                row_digests=create_req.row_digests,
-            )
-        else:
+        chunk_manager = TableChunkManager()
+        estimated_bytes = chunk_manager.calculate_request_bytes(req)
+        if estimated_bytes <= self.remote_request_bytes_limit:
             return self._generic_request(
                 "/table/create", req, tsi.TableCreateReq, tsi.TableCreateRes
             )
+
+        chunk_manager = TableChunkManager()
+        chunks = chunk_manager.create_chunks(req.table.rows)
+        chunk_manager.validate_chunks(chunks, req.table.rows)
+
+        table_digests, all_row_digests = chunk_manager.process_chunks_concurrently(
+            chunks, self._create_table_chunk, req.table.project_id
+        )
+
+        logger.debug(
+            f"Created {len(table_digests)} table chunks, with # rows: {len(req.table.rows)}"
+        )
+
+        create_req = tsi.TableCreateFromDigestsReq(
+            project_id=req.table.project_id, row_digests=all_row_digests
+        )
+        create_res = self.table_create_from_digests(create_req)
+
+        return tsi.TableCreateRes(
+            digest=create_res.digest,
+            row_digests=create_req.row_digests,
+        )
 
     def _create_table_chunk(
         self, project_id: str, rows: list[dict[str, Any]], index: int
