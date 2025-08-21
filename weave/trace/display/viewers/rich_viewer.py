@@ -260,3 +260,15 @@ class RichText:
 
     def __repr__(self) -> str:
         return repr(self._text)
+
+
+# Registration function to be called by display module
+def register() -> None:
+    """Register the rich viewer with the display system.
+
+    This function is called by the display module after initialization
+    to avoid circular import issues.
+    """
+    from weave.trace.display import display
+
+    display.register_viewer("rich", RichViewer)

@@ -7,7 +7,7 @@ display method (rich, print, logger, etc.).
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Callable
 
 from typing_extensions import Self
 
@@ -21,14 +21,18 @@ from weave.trace.display.protocols import (
 )
 from weave.trace.display.types import Style
 
+# Since ViewerProtocol is a Protocol, we can't use Type[ViewerProtocol]
+# Instead, we use a callable that returns a ViewerProtocol
+ViewerFactory = Callable[..., ViewerProtocol]
+
 # Global viewer registry and configuration
-_viewer_registry: dict[str, Any] = {}
+_viewer_registry: dict[str, ViewerFactory] = {}
 _current_viewer: ViewerProtocol | None = None
-_default_viewer_name = "auto"  # Will try rich first, then fallback to print
+_default_viewer_name = "auto"
 
 
 # Viewer registration and configuration
-def register_viewer(name: str, viewer_class: Any) -> None:
+def register_viewer(name: str, viewer_class: ViewerFactory) -> None:
     """Register a viewer implementation.
 
     Args:
@@ -36,6 +40,25 @@ def register_viewer(name: str, viewer_class: Any) -> None:
         viewer_class: The viewer class to register.
     """
     _viewer_registry[name] = viewer_class
+
+
+def _get_auto_viewer(**kwargs: Any) -> ViewerProtocol:
+    """Get the auto-detected viewer.  Tries to use rich first, then falls back to print.
+
+    Args:
+        **kwargs: Additional arguments to pass to the viewer constructor.
+
+    Returns:
+        The auto-detected viewer.
+    """
+    try:
+        from weave.trace.display.viewers.rich_viewer import RichViewer
+
+        return RichViewer(**kwargs)
+    except ImportError:
+        from weave.trace.display.viewers.print_viewer import PrintViewer
+
+        return PrintViewer(**kwargs)
 
 
 def set_viewer(name: str, **kwargs: Any) -> None:
@@ -48,15 +71,10 @@ def set_viewer(name: str, **kwargs: Any) -> None:
     global _current_viewer
 
     if name == "auto":
-        # Auto-detect: try rich first, fallback to print
-        try:
-            _current_viewer = _create_rich_viewer(**kwargs)
-        except ImportError:
-            from weave.trace.display.viewers.print_viewer import PrintViewer
-
-            _current_viewer = PrintViewer(**kwargs)
+        _current_viewer = _get_auto_viewer(**kwargs)
     elif name in _viewer_registry:
-        _current_viewer = _viewer_registry[name](**kwargs)
+        viewer_class = _viewer_registry[name]
+        _current_viewer = viewer_class(**kwargs)
     else:
         raise ValueError(f"Unknown viewer: {name}")
 
@@ -74,33 +92,6 @@ def get_viewer() -> ViewerProtocol:
 
     assert _current_viewer is not None  # Set by set_viewer above
     return _current_viewer
-
-
-def _create_rich_viewer(**kwargs: Any) -> ViewerProtocol:
-    """Create a rich viewer, raising ImportError if rich is not available."""
-    try:
-        import rich  # noqa: F401
-
-        from weave.trace.display.viewers.rich_viewer import RichViewer
-
-        return RichViewer(**kwargs)
-    except ImportError as e:
-        raise ImportError("Rich library is not available") from e
-
-
-def _register_default_viewers() -> None:
-    """Register the default built-in viewers."""
-    try:
-        from weave.trace.display.viewers.rich_viewer import RichViewer
-
-        register_viewer("rich", RichViewer)
-    except ImportError:
-        # Rich viewer not available, that's OK
-        pass
-
-    from weave.trace.display.viewers.print_viewer import PrintViewer
-
-    register_viewer("print", PrintViewer)
 
 
 # Public API classes that delegate to the viewer
@@ -131,18 +122,16 @@ class Console:
         if viewer:
             # Create a specific viewer for this console
             if viewer == "auto":
-                try:
-                    self._viewer = _create_rich_viewer(
-                        file=file, emoji=emoji, force_terminal=force_terminal, **kwargs
-                    )
-                except ImportError:
-                    from weave.trace.display.viewers.print_viewer import PrintViewer
-
-                    self._viewer = PrintViewer(file=file, emoji=emoji, **kwargs)
+                kwargs = {
+                    "file": file,
+                    "emoji": emoji,
+                    "force_terminal": force_terminal,
+                    **kwargs,
+                }
+                self._viewer = _get_auto_viewer(**kwargs)
             elif viewer in _viewer_registry:
-                self._viewer = _viewer_registry[viewer](
-                    file=file, emoji=emoji, **kwargs
-                )
+                viewer_class = _viewer_registry[viewer]
+                self._viewer = viewer_class(file=file, emoji=emoji, **kwargs)
             else:
                 raise ValueError(f"Unknown viewer: {viewer}")
         else:
@@ -319,10 +308,26 @@ def get_console() -> Console:
     return console
 
 
-# Register default viewers on module import
-_register_default_viewers()
+# Register built-in viewers
+# This happens after all module-level definitions to avoid circular imports
+def _register_viewers() -> None:
+    """Register built-in viewers after module initialization."""
+    # Register print viewer (always available)
+    from weave.trace.display.viewers import print_viewer
 
-# Create default console instance
+    print_viewer.register()
+
+    # Register rich viewer if available
+    try:
+        from weave.trace.display.viewers import rich_viewer
+
+        rich_viewer.register()
+    except ImportError:
+        pass  # Rich viewer not available
+
+
+# Register viewers and create default console
+_register_viewers()
 console = Console()
 
 

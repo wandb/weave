@@ -322,3 +322,15 @@ class PrintText:
 
     def __repr__(self) -> str:
         return f"Text({self._text!r}, style={self._style!r})"
+
+
+# Registration function to be called by display module
+def register() -> None:
+    """Register the print viewer with the display system.
+
+    This function is called by the display module after initialization
+    to avoid circular import issues.
+    """
+    from weave.trace.display import display
+
+    display.register_viewer("print", PrintViewer)
