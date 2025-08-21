@@ -113,7 +113,7 @@ article = draft_article(topic="World Cup 2002")
 
 ## Evaluation of your DSPy Program
 
-Weave now provides tighter integration with DSPy evaluation workflow. When you run `dspy.Evaluate`, weave automatically logs:
+When you run `dspy.Evaluate`, weave automatically logs:
 
 - Aggregated metrics for the evaluation run and per-sample scores you return from your metrics,
 - Per-sample inputs/outputs to full execution traces for deep debugging,
