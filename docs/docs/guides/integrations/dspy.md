@@ -12,7 +12,7 @@ The DSPy Weave integration supports DSPy version 3.x. Features like Evaluation a
 
 ## Getting starting with tracing DSPy modules
 
-It’s important to store traces of AI applications, both during development and in production, ideally in a central location. These traces can be useful for debugging, and for building evaluation datasets that will help you improve your application iteratively.
+Storing traces of AI applications, both during development and in production, is useful for debugging, and building evaluation datasets that will help you improve your application iteratively.
 
 Once initiated with `weave.init()`, Weave will automatically capture traces for [DSPy](https://dspy.ai). To run the example below, you need to install DSPy and Weave.
 
