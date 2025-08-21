@@ -47,7 +47,7 @@ Weave logs all LM calls in your DSPy program, providing details about inputs, ou
 
 ### Track your custom DSPy Modules and Signatures
 
-A `Module` is the building block with learnable parameters for DSPy programs that abstracts a prompting technique. A `Signature` is a declarative specification of input/output behavior of a DSPy Module. Weave automatically tracks all in-built and custom Signatures and Modules in your DSPy programs.
+A `Module` is the building block for DSPy programs that abstracts a prompting technique with learnable parameters. A `Signature` is a declarative specification of input/output behavior of a DSPy Module. Weave automatically tracks all in-built and custom Modules and Signatures in your DSPy programs.
 
 ```python
 import os
