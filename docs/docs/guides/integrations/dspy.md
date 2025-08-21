@@ -7,7 +7,7 @@
 [DSPy](https://dspy.ai/) is a framework for algorithmically optimizing LM prompts and weights, especially when LMs are used one or more times within a pipeline. Weave automatically tracks and logs calls made using DSPy modules and functions.
 
 :::note Support for DSPy 3.x
-The integration supports the new DSPy 3.x version. Features like Evaluation and Optimization are not supported for version below 3.x.
+The DSPy Weave integration supports DSPy version 3.x. Features like Evaluation and Optimization are not supported for versions below 3.x.
 :::
 
 ## Getting starting with tracing DSPy modules
