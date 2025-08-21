@@ -471,11 +471,6 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         table_digests, all_row_digests = chunk_manager.process_chunks_concurrently(
             chunks, self._create_table_chunk, req.table.project_id
         )
-
-        logger.debug(
-            f"Created {len(table_digests)} table chunks, with # rows: {len(req.table.rows)}"
-        )
-
         create_req = tsi.TableCreateFromDigestsReq(
             project_id=req.table.project_id, row_digests=all_row_digests
         )

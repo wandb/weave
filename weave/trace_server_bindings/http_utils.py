@@ -1,5 +1,6 @@
 import json
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, Any, Callable, Optional, TypeVar, Union
 
 from weave.trace_server import requests
@@ -325,8 +326,6 @@ class TableChunkManager:
         Returns:
             Tuple of (table_digests, all_row_digests)
         """
-        from concurrent.futures import ThreadPoolExecutor
-
         with ThreadPoolExecutor(
             max_workers=min(len(chunks), self.max_workers)
         ) as executor:
