@@ -2,6 +2,7 @@ import datetime
 import io
 import logging
 from collections.abc import Iterator
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Optional, Union, cast
 from zoneinfo import ZoneInfo
 
@@ -445,11 +446,9 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     def table_create(
         self, req: Union[tsi.TableCreateReq, dict[str, Any]]
     ) -> tsi.TableCreateRes:
-        """Similar to `calls/batch_upsert`, we can dynamically adjust the payload size
-        due to the property that table creation can be decomposed into a series of
-        updates. This is useful when the table creation size is too big to be sent in
-        a single request. We can create an empty table first, then update the table
-        with the rows.
+        """Create tables in parallel and merge them using the table/merge endpoint.
+        When the request is too large, we split it into smaller chunks and create
+        them concurrently, then merge the results.
         """
         if isinstance(req, dict):
             req = tsi.TableCreateReq.model_validate(req)
@@ -457,31 +456,112 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
         estimated_bytes = len(req.model_dump_json(by_alias=True).encode("utf-8"))
         if estimated_bytes > self.remote_request_bytes_limit:
-            initialization_req = tsi.TableCreateReq(
-                table=tsi.TableSchemaForInsert(
-                    project_id=req.table.project_id,
-                    rows=[],
-                )
-            )
-            initialization_res = self.table_create(initialization_req)
+            # Split rows into chunks aiming for 1MB size
+            target_chunk_bytes = 1 * 1024 * 1024  # 1MB
+            chunks = []
+            current_chunk = []
+            current_chunk_bytes = 0
 
-            update_req = tsi.TableUpdateReq(
-                project_id=req.table.project_id,
-                base_digest=initialization_res.digest,
-                updates=[
-                    tsi.TableAppendSpec(append=tsi.TableAppendSpecPayload(row=row))
-                    for row in req.table.rows
-                ],
+            for row in req.table.rows:
+                row_bytes = len(str(row).encode("utf-8"))
+
+                # If adding this row would exceed target and we have rows in current chunk
+                if (
+                    current_chunk_bytes + row_bytes > target_chunk_bytes
+                    and current_chunk
+                ):
+                    chunks.append(current_chunk)
+                    current_chunk = [row]
+                    current_chunk_bytes = row_bytes
+                else:
+                    current_chunk.append(row)
+                    current_chunk_bytes += row_bytes
+
+            # Add the last chunk if it has rows
+            if current_chunk:
+                chunks.append(current_chunk)
+
+            # Ensure we have at least one chunk and no empty chunks
+            chunks = [chunk for chunk in chunks if chunk]
+            if not chunks:
+                # Fallback: create single chunk with all rows
+                chunks = [req.table.rows]
+
+            # Log chunking info for debugging
+            total_chunk_rows = sum(len(chunk) for chunk in chunks)
+            logger.info(
+                f"Split {len(req.table.rows)} rows into {len(chunks)} chunks (total: {total_chunk_rows})"
             )
-            update_res = self.table_update(update_req)
+
+            # Validate that chunking didn't create duplicates
+            if total_chunk_rows != len(req.table.rows):
+                raise RuntimeError(
+                    f"Chunking error: expected {len(req.table.rows)} rows, got {total_chunk_rows}"
+                )
+
+            for i, chunk in enumerate(chunks):
+                logger.debug(f"Chunk {i}: {len(chunk)} rows")
+
+            # Create tables in parallel while preserving order
+            with ThreadPoolExecutor(max_workers=min(len(chunks), 16)) as executor:
+                # Submit all futures and track their order
+                future_to_index = {}
+                for i, chunk in enumerate(chunks):
+                    future = executor.submit(
+                        self._create_table_chunk, req.table.project_id, chunk
+                    )
+                    future_to_index[future] = i
+
+                # Collect results in order
+                table_digests = [None] * len(chunks)
+                for future in as_completed(future_to_index):
+                    try:
+                        result = future.result()
+                        chunk_index = future_to_index[future]
+                        table_digests[chunk_index] = result.digest
+                    except Exception as e:
+                        logger.error(f"Failed to create table chunk: {e}")
+                        raise
+
+                # Safety check: ensure we have digests to merge
+                if not all(digest is not None for digest in table_digests):
+                    raise RuntimeError("Not all table chunks were created successfully")
+
+                # Log the digests we're about to merge
+                logger.info(
+                    f"Created {len(table_digests)} table chunks, digests: {table_digests}"
+                )
+
+            # Merge all tables using the table/merge endpoint
+            merge_req = tsi.TablesMergeReq(
+                project_id=req.table.project_id, digests=table_digests
+            )
+            merge_res = self.table_merge(merge_req)
+
+            print("merge_res", merge_res.digest, "len", len(merge_res.row_digests))
 
             return tsi.TableCreateRes(
-                digest=update_res.digest, row_digests=update_res.updated_row_digests
+                digest=merge_res.digest,
+                row_digests=merge_res.row_digests,
             )
         else:
             return self._generic_request(
                 "/table/create", req, tsi.TableCreateReq, tsi.TableCreateRes
             )
+
+    def _create_table_chunk(
+        self, project_id: str, rows: list[dict[str, Any]]
+    ) -> tsi.TableCreateRes:
+        """Create a single table chunk with the given rows."""
+        chunk_req = tsi.TableCreateReq(
+            table=tsi.TableSchemaForInsert(
+                project_id=project_id,
+                rows=rows,
+            )
+        )
+        return self._generic_request(
+            "/table/create", chunk_req, tsi.TableCreateReq, tsi.TableCreateRes
+        )
 
     def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
         """Similar to `calls/batch_upsert`, we can dynamically adjust the payload size
@@ -537,6 +617,18 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     ) -> tsi.TableQueryStatsRes:
         return self._generic_request(
             "/table/query_stats", req, tsi.TableQueryStatsReq, tsi.TableQueryStatsRes
+        )
+
+    def table_merge(
+        self, req: Union[tsi.TablesMergeReq, dict[str, Any]]
+    ) -> tsi.TablesMergeRes:
+        """Merge multiple tables into a single table using the table/merge endpoint."""
+        if isinstance(req, dict):
+            req = tsi.TablesMergeReq.model_validate(req)
+        req = cast(tsi.TablesMergeReq, req)
+
+        return self._generic_request(
+            "/table/merge", req, tsi.TablesMergeReq, tsi.TablesMergeRes
         )
 
     def table_query_stats_batch(

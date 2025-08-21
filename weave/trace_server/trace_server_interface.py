@@ -243,6 +243,16 @@ class TableSchemaForInsert(BaseModel):
     rows: list[dict[str, Any]]
 
 
+class TablesMergeReq(BaseModel):
+    project_id: str
+    digests: list[str]
+
+
+class TablesMergeRes(BaseModel):
+    digest: str
+    row_digests: list[str]
+
+
 class OtelExportReq(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     project_id: str
