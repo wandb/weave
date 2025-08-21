@@ -213,7 +213,10 @@ class ObjectRef(RefWithExtra):
         # Move import here so that it only happens when the function is called.
         # This import is invalid in the trace server and represents a dependency
         # that should be removed.
-        from weave.trace.context.weave_client_context import get_weave_client
+        from weave.trace.context.weave_client_context import (
+            get_weave_client,
+            set_weave_client_global,
+        )
         from weave.trace.weave_init import init_weave
 
         gc = get_weave_client()
@@ -224,13 +227,14 @@ class ObjectRef(RefWithExtra):
         # yet initialized the client, we can initialize a client to
         # fetch the object. It is critical to reset the client after fetching the
         # object to avoid any side effects in user code.
-        init_client = init_weave(
+
+        client = init_weave(
             f"{self.entity}/{self.project}", ensure_project_exists=False
         )
         try:
-            res = init_client.client.get(self, objectify=objectify)
+            res = client.get(self, objectify=objectify)
         finally:
-            init_client.reset()
+            set_weave_client_global(None)
         return res
 
     def is_descended_from(self, potential_ancestor: ObjectRef) -> bool:
