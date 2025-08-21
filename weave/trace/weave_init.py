@@ -22,8 +22,6 @@ from weave.trace_server_bindings.caching_middleware_trace_server import (
 logger = logging.getLogger(__name__)
 
 
-_current_client: weave_client.WeaveClient | None = None
-
 
 def get_username() -> str | None:
     api = wandb.Api()
@@ -75,19 +73,18 @@ def init_weave(
     ensure_project_exists: bool = True,
     autopatch_settings: autopatch.AutopatchSettings | None = None,
 ) -> weave_client.WeaveClient:
-    global _current_client
-    if _current_client is not None:
+    current_client = weave_client_context.get_weave_client()
+    if current_client is not None:
         # TODO: Prob should move into settings
         if (
-            _current_client.project == project_name
-            and _current_client.ensure_project_exists == ensure_project_exists
+            current_client.project == project_name
+            and current_client.ensure_project_exists == ensure_project_exists
         ):
-            return _current_client
+            return current_client
         else:
             # Flush any pending calls before switching to a new project
-            _current_client.finish()
+            current_client.finish()
             weave_client_context.set_weave_client_global(None)
-            _current_client = None
 
     from weave.wandb_interface import (
         context as wandb_context_module,  # type: ignore
@@ -127,7 +124,6 @@ def init_weave(
     # If the project name was formatted by init, update the project name
     project_name = client.project
 
-    _current_client = client
     weave_client_context.set_weave_client_global(client)
 
     # autopatching is only supported for the wandb client, because OpenAI calls are not
@@ -167,7 +163,7 @@ def init_weave(
         }
     )
 
-    return _current_client
+    return client
 
 
 def init_weave_disabled() -> weave_client.WeaveClient:
@@ -181,10 +177,9 @@ def init_weave_disabled() -> weave_client.WeaveClient:
     make requests (eg. publishing, fetching, querying) while disabled
     will fail.
     """
-    global _current_client
-    if _current_client is not None:
+    current_client = weave_client_context.get_weave_client()
+    if current_client is not None:
         weave_client_context.set_weave_client_global(None)
-        _current_client = None
 
     client = weave_client.WeaveClient(
         "DISABLED",
@@ -193,7 +188,6 @@ def init_weave_disabled() -> weave_client.WeaveClient:
         ensure_project_exists=False,
     )
 
-    _current_client = client
     weave_client_context.set_weave_client_global(client)
     return client
 
@@ -219,10 +213,9 @@ def init_local() -> weave_client.WeaveClient:
 
 
 def finish() -> None:
-    global _current_client
-    if _current_client is not None:
+    current_client = weave_client_context.get_weave_client()
+    if current_client is not None:
         weave_client_context.set_weave_client_global(None)
-        _current_client = None
 
     # autopatching is only supported for the wandb client, because OpenAI calls are not
     # logged in local mode currently. When that's fixed, this reset_autopatch call can be

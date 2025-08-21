@@ -3474,10 +3474,9 @@ def test_weave_finish_unsets_client(client):
         return 1
 
     set_weave_client_global(None)
-    weave.trace.weave_init._current_client = client
     set_weave_client_global(client)
-    weave_client = weave.trace.weave_init._current_client
-    assert weave.trace.weave_init._current_client is not None
+    weave_client = get_weave_client()
+    assert get_weave_client() is not None
 
     foo()
     assert len(list(weave_client.get_calls())) == 1
@@ -3486,7 +3485,7 @@ def test_weave_finish_unsets_client(client):
 
     foo()
     assert len(list(weave_client.get_calls())) == 1
-    assert weave.trace.weave_init._current_client is None
+    assert get_weave_client() is None
 
 
 def test_op_sampling(client):
