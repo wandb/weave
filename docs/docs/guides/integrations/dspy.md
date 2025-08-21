@@ -270,7 +270,7 @@ Running this program will give you both the W&B run and Weave URLs. You can clic
 
 ### How can I reduce ingestion volume?
 
-DSPy often includes a verbose `history` in calls, which can increase ingestion volume and slow logging traces especially for evals and optimizations. To suppress logging of DSPy history fields in Weave, set the following environment variable before running your program:
+DSPy includes a verbose `history` field in calls, which increases ingestion volume and slows logging traces when running evaluations and optimizations. To suppress the logging of `history` fields in Weave, set the following environment variable before running your program:
 
 ```bash
 export WEAVE_DSPY_HIDE_HISTORY=true
