@@ -226,10 +226,26 @@ class SerializationRegistry:
     
     def _fallback_serialize(self, obj: Any, context: SerializationContext) -> Any:
         """Fallback serialization for unknown types."""
-        # Try to_dict if available
-        if hasattr(obj, "to_dict") and callable(obj.to_dict):
+        # Import here to avoid circular dependency
+        from weave.trace.serialization.dictifiable import try_to_dict
+        
+        # Try to_dict if available (using the protocol)
+        if as_dict := try_to_dict(obj):
+            # Recursively serialize the dictionary
+            new_context = context.increment_depth()
+            return {k: self.serialize(v, new_context) for k, v in as_dict.items()}
+        
+        # Try __dict__ if available
+        if hasattr(obj, "__dict__"):
             try:
-                return obj.to_dict()
+                obj_dict = obj.__dict__.copy()
+                new_context = context.increment_depth()
+                return {
+                    "_type": "Object",
+                    "_class": obj.__class__.__name__,
+                    "_module": obj.__class__.__module__,
+                    "data": {k: self.serialize(v, new_context) for k, v in obj_dict.items()}
+                }
             except Exception:
                 pass
         

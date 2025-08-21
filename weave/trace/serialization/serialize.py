@@ -11,6 +11,12 @@ from weave.trace.object_record import ObjectRecord
 from weave.trace.refs import ObjectRef, TableRef, parse_uri
 from weave.trace.serialization import custom_objs
 from weave.trace.serialization.dictifiable import try_to_dict
+from weave.trace.serialization.registry import (
+    SerializationContext,
+    get_registry,
+    serialize as registry_serialize,
+)
+from weave.trace.serialization.handlers import register_all_handlers
 from weave.trace_server.trace_server_interface import (
     FileContentReadReq,
     FileCreateReq,
@@ -21,6 +27,20 @@ from weave.utils.sanitize import REDACTED_VALUE, should_redact
 
 if TYPE_CHECKING:
     from weave.trace.weave_client import WeaveClient
+
+# Initialize the registry on module import
+_registry_initialized = False
+
+def _ensure_registry_initialized():
+    """Ensure the serialization registry is initialized."""
+    global _registry_initialized
+    if not _registry_initialized:
+        get_registry().clear()  # Clear any existing handlers
+        register_all_handlers()  # Register built-in handlers
+        # Register Weave-specific handlers
+        from weave.trace.serialization.handlers.weave_types import register_weave_handlers
+        register_weave_handlers()
+        _registry_initialized = True
 
 
 def is_pydantic_model_class(obj: Any) -> bool:
@@ -46,73 +66,101 @@ def _is_inline_custom_obj(encoded: dict) -> bool:
 def to_json(
     obj: Any, project_id: str, client: WeaveClient, use_dictify: bool = False
 ) -> Any:
-    if isinstance(obj, TableRef):
-        return obj.uri()
-    elif isinstance(obj, ObjectRef):
-        return obj.uri()
-    elif isinstance(obj, ObjectRecord):
-        res = {"_type": obj._class_name}
-        for k, v in obj.__dict__.items():
-            if k == "ref":
-                # Refs are pointers to remote objects and should not be part of
-                # the serialized payload. They are attached by the client after
-                # the object is saved and returned from the server. If we encounter
-                # a ref in the serialized payload, this would almost certainly be a
-                # bug. However, we would prefer not to raise and error as that would
-                # result in lost data. These refs should be removed before serialization.
-                if v is not None:
-                    logging.exception(f"Unexpected ref in object record: {obj}")
-                else:
-                    logging.warning(f"Unexpected null ref in object record: {obj}")
-                    continue
-            res[k] = to_json(v, project_id, client, use_dictify)
-        return res
-    elif isinstance_namedtuple(obj):
-        return {
-            k: to_json(v, project_id, client, use_dictify)
-            for k, v in obj._asdict().items()
-        }
-    elif isinstance(obj, (list, tuple)):
-        return [to_json(v, project_id, client, use_dictify) for v in obj]
-    elif isinstance(obj, dict):
-        return {k: to_json(v, project_id, client, use_dictify) for k, v in obj.items()}
-    elif is_pydantic_model_class(obj):
-        return obj.model_json_schema()
-
-    if isinstance(obj, (int, float, str, bool)) or obj is None:
-        return obj
-
-    # Add explicit handling for WeaveScorerResult models
-    from weave.flow.scorer import WeaveScorerResult
-
-    if isinstance(obj, WeaveScorerResult):
-        return {
-            k: to_json(v, project_id, client, use_dictify)
-            for k, v in obj.model_dump().items()
-        }
-
-    # This still blocks potentially on large-file i/o.
-    encoded = custom_objs.encode_custom_obj(obj)
-    if encoded is None:
-        if (
-            use_dictify
-            and not isinstance(obj, ALWAYS_STRINGIFY)
-            and not has_custom_repr(obj)
-        ):
-            return dictify(obj)
-
-        # TODO: I would prefer to only have this once in dictify? Maybe dictify and to_json need to be merged?
-        # However, even if dictify is false, i still want to try to convert to dict
-        elif as_dict := try_to_dict(obj):
+    """Serialize an object to JSON format using the new registry system.
+    
+    This function now uses the unified serialization registry while maintaining
+    backward compatibility with existing code.
+    """
+    _ensure_registry_initialized()
+    
+    # Create a serialization context
+    context = SerializationContext(
+        project_id=project_id,
+        client=client,
+        use_refs=True,
+        file_storage=True,
+        redact_pii=should_redact is not None,  # Enable PII redaction if sanitize module is configured
+    )
+    
+    # First try the new registry system
+    try:
+        result = registry_serialize(obj, context)
+        
+        # Handle special cases for backward compatibility
+        if isinstance(result, dict):
+            # If it's a fallback string, use the old fallback behavior
+            if result.get("_type") == "FallbackString" and use_dictify:
+                # Fall back to dictify for unknown types if requested
+                if not isinstance(obj, ALWAYS_STRINGIFY) and not has_custom_repr(obj):
+                    return dictify(obj)
+                return result.get("_value", fallback_encode(obj))
+        
+        return result
+        
+    except Exception as e:
+        # If the new system fails, fall back to the old implementation
+        # This ensures backward compatibility during migration
+        logging.debug(f"Registry serialization failed, using fallback: {e}")
+        
+        # OLD IMPLEMENTATION AS FALLBACK
+        if isinstance(obj, TableRef):
+            return obj.uri()
+        elif isinstance(obj, ObjectRef):
+            return obj.uri()
+        elif isinstance(obj, ObjectRecord):
+            res = {"_type": obj._class_name}
+            for k, v in obj.__dict__.items():
+                if k == "ref":
+                    if v is not None:
+                        logging.exception(f"Unexpected ref in object record: {obj}")
+                    else:
+                        logging.warning(f"Unexpected null ref in object record: {obj}")
+                        continue
+                res[k] = to_json(v, project_id, client, use_dictify)
+            return res
+        elif isinstance_namedtuple(obj):
             return {
                 k: to_json(v, project_id, client, use_dictify)
-                for k, v in as_dict.items()
+                for k, v in obj._asdict().items()
             }
-        return fallback_encode(obj)
-    if _is_inline_custom_obj(encoded):
-        return encoded
-    result = _build_result_from_encoded(encoded, project_id, client)
-    return result
+        elif isinstance(obj, (list, tuple)):
+            return [to_json(v, project_id, client, use_dictify) for v in obj]
+        elif isinstance(obj, dict):
+            return {k: to_json(v, project_id, client, use_dictify) for k, v in obj.items()}
+        elif is_pydantic_model_class(obj):
+            return obj.model_json_schema()
+
+        if isinstance(obj, (int, float, str, bool)) or obj is None:
+            return obj
+
+        # Add explicit handling for WeaveScorerResult models
+        from weave.flow.scorer import WeaveScorerResult
+
+        if isinstance(obj, WeaveScorerResult):
+            return {
+                k: to_json(v, project_id, client, use_dictify)
+                for k, v in obj.model_dump().items()
+            }
+
+        # This still blocks potentially on large-file i/o.
+        encoded = custom_objs.encode_custom_obj(obj)
+        if encoded is None:
+            if (
+                use_dictify
+                and not isinstance(obj, ALWAYS_STRINGIFY)
+                and not has_custom_repr(obj)
+            ):
+                return dictify(obj)
+            elif as_dict := try_to_dict(obj):
+                return {
+                    k: to_json(v, project_id, client, use_dictify)
+                    for k, v in as_dict.items()
+                }
+            return fallback_encode(obj)
+        if _is_inline_custom_obj(encoded):
+            return encoded
+        result = _build_result_from_encoded(encoded, project_id, client)
+        return result
 
 
 def _build_result_from_encoded(
