@@ -113,11 +113,11 @@ article = draft_article(topic="World Cup 2002")
 
 ## Evaluation of your DSPy Program
 
-When you run `dspy.Evaluate`, weave automatically logs:
+When you run `dspy.Evaluate`, Weave automatically logs:
 
 - Aggregated metrics and per-sample scores for the evaluation run
 - Per-sample inputs/outputs and full execution traces for deep debugging
-- Token usage, latency, and cost tracking when Weave is initialized before model calls
+- Token usage, latency, and cost tracking
 - Model configuration and metadata for side-by-side comparisons
 
 Before running the below code sample, install this `pip` package from `hendrycks/math` on GitHub.
