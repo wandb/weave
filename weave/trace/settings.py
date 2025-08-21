@@ -17,18 +17,6 @@ If True, all weave ops will behave like regular functions and no network request
 * Type: `bool`
 
 If True, prints a link to the Weave UI when calling a weave op.
-
-## `display_viewer`
-
-* Environment Variable: `WEAVE_DISPLAY_VIEWER`
-* Settings Key: `display_viewer`
-* Default: `auto`
-* Type: `str`
-
-Sets the display viewer for console output. Valid values are:
-- `auto`: Automatically selects rich if available, otherwise falls back to print
-- `rich`: Uses the rich library for enhanced terminal output
-- `print`: Uses basic print functions for output
 """
 
 import os
