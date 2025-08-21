@@ -27,7 +27,9 @@ class Refs(AbstractRichContainer[str]):
         return [Ref.parse_uri(ref) for ref in self.items]
 
     def call_refs(self) -> "Refs":
-        return Refs(ref for ref in self.items if isinstance(Ref.parse_uri(ref), CallRef))
+        return Refs(
+            ref for ref in self.items if isinstance(Ref.parse_uri(ref), CallRef)
+        )
 
     # TODO: Perhaps there should be a Calls that extends AbstractRichContainer
     def calls(self) -> list[WeaveObject]:
