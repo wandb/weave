@@ -120,7 +120,7 @@ When you run `dspy.Evaluate`, weave automatically logs:
 - Token usage, latency, and cost tracking when Weave is initialized before model calls
 - Model configuration and metadata for side-by-side comparisons
 
-To run the example below do:
+Before running the below code sample, install this `pip` package from `hendrycks/math` on GitHub.
 
 ```bash
 pip install git+https://github.com/hendrycks/math.git
