@@ -1,5 +1,5 @@
-import type { SidebarsConfig } from "@docusaurus/plugin-content-docs";
-import { SidebarItemCategoryBase } from "@docusaurus/plugin-content-docs-types";
+// import type { SidebarsConfig } from "@docusaurus/plugin-content-docs";
+// import { SidebarItemCategoryBase } from "@docusaurus/plugin-content-docs-types";
 
 const CATEGORY_SECTION_HEADER_MIXIN: SidebarItemCategoryBase = {
   type: "category",
@@ -104,6 +104,7 @@ const sidebars: SidebarsConfig = {
           label: "Evaluations",
           items: [
             "guides/core-types/evaluations",
+            "guides/core-types/evaluation_playground",
             "guides/core-types/datasets",
             "guides/evaluation/scorers",
             "guides/evaluation/builtin_scorers",
