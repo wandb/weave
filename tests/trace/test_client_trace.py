@@ -35,7 +35,7 @@ from weave.trace.context.weave_client_context import (
     get_weave_client,
     set_weave_client_global,
 )
-from weave.trace.refs import parse_uri
+from weave.trace.refs import Ref
 from weave.trace.vals import MissingSelfInstanceError
 from weave.trace.weave_client import sanitize_object_name
 from weave.trace_server import trace_server_interface as tsi
@@ -4157,7 +4157,7 @@ def test_obj_query_with_storage_size_clickhouse(client):
     assert queried_obj.size_bytes == 257  # Should have some size due to the test data
 
     # Test that a table is created and its size is correct
-    table_ref = parse_uri(queried_obj.val["rows"])
+    table_ref = Ref.parse_uri(queried_obj.val["rows"])
     res = client.server.table_query_stats_batch(
         tsi.TableQueryStatsBatchReq(
             project_id=client._project_id(),

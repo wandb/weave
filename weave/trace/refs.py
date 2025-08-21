@@ -335,19 +335,3 @@ def parse_name_version(name_version: str) -> tuple[str, str]:
         return name, version
     return name_version, "latest"
 
-
-# Legacy function names for backward compatibility
-def parse_uri(uri: str) -> AnyRef:
-    return Ref.parse_uri(uri)
-
-
-def parse_op_uri(uri: str) -> OpRef:
-    return OpRef.parse_uri(uri)
-
-
-def parse_object_uri(uri: str) -> ObjectRef:
-    return ObjectRef.parse_uri(uri)
-
-
-def maybe_parse_uri(s: str) -> AnyRef | None:
-    return Ref.maybe_parse_uri(s)

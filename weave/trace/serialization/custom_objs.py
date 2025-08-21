@@ -5,7 +5,7 @@ from typing import Any, Callable
 
 from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.op import Op, is_op, op
-from weave.trace.refs import ObjectRef, OpRef, parse_uri
+from weave.trace.refs import ObjectRef, OpRef, Ref
 from weave.trace.serialization import (
     op_type,  # noqa: F401, Must import this to register op save/load
 )
@@ -102,7 +102,7 @@ def decode_custom_inline_obj(obj: dict) -> Any:
     if load_op_uri is None:
         raise ValueError(f"No serializer found for `{type_}`")
 
-    ref = parse_uri(load_op_uri)
+    ref = Ref.parse_uri(load_op_uri)
     if not isinstance(ref, OpRef):
         raise TypeError(f"Expected OpRef, got `{type(ref)}`")
 
@@ -154,7 +154,7 @@ def decode_custom_files_obj(
         if load_instance_op_uri is None:
             raise ValueError(f"No serializer found for `{type_}`")
 
-        ref = parse_uri(load_instance_op_uri)
+        ref = Ref.parse_uri(load_instance_op_uri)
         if not isinstance(ref, ObjectRef):
             raise TypeError(f"Expected ObjectRef, got `{type(ref)}`")
 

@@ -13,7 +13,7 @@ from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.display.rich import pydantic_util
 from weave.trace.display.rich.container import AbstractRichContainer
 from weave.trace.display.rich.refs import Refs
-from weave.trace.refs import parse_object_uri, parse_uri
+from weave.trace.refs import ObjectRef, Ref
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.interface.query import Query
 
@@ -171,7 +171,7 @@ class RefFeedbackQuery(FeedbackQuery):
     weave_ref: str
 
     def __init__(self, ref: str) -> None:
-        parsed_ref = parse_uri(ref)
+        parsed_ref = Ref.parse_uri(ref)
         query = {
             "$expr": {
                 "$eq": [
@@ -203,7 +203,7 @@ class RefFeedbackQuery(FeedbackQuery):
         )
         if annotation_ref:
             try:
-                parse_object_uri(annotation_ref)
+                ObjectRef.parse_uri(annotation_ref)
             except TypeError:
                 raise TypeError(
                     "annotation_ref must be a valid object ref, eg weave:///<entity>/<project>/object/<name>:<digest>"

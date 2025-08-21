@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 from pydantic import BaseModel
 
 from weave.trace.object_record import ObjectRecord
-from weave.trace.refs import ObjectRef, TableRef, parse_uri
+from weave.trace.refs import ObjectRef, TableRef, Ref
 from weave.trace.serialization import custom_objs
 from weave.trace.serialization.dictifiable import try_to_dict
 from weave.trace_server.trace_server_interface import (
@@ -328,6 +328,6 @@ def from_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
             {k: from_json(v, project_id, server) for k, v in obj.items()}
         )
     elif isinstance(obj, str) and obj.startswith("weave://"):
-        return parse_uri(obj)
+        return Ref.parse_uri(obj)
 
     return obj

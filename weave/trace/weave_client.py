@@ -60,9 +60,6 @@ from weave.trace.refs import (
     OpRef,
     Ref,
     TableRef,
-    maybe_parse_uri,
-    parse_op_uri,
-    parse_uri,
 )
 from weave.trace.serialization.serialize import (
     from_json,
@@ -246,7 +243,7 @@ def _add_scored_by_to_calls_query(
     if query is not None:
         exprs.append(query["$expr"])
     for name in scored_by:
-        ref = maybe_parse_uri(name)
+        ref = Ref.maybe_parse_uri(name)
         if ref and isinstance(ref, ObjectRef):
             uri = name
             scorer_name = ref.name
@@ -431,7 +428,7 @@ class Call:
         This is different from `op_name` which is usually the ref of the op.
         """
         if self.op_name.startswith("weave:///"):
-            ref = parse_op_uri(self.op_name)
+            ref = OpRef.parse_uri(self.op_name)
             return ref.name
 
         return self.op_name
@@ -1698,13 +1695,13 @@ class WeaveClient:
         - Should we somehow include supervision (ie. the ground truth) in the payload?
         """
         # Parse the refs (acts as validation)
-        call_ref = parse_uri(weave_ref_uri)
+        call_ref = Ref.parse_uri(weave_ref_uri)
         if not isinstance(call_ref, CallRef):
             raise TypeError(f"Invalid call ref: {weave_ref_uri}")
-        scorer_call_ref = parse_uri(call_ref_uri)
+        scorer_call_ref = Ref.parse_uri(call_ref_uri)
         if not isinstance(scorer_call_ref, CallRef):
             raise TypeError(f"Invalid scorer call ref: {call_ref_uri}")
-        runnable_ref = parse_uri(runnable_ref_uri)
+        runnable_ref = Ref.parse_uri(runnable_ref_uri)
         if not isinstance(runnable_ref, (OpRef, ObjectRef)):
             raise TypeError(f"Invalid scorer op ref: {runnable_ref_uri}")
 
