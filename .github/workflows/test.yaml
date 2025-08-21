@@ -235,8 +235,7 @@ jobs:
       - name: Run nox (Non Trace Server)
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
-            -m "not trace_server" \
-            --cov-report=xml
+            -m "not trace_server"
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
         with:
@@ -357,8 +356,7 @@ jobs:
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
             -m "trace_server" \
-            --trace-server=sqlite \
-            --cov-report=xml
+            --trace-server=sqlite
       - name: Run nox (Clickhouse Trace Server)
         env:
           WEAVE_SENTRY_ENV: ci
@@ -370,8 +368,7 @@ jobs:
           OPENAI_API_KEY: dummyapikey
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
-            -m "trace_server and not skip_clickhouse_client" \
-            --cov-report=xml
+            -m "trace_server and not skip_clickhouse_client"
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
         with:
