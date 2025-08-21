@@ -12,7 +12,6 @@ from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.op import (
     Op,
     ProcessedInputs,
-    _add_accumulator,
     _default_on_input_handler,
 )
 
@@ -66,8 +65,15 @@ def openai_on_finish_post_processor(value: ChatCompletionChunk | None) -> dict |
     from openai.types.chat.chat_completion_message import FunctionCall
     from openai.types.chat.chat_completion_message_tool_call import (
         ChatCompletionMessageToolCall,
-        Function,
     )
+    # Function is typically an attribute/nested class of ChatCompletionMessageToolCall
+    # In newer OpenAI SDK versions, we need to handle this differently
+    try:
+        from openai.types.chat.chat_completion_message_tool_call import Function
+    except ImportError:
+        # If Function is not directly importable, it's likely a nested type
+        # We'll handle this below by using the function attribute directly
+        Function = None
 
     value = maybe_unwrap_api_response(value)
 
@@ -94,15 +100,17 @@ def openai_on_finish_post_processor(value: ChatCompletionChunk | None) -> dict |
         if isinstance(tool_calls, list):
             for tool_call in tool_calls:
                 assert isinstance(tool_call, ChoiceDeltaToolCall)
+                # Create the tool call, handling the function field appropriately
+                tool_call_dict = {
+                    "id": tool_call.id,
+                    "type": tool_call.type,
+                    "function": {
+                        "name": tool_call.function.name,
+                        "arguments": tool_call.function.arguments,
+                    }
+                }
                 tool_calls_.append(
-                    ChatCompletionMessageToolCall(
-                        id=tool_call.id,
-                        type=tool_call.type,
-                        function=Function(
-                            name=tool_call.function.name,
-                            arguments=tool_call.function.arguments,
-                        ),
-                    )
+                    ChatCompletionMessageToolCall(**tool_call_dict)
                 )
         return tool_calls_
 
@@ -384,18 +392,59 @@ def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
                 return True
             return False
 
-        op_kwargs = settings.model_dump()
-        op = weave.op(_add_stream_options(fn), **op_kwargs)
+        # Create a stateful accumulator for streaming responses
+        def native_accumulator(acc: Any, value: Any) -> Any:
+            # This accumulator is only called when we're iterating over a stream
+            # The op framework only calls it for iterators/generators
+            from weave.trace.context import call_context
+            current_call = call_context.get_current_call()
+            skip_last = False
+            if current_call and hasattr(current_call, 'inputs'):
+                inputs = current_call.inputs
+                # Check if stream_options is set to determine skip_last
+                skip_last = not _openai_stream_options_is_set(inputs)
+            
+            # Use the OpenAI accumulator for streaming
+            # It will raise StopIteration when appropriate (e.g., to skip the last chunk)
+            return openai_accumulator(acc, value, skip_last=skip_last)
 
-        op._set_on_input_handler(openai_on_input_handler)
-        return _add_accumulator(
-            op,  # type: ignore
-            make_accumulator=lambda inputs: lambda acc, value: openai_accumulator(
-                acc, value, skip_last=not _openai_stream_options_is_set(inputs)
-            ),
-            should_accumulate=should_use_accumulator,
-            on_finish_post_processor=openai_on_finish_post_processor,
-        )
+        # Custom postprocess_inputs to handle OpenAI-specific input processing
+        def openai_postprocess_inputs(inputs: dict) -> dict:
+            # Handle completion instance conversion
+            if 'self' in inputs and completion_instance_check(inputs['self']):
+                inputs['self'] = convert_completion_to_dict(inputs['self'])
+            
+            # Handle EasyPrompt - this is typically in args but shows up in inputs
+            if 'prompt' in inputs and isinstance(inputs.get('prompt'), weave.EasyPrompt):
+                prompt = inputs['prompt']
+                inputs.update(prompt.as_dict())
+            
+            return inputs
+
+        op_kwargs = settings.model_dump()
+        
+        # Chain postprocess_inputs if user provided one
+        user_postprocess_inputs = op_kwargs.get('postprocess_inputs')
+        if user_postprocess_inputs:
+            def chained_postprocess_inputs(inputs: dict) -> dict:
+                # First apply OpenAI processing
+                inputs = openai_postprocess_inputs(inputs)
+                # Then apply user's processing
+                return user_postprocess_inputs(inputs)
+            op_kwargs['postprocess_inputs'] = chained_postprocess_inputs
+        else:
+            op_kwargs['postprocess_inputs'] = openai_postprocess_inputs
+        
+        # Set the accumulator directly on the op
+        op_kwargs['accumulator'] = native_accumulator
+        # Set postprocess_output
+        op_kwargs['postprocess_output'] = openai_on_finish_post_processor
+        
+        op = weave.op(_add_stream_options(fn), **op_kwargs)
+        # Note: Input processing is now handled in the wrapper function itself
+        # and output post-processing is handled by the accumulator
+        
+        return op
 
     return wrapper
 
@@ -425,17 +474,59 @@ def create_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]
                 return True
             return False
 
+        # Create a stateful accumulator for streaming responses
+        def native_accumulator(acc: Any, value: Any) -> Any:
+            # This accumulator is only called when we're iterating over a stream
+            # The op framework only calls it for iterators/generators
+            from weave.trace.context import call_context
+            current_call = call_context.get_current_call()
+            skip_last = False
+            if current_call and hasattr(current_call, 'inputs'):
+                inputs = current_call.inputs
+                # Check if stream_options is set to determine skip_last
+                skip_last = not _openai_stream_options_is_set(inputs)
+            
+            # Use the OpenAI accumulator for streaming
+            # It will raise StopIteration when appropriate (e.g., to skip the last chunk)
+            return openai_accumulator(acc, value, skip_last=skip_last)
+
+        # Custom postprocess_inputs to handle OpenAI-specific input processing
+        def openai_postprocess_inputs(inputs: dict) -> dict:
+            # Handle completion instance conversion
+            if 'self' in inputs and completion_instance_check(inputs['self']):
+                inputs['self'] = convert_completion_to_dict(inputs['self'])
+            
+            # Handle EasyPrompt - this is typically in args but shows up in inputs
+            if 'prompt' in inputs and isinstance(inputs.get('prompt'), weave.EasyPrompt):
+                prompt = inputs['prompt']
+                inputs.update(prompt.as_dict())
+            
+            return inputs
+
         op_kwargs = settings.model_dump()
+        
+        # Chain postprocess_inputs if user provided one
+        user_postprocess_inputs = op_kwargs.get('postprocess_inputs')
+        if user_postprocess_inputs:
+            def chained_postprocess_inputs(inputs: dict) -> dict:
+                # First apply OpenAI processing
+                inputs = openai_postprocess_inputs(inputs)
+                # Then apply user's processing
+                return user_postprocess_inputs(inputs)
+            op_kwargs['postprocess_inputs'] = chained_postprocess_inputs
+        else:
+            op_kwargs['postprocess_inputs'] = openai_postprocess_inputs
+        
+        # Set the accumulator directly on the op
+        op_kwargs['accumulator'] = native_accumulator
+        # Set postprocess_output
+        op_kwargs['postprocess_output'] = openai_on_finish_post_processor
+        
         op = weave.op(_add_stream_options(fn), **op_kwargs)
-        op._set_on_input_handler(openai_on_input_handler)
-        return _add_accumulator(
-            op,  # type: ignore
-            make_accumulator=lambda inputs: lambda acc, value: openai_accumulator(
-                acc, value, skip_last=not _openai_stream_options_is_set(inputs)
-            ),
-            should_accumulate=should_use_accumulator,
-            on_finish_post_processor=openai_on_finish_post_processor,
-        )
+        # Note: Input processing is now handled in the wrapper function itself
+        # and output post-processing is handled by the accumulator
+        
+        return op
 
     return wrapper
 
@@ -636,22 +727,37 @@ def create_wrapper_responses_sync(
     settings: OpSettings,
 ) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
-        op_kwargs = settings.model_dump()
-
         @wraps(fn)
         def _inner(*args: Any, **kwargs: Any) -> Any:
             return fn(*args, **kwargs)
 
+        # Create a stateful accumulator for responses
+        def native_responses_accumulator(acc: Any, value: Any) -> Any:
+            # Get the current call context to check if streaming
+            try:
+                from weave.trace.context import call_context
+                current_call = call_context.get_current_call()
+                if current_call and hasattr(current_call, 'inputs'):
+                    inputs = current_call.inputs
+                    # Only accumulate if streaming is enabled
+                    if not should_use_responses_accumulator(inputs):
+                        return value
+            except Exception:
+                pass
+            
+            return responses_accumulator(acc, value)
+
+        op_kwargs = settings.model_dump()
+        # Set the accumulator directly on the op
+        op_kwargs['accumulator'] = native_responses_accumulator
+        # For responses, we use identity function for post-processing
+        # since responses don't need the same transformation as chat completions
+        op_kwargs['postprocess_output'] = lambda x: x
+        
         op = weave.op(_inner, **op_kwargs)
         op._set_on_input_handler(openai_on_input_handler)
-        return _add_accumulator(
-            op,  # type: ignore
-            make_accumulator=lambda inputs: lambda acc, value: responses_accumulator(
-                acc, value
-            ),
-            should_accumulate=should_use_responses_accumulator,
-            on_finish_post_processor=lambda value: value,
-        )
+
+        return op
 
     return wrapper
 
@@ -660,22 +766,37 @@ def create_wrapper_responses_async(
     settings: OpSettings,
 ) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
-        op_kwargs = settings.model_dump()
-
         @wraps(fn)
         async def _inner(*args: Any, **kwargs: Any) -> Any:
             return await fn(*args, **kwargs)
 
+        # Create a stateful accumulator for responses
+        def native_responses_accumulator(acc: Any, value: Any) -> Any:
+            # Get the current call context to check if streaming
+            try:
+                from weave.trace.context import call_context
+                current_call = call_context.get_current_call()
+                if current_call and hasattr(current_call, 'inputs'):
+                    inputs = current_call.inputs
+                    # Only accumulate if streaming is enabled
+                    if not should_use_responses_accumulator(inputs):
+                        return value
+            except Exception:
+                pass
+            
+            return responses_accumulator(acc, value)
+
+        op_kwargs = settings.model_dump()
+        # Set the accumulator directly on the op
+        op_kwargs['accumulator'] = native_responses_accumulator
+        # For responses, we use identity function for post-processing
+        # since responses don't need the same transformation as chat completions
+        op_kwargs['postprocess_output'] = lambda x: x
+        
         op = weave.op(_inner, **op_kwargs)
         op._set_on_input_handler(openai_on_input_handler)
-        return _add_accumulator(
-            op,  # type: ignore
-            make_accumulator=lambda inputs: lambda acc, value: responses_accumulator(
-                acc, value
-            ),
-            should_accumulate=should_use_responses_accumulator,
-            on_finish_post_processor=lambda value: value,
-        )
+
+        return op
 
     return wrapper
 
