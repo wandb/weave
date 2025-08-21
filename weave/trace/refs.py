@@ -33,6 +33,41 @@ class Ref:
         memo[id(self)] = res
         return res
 
+    @classmethod
+    def parse_uri(cls, uri: str) -> AnyRef:
+        if not uri.startswith("weave:///"):
+            raise ValueError(f"Invalid URI: {uri}")
+        path = uri[len("weave:///") :]
+        parts = path.split("/")
+        if len(parts) < 3:
+            raise ValueError(f"Invalid URI: {uri}")
+        entity, project, kind = parts[:3]
+        remaining = tuple(parts[3:])
+        if kind == "table":
+            return TableRef(entity=entity, project=project, _digest=remaining[0])
+        extra = tuple(urllib.parse.unquote(r) for r in remaining[1:])
+        if kind == "call":
+            return CallRef(entity=entity, project=project, id=remaining[0], _extra=extra)
+        elif kind == "object":
+            name, version = parse_name_version(remaining[0])
+            return ObjectRef(
+                entity=entity, project=project, name=name, _digest=version, _extra=extra
+            )
+        elif kind == "op":
+            name, version = parse_name_version(remaining[0])
+            return OpRef(
+                entity=entity, project=project, name=name, _digest=version, _extra=extra
+            )
+        else:
+            raise ValueError(f"Unknown ref kind: {kind}")
+
+    @classmethod
+    def maybe_parse_uri(cls, s: str) -> AnyRef | None:
+        try:
+            return cls.parse_uri(s)
+        except ValueError:
+            return None
+
 
 @dataclass(frozen=True)
 class TableRef(Ref):
@@ -87,6 +122,12 @@ class TableRef(Ref):
 
     def uri(self) -> str:
         return f"weave:///{self.entity}/{self.project}/table/{self.digest}"
+
+    @classmethod
+    def parse_uri(cls, uri: str) -> TableRef:
+        if not isinstance(parsed := Ref.parse_uri(uri), TableRef):
+            raise TypeError(f"URI is not for a Table: {uri}")
+        return parsed
 
 
 @dataclass(frozen=True)
@@ -211,6 +252,12 @@ class ObjectRef(RefWithExtra):
         if gc is not None:
             gc.delete_object_version(self)
 
+    @classmethod
+    def parse_uri(cls, uri: str) -> ObjectRef:
+        if not isinstance(parsed := Ref.parse_uri(uri), ObjectRef):
+            raise TypeError(f"URI is not for an Object: {uri}")
+        return parsed
+
 
 @dataclass(frozen=True)
 class OpRef(ObjectRef):
@@ -226,6 +273,12 @@ class OpRef(ObjectRef):
         gc = get_weave_client()
         if gc is not None:
             gc.delete_op_version(self)
+
+    @classmethod
+    def parse_uri(cls, uri: str) -> OpRef:
+        if not isinstance(parsed := Ref.parse_uri(uri), OpRef):
+            raise TypeError(f"URI is not for an Op: {uri}")
+        return parsed
 
 
 @dataclass(frozen=True)
@@ -253,6 +306,12 @@ class CallRef(RefWithExtra):
             u += "/" + "/".join(refs_internal.extra_value_quoter(e) for e in self.extra)
         return u
 
+    @classmethod
+    def parse_uri(cls, uri: str) -> CallRef:
+        if not isinstance(parsed := Ref.parse_uri(uri), CallRef):
+            raise TypeError(f"URI is not for a Call: {uri}")
+        return parsed
+
 
 @dataclass(frozen=True)
 class DeletedRef(Ref):
@@ -277,48 +336,18 @@ def parse_name_version(name_version: str) -> tuple[str, str]:
     return name_version, "latest"
 
 
+# Legacy function names for backward compatibility
 def parse_uri(uri: str) -> AnyRef:
-    if not uri.startswith("weave:///"):
-        raise ValueError(f"Invalid URI: {uri}")
-    path = uri[len("weave:///") :]
-    parts = path.split("/")
-    if len(parts) < 3:
-        raise ValueError(f"Invalid URI: {uri}")
-    entity, project, kind = parts[:3]
-    remaining = tuple(parts[3:])
-    if kind == "table":
-        return TableRef(entity=entity, project=project, _digest=remaining[0])
-    extra = tuple(urllib.parse.unquote(r) for r in remaining[1:])
-    if kind == "call":
-        return CallRef(entity=entity, project=project, id=remaining[0], _extra=extra)
-    elif kind == "object":
-        name, version = parse_name_version(remaining[0])
-        return ObjectRef(
-            entity=entity, project=project, name=name, _digest=version, _extra=extra
-        )
-    elif kind == "op":
-        name, version = parse_name_version(remaining[0])
-        return OpRef(
-            entity=entity, project=project, name=name, _digest=version, _extra=extra
-        )
-    else:
-        raise ValueError(f"Unknown ref kind: {kind}")
+    return Ref.parse_uri(uri)
 
 
 def parse_op_uri(uri: str) -> OpRef:
-    if not isinstance(parsed := parse_uri(uri), OpRef):
-        raise TypeError(f"URI is not for an Op: {uri}")
-    return parsed
+    return OpRef.parse_uri(uri)
 
 
 def parse_object_uri(uri: str) -> ObjectRef:
-    if not isinstance(parsed := parse_uri(uri), ObjectRef):
-        raise TypeError(f"URI is not for an Object: {uri}")
-    return parsed
+    return ObjectRef.parse_uri(uri)
 
 
 def maybe_parse_uri(s: str) -> AnyRef | None:
-    try:
-        return parse_uri(s)
-    except ValueError:
-        return None
+    return Ref.maybe_parse_uri(s)
