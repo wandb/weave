@@ -10,9 +10,6 @@ This file is a trimmed down version of the original WandB Sentry module.
 
 from __future__ import annotations
 
-__all__ = ("SENTRY_AVAILABLE", "Sentry", "sentry_sdk")
-
-
 import atexit
 import functools
 import os
@@ -265,3 +262,5 @@ def _is_local_dev_install(module: Any) -> bool:
 global_trace_sentry = Sentry()
 global_trace_sentry.setup()
 global_trace_sentry.configure_scope()
+
+__all__ = ("SENTRY_AVAILABLE", "Sentry", "sentry_sdk")
