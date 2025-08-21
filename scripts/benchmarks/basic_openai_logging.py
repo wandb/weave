@@ -7,6 +7,7 @@
 # ]
 # ///
 """Benchmark Weave overhead on OpenAI API calls."""
+
 from __future__ import annotations
 
 import argparse

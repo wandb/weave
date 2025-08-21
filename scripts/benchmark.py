@@ -9,6 +9,7 @@
 
 A typer app for selecting and running benchmarks from the benchmarks/ directory.
 """
+
 from __future__ import annotations
 
 import subprocess
