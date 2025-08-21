@@ -127,10 +127,10 @@ class TableRef(Ref):
     def uri(self) -> str:
         return f"weave:///{self.entity}/{self.project}/table/{self.digest}"
 
-    @classmethod
-    def parse_uri(cls, uri: str) -> Self:
-        if not isinstance(parsed := Ref.parse_uri(uri), cls):
-            raise TypeError(f"URI is not for a {cls.__name__}: {uri}")
+    @staticmethod
+    def parse_uri(uri: str) -> TableRef:
+        if not isinstance(parsed := Ref.parse_uri(uri), TableRef):
+            raise TypeError(f"URI is not for a Table: {uri}")
         return parsed
 
 
@@ -256,10 +256,10 @@ class ObjectRef(RefWithExtra):
         if gc is not None:
             gc.delete_object_version(self)
 
-    @classmethod
-    def parse_uri(cls, uri: str) -> Self:
-        if not isinstance(parsed := Ref.parse_uri(uri), cls):
-            raise TypeError(f"URI is not for an {cls.__name__}: {uri}")
+    @staticmethod
+    def parse_uri(uri: str) -> ObjectRef:
+        if not isinstance(parsed := Ref.parse_uri(uri), ObjectRef):
+            raise TypeError(f"URI is not for an Object: {uri}")
         return parsed
 
 
@@ -278,10 +278,10 @@ class OpRef(ObjectRef):
         if gc is not None:
             gc.delete_op_version(self)
 
-    @classmethod
-    def parse_uri(cls, uri: str) -> Self:
-        if not isinstance(parsed := Ref.parse_uri(uri), cls):
-            raise TypeError(f"URI is not for an {cls.__name__}: {uri}")
+    @staticmethod
+    def parse_uri(uri: str) -> OpRef:
+        if not isinstance(parsed := Ref.parse_uri(uri), OpRef):
+            raise TypeError(f"URI is not for an Op: {uri}")
         return parsed
 
 
@@ -310,10 +310,10 @@ class CallRef(RefWithExtra):
             u += "/" + "/".join(refs_internal.extra_value_quoter(e) for e in self.extra)
         return u
 
-    @classmethod
-    def parse_uri(cls, uri: str) -> Self:
-        if not isinstance(parsed := Ref.parse_uri(uri), cls):
-            raise TypeError(f"URI is not for a {cls.__name__}: {uri}")
+    @staticmethod
+    def parse_uri(uri: str) -> CallRef:
+        if not isinstance(parsed := Ref.parse_uri(uri), CallRef):
+            raise TypeError(f"URI is not for a Call: {uri}")
         return parsed
 
 
