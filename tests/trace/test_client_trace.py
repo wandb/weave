@@ -3473,7 +3473,6 @@ def test_weave_finish_unsets_client(client):
     def foo():
         return 1
 
-    set_weave_client_global(None)
     set_weave_client_global(client)
     weave_client = get_weave_client()
     assert get_weave_client() is not None

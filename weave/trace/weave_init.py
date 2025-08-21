@@ -22,7 +22,6 @@ from weave.trace_server_bindings.caching_middleware_trace_server import (
 logger = logging.getLogger(__name__)
 
 
-
 def get_username() -> str | None:
     api = wandb.Api()
     try:
