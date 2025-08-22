@@ -3701,12 +3701,12 @@ def test_parallel_table_uploads_digest_consistency(network_proxy_client, monkeyp
     ]
 
     table2_res = client.server.table_create(
-        tsi.TableCreateReq(
-            table=tsi.TableSchemaForInsert(
-                project_id=client._project_id(),
-                rows=table2_rows,
-            )
-        )
+        {
+            "table": {
+                "project_id": client._project_id(),
+                "rows": table2_rows,
+            }
+        }
     )
     digest2 = table2_res.digest
     row_digests2 = table2_res.row_digests
@@ -3736,12 +3736,12 @@ def test_parallel_table_uploads_digest_consistency(network_proxy_client, monkeyp
 
     # Table 4: [3, 1, 2] with small chunk size
     table4_res = client.server.table_create(
-        tsi.TableCreateReq(
-            table=tsi.TableSchemaForInsert(
-                project_id=client._project_id(),
-                rows=table2_rows,
-            )
-        )
+        {
+            "table": {
+                "project_id": client._project_id(),
+                "rows": table2_rows,
+            }
+        }
     )
     digest4 = table4_res.digest
     row_digests4 = table4_res.row_digests
