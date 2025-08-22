@@ -11,7 +11,6 @@ from requests import HTTPError as HTTPError
 from requests import PreparedRequest, Response, Session
 from requests.adapters import HTTPAdapter
 
-# Use the display module which handles rich/no-rich automatically
 from weave.trace.display.display import Console, SyntaxHighlight, Text
 
 console = Console()
