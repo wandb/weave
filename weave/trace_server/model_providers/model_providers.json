@@ -27,6 +27,10 @@
     "litellm_provider": "coreweave",
     "api_key_name": "WANDB_API_KEY"
   },
+  "deepseek-ai/DeepSeek-V3.1": {
+    "litellm_provider": "coreweave",
+    "api_key_name": "WANDB_API_KEY"
+  },
   "deepseek-ai/DeepSeek-R1-0528": {
     "litellm_provider": "coreweave",
     "api_key_name": "WANDB_API_KEY"
@@ -1180,6 +1184,14 @@
     "api_key_name": "AZURE_API_KEY"
   },
   "azure_ai/embed-v-4-0": {
+    "litellm_provider": "azure_ai",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure_ai/FLUX-1.1-pro": {
+    "litellm_provider": "azure_ai",
+    "api_key_name": "AZURE_API_KEY"
+  },
+  "azure_ai/FLUX.1-Kontext-pro": {
     "litellm_provider": "azure_ai",
     "api_key_name": "AZURE_API_KEY"
   },

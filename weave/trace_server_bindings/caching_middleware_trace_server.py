@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from typing_extensions import Self
 
 from weave import version
-from weave.trace.refs import ObjectRef, parse_uri
+from weave.trace.refs import ObjectRef, Ref
 from weave.trace.settings import (
     server_cache_dir,
     server_cache_size_limit,
@@ -381,7 +381,7 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
 
                 # Only cache if the ref has a cacheable digest
                 try:
-                    parsed_ref = parse_uri(needed_ref)
+                    parsed_ref = Ref.parse_uri(needed_ref)
                     if isinstance(parsed_ref, ObjectRef) and digest_is_cacheable(
                         parsed_ref.digest
                     ):
