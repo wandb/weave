@@ -40,7 +40,6 @@ dependencies = [
   "pydantic>=2.0.0",
   "packaging>=21.0",          # For version parsing in integrations
   "tenacity>=8.3.0,!=8.4.0",  # Excluding 8.4.0 because it had a bug on import of AsyncRetrying
-  "rich",                     # Used for special formatting of tables (should be made optional)
   "click",                    # Used for terminal/stdio printing
   "gql[aiohttp,requests]",    # Used exclusively in wandb_api.py
   "diskcache==5.6.3",         # Used for data caching
@@ -58,6 +57,7 @@ dependencies = [
 
 [project.optional-dependencies]
 wandb = ["wandb>=0.17.1"]
+rich = ["rich"]           # Optional dependency for enhanced console output
 # stainless = [
 #   # This dependency will be updated each time we regenerate the trace server bindings.
 #   # 1. For normal dev, pin to a SHA and allow direct references.  This will look like:
@@ -198,6 +198,7 @@ test = [
   "fastapi>=0.110.0",
   "sqlparse==0.5.0",
   "freezegun",
+  "rich",
 
   # Integration Tests
   "pytest-recording>=0.13.2",
