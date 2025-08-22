@@ -5,7 +5,7 @@ import pytest
 
 import weave
 import weave.type_handlers
-from weave.trace.weave_client import WeaveClient
+from weave.client.weave_client import WeaveClient
 
 
 def publish_all(items):

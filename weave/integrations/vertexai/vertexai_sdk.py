@@ -9,7 +9,7 @@ from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.op import _add_accumulator
 from weave.trace.serialization.serialize import dictify
-from weave.trace.weave_client import Call
+from weave.client.weave_client import Call
 
 if TYPE_CHECKING:
     from vertexai.generative_models import GenerationResponse

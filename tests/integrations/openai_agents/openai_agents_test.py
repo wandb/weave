@@ -4,7 +4,7 @@ from agents import Agent, GuardrailFunctionOutput, InputGuardrail, Runner
 from pydantic import BaseModel
 
 from weave.integrations.openai_agents.openai_agents import WeaveTracingProcessor
-from weave.trace.weave_client import WeaveClient
+from weave.client.weave_client import WeaveClient
 
 # TODO: Responses should be updated once we have patching for the new Responses API
 

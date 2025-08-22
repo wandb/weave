@@ -5,7 +5,7 @@ from openai import AsyncOpenAI, OpenAI
 
 import weave
 from weave.integrations.integration_utilities import op_name_from_ref
-from weave.trace.weave_client import WeaveClient
+from weave.client.weave_client import WeaveClient
 
 model = "gpt-4o"
 

@@ -10,7 +10,7 @@ import pytest
 import weave
 from tests.trace.util import DummyTestException
 from weave.trace.context.tests_context import raise_on_captured_errors
-from weave.trace.weave_client import WeaveClient
+from weave.client.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
 
 

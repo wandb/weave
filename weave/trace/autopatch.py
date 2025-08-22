@@ -8,7 +8,7 @@ from typing import Any, Callable, Optional, Union
 
 from pydantic import BaseModel, Field, validate_call
 
-from weave.trace.weave_client import Call
+from weave.client.weave_client import Call
 
 
 class OpSettings(BaseModel):

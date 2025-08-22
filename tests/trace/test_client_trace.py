@@ -29,7 +29,7 @@ from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     DummyIdConverter,
 )
 from weave import Thread, ThreadPoolExecutor
-from weave.trace import weave_client
+from weave.client import weave_client
 from weave.trace.context.call_context import require_current_call
 from weave.trace.context.weave_client_context import (
     get_weave_client,
@@ -37,7 +37,7 @@ from weave.trace.context.weave_client_context import (
 )
 from weave.trace.refs import TableRef
 from weave.trace.vals import MissingSelfInstanceError
-from weave.trace.weave_client import sanitize_object_name
+from weave.client.weave_client import sanitize_object_name
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_trace_server_settings import ENTITY_TOO_LARGE_PAYLOAD
 from weave.trace_server.errors import InsertTooLarge, InvalidFieldError
@@ -520,7 +520,7 @@ def test_trace_call_query_filter_input_object_version_refs(client):
 
 def test_trace_call_wb_run_step_query(client):
     full_wb_run_id = f"{client.entity}/{client.project}/test-run"
-    from weave.trace import weave_client
+    from weave.client import weave_client
 
     step_counter = iter(range(100))
     with (
@@ -744,7 +744,7 @@ def test_trace_call_query_filter_trace_roots_only(client):
 def test_trace_call_query_filter_wb_run_ids(client):
     full_wb_run_id_1 = f"{client.entity}/{client.project}/test-run-1"
     full_wb_run_id_2 = f"{client.entity}/{client.project}/test-run-2"
-    from weave.trace import weave_client
+    from weave.client import weave_client
 
     with mock.patch.object(
         weave_client, "safe_current_wb_run_id", return_value=full_wb_run_id_1

@@ -77,7 +77,7 @@ from weave.trace.settings import (
 from weave.trace.table import Table
 from weave.trace.util import deprecated, log_once
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
-from weave.trace.weave_client_send_file_cache import WeaveClientSendFileCache
+from weave.client.weave_client_send_file_cache import WeaveClientSendFileCache
 from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH, MAX_OBJECT_NAME_LENGTH
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface.feedback_types import (

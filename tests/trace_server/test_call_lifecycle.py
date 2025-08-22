@@ -1,7 +1,7 @@
 import datetime
 import uuid
 
-from weave.trace import weave_client
+from weave.client import weave_client
 from weave.trace_server import trace_server_interface as tsi
 
 

@@ -8,7 +8,7 @@ from util import generate_media
 import weave
 from weave import Dataset
 from weave.trace.table import Table
-from weave.trace.weave_client import WeaveClient
+from weave.client.weave_client import WeaveClient
 from weave.type_wrappers.Content.content import Content
 
 

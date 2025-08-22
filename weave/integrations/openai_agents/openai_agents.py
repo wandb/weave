@@ -15,7 +15,7 @@ from weave.trace.context import call_context
 from weave.trace.context.weave_client_context import (
     get_weave_client,
 )
-from weave.trace.weave_client import Call
+from weave.client.weave_client import Call
 
 _openai_agents_patcher: OpenAIAgentsPatcher | None = None
 

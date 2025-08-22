@@ -3,7 +3,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from weave.trace.refs import OpRef
-from weave.trace.weave_client import WeaveClient, get_ref
+from weave.client.weave_client import WeaveClient, get_ref
 from weave.trace_server.interface.builtin_object_classes import leaderboard
 from weave.trace_server.trace_server_interface import CallsFilter
 

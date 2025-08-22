@@ -8,7 +8,7 @@ from weave.integrations.dspy.dspy_utils import (
 )
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.serialization.serialize import dictify
-from weave.trace.weave_client import Call
+from weave.client.weave_client import Call
 
 import_failed = False
 

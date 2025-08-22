@@ -1,7 +1,7 @@
 import base64
 
 import weave
-from weave.trace.weave_client import WeaveClient
+from weave.client.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
 
 

@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from weave.integrations.patcher import Patcher
 from weave.trace.context import weave_client_context
 from weave.trace.util import log_once
-from weave.trace.weave_client import Call, WeaveClient
+from weave.client.weave_client import Call, WeaveClient
 
 _import_failed = False
 
