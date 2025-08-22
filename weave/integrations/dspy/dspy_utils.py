@@ -11,8 +11,8 @@ import weave
 from weave.integrations.patcher import SymbolPatcher
 from weave.trace.autopatch import OpSettings
 from weave.trace.op import Op
+from weave.trace.serialization.serialize import is_primitive, stringify
 from weave.utils.sanitize import REDACTED_VALUE, should_redact
-from weave.trace.serialization.serialize import stringify, is_primitive
 
 if TYPE_CHECKING:
     from dspy.primitives.prediction import Example

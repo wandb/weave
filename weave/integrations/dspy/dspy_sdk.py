@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import functools
 import logging
-import threading
 from collections.abc import Sequence
 from typing import Any, Callable
 
@@ -82,9 +81,7 @@ class DSPyPatcher(MultiPatcher):
                     else self.display_progress
                 )
                 display_table = (
-                    display_table
-                    if display_table is not None
-                    else self.display_table
+                    display_table if display_table is not None else self.display_table
                 )
 
                 if callback_metadata:
@@ -105,9 +102,7 @@ class DSPyPatcher(MultiPatcher):
                     "name": model_name,
                     "dump_state": raw_dump_state,
                     "_compiled": getattr(program, "_compiled", None),
-                    "callbacks": [
-                        repr(cb) for cb in getattr(program, "callbacks", [])
-                    ],
+                    "callbacks": [repr(cb) for cb in getattr(program, "callbacks", [])],
                     "program_repr": repr(program),
                     "metric_repr": repr(metric),
                     "num_threads": num_threads,
