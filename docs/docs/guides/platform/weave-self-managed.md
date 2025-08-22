@@ -272,11 +272,11 @@ spec:
     # Refer to: https://clickhouse.com/docs/operations/server-configuration-parameters/settings#zookeeper
     zookeeper:
       nodes:
-        - host: chk-wandb-keeper-0-0.clickhouse.svc.cluster.local
+        - host: chk-wandb-keeper-0-0-0.clickhouse.svc.cluster.local
           port: 2181
-        - host: chk-wandb-keeper-0-1.clickhouse.svc.cluster.local
+        - host: chk-wandb-keeper-0-1-0.clickhouse.svc.cluster.local
           port: 2181
-        - host: chk-wandb-keeper-0-2.clickhouse.svc.cluster.local
+        - host: chk-wandb-keeper-0-2-0.clickhouse.svc.cluster.local
           port: 2181
       # Other configurations
       # session_timeout_ms: 30000
@@ -287,8 +287,6 @@ spec:
     # sha256sum <<< weave123 OR echo -n weave123 | sha256sum OR printf "weave123" | sha256sum
     # It wil turn into <password_sha256_hex>...</password_sha256_hex> in user config
     users:
-      weave/password_sha256_hex: e419535466c5c9c280a157975503187bf27f94093a35a9847ed5249d3df54b4b
-      #weave/password: <PASSWORD> #for cleartext password
       weave/password:   # to use k8s secrets for "weave" user password
         valueFrom:
           secretKeyRef:
@@ -403,10 +401,14 @@ kubectl get pods -n clickhouse
 You should see the following pods:
 
 ```bash
-NAME                                 READY   STATUS    RESTARTS   AGE
-clickhouse-shard0-0                  1/1     Running   0          9m59s
-clickhouse-shard0-1                  1/1     Running   0          10m
-clickhouse-shard0-2                  1/1     Running   0          10m
+NAME                                                        READY   STATUS    RESTARTS   AGE
+ch-operator-altinity-clickhouse-operator-56d6c46f49-nqqv7   2/2     Running   0          158m
+chi-wandb-clickhouse-0-0-0                                  1/1     Running   0          2m10s
+chi-wandb-clickhouse-0-1-0                                  1/1     Running   0          79s
+chi-wandb-clickhouse-0-2-0                                  0/1     Running   0          15s
+chk-wandb-keeper-0-0-0                                      1/1     Running   0          137m
+chk-wandb-keeper-0-1-0                                      1/1     Running   0          137m
+chk-wandb-keeper-0-2-0                                      1/1     Running   0          137m
 ```
 ## 2. Add ClickHouse Configuration in W&B Platform CR
 
