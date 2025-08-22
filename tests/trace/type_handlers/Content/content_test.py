@@ -3,14 +3,13 @@ import tempfile
 from pathlib import Path
 
 import pytest
+from util import generate_media
 
 import weave
 from weave import Dataset
 from weave.trace.table import Table
 from weave.trace.weave_client import WeaveClient
 from weave.type_wrappers.Content.content import Content
-
-from .util import generate_media
 
 
 @pytest.fixture(scope="session")
