@@ -3643,6 +3643,7 @@ def test_feedback_batching(network_proxy_client):
         assert feedback.payload["note"] == f"Test feedback {i}"
 
 
+@pytest.mark.disable_logging_error_check
 def test_parallel_table_uploads_digest_consistency(network_proxy_client, monkeypatch):
     """Test parallel table uploads are consistent with one shot uploads."""
     # Set up advanced client that uses the RemoteHttpTraceServer handler
@@ -3791,6 +3792,62 @@ def test_parallel_table_uploads_digest_consistency(network_proxy_client, monkeyp
         f"Expected {expected_from_digests_calls} table_create_from_digests calls, got {len(table_create_from_digests_records)}"
     )
 
+    # Create additional test to hit the chunk splitting logic
+    # Use smaller rows that can fit multiple per chunk, then exceed the limit
+    small_rows = [
+        {"id": i, "data": "x" * 100}
+        for i in range(10)  # 10 small rows (~100 bytes each)
+    ]
+
+    # Set chunk size to allow ~3 small rows per chunk (400 bytes)
+    test_chunk_size = 400
+    current_chunk_size[0] = test_chunk_size
+    client.server.remote_request_bytes_limit = (
+        test_chunk_size * 5
+    )  # Allow multiple chunks
+
+    # This should trigger the chunk splitting logic since we'll have multiple small rows
+    # that fit in chunks, but eventually exceed the chunk size
+    small_table_res = client.server.table_create(
+        tsi.TableCreateReq(
+            table=tsi.TableSchemaForInsert(
+                project_id=client._project_id(),
+                rows=small_rows,
+            )
+        )
+    )
+    assert small_table_res.digest is not None
+    assert small_table_res.row_digests is not None
+
+    # Test error handling in chunking - mock a failing chunk creation
+    with monkeypatch.context() as m:
+        # Store the original method before mocking to avoid recursion
+        original_create_table_chunk = client.server._create_table_chunk
+
+        def failing_create_table_chunk(self, project_id, rows, index):
+            if index == 0:  # Fail on the first chunk (index 0 is more reliable)
+                raise RuntimeError("Simulated chunk creation failure")
+            # Call the original method for other chunks
+            return original_create_table_chunk(project_id, rows, index)
+
+        # Mock the _create_table_chunk method on RemoteHTTPTraceServer to fail on second chunk
+        m.setattr(
+            "weave.trace_server_bindings.remote_http_trace_server.RemoteHTTPTraceServer._create_table_chunk",
+            failing_create_table_chunk,
+        )
+
+        # This should raise an exception due to the failing chunk
+        # We expect this to fail and hit the exception handling code in http_utils.py
+        with pytest.raises(RuntimeError, match="Simulated chunk creation failure"):
+            client.server.table_create(
+                tsi.TableCreateReq(
+                    table=tsi.TableSchemaForInsert(
+                        project_id=client._project_id(),
+                        rows=table1_rows,
+                    )
+                )
+            )
+
 
 def test_table_create_from_digests(network_proxy_client):
     """Test that table_create_from_digests works correctly to merge existing row digests."""
@@ -3859,7 +3916,6 @@ def test_table_create_from_digests(network_proxy_client):
             row_digests=combined_digests,
         )
     )
-    print("combined_res", combined_res)
 
     # now get the new table
     new_table_res = basic_client.server.table_query(
