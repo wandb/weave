@@ -2012,7 +2012,6 @@ class WeaveClient:
     ) -> Future[TableCreateRes]:
         """Create table using parallel chunks and table_create_from_digests."""
         chunks = chunk_manager.create_chunks(req.table.rows)
-        chunk_manager.validate_chunks(chunks, req.table.rows)
 
         # Create chunks in parallel using future_executor
         chunk_futures = []
