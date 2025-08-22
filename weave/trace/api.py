@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import contextlib
+
+# Patch json.dumps to handle bytes objects safely
+import json
 import logging
 import sys
 import warnings
@@ -12,6 +15,38 @@ from typing import Any, Union, cast
 # TODO: type_handlers is imported here to trigger registration of the image serializer.
 # There is probably a better place for this, but including here for now to get the fix in.
 from weave import type_handlers  # noqa: F401
+
+_original_json_dumps = json.dumps
+
+
+def _safe_json_dumps(obj, *args, **kwargs):
+    """Safe JSON dumps that handles bytes objects."""
+
+    def _json_default(o):
+        if isinstance(o, bytes):
+            try:
+                # Try to decode as UTF-8 first
+                return o.decode("utf-8")
+            except UnicodeDecodeError:
+                # Fall back to base64 for binary data
+                import base64
+
+                return f"<base64:{base64.b64encode(o).decode('ascii')}>"
+        # If there's an existing default function, use it
+        if "default" in kwargs and kwargs["default"]:
+            return kwargs["default"](o)
+        # Otherwise use string representation
+        return str(o)
+
+    # If no default is provided, use our safe default
+    if "default" not in kwargs:
+        kwargs["default"] = _json_default
+
+    return _original_json_dumps(obj, *args, **kwargs)
+
+
+# Apply the patch
+json.dumps = _safe_json_dumps
 from weave.trace import urls, weave_client, weave_init
 from weave.trace.autopatch import AutopatchSettings
 from weave.trace.constants import TRACE_OBJECT_EMOJI
