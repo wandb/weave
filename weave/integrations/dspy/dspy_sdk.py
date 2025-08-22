@@ -182,7 +182,9 @@ class DSPyPatcher(MultiPatcher):
                 results = [
                     (example, prediction, score)
                     for example, (prediction, score) in zip(
-                        devset, results, strict=False
+                        devset,
+                        results,
+                        strict=False,  # type: ignore[arg-type]
                     )
                 ]
                 ncorrect, ntotal = sum(score for *_, score in results), len(devset)
