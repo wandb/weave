@@ -14,7 +14,7 @@ from gql.transport.aiohttp import AIOHTTPTransport
 from gql.transport.requests import RequestsHTTPTransport
 from requests.auth import HTTPBasicAuth
 
-from weave.trace import env
+from weave.trace import settings
 from weave.wandb_interface.context import get_wandb_api_context
 
 logger = logging.getLogger(__name__)
@@ -31,7 +31,7 @@ class Api:
             cookies = wandb_context.cookies
             if wandb_context.api_key is not None:
                 auth = HTTPBasicAuth("api", wandb_context.api_key)
-        url_base = env.wandb_base_url()
+        url_base = settings.get_wandb_base_url()
         transport = RequestsHTTPTransport(
             url=url_base + "/graphql",
             headers=headers,
@@ -237,7 +237,7 @@ class ApiAsync:
         api_key_override = kwargs.pop("api_key", None)
         if api_key_override:
             auth = aiohttp.BasicAuth("api", api_key_override)
-        url_base = env.wandb_base_url()
+        url_base = settings.get_wandb_base_url()
         transport = AIOHTTPTransport(
             url=url_base + "/graphql",
             client_session_args={

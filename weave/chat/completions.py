@@ -15,7 +15,7 @@ from weave.chat.types.chat_completion import ChatCompletion
 from weave.chat.types.chat_completion_stream_options_param import (
     ChatCompletionStreamOptionsParam,
 )
-from weave.trace.env import weave_trace_server_url
+from weave.trace.settings import get_weave_trace_server_url as weave_trace_server_url
 from weave.trace.op import op
 from weave.trace_server.constants import COMPLETIONS_CREATE_OP_NAME, INFERENCE_HOST
 from weave.wandb_interface.context import get_wandb_api_context

@@ -10,7 +10,7 @@ from typing import Any
 
 from typing_extensions import Self
 
-from weave.trace import env
+from weave.trace import settings
 
 
 @dataclass
@@ -74,7 +74,7 @@ def get_wandb_api_context() -> WandbApiContext | None:
 
 
 def init() -> Token[WandbApiContext | None] | None:
-    if api_key := env.weave_wandb_api_key():
+    if api_key := settings.get_weave_wandb_api_key():
         return set_wandb_api_context("admin", api_key, None, None)
     return None
 

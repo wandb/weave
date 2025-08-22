@@ -6,8 +6,8 @@ from weave.compat import wandb
 from weave.telemetry import trace_sentry
 from weave.trace import (
     autopatch,
-    env,
     init_message,
+    settings,
     wandb_termlog_patch,
     weave_client,
 )
@@ -94,7 +94,7 @@ def init_weave(
     wandb_context_module.init()
     wandb_context = wandb_context_module.get_wandb_api_context()
     if wandb_context is None:
-        url = wandb.app_url(env.wandb_base_url())
+        url = wandb.app_url(settings.get_wandb_base_url())
         logger.info(f"Please login to Weights & Biases ({url}) to continue...")
         wandb_termlog_patch.ensure_patched()
         wandb.login(anonymous="never", force=True)  # type: ignore

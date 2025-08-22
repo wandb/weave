@@ -60,7 +60,7 @@ async def test_evaluation_status(client):
 
     assert get_status() == EvaluationStatusNotFound()
 
-    # mock weave.trace.env.py::get_weave_parallelism to return 1 (allows for checking status deterministically)
+    # mock weave.trace.settings::get_weave_parallelism to return 1 (allows for checking status deterministically)
     with mock.patch.dict("os.environ", {"WEAVE_PARALLELISM": "1"}):
         # Patch the first 2 calls to generate_id to return eval_call_id, then defer to the real function
         real_generate_id = generate_id

@@ -15,13 +15,13 @@ from weave.wandb_interface.context import (
 
 @pytest.fixture
 def valid_api_key():
-    with patch("weave.trace.env.weave_wandb_api_key", return_value="test_api_key"):
+    with patch("weave.trace.settings.get_weave_wandb_api_key", return_value="test_api_key"):
         yield "test_api_key"
 
 
 @pytest.fixture
 def invalid_api_key():
-    with patch("weave.trace.env.weave_wandb_api_key", return_value=None):
+    with patch("weave.trace.settings.get_weave_wandb_api_key", return_value=None):
         yield None
 
 

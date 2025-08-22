@@ -19,10 +19,13 @@ If True, all weave ops will behave like regular functions and no network request
 If True, prints a link to the Weave UI when calling a weave op.
 """
 
+import configparser
+import netrc
 import os
 from contextvars import ContextVar
 from pathlib import Path
 from typing import Any, Optional, Union
+from urllib.parse import urlparse
 
 from pydantic import BaseModel, ConfigDict, PrivateAttr
 
@@ -168,12 +171,42 @@ class UserSettings(BaseModel):
     Can be overridden with the environment variable `WEAVE_ENABLE_DISK_FALLBACK`
     """
 
+    wandb_base_url: Optional[str] = None
+    """W&B API base URL.
+    
+    If not set, reads from wandb config files or defaults to https://api.wandb.ai.
+    Can be overridden with the environment variable `WANDB_BASE_URL`"""
+
     model_config = ConfigDict(extra="forbid")
     _is_first_apply: bool = PrivateAttr(True)
+    _wandb_config: Optional[configparser.ConfigParser] = PrivateAttr(None)
 
     def _reset(self) -> None:
         for name, field in self.model_fields.items():
             setattr(self, name, field.default)
+        self._wandb_config = None
+    
+    def _load_wandb_config(self) -> None:
+        """Load wandb configuration from config files."""
+        if self._wandb_config is None:
+            self._wandb_config = configparser.ConfigParser()
+            if not self._wandb_config.has_section("default"):
+                self._wandb_config.add_section("default")
+            config_paths = [
+                self._wandb_global_config_path(),
+                self._wandb_local_config_path()
+            ]
+            self._wandb_config.read(config_paths)
+    
+    @staticmethod
+    def _wandb_local_config_path() -> str:
+        return os.path.join(os.getcwd(), "wandb", "settings")
+
+    @staticmethod
+    def _wandb_global_config_path() -> str:
+        default_config_dir = os.path.join(os.path.expanduser("~"), ".config", "wandb")
+        config_dir = os.environ.get("WANDB_CONFIG_DIR", default_config_dir)
+        return os.path.join(config_dir, "settings")
 
     def apply(self) -> None:
         if self._is_first_apply:
@@ -264,6 +297,84 @@ def retry_max_interval() -> float:
 def should_enable_disk_fallback() -> bool:
     """Returns whether disk fallback should be enabled for dropped items."""
     return _should("enable_disk_fallback")
+
+
+def get_wandb_base_url() -> str:
+    """Get the W&B base URL from environment or config."""
+    # First check environment variable
+    if env_url := os.environ.get("WANDB_BASE_URL"):
+        return env_url.rstrip("/")
+    
+    # Load wandb config from files
+    config = configparser.ConfigParser()
+    if not config.has_section("default"):
+        config.add_section("default")
+    
+    config_paths = [
+        UserSettings._wandb_global_config_path(),
+        UserSettings._wandb_local_config_path()
+    ]
+    config.read(config_paths)
+    
+    try:
+        url = config.get("default", "base_url")
+        return url.rstrip("/")
+    except configparser.NoOptionError:
+        pass
+    
+    return "https://api.wandb.ai"
+
+
+def get_wandb_frontend_base_url() -> str:
+    """Get the W&B frontend base URL."""
+    public_url = os.getenv("WANDB_PUBLIC_BASE_URL", "").rstrip("/")
+    return public_url if public_url != "" else get_wandb_base_url()
+
+
+def get_weave_trace_server_url() -> str:
+    """Get the Weave trace server URL."""
+    base_url = get_wandb_frontend_base_url()
+    default = "https://trace.wandb.ai"
+    if base_url != "https://api.wandb.ai":
+        default = base_url + "/traces"
+    return os.getenv("WF_TRACE_SERVER_URL", default)
+
+
+def get_weave_parallelism() -> int:
+    """Get the Weave parallelism setting."""
+    return int(os.getenv("WEAVE_PARALLELISM", "20"))
+
+
+def _get_wandb_api_key_via_netrc() -> Optional[str]:
+    """Get W&B API key from netrc file."""
+    for filepath in ("~/.netrc", "~/_netrc"):
+        api_key = _get_wandb_api_key_via_netrc_file(filepath)
+        if api_key:
+            return api_key
+    return None
+
+
+def _get_wandb_api_key_via_netrc_file(filepath: str) -> Optional[str]:
+    """Get W&B API key from a specific netrc file."""
+    netrc_path = os.path.expanduser(filepath)
+    if not os.path.exists(netrc_path):
+        return None
+    try:
+        nrc = netrc.netrc(netrc_path)
+        res = nrc.authenticators(urlparse(get_wandb_base_url()).netloc)
+        if res:
+            _, _, api_key = res
+            return api_key
+    except (netrc.NetrcParseError, OSError):
+        pass
+    return None
+
+
+def get_weave_wandb_api_key() -> Optional[str]:
+    """Get W&B API key from environment or netrc."""
+    if env_api_key := os.environ.get("WANDB_API_KEY"):
+        return env_api_key
+    return _get_wandb_api_key_via_netrc()
 
 
 def parse_and_apply_settings(

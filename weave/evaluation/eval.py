@@ -29,7 +29,7 @@ from weave.flow.scorer import (
 from weave.flow.util import make_memorable_name, transpose
 from weave.object.obj import Object
 from weave.trace.context.weave_client_context import require_weave_client
-from weave.trace.env import get_weave_parallelism
+from weave.trace.settings import get_weave_parallelism
 from weave.trace.objectify import maybe_objectify, register_object
 from weave.trace.op import CallDisplayNameFunc, Op, OpCallError, as_op, is_op
 from weave.trace.refs import ObjectRef

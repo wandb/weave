@@ -396,7 +396,7 @@ def test_wandb_context():
 
 def test_auth_from_env_environment():
     """Test authentication from environment."""
-    with patch("weave.trace.env.weave_wandb_api_key", return_value="test_api_key"):
+    with patch("weave.trace.settings.get_weave_wandb_api_key", return_value="test_api_key"):
         with from_environment():
             context = get_wandb_api_context()
             assert context is not None
