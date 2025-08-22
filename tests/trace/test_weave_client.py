@@ -1513,11 +1513,20 @@ def test_table_partitioning(network_proxy_client):
     )
     assert res.digest == exp_digest
     assert res.row_digests == row_digests
-    assert len(records) == (
-        1  # The first create call,
-        + 1  # the second  create
-        + num_rows / 2  # updates - 2 per batch
+    # Verify that chunking happened by checking for table_create_from_digests call
+    table_create_records = [r for r in records if r[0] == "table_create"]
+    table_create_from_digests_records = [
+        r for r in records if r[0] == "table_create_from_digests"
+    ]
+
+    # Expected: 2 table_create calls (first + second) + 1 table_create_from_digests (chunking merge)
+    assert len(table_create_records) == 2, (
+        f"Expected 2 table_create calls, got {len(table_create_records)}"
     )
+    assert len(table_create_from_digests_records) == 1, (
+        f"Expected 1 table_create_from_digests call, got {len(table_create_from_digests_records)}"
+    )
+    assert len(records) == 3, f"Expected 3 total records, got {len(records)}"
 
 
 def test_summary_tokens_cost(client):
