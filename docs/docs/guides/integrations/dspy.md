@@ -108,7 +108,7 @@ draft_article = DraftArticle()
 article = draft_article(topic="World Cup 2002")
 ```
 
-![](imgs/dspy/dspy_custom_module.png)
+![dspy_custom_module.png](imgs/dspy/dspy_custom_module.png)
 
 
 ## Evaluation of your DSPy Program
@@ -160,7 +160,7 @@ result = evaluate(module)
 
 After the run completes, click on the generated Weave URL and navigate to **Evals** to see the evaluation summary, metrics, and per-sample rows. You can drill into any row to inspect the full trace and the artifacts that produced that output.
 
-![](imgs/dspy/dspy_eval.png)
+![dspy_eval.png](imgs/dspy/dspy_eval.png)
 
 ### Compare evaluation runs
 
@@ -169,7 +169,7 @@ When viewing evaluation logs, Weave supports both holistic and sample-wise compa
 From the Evals tab, select multiple evals and click **Compare**. See [EvaluationLogger (Comparisons section)](../evaluation/evaluation_logger.md#log-and-compare-multiple-evaluations) and the general [Comparison](../tools/comparison.md) guide for details on the comparison UI and controls.
 
 
-| ![](imgs/dspy/dspy_eval_comparison.png) | ![](imgs/dspy/dspy_eval_comparison_samples.png) |
+| ![dspy_eval_comparison.png](imgs/dspy/dspy_eval_comparison.png) | ![dspy_eval_comparison_samples.png](imgs/dspy/dspy_eval_comparison_samples.png) |
 |---|---|
 | Holistic comparison view | Sample-wise comparison view |
 
@@ -203,7 +203,7 @@ optimized_module = optimizer.compile(
 )
 ```
 
-![](imgs/dspy/dspy_optimization.png)
+![dspy_optimization.png](imgs/dspy/dspy_optimization.png)
 
 ### Bringing W&B Models to track improvement of program signature
 
@@ -261,7 +261,7 @@ print(optimized_module)
 
 Running this program will generate both W&B run and Weave URLs. You can click on the W&B run URL to view the logged metrics and the W&B Table. You can then click on the **Overview** tab of the run page to see the traces associated with the optimization run.
 
-![](imgs/dspy/dspy_models_weave.png)
+![dspy_models_weave.png](imgs/dspy/dspy_models_weave.png)
 
 ## FAQ
 
