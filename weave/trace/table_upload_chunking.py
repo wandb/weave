@@ -30,7 +30,7 @@ class TableChunkManager:
         """Calculate the estimated size in bytes of a request."""
         return len(req.model_dump_json(by_alias=True).encode("utf-8"))
 
-    def calculate_row_bytes(self, row: RowItemType) -> int:
+    def calculate_row_bytes(self, row: object) -> int:
         """Calculate the size in bytes of a single row."""
         return len(str(row).encode("utf-8"))
 
@@ -67,7 +67,7 @@ class TableChunkManager:
 
         chunks = [chunk for chunk in chunks if chunk]
         if not chunks:
-            chunks = [rows]
+            chunks = [list(rows)]
 
         return chunks
 
