@@ -255,8 +255,12 @@ class FutureExecutor:
 
 
 def _format_exception(e: BaseException) -> str:
-    exception_str = f"{type(e).__name__}: {e}"
-    return exception_str
+    try:
+        exception_str = f"{type(e).__name__}: {e}"
+        return exception_str
+    except Exception:
+        # Fallback if the exception contains unprintable objects (e.g., bytes)
+        return f"{type(e).__name__}: <exception details unavailable>"
     # try:
     #     if hasattr(e, "__traceback__"):
     #         traceback_str = "".join(traceback.format_tb(e.__traceback__))
