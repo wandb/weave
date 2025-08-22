@@ -75,6 +75,7 @@ from weave.trace.settings import (
     should_redact_pii,
 )
 from weave.trace.table import Table
+from weave.trace.table_upload_chunking import TableChunkManager
 from weave.trace.util import deprecated, log_once
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
 from weave.trace.weave_client_send_file_cache import WeaveClientSendFileCache
@@ -118,12 +119,17 @@ from weave.trace_server.trace_server_interface import (
     StartedCallSchemaForInsert,
     TableAppendSpec,
     TableAppendSpecPayload,
+    TableCreateFromDigestsReq,
     TableCreateReq,
     TableCreateRes,
     TableSchemaForInsert,
     TableUpdateReq,
     TraceServerInterface,
     TraceStatus,
+)
+from weave.trace_server_bindings.http_utils import (
+    REMOTE_REQUEST_BYTES_LIMIT,
+    check_endpoint_exists,
 )
 from weave.utils.attributes_dict import AttributesDict
 from weave.utils.dict_utils import sum_dict_leaves, zip_dicts
@@ -1942,17 +1948,44 @@ class WeaveClient:
     def _save_table(self, table: Table | WeaveTable) -> TableRef:
         """Saves a Table to the weave server and returns the TableRef.
         This is the sister function to _save_object_basic but for Tables.
+
+        Uses chunking and parallel uploads for large tables, with fallback to
+        incremental table_update pattern if table_create_from_digests is not available.
         """
         # Skip saving the table if it is already persisted.
         if isinstance(table, WeaveTable) and table.table_ref is not None:
             return table.table_ref
 
-        def send_table_create() -> TableCreateRes:
-            rows = to_json(table.rows, self._project_id(), self)
-            req = TableCreateReq(
-                table=TableSchemaForInsert(project_id=self._project_id(), rows=rows)
+        # Check endpoint availability before deferring to executor
+        rows = to_json(table.rows, self._project_id(), self)
+        req = TableCreateReq(
+            table=TableSchemaForInsert(project_id=self._project_id(), rows=rows)
+        )
+
+        # Determine chunking strategy upfront based on endpoint availability
+        chunk_manager = TableChunkManager()
+        remote_request_bytes_limit = getattr(
+            self.server, "remote_request_bytes_limit", REMOTE_REQUEST_BYTES_LIMIT
+        )
+        estimated_bytes = chunk_manager.calculate_request_bytes(req)
+        use_chunking = estimated_bytes > remote_request_bytes_limit
+        use_parallel_chunks = False
+
+        if use_chunking:
+            test_req = TableCreateFromDigestsReq(
+                project_id=req.table.project_id, row_digests=[]
             )
-            return self.server.table_create(req)
+            use_parallel_chunks = check_endpoint_exists(
+                self.server, "table_create_from_digests", test_req
+            )
+
+        def send_table_create() -> TableCreateRes:
+            if not use_chunking:
+                return self.server.table_create(req)
+            elif use_parallel_chunks:
+                return self._create_table_with_parallel_chunks(req, chunk_manager)
+            else:
+                return self._create_table_with_incremental_updates(req, chunk_manager)
 
         res_future: Future[TableCreateRes] = self.future_executor.defer(
             send_table_create
@@ -1975,6 +2008,87 @@ class WeaveClient:
             table.table_ref = table_ref
 
         return table_ref
+
+    def _create_table_with_parallel_chunks(
+        self, req: TableCreateReq, chunk_manager: TableChunkManager
+    ) -> TableCreateRes:
+        """Create table using parallel chunks and table_create_from_digests."""
+        chunks = chunk_manager.create_chunks(req.table.rows)
+        chunk_manager.validate_chunks(chunks, req.table.rows)
+
+        # Create chunks in parallel using future_executor
+        chunk_futures = []
+        for chunk in chunks:
+            chunk_req = TableCreateReq(
+                table=TableSchemaForInsert(
+                    project_id=req.table.project_id,
+                    rows=chunk,
+                )
+            )
+            chunk_future = self.future_executor.defer(
+                lambda cr=chunk_req: self.server.table_create(cr)
+            )
+            chunk_futures.append(chunk_future)
+
+        # Wait for all chunks to complete and collect results
+        all_row_digests = []
+        for chunk_future in chunk_futures:
+            chunk_result = chunk_future.result()
+            all_row_digests.extend(chunk_result.row_digests)
+
+        # Create final table from digests
+        create_req = TableCreateFromDigestsReq(
+            project_id=req.table.project_id, row_digests=all_row_digests
+        )
+        create_res = self.server.table_create_from_digests(create_req)
+
+        return TableCreateRes(
+            digest=create_res.digest,
+            row_digests=all_row_digests,
+        )
+
+    def _create_table_with_incremental_updates(
+        self, req: TableCreateReq, chunk_manager: TableChunkManager
+    ) -> TableCreateRes:
+        """Create table using incremental table_update pattern (fallback)."""
+        chunks = chunk_manager.create_chunks(req.table.rows)
+        chunk_manager.validate_chunks(chunks, req.table.rows)
+
+        if not chunks:
+            # No chunks, create empty table
+            empty_req = TableCreateReq(
+                table=TableSchemaForInsert(project_id=req.table.project_id, rows=[])
+            )
+            return self.server.table_create(empty_req)
+
+        # Create first chunk as the base table
+        first_chunk = chunks[0]
+        first_req = TableCreateReq(
+            table=TableSchemaForInsert(
+                project_id=req.table.project_id,
+                rows=first_chunk,
+            )
+        )
+        base_result = self.server.table_create(first_req)
+        current_digest = base_result.digest
+        all_row_digests = list(base_result.row_digests)
+
+        # Add remaining chunks incrementally using table_update
+        for chunk in chunks[1:]:
+            payloads = [TableAppendSpecPayload(row=row) for row in chunk]
+            update_req = TableUpdateReq(
+                project_id=req.table.project_id,
+                base_digest=current_digest,
+                updates=[TableAppendSpec(append=payload) for payload in payloads],
+            )
+            update_result = self.server.table_update(update_req)
+            current_digest = update_result.digest
+            all_row_digests.extend(update_result.updated_row_digests)
+
+        return TableCreateRes(
+            digest=current_digest,
+            row_digests=all_row_digests,
+        )
 
     def _append_to_table(self, table_digest: str, rows: list[dict]) -> WeaveTable:
         payloads = [TableAppendSpecPayload(row=row) for row in rows]

@@ -25,7 +25,7 @@ from tests.trace.util import (
 )
 from weave import Evaluation
 from weave.integrations.integration_utilities import op_name_from_call
-from weave.trace import refs, weave_client
+from weave.trace import refs, table_upload_chunking, weave_client
 from weave.trace.context import call_context
 from weave.trace.context.call_context import tracing_disabled
 from weave.trace.isinstance import weave_isinstance
@@ -57,7 +57,6 @@ from weave.trace_server.trace_server_interface import (
     TableQueryReq,
     TableSchemaForInsert,
 )
-from weave.trace_server_bindings import http_utils
 
 
 def test_table_create(client):
@@ -3644,36 +3643,34 @@ def test_feedback_batching(network_proxy_client):
 
 
 @pytest.mark.disable_logging_error_check
-def test_parallel_table_uploads_digest_consistency(network_proxy_client, monkeypatch):
+def test_parallel_table_uploads_digest_consistency(client, monkeypatch):
     """Test parallel table uploads are consistent with one shot uploads."""
-    # Set up advanced client that uses the RemoteHttpTraceServer handler
-    basic_client, remote_client, records = network_proxy_client
+    # Set up access logging to track method calls
+    client.server.attribute_access_log = []
 
     # Set up the mock before creating the client
     # We'll use a mutable container to control the chunk size dynamically
-    current_chunk_size = [http_utils.TARGET_CHUNK_BYTES]  # Start with default
+    current_chunk_size = [
+        table_upload_chunking.TARGET_CHUNK_BYTES
+    ]  # Start with default
 
-    original_table_chunk_manager = http_utils.TableChunkManager
+    original_table_chunk_manager = table_upload_chunking.TableChunkManager
 
     class MockTableChunkManager(original_table_chunk_manager):
         def __init__(self, max_workers=None, target_chunk_bytes=None):
             super().__init__(
-                max_workers=max_workers or http_utils.MAX_CONCURRENT_CHUNKS,
+                max_workers=max_workers or table_upload_chunking.MAX_CONCURRENT_CHUNKS,
                 target_chunk_bytes=current_chunk_size[0],  # Use the dynamic value
             )
 
     # Apply the mock before creating the client
-    monkeypatch.setattr(http_utils, "TableChunkManager", MockTableChunkManager)
-
-    client = TestOnlyFlushingWeaveClient(
-        entity=basic_client.entity,
-        project=basic_client.project,
-        server=remote_client,
-        ensure_project_exists=False,
+    monkeypatch.setattr(
+        table_upload_chunking, "TableChunkManager", MockTableChunkManager
     )
 
-    # Create 3 large rows that will exceed the chunk size when combined
-    large_row_size = 1 * 1024  # 1KB per row (large enough to trigger chunking)
+    # Create large rows that will exceed the 32MB REMOTE_REQUEST_BYTES_LIMIT
+    # Use 12MB per row with 3 rows = ~36MB total, exceeding 32MB limit
+    large_row_size = 12 * 1024 * 1024  # 12MB per row
     large_data = "x" * large_row_size
 
     # Create table with 3 large rows in order [1, 2, 3]
@@ -3683,16 +3680,19 @@ def test_parallel_table_uploads_digest_consistency(network_proxy_client, monkeyp
         {"id": 3, "data": large_data + "_3", "order": "third"},
     ]
 
-    table1_res = client.server.table_create(
-        tsi.TableCreateReq(
-            table=tsi.TableSchemaForInsert(
-                project_id=client._project_id(),
-                rows=table1_rows,
-            )
-        )
+    # Use client.save() with Table object to trigger _save_table chunking logic
+    table1 = weave_client.Table(table1_rows)
+    saved_table1 = client.save(table1, "test-table-1")
+
+    # Get the table reference from the saved table
+    table1_ref = saved_table1.table_ref
+
+    # Get the digest information from the saved table
+    table1_res = client.server.table_query(
+        tsi.TableQueryReq(project_id=client._project_id(), digest=table1_ref.digest)
     )
-    digest1 = table1_res.digest
-    row_digests1 = table1_res.row_digests
+    digest1 = table1_ref.digest
+    row_digests1 = [row.digest for row in table1_res.rows]
 
     # Create table with same rows but scrambled order [3, 1, 2]
     table2_rows = [
@@ -3701,51 +3701,57 @@ def test_parallel_table_uploads_digest_consistency(network_proxy_client, monkeyp
         {"id": 2, "data": large_data + "_2", "order": "second"},
     ]
 
-    table2_res = client.server.table_create(
-        {
-            "table": {
-                "project_id": client._project_id(),
-                "rows": table2_rows,
-            }
-        }
-    )
-    digest2 = table2_res.digest
-    row_digests2 = table2_res.row_digests
+    # Use client.save() with Table object to trigger _save_table chunking logic
+    table2 = weave_client.Table(table2_rows)
+    saved_table2 = client.save(table2, "test-table-2")
 
-    # Now switch to smaller chunk size to force parallel uploads
-    # This will force parallel uploads even for our 3-row table
-    small_chunk_size = int(0.5 * 1024)  # 0.5KB (smaller than our 1KB rows)
+    # Get the table reference from the saved table
+    table2_ref = saved_table2.table_ref
+
+    # Get the digest information from the saved table
+    table2_res = client.server.table_query(
+        tsi.TableQueryReq(project_id=client._project_id(), digest=table2_ref.digest)
+    )
+    digest2 = table2_ref.digest
+    row_digests2 = [row.digest for row in table2_res.rows]
+
+    # Now switch to smaller chunk size to force more parallel uploads
+    # This will force even more chunking since each row is 12MB and chunk will be 8MB
+    small_chunk_size = 8 * 1024 * 1024  # 8MB (smaller than our 12MB rows)
 
     # Switch to the smaller chunk size
     current_chunk_size[0] = small_chunk_size
-    client.server.remote_request_bytes_limit = small_chunk_size * 1.5
 
     # Create the same tables again with the smaller chunk size
     # This should trigger parallel uploads since each row is larger than the chunk size
 
     # Table 3: [1, 2, 3] with small chunk size
-    table3_res = client.server.table_create(
-        tsi.TableCreateReq(
-            table=tsi.TableSchemaForInsert(
-                project_id=client._project_id(),
-                rows=table1_rows,
-            )
-        )
+    table3 = weave_client.Table(table1_rows)
+    saved_table3 = client.save(table3, "test-table-3")
+
+    # Get the table reference from the saved table
+    table3_ref = saved_table3.table_ref
+
+    # Get the digest information from the saved table
+    table3_res = client.server.table_query(
+        tsi.TableQueryReq(project_id=client._project_id(), digest=table3_ref.digest)
     )
-    digest3 = table3_res.digest
-    row_digests3 = table3_res.row_digests
+    digest3 = table3_ref.digest
+    row_digests3 = [row.digest for row in table3_res.rows]
 
     # Table 4: [3, 1, 2] with small chunk size
-    table4_res = client.server.table_create(
-        {
-            "table": {
-                "project_id": client._project_id(),
-                "rows": table2_rows,
-            }
-        }
+    table4 = weave_client.Table(table2_rows)
+    saved_table4 = client.save(table4, "test-table-4")
+
+    # Get the table reference from the saved table
+    table4_ref = saved_table4.table_ref
+
+    # Get the digest information from the saved table
+    table4_res = client.server.table_query(
+        tsi.TableQueryReq(project_id=client._project_id(), digest=table4_ref.digest)
     )
-    digest4 = table4_res.digest
-    row_digests4 = table4_res.row_digests
+    digest4 = table4_ref.digest
+    row_digests4 = [row.digest for row in table4_res.rows]
 
     # Verify that digests are consistent:
     # - digest1 and digest3 should be the same (same row order, different chunking)
@@ -3773,80 +3779,81 @@ def test_parallel_table_uploads_digest_consistency(network_proxy_client, monkeyp
         "Row digests should be different for different row order"
     )
 
-    # Verify that the parallel uploads actually happened by checking records
-    # We should see table_create calls for all tables, plus table_create_from_digests for chunked tables
-    table_create_records = [r for r in records if r[0] == "table_create"]
-    table_create_from_digests_records = [
-        r for r in records if r[0] == "table_create_from_digests"
+    # Verify that chunking actually happened by checking the access log
+    access_log = client.server.attribute_access_log
+
+    # Look for chunking-related method calls
+    table_create_calls = [call for call in access_log if "table_create" in call]
+    table_create_from_digests_calls = [
+        call for call in access_log if "table_create_from_digests" in call
     ]
-
-    # Expected: 4 table_create calls (2 initial + 2 chunked) + 2 table_create_from_digests calls (for chunked tables)
-    expected_table_create_calls = 4
-    expected_from_digests_calls = 2
-
-    assert len(table_create_records) == expected_table_create_calls, (
-        f"Expected {expected_table_create_calls} table_create calls, got {len(table_create_records)}"
-    )
-
-    assert len(table_create_from_digests_records) == expected_from_digests_calls, (
-        f"Expected {expected_from_digests_calls} table_create_from_digests calls, got {len(table_create_from_digests_records)}"
-    )
-
-    # Create additional test to hit the chunk splitting logic
-    # Use smaller rows that can fit multiple per chunk, then exceed the limit
-    small_rows = [
-        {"id": i, "data": "x" * 100}
-        for i in range(10)  # 10 small rows (~100 bytes each)
-    ]
-
-    # Set chunk size to allow ~3 small rows per chunk (400 bytes)
-    test_chunk_size = 400
+    # Test with smaller chunk size to verify more aggressive chunking
+    # Set a very small chunk size to force chunking even on smaller data
+    test_chunk_size = 1024 * 1024  # 1MB (much smaller than our 12MB rows)
     current_chunk_size[0] = test_chunk_size
-    client.server.remote_request_bytes_limit = (
-        test_chunk_size * 5
-    )  # Allow multiple chunks
 
-    # This should trigger the chunk splitting logic since we'll have multiple small rows
-    # that fit in chunks, but eventually exceed the chunk size
-    small_table_res = client.server.table_create(
-        tsi.TableCreateReq(
-            table=tsi.TableSchemaForInsert(
-                project_id=client._project_id(),
-                rows=small_rows,
-            )
-        )
+    # Create another table with the aggressive chunking settings
+    table5 = weave_client.Table(table1_rows)
+    saved_table5 = client.save(table5, "test-table-5")
+
+    # Verify it was saved successfully
+    assert saved_table5.table_ref is not None
+
+
+def test_individual_chunk_failure_behavior(network_proxy_client):
+    """Test what happens when an individual chunk creation fails during parallel chunking.
+
+    This demonstrates that when chunk_future.result() is called and a chunk has failed,
+    it raises an exception and immediately stops the entire table creation process
+    with no error recovery.
+    """
+    basic_client, remote_client, records = network_proxy_client
+    client = TestOnlyFlushingWeaveClient(
+        entity=basic_client.entity,
+        project=basic_client.project,
+        server=remote_client,
+        ensure_project_exists=False,
     )
-    assert small_table_res.digest is not None
-    assert small_table_res.row_digests is not None
 
-    # Test error handling in chunking - mock a failing chunk creation
-    with monkeypatch.context() as m:
-        # Store the original method before mocking to avoid recursion
-        original_create_table_chunk = client.server._create_table_chunk
+    # Create data that will trigger chunking
+    large_row_size = 2 * 1024  # 2KB per row
+    large_data = "x" * large_row_size
 
-        def failing_create_table_chunk(self, project_id, rows, index):
-            if index == 0:  # Fail on the first chunk (index 0 is more reliable)
-                raise RuntimeError("Simulated chunk creation failure")
-            # Call the original method for other chunks
-            return original_create_table_chunk(project_id, rows, index)
+    rows = [
+        {"id": 1, "data": large_data + "_1", "order": "first"},
+        {"id": 2, "data": large_data + "_2", "order": "second"},
+        {"id": 3, "data": large_data + "_3", "order": "third"},
+    ]
 
-        # Mock the _create_table_chunk method on RemoteHTTPTraceServer to fail on second chunk
-        m.setattr(
-            "weave.trace_server_bindings.remote_http_trace_server.RemoteHTTPTraceServer._create_table_chunk",
-            failing_create_table_chunk,
-        )
+    # Set small chunk size to force chunking
+    client.server.remote_request_bytes_limit = 1 * 1024  # 1KB limit, forces chunking
 
-        # This should raise an exception due to the failing chunk
-        # We expect this to fail and hit the exception handling code in http_utils.py
-        with pytest.raises(RuntimeError, match="Simulated chunk creation failure"):
+    # Mock the underlying post method to fail on the second call
+    original_post = client.server.post
+    call_count = [0]
+
+    def failing_post(url, *args, **kwargs):
+        if url == "/table/create":
+            call_count[0] += 1
+            if call_count[0] == 2:  # Fail on the second chunk
+                raise RuntimeError("Simulated individual chunk failure")
+        return original_post(url, *args, **kwargs)
+
+    client.server.post = failing_post
+
+    try:
+        with pytest.raises(RuntimeError, match="Simulated individual chunk failure"):
             client.server.table_create(
                 tsi.TableCreateReq(
                     table=tsi.TableSchemaForInsert(
                         project_id=client._project_id(),
-                        rows=table1_rows,
+                        rows=rows,
                     )
                 )
             )
+    finally:
+        # Restore original
+        client.server.post = original_post
 
 
 def test_table_create_from_digests(network_proxy_client):

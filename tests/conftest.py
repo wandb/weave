@@ -481,16 +481,6 @@ def network_proxy_client(client):
         )
         return client.server.table_create(req)
 
-    @app.post("/table/create_row_digest")
-    def table_create_row_digest(req: tsi.TableCreateReq) -> tsi.TableCreateRes:
-        records.append(
-            (
-                "table_create_row_digest",
-                req,
-            )
-        )
-        return client.server.table_create(req)
-
     @app.post("/table/create_from_digests")
     def table_create_from_digests(
         req: tsi.TableCreateFromDigestsReq,
@@ -534,6 +524,26 @@ def network_proxy_client(client):
             )
         )
         return client.server.feedback_create_batch(req)
+
+    @app.post("/obj/create")
+    def obj_create(req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
+        records.append(
+            (
+                "obj_create",
+                req,
+            )
+        )
+        return client.server.obj_create(req)
+
+    @app.post("/obj/read")
+    def obj_read(req: tsi.ObjReadReq) -> tsi.ObjReadRes:
+        records.append(
+            (
+                "obj_read",
+                req,
+            )
+        )
+        return client.server.obj_read(req)
 
     with TestClient(app) as c:
 

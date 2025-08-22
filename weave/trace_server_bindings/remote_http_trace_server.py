@@ -15,7 +15,7 @@ from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.http_utils import (
-    TableChunkManager,
+    REMOTE_REQUEST_BYTES_LIMIT,
     handle_response_error,
     log_dropped_call_batch,
     log_dropped_feedback_batch,
@@ -36,11 +36,6 @@ logger = logging.getLogger(__name__)
 # DEFAULT_CONNECT_TIMEOUT = 10
 # DEFAULT_READ_TIMEOUT = 30
 # DEFAULT_TIMEOUT = (DEFAULT_CONNECT_TIMEOUT, DEFAULT_READ_TIMEOUT)
-
-
-REMOTE_REQUEST_BYTES_LIMIT = (
-    (32 - 1) * 1024 * 1024
-)  # 32 MiB (real limit) - 1 MiB (buffer)
 
 
 class RemoteHTTPTraceServer(tsi.TraceServerInterface):
@@ -446,50 +441,8 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     def table_create(
         self, req: Union[tsi.TableCreateReq, dict[str, Any]]
     ) -> tsi.TableCreateRes:
-        """Create tables in parallel and merge them using the table/merge endpoint.
-
-        When the request is too large, we split it into smaller chunks and create
-        them concurrently, then merge the results.
-        """
-        if isinstance(req, dict):
-            req = tsi.TableCreateReq.model_validate(req)
-        req = cast(tsi.TableCreateReq, req)
-
-        chunk_manager = TableChunkManager()
-        estimated_bytes = chunk_manager.calculate_request_bytes(req)
-        if estimated_bytes <= self.remote_request_bytes_limit:
-            return self._generic_request(
-                "/table/create", req, tsi.TableCreateReq, tsi.TableCreateRes
-            )
-
-        chunks = chunk_manager.create_chunks(req.table.rows)
-        chunk_manager.validate_chunks(chunks, req.table.rows)
-
-        table_digests, all_row_digests = chunk_manager.process_chunks_concurrently(
-            chunks, self._create_table_chunk, req.table.project_id
-        )
-        create_req = tsi.TableCreateFromDigestsReq(
-            project_id=req.table.project_id, row_digests=all_row_digests
-        )
-        create_res = self.table_create_from_digests(create_req)
-
-        return tsi.TableCreateRes(
-            digest=create_res.digest,
-            row_digests=all_row_digests,
-        )
-
-    def _create_table_chunk(
-        self, project_id: str, rows: list[dict[str, Any]], index: int
-    ) -> tsi.TableCreateRes:
-        """Create a single table chunk with the given rows."""
-        chunk_req = tsi.TableCreateReq(
-            table=tsi.TableSchemaForInsert(
-                project_id=project_id,
-                rows=rows,
-            )
-        )
         return self._generic_request(
-            "/table/create", chunk_req, tsi.TableCreateReq, tsi.TableCreateRes
+            "/table/create", req, tsi.TableCreateReq, tsi.TableCreateRes
         )
 
     def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
