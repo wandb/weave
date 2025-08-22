@@ -1,6 +1,6 @@
 import threading
 
-from weave.trace.weave_client_send_file_cache import (
+from weave.client.weave_client_send_file_cache import (
     ThreadSafeLRUCache,
     WeaveClientSendFileCache,
 )
