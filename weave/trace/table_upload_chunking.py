@@ -1,6 +1,7 @@
 """Table upload chunking functionality for efficient parallel table creation."""
 
 import logging
+from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable, TypeVar
 
@@ -33,7 +34,7 @@ class TableChunkManager:
         """Calculate the size in bytes of a single row."""
         return len(str(row).encode("utf-8"))
 
-    def create_chunks(self, rows: list[RowItemType]) -> list[list[RowItemType]]:
+    def create_chunks(self, rows: Sequence[RowItemType]) -> list[list[RowItemType]]:
         """
         Split rows into chunks based on target byte size.
 

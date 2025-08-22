@@ -16,6 +16,7 @@ _ENDPOINT_CACHE: dict[str, bool] = {}
 
 # Default remote request bytes limit (32 MiB real limit - 1 MiB buffer)
 REMOTE_REQUEST_BYTES_LIMIT = (32 - 1) * 1024 * 1024
+ROW_COUNT_CHUNKING_THRESHOLD = 1000
 
 # Type variable for batch items
 T = TypeVar("T")

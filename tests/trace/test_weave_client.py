@@ -3800,60 +3800,45 @@ def test_parallel_table_uploads_digest_consistency(client, monkeypatch):
     assert saved_table5.table_ref is not None
 
 
-def test_individual_chunk_failure_behavior(network_proxy_client):
+def test_individual_chunk_failure_behavior(client, monkeypatch):
     """Test what happens when an individual chunk creation fails during parallel chunking.
 
     This demonstrates that when chunk_future.result() is called and a chunk has failed,
     it raises an exception and immediately stops the entire table creation process
     with no error recovery.
     """
-    basic_client, remote_client, records = network_proxy_client
-    client = TestOnlyFlushingWeaveClient(
-        entity=basic_client.entity,
-        project=basic_client.project,
-        server=remote_client,
-        ensure_project_exists=False,
-    )
+    # Force chunking by setting ROW_COUNT_CHUNKING_THRESHOLD to 1
+    from weave.trace_server_bindings import http_utils
 
-    # Create data that will trigger chunking
-    large_row_size = 2 * 1024  # 2KB per row
-    large_data = "x" * large_row_size
+    monkeypatch.setattr(http_utils, "ROW_COUNT_CHUNKING_THRESHOLD", 1)
 
+    # Create small data that will still trigger chunking due to the small limit
     rows = [
-        {"id": 1, "data": large_data + "_1", "order": "first"},
-        {"id": 2, "data": large_data + "_2", "order": "second"},
-        {"id": 3, "data": large_data + "_3", "order": "third"},
+        {"id": 1, "data": "1" * 30, "order": "first"},
+        {"id": 2, "data": "2" * 30, "order": "second"},
+        {"id": 3, "data": "3" * 30, "order": "third"},
+        {"id": 4, "data": "4" * 30, "order": "fourth"},
+        {"id": 5, "data": "5" * 30, "order": "fifth"},
     ]
 
-    # Set small chunk size to force chunking
-    client.server.remote_request_bytes_limit = 1 * 1024  # 1KB limit, forces chunking
-
-    # Mock the underlying post method to fail on the second call
-    original_post = client.server.post
+    # Mock the _send_table_create method to fail on the second chunk
+    original_send_table_create = client._send_table_create
     call_count = [0]
 
-    def failing_post(url, *args, **kwargs):
-        if url == "/table/create":
-            call_count[0] += 1
-            if call_count[0] == 2:  # Fail on the second chunk
-                raise RuntimeError("Simulated individual chunk failure")
-        return original_post(url, *args, **kwargs)
+    def failing_send_table_create(chunk_rows):
+        call_count[0] += 1
+        if call_count[0] == 2:  # Fail on the second chunk
+            raise RuntimeError("Simulated individual chunk failure")
+        return original_send_table_create(chunk_rows)
 
-    client.server.post = failing_post
+    client._send_table_create = failing_send_table_create
 
-    try:
-        with pytest.raises(RuntimeError, match="Simulated individual chunk failure"):
-            client.server.table_create(
-                tsi.TableCreateReq(
-                    table=tsi.TableSchemaForInsert(
-                        project_id=client._project_id(),
-                        rows=rows,
-                    )
-                )
-            )
-    finally:
-        # Restore original
-        client.server.post = original_post
+    with pytest.raises(RuntimeError, match="Simulated individual chunk failure"):
+        table = weave_client.Table(rows)
+        client.save(table, "test-chunk-failure")
+
+    # Restore original
+    client._send_table_create = original_send_table_create
 
 
 def test_table_create_from_digests(network_proxy_client):

@@ -129,6 +129,7 @@ from weave.trace_server.trace_server_interface import (
 )
 from weave.trace_server_bindings.http_utils import (
     REMOTE_REQUEST_BYTES_LIMIT,
+    ROW_COUNT_CHUNKING_THRESHOLD,
     check_endpoint_exists,
 )
 from weave.utils.attributes_dict import AttributesDict
@@ -1944,6 +1945,13 @@ class WeaveClient:
 
         return self._save_object_basic(op, name)
 
+    def _send_table_create(self, rows: list[Any]) -> TableCreateRes:
+        json_rows = to_json(rows, self._project_id(), self)
+        req = TableCreateReq(
+            table=TableSchemaForInsert(project_id=self._project_id(), rows=json_rows)
+        )
+        return self.server.table_create(req)
+
     @trace_sentry.global_trace_sentry.watch()
     def _save_table(self, table: Table | WeaveTable) -> TableRef:
         """Saves a Table to the weave server and returns the TableRef.
@@ -1956,38 +1964,39 @@ class WeaveClient:
         if isinstance(table, WeaveTable) and table.table_ref is not None:
             return table.table_ref
 
-        # Check endpoint availability before deferring to executor
-        rows = to_json(table.rows, self._project_id(), self)
-        req = TableCreateReq(
-            table=TableSchemaForInsert(project_id=self._project_id(), rows=rows)
-        )
-
-        # Determine chunking strategy upfront based on endpoint availability
-        chunk_manager = TableChunkManager()
         remote_request_bytes_limit = getattr(
             self.server, "remote_request_bytes_limit", REMOTE_REQUEST_BYTES_LIMIT
         )
-        estimated_bytes = chunk_manager.calculate_request_bytes(req)
-        use_chunking = estimated_bytes > remote_request_bytes_limit
-        use_parallel_chunks = False
 
+        # Primary heuristic: row count
+        use_chunking = len(table.rows) > ROW_COUNT_CHUNKING_THRESHOLD
+        # Secondary heuristic: basic size estimation for smaller tables
+        if not use_chunking and len(table.rows) > 0:
+            # Simple size estimation without full serialization
+            sample_row_size = len(str(table.rows[0]).encode("utf-8"))
+            estimated_bytes = sample_row_size * len(table.rows) * 2
+            use_chunking = estimated_bytes > remote_request_bytes_limit
+
+        # Determine parallel vs incremental chunking
+        use_parallel_chunks = False
         if use_chunking:
             test_req = TableCreateFromDigestsReq(
-                project_id=req.table.project_id, row_digests=[]
+                project_id=self._project_id(), row_digests=[]
             )
             use_parallel_chunks = check_endpoint_exists(
                 self.server, "table_create_from_digests", test_req
             )
 
-        # Execute chunking strategy and get future result
+        # Execute chunking strategy - defer to_json serialization
         if not use_chunking:
+            # Simple case: defer the entire serialization and upload
             res_future: Future[TableCreateRes] = self.future_executor.defer(
-                lambda: self.server.table_create(req)
+                lambda: self._send_table_create(list(table.rows))
             )
         elif use_parallel_chunks:
-            res_future = self._create_table_with_parallel_chunks(req, chunk_manager)
+            res_future = self._create_table_with_parallel_chunks(table)
         else:
-            res_future = self._create_table_with_incremental_updates(req, chunk_manager)
+            res_future = self._create_table_with_incremental_updates(table)
 
         digest_future: Future[str] = self.future_executor.then(
             [res_future], lambda res: res[0].digest
@@ -2008,22 +2017,18 @@ class WeaveClient:
         return table_ref
 
     def _create_table_with_parallel_chunks(
-        self, req: TableCreateReq, chunk_manager: TableChunkManager
+        self, table: Table | WeaveTable
     ) -> Future[TableCreateRes]:
-        """Create table using parallel chunks and table_create_from_digests."""
-        chunks = chunk_manager.create_chunks(req.table.rows)
+        """Execute the actual parallel chunk upload."""
+        # Create chunks from raw table data (not serialized yet)
+        chunk_manager = TableChunkManager()
+        raw_chunks: list[list[Any]] = chunk_manager.create_chunks(table.rows)
 
-        # Create chunks in parallel using future_executor
+        # Create chunks in parallel using future_executor - defer serialization
         chunk_futures = []
-        for chunk in chunks:
-            chunk_req = TableCreateReq(
-                table=TableSchemaForInsert(
-                    project_id=req.table.project_id,
-                    rows=chunk,
-                )
-            )
+        for raw_chunk in raw_chunks:
             chunk_future = self.future_executor.defer(
-                lambda cr=chunk_req: self.server.table_create(cr)
+                lambda: self._send_table_create(raw_chunk)
             )
             chunk_futures.append(chunk_future)
 
@@ -2037,7 +2042,7 @@ class WeaveClient:
 
             # Create final table from digests
             create_req = TableCreateFromDigestsReq(
-                project_id=req.table.project_id, row_digests=all_row_digests
+                project_id=self._project_id(), row_digests=all_row_digests
             )
             create_res = self.server.table_create_from_digests(create_req)
 
@@ -2050,30 +2055,23 @@ class WeaveClient:
         return self.future_executor.then(chunk_futures, combine_chunks_and_create_table)
 
     def _create_table_with_incremental_updates(
-        self, req: TableCreateReq, chunk_manager: TableChunkManager
+        self, table: Table | WeaveTable
     ) -> Future[TableCreateRes]:
         """Create table using incremental table_update pattern (fallback)."""
-        chunks = chunk_manager.create_chunks(req.table.rows)
-        if not chunks:
-            # No chunks, create empty table
-            empty_req = TableCreateReq(
-                table=TableSchemaForInsert(project_id=req.table.project_id, rows=[])
-            )
-            return self.future_executor.defer(
-                lambda: self.server.table_create(empty_req)
-            )
+        # Create chunks from raw table data (not serialized yet)
+        chunk_manager = TableChunkManager()
+        raw_chunks: list[list[Any]] = chunk_manager.create_chunks(table.rows)
+        if not raw_chunks:
+            return self.future_executor.defer(lambda: self._send_table_create([]))
 
-        # Create first chunk as the base table async
-        first_chunk = chunks[0]
-        first_req = TableCreateReq(
-            table=TableSchemaForInsert(
-                project_id=req.table.project_id,
-                rows=first_chunk,
-            )
-        )
-        base_future = self.future_executor.defer(
-            lambda: self.server.table_create(first_req)
-        )
+        # Create first chunk as the base table - defer serialization
+        first_raw_chunk = raw_chunks[0]
+
+        def create_first_chunk() -> TableCreateRes:
+            serialized_rows = to_json(first_raw_chunk, self._project_id(), self)
+            return self._send_table_create(serialized_rows)
+
+        base_future = self.future_executor.defer(create_first_chunk)
 
         # Chain the incremental updates sequentially
         def process_remaining_chunks(
@@ -2084,10 +2082,12 @@ class WeaveClient:
             all_row_digests = list(base_result.row_digests)
 
             # Process remaining chunks sequentially (each depends on previous)
-            for chunk in chunks[1:]:
-                payloads = [TableAppendSpecPayload(row=row) for row in chunk]
+            for raw_chunk in raw_chunks[1:]:
+                # Serialize each chunk separately to avoid recursion
+                serialized_chunk = to_json(raw_chunk, self._project_id(), self)
+                payloads = [TableAppendSpecPayload(row=row) for row in serialized_chunk]
                 update_req = TableUpdateReq(
-                    project_id=req.table.project_id,
+                    project_id=self._project_id(),
                     base_digest=current_digest,
                     updates=[TableAppendSpec(append=payload) for payload in payloads],
                 )
