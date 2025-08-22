@@ -9716,5 +9716,37 @@
       "output": 3.5e-07,
       "created_at": "2025-08-20 13:33:54"
     }
+  ],
+  "vertex_ai/qwen/qwen3-coder-480b-a35b-instruct-maas": [
+    {
+      "provider": "vertex_ai-qwen_models",
+      "input": 1e-06,
+      "output": 4e-06,
+      "created_at": "2025-08-21 14:19:20"
+    }
+  ],
+  "vertex_ai/qwen/qwen3-235b-a22b-instruct-2507-maas": [
+    {
+      "provider": "vertex_ai-qwen_models",
+      "input": 2.5e-07,
+      "output": 1e-06,
+      "created_at": "2025-08-21 14:19:20"
+    }
+  ],
+  "fireworks_ai/accounts/fireworks/models/deepseek-v3-0324": [
+    {
+      "provider": "fireworks_ai",
+      "input": 9e-07,
+      "output": 9e-07,
+      "created_at": "2025-08-21 14:19:20"
+    }
+  ],
+  "coreweave/deepseek-ai/DeepSeek-V3.1": [
+    {
+      "provider": "coreweave",
+      "input": 5.5e-07,
+      "output": 1.65e-06,
+      "created_at": "2025-08-21 14:19:20"
+    }
   ]
 }
