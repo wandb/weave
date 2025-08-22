@@ -480,6 +480,28 @@ def network_proxy_client(client):
         )
         return client.server.table_create(req)
 
+    @app.post("/table/create_row_digest")
+    def table_create_row_digest(req: tsi.TableCreateReq) -> tsi.TableCreateRes:
+        records.append(
+            (
+                "table_create_row_digest",
+                req,
+            )
+        )
+        return client.server.table_create(req)
+
+    @app.post("/table/create_from_digests")
+    def table_create_from_digests(
+        req: tsi.TableCreateFromDigestsReq,
+    ) -> tsi.TableCreateRes:
+        records.append(
+            (
+                "table_create_from_digests",
+                req,
+            )
+        )
+        return client.server.table_create_from_digests(req)
+
     @app.post("/table/update")
     def table_update(req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
         records.append(

@@ -1,8 +1,6 @@
 import datetime
 import io
 import logging
-import threading
-import time
 from collections.abc import Iterator
 from typing import Any, Optional, Union, cast
 from zoneinfo import ZoneInfo
@@ -465,7 +463,14 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             )
 
         chunk_manager = TableChunkManager()
-        chunks = chunk_manager.create_chunks(req.table.rows)
+        # Import at runtime to get the current value after patching
+        from weave.trace_server_bindings.http_utils import (
+            TARGET_CHUNK_BYTES as current_chunk_bytes,
+        )
+
+        chunks = chunk_manager.create_chunks(
+            req.table.rows, target_chunk_bytes=current_chunk_bytes
+        )
         chunk_manager.validate_chunks(chunks, req.table.rows)
 
         table_digests, all_row_digests = chunk_manager.process_chunks_concurrently(
@@ -491,15 +496,9 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
                 rows=rows,
             )
         )
-        start = time.time()
-        r = self._generic_request(
+        return self._generic_request(
             "/table/create", chunk_req, tsi.TableCreateReq, tsi.TableCreateRes
         )
-        end = time.time()
-        print(
-            f">>>>> index: {index} [{threading.current_thread().name}] rows: {len(rows)} bytes: {len(chunk_req.model_dump_json(by_alias=True).encode('utf-8')) / 1024} time: {end - start}"
-        )
-        return r
 
     def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
         """Similar to `calls/batch_upsert`, we can dynamically adjust the payload size

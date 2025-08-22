@@ -342,7 +342,7 @@ class TableChunkManager:
                     result = future.result()
                     table_digests[chunk_index] = result.digest
                     all_row_digests.extend(result.row_digests)
-                except Exception as e:
+                except Exception:
                     logger.exception(f"Failed to create table chunk {chunk_index}")
                     raise
 
