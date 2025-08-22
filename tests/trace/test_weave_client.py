@@ -3645,15 +3645,9 @@ def test_feedback_batching(network_proxy_client):
 @pytest.mark.disable_logging_error_check
 def test_parallel_table_uploads_digest_consistency(client, monkeypatch):
     """Test parallel table uploads are consistent with one shot uploads."""
-    # Set up access logging to track method calls
-    client.server.attribute_access_log = []
-
     # Set up the mock before creating the client
     # We'll use a mutable container to control the chunk size dynamically
-    current_chunk_size = [
-        table_upload_chunking.TARGET_CHUNK_BYTES
-    ]  # Start with default
-
+    current_chunk_size = [table_upload_chunking.TARGET_CHUNK_BYTES]
     original_table_chunk_manager = table_upload_chunking.TableChunkManager
 
     class MockTableChunkManager(original_table_chunk_manager):
@@ -3668,9 +3662,9 @@ def test_parallel_table_uploads_digest_consistency(client, monkeypatch):
         table_upload_chunking, "TableChunkManager", MockTableChunkManager
     )
 
-    # Create large rows that will exceed the 32MB REMOTE_REQUEST_BYTES_LIMIT
-    # Use 12MB per row with 3 rows = ~36MB total, exceeding 32MB limit
-    large_row_size = 12 * 1024 * 1024  # 12MB per row
+    # Create large rows that will trigger chunking behavior
+    # Use 500KB per row with 3 rows = ~1.5MB total, much more efficient for testing
+    large_row_size = 500 * 1024  # 500KB per row (reduced from 12MB for performance)
     large_data = "x" * large_row_size
 
     # Create table with 3 large rows in order [1, 2, 3]
@@ -3716,8 +3710,8 @@ def test_parallel_table_uploads_digest_consistency(client, monkeypatch):
     row_digests2 = [row.digest for row in table2_res.rows]
 
     # Now switch to smaller chunk size to force more parallel uploads
-    # This will force even more chunking since each row is 12MB and chunk will be 8MB
-    small_chunk_size = 8 * 1024 * 1024  # 8MB (smaller than our 12MB rows)
+    # This will force chunking since each row is 500KB and chunk will be 300KB
+    small_chunk_size = 300 * 1024  # 300KB (smaller than our 500KB rows)
 
     # Switch to the smaller chunk size
     current_chunk_size[0] = small_chunk_size
@@ -3789,7 +3783,7 @@ def test_parallel_table_uploads_digest_consistency(client, monkeypatch):
     ]
     # Test with smaller chunk size to verify more aggressive chunking
     # Set a very small chunk size to force chunking even on smaller data
-    test_chunk_size = 1024 * 1024  # 1MB (much smaller than our 12MB rows)
+    test_chunk_size = 100 * 1024  # 100KB (much smaller than our 500KB rows)
     current_chunk_size[0] = test_chunk_size
 
     # Create another table with the aggressive chunking settings
