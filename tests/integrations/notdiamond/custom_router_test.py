@@ -9,7 +9,7 @@ import weave
 from weave.evaluation.eval import EvaluationResults
 from weave.integrations.notdiamond.custom_router import evaluate_router, train_router
 from weave.integrations.notdiamond.util import get_model_evals
-from weave.trace.weave_client import WeaveClient
+from weave.client.weave_client import WeaveClient
 
 
 @pytest.fixture

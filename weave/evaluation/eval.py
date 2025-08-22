@@ -34,7 +34,7 @@ from weave.trace.objectify import maybe_objectify, register_object
 from weave.trace.op import CallDisplayNameFunc, Op, OpCallError, as_op, is_op
 from weave.trace.refs import ObjectRef
 from weave.trace.vals import WeaveObject
-from weave.trace.weave_client import Call, CallsIter, get_ref
+from weave.client.weave_client import Call, CallsIter, get_ref
 from weave.trace_server.trace_server_interface import CallsFilter
 
 console = Console()

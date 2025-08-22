@@ -350,7 +350,7 @@ def main():
     import weave
     from weave.trace import feedback, util
     from weave.trace import op as OpSpec
-    from weave.trace import weave_client as client
+    from weave.client import weave_client as client
     from weave.trace_server import (
         trace_server_interface,
     )

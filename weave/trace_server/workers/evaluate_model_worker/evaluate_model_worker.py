@@ -9,7 +9,7 @@ from weave.evaluation.eval import Evaluation
 from weave.scorers.llm_as_a_judge_scorer import LLMAsAJudgeScorer
 from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.refs import Ref
-from weave.trace.weave_client import WeaveClient
+from weave.client.weave_client import WeaveClient
 from weave.trace_server.interface.builtin_object_classes.llm_structured_model import (
     LLMStructuredCompletionModel,
 )

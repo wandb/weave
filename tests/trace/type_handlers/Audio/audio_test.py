@@ -5,7 +5,7 @@ import wave
 import pytest
 
 import weave
-from weave.trace.weave_client import WeaveClient, get_ref
+from weave.client.weave_client import WeaveClient, get_ref
 from weave.type_handlers.Audio.audio import Audio
 
 # These paths will always resolve to the same location as this file

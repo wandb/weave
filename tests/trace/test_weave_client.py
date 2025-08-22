@@ -25,7 +25,8 @@ from tests.trace.util import (
 )
 from weave import Evaluation
 from weave.integrations.integration_utilities import op_name_from_call
-from weave.trace import refs, weave_client
+from weave.client import weave_client
+from weave.trace import refs
 from weave.trace.context import call_context
 from weave.trace.context.call_context import tracing_disabled
 from weave.trace.isinstance import weave_isinstance
@@ -2813,7 +2814,7 @@ def test_calls_query_sort_by_display_name_prioritized(client):
 
 def test_tracing_enabled_context(client):
     """Test that gc.create_call() and gc.finish_call() respect the _tracing_enabled context variable."""
-    from weave.trace.weave_client import Call
+    from weave.client.weave_client import Call
 
     @weave.op
     def test_op():

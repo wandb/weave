@@ -7,7 +7,7 @@ import pytest
 from moviepy.editor import ColorClip, VideoClip, VideoFileClip
 
 import weave
-from weave.trace.weave_client import WeaveClient
+from weave.client.weave_client import WeaveClient
 from weave.type_handlers.Video.video import VideoFormat, write_video
 
 """When testing types, it is important to test:

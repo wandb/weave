@@ -14,7 +14,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any
 
-from weave.trace.weave_client import Call
+from weave.client.weave_client import Call
 from weave.utils.dict_utils import convert_defaultdict_to_dict, flatten_attributes
 
 

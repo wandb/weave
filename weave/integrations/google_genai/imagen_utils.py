@@ -7,7 +7,7 @@ from weave.integrations.google_genai.gemini_utils import (
     google_genai_gemini_postprocess_inputs,
 )
 from weave.trace.autopatch import OpSettings
-from weave.trace.weave_client import Call
+from weave.client.weave_client import Call
 
 logger = logging.getLogger(__name__)
 

@@ -2,7 +2,7 @@ import pytest
 
 import weave
 from weave.trace.context import call_context
-from weave.trace.weave_client import RESERVED_SUMMARY_STATUS_COUNTS_KEY
+from weave.client.weave_client import RESERVED_SUMMARY_STATUS_COUNTS_KEY
 from weave.trace_server import trace_server_interface as tsi
 
 

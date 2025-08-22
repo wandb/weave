@@ -6,7 +6,7 @@ import pytest
 from tests.trace.util import (
     client_is_sqlite,
 )
-from weave.trace.weave_client import WeaveClient
+from weave.client.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
 
 

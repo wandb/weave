@@ -11,7 +11,7 @@ import weave
 from tests.trace.util import capture_output, flushing_callback
 from weave.trace.constants import TRACE_CALL_EMOJI
 from weave.trace.settings import UserSettings, parse_and_apply_settings
-from weave.trace.weave_client import get_parallelism_settings
+from weave.client.weave_client import get_parallelism_settings
 from weave.utils.retry import with_retry
 
 

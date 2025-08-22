@@ -5,7 +5,7 @@ import pytest
 import weave
 from tests.trace.util import client_is_sqlite
 from weave import AnnotationSpec
-from weave.trace.weave_client import WeaveClient, get_ref
+from weave.client.weave_client import WeaveClient, get_ref
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import InvalidRequest
 from weave.trace_server.interface.query import Query

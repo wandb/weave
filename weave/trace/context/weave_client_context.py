@@ -6,7 +6,7 @@ from contextlib import contextmanager
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from weave.trace.weave_client import WeaveClient
+    from weave.client.weave_client import WeaveClient
 
 _global_weave_client: WeaveClient | None = None
 lock = threading.Lock()

@@ -4,7 +4,7 @@ from collections.abc import Coroutine
 import pytest
 
 import weave
-from weave.trace.weave_client import Call
+from weave.client.weave_client import Call
 
 
 def test_sync_val(client):
