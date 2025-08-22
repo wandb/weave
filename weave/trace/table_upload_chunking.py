@@ -70,24 +70,6 @@ class TableChunkManager:
 
         return chunks
 
-    def validate_chunks(
-        self, chunks: list[list[RowItemType]], original_rows: list[RowItemType]
-    ) -> None:
-        """
-        Validate that chunking preserved all rows without duplicates.
-
-        Args:
-            chunks: List of row chunks
-            original_rows: Original list of rows
-
-        Raises:
-            AssertionError: If chunking validation fails
-        """
-        total_chunk_rows = sum(len(chunk) for chunk in chunks)
-        assert total_chunk_rows == len(original_rows), (
-            f"Chunking error: expected {len(original_rows)} rows, got {total_chunk_rows}"
-        )
-
     def process_chunks_concurrently(
         self,
         chunks: list[list[RowItemType]],

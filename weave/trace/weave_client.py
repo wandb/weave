@@ -1979,17 +1979,15 @@ class WeaveClient:
                 self.server, "table_create_from_digests", test_req
             )
 
-        def send_table_create() -> TableCreateRes:
-            if not use_chunking:
-                return self.server.table_create(req)
-            elif use_parallel_chunks:
-                return self._create_table_with_parallel_chunks(req, chunk_manager)
-            else:
-                return self._create_table_with_incremental_updates(req, chunk_manager)
-
-        res_future: Future[TableCreateRes] = self.future_executor.defer(
-            send_table_create
-        )
+        # Execute chunking strategy and get future result
+        if not use_chunking:
+            res_future: Future[TableCreateRes] = self.future_executor.defer(
+                lambda: self.server.table_create(req)
+            )
+        elif use_parallel_chunks:
+            res_future = self._create_table_with_parallel_chunks(req, chunk_manager)
+        else:
+            res_future = self._create_table_with_incremental_updates(req, chunk_manager)
 
         digest_future: Future[str] = self.future_executor.then(
             [res_future], lambda res: res[0].digest
@@ -2011,7 +2009,7 @@ class WeaveClient:
 
     def _create_table_with_parallel_chunks(
         self, req: TableCreateReq, chunk_manager: TableChunkManager
-    ) -> TableCreateRes:
+    ) -> Future[TableCreateRes]:
         """Create table using parallel chunks and table_create_from_digests."""
         chunks = chunk_manager.create_chunks(req.table.rows)
         chunk_manager.validate_chunks(chunks, req.table.rows)
@@ -2030,38 +2028,43 @@ class WeaveClient:
             )
             chunk_futures.append(chunk_future)
 
-        # Wait for all chunks to complete and collect results
-        all_row_digests = []
-        for chunk_future in chunk_futures:
-            chunk_result = chunk_future.result()
-            all_row_digests.extend(chunk_result.row_digests)
+        # Chain the operations using future_executor.then
+        def combine_chunks_and_create_table(
+            chunk_results: list[TableCreateRes],
+        ) -> TableCreateRes:
+            all_row_digests = []
+            for chunk_result in chunk_results:
+                all_row_digests.extend(chunk_result.row_digests)
 
-        # Create final table from digests
-        create_req = TableCreateFromDigestsReq(
-            project_id=req.table.project_id, row_digests=all_row_digests
-        )
-        create_res = self.server.table_create_from_digests(create_req)
+            # Create final table from digests
+            create_req = TableCreateFromDigestsReq(
+                project_id=req.table.project_id, row_digests=all_row_digests
+            )
+            create_res = self.server.table_create_from_digests(create_req)
 
-        return TableCreateRes(
-            digest=create_res.digest,
-            row_digests=all_row_digests,
-        )
+            return TableCreateRes(
+                digest=create_res.digest,
+                row_digests=all_row_digests,
+            )
+
+        # Return a future that will complete when all chunks are done and combined
+        return self.future_executor.then(chunk_futures, combine_chunks_and_create_table)
 
     def _create_table_with_incremental_updates(
         self, req: TableCreateReq, chunk_manager: TableChunkManager
-    ) -> TableCreateRes:
+    ) -> Future[TableCreateRes]:
         """Create table using incremental table_update pattern (fallback)."""
         chunks = chunk_manager.create_chunks(req.table.rows)
-        chunk_manager.validate_chunks(chunks, req.table.rows)
-
         if not chunks:
             # No chunks, create empty table
             empty_req = TableCreateReq(
                 table=TableSchemaForInsert(project_id=req.table.project_id, rows=[])
             )
-            return self.server.table_create(empty_req)
+            return self.future_executor.defer(
+                lambda: self.server.table_create(empty_req)
+            )
 
-        # Create first chunk as the base table
+        # Create first chunk as the base table async
         first_chunk = chunks[0]
         first_req = TableCreateReq(
             table=TableSchemaForInsert(
@@ -2069,26 +2072,37 @@ class WeaveClient:
                 rows=first_chunk,
             )
         )
-        base_result = self.server.table_create(first_req)
-        current_digest = base_result.digest
-        all_row_digests = list(base_result.row_digests)
-
-        # Add remaining chunks incrementally using table_update
-        for chunk in chunks[1:]:
-            payloads = [TableAppendSpecPayload(row=row) for row in chunk]
-            update_req = TableUpdateReq(
-                project_id=req.table.project_id,
-                base_digest=current_digest,
-                updates=[TableAppendSpec(append=payload) for payload in payloads],
-            )
-            update_result = self.server.table_update(update_req)
-            current_digest = update_result.digest
-            all_row_digests.extend(update_result.updated_row_digests)
-
-        return TableCreateRes(
-            digest=current_digest,
-            row_digests=all_row_digests,
+        base_future = self.future_executor.defer(
+            lambda: self.server.table_create(first_req)
         )
+
+        # Chain the incremental updates sequentially
+        def process_remaining_chunks(
+            base_results: list[TableCreateRes],
+        ) -> TableCreateRes:
+            base_result = base_results[0]
+            current_digest = base_result.digest
+            all_row_digests = list(base_result.row_digests)
+
+            # Process remaining chunks sequentially (each depends on previous)
+            for chunk in chunks[1:]:
+                payloads = [TableAppendSpecPayload(row=row) for row in chunk]
+                update_req = TableUpdateReq(
+                    project_id=req.table.project_id,
+                    base_digest=current_digest,
+                    updates=[TableAppendSpec(append=payload) for payload in payloads],
+                )
+                update_result = self.server.table_update(update_req)
+                current_digest = update_result.digest
+                all_row_digests.extend(update_result.updated_row_digests)
+
+            return TableCreateRes(
+                digest=current_digest,
+                row_digests=all_row_digests,
+            )
+
+        # Chain the sequential processing after the base table is created
+        return self.future_executor.then([base_future], process_remaining_chunks)
 
     def _append_to_table(self, table_digest: str, rows: list[dict]) -> WeaveTable:
         payloads = [TableAppendSpecPayload(row=row) for row in rows]
