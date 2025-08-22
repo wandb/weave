@@ -3790,3 +3790,105 @@ def test_parallel_table_uploads_digest_consistency(network_proxy_client, monkeyp
     assert len(table_create_from_digests_records) == expected_from_digests_calls, (
         f"Expected {expected_from_digests_calls} table_create_from_digests calls, got {len(table_create_from_digests_records)}"
     )
+
+
+def test_table_create_from_digests(network_proxy_client):
+    """Test that table_create_from_digests works correctly to merge existing row digests."""
+    basic_client, remote_client, records = network_proxy_client
+    client = TestOnlyFlushingWeaveClient(
+        entity=basic_client.entity,
+        project=basic_client.project,
+        server=remote_client,
+        ensure_project_exists=False,
+    )
+
+    # First, create some individual rows to get their digests
+    rows = [
+        {"id": 1, "name": "Alice", "value": 100},
+        {"id": 2, "name": "Bob", "value": 200},
+        {"id": 3, "name": "Charlie", "value": 300},
+    ]
+
+    # Create a table with these rows to get the row digests
+    table_res = client.server.table_create(
+        tsi.TableCreateReq(
+            table=tsi.TableSchemaForInsert(
+                project_id=client._project_id(),
+                rows=rows,
+            )
+        )
+    )
+
+    original_digest = table_res.digest
+    row_digests = table_res.row_digests
+
+    # Now create a new table using the same row digests
+    from_digests_res = client.server.table_create_from_digests(
+        {
+            "project_id": client._project_id(),
+            "row_digests": row_digests,
+        }
+    )
+
+    # The digest should be the same since we're using the same rows
+    assert from_digests_res.digest == original_digest, (
+        f"Digests should match: {from_digests_res.digest} vs {original_digest}"
+    )
+
+    more_rows = [
+        {"id": 4, "name": "Dave", "value": 400},
+        {"id": 5, "name": "Eve", "value": 500},
+        {"id": 6, "name": "Frank", "value": 600},
+    ]
+
+    more_table_res = client.server.table_create(
+        tsi.TableCreateReq(
+            table=tsi.TableSchemaForInsert(
+                project_id=client._project_id(),
+                rows=more_rows,
+            )
+        )
+    )
+
+    combined_digests = row_digests + more_table_res.row_digests
+
+    # Test with a different order of row digests - should produce different digest
+    combined_res = client.server.table_create_from_digests(
+        tsi.TableCreateFromDigestsReq(
+            project_id=client._project_id(),
+            row_digests=combined_digests,
+        )
+    )
+    print("combined_res", combined_res)
+
+    # now get the new table
+    new_table_res = basic_client.server.table_query(
+        tsi.TableQueryReq(
+            project_id=client._project_id(),
+            digest=combined_res.digest,
+        )
+    )
+    assert len(new_table_res.rows) == 6
+    new_table_rows = [row.val for row in new_table_res.rows]
+    assert new_table_rows == [
+        {"id": 1, "name": "Alice", "value": 100},
+        {"id": 2, "name": "Bob", "value": 200},
+        {"id": 3, "name": "Charlie", "value": 300},
+        {"id": 4, "name": "Dave", "value": 400},
+        {"id": 5, "name": "Eve", "value": 500},
+        {"id": 6, "name": "Frank", "value": 600},
+    ]
+
+    # Test with a different order of row digests - should produce different digest
+    shuffled_digests = [row_digests[2], row_digests[0], row_digests[1]]  # [3, 1, 2]
+    shuffled_res = client.server.table_create_from_digests(
+        tsi.TableCreateFromDigestsReq(
+            project_id=client._project_id(),
+            row_digests=shuffled_digests,
+        )
+    )
+
+    # Different order should produce different digest
+    assert shuffled_res.digest != original_digest, (
+        f"Different row order should produce different digest: {shuffled_res.digest} vs {original_digest}"
+    )

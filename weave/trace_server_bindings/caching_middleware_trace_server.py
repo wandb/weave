@@ -483,7 +483,7 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
 
     def table_create_from_digests(
         self, req: tsi.TableCreateFromDigestsReq
-    ) -> tsi.TableCreateRes:
+    ) -> tsi.TableCreateFromDigestsRes:
         return self._next_trace_server.table_create_from_digests(req)
 
     def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
