@@ -42,7 +42,8 @@ def load(artifact: MemTraceFilesArtifact, name: str) -> Content:
 
 
 def register() -> None:
-    from weave.trace.serialization import serializer
-    from weave.type_wrappers.Content.content import Content
-
-    serializer.register_serializer(Content, save, load)
+    # Registration moved to weave.trace.serialization.handlers.media
+    # from weave.trace.serialization import serializer
+    # from weave.type_wrappers.Content.content import Content
+    # serializer.register_serializer(Content, save, load)
+    pass

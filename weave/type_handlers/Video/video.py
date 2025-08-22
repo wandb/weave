@@ -193,5 +193,7 @@ def is_video_clip_instance(obj: Any) -> bool:
 
 def register() -> None:
     """Register the video type handler with the serializer."""
-    if dependencies_met:
-        serializer.register_serializer(VideoClip, save, load, is_video_clip_instance)
+    # Registration moved to weave.trace.serialization.handlers.media
+    # if dependencies_met:
+    #     serializer.register_serializer(VideoClip, save, load, is_video_clip_instance)
+    pass

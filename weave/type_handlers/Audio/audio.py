@@ -283,6 +283,7 @@ def register() -> None:
 
     This function must be called to enable serialization of Audio and wave.Wave_read objects.
     """
-    # Register the serializers for the various audio types
-    serializer.register_serializer(Audio, save, load, is_audio_instance)
-    serializer.register_serializer(wave.Wave_read, save, load)
+    # Registration moved to weave.trace.serialization.handlers.audio
+    # serializer.register_serializer(Audio, save, load, is_audio_instance)
+    # serializer.register_serializer(wave.Wave_read, save, load)
+    pass
