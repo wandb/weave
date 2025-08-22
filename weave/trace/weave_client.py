@@ -2239,6 +2239,10 @@ class WeaveClient:
             self._server_feedback_processor.stop_accepting_new_work_and_flush_queue()
             # Restart feedback processor processing thread after flushing
             self._server_feedback_processor.accept_new_work()
+        # Close offline server if present
+        from weave.trace_server_bindings.offline_trace_server import OfflineTraceServer
+        if isinstance(self.server, OfflineTraceServer):
+            self.server.close()
 
     def _get_pending_jobs(self) -> PendingJobCounts:
         """Get the current number of pending jobs for each type.

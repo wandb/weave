@@ -48,6 +48,8 @@ def init(
     global_postprocess_inputs: PostprocessInputsFunc | None = None,
     global_postprocess_output: PostprocessOutputFunc | None = None,
     global_attributes: dict[str, Any] | None = None,
+    offline: bool = False,
+    offline_dir: str | None = None,
 ) -> weave_client.WeaveClient:
     """Initialize weave tracking, logging to a wandb project.
 
@@ -64,6 +66,8 @@ def init(
         global_postprocess_inputs: A function that will be applied to all inputs of all ops.
         global_postprocess_output: A function that will be applied to all outputs of all ops.
         global_attributes: A dictionary of attributes that will be applied to all traces.
+        offline: If True, initialize in offline mode, saving traces locally.
+        offline_dir: Directory to store offline data. Defaults to ~/.weave/offline
 
     NOTE: Global postprocessing settings are applied to all ops after each op's own
     postprocessing.  The order is always:
@@ -94,6 +98,13 @@ def init(
 
     if should_disable_weave():
         return weave_init.init_weave_disabled()
+
+    if offline:
+        return weave_init.init_weave_offline(
+            project_name,
+            offline_dir=offline_dir,
+            autopatch_settings=autopatch_settings,
+        )
 
     return weave_init.init_weave(
         project_name,
@@ -336,6 +347,24 @@ def finish() -> None:
 # __docspec__ = []
 
 
+def sync_offline_data(
+    offline_dir: str | None = None,
+    project_name: str | None = None,
+    api_key: str | None = None,
+) -> dict:
+    """Sync offline trace data to the remote server.
+    
+    Args:
+        offline_dir: Directory containing offline data. Defaults to ~/.weave/offline
+        project_name: Optional specific project to sync. If None, syncs all projects.
+        api_key: Optional API key for authentication.
+        
+    Returns:
+        Dict with sync results showing how many items were synced per data type.
+    """
+    return weave_init.sync_offline_data(offline_dir, project_name, api_key)
+
+
 __all__ = [
     "ObjectRef",
     "Table",
@@ -351,6 +380,7 @@ __all__ = [
     "publish",
     "ref",
     "require_current_call",
+    "sync_offline_data",
     "thread",
     "weave_client_context",
 ]

@@ -42,6 +42,7 @@ __docspec__ = [
     finish,
     op,
     attributes,
+    sync_offline_data,
     thread,
     # Re-exported from flow module
     Object,
@@ -91,5 +92,6 @@ __all__ = [
     "publish",
     "ref",
     "require_current_call",
+    "sync_offline_data",
     "thread",
 ]

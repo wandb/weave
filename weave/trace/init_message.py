@@ -97,7 +97,7 @@ def assert_min_weave_version(
 
 
 def print_init_message(
-    username: str | None, entity_name: str, project_name: str, read_only: bool
+    username: str | None, entity_name: str, project_name: str, read_only: bool, offline: bool = False
 ) -> None:
     try:
         _print_version_check()
@@ -105,11 +105,16 @@ def print_init_message(
         pass
 
     message = ""
-    if username is not None:
-        message += f"Logged in as Weights & Biases user: {username}.\n"
-    message += (
-        f"View Weave data at {urls.project_weave_root_url(entity_name, project_name)}"
-    )
+    if offline:
+        message = f"Weave is running in offline mode.\n"
+        message += f"Data will be saved locally for project: {entity_name}/{project_name}\n"
+        message += "Use weave.sync_offline_data() to upload data when online."
+    else:
+        if username is not None:
+            message += f"Logged in as Weights & Biases user: {username}.\n"
+        message += (
+            f"View Weave data at {urls.project_weave_root_url(entity_name, project_name)}"
+        )
     # Cosmetically, if we are in `read_only` mode, we are not logging data, so
     # we should not print the message about logging data.
     if not read_only:

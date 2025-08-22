@@ -18,6 +18,7 @@ from weave.trace_server_bindings import remote_http_trace_server
 from weave.trace_server_bindings.caching_middleware_trace_server import (
     CachingMiddlewareTraceServer,
 )
+from weave.trace_server_bindings.offline_trace_server import OfflineTraceServer
 
 logger = logging.getLogger(__name__)
 
@@ -165,6 +166,66 @@ def init_weave(
     return client
 
 
+def init_weave_offline(
+    project_name: str,
+    offline_dir: str | None = None,
+    autopatch_settings: autopatch.AutopatchSettings | None = None,
+) -> weave_client.WeaveClient:
+    """Initialize a weave client in offline mode.
+    
+    This creates a client that writes traces to local files instead of sending
+    them to a remote server. The data can be synced later using the sync_offline_data
+    function.
+    
+    Args:
+        project_name: The project name to use. Can be "project" or "entity/project".
+        offline_dir: Directory to store offline data. Defaults to ~/.weave/offline
+        autopatch_settings: Settings for autopatching integrations.
+        
+    Returns:
+        A WeaveClient configured for offline operation.
+    """
+    current_client = weave_client_context.get_weave_client()
+    if current_client is not None:
+        # Flush any pending calls before switching to a new project
+        current_client.finish()
+        weave_client_context.set_weave_client_global(None)
+        
+    # Parse entity and project name
+    fields = project_name.split("/")
+    if len(fields) == 1:
+        entity_name = "offline"
+        project_name = fields[0]
+    elif len(fields) == 2:
+        entity_name, project_name = fields
+    else:
+        raise ValueError(
+            'project_name must be of the form "<project_name>" or "<entity_name>/<project_name>"'
+        )
+        
+    # Create offline server
+    from pathlib import Path
+    offline_path = Path(offline_dir) if offline_dir else None
+    server = OfflineTraceServer(offline_dir=offline_path)
+    
+    # Create client
+    client = weave_client.WeaveClient(
+        entity_name, project_name, server, ensure_project_exists=True
+    )
+    
+    weave_client_context.set_weave_client_global(client)
+    
+    # Apply autopatching
+    autopatch.autopatch(autopatch_settings)
+    
+    # Print init message
+    init_message.print_init_message(
+        None, entity_name, project_name, read_only=False, offline=True
+    )
+    
+    return client
+
+
 def init_weave_disabled() -> weave_client.WeaveClient:
     """Initialize a dummy client that does nothing.
 
@@ -189,6 +250,49 @@ def init_weave_disabled() -> weave_client.WeaveClient:
 
     weave_client_context.set_weave_client_global(client)
     return client
+
+
+def sync_offline_data(
+    offline_dir: str | None = None,
+    project_name: str | None = None,
+    api_key: str | None = None,
+) -> dict:
+    """Sync offline trace data to the remote server.
+    
+    Args:
+        offline_dir: Directory containing offline data. Defaults to ~/.weave/offline
+        project_name: Optional specific project to sync. If None, syncs all projects.
+        api_key: Optional API key for authentication.
+        
+    Returns:
+        Dict with sync results.
+    """
+    from pathlib import Path
+    from weave.trace.offline_sync import OfflineDataSyncer
+    
+    # Get remote server
+    remote_server = init_weave_get_server(api_key)
+    
+    # Create syncer
+    offline_path = Path(offline_dir) if offline_dir else None
+    syncer = OfflineDataSyncer(remote_server, offline_path)
+    
+    # Sync data
+    if project_name:
+        fields = project_name.split("/")
+        if len(fields) == 1:
+            entity = "offline"
+            project = fields[0]
+        elif len(fields) == 2:
+            entity, project = fields
+        else:
+            raise ValueError(
+                'project_name must be of the form "<project_name>" or "<entity_name>/<project_name>"'
+            )
+        results = syncer.sync_project(entity, project)
+        return {f"{entity}/{project}": results}
+    else:
+        return syncer.sync_all()
 
 
 def init_weave_get_server(
