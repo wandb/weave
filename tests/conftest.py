@@ -1,12 +1,15 @@
 import contextlib
+import json
 import logging
 import os
 import typing
 from collections.abc import Iterator
+from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import FastAPI
+from fastapi.responses import StreamingResponse
 from fastapi.testclient import TestClient
 
 import weave
@@ -14,6 +17,7 @@ from tests.trace.util import DummyTestException
 from tests.trace_server.conftest import *
 from tests.trace_server.conftest import TEST_ENTITY, get_trace_server_flag
 from weave.trace import autopatch, weave_client, weave_init
+from weave.trace.context import weave_client_context
 from weave.trace.context.call_context import set_call_stack
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings import remote_http_trace_server
@@ -168,6 +172,11 @@ class ThrowingServer(tsi.TraceServerInterface):
 
     def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
         raise DummyTestException("FAILURE - feedback_create, req:", req)
+
+    def feedback_create_batch(
+        self, req: tsi.FeedbackCreateBatchReq
+    ) -> tsi.FeedbackCreateBatchRes:
+        raise DummyTestException("FAILURE - feedback_create_batch, req:", req)
 
     def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
         raise DummyTestException("FAILURE - feedback_query, req:", req)
@@ -354,7 +363,7 @@ def create_client(
     trace_server,
     autopatch_settings: typing.Optional[autopatch.AutopatchSettings] = None,
     global_attributes: typing.Optional[dict[str, typing.Any]] = None,
-) -> weave_init.InitializedClient:
+) -> weave_client.WeaveClient:
     trace_server_flag = get_trace_server_flag(request)
     if trace_server_flag == "prod":
         # Note: this is only for local dev testing and should be removed
@@ -371,12 +380,12 @@ def create_client(
     client = TestOnlyFlushingWeaveClient(
         TEST_ENTITY, "test-project", make_server_recorder(caching_server)
     )
-    inited_client = weave_init.InitializedClient(client)
+    weave_client_context.set_weave_client_global(client)
     autopatch.autopatch(autopatch_settings)
     if global_attributes is not None:
         weave.trace.api._global_attributes = global_attributes
 
-    return inited_client
+    return client
 
 
 @pytest.fixture
@@ -389,11 +398,11 @@ def zero_stack():
 def client(zero_stack, request, trace_server):
     """This is the standard fixture used everywhere in tests to test end to end
     client functionality"""
-    inited_client = create_client(request, trace_server)
+    client = create_client(request, trace_server)
     try:
-        yield inited_client.client
+        yield client
     finally:
-        inited_client.reset()
+        weave_client_context.set_weave_client_global(None)
         autopatch.reset_autopatch()
 
 
@@ -409,13 +418,13 @@ def client_creator(zero_stack, request, trace_server):
     ):
         if settings is not None:
             weave.trace.settings.parse_and_apply_settings(settings)
-        inited_client = create_client(
+        client = create_client(
             request, trace_server, autopatch_settings, global_attributes
         )
         try:
-            yield inited_client.client
+            yield client
         finally:
-            inited_client.reset()
+            weave_client_context.set_weave_client_global(None)
             autopatch.reset_autopatch()
             weave.trace.api._global_attributes = {}
             weave.trace.settings.parse_and_apply_settings(
@@ -441,6 +450,27 @@ def network_proxy_client(client):
 
     records = []
 
+    @app.post("/calls/stream_query")
+    def calls_stream_query(req: tsi.CallsQueryReq):
+        records.append(
+            (
+                "calls_stream_query",
+                req,
+            )
+        )
+
+        def generate():
+            calls = client.server.calls_query_stream(req)
+            for call in calls:
+                # Convert datetime objects to ISO format for JSON serialization
+                call_dict = call.model_dump()
+                for key, value in call_dict.items():
+                    if isinstance(value, datetime):
+                        call_dict[key] = value.isoformat()
+                yield f"{json.dumps(call_dict)}\n"
+
+        return StreamingResponse(generate(), media_type="application/x-ndjson")
+
     @app.post("/table/create")
     def table_create(req: tsi.TableCreateReq) -> tsi.TableCreateRes:
         records.append(
@@ -461,6 +491,28 @@ def network_proxy_client(client):
         )
         return client.server.table_update(req)
 
+    @app.post("/feedback/create")
+    def feedback_create(req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
+        records.append(
+            (
+                "feedback_create",
+                req,
+            )
+        )
+        return client.server.feedback_create(req)
+
+    @app.post("/feedback/batch/create")
+    def feedback_create_batch(
+        req: tsi.FeedbackCreateBatchReq,
+    ) -> tsi.FeedbackCreateBatchRes:
+        records.append(
+            (
+                "feedback_create_batch",
+                req,
+            )
+        )
+        return client.server.feedback_create_batch(req)
+
     with TestClient(app) as c:
 
         def post(url, data=None, json=None, **kwargs):
@@ -471,7 +523,8 @@ def network_proxy_client(client):
         weave.trace_server.requests.post = post
 
         remote_client = remote_http_trace_server.RemoteHTTPTraceServer(
-            trace_server_url=""
+            trace_server_url="",
+            should_batch=True,
         )
         yield (client, remote_client, records)
 
@@ -515,3 +568,49 @@ def make_evals(client):
     ev2.log_summary(summary={"z": 90})
 
     return ev._pseudo_evaluation.ref, ev2._pseudo_evaluation.ref
+
+
+@pytest.fixture
+def mock_wandb_api():
+    """Fixture that provides a mocked wandb Api instance."""
+    with patch("weave.compat.wandb.Api") as mock_api_class:
+        mock_api_instance = MagicMock()
+        mock_api_class.return_value = mock_api_instance
+        yield mock_api_instance
+
+
+@pytest.fixture
+def mock_wandb_login():
+    """Fixture that provides a mock for wandb login functionality."""
+    with patch("weave.compat.wandb.login") as mock_login:
+        mock_login.return_value = True
+        yield mock_login
+
+
+@pytest.fixture
+def mock_default_host():
+    """Fixture that mocks _get_default_host to return api.wandb.ai."""
+    with patch(
+        "weave.cli.login._get_default_host",
+        return_value="api.wandb.ai",
+    ):
+        yield
+
+
+@pytest.fixture
+def mock_wandb_context():
+    """Fixture that provides mocked weave wandb context operations."""
+    with (
+        patch("weave.wandb_interface.context.init") as mock_context_init,
+        patch(
+            "weave.wandb_interface.context.get_wandb_api_context"
+        ) as mock_get_context,
+        patch(
+            "weave.wandb_interface.context.set_wandb_api_context"
+        ) as mock_set_context,
+    ):
+        yield {
+            "init": mock_context_init,
+            "get": mock_get_context,
+            "set": mock_set_context,
+        }

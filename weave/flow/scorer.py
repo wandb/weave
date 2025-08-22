@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from typing_extensions import Self
 
 import weave
-from weave.flow.obj import Object
+from weave.object.obj import Object
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import Op, OpCallError, as_op, is_op
 from weave.trace.op_caller import async_call_op
@@ -252,7 +252,7 @@ class ApplyScorerSuccess:
 ApplyScorerResult = ApplyScorerSuccess
 
 
-def preparer_scorer_op_args(
+def prepare_scorer_op_args(
     scorer: Union[Op, Scorer], example: dict[str, Any], model_output: Any
 ) -> tuple[Op, dict[str, Any]]:
     # Extract the core components of the scorer
@@ -402,7 +402,7 @@ async def apply_scorer_async(
     if weave_isinstance(scorer, Scorer):
         scorer_self = scorer
 
-    score_op, score_args = preparer_scorer_op_args(scorer, example, model_output)
+    score_op, score_args = prepare_scorer_op_args(scorer, example, model_output)
 
     try:
         # Execute the scoring operation

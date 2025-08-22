@@ -20,7 +20,7 @@ PY39_INCOMPATIBLE_SHARDS = [
     "smolagents",
     "dspy",
     "autogen_tests",
-    "langchain"
+    "langchain",
 ]
 NUM_TRACE_SERVER_SHARDS = 4
 
@@ -166,6 +166,7 @@ def tests(session, shard):
         "--strict-markers",
         "--cov=weave",
         "--cov-report=html",
+        "--cov-report=xml",
         "--cov-branch",
     ]
 

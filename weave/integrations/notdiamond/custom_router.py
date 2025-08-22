@@ -4,7 +4,7 @@ import pandas as pd
 from notdiamond.toolkit.custom_router import CustomRouter
 
 import weave
-from weave.flow.eval import EvaluationResults
+from weave.evaluation.eval import EvaluationResults
 
 
 @weave.op(

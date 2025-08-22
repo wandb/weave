@@ -1,6 +1,6 @@
 from typing import Any, Optional
 
-from weave.trace.refs import ObjectRef, OpRef, parse_uri
+from weave.trace.refs import ObjectRef, OpRef, Ref
 
 
 class ObjectRefStrMatcher:
@@ -21,7 +21,7 @@ class ObjectRefStrMatcher:
         self.extra = extra
 
     def __eq__(self, other: Any) -> bool:
-        other_ref = parse_uri(other)
+        other_ref = Ref.parse_uri(other)
         if not isinstance(other_ref, ObjectRef):
             return False
         if self.entity is not None and self.entity != other_ref.entity:

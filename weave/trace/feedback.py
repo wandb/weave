@@ -10,10 +10,10 @@ from rich.table import Table
 
 from weave.trace import util
 from weave.trace.context import weave_client_context as weave_client_context
-from weave.trace.refs import parse_object_uri, parse_uri
-from weave.trace.rich import pydantic_util
-from weave.trace.rich.container import AbstractRichContainer
-from weave.trace.rich.refs import Refs
+from weave.trace.display.rich import pydantic_util
+from weave.trace.display.rich.container import AbstractRichContainer
+from weave.trace.display.rich.refs import Refs
+from weave.trace.refs import ObjectRef, Ref
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.interface.query import Query
 
@@ -171,7 +171,10 @@ class RefFeedbackQuery(FeedbackQuery):
     weave_ref: str
 
     def __init__(self, ref: str) -> None:
-        parsed_ref = parse_uri(ref)
+        parsed_ref = Ref.parse_uri(ref)
+        # All ref types have entity and project attributes
+        if not hasattr(parsed_ref, "entity") or not hasattr(parsed_ref, "project"):
+            raise ValueError(f"Invalid ref type: {type(parsed_ref)}")
         query = {
             "$expr": {
                 "$eq": [
@@ -181,8 +184,8 @@ class RefFeedbackQuery(FeedbackQuery):
             }
         }
         super().__init__(
-            entity=parsed_ref.entity,
-            project=parsed_ref.project,
+            entity=parsed_ref.entity,  # type: ignore
+            project=parsed_ref.project,  # type: ignore
             query=Query(**query),
         )
         self.weave_ref = ref
@@ -203,7 +206,7 @@ class RefFeedbackQuery(FeedbackQuery):
         )
         if annotation_ref:
             try:
-                parse_object_uri(annotation_ref)
+                ObjectRef.parse_uri(annotation_ref)
             except TypeError:
                 raise TypeError(
                     "annotation_ref must be a valid object ref, eg weave:///<entity>/<project>/object/<name>:<digest>"

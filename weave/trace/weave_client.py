@@ -21,13 +21,15 @@ from requests import HTTPError
 from weave import version
 from weave.chat.chat import Chat
 from weave.chat.inference_models import InferenceModels
-from weave.trace import trace_sentry, urls
+from weave.telemetry import trace_sentry
+from weave.trace import settings, urls
 from weave.trace.casting import CallsFilterLike, QueryLike, SortByLike
 from weave.trace.concurrent.futures import FutureExecutor
+from weave.trace.constants import TRACE_CALL_EMOJI
 from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
-from weave.trace.exception import exception_to_json_str
 from weave.trace.feedback import FeedbackQuery, RefFeedbackQuery
+from weave.trace.init_message import WANDB_AVAILABLE
 from weave.trace.interface_query_builder import (
     exists_expr,
     get_field_expr,
@@ -48,7 +50,6 @@ from weave.trace.op import (
     is_tracing_setting_disabled,
     maybe_unbind_method,
     placeholder_call,
-    print_call_link,
     should_skip_tracing_for_op,
 )
 from weave.trace.op import op as op_deco
@@ -59,11 +60,7 @@ from weave.trace.refs import (
     OpRef,
     Ref,
     TableRef,
-    maybe_parse_uri,
-    parse_op_uri,
-    parse_uri,
 )
-from weave.trace.sanitize import REDACTED_VALUE, should_redact
 from weave.trace.serialization.serialize import (
     from_json,
     isinstance_namedtuple,
@@ -130,12 +127,14 @@ from weave.trace_server.trace_server_interface import (
 )
 from weave.utils.attributes_dict import AttributesDict
 from weave.utils.dict_utils import sum_dict_leaves, zip_dicts
+from weave.utils.exception import exception_to_json_str
 from weave.utils.paginated_iterator import PaginatedIterator
+from weave.utils.sanitize import REDACTED_VALUE, should_redact
 
 if TYPE_CHECKING:
     import wandb
 
-    from weave.flow.eval import Evaluation
+    from weave.evaluation.eval import Evaluation
     from weave.flow.scorer import ApplyScorerResult, Scorer
 
 
@@ -150,6 +149,11 @@ logger = logging.getLogger(__name__)
 # TODO: should be Call, not WeaveObject
 CallsIter = PaginatedIterator[CallSchema, WeaveObject]
 DEFAULT_CALLS_PAGE_SIZE = 1000
+
+
+def print_call_link(call: Call) -> None:
+    if settings.should_print_call_link():
+        logger.info(f"{TRACE_CALL_EMOJI} {call.ui_url}")
 
 
 def _make_calls_iterator(
@@ -239,7 +243,7 @@ def _add_scored_by_to_calls_query(
     if query is not None:
         exprs.append(query["$expr"])
     for name in scored_by:
-        ref = maybe_parse_uri(name)
+        ref = Ref.maybe_parse_uri(name)
         if ref and isinstance(ref, ObjectRef):
             uri = name
             scorer_name = ref.name
@@ -424,7 +428,7 @@ class Call:
         This is different from `op_name` which is usually the ref of the op.
         """
         if self.op_name.startswith("weave:///"):
-            ref = parse_op_uri(self.op_name)
+            ref = OpRef.parse_uri(self.op_name)
             return ref.name
 
         return self.op_name
@@ -698,6 +702,7 @@ class WeaveClient:
             self.project = resp.project_name
 
         self._server_call_processor = None
+        self._server_feedback_processor = None
         # This is a short-term hack to get around the fact that we are reaching into
         # the underlying implementation of the specific server to get the call processor.
         # The `RemoteHTTPTraceServer` contains a call processor and we use that to control
@@ -707,6 +712,8 @@ class WeaveClient:
         # to define no-ops.
         if hasattr(self.server, "get_call_processor"):
             self._server_call_processor = self.server.get_call_processor()
+        if hasattr(self.server, "get_feedback_processor"):
+            self._server_feedback_processor = self.server.get_feedback_processor()
         self.send_file_cache = WeaveClientSendFileCache()
 
     ################ High Level Convenience Methods ################
@@ -1142,7 +1149,7 @@ class WeaveClient:
         def send_start_call() -> bool:
             maybe_redacted_inputs_with_refs = inputs_with_refs
             if should_redact_pii():
-                from weave.trace.pii_redaction import redact_pii
+                from weave.utils.pii_redaction import redact_pii
 
                 maybe_redacted_inputs_with_refs = redact_pii(inputs_with_refs)
 
@@ -1304,7 +1311,7 @@ class WeaveClient:
         def send_end_call() -> None:
             maybe_redacted_output_as_refs = output_as_refs
             if should_redact_pii():
-                from weave.trace.pii_redaction import redact_pii
+                from weave.utils.pii_redaction import redact_pii
 
                 maybe_redacted_output_as_refs = redact_pii(output_as_refs)
 
@@ -1688,13 +1695,9 @@ class WeaveClient:
         - Should we somehow include supervision (ie. the ground truth) in the payload?
         """
         # Parse the refs (acts as validation)
-        call_ref = parse_uri(weave_ref_uri)
-        if not isinstance(call_ref, CallRef):
-            raise TypeError(f"Invalid call ref: {weave_ref_uri}")
-        scorer_call_ref = parse_uri(call_ref_uri)
-        if not isinstance(scorer_call_ref, CallRef):
-            raise TypeError(f"Invalid scorer call ref: {call_ref_uri}")
-        runnable_ref = parse_uri(runnable_ref_uri)
+        call_ref = CallRef.parse_uri(weave_ref_uri)  # noqa: RUF100
+        scorer_call_ref = CallRef.parse_uri(call_ref_uri)  # # noqa: RUF100
+        runnable_ref = Ref.parse_uri(runnable_ref_uri)
         if not isinstance(runnable_ref, (OpRef, ObjectRef)):
             raise TypeError(f"Invalid scorer op ref: {runnable_ref_uri}")
 
@@ -1798,7 +1801,7 @@ class WeaveClient:
                 return
             remove_ref(obj)
         # Must defer import here to avoid circular import
-        from weave.flow.obj import Object
+        from weave.object.obj import Object
 
         # Case 1: Object:
         # Here we recurse into each of the properties of the object
@@ -2089,6 +2092,9 @@ class WeaveClient:
         # Add call batch uploads if available
         if self._server_call_processor:
             total += self._server_call_processor.num_outstanding_jobs
+        # Add feedback batch uploads if available
+        if self._server_feedback_processor:
+            total += self._server_feedback_processor.num_outstanding_jobs
         return total
 
     def finish(
@@ -2113,7 +2119,9 @@ class WeaveClient:
                       Overrides use_progress_bar.
         """
         if use_progress_bar and callback is None:
-            from weave.trace.client_progress_bar import create_progress_bar_callback
+            from weave.trace.display.client_progress_bar import (
+                create_progress_bar_callback,
+            )
 
             callback = create_progress_bar_callback()
 
@@ -2167,8 +2175,16 @@ class WeaveClient:
                 prev_job_counts["call_processor_jobs"]
                 - current_job_counts["call_processor_jobs"],
             )
+            feedback_processor_completed = max(
+                0,
+                prev_job_counts["feedback_processor_jobs"]
+                - current_job_counts["feedback_processor_jobs"],
+            )
             completed_this_iteration = (
-                main_completed + fastlane_completed + call_processor_completed
+                main_completed
+                + fastlane_completed
+                + call_processor_completed
+                + feedback_processor_completed
             )
 
             if completed_this_iteration > 0:
@@ -2199,6 +2215,7 @@ class WeaveClient:
                 main_jobs=0,
                 fastlane_jobs=0,
                 call_processor_jobs=0,
+                feedback_processor_jobs=0,
                 total_jobs=0,
             ),
             completed_since_last_update=0,
@@ -2218,6 +2235,10 @@ class WeaveClient:
             self._server_call_processor.stop_accepting_new_work_and_flush_queue()
             # Restart call processor processing thread after flushing
             self._server_call_processor.accept_new_work()
+        if self._server_feedback_processor:
+            self._server_feedback_processor.stop_accepting_new_work_and_flush_queue()
+            # Restart feedback processor processing thread after flushing
+            self._server_feedback_processor.accept_new_work()
 
     def _get_pending_jobs(self) -> PendingJobCounts:
         """Get the current number of pending jobs for each type.
@@ -2227,6 +2248,7 @@ class WeaveClient:
                 - main_jobs: Number of pending jobs in the main executor
                 - fastlane_jobs: Number of pending jobs in the fastlane executor
                 - call_processor_jobs: Number of pending jobs in the call processor
+                - feedback_processor_jobs: Number of pending jobs in the feedback processor
                 - total_jobs: Total number of pending jobs
         """
         main_jobs = self.future_executor.num_outstanding_futures
@@ -2236,12 +2258,21 @@ class WeaveClient:
         call_processor_jobs = 0
         if self._server_call_processor:
             call_processor_jobs = self._server_call_processor.num_outstanding_jobs
+        feedback_processor_jobs = 0
+        if self._server_feedback_processor:
+            feedback_processor_jobs = (
+                self._server_feedback_processor.num_outstanding_jobs
+            )
 
         return PendingJobCounts(
             main_jobs=main_jobs,
             fastlane_jobs=fastlane_jobs,
             call_processor_jobs=call_processor_jobs,
-            total_jobs=main_jobs + fastlane_jobs + call_processor_jobs,
+            feedback_processor_jobs=feedback_processor_jobs,
+            total_jobs=main_jobs
+            + fastlane_jobs
+            + call_processor_jobs
+            + feedback_processor_jobs,
         )
 
     def _has_pending_jobs(self) -> bool:
@@ -2259,6 +2290,7 @@ class PendingJobCounts(TypedDict):
     main_jobs: int
     fastlane_jobs: int
     call_processor_jobs: int
+    feedback_processor_jobs: int
     total_jobs: int
 
 
@@ -2299,22 +2331,11 @@ def get_parallelism_settings() -> tuple[int | None, int | None]:
 
 
 def _safe_get_wandb_run() -> wandb.sdk.wandb_run.Run | None:
-    # Check if wandb is installed.  This will pass even if wandb is not installed
-    # if there is a wandb directory in the user's current directory, so the
-    # second check is required.
-    try:
+    if WANDB_AVAILABLE:
         import wandb
-    except (ImportError, ModuleNotFoundError):
-        return None
 
-    # If a wandb directory exists, but wandb is installed, `wandb.run` will raise
-    # AttributeError.  This is an artifact of how python handles imports.
-    try:
-        wandb_run = wandb.run
-    except AttributeError:
-        return None
-
-    return wandb_run
+        return wandb.run
+    return None
 
 
 def safe_current_wb_run_id() -> str | None:

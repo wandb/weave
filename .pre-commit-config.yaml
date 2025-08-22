@@ -5,7 +5,7 @@ repos:
     rev: v2.1.0
     hooks:
       - id: fixit-fix
-        exclude: "(weave_query|weave-js)"
+        exclude: "(weave_query)"
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.12.3
     hooks:
@@ -51,13 +51,13 @@ repos:
     hooks:
       - id: typos
         # Excluding extra things to make initial reviews easier, starting with `examples``
-        exclude: "(weave_query|weave-js|cassettes|examples|tests|tools|docs)"
+        exclude: "(weave_query|cassettes|examples|tests|tools|docs)"
   - repo: https://github.com/oxipng/oxipng
     rev: v9.1.5
     hooks:
       - id: oxipng
         args: ["-o", "4", "--strip", "safe", "--alpha"]
-        exclude: (weave_query|weave-js)
+        exclude: (weave_query)
   - repo: local
     hooks:
       - id: jupyter-nb-clear-output
