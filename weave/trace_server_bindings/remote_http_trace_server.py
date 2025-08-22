@@ -462,15 +462,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
                 "/table/create", req, tsi.TableCreateReq, tsi.TableCreateRes
             )
 
-        chunk_manager = TableChunkManager()
-        # Import at runtime to get the current value after patching
-        from weave.trace_server_bindings.http_utils import (
-            TARGET_CHUNK_BYTES as current_chunk_bytes,
-        )
-
-        chunks = chunk_manager.create_chunks(
-            req.table.rows, target_chunk_bytes=current_chunk_bytes
-        )
+        chunks = chunk_manager.create_chunks(req.table.rows)
         chunk_manager.validate_chunks(chunks, req.table.rows)
 
         table_digests, all_row_digests = chunk_manager.process_chunks_concurrently(
@@ -483,7 +475,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
         return tsi.TableCreateRes(
             digest=create_res.digest,
-            row_digests=create_req.row_digests,
+            row_digests=all_row_digests,
         )
 
     def _create_table_chunk(
@@ -568,7 +560,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             "/table/create_from_digests",
             req,
             tsi.TableCreateFromDigestsReq,
-            tsi.TableCreateRes,
+            tsi.TableCreateFromDigestsRes,
         )
 
     def table_query_stats_batch(

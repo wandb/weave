@@ -57,6 +57,7 @@ from weave.trace_server.trace_server_interface import (
     TableQueryReq,
     TableSchemaForInsert,
 )
+from weave.trace_server_bindings import http_utils
 
 
 def test_table_create(client):
@@ -3633,10 +3634,27 @@ def test_feedback_batching(network_proxy_client):
         assert feedback.payload["note"] == f"Test feedback {i}"
 
 
-def test_parallel_table_uploads_digest_consistency(network_proxy_client):
+def test_parallel_table_uploads_digest_consistency(network_proxy_client, monkeypatch):
     """Test parallel table uploads are consistent with one shot uploads."""
     # Set up advanced client that uses the RemoteHttpTraceServer handler
     basic_client, remote_client, records = network_proxy_client
+
+    # Set up the mock before creating the client
+    # We'll use a mutable container to control the chunk size dynamically
+    current_chunk_size = [http_utils.TARGET_CHUNK_BYTES]  # Start with default
+
+    original_table_chunk_manager = http_utils.TableChunkManager
+
+    class MockTableChunkManager(original_table_chunk_manager):
+        def __init__(self, max_workers=None, target_chunk_bytes=None):
+            super().__init__(
+                max_workers=max_workers or http_utils.MAX_CONCURRENT_CHUNKS,
+                target_chunk_bytes=current_chunk_size[0],  # Use the dynamic value
+            )
+
+    # Apply the mock before creating the client
+    monkeypatch.setattr(http_utils, "TableChunkManager", MockTableChunkManager)
+
     client = TestOnlyFlushingWeaveClient(
         entity=basic_client.entity,
         project=basic_client.project,
@@ -3645,7 +3663,7 @@ def test_parallel_table_uploads_digest_consistency(network_proxy_client):
     )
 
     # Create 3 large rows that will exceed the chunk size when combined
-    large_row_size = 100 * 1024  # 100KB per row (large enough to trigger chunking)
+    large_row_size = 1 * 1024  # 1KB per row (large enough to trigger chunking)
     large_data = "x" * large_row_size
 
     # Create table with 3 large rows in order [1, 2, 3]
@@ -3684,92 +3702,82 @@ def test_parallel_table_uploads_digest_consistency(network_proxy_client):
     digest2 = table2_res.digest
     row_digests2 = table2_res.row_digests
 
-    # Now temporarily patch the chunk size to be smaller than our row size
+    # Now switch to smaller chunk size to force parallel uploads
     # This will force parallel uploads even for our 3-row table
-    original_chunk_size = 10 * 1024 * 1024  # 10MB
-    small_chunk_size = 50 * 1024  # 50KB (smaller than our 100KB rows)
+    small_chunk_size = int(0.5 * 1024)  # 0.5KB (smaller than our 1KB rows)
 
-    # Patch the TARGET_CHUNK_BYTES constant and the remote request limit
-    import weave.trace_server_bindings.http_utils as http_utils
+    # Switch to the smaller chunk size
+    current_chunk_size[0] = small_chunk_size
+    client.server.remote_request_bytes_limit = small_chunk_size * 1.5
 
-    original_target_chunk_bytes = http_utils.TARGET_CHUNK_BYTES
-    http_utils.TARGET_CHUNK_BYTES = small_chunk_size
+    # Create the same tables again with the smaller chunk size
+    # This should trigger parallel uploads since each row is larger than the chunk size
 
-    # Also need to lower the remote request bytes limit to force chunking
-    original_remote_limit = remote_client.remote_request_bytes_limit
-    remote_client.remote_request_bytes_limit = (
-        200 * 1024
-    )  # 200KB (smaller than our 3 * 100KB = 300KB total)
-
-    try:
-        # Create the same tables again with the smaller chunk size
-        # This should trigger parallel uploads since each row is larger than the chunk size
-
-        # Table 3: [1, 2, 3] with small chunk size
-        table3_res = client.server.table_create(
-            tsi.TableCreateReq(
-                table=tsi.TableSchemaForInsert(
-                    project_id=client._project_id(),
-                    rows=table1_rows,
-                )
+    # Table 3: [1, 2, 3] with small chunk size
+    table3_res = client.server.table_create(
+        tsi.TableCreateReq(
+            table=tsi.TableSchemaForInsert(
+                project_id=client._project_id(),
+                rows=table1_rows,
             )
         )
-        digest3 = table3_res.digest
-        row_digests3 = table3_res.row_digests
+    )
+    digest3 = table3_res.digest
+    row_digests3 = table3_res.row_digests
 
-        # Table 4: [3, 1, 2] with small chunk size
-        table4_res = client.server.table_create(
-            tsi.TableCreateReq(
-                table=tsi.TableSchemaForInsert(
-                    project_id=client._project_id(),
-                    rows=table2_rows,
-                )
+    # Table 4: [3, 1, 2] with small chunk size
+    table4_res = client.server.table_create(
+        tsi.TableCreateReq(
+            table=tsi.TableSchemaForInsert(
+                project_id=client._project_id(),
+                rows=table2_rows,
             )
         )
-        digest4 = table4_res.digest
-        row_digests4 = table4_res.row_digests
+    )
+    digest4 = table4_res.digest
+    row_digests4 = table4_res.row_digests
 
-        # Verify that digests are consistent:
-        # - digest1 and digest3 should be the same (same row order, different chunking)
-        # - digest2 and digest4 should be the same (same row order, different chunking)
-        # - digest1 and digest2 should be different (different row order)
-        # - digest3 and digest4 should be different (different row order)
+    # Verify that digests are consistent:
+    # - digest1 and digest3 should be the same (same row order, different chunking)
+    # - digest2 and digest4 should be the same (same row order, different chunking)
+    # - digest1 and digest2 should be different (different row order)
+    # - digest3 and digest4 should be different (different row order)
 
-        assert digest1 == digest3, (
-            f"Digests should be same for same row order: {digest1} vs {digest3}"
-        )
-        assert digest2 == digest4, (
-            f"Digests should be same for same row order: {digest2} vs {digest4}"
-        )
-        assert digest1 != digest2, (
-            f"Digests should be different for different row order: {digest1} vs {digest2}"
-        )
-        assert digest3 != digest4, (
-            f"Digests should be different for different row order: {digest3} vs {digest4}"
-        )
+    assert digest1 == digest3, (
+        f"Digests should be same for same row order: {digest1} vs {digest3}"
+    )
+    assert digest2 == digest4, (
+        f"Digests should be same for same row order: {digest2} vs {digest4}"
+    )
+    assert digest1 != digest2, (
+        f"Digests should be different for different row order: {digest1} vs {digest2}"
+    )
+    assert digest3 != digest4, (
+        f"Digests should be different for different row order: {digest3} vs {digest4}"
+    )
 
-        # Verify row digests are also consistent
-        assert row_digests1 == row_digests3, (
-            "Row digests should be same for same row order"
-        )
-        assert row_digests2 == row_digests4, (
-            "Row digests should be same for same row order"
-        )
-        assert row_digests1 != row_digests2, (
-            "Row digests should be different for different row order"
-        )
+    # Verify row digests are also consistent
+    assert row_digests1 == row_digests3, "Row digests should be same for same row order"
+    assert row_digests2 == row_digests4, "Row digests should be same for same row order"
+    assert row_digests1 != row_digests2, (
+        "Row digests should be different for different row order"
+    )
 
-        # Verify that the parallel uploads actually happened by checking records
-        # We should see multiple table_create calls due to chunking
-        table_create_records = [r for r in records if r[0] == "table_create"]
+    # Verify that the parallel uploads actually happened by checking records
+    # We should see table_create calls for all tables, plus table_create_from_digests for chunked tables
+    table_create_records = [r for r in records if r[0] == "table_create"]
+    table_create_from_digests_records = [
+        r for r in records if r[0] == "table_create_from_digests"
+    ]
 
-        # The chunking might not work exactly as expected, so let's be more flexible
-        # We expect at least 4 calls (the original 4 tables) and potentially more if chunking works
-        assert len(table_create_records) >= 4, (
-            f"Expected at least 4 table_create calls, got {len(table_create_records)}"
-        )
+    # Expected: 4 table_create calls (2 initial + 2 chunked) + 2 table_create_from_digests calls (for chunked tables)
+    expected_table_create_calls = 4
+    expected_from_digests_calls = 2
 
-    finally:
-        # Restore the original chunk size and remote limit
-        http_utils.TARGET_CHUNK_BYTES = original_target_chunk_bytes
-        remote_client.remote_request_bytes_limit = original_remote_limit
+    assert len(table_create_records) == expected_table_create_calls, (
+        f"Expected {expected_table_create_calls} table_create calls, got {len(table_create_records)}"
+    )
+
+    assert len(table_create_from_digests_records) == expected_from_digests_calls, (
+        f"Expected {expected_from_digests_calls} table_create_from_digests calls, got {len(table_create_from_digests_records)}"
+    )

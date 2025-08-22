@@ -243,8 +243,13 @@ RowItemType = TypeVar("RowItemType")
 class TableChunkManager:
     """Manages concurrent creation of table chunks with proper error handling."""
 
-    def __init__(self, max_workers: int = MAX_CONCURRENT_CHUNKS):
+    def __init__(
+        self,
+        max_workers: int = MAX_CONCURRENT_CHUNKS,
+        target_chunk_bytes: int = TARGET_CHUNK_BYTES,
+    ):
         self.max_workers = max_workers
+        self.target_chunk_bytes = target_chunk_bytes
 
     def calculate_request_bytes(self, req: Any) -> int:
         """Calculate the estimated size in bytes of a request."""
@@ -254,15 +259,12 @@ class TableChunkManager:
         """Calculate the size in bytes of a single row."""
         return len(str(row).encode("utf-8"))
 
-    def create_chunks(
-        self, rows: list[RowItemType], target_chunk_bytes: int = TARGET_CHUNK_BYTES
-    ) -> list[list[RowItemType]]:
+    def create_chunks(self, rows: list[RowItemType]) -> list[list[RowItemType]]:
         """
         Split rows into chunks based on target byte size.
 
         Args:
             rows: List of rows to chunk
-            target_chunk_bytes: Target size for each chunk in bytes
 
         Returns:
             List of row chunks
@@ -274,7 +276,10 @@ class TableChunkManager:
         for row in rows:
             row_bytes = self.calculate_row_bytes(row)
 
-            if current_chunk_bytes + row_bytes > target_chunk_bytes and current_chunk:
+            if (
+                current_chunk_bytes + row_bytes > self.target_chunk_bytes
+                and current_chunk
+            ):
                 chunks.append(current_chunk)
                 current_chunk = [row]
                 current_chunk_bytes = row_bytes

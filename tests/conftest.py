@@ -494,7 +494,7 @@ def network_proxy_client(client):
     @app.post("/table/create_from_digests")
     def table_create_from_digests(
         req: tsi.TableCreateFromDigestsReq,
-    ) -> tsi.TableCreateRes:
+    ) -> tsi.TableCreateFromDigestsRes:
         records.append(
             (
                 "table_create_from_digests",

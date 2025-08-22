@@ -1013,7 +1013,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
     def table_create_from_digests(
         self, req: tsi.TableCreateFromDigestsReq
-    ) -> tsi.TableCreateRes:
+    ) -> tsi.TableCreateFromDigestsRes:
         """Create a table by specifying row digests, instead actual rows"""
         conn, cursor = get_conn_cursor(self.db_path)
 
@@ -1030,7 +1030,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             )
             conn.commit()
 
-        return tsi.TableCreateRes(digest=digest, row_digests=req.row_digests)
+        return tsi.TableCreateFromDigestsRes(digest=digest)
 
     def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
         conn, cursor = get_conn_cursor(self.db_path)
