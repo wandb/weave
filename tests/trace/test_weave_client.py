@@ -3826,10 +3826,10 @@ def test_table_create_from_digests(network_proxy_client):
 
     # Now create a new table using the same row digests
     from_digests_res = client.server.table_create_from_digests(
-        {
-            "project_id": client._project_id(),
-            "row_digests": row_digests,
-        }
+        tsi.TableCreateFromDigestsReq(
+            project_id=client._project_id(),
+            row_digests=row_digests,
+        )
     )
 
     # The digest should be the same since we're using the same rows

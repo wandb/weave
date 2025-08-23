@@ -505,10 +505,6 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         self, req: Union[tsi.TableCreateFromDigestsReq, dict[str, Any]]
     ) -> tsi.TableCreateFromDigestsRes:
         """Create a table by specifying row digests instead of actual rows."""
-        if isinstance(req, dict):
-            req = tsi.TableCreateFromDigestsReq.model_validate(req)
-        req = cast(tsi.TableCreateFromDigestsReq, req)
-
         return self._generic_request(
             "/table/create_from_digests",
             req,

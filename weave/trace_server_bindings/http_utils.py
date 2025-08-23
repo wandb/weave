@@ -240,40 +240,44 @@ def handle_response_error(response: requests.Response, url: str) -> None:
     raise requests.HTTPError(message, response=response)
 
 
-def check_endpoint_exists(server: Any, endpoint_name: str, test_req: Any) -> bool:
+def check_endpoint_exists(
+    func: Callable, test_req: Any, cache_key: str | None = None
+) -> bool:
     """
-    Check if a server endpoint exists and cache the result globally.
+    Check if a function/endpoint exists and works by calling it with a test request.
+
+    This allows bypassing retry logic by passing the unwrapped function directly,
+    or testing any callable with consistent caching and error handling.
 
     Args:
-        server: The server instance to check
-        endpoint_name: Name of the endpoint method to check
-        test_req: A test request to use for checking the endpoint
+        func: The function to test (e.g., server.table_create_from_digests or
+              server._generic_request_executor.__wrapped__)
+        test_req: A test request to use for checking the function
+        cache_key: Optional cache key. If not provided, uses id(func)
 
     Returns:
-        True if endpoint exists and works, False otherwise
+        True if function exists and works, False otherwise
     """
-    # Check cache first
-    server_id = id(server)  # Use server instance id as cache key
-    cache_key = f"{server_id}_{endpoint_name}"
+    # Generate cache key
+    if cache_key is None:
+        cache_key = str(id(func))
 
+    # Check cache first
     if cache_key in _ENDPOINT_CACHE:
         return _ENDPOINT_CACHE[cache_key]
 
-    # Check if method exists on server
-    if not hasattr(server, endpoint_name):
-        _ENDPOINT_CACHE[cache_key] = False
-        return False
-
     try:
-        # Try calling the endpoint with test request
-        server_method = getattr(server, endpoint_name)
-        server_method(test_req)
+        # Try calling the function with test request
+        func(test_req)
         endpoint_exists = True
     except Exception as e:
         # Check if this is a 404 (method not found)
         response = getattr(e, "response", None)
         status_code = getattr(response, "status_code", None) if response else None
-        endpoint_exists = status_code != 404
+        if status_code:
+            endpoint_exists = status_code != 404
+        else:
+            endpoint_exists = False
 
     _ENDPOINT_CACHE[cache_key] = endpoint_exists
     return endpoint_exists

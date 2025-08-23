@@ -1964,38 +1964,17 @@ class WeaveClient:
         if isinstance(table, WeaveTable) and table.table_ref is not None:
             return table.table_ref
 
-        remote_request_bytes_limit = getattr(
-            self.server, "remote_request_bytes_limit", REMOTE_REQUEST_BYTES_LIMIT
-        )
-
-        # Primary heuristic: row count
-        use_chunking = len(table.rows) > ROW_COUNT_CHUNKING_THRESHOLD
-        # Secondary heuristic: basic size estimation for smaller tables
-        if not use_chunking and len(table.rows) > 0:
-            # Simple size estimation without full serialization
-            sample_row_size = len(str(table.rows[0]).encode("utf-8"))
-            estimated_bytes = sample_row_size * len(table.rows) * 2
-            use_chunking = estimated_bytes > remote_request_bytes_limit
-
-        # Determine parallel vs incremental chunking
-        use_parallel_chunks = False
-        if use_chunking:
-            test_req = TableCreateFromDigestsReq(
-                project_id=self._project_id(), row_digests=[]
-            )
-            use_parallel_chunks = check_endpoint_exists(
-                self.server, "table_create_from_digests", test_req
-            )
-
-        # Execute chunking strategy - defer to_json serialization
+        use_chunking, use_parallel_chunks = self._should_use_chunking(table)
         if not use_chunking:
             # Simple case: defer the entire serialization and upload
             res_future: Future[TableCreateRes] = self.future_executor.defer(
                 lambda: self._send_table_create(list(table.rows))
             )
         elif use_parallel_chunks:
+            # Need to chunk up, use parallelism
             res_future = self._create_table_with_parallel_chunks(table)
         else:
+            # Legacy method for large tables and old servers
             res_future = self._create_table_with_incremental_updates(table)
 
         digest_future: Future[str] = self.future_executor.then(
@@ -2015,6 +1994,41 @@ class WeaveClient:
             table.table_ref = table_ref
 
         return table_ref
+
+    def _should_use_chunking(self, table: Table | WeaveTable) -> tuple[bool, bool]:
+        """Determine if we should use chunking and parallel chunks for a table."""
+        remote_request_bytes_limit = getattr(
+            self.server, "remote_request_bytes_limit", REMOTE_REQUEST_BYTES_LIMIT
+        )
+
+        # Primary heuristic: row count
+        use_chunking = len(table.rows) > ROW_COUNT_CHUNKING_THRESHOLD
+        # Secondary heuristic: basic size estimation for smaller tables
+        if not use_chunking and len(table.rows) > 0:
+            # Simple size estimation without full serialization
+            sample_row_size = len(str(table.rows[0]).encode("utf-8"))
+            estimated_bytes = sample_row_size * len(table.rows) * 2
+            use_chunking = estimated_bytes > remote_request_bytes_limit
+
+        # Determine parallel vs incremental chunking
+        use_parallel_chunks = False
+        if use_chunking:
+            test_req = TableCreateFromDigestsReq(
+                project_id=self._project_id(), row_digests=[]
+            )
+
+            def test_func(req: TableCreateFromDigestsReq) -> Any:
+                assert hasattr(self.server, "_generic_request_executor")
+                assert hasattr(self.server._generic_request_executor, "__wrapped__")
+                return self.server._generic_request_executor.__wrapped__(
+                    self.server, "/table/create_from_digests", req
+                )
+
+            use_parallel_chunks = check_endpoint_exists(
+                test_func, test_req, "table_create_from_digests"
+            )
+
+        return use_chunking, use_parallel_chunks
 
     def _create_table_with_parallel_chunks(
         self, table: Table | WeaveTable
