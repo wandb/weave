@@ -188,6 +188,9 @@ ALL_CALL_INSERT_COLUMNS = sorted(
 
 ALL_CALL_SELECT_COLUMNS = list(SelectableCHCallSchema.model_fields.keys())
 ALL_CALL_JSON_COLUMNS = ("inputs", "output", "attributes", "summary")
+ALL_CALL_JSON_COLUMN_INDICES = [
+    ALL_CALL_INSERT_COLUMNS.index(f"{col}_dump") for col in ALL_CALL_JSON_COLUMNS
+]
 REQUIRED_CALL_COLUMNS = ["id", "project_id", "trace_id", "op_name", "started_at"]
 
 # Columns in the calls_merged table with special aggregation functions:

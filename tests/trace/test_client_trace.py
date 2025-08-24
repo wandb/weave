@@ -3395,11 +3395,12 @@ def test_large_keys_are_stripped_call(client, caplog, monkeypatch):
         return
 
     original_insert_call_batch = weave.trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer._insert_call_batch
+    max_size = 10 * 1024
 
     # Patch _insert_call_batch to raise InsertTooLarge
     def mock_insert_call_batch(self, batch):
         # mock raise insert error
-        if len(str(batch)) > 10 * 1024:
+        if len(str(batch)) > max_size:
             raise InsertTooLarge(
                 "Database insertion failed. Record too large. "
                 "A likely cause is that a single row or cell exceeded "
@@ -3410,12 +3411,7 @@ def test_large_keys_are_stripped_call(client, caplog, monkeypatch):
     monkeypatch.setattr(
         weave.trace_server.clickhouse_trace_server_settings,
         "CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT",
-        10 * 1024,  # 1KB
-    )
-    monkeypatch.setattr(
-        weave.trace_server.clickhouse_trace_server_settings,
-        "CLICKHOUSE_SINGLE_VALUE_BYTES_LIMIT",
-        1 * 1024,  # 1KB
+        max_size,
     )
     monkeypatch.setattr(
         weave.trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer,
@@ -3423,8 +3419,8 @@ def test_large_keys_are_stripped_call(client, caplog, monkeypatch):
         mock_insert_call_batch,
     )
 
-    # Use a smaller dictionary that will still exceed our new 10KB limit
-    data = {"dictionary": {f"{i}": i for i in range(10_000)}}
+    # Use a dictionary that will exceed our new 10KB limit
+    data = {"dictionary": {f"{i}": i for i in range(max_size // 10)}}
 
     @weave.op
     def test_op_dict(input_data: dict):
@@ -3466,6 +3462,40 @@ def test_large_keys_are_stripped_call(client, caplog, monkeypatch):
     ]
     for error_message in error_messages:
         assert "Retrying with large objects stripped" in error_message
+
+    # test that when inputs + output > max_size but input < max_size
+    # we only strip the inputs
+    smaller_data = {"dictionary": {f"{i}": i for i in range(max_size // 16)}}
+
+    @weave.op
+    def test_op_strip_inputs(input_data: dict):
+        # combined output is larger than single row size
+        return {"output1": input_data, "output2": smaller_data}
+
+    def _compare_inputs(inputs, expected):
+        for k, v in expected.items():
+            assert inputs[k] == v
+
+    test_op_strip_inputs(smaller_data)
+
+    calls = list(test_op_strip_inputs.calls())
+    assert len(calls) == 1
+    assert calls[0].output == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
+    _compare_inputs(calls[0].inputs, {"input_data": smaller_data})
+
+    # test when inputs + output + attributes > max_size and attributes is largest
+    # we strip the attributes
+    @weave.op
+    def test_op_strip_summary(input_data: dict):
+        return "really_small"
+
+    with weave.attributes({"slightly_larger_data": smaller_data | {"a": 1}}):
+        test_op_strip_summary(smaller_data)
+
+    call = next(iter(test_op_strip_summary.calls()))
+    assert call.attributes == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
+    assert call.output == "really_small"
+    _compare_inputs(call.inputs, {"input_data": smaller_data})
 
 
 def test_weave_finish_unsets_client(client):
