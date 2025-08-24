@@ -4,11 +4,26 @@ This module should not require any dependencies beyond the standard library. It 
 check if libraries are installed and imported and patch in the case that they are.
 """
 
+import importlib
+import os
+import sys
+import threading
 from typing import Any, Callable, Optional, Union
 
 from pydantic import BaseModel, Field, validate_call
 
 from weave.trace.weave_client import Call
+
+# Debug flag - can be set via environment variable WEAVE_DEBUG_AUTOPATCH=1
+_DEBUG_AUTOPATCH = os.environ.get("WEAVE_DEBUG_AUTOPATCH", "").lower() in ("1", "true", "yes")
+
+# Track which integrations have been patched
+_patched_integrations = set()
+_deferred_integrations = {}  # Maps integration names to their configs for deferred patching
+_patch_lock = threading.Lock()
+
+# Global settings for autopatching
+_autopatch_settings: Optional['AutopatchSettings'] = None
 
 
 class OpSettings(BaseModel):
@@ -57,119 +72,473 @@ class AutopatchSettings(BaseModel):
     autogen: IntegrationSettings = Field(default_factory=IntegrationSettings)
 
 
+# Mapping of integration names to their module paths and patcher functions
+_INTEGRATION_CONFIGS = {
+    "openai": {
+        "module": "weave.integrations.openai.openai_sdk",
+        "patcher_func": "get_openai_patcher",
+        "trigger_modules": ["openai"],  # When these modules are imported, trigger patching
+    },
+    "mistral": {
+        "module": "weave.integrations.mistral.mistral_sdk",
+        "patcher_func": "get_mistral_patcher",
+        "trigger_modules": ["mistralai"],
+    },
+    "mcp_server": {
+        "module": "weave.integrations.mcp",
+        "patcher_func": "get_mcp_server_patcher",
+        "settings_attr": "mcp",
+        "trigger_modules": ["mcp"],
+    },
+    "mcp_client": {
+        "module": "weave.integrations.mcp",
+        "patcher_func": "get_mcp_client_patcher",
+        "settings_attr": "mcp",
+        "trigger_modules": ["mcp"],
+    },
+    "litellm": {
+        "module": "weave.integrations.litellm.litellm",
+        "patcher_func": "get_litellm_patcher",
+        "trigger_modules": ["litellm"],
+    },
+    "anthropic": {
+        "module": "weave.integrations.anthropic.anthropic_sdk",
+        "patcher_func": "get_anthropic_patcher",
+        "trigger_modules": ["anthropic"],
+    },
+    "groq": {
+        "module": "weave.integrations.groq.groq_sdk",
+        "patcher_func": "get_groq_patcher",
+        "trigger_modules": ["groq"],
+    },
+    "instructor": {
+        "module": "weave.integrations.instructor.instructor_sdk",
+        "patcher_func": "get_instructor_patcher",
+        "trigger_modules": ["instructor"],
+    },
+    "dspy": {
+        "module": "weave.integrations.dspy.dspy_sdk",
+        "patcher_func": "get_dspy_patcher",
+        "trigger_modules": ["dspy"],
+    },
+    "cerebras": {
+        "module": "weave.integrations.cerebras.cerebras_sdk",
+        "patcher_func": "get_cerebras_patcher",
+        "trigger_modules": ["cerebras"],
+    },
+    "cohere": {
+        "module": "weave.integrations.cohere.cohere_sdk",
+        "patcher_func": "get_cohere_patcher",
+        "trigger_modules": ["cohere"],
+    },
+    "google_genai": {
+        "module": "weave.integrations.google_genai.google_genai_sdk",
+        "patcher_func": "get_google_genai_patcher",
+        "settings_attr": "google_genai_sdk",
+        "trigger_modules": ["google.generativeai"],
+    },
+    "crewai": {
+        "module": "weave.integrations.crewai",
+        "patcher_func": "get_crewai_patcher",
+        "trigger_modules": ["crewai"],
+    },
+    "notdiamond": {
+        "module": "weave.integrations.notdiamond.tracing",
+        "patcher_func": "get_notdiamond_patcher",
+        "trigger_modules": ["notdiamond"],
+    },
+    "vertexai": {
+        "module": "weave.integrations.vertexai.vertexai_sdk",
+        "patcher_func": "get_vertexai_patcher",
+        "trigger_modules": ["vertexai"],
+    },
+    "chatnvidia": {
+        "module": "weave.integrations.langchain_nvidia_ai_endpoints.langchain_nv_ai_endpoints",
+        "patcher_func": "get_nvidia_ai_patcher",
+        "trigger_modules": ["langchain_nvidia_ai_endpoints"],
+    },
+    "huggingface": {
+        "module": "weave.integrations.huggingface.huggingface_inference_client_sdk",
+        "patcher_func": "get_huggingface_patcher",
+        "trigger_modules": ["huggingface_hub"],
+    },
+    "smolagents": {
+        "module": "weave.integrations.smolagents.smolagents_sdk",
+        "patcher_func": "get_smolagents_patcher",
+        "trigger_modules": ["smolagents"],
+    },
+    "openai_agents": {
+        "module": "weave.integrations.openai_agents.openai_agents",
+        "patcher_func": "get_openai_agents_patcher",
+        "trigger_modules": ["swarm"],
+    },
+    "verdict": {
+        "module": "weave.integrations.verdict.verdict_sdk",
+        "patcher_func": "get_verdict_patcher",
+        "trigger_modules": ["verdict"],
+    },
+    "langchain": {
+        "module": "weave.integrations.langchain.langchain",
+        "patcher_func": None,  # Uses module.langchain_patcher directly
+        "trigger_modules": ["langchain"],
+    },
+    "llamaindex": {
+        "module": "weave.integrations.llamaindex.llamaindex",
+        "patcher_func": None,  # Uses module.llamaindex_patcher directly
+        "trigger_modules": ["llama_index"],
+    },
+    "autogen": {
+        "module": "weave.integrations.autogen",
+        "patcher_func": "get_autogen_patcher",
+        "trigger_modules": ["autogen"],
+    },
+}
+
+
+def _lazy_load_and_patch(integration_name: str, settings: Optional[IntegrationSettings] = None):
+    """Lazily load an integration module and attempt to patch it."""
+    with _patch_lock:
+        # Check if already patched
+        if integration_name in _patched_integrations:
+            if _DEBUG_AUTOPATCH:
+                print(f"[WEAVE AUTOPATCH] {integration_name} already patched, skipping")
+            return
+        
+        if _DEBUG_AUTOPATCH:
+            print(f"[WEAVE AUTOPATCH] Patching {integration_name}...")
+        
+        config = _INTEGRATION_CONFIGS.get(integration_name)
+        if not config:
+            raise ValueError(f"Unknown integration: {integration_name}")
+        
+        module = importlib.import_module(config["module"])
+        
+        if config["patcher_func"]:
+            patcher_func = getattr(module, config["patcher_func"])
+            if settings is not None:
+                patcher = patcher_func(settings)
+            else:
+                patcher = patcher_func()
+            patcher.attempt_patch()
+        else:
+            # Special case for langchain and llamaindex
+            if integration_name == "langchain":
+                module.langchain_patcher.attempt_patch()
+            elif integration_name == "llamaindex":
+                module.llamaindex_patcher.attempt_patch()
+        
+        # Track that this integration has been patched
+        _patched_integrations.add(integration_name)
+        if _DEBUG_AUTOPATCH:
+            print(f"[WEAVE AUTOPATCH] Successfully patched {integration_name}")
+
+
+def _lazy_load_and_unpatch(integration_name: str):
+    """Lazily load an integration module and undo its patches."""
+    with _patch_lock:
+        # Only unpatch if it was patched
+        if integration_name not in _patched_integrations:
+            return
+            
+        config = _INTEGRATION_CONFIGS.get(integration_name)
+        if not config:
+            raise ValueError(f"Unknown integration: {integration_name}")
+        
+        module = importlib.import_module(config["module"])
+        
+        if config["patcher_func"]:
+            patcher_func = getattr(module, config["patcher_func"])
+            patcher = patcher_func()
+            patcher.undo_patch()
+        else:
+            # Special case for langchain and llamaindex
+            if integration_name == "langchain":
+                module.langchain_patcher.undo_patch()
+            elif integration_name == "llamaindex":
+                module.llamaindex_patcher.undo_patch()
+        
+        # Remove from tracked patched integrations
+        _patched_integrations.discard(integration_name)
+
+
+def _setup_deferred_patch(integration_name: str, config: dict):
+    """Set up deferred patching for an integration."""
+    global _deferred_integrations
+    
+    with _patch_lock:
+        if integration_name not in _deferred_integrations:
+            _deferred_integrations[integration_name] = config
+            if _DEBUG_AUTOPATCH:
+                print(f"[WEAVE AUTOPATCH] Set up deferred patching for {integration_name}")
+            
+            # Install hooks to trigger patching on actual use
+            _install_sdk_hooks(integration_name, config)
+
+
+def _install_sdk_hooks(integration_name: str, config: dict):
+    """Install hooks on SDK modules to trigger patching on actual use."""
+    trigger_modules = config.get("trigger_modules", [])
+    
+    for module_name in trigger_modules:
+        if module_name in sys.modules:
+            module = sys.modules[module_name]
+            
+            # Check if we already installed hooks
+            if hasattr(module, '_weave_deferred_patch_installed'):
+                continue
+            
+            # Get the original __getattr__ if it exists
+            original_getattr = getattr(module, '__getattr__', None)
+            
+            def make_getattr_hook(integration_name, module_name):
+                def lazy_patch_getattr(name):
+                    # List of attributes that trigger patching
+                    trigger_attrs = {
+                        'openai': ['OpenAI', 'AsyncOpenAI', 'Client', 'AsyncClient'],
+                        'anthropic': ['Anthropic', 'AsyncAnthropic', 'Client', 'AsyncClient'],
+                        'cohere': ['Client', 'AsyncClient', 'Cohere', 'AsyncCohere'],
+                    }
+                    
+                    # Check if this attribute access should trigger patching
+                    if name in trigger_attrs.get(integration_name, []):
+                        if _DEBUG_AUTOPATCH:
+                            print(f"[WEAVE AUTOPATCH] Access to {module_name}.{name} triggering patch for {integration_name}")
+                        _trigger_deferred_patch_if_needed(integration_name)
+                    
+                    # Call the original __getattr__ if it exists
+                    if original_getattr:
+                        return original_getattr(name)
+                    else:
+                        # Default behavior - look up the attribute normally
+                        try:
+                            return getattr(module, name)
+                        except AttributeError:
+                            raise AttributeError(f"module '{module_name}' has no attribute '{name}'")
+                
+                return lazy_patch_getattr
+            
+            # Install the hook
+            module.__getattr__ = make_getattr_hook(integration_name, module_name)
+            module._weave_deferred_patch_installed = True
+            
+            if _DEBUG_AUTOPATCH:
+                print(f"[WEAVE AUTOPATCH] Installed SDK hook on {module_name} for {integration_name}")
+
+
+def _trigger_deferred_patch_if_needed(integration_name: str):
+    """Trigger deferred patch if it's set up and not yet patched."""
+    global _deferred_integrations, _autopatch_settings
+    
+    if integration_name not in _deferred_integrations:
+        return
+    
+    if integration_name in _patched_integrations:
+        return
+    
+    config = _deferred_integrations[integration_name]
+    
+    # Get the settings for this integration
+    settings_attr = config.get("settings_attr", integration_name)
+    if integration_name in ["mcp_server", "mcp_client"]:
+        settings_attr = "mcp"
+    
+    integration_settings = getattr(_autopatch_settings, settings_attr, None)
+    
+    # Only patch if enabled
+    if integration_settings and integration_settings.enabled:
+        if _DEBUG_AUTOPATCH:
+            print(f"[WEAVE AUTOPATCH] Triggering deferred patch for {integration_name}")
+        _lazy_load_and_patch(integration_name, integration_settings)
+        # Remove from deferred list once patched
+        _deferred_integrations.pop(integration_name, None)
+
+
+def _check_and_patch_if_needed(called_from_init=False):
+    """Check if any libraries that need patching have been imported and patch them.
+    
+    This now defers patching to avoid loading integration modules unnecessarily.
+    """
+    global _autopatch_settings
+    
+    if _autopatch_settings is None or _autopatch_settings.disable_autopatch:
+        return
+    
+    # For certain integrations, we want to defer patching to avoid import overhead
+    deferred_integrations = {"openai", "anthropic", "cohere"}
+    
+    # Check each integration to see if its trigger modules are imported
+    for integration_name, config in _INTEGRATION_CONFIGS.items():
+        # Skip if already patched
+        if integration_name in _patched_integrations:
+            continue
+            
+        # Check if any trigger modules are imported
+        trigger_modules = config.get("trigger_modules", [])
+        for trigger_module in trigger_modules:
+            if trigger_module in sys.modules:
+                if _DEBUG_AUTOPATCH:
+                    if called_from_init:
+                        # This is problematic - library was imported before weave.init()
+                        print(f"[WEAVE AUTOPATCH] WARNING: {trigger_module} was already imported before weave.init()!")
+                        if integration_name in deferred_integrations:
+                            print(f"[WEAVE AUTOPATCH]          Deferring patch for {integration_name} to avoid import overhead.")
+                        else:
+                            print(f"[WEAVE AUTOPATCH]          This means patching happens immediately instead of on-demand.")
+                            print(f"[WEAVE AUTOPATCH]          Consider importing {trigger_module} after weave.init() for better performance.")
+                    print(f"[WEAVE AUTOPATCH] Detected {trigger_module} import, checking if {integration_name} should be patched")
+                
+                # For deferred integrations, set up a hook instead of patching immediately
+                if integration_name in deferred_integrations and called_from_init:
+                    if _DEBUG_AUTOPATCH:
+                        print(f"[WEAVE AUTOPATCH] Deferring {integration_name} patch to first use")
+                    # Mark for deferred patching
+                    _setup_deferred_patch(integration_name, config)
+                    break
+                
+                # The library is imported, check if we should patch it
+                settings_attr = config.get("settings_attr", integration_name)
+                
+                # Skip mcp_server and mcp_client special handling
+                if integration_name in ["mcp_server", "mcp_client"]:
+                    settings_attr = "mcp"
+                
+                # Get the settings for this integration
+                integration_settings = getattr(_autopatch_settings, settings_attr, None)
+                
+                # Only patch if enabled
+                if integration_settings and integration_settings.enabled:
+                    _lazy_load_and_patch(integration_name, integration_settings)
+                    break  # Once we've found a trigger module, no need to check others
+
+
+# Custom import hook to detect when libraries are imported
+class WeaveImportHook:
+    """Import hook that detects when specific libraries are imported and triggers patching."""
+    
+    def find_module(self, fullname, path=None):
+        # Check if this is a library we're interested in
+        for config in _INTEGRATION_CONFIGS.values():
+            if fullname in config.get("trigger_modules", []):
+                # Return ourselves as the loader
+                return self
+        return None
+    
+    def load_module(self, fullname):
+        # If the module is already loaded, return it
+        if fullname in sys.modules:
+            return sys.modules[fullname]
+        
+        if _DEBUG_AUTOPATCH:
+            print(f"[WEAVE AUTOPATCH] Import hook triggered for {fullname}")
+        
+        # Remove ourselves temporarily to avoid infinite recursion
+        sys.meta_path.remove(self)
+        try:
+            # Import the module normally
+            module = importlib.import_module(fullname)
+            sys.modules[fullname] = module
+            
+            # Check if this is a deferred integration that needs patching
+            deferred_integrations = {"openai", "anthropic", "cohere"}
+            
+            # Find which integration this module belongs to
+            for integration_name, config in _INTEGRATION_CONFIGS.items():
+                if fullname in config.get("trigger_modules", []) and integration_name in deferred_integrations:
+                    # Don't patch immediately, just mark for deferred patching
+                    _setup_deferred_patch(integration_name, config)
+                    break
+            else:
+                # For non-deferred integrations, check if we need to patch
+                _check_and_patch_if_needed(called_from_init=False)
+            
+            return module
+        finally:
+            # Re-add ourselves
+            if self not in sys.meta_path:
+                sys.meta_path.insert(0, self)
+
+
+# Install the import hook when this module is imported
+_import_hook = WeaveImportHook()
+
+
 @validate_call
 def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
+    """Configure autopatch settings and enable the import hook.
+    
+    This function no longer immediately patches integrations. Instead, it:
+    1. Stores the settings for later use
+    2. Installs an import hook that will patch integrations when they are first imported
+    3. Checks if any integrations are already imported and patches them if needed
+    """
+    global _autopatch_settings
+    
     if settings is None:
         settings = AutopatchSettings()
+    
+    _autopatch_settings = settings
+    
     if settings.disable_autopatch:
+        # Remove the import hook if autopatch is disabled
+        if _import_hook in sys.meta_path:
+            if _DEBUG_AUTOPATCH:
+                print("[WEAVE AUTOPATCH] Removing import hook (autopatch disabled)")
+            sys.meta_path.remove(_import_hook)
         return
+    
+    # Install the import hook if not already installed
+    if _import_hook not in sys.meta_path:
+        if _DEBUG_AUTOPATCH:
+            print("[WEAVE AUTOPATCH] Installing import hook for on-demand patching")
+        sys.meta_path.insert(0, _import_hook)
+    elif _DEBUG_AUTOPATCH:
+        print("[WEAVE AUTOPATCH] Import hook already installed")
+    
+    # Check if any libraries are already imported and patch them
+    if _DEBUG_AUTOPATCH:
+        print("[WEAVE AUTOPATCH] Checking for already-imported libraries...")
+    _check_and_patch_if_needed(called_from_init=True)
 
-    from weave.integrations.anthropic.anthropic_sdk import get_anthropic_patcher
-    from weave.integrations.autogen import get_autogen_patcher
-    from weave.integrations.cerebras.cerebras_sdk import get_cerebras_patcher
-    from weave.integrations.cohere.cohere_sdk import get_cohere_patcher
-    from weave.integrations.crewai import get_crewai_patcher
-    from weave.integrations.dspy.dspy_sdk import get_dspy_patcher
-    from weave.integrations.google_genai.google_genai_sdk import (
-        get_google_genai_patcher,
-    )
-    from weave.integrations.groq.groq_sdk import get_groq_patcher
-    from weave.integrations.huggingface.huggingface_inference_client_sdk import (
-        get_huggingface_patcher,
-    )
-    from weave.integrations.instructor.instructor_sdk import get_instructor_patcher
-    from weave.integrations.langchain.langchain import langchain_patcher
-    from weave.integrations.langchain_nvidia_ai_endpoints.langchain_nv_ai_endpoints import (
-        get_nvidia_ai_patcher,
-    )
-    from weave.integrations.litellm.litellm import get_litellm_patcher
-    from weave.integrations.llamaindex.llamaindex import llamaindex_patcher
-    from weave.integrations.mcp import get_mcp_client_patcher, get_mcp_server_patcher
-    from weave.integrations.mistral.mistral_sdk import get_mistral_patcher
-    from weave.integrations.notdiamond.tracing import get_notdiamond_patcher
-    from weave.integrations.openai.openai_sdk import get_openai_patcher
-    from weave.integrations.openai_agents.openai_agents import get_openai_agents_patcher
-    from weave.integrations.smolagents.smolagents_sdk import get_smolagents_patcher
-    from weave.integrations.verdict.verdict_sdk import get_verdict_patcher
-    from weave.integrations.vertexai.vertexai_sdk import get_vertexai_patcher
 
-    get_openai_patcher(settings.openai).attempt_patch()
-    get_mistral_patcher(settings.mistral).attempt_patch()
-    get_mcp_server_patcher(settings.mcp).attempt_patch()
-    get_mcp_client_patcher(settings.mcp).attempt_patch()
-    get_litellm_patcher(settings.litellm).attempt_patch()
-    get_anthropic_patcher(settings.anthropic).attempt_patch()
-    get_groq_patcher(settings.groq).attempt_patch()
-    get_instructor_patcher(settings.instructor).attempt_patch()
-    get_dspy_patcher(settings.dspy).attempt_patch()
-    get_cerebras_patcher(settings.cerebras).attempt_patch()
-    get_cohere_patcher(settings.cohere).attempt_patch()
-    get_google_genai_patcher(settings.google_genai_sdk).attempt_patch()
-    get_crewai_patcher(settings.crewai).attempt_patch()
-    get_notdiamond_patcher(settings.notdiamond).attempt_patch()
-    get_vertexai_patcher(settings.vertexai).attempt_patch()
-    get_nvidia_ai_patcher(settings.chatnvidia).attempt_patch()
-    get_huggingface_patcher(settings.huggingface).attempt_patch()
-    get_smolagents_patcher(settings.smolagents).attempt_patch()
-    get_openai_agents_patcher(settings.openai_agents).attempt_patch()
-    get_verdict_patcher(settings.verdict).attempt_patch()
+def trigger_deferred_patches() -> None:
+    """Manually trigger all deferred patches.
+    
+    This is useful when you want to ensure all integrations are patched
+    before starting to use them, avoiding the lazy loading overhead.
+    """
+    # Create a copy of the deferred integrations to avoid modifying while iterating
+    deferred = list(_deferred_integrations.keys())
+    
+    for integration_name in deferred:
+        _trigger_deferred_patch_if_needed(integration_name)
 
-    langchain_patcher.attempt_patch()
-    llamaindex_patcher.attempt_patch()
-    get_autogen_patcher(settings.autogen).attempt_patch()
+
+def ensure_integration_patched(integration_name: str) -> None:
+    """Ensure a specific integration is patched.
+    
+    This is called automatically when using the SDK, but can also be
+    called manually to force patching of a specific integration.
+    """
+    _trigger_deferred_patch_if_needed(integration_name)
 
 
 def reset_autopatch() -> None:
-    from weave.integrations.anthropic.anthropic_sdk import get_anthropic_patcher
-    from weave.integrations.autogen import get_autogen_patcher
-    from weave.integrations.cerebras.cerebras_sdk import get_cerebras_patcher
-    from weave.integrations.cohere.cohere_sdk import get_cohere_patcher
-    from weave.integrations.crewai import get_crewai_patcher
-    from weave.integrations.dspy.dspy_sdk import get_dspy_patcher
-    from weave.integrations.google_genai.google_genai_sdk import (
-        get_google_genai_patcher,
-    )
-    from weave.integrations.groq.groq_sdk import get_groq_patcher
-    from weave.integrations.huggingface.huggingface_inference_client_sdk import (
-        get_huggingface_patcher,
-    )
-    from weave.integrations.instructor.instructor_sdk import get_instructor_patcher
-    from weave.integrations.langchain.langchain import langchain_patcher
-    from weave.integrations.langchain_nvidia_ai_endpoints.langchain_nv_ai_endpoints import (
-        get_nvidia_ai_patcher,
-    )
-    from weave.integrations.litellm.litellm import get_litellm_patcher
-    from weave.integrations.llamaindex.llamaindex import llamaindex_patcher
-    from weave.integrations.mcp import get_mcp_client_patcher, get_mcp_server_patcher
-    from weave.integrations.mistral.mistral_sdk import get_mistral_patcher
-    from weave.integrations.notdiamond.tracing import get_notdiamond_patcher
-    from weave.integrations.openai.openai_sdk import get_openai_patcher
-    from weave.integrations.openai_agents.openai_agents import get_openai_agents_patcher
-    from weave.integrations.smolagents.smolagents_sdk import get_smolagents_patcher
-    from weave.integrations.verdict.verdict_sdk import get_verdict_patcher
-    from weave.integrations.vertexai.vertexai_sdk import get_vertexai_patcher
-
-    get_openai_patcher().undo_patch()
-    get_mistral_patcher().undo_patch()
-    get_mcp_server_patcher().undo_patch()
-    get_mcp_client_patcher().undo_patch()
-    get_litellm_patcher().undo_patch()
-    get_anthropic_patcher().undo_patch()
-    get_groq_patcher().undo_patch()
-    get_instructor_patcher().undo_patch()
-    get_dspy_patcher().undo_patch()
-    get_cerebras_patcher().undo_patch()
-    get_cohere_patcher().undo_patch()
-    get_crewai_patcher().undo_patch()
-    get_google_genai_patcher().undo_patch()
-    get_notdiamond_patcher().undo_patch()
-    get_vertexai_patcher().undo_patch()
-    get_nvidia_ai_patcher().undo_patch()
-    get_huggingface_patcher().undo_patch()
-    get_smolagents_patcher().undo_patch()
-    get_openai_agents_patcher().undo_patch()
-    get_verdict_patcher().undo_patch()
-
-    langchain_patcher.undo_patch()
-    llamaindex_patcher.undo_patch()
-    get_autogen_patcher().undo_patch()
+    """Reset autopatch by unpatching all patched integrations and removing the import hook."""
+    global _autopatch_settings, _deferred_integrations
+    
+    # Remove the import hook
+    if _import_hook in sys.meta_path:
+        sys.meta_path.remove(_import_hook)
+    
+    # Only unpatch integrations that were actually patched
+    # Create a copy of the set to avoid modifying while iterating
+    patched = list(_patched_integrations)
+    
+    for integration_name in patched:
+        _lazy_load_and_unpatch(integration_name)
+    
+    # Clear deferred integrations
+    _deferred_integrations.clear()
+    
+    # Clear the settings
+    _autopatch_settings = None
