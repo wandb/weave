@@ -362,7 +362,6 @@ class CallDict(TypedDict):
     attributes: dict[str, Any] | None
     started_at: datetime.datetime | None
     ended_at: datetime.datetime | None
-    deleted_at: datetime.datetime | None
     thread_id: str | None
     turn_id: str | None
 
@@ -392,7 +391,6 @@ class Call:
     attributes: dict[str, Any] | None = None
     started_at: datetime.datetime | None = None
     ended_at: datetime.datetime | None = None
-    deleted_at: datetime.datetime | None = None
     thread_id: str | None = None
     turn_id: str | None = None
 
@@ -603,7 +601,6 @@ class Call:
             attributes=self.attributes,
             started_at=self.started_at,
             ended_at=self.ended_at,
-            deleted_at=self.deleted_at,
             thread_id=self.thread_id,
             turn_id=self.turn_id,
         )
@@ -636,7 +633,6 @@ def make_client_call(
         attributes=server_call.attributes,
         started_at=server_call.started_at,
         ended_at=server_call.ended_at,
-        deleted_at=server_call.deleted_at,
         thread_id=server_call.thread_id,
         turn_id=server_call.turn_id,
     )
