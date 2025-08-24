@@ -9,3 +9,6 @@ update_model_providers:
 
 update_model_catalog:
 	python trace_server/model_providers/catalog_augment_hf.py
+
+generate-bindings:
+	uv run ../tools/codegen/generate.py $(ARGS)
