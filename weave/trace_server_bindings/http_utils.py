@@ -241,7 +241,7 @@ def handle_response_error(response: requests.Response, url: str) -> None:
 
 
 def check_endpoint_exists(
-    func: Callable, test_req: Any, cache_key: str | None = None
+    func: Callable, test_req: Any, cache_key: Union[str, None] = None
 ) -> bool:
     """
     Check if a function/endpoint exists and works by calling it with a test request.
