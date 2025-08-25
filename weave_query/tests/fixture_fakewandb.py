@@ -14,9 +14,12 @@ import weave_query as weave
 # high level and doesn't test the actual io implementation. We should
 # mock wandb_api instead probably.
 from weave_query import io_service, util, wandb_api, wandb_client_api
-from weave_query.artifact_wandb import (WandbArtifact, WandbArtifactManifest,
-                                        WeaveWBArtifactByIDURI,
-                                        WeaveWBArtifactURI)
+from weave_query.artifact_wandb import (
+    WandbArtifact,
+    WandbArtifactManifest,
+    WeaveWBArtifactByIDURI,
+    WeaveWBArtifactURI,
+)
 
 from tests.util.tag_test_util import op_add_tag
 
