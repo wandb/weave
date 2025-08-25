@@ -163,6 +163,8 @@ def tests(session, shard):
         "pytest",
         "--durations=20",
         "--strict-markers",
+        "--memray",
+        "--most-allocations=5",
         "--cov=weave",
         "--cov-report=html",
         "--cov-report=xml",
