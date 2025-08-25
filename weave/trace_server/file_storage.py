@@ -46,6 +46,7 @@ from abc import abstractmethod
 from typing import Any, Callable, Optional, Union, cast
 
 import boto3
+from aiobotocore.session import get_session
 from azure.core.exceptions import HttpResponseError
 from azure.storage.blob import BlobServiceClient
 from botocore.config import Config
@@ -107,6 +108,11 @@ class FileStorageClient:
         pass
 
     @abstractmethod
+    async def store_async(self, uri: FileStorageURI, data: bytes) -> None:
+        """Store data at the specified URI location in cloud storage (async)."""
+        pass
+
+    @abstractmethod
     def read(self, uri: FileStorageURI) -> bytes:
         """Read data from the specified URI location in cloud storage."""
         pass
@@ -131,6 +137,19 @@ def store_in_bucket(
     try:
         target_file_storage_uri = client.base_uri.with_path(path)
         client.store(target_file_storage_uri, data)
+    except Exception as e:
+        logger.exception("Failed to store file at %s", target_file_storage_uri)
+        raise FileStorageWriteError(f"Failed to store file at {path}: {e!s}") from e
+    return target_file_storage_uri
+
+
+async def store_in_bucket_async(
+    client: FileStorageClient, path: str, data: bytes
+) -> FileStorageURI:
+    """Store a file in a storage bucket (async)."""
+    try:
+        target_file_storage_uri = client.base_uri.with_path(path)
+        await client.store_async(target_file_storage_uri, data)
     except Exception as e:
         logger.exception("Failed to store file at %s", target_file_storage_uri)
         raise FileStorageWriteError(f"Failed to store file at {path}: {e!s}") from e
@@ -266,6 +285,24 @@ class S3StorageClient(FileStorageClient):
 
         self.client.put_object(**put_object_params)
 
+    async def store_async(self, uri: FileStorageURI, data: bytes) -> None:
+        """Store data in S3 bucket with automatic retries on failure (async)."""
+        assert isinstance(uri, S3FileStorageURI)
+        assert uri.to_uri_str().startswith(self.base_uri.to_uri_str())
+
+        # Use KMS key for encryption if available
+        put_object_params = {"Bucket": uri.bucket, "Key": uri.path, "Body": data}
+
+        # Add ServerSideEncryption with KMS if KMS key is provided
+        if self.kms_key:
+            put_object_params["ServerSideEncryption"] = "aws:kms"
+            put_object_params["SSEKMSKeyId"] = self.kms_key
+
+        # Use same credentials as sync client
+        session = get_session()
+        async with session.create_client("s3") as s3_client:
+            await s3_client.put_object(**put_object_params)
+
     @create_retry_decorator("s3_read")
     def read(self, uri: S3FileStorageURI) -> bytes:
         """Read data from S3 bucket with automatic retries on failure."""
@@ -294,6 +331,19 @@ class GCSStorageClient(FileStorageClient):
         assert isinstance(uri, GCSFileStorageURI)
         assert uri.to_uri_str().startswith(self.base_uri.to_uri_str())
         bucket = self.client.bucket(uri.bucket)
+        blob = bucket.blob(uri.path)
+        # Explicitly disable retries at the operation level
+        # https://cloud.google.com/python/docs/reference/storage/latest/retry_timeout
+        blob.upload_from_string(data, timeout=DEFAULT_READ_TIMEOUT, retry=None)
+
+    async def store_async(self, uri: GCSFileStorageURI, data: bytes) -> None:
+        """Store data in GCS bucket with automatic retries on failure (async)."""
+        assert isinstance(uri, GCSFileStorageURI)
+        assert uri.to_uri_str().startswith(self.base_uri.to_uri_str())
+
+        # Use same credentials as sync client
+        async_client = AsyncClient(credentials=self.client._credentials)
+        bucket = async_client.bucket(uri.bucket)
         blob = bucket.blob(uri.path)
         # Explicitly disable retries at the operation level
         # https://cloud.google.com/python/docs/reference/storage/latest/retry_timeout
@@ -353,6 +403,39 @@ class AzureStorageClient(FileStorageClient):
         container_client = client.get_container_client(uri.container)
         blob_client = container_client.get_blob_client(uri.path)
         blob_client.upload_blob(data, overwrite=True)
+
+    async def store_async(self, uri: AzureFileStorageURI, data: bytes) -> None:
+        """Store data in Azure container with automatic retries on failure (async)."""
+        from azure.storage.blob.aio import BlobServiceClient as AsyncBlobServiceClient
+
+        assert isinstance(uri, AzureFileStorageURI)
+        assert uri.to_uri_str().startswith(self.base_uri.to_uri_str())
+
+        # Create async Azure client based on available credentials
+        if "connection_string" in self.credentials:
+            connection_creds = cast(AzureConnectionCredentials, self.credentials)
+            async_client = AsyncBlobServiceClient.from_connection_string(
+                connection_creds["connection_string"],
+                connection_timeout=DEFAULT_CONNECT_TIMEOUT,
+                read_timeout=DEFAULT_READ_TIMEOUT,
+            )
+        else:
+            account_creds = cast(AzureAccountCredentials, self.credentials)
+            if "account_url" in account_creds and account_creds["account_url"]:
+                account_url = account_creds["account_url"]
+            else:
+                account_url = f"https://{uri.account}.blob.core.windows.net/"
+            async_client = AsyncBlobServiceClient(
+                account_url=account_url,
+                credential=account_creds["access_key"],
+                connection_timeout=DEFAULT_CONNECT_TIMEOUT,
+                read_timeout=DEFAULT_READ_TIMEOUT,
+            )
+
+        async with async_client:
+            container_client = async_client.get_container_client(uri.container)
+            blob_client = container_client.get_blob_client(uri.path)
+            await blob_client.upload_blob(data, overwrite=True)
 
     @create_retry_decorator("azure_read")
     def read(self, uri: AzureFileStorageURI) -> bytes:

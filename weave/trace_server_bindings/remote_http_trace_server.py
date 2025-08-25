@@ -557,8 +557,8 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         )
 
     @with_retry
-    def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
-        r = self.post(
+    async def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
+        r = await self.post(
             "/files/create",
             data={"project_id": req.project_id},
             files={"file": (req.name, req.content)},

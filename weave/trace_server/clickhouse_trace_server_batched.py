@@ -36,7 +36,12 @@ from zoneinfo import ZoneInfo
 
 import clickhouse_connect
 import ddtrace
-from clickhouse_connect.driver.client import Client as CHClient
+from clickhouse_connect.driver.client import (
+    AsyncClient as AsyncCHClient,
+)
+from clickhouse_connect.driver.client import (
+    Client as CHClient,
+)
 from clickhouse_connect.driver.query import QueryResult
 from clickhouse_connect.driver.summary import QuerySummary
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
@@ -98,7 +103,7 @@ from weave.trace_server.file_storage import (
     key_for_project_digest,
     maybe_get_storage_client_from_env,
     read_from_bucket,
-    store_in_bucket,
+    store_in_bucket_async,
 )
 from weave.trace_server.file_storage_uris import FileStorageURI
 from weave.trace_server.ids import generate_id
@@ -1484,29 +1489,31 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         return [r.val for r in extra_results]
 
-    def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
+    async def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         digest = bytes_digest(req.content)
         use_file_storage = self._should_use_file_storage_for_writes(req.project_id)
         client = self.file_storage_client
 
         if client is not None and use_file_storage:
             try:
-                self._file_create_bucket(req, digest, client)
+                await self._file_create_bucket(req, digest, client)
             except FileStorageWriteError:
-                self._file_create_clickhouse(req, digest)
+                await self._file_create_clickhouse(req, digest)
         else:
-            self._file_create_clickhouse(req, digest)
+            await self._file_create_clickhouse(req, digest)
         set_root_span_dd_tags({"write_bytes": len(req.content)})
         return tsi.FileCreateRes(digest=digest)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._file_create_clickhouse")
-    def _file_create_clickhouse(self, req: tsi.FileCreateReq, digest: str) -> None:
+    async def _file_create_clickhouse(
+        self, req: tsi.FileCreateReq, digest: str
+    ) -> None:
         set_root_span_dd_tags({"storage_provider": "clickhouse"})
         chunks = [
             req.content[i : i + ch_settings.FILE_CHUNK_SIZE]
             for i in range(0, len(req.content), ch_settings.FILE_CHUNK_SIZE)
         ]
-        self._insert(
+        await self._insert_async(
             "files",
             data=[
                 (
@@ -1534,14 +1541,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._file_create_bucket")
-    def _file_create_bucket(
+    async def _file_create_bucket(
         self, req: tsi.FileCreateReq, digest: str, client: FileStorageClient
     ) -> None:
         set_root_span_dd_tags({"storage_provider": "bucket"})
-        target_file_storage_uri = store_in_bucket(
+        target_file_storage_uri = await store_in_bucket_async(
             client, key_for_project_digest(req.project_id, digest), req.content
         )
-        self._insert(
+        await self._insert_async(
             "files",
             data=[
                 (
@@ -2073,6 +2080,22 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         client.database = self._database
         return client
 
+    @property
+    def async_ch_client(self) -> AsyncCHClient:
+        if not hasattr(self._thread_local, "async_ch_client"):
+            self._thread_local.async_ch_client = self._mint_async_client()
+        return self._thread_local.async_ch_client
+
+    def _mint_async_client(self) -> AsyncCHClient:
+        client = clickhouse_connect.get_async_client(
+            host=self._host,
+            port=self._port,
+            user=self._user,
+            password=self._password,
+            secure=self._port == 8443,
+        )
+        return client
+
     @contextmanager
     def with_new_client(self) -> Iterator[None]:
         """Context manager to use a new client for operations.
@@ -2301,6 +2324,18 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 },
             )
             raise
+
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_async")
+    async def _insert_async(
+        self,
+        table: str,
+        data: Sequence[Sequence[Any]],
+        column_names: list[str],
+        settings: Optional[dict[str, Any]] = None,
+    ) -> QuerySummary:
+        return await self.async_ch_client.insert(
+            table, data=data, column_names=column_names, settings=settings
+        )
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call")
     def _insert_call(self, ch_call: CallCHInsertable) -> None:
