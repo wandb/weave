@@ -12,22 +12,10 @@ import requests
 from wandb import Artifact
 from wandb.apis.public import api as wb_public
 from wandb.sdk.lib.hashutil import b64_to_hex_id, hex_to_b64_id
-
+from weave_query import (artifact_fs, eager, engine_trace, errors, file_base,
+                         file_util, filesystem, memo, uris, urls, util,
+                         wandb_client_api)
 from weave_query import weave_types as types
-from weave_query import (
-    filesystem,
-    urls,
-    errors,
-    engine_trace,
-    artifact_fs,
-    eager,
-    file_base,
-    file_util,
-    memo,
-    uris,
-    wandb_client_api,
-    util,
-)
 from weave_query.wandb_interface import wandb_artifact_pusher
 
 if typing.TYPE_CHECKING:
@@ -101,7 +89,7 @@ def get_wandb_read_artifact(path: str):
     tracer = engine_trace.tracer()
     with tracer.trace("get_wandb_read_artifact"):
         try:
-            return wandb_client_api.wandb_public_api().artifact(path)
+            return wandb_client_api.wandb_public_api()._artifact(path)
         except wandb_client_api.WandbCommError:
             raise errors.WeaveArtifactVersionNotFound(
                 f"Could not find artifact with path {path} in W&B"
