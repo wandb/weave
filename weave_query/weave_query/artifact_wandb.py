@@ -101,7 +101,7 @@ def get_wandb_read_artifact(path: str):
     tracer = engine_trace.tracer()
     with tracer.trace("get_wandb_read_artifact"):
         try:
-            return wandb_client_api.wandb_public_api().artifact(path)
+            return wandb_client_api.wandb_public_api()._artifact(path)
         except wandb_client_api.WandbCommError:
             raise errors.WeaveArtifactVersionNotFound(
                 f"Could not find artifact with path {path} in W&B"
