@@ -959,6 +959,25 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
         return tsi.TableUpdateRes(digest=digest, updated_row_digests=updated_digests)
 
+    def table_create_from_digests(
+        self, req: tsi.TableCreateFromDigestsReq
+    ) -> tsi.TableCreateFromDigestsRes:
+        """Create a table by specifying row digests, instead actual rows"""
+        # Calculate table digest from row digests
+        table_hasher = hashlib.sha256()
+        for row_digest in req.row_digests:
+            table_hasher.update(row_digest.encode())
+        digest = table_hasher.hexdigest()
+
+        # Insert into tables table
+        self._insert(
+            "tables",
+            data=[(req.project_id, digest, req.row_digests)],
+            column_names=["project_id", "digest", "row_digests"],
+        )
+
+        return tsi.TableCreateFromDigestsRes(digest=digest)
+
     def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
         rows = list(self.table_query_stream(req))
         return tsi.TableQueryRes(rows=rows)
