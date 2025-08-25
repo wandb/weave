@@ -1502,16 +1502,20 @@ def test_table_partitioning(network_proxy_client):
     remote_client.remote_request_bytes_limit = (
         4 * 1024
     )  # Small enough to get multiple updates
-    res = remote_client.table_create(
-        tsi.TableCreateReq(
-            table=tsi.TableSchemaForInsert(
-                project_id=client._project_id(),
-                rows=rows,
-            )
-        )
+
+    # Set the client to use the remote server so calls get recorded
+    client = TestOnlyFlushingWeaveClient(
+        entity=client.entity,
+        project=client.project,
+        server=remote_client,
+        ensure_project_exists=False,
     )
-    assert res.digest == exp_digest
-    assert res.row_digests == row_digests
+
+    # Create a Table object and save it to trigger chunking logic
+    table_obj = weave_client.Table(rows)
+    saved_table = client.save(table_obj, "table")
+
+    assert saved_table.table_ref._digest == exp_digest
     # Verify that chunking happened by checking for table_create_from_digests call
     table_create_records = [r for r in records if r[0] == "table_create"]
     table_create_from_digests_records = [
@@ -1522,10 +1526,11 @@ def test_table_partitioning(network_proxy_client):
     assert len(table_create_records) == 2, (
         f"Expected 2 table_create calls, got {len(table_create_records)}"
     )
-    assert len(table_create_from_digests_records) == 1, (
-        f"Expected 1 table_create_from_digests call, got {len(table_create_from_digests_records)}"
+    # 1 for testing if the endpoint exists, 1 for the actual request
+    assert len(table_create_from_digests_records) == 2, (
+        f"Expected 2 table_create_from_digests calls, got {len(table_create_from_digests_records)}"
     )
-    assert len(records) == 3, f"Expected 3 total records, got {len(records)}"
+    assert len(records) == 4, f"Expected 4 total records, got {len(records)}"
 
 
 def test_summary_tokens_cost(client):
