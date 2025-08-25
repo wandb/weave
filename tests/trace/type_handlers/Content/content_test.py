@@ -498,3 +498,30 @@ class TestWeaveContent:
         assert content_text_no_ext.data == b""
         assert content_text_no_ext.extension == ".txt"  # Default for text
         assert content_text_no_ext.size == 0
+
+    def test_emoji_content(self):
+        doc = """
+My Awesome Emoji Document 👋
+This is a simple document to show how you can use emojis in Markdown. It's a great way to add some personality and visual interest to your text! 🥳
+
+I'm feeling pretty happy about it. 😄
+
+My Goals for Today 🚀
+Here is a list of things I want to accomplish:
+
+✅ Finish my first task.
+
+💡 Come up with a brilliant new idea.
+
+🍕 Grab a slice of pizza for lunch.
+
+🎉 Celebrate a small victory!
+
+That's all for now. Have a great day! ☀️
+"""
+        # First do it with the correct constructor
+        content = Content.from_text(doc, extension=".md")
+        assert content.mimetype == "text/markdown"
+        # Next guess from annotated value
+        content = Content._from_guess(doc, extension=".md")
+        assert content.mimetype == "text/markdown"
