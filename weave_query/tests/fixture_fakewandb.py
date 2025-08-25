@@ -9,7 +9,10 @@ from unittest import mock
 from urllib import parse
 
 import wandb
+
 import weave_query as weave
+from tests.util.tag_test_util import op_add_tag
+
 # Note: We're mocking out the whole io_service right now. This is too
 # high level and doesn't test the actual io implementation. We should
 # mock wandb_api instead probably.
@@ -20,8 +23,6 @@ from weave_query.artifact_wandb import (
     WeaveWBArtifactByIDURI,
     WeaveWBArtifactURI,
 )
-
-from tests.util.tag_test_util import op_add_tag
 
 TEST_TABLE_ARTIFACT_PATH = "testdata/wb_artifacits/test_res_1fwmcd3q:v0"
 ABS_TEST_TABLE_ARTIFACT_PATH = os.path.abspath(TEST_TABLE_ARTIFACT_PATH)
