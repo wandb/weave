@@ -1,12 +1,13 @@
 from typing import TYPE_CHECKING, Any, Union
 
 import pydantic
+from typing_extensions import TypeIs
 
 if TYPE_CHECKING:
     from pydantic.v1 import BaseModel as PydanticBaseModelV1
 
 
-def is_pydantic_v1_base_model(obj: Any) -> bool:
+def is_pydantic_v1_base_model(obj: Any) -> TypeIs[PydanticBaseModelV1]:
     try:
         from pydantic.v1 import BaseModel as PydanticBaseModelV1
 
