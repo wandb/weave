@@ -368,6 +368,9 @@ exclude = ["weave_query", "rules"]
 "!/weave/trace/**/*.py" = ["T201"]
 "!/tests/**/*.py" = ["RUF059"]
 
+[tool.ruff.format]
+docstring-code-format = true
+
 [tool.pyright]
 include = ["weave"]
 exclude = ["weave_query", "tests", "examples", "docs", "noxfile.py"]
