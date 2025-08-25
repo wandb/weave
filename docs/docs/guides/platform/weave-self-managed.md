@@ -59,6 +59,9 @@ To Install Altinity Operator for clickhouse follow the below steps:
   ```
 ### Deploy keeper into Kubernetes cluster:
 
+  Modify any parts related
+    1. PVC `storageClassName`
+
  `kubectl apply -f ch-keeper.yaml -n clickhouse`
 
  ```
@@ -96,16 +99,16 @@ spec:
           #     type: "RuntimeDefault"
 
           # Recommended for multiple nodes
-          # affinity:
-          #   podAntiAffinity:
-          #     requiredDuringSchedulingIgnoredDuringExecution:
-          #       - labelSelector:
-          #           matchExpressions:
-          #             - key: "app"
-          #               operator: In
-          #               values:
-          #                 - clickhouse-keeper
-          #         topologyKey: "kubernetes.io/hostname"
+          affinity:
+            podAntiAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - labelSelector:
+                    matchExpressions:
+                      - key: "app"
+                        operator: In
+                        values:
+                          - clickhouse-keeper
+                  topologyKey: "kubernetes.io/hostname"
 
           # Container configuration
           containers:
@@ -169,8 +172,10 @@ spec:
 ### Deploy ch-server into Kubernetes cluster:
 
     Modify any parts related
-    1. PVC `storageClassName`
-    2. Bucket configuration
+    1. Update `storageClassName`
+    2. Update node endpoints `<zookeeperpod>.<namespace>.svc.cluster.local`
+    3. Update host endpoints `<host><clickhouse-pod>.<namespace>.svc.cluster.local</host>`
+    2. Update `storage_configuration`
     3. Sizes of cache and other filesystems
     4. Password for `weave` user
 
@@ -210,16 +215,16 @@ spec:
           #     type: "RuntimeDefault"
 
           # Recommended for multiple nodes
-          # affinity:
-          #   podAntiAffinity:
-          #     requiredDuringSchedulingIgnoredDuringExecution:
-          #       - labelSelector:
-          #           matchExpressions:
-          #             - key: "app"
-          #               operator: In
-          #               values:
-          #                 - clickhouse-server
-          #         topologyKey: "kubernetes.io/hostname"
+          affinity:
+            podAntiAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - labelSelector:
+                    matchExpressions:
+                      - key: "app"
+                        operator: In
+                        values:
+                          - clickhouse-server
+                  topologyKey: "kubernetes.io/hostname"
 
           containers:
             - name: clickhouse
@@ -271,13 +276,13 @@ spec:
   configuration:
     # Refer to: https://clickhouse.com/docs/operations/server-configuration-parameters/settings#zookeeper
     zookeeper:
-      nodes:
-        - host: chk-wandb-keeper-0-0-0.clickhouse.svc.cluster.local
-          port: 2181
-        - host: chk-wandb-keeper-0-1-0.clickhouse.svc.cluster.local
-          port: 2181
-        - host: chk-wandb-keeper-0-2-0.clickhouse.svc.cluster.local
-          port: 2181
+      #nodes:
+      #  - host: chk-wandb-keeper-0-0-0.clickhouse.svc.cluster.local # Set zookeeper node endpoints
+      #    port: 2181
+      #  - host: chk-wandb-keeper-0-1-0.clickhouse.svc.cluster.local # Set zookeeper node endpoints
+      #    port: 2181
+      #  - host: chk-wandb-keeper-0-2-0.clickhouse.svc.cluster.local # Set zookeeper node endpoints
+      #    port: 2181
       # Other configurations
       # session_timeout_ms: 30000
       # operation_timeout_ms: 10000
@@ -336,15 +341,15 @@ spec:
             <weave_cluster>
               <shard>
                 <replica>
-                  <host>chi-wandb-clickhouse-0-0.clickhouse.svc.cluster.local</host>
+                  <host>chi-wandb-clickhouse-0-0.clickhouse.svc.cluster.local</host> # Update shard replica host
                   <port>9000</port>
                 </replica>
                 <replica>
-                  <host>chi-wandb-clickhouse-0-1.clickhouse.svc.cluster.local</host>
+                  <host>chi-wandb-clickhouse-0-1.clickhouse.svc.cluster.local</host> Update shard replica host
                   <port>9000</port>
                 </replica>
                 <replica>
-                  <host>chi-wandb-clickhouse-0-2.clickhouse.svc.cluster.local</host>
+                  <host>chi-wandb-clickhouse-0-2.clickhouse.svc.cluster.local</host> Update shard replica host
                   <port>9000</port>
                 </replica>
               </shard>
@@ -357,7 +362,7 @@ spec:
                 <disks>
                     <s3_disk>
                         <type>s3</type>
-                        <endpoint>https://storage.googleapis.com/wandbench-ch-1/s3_disk/{replica}</endpoint>
+                        <endpoint>https://storage.googleapis.com/wandbench-ch-1/{replica}</endpoint>
                         <metadata_path>/var/lib/clickhouse/disks/s3_disk/</metadata_path>
                         <use_environment_credentials>true</use_environment_credentials>
                         <s3_use_virtual_hosted_style>false</s3_use_virtual_hosted_style>
@@ -405,7 +410,7 @@ NAME                                                        READY   STATUS    RE
 ch-operator-altinity-clickhouse-operator-56d6c46f49-nqqv7   2/2     Running   0          158m
 chi-wandb-clickhouse-0-0-0                                  1/1     Running   0          2m10s
 chi-wandb-clickhouse-0-1-0                                  1/1     Running   0          79s
-chi-wandb-clickhouse-0-2-0                                  0/1     Running   0          15s
+chi-wandb-clickhouse-0-2-0                                  1/1     Running   0          15s
 chk-wandb-keeper-0-0-0                                      1/1     Running   0          137m
 chk-wandb-keeper-0-1-0                                      1/1     Running   0          137m
 chk-wandb-keeper-0-2-0                                      1/1     Running   0          137m
