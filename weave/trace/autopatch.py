@@ -50,6 +50,7 @@ class AutopatchSettings(BaseModel):
     notdiamond: IntegrationSettings = Field(default_factory=IntegrationSettings)
     openai: IntegrationSettings = Field(default_factory=IntegrationSettings)
     openai_agents: IntegrationSettings = Field(default_factory=IntegrationSettings)
+    openai_realtime: IntegrationSettings = Field(default_factory=IntegrationSettings)
     vertexai: IntegrationSettings = Field(default_factory=IntegrationSettings)
     chatnvidia: IntegrationSettings = Field(default_factory=IntegrationSettings)
     smolagents: IntegrationSettings = Field(default_factory=IntegrationSettings)
@@ -89,6 +90,9 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     from weave.integrations.notdiamond.tracing import get_notdiamond_patcher
     from weave.integrations.openai.openai_sdk import get_openai_patcher
     from weave.integrations.openai_agents.openai_agents import get_openai_agents_patcher
+    from weave.integrations.openai_realtime.openai_realtime_sdk import (
+        get_websocket_patcher,
+    )
     from weave.integrations.smolagents.smolagents_sdk import get_smolagents_patcher
     from weave.integrations.verdict.verdict_sdk import get_verdict_patcher
     from weave.integrations.vertexai.vertexai_sdk import get_vertexai_patcher
@@ -112,6 +116,7 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     get_huggingface_patcher(settings.huggingface).attempt_patch()
     get_smolagents_patcher(settings.smolagents).attempt_patch()
     get_openai_agents_patcher(settings.openai_agents).attempt_patch()
+    get_websocket_patcher(settings.openai_realtime).attempt_patch()
     get_verdict_patcher(settings.verdict).attempt_patch()
 
     langchain_patcher.attempt_patch()
@@ -145,6 +150,9 @@ def reset_autopatch() -> None:
     from weave.integrations.notdiamond.tracing import get_notdiamond_patcher
     from weave.integrations.openai.openai_sdk import get_openai_patcher
     from weave.integrations.openai_agents.openai_agents import get_openai_agents_patcher
+    from weave.integrations.openai_realtime.openai_realtime_sdk import (
+        get_websocket_patcher,
+    )
     from weave.integrations.smolagents.smolagents_sdk import get_smolagents_patcher
     from weave.integrations.verdict.verdict_sdk import get_verdict_patcher
     from weave.integrations.vertexai.vertexai_sdk import get_vertexai_patcher
@@ -168,6 +176,7 @@ def reset_autopatch() -> None:
     get_huggingface_patcher().undo_patch()
     get_smolagents_patcher().undo_patch()
     get_openai_agents_patcher().undo_patch()
+    get_websocket_patcher().undo_patch()
     get_verdict_patcher().undo_patch()
 
     langchain_patcher.undo_patch()
