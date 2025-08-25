@@ -7,7 +7,7 @@ if TYPE_CHECKING:
     from pydantic.v1 import BaseModel as PydanticBaseModelV1
 
 
-def is_pydantic_v1_base_model(obj: Any) -> TypeIs[PydanticBaseModelV1]:
+def is_pydantic_v1_base_model(obj: Any) -> TypeIs["PydanticBaseModelV1"]:
     try:
         from pydantic.v1 import BaseModel as PydanticBaseModelV1
 
