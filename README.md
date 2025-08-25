@@ -5,6 +5,7 @@
 [![Download Stats](https://img.shields.io/pypi/dm/weave)](https://pypistats.org/packages/weave)
 [![Github Checks](https://img.shields.io/github/check-runs/wandb/weave/master
 )](https://github.com/wandb/weave)
+[![codecov](https://codecov.io/gh/wandb/weave/graph/badge.svg?token=YOUR_TOKEN)](https://codecov.io/gh/wandb/weave)
 
 Weave is a toolkit for developing Generative AI applications, built by [Weights & Biases](https://wandb.ai/).
 
@@ -28,7 +29,7 @@ Our documentation site can be found [here](https://wandb.me/weave).
 
 ## Prerequisites
 
-- Python 3.8 or higher
+- Python 3.9 or higher
 - A [Weights & Biases account](https://wandb.ai/signup) (free tier available)
 
 
