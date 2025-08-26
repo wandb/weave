@@ -36,7 +36,7 @@ class WeaveWandbAuthenticationException(Exception): ...
 def get_entity_project_from_project_name(project_name: str) -> tuple[str, str]:
     if not project_name or not project_name.strip():
         raise ValueError("project_name must be non-empty")
-    
+
     fields = project_name.split("/")
     if len(fields) == 1:
         api = wandb.Api()
@@ -77,7 +77,7 @@ def init_weave(
 ) -> weave_client.WeaveClient:
     if not project_name or not project_name.strip():
         raise ValueError("project_name must be non-empty")
-    
+
     current_client = weave_client_context.get_weave_client()
     if current_client is not None:
         # TODO: Prob should move into settings
