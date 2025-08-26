@@ -454,6 +454,8 @@ Weave automatically handles `mp3`, `wav`, `flac`, `ogg` and `m4a` file types. Yo
 
 ### Quickstart
 
+The following code snippet generates a sine wave, records it, and then logs the audio to Weave:
+
 <Tabs groupId="package-manager" queryString>
   <TabItem value="pip" label="pip" default>
     ```bash
