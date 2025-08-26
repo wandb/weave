@@ -161,9 +161,12 @@ print(deepseek_model.predict(test_question))
 
 ## Step 4: Evaluate model performance
 
-Evaluate how well a model performs on a Q&A task:
+Evaluate how well a model performs on a Q&A task using Weave's built-in `EvaluationLogger`. This provides structured evaluation tracking with automatic aggregation, token usage capture, and rich comparison features in the UI:
 
 ```python
+from typing import Optional
+from weave import EvaluationLogger
+
 # Create a simple dataset
 dataset = [
     {"question": "What is 2 + 2?", "expected": "4"},
@@ -184,15 +187,25 @@ def accuracy_scorer(expected: str, output: str, expected_one_of: Optional[list[s
     
     return {"correct": is_correct, "score": 1.0 if is_correct else 0.0}
 
-# Evaluate a model
-@weave.op()
-def evaluate_model(model: InferenceModel, dataset: list[dict]) -> dict:
-    """Run evaluation on a dataset."""
-    scores = []
+# Evaluate a model using Weave's EvaluationLogger
+def evaluate_model(model: InferenceModel, dataset: list[dict]):
+    """Run evaluation on a dataset using Weave's built-in evaluation framework."""
+    # Initialize EvaluationLogger BEFORE calling the model to capture token usage
+    # This is especially important for W&B Inference to track costs
+    eval_logger = EvaluationLogger(
+        model=model.model_name,
+        dataset="qa_dataset"
+    )
     
     for example in dataset:
         # Get model prediction
         output = model.predict(example["question"])
+        
+        # Log the prediction
+        pred_logger = eval_logger.log_prediction(
+            inputs={"question": example["question"]},
+            output=output
+        )
         
         # Score the output
         score = accuracy_scorer(
@@ -200,20 +213,33 @@ def evaluate_model(model: InferenceModel, dataset: list[dict]) -> dict:
             output=output,
             expected_one_of=example.get("expected_one_of")
         )
-        scores.append(score["score"])
+        
+        # Log the score
+        pred_logger.log_score(
+            scorer="accuracy",
+            score=score["score"]
+        )
+        
+        # Finish logging for this prediction
+        pred_logger.finish()
     
-    return {
-        "model": model.model_name,
-        "accuracy": sum(scores) / len(scores),
-        "total_correct": sum(scores),
-        "total_examples": len(dataset)
-    }
+    # Log summary - Weave automatically aggregates the accuracy scores
+    eval_logger.log_summary()
+    print(f"Evaluation complete for {model.model_name}. View results in the Weave UI.")
 
-# Run evaluation
-results = evaluate_model(llama_model, dataset)
-print(f"Model: {results['model']}")
-print(f"Accuracy: {results['accuracy']:.2%}")
-print(f"Correct: {results['total_correct']}/{results['total_examples']}")
+# Run evaluation for a single model
+evaluate_model(llama_model, dataset)
+
+# Compare multiple models - a key feature of Weave's evaluation framework
+models_to_compare = [
+    InferenceModel(model_name="meta-llama/Llama-3.1-8B-Instruct"),
+    InferenceModel(model_name="deepseek-ai/DeepSeek-V3-0324"),
+]
+
+for model in models_to_compare:
+    evaluate_model(model, dataset)
+
+# In the Weave UI, navigate to the Evals tab to compare results across models
 ```
 
 After running these examples, you'll see links in your terminal. Click any link to view traces in the Weave UI.
@@ -221,9 +247,11 @@ After running these examples, you'll see links in your terminal. Click any link 
 In the Weave UI, you can:
 - See a timeline of all your LLM calls
 - Inspect inputs and outputs for each operation
-- View token usage and estimated costs
+- View token usage and estimated costs (automatically captured by EvaluationLogger)
 - Analyze latency and performance metrics
-- Compare different runs
+- Navigate to the **Evals** tab to see aggregated evaluation results
+- Use the **Compare** feature to analyze performance across different models
+- Page through specific examples to see how different models performed on the same inputs
 
 ## Available models
 
