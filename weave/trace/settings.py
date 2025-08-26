@@ -22,7 +22,7 @@ If True, prints a link to the Weave UI when calling a weave op.
 import os
 from contextvars import ContextVar
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any, Literal, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, PrivateAttr
 
@@ -58,6 +58,16 @@ class UserSettings(BaseModel):
     Controls the log level of the weave logger.
     Valid values are: DEBUG, INFO, WARNING, ERROR, CRITICAL
     Can be overridden with the environment variable `WEAVE_LOG_LEVEL`"""
+
+    display_viewer: Literal["auto", "rich", "print"] = "auto"
+    """Sets the display viewer for console output.
+
+    Controls which viewer implementation to use for display operations.
+    Valid values are: auto, rich, print
+    - auto: Automatically selects rich if available, otherwise falls back to print
+    - rich: Uses the rich library for enhanced terminal output
+    - print: Uses basic print functions for output
+    Can be overridden with the environment variable `WEAVE_DISPLAY_VIEWER`"""
 
     capture_code: bool = True
     """Toggles code capture for ops.
@@ -196,6 +206,15 @@ def should_print_call_link() -> bool:
 
 def log_level() -> str:
     return _optional_str("log_level") or "INFO"
+
+
+def display_viewer() -> str:
+    """Returns the configured display viewer.
+
+    Returns:
+        The display viewer to use (auto, rich, or print).
+    """
+    return _optional_str("display_viewer") or "auto"
 
 
 def should_capture_code() -> bool:

@@ -54,9 +54,12 @@ def is_valid_b64(input: str | bytes) -> bool:
     if len(input) == 0:
         return False
 
-    # Normalize to bytes
+    # Normalize to bytes and verify it is not unicode
     if isinstance(input, str):
-        input = input.encode("ascii")
+        try:
+            input = input.encode("ascii")
+        except UnicodeEncodeError:
+            return False
     try:
         base64.b64decode(input, validate=True)
 

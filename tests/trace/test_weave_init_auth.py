@@ -82,6 +82,18 @@ def test_get_entity_project_from_project_name_success(
     "case",
     [
         ExceptionCase(
+            project_name="",
+            expected_match="project_name must be non-empty",
+        ),
+        ExceptionCase(
+            project_name="   ",
+            expected_match="project_name must be non-empty",
+        ),
+        ExceptionCase(
+            project_name="\t\n",
+            expected_match="project_name must be non-empty",
+        ),
+        ExceptionCase(
             project_name="entity/project/extra",
             expected_match="project_name must be of the form",
         ),
