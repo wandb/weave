@@ -109,19 +109,17 @@ def get_client() -> weave_client.WeaveClient | None:
 
 
 def publish(obj: Any, name: str | None = None) -> ObjectRef:
-    """Save and version a python object.
+    """Save and version a Python object.
 
-    If an object with name already exists, and the content hash of obj does
-    not match the latest version of that object, a new version will be created.
-
-    TODO: Need to document how name works with this change.
+    Weave creates a new version of the object if the object's name already exists and its content hash does
+    not match the latest version of that object.
 
     Args:
         obj: The object to save and version.
         name: The name to save the object under.
 
     Returns:
-        A weave Ref to the saved object.
+        A Weave Ref to the saved object.
     """
     client = weave_client_context.require_weave_client()
 
@@ -163,16 +161,14 @@ def publish(obj: Any, name: str | None = None) -> ObjectRef:
 
 
 def ref(location: str) -> ObjectRef:
-    """Construct a Ref to a Weave object.
-
-    TODO: what happens if obj does not exist
+    """Creates a Ref to an existing Weave object. This does not directly retrieve
+    the object but allows you to pass it to other Weave API functions.
 
     Args:
-        location: A fully-qualified weave ref URI, or if weave.init() has been called, "name:version" or just "name" ("latest" will be used for version in this case).
-
+        location: A Weave Ref URI, or if `weave.init()` has been called, `name:version` or `name`. If no version is provided, `latest` is used.
 
     Returns:
-        A weave Ref to the object.
+        A Weave Ref to the object.
     """
     if "://" not in location:
         client = weave_client_context.get_weave_client()
