@@ -178,6 +178,15 @@ def tests(session, shard):
         "--cov-branch",
     ]
 
+    # Memray not working with trace_server shard atm
+    if shard != "trace_server":
+        pytest_args.extend(
+            [
+                "--memray",
+                "--most-allocations=5",
+            ]
+        )
+
     # Handle trace sharding: run every 3rd test starting at different offsets
     if shard in trace_server_shards:
         shard_id = int(shard[-1]) - 1
