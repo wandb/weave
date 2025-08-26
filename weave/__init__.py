@@ -1,6 +1,7 @@
 """The top-level functions and classes for working with Weave."""
 
 from weave import version
+from weave.client.init import init
 from weave.trace.api import *
 
 __version__ = version.VERSION

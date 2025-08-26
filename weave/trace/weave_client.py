@@ -666,7 +666,7 @@ class WeaveClient:
         ):
             return placeholder_call()
 
-        from weave.trace.api import _global_attributes, _global_postprocess_inputs
+        from weave.client.init import _global_attributes, _global_postprocess_inputs
 
         if isinstance(op, str):
             if op not in self._anonymous_ops:
@@ -844,7 +844,7 @@ class WeaveClient:
         ):
             return None
 
-        from weave.trace.api import _global_postprocess_output
+        from weave.client.init import _global_postprocess_output
 
         ended_at = datetime.datetime.now(tz=datetime.timezone.utc)
         call.ended_at = ended_at
