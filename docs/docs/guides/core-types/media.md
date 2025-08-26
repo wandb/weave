@@ -373,7 +373,7 @@ csv_result = load_document("sample_data.csv")
 
 ### Example
 
-Here's an illustrative example of using documenting logging withing a RAG (Retrieval-Augmented Generation) project:
+This example demonstrates how to log documents within a Retrieval-Augmented Generation (RAG) system:
 
 <Tabs groupId="package-manager" queryString>
   <TabItem value="pip" label="pip" default>
