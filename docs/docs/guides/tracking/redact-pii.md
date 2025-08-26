@@ -96,9 +96,9 @@ from weave.utils import sanitize
 client = weave.init("my-project")
 
 # Add custom keys to redact
-sanitize.REDACT_KEYS.add("token")
-sanitize.REDACT_KEYS.add("client_id")
-sanitize.REDACT_KEYS.add("whatever_else")
+sanitize.add_redact_key("token")
+sanitize.add_redact_key("client_id")
+sanitize.add_redact_key("whatever_else")
 
 token = "secret_token_123"
 client_id = "123"
@@ -118,6 +118,24 @@ When viewed in the Weave UI, the values of `token`, `client_id`, and `whatever_e
 token = "REDACTED"
 client_id = "REDACTED"
 whatever_else = "REDACTED"
+```
+
+### Managing redacted keys
+
+The sanitize module provides additional functions to manage redacted keys:
+
+```python
+from weave.utils import sanitize
+
+# Get the current list of redacted keys
+current_keys = sanitize.get_redact_keys()
+print(current_keys)  # {'api_key', 'auth_headers', 'authorization', 'token', 'client_id', 'whatever_else'}
+
+# Remove a key from the redaction list (if needed)
+sanitize.remove_redact_key("whatever_else")
+
+# Check if a specific key will be redacted (case-insensitive)
+will_redact = sanitize.should_redact("TOKEN")  # Returns True
 ```
 
 ## Usage information

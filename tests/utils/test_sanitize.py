@@ -3,23 +3,20 @@
 from weave.utils import sanitize
 
 
-def test_redact_keys_is_mutable_set() -> None:
-    """Test that REDACT_KEYS is a mutable set that can be extended."""
-    # Verify REDACT_KEYS is a set
-    assert isinstance(sanitize.REDACT_KEYS, set)
-    
-    # Verify default keys are present
-    assert "api_key" in sanitize.REDACT_KEYS
-    assert "auth_headers" in sanitize.REDACT_KEYS
-    assert "authorization" in sanitize.REDACT_KEYS
-    
+def test_add_redact_key() -> None:
+    """Test the add_redact_key API function."""
     # Store original keys to restore later
-    original_keys = sanitize.REDACT_KEYS.copy()
+    original_keys = sanitize.get_redact_keys()
     
     try:
-        # Test adding new keys
-        sanitize.REDACT_KEYS.add("token")
-        sanitize.REDACT_KEYS.add("client_id")
+        # Add new keys using the API
+        sanitize.add_redact_key("token")
+        sanitize.add_redact_key("CLIENT_ID")  # Test case normalization
+        
+        # Verify keys were added (case normalized to lowercase)
+        current_keys = sanitize.get_redact_keys()
+        assert "token" in current_keys
+        assert "client_id" in current_keys
         
         # Test that should_redact works with new keys (case insensitive)
         assert sanitize.should_redact("token") is True
@@ -33,7 +30,68 @@ def test_redact_keys_is_mutable_set() -> None:
         
     finally:
         # Restore original keys to avoid affecting other tests
-        sanitize.REDACT_KEYS = original_keys
+        sanitize._REDACT_KEYS = original_keys
+
+
+def test_remove_redact_key() -> None:
+    """Test the remove_redact_key API function."""
+    # Store original keys to restore later
+    original_keys = sanitize.get_redact_keys()
+    
+    try:
+        # Add a test key
+        sanitize.add_redact_key("temporary_key")
+        assert sanitize.should_redact("temporary_key") is True
+        
+        # Remove the key
+        sanitize.remove_redact_key("TEMPORARY_KEY")  # Test case normalization
+        assert sanitize.should_redact("temporary_key") is False
+        
+        # Verify default keys are still present
+        assert sanitize.should_redact("api_key") is True
+        assert sanitize.should_redact("auth_headers") is True
+        assert sanitize.should_redact("authorization") is True
+        
+    finally:
+        # Restore original keys
+        sanitize._REDACT_KEYS = original_keys
+
+
+def test_get_redact_keys() -> None:
+    """Test that get_redact_keys returns a copy."""
+    # Get a copy of the keys
+    keys_copy = sanitize.get_redact_keys()
+    
+    # Verify it contains the default keys
+    assert "api_key" in keys_copy
+    assert "auth_headers" in keys_copy
+    assert "authorization" in keys_copy
+    
+    # Verify it's a copy (modifying it doesn't affect the original)
+    keys_copy.add("test_key")
+    assert "test_key" in keys_copy
+    assert "test_key" not in sanitize.get_redact_keys()
+
+
+def test_backward_compatibility() -> None:
+    """Test that REDACT_KEYS is still accessible for backward compatibility."""
+    # Store original keys to restore later
+    original_keys = sanitize.get_redact_keys()
+    
+    try:
+        # Test that REDACT_KEYS is still accessible and modifiable
+        assert isinstance(sanitize.REDACT_KEYS, set)
+        
+        # Test adding via the old API (direct set modification)
+        sanitize.REDACT_KEYS.add("legacy_key")
+        assert sanitize.should_redact("legacy_key") is True
+        
+        # Verify the new API sees the change
+        assert "legacy_key" in sanitize.get_redact_keys()
+        
+    finally:
+        # Restore original keys
+        sanitize._REDACT_KEYS = original_keys
 
 
 def test_should_redact_case_insensitive() -> None:
