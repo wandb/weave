@@ -20,6 +20,12 @@ from weave.trace.op import op
 from weave.trace.refs import ObjectRef
 from weave.trace.vals import WeaveObject
 
+# Provider constants
+PROVIDER_OPENAI = "openai"
+PROVIDER_BEDROCK = "bedrock"
+PROVIDER_ANTHROPIC = "anthropic"
+PROVIDER_GOOGLE = "google"
+
 
 class Message(TypedDict):
     role: str
@@ -59,6 +65,122 @@ def extract_placeholders(text: str) -> list[str]:
         if name not in unique:
             unique.append(name)
     return unique
+
+
+def infer_provider_from_model(model: str) -> str:
+    """Infer provider from model name."""
+    model_lower = model.lower()
+    if "gpt" in model_lower or "o1" in model_lower or "dall-e" in model_lower:
+        return PROVIDER_OPENAI
+    elif "claude" in model_lower:
+        return PROVIDER_ANTHROPIC
+    elif "gemini" in model_lower or "palm" in model_lower:
+        return PROVIDER_GOOGLE
+    elif "titan" in model_lower or "nova" in model_lower:
+        # Amazon's own models
+        return PROVIDER_BEDROCK
+    # Add more patterns as needed
+    return PROVIDER_OPENAI  # default
+
+
+def infer_provider_from_content(content: Any) -> str:
+    """Infer provider from content structure."""
+    if isinstance(content, list) and len(content) > 0:
+        first_item = content[0]
+        if isinstance(first_item, dict):
+            # Check for OpenAI multimodal format first (has "type" key)
+            if "type" in first_item:
+                return PROVIDER_OPENAI
+            # Bedrock format: content is [{"text": "..."}] without "type"
+            elif "text" in first_item:
+                return PROVIDER_BEDROCK
+    return PROVIDER_OPENAI  # default
+
+
+def convert_openai_to_bedrock(messages: list) -> list:
+    """Convert OpenAI format messages to Bedrock format."""
+    bedrock_messages = []
+    for msg in messages:
+        bedrock_msg = {"role": msg["role"]}
+        
+        content = msg.get("content", "")
+        if isinstance(content, str):
+            # Convert string content to Bedrock format
+            bedrock_msg["content"] = [{"text": content}]
+        elif isinstance(content, list):
+            # Check if already in correct format
+            if content and isinstance(content[0], dict) and "text" in content[0]:
+                # Already in Bedrock format
+                bedrock_msg["content"] = content
+            else:
+                # Assume it's OpenAI multimodal format, keep as is for now
+                bedrock_msg["content"] = content
+        else:
+            # Keep as is
+            bedrock_msg["content"] = content
+        
+        # Copy over any other fields
+        for key, value in msg.items():
+            if key not in ("role", "content"):
+                bedrock_msg[key] = value
+                
+        bedrock_messages.append(bedrock_msg)
+    return bedrock_messages
+
+
+def convert_bedrock_to_openai(messages: list) -> list:
+    """Convert Bedrock format messages to OpenAI format."""
+    openai_messages = []
+    for msg in messages:
+        openai_msg = {"role": msg["role"]}
+        
+        content = msg.get("content", "")
+        if isinstance(content, list):
+            # Check if it's simple text format
+            if len(content) == 1 and isinstance(content[0], dict) and "text" in content[0]:
+                # Convert single text item to string
+                openai_msg["content"] = content[0]["text"]
+            else:
+                # Keep complex content as is (multimodal)
+                openai_msg["content"] = content
+        else:
+            # Already a string or other format
+            openai_msg["content"] = content
+        
+        # Copy over any other fields
+        for key, value in msg.items():
+            if key not in ("role", "content"):
+                openai_msg[key] = value
+                
+        openai_messages.append(openai_msg)
+    return openai_messages
+
+
+def validate_bedrock_format(messages: list) -> bool:
+    """Validate that messages are in correct Bedrock format."""
+    if not isinstance(messages, list):
+        return False
+    
+    for msg in messages:
+        if not isinstance(msg, dict):
+            return False
+        if "role" not in msg or "content" not in msg:
+            return False
+        
+        content = msg["content"]
+        # Bedrock format requires content to be a list
+        if not isinstance(content, list):
+            return False
+        
+        # Each content item should be a dict with at least one key like 'text', 'image', etc.
+        for item in content:
+            if not isinstance(item, dict):
+                return False
+            # Should have at least one content type key
+            if not any(key in item for key in ["text", "image", "toolUse", "toolResult"]):
+                return False
+    
+    return True
 
 
 def color_content(content: str, values: dict) -> str:
@@ -119,7 +241,72 @@ class MessagesPrompt(Prompt):
         return m
 
     def format(self, **kwargs: Any) -> list:
-        return [self.format_message(m, **kwargs) for m in self.messages]
+        """Auto-detect provider and format accordingly."""
+        # Try to detect provider
+        provider = None
+        
+        # Check message content structure first (most reliable)
+        if self.messages:
+            for msg in self.messages:
+                if "content" in msg:
+                    provider = infer_provider_from_content(msg["content"])
+                    if provider != PROVIDER_OPENAI:
+                        # Found non-OpenAI format, use it
+                        break
+        
+        # Default to OpenAI if no specific format detected
+        if provider is None:
+            provider = PROVIDER_OPENAI
+            
+        return self.format_for_provider(provider, **kwargs)
+    
+    def format_for_provider(self, provider: str, **kwargs: Any) -> list:
+        """Format messages for a specific provider."""
+        formatted_messages = [self.format_message(m, **kwargs) for m in self.messages]
+        
+        if provider == PROVIDER_BEDROCK:
+            return self._convert_to_bedrock_format(formatted_messages)
+        elif provider == PROVIDER_OPENAI:
+            return formatted_messages  # Already in OpenAI format
+        elif provider == PROVIDER_ANTHROPIC:
+            # Anthropic uses similar format to OpenAI
+            return formatted_messages
+        elif provider == PROVIDER_GOOGLE:
+            # Google uses similar format to OpenAI for now
+            return formatted_messages
+        else:
+            # Unknown provider, default to OpenAI format
+            return formatted_messages
+    
+    def _convert_to_bedrock_format(self, messages: list) -> list:
+        """Convert messages to Bedrock format."""
+        bedrock_messages = []
+        for msg in messages:
+            bedrock_msg = {"role": msg["role"]}
+            
+            content = msg.get("content", "")
+            if isinstance(content, str):
+                # Convert string content to Bedrock format
+                bedrock_msg["content"] = [{"text": content}]
+            elif isinstance(content, list):
+                # Check if already in correct format
+                if content and isinstance(content[0], dict) and "text" in content[0]:
+                    # Already in Bedrock format
+                    bedrock_msg["content"] = content
+                else:
+                    # Need to convert - assume it's a list of other items
+                    bedrock_msg["content"] = content
+            else:
+                # Keep as is
+                bedrock_msg["content"] = content
+            
+            # Copy over any other fields
+            for key, value in msg.items():
+                if key not in ("role", "content"):
+                    bedrock_msg[key] = value
+                    
+            bedrock_messages.append(bedrock_msg)
+        return bedrock_messages
 
     @classmethod
     def from_obj(cls, obj: WeaveObject) -> Self:
@@ -156,6 +343,8 @@ class EasyPrompt(UserList, Prompt):
             config.update(kwargs)
             kwargs = {"config": config, "requirements": requirements}
         super(Object, self).__init__(name=name, description=description, **kwargs)
+        self.config = config
+        self.requirements = requirements
         self._values = {}
         if content is not None:
             if isinstance(content, (str, dict)):
@@ -217,11 +406,14 @@ class EasyPrompt(UserList, Prompt):
     def placeholders(self) -> list[str]:
         all_placeholders: list[str] = []
         for message in self.data:
-            # TODO: Support placeholders in image messages?
-            placeholders = extract_placeholders(message["content"])
-            all_placeholders.extend(
-                p for p in placeholders if p not in all_placeholders
-            )
+            content = message.get("content", "")
+            # Extract placeholders from string content
+            if isinstance(content, str):
+                placeholders = extract_placeholders(content)
+                all_placeholders.extend(
+                    p for p in placeholders if p not in all_placeholders
+                )
+            # TODO: Support placeholders in list/multimodal content
         return all_placeholders
 
     @property
@@ -272,6 +464,91 @@ class EasyPrompt(UserList, Prompt):
         self._values.update(kwargs)
         return self
 
+    def format(self, **kwargs: Any) -> list[Message]:
+        """Auto-detect provider and format accordingly."""
+        # Bind any provided values
+        prompt = self.bind(**kwargs) if kwargs else self
+        
+        # Try to detect provider
+        provider = None
+        
+        # 1. Check explicit provider in config
+        if "provider" in self.config:
+            provider = self.config["provider"]
+        
+        # 2. Check model in config and infer
+        elif "model" in self.config:
+            provider = infer_provider_from_model(self.config["model"])
+        
+        # 3. Check message content structure
+        elif self.data:
+            for msg in self.data:
+                if "content" in msg:
+                    provider = infer_provider_from_content(msg["content"])
+                    if provider != PROVIDER_OPENAI:
+                        # Found non-OpenAI format, use it
+                        break
+        
+        # 4. Default to OpenAI
+        if provider is None:
+            provider = PROVIDER_OPENAI
+            
+        return prompt.format_for_provider(provider)
+    
+    def format_for_provider(self, provider: str, **kwargs: Any) -> list[Message]:
+        """Format messages for a specific provider."""
+        # Bind any provided values
+        prompt = self.bind(**kwargs) if kwargs else self
+        
+        # Get the messages with placeholders filled in
+        messages = []
+        for i in range(len(prompt.data)):
+            messages.append(prompt[i])  # This uses __getitem__ which fills placeholders
+        
+        if provider == PROVIDER_BEDROCK:
+            return self._convert_to_bedrock_format(messages)
+        elif provider == PROVIDER_OPENAI:
+            return messages  # Already in OpenAI format
+        elif provider == PROVIDER_ANTHROPIC:
+            # Anthropic uses similar format to OpenAI
+            return messages
+        elif provider == PROVIDER_GOOGLE:
+            # Google uses similar format to OpenAI for now
+            return messages
+        else:
+            # Unknown provider, default to OpenAI format
+            return messages
+    
+    def _convert_to_bedrock_format(self, messages: list) -> list:
+        """Convert messages to Bedrock format."""
+        bedrock_messages = []
+        for msg in messages:
+            bedrock_msg = {"role": msg["role"]}
+            
+            content = msg.get("content", "")
+            if isinstance(content, str):
+                # Convert string content to Bedrock format
+                bedrock_msg["content"] = [{"text": content}]
+            elif isinstance(content, list):
+                # Check if already in correct format
+                if content and isinstance(content[0], dict) and "text" in content[0]:
+                    # Already in Bedrock format
+                    bedrock_msg["content"] = content
+                else:
+                    # Need to convert - assume it's a list of other items
+                    bedrock_msg["content"] = content
+            else:
+                # Keep as is
+                bedrock_msg["content"] = content
+            
+            # Copy over any other fields
+            for key, value in msg.items():
+                if key not in ("role", "content"):
+                    bedrock_msg[key] = value
+                    
+            bedrock_messages.append(bedrock_msg)
+        return bedrock_messages
+
     def __call__(self, *args: Any, **kwargs: Any) -> list[Message]:
         if len(args) == 1 and len(kwargs) == 0 and isinstance(args[0], dict):
             kwargs = args[0]
@@ -297,19 +574,26 @@ class EasyPrompt(UserList, Prompt):
         if isinstance(key, SupportsIndex):
             int_index = key.__index__()
             message = self.data[int_index].copy()
-            placeholders = extract_placeholders(message["content"])
-            values = {}
-            for placeholder in placeholders:
-                if placeholder in self._values:
-                    values[placeholder] = self._values[placeholder]
-                elif (
-                    placeholder in self.requirements
-                    and "default" in self.requirements[placeholder]
-                ):
-                    values[placeholder] = self.requirements[placeholder]["default"]
-                else:
-                    values[placeholder] = "{" + placeholder + "}"
-            message["content"] = message["content"].format(**values)
+            content = message.get("content", "")
+            
+            # Only process placeholders if content is a string
+            if isinstance(content, str):
+                placeholders = extract_placeholders(content)
+                values = {}
+                for placeholder in placeholders:
+                    if placeholder in self._values:
+                        values[placeholder] = self._values[placeholder]
+                    elif (
+                        placeholder in self.requirements
+                        and "default" in self.requirements[placeholder]
+                    ):
+                        values[placeholder] = self.requirements[placeholder]["default"]
+                    else:
+                        values[placeholder] = "{" + placeholder + "}"
+                message["content"] = content.format(**values)
+            # For list content (multimodal), we could process placeholders in text items
+            # but for now just return as is
+            
             return message
         elif isinstance(key, slice):
             new_prompt = Prompt()
