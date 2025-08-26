@@ -64,6 +64,16 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     if settings.disable_autopatch:
         return
 
+    # Defer OpenAI imports
+    if settings.openai.enabled:
+        from weave.integrations.openai.openai_sdk import get_openai_patcher
+        get_openai_patcher(settings.openai).attempt_patch()
+    
+    if settings.openai_agents.enabled:
+        from weave.integrations.openai_agents.openai_agents import get_openai_agents_patcher
+        get_openai_agents_patcher(settings.openai_agents).attempt_patch()
+    
+    # Import and patch other integrations as before
     from weave.integrations.anthropic.anthropic_sdk import get_anthropic_patcher
     from weave.integrations.autogen import get_autogen_patcher
     from weave.integrations.cerebras.cerebras_sdk import get_cerebras_patcher
@@ -87,13 +97,10 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     from weave.integrations.mcp import get_mcp_client_patcher, get_mcp_server_patcher
     from weave.integrations.mistral.mistral_sdk import get_mistral_patcher
     from weave.integrations.notdiamond.tracing import get_notdiamond_patcher
-    from weave.integrations.openai.openai_sdk import get_openai_patcher
-    from weave.integrations.openai_agents.openai_agents import get_openai_agents_patcher
     from weave.integrations.smolagents.smolagents_sdk import get_smolagents_patcher
     from weave.integrations.verdict.verdict_sdk import get_verdict_patcher
     from weave.integrations.vertexai.vertexai_sdk import get_vertexai_patcher
 
-    get_openai_patcher(settings.openai).attempt_patch()
     get_mistral_patcher(settings.mistral).attempt_patch()
     get_mcp_server_patcher(settings.mcp).attempt_patch()
     get_mcp_client_patcher(settings.mcp).attempt_patch()
@@ -111,7 +118,6 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     get_nvidia_ai_patcher(settings.chatnvidia).attempt_patch()
     get_huggingface_patcher(settings.huggingface).attempt_patch()
     get_smolagents_patcher(settings.smolagents).attempt_patch()
-    get_openai_agents_patcher(settings.openai_agents).attempt_patch()
     get_verdict_patcher(settings.verdict).attempt_patch()
 
     langchain_patcher.attempt_patch()
@@ -120,6 +126,18 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
 
 
 def reset_autopatch() -> None:
+    import sys
+    
+    # Only import and unpatch OpenAI if it was imported
+    if 'weave.integrations.openai.openai_sdk' in sys.modules:
+        from weave.integrations.openai.openai_sdk import get_openai_patcher
+        get_openai_patcher().undo_patch()
+    
+    if 'weave.integrations.openai_agents.openai_agents' in sys.modules:
+        from weave.integrations.openai_agents.openai_agents import get_openai_agents_patcher
+        get_openai_agents_patcher().undo_patch()
+    
+    # Import and unpatch other integrations
     from weave.integrations.anthropic.anthropic_sdk import get_anthropic_patcher
     from weave.integrations.autogen import get_autogen_patcher
     from weave.integrations.cerebras.cerebras_sdk import get_cerebras_patcher
@@ -143,13 +161,10 @@ def reset_autopatch() -> None:
     from weave.integrations.mcp import get_mcp_client_patcher, get_mcp_server_patcher
     from weave.integrations.mistral.mistral_sdk import get_mistral_patcher
     from weave.integrations.notdiamond.tracing import get_notdiamond_patcher
-    from weave.integrations.openai.openai_sdk import get_openai_patcher
-    from weave.integrations.openai_agents.openai_agents import get_openai_agents_patcher
     from weave.integrations.smolagents.smolagents_sdk import get_smolagents_patcher
     from weave.integrations.verdict.verdict_sdk import get_verdict_patcher
     from weave.integrations.vertexai.vertexai_sdk import get_vertexai_patcher
 
-    get_openai_patcher().undo_patch()
     get_mistral_patcher().undo_patch()
     get_mcp_server_patcher().undo_patch()
     get_mcp_client_patcher().undo_patch()
@@ -167,7 +182,6 @@ def reset_autopatch() -> None:
     get_nvidia_ai_patcher().undo_patch()
     get_huggingface_patcher().undo_patch()
     get_smolagents_patcher().undo_patch()
-    get_openai_agents_patcher().undo_patch()
     get_verdict_patcher().undo_patch()
 
     langchain_patcher.undo_patch()
