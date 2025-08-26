@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import logging
 
+from weave.client import init_message
 from weave.compat import wandb
 from weave.telemetry import trace_sentry
 from weave.trace import (
     autopatch,
     env,
-    init_message,
     wandb_termlog_patch,
     weave_client,
 )
