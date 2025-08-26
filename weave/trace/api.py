@@ -162,7 +162,7 @@ def ref(location: str) -> ObjectRef:
     the object but allows you to pass it to other Weave API functions.
 
     Args:
-        location: A fully-qualified Weave Ref URI, or if `weave.init()` has been called, `name:version` or `name`. If no version is provided, `latest` is used.
+        location: A Weave Ref URI, or if `weave.init()` has been called, `name:version` or `name`. If no version is provided, `latest` is used.
 
 
     Returns:
@@ -182,14 +182,14 @@ def ref(location: str) -> ObjectRef:
     specific_model_ref = weave.ref("ExtractFruitsModel:v2")
     
     dataset = [
-    {"input": "I bought apples and bananas"},
-    {"input": "Grapes are my favorite fruit"},
+        {"input": "I bought apples and bananas"},
+        {"input": "Grapes are my favorite fruit"},
     ]
     
     evaluation = weave.Evaluation(
-      dataset=dataset,
-      model=model_ref,  # pass the reference here
-      scorers=[],
+        dataset=dataset,
+        model=model_ref,  # pass the reference here
+        scorers=[],
     )
     ```
 
