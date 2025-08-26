@@ -448,7 +448,7 @@ hr_response = create_and_query_document(
 
 ## Audio
 
-Log audio to Weave by annotating functions with `Annotated[bytes, Content]` types or by specifying the document type with `Annotated[str, Content[Literal['mp3']]`. 
+Log audio to Weave by annotating functions with `Annotated[bytes, Content]` types, or by specifying the document type with `Annotated[str, Content[Literal['mp3']]`. 
 
 Weave automatically handles `mp3`, `wav`, `flac`, `ogg` and `m4a` file types and can handle logging using filepaths too with `Annotated[str, Content]`.
 
