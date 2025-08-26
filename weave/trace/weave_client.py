@@ -23,7 +23,14 @@ from weave.chat.chat import Chat
 from weave.chat.inference_models import InferenceModels
 from weave.telemetry import trace_sentry
 from weave.trace import settings
-from weave.trace.call import Call
+from weave.trace.call import (
+    DEFAULT_CALLS_PAGE_SIZE,
+    Call,
+    CallsIter,
+    _make_calls_iterator,
+    elide_display_name,
+    make_client_call,
+)
 from weave.trace.casting import CallsFilterLike, QueryLike, SortByLike
 from weave.trace.concurrent.futures import FutureExecutor
 from weave.trace.constants import TRACE_CALL_EMOJI
@@ -74,10 +81,10 @@ from weave.trace.settings import (
     should_redact_pii,
 )
 from weave.trace.table import Table
-from weave.trace.util import deprecated, log_once
+from weave.trace.util import deprecated
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
 from weave.trace.weave_client_send_file_cache import WeaveClientSendFileCache
-from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH, MAX_OBJECT_NAME_LENGTH
+from weave.trace_server.constants import MAX_OBJECT_NAME_LENGTH
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface.feedback_types import (
     RUNNABLE_FEEDBACK_TYPE_PREFIX,
@@ -86,11 +93,9 @@ from weave.trace_server.interface.feedback_types import (
 )
 from weave.trace_server.trace_server_interface import (
     CallEndReq,
-    CallSchema,
     CallsDeleteReq,
     CallsFilter,
     CallsQueryReq,
-    CallsQueryStatsReq,
     CallStartReq,
     CallUpdateReq,
     CostCreateInput,
@@ -113,7 +118,6 @@ from weave.trace_server.trace_server_interface import (
     ObjSchemaForInsert,
     Query,
     RefsReadBatchReq,
-    SortBy,
     StartedCallSchemaForInsert,
     TableAppendSpec,
     TableAppendSpecPayload,
@@ -127,7 +131,6 @@ from weave.trace_server.trace_server_interface import (
 from weave.utils.attributes_dict import AttributesDict
 from weave.utils.dict_utils import sum_dict_leaves, zip_dicts
 from weave.utils.exception import exception_to_json_str
-from weave.utils.paginated_iterator import PaginatedIterator
 from weave.utils.sanitize import REDACTED_VALUE, should_redact
 
 if TYPE_CHECKING:
@@ -144,87 +147,11 @@ logger = logging.getLogger(__name__)
 
 
 # TODO: should be Call, not WeaveObject
-CallsIter = PaginatedIterator[CallSchema, WeaveObject]
-DEFAULT_CALLS_PAGE_SIZE = 1000
 
 
 def print_call_link(call: Call) -> None:
     if settings.should_print_call_link():
         logger.info(f"{TRACE_CALL_EMOJI} {call.ui_url}")
-
-
-def _make_calls_iterator(
-    server: TraceServerInterface,
-    project_id: str,
-    filter: CallsFilter,
-    limit_override: int | None = None,
-    offset_override: int | None = None,
-    sort_by: list[SortBy] | None = None,
-    query: Query | None = None,
-    include_costs: bool = False,
-    include_feedback: bool = False,
-    columns: list[str] | None = None,
-    expand_columns: list[str] | None = None,
-    return_expanded_column_values: bool = True,
-    page_size: int = DEFAULT_CALLS_PAGE_SIZE,
-) -> CallsIter:
-    def fetch_func(offset: int, limit: int) -> list[CallSchema]:
-        # Add the global offset to the page offset
-        # This ensures the offset is applied only once
-        effective_offset = offset
-        if offset_override is not None:
-            effective_offset += offset_override
-
-        return list(
-            server.calls_query_stream(
-                CallsQueryReq(
-                    project_id=project_id,
-                    filter=filter,
-                    offset=effective_offset,
-                    limit=limit,
-                    include_costs=include_costs,
-                    include_feedback=include_feedback,
-                    query=query,
-                    sort_by=sort_by,
-                    columns=columns,
-                    expand_columns=expand_columns,
-                    return_expanded_column_values=return_expanded_column_values,
-                )
-            )
-        )
-
-    # TODO: Should be Call, not WeaveObject
-    def transform_func(call: CallSchema) -> WeaveObject:
-        entity, project = project_id.split("/")
-        return make_client_call(entity, project, call, server)
-
-    def size_func() -> int:
-        response = server.calls_query_stats(
-            CallsQueryStatsReq(
-                project_id=project_id,
-                filter=filter,
-                query=query,
-                expand_columns=expand_columns,
-            )
-        )
-        if limit_override is not None:
-            offset = offset_override or 0
-            return min(limit_override, max(0, response.count - offset))
-        if offset_override is not None:
-            return response.count - offset_override
-        return response.count
-
-    if offset_override is not None and offset_override < 0:
-        raise ValueError("offset must be greater than or equal to 0")
-
-    return PaginatedIterator(
-        fetch_func,
-        transform_func=transform_func,
-        size_func=size_func,
-        limit=limit_override,
-        offset=None,  # Set offset to None since we handle it in fetch_func
-        page_size=page_size,
-    )
 
 
 def _add_scored_by_to_calls_query(
@@ -259,10 +186,6 @@ def _add_scored_by_to_calls_query(
                 exists_expr(get_field_expr(runnable_feedback_output_selector(name)))
             )
     return Query.model_validate({"$expr": {"$and": exprs}})
-
-
-class OpNameError(ValueError):
-    """Raised when an op name is invalid."""
 
 
 def get_obj_name(val: Any) -> str:
@@ -343,36 +266,6 @@ def map_to_refs(obj: Any) -> Any:
         return map_to_refs(obj._val)
 
     return obj
-
-
-def make_client_call(
-    entity: str, project: str, server_call: CallSchema, server: TraceServerInterface
-) -> WeaveObject:
-    if (call_id := server_call.id) is None:
-        raise ValueError("Call ID is None")
-
-    call = Call(
-        _op_name=server_call.op_name,
-        project_id=server_call.project_id,
-        trace_id=server_call.trace_id,
-        parent_id=server_call.parent_id,
-        id=call_id,
-        inputs=from_json(server_call.inputs, server_call.project_id, server),
-        output=from_json(server_call.output, server_call.project_id, server),
-        exception=server_call.exception,
-        summary=dict(server_call.summary) if server_call.summary is not None else {},
-        _display_name=server_call.display_name,
-        attributes=server_call.attributes,
-        started_at=server_call.started_at,
-        ended_at=server_call.ended_at,
-        deleted_at=server_call.deleted_at,
-        thread_id=server_call.thread_id,
-        turn_id=server_call.turn_id,
-    )
-    if isinstance(call.attributes, AttributesDict):
-        call.attributes.freeze()
-    ref = CallRef(entity, project, call_id)
-    return WeaveObject(call, ref, server, None)
 
 
 RESERVED_SUMMARY_USAGE_KEY = "usage"
@@ -2160,16 +2053,6 @@ def sanitize_object_name(name: str) -> str:
     if len(res) > MAX_OBJECT_NAME_LENGTH:
         res = res[:MAX_OBJECT_NAME_LENGTH]
     return res
-
-
-def elide_display_name(name: str) -> str:
-    if len(name) > MAX_DISPLAY_NAME_LENGTH:
-        log_once(
-            logger.warning,
-            f"Display name {name} is longer than {MAX_DISPLAY_NAME_LENGTH} characters.  It will be truncated!",
-        )
-        return name[: MAX_DISPLAY_NAME_LENGTH - 3] + "..."
-    return name
 
 
 __docspec__ = [WeaveClient, Call, CallsIter]

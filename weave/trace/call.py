@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import datetime
+import logging
 from concurrent.futures import Future
 from typing import TYPE_CHECKING, Any, Callable, TypedDict
 
@@ -12,17 +13,28 @@ from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import Op
 from weave.trace.ref_util import get_ref
 from weave.trace.refs import CallRef, ObjectRef, OpRef
-from weave.trace.weave_client import (
-    DEFAULT_CALLS_PAGE_SIZE,
-    CallsIter,
-    OpNameError,
-    _make_calls_iterator,
-    elide_display_name,
+from weave.trace.serialization.serialize import from_json
+from weave.trace.util import log_once
+from weave.trace.vals import WeaveObject
+from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH
+from weave.trace_server.interface.query import Query
+from weave.trace_server.trace_server_interface import (
+    CallSchema,
+    CallsFilter,
+    CallsQueryReq,
+    CallsQueryStatsReq,
+    SortBy,
+    TraceServerInterface,
 )
-from weave.trace_server.trace_server_interface import CallsFilter
+from weave.utils.attributes_dict import AttributesDict
+from weave.utils.paginated_iterator import PaginatedIterator
 
 if TYPE_CHECKING:
     from weave.flow.scorer import ApplyScorerResult, Scorer
+
+logger = logging.getLogger(__name__)
+
+DEFAULT_CALLS_PAGE_SIZE = 1000
 
 
 @dataclasses.dataclass
@@ -291,3 +303,124 @@ class CallDict(TypedDict):
     deleted_at: datetime.datetime | None
     thread_id: str | None
     turn_id: str | None
+
+
+CallsIter = PaginatedIterator[CallSchema, WeaveObject]
+
+
+class OpNameError(ValueError):
+    """Raised when an op name is invalid."""
+
+
+def elide_display_name(name: str) -> str:
+    if len(name) > MAX_DISPLAY_NAME_LENGTH:
+        log_once(
+            logger.warning,
+            f"Display name {name} is longer than {MAX_DISPLAY_NAME_LENGTH} characters.  It will be truncated!",
+        )
+        return name[: MAX_DISPLAY_NAME_LENGTH - 3] + "..."
+    return name
+
+
+def _make_calls_iterator(
+    server: TraceServerInterface,
+    project_id: str,
+    filter: CallsFilter,
+    limit_override: int | None = None,
+    offset_override: int | None = None,
+    sort_by: list[SortBy] | None = None,
+    query: Query | None = None,
+    include_costs: bool = False,
+    include_feedback: bool = False,
+    columns: list[str] | None = None,
+    expand_columns: list[str] | None = None,
+    return_expanded_column_values: bool = True,
+    page_size: int = DEFAULT_CALLS_PAGE_SIZE,
+) -> CallsIter:
+    def fetch_func(offset: int, limit: int) -> list[CallSchema]:
+        # Add the global offset to the page offset
+        # This ensures the offset is applied only once
+        effective_offset = offset
+        if offset_override is not None:
+            effective_offset += offset_override
+
+        return list(
+            server.calls_query_stream(
+                CallsQueryReq(
+                    project_id=project_id,
+                    filter=filter,
+                    offset=effective_offset,
+                    limit=limit,
+                    include_costs=include_costs,
+                    include_feedback=include_feedback,
+                    query=query,
+                    sort_by=sort_by,
+                    columns=columns,
+                    expand_columns=expand_columns,
+                    return_expanded_column_values=return_expanded_column_values,
+                )
+            )
+        )
+
+    # TODO: Should be Call, not WeaveObject
+    def transform_func(call: CallSchema) -> WeaveObject:
+        entity, project = project_id.split("/")
+        return make_client_call(entity, project, call, server)
+
+    def size_func() -> int:
+        response = server.calls_query_stats(
+            CallsQueryStatsReq(
+                project_id=project_id,
+                filter=filter,
+                query=query,
+                expand_columns=expand_columns,
+            )
+        )
+        if limit_override is not None:
+            offset = offset_override or 0
+            return min(limit_override, max(0, response.count - offset))
+        if offset_override is not None:
+            return response.count - offset_override
+        return response.count
+
+    if offset_override is not None and offset_override < 0:
+        raise ValueError("offset must be greater than or equal to 0")
+
+    return PaginatedIterator(
+        fetch_func,
+        transform_func=transform_func,
+        size_func=size_func,
+        limit=limit_override,
+        offset=None,  # Set offset to None since we handle it in fetch_func
+        page_size=page_size,
+    )
+
+
+def make_client_call(
+    entity: str, project: str, server_call: CallSchema, server: TraceServerInterface
+) -> WeaveObject:
+    if (call_id := server_call.id) is None:
+        raise ValueError("Call ID is None")
+
+    call = Call(
+        _op_name=server_call.op_name,
+        project_id=server_call.project_id,
+        trace_id=server_call.trace_id,
+        parent_id=server_call.parent_id,
+        id=call_id,
+        inputs=from_json(server_call.inputs, server_call.project_id, server),
+        output=from_json(server_call.output, server_call.project_id, server),
+        exception=server_call.exception,
+        summary=dict(server_call.summary) if server_call.summary is not None else {},
+        _display_name=server_call.display_name,
+        attributes=server_call.attributes,
+        started_at=server_call.started_at,
+        ended_at=server_call.ended_at,
+        deleted_at=server_call.deleted_at,
+        thread_id=server_call.thread_id,
+        turn_id=server_call.turn_id,
+    )
+    if isinstance(call.attributes, AttributesDict):
+        call.attributes.freeze()
+    ref = CallRef(entity, project, call_id)
+    return WeaveObject(call, ref, server, None)
