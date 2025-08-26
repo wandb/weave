@@ -43,7 +43,7 @@ _global_postprocess_output: PostprocessOutputFunc | None = None
 _global_attributes: dict[str, Any] = {}
 
 
-class InitKwargs(TypedDict):
+class InitKwargs(TypedDict, total=False):
     settings: UserSettings | dict[str, Any] | None
     autopatch_settings: AutopatchSettings | None
     global_postprocess_inputs: PostprocessInputsFunc | None
