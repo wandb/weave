@@ -242,7 +242,7 @@ for model in models_to_compare:
 # In the Weave UI, navigate to the Evals tab to compare results across models
 ```
 
-After running these examples, you'll see links in your terminal. Click any link to view traces in the Weave UI.
+Running these examples returns links to the traces in the terminal. Click any link to view traces in the Weave UI.
 
 In the Weave UI, you can:
 - See a timeline of all your LLM calls
