@@ -73,27 +73,6 @@ def test_get_redact_keys() -> None:
     assert "test_key" not in sanitize.get_redact_keys()
 
 
-def test_backward_compatibility() -> None:
-    """Test that REDACT_KEYS is still accessible for backward compatibility."""
-    # Store original keys to restore later
-    original_keys = sanitize.get_redact_keys()
-
-    try:
-        # Test that REDACT_KEYS is still accessible and modifiable
-        assert isinstance(sanitize.REDACT_KEYS, set)
-
-        # Test adding via the old API (direct set modification)
-        sanitize.REDACT_KEYS.add("legacy_key")
-        assert sanitize.should_redact("legacy_key") is True
-
-        # Verify the new API sees the change
-        assert "legacy_key" in sanitize.get_redact_keys()
-
-    finally:
-        # Restore original keys
-        sanitize._REDACT_KEYS = original_keys
-
-
 def test_should_redact_case_insensitive() -> None:
     """Test that should_redact is case insensitive."""
     # Test with default keys

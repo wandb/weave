@@ -42,13 +42,33 @@ def get_redact_keys() -> set[str]:
 
     Returns:
         A copy of the set of keys that will be redacted.
+
+    Examples:
+        >>> from weave.utils import sanitize
+        >>> keys = sanitize.get_redact_keys()
+        >>> "api_key" in keys
+        True
     """
     return _REDACT_KEYS.copy()
 
 
 def should_redact(key: str) -> bool:
+    """Return whether a given key should be redacted.
+
+    Args:
+        key: The key name to check.
+
+    Returns:
+        True if the key is configured to be redacted (case-insensitive), False otherwise.
+
+    Examples:
+        >>> from weave.utils import sanitize
+        >>> sanitize.should_redact("API_KEY")
+        True
+        >>> sanitize.should_redact("random_key")
+        False
+    """
     return key.lower() in _REDACT_KEYS
 
 
-# Maintain backward compatibility by exposing REDACT_KEYS
-REDACT_KEYS = _REDACT_KEYS
+# Note: No backward-compatibility alias is exposed; use add/remove/get helpers.
