@@ -13,7 +13,7 @@ W&B Weave supports logging and has dedicated displays for numerous content types
 
 ## Overview
 
-The easiest way to log media in Weave is to use type annotations like `Annotated[bytes, Content]` or `Annotated[str, Content]` as input or return types in your ops. You can also annotate paths arguments with `Annotated[str, Content]` and Weave will automatically open, detect and display the media for you within your trace.
+The easiest way to log media in Weave is to use type annotations like `Annotated[bytes, Content]` or `Annotated[str, Content]` as input or return types in your ops. You can also annotate path arguments with `Annotated[str, Content]` and Weave will automatically open, detect and display the media for you within your trace.
 
 All examples below use this annotation approach, which is the recommended and simplest way to get started. For more advanced use cases, see the [Content API section](#using-the-contents-api) at the end of this page.
 
