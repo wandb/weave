@@ -9,7 +9,7 @@ This guide shows you how to use W&B Weave with [W&B Inference](https://docs.wand
 
 In this guide, you'll:
 - Set up Weave and W&B Inference
-- Build a simple LLM application with automatic tracing
+- Build a basic LLM application with automatic tracing
 - Compare multiple models
 - Evaluate model performance on a dataset
 - View your results in the Weave UI
@@ -68,7 +68,7 @@ print(result)
 
 ## Step 2: Build a text summarization application
 
-Next, try running this code, which is a simple summarization app that shows how Weave traces nested operations:
+Next, try running this code, which is a basic summarization app that shows how Weave traces nested operations:
 
 ```python
 import weave
