@@ -726,7 +726,7 @@ prompt = "Weights & Biases UI but with multi-run selection and plots, but it loo
 result = generate_html(prompt, prompt_template)
 ```
 
-This HTML is logged to Weave and automatically displayed in the UI. Clicking the `file_name.html` cell in the table will open it fullscreen. You can also download the raw `.html` file.
+This HTML is logged to Weave and automatically displayed in the UI. Clicking the `file_name.html` cell in the table opens it in full screen. You can also download the raw `.html` file.
 
 ![HTML logging in Weave](/img/html.png)
 
