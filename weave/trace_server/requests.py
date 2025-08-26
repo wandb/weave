@@ -64,7 +64,6 @@ def pprint_json(text: str) -> None:
     try:
         json_body = json.loads(text)
         pretty_json = json.dumps(json_body, indent=4)
-        # Add line numbers manually and print as plain text to avoid ANSI code issues
         lines = pretty_json.split("\n")
         for i, line in enumerate(lines, 1):
             line_num = Text(f"{i:>3} ", style="dim")
