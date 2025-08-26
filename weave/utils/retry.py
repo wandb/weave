@@ -19,6 +19,9 @@ T = TypeVar("T")
 # Context variable to store retry ID for correlation
 _retry_id: contextvars.ContextVar[str] = contextvars.ContextVar("retry_id")
 
+# Track whether we've warned about server being down
+_server_down_warning_shown = False
+
 
 def with_retry(func: Callable[..., T]) -> Callable[..., T]:
     """
@@ -80,25 +83,72 @@ def _is_retryable_exception(e: BaseException) -> bool:
 
 
 def _log_retry(retry_state: tenacity.RetryCallState) -> None:
-    logger.info(
-        "retry_attempt",
-        extra={
-            "fn": retry_state.fn,
-            "retry_id": get_current_retry_id(),
-            "attempt_number": retry_state.attempt_number,
-            "exception": str(retry_state.outcome.exception()),
-        },
-    )
+    global _server_down_warning_shown
+    exception = retry_state.outcome.exception()
+    
+    # For server errors, log a more user-friendly message
+    if isinstance(exception, requests.HTTPError) and exception.response is not None:
+        status_code = exception.response.status_code
+        if status_code == 502:
+            # Show a user-friendly warning only once per session
+            if not _server_down_warning_shown:
+                logger.warning(
+                    "Weave server appears to be unavailable. Will retry connection..."
+                )
+                _server_down_warning_shown = True
+            logger.debug(
+                f"Server unavailable (attempt {retry_state.attempt_number}). Retrying..."
+            )
+        elif status_code >= 500:
+            logger.debug(
+                f"Server error {status_code} (attempt {retry_state.attempt_number}). Retrying..."
+            )
+        else:
+            logger.debug(
+                f"HTTP {status_code} error (attempt {retry_state.attempt_number}). Retrying..."
+            )
+    else:
+        # For non-HTTP errors, preserve original INFO level logging for compatibility
+        logger.info(
+            "retry_attempt",
+            extra={
+                "fn": retry_state.fn,
+                "retry_id": get_current_retry_id(),
+                "attempt_number": retry_state.attempt_number,
+                "exception": str(exception),
+            },
+        )
 
 
 def _log_failure(retry_state: tenacity.RetryCallState) -> Any:
-    logger.info(
-        "retry_failed",
-        extra={
-            "fn": retry_state.fn,
-            "retry_id": get_current_retry_id(),
-            "attempt_number": retry_state.attempt_number,
-            "exception": str(retry_state.outcome.exception()),
-        },
-    )
+    exception = retry_state.outcome.exception()
+    
+    # For server errors after all retries, log a clear user-friendly message
+    if isinstance(exception, requests.HTTPError) and exception.response is not None:
+        status_code = exception.response.status_code
+        if status_code == 502:
+            logger.error(
+                f"Unable to connect to Weave server after {retry_state.attempt_number} attempts. "
+                "The server may be down or experiencing issues. Please try again later."
+            )
+        elif status_code >= 500:
+            logger.error(
+                f"Server error (HTTP {status_code}) persists after {retry_state.attempt_number} attempts. "
+                "Please check server status or try again later."
+            )
+        else:
+            logger.warning(
+                f"HTTP {status_code} error after {retry_state.attempt_number} attempts."
+            )
+    else:
+        # For non-HTTP errors, log with more details
+        logger.info(
+            "retry_failed",
+            extra={
+                "fn": retry_state.fn,
+                "retry_id": get_current_retry_id(),
+                "attempt_number": retry_state.attempt_number,
+                "exception": str(exception),
+            },
+        )
     return retry_state.outcome.result()

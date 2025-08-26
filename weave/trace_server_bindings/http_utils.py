@@ -206,6 +206,18 @@ def handle_response_error(response: requests.Response, url: str) -> None:
     if 200 <= response.status_code < 300:
         return
 
+    # Provide user-friendly messages for common server errors
+    if response.status_code == 502:
+        message = f"502 Server Error: Bad Gateway for url: {url}"
+        # Don't include full traceback details for 502 errors
+        raise requests.HTTPError(message, response=response)
+    elif response.status_code == 503:
+        message = f"503 Server Error: Service Unavailable for url: {url}"
+        raise requests.HTTPError(message, response=response)
+    elif response.status_code == 504:
+        message = f"504 Server Error: Gateway Timeout for url: {url}"
+        raise requests.HTTPError(message, response=response)
+
     # Get the default HTTP error message
     default_message = None
     try:
