@@ -35,13 +35,11 @@ from weave.trace.context.weave_client_context import (
     get_weave_client,
     set_weave_client_global,
 )
-from weave.trace.refs import parse_uri
+from weave.trace.refs import TableRef
 from weave.trace.vals import MissingSelfInstanceError
 from weave.trace.weave_client import sanitize_object_name
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.clickhouse_trace_server_batched import (
-    ENTITY_TOO_LARGE_PAYLOAD,
-)
+from weave.trace_server.clickhouse_trace_server_settings import ENTITY_TOO_LARGE_PAYLOAD
 from weave.trace_server.errors import InsertTooLarge, InvalidFieldError
 from weave.trace_server.ids import generate_id
 from weave.trace_server.refs_internal import extra_value_quoter
@@ -3077,18 +3075,18 @@ def test_calls_stream_column_expansion(client):
 
 
 # Batch size is dynamically increased from 10 to MAX_CALLS_STREAM_BATCH_SIZE (500)
-# in clickhouse_trace_server_batched.py, this test verifies that the dynamic
+# in clickhouse_trace_server_settings.py, this test verifies that the dynamic
 # increase works as expected
 @pytest.mark.parametrize("batch_size", [1, 5, 6])
 def test_calls_stream_column_expansion_dynamic_batch_size(
     client, batch_size, monkeypatch
 ):
     monkeypatch.setattr(
-        "weave.trace_server.clickhouse_trace_server_batched.INITIAL_CALLS_STREAM_BATCH_SIZE",
+        "weave.trace_server.clickhouse_trace_server_settings.INITIAL_CALLS_STREAM_BATCH_SIZE",
         1,
     )
     monkeypatch.setattr(
-        "weave.trace_server.clickhouse_trace_server_batched.MAX_CALLS_STREAM_BATCH_SIZE",
+        "weave.trace_server.clickhouse_trace_server_settings.MAX_CALLS_STREAM_BATCH_SIZE",
         5,
     )
 
@@ -3410,12 +3408,12 @@ def test_large_keys_are_stripped_call(client, caplog, monkeypatch):
         original_insert_call_batch(self, batch)
 
     monkeypatch.setattr(
-        weave.trace_server.clickhouse_trace_server_batched,
+        weave.trace_server.clickhouse_trace_server_settings,
         "CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT",
         10 * 1024,  # 1KB
     )
     monkeypatch.setattr(
-        weave.trace_server.clickhouse_trace_server_batched,
+        weave.trace_server.clickhouse_trace_server_settings,
         "CLICKHOUSE_SINGLE_VALUE_BYTES_LIMIT",
         1 * 1024,  # 1KB
     )
@@ -3475,12 +3473,9 @@ def test_weave_finish_unsets_client(client):
     def foo():
         return 1
 
-    set_weave_client_global(None)
-    weave.trace.weave_init._current_inited_client = (
-        weave.trace.weave_init.InitializedClient(client)
-    )
-    weave_client = weave.trace.weave_init._current_inited_client.client
-    assert weave.trace.weave_init._current_inited_client is not None
+    set_weave_client_global(client)
+    weave_client = get_weave_client()
+    assert get_weave_client() is not None
 
     foo()
     assert len(list(weave_client.get_calls())) == 1
@@ -3489,7 +3484,7 @@ def test_weave_finish_unsets_client(client):
 
     foo()
     assert len(list(weave_client.get_calls())) == 1
-    assert weave.trace.weave_init._current_inited_client is None
+    assert get_weave_client() is None
 
 
 def test_op_sampling(client):
@@ -4159,7 +4154,7 @@ def test_obj_query_with_storage_size_clickhouse(client):
     assert queried_obj.size_bytes == 257  # Should have some size due to the test data
 
     # Test that a table is created and its size is correct
-    table_ref = parse_uri(queried_obj.val["rows"])
+    table_ref = TableRef.parse_uri(queried_obj.val["rows"])
     res = client.server.table_query_stats_batch(
         tsi.TableQueryStatsBatchReq(
             project_id=client._project_id(),

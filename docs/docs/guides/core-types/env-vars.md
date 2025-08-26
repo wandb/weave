@@ -1,6 +1,6 @@
 # Environment variables
 
-Weave provides a set of environment variables to configure and optimize its behavior. You can set these variables in your shell or within scripts to control specific functionality.
+W&B Weave provides a set of environment variables to configure and optimize its behavior. You can set these variables in your shell or within scripts to control specific functionality.
 
 ```bash
 # Example of setting environment variables in the shell

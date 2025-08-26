@@ -1,7 +1,7 @@
 import pandas as pd
 
 import weave
-from weave.flow.eval import EvaluationResults
+from weave.evaluation.eval import EvaluationResults
 
 
 def get_model_evals(

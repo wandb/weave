@@ -19,7 +19,7 @@ jobs:
     permissions:
       id-token: write
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - name: Install uv
@@ -33,6 +33,36 @@ jobs:
         if: ${{ inputs.is_test }}
         with:
           repository-url: https://test.pypi.org/legacy/
+          verbose: true
       - name: upload distribution
         uses: pypa/gh-action-pypi-publish@release/v1
         if: ${{ !inputs.is_test }}
+
+  # this job exists so that there's some traceability between weave SDk releases
+  # and potential build failures in core.
+  notify-core:
+    name: notify wandb/core of release
+    runs-on: ubuntu-latest
+    if: "!inputs.is_test"
+    needs: [build-release]
+
+    steps:
+      - name: Create GitHub App Token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.WANDBOT_3000_APP_ID }}
+          private-key: ${{ secrets.WANDBOT_3000_PRIVATE_KEY }}
+
+      - name: Repository dispatch
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          token: "${{ steps.app-token.outputs.token }}"
+          repository: wandb/core
+          event-type: weave-sdk-released
+          client-payload: |-
+            {
+              "ref_name": "${{ github.ref_name }}",
+              "actor": "${{ github.actor }}",
+              "actor_id": "${{ github.actor_id }}"
+            }

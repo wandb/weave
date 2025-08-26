@@ -1,6 +1,6 @@
 # Leaderboards
 
-Use Weave _Leaderboards_ to evaluate and compare multiple models across multiple metrics and measure accuracy, generation quality, latency, or custom evaluation logic. A leaderboard helps you visualize model performance in a central location, track changes over time, and align on team-wide benchmarks.
+Use W&B Weave _Leaderboards_ to evaluate and compare multiple models across multiple metrics and measure accuracy, generation quality, latency, or custom evaluation logic. A leaderboard helps you visualize model performance in a central location, track changes over time, and align on team-wide benchmarks.
 
 Leaderboards are ideal for:
 
