@@ -499,7 +499,7 @@ result = load_audio("beep.wav")
 
 ### Example
 
-Generate and log AI-created audio using the Content annotation:
+This example generates and logs AI-created audio using the `Content` annotation:
 
 <Tabs groupId="package-manager" queryString>
   <TabItem value="pip" label="pip" default>
