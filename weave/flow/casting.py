@@ -35,6 +35,10 @@ def cast_to_scorer(obj: Any) -> Scorer | Op:
         res = obj
     elif weave_isinstance(obj, Scorer):
         res = Scorer.from_obj(obj)
+    elif isinstance(obj, ObjectRef):
+        # Get the object from the ref and recursively cast it
+        gotten_obj = obj.get()
+        res = cast_to_scorer(gotten_obj)
     elif isinstance(obj, type):
         raise TypeError(
             f"Scorer {obj.__name__} must be an instance, not a class. Did you instantiate?"
