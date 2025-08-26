@@ -30,11 +30,11 @@ Weave supports [numerous LLM providers, local models, frameworks, protocols, and
 Choose your path to get started with Weave:
 
 ### Recommended: Start with W&B Inference
-[Try Weave with Inference Service](/quickstart-inference) - The fastest way to experience Weave
+[Try Weave with W&B Inference](/quickstart-inference) - The fastest way to experience Weave
 - No API keys needed - start building immediately
 - Free credits included with all plans
 - Learn tracing, evaluation, and monitoring with real models
-- Access powerful models like Llama 3.3 70B and DeepSeek V3
+- Access to live instances of powerful models like Llama, GPT-OSS, Qwen, and DeepSeek
 
 ### Have your own API keys?
 [Track LLM Calls](/quickstart) - Connect your existing LLM providers

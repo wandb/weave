@@ -18,7 +18,7 @@ In this guide, you'll:
 
 Before you begin, you need a [W&B account](https://app.wandb.ai/login?signup=true) and an API key from from [https://wandb.ai/authorize](https://wandb.ai/authorize).
 
-Then, in a Python environment running version 3.8 or later, install the required libraries: 
+Then, in a Python environment running version 3.9 or later, install the required libraries: 
 
 ```bash
 pip install weave openai
@@ -68,9 +68,15 @@ print(result)
 
 ## Step 2: Build a text summarization application
 
-Create a simple summarization app that shows how Weave traces nested operations:
+Next, try running this code, which is a simple summarization app that shows how Weave traces nested operations:
 
 ```python
+import weave
+import openai
+
+# Initialize Weave - replace with your-team/your-project
+weave.init("my-first-weave-project")
+
 @weave.op()
 def extract_key_points(text: str) -> list[str]:
     """Extract key points from a text."""
@@ -84,13 +90,13 @@ def extract_key_points(text: str) -> list[str]:
     return response.choices[0].message.content.strip().split('\n')
 
 @weave.op()
-def create_summary(text: str, key_points: list[str]) -> str:
+def create_summary(key_points: list[str]) -> str:
     """Create a concise summary based on key points."""
-    points_text = "\n".join([f"- {point}" for point in key_points])
+    points_text = "\n".join(f"- {point}" for point in key_points)
     response = client.chat.completions.create(
         model="meta-llama/Llama-3.1-8B-Instruct",
         messages=[
-            {"role": "system", "content": "Create a 2-3 sentence summary based on these key points."},
+            {"role": "system", "content": "Create a one-sentence summary based on these key points."},
             {"role": "user", "content": f"Key points:\n{points_text}"}
         ],
     )
@@ -100,7 +106,7 @@ def create_summary(text: str, key_points: list[str]) -> str:
 def summarize_text(text: str) -> dict:
     """Main summarization pipeline."""
     key_points = extract_key_points(text)
-    summary = create_summary(text, key_points)
+    summary = create_summary(key_points)
     return {
         "key_points": key_points,
         "summary": summary
@@ -155,7 +161,7 @@ print(deepseek_model.predict(test_question))
 
 ## Step 4: Evaluate model performance
 
-Evaluate how well different models perform on a Q&A task:
+Evaluate how well a model performs on a Q&A task:
 
 ```python
 # Create a simple dataset
@@ -167,7 +173,7 @@ dataset = [
 
 # Define a scorer
 @weave.op()
-def accuracy_scorer(expected: str, output: str, expected_one_of: list[str] = None) -> dict:
+def accuracy_scorer(expected: str, output: str, expected_one_of: Optional[list[str]] = None) -> dict:
     """Score the accuracy of the model output."""
     output_clean = output.strip().lower()
     
@@ -228,7 +234,6 @@ For a complete list of available models, see the [Available Models section](http
 - **Use the Playground**: [Try models interactively](guides/tools/playground.md#access-the-playground) in the Weave Playground
 - **Build evaluations**: Learn about [systematic evaluation](guides/core-types/evaluations.md) of your LLM applications
 - **Try other integrations**: Weave works with [OpenAI, Anthropic, and many more](guides/integrations/index.md)
-- **Deploy your app**: Use [Weave Serve](guides/tools/serve.md) to deploy your applications
 
 ## Troubleshooting
 
