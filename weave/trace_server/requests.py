@@ -64,7 +64,7 @@ def pprint_json(text: str) -> None:
     try:
         json_body = json.loads(text)
         pretty_json = json.dumps(json_body, indent=4)
-        lines = pretty_json.split("\n")
+        lines = pretty_json.splitlines()
         for i, line in enumerate(lines, 1):
             line_num = Text(f"{i:>3} ", style="dim")
             console.print(line_num, line, sep="", end="\n")
