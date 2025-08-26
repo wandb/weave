@@ -826,7 +826,7 @@ content = Content.from_bytes(video_bytes, mimetype='video/mp4')
 
 ### Content properties
 
-For a comprehensive list of class attributes and methods view the [Content reference docs](https://weave-docs.wandb.ai/reference/python-sdk/weave/#class-content)
+For a comprehensive list of class attributes and methods, view the [Content reference docs](https://weave-docs.wandb.ai/reference/python-sdk/weave/#class-content)
 
 #### Attributes
 
