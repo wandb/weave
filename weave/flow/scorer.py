@@ -15,7 +15,8 @@ from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import Op, OpCallError, as_op, is_op
 from weave.trace.op_caller import async_call_op
 from weave.trace.vals import WeaveObject
-from weave.trace.weave_client import Call, sanitize_object_name
+from weave.trace.weave_client import sanitize_object_name
+from weave.trace.call import Call
 
 try:
     import numpy as np

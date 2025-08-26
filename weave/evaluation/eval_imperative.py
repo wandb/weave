@@ -29,7 +29,7 @@ from weave.flow.util import make_memorable_name
 from weave.trace.context import call_context
 from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.op import Op
-from weave.trace.weave_client import Call
+from weave.trace.call import Call
 
 T = TypeVar("T")
 ID = str

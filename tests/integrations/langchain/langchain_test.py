@@ -12,7 +12,8 @@ from weave.integrations.integration_utilities import (
     op_name_from_ref,
 )
 from weave.trace.context import call_context
-from weave.trace.weave_client import Call, WeaveClient
+from weave.trace.weave_client import WeaveClient
+from weave.trace.call import Call
 from weave.trace_server import trace_server_interface as tsi
 
 

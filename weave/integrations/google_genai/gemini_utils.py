@@ -5,7 +5,7 @@ import weave
 from weave.trace.autopatch import OpSettings
 from weave.trace.op import _add_accumulator
 from weave.trace.serialization.serialize import dictify
-from weave.trace.weave_client import Call
+from weave.trace.call import Call
 
 if TYPE_CHECKING:
     from google.genai.types import GenerateContentResponse

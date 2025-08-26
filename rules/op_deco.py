@@ -1,6 +1,8 @@
 import libcst
 from fixit import InvalidTestCase, LintRule, ValidTestCase
 
+import weave.trace.call
+
 
 class OpDecoRule(LintRule):
     """
@@ -13,7 +15,7 @@ class OpDecoRule(LintRule):
 
     def visit_Decorator(self, node: libcst.Decorator) -> None:
         if (
-            isinstance(node.decorator, libcst.Call)
+            isinstance(node.decorator, weave.trace.call.Call)
             and isinstance(attr := node.decorator.func, libcst.Attribute)
             and isinstance(name := attr.value, libcst.Name)
             and name.value == "weave"

@@ -9,13 +9,14 @@ from __future__ import annotations
 
 from typing import Any, TypedDict
 
+import weave.trace.call
 from weave.integrations.patcher import NoOpPatcher, Patcher
 from weave.trace.autopatch import IntegrationSettings
 from weave.trace.context import call_context
 from weave.trace.context.weave_client_context import (
     get_weave_client,
 )
-from weave.trace.weave_client import Call
+from weave.trace.call import Call
 
 _openai_agents_patcher: OpenAIAgentsPatcher | None = None
 
@@ -66,8 +67,8 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
 
     def __init__(self) -> None:
         self._trace_data: dict[str, dict[str, Any]] = {}
-        self._trace_calls: dict[str, call_context.Call] = {}
-        self._span_calls: dict[str, call_context.Call] = {}
+        self._trace_calls: dict[str, weave.trace.call.Call] = {}
+        self._span_calls: dict[str, weave.trace.call.Call] = {}
         self._ended_traces: set[str] = set()
         self._span_parents: dict[str, str] = {}
 

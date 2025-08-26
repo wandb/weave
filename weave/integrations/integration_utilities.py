@@ -5,7 +5,8 @@ from concurrent.futures import Future
 from typing import Any, Union
 
 from weave.trace.refs import OpRef
-from weave.trace.weave_client import Call, CallsIter
+from weave.trace.weave_client import CallsIter
+from weave.trace.call import Call
 from weave.trace_server.constants import MAX_OP_NAME_LENGTH
 
 

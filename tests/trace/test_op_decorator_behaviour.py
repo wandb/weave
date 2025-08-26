@@ -7,7 +7,7 @@ import weave
 from weave.trace.op import OpCallError, is_op, op
 from weave.trace.refs import ObjectRef, Ref
 from weave.trace.vals import MissingSelfInstanceError
-from weave.trace.weave_client import Call
+from weave.trace.call import Call
 
 
 @pytest.fixture
