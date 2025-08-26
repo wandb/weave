@@ -164,35 +164,8 @@ def ref(location: str) -> ObjectRef:
     Args:
         location: A Weave Ref URI, or if `weave.init()` has been called, `name:version` or `name`. If no version is provided, `latest` is used.
 
-
     Returns:
         A Weave Ref to the object.
-    
-    Example:
-
-    The following example sets a specific model object as a Ref and then passes it to
-    the `Evaluation()` class.
-    
-    ```python
-    import weave
-    
-    # Initialize your project
-    weave.init("fruit-extraction-project")
-    
-    specific_model_ref = weave.ref("ExtractFruitsModel:v2")
-    
-    dataset = [
-        {"input": "I bought apples and bananas"},
-        {"input": "Grapes are my favorite fruit"},
-    ]
-    
-    evaluation = weave.Evaluation(
-        dataset=dataset,
-        model=model_ref,  # pass the reference here
-        scorers=[],
-    )
-    ```
-
     """
     if "://" not in location:
         client = weave_client_context.get_weave_client()
