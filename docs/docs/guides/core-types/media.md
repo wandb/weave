@@ -767,7 +767,7 @@ bytes_data = content_annotation('./path/to/your/file.mp4')
 If you want to take advantage of features such as:
 - Opening a file with a default application (such as a PDF viewer)
 - Dumping the model to JSON to upload to your own blob storage (such as S3)
-- Passing custom metadata to associate with the Content blob (such as the model used to generate it)
+- Passing custom metadata to associate with the `Content` blob (such as the model used to generate it)
 
 You can initialize content directly from your target type using one of the following methods:
 - `Content.from_path` - Create from a file path
