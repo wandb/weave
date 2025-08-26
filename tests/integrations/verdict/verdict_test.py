@@ -1,12 +1,12 @@
 import pytest
 
+from weave.client.weave_client import WeaveClient
 from weave.integrations.integration_utilities import (
     filter_body,
     flatten_calls,
     op_name_from_ref,
 )
 from weave.trace.call import Call
-from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
 
 

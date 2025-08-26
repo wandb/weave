@@ -6,6 +6,7 @@ import pytest
 import tiktoken
 
 import weave
+from weave.client.weave_client import WeaveClient
 from weave.integrations.integration_utilities import (
     filter_body,
     flatten_calls,
@@ -13,7 +14,6 @@ from weave.integrations.integration_utilities import (
 )
 from weave.trace.call import Call
 from weave.trace.context import call_context
-from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
 
 

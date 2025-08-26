@@ -1,6 +1,7 @@
 import pytest
 
 import weave
+from weave.client.weave_client import WeaveClient
 from weave.integrations.integration_utilities import flatten_calls, op_name_from_ref
 
 
@@ -10,9 +11,7 @@ from weave.integrations.integration_utilities import flatten_calls, op_name_from
     allowed_hosts=["api.wandb.ai", "localhost"],
 )
 @pytest.mark.asyncio
-async def test_simple_client_create(
-    client: weave.trace.weave_client.WeaveClient,
-) -> None:
+async def test_simple_client_create(client: WeaveClient) -> None:
     from autogen_core.models import UserMessage
     from autogen_ext.models.openai import OpenAIChatCompletionClient
 
@@ -49,7 +48,7 @@ async def test_simple_client_create(
 @pytest.mark.asyncio
 @pytest.mark.disable_logging_error_check(reason="This test is expected to fail")
 async def test_simple_client_create_with_exception(
-    client: weave.trace.weave_client.WeaveClient,
+    client: WeaveClient,
 ) -> None:
     from autogen_core.models import UserMessage
     from autogen_ext.models.openai import OpenAIChatCompletionClient
@@ -92,7 +91,7 @@ async def test_simple_client_create_with_exception(
 )
 @pytest.mark.asyncio
 async def test_simple_client_create_stream(
-    client: weave.trace.weave_client.WeaveClient,
+    client: WeaveClient,
 ) -> None:
     from autogen_core.models import UserMessage
     from autogen_ext.models.openai import OpenAIChatCompletionClient
@@ -132,7 +131,7 @@ async def test_simple_client_create_stream(
 )
 @pytest.mark.asyncio
 async def test_simple_cached_client_create(
-    client: weave.trace.weave_client.WeaveClient,
+    client: WeaveClient,
 ) -> None:
     from autogen_core._cache_store import InMemoryStore
     from autogen_core.models import UserMessage
@@ -189,7 +188,7 @@ async def test_simple_cached_client_create(
 )
 @pytest.mark.asyncio
 async def test_simple_cached_client_create_stream(
-    client: weave.trace.weave_client.WeaveClient,
+    client: WeaveClient,
 ) -> None:
     from autogen_core._cache_store import InMemoryStore
     from autogen_core.models import UserMessage
@@ -241,7 +240,7 @@ async def test_simple_cached_client_create_stream(
 )
 @pytest.mark.asyncio
 async def test_agentchat_run_with_tool(
-    client: weave.trace.weave_client.WeaveClient,
+    client: WeaveClient,
 ) -> None:
     from autogen_agentchat.agents import AssistantAgent
     from autogen_ext.models.openai import OpenAIChatCompletionClient
@@ -324,7 +323,7 @@ async def test_agentchat_run_with_tool(
 )
 @pytest.mark.asyncio
 async def test_agentchat_run_stream_with_tool(
-    client: weave.trace.weave_client.WeaveClient,
+    client: WeaveClient,
 ) -> None:
     from autogen_agentchat.agents import AssistantAgent
     from autogen_ext.models.openai import OpenAIChatCompletionClient
@@ -398,7 +397,7 @@ async def test_agentchat_run_stream_with_tool(
 )
 @pytest.mark.asyncio
 async def test_agentchat_group_chat(
-    client: weave.trace.weave_client.WeaveClient,
+    client: WeaveClient,
 ) -> None:
     from autogen_agentchat.agents import AssistantAgent
     from autogen_agentchat.conditions import TextMessageTermination
@@ -677,7 +676,7 @@ async def test_agentchat_group_chat(
 )
 @pytest.mark.asyncio
 async def test_agent_with_memory(
-    client: weave.trace.weave_client.WeaveClient,
+    client: WeaveClient,
 ) -> None:
     from autogen_agentchat.agents import AssistantAgent
     from autogen_core.memory import ListMemory, MemoryContent, MemoryMimeType
@@ -798,7 +797,7 @@ async def test_agent_with_memory(
 )
 @pytest.mark.asyncio
 async def test_workflows_singlethreaded_runtime(
-    client: weave.trace.weave_client.WeaveClient,
+    client: WeaveClient,
 ) -> None:
     from dataclasses import dataclass
     from typing import Callable

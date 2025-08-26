@@ -1,5 +1,5 @@
 import weave
-from weave.trace.weave_client import WeaveClient
+from weave.client.weave_client import WeaveClient
 
 
 def test_get_client(client: WeaveClient):

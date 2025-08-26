@@ -21,9 +21,9 @@ import weave
 from tests.trace_server.isolated_client_executor.cross_process_trace_server import (
     CrossProcessTraceServerReceiver,
 )
+from weave.client.weave_client import WeaveClient
 from weave.trace.context.weave_client_context import get_weave_client
 from weave.trace.ref_util import get_ref
-from weave.trace.weave_client import WeaveClient
 from weave.trace_server.isolated_client_executor import (
     IsolatedClientExecutor,
     IsolatedClientExecutorError,

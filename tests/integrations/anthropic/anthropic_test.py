@@ -3,7 +3,7 @@ import os
 import pytest
 from anthropic import Anthropic, AsyncAnthropic
 
-import weave
+from weave.client.weave_client import WeaveClient
 
 model = "claude-3-haiku-20240307"
 # model = "claude-3-opus-20240229"
@@ -14,9 +14,7 @@ model = "claude-3-haiku-20240307"
     filter_headers=["authorization", "x-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost"],
 )
-def test_anthropic(
-    client: weave.trace.weave_client.WeaveClient,
-) -> None:
+def test_anthropic(client: WeaveClient) -> None:
     api_key = os.getenv("ANTHROPIC_API_KEY", "DUMMY_API_KEY")
     anthropic_client = Anthropic(api_key=api_key)
     message = anthropic_client.messages.create(
@@ -53,7 +51,7 @@ def test_anthropic(
     allowed_hosts=["api.wandb.ai", "localhost"],
 )
 def test_anthropic_stream(
-    client: weave.trace.weave_client.WeaveClient,
+    client: WeaveClient,
 ) -> None:
     api_key = os.getenv("ANTHROPIC_API_KEY", "DUMMY_API_KEY")
     anthropic_client = Anthropic(api_key=api_key)
@@ -101,7 +99,7 @@ def test_anthropic_stream(
 )
 @pytest.mark.asyncio
 async def test_async_anthropic(
-    client: weave.trace.weave_client.WeaveClient,
+    client: WeaveClient,
 ) -> None:
     anthropic_client = AsyncAnthropic(
         # This is the default and can be omitted
@@ -143,7 +141,7 @@ async def test_async_anthropic(
 )
 @pytest.mark.asyncio
 async def test_async_anthropic_stream(
-    client: weave.trace.weave_client.WeaveClient,
+    client: WeaveClient,
 ) -> None:
     anthropic_client = AsyncAnthropic(
         # This is the default and can be omitted
@@ -193,7 +191,7 @@ async def test_async_anthropic_stream(
     allowed_hosts=["api.wandb.ai", "localhost"],
 )
 def test_tools_calling(
-    client: weave.trace.weave_client.WeaveClient,
+    client: WeaveClient,
 ) -> None:
     api_key = os.getenv("ANTHROPIC_API_KEY", "DUMMY_API_KEY")
     anthropic_client = Anthropic(api_key=api_key)
@@ -253,7 +251,7 @@ def test_tools_calling(
     allowed_hosts=["api.wandb.ai", "localhost"],
 )
 def test_anthropic_messages_stream_ctx_manager(
-    client: weave.trace.weave_client.WeaveClient,
+    client: WeaveClient,
 ) -> None:
     api_key = os.getenv("ANTHROPIC_API_KEY", "DUMMY_API_KEY")
     anthropic_client = Anthropic(api_key=api_key)
@@ -301,7 +299,7 @@ def test_anthropic_messages_stream_ctx_manager(
 )
 @pytest.mark.asyncio
 async def test_async_anthropic_messages_stream_ctx_manager(
-    client: weave.trace.weave_client.WeaveClient,
+    client: WeaveClient,
 ) -> None:
     anthropic_client = AsyncAnthropic(
         api_key=os.getenv("ANTHROPIC_API_KEY", "DUMMY_API_KEY"),
@@ -350,7 +348,7 @@ async def test_async_anthropic_messages_stream_ctx_manager(
     allowed_hosts=["api.wandb.ai", "localhost"],
 )
 def test_anthropic_messages_stream_ctx_manager_text(
-    client: weave.trace.weave_client.WeaveClient,
+    client: WeaveClient,
 ) -> None:
     api_key = os.getenv("ANTHROPIC_API_KEY", "DUMMY_API_KEY")
     anthropic_client = Anthropic(api_key=api_key)
@@ -397,7 +395,7 @@ def test_anthropic_messages_stream_ctx_manager_text(
 )
 @pytest.mark.asyncio
 async def test_async_anthropic_messages_stream_ctx_manager_text(
-    client: weave.trace.weave_client.WeaveClient,
+    client: WeaveClient,
 ) -> None:
     anthropic_client = AsyncAnthropic(
         api_key=os.getenv("ANTHROPIC_API_KEY", "DUMMY_API_KEY"),
@@ -445,7 +443,7 @@ async def test_async_anthropic_messages_stream_ctx_manager_text(
     allowed_hosts=["api.wandb.ai", "localhost"],
 )
 def test_beta_anthropic(
-    client: weave.trace.weave_client.WeaveClient,
+    client: WeaveClient,
 ) -> None:
     api_key = os.getenv("ANTHROPIC_API_KEY", "DUMMY_API_KEY")
     anthropic_client = Anthropic(api_key=api_key)
@@ -483,7 +481,7 @@ def test_beta_anthropic(
     allowed_hosts=["api.wandb.ai", "localhost"],
 )
 def test_beta_anthropic_stream(
-    client: weave.trace.weave_client.WeaveClient,
+    client: WeaveClient,
 ) -> None:
     api_key = os.getenv("ANTHROPIC_API_KEY", "DUMMY_API_KEY")
     anthropic_client = Anthropic(api_key=api_key)
@@ -531,7 +529,7 @@ def test_beta_anthropic_stream(
 )
 @pytest.mark.asyncio
 async def test_beta_async_anthropic(
-    client: weave.trace.weave_client.WeaveClient,
+    client: WeaveClient,
 ) -> None:
     anthropic_client = AsyncAnthropic(
         # This is the default and can be omitted
@@ -573,7 +571,7 @@ async def test_beta_async_anthropic(
 )
 @pytest.mark.asyncio
 async def test_beta_async_anthropic_stream(
-    client: weave.trace.weave_client.WeaveClient,
+    client: WeaveClient,
 ) -> None:
     anthropic_client = AsyncAnthropic(
         # This is the default and can be omitted

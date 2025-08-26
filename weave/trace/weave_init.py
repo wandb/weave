@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import os
 
+from weave.client.weave_client import WeaveClient
 from weave.compat import wandb
 from weave.telemetry import trace_sentry
 from weave.trace import (
@@ -79,7 +80,7 @@ def init_weave(
     project_name: str,
     ensure_project_exists: bool = True,
     autopatch_settings: autopatch.AutopatchSettings | None = None,
-) -> weave_client.WeaveClient:
+) -> WeaveClient:
     if not project_name or not project_name.strip():
         raise ValueError("project_name must be non-empty")
 
@@ -127,9 +128,7 @@ def init_weave(
     if use_server_cache():
         server = CachingMiddlewareTraceServer.from_env(server)
 
-    client = weave_client.WeaveClient(
-        entity_name, project_name, server, ensure_project_exists
-    )
+    client = WeaveClient(entity_name, project_name, server, ensure_project_exists)
 
     # If the project name was formatted by init, update the project name
     project_name = client.project
@@ -176,7 +175,7 @@ def init_weave(
     return client
 
 
-def init_weave_disabled() -> weave_client.WeaveClient:
+def init_weave_disabled() -> WeaveClient:
     """Initialize a dummy client that does nothing.
 
     This is used when the program is execuring with Weave disabled.
@@ -191,7 +190,7 @@ def init_weave_disabled() -> weave_client.WeaveClient:
     if current_client is not None:
         weave_client_context.set_weave_client_global(None)
 
-    client = weave_client.WeaveClient(
+    client = WeaveClient(
         "DISABLED",
         "DISABLED",
         init_weave_get_server("DISABLED", should_batch=False),
@@ -212,12 +211,12 @@ def init_weave_get_server(
     return res
 
 
-def init_local() -> weave_client.WeaveClient:
+def init_local() -> WeaveClient:
     from weave.trace_server import sqlite_trace_server
 
     server = sqlite_trace_server.SqliteTraceServer("weave.db")
     server.setup_tables()
-    client = weave_client.WeaveClient("none", "none", server)
+    client = WeaveClient("none", "none", server)
     weave_client_context.set_weave_client_global(client)
     return client
 

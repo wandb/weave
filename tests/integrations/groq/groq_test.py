@@ -5,6 +5,7 @@ from typing import Union
 import pytest
 
 import weave
+from weave.client.weave_client import WeaveClient
 from weave.integrations.integration_utilities import (
     flatten_calls,
     flattened_calls_to_names,
@@ -17,9 +18,7 @@ from weave.trace_server.trace_server_interface import CallsFilter
     filter_headers=["authorization", "x-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
-def test_groq_quickstart(
-    client: weave.trace.weave_client.WeaveClient,
-) -> None:
+def test_groq_quickstart(client: WeaveClient) -> None:
     from groq import Groq
 
     groq_client = Groq(
@@ -67,7 +66,7 @@ def test_groq_quickstart(
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 def test_groq_async_chat_completion(
-    client: weave.trace.weave_client.WeaveClient,
+    client: WeaveClient,
 ) -> None:
     from groq import AsyncGroq
 
@@ -131,7 +130,7 @@ Remember, as your psychiatrist, my goal is to help you understand what's going o
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 def test_groq_streaming_chat_completion(
-    client: weave.trace.weave_client.WeaveClient,
+    client: WeaveClient,
 ) -> None:
     from groq import Groq
 
@@ -210,7 +209,7 @@ In summary, fast language models have revolutionized the field of NLP, enabling 
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 def test_groq_async_streaming_chat_completion(
-    client: weave.trace.weave_client.WeaveClient,
+    client: WeaveClient,
 ) -> None:
     from groq import AsyncGroq
 
@@ -285,7 +284,7 @@ Remember, as your psychiatrist, my goal is to help you understand what's going o
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 def test_groq_tool_call(
-    client: weave.trace.weave_client.WeaveClient,
+    client: WeaveClient,
 ) -> None:
     import json
 

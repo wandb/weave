@@ -10,7 +10,7 @@ from weave.trace import urls
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.feedback import RefFeedbackQuery
 from weave.trace.isinstance import weave_isinstance
-from weave.trace.op import Op
+from weave.trace.op_protocol import Op
 from weave.trace.ref_util import get_ref
 from weave.trace.refs import CallRef, ObjectRef, OpRef
 from weave.trace.serialization.serialize import from_json

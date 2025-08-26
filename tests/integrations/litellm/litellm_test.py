@@ -8,6 +8,7 @@ import pytest
 from packaging.version import parse as version_parse
 
 import weave
+from weave.client.weave_client import WeaveClient
 from weave.integrations.litellm.litellm import get_litellm_patcher
 
 # This PR:
@@ -47,9 +48,7 @@ def patch_litellm(request: Any) -> Generator[None, None, None]:
 @pytest.mark.vcr(
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
-def test_litellm_quickstart(
-    client: weave.trace.weave_client.WeaveClient, patch_litellm: None
-) -> None:
+def test_litellm_quickstart(client: WeaveClient, patch_litellm: None) -> None:
     # This is taken directly from https://docs.litellm.ai/docs/
     chat_response = litellm.completion(
         api_key=os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY"),
@@ -90,7 +89,7 @@ def test_litellm_quickstart(
 )
 @pytest.mark.asyncio
 async def test_litellm_quickstart_async(
-    client: weave.trace.weave_client.WeaveClient, patch_litellm: None
+    client: WeaveClient, patch_litellm: None
 ) -> None:
     # This is taken directly from https://docs.litellm.ai/docs/
     chat_response = await litellm.acompletion(
@@ -131,9 +130,7 @@ async def test_litellm_quickstart_async(
 @pytest.mark.vcr(
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
-def test_litellm_quickstart_stream(
-    client: weave.trace.weave_client.WeaveClient, patch_litellm: None
-) -> None:
+def test_litellm_quickstart_stream(client: WeaveClient, patch_litellm: None) -> None:
     # This is taken directly from https://docs.litellm.ai/docs/
     chat_response = litellm.completion(
         api_key=os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY"),
@@ -182,7 +179,7 @@ def test_litellm_quickstart_stream(
 )
 @pytest.mark.asyncio
 async def test_litellm_quickstart_stream_async(
-    client: weave.trace.weave_client.WeaveClient, patch_litellm: None
+    client: WeaveClient, patch_litellm: None
 ) -> None:
     # This is taken directly from https://docs.litellm.ai/docs/
     chat_response = await litellm.acompletion(
@@ -230,9 +227,7 @@ async def test_litellm_quickstart_stream_async(
     filter_headers=["authorization", "x-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost"],
 )
-def test_model_predict(
-    client: weave.trace.weave_client.WeaveClient, patch_litellm: None
-) -> None:
+def test_model_predict(client: WeaveClient, patch_litellm: None) -> None:
     class TranslatorModel(weave.Model):
         model: str
         temperature: float

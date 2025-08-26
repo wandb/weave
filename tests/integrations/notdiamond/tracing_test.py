@@ -2,11 +2,11 @@ import os
 
 import pytest
 
+from weave.client.weave_client import WeaveClient
 from weave.integrations.integration_utilities import (
     flatten_calls,
     flattened_calls_to_names,
 )
-from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
 
 
