@@ -10,7 +10,7 @@ from pydantic.json_schema import SkipJsonSchema
 
 from weave.trace.env import weave_trace_server_url
 from weave.trace.settings import max_calls_queue_size, should_enable_disk_fallback
-from weave.trace_server import requests
+from weave.utils import http_requests as requests
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor

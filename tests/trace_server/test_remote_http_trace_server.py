@@ -39,7 +39,7 @@ def trace_server():
     return RemoteHTTPTraceServer(trace_server_url)
 
 
-@patch("weave.trace_server.requests.post")
+@patch("weave.utils.http_requests.post")
 def test_ok(mock_post, trace_server):
     """Test successful call_start request."""
     call_id = generate_id()
@@ -53,7 +53,7 @@ def test_ok(mock_post, trace_server):
     mock_post.assert_called_once()
 
 
-@patch("weave.trace_server.requests.post")
+@patch("weave.utils.http_requests.post")
 def test_400_no_retry(mock_post, trace_server):
     """Test that 400 errors are not retried."""
     call_id = generate_id()
@@ -76,7 +76,7 @@ def test_invalid_no_retry(trace_server):
         trace_server.call_start(tsi.CallStartReq(start={"invalid": "broken"}))
 
 
-@patch("weave.trace_server.requests.post")
+@patch("weave.utils.http_requests.post")
 def test_500_502_503_504_429_retry(mock_post, trace_server, monkeypatch):
     """Test that 5xx and 429 errors are retried."""
     # This test has multiple failures, so it needs extra retries!
@@ -108,7 +108,7 @@ def test_500_502_503_504_429_retry(mock_post, trace_server, monkeypatch):
     trace_server.call_start(tsi.CallStartReq(start=start))
 
 
-@patch("weave.trace_server.requests.post")
+@patch("weave.utils.http_requests.post")
 def test_other_error_retry(mock_post, trace_server, monkeypatch):
     """Test that connection errors are retried."""
     # This test has multiple failures, so it needs extra retries!
