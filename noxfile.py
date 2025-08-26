@@ -10,7 +10,6 @@ nox.options.stop_on_first_error = True
 SUPPORTED_PYTHON_VERSIONS = ["3.9", "3.10", "3.11", "3.12", "3.13"]
 PY313_INCOMPATIBLE_SHARDS = [
     "cohere",
-    "dspy",
     "notdiamond",
 ]
 PY39_INCOMPATIBLE_SHARDS = [
@@ -166,6 +165,7 @@ def tests(session, shard):
         "--strict-markers",
         "--cov=weave",
         "--cov-report=html",
+        "--cov-report=xml",
         "--cov-branch",
     ]
 

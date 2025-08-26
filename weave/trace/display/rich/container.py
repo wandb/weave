@@ -2,8 +2,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterable, Iterator
 from typing import Any, Generic, Optional, TypeVar
 
-from rich.table import Table
-
+from weave.trace.display import display
 from weave.trace.display.rich import pydantic_util
 
 T = TypeVar("T")
@@ -29,15 +28,15 @@ class AbstractRichContainer(ABC, Generic[T]):
         return len(self.items)
 
     @abstractmethod
-    def _add_table_columns(self, table: Table) -> None:
+    def _add_table_columns(self, table: display.Table) -> None:
         pass
 
     @abstractmethod
     def _item_to_row(self, item: T) -> list:
         pass
 
-    def as_rich_table(self) -> Table:
-        table = Table(show_header=True, header_style="bold cyan")
+    def as_rich_table(self) -> display.Table:
+        table = display.Table(show_header=True, header_style="bold cyan")
         self._add_table_columns(table)
         for item in self.items:
             table.add_row(*self._item_to_row(item))
