@@ -28,7 +28,7 @@ The `openai` library is installed because you use the standard `openai` client t
 
 ## Step 1: Trace your first LLM call
 
-Start with a simple example that uses Llama 3.1-8B through W&B Inference. 
+Start with a basic example that uses Llama 3.1-8B through W&B Inference. 
 
 When you run this code, Weave:
 - Traces your LLM call automatically
