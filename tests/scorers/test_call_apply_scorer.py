@@ -4,9 +4,10 @@ import pytest
 
 import weave
 from weave.flow.scorer import ApplyScorerResult, WeaveScorerResult
+from weave.trace.call import Call
 from weave.trace.op import OpCallError
 from weave.trace.refs import CallRef
-from weave.trace.weave_client import Call, Op, WeaveClient
+from weave.trace.weave_client import Op, WeaveClient
 
 
 def do_assertions_for_scorer_op(
