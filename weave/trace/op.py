@@ -50,7 +50,7 @@ from weave.trace.refs import ObjectRef
 from weave.trace.util import log_once
 
 if TYPE_CHECKING:
-    from weave.trace.call import Call, CallsIter, NoOpCall
+    from weave.trace.call import Call, CallsIter
 
 try:
     from openai._types import NOT_GIVEN as OPENAI_NOT_GIVEN

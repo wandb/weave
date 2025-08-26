@@ -3,8 +3,6 @@ import libcst
 from fixit import Invalid, LintRule, Valid
 from libcst.metadata import QualifiedNameProvider
 
-import weave.trace.call
-
 
 class ClientCallsRule(LintRule):
     """
@@ -16,7 +14,7 @@ class ClientCallsRule(LintRule):
     VALID = [Valid("client.get_calls")]
     INVALID = [Invalid("client.calls")]
     
-    def visit_Call(self, node: weave.trace.call.Call) -> None:
+    def visit_Call(self, node: libcst.Call) -> None:
         if (
             isinstance(node.func, libcst.Attribute)
             and isinstance(node.func.value, libcst.Name)
@@ -44,7 +42,7 @@ class ClientCallRule(LintRule):
     VALID = [Valid("client.get_call")]
     INVALID = [Invalid("client.call")]
 
-    def visit_Call(self, node: weave.trace.call.Call) -> None:
+    def visit_Call(self, node: libcst.Call) -> None:
         if (
             isinstance(node.func, libcst.Attribute)
             and isinstance(node.func.value, libcst.Name)
@@ -73,7 +71,7 @@ class ClientFeedbackRule(LintRule):
     VALID = [Valid("client.get_feedback")]
     INVALID = [Invalid("client.feedback")]
     
-    def visit_Call(self, node: weave.trace.call.Call) -> None:
+    def visit_Call(self, node: libcst.Call) -> None:
         if (
             isinstance(node.func, libcst.Attribute)
             and isinstance(node.func.value, libcst.Name)
@@ -150,7 +148,7 @@ class ReplaceFileWithContentRule(LintRule):
         ),
     ]
 
-    def visit_Call(self, node: weave.trace.call.Call) -> None:
+    def visit_Call(self, node: libcst.Call) -> None:
         """Visit a Call node and check if it's a `File` instantiation."""
         # Get all possible fully qualified names for the function being called.
         q_names = self.get_metadata(QualifiedNameProvider, node.func)
