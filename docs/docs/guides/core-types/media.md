@@ -244,7 +244,7 @@ bunny_video = load_video_content("big_buck_bunny.mp4")
 
 ### Example
 
-Here's an example of using video logging within a video understanding project:
+The following example shows how to log video within a video-understanding project:
 
 
 <Tabs groupId="package-manager" queryString>
