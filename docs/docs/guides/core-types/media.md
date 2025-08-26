@@ -23,7 +23,7 @@ All examples below use this annotation approach, which is the recommended and si
 
 Log images by annotating functions with `Annotated[bytes, Content]` types or filepaths with `Annotated[str, Content]`. 
 
-Weave automatically handles `png`, `jpeg`, `gif`, `bmp`, `webp`, `svg` image formats. It also automatically handles `PIL.Image` objects. Here's a simple example:
+The following example draws a basic image and then logs it to Weave using the `Content` annotation:
 
 <Tabs groupId="package-manager" queryString>
   <TabItem value="pip" label="pip" default>
