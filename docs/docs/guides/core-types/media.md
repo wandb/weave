@@ -319,7 +319,7 @@ Weave automatically handles `pdf`, `csv`, `md`, `text`, `json`, `xml` file types
 
 ### Quickstart
 
-Here's a simple example:
+The following example shows how stores copies of the input PDF and CSV files, and then stores the file contents returned by the function:
 
 <Tabs groupId="package-manager" queryString>
   <TabItem value="pip" label="pip" default>
