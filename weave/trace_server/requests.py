@@ -11,7 +11,7 @@ from requests import HTTPError as HTTPError
 from requests import PreparedRequest, Response, Session
 from requests.adapters import HTTPAdapter
 
-from weave.trace.display.display import Console, SyntaxHighlight, Text
+from weave.trace.display.display import Console, Text
 
 console = Console()
 
@@ -64,10 +64,11 @@ def pprint_json(text: str) -> None:
     try:
         json_body = json.loads(text)
         pretty_json = json.dumps(json_body, indent=4)
-        body_syntax = SyntaxHighlight(
-            pretty_json, "json", theme=THEME_JSON, line_numbers=True
-        )
-        console.print(body_syntax.to_string())
+        # Add line numbers manually and print as plain text to avoid ANSI code issues
+        lines = pretty_json.split("\n")
+        for i, line in enumerate(lines, 1):
+            line_num = Text(f"{i:>3} ", style="dim")
+            console.print(line_num, line, sep="", end="\n")
     except json.JSONDecodeError:
         console.print(Text("  Invalid JSON", style=STYLE_ERROR))
         console.print(Text(text, style=STYLE_ERROR))
