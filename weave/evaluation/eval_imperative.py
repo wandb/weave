@@ -19,17 +19,20 @@ from pydantic import (
     PrivateAttr,
 )
 
-import weave
 from weave.dataset.dataset import Dataset
 from weave.evaluation.eval import Evaluation, default_evaluation_display_name
 from weave.flow.model import MissingInferenceMethodError, Model
 from weave.flow.scorer import Scorer
 from weave.flow.scorer import auto_summarize as auto_summarize_fn
 from weave.flow.util import make_memorable_name
+from weave.object.obj import Object
+from weave.trace.api import attributes
 from weave.trace.call import Call
 from weave.trace.context import call_context
 from weave.trace.context.weave_client_context import require_weave_client
+from weave.trace.op import op
 from weave.trace.op_protocol import Op
+from weave.trace.table import Table
 
 T = TypeVar("T")
 ID = str
@@ -130,7 +133,7 @@ def _cast_to_cls(type_: type[T]) -> Callable[[str | dict | T], T]:
 
         elif isinstance(value, type_):
             instance = value
-            if isinstance(instance, weave.Object) and not instance.name:
+            if isinstance(instance, Object) and not instance.name:
                 instance.name = instance.__class__.__name__
             return instance
 
@@ -141,9 +144,9 @@ def _cast_to_cls(type_: type[T]) -> Callable[[str | dict | T], T]:
 
 def _cast_to_imperative_dataset(value: Dataset | list[dict] | str) -> Dataset:
     if isinstance(value, str):
-        return Dataset(name=value, rows=weave.Table([{"dataset_id": value}]))
+        return Dataset(name=value, rows=Table([{"dataset_id": value}]))
     elif isinstance(value, list):
-        return Dataset(rows=weave.Table(value))
+        return Dataset(rows=Table(value))
     elif isinstance(value, Dataset):
         return value
     else:
@@ -282,7 +285,7 @@ class ScoreLogger(BaseModel):
         # this is safe; pydantic casting is done in validator above
         scorer = cast(Scorer, scorer)
 
-        @weave.op(name=scorer.name, enable_code_capture=False)
+        @op(name=scorer.name, enable_code_capture=False)
         def score_method(self: Scorer, *, output: Any, inputs: Any) -> ScoreType:
             # TODO: can't use score here because it will cause version mismatch
             # return score
@@ -295,7 +298,7 @@ class ScoreLogger(BaseModel):
             [self.evaluate_call, self.predict_and_score_call]
         ):
             with _set_current_score(score):
-                with weave.attributes(IMPERATIVE_SCORE_MARKER):
+                with attributes(IMPERATIVE_SCORE_MARKER):
                     await self.predict_call.apply_scorer(scorer)
 
         # this is always true because of how the scorer is created in the validator
@@ -346,7 +349,7 @@ class EvaluationLogger(BaseModel):
         BeforeValidator(_cast_to_imperative_dataset),
         Field(
             default_factory=lambda: Dataset(
-                rows=weave.Table([{"dataset_id": _default_dataset_name()}]),
+                rows=Table([{"dataset_id": _default_dataset_name()}]),
             ),
             description="(Optional): A metadata-only Dataset used for comparisons."
             "If you already know your rows ahead of time, you can pass either"
@@ -408,7 +411,7 @@ class EvaluationLogger(BaseModel):
             self.model.get_infer_method()
         except MissingInferenceMethodError:
 
-            @weave.op(name="Model.predict", enable_code_capture=False)
+            @op(name="Model.predict", enable_code_capture=False)
             def predict(self: Model, inputs: dict) -> Any:
                 # Get the output from the context variable
                 return current_output.get()
@@ -416,13 +419,13 @@ class EvaluationLogger(BaseModel):
             self.model.__dict__["predict"] = MethodType(predict, self.model)
 
         # --- Setup the evaluation object ---
-        @weave.op(name="Evaluation.evaluate", enable_code_capture=False)
+        @op(name="Evaluation.evaluate", enable_code_capture=False)
         def evaluate(self: Evaluation, model: Model) -> None: ...
 
-        @weave.op(name="Evaluation.predict_and_score", enable_code_capture=False)
+        @op(name="Evaluation.predict_and_score", enable_code_capture=False)
         def predict_and_score(self: Evaluation, model: Model, example: dict) -> dict:
             predict_method = cast(Op, model.get_infer_method())
-            with weave.attributes(IMPERATIVE_EVAL_MARKER):
+            with attributes(IMPERATIVE_EVAL_MARKER):
                 output, predict_call = predict_method.call(model, example)
                 current_predict_call.set(predict_call)
 
@@ -434,7 +437,7 @@ class EvaluationLogger(BaseModel):
                 "model_latency": None,
             }
 
-        @weave.op(name="Evaluation.summarize", enable_code_capture=False)
+        @op(name="Evaluation.summarize", enable_code_capture=False)
         def summarize(self: Evaluation) -> dict:
             return cast(dict, current_summary.get())
 
@@ -514,7 +517,7 @@ class EvaluationLogger(BaseModel):
         with call_context.set_call_stack([self._evaluate_call]):
             # Make the prediction call
             with _set_current_output(output):
-                with weave.attributes(IMPERATIVE_EVAL_MARKER):
+                with attributes(IMPERATIVE_EVAL_MARKER):
                     _, predict_and_score_call = (
                         self._pseudo_evaluation.predict_and_score.call(
                             self._pseudo_evaluation,
@@ -578,7 +581,7 @@ class EvaluationLogger(BaseModel):
         with call_context.set_call_stack([self._evaluate_call]):
             try:
                 with _set_current_summary(final_summary):
-                    with weave.attributes(IMPERATIVE_EVAL_MARKER):
+                    with attributes(IMPERATIVE_EVAL_MARKER):
                         self._pseudo_evaluation.summarize()
             except Exception:
                 logger.error("Error during execution of summarize op.", exc_info=True)
