@@ -312,7 +312,7 @@ result = analyze_video(video_data)
 
 ## Documents
 
-Log documents by annotating functions with `Annotated[bytes, Content]` types or by specifying the document type with `Annotated[str, Content[Literal['text']]`. 
+Log documents by annotating functions with `Annotated[bytes, Content]` types, or by specifying the document type with `Annotated[str, Content[Literal['text']]`. 
 
 Weave automatically handles `pdf`, `csv`, `md`, `text`, `json`, `xml` file types and can handle logging using filepaths too with `Annotated[str, Content]`.
 
