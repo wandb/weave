@@ -11,11 +11,10 @@ import weave
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.op import (
-    Op,
-    ProcessedInputs,
     _add_accumulator,
     _default_on_input_handler,
 )
+from weave.trace.op_protocol import Op, ProcessedInputs
 from weave.utils.stream_metrics import (
     WEAVE_STREAM_START_TIME,
     add_time_to_first_token_to_dict,

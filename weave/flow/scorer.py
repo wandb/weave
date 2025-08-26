@@ -13,8 +13,9 @@ import weave
 from weave.object.obj import Object
 from weave.trace.call import Call
 from weave.trace.isinstance import weave_isinstance
-from weave.trace.op import Op, OpCallError, as_op, is_op
+from weave.trace.op import OpCallError, as_op, is_op
 from weave.trace.op_caller import async_call_op
+from weave.trace.op_protocol import Op
 from weave.trace.vals import WeaveObject
 from weave.trace.weave_client import sanitize_object_name
 
@@ -209,7 +210,7 @@ def get_scorer_attributes(
                 raise TypeError(
                     f"Scorer {scorer_name} must implement `score` as a weave.op() decorated function."
                 )
-            score_op = scorer.score
+            score_op = as_op(scorer.score)
             summarize_fn = scorer.summarize  # type: ignore
 
         except AttributeError:
