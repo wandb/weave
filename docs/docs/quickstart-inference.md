@@ -245,7 +245,7 @@ for model in models_to_compare:
 Running these examples returns links to the traces in the terminal. Click any link to view traces in the Weave UI.
 
 In the Weave UI, you can:
-- See a timeline of all your LLM calls
+- Review a timeline of all your LLM calls
 - Inspect inputs and outputs for each operation
 - View token usage and estimated costs (automatically captured by EvaluationLogger)
 - Analyze latency and performance metrics
