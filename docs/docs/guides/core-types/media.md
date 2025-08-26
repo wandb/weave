@@ -623,7 +623,8 @@ Try our cookbook for [Audio Logging](/reference/gen_notebooks/audio_with_weave) 
 
 ## HTML
 
-Log interactive HTML by annotating functions with `Annotated[str, Content[Literal['html']]`. Here's a simple example:
+Log interactive HTML by annotating functions with `Annotated[str, Content[Literal['html']]`.
+
 
 ### Quickstart
 
