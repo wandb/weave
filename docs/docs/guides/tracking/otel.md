@@ -5,7 +5,7 @@ Weave supports ingestion of OpenTelemetry compatible trace data through a dedica
 
 ## Endpoint details
 
-**Path**: `/otel/v1/traces`  
+**Path**: `/otel/v1/traces`
 **Method**: POST  
 **Content-Type**: `application/x-protobuf`
 **Base URL**: The base URL for the OTEL trace endpoint depends on your W&B deployment type:
