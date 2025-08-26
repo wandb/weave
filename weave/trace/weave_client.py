@@ -2018,10 +2018,14 @@ class WeaveClient:
             )
 
             def test_func(req: TableCreateFromDigestsReq) -> Any:
-                assert hasattr(self.server, "_generic_request_executor")
-                assert hasattr(self.server._generic_request_executor, "__wrapped__")
-                return self.server._generic_request_executor.__wrapped__(
-                    self.server, "/table/create_from_digests", req
+                server = self.server
+                if hasattr(server, "_next_trace_server"):
+                    server = server._next_trace_server
+
+                assert hasattr(server, "_generic_request_executor")
+                assert hasattr(server._generic_request_executor, "__wrapped__")
+                return server._generic_request_executor.__wrapped__(
+                    server, "/table/create_from_digests", req
                 )
 
             use_parallel_chunks = check_endpoint_exists(
@@ -2042,7 +2046,7 @@ class WeaveClient:
         chunk_futures = []
         for raw_chunk in raw_chunks:
             chunk_future = self.future_executor.defer(
-                lambda: self._send_table_create(raw_chunk)
+                lambda chunk=raw_chunk: self._send_table_create(chunk)
             )
             chunk_futures.append(chunk_future)
 
