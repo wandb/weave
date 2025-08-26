@@ -91,26 +91,31 @@ You can extend this list with your own custom keys that you want to redact from 
 
 ```python
 import weave
+from weave.utils import sanitize
 
 client = weave.init("my-project")
 
 # Add custom keys to redact
-weave.trace.sanitize.REDACT_KEYS.add("client_id")
-weave.trace.sanitize.REDACT_KEYS.add("whatever_else")
+sanitize.REDACT_KEYS.add("token")
+sanitize.REDACT_KEYS.add("client_id")
+sanitize.REDACT_KEYS.add("whatever_else")
 
+token = "secret_token_123"
 client_id = "123"
 whatever_else = "456"
 
 @weave.op()
 def test():
-    a = client_id
-    b = whatever_else
+    a = token
+    b = client_id
+    c = whatever_else
     return 1
 ```
 
-When viewed in the Weave UI, the values of `client_id` and `whatever_else` will appear as `"REDACTED"`:
+When viewed in the Weave UI, the values of `token`, `client_id`, and `whatever_else` will appear as `"REDACTED"`:
 
 ```python
+token = "REDACTED"
 client_id = "REDACTED"
 whatever_else = "REDACTED"
 ```
