@@ -5,6 +5,7 @@ from langchain_core.messages import AIMessageChunk
 from langchain_nvidia_ai_endpoints import ChatNVIDIA
 
 import weave
+import weave.client.weave_client
 from weave.integrations.integration_utilities import op_name_from_ref
 
 model = "meta/llama-3.1-8b-instruct"
@@ -15,7 +16,7 @@ model = "meta/llama-3.1-8b-instruct"
     filter_headers=["authorization"],
     allowed_hosts=["api.wandb.ai", "localhost"],
 )
-def test_chatnvidia_quickstart(client: weave.trace.weave_client.WeaveClient) -> None:
+def test_chatnvidia_quickstart(client: weave.client.weave_client.WeaveClient) -> None:
     api_key = os.environ.get("NVIDIA_API_KEY", "DUMMY_API_KEY")
 
     nvidia_client = ChatNVIDIA(
@@ -61,7 +62,7 @@ def test_chatnvidia_quickstart(client: weave.trace.weave_client.WeaveClient) -> 
 )
 @pytest.mark.asyncio
 async def test_chatnvidia_async_quickstart(
-    client: weave.trace.weave_client.WeaveClient,
+    client: weave.client.weave_client.WeaveClient,
 ) -> None:
     api_key = os.environ.get("NVIDIA_API_KEY", "DUMMY_API_KEY")
 
@@ -108,7 +109,7 @@ async def test_chatnvidia_async_quickstart(
     allowed_hosts=["api.wandb.ai", "localhost"],
 )
 def test_chatnvidia_stream_quickstart(
-    client: weave.trace.weave_client.WeaveClient,
+    client: weave.client.weave_client.WeaveClient,
 ) -> None:
     api_key = os.environ.get("NVIDIA_API_KEY", "DUMMY_API_KEY")
 
@@ -160,7 +161,7 @@ def test_chatnvidia_stream_quickstart(
 )
 @pytest.mark.asyncio
 async def test_chatnvidia_async_stream_quickstart(
-    client: weave.trace.weave_client.WeaveClient,
+    client: weave.client.weave_client.WeaveClient,
 ) -> None:
     api_key = os.environ.get("NVIDIA_API_KEY", "DUMMY_API_KEY")
 
@@ -209,7 +210,7 @@ async def test_chatnvidia_async_stream_quickstart(
 @pytest.mark.vcr(
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
-def test_chatnvidia_tool_call(client: weave.trace.weave_client.WeaveClient) -> None:
+def test_chatnvidia_tool_call(client: weave.client.weave_client.WeaveClient) -> None:
     api_key = os.environ.get("NVIDIA_API_KEY", "DUMMY_API_KEY")
 
     function_list = [
@@ -295,7 +296,7 @@ def test_chatnvidia_tool_call(client: weave.trace.weave_client.WeaveClient) -> N
 )
 @pytest.mark.asyncio
 async def test_chatnvidia_tool_call_async(
-    client: weave.trace.weave_client.WeaveClient,
+    client: weave.client.weave_client.WeaveClient,
 ) -> None:
     api_key = os.environ.get("NVIDIA_API_KEY", "DUMMY_API_KEY")
 
@@ -381,7 +382,7 @@ async def test_chatnvidia_tool_call_async(
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
 def test_chatnvidia_tool_call_stream(
-    client: weave.trace.weave_client.WeaveClient,
+    client: weave.client.weave_client.WeaveClient,
 ) -> None:
     api_key = os.environ.get("NVIDIA_API_KEY", "DUMMY_API_KEY")
 
@@ -473,7 +474,7 @@ def test_chatnvidia_tool_call_stream(
 )
 @pytest.mark.asyncio
 async def test_chatnvidia_tool_call_async_stream(
-    client: weave.trace.weave_client.WeaveClient,
+    client: weave.client.weave_client.WeaveClient,
 ) -> None:
     api_key = os.environ.get("NVIDIA_API_KEY", "DUMMY_API_KEY")
 

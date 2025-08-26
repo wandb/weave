@@ -9,10 +9,12 @@ import warnings
 from collections.abc import Iterator
 from typing import Any, Union, cast
 
+import weave.client.weave_client
+
 # TODO: type_handlers is imported here to trigger registration of the image serializer.
 # There is probably a better place for this, but including here for now to get the fix in.
 from weave import type_handlers  # noqa: F401
-from weave.trace import urls, weave_client, weave_init
+from weave.trace import urls, weave_init
 from weave.trace.autopatch import AutopatchSettings
 from weave.trace.constants import TRACE_OBJECT_EMOJI
 from weave.trace.context import call_context
@@ -21,7 +23,7 @@ from weave.trace.context.call_context import get_current_call, require_current_c
 from weave.trace.display.term import configure_logger
 from weave.trace.op import as_op, op
 from weave.trace.op_protocol import PostprocessInputsFunc, PostprocessOutputFunc
-from weave.trace.refs import ObjectRef, Ref
+from weave.trace.refs import ObjectRef, OpRef, Ref
 from weave.trace.settings import (
     UserSettings,
     parse_and_apply_settings,
@@ -49,7 +51,7 @@ def init(
     global_postprocess_inputs: PostprocessInputsFunc | None = None,
     global_postprocess_output: PostprocessOutputFunc | None = None,
     global_attributes: dict[str, Any] | None = None,
-) -> weave_client.WeaveClient:
+) -> weave.client.weave_client.WeaveClient:
     """Initialize weave tracking, logging to a wandb project.
 
     Logging is initialized globally, so you do not need to keep a reference
@@ -105,7 +107,7 @@ def init(
     )
 
 
-def get_client() -> weave_client.WeaveClient | None:
+def get_client() -> weave.client.weave_client.WeaveClient | None:
     return weave_client_context.get_weave_client()
 
 
@@ -137,7 +139,7 @@ def publish(obj: Any, name: str | None = None) -> ObjectRef:
     ref = client._save_object(obj, save_name, "latest")
 
     if isinstance(ref, ObjectRef):
-        if isinstance(ref, weave_client.OpRef):
+        if isinstance(ref, OpRef):
             url = urls.op_version_path(
                 ref.entity,
                 ref.project,

@@ -1,11 +1,11 @@
 import datetime
 import uuid
 
-from weave.trace import weave_client
+import weave.client.weave_client
 from weave.trace_server import trace_server_interface as tsi
 
 
-def test_call_update_out_of_order(client: weave_client.WeaveClient):
+def test_call_update_out_of_order(client: weave.client.weave_client.WeaveClient):
     # Here, we are going to do an out of order sequence:
     # 1. Name a call
     # 2. Finish the call

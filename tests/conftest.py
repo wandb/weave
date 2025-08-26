@@ -13,10 +13,11 @@ from fastapi.responses import StreamingResponse
 from fastapi.testclient import TestClient
 
 import weave
+import weave.client.weave_client
 from tests.trace.util import DummyTestException
 from tests.trace_server.conftest import *
 from tests.trace_server.conftest import TEST_ENTITY, get_trace_server_flag
-from weave.trace import autopatch, weave_client, weave_init
+from weave.trace import autopatch, weave_init
 from weave.trace.context import weave_client_context
 from weave.trace.context.call_context import set_call_stack
 from weave.trace_server import trace_server_interface as tsi
@@ -275,7 +276,7 @@ def logging_error_check(request, log_collector):
         )
 
 
-class TestOnlyFlushingWeaveClient(weave_client.WeaveClient):
+class TestOnlyFlushingWeaveClient(weave.client.weave_client.WeaveClient):
     """
     A WeaveClient that automatically flushes after every method call.
 
@@ -363,7 +364,7 @@ def create_client(
     trace_server,
     autopatch_settings: typing.Optional[autopatch.AutopatchSettings] = None,
     global_attributes: typing.Optional[dict[str, typing.Any]] = None,
-) -> weave_client.WeaveClient:
+) -> weave.client.weave_client.WeaveClient:
     trace_server_flag = get_trace_server_flag(request)
     if trace_server_flag == "prod":
         # Note: this is only for local dev testing and should be removed

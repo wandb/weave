@@ -7,7 +7,8 @@ import pytest
 from PIL import Image
 
 import weave
-from weave.trace.weave_client import WeaveClient, get_ref
+from weave.client.weave_client import WeaveClient
+from weave.trace.weave_client import get_ref
 
 """When testing types, it is important to test:
 Objects:

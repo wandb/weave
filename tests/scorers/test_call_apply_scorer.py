@@ -3,12 +3,12 @@ from __future__ import annotations
 import pytest
 
 import weave
+from weave.client.weave_client import WeaveClient
 from weave.flow.scorer import ApplyScorerResult, WeaveScorerResult
 from weave.trace.call import Call
 from weave.trace.op import OpCallError
 from weave.trace.op_protocol import Op
 from weave.trace.refs import CallRef
-from weave.trace.weave_client import WeaveClient
 
 
 def do_assertions_for_scorer_op(

@@ -21,13 +21,13 @@ from llama_index.core.workflow import (
 from llama_index.llms.openai import OpenAI
 from pydantic import BaseModel
 
+from weave.client.weave_client import WeaveClient
 from weave.integrations.integration_utilities import (
     filter_body,
     flatten_calls,
     flattened_calls_to_names,
     op_name_from_ref,
 )
-from weave.trace.weave_client import WeaveClient
 from weave.trace_server.trace_server_interface import CallsFilter
 
 

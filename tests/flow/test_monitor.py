@@ -1,9 +1,9 @@
 import pytest
 from pydantic import ValidationError
 
+import weave.client.weave_client
 from weave.flow.monitor import Monitor
 from weave.scorers import ValidJSONScorer
-from weave.trace import weave_client
 from weave.trace.api import publish
 from weave.trace_server.interface.query import Query
 
@@ -37,7 +37,7 @@ def test_out_of_range_sampling_rate():
         )
 
 
-def test_publish(client: weave_client.WeaveClient):
+def test_publish(client: weave.client.weave_client.WeaveClient):
     monitor = Monitor(
         name="test_monitor",
         sampling_rate=0.5,
@@ -72,7 +72,7 @@ def test_publish(client: weave_client.WeaveClient):
     )
 
 
-def test_activate(client: weave_client.WeaveClient):
+def test_activate(client: weave.client.weave_client.WeaveClient):
     monitor = Monitor(
         name="test_monitor",
         sampling_rate=0.5,

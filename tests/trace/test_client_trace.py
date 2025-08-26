@@ -17,6 +17,7 @@ import pytest
 from pydantic import BaseModel, ValidationError
 
 import weave
+import weave.client.weave_client
 import weave.trace.call
 from tests.trace.util import (
     AnyIntMatcher,
@@ -69,7 +70,7 @@ def extract_weave_refs_from_value(value):
     return refs
 
 
-ClientType = weave_client.WeaveClient
+ClientType = weave.client.weave_client.WeaveClient
 
 
 @dataclass
@@ -79,12 +80,12 @@ class ComplexAttribute:
 
 
 def get_client_trace_server(
-    client: weave_client.WeaveClient,
+    client: weave.client.weave_client.WeaveClient,
 ) -> tsi.TraceServerInterface:
     return client.server
 
 
-def get_client_project_id(client: weave_client.WeaveClient) -> str:
+def get_client_project_id(client: weave.client.weave_client.WeaveClient) -> str:
     return client._project_id()
 
 
@@ -1809,7 +1810,7 @@ def _no_graph_client():
 
 
 @contextmanager
-def _patched_default_initializer(trace_client: weave_client.WeaveClient):
+def _patched_default_initializer(trace_client: weave.client.weave_client.WeaveClient):
     from weave.trace import weave_init
 
     def init_weave_get_server_patched(api_key):

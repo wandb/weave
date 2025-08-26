@@ -20,7 +20,7 @@ from weave.trace_server.trace_server_interface_util import bytes_digest
 from weave.utils.sanitize import REDACTED_VALUE, should_redact
 
 if TYPE_CHECKING:
-    from weave.trace.weave_client import WeaveClient
+    from weave.client.weave_client import WeaveClient
 
 
 def is_pydantic_model_class(obj: Any) -> bool:

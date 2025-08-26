@@ -45,11 +45,11 @@ from typing import TYPE_CHECKING, Any, Callable, Optional, TypeVar, Union, overl
 
 from pydantic import BaseModel
 
+from weave.client.weave_client import WeaveClient
 from weave.trace.context.weave_client_context import (
     get_weave_client,
     set_weave_client_global,
 )
-from weave.trace.weave_client import WeaveClient
 
 logger = logging.getLogger(__name__)
 

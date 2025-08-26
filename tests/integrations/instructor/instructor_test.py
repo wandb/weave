@@ -8,6 +8,7 @@ import pytest
 from pydantic import BaseModel
 
 import weave
+import weave.client.weave_client
 from weave.integrations.integration_utilities import op_name_from_ref
 
 
@@ -36,7 +37,7 @@ class MeetingInfo(BaseModel):
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 def test_instructor_openai(
-    client: weave.trace.weave_client.WeaveClient,
+    client: weave.client.weave_client.WeaveClient,
 ) -> None:
     import instructor
     from openai import OpenAI
@@ -78,7 +79,7 @@ def test_instructor_openai(
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 def test_instructor_openai_with_completion(
-    client: weave.trace.weave_client.WeaveClient,
+    client: weave.client.weave_client.WeaveClient,
 ) -> None:
     import instructor
     from openai import OpenAI
@@ -117,7 +118,7 @@ def test_instructor_openai_with_completion(
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 def test_instructor_openai_async(
-    client: weave.trace.weave_client.WeaveClient,
+    client: weave.client.weave_client.WeaveClient,
 ) -> None:
     import instructor
     from openai import AsyncOpenAI
@@ -165,7 +166,7 @@ def test_instructor_openai_async(
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 def test_instructor_iterable(
-    client: weave.trace.weave_client.WeaveClient,
+    client: weave.client.weave_client.WeaveClient,
 ) -> None:
     import instructor
     from openai import OpenAI
@@ -223,7 +224,7 @@ def test_instructor_iterable(
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 def test_instructor_iterable_sync_stream(
-    client: weave.trace.weave_client.WeaveClient,
+    client: weave.client.weave_client.WeaveClient,
 ) -> None:
     import instructor
     from openai import OpenAI
@@ -272,7 +273,7 @@ def test_instructor_iterable_sync_stream(
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 def test_instructor_iterable_async_stream(
-    client: weave.trace.weave_client.WeaveClient,
+    client: weave.client.weave_client.WeaveClient,
 ) -> None:
     import instructor
     from openai import AsyncOpenAI
@@ -330,7 +331,7 @@ def test_instructor_iterable_async_stream(
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 def test_instructor_partial_stream(
-    client: weave.trace.weave_client.WeaveClient,
+    client: weave.client.weave_client.WeaveClient,
 ) -> None:
     import instructor
     from openai import OpenAI
@@ -400,7 +401,7 @@ list of speakers.
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
 def test_instructor_partial_stream_async(
-    client: weave.trace.weave_client.WeaveClient,
+    client: weave.client.weave_client.WeaveClient,
 ) -> None:
     import instructor
     from openai import AsyncOpenAI

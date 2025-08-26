@@ -3,12 +3,12 @@ from typing import Literal
 import dspy
 import pytest
 
+from weave.client.weave_client import WeaveClient
 from weave.integrations.integration_utilities import (
     flatten_calls,
     flattened_calls_to_names,
     op_name_from_ref,
 )
-from weave.trace.weave_client import WeaveClient
 from weave.trace_server.trace_server_interface import CallsFilter
 
 SAMPLE_EVAL_DATASET = [

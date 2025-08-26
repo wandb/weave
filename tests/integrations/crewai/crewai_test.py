@@ -2,11 +2,11 @@ import asyncio
 
 import pytest
 
+from weave.client.weave_client import WeaveClient
 from weave.integrations.integration_utilities import (
     flatten_calls,
     flattened_calls_to_names,
 )
-from weave.trace.weave_client import WeaveClient
 from weave.trace_server.trace_server_interface import CallsFilter
 
 
