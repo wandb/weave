@@ -398,12 +398,13 @@ def _should_sample_traces(op: Op) -> bool:
 
 def placeholder_call() -> Call:
     # Import here to avoid circular dependency
+    from weave.trace.call import NoOpCall
 
     return NoOpCall()
 
 
 def is_placeholder_call(call: Call) -> bool:
-    from weave.trace.weave_client import NoOpCall
+    from weave.trace.call import NoOpCall
 
     return isinstance(call, NoOpCall)
 
