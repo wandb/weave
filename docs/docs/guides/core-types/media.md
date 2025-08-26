@@ -674,7 +674,7 @@ result = create_simple_html()
 
 ### Example
 
-Here's an example of using HTML logging within a generative UI project using W&B Inference:
+This example generates self-contained HTML pages using [W&B Inference](https://docs.wandb.ai/guides/inference/) and logs the pages to Weave:
 
 <Tabs groupId="package-manager" queryString>
   <TabItem value="pip" label="pip" default>
