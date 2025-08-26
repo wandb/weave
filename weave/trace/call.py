@@ -5,17 +5,21 @@ import datetime
 from concurrent.futures import Future
 from typing import Any, Callable, TypedDict
 
-from weave import ObjectRef
-from weave.flow.scorer import Scorer, ApplyScorerResult
+from weave.flow.scorer import ApplyScorerResult, Scorer
 from weave.trace import urls
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.feedback import RefFeedbackQuery
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.op import Op
 from weave.trace.ref_util import get_ref
-from weave.trace.refs import OpRef, CallRef
-from weave.trace.weave_client import elide_display_name, OpNameError, DEFAULT_CALLS_PAGE_SIZE, CallsIter, \
-    _make_calls_iterator
+from weave.trace.refs import CallRef, ObjectRef, OpRef
+from weave.trace.weave_client import (
+    DEFAULT_CALLS_PAGE_SIZE,
+    CallsIter,
+    OpNameError,
+    _make_calls_iterator,
+    elide_display_name,
+)
 from weave.trace_server.trace_server_interface import CallsFilter
 
 

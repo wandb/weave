@@ -1,8 +1,8 @@
 import warnings
 from typing import Any
 
-from weave.trace.serialization.serialize import dictify, stringify
 from weave.trace.call import Call
+from weave.trace.serialization.serialize import dictify, stringify
 
 EXCLUDE_TASK_ATTRS = {"agent": True}
 

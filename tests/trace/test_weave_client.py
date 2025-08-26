@@ -2829,7 +2829,9 @@ def test_tracing_enabled_context(client):
     # Test create_call with tracing disabled
     with tracing_disabled():
         call = client.create_call(test_op, {})
-        assert isinstance(call, weave.trace.call.NoOpCall)  # Should be a NoOpCall instance
+        assert isinstance(
+            call, weave.trace.call.NoOpCall
+        )  # Should be a NoOpCall instance
         assert (
             len(list(client.get_calls())) == 1
         )  # Verify no additional calls were created

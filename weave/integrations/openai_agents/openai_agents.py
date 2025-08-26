@@ -12,11 +12,11 @@ from typing import Any, TypedDict
 import weave.trace.call
 from weave.integrations.patcher import NoOpPatcher, Patcher
 from weave.trace.autopatch import IntegrationSettings
+from weave.trace.call import Call
 from weave.trace.context import call_context
 from weave.trace.context.weave_client_context import (
     get_weave_client,
 )
-from weave.trace.call import Call
 
 _openai_agents_patcher: OpenAIAgentsPatcher | None = None
 

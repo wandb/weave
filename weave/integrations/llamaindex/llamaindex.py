@@ -7,10 +7,10 @@ from typing import Any, Optional, Union
 from pydantic import BaseModel
 
 from weave.integrations.patcher import Patcher
+from weave.trace.call import Call
 from weave.trace.context import weave_client_context
 from weave.trace.util import log_once
 from weave.trace.weave_client import WeaveClient
-from weave.trace.call import Call
 
 _import_failed = False
 
