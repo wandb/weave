@@ -21,6 +21,7 @@ from requests import HTTPError
 from weave import version
 from weave.chat.chat import Chat
 from weave.chat.inference_models import InferenceModels
+from weave.init.init_message import WANDB_AVAILABLE
 from weave.telemetry import trace_sentry
 from weave.trace import settings
 from weave.trace.call import (
@@ -36,7 +37,6 @@ from weave.trace.concurrent.futures import FutureExecutor
 from weave.trace.constants import TRACE_CALL_EMOJI
 from weave.trace.context import call_context
 from weave.trace.feedback import FeedbackQuery
-from weave.trace.init_message import WANDB_AVAILABLE
 from weave.trace.interface_query_builder import (
     exists_expr,
     get_field_expr,
@@ -666,7 +666,7 @@ class WeaveClient:
         ):
             return placeholder_call()
 
-        from weave.trace.api import _global_attributes, _global_postprocess_inputs
+        from weave.init.init import _global_attributes, _global_postprocess_inputs
 
         if isinstance(op, str):
             if op not in self._anonymous_ops:
@@ -844,7 +844,7 @@ class WeaveClient:
         ):
             return None
 
-        from weave.trace.api import _global_postprocess_output
+        from weave.init.init import _global_postprocess_output
 
         ended_at = datetime.datetime.now(tz=datetime.timezone.utc)
         call.ended_at = ended_at
