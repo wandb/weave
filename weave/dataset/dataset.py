@@ -9,13 +9,11 @@ from typing_extensions import Self
 import weave
 from weave.flow.util import short_str
 from weave.object.obj import Object
+from weave.trace.call import Call
 from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.objectify import register_object
 from weave.trace.vals import WeaveObject, WeaveTable
-from weave.trace.weave_client import (
-    Call,
-)
 
 if TYPE_CHECKING:
     import pandas as pd

@@ -14,6 +14,7 @@ import requests
 from pydantic import ValidationError
 
 import weave
+import weave.trace.call
 import weave.trace_server.trace_server_interface as tsi
 from tests.conftest import TestOnlyFlushingWeaveClient
 from tests.trace.testutil import ObjectRefStrMatcher
@@ -324,7 +325,7 @@ def test_call_create(client):
     call = client.create_call("x", {"a": 5, "b": 10})
     client.finish_call(call, "hello")
     result = client.get_call(call.id)
-    expected = weave_client.Call(
+    expected = weave.trace.call.Call(
         _op_name="weave:///shawn/test-project/op/x:tzUhDyzVm5bqQsuqh5RT4axEXSosyLIYZn9zbRyenaw",
         project_id="shawn/test-project",
         trace_id=RegexStringMatcher(".*"),
@@ -368,7 +369,7 @@ def test_calls_query(client):
     call2 = client.create_call("y", {"a": 5, "b": 10})
     result = list(client.get_calls(filter=tsi.CallsFilter(op_names=[call1.op_name])))
     assert len(result) == 2
-    assert result[0] == weave_client.Call(
+    assert result[0] == weave.trace.call.Call(
         _op_name="weave:///shawn/test-project/op/x:tzUhDyzVm5bqQsuqh5RT4axEXSosyLIYZn9zbRyenaw",
         project_id="shawn/test-project",
         trace_id=RegexStringMatcher(".*"),
@@ -394,7 +395,7 @@ def test_calls_query(client):
         started_at=DatetimeMatcher(),
         ended_at=None,
     )
-    assert result[1] == weave_client.Call(
+    assert result[1] == weave.trace.call.Call(
         _op_name="weave:///shawn/test-project/op/x:tzUhDyzVm5bqQsuqh5RT4axEXSosyLIYZn9zbRyenaw",
         project_id="shawn/test-project",
         trace_id=RegexStringMatcher(".*"),
@@ -2813,7 +2814,7 @@ def test_calls_query_sort_by_display_name_prioritized(client):
 
 def test_tracing_enabled_context(client):
     """Test that gc.create_call() and gc.finish_call() respect the _tracing_enabled context variable."""
-    from weave.trace.weave_client import Call
+    from weave.trace.call import Call
 
     @weave.op
     def test_op():
@@ -2828,7 +2829,9 @@ def test_tracing_enabled_context(client):
     # Test create_call with tracing disabled
     with tracing_disabled():
         call = client.create_call(test_op, {})
-        assert isinstance(call, weave_client.NoOpCall)  # Should be a NoOpCall instance
+        assert isinstance(
+            call, weave.trace.call.NoOpCall
+        )  # Should be a NoOpCall instance
         assert (
             len(list(client.get_calls())) == 1
         )  # Verify no additional calls were created

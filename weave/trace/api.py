@@ -73,6 +73,9 @@ def init(
     Returns:
         A Weave client.
     """
+    if not project_name or not project_name.strip():
+        raise ValueError("project_name must be non-empty")
+
     configure_logger()
 
     if sys.version_info < (3, 10):
