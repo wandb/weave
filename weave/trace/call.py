@@ -3,9 +3,8 @@ from __future__ import annotations
 import dataclasses
 import datetime
 from concurrent.futures import Future
-from typing import Any, Callable, TypedDict
+from typing import TYPE_CHECKING, Any, Callable, TypedDict
 
-from weave.flow.scorer import ApplyScorerResult, Scorer
 from weave.trace import urls
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.feedback import RefFeedbackQuery
@@ -21,6 +20,9 @@ from weave.trace.weave_client import (
     elide_display_name,
 )
 from weave.trace_server.trace_server_interface import CallsFilter
+
+if TYPE_CHECKING:
+    from weave.flow.scorer import ApplyScorerResult, Scorer
 
 
 @dataclasses.dataclass
