@@ -132,9 +132,6 @@ def init_weave(
 
     weave_client_context.set_weave_client_global(client)
 
-    # Autopatching has been removed. Users must now explicitly call patch functions
-    # for each integration they want to use (e.g. weave.integrations.patch_openai())
-
     username = get_username()
 
     # This is a temporary event to track the number of users who have enabled PII redaction.
