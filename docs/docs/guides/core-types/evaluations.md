@@ -56,6 +56,32 @@ evaluation = Evaluation(
 evaluation.evaluate(model, __weave={"display_name": "My Evaluation Run"})
 ```
 
+### (Optional) Add metadata to track evaluation parameters
+
+You can attach metadata to your evaluation to track experiment parameters, configuration settings, or any other contextual information. This metadata will be associated with the evaluation run and visible in the UI.
+
+```python
+evaluation = Evaluation(
+    dataset=examples,
+    scorers=[match_score1],
+    metadata={
+        "model_version": "v1.0",
+        "experiment": "baseline",
+        "hyperparameters": {
+            "temperature": 0.7,
+            "max_tokens": 100,
+            "top_p": 0.9
+        }
+    }
+)
+```
+
+The metadata dictionary can contain any JSON-serializable data and helps you:
+- Track different experimental configurations
+- Compare evaluations with different settings
+- Filter and organize evaluation runs in the UI
+- Document the context of each evaluation
+
 ## 2. Define a datset of test examples
 
 First, define a [Dataset](../core-types/datasets.md) object or list of dictionaries with a collection of examples to be evaluated. These examples are often failure cases that you want to test for, these are similar to unit tests in Test-Driven Development (TDD).
