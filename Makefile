@@ -15,7 +15,7 @@ build:
 	uv build
 
 prerelease-dry-run:
-	uv run ./weave/scripts/prerelease_dry_run.py
+	uv run ./scripts/prerelease_dry_run.py
 
 prepare-release: docs build
 

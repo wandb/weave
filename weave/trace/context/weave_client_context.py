@@ -74,7 +74,7 @@ def with_weave_client(
 
         scoped_name = f"{entity}/{project}"
         try:
-            initialized_client = init_weave(scoped_name, ensure_project_exists=False)
-            yield initialized_client.client
+            client = init_weave(scoped_name, ensure_project_exists=False)
+            yield client
         finally:
             set_weave_client_global(current_client)

@@ -40,7 +40,6 @@ dependencies = [
   "pydantic>=2.0.0",
   "packaging>=21.0",          # For version parsing in integrations
   "tenacity>=8.3.0,!=8.4.0",  # Excluding 8.4.0 because it had a bug on import of AsyncRetrying
-  "rich",                     # Used for special formatting of tables (should be made optional)
   "click",                    # Used for terminal/stdio printing
   "gql[aiohttp,requests]",    # Used exclusively in wandb_api.py
   "jsonschema>=4.23.0",       # Used by scorers for field validation
@@ -59,6 +58,7 @@ dependencies = [
 
 [project.optional-dependencies]
 wandb = ["wandb>=0.17.1"]
+rich = ["rich"]           # Optional dependency for enhanced console output
 # stainless = [
 #   # This dependency will be updated each time we regenerate the trace server bindings.
 #   # 1. For normal dev, pin to a SHA and allow direct references.  This will look like:
@@ -194,10 +194,12 @@ test = [
   "pytest-rerunfailures>=12.0",
   "pytest-rerunfailures>=14.0",
   "pytest-shard==0.1.2",
+  "pytest-memray~=1.8",
   "clickhouse_connect==0.7.0",
   "fastapi>=0.110.0",
   "sqlparse==0.5.0",
   "freezegun",
+  "rich",
 
   # Integration Tests
   "pytest-recording>=0.13.2",
@@ -396,7 +398,7 @@ module = "weave_query.*"
 ignore_errors = true
 
 [tool.bumpversion]
-current_version = "0.52.2-dev0"
+current_version = "0.52.5-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.
@@ -439,3 +441,7 @@ BoxedNDArray = "BoxedNDArray"
 [tool.fixit]
 enable = [".rules.op_deco", ".rules.legacy_methods"]
 disable = ["fixit.rules"]
+
+[tool.coverage.report]
+exclude_also = ["if TYPE_CHECKING:", "@abstractmethod"]
+omit = ["weave_query/**", "weave/agent/**"]

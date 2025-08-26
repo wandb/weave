@@ -1,7 +1,6 @@
-from rich.console import Console
-from rich.padding import Padding
+from weave.trace.display import display
 
-console = Console()
+console = display.Console()
 
 
 class LogEvents:
@@ -33,7 +32,7 @@ class LogEvents:
             lines.append("...")
             tool_response = "\n".join(lines)
         console.print(
-            Padding.indent(f"{tool_response}\n", 4),
+            display.PaddingWrapper.indent(f"{tool_response}\n", 4),
             no_wrap=True,
             overflow="ellipsis",
         )

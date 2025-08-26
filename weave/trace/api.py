@@ -20,7 +20,7 @@ from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.context.call_context import get_current_call, require_current_call
 from weave.trace.display.term import configure_logger
 from weave.trace.op import PostprocessInputsFunc, PostprocessOutputFunc, as_op, op
-from weave.trace.refs import ObjectRef, parse_uri
+from weave.trace.refs import ObjectRef, Ref
 from weave.trace.settings import (
     UserSettings,
     parse_and_apply_settings,
@@ -73,6 +73,9 @@ def init(
     Returns:
         A Weave client.
     """
+    if not project_name or not project_name.strip():
+        raise ValueError("project_name must be non-empty")
+
     configure_logger()
 
     if sys.version_info < (3, 10):
@@ -93,14 +96,12 @@ def init(
     _global_attributes = global_attributes or {}
 
     if should_disable_weave():
-        return weave_init.init_weave_disabled().client
+        return weave_init.init_weave_disabled()
 
-    initialized_client = weave_init.init_weave(
+    return weave_init.init_weave(
         project_name,
         autopatch_settings=autopatch_settings,
     )
-
-    return initialized_client.client
 
 
 def get_client() -> weave_client.WeaveClient | None:
@@ -186,10 +187,10 @@ def ref(location: str) -> ObjectRef:
             name, version = location.split(":")
         location = str(client._ref_uri(name, version, "obj"))
 
-    uri = parse_uri(location)
-    if not isinstance(uri, ObjectRef):
+    ref = Ref.parse_uri(location)
+    if not isinstance(ref, ObjectRef):
         raise TypeError("Expected an object ref")
-    return uri
+    return ref
 
 
 def get(uri: str | ObjectRef) -> Any:
@@ -350,7 +351,6 @@ __all__ = [
     "get_current_call",
     "init",
     "op",
-    "parse_uri",
     "publish",
     "ref",
     "require_current_call",

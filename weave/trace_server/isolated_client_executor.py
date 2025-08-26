@@ -45,9 +45,11 @@ from typing import TYPE_CHECKING, Any, Callable, Optional, TypeVar, Union, overl
 
 from pydantic import BaseModel
 
-from weave.trace.context.weave_client_context import get_weave_client
+from weave.trace.context.weave_client_context import (
+    get_weave_client,
+    set_weave_client_global,
+)
 from weave.trace.weave_client import WeaveClient
-from weave.trace.weave_init import InitializedClient
 
 logger = logging.getLogger(__name__)
 
@@ -398,11 +400,11 @@ def _client_context(client: WeaveClient) -> Generator[None, None, None]:
             "Unsafe to run as user with existing weave client"
         )
 
-    ic = InitializedClient(client)
+    set_weave_client_global(client)
     try:
         yield
     finally:
-        _cleanup_client(client, ic)
+        _cleanup_client(client)
 
 
 def _execute_function(
@@ -434,13 +436,12 @@ def _execute_function(
     return result, None
 
 
-def _cleanup_client(client: WeaveClient, ic: InitializedClient) -> None:
+def _cleanup_client(client: WeaveClient) -> None:
     """
-    Clean up the client and initialized client.
+    Clean up the client.
 
     Args:
         client: The weave client to finish
-        ic: The initialized client to reset
     """
     try:
         client.finish(use_progress_bar=False)
@@ -448,6 +449,6 @@ def _cleanup_client(client: WeaveClient, ic: InitializedClient) -> None:
         logger.error(f"Error finishing client: {e}", exc_info=True)
 
     try:
-        ic.reset()
+        set_weave_client_global(None)
     except Exception as e:
         logger.error(f"Error resetting client: {e}", exc_info=True)
