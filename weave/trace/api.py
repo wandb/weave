@@ -9,11 +9,10 @@ import warnings
 from collections.abc import Iterator
 from typing import Any, Union, cast
 
-import weave.client.weave_client
-
 # TODO: type_handlers is imported here to trigger registration of the image serializer.
 # There is probably a better place for this, but including here for now to get the fix in.
 from weave import type_handlers  # noqa: F401
+from weave.client.weave_client import WeaveClient
 from weave.trace import urls, weave_init
 from weave.trace.autopatch import AutopatchSettings
 from weave.trace.constants import TRACE_OBJECT_EMOJI
@@ -51,7 +50,7 @@ def init(
     global_postprocess_inputs: PostprocessInputsFunc | None = None,
     global_postprocess_output: PostprocessOutputFunc | None = None,
     global_attributes: dict[str, Any] | None = None,
-) -> weave.client.weave_client.WeaveClient:
+) -> WeaveClient:
     """Initialize weave tracking, logging to a wandb project.
 
     Logging is initialized globally, so you do not need to keep a reference
@@ -107,7 +106,7 @@ def init(
     )
 
 
-def get_client() -> weave.client.weave_client.WeaveClient | None:
+def get_client() -> WeaveClient | None:
     return weave_client_context.get_weave_client()
 
 

@@ -7,8 +7,7 @@ import botocore
 import pytest
 from moto import mock_aws
 
-import weave
-import weave.client.weave_client
+from weave.client.weave_client import WeaveClient
 from weave.integrations.bedrock import patch_client
 
 model_id = "anthropic.claude-3-5-sonnet-20240620-v1:0"
@@ -249,9 +248,7 @@ def mock_invoke_exception_make_api_call(
 @pytest.mark.skip_clickhouse_client
 @mock_aws
 @pytest.mark.parametrize("model_identifier", [model_id, inference_profile_id])
-def test_bedrock_converse(
-    client: weave.client.weave_client.WeaveClient, model_identifier: str
-) -> None:
+def test_bedrock_converse(client: WeaveClient, model_identifier: str) -> None:
     bedrock_client = boto3.client("bedrock-runtime", region_name="us-east-1")
     patch_client(bedrock_client)
 
@@ -304,9 +301,7 @@ def test_bedrock_converse(
 @pytest.mark.skip_clickhouse_client
 @mock_aws
 @pytest.mark.parametrize("model_identifier", [model_id, inference_profile_id])
-def test_bedrock_converse_stream(
-    client: weave.client.weave_client.WeaveClient, model_identifier: str
-) -> None:
+def test_bedrock_converse_stream(client: WeaveClient, model_identifier: str) -> None:
     bedrock_client = boto3.client("bedrock-runtime", region_name="us-east-1")
     patch_client(bedrock_client)
 
@@ -358,7 +353,7 @@ def test_bedrock_converse_stream(
 
 @pytest.mark.skip_clickhouse_client
 @mock_aws
-def test_bedrock_invoke(client: weave.client.weave_client.WeaveClient) -> None:
+def test_bedrock_invoke(client: WeaveClient) -> None:
     bedrock_client = boto3.client("bedrock-runtime", region_name="us-east-1")
     patch_client(bedrock_client)
 
@@ -410,7 +405,7 @@ def test_bedrock_invoke(client: weave.client.weave_client.WeaveClient) -> None:
 
 @pytest.mark.skip_clickhouse_client
 @mock_aws
-def test_bedrock_apply_guardrail(client: weave.client.weave_client.WeaveClient) -> None:
+def test_bedrock_apply_guardrail(client: WeaveClient) -> None:
     from weave.scorers.bedrock_guardrails import BedrockGuardrailScorer
 
     scorer = BedrockGuardrailScorer(
@@ -487,7 +482,7 @@ def test_bedrock_apply_guardrail(client: weave.client.weave_client.WeaveClient) 
 @pytest.mark.skip_clickhouse_client
 @mock_aws
 def test_bedrock_invoke_exception_handling(
-    client: weave.client.weave_client.WeaveClient,
+    client: WeaveClient,
 ) -> None:
     """Test that the postprocessor handles exceptions gracefully without crashing."""
     bedrock_client = boto3.client("bedrock-runtime", region_name="us-east-1")

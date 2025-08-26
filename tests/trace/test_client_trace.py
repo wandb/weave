@@ -70,7 +70,7 @@ def extract_weave_refs_from_value(value):
     return refs
 
 
-ClientType = weave.client.weave_client.WeaveClient
+ClientType = WeaveClient
 
 
 @dataclass
@@ -80,12 +80,12 @@ class ComplexAttribute:
 
 
 def get_client_trace_server(
-    client: weave.client.weave_client.WeaveClient,
+    client: WeaveClient,
 ) -> tsi.TraceServerInterface:
     return client.server
 
 
-def get_client_project_id(client: weave.client.weave_client.WeaveClient) -> str:
+def get_client_project_id(client: WeaveClient) -> str:
     return client._project_id()
 
 
@@ -1810,7 +1810,7 @@ def _no_graph_client():
 
 
 @contextmanager
-def _patched_default_initializer(trace_client: weave.client.weave_client.WeaveClient):
+def _patched_default_initializer(trace_client: WeaveClient):
     from weave.trace import weave_init
 
     def init_weave_get_server_patched(api_key):

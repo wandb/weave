@@ -21,7 +21,7 @@ from opentelemetry.proto.trace.v1.trace_pb2 import (
     TracesData,
 )
 
-import weave.client.weave_client
+from weave.client.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.constants import MAX_OP_NAME_LENGTH
 from weave.trace_server.opentelemetry.attributes import (
@@ -138,7 +138,7 @@ def create_test_export_request(project_id="test_project"):
     return tsi.OtelExportReq(project_id=project_id, traces=request, wb_user_id=None)
 
 
-def test_otel_export_clickhouse(client: weave.client.weave_client.WeaveClient):
+def test_otel_export_clickhouse(client: WeaveClient):
     """Test the otel_export method."""
     export_req = create_test_export_request()
     project_id = client._project_id()
@@ -200,7 +200,7 @@ def test_otel_export_clickhouse(client: weave.client.weave_client.WeaveClient):
 
 
 def test_otel_export_with_turn_and_thread(
-    client: weave.client.weave_client.WeaveClient,
+    client: WeaveClient,
 ):
     """Test the otel_export method with turn and thread attributes."""
     # Create a test export request
@@ -250,7 +250,7 @@ def test_otel_export_with_turn_and_thread(
     )
 
 
-def test_otel_export_with_turn_no_thread(client: weave.client.weave_client.WeaveClient):
+def test_otel_export_with_turn_no_thread(client: WeaveClient):
     """Test the otel_export method with is_turn=True but no thread_id."""
     # Create a test export request
     export_req = create_test_export_request()

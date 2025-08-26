@@ -3,8 +3,7 @@ import os
 import pytest
 from cerebras.cloud.sdk import AsyncCerebras, Cerebras
 
-import weave
-import weave.client.weave_client
+from weave.client.weave_client import WeaveClient
 
 model = "llama3.1-8b"  # Cerebras model
 
@@ -13,7 +12,7 @@ model = "llama3.1-8b"  # Cerebras model
 @pytest.mark.vcr(
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
-def test_cerebras_sync(client: weave.client.weave_client.WeaveClient) -> None:
+def test_cerebras_sync(client: WeaveClient) -> None:
     api_key = os.environ.get("CEREBRAS_API_KEY", "DUMMY_API_KEY")
     cerebras_client = Cerebras(api_key=api_key)
 
@@ -50,7 +49,7 @@ def test_cerebras_sync(client: weave.client.weave_client.WeaveClient) -> None:
     filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
 )
 @pytest.mark.asyncio
-async def test_cerebras_async(client: weave.client.weave_client.WeaveClient) -> None:
+async def test_cerebras_async(client: WeaveClient) -> None:
     api_key = os.environ.get("CEREBRAS_API_KEY", "DUMMY_API_KEY")
     cerebras_client = AsyncCerebras(api_key=api_key)
 
