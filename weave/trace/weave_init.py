@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 
 from weave.compat import wandb
 from weave.telemetry import trace_sentry
@@ -39,12 +40,16 @@ def get_entity_project_from_project_name(project_name: str) -> tuple[str, str]:
 
     fields = project_name.split("/")
     if len(fields) == 1:
-        api = wandb.Api()
-        entity_name = api.default_entity_name()
+        # First check for WANDB_ENTITY environment variable
+        entity_name = os.environ.get("WANDB_ENTITY")
         if entity_name is None:
-            raise WeaveWandbAuthenticationException(
-                'weave init requires wandb. Run "wandb login"'
-            )
+            # Fall back to wandb default entity
+            api = wandb.Api()
+            entity_name = api.default_entity_name()
+            if entity_name is None:
+                raise WeaveWandbAuthenticationException(
+                    'weave init requires wandb. Run "wandb login"'
+                )
         project_name = fields[0]
     elif len(fields) == 2:
         entity_name, project_name = fields

@@ -20,25 +20,25 @@ To get started with the Sensitive Data Protection feature in Weave, complete the
 
 1. Install the required dependencies:
 
-    ```bash
-    pip install presidio-analyzer presidio-anonymizer
-    ```
+   ```bash
+   pip install presidio-analyzer presidio-anonymizer
+   ```
 
 2. Modify your `weave.init` call to enable redaction. When `redact_pii=True`, [common entities are redacted by default](#entities-redacted-by-default):
 
-    ```python
-    import weave
+   ```python
+   import weave
 
-    weave.init("my-project", settings={"redact_pii": True})
-    ```
+   weave.init("my-project", settings={"redact_pii": True})
+   ```
 
 3. (Optional) Customize redaction fields using the `redact_pii_fields` parameter:
 
-    ```python
-    weave.init("my-project", settings={"redact_pii": True, "redact_pii_fields":["CREDIT_CARD", "US_SSN"]})
-    ```
+   ```python
+   weave.init("my-project", settings={"redact_pii": True, "redact_pii_fields":["CREDIT_CARD", "US_SSN"]})
+   ```
 
-    For a full list of the entities that can be detected and redacted, see [PII entities supported by Presidio](https://microsoft.github.io/presidio/supported_entities/).
+   For a full list of the entities that can be detected and redacted, see [PII entities supported by Presidio](https://microsoft.github.io/presidio/supported_entities/).
 
 ## Entities redacted by default
 
@@ -63,9 +63,9 @@ The following entities are automatically redacted when PII redaction is enabled:
 - `US_PASSPORT`
 - `US_SSN`
 
-## Redacting sensitive keys with `REDACT_KEYS`
+## Redacting sensitive keys
 
-In addition to PII redaction, the Weave SDK also supports redaction of custom keys using `REDACT_KEYS`. This is useful when you want to protect additional sensitive data that might not fall under the PII category but needs to be kept private. Examples include:
+In addition to PII redaction, the Weave SDK also supports redaction of custom keys via the sanitize helpers. This is useful when you want to protect additional sensitive data that might not fall under the PII category but needs to be kept private. Examples include:
 
 - API keys
 - Authentication headers
@@ -73,16 +73,12 @@ In addition to PII redaction, the Weave SDK also supports redaction of custom ke
 - Internal IDs
 - Config values
 
-### Pre-defined `REDACT_KEYS`
+### Default redacted keys
 
 Weave automatically redacts the following sensitive keys by default:
 
 ```json
-[
-  "api_key",
-  "auth_headers",
-  "authorization"
-]
+["api_key", "auth_headers", "authorization"]
 ```
 
 ### Adding your own keys
@@ -91,32 +87,54 @@ You can extend this list with your own custom keys that you want to redact from 
 
 ```python
 import weave
+from weave.utils import sanitize
 
 client = weave.init("my-project")
 
 # Add custom keys to redact
-weave.trace.sanitize.REDACT_KEYS.add("client_id")
-weave.trace.sanitize.REDACT_KEYS.add("whatever_else")
+sanitize.add_redact_key("token")
+sanitize.add_redact_key("client_id")
+sanitize.add_redact_key("whatever_else")
 
+token = "secret_token_123"
 client_id = "123"
 whatever_else = "456"
 
 @weave.op()
 def test():
-    a = client_id
-    b = whatever_else
+    a = token
+    b = client_id
+    c = whatever_else
     return 1
 ```
 
-When viewed in the Weave UI, the values of `client_id` and `whatever_else` will appear as `"REDACTED"`:
+When viewed in the Weave UI, the values of `token`, `client_id`, and `whatever_else` will appear as `"REDACTED"`:
 
 ```python
+token = "REDACTED"
 client_id = "REDACTED"
 whatever_else = "REDACTED"
+```
+
+### Managing redacted keys
+
+The sanitize module provides additional functions to manage redacted keys:
+
+```python
+from weave.utils import sanitize
+
+# Get the current list of redacted keys
+current_keys = sanitize.get_redact_keys()
+print(current_keys)  # {'api_key', 'auth_headers', 'authorization', 'token', 'client_id', 'whatever_else'}
+
+# Remove a key from the redaction list (if needed)
+sanitize.remove_redact_key("whatever_else")
+
+# Check if a specific key will be redacted (case-insensitive)
+will_redact = sanitize.should_redact("TOKEN")  # Returns True
 ```
 
 ## Usage information
 
 - This feature is only available in the Python SDK.
 - Enabling redaction increases processing time due to the Presidio dependency.
-

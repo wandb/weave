@@ -49,7 +49,6 @@ from weave.trace.object_record import (
 )
 from weave.trace.objectify import maybe_objectify
 from weave.trace.op import (
-    Op,
     as_op,
     is_op,
     is_placeholder_call,
@@ -59,6 +58,7 @@ from weave.trace.op import (
     should_skip_tracing_for_op,
 )
 from weave.trace.op import op as op_deco
+from weave.trace.op_protocol import Op
 from weave.trace.ref_util import get_ref, remove_ref, set_ref
 from weave.trace.refs import (
     CallRef,
