@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # Global cache for endpoint availability to avoid repeated checks
-_ENDPOINT_CACHE: dict[str, bool] = {}
+_ENDPOINT_CACHE: set[str] = set()
 
 # Default remote request bytes limit (32 MiB real limit - 1 MiB buffer)
 REMOTE_REQUEST_BYTES_LIMIT = (32 - 1) * 1024 * 1024
@@ -264,7 +264,7 @@ def check_endpoint_exists(
 
     # Check cache first
     if cache_key in _ENDPOINT_CACHE:
-        return _ENDPOINT_CACHE[cache_key]
+        return True
 
     try:
         # Try calling the function with test request
@@ -279,5 +279,6 @@ def check_endpoint_exists(
         else:
             endpoint_exists = False
 
-    _ENDPOINT_CACHE[cache_key] = endpoint_exists
+    if endpoint_exists:
+        _ENDPOINT_CACHE.add(cache_key)
     return endpoint_exists

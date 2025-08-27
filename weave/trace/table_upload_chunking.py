@@ -1,5 +1,6 @@
 """Table upload chunking functionality for efficient parallel table creation."""
 
+import dataclasses
 import logging
 from collections.abc import Sequence
 from typing import Any, TypeVar
@@ -9,6 +10,14 @@ logger = logging.getLogger(__name__)
 # Constants for table chunking
 TARGET_CHUNK_BYTES = 10 * 1024 * 1024  # 10MB
 RowItemType = TypeVar("RowItemType")
+
+
+@dataclasses.dataclass
+class ChunkingConfig:
+    """Configuration for table chunking behavior."""
+
+    use_chunking: bool
+    use_parallel_chunks: bool
 
 
 class TableChunkManager:

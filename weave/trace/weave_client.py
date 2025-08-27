@@ -75,7 +75,7 @@ from weave.trace.settings import (
     should_redact_pii,
 )
 from weave.trace.table import Table
-from weave.trace.table_upload_chunking import TableChunkManager
+from weave.trace.table_upload_chunking import ChunkingConfig, TableChunkManager
 from weave.trace.util import deprecated, log_once
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
 from weave.trace.weave_client_send_file_cache import WeaveClientSendFileCache
@@ -1964,13 +1964,13 @@ class WeaveClient:
         if isinstance(table, WeaveTable) and table.table_ref is not None:
             return table.table_ref
 
-        use_chunking, use_parallel_chunks = self._should_use_chunking(table)
-        if not use_chunking:
+        chunking_config = self._should_use_chunking(table)
+        if not chunking_config.use_chunking:
             # Simple case: defer the entire serialization and upload
             res_future: Future[TableCreateRes] = self.future_executor.defer(
                 lambda: self._send_table_create(list(table.rows))
             )
-        elif use_parallel_chunks:
+        elif chunking_config.use_parallel_chunks:
             # Need to chunk up, use parallelism
             res_future = self._create_table_with_parallel_chunks(table)
         else:
@@ -1995,7 +1995,7 @@ class WeaveClient:
 
         return table_ref
 
-    def _should_use_chunking(self, table: Table | WeaveTable) -> tuple[bool, bool]:
+    def _should_use_chunking(self, table: Table | WeaveTable) -> ChunkingConfig:
         """Determine if we should use chunking and parallel chunks for a table."""
         remote_request_bytes_limit = getattr(
             self.server, "remote_request_bytes_limit", REMOTE_REQUEST_BYTES_LIMIT
@@ -2032,7 +2032,9 @@ class WeaveClient:
                 test_func, test_req, "table_create_from_digests"
             )
 
-        return use_chunking, use_parallel_chunks
+        return ChunkingConfig(
+            use_chunking=use_chunking, use_parallel_chunks=use_parallel_chunks
+        )
 
     def _create_table_with_parallel_chunks(
         self, table: Table | WeaveTable
