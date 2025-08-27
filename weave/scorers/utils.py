@@ -19,7 +19,7 @@ def download_model_from_wandb(artifact_path: Union[str, Path]) -> Path:
         ) from None
 
     api = Api()
-    art = api.artifact(
+    art = api._artifact(
         type="model",
         name=str(artifact_path),
     )

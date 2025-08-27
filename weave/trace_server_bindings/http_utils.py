@@ -2,9 +2,9 @@ import json
 import logging
 from typing import TYPE_CHECKING, Any, Callable, Optional, TypeVar, Union
 
-from weave.trace_server import requests
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
+from weave.utils import http_requests as requests
 
 if TYPE_CHECKING:
     from weave.trace_server_bindings.models import EndBatchItem, StartBatchItem

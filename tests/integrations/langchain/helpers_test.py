@@ -15,7 +15,7 @@ from weave.integrations.langchain.helpers import (
     _find_full_model_name,
     _normalize_usage_metadata,
 )
-from weave.trace.weave_client import Call
+from weave.trace.call import Call
 
 
 @pytest.mark.parametrize(
