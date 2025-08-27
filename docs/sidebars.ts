@@ -17,6 +17,11 @@ const sidebars: SidebarsConfig = {
         "introduction",
         {
           type: "doc",
+          label: "Learn Weave with W&B Inference",
+          id: "quickstart-inference",
+        },
+        {
+          type: "doc",
           label: "Quickstart: Track LLM Calls",
           id: "quickstart",
         },
