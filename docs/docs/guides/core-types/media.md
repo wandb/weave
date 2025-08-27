@@ -74,8 +74,6 @@ result1 = load_image_content("sample_image.png")
 result2 = load_image_pil("sample_image.png")
 ```
 
-### Example
-
 The following example shows how to log an image generated via the OpenAI DALL-E API:
 
 <Tabs groupId="package-manager" queryString>
