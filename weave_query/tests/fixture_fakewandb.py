@@ -229,6 +229,9 @@ class FakeApi:
     run = mock.Mock(return_value=FakeRun())
 
     def artifact(self, path: str) -> FakeVersion:
+        return self._artifact(path)
+
+    def _artifact(self, path: str) -> FakeVersion:
         entity, project, name = path.split("/")
         if ":" in name:
             name, version = name.split(":")
