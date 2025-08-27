@@ -3,7 +3,9 @@ from __future__ import annotations
 import atexit
 import datetime
 import json
+import keyword
 import logging
+import re
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -36,6 +38,9 @@ ID = str
 ScoreType = Union[float, bool, dict]
 
 logger = logging.getLogger(__name__)
+
+# Class names should start with a letter or underscore and contain only alphanumeric characters and underscores
+VALID_CLASS_NAME_REGEX = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
 
 # Registry to track active EvaluationLogger instances
 _active_evaluation_loggers: list[EvaluationLogger] = []
@@ -105,7 +110,7 @@ def _cast_to_cls(type_: type[T]) -> Callable[[str | dict | T], T]:
             cls_name = value
 
             # Dynamically create the class if the user only provides a name
-            cls_name = _validate_class_name(cls_name)
+            cls_name = _validate_class_name(cls_name, type_.__name__)
 
             pydantic_config_dict = {
                 "__annotations__": {"name": str},
@@ -156,28 +161,21 @@ def _default_dataset_name() -> str:
     return f"{date}-{unique_name}-dataset"
 
 
-def _validate_class_name(name: str) -> str:
-    """Validate the scorer name to be a valid class name."""
+def _validate_class_name(name: str, cls_name: str = "Class") -> str:
+    """Validate the class name to be a valid Python class name."""
     # Check if name is not empty
     if not name:
-        raise ValueError("Scorer name cannot be empty")
+        raise ValueError(f"{cls_name} name cannot be empty")
 
-    # Check if name follows Python class naming conventions
-    # Class names should start with a letter or underscore and contain only
-    # alphanumeric characters and underscores
-    import re
-
-    if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", name):
+    if not VALID_CLASS_NAME_REGEX.match(name):
         raise ValueError(
-            f"Invalid scorer name: '{name}'. Scorer names must start with a letter or underscore "
+            f"Invalid `{cls_name}` name: '{name}'. `{cls_name}` names must start with a letter or underscore "
             "and contain only alphanumeric characters and underscores."
         )
 
     # Check if name is not a Python keyword
-    import keyword
-
     if keyword.iskeyword(name):
-        raise ValueError(f"Scorer name '{name}' cannot be a Python keyword")
+        raise ValueError(f"`{cls_name}` name '{name}' cannot be a Python keyword")
 
     return name
 
