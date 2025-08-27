@@ -9,7 +9,6 @@ from typing import Any, Callable, Literal, Optional, Union
 from pydantic import PrivateAttr
 from typing_extensions import Self
 
-import weave
 from weave.dataset.dataset import Dataset
 from weave.flow import util
 from weave.flow.casting import DatasetLike, ScorerLike
@@ -27,13 +26,16 @@ from weave.flow.scorer import (
 )
 from weave.flow.util import make_memorable_name, transpose
 from weave.object.obj import Object
+from weave.trace.call import Call, CallsIter
 from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.env import get_weave_parallelism
 from weave.trace.objectify import maybe_objectify, register_object
-from weave.trace.op import CallDisplayNameFunc, Op, OpCallError, as_op, is_op
+from weave.trace.op import OpCallError, as_op, is_op, op
+from weave.trace.op_protocol import CallDisplayNameFunc, Op
 from weave.trace.refs import ObjectRef
+from weave.trace.table import Table
 from weave.trace.vals import WeaveObject
-from weave.trace.weave_client import Call, CallsIter, get_ref
+from weave.trace.weave_client import get_ref
 from weave.trace_server.trace_server_interface import CallsFilter
 
 logger = logging.getLogger(__name__)
@@ -51,7 +53,7 @@ def default_evaluation_display_name(call: Call) -> str:
 
 
 class EvaluationResults(Object):
-    rows: weave.Table
+    rows: Table
 
 
 @register_object
@@ -170,7 +172,7 @@ class Evaluation(Object):
         if self.name is None and self.dataset.name is not None:
             self.name = self.dataset.name + "-evaluation"  # type: ignore
 
-    @weave.op
+    @op
     async def predict_and_score(self, model: Union[Op, Model], example: dict) -> dict:
         apply_model_result = await apply_model_async(
             model, example, self.preprocess_model_input
@@ -208,7 +210,7 @@ class Evaluation(Object):
             "model_latency": model_latency,
         }
 
-    @weave.op
+    @op
     async def summarize(self, eval_table: EvaluationResults) -> dict:
         eval_table_rows = list(eval_table.rows)
         cols = transpose(eval_table_rows)
@@ -271,9 +273,9 @@ class Evaluation(Object):
             eval_rows.append((index, eval_row))
         eval_rows.sort(key=lambda x: x[0])
         table_rows = [eval_row for _, eval_row in eval_rows]
-        return EvaluationResults(rows=weave.Table(table_rows))
+        return EvaluationResults(rows=Table(table_rows))
 
-    @weave.op(call_display_name=default_evaluation_display_name)
+    @op(call_display_name=default_evaluation_display_name)
     async def evaluate(self, model: Union[Op, Model]) -> dict:
         eval_results = await self.get_eval_results(model)
         summary = await self.summarize(eval_results)

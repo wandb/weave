@@ -8,7 +8,7 @@ from collections.abc import Iterator
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from weave.trace.weave_client import Call
+    from weave.trace.call import Call
 
 
 class NoCurrentCallError(Exception): ...

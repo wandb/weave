@@ -29,8 +29,17 @@ def lint(session):
     session.install("pre-commit", "jupyter")
     dry_run = session.posargs and "dry-run" in session.posargs
     all_files = session.posargs and "--all-files" in session.posargs
+    ruff_only = session.posargs and "--ruff-only" in session.posargs
 
-    if dry_run:
+    if ruff_only:
+        # Run only ruff checks on all files
+        session.run(
+            "pre-commit", "run", "--hook-stage=pre-push", "ruff-check", "--all-files"
+        )
+        session.run(
+            "pre-commit", "run", "--hook-stage=pre-push", "ruff-format", "--all-files"
+        )
+    elif dry_run:
         session.run(
             "pre-commit",
             "run",
@@ -168,6 +177,15 @@ def tests(session, shard):
         "--cov-report=xml",
         "--cov-branch",
     ]
+
+    # Memray not working with trace_server shard atm
+    if shard != "trace_server":
+        pytest_args.extend(
+            [
+                "--memray",
+                "--most-allocations=5",
+            ]
+        )
 
     # Handle trace sharding: run every 3rd test starting at different offsets
     if shard in trace_server_shards:

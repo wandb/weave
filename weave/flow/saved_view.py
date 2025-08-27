@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from weave.trace import urls
 from weave.trace.api import publish as weave_publish
 from weave.trace.api import ref as weave_ref
+from weave.trace.call import CallsIter
 from weave.trace.context import weave_client_context
 from weave.trace.display import display
 from weave.trace.display.grid import Grid
@@ -15,7 +16,6 @@ from weave.trace.display.rich import pydantic_util
 from weave.trace.refs import ObjectRef, OpRef
 from weave.trace.traverse import ObjectPath, get_paths
 from weave.trace.vals import WeaveObject
-from weave.trace.weave_client import CallsIter
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.interface.builtin_object_classes.saved_view import Column, Pin
