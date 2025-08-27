@@ -3,7 +3,7 @@ from pydantic import BaseModel
 
 import weave
 from weave.trace.object_record import pydantic_object_record
-from weave.trace.serialization.op_type import _replace_memory_address
+from weave.trace.code_capture import _replace_memory_address
 from weave.trace.serialization.serialize import (
     dictify,
     fallback_encode,

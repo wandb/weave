@@ -1366,12 +1366,9 @@ def get_captured_code(op: Op) -> str:
     op = ref.get()
     captured_code = op.get_captured_code()
     """
-    try:
-        return op.art.path_contents["obj.py"].decode()  # type: ignore
-    except Exception:
-        raise RuntimeError(
-            "Failed to get captured code for op (this only works when you get an op back from a ref)."
-        ) from None
+    from weave.trace import code_capture
+    
+    return code_capture.get_captured_code(op)
 
 
 def maybe_bind_method(func: Callable, self: Any = None) -> Callable | MethodType:
