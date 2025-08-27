@@ -2318,18 +2318,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         try:
             self._insert_call_batch(self._call_batch)
         except InsertTooLarge:
-            logger.info(
-                "Retrying with large objects stripped and inserting one by one."
-            )
-            stripped_batch = self._strip_large_values(self._call_batch)
+            logger.info("Retrying with large objects stripped.")
+            batch = self._strip_large_values(self._call_batch)
             # Insert rows one at a time after stripping large values
-            for row in stripped_batch:
-                self._insert(
-                    "call_parts",
-                    data=[row],
-                    column_names=ALL_CALL_INSERT_COLUMNS,
-                    settings={},
-                )
+            for row in batch:
+                self._insert_call(row)
 
         self._call_batch = []
 
