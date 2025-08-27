@@ -724,3 +724,33 @@ def create_server_message_from_dict(data: dict) -> ServerMessageType:
         return RateLimitsUpdatedMessage(**data)
 
     return UnknownServerMessage(**data)
+
+
+def create_message_from_dict(data: dict) -> Union[ServerMessageType, UserMessageType]:
+    """
+    Create either a server or user message from a dictionary based on the message type.
+    
+    This function determines whether to use create_server_message_from_dict or
+    create_user_message_from_dict based on the message type.
+    """
+    event_type = data.get("type", "")
+    
+    # Client/User message types
+    client_message_types = {
+        "session.update",
+        "input_audio_buffer.append", 
+        "input_audio_buffer.commit",
+        "input_audio_buffer.clear",
+        "conversation.item.create",
+        "conversation.item.truncate",
+        "conversation.item.delete",
+        "response.create",
+        "response.cancel"
+    }
+    
+    # Check if it's a client message
+    if event_type in client_message_types:
+        return create_user_message_from_dict(data)
+    else:
+        # Default to server message (includes all response.*, session.created, etc.)
+        return create_server_message_from_dict(data)
