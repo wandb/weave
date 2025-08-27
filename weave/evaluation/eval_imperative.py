@@ -161,21 +161,21 @@ def _default_dataset_name() -> str:
     return f"{date}-{unique_name}-dataset"
 
 
-def _validate_class_name(name: str, cls_name: str = "Class") -> str:
+def _validate_class_name(name: str, super_cls_name: str = "Class") -> str:
     """Validate the class name to be a valid Python class name."""
     # Check if name is not empty
     if not name:
-        raise ValueError(f"{cls_name} name cannot be empty")
+        raise ValueError(f"{super_cls_name} name cannot be empty")
 
     if not VALID_CLASS_NAME_REGEX.match(name):
         raise ValueError(
-            f"Invalid `{cls_name}` name: '{name}'. `{cls_name}` names must start with a letter or underscore "
+            f"Invalid `{super_cls_name}` name: '{name}'. `{super_cls_name}` names must start with a letter or underscore "
             "and contain only alphanumeric characters and underscores."
         )
 
     # Check if name is not a Python keyword
     if keyword.iskeyword(name):
-        raise ValueError(f"`{cls_name}` name '{name}' cannot be a Python keyword")
+        raise ValueError(f"`{super_cls_name}` name '{name}' cannot be a Python keyword")
 
     return name
 
