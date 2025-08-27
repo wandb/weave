@@ -1,21 +1,21 @@
 # W&B Weave Self-Managed
 
-This guide explains how to deploy all the components required to run W&B Weave in a self-managed environment.
+Self-hosting W&B Weave allows you have more control over its environment and configuration. This can be helpful for use cases that require isolation and additional security compliance. This guide explains how to deploy all the components required to run W&B Weave in a self-managed environment.
 
-A key component of a self-managed Weave deployment is [ClickHouseDB](https://clickhouse.com/), which the Weave application backend relies on.
-
-Although the deployment process sets up a fully functional ClickHouseDB instance, you may need to take additional steps to ensure reliability and high availability for a production-ready environment.
+Self-managed Weave deployments rely on [ClickHouseDB](https://clickhouse.com/) to manage its backend. Although the deployment process sets up a fully functional ClickHouseDB instance, you may need to take additional steps to ensure reliability and high availability for a production-ready environment.
 
 ## Requirements
 
-- W&B Platform installed. For more information, see the [Self-Managed Deployment Guide](https://docs.wandb.ai/guides/hosting/hosting-options/self-managed/).
-- [Altinity Kubernetes Operator for ClickHouse](https://docs.altinity.com/altinitykubernetesoperator).
+Setting up a self-managed instance of Weave requires:
+
+- The [W&B Platform installed](https://docs.wandb.ai/guides/hosting/hosting-options/self-managed/).
+- The [Altinity Kubernetes Operator for ClickHouse](https://docs.altinity.com/altinitykubernetesoperator).
 - An S3 bucket pre-configured for ClickHouse storage. For configuration details, see [Provide S3 Credentials](#provide-s3-credentials).
-- Kubernetes Cluster Nodes with the following specifications:
+- A Kubernetes cluster node with the following specifications:
   - CPU: 8 cores  
   - RAM: 64 GB  
   - Disk: 200GB+
-- A Weave-enabled license from W&B. To request a license, please contact `support@wandb.com`.
+- A Weave-enabled license from W&B. To request a license, contact `support@wandb.com`.
 
 :::tip  
 For a detailed reference architecture, see [https://docs.wandb.ai/guides/hosting/self-managed/ref-arch/](https://docs.wandb.ai/guides/hosting/self-managed/ref-arch/#models-and-weave).
@@ -23,17 +23,14 @@ For a detailed reference architecture, see [https://docs.wandb.ai/guides/hosting
 
 ## 1. Deploy ClickHouse
 
-The ClickHouse deployment in this document uses the [Altinity Kubernetes Operator for ClickHouse](https://docs.altinity.com/altinitykubernetesoperator).
+The ClickHouse deployment in this guide uses the [Altinity Kubernetes Operator for ClickHouse](https://docs.altinity.com/altinitykubernetesoperator).
 
-Altinity uses operator to install, configure, and run a ClickHouse cluster in a Kubernetes cluster, including how to set up persistent storage and replication. Be aware that the GitHub repo for the project (https://github.com/Altinity/clickhouse-operator) has in-depth technical details (https://github.com/Altinity/clickhouse-operator/tree/master/docs#table-of-contents) for a number of advanced configuration.
+Altinity uses operator to install, configure, and run a ClickHouse cluster in a Kubernetes cluster, including setting up persistent storage and replication. See the [ClickHouse Operator repo](https://github.com/Altinity/clickhouse-operator) for in-depth technical details and [advanced configuration](https://github.com/Altinity/clickhouse-operator/tree/master/docs#table-of-contents).
 
-To Install Altinity Operator for clickhouse follow the below steps:
-
-1. [Configure the Helm repository](#configure-helm-repository)
-2. [Create Helm Configuration](#create-helm-configuration)
-3. [Provide S3 credentials](#provide-s3-credentials)
 
 ### Configure Helm repository
+
+To begin deploying ClickHouse:
 
 1. Add the Altinity Helm repository:
 
@@ -42,11 +39,13 @@ To Install Altinity Operator for clickhouse follow the below steps:
 2. Update the helm repository:
 
    `helm repo update`
+
 ### Install Altinity Operator:
    
    `helm install ch-operator altinity/clickhouse --namespace clickhouse --create-namespace --version 0.2.6`
 
 ### Configure bucket access/secret credentials:
+
   ```
   # Create secret in clickhouse namespace with bucket secret
    SECRET_NAME="ch-bucket-cred"
@@ -57,10 +56,10 @@ To Install Altinity Operator for clickhouse follow the below steps:
    --from-literal=secret_key="$SECRET" \
    --dry-run=client -o yaml | kubectl apply -f -
   ```
+
 ### Deploy keeper into Kubernetes cluster:
 
-  Modify any parts related
-    1. PVC `storageClassName`
+  Customize the `storageClassName` paramater in the following configuration and then run:
 
  `kubectl apply -f ch-keeper.yaml -n clickhouse`
 
@@ -169,15 +168,17 @@ spec:
       keeper_server/coordination_settings/raft_logs_level: "information"
  ```
 
-### Deploy ch-server into Kubernetes cluster:
+### Deploy ch-server into the Kubernetes cluster:
 
-    Modify any parts related
+    Customize the following fields in the following configuration as needed:
     1. Update `storageClassName`
     2. Update node endpoints `<zookeeperpod>.<namespace>.svc.cluster.local`
     3. Update host endpoints `<host><clickhouse-pod>.<namespace>.svc.cluster.local</host>`
-    2. Update `storage_configuration`
-    3. Sizes of cache and other filesystems
-    4. Password for `weave` user
+    4. Update `storage_configuration`
+    5. Sizes of cache and other filesystems
+    6. Password for `weave` user
+
+Once you've updated your fields, apply the changes:
 
 `kubectl apply -f ch-server.yaml -n clickhouse`
 
@@ -403,7 +404,7 @@ Confirm that ClickHouse is deployed using the following command:
 kubectl get pods -n clickhouse
 ```
 
-You should see the following pods:
+The command returns the following pods:
 
 ```bash
 NAME                                                        READY   STATUS    RESTARTS   AGE
@@ -417,8 +418,7 @@ chk-wandb-keeper-0-2-0                                      1/1     Running   0 
 ```
 ## 2. Add ClickHouse Configuration in W&B Platform CR
 
- 
-Edit the [CR instance](https://docs.wandb.ai/guides/hosting/operator/#complete-example) used to deploy the platform.
+To integrate the ClickHouse database with W&B, edit the [CR instance](https://docs.wandb.ai/guides/hosting/operator/#complete-example) used to deploy the platform:
 
 1. Use Kubernetes service details to configure Weave tracing:
 
@@ -429,7 +429,7 @@ Edit the [CR instance](https://docs.wandb.ai/guides/hosting/operator/#complete-e
   - **Username**: Set in the `values.yaml`
   - **Password**: Set in the `values.yaml`
 
-2. With this information, update the W&B Platform Custom Resource(CR) by adding the following configuration:
+2. Using this information, update the W&B Platform Custom Resource(CR) by adding the following configuration:
 
     ```yaml
     apiVersion: apps.wandb.com/v1
@@ -470,13 +470,13 @@ When using more than one replica (W&B recommend a least 3 replicas), ensure to h
 extraEnv:
   WF_CLICKHOUSE_REPLICATED: "true"
 ```
-This has the same effect of `replicated: true` which in preview.
+This has the same effect as `replicated: true`.
 :::
 
 
-3. Set the `clusterName` in `values.yaml` to `weave_cluster`. If it is not, the database migration will fail.  
+3. Set the `clusterName` in `values.yaml` to `weave_cluster`. The database migration fails if you do not set this value correctly. 
 
-    Alternatively, ff you use a different cluster name, set the `WF_CLICKHOUSE_REPLICATED_CLUSTER` environment variable in `weave-trace.extraEnv` to match the chosen name, as shown in the example below.
+    If you want to set a different cluster name, you can set the `WF_CLICKHOUSE_REPLICATED_CLUSTER` environment variable in `weave-trace.extraEnv` to match the chosen name, as shown in the example below.
 
     ```yaml
     [...]
@@ -501,7 +501,7 @@ This has the same effect of `replicated: true` which in preview.
     [...]
     ```
 
-    The final configuration will look like the following example:
+    The final configuration looks like the following example:
 
     ```yaml
     apiVersion: apps.wandb.com/v1
@@ -562,6 +562,6 @@ This has the same effect of `replicated: true` which in preview.
 
 ## 3. Access Weave
 
-Once the deployment is running, accessing the W&B endpoint configured in the `host` option should display the Weave licensing status as enabled.
+Once the deployment is running, you can access it using W&B endpoint configured in the `host` field. It shows the Weave licensing status as enabled.
 
 ![Weave](../../media/weave-self-managed/weave-org-dashboard.png)
