@@ -1,11 +1,17 @@
 import json
 import uuid
-from typing import Any
+from typing import Any, Union
 
 import websocket
 
 import weave
 
+from .models import (
+    ServerMessageType,
+    UserMessageType,
+    create_server_message_from_dict,
+    create_user_message_from_dict,
+)
 from .sessions import SessionManager
 
 try:
@@ -75,7 +81,14 @@ class WeaveMediaConnection:
                 # Process outgoing events with session manager
                 parsed_data = _try_json_load(data)
                 if isinstance(parsed_data, dict):
-                    self.session_manager.process_event(parsed_data)
+                    # Try to parse as typed message first
+                    try:
+                        typed_message = create_user_message_from_dict(parsed_data)
+                        with weave.attributes({"typed_message": typed_message.type}):
+                            self.session_manager.process_event(parsed_data)
+                    except Exception:
+                        # Fall back to raw dict processing
+                        self.session_manager.process_event(parsed_data)
                 return sender(data, opcode)
 
         return wrapper
@@ -102,7 +115,14 @@ class WeaveMediaConnection:
                     message = args[1]
                     parsed_message = _try_json_load(message)
                     if isinstance(parsed_message, dict):
-                        self.session_manager.process_event(parsed_message)
+                        # Try to parse as typed message first
+                        try:
+                            typed_message = create_server_message_from_dict(parsed_message)
+                            with weave.attributes({"typed_message": typed_message.type}):
+                                self.session_manager.process_event(parsed_message)
+                        except Exception:
+                            # Fall back to raw dict processing
+                            self.session_manager.process_event(parsed_message)
                 # Call the original handler
                 return handler(*args, **kwargs)
 
@@ -144,9 +164,19 @@ class WeaveAsyncWebsocketConnection:
             parsed_message = _try_json_load(message)
             # Process outgoing events with session manager
             if isinstance(parsed_message, dict):
-                self.session_manager.process_event(parsed_message)
-            with weave.attributes({"data": parsed_message}):
-                return await self.original_connection.send(*args, **kwargs)
+                # Try to parse as typed message first
+                try:
+                    typed_message = create_user_message_from_dict(parsed_message)
+                    with weave.attributes({"typed_message": typed_message.type, "data": parsed_message}):
+                        self.session_manager.process_event(parsed_message)
+                except Exception:
+                    # Fall back to raw dict processing
+                    with weave.attributes({"data": parsed_message}):
+                        self.session_manager.process_event(parsed_message)
+            else:
+                with weave.attributes({"data": parsed_message}):
+                    pass
+            return await self.original_connection.send(*args, **kwargs)
 
     async def recv(self, *args: Any, **kwargs: Any) -> Any:
         with weave.attributes({"websocket_id": self.id}):
@@ -154,9 +184,19 @@ class WeaveAsyncWebsocketConnection:
             parsed_message = _try_json_load(message)
             # Process incoming events with session manager
             if isinstance(parsed_message, dict):
-                self.session_manager.process_event(parsed_message)
-            with weave.attributes({"data": parsed_message}):
-                return message
+                # Try to parse as typed message first
+                try:
+                    typed_message = create_server_message_from_dict(parsed_message)
+                    with weave.attributes({"typed_message": typed_message.type, "data": parsed_message}):
+                        self.session_manager.process_event(parsed_message)
+                except Exception:
+                    # Fall back to raw dict processing
+                    with weave.attributes({"data": parsed_message}):
+                        self.session_manager.process_event(parsed_message)
+            else:
+                with weave.attributes({"data": parsed_message}):
+                    pass
+            return message
 
     def __aiter__(self) -> Any:
         return self

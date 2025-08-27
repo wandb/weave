@@ -6,11 +6,82 @@ import uuid
 import wave
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
 from typing import Any, Literal, Optional, Union
 
 import weave
 from weave import Content
+
+# Re-export ItemStatus for backward compatibility
+class ItemStatus:
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+
+from .models import (
+    AudioFormat,
+    Modality,
+    Voice,
+    MessageRole,
+    ItemParamStatus,
+    ResponseItemStatus,
+    ResponseStatus,
+    InputAudioTranscription,
+    TurnDetection,
+    ServerVAD,
+    NoTurnDetection,
+    ToolsDefinition,
+    ToolChoice,
+    Temperature,
+    SessionUpdateParams,
+    Session as ModelSession,
+    SessionCreatedMessage,
+    SessionUpdatedMessage,
+    InputAudioBufferAppendMessage,
+    InputAudioBufferSpeechStartedMessage,
+    InputAudioBufferSpeechStoppedMessage,
+    InputAudioBufferCommittedMessage,
+    InputAudioBufferClearMessage,
+    ItemCreatedMessage,
+    ItemTruncatedMessage,
+    ItemDeletedMessage,
+    ItemInputAudioTranscriptionCompletedMessage,
+    ItemInputAudioTranscriptionDeltaMessage,
+    ItemInputAudioTranscriptionFailedMessage,
+    ResponseCreatedMessage,
+    ResponseDoneMessage,
+    ResponseOutputItemAddedMessage,
+    ResponseOutputItemDoneMessage,
+    ResponseContentPartAddedMessage,
+    ResponseContentPartDoneMessage,
+    ResponseAudioDeltaMessage,
+    ResponseAudioDoneMessage,
+    ResponseTextDeltaMessage,
+    ResponseTextDoneMessage,
+    ResponseAudioTranscriptDeltaMessage,
+    ResponseAudioTranscriptDoneMessage,
+    ResponseFunctionCallArgumentsDeltaMessage,
+    ResponseFunctionCallArgumentsDoneMessage,
+    ResponseMessageItem,
+    ResponseFunctionCallItem,
+    ResponseFunctionCallOutputItem,
+    ResponseItem,
+    ResponseItemContentPart,
+    Response,
+    Usage,
+    MessageItem,
+    SystemMessageItem,
+    UserMessageItem,
+    AssistantMessageItem,
+    FunctionCallItem,
+    FunctionCallOutputItem,
+    Item,
+    InputTextContentPart,
+    InputAudioContentPart,
+    OutputTextContentPart,
+    UserContentPart,
+    AssistantContentPart,
+    create_server_message_from_dict,
+    create_user_message_from_dict,
+)
 
 
 def pcm_to_wav(
@@ -61,21 +132,6 @@ def pcm_to_wav(
     return wav_buffer.getvalue()
 
 
-class ContentType(Enum):
-    AUDIO = "audio"
-    TEXT = "text"
-
-
-class ItemStatus(Enum):
-    IN_PROGRESS = "in_progress"
-    COMPLETED = "completed"
-
-
-class Role(Enum):
-    USER = "user"
-    ASSISTANT = "assistant"
-    SYSTEM = "system"
-    TOOL = "tool"
 
 
 @dataclass
@@ -88,7 +144,7 @@ class ItemContent:
     transcript: Optional[str] = None
     audio_start_ms: Optional[int] = None
     audio_end_ms: Optional[int] = None
-    audio_format: Optional[str] = None  # Format like "pcm16", "g711_ulaw", "g711_alaw"
+    audio_format: Optional[AudioFormat] = None
 
     def get_audio_content(self) -> Optional[Content]:
         """Convert audio bytes to Content object."""
@@ -128,7 +184,7 @@ class ConversationTurn:
     user_item: Optional["ConversationItem"] = None
     assistant_item: Optional["ConversationItem"] = None
     weave_call: Optional[Any] = None  # The weave call object
-    status: ItemStatus = ItemStatus.IN_PROGRESS
+    status: ResponseItemStatus = "in_progress"
     created_at: datetime = field(default_factory=datetime.now)
     completed_at: Optional[datetime] = None
     pending_function_calls: dict[str, dict[str, Any]] = field(
@@ -146,7 +202,7 @@ class ConversationTurn:
 
     def complete(self, response_data: Optional[dict[str, Any]] = None) -> None:
         """Mark the turn as completed."""
-        self.status = ItemStatus.COMPLETED
+        self.status = "completed"
         self.completed_at = datetime.now()
         if self.weave_call:
             # Finish the weave call with the complete conversation turn data
@@ -320,8 +376,8 @@ class ConversationTurn:
 @dataclass
 class ConversationItem:
     id: str
-    role: Role
-    status: ItemStatus
+    role: Union[MessageRole, Literal["tool"]]  # MessageRole doesn't have "tool", so we keep it separate
+    status: ResponseItemStatus
     content: list[ItemContent] = field(default_factory=list)
     created_at: datetime = field(default_factory=datetime.now)
     previous_item_id: Optional[str] = None
@@ -394,7 +450,7 @@ class ConversationItem:
 
     def complete(self) -> None:
         """Mark the item as completed."""
-        self.status = ItemStatus.COMPLETED
+        self.status = "completed"
 
     def has_audio(self) -> bool:
         """Check if the item contains audio content."""
@@ -456,11 +512,11 @@ class Conversation:
 
     def get_user_items(self) -> list[ConversationItem]:
         """Get all user conversation items."""
-        return [item for item in self.items if item.role == Role.USER]
+        return [item for item in self.items if item.role == "user"]
 
     def get_assistant_items(self) -> list[ConversationItem]:
         """Get all assistant conversation items."""
-        return [item for item in self.items if item.role == Role.ASSISTANT]
+        return [item for item in self.items if item.role == "assistant"]
 
     def start_turn(self, turn_id: str) -> ConversationTurn:
         """Start a new conversation turn."""
@@ -489,17 +545,17 @@ class Conversation:
         messages = []
 
         for item in self.items:
-            if item.status != ItemStatus.COMPLETED:
+            if item.status != "completed":
                 continue
 
-            message: dict[str, Any] = {"role": item.role.value}
+            message: dict[str, Any] = {"role": item.role if isinstance(item.role, str) else item.role.value}
 
             # Build content based on what the item contains
             text_content = item.get_full_text()
             audio_content = item.get_audio_content()
 
             # For user messages with both text and audio, create multi-part content
-            if item.role == Role.USER and item.has_audio() and text_content:
+            if item.role == "user" and item.has_audio() and text_content:
                 content_parts: list[dict[str, Any]] = []
 
                 # Add text part
@@ -517,7 +573,7 @@ class Conversation:
                 message["content"] = content_parts
 
             # For user messages with only audio
-            elif item.role == Role.USER and item.has_audio() and not text_content:
+            elif item.role == "user" and item.has_audio() and not text_content:
                 if audio_content:
                     message["content"] = [
                         {
@@ -529,7 +585,7 @@ class Conversation:
                     message["content"] = None
 
             # For assistant messages with both text and audio, create multi-part content
-            elif item.role == Role.ASSISTANT and item.has_audio() and text_content:
+            elif item.role == "assistant" and item.has_audio() and text_content:
                 content_parts = []
 
                 # Add text part
@@ -547,7 +603,7 @@ class Conversation:
                 message["content"] = content_parts
 
             # For assistant messages with only audio
-            elif item.role == Role.ASSISTANT and item.has_audio() and not text_content:
+            elif item.role == "assistant" and item.has_audio() and not text_content:
                 if audio_content:
                     message["content"] = [
                         {
@@ -565,12 +621,12 @@ class Conversation:
                 message["content"] = None
 
             # Add tool-specific fields
-            if item.role == Role.TOOL:
+            if item.role == "tool":
                 message["tool_call_id"] = item.tool_call_id
                 message["name"] = item.tool_name
 
             # Add assistant-specific fields
-            elif item.role == Role.ASSISTANT:
+            elif item.role == "assistant":
                 message["refusal"] = None
                 message["annotations"] = []
                 message["function_call"] = None
@@ -583,17 +639,17 @@ class Conversation:
 
 @dataclass
 class SessionConfig:
-    modalities: list[str] = field(default_factory=lambda: ["text", "audio"])
+    modalities: list[Modality] = field(default_factory=lambda: ["text", "audio"])
     instructions: str = "You are a helpful assistant."
-    voice: str = "alloy"
-    input_audio_format: str = "pcm16"
-    output_audio_format: str = "pcm16"
-    input_audio_transcription: Optional[dict[str, Any]] = None
-    turn_detection: Optional[dict[str, Any]] = None
+    voice: Voice = "alloy"
+    input_audio_format: AudioFormat = "pcm16"
+    output_audio_format: AudioFormat = "pcm16"
+    input_audio_transcription: Optional[InputAudioTranscription] = None
+    turn_detection: Optional[TurnDetection] = None
     temperature: float = 0.8
     max_response_output_tokens: Union[str, int] = "inf"
-    tools: list[dict[str, Any]] = field(default_factory=list)
-    tool_choice: str = "auto"
+    tools: ToolsDefinition = field(default_factory=list)
+    tool_choice: ToolChoice = "auto"
 
 
 @dataclass
@@ -615,7 +671,7 @@ class Session:
     def start_user_input(self, item_id: str) -> ConversationItem:
         """Start a new user input item."""
         item = ConversationItem(
-            id=item_id, role=Role.USER, status=ItemStatus.IN_PROGRESS
+            id=item_id, role="user", status="in_progress"
         )
         self.conversation.add_item(item)
         self.current_item_id = item_id
@@ -626,7 +682,7 @@ class Session:
     ) -> ConversationItem:
         """Start a new assistant response item."""
         item = ConversationItem(
-            id=item_id, role=Role.ASSISTANT, status=ItemStatus.IN_PROGRESS
+            id=item_id, role="assistant", status="in_progress"
         )
         self.conversation.add_item(item)
         self.current_item_id = item_id
@@ -725,18 +781,37 @@ class SessionManager:
             session_data = event.get("session", {})
             session_id = session_data.get("id")
             if session_id:
+                # Parse modalities - already list of strings matching Modality type
+                modalities = session_data.get("modalities", ["text", "audio"])
+
+                # Parse voice - already a string matching Voice type
+                voice = session_data.get("voice", "alloy")
+
+                # Parse audio formats - already strings matching AudioFormat type
+                input_format = session_data.get("input_audio_format", "pcm16")
+                output_format = session_data.get("output_audio_format", "pcm16")
+
+                # Parse input audio transcription
+                transcription_raw = session_data.get("input_audio_transcription")
+                transcription = InputAudioTranscription(**transcription_raw) if transcription_raw else None
+
+                # Parse turn detection
+                turn_detection_raw = session_data.get("turn_detection")
+                turn_detection = None
+                if turn_detection_raw:
+                    if turn_detection_raw.get("type") == "server_vad":
+                        turn_detection = ServerVAD(**turn_detection_raw)
+                    else:
+                        turn_detection = NoTurnDetection(**turn_detection_raw)
+
                 config = SessionConfig(
-                    modalities=session_data.get("modalities", ["text", "audio"]),
+                    modalities=modalities,
                     instructions=session_data.get("instructions", ""),
-                    voice=session_data.get("voice", "alloy"),
-                    input_audio_format=session_data.get("input_audio_format", "pcm16"),
-                    output_audio_format=session_data.get(
-                        "output_audio_format", "pcm16"
-                    ),
-                    input_audio_transcription=session_data.get(
-                        "input_audio_transcription"
-                    ),
-                    turn_detection=session_data.get("turn_detection"),
+                    voice=voice,
+                    input_audio_format=input_format,
+                    output_audio_format=output_format,
+                    input_audio_transcription=transcription,
+                    turn_detection=turn_detection,
                     temperature=session_data.get("temperature", 0.8),
                     max_response_output_tokens=session_data.get(
                         "max_response_output_tokens", "inf"
@@ -763,7 +838,7 @@ class SessionManager:
                 # Only store audio if we have an active item (speech has started)
                 # This prevents accumulating silence/noise before speech
                 item = session.conversation.get_item(session.current_item_id)
-                if item and item.role == Role.USER:
+                if item and item.role == "user":
                     item.add_audio_delta(audio_base64)
             # Don't buffer audio before speech starts - let server VAD handle it
             return None
@@ -862,8 +937,8 @@ class SessionManager:
                     # Create a tool response item in the conversation
                     tool_item = ConversationItem(
                         id=item_id,
-                        role=Role.TOOL,
-                        status=ItemStatus.COMPLETED,
+                        role="tool",  # Tool role is not in MessageRole
+                        status="completed",
                         tool_call_id=call_id,
                         tool_name=function_name,
                     )
@@ -918,10 +993,8 @@ class SessionManager:
                 if not existing_item:
                     item = ConversationItem(
                         id=item_id,
-                        role=Role(role),
-                        status=ItemStatus.COMPLETED
-                        if status == "completed"
-                        else ItemStatus.IN_PROGRESS,
+                        role=role,  # Already a string, will be validated by type
+                        status="completed" if status == "completed" else "in_progress",
                     )
 
                     # Process content
