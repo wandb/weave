@@ -61,7 +61,7 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
 )
 from weave.trace_server.clickhouse_schema import (
     ALL_CALL_INSERT_COLUMNS,
-    ALL_CALL_JSON_COLUMN_INDICES,
+    ALL_CALL_JSON_COLUMNS,
     ALL_CALL_SELECT_COLUMNS,
     REQUIRED_CALL_COLUMNS,
     CallCHInsertable,
@@ -2344,37 +2344,38 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         stripped_count = 0
         final_batch = []
 
+        json_column_indices = [
+            ALL_CALL_INSERT_COLUMNS.index(f"{col}_dump")
+            for col in ALL_CALL_JSON_COLUMNS
+        ]
+        entity_too_large_payload_byte_size = _num_bytes(
+            ch_settings.ENTITY_TOO_LARGE_PAYLOAD
+        )
+
         for item in batch:
             # Calculate only JSON dump bytes
-            json_sizes = [
-                (i, _num_bytes(item[i])) for i in ALL_CALL_JSON_COLUMN_INDICES
+            json_idx_size_pairs = [
+                (i, _num_bytes(item[i])) for i in json_column_indices
             ]
-            total_json_bytes = sum(size for _, size in json_sizes)
-
-            # If JSON columns are under limit, keep as is
-            if total_json_bytes <= ch_settings.CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT:
-                final_batch.append(item)
-                continue
+            total_json_bytes = sum(size for _, size in json_idx_size_pairs)
 
             # If over limit, try to optimize by selectively stripping largest JSON values
             stripped_item = list(item)
-            sorted_json_sizes = sorted(json_sizes, key=lambda x: x[1], reverse=True)
+            sorted_json_idx_size_pairs = sorted(
+                json_idx_size_pairs, key=lambda x: x[1], reverse=True
+            )
 
             # Try to get under the limit by replacing largest JSON values
-            for col_idx, size in sorted_json_sizes:
+            for col_idx, size in sorted_json_idx_size_pairs:
                 if (
                     total_json_bytes
                     <= ch_settings.CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT
                 ):
                     break
 
-                # Replace this large JSON value with placeholder
+                # Replace this large JSON value with placeholder, update running size
                 stripped_item[col_idx] = ch_settings.ENTITY_TOO_LARGE_PAYLOAD
-                total_json_bytes = (
-                    total_json_bytes
-                    - size
-                    + _num_bytes(ch_settings.ENTITY_TOO_LARGE_PAYLOAD)
-                )
+                total_json_bytes -= size - entity_too_large_payload_byte_size
                 stripped_count += 1
 
             final_batch.append(stripped_item)
