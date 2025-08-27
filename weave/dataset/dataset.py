@@ -6,13 +6,13 @@ from typing import TYPE_CHECKING, Any, Union
 from pydantic import field_validator
 from typing_extensions import Self
 
-import weave
 from weave.flow.util import short_str
 from weave.object.obj import Object
 from weave.trace.call import Call
 from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.isinstance import weave_isinstance
 from weave.trace.objectify import register_object
+from weave.trace.table import Table
 from weave.trace.vals import WeaveObject, WeaveTable
 
 if TYPE_CHECKING:
@@ -49,7 +49,7 @@ class Dataset(Object):
     ```
     """
 
-    rows: Union[weave.Table, WeaveTable]
+    rows: Union[Table, WeaveTable]
 
     @classmethod
     def from_obj(cls, obj: WeaveObject) -> Self:
@@ -140,6 +140,8 @@ class Dataset(Object):
         Returns:
             The updated dataset.
         """
+        import weave
+
         client = require_weave_client()
         if not isinstance(self.rows, WeaveTable) or not self.rows.table_ref:
             raise TypeError(
@@ -171,12 +173,12 @@ class Dataset(Object):
         return new_dataset
 
     @field_validator("rows", mode="before")
-    def convert_to_table(cls, rows: Any) -> Union[weave.Table, WeaveTable]:  # noqa: N805
+    def convert_to_table(cls, rows: Any) -> Union[Table, WeaveTable]:  # noqa: N805
         if weave_isinstance(rows, WeaveTable):
             return rows
-        if not isinstance(rows, weave.Table):
+        if not isinstance(rows, Table):
             table_ref = getattr(rows, "table_ref", None)
-            rows = weave.Table(rows)
+            rows = Table(rows)
             if table_ref:
                 rows.table_ref = table_ref
         if len(rows.rows) == 0:
