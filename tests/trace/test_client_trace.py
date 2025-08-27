@@ -3497,6 +3497,45 @@ def test_large_keys_are_stripped_call(client, caplog, monkeypatch):
     assert call.output == "really_small"
     _compare_inputs(call.inputs, {"input_data": smaller_data})
 
+    # Test case where we have a batch with mixed sizes - some calls need stripping, some don't
+    # This ensures we hit the lines where total_json_bytes <= limit (lines 2355-2357)
+    # for items that don't need stripping within a batch that overall needs stripping
+
+    @weave.op
+    def test_op_mixed_batch_small(input_data: str):
+        return input_data
+
+    @weave.op
+    def test_op_mixed_batch_large(input_data: dict):
+        return {"large_output": input_data}
+
+    # Create a small call that fits under the limit
+    test_op_mixed_batch_small("tiny data")
+
+    # Create a large call that needs stripping
+    large_data = {"dictionary": {f"{i}": i for i in range(max_size // 10)}}
+    test_op_mixed_batch_large(large_data)
+
+    # Create another small call
+    test_op_mixed_batch_small("another tiny piece")
+
+    # Flush to ensure they're in the same batch
+    client.flush()
+
+    # Check that the small calls preserved their data while the large one was stripped
+    small_calls = list(test_op_mixed_batch_small.calls())
+    assert len(small_calls) == 2
+    assert small_calls[0].output == "tiny data"
+    assert small_calls[0].inputs == {"input_data": "tiny data"}
+    assert small_calls[1].output == "another tiny piece"
+    assert small_calls[1].inputs == {"input_data": "another tiny piece"}
+
+    large_calls = list(test_op_mixed_batch_large.calls())
+    assert len(large_calls) == 1
+    # The large call should have been stripped
+    assert large_calls[0].output == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
+    assert large_calls[0].inputs == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
+
 
 def test_weave_finish_unsets_client(client):
     @weave.op
