@@ -142,6 +142,86 @@ class Call:
 
         return CallRef(entity, project, self.id)
 
+    @property
+    def latency(self) -> float | None:
+        """
+        Get the call's latency in milliseconds.
+
+        Returns None if the call hasn't ended yet or if timing information is unavailable.
+        """
+        # First try to get from summary if it's been computed
+        if self.summary and "weave" in self.summary:
+            latency_ms = self.summary["weave"].get("latency_ms")
+            if latency_ms is not None:
+                return latency_ms
+
+        # Otherwise compute it from started_at and ended_at
+        if self.started_at and self.ended_at:
+            delta = self.ended_at - self.started_at
+            days = delta.days
+            seconds = delta.seconds
+            milliseconds = delta.microseconds // 1000
+            return (days * 24 * 60 * 60 + seconds) * 1000 + milliseconds
+
+        return None
+
+    @property
+    def latency_ms(self) -> float | None:
+        """Alias for latency property for backward compatibility."""
+        return self.latency
+
+    @property
+    def status(self) -> str | None:
+        """
+        Get the call's status.
+
+        Returns one of: "success", "error", "running", "descendant_error", or None if unavailable.
+        """
+        # First try to get from summary if it's been computed
+        if self.summary and "weave" in self.summary:
+            status = self.summary["weave"].get("status")
+            if status is not None:
+                return status
+
+        # Otherwise compute it based on the call state
+        if self.exception:
+            return "error"
+        elif self.ended_at is None:
+            return "running"
+        elif self.summary and self.summary.get("status_counts", {}).get("error", 0) > 0:
+            return "descendant_error"
+        else:
+            return "success"
+
+    @property
+    def status_code(self) -> str | None:
+        """
+        Get the HTTP status code if this call represents an HTTP request.
+
+        This checks the summary for a status_code field which some integrations
+        (like HTTP clients) may populate.
+        """
+        if self.summary:
+            # Check if there's a status_code at the top level of summary
+            status_code = self.summary.get("status_code")
+            if status_code is not None:
+                return str(status_code)
+            
+            # Also check common locations where integrations might store it
+            if "http" in self.summary:
+                status_code = self.summary["http"].get("status_code")
+                if status_code is not None:
+                    return str(status_code)
+                    
+        # Check outputs for HTTP response patterns
+        if self.output and isinstance(self.output, dict):
+            # Common patterns for HTTP responses
+            for key in ["status_code", "status", "statusCode"]:
+                if key in self.output:
+                    return str(self.output[key])
+                    
+        return None
+
     # These are the children if we're using Call at read-time
     def children(self, *, page_size: int = DEFAULT_CALLS_PAGE_SIZE) -> CallsIter:
         """
