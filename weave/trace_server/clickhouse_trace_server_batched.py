@@ -2322,7 +2322,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             batch = self._strip_large_values(self._call_batch)
             # Insert rows one at a time after stripping large values
             for row in batch:
-                self._insert_call(row)
+                self._insert_call_batch([row])
 
         self._call_batch = []
 
