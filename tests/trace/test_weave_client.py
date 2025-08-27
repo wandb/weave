@@ -25,7 +25,7 @@ from tests.trace.util import (
 )
 from weave import Evaluation
 from weave.integrations.integration_utilities import op_name_from_call
-from weave.trace import refs, table_upload_chunking, weave_client
+from weave.trace import refs, settings, table_upload_chunking, weave_client
 from weave.trace.context import call_context
 from weave.trace.context.call_context import tracing_disabled
 from weave.trace.isinstance import weave_isinstance
@@ -1455,7 +1455,8 @@ def row_gen(num_rows: int, approx_row_bytes: int = 1024):
         yield {"a": i, "b": "x" * approx_row_bytes}
 
 
-def test_table_partitioning(network_proxy_client):
+@pytest.mark.parametrize("use_parallel_table_upload", [False, True])
+def test_table_partitioning(network_proxy_client, use_parallel_table_upload):
     """
     This test is specifically testing the correctness
     of the table partitioning logic in the remote client.
@@ -1463,6 +1464,13 @@ def test_table_partitioning(network_proxy_client):
     creation into multiple updates
     """
     client, remote_client, records = network_proxy_client
+
+    # Set the parallel table upload setting for this test
+    test_settings = settings.UserSettings(
+        use_parallel_table_upload=use_parallel_table_upload
+    )
+    settings.parse_and_apply_settings(test_settings)
+
     num_rows = 16
     rows = list(row_gen(num_rows, 1024))
     exp_digest = "15696550bde28f9231173a085ce107c823e7eab6744a97adaa7da55bc9c93347"
@@ -1516,25 +1524,27 @@ def test_table_partitioning(network_proxy_client):
     saved_table = client.save(table_obj, "table")
 
     assert saved_table.table_ref._digest == exp_digest
-    # Verify that chunking happened by checking for table_create_from_digests call
-    table_create_records = [r for r in records if r[0] == "table_create"]
-    table_create_from_digests_records = [
-        r for r in records if r[0] == "table_create_from_digests"
-    ]
-    obj_records = [r for r in records if r[0] in ["obj_create", "obj_read"]]
 
-    # Expected: 2 table_create calls (first + second) + 1 table_create_from_digests (chunking merge)
-    assert len(table_create_records) == 2, (
-        f"Expected 2 table_create calls, got {len(table_create_records)}"
-    )
-    # 1 for testing if the endpoint exists, 1 for the actual request
-    assert len(table_create_from_digests_records) == 2, (
-        f"Expected 2 table_create_from_digests calls, got {len(table_create_from_digests_records)}"
-    )
-    assert len(obj_records) == 2, (
-        f"Expected 2 obj_create/obj_read calls, got {len(obj_records)}"
-    )
-    assert len(records) == 6, f"Expected 6 total records, got {len(records)}"
+    if use_parallel_table_upload:
+        # Verify that chunking happened by checking for table_create_from_digests call
+        table_create_records = [r for r in records if r[0] == "table_create"]
+        table_create_from_digests_records = [
+            r for r in records if r[0] == "table_create_from_digests"
+        ]
+        obj_records = [r for r in records if r[0] in ["obj_create", "obj_read"]]
+
+        # Expected: 2 table_create calls (first + second) + 1 table_create_from_digests (chunking merge)
+        assert len(table_create_records) == 2, (
+            f"Expected 2 table_create calls, got {len(table_create_records)}"
+        )
+        # 1 for testing if the endpoint exists, 1 for the actual request
+        assert len(table_create_from_digests_records) == 2, (
+            f"Expected 2 table_create_from_digests calls, got {len(table_create_from_digests_records)}"
+        )
+        assert len(obj_records) == 2, (
+            f"Expected 2 obj_create/obj_read calls, got {len(obj_records)}"
+        )
+        assert len(records) == 6, f"Expected 6 total records, got {len(records)}"
 
 
 def test_summary_tokens_cost(client):
@@ -3652,8 +3662,17 @@ def test_feedback_batching(network_proxy_client):
 
 
 @pytest.mark.disable_logging_error_check
-def test_parallel_table_uploads_digest_consistency(client, monkeypatch):
+@pytest.mark.parametrize("use_parallel_table_upload", [False, True])
+def test_parallel_table_uploads_digest_consistency(
+    client, monkeypatch, use_parallel_table_upload
+):
     """Test parallel table uploads are consistent with one shot uploads."""
+    # Set the parallel table upload setting for this test
+    test_settings = settings.UserSettings(
+        use_parallel_table_upload=use_parallel_table_upload
+    )
+    settings.parse_and_apply_settings(test_settings)
+
     # Set up the mock before creating the client
     # We'll use a mutable container to control the chunk size dynamically
     current_chunk_size = [table_upload_chunking.TARGET_CHUNK_BYTES]

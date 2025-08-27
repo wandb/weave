@@ -73,6 +73,7 @@ from weave.trace.settings import (
     should_capture_system_info,
     should_print_call_link,
     should_redact_pii,
+    should_use_parallel_table_upload,
 )
 from weave.trace.table import Table
 from weave.trace.table_upload_chunking import ChunkingConfig, TableChunkManager
@@ -2012,7 +2013,7 @@ class WeaveClient:
 
         # Determine parallel vs incremental chunking
         use_parallel_chunks = False
-        if use_chunking:
+        if use_chunking and should_use_parallel_table_upload():
             test_req = TableCreateFromDigestsReq(
                 project_id=self._project_id(), row_digests=[]
             )
