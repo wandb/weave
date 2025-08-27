@@ -277,13 +277,13 @@ spec:
   configuration:
     # Refer to: https://clickhouse.com/docs/operations/server-configuration-parameters/settings#zookeeper
     zookeeper:
-      #nodes:
-      #  - host: chk-wandb-keeper-0-0-0.clickhouse.svc.cluster.local # Set zookeeper node endpoints
-      #    port: 2181
-      #  - host: chk-wandb-keeper-0-1-0.clickhouse.svc.cluster.local # Set zookeeper node endpoints
-      #    port: 2181
-      #  - host: chk-wandb-keeper-0-2-0.clickhouse.svc.cluster.local # Set zookeeper node endpoints
-      #    port: 2181
+      nodes:
+        - host: chk-wandb-keeper-0-0-0.clickhouse.svc.cluster.local # Set zookeeper node endpoints
+          port: 2181
+        - host: chk-wandb-keeper-0-1-0.clickhouse.svc.cluster.local # Set zookeeper node endpoints
+          port: 2181
+        - host: chk-wandb-keeper-0-2-0.clickhouse.svc.cluster.local # Set zookeeper node endpoints
+          port: 2181
       # Other configurations
       # session_timeout_ms: 30000
       # operation_timeout_ms: 10000
