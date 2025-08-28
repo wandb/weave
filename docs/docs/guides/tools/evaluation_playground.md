@@ -1,6 +1,3 @@
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
 # Evaluation Playground
 
 The Evaluation Playground is a powerful tool in the Weave UI that allows you to access existing models, build new ones, and compare their performances using evaluation datasets and LLM scoring judges. This enables you to start experimenting with and comparing your models without setting up any code. You can also save the models, scorers, and datasets you develop in the playground for later development and deployment.
