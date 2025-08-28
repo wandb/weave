@@ -32,7 +32,7 @@ from typing import (
     overload,
 )
 
-from typing_extensions import ParamSpec
+from typing_extensions import ParamSpec, TypeIs
 
 from weave.trace import box, settings
 from weave.trace.context import call_context
@@ -57,7 +57,7 @@ from weave.trace.op_protocol import (
 from weave.trace.util import log_once
 
 if TYPE_CHECKING:
-    from weave.trace.call import Call, CallsIter
+    from weave.trace.call import Call, CallsIter, NoOpCall
 
 try:
     from openai._types import NOT_GIVEN as OPENAI_NOT_GIVEN
@@ -326,7 +326,7 @@ def placeholder_call() -> Call:
     return NoOpCall()
 
 
-def is_placeholder_call(call: Call) -> bool:
+def is_placeholder_call(call: Call) -> TypeIs[NoOpCall]:
     from weave.trace.call import NoOpCall
 
     return isinstance(call, NoOpCall)
@@ -1321,7 +1321,7 @@ def maybe_unbind_method(oplike: Op | MethodType | partial) -> Op:
     return cast(Op, op)
 
 
-def is_op(obj: Any) -> bool:
+def is_op(obj: Any) -> TypeIs[Op]:
     """Check if an object is an Op."""
     if sys.version_info < (3, 12):
         return isinstance(obj, Op)
