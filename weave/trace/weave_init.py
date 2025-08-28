@@ -83,6 +83,9 @@ def init_weave(
     if not project_name or not project_name.strip():
         raise ValueError("project_name must be non-empty")
 
+    # Check for active wandb run early to prevent project mismatches
+    wandb_run_id = weave_client.safe_current_wb_run_id()
+    
     current_client = weave_client_context.get_weave_client()
     if current_client is not None:
         # TODO: Prob should move into settings
@@ -92,6 +95,33 @@ def init_weave(
         ):
             return current_client
         else:
+            # Check if wandb run is active before switching projects
+            if wandb_run_id:
+                # Parse the requested project_name to check for conflicts
+                # For simple project names, we need to resolve the entity
+                fields = project_name.split("/")
+                if len(fields) == 2:
+                    # Entity is explicit, can check directly
+                    req_entity, req_project = fields
+                    weave_client.check_wandb_run_matches(wandb_run_id, req_entity, req_project)
+                elif len(fields) == 1:
+                    # Need to check if the implicit entity would conflict
+                    # The entity will be resolved later, but we check if switching would cause a conflict
+                    wandb_entity, wandb_project, _ = wandb_run_id.split("/")
+                    # If current client exists and matches the wandb run, prevent switching to a different project
+                    if current_client.entity == wandb_entity and current_client.project == wandb_project:
+                        # Current client matches wandb run, but new project differs
+                        if project_name != wandb_project:
+                            raise ValueError(
+                                f'Project Mismatch: Cannot call weave.init with project "{project_name}" while '
+                                f'wandb run is active with project "{wandb_entity}/{wandb_project}". '
+                                f'To fix, please use weave.init("{wandb_entity}/{wandb_project}") or finish the wandb run first.'
+                            )
+                else:
+                    raise ValueError(
+                        f'project_name must be of the form "<project_name>" or "<entity_name>/<project_name>"'
+                    )
+            
             # Flush any pending calls before switching to a new project
             current_client.finish()
             weave_client_context.set_weave_client_global(None)
