@@ -7,12 +7,14 @@ import logging
 import sys
 import warnings
 from collections.abc import Iterator
-from typing import Any, Union, cast
+from typing import Any, TypedDict, Union, cast, overload
+
+from typing_extensions import Unpack
 
 # TODO: type_handlers is imported here to trigger registration of the image serializer.
 # There is probably a better place for this, but including here for now to get the fix in.
 from weave import type_handlers  # noqa: F401
-from weave.trace import urls, weave_client, weave_init
+from weave.trace import urls, weave_init
 from weave.trace.autopatch import AutopatchSettings
 from weave.trace.constants import TRACE_OBJECT_EMOJI
 from weave.trace.context import call_context
@@ -21,13 +23,14 @@ from weave.trace.context.call_context import get_current_call, require_current_c
 from weave.trace.display.term import configure_logger
 from weave.trace.op import as_op, op
 from weave.trace.op_protocol import PostprocessInputsFunc, PostprocessOutputFunc
-from weave.trace.refs import ObjectRef, Ref
+from weave.trace.refs import ObjectRef, OpRef, Ref
 from weave.trace.settings import (
     UserSettings,
     parse_and_apply_settings,
     should_disable_weave,
 )
 from weave.trace.table import Table
+from weave.trace.weave_client import WeaveClient
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface.builtin_object_classes import leaderboard
 
@@ -41,16 +44,23 @@ _global_postprocess_output: PostprocessOutputFunc | None = None
 _global_attributes: dict[str, Any] = {}
 
 
+class InitKwargs(TypedDict, total=False):
+    settings: UserSettings | dict[str, Any] | None
+    autopatch_settings: AutopatchSettings | None
+    global_postprocess_inputs: PostprocessInputsFunc | None
+    global_postprocess_output: PostprocessOutputFunc | None
+    global_attributes: dict[str, Any] | None
+
+
+@overload
+def init(project_name: str, /, **kwargs: Unpack[InitKwargs]) -> WeaveClient: ...
+@overload
+def init(entity: str, project: str, /, **kwargs: Unpack[InitKwargs]) -> WeaveClient: ...
 def init(
-    project_name: str,
-    *,
-    settings: UserSettings | dict[str, Any] | None = None,
-    autopatch_settings: AutopatchSettings | None = None,
-    global_postprocess_inputs: PostprocessInputsFunc | None = None,
-    global_postprocess_output: PostprocessOutputFunc | None = None,
-    global_attributes: dict[str, Any] | None = None,
-) -> weave_client.WeaveClient:
-    """Initialize weave tracking, logging to a wandb project.
+    entity: str, project: str | None = None, /, **init_kwargs: Unpack[InitKwargs]
+) -> WeaveClient:
+    """
+    Initialize weave tracking, logging to a wandb project.
 
     Logging is initialized globally, so you do not need to keep a reference
     to the return value of init.
@@ -59,12 +69,12 @@ def init(
     to the specified project.
 
     Args:
-        project_name: The name of the Weights & Biases project to log to.
-        settings: Configuration for the Weave client generally.
-        autopatch_settings: Configuration for autopatch integrations, e.g. openai
-        global_postprocess_inputs: A function that will be applied to all inputs of all ops.
-        global_postprocess_output: A function that will be applied to all outputs of all ops.
-        global_attributes: A dictionary of attributes that will be applied to all traces.
+        project_name (str): The name of the Weights & Biases project to log to.
+        settings (UserSettings | dict[str, Any] | None): Configuration for the Weave client generally.
+        autopatch_settings (AutopatchSettings | None): Configuration for autopatch integrations, e.g. openai.
+        global_postprocess_inputs (PostprocessInputsFunc | None): A function that will be applied to all inputs of all ops.
+        global_postprocess_output (PostprocessOutputFunc | None): A function that will be applied to all outputs of all ops.
+        global_attributes (dict[str, Any] | None): A dictionary of attributes that will be applied to all traces.
 
     NOTE: Global postprocessing settings are applied to all ops after each op's own
     postprocessing.  The order is always:
@@ -72,7 +82,12 @@ def init(
     2. Global postprocessing
 
     Returns:
-        A Weave client.
+        WeaveClient: A Weave client.
+
+    Examples:
+        >>> client = init("my-project")
+        >>> client = init("my-entity", "my-project")
+        >>> client = init("my-project", settings={"api_url": "https://my-weave-server"})
     """
     if not project_name or not project_name.strip():
         raise ValueError("project_name must be non-empty")
@@ -85,6 +100,18 @@ def init(
             DeprecationWarning,
             stacklevel=2,
         )
+
+    # Parse arguments to support both (entity, project, ...) and (project_name, ...)
+    if project is not None:
+        final_project_name = f"{entity}/{project}"
+    else:
+        final_project_name = entity
+
+    settings = init_kwargs.get("settings", None)
+    autopatch_settings = init_kwargs.get("autopatch_settings", None)
+    global_postprocess_inputs = init_kwargs.get("global_postprocess_inputs", None)
+    global_postprocess_output = init_kwargs.get("global_postprocess_output", None)
+    global_attributes = init_kwargs.get("global_attributes", None)
 
     parse_and_apply_settings(settings)
 
@@ -100,12 +127,20 @@ def init(
         return weave_init.init_weave_disabled()
 
     return weave_init.init_weave(
-        project_name,
+        final_project_name,
         autopatch_settings=autopatch_settings,
     )
 
 
-def get_client() -> weave_client.WeaveClient | None:
+def get_client() -> WeaveClient | None:
+    """Get the current global Weave client, or None if not initialized.
+
+    Returns:
+        WeaveClient | None: The current Weave client, or None if not initialized.
+
+    Examples:
+        >>> client = get_client()
+    """
     return weave_client_context.get_weave_client()
 
 
@@ -135,7 +170,7 @@ def publish(obj: Any, name: str | None = None) -> ObjectRef:
     ref = client._save_object(obj, save_name, "latest")
 
     if isinstance(ref, ObjectRef):
-        if isinstance(ref, weave_client.OpRef):
+        if isinstance(ref, OpRef):
             url = urls.op_version_path(
                 ref.entity,
                 ref.project,
