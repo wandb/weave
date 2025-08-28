@@ -190,9 +190,6 @@ class ConversationTurn:
     pending_function_calls: dict[str, dict[str, Any]] = field(
         default_factory=dict
     )  # Store function calls by call_id
-    _debounce_timer: Optional[threading.Timer] = field(
-        default=None, init=False, repr=False
-    )  # Timer for debounced call creation
     _session_ref: Optional[Any] = field(
         default=None, init=False, repr=False
     )  # Reference to the session
@@ -296,24 +293,6 @@ class ConversationTurn:
 
         outputs["choices"] = choices
         return outputs
-
-    def schedule_weave_call_creation(self, delay_ms: int = 1000) -> None:
-        """Schedule the creation of a weave call with a delay to allow transcripts to arrive."""
-        # Cancel any existing timer
-        if self._debounce_timer:
-            self._debounce_timer.cancel()
-
-        # Schedule the call creation
-        self._debounce_timer = threading.Timer(
-            delay_ms / 1000.0, self._create_weave_call
-        )
-        self._debounce_timer.start()
-
-    def cancel_debounce(self) -> None:
-        """Cancel any pending debounced call creation."""
-        if self._debounce_timer:
-            self._debounce_timer.cancel()
-            self._debounce_timer = None
 
     def _create_weave_call(self) -> None:
         """Create the weave call for this turn."""
@@ -653,7 +632,7 @@ class SessionConfig:
 
 
 @dataclass
-class Session:
+class WeaveSession:
     id: str
     config: SessionConfig
     conversation: Conversation
@@ -726,27 +705,27 @@ def function_call_execution(
 
 class SessionManager:
     def __init__(self) -> None:
-        self.sessions: dict[str, Session] = {}
+        self.sessions: dict[str, WeaveSession] = {}
         self.active_session_id: Optional[str] = None
 
     def create_session(
         self, session_id: str, config: Optional[SessionConfig] = None
-    ) -> Session:
+    ) -> WeaveSession:
         """Create a new session."""
         if config is None:
             config = SessionConfig()
 
         conversation = Conversation(id=f"{session_id}")
-        session = Session(id=session_id, config=config, conversation=conversation)
+        session = WeaveSession(id=session_id, config=config, conversation=conversation)
         self.sessions[session_id] = session
         self.active_session_id = session_id
         return session
 
-    def get_session(self, session_id: str) -> Optional[Session]:
+    def get_session(self, session_id: str) -> Optional[WeaveSession]:
         """Get a session by ID."""
         return self.sessions.get(session_id)
 
-    def get_active_session(self) -> Optional[Session]:
+    def get_active_session(self) -> Optional[WeaveSession]:
         """Get the currently active session."""
         if self.active_session_id:
             return self.sessions.get(self.active_session_id)
@@ -776,7 +755,7 @@ class SessionManager:
         if not session and event_type not in ["session.created", "session.update"]:
             return None
 
-        # Session events
+        # WeaveSession events
         if event_type == "session.created":
             session_data = event.get("session", {})
             session_id = session_data.get("id")
@@ -899,14 +878,7 @@ class SessionManager:
                     turn = session.conversation.start_turn(turn_id=item_id)
                     turn.user_item = item
                     turn._session_ref = session
-
-                    # Schedule debounced weave call creation to wait for transcripts
-                    # If the item has audio content, wait for transcript to arrive
-                    if item.has_audio():
-                        turn.schedule_weave_call_creation(delay_ms=1000)
-                    else:
-                        # For text-only items, create the call immediately
-                        turn._create_weave_call()
+                    turn._create_weave_call()
                 return item
 
         # Conversation item events
@@ -1038,14 +1010,7 @@ class SessionManager:
                         turn = session.conversation.start_turn(turn_id=item_id)
                         turn.user_item = item
                         turn._session_ref = session
-
-                        # Schedule debounced weave call creation to wait for transcripts
-                        # If the item has audio content, wait for transcript to arrive
-                        if item.has_audio():
-                            turn.schedule_weave_call_creation(delay_ms=1000)
-                        else:
-                            # For text-only items, create the call immediately
-                            turn._create_weave_call()
+                        turn._create_weave_call()
 
                     return item
                 return existing_item
@@ -1077,12 +1042,10 @@ class SessionManager:
                             content_part.transcript = transcript
                             break
 
-                    # If there's a turn with a pending debounce, cancel it and create the call now
                     existing_turn: Optional[ConversationTurn] = (
                         session.conversation.get_turn(item_id)
                     )
-                    if existing_turn and existing_turn._debounce_timer:
-                        existing_turn.cancel_debounce()
+                    if existing_turn:
                         existing_turn._create_weave_call()
 
                 return item
