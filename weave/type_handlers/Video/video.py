@@ -18,9 +18,7 @@ def _dependencies_met() -> bool:
     """Check if the dependencies are met.  This import is deferred to avoid
     an expensive module import at the top level.
     """
-    if importlib.util.find_spec("moviepy") is None:
-        return False
-    return True
+    return importlib.util.find_spec("moviepy") is not None
 
 
 class VideoFormat(str, Enum):
