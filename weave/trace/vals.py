@@ -10,7 +10,6 @@ from typing import Any, Literal, Optional, SupportsIndex, Union
 from pydantic import BaseModel
 from pydantic import v1 as pydantic_v1
 
-from weave.trace import box
 from weave.trace.context.tests_context import get_raise_on_captured_errors
 from weave.trace.context.weave_client_context import (
     get_weave_client,
@@ -759,7 +758,7 @@ def make_trace_obj(
         return val
     if hasattr(val, "ref") and isinstance(val.ref, RefWithExtra):
         # The Traceable check above does not currently work for Ops, where we
-        # directly attach a ref, or to our Boxed classes. We should use Traceable
+        # directly attach a ref. We should use Traceable
         # for all of these, but for now we need to check for the ref attribute.
         return val
     # Dereference val and create the appropriate wrapper object
@@ -883,24 +882,17 @@ def make_trace_obj(
         # not-yet-saved-method-op API which requires explicitly passing self
         # val.call = partial(call, val, parent)
         val = maybe_bind_method(val, parent)
-    box_val = box.box(val)
-    if isinstance(box_val, pydantic_v1.BaseModel) or is_op(val):
-        box_val.__dict__["ref"] = new_ref
-    elif box_val is None or isinstance(box_val, bool):
-        # We intentionally don't box None and bools because it's impossible to
-        # make them behave like the underlying True/False/None objects in python.
-        # This is unlike other objects (dict, list, int) that can be inherited
-        # from and compared.
-
-        # The tradeoff we're making here is:
-        # 1. We won't ref track bools or None when passed into a call; but
-        # 2. Users can compare them pythonically (e.g. `x is None` vs. `x == None`)
-
+    # Attach ref to val if supported
+    if isinstance(val, pydantic_v1.BaseModel) or is_op(val):
+        val.__dict__["ref"] = new_ref
+    elif val is None or isinstance(val, bool):
+        # We don't track refs for None and bools
         pass
     else:
-        if hasattr(box_val, "ref") and not isinstance(box_val, DeletedRef):
-            setattr(box_val, "ref", new_ref)
-    return box_val
+        # For other objects that support ref attribute, set it
+        if hasattr(val, "ref") and not isinstance(val, DeletedRef):
+            setattr(val, "ref", new_ref)
+    return val
 
 
 class MissingSelfInstanceError(ValueError):

@@ -436,7 +436,6 @@ fasion = "fasion" # Wandb lore
 
 [tool.typos.default.extend-identifiers]
 alog_score = "alog_score"
-BoxedNDArray = "BoxedNDArray"
 
 [tool.fixit]
 enable = [".rules.op_deco", ".rules.legacy_methods"]
