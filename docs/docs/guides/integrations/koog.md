@@ -6,9 +6,6 @@ With the Weave exporter enabled, Koog forwards OpenTelemetry spans to your Weave
 
 ## Prerequisites
 
-- A W&B account and Weave access
-- API key and workspace details
-
 Set the following environment variables before running your agent:
 
 ```bash
@@ -27,29 +24,27 @@ dependencies {
 }
 ```
 
-Ensure `mavenCentral()` is listed in your repositories.
-
 Learn more about installing Koog [here](https://docs.koog.ai/).
 
 ## Enable Weave export (OpenTelemetry)
 
-Install Koog’s OpenTelemetry feature and add the Weave exporter. Koog uses Weave’s OpenTelemetry endpoint under the hood. For general Koog OTEL configuration and concepts, see the [Koog OpenTelemetry support docs](https://docs.koog.ai/opentelemetry-support/).
+Install Koog’s OpenTelemetry feature and add the [Weave exporter](https://api.koog.ai/agents/agents-features/agents-features-opentelemetry/ai.koog.agents.features.opentelemetry.integration.weave/add-weave-exporter.html?query=fun%20OpenTelemetryConfig.addWeaveExporter(weaveOtelBaseUrl:%20String?%20=%20null,%20weaveEntity:%20String?%20=%20null,%20weaveProjectName:%20String?%20=%20null,%20weaveApiKey:%20String?%20=%20null,%20timeout:%20Duration%20=%2010.seconds)). Doing so will use Weave’s OpenTelemetry endpoint under the hood. Learn about Weave's OTEL support [here](../tracking/otel.md)
+
+For more information on Koog OTEL configuration and concepts, see the [Koog OpenTelemetry support docs](https://docs.koog.ai/opentelemetry-support/).
 
 ```kotlin
 fun main() = runBlocking {
+    val apiKey = "api-key"
     val entity = System.getenv()["WEAVE_ENTITY"] ?: throw IllegalArgumentException("WEAVE_ENTITY is not set")
     val projectName = System.getenv()["WEAVE_PROJECT_NAME"] ?: "koog-tracing"
 
     val agent = AIAgent(
-        executor = simpleOpenAIExecutor(ApiKeyService.openAIApiKey),
+        executor = simpleOpenAIExecutor(apiKey),
         llmModel = OpenAIModels.CostOptimized.GPT4oMini,
         systemPrompt = "You are a code assistant. Provide concise code examples."
     ) {
         install(OpenTelemetry) {
-            addWeaveExporter(
-                weaveEntity = entity,
-                weaveProjectName = projectName
-            )
+            addWeaveExporter()
         }
     }
 
@@ -71,17 +66,4 @@ When enabled, Koog’s Weave exporter captures the same spans as Koog’s genera
 - System context (model name, Koog version, environment metadata)
 
 You can visualize these traces in the Weave UI to understand performance and quality.
-
-## Troubleshooting
-
-- No traces appear: confirm `WEAVE_API_KEY`, `WEAVE_ENTITY`, and `WEAVE_PROJECT_NAME` are set and valid.
-- Authentication errors: ensure the API key has permission to write traces to the specified entity.
-- Connection issues: verify your environment can reach W&B’s OTEL ingestion endpoints.
-
-## Learn more
-
-- Weave OpenTelemetry guide: [/guides/tracking/otel](/guides/tracking/otel)
-- Weave Tracing overview: [/guides/tracking/tracing](/guides/tracking/tracing)
-- Koog documentation: `https://docs.koog.ai/`
-
 
