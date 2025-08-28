@@ -13,7 +13,10 @@ def wandb_init_hook() -> None:
     # Try to get the active run path from wandb if we can
     try:
         from wandb.integration.weave import active_run_path
-    except Exception:
+    except ImportError:
+        return  # wandb not available
+    except Exception as e:
+        logger.debug(f"Unexpected wandb error: {e}")
         return
     if not (run_path := active_run_path()):
         return

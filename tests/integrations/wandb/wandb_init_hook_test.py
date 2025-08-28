@@ -82,8 +82,6 @@ def test_wandb_init_hook_behavior(tc, install_fake_wandb, monkeypatch):
             monkeypatch.setenv(key, value)
 
     calls = install_fake_wandb(tc.active_run)
-    # Import the module after mocking to ensure we get the patched version
-    from weave.integrations.wandb.wandb import wandb_init_hook
+    weave.integrations.wandb.wandb.wandb_init_hook()
 
-    wandb_init_hook()
     assert calls == tc.expected_calls
