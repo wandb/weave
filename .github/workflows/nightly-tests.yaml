@@ -29,8 +29,41 @@ jobs:
             #
           ]
         shard: [
+            "flow",
+            "trace_server",
+            "trace_server_bindings",
+            "anthropic",
+            "cerebras",
+            "cohere",
+            "crewai",
+            "dspy",
+            "google_ai_studio",
+            "google_genai",
+            "groq",
+            "instructor",
+            "langchain_nvidia_ai_endpoints",
+            "langchain",
+            "litellm",
+            "llamaindex",
+            "mistral",
+            "notdiamond",
+            "openai",
+            "openai_agents",
+            "vertexai",
+            "bedrock",
             "scorers",
-            # Add future shards here, e.g., "heavy-api-shard"
+            "pandas-test",
+            "huggingface",
+            "smolagents",
+            "mcp",
+            "verdict",
+            "autogen_tests",
+            "trace",
+            "trace1",
+            "trace2",
+            "trace3",
+            "trace4",
+            "trace_no_server",
           ]
       fail-fast: false
     services:
@@ -68,6 +101,31 @@ jobs:
       - name: Filter shards if specified
         id: filter_shards
         run: |
+          # Handle Python version compatibility
+          PY_VERSION="${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}"
+          SHARD="${{ matrix.shard }}"
+          
+          # Python 3.13 incompatible shards
+          if [[ "$PY_VERSION" == "3.13" ]]; then
+            if [[ "$SHARD" == "cohere" || "$SHARD" == "notdiamond" ]]; then
+              echo "Skipping $SHARD as it's not compatible with Python 3.13"
+              echo "skip=true" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+          fi
+          
+          # Python 3.9 incompatible shards
+          if [[ "$PY_VERSION" == "3.9" ]]; then
+            if [[ "$SHARD" == "crewai" || "$SHARD" == "google_genai" || "$SHARD" == "mcp" || \
+                  "$SHARD" == "smolagents" || "$SHARD" == "dspy" || "$SHARD" == "autogen_tests" || \
+                  "$SHARD" == "langchain" ]]; then
+              echo "Skipping $SHARD as it's not compatible with Python 3.9"
+              echo "skip=true" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+          fi
+          
+          # Check manual shard filter
           INPUT_SHARDS="${{ github.event.inputs.shards }}"
           if [ -n "$INPUT_SHARDS" ]; then
             echo "Running specific shards: $INPUT_SHARDS"
@@ -109,6 +167,7 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
           DD_TRACE_ENABLED: false
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.shard }}')"
