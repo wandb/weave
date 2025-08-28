@@ -152,27 +152,41 @@ class ConversationItem:
         """Convert to message format for trace submission."""
         message: dict[str, Any] = {"role": self.role.value if self.role else "user"}
 
-        if self.type == "function_call":
-            message["tool_calls"] = [{
-                "id": self.call_id,
-                "type": "function",
-                "function": {
-                    "name": self.name,
-                    "arguments": self.arguments or ""
-                }
-            }]
-        elif self.type == "function_call_output":
+        if self.type == "function_call_output":
+            # Tool response message
             message["role"] = "tool"
             message["content"] = self.output or ""
             message["tool_call_id"] = self.call_id
         else:
-            # Regular message with content
-            if len(self.content) == 1 and self.content[0].type == "text":
+            # Regular message - always include content if available
+            content_list = []
+            for c in self.content:
+                content_dict = c.to_dict()
+                if content_dict:  # Only add non-empty content
+                    content_list.append(content_dict)
+            
+            # Add content (text/audio) if available
+            if len(content_list) == 1 and content_list[0].get("type") == "text":
                 # Single text content can be simplified
-                message["content"] = self.content[0].text or ""
-            else:
+                message["content"] = content_list[0].get("text", "")
+            elif content_list:
                 # Multi-modal or audio content
-                message["content"] = [c.to_dict() for c in self.content]
+                message["content"] = content_list
+            else:
+                message["content"] = ""
+            
+            # Add function calls if stored
+            if hasattr(self, '_function_calls') and self._function_calls:
+                message["tool_calls"] = []
+                for fc in self._function_calls:
+                    message["tool_calls"].append({
+                        "id": fc["id"],
+                        "type": "function",
+                        "function": {
+                            "name": fc["name"],
+                            "arguments": fc["arguments"] or ""
+                        }
+                    })
         
         return message
 
@@ -182,15 +196,15 @@ class ConversationTurn:
     """Manages a single conversation turn (user input + assistant response)."""
     id: str
     user_item: Optional[ConversationItem] = None
-    assistant_items: List[ConversationItem] = field(default_factory=list)
+    assistant_item: Optional[ConversationItem] = None  # Single assistant item that accumulates all content
     weave_call: Optional[Any] = None
     debounce_timer: Optional[Timer] = None
     pending_tool_calls: List[str] = field(default_factory=list)
     tool_call_traces: Dict[str, Any] = field(default_factory=dict)
     
-    def add_assistant_item(self, item: ConversationItem) -> None:
-        """Add an assistant response item to this turn."""
-        self.assistant_items.append(item)
+    def set_assistant_item(self, item: ConversationItem) -> None:
+        """Set the assistant response item for this turn."""
+        self.assistant_item = item
     
     def has_audio_input(self) -> bool:
         """Check if user input contains audio."""
@@ -301,22 +315,17 @@ class ConversationTurn:
         if usage:
             output["usage"] = usage
 
-        # Add assistant responses as choices
-        for item in self.assistant_items:
+        # Add assistant response as choice
+        if self.assistant_item:
+            message = self.assistant_item.to_message_dict()
             choice = {
-                "message": item.to_message_dict(),
-                "finish_reason": "tool_calls" if item.type == "function_call" else "stop"
+                "message": message,
+                "finish_reason": "stop"
             }
             
-            if item.type == "function_call":
-                choice["tool_calls"] = [{
-                    "id": item.call_id,
-                    "type": "function",
-                    "function": {
-                        "name": item.name,
-                        "arguments": item.arguments or ""
-                    }
-                }]
+            # Check if there are tool calls in the message
+            if "tool_calls" in message and message["tool_calls"]:
+                choice["finish_reason"] = "tool_calls"
             
             output["choices"].append(choice)
         
@@ -327,7 +336,8 @@ class ConversationTurn:
         # Add items to conversation history
         if self.user_item:
             session.conversation_history.append(self.user_item)
-        session.conversation_history.extend(self.assistant_items)
+        if self.assistant_item:
+            session.conversation_history.append(self.assistant_item)
 
 
 @dataclass
@@ -618,28 +628,36 @@ class SessionManager:
             raise RuntimeError(f"_handle_output_item_added - No current session")
         item_data = event.item
         
-        # Create conversation item
-        item = ConversationItem(
-            id=item_data.id or f"item_{uuid.uuid4().hex[:8]}",
-            type=item_data.type,
-            role=ItemRole.ASSISTANT
-        )
+        # Get or create the single assistant item for this turn
+        if session.current_turn and not session.current_turn.assistant_item:
+            # Create the main assistant item on first output item
+            assistant_item = ConversationItem(
+                id=f"assistant_{session.current_turn.id}",
+                type="message",  # Always "message" for the main assistant item
+                role=ItemRole.ASSISTANT
+            )
+            session.current_turn.set_assistant_item(assistant_item)
         
-        # Handle function calls
-        if item_data.type == "function_call":
-            item.name = item_data.name
-            item.call_id = item_data.call_id
-            item.arguments = item_data.arguments
+        assistant_item = session.current_turn.assistant_item if session.current_turn else None
+        
+        # Handle function calls - add them to the assistant item
+        if item_data.type == "function_call" and assistant_item:
+            # Store function call info for later building tool_calls
+            if not hasattr(assistant_item, '_function_calls'):
+                assistant_item._function_calls = []
+            assistant_item._function_calls.append({
+                "id": item_data.call_id,
+                "name": item_data.name,
+                "arguments": item_data.arguments or ""
+            })
+            
             # Track pending tool call
             if session.current_turn:
                 session.current_turn.pending_tool_calls.append(item_data.call_id)
         
-        # Store in session for delta updates
-        session.current_response_items[item.id] = item
-        
-        # Add to current turn
-        if session.current_turn:
-            session.current_turn.add_assistant_item(item)
+        # Store item reference for delta updates (map item_id to our assistant_item)
+        if assistant_item:
+            session.current_response_items[item_data.id] = assistant_item
     
     def _handle_text_delta(self, event: ResponseTextDeltaMessage) -> None:
         """Handle text delta."""
@@ -692,11 +710,17 @@ class SessionManager:
         session = self._get_session()
         if not session:
             raise RuntimeError(f"_handle_function_arguments_delta - No current session")
+        # Since function calls are stored in _function_calls, we need to update them
         if event.item_id in session.current_response_items:
             item = session.current_response_items[event.item_id]
-            if item.arguments is None:
-                item.arguments = ""
-            item.arguments += event.delta
+            if hasattr(item, '_function_calls') and item._function_calls:
+                # Update the last function call's arguments
+                for fc in item._function_calls:
+                    if fc.get("id") == event.call_id:
+                        if fc.get("arguments") is None:
+                            fc["arguments"] = ""
+                        fc["arguments"] += event.delta
+                        break
     
     def _handle_function_arguments_done(self, event: ResponseFunctionCallArgumentsDoneMessage) -> None:
         """Handle function arguments completion."""
@@ -705,8 +729,13 @@ class SessionManager:
             raise RuntimeError(f"_handle_function_arguments_done - No current session")
         if event.item_id in session.current_response_items:
             item = session.current_response_items[event.item_id]
-            item.name = event.name
-            item.arguments = event.arguments
+            if hasattr(item, '_function_calls') and item._function_calls:
+                # Update the function call with final name and arguments
+                for fc in item._function_calls:
+                    if fc.get("id") == event.call_id:
+                        fc["name"] = event.name
+                        fc["arguments"] = event.arguments
+                        break
     
     def _handle_response_done(self, event: ResponseDoneMessage) -> None:
         """Handle response completion."""

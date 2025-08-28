@@ -2,7 +2,7 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
-from typing import Annotated, Any, Literal, Optional, Union
+from typing import Annotated, Any, Literal, Optional, Union, Type
 
 from pydantic import AliasChoices, BaseModel, Field
 
@@ -445,12 +445,21 @@ ResponseStatusDetails = Annotated[
     Field(discriminator="type"),
 ]
 
+class TokenDetails(BaseModel):
+    text_tokens: int
+    audio_tokens: int
+    image_tokens: int
+
+class InputTokenDetails(TokenDetails):
+    cached_tokens: int
+    cached_tokens_details: Optional[TokenDetails]
 
 class Usage(BaseModel):
     total_tokens: int
     input_tokens: int
     output_tokens: int
-
+    input_token_details: Optional[InputTokenDetails]
+    output_token_details: Optional[TokenDetails]
 
 class Response(BaseModel):
     id: str
@@ -641,116 +650,87 @@ ServerMessageType = Annotated[
     Field(discriminator="type"),
 ]
 
-def create_user_message_from_dict(data: dict) -> UserMessageType:
-    event_type = data.get("type")
-    if event_type == "session.update":
-        return SessionUpdateMessage(**data)
-    elif event_type == "input_audio_buffer.append":
-        return InputAudioBufferAppendMessage(**data)
-    elif event_type == "input_audio_buffer.commit":
-        return InputAudioBufferCommitMessage(**data)
-    elif event_type == "input_audio_buffer.clear":
-        return InputAudioBufferClearMessage(**data)
-    elif event_type == "conversation.item.create":
-        return ItemCreateMessage(**data)
-    elif event_type == "conversation.item.truncate":
-        return ItemTruncateMessage(**data)
-    elif event_type == "conversation.item.delete":
-        return ItemDeleteMessage(**data)
-    elif event_type == "response.create":
-        return ResponseCreateMessage(**data)
-    elif event_type == "response.cancel":
-        return ResponseCancelMessage(**data)
+# Dictionary mapping user message types to their respective classes.
+USER_MESSAGE_CLASSES: dict[str, Type[UserMessageType]] = {
+    "session.update": SessionUpdateMessage,
+    "input_audio_buffer.append": InputAudioBufferAppendMessage,
+    "input_audio_buffer.commit": InputAudioBufferCommitMessage,
+    "input_audio_buffer.clear": InputAudioBufferClearMessage,
+    "conversation.item.create": ItemCreateMessage,
+    "conversation.item.truncate": ItemTruncateMessage,
+    "conversation.item.delete": ItemDeleteMessage,
+    "response.create": ResponseCreateMessage,
+    "response.cancel": ResponseCancelMessage,
+}
 
-    return UnknownClientMessage(**data)
+# Dictionary mapping server message types to their respective classes.
+# The type hint is changed to Type[ServerMessageType] for the same reason.
+SERVER_MESSAGE_CLASSES: dict[str, Type[ServerMessageType]] = {
+    "error": ErrorMessage,
+    "session.created": SessionCreatedMessage,
+    "session.updated": SessionUpdatedMessage,
+    "input_audio_buffer.committed": InputAudioBufferCommittedMessage,
+    "input_audio_buffer.cleared": InputAudioBufferClearedMessage,
+    "input_audio_buffer.speech_started": InputAudioBufferSpeechStartedMessage,
+    "input_audio_buffer.speech_stopped": InputAudioBufferSpeechStoppedMessage,
+    "conversation.item.created": ItemCreatedMessage,
+    "conversation.item.truncated": ItemTruncatedMessage,
+    "conversation.item.deleted": ItemDeletedMessage,
+    "conversation.item.input_audio_transcription.completed": ItemInputAudioTranscriptionCompletedMessage,
+    "conversation.item.input_audio_transcription.failed": ItemInputAudioTranscriptionFailedMessage,
+    "conversation.item.input_audio_transcription.delta": ItemInputAudioTranscriptionDeltaMessage,
+    "response.created": ResponseCreatedMessage,
+    "response.done": ResponseDoneMessage,
+    "response.output_item.added": ResponseOutputItemAddedMessage,
+    "response.output_item.done": ResponseOutputItemDoneMessage,
+    "response.content_part.added": ResponseContentPartAddedMessage,
+    "response.content_part.done": ResponseContentPartDoneMessage,
+    "response.text.delta": ResponseTextDeltaMessage,
+    "response.text.done": ResponseTextDoneMessage,
+    "response.audio_transcript.delta": ResponseAudioTranscriptDeltaMessage,
+    "response.audio_transcript.done": ResponseAudioTranscriptDoneMessage,
+    "response.audio.delta": ResponseAudioDeltaMessage,
+    "response.audio.done": ResponseAudioDoneMessage,
+    "response.function_call_arguments.delta": ResponseFunctionCallArgumentsDeltaMessage,
+    "response.function_call_arguments.done": ResponseFunctionCallArgumentsDoneMessage,
+    "rate_limits.updated": RateLimitsUpdatedMessage,
+}
+
+def create_user_message_from_dict(data: dict) -> UserMessageType:
+    """
+    Creates a user message object from a dictionary based on its 'type'.
+    """
+    event_type = data.get("type")
+
+    if not event_type:
+        return UnknownClientMessage(**data)
+    # Use .get() to look up the class, providing a default if the key is not found.
+    message_class = USER_MESSAGE_CLASSES.get(event_type, UnknownClientMessage)
+    return message_class(**data)
 
 def create_server_message_from_dict(data: dict) -> ServerMessageType:
+    """
+    Creates a server message object from a dictionary based on its 'type'.
+    """
     event_type = data.get("type")
-    if event_type == "error":
-        return ErrorMessage(**data)
-    elif event_type == "session.created":
-        return SessionCreatedMessage(**data)
-    elif event_type == "session.updated":
-        return SessionUpdatedMessage(**data)
-    elif event_type == "input_audio_buffer.committed":
-        return InputAudioBufferCommittedMessage(**data)
-    elif event_type == "input_audio_buffer.cleared":
-        return InputAudioBufferClearedMessage(**data)
-    elif event_type == "input_audio_buffer.speech_started":
-        return InputAudioBufferSpeechStartedMessage(**data)
-    elif event_type == "input_audio_buffer.speech_stopped":
-        return InputAudioBufferSpeechStoppedMessage(**data)
-    elif event_type == "conversation.item.created":
-        return ItemCreatedMessage(**data)
-    elif event_type == "conversation.item.truncated":
-        return ItemTruncatedMessage(**data)
-    elif event_type == "conversation.item.deleted":
-        return ItemDeletedMessage(**data)
-    elif event_type == "conversation.item.input_audio_transcription.completed":
-        return ItemInputAudioTranscriptionCompletedMessage(**data)
-    elif event_type == "conversation.item.input_audio_transcription.failed":
-        return ItemInputAudioTranscriptionFailedMessage(**data)
-    elif event_type == "conversation.item.input_audio_transcription.delta":
-        return ItemInputAudioTranscriptionDeltaMessage(**data)
-    elif event_type == "response.created":
-        return ResponseCreatedMessage(**data)
-    elif event_type == "response.done":
-        return ResponseDoneMessage(**data)
-    elif event_type == "response.output_item.added":
-        return ResponseOutputItemAddedMessage(**data)
-    elif event_type == "response.output_item.done":
-        return ResponseOutputItemDoneMessage(**data)
-    elif event_type == "response.content_part.added":
-        return ResponseContentPartAddedMessage(**data)
-    elif event_type == "response.content_part.done":
-        return ResponseContentPartDoneMessage(**data)
-    elif event_type == "response.text.delta":
-        return ResponseTextDeltaMessage(**data)
-    elif event_type == "response.text.done":
-        return ResponseTextDoneMessage(**data)
-    elif event_type == "response.audio_transcript.delta":
-        return ResponseAudioTranscriptDeltaMessage(**data)
-    elif event_type == "response.audio_transcript.done":
-        return ResponseAudioTranscriptDoneMessage(**data)
-    elif event_type == "response.audio.delta":
-        return ResponseAudioDeltaMessage(**data)
-    elif event_type == "response.audio.done":
-        return ResponseAudioDoneMessage(**data)
-    elif event_type == "response.function_call_arguments.delta":
-        return ResponseFunctionCallArgumentsDeltaMessage(**data)
-    elif event_type == "response.function_call_arguments.done":
-        return ResponseFunctionCallArgumentsDoneMessage(**data)
-    elif event_type == "rate_limits.updated":
-        return RateLimitsUpdatedMessage(**data)
 
-    return UnknownServerMessage(**data)
+    if not event_type:
+        return UnknownServerMessage(**data)
 
+    message_class = SERVER_MESSAGE_CLASSES.get(event_type, UnknownServerMessage)
+    return message_class(**data)
 
-def create_message_from_dict(data: dict) -> Union[ServerMessageType, UserMessageType]:
+def create_message_from_dict(data: dict) -> ServerMessageType | UserMessageType:
     """
-    Create either a server or user message from a dictionary based on the message type.
-    
-    This function determines whether to use create_server_message_from_dict or
-    create_user_message_from_dict based on the message type.
+    Creates a message object from a dictionary based on its 'type'.
     """
-    event_type = data.get("type", "")
-    
-    # Client/User message types
-    client_message_types = {
-        "session.update",
-        "input_audio_buffer.append", 
-        "input_audio_buffer.commit",
-        "input_audio_buffer.clear",
-        "conversation.item.create",
-        "conversation.item.truncate",
-        "conversation.item.delete",
-        "response.create",
-        "response.cancel"
-    }
-    
-    # Check if it's a client message
-    if event_type in client_message_types:
-        return create_user_message_from_dict(data)
-    else:
-        # Default to server message (includes all response.*, session.created, etc.)
-        return create_server_message_from_dict(data)
+    event_type = data.get("type") or ""
+    if event_type in USER_MESSAGE_CLASSES.keys():
+        cls =  USER_MESSAGE_CLASSES[event_type]
+        return cls(**data)
+
+    elif event_type in SERVER_MESSAGE_CLASSES.keys():
+        cls =  USER_MESSAGE_CLASSES[event_type]
+        return cls(**data)
+
+    return UnknownClientMessage(**data)

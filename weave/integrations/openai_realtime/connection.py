@@ -13,7 +13,7 @@ from .models import (
     create_server_message_from_dict,
     create_user_message_from_dict,
 )
-from .sessions_2 import SessionManager
+from .sessions import SessionManager, WeaveSession
 
 try:
     from aiohttp import ClientWebSocketResponse, WSMsgType
@@ -289,7 +289,7 @@ class WeaveAiohttpWebsocketConnection:
             raise StopAsyncIteration
         return msg
 
-    def get_session(self) -> Session:
+    def get_session(self) -> WeaveSession | None:
         """Get the active session from the session manager."""
         return self.session_manager.get_active_session()
 
