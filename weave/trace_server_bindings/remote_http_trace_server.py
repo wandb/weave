@@ -1,4 +1,5 @@
 import datetime
+import gzip
 import io
 import logging
 from collections.abc import Iterator
@@ -9,7 +10,11 @@ from pydantic import BaseModel, Field
 from pydantic.json_schema import SkipJsonSchema
 
 from weave.trace.env import weave_trace_server_url
-from weave.trace.settings import max_calls_queue_size, should_enable_disk_fallback
+from weave.trace.settings import (
+    max_calls_queue_size,
+    should_enable_disk_fallback,
+    should_use_binary_table_upload,
+)
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
@@ -98,6 +103,9 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
     def get(self, url: str, *args: Any, **kwargs: Any) -> requests.Response:
         headers = self._build_dynamic_request_headers()
+        # Merge any headers passed in kwargs with our dynamic headers
+        if "headers" in kwargs:
+            headers.update(kwargs.pop("headers"))
 
         return requests.get(
             self.trace_server_url + url,
@@ -108,6 +116,10 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
     def post(self, url: str, *args: Any, **kwargs: Any) -> requests.Response:
         headers = self._build_dynamic_request_headers()
+        # Merge any headers passed in kwargs with our dynamic headers
+        if "headers" in kwargs:
+            additional_headers = kwargs.pop("headers")
+            headers.update(additional_headers)
 
         return requests.post(
             self.trace_server_url + url,
@@ -439,36 +451,100 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         )
 
     def table_create(
-        self, req: Union[tsi.TableCreateReq, dict[str, Any]]
+        self,
+        req: Union[tsi.TableCreateReq, dict[str, Any]],
+        use_compression: Optional[bool] = None,
     ) -> tsi.TableCreateRes:
+        """Create a table, optionally using gzip compression for better size efficiency.
+
+        Args:
+            req: The table creation request
+            use_compression: If True, send data as gzip-compressed JSON.
+                            If None (default), uses the WEAVE_USE_BINARY_TABLE_UPLOAD setting.
+                            This can significantly reduce payload size for large tables.
+        """
+        if isinstance(req, dict):
+            req = tsi.TableCreateReq.model_validate(req)
+
+        # Use setting if not explicitly specified
+        if use_compression is None:
+            use_compression = should_use_binary_table_upload()
+
+        # Serialize to JSON
+        json_data = req.model_dump_json(by_alias=True).encode("utf-8")
+
+        if use_compression:
+            # Compress with gzip
+            compressed_data = gzip.compress(json_data)
+
+            print(
+                f">>> JSON: {len(json_data)} bytes, Compressed: {len(compressed_data)} bytes"
+            )
+
+            # Only use compression if it's actually smaller
+            if len(compressed_data) < len(json_data):
+                # Use compressed format - typically 60-80% smaller for table data
+                r = self.post(
+                    "/table/create",
+                    data=compressed_data,
+                    headers={
+                        "Content-Encoding": "gzip",
+                        "Content-Type": "application/json",
+                    },
+                )
+                handle_response_error(r, "/table/create")
+                return tsi.TableCreateRes.model_validate(r.json())
+
+        # Fall back to uncompressed JSON format
         return self._generic_request(
             "/table/create", req, tsi.TableCreateReq, tsi.TableCreateRes
         )
 
-    def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
+    def table_update(
+        self, req: tsi.TableUpdateReq, use_compression: Optional[bool] = None
+    ) -> tsi.TableUpdateRes:
         """Similar to `calls/batch_upsert`, we can dynamically adjust the payload size
         due to the property that table updates can be decomposed into a series of
         updates.
+
+        Args:
+            req: The table update request
+            use_compression: If True, send data as gzip-compressed JSON.
+                            If None (default), uses the WEAVE_USE_BINARY_TABLE_UPLOAD setting.
         """
         if isinstance(req, dict):
             req = tsi.TableUpdateReq.model_validate(req)
         req = cast(tsi.TableUpdateReq, req)
 
-        estimated_bytes = len(req.model_dump_json(by_alias=True).encode("utf-8"))
+        # Use setting if not explicitly specified
+        if use_compression is None:
+            use_compression = should_use_binary_table_upload()
+
+        # Estimate size for splitting logic
+        json_bytes = req.model_dump_json(by_alias=True).encode("utf-8")
+        estimated_bytes = len(json_bytes)
+        if use_compression:
+            estimated_bytes = len(gzip.compress(json_bytes))
+
         if estimated_bytes > self.remote_request_bytes_limit and len(req.updates) > 1:
+            # Split large updates into multiple requests
             split_ndx = len(req.updates) // 2
             first_half_req = tsi.TableUpdateReq(
                 project_id=req.project_id,
                 base_digest=req.base_digest,
                 updates=req.updates[:split_ndx],
             )
-            first_half_res = self.table_update(first_half_req)
+            first_half_res = self.table_update(
+                first_half_req, use_compression=use_compression
+            )
             second_half_req = tsi.TableUpdateReq(
                 project_id=req.project_id,
                 base_digest=first_half_res.digest,
                 updates=req.updates[split_ndx:],
             )
-            second_half_res = self.table_update(second_half_req)
+            second_half_res = self.table_update(
+                second_half_req, use_compression=use_compression
+            )
             all_digests = (
                 first_half_res.updated_row_digests + second_half_res.updated_row_digests
             )
@@ -476,6 +552,24 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
                 digest=second_half_res.digest, updated_row_digests=all_digests
             )
         else:
+            # Try compression if enabled
+            if use_compression:
+                compressed_data = gzip.compress(json_bytes)
+
+                # Only use compression if it's actually smaller
+                if len(compressed_data) < len(json_bytes):
+                    r = self.post(
+                        "/table/update",
+                        data=compressed_data,
+                        headers={
+                            "Content-Encoding": "gzip",
+                            "Content-Type": "application/json",
+                        },
+                    )
+                    handle_response_error(r, "/table/update")
+                    return tsi.TableUpdateRes.model_validate(r.json())
+
+            # Fall back to uncompressed JSON format
             return self._generic_request(
                 "/table/update", req, tsi.TableUpdateReq, tsi.TableUpdateRes
             )

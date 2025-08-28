@@ -10,6 +10,7 @@ from typing import Any, Optional, Union
 from requests import HTTPError as HTTPError
 from requests import PreparedRequest, Response, Session
 from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from weave.trace.display.display import Console, Text
 
@@ -131,9 +132,29 @@ def pprint_response(response: Response) -> None:
 
 
 class LoggingHTTPAdapter(HTTPAdapter):
+    """HTTP Adapter with logging and enhanced connection pooling for large payloads."""
+
+    def __init__(self, *args: Any, **kwargs: Any):
+        # Configure connection pooling for better handling of large uploads
+        # pool_connections: Number of connection pools to cache
+        # pool_maxsize: Maximum number of connections to save in the pool
+        # pool_block: Whether the connection pool should block for connections
+        kwargs.setdefault("pool_connections", 10)
+        kwargs.setdefault("pool_maxsize", 20)
+        kwargs.setdefault("pool_block", False)
+        super().__init__(*args, **kwargs)
+
     # Actual signature is:
     # self, request, stream=False, timeout=None, verify=True, cert=None, proxies=None
     def send(self, request: PreparedRequest, **kwargs: Any) -> Response:  # type: ignore
+        # Set default timeout if not specified
+        # For large uploads, use longer timeouts
+        if "timeout" not in kwargs:
+            # (connect_timeout, read_timeout)
+            # Connect timeout: time to establish connection
+            # Read timeout: time to wait for server response after sending data
+            kwargs["timeout"] = (30, 300)  # 30s connect, 5min read for large payloads
+
         if os.environ.get("WEAVE_DEBUG_HTTP") != "1":
             return super().send(request, **kwargs)
 
@@ -152,10 +173,26 @@ class LoggingHTTPAdapter(HTTPAdapter):
         return response
 
 
+# Configure retry strategy for transient failures
+retry_strategy = Retry(
+    total=3,
+    backoff_factor=1,
+    status_forcelist=[408, 429, 500, 502, 503, 504],
+    # Don't retry on POST by default to avoid duplicate data
+    allowed_methods=["GET", "PUT", "DELETE", "HEAD", "OPTIONS", "TRACE"],
+)
+
 session = Session()
-adapter = LoggingHTTPAdapter()
-session.mount("http://", adapter)
-session.mount("https://", adapter)
+
+# Use separate adapters for different types of operations
+# Standard adapter with retries for most operations
+standard_adapter = LoggingHTTPAdapter(max_retries=retry_strategy)
+
+# Special adapter for large uploads (no automatic retries on POST)
+upload_adapter = LoggingHTTPAdapter()
+
+session.mount("http://", upload_adapter)
+session.mount("https://", upload_adapter)
 
 
 def get(url: str, params: Optional[dict[str, str]] = None, **kwargs: Any) -> Response:

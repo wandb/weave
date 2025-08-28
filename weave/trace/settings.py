@@ -26,6 +26,15 @@ If True, prints a link to the Weave UI when calling a weave op.
 * Type: `bool`
 
 If True, enables parallel table upload chunking for large tables. If False, uses incremental upload method.
+
+## `use_compressed_table_upload`
+
+* Environment Variable: `WEAVE_USE_BINARY_TABLE_UPLOAD`
+* Settings Key: `use_binary_table_upload`
+* Default: `True`
+* Type: `bool`
+
+If True, uses gzip compression for table uploads when it results in smaller payload size (typically 60-80% reduction). If False, always uses uncompressed JSON.
 """
 
 import os
@@ -196,6 +205,17 @@ class UserSettings(BaseModel):
     Can be overridden with the environment variable `WEAVE_USE_PARALLEL_TABLE_UPLOAD`
     """
 
+    use_binary_table_upload: bool = True
+    """
+    Toggles compression for table uploads.
+
+    If True, uses gzip compression for table create/update operations
+    when it results in smaller payload size. This typically reduces payload size
+    by 60-80% for table data.
+    If False, always uses uncompressed JSON.
+    Can be overridden with the environment variable `WEAVE_USE_BINARY_TABLE_UPLOAD`
+    """
+
     model_config = ConfigDict(extra="forbid")
     _is_first_apply: bool = PrivateAttr(True)
 
@@ -306,6 +326,11 @@ def should_enable_disk_fallback() -> bool:
 def should_use_parallel_table_upload() -> bool:
     """Returns whether parallel table upload chunking should be used."""
     return _should("use_parallel_table_upload")
+
+
+def should_use_binary_table_upload() -> bool:
+    """Returns whether gzip compression should be used for table uploads."""
+    return _should("use_binary_table_upload")
 
 
 def parse_and_apply_settings(

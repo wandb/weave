@@ -79,6 +79,7 @@ from weave.trace.settings import (
     should_capture_system_info,
     should_print_call_link,
     should_redact_pii,
+    should_use_binary_table_upload,
     should_use_parallel_table_upload,
 )
 from weave.trace.table import Table
@@ -1624,13 +1625,18 @@ class WeaveClient:
             self.server, "remote_request_bytes_limit", REMOTE_REQUEST_BYTES_LIMIT
         )
 
+        use_compression = should_use_binary_table_upload()
+
         # Primary heuristic: row count
         use_chunking = len(table.rows) > ROW_COUNT_CHUNKING_THRESHOLD
         # Secondary heuristic: basic size estimation for smaller tables
         if not use_chunking and len(table.rows) > 0:
             # Simple size estimation without full serialization
-            sample_row_size = len(str(table.rows[0]).encode("utf-8"))
-            estimated_bytes = sample_row_size * len(table.rows) * 2
+            if use_compression:
+                estimated_bytes = len(str(table.rows).encode("utf-8")) // 10
+            else:
+                sample_row_size = len(str(table.rows[0]).encode("utf-8"))
+                estimated_bytes = sample_row_size * len(table.rows)
             use_chunking = estimated_bytes > remote_request_bytes_limit
 
         # Determine parallel vs incremental chunking
