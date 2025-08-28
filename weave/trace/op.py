@@ -34,7 +34,7 @@ from typing import (
 
 from typing_extensions import ParamSpec
 
-from weave.trace import box, settings
+from weave.trace import settings
 from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.context.call_context import (
@@ -472,7 +472,7 @@ def _call_sync_func(
         finish(exception=e)
         raise
 
-    res = box.box(res)
+    # res unchanged - pass through directly
     try:
         # Here we do a try/catch because we don't want to
         # break the user process if we trip up on processing
@@ -603,7 +603,7 @@ async def _call_async_func(
         finish(exception=e)
         raise
 
-    res = box.box(res)
+    # res unchanged - pass through directly
     try:
         # Here we do a try/catch because we don't want to
         # break the user process if we trip up on processing
@@ -754,13 +754,12 @@ def _call_sync_gen(
                         if current_call is None or current_call.id != call.id:
                             call_context.push_call(call)
 
-                        # Box the value
-                        boxed_value = box.box(value)
+                        # Pass value through directly
 
                         # Accumulate if we have an accumulator
                         if acc:
                             try:
-                                accumulated_state = acc(accumulated_state, boxed_value)
+                                accumulated_state = acc(accumulated_state, value)
                             except StopIteration as e:
                                 # Handle special case where accumulator signals end
                                 accumulated_state = e.value
@@ -772,7 +771,7 @@ def _call_sync_gen(
                         if accumulated_state is not None:
                             call.output = accumulated_state
                         else:
-                            call.output = boxed_value
+                            call.output = value
 
                         # Temporarily pop the call context before yielding
                         # This allows nested generators to establish their own call context
@@ -782,7 +781,7 @@ def _call_sync_gen(
 
                         # Yield the value to the caller
                         try:
-                            yield boxed_value
+                            yield value
                         except GeneratorExit:
                             # Generator was closed before exhaustion (e.g., break in for loop)
                             # Ensure we finish the call with the accumulated state so far
@@ -964,13 +963,12 @@ async def _call_async_gen(
                         if current_call is None or current_call.id != call.id:
                             call_context.push_call(call)
 
-                        # Box the value
-                        boxed_value = box.box(value)
+                        # Pass value through directly
 
                         # Accumulate if we have an accumulator
                         if acc:
                             try:
-                                accumulated_result = acc(accumulated_state, boxed_value)
+                                accumulated_result = acc(accumulated_state, value)
                                 # If the accumulator is async, await it
                                 if inspect.iscoroutine(accumulated_result):
                                     accumulated_state = await accumulated_result
@@ -987,7 +985,7 @@ async def _call_async_gen(
                         if accumulated_state is not None:
                             call.output = accumulated_state
                         else:
-                            call.output = boxed_value
+                            call.output = value
 
                         # Temporarily pop the call context before yielding
                         # This allows nested generators to establish their own call context
@@ -997,7 +995,7 @@ async def _call_async_gen(
 
                         # Yield the value to the caller
                         try:
-                            yield boxed_value
+                            yield value
                         except GeneratorExit:
                             # Generator was closed before exhaustion (e.g., break in for loop)
                             # Ensure we finish the call with the accumulated state so far
