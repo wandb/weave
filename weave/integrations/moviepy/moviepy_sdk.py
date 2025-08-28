@@ -57,7 +57,7 @@ class MoviePyPatcher(Patcher):
             if self._patcher.attempt_patch():
                 self._patched = True
                 return True
-            return False
+            return False  # noqa: TRY300
 
         except ImportError:
             logger.debug("moviepy not installed, skipping moviepy patching")

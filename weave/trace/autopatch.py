@@ -88,14 +88,14 @@ def autopatch(settings: Optional[AutopatchSettings] = None) -> None:
     from weave.integrations.llamaindex.llamaindex import llamaindex_patcher
     from weave.integrations.mcp import get_mcp_client_patcher, get_mcp_server_patcher
     from weave.integrations.mistral.mistral_sdk import get_mistral_patcher
+    from weave.integrations.moviepy import get_moviepy_patcher
     from weave.integrations.notdiamond.tracing import get_notdiamond_patcher
     from weave.integrations.openai.openai_sdk import get_openai_patcher
     from weave.integrations.openai_agents.openai_agents import get_openai_agents_patcher
+    from weave.integrations.pil import get_pil_patcher
     from weave.integrations.smolagents.smolagents_sdk import get_smolagents_patcher
     from weave.integrations.verdict.verdict_sdk import get_verdict_patcher
     from weave.integrations.vertexai.vertexai_sdk import get_vertexai_patcher
-    from weave.integrations.pil import get_pil_patcher
-    from weave.integrations.moviepy import get_moviepy_patcher
 
     # Apply PIL and moviepy patches first as they provide foundational thread safety
     get_pil_patcher(settings.pil).attempt_patch()
@@ -150,14 +150,14 @@ def reset_autopatch() -> None:
     from weave.integrations.llamaindex.llamaindex import llamaindex_patcher
     from weave.integrations.mcp import get_mcp_client_patcher, get_mcp_server_patcher
     from weave.integrations.mistral.mistral_sdk import get_mistral_patcher
+    from weave.integrations.moviepy import get_moviepy_patcher
     from weave.integrations.notdiamond.tracing import get_notdiamond_patcher
     from weave.integrations.openai.openai_sdk import get_openai_patcher
     from weave.integrations.openai_agents.openai_agents import get_openai_agents_patcher
+    from weave.integrations.pil import get_pil_patcher
     from weave.integrations.smolagents.smolagents_sdk import get_smolagents_patcher
     from weave.integrations.verdict.verdict_sdk import get_verdict_patcher
     from weave.integrations.vertexai.vertexai_sdk import get_vertexai_patcher
-    from weave.integrations.pil import get_pil_patcher
-    from weave.integrations.moviepy import get_moviepy_patcher
 
     get_pil_patcher().undo_patch()
     get_moviepy_patcher().undo_patch()

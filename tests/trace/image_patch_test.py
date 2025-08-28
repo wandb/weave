@@ -8,13 +8,13 @@ def test_patching_import_order():
     # of an image
     # With the refactored integration system, we use the patcher directly
     patcher = get_pil_patcher()
-    
+
     # First ensure we start with a clean state
     if patcher._patched:
         patcher.undo_patch()
-    
+
     assert not patcher._patched
-    
+
     import PIL
 
     # Create an image before patching
@@ -29,7 +29,7 @@ def test_patching_import_order():
 
     # This should work without issues even though the image was created before patching
     image.crop((0, 0, 10, 10))
-    
+
     # Clean up: re-apply patch for other tests
     if not patcher._patched:
         patcher.attempt_patch()
