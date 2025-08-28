@@ -16,7 +16,7 @@ import weave
 from tests.trace.util import DummyTestException
 from tests.trace_server.conftest import *
 from tests.trace_server.conftest import TEST_ENTITY, get_trace_server_flag
-, weave_client, weave_init
+from weave.trace import weave_client, weave_init
 from weave.trace.context import weave_client_context
 from weave.trace.context.call_context import set_call_stack
 from weave.trace_server import trace_server_interface as tsi
@@ -414,9 +414,7 @@ def client_creator(zero_stack, request, trace_server):
     ):
         if settings is not None:
             weave.trace.settings.parse_and_apply_settings(settings)
-        client = create_client(
-            request, trace_server, global_attributes
-        )
+        client = create_client(request, trace_server, global_attributes)
         try:
             yield client
         finally:
