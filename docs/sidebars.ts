@@ -51,6 +51,7 @@ const sidebars: SidebarsConfig = {
               id: "guides/core-types/media",
             },
             "guides/tools/playground",
+            "guides/tools/evaluation_playground",
             "guides/integrations/index",
             "guides/tools/saved-views",
             {
@@ -104,7 +105,6 @@ const sidebars: SidebarsConfig = {
           label: "Evaluations",
           items: [
             "guides/core-types/evaluations",
-            "guides/core-types/evaluation_playground",
             "guides/core-types/datasets",
             "guides/evaluation/scorers",
             "guides/evaluation/builtin_scorers",

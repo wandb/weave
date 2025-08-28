@@ -111,5 +111,4 @@ The **Dataset results** tab displays the input, expected output, the model's act
 
 The **Summary** tab provides an overview of how each model performed with visual representations of the data.
 
-For more information about how to open and compare evaluations, see [Evaluations](#link).
-
+For more information about how to open and compare evaluations, see [Evaluations](../core-types/evaluations).
