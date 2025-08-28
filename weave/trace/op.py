@@ -18,6 +18,7 @@ from collections.abc import (
     Iterator,
     Mapping,
 )
+from dataclasses import dataclass
 from functools import partial, wraps
 from types import MethodType
 from typing import (
@@ -32,7 +33,7 @@ from typing import (
     overload,
 )
 
-from typing_extensions import ParamSpec
+from typing_extensions import ParamSpec, TypeIs
 
 from weave.trace import box, settings
 from weave.trace.context import call_context
@@ -57,27 +58,7 @@ from weave.trace.op_protocol import (
 from weave.trace.util import log_once
 
 if TYPE_CHECKING:
-    from weave.trace.call import Call, CallsIter
-
-try:
-    from openai._types import NOT_GIVEN as OPENAI_NOT_GIVEN
-except ImportError:
-    OPENAI_NOT_GIVEN = None
-
-try:
-    from cohere.base_client import COHERE_NOT_GIVEN
-except ImportError:
-    COHERE_NOT_GIVEN = None
-
-try:
-    from anthropic._types import NOT_GIVEN as ANTHROPIC_NOT_GIVEN
-except ImportError:
-    ANTHROPIC_NOT_GIVEN = None
-
-try:
-    from cerebras.cloud.sdk._types import NOT_GIVEN as CEREBRAS_NOT_GIVEN
-except ImportError:
-    CEREBRAS_NOT_GIVEN = None
+    from weave.trace.call import Call, CallsIter, NoOpCall
 
 
 S = TypeVar("S")
@@ -117,15 +98,71 @@ class DisplayNameFuncError(ValueError): ...
 # Call, original function output, exception if occurred
 
 
-def _value_is_sentinel(param: Any) -> bool:
-    return param.default in (
-        None,
-        Ellipsis,
-        OPENAI_NOT_GIVEN,
-        COHERE_NOT_GIVEN,
-        ANTHROPIC_NOT_GIVEN,
-        CEREBRAS_NOT_GIVEN,
-    )
+# Cache for package sentinel values to avoid repeated imports
+_SENTINEL_CACHE: dict[Sentinel, Any] = {}
+
+
+@dataclass(frozen=True)
+class Sentinel:
+    package: str
+    path: str
+    name: str
+
+
+_sentinels_to_check = [
+    Sentinel(package="openai", path="openai._types", name="NOT_GIVEN"),
+    Sentinel(package="cohere", path="cohere.base_client", name="COHERE_NOT_GIVEN"),
+    Sentinel(package="anthropic", path="anthropic._types", name="NOT_GIVEN"),
+    Sentinel(package="cerebras", path="cerebras.cloud.sdk._types", name="NOT_GIVEN"),
+]
+
+
+def _check_param_is_sentinel(param: inspect.Parameter, sentinel: Sentinel) -> bool:
+    """Check if param_default is a sentinel from a specific package.
+
+    Only imports the sentinel if:
+    1. The package is already imported in sys.modules
+    2. We haven't cached this sentinel yet
+
+    Args:
+        package_name: Name of the package to check (e.g., "openai")
+        import_path: Full import path for the sentinel (e.g., "openai._types")
+        sentinel_name: Name of the sentinel constant (e.g., "NOT_GIVEN")
+        param_default: The default value to check
+
+    Returns:
+        True if param_default is the sentinel from this package, False otherwise
+    """
+    if sentinel in _SENTINEL_CACHE:
+        return param.default is _SENTINEL_CACHE[sentinel]
+
+    if sentinel.package in sys.modules:
+        try:
+            module = __import__(sentinel.path, fromlist=[sentinel.name])
+            sentinel_value = getattr(module, sentinel.name)
+            _SENTINEL_CACHE[sentinel] = sentinel_value
+            if param.default is sentinel_value:
+                return True
+        except (ImportError, AttributeError):
+            _SENTINEL_CACHE[sentinel] = None
+    return False
+
+
+def _value_is_sentinel(param: inspect.Parameter) -> bool:
+    # Always check for None and Ellipsis using identity check
+    if param.default is None or param.default is Ellipsis:
+        return True
+
+    # Check cached sentinels first
+    for sentinel in _SENTINEL_CACHE.values():
+        if sentinel is not None and param.default is sentinel:
+            return True
+
+    for sentinel in _sentinels_to_check:
+        if _check_param_is_sentinel(param, sentinel):
+            return True
+
+    return False
 
 
 def _apply_fn_defaults_to_inputs(
@@ -326,7 +363,7 @@ def placeholder_call() -> Call:
     return NoOpCall()
 
 
-def is_placeholder_call(call: Call) -> bool:
+def is_placeholder_call(call: Call) -> TypeIs[NoOpCall]:
     from weave.trace.call import NoOpCall
 
     return isinstance(call, NoOpCall)
@@ -1321,7 +1358,7 @@ def maybe_unbind_method(oplike: Op | MethodType | partial) -> Op:
     return cast(Op, op)
 
 
-def is_op(obj: Any) -> bool:
+def is_op(obj: Any) -> TypeIs[Op]:
     """Check if an object is an Op."""
     if sys.version_info < (3, 12):
         return isinstance(obj, Op)
