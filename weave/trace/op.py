@@ -18,6 +18,7 @@ from collections.abc import (
     Iterator,
     Mapping,
 )
+from dataclasses import dataclass
 from functools import partial, wraps
 from types import MethodType
 from typing import (
@@ -59,26 +60,6 @@ from weave.trace.util import log_once
 if TYPE_CHECKING:
     from weave.trace.call import Call, CallsIter, NoOpCall
 
-try:
-    from openai._types import NOT_GIVEN as OPENAI_NOT_GIVEN
-except ImportError:
-    OPENAI_NOT_GIVEN = None
-
-try:
-    from cohere.base_client import COHERE_NOT_GIVEN
-except ImportError:
-    COHERE_NOT_GIVEN = None
-
-try:
-    from anthropic._types import NOT_GIVEN as ANTHROPIC_NOT_GIVEN
-except ImportError:
-    ANTHROPIC_NOT_GIVEN = None
-
-try:
-    from cerebras.cloud.sdk._types import NOT_GIVEN as CEREBRAS_NOT_GIVEN
-except ImportError:
-    CEREBRAS_NOT_GIVEN = None
-
 
 S = TypeVar("S")
 V = TypeVar("V")
@@ -117,15 +98,70 @@ class DisplayNameFuncError(ValueError): ...
 # Call, original function output, exception if occurred
 
 
+# Cache for package sentinel values to avoid repeated imports
+_SENTINEL_CACHE: dict[str, Any] = {}
+
+
+@dataclass
+class Sentinel:
+    package: str
+    path: str
+    name: str
+
+
+_sentinels_to_check = [
+    Sentinel(package="openai", path="openai._types", name="NOT_GIVEN"),
+    Sentinel(package="cohere", path="cohere.base_client", name="COHERE_NOT_GIVEN"),
+    Sentinel(package="anthropic", path="anthropic._types", name="NOT_GIVEN"),
+    Sentinel(package="cerebras", path="cerebras.cloud.sdk._types", name="NOT_GIVEN"),
+]
+
+
+def _check_package_sentinel(sentinel: Sentinel, param_default: Any) -> bool:
+    """Check if param_default is a sentinel from a specific package.
+
+    Only imports the sentinel if:
+    1. The package is already imported in sys.modules
+    2. We haven't cached this sentinel yet
+
+    Args:
+        package_name: Name of the package to check (e.g., "openai")
+        import_path: Full import path for the sentinel (e.g., "openai._types")
+        sentinel_name: Name of the sentinel constant (e.g., "NOT_GIVEN")
+        param_default: The default value to check
+
+    Returns:
+        True if param_default is the sentinel from this package, False otherwise
+    """
+    if sentinel.package in sys.modules and sentinel.package not in _SENTINEL_CACHE:
+        try:
+            module = __import__(sentinel.path, fromlist=[sentinel.name])
+            sentinel = getattr(module, sentinel.name)
+            _SENTINEL_CACHE[sentinel.package] = sentinel
+            if param_default is sentinel:
+                return True
+        except (ImportError, AttributeError):
+            _SENTINEL_CACHE[sentinel.package] = (
+                None  # Mark as checked but not available
+            )
+    return False
+
+
 def _value_is_sentinel(param: Any) -> bool:
-    return param.default in (
-        None,
-        Ellipsis,
-        OPENAI_NOT_GIVEN,
-        COHERE_NOT_GIVEN,
-        ANTHROPIC_NOT_GIVEN,
-        CEREBRAS_NOT_GIVEN,
-    )
+    # Always check for None and Ellipsis using identity check
+    if param.default is None or param.default is Ellipsis:
+        return True
+
+    # Check cached sentinels first
+    for sentinel in _SENTINEL_CACHE.values():
+        if sentinel is not None and param.default is sentinel:
+            return True
+
+    for sentinel in _sentinels_to_check:
+        if _check_package_sentinel(sentinel, param.default):
+            return True
+
+    return False
 
 
 def _apply_fn_defaults_to_inputs(
