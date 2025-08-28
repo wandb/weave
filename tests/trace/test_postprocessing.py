@@ -36,10 +36,28 @@ def test_global_postprocessing(client, apply_postprocessing) -> None:
             f"Hello, {name}! You are {age} years old.  Also your api_key is {api_key}."
         )
 
-    func(api_key="123", secret_key="456", name="John", age=30)
+    original_inputs = {
+        "api_key": "123",
+        "secret_key": "456",
+        "name": "John",
+        "age": 30,
+    }
+
+    result = func(**original_inputs)
 
     calls = list(client.get_calls())
     call = calls[0]
+
+    # Confirm the original inputs were not mutated by postprocessing
+    assert original_inputs == {
+        "api_key": "123",
+        "secret_key": "456",
+        "name": "John",
+        "age": 30,
+    }
+
+    # Confirm the user's returned value is not postprocessed
+    assert result == "Hello, John! You are 30 years old.  Also your api_key is 123."
 
     assert call.inputs == {
         "api_key": "REDACTED",
