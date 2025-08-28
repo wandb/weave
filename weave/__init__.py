@@ -16,7 +16,6 @@ from weave.flow.model import Model
 from weave.flow.monitor import Monitor
 from weave.flow.saved_view import SavedView
 from weave.flow.scorer import Scorer
-from weave.initialization import *
 from weave.object.obj import Object
 from weave.prompt.prompt import EasyPrompt, MessagesPrompt, Prompt, StringPrompt
 from weave.trace.util import Thread as Thread
