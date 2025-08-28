@@ -20,7 +20,7 @@ def wandb_init_hook() -> None:
 
     project_name = f"{entity}/{project}"
     logger.info(
-        f"Active wandb run detected.  Using project name from wandb: {project_name}"
+        f"Active wandb run detected. Using project name from wandb: {project_name}"
     )
 
     init(project_name)

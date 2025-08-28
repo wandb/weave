@@ -32,13 +32,12 @@ def install_fake_wandb(monkeypatch):
             monkeypatch.setitem(sys.modules, name, mod)
 
         # Patch weave.integrations.wandb.wandb.init to record calls
-        target_module = importlib.import_module("weave.integrations.wandb.wandb")
         calls = []
 
-        def fake_init(project_name=None, **_):
+        def fake_init(project_name=None):
             calls.append(project_name)
 
-        monkeypatch.setattr(target_module, "init", fake_init, raising=True)
+        monkeypatch.setattr("weave.trace.api.init", fake_init)
         return calls
 
     return _install
