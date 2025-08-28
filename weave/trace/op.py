@@ -99,10 +99,10 @@ class DisplayNameFuncError(ValueError): ...
 
 
 # Cache for package sentinel values to avoid repeated imports
-_SENTINEL_CACHE: dict[str, Any] = {}
+_SENTINEL_CACHE: dict[Sentinel, Any] = {}
 
 
-@dataclass
+@dataclass(frozen=True)
 class Sentinel:
     package: str
     path: str
@@ -117,7 +117,7 @@ _sentinels_to_check = [
 ]
 
 
-def _check_package_sentinel(sentinel: Sentinel, param_default: Any) -> bool:
+def _check_param_is_sentinel(param: inspect.Parameter, sentinel: Sentinel) -> bool:
     """Check if param_default is a sentinel from a specific package.
 
     Only imports the sentinel if:
@@ -133,21 +133,22 @@ def _check_package_sentinel(sentinel: Sentinel, param_default: Any) -> bool:
     Returns:
         True if param_default is the sentinel from this package, False otherwise
     """
-    if sentinel.package in sys.modules and sentinel.package not in _SENTINEL_CACHE:
+    if sentinel in _SENTINEL_CACHE:
+        return param.default is _SENTINEL_CACHE[sentinel]
+
+    if sentinel.package in sys.modules:
         try:
             module = __import__(sentinel.path, fromlist=[sentinel.name])
-            sentinel = getattr(module, sentinel.name)
-            _SENTINEL_CACHE[sentinel.package] = sentinel
-            if param_default is sentinel:
+            sentinel_value = getattr(module, sentinel.name)
+            _SENTINEL_CACHE[sentinel] = sentinel_value
+            if param.default is sentinel_value:
                 return True
         except (ImportError, AttributeError):
-            _SENTINEL_CACHE[sentinel.package] = (
-                None  # Mark as checked but not available
-            )
+            _SENTINEL_CACHE[sentinel] = None
     return False
 
 
-def _value_is_sentinel(param: Any) -> bool:
+def _value_is_sentinel(param: inspect.Parameter) -> bool:
     # Always check for None and Ellipsis using identity check
     if param.default is None or param.default is Ellipsis:
         return True
@@ -158,7 +159,7 @@ def _value_is_sentinel(param: Any) -> bool:
             return True
 
     for sentinel in _sentinels_to_check:
-        if _check_package_sentinel(sentinel, param.default):
+        if _check_param_is_sentinel(param, sentinel):
             return True
 
     return False
