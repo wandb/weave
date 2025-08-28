@@ -17,6 +17,15 @@ If True, all weave ops will behave like regular functions and no network request
 * Type: `bool`
 
 If True, prints a link to the Weave UI when calling a weave op.
+
+## `use_parallel_table_upload`
+
+* Environment Variable: `WEAVE_USE_PARALLEL_TABLE_UPLOAD`
+* Settings Key: `use_parallel_table_upload`
+* Default: `False`
+* Type: `bool`
+
+If True, enables parallel table upload chunking for large tables. If False, uses incremental upload method.
 """
 
 import os
@@ -178,6 +187,15 @@ class UserSettings(BaseModel):
     Can be overridden with the environment variable `WEAVE_ENABLE_DISK_FALLBACK`
     """
 
+    use_parallel_table_upload: bool = False
+    """
+    Toggles parallel table upload chunking.
+
+    If True, enables parallel upload of table chunks when tables are large enough
+    to require chunking. If False, uses incremental upload method.
+    Can be overridden with the environment variable `WEAVE_USE_PARALLEL_TABLE_UPLOAD`
+    """
+
     model_config = ConfigDict(extra="forbid")
     _is_first_apply: bool = PrivateAttr(True)
 
@@ -283,6 +301,11 @@ def retry_max_interval() -> float:
 def should_enable_disk_fallback() -> bool:
     """Returns whether disk fallback should be enabled for dropped items."""
     return _should("enable_disk_fallback")
+
+
+def should_use_parallel_table_upload() -> bool:
+    """Returns whether parallel table upload chunking should be used."""
+    return _should("use_parallel_table_upload")
 
 
 def parse_and_apply_settings(
