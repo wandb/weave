@@ -19,4 +19,4 @@ def wandb_init_hook() -> None:
         f"Active wandb run detected. Using project name from wandb: {project_path}"
     )
 
-    init(project_path)
+    init(project_path, global_attributes={"run_id": run_path.run_id})
