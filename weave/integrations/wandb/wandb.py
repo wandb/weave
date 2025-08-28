@@ -13,14 +13,10 @@ def wandb_init_hook() -> None:
         return
     if not (run_path := active_run_path()):
         return
-    if not (entity := run_path.entity):
-        return
-    if not (project := run_path.project):
-        return
 
-    project_name = f"{entity}/{project}"
+    project_path = f"{run_path.entity}/{run_path.project}"
     logger.info(
-        f"Active wandb run detected. Using project name from wandb: {project_name}"
+        f"Active wandb run detected. Using project name from wandb: {project_path}"
     )
 
-    init(project_name)
+    init(project_path)
