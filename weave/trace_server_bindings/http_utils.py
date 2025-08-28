@@ -269,7 +269,6 @@ def check_endpoint_exists(
     try:
         # Try calling the function with test request
         func(test_req)
-        endpoint_exists = True
     except Exception as e:
         # Check if this is a 404 (method not found)
         response = getattr(e, "response", None)
@@ -278,6 +277,8 @@ def check_endpoint_exists(
             endpoint_exists = status_code != 404
         else:
             endpoint_exists = False
+    else:
+        endpoint_exists = True
 
     if endpoint_exists:
         _ENDPOINT_CACHE.add(cache_key)
