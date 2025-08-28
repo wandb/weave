@@ -9,6 +9,8 @@ from weave.trace.serialization.custom_objs import MemTraceFilesArtifact
 from weave.utils.invertable_dict import InvertableDict
 
 try:
+    from weave.initialization import ensure_patches_applied
+    ensure_patches_applied()
     from PIL import Image
 except ImportError:
     dependencies_met = False

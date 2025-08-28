@@ -10,6 +10,8 @@ from weave.trace.serialization import serializer
 from weave.trace.serialization.custom_objs import MemTraceFilesArtifact
 
 try:
+    from weave.initialization import ensure_patches_applied
+    ensure_patches_applied()
     from moviepy.editor import (
         VideoClip,
         VideoFileClip,
