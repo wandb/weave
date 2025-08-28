@@ -7,6 +7,8 @@ import shutil
 from enum import Enum
 from typing import TYPE_CHECKING, Any
 
+from typing_extensions import TypeIs
+
 from weave.trace.serialization import serializer
 from weave.trace.serialization.custom_objs import MemTraceFilesArtifact
 
@@ -185,8 +187,10 @@ def load(artifact: MemTraceFilesArtifact, name: str) -> VideoClip:
     raise ValueError("No video or found for artifact")
 
 
-def is_video_clip_instance(obj: Any) -> bool:
+def is_video_clip_instance(obj: Any) -> TypeIs[VideoClip]:
     """Check if the object is any subclass of VideoClip."""
+    from moviepy.editor import VideoClip
+
     return isinstance(obj, VideoClip)
 
 
