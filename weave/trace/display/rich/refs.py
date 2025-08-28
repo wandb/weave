@@ -3,9 +3,8 @@
 from collections.abc import Iterable
 from typing import Optional
 
-from rich.table import Table
-
 from weave.trace.context import weave_client_context as weave_client_context
+from weave.trace.display import display
 from weave.trace.display.rich.container import AbstractRichContainer
 from weave.trace.refs import AnyRef, CallRef, Ref
 from weave.trace.vals import WeaveObject
@@ -17,7 +16,7 @@ class Refs(AbstractRichContainer[str]):
     def __init__(self, refs: Optional[Iterable[str]] = None) -> None:
         super().__init__("Ref", refs)
 
-    def _add_table_columns(self, table: Table) -> None:
+    def _add_table_columns(self, table: display.Table) -> None:
         table.add_column("Ref", overflow="fold")
 
     def _item_to_row(self, item: str) -> list:

@@ -17,6 +17,7 @@ import pytest
 from pydantic import BaseModel, ValidationError
 
 import weave
+import weave.trace.call
 from tests.trace.util import (
     AnyIntMatcher,
     DatetimeMatcher,
@@ -108,7 +109,7 @@ def test_simple_op(client):
     expected_name = (
         f"{TRACE_REF_SCHEME}:///{client.entity}/{client.project}/op/my_op:{digest}"
     )
-    assert fetched_call == weave_client.Call(
+    assert fetched_call == weave.trace.call.Call(
         _op_name=expected_name,
         project_id=f"{client.entity}/{client.project}",
         trace_id=fetched_call.trace_id,

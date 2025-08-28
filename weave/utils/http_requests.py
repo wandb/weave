@@ -10,9 +10,8 @@ from typing import Any, Optional, Union
 from requests import HTTPError as HTTPError
 from requests import PreparedRequest, Response, Session
 from requests.adapters import HTTPAdapter
-from rich.console import Console
-from rich.syntax import Syntax
-from rich.text import Text
+
+from weave.trace.display.display import Console, Text
 
 console = Console()
 
@@ -65,8 +64,10 @@ def pprint_json(text: str) -> None:
     try:
         json_body = json.loads(text)
         pretty_json = json.dumps(json_body, indent=4)
-        body_syntax = Syntax(pretty_json, "json", theme=THEME_JSON, line_numbers=True)
-        console.print(body_syntax)
+        lines = pretty_json.splitlines()
+        for i, line in enumerate(lines, 1):
+            line_num = Text(f"{i:>3} ", style="dim")
+            console.print(line_num, line, sep="", end="\n")
     except json.JSONDecodeError:
         console.print(Text("  Invalid JSON", style=STYLE_ERROR))
         console.print(Text(text, style=STYLE_ERROR))
@@ -80,10 +81,10 @@ def pprint_prepared_request(prepared_request: PreparedRequest) -> None:
     thread_text = Text(str(threading.get_ident()), style=STYLE_METADATA)
     method_text = Text(f"{prepared_request.method}", style=STYLE_METHOD)
     url_text = Text(f"{prepared_request.url}", style=STYLE_URL)
-    console.print(Text("Time: ", style=STYLE_LABEL) + time_text)
-    console.print(Text("Thread ID: ", style=STYLE_LABEL) + thread_text)
-    console.print(Text("Method: ", style=STYLE_LABEL) + method_text)
-    console.print(Text("URL: ", style=STYLE_LABEL) + url_text)
+    console.print(Text("Time: ", style=STYLE_LABEL), time_text, sep="")
+    console.print(Text("Thread ID: ", style=STYLE_LABEL), thread_text, sep="")
+    console.print(Text("Method: ", style=STYLE_LABEL), method_text, sep="")
+    console.print(Text("URL: ", style=STYLE_LABEL), url_text, sep="")
 
     console.print(Text("Headers:", style=STYLE_LABEL))
     for header in prepared_request.headers.items():
@@ -114,8 +115,8 @@ def pprint_response(response: Response) -> None:
         status_style = STYLE_STATUS_ERROR
     status_code_text = Text(f"{response.status_code}", style=status_style)
     reason_text = Text(f"{response.reason}", style=status_style)
-    console.print(Text("Status Code: ", style=STYLE_LABEL) + status_code_text)
-    console.print(Text("Reason: ", style=STYLE_LABEL) + reason_text)
+    console.print(Text("Status Code: ", style=STYLE_LABEL), status_code_text, sep="")
+    console.print(Text("Reason: ", style=STYLE_LABEL), reason_text, sep="")
     console.print(Text("Headers:", style=STYLE_LABEL))
     for header in response.headers.items():
         pprint_header(header)
@@ -143,8 +144,9 @@ class LoggingHTTPAdapter(HTTPAdapter):
         elapsed_time = time() - start_time
         console.print(Text("----- Response below -----", style=STYLE_DIVIDER_RESPONSE))
         console.print(
-            Text("Elapsed Time: ", style=STYLE_LABEL)
-            + Text(f"{elapsed_time:.2f} seconds", style=STYLE_METADATA)
+            Text("Elapsed Time: ", style=STYLE_LABEL),
+            Text(f"{elapsed_time:.2f} seconds", style=STYLE_METADATA),
+            sep="",
         )
         pprint_response(response)
         return response
