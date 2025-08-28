@@ -16,7 +16,8 @@ from typing import Any, Callable, TypedDict, get_args, get_origin
 
 from weave.trace import settings
 from weave.trace.context.weave_client_context import get_weave_client
-from weave.trace.op import Op, as_op, is_op
+from weave.trace.op import as_op, is_op
+from weave.trace.op_protocol import Op
 from weave.trace.refs import ObjectRef
 from weave.trace.serialization import serializer
 from weave.trace.serialization.mem_artifact import MemTraceFilesArtifact
@@ -417,7 +418,7 @@ def _get_code_deps(
                         f"from {var_value.__module__} import {var_value.__name__}"
                     )
                     if var_value.__name__ != var_name:
-                        import_line += f"as {var_name}"
+                        import_line += f" as {var_name}"
 
                     import_code.append(import_line)
 

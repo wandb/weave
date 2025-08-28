@@ -8,6 +8,15 @@ W&B Weave supports ingestion of OpenTelemetry compatible trace data through a de
 **Path**: `/otel/v1/traces`
 **Method**: POST
 **Content-Type**: `application/x-protobuf`
+**Base URL**: The base URL for the OTEL trace endpoint depends on your W&B deployment type:
+
+- SaaS (Multi-tenant):  
+  `https://traces.wandb.ai/<path>`
+
+- Dedicated instances:  
+  `https://<your-subdomain>.wandb.io/<path>`
+
+Replace `<your-subdomain>` with your organization's unique W&B domain, e.g., `acme.wandb.io`.
 
 ## Authentication
 Standard W&B authentication is used. You must have write permissions to the project where you're sending trace data.

@@ -40,7 +40,7 @@ import inspect
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Callable, Union
 
-from typing_extensions import TypeGuard
+from typing_extensions import TypeIs
 
 # Not locking down the return type for inline encoding but
 # it would be expected to be something like a str or dict.
@@ -53,14 +53,14 @@ FileSave = Callable[[Any, "MemTraceFilesArtifact", str], None]
 Save = Union[InlineSave, FileSave]
 
 
-def is_inline_save(value: Callable) -> TypeGuard[InlineSave]:
+def is_inline_save(value: Callable) -> TypeIs[InlineSave]:
     """Check if a function is an inline save function."""
     signature = inspect.signature(value)
     param_count = len(signature.parameters)
     return param_count == 1
 
 
-def is_file_save(value: Callable) -> TypeGuard[FileSave]:
+def is_file_save(value: Callable) -> TypeIs[FileSave]:
     """Check if a function is a file-based save function."""
     signature = inspect.signature(value)
     params = list(signature.parameters.values())

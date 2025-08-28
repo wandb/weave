@@ -124,7 +124,7 @@ smolagents = [
 ]
 instructor = [
   "instructor>=1.4.3,<1.7.0; python_version <= '3.9'",
-  "instructor>=1.4.3; python_version > '3.9'",
+  "instructor>=1.4.3,<1.11.0; python_version > '3.9'",
   "google-genai>=1.5.0",
   "openai>=1.99.9,<1.100.0",
 ]
@@ -194,6 +194,7 @@ test = [
   "pytest-rerunfailures>=12.0",
   "pytest-rerunfailures>=14.0",
   "pytest-shard==0.1.2",
+  "pytest-memray~=1.8",
   "clickhouse_connect==0.7.0",
   "fastapi>=0.110.0",
   "sqlparse==0.5.0",
@@ -440,3 +441,7 @@ BoxedNDArray = "BoxedNDArray"
 [tool.fixit]
 enable = [".rules.op_deco", ".rules.legacy_methods"]
 disable = ["fixit.rules"]
+
+[tool.coverage.report]
+exclude_also = ["if TYPE_CHECKING:", "@abstractmethod"]
+omit = ["weave_query/**", "weave/agent/**"]

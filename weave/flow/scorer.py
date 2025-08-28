@@ -9,13 +9,14 @@ from typing import Any, Callable, Optional, Union, cast
 from pydantic import BaseModel, Field
 from typing_extensions import Self
 
-import weave
 from weave.object.obj import Object
+from weave.trace.call import Call
 from weave.trace.isinstance import weave_isinstance
-from weave.trace.op import Op, OpCallError, as_op, is_op
+from weave.trace.op import OpCallError, as_op, is_op, op
 from weave.trace.op_caller import async_call_op
+from weave.trace.op_protocol import Op
 from weave.trace.vals import WeaveObject
-from weave.trace.weave_client import Call, sanitize_object_name
+from weave.trace.weave_client import sanitize_object_name
 
 try:
     import numpy as np
@@ -35,11 +36,11 @@ class Scorer(Object):
         super().model_post_init(__context)
         _validate_scorer_signature(self)
 
-    @weave.op
+    @op
     def score(self, *, output: Any, **kwargs: Any) -> Any:
         raise NotImplementedError
 
-    @weave.op
+    @op
     def summarize(self, score_rows: list) -> Optional[dict]:
         return auto_summarize(score_rows)
 
@@ -208,7 +209,7 @@ def get_scorer_attributes(
                 raise TypeError(
                     f"Scorer {scorer_name} must implement `score` as a weave.op() decorated function."
                 )
-            score_op = scorer.score
+            score_op = as_op(scorer.score)
             summarize_fn = scorer.summarize  # type: ignore
 
         except AttributeError:
