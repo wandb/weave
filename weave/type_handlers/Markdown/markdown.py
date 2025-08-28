@@ -14,7 +14,7 @@ except ImportError:
 
     # Create a dummy Markdown class for when rich is not available
     class Markdown:  # type: ignore[no-redef]
-        def __init__(self, markup: str, code_theme: str = "ansi_dark", **kwargs: Any):
+        def __init__(self, markup: str, code_theme: str = "monokai", **kwargs: Any):
             self.markup = markup
             self.code_theme = code_theme
 
@@ -39,5 +39,4 @@ def load(encoded: SerializedMarkdown) -> Markdown:
 
 
 def register() -> None:
-    if RICH_MARKDOWN_AVAILABLE:
-        serializer.register_serializer(Markdown, save, load)
+    serializer.register_serializer(Markdown, save, load)
