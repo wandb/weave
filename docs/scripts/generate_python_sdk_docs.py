@@ -217,7 +217,155 @@ def find_and_replace(text, start, end, replace_with, end_optional=False):
     return after
 
 
+def add_deprecation_notice(text, obj):
+    """
+    Add deprecation notice to documentation if object has __deprecated__ attribute.
+    
+    This supports both typing_extensions.deprecated decorator and custom deprecation decorators
+    that add a __deprecated__ attribute.
+    
+    Args:
+        text: The markdown text for the object
+        obj: The Python object (function, class, etc.)
+        
+    Returns:
+        The markdown text with deprecation notice prepended if applicable
+    """
+    # Check for __deprecated__ attribute (from typing_extensions.deprecated)
+    if hasattr(obj, '__deprecated__'):
+        deprecation_msg = getattr(obj, '__deprecated__', '')
+        if deprecation_msg:
+            # Find the first heading in the text to insert the notice after it
+            lines = text.split('\n')
+            for i, line in enumerate(lines):
+                if line.startswith('#'):
+                    # Insert deprecation notice after the heading
+                    notice = f"\n> **⚠️ Deprecated**: {deprecation_msg}\n"
+                    lines.insert(i + 1, notice)
+                    return '\n'.join(lines)
+            # If no heading found, prepend the notice
+            return f"> **⚠️ Deprecated**: {deprecation_msg}\n\n{text}"
+    
+    # Check for custom deprecation in wrapped functions (from weave.trace.util.deprecated)
+    # The deprecated decorator wraps the function, so we check __wrapped__ and closure variables
+    if hasattr(obj, '__wrapped__') and hasattr(obj, '__closure__'):
+        # Look for the new_name in the closure variables
+        closure = obj.__closure__
+        if closure:
+            for cell in closure:
+                try:
+                    cell_contents = cell.cell_contents
+                    if isinstance(cell_contents, str):
+                        # Check if this looks like a function/method name that was passed as new_name
+                        # The deprecated decorator stores new_name in its closure
+                        if not cell_contents.startswith('_') and '.' not in cell_contents and len(cell_contents) > 1:
+                            # This might be the new_name parameter
+                            # Verify by checking if the wrapper mentions deprecation
+                            import inspect
+                            try:
+                                source = inspect.getsource(obj)
+                                if 'DeprecationWarning' in source or 'deprecated' in source.lower():
+                                    lines = text.split('\n')
+                                    for i, line in enumerate(lines):
+                                        if line.startswith('#'):
+                                            notice = f"\n> **⚠️ Deprecated**: Use `{cell_contents}` instead.\n"
+                                            lines.insert(i + 1, notice)
+                                            return '\n'.join(lines)
+                            except:
+                                pass
+                except:
+                    pass
+    
+    # Check for Pydantic field deprecation
+    if isinstance(obj, type) and issubclass(obj, pydantic.BaseModel):
+        # Check model fields for deprecated flag
+        deprecated_fields = []
+        for field_name, field_info in obj.model_fields.items():
+            if hasattr(field_info, 'deprecated') and field_info.deprecated:
+                deprecated_fields.append(field_name)
+        
+        if deprecated_fields:
+            # Add a note about deprecated fields after the field listing
+            lines = text.split('\n')
+            # Find where to insert the deprecation notice (after the Pydantic Fields section)
+            for i, line in enumerate(lines):
+                if '**Pydantic Fields:**' in line:
+                    # Find the end of the fields list
+                    j = i + 1
+                    while j < len(lines) and (lines[j].startswith('- ') or lines[j].strip() == ''):
+                        j += 1
+                    # Insert deprecation notice for fields
+                    notice = f"\n> **⚠️ Deprecated Fields**: {', '.join([f'`{f}`' for f in deprecated_fields])}\n"
+                    lines.insert(j, notice)
+                    return '\n'.join(lines)
+    
+    return text
+
+
+def add_method_deprecation_notices(text, cls):
+    """Add deprecation notices to methods within class documentation."""
+    import inspect
+    
+    lines = text.split('\n')
+    result_lines = []
+    i = 0
+    
+    while i < len(lines):
+        line = lines[i]
+        
+        # Check if this line is a method header
+        if '### <kbd>method</kbd>' in line or '### <kbd>classmethod</kbd>' in line:
+            # Extract method name from the line
+            import re
+            match = re.search(r'`([^`]+)`', line)
+            if match:
+                method_name = match.group(1)
+                # Get the actual method object
+                if hasattr(cls, method_name):
+                    method = getattr(cls, method_name)
+                    # Check if it's deprecated
+                    if hasattr(method, '__deprecated__'):
+                        deprecation_msg = getattr(method, '__deprecated__', '')
+                        if deprecation_msg:
+                            result_lines.append(line)
+                            result_lines.append("")
+                            result_lines.append(f"> **⚠️ Deprecated**: {deprecation_msg}")
+                            result_lines.append("")
+                            i += 1
+                            continue
+                    elif hasattr(method, '__closure__') and method.__closure__:
+                        # Check for custom deprecated decorator
+                        for cell in method.__closure__ or []:
+                            try:
+                                cell_contents = cell.cell_contents
+                                if isinstance(cell_contents, str):
+                                    # Check if this looks like a function/method name
+                                    if not cell_contents.startswith('_') and len(cell_contents) > 1:
+                                        # Verify this is a deprecation by checking source
+                                        try:
+                                            source = inspect.getsource(method)
+                                            if 'DeprecationWarning' in source or 'deprecated' in source.lower():
+                                                result_lines.append(line)
+                                                result_lines.append("")
+                                                result_lines.append(f"> **⚠️ Deprecated**: Use `{cell_contents}` instead.")
+                                                result_lines.append("")
+                                                i += 1
+                                                break
+                                        except:
+                                            pass
+                            except:
+                                pass
+        
+        result_lines.append(line)
+        i += 1
+    
+    return '\n'.join(result_lines)
+
+
 def fix_pydantic_model(text, obj, module_name):
+    # Add deprecation notices for methods
+    text = add_method_deprecation_notices(text, obj)
+    
     # First, remove these properties that are not useful in the docs
     search_for = """---
 
@@ -280,12 +428,17 @@ def generate_module_doc_string(module, src_root_path):
         # since the lazydocs library doesn't handle them well.
         if isinstance(obj, type) and issubclass(obj, pydantic.BaseModel):
             markdown_paragraphs.append(
-                fix_pydantic_model(generator.class2md(obj), obj, module_name)
+                add_deprecation_notice(
+                    fix_pydantic_model(generator.class2md(obj), obj, module_name), obj
+                )
             )
         elif callable(obj) and not isinstance(obj, type):
-            markdown_paragraphs.append(generator.func2md(obj))
+            markdown_paragraphs.append(add_deprecation_notice(generator.func2md(obj), obj))
         elif isinstance(obj, type):
-            markdown_paragraphs.append(generator.class2md(obj))
+            # Apply method deprecation notices to all classes
+            class_md = generator.class2md(obj)
+            class_md = add_method_deprecation_notices(class_md, obj)
+            markdown_paragraphs.append(add_deprecation_notice(class_md, obj))
 
     if hasattr(module, "__docspec__"):
         for obj in module.__docspec__:
