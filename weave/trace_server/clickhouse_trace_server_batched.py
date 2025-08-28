@@ -61,6 +61,7 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
 )
 from weave.trace_server.clickhouse_schema import (
     ALL_CALL_INSERT_COLUMNS,
+    ALL_CALL_JSON_COLUMNS,
     ALL_CALL_SELECT_COLUMNS,
     REQUIRED_CALL_COLUMNS,
     CallCHInsertable,
@@ -2338,44 +2339,58 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         except InsertTooLarge:
             logger.info("Retrying with large objects stripped.")
             batch = self._strip_large_values(self._call_batch)
-            self._insert_call_batch(batch)
+            # Insert rows one at a time after stripping large values
+            for row in batch:
+                self._insert_call_batch([row])
 
         self._call_batch = []
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._strip_large_values")
     def _strip_large_values(self, batch: list[list[Any]]) -> list[list[Any]]:
         """
-        Iterate through the batch and replace large values with placeholders.
+        Iterate through the batch and replace large JSON values with placeholders.
 
-        If values are larger than 1MiB replace them with placeholder values.
+        Only considers JSON dump columns and ensures their combined size stays under
+        the limit by selectively replacing the largest values.
         """
         stripped_count = 0
         final_batch = []
-        # Set the value byte limit to be anything over 1MiB to catch
-        # payloads with multiple large values that are still under the
-        # single row insert limit.
+
+        json_column_indices = [
+            ALL_CALL_INSERT_COLUMNS.index(f"{col}_dump")
+            for col in ALL_CALL_JSON_COLUMNS
+        ]
+        entity_too_large_payload_byte_size = _num_bytes(
+            ch_settings.ENTITY_TOO_LARGE_PAYLOAD
+        )
+
         for item in batch:
-            bytes_size = _num_bytes(str(item))
-            # If bytes_size > the limit, this item is too large,
-            # iterate through the json-dumped item values to find and
-            # replace the large values with a placeholder.
-            if bytes_size > ch_settings.CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT:
-                stripped_item = []
-                for value in item:
-                    # all the values should be json dumps, there are no
-                    # non json fields controlled by the user that can
-                    # be large enough to strip... (?)
-                    if (
-                        _num_bytes(value)
-                        > ch_settings.CLICKHOUSE_SINGLE_VALUE_BYTES_LIMIT
-                    ):
-                        stripped_item += [ch_settings.ENTITY_TOO_LARGE_PAYLOAD]
-                        stripped_count += 1
-                    else:
-                        stripped_item += [value]
-                final_batch.append(stripped_item)
-            else:
-                final_batch.append(item)
+            # Calculate only JSON dump bytes
+            json_idx_size_pairs = [
+                (i, _num_bytes(item[i])) for i in json_column_indices
+            ]
+            total_json_bytes = sum(size for _, size in json_idx_size_pairs)
+
+            # If over limit, try to optimize by selectively stripping largest JSON values
+            stripped_item = list(item)
+            sorted_json_idx_size_pairs = sorted(
+                json_idx_size_pairs, key=lambda x: x[1], reverse=True
+            )
+
+            # Try to get under the limit by replacing largest JSON values
+            for col_idx, size in sorted_json_idx_size_pairs:
+                if (
+                    total_json_bytes
+                    <= ch_settings.CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT
+                ):
+                    break
+
+                # Replace this large JSON value with placeholder, update running size
+                stripped_item[col_idx] = ch_settings.ENTITY_TOO_LARGE_PAYLOAD
+                total_json_bytes -= size - entity_too_large_payload_byte_size
+                stripped_count += 1
+
+            final_batch.append(stripped_item)
 
         ddtrace.tracer.current_span().set_tags(
             {
