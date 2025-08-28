@@ -13,8 +13,6 @@ title: Trace and Evaluate a Computer Vision Pipeline with Weave
 
 
 
-<!--- @wandbcode{feedback-colab} -->
-
 
 # Trace and Evaluate a Computer Vision Pipeline with Weave
 
