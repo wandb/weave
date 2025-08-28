@@ -186,7 +186,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install nox uv==0.8.6
       - name: Run nox
-        run: nox -e lint -- --all-files
+        run: nox -e lint
 
   trace-docs:
     name: Trace docs
