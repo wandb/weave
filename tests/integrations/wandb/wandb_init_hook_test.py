@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-import importlib
 import sys
 import types
 from dataclasses import dataclass
 
 import pytest
+
+import weave.integrations.wandb.wandb
 
 
 @dataclass
@@ -22,7 +23,7 @@ def install_fake_wandb(monkeypatch):
         # Minimal fake wandb module structure
         weave_mod = types.SimpleNamespace(active_run_path=lambda: active_run_return)
         integration_mod = types.SimpleNamespace(weave=weave_mod)
-        wandb_mod = types.SimpleNamespace(integration=integration_mod)
+        wandb_mod = types.SimpleNamespace(integration=integration_mod, run=None)
 
         for name, mod in [
             ("wandb", wandb_mod),
@@ -37,7 +38,7 @@ def install_fake_wandb(monkeypatch):
         def fake_init(project_name=None):
             calls.append(project_name)
 
-        monkeypatch.setattr("weave.trace.api.init", fake_init)
+        monkeypatch.setattr(weave.integrations.wandb.wandb, "init", fake_init)
         return calls
 
     return _install
@@ -48,6 +49,7 @@ class TestCase:
     name: str
     active_run: RunPath | None
     expected_calls: list[str]
+    env_vars: dict[str, str] | None = None
 
 
 @pytest.mark.parametrize(
@@ -63,12 +65,25 @@ class TestCase:
             active_run=RunPath(entity="ent", project="proj"),
             expected_calls=["ent/proj"],
         ),
+        TestCase(
+            name="active_run_with_weave_disabled",
+            active_run=RunPath(entity="ent", project="proj"),
+            expected_calls=[],
+            env_vars={"WANDB_DISABLE_WEAVE": "true"},
+        ),
         # TODO: What if there are multiple active runs?
     ],
     ids=lambda tc: tc.name,
 )
-def test_wandb_init_hook_behavior(tc, install_fake_wandb):
+def test_wandb_init_hook_behavior(tc, install_fake_wandb, monkeypatch):
+    # Set environment variables if specified
+    if tc.env_vars:
+        for key, value in tc.env_vars.items():
+            monkeypatch.setenv(key, value)
+
     calls = install_fake_wandb(tc.active_run)
-    wandb_integration_module = importlib.import_module("weave.integrations.wandb.wandb")
-    wandb_integration_module.wandb_init_hook()
+    # Import the module after mocking to ensure we get the patched version
+    from weave.integrations.wandb.wandb import wandb_init_hook
+
+    wandb_init_hook()
     assert calls == tc.expected_calls

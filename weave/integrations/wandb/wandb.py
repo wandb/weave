@@ -1,4 +1,5 @@
 import logging
+import os
 
 from weave.trace.api import init
 
@@ -6,6 +7,9 @@ logger = logging.getLogger(__name__)
 
 
 def wandb_init_hook() -> None:
+    if os.environ.get("WANDB_DISABLE_WEAVE"):
+        return
+
     # Try to get the active run path from wandb if we can
     try:
         from wandb.integration.weave import active_run_path
