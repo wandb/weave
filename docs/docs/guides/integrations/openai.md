@@ -19,14 +19,37 @@ It’s important to store traces of LLM applications in a central database, both
   <TabItem value="python" label="Python" default>
     Weave can automatically capture traces for the [openai python library](https://platform.openai.com/docs/libraries/python-library).
 
-    Start capturing by calling `weave.init(<project-name>)` with a project name your choice, then explicitly enable OpenAI tracing with `weave.integrations.patch_openai()`.
+    Start capturing by calling `weave.init(<project-name>)` with a project name of your choice.
+
+    **Option 1: Implicit Patching (Automatic)**
+    If OpenAI is imported before `weave.init()`, it will be automatically patched:
 
     ```python
-    from openai import OpenAI
+    from openai import OpenAI  # Import BEFORE weave.init()
+    import weave
+
+    # highlight-next-line
+    weave.init('emoji-bot')  # OpenAI is automatically patched!
+
+    client = OpenAI()
+    response = client.chat.completions.create(
+      model="gpt-4",
+      messages=[
+        {"role": "user", "content": "Make me a emoji"}
+      ]
+    )
+    ```
+
+    **Option 2: Explicit Patching (Manual)**
+    If you import OpenAI after `weave.init()` or want explicit control:
+
+    ```python
     import weave
 
     # highlight-next-line
     weave.init('emoji-bot')
+
+    from openai import OpenAI  # Import AFTER weave.init()
     # highlight-next-line
     weave.integrations.patch_openai()  # Enable OpenAI tracing
 

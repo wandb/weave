@@ -1,7 +1,17 @@
 # Integrations
 
-:::info[Explicit Integration Tracking]
-To enable tracing for specific integrations, call `weave.init()` followed by the corresponding patch function for each integration you want to use. For example:
+:::info[Integration Tracking]
+Weave supports both **implicit** and **explicit** patching for integrations:
+
+**Implicit Patching (Automatic):** Libraries that are imported _before_ `weave.init()` are automatically patched.
+
+```python
+import openai  # Import BEFORE weave.init()
+import weave
+weave.init('my-project')  # OpenAI is automatically patched!
+```
+
+**Explicit Patching (Manual):** Libraries imported _after_ `weave.init()` require explicit patch calls.
 
 ```python
 import weave
