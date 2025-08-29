@@ -28,9 +28,43 @@ jobs:
             "13",
             #
           ]
-        shard: [
+        shard:
+          [
+            "flow",
+            "trace_server",
+            "trace_server_bindings",
+            "anthropic",
+            "cerebras",
+            "cohere",
+            "crewai",
+            "dspy",
+            "google_ai_studio",
+            "google_genai",
+            "groq",
+            "instructor",
+            "langchain_nvidia_ai_endpoints",
+            "langchain",
+            "litellm",
+            "llamaindex",
+            "mistral",
+            "notdiamond",
+            "openai",
+            "openai_agents",
+            "vertexai",
+            "bedrock",
             "scorers",
-            # Add future shards here, e.g., "heavy-api-shard"
+            "pandas-test",
+            "huggingface",
+            "smolagents",
+            "mcp",
+            "verdict",
+            "autogen_tests",
+            "trace",
+            "trace1",
+            "trace2",
+            "trace3",
+            "trace4",
+            "trace_no_server",
           ]
       fail-fast: false
     services:
