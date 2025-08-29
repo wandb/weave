@@ -62,7 +62,7 @@ fun main() = runBlocking {
 }
 ```
 
-You can specify [specific parameters](https://api.koog.ai/agents/agents-features/agents-features-opentelemetry/ai.koog.agents.features.opentelemetry.integration.weave/add-weave-exporter.html?query=fun%20OpenTelemetryConfig.addWeaveExporter(weaveOtelBaseUrl:%20String?%20=%20null,%20weaveEntity:%20String?%20=%20null,%20weaveProjectName:%20String?%20=%20null,%20weaveApiKey:%20String?%20=%20null,%20timeout:%20Duration%20=%2010.seconds)) for the exporter, like this:
+The function automatically reads your Weave environment variables, but you can also configure [specific parameters](https://api.koog.ai/agents/agents-features/agents-features-opentelemetry/ai.koog.agents.features.opentelemetry.integration.weave/add-weave-exporter.html?query=fun%20OpenTelemetryConfig.addWeaveExporter(weaveOtelBaseUrl:%20String?%20=%20null,%20weaveEntity:%20String?%20=%20null,%20weaveProjectName:%20String?%20=%20null,%20weaveApiKey:%20String?%20=%20null,%20timeout:%20Duration%20=%2010.seconds)) for the exporter, like this:
 
 ```kotlin
 install(OpenTelemetry) {
@@ -82,9 +82,9 @@ The example above:
 - Sets `weaveOtelBaseUrl` to your trace endpoint (for example, `https://<your-subdomain>.wandb.io/<path>`). Use the parameter for dedicated Weave instances.
 
 If you’re new to using Koog with Weave, we recommend reviewing the following pieces of documentation:
-* [Koog's Weave exporter guide](https://docs.koog.ai/opentelemetry-weave-exporter/)
-* [Koog's OpenTelemetry support guide](https://docs.koog.ai/opentelemetry-support/) for core concepts
-* [Weave OTEL docs](../tracking/otel.md) to understand how Weave ingests OTLP data
+* [Koog's Weave exporter guide](https://docs.koog.ai/opentelemetry-weave-exporter/) for additional information about the exporter
+* [Koog's OpenTelemetry support guide](https://docs.koog.ai/opentelemetry-support/) for core concepts about how OpenTelemetry works with Koog
+* [Weave OTEL docs](../tracking/otel.md) for information about how Weave ingests OTLP data
 
 ## What gets traced
 
@@ -105,4 +105,4 @@ See Koog's documentation for a [runnable notebooks](https://docs.koog.ai/example
 
 - If traces are missing, first verify that `WEAVE_API_KEY`, `WEAVE_ENTITY`, and `WEAVE_PROJECT_NAME` are set correctly.
 - Confirm your environment can reach `https://trace.wandb.ai` and that the exporter is configured as shown above.
-- For deeper troubleshooting and sampling guidance, see Koog’s [OpenTelemetry support](https://docs.koog.ai/opentelemetry-support/).
+- For additional troubleshooting and sampling guidance, see Koog’s [OpenTelemetry support](https://docs.koog.ai/opentelemetry-support/).
