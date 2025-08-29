@@ -702,15 +702,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.OpQueryRes(op_objs=objs)
 
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
-        logger.error("req", req)
         processed_result = process_incoming_object_val(
             req.obj.val, req.obj.builtin_object_class
         )
-        logger.error("proc", processed_result)
         processed_val = processed_result["val"]
-        logger.error("procval", processed_val)
         json_val = json.dumps(processed_val)
-        logger.error("json_val", json_val)
         digest = str_digest(json_val)
 
         ch_obj = ObjCHInsertable(
