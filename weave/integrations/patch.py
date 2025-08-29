@@ -221,74 +221,31 @@ def patch_llamaindex() -> None:
 
 # Mapping of module names to patch functions for implicit patching
 # When a module is already imported, we'll automatically call its patch function
+
 INTEGRATION_MODULE_MAPPING: dict[str, Callable[[], None]] = {
-    # OpenAI
     "openai": patch_openai,
-    "openai.resources": patch_openai,
-    "openai.resources.chat": patch_openai,
-    "openai.resources.chat.completions": patch_openai,
-    # Anthropic
     "anthropic": patch_anthropic,
-    # Mistral
     "mistralai": patch_mistral,
-    "mistralai.chat": patch_mistral,
-    # Groq
     "groq": patch_groq,
-    # LiteLLM
     "litellm": patch_litellm,
-    # Cerebras
     "cerebras": patch_cerebras,
-    "cerebras.cloud": patch_cerebras,
-    # Cohere
     "cohere": patch_cohere,
-    # Google AI
     "google.generativeai": patch_google_genai,
     "vertexai": patch_vertexai,
-    "vertexai.generative_models": patch_vertexai,
-    "vertexai.preview": patch_vertexai,
-    # Hugging Face
     "huggingface_hub": patch_huggingface,
-    # Instructor
     "instructor": patch_instructor,
-    "instructor.client": patch_instructor,
-    # DSPy
     "dspy": patch_dspy,
-    # CrewAI
     "crewai": patch_crewai,
     "crewai_tools": patch_crewai,
-    # NotDiamond
     "notdiamond": patch_notdiamond,
-    "notdiamond.toolkit": patch_notdiamond,
-    "notdiamond.toolkit.custom_router": patch_notdiamond,
-    # MCP
     "mcp": patch_mcp,
-    "mcp.server": patch_mcp,
-    "mcp.server.fastmcp": patch_mcp,
-    "mcp.client": patch_mcp,
-    "mcp.client.session": patch_mcp,
-    # NVIDIA
     "langchain_nvidia_ai_endpoints": patch_nvidia,
-    # SmolAgents
     "smolagents": patch_smolagents,
-    # OpenAI Agents
     "openai_agents": patch_openai_agents,
-    # Verdict
     "verdict": patch_verdict,
-    "verdict.core": patch_verdict,
-    "verdict.core.pipeline": patch_verdict,
-    # AutoGen
     "autogen": patch_autogen,
-    "autogen_agentchat": patch_autogen,
-    "autogen_core": patch_autogen,
-    "autogen_ext": patch_autogen,
-    # LangChain
     "langchain": patch_langchain,
-    "langchain.chat_models": patch_langchain,
-    "langchain_core": patch_langchain,
-    # LlamaIndex
     "llama_index": patch_llamaindex,
-    "llama_index.core": patch_llamaindex,
-    "llamaindex": patch_llamaindex,
 }
 
 
