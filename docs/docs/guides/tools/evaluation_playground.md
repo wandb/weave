@@ -66,7 +66,7 @@ To add a model in the **Models** section of the Evaluation Playground:
 
 ### Add Scorers
 
-[Scorers](../evaluation/scorers) use LLM judges to measure and assess the quality of AI model outputs. You can select existing scorers in your project or create new ones to evaluate your models with. You can only use scorers created within the playground.
+[Scorers](../evaluation/scorers) use LLM judges to measure and assess the quality of AI model outputs. You can select existing scorers in your project or create new ones to evaluate your models with.
 
 To add a scorer in the Evaluation Playground: 
 
