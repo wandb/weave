@@ -1,7 +1,6 @@
 """The top-level functions and classes for working with Weave."""
 
 from weave import version
-from weave.trace.api import *
 from weave.integrations.patch import (
     patch_anthropic,
     patch_autogen,
@@ -26,6 +25,7 @@ from weave.integrations.patch import (
     patch_verdict,
     patch_vertexai,
 )
+from weave.trace.api import *
 
 __version__ = version.VERSION
 
