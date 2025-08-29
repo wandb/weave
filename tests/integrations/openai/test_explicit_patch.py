@@ -1,5 +1,6 @@
 # This tests the explicit patching mechanism for OpenAI
 
+import os
 from typing import Any
 
 import pytest
@@ -16,8 +17,10 @@ from weave.trace.autopatch import IntegrationSettings, OpSettings
 )
 def test_no_patch_no_trace(client_creator):
     """Test that without explicit patching, OpenAI calls are not traced."""
+    api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
+
     with client_creator() as client:
-        oaiclient = OpenAI()
+        oaiclient = OpenAI(api_key=api_key)
         oaiclient.chat.completions.create(
             model="gpt-4o",
             messages=[{"role": "user", "content": "tell me a joke"}],
@@ -33,11 +36,13 @@ def test_no_patch_no_trace(client_creator):
 )
 def test_explicit_patch_traces(client_creator):
     """Test that explicit patching enables OpenAI tracing."""
+    api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
+
     with client_creator() as client:
         # Explicitly patch OpenAI
         weave.patch_openai()
 
-        oaiclient = OpenAI()
+        oaiclient = OpenAI(api_key=api_key)
         oaiclient.chat.completions.create(
             model="gpt-4o",
             messages=[{"role": "user", "content": "tell me a joke"}],
@@ -53,6 +58,7 @@ def test_explicit_patch_traces(client_creator):
 )
 def test_explicit_patch_with_settings(client_creator):
     """Test explicit patching with custom settings."""
+    api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
 
     def redact_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
         return dict.fromkeys(inputs, "REDACTED")
@@ -72,7 +78,7 @@ def test_explicit_patch_with_settings(client_creator):
         )
         weave.patch_openai(settings)
 
-        oaiclient = OpenAI()
+        oaiclient = OpenAI(api_key=api_key)
         oaiclient.chat.completions.create(
             model="gpt-4o",
             messages=[{"role": "user", "content": "tell me a joke"}],
@@ -91,12 +97,14 @@ def test_explicit_patch_with_settings(client_creator):
 )
 def test_multiple_explicit_patches(client_creator):
     """Test that multiple integrations can be explicitly patched independently."""
+    api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
+
     with client_creator() as client:
         # Patch only OpenAI, not other integrations
         weave.patch_openai()
         # Could also do: weave.patch_anthropic(), weave.patch_mistral(), etc.
 
-        oaiclient = OpenAI()
+        oaiclient = OpenAI(api_key=api_key)
         oaiclient.chat.completions.create(
             model="gpt-4o",
             messages=[{"role": "user", "content": "tell me a joke"}],
