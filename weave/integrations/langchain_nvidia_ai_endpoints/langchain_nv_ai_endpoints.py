@@ -14,7 +14,8 @@ except ImportError:
 import weave
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
-from weave.trace.op import Op, ProcessedInputs, _add_accumulator
+from weave.trace.op import _add_accumulator
+from weave.trace.op_protocol import Op, ProcessedInputs
 
 _lc_nvidia_patcher: MultiPatcher | None = None
 

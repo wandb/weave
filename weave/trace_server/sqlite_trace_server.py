@@ -1011,6 +1011,27 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
         return tsi.TableCreateRes(digest=digest, row_digests=row_digests)
 
+    def table_create_from_digests(
+        self, req: tsi.TableCreateFromDigestsReq
+    ) -> tsi.TableCreateFromDigestsRes:
+        """Create a table by specifying row digests, instead actual rows"""
+        conn, cursor = get_conn_cursor(self.db_path)
+
+        # Calculate table digest from row digests
+        table_hasher = hashlib.sha256()
+        for row_digest in req.row_digests:
+            table_hasher.update(row_digest.encode())
+        digest = table_hasher.hexdigest()
+
+        with self.lock:
+            cursor.execute(
+                "INSERT OR IGNORE INTO tables (project_id, digest, row_digests) VALUES (?, ?, ?)",
+                (req.project_id, digest, json.dumps(req.row_digests)),
+            )
+            conn.commit()
+
+        return tsi.TableCreateFromDigestsRes(digest=digest)
+
     def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
         conn, cursor = get_conn_cursor(self.db_path)
         # conds = ["project_id = {project_id: String}"]
@@ -1221,6 +1242,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         parsed_refs = [ri.parse_internal_uri(r) for r in req.refs]
         if any(isinstance(r, ri.InternalTableRef) for r in parsed_refs):
             raise ValueError("Table refs not supported")
+        if any(isinstance(r, ri.InternalCallRef) for r in parsed_refs):
+            raise ValueError("Call refs not supported")
         parsed_obj_refs = cast(list[ri.InternalObjectRef], parsed_refs)
 
         def read_ref(r: ri.InternalObjectRef) -> Any:

@@ -163,7 +163,7 @@ Run `make synchronize-base-object-schemas` to ensure the frontend TypeScript typ
 1. Define your schema in a python file in the `weave/trace_server/interface/builtin_object_classes/test_only_example.py` directory. See `weave/trace_server/interface/builtin_object_classes/test_only_example.py` as an example.
 2. Make sure to register your schemas in `weave/trace_server/interface/builtin_object_classes/builtin_object_registry.py` by calling `register_base_object`.
 3. Run `make synchronize-base-object-schemas` to generate the frontend types.
-   - The first step (`make generate_base_object_schemas`) will run `weave/scripts/generate_base_object_schemas.py` to generate a JSON schema in `weave/trace_server/interface/builtin_object_classes/generated/generated_builtin_object_class_schemas.json`.
+   - The first step (`make generate_base_object_schemas`) will run `scripts/generate_base_object_schemas.py` to generate a JSON schema in `weave/trace_server/interface/builtin_object_classes/generated/generated_builtin_object_class_schemas.json`.
    - The second step (yarn `generate-schemas`) will read this file and use it to generate the frontend types located in `frontends/weave/src/components/PagePanelComponents/Home/Browse3/pages/wfReactInterface/generatedBuiltinObjectClasses.zod.ts`.
 4. Now, each use case uses different parts:
    1. `Python Writing`. Users can directly import these classes and use them as normal Pydantic models, which get published with `weave.publish`. The python client correct builds the requisite payload.
@@ -183,7 +183,7 @@ graph TD
 
     subgraph Schema Generation
         M["make synchronize-base-object-schemas"] --> G["make generate_base_object_schemas"]
-        G --> |runs| S["weave/scripts/<br>generate_base_object_schemas.py"]
+        G --> |runs| S["scripts/<br>generate_base_object_schemas.py"]
         R --> |import registered classes| S
         S --> |generates| J["generated_builtin_object_class_schemas.json"]
         M --> |yarn generate-schemas| Z["generatedBuiltinObjectClasses.zod.ts"]

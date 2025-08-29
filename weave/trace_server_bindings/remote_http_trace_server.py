@@ -10,11 +10,11 @@ from pydantic.json_schema import SkipJsonSchema
 
 from weave.trace.env import weave_trace_server_url
 from weave.trace.settings import max_calls_queue_size, should_enable_disk_fallback
-from weave.trace_server import requests
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.http_utils import (
+    REMOTE_REQUEST_BYTES_LIMIT,
     handle_response_error,
     log_dropped_call_batch,
     log_dropped_feedback_batch,
@@ -26,6 +26,7 @@ from weave.trace_server_bindings.models import (
     ServerInfoRes,
     StartBatchItem,
 )
+from weave.utils import http_requests as requests
 from weave.utils.retry import get_current_retry_id, with_retry
 from weave.wandb_interface import project_creator
 
@@ -35,11 +36,6 @@ logger = logging.getLogger(__name__)
 # DEFAULT_CONNECT_TIMEOUT = 10
 # DEFAULT_READ_TIMEOUT = 30
 # DEFAULT_TIMEOUT = (DEFAULT_CONNECT_TIMEOUT, DEFAULT_READ_TIMEOUT)
-
-
-REMOTE_REQUEST_BYTES_LIMIT = (
-    (32 - 1) * 1024 * 1024
-)  # 32 MiB (real limit) - 1 MiB (buffer)
 
 
 class RemoteHTTPTraceServer(tsi.TraceServerInterface):
@@ -445,43 +441,9 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     def table_create(
         self, req: Union[tsi.TableCreateReq, dict[str, Any]]
     ) -> tsi.TableCreateRes:
-        """Similar to `calls/batch_upsert`, we can dynamically adjust the payload size
-        due to the property that table creation can be decomposed into a series of
-        updates. This is useful when the table creation size is too big to be sent in
-        a single request. We can create an empty table first, then update the table
-        with the rows.
-        """
-        if isinstance(req, dict):
-            req = tsi.TableCreateReq.model_validate(req)
-        req = cast(tsi.TableCreateReq, req)
-
-        estimated_bytes = len(req.model_dump_json(by_alias=True).encode("utf-8"))
-        if estimated_bytes > self.remote_request_bytes_limit:
-            initialization_req = tsi.TableCreateReq(
-                table=tsi.TableSchemaForInsert(
-                    project_id=req.table.project_id,
-                    rows=[],
-                )
-            )
-            initialization_res = self.table_create(initialization_req)
-
-            update_req = tsi.TableUpdateReq(
-                project_id=req.table.project_id,
-                base_digest=initialization_res.digest,
-                updates=[
-                    tsi.TableAppendSpec(append=tsi.TableAppendSpecPayload(row=row))
-                    for row in req.table.rows
-                ],
-            )
-            update_res = self.table_update(update_req)
-
-            return tsi.TableCreateRes(
-                digest=update_res.digest, row_digests=update_res.updated_row_digests
-            )
-        else:
-            return self._generic_request(
-                "/table/create", req, tsi.TableCreateReq, tsi.TableCreateRes
-            )
+        return self._generic_request(
+            "/table/create", req, tsi.TableCreateReq, tsi.TableCreateRes
+        )
 
     def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
         """Similar to `calls/batch_upsert`, we can dynamically adjust the payload size
@@ -537,6 +499,17 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     ) -> tsi.TableQueryStatsRes:
         return self._generic_request(
             "/table/query_stats", req, tsi.TableQueryStatsReq, tsi.TableQueryStatsRes
+        )
+
+    def table_create_from_digests(
+        self, req: Union[tsi.TableCreateFromDigestsReq, dict[str, Any]]
+    ) -> tsi.TableCreateFromDigestsRes:
+        """Create a table by specifying row digests instead of actual rows."""
+        return self._generic_request(
+            "/table/create_from_digests",
+            req,
+            tsi.TableCreateFromDigestsReq,
+            tsi.TableCreateFromDigestsRes,
         )
 
     def table_query_stats_batch(

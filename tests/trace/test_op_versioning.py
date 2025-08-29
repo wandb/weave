@@ -553,3 +553,57 @@ def test_op_instance(client):
     clean_saved_code = re.sub(r"0x[0-9a-fA-F]+", "0x000000000", saved_code)
 
     assert clean_saved_code == EXPECTED_INSTANCE_CODE
+
+
+EXPECTED_IMPORT_AS_CODE = """import weave
+import json as js
+
+@weave.op()
+def func(data: dict) -> str:
+    return js.dumps(data)
+"""
+
+
+def test_op_import_as(client):
+    import json as js
+
+    @weave.op
+    def func(data: dict) -> str:
+        return js.dumps(data)
+
+    func({"a": 1})
+
+    ref = as_op(func).ref
+    assert ref is not None
+
+    saved_code = get_saved_code(client, ref)
+    print(saved_code)
+
+    assert saved_code == EXPECTED_IMPORT_AS_CODE
+
+
+EXPECTED_IMPORT_FROM_AS_CODE = """import weave
+from json import dumps as ds
+
+@weave.op()
+def func(data: dict) -> str:
+    return ds(data)
+"""
+
+
+def test_op_import_from_as(client):
+    from json import dumps as ds
+
+    @weave.op
+    def func(data: dict) -> str:
+        return ds(data)
+
+    func({"a": 1})
+
+    ref = as_op(func).ref
+    assert ref is not None
+
+    saved_code = get_saved_code(client, ref)
+    print(saved_code)
+
+    assert saved_code == EXPECTED_IMPORT_FROM_AS_CODE

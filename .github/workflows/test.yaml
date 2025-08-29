@@ -186,7 +186,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install nox uv==0.8.6
       - name: Run nox
-        run: nox -e lint -- --all-files
+        run: nox -e lint
 
   trace-docs:
     name: Trace docs
@@ -213,9 +213,6 @@ jobs:
         python-version-major: ["3"]
         python-version-minor: [
             "9",
-            "10",
-            "11",
-            "12",
             "13",
             #
           ]
@@ -236,6 +233,14 @@ jobs:
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
             -m "not trace_server"
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./tests/coverage.xml
+          flags: trace-no-server
+          name: trace-no-server-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   trace-tests:
     name: Trace nox tests
@@ -246,9 +251,6 @@ jobs:
         python-version-major: ["3"]
         python-version-minor: [
             "9",
-            "10",
-            "11",
-            "12",
             "13",
             #
           ]
@@ -361,6 +363,14 @@ jobs:
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
             -m "trace_server and not skip_clickhouse_client"
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./tests/coverage.xml
+          flags: trace-tests
+          name: trace-tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}-${{ matrix.nox-shard }}
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
   trace-tests-matrix-check: # This job does nothing and is only used for the branch protection
     if: always()
 

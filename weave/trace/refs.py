@@ -6,6 +6,8 @@ from dataclasses import asdict, dataclass, fields
 from datetime import datetime
 from typing import Any, Union, cast
 
+from typing_extensions import Self
+
 from weave.trace_server import refs_internal
 from weave.trace_server.errors import ObjectDeletedError
 
@@ -27,11 +29,48 @@ class Ref:
     def as_param_dict(self) -> dict:
         return asdict(self)
 
-    def __deepcopy__(self, memo: dict) -> Ref:
+    def __deepcopy__(self, memo: dict) -> Self:
         d = {f.name: getattr(self, f.name) for f in fields(self)}
         res = self.__class__(**d)
         memo[id(self)] = res
         return res
+
+    @staticmethod
+    def parse_uri(uri: str) -> AnyRef:
+        if not uri.startswith("weave:///"):
+            raise ValueError(f"Invalid URI: {uri}")
+        path = uri[len("weave:///") :]
+        parts = path.split("/")
+        if len(parts) < 3:
+            raise ValueError(f"Invalid URI: {uri}")
+        entity, project, kind = parts[:3]
+        remaining = tuple(parts[3:])
+        if kind == "table":
+            return TableRef(entity=entity, project=project, _digest=remaining[0])
+        extra = tuple(urllib.parse.unquote(r) for r in remaining[1:])
+        if kind == "call":
+            return CallRef(
+                entity=entity, project=project, id=remaining[0], _extra=extra
+            )
+        elif kind == "object":
+            name, version = parse_name_version(remaining[0])
+            return ObjectRef(
+                entity=entity, project=project, name=name, _digest=version, _extra=extra
+            )
+        elif kind == "op":
+            name, version = parse_name_version(remaining[0])
+            return OpRef(
+                entity=entity, project=project, name=name, _digest=version, _extra=extra
+            )
+        else:
+            raise ValueError(f"Unknown ref kind: {kind}")
+
+    @staticmethod
+    def maybe_parse_uri(s: str) -> AnyRef | None:
+        try:
+            return Ref.parse_uri(s)
+        except ValueError:
+            return None
 
 
 @dataclass(frozen=True)
@@ -88,24 +127,30 @@ class TableRef(Ref):
     def uri(self) -> str:
         return f"weave:///{self.entity}/{self.project}/table/{self.digest}"
 
+    @staticmethod
+    def parse_uri(uri: str) -> TableRef:
+        if not isinstance(parsed := Ref.parse_uri(uri), TableRef):
+            raise TypeError(f"URI is not for a Table: {uri}")
+        return parsed
+
 
 @dataclass(frozen=True)
 class RefWithExtra(Ref):
-    def with_extra(self, extra: tuple[str | Future[str], ...]) -> RefWithExtra:
+    def with_extra(self, extra: tuple[str | Future[str], ...]) -> Self:
         params = self.as_param_dict()
         params["_extra"] = self._extra + tuple(extra)  # type: ignore
         return self.__class__(**params)
 
-    def with_key(self, key: str) -> RefWithExtra:
+    def with_key(self, key: str) -> Self:
         return self.with_extra((DICT_KEY_EDGE_NAME, key))
 
-    def with_attr(self, attr: str) -> RefWithExtra:
+    def with_attr(self, attr: str) -> Self:
         return self.with_extra((OBJECT_ATTR_EDGE_NAME, attr))
 
-    def with_index(self, index: int) -> RefWithExtra:
+    def with_index(self, index: int) -> Self:
         return self.with_extra((LIST_INDEX_EDGE_NAME, str(index)))
 
-    def with_item(self, item_digest: str | Future[str]) -> RefWithExtra:
+    def with_item(self, item_digest: str | Future[str]) -> Self:
         return self.with_extra((TABLE_ROW_ID_EDGE_NAME, item_digest))
 
 
@@ -168,7 +213,10 @@ class ObjectRef(RefWithExtra):
         # Move import here so that it only happens when the function is called.
         # This import is invalid in the trace server and represents a dependency
         # that should be removed.
-        from weave.trace.context.weave_client_context import get_weave_client
+        from weave.trace.context.weave_client_context import (
+            get_weave_client,
+            set_weave_client_global,
+        )
         from weave.trace.weave_init import init_weave
 
         gc = get_weave_client()
@@ -179,13 +227,14 @@ class ObjectRef(RefWithExtra):
         # yet initialized the client, we can initialize a client to
         # fetch the object. It is critical to reset the client after fetching the
         # object to avoid any side effects in user code.
-        init_client = init_weave(
+
+        client = init_weave(
             f"{self.entity}/{self.project}", ensure_project_exists=False
         )
         try:
-            res = init_client.client.get(self, objectify=objectify)
+            res = client.get(self, objectify=objectify)
         finally:
-            init_client.reset()
+            set_weave_client_global(None)
         return res
 
     def is_descended_from(self, potential_ancestor: ObjectRef) -> bool:
@@ -211,6 +260,12 @@ class ObjectRef(RefWithExtra):
         if gc is not None:
             gc.delete_object_version(self)
 
+    @staticmethod
+    def parse_uri(uri: str) -> ObjectRef:
+        if not isinstance(parsed := Ref.parse_uri(uri), ObjectRef):
+            raise TypeError(f"URI is not for an Object: {uri}")
+        return parsed
+
 
 @dataclass(frozen=True)
 class OpRef(ObjectRef):
@@ -226,6 +281,12 @@ class OpRef(ObjectRef):
         gc = get_weave_client()
         if gc is not None:
             gc.delete_op_version(self)
+
+    @staticmethod
+    def parse_uri(uri: str) -> OpRef:
+        if not isinstance(parsed := Ref.parse_uri(uri), OpRef):
+            raise TypeError(f"URI is not for an Op: {uri}")
+        return parsed
 
 
 @dataclass(frozen=True)
@@ -253,6 +314,12 @@ class CallRef(RefWithExtra):
             u += "/" + "/".join(refs_internal.extra_value_quoter(e) for e in self.extra)
         return u
 
+    @staticmethod
+    def parse_uri(uri: str) -> CallRef:
+        if not isinstance(parsed := Ref.parse_uri(uri), CallRef):
+            raise TypeError(f"URI is not for a Call: {uri}")
+        return parsed
+
 
 @dataclass(frozen=True)
 class DeletedRef(Ref):
@@ -275,50 +342,3 @@ def parse_name_version(name_version: str) -> tuple[str, str]:
         name, version = name_version.rsplit(":", maxsplit=1)
         return name, version
     return name_version, "latest"
-
-
-def parse_uri(uri: str) -> AnyRef:
-    if not uri.startswith("weave:///"):
-        raise ValueError(f"Invalid URI: {uri}")
-    path = uri[len("weave:///") :]
-    parts = path.split("/")
-    if len(parts) < 3:
-        raise ValueError(f"Invalid URI: {uri}")
-    entity, project, kind = parts[:3]
-    remaining = tuple(parts[3:])
-    if kind == "table":
-        return TableRef(entity=entity, project=project, _digest=remaining[0])
-    extra = tuple(urllib.parse.unquote(r) for r in remaining[1:])
-    if kind == "call":
-        return CallRef(entity=entity, project=project, id=remaining[0], _extra=extra)
-    elif kind == "object":
-        name, version = parse_name_version(remaining[0])
-        return ObjectRef(
-            entity=entity, project=project, name=name, _digest=version, _extra=extra
-        )
-    elif kind == "op":
-        name, version = parse_name_version(remaining[0])
-        return OpRef(
-            entity=entity, project=project, name=name, _digest=version, _extra=extra
-        )
-    else:
-        raise ValueError(f"Unknown ref kind: {kind}")
-
-
-def parse_op_uri(uri: str) -> OpRef:
-    if not isinstance(parsed := parse_uri(uri), OpRef):
-        raise TypeError(f"URI is not for an Op: {uri}")
-    return parsed
-
-
-def parse_object_uri(uri: str) -> ObjectRef:
-    if not isinstance(parsed := parse_uri(uri), ObjectRef):
-        raise TypeError(f"URI is not for an Object: {uri}")
-    return parsed
-
-
-def maybe_parse_uri(s: str) -> AnyRef | None:
-    try:
-        return parse_uri(s)
-    except ValueError:
-        return None

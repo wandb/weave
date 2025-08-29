@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib
 import logging
+import time
 from functools import wraps
 from typing import TYPE_CHECKING, Any, Callable
 from urllib.parse import urlparse
@@ -10,10 +11,16 @@ import weave
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.op import (
-    Op,
-    ProcessedInputs,
     _add_accumulator,
     _default_on_input_handler,
+)
+from weave.trace.op_protocol import Op, ProcessedInputs
+from weave.utils.stream_metrics import (
+    WEAVE_STREAM_START_TIME,
+    add_time_to_first_token_to_dict,
+    calculate_time_to_first_token,
+    init_stream_tracking,
+    preserve_stream_attributes,
 )
 
 if TYPE_CHECKING:
@@ -136,13 +143,34 @@ def openai_on_finish_post_processor(value: ChatCompletionChunk | None) -> dict |
         dump = value.model_dump(exclude_unset=True, exclude_none=True)
     if hasattr(value, "_request_id"):
         dump["request_id"] = value._request_id
+
+    # Add time to first token if available
+    dump = add_time_to_first_token_to_dict(dump, value)
+
     return dump
+
+
+def _openai_chunk_has_content(chunk: ChatCompletionChunk) -> bool:
+    """
+    Detect if an OpenAI chunk contains actual content (first token).
+
+    Args:
+        chunk: The OpenAI ChatCompletionChunk to check.
+
+    Returns:
+        True if the chunk contains content, False otherwise.
+    """
+    for choice in chunk.choices:
+        if choice.delta and choice.delta.content:
+            return True
+    return False
 
 
 def openai_accumulator(
     acc: ChatCompletionChunk | None,
     value: ChatCompletionChunk,
     skip_last: bool = False,
+    stream_start_time: float | None = None,
 ) -> ChatCompletionChunk:
     from openai.types.chat import ChatCompletionChunk
     from openai.types.chat.chat_completion_chunk import (
@@ -269,6 +297,8 @@ def openai_accumulator(
                 object=value.object or "chat.completion.chunk",
                 system_fingerprint=value.system_fingerprint,
             )
+            # Initialize stream tracking with pre-stored start time
+            init_stream_tracking(acc, stream_start_time)
             return acc
         else:
             raise ValueError("Initial event must contain choices")
@@ -277,6 +307,11 @@ def openai_accumulator(
         value, [choice.model_dump() for choice in acc.choices]
     )
 
+    # Calculate time to first token if this is the first chunk with content
+    calculate_time_to_first_token(acc, value, _openai_chunk_has_content)
+
+    # Create new accumulator and preserve stream attributes
+    old_acc = acc
     acc = ChatCompletionChunk(
         id=acc.id,
         choices=output_choices,
@@ -285,6 +320,9 @@ def openai_accumulator(
         object=acc.object,
         system_fingerprint=acc.system_fingerprint,
     )
+
+    # Preserve stream tracking attributes
+    preserve_stream_attributes(old_acc, acc)
 
     # add usage info
     if len(value.choices) == 0 and value.usage:
@@ -335,6 +373,10 @@ def openai_on_input_handler(
     processed_inputs = _default_on_input_handler(func, tuple(args), kwargs)
     inputs = processed_inputs.inputs
 
+    # Capture start time for streaming requests
+    if kwargs.get("stream"):
+        inputs[WEAVE_STREAM_START_TIME] = time.time()
+
     args = list(args)  # type: ignore[assignment]
     if len(args) > 0 and completion_instance_check(args[0]):
         # This will be the `self` argument to the function, convert it to a dict
@@ -375,6 +417,7 @@ def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
                     # Only set stream_options if it targets the OpenAI endpoints
                     if urlparse(base_url).hostname == "api.openai.com":
                         kwargs["stream_options"] = {"include_usage": True}
+
                 return fn(self, *args, **kwargs)
 
             return _wrapper
@@ -391,7 +434,10 @@ def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
         return _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: lambda acc, value: openai_accumulator(
-                acc, value, skip_last=not _openai_stream_options_is_set(inputs)
+                acc,
+                value,
+                skip_last=not _openai_stream_options_is_set(inputs),
+                stream_start_time=inputs.get(WEAVE_STREAM_START_TIME),
             ),
             should_accumulate=should_use_accumulator,
             on_finish_post_processor=openai_on_finish_post_processor,
@@ -416,6 +462,7 @@ def create_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]
                     # Only set stream_options if it targets the OpenAI endpoints
                     if urlparse(base_url).hostname == "api.openai.com":
                         kwargs["stream_options"] = {"include_usage": True}
+
                 return await fn(self, *args, **kwargs)
 
             return _wrapper
@@ -431,7 +478,10 @@ def create_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]
         return _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: lambda acc, value: openai_accumulator(
-                acc, value, skip_last=not _openai_stream_options_is_set(inputs)
+                acc,
+                value,
+                skip_last=not _openai_stream_options_is_set(inputs),
+                stream_start_time=inputs.get(WEAVE_STREAM_START_TIME),
             ),
             should_accumulate=should_use_accumulator,
             on_finish_post_processor=openai_on_finish_post_processor,
@@ -702,10 +752,10 @@ def get_openai_patcher(
         update={"name": base.name or "openai.chat.completions.create"}
     )
     completions_parse_settings = base.model_copy(
-        update={"name": base.name or "openai.beta.chat.completions.parse"}
+        update={"name": base.name or "openai.chat.completions.parse"}
     )
     async_completions_parse_settings = base.model_copy(
-        update={"name": base.name or "openai.beta.chat.completions.parse"}
+        update={"name": base.name or "openai.chat.completions.parse"}
     )
     moderation_create_settings = base.model_copy(
         update={"name": base.name or "openai.moderations.create"}
@@ -744,6 +794,17 @@ def get_openai_patcher(
                 "AsyncCompletions.create",
                 create_wrapper_async(settings=async_completions_create_settings),
             ),
+            SymbolPatcher(
+                lambda: importlib.import_module("openai.resources.chat.completions"),
+                "Completions.parse",
+                create_wrapper_sync(settings=completions_parse_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("openai.resources.chat.completions"),
+                "AsyncCompletions.parse",
+                create_wrapper_async(settings=async_completions_parse_settings),
+            ),
+            # Beta methods were removed in 1.92.0
             SymbolPatcher(
                 lambda: importlib.import_module(
                     "openai.resources.beta.chat.completions"
