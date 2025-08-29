@@ -7,7 +7,7 @@ with content objects stored in bucket storage.
 import base64
 import logging
 import re
-from typing import Any, Optional, Tuple, TypeVar, Union
+from typing import Any, Optional, TypeVar, Union
 
 from weave.trace_server.trace_server_interface import (
     CallEndReq,
@@ -61,12 +61,13 @@ def is_valid_base64(value: str) -> bool:
             return False
 
         base64.b64decode(value, validate=True)
-        return True
     except Exception:
         return False
+    else:
+        return True
 
 
-def extract_data_uri_content(data_uri: str) -> Optional[Tuple[str, bytes, str]]:
+def extract_data_uri_content(data_uri: str) -> Optional[tuple[str, bytes, str]]:
     """Extract content type and decoded bytes from a data URI.
 
     Args:
@@ -92,14 +93,15 @@ def extract_data_uri_content(data_uri: str) -> Optional[Tuple[str, bytes, str]]:
             return None
 
         decoded_bytes = base64.b64decode(base64_data, validate=True)
-        original_schema = f"data:{content_type};base64,{{base64_content}}"
-        return content_type, decoded_bytes, original_schema
     except Exception as e:
         logger.warning(f"Failed to decode base64 data from data URI: {e}")
         return None
+    else:
+        original_schema = f"data:{content_type};base64,{{base64_content}}"
+        return content_type, decoded_bytes, original_schema
 
 
-def extract_standalone_base64(value: str) -> Optional[Tuple[bytes, str]]:
+def extract_standalone_base64(value: str) -> Optional[tuple[bytes, str]]:
     """Extract decoded bytes from a standalone base64 string.
 
     Args:
@@ -121,11 +123,12 @@ def extract_standalone_base64(value: str) -> Optional[Tuple[bytes, str]]:
             return None
 
         decoded_bytes = base64.b64decode(value, validate=True)
-        original_schema = "{base64_content}"
-        return decoded_bytes, original_schema
     except Exception as e:
         logger.warning(f"Failed to decode standalone base64: {e}")
         return None
+    else:
+        original_schema = "{base64_content}"
+        return decoded_bytes, original_schema
 
 
 def create_content_object(
@@ -225,10 +228,11 @@ def replace_base64_with_content_objects(
                     )
 
                     logger.debug("Replaced data URI with Content object")
-                    return content_obj
                 except Exception as e:
                     logger.warning(f"Failed to create content from data URI: {e}")
                     return val
+                else:
+                    return content_obj
 
             # Check for standalone base64
             standalone_content = extract_standalone_base64(val)
@@ -245,12 +249,13 @@ def replace_base64_with_content_objects(
                     )
 
                     logger.debug("Replaced standalone base64 with Content object")
-                    return content_obj
                 except Exception as e:
                     logger.warning(
                         f"Failed to create content from standalone base64: {e}"
                     )
                     return val
+                else:
+                    return content_obj
 
             return val
         else:
@@ -258,7 +263,10 @@ def replace_base64_with_content_objects(
 
     return _visit(vals)
 
+
 R = TypeVar("R", bound=Union[CallStartReq, CallEndReq])
+
+
 def process_call_req_to_content(
     req: R,
     trace_server: TraceServerInterface,
@@ -276,9 +284,13 @@ def process_call_req_to_content(
         Tuple of (processed_data, list_of_refs) with base64 content replaced by Content objects
     """
     if isinstance(req, CallStartReq):
-        req.start.inputs = replace_base64_with_content_objects(req.start.inputs, req.start.project_id, trace_server)
+        req.start.inputs = replace_base64_with_content_objects(
+            req.start.inputs, req.start.project_id, trace_server
+        )
     else:
-        req.end.output = req.end.output = replace_base64_with_content_objects(req.end.output, req.end.project_id, trace_server)
+        req.end.output = req.end.output = replace_base64_with_content_objects(
+            req.end.output, req.end.project_id, trace_server
+        )
 
     return req
 
@@ -364,13 +376,13 @@ def reconstruct_base64_for_call(
                         b64_content = base64.b64encode(content_bytes).decode("ascii")
                         return original_schema.replace("{base64_content}", b64_content)
 
-                    # Unknown schema format, keep as-is
-                    return val
-
                 except Exception as e:
                     logger.warning(
                         f"Failed to reconstruct base64 from Content object: {e}"
                     )
+                    return val
+                else:
+                    # Unknown schema format, keep as-is
                     return val
             else:
                 # Regular dict, process recursively

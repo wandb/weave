@@ -50,6 +50,10 @@ from weave.trace_server import environment as wf_env
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.actions_worker.dispatcher import execute_batch
+from weave.trace_server.base64_content_conversion import (
+    process_call_req_to_content,
+    reconstruct_base64_for_call,
+)
 from weave.trace_server.calls_query_builder.calls_query_builder import (
     CallsQuery,
     HardCodedFilter,
@@ -157,10 +161,6 @@ from weave.trace_server.trace_server_interface_util import (
 from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker import (
     EvaluateModelArgs,
     EvaluateModelDispatcher,
-)
-from weave.trace_server.base64_content_conversion import (
-    process_call_req_to_content,
-    reconstruct_base64_for_call,
 )
 
 logger = logging.getLogger(__name__)
@@ -488,7 +488,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
             for call in call_dicts:
                 if req.convert_content:
-                    yield reconstruct_base64_for_call(tsi.CallSchema.model_validate(call), self)
+                    yield reconstruct_base64_for_call(
+                        tsi.CallSchema.model_validate(call), self
+                    )
                 else:
                     yield tsi.CallSchema.model_validate(call)
 
