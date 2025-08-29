@@ -134,8 +134,11 @@ def init_weave(
 
     weave_client_context.set_weave_client_global(client)
 
-    # Autopatching has been removed. Users must now explicitly call patch functions
-    # for each integration they want to use (e.g. weave.integrations.patch_openai())
+    # Implicit patching: Check sys.modules and automatically patch any already-imported integrations
+    # Users can still explicitly call patch functions for integrations they import later
+    from weave.integrations.patch import implicit_patch
+
+    implicit_patch()
 
     username = get_username()
 
