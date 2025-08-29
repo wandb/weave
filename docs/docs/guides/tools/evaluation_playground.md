@@ -1,6 +1,6 @@
 # Evaluation Playground
 
-The Evaluation Playground is a powerful tool in the Weave UI that allows you to access existing models, build new ones, and compare their performances using evaluation datasets and LLM scoring judges. This enables you to start experimenting with and comparing your models without setting up any code. You can also save the models, scorers, and datasets you develop in the playground for later development and deployment.
+The Evaluation Playground allows you to access existing models and compare their performance using evaluation datasets and LLM scoring judges. This enables you to start experimenting with and comparing your models without setting up any code. You can also save the models, scorers, and datasets you develop in the playground for later development and deployment.
 
 For example, you can open the Evaluation Playground, add two models you've previously saved, and then evaluate their performance based on a new or previously saved question-answer style evaluation dataset. You can then create a new model in the interface, add system prompts to it, and then run a new evaluation on all three models to see how they perform against one another.
 
