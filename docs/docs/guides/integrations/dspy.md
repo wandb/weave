@@ -1,5 +1,7 @@
 # DSPy
 
+import DefaultEntityNote from '../../../src/components/DefaultEntityNote.mdx';
+
 <a target="_blank" href="https://github.com/wandb/examples/blob/master/weave/docs/quickstart_dspy.ipynb">
   <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
 </a>
@@ -38,9 +40,12 @@ classify = dspy.Predict("sentence -> sentiment")
 classify(sentence="it's a charming and often affecting journey.")
 ```
 
-![dspy_trace.png](imgs/dspy/dspy-trace.png)
+<DefaultEntityNote />
+
+![Example of a DSpy trace](imgs/dspy/dspy-trace.png)
 
 Weave logs all LM calls in your DSPy program, providing details about inputs, outputs, latency of each component, token counts, cost and more.
+
 
 - Learn how to navigate the trace for a given sample: [Navigate the Trace View](../tracking/trace-tree.md)
 - Leave or review annotations on any call: [Feedback](../tracking/feedback.md)

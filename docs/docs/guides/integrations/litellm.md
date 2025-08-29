@@ -1,5 +1,7 @@
 # LiteLLM
 
+import DefaultEntityNote from '../../../src/components/DefaultEntityNote.mdx';
+
 <a target="_blank" href="https://colab.research.google.com/github/wandb/examples/blob/master/weave/docs/quickstart_litellm.ipynb">
   <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
 </a>
@@ -12,7 +14,7 @@ It's important to store traces of LLM applications in a central database, both d
 
 > **Note:** When using LiteLLM, make sure to import the library using `import litellm` and call the completion function with `litellm.completion` instead of `from litellm import completion`. This ensures that all functions and parameters are correctly referenced.
 
-Weave will automatically capture traces for LiteLLM. You can use the library as usual, start by calling `weave.init()`:
+Weave will automatically capture traces for LiteLLM. You can use the library as usual, start by calling `weave.init()`. <DefaultEntityNote />:
 
 ```python
 import litellm
