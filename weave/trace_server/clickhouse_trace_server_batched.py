@@ -275,7 +275,16 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # Converts the user-provided call details into a clickhouse schema.
         # This does validation and conversion of the input data as well
         # as enforcing business rules and defaults
-        ch_call = _start_call_for_insert_to_ch_insertable_start_call(req.start)
+
+        from weave.trace_server.base64_content_conversion import (
+            process_call_inputs_outputs,
+        )
+
+        processed_inputs = process_call_inputs_outputs(
+            req.start.inputs, req.start.project_id, self
+        )
+        req.start.inputs = processed_inputs
+        ch_call = _start_call_for_insert_to_ch_insertable_start_call(req.start, self)
 
         # Inserts the call into the clickhouse database, verifying that
         # the call does not already exist
@@ -296,7 +305,16 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # Converts the user-provided call details into a clickhouse schema.
         # This does validation and conversion of the input data as well
         # as enforcing business rules and defaults
-        ch_call = _end_call_for_insert_to_ch_insertable_end_call(req.end)
+
+        from weave.trace_server.base64_content_conversion import (
+            process_call_inputs_outputs,
+        )
+
+        processed_output = process_call_inputs_outputs(
+            req.end.output, req.end.project_id, self
+        )
+        req.end.output = processed_output
+        ch_call = _end_call_for_insert_to_ch_insertable_end_call(req.end, self)
 
         # Inserts the call into the clickhouse database, verifying that
         # the call does not already exist
@@ -686,11 +704,15 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.OpQueryRes(op_objs=objs)
 
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
+        logger.error("req", req)
         processed_result = process_incoming_object_val(
             req.obj.val, req.obj.builtin_object_class
         )
+        logger.error("proc", processed_result)
         processed_val = processed_result["val"]
+        logger.error("procval", processed_val)
         json_val = json.dumps(processed_val)
+        logger.error("json_val", json_val)
         digest = str_digest(json_val)
 
         ch_obj = ObjCHInsertable(
@@ -1960,7 +1982,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             inputs={**req.inputs.model_dump(exclude_none=True)},
             attributes={},
         )
-        start_call = _start_call_for_insert_to_ch_insertable_start_call(start)
+        start_call = _start_call_for_insert_to_ch_insertable_start_call(start, self)
         end = tsi.EndedCallSchemaForInsert(
             project_id=req.project_id,
             id=start_call.id,
@@ -1973,7 +1995,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         if "error" in res.response:
             end.exception = res.response["error"]
-        end_call = _end_call_for_insert_to_ch_insertable_end_call(end)
+        end_call = _end_call_for_insert_to_ch_insertable_end_call(end, self)
         calls: list[Union[CallStartCHInsertable, CallEndCHInsertable]] = [
             start_call,
             end_call,
@@ -2026,7 +2048,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 inputs={**req.inputs.model_dump(exclude_none=True)},
                 attributes={},
             )
-            start_call = _start_call_for_insert_to_ch_insertable_start_call(start)
+            start_call = _start_call_for_insert_to_ch_insertable_start_call(start, self)
             # Insert immediately so that callers can see the call in progress
             self._insert_call(start_call)
 
@@ -2544,11 +2566,16 @@ def _ch_table_stats_to_table_stats_schema(
 
 def _start_call_for_insert_to_ch_insertable_start_call(
     start_call: tsi.StartedCallSchemaForInsert,
+    trace_server: Optional[tsi.TraceServerInterface] = None,
 ) -> CallStartCHInsertable:
     # Note: it is technically possible for the user to mess up and provide the
     # wrong trace id (one that does not match the parent_id)!
     call_id = start_call.id or generate_id()
     trace_id = start_call.trace_id or generate_id()
+    # Process inputs for base64 content if trace_server is provided
+    inputs = start_call.inputs
+    input_refs = extract_refs_from_values(inputs)
+
     return CallStartCHInsertable(
         project_id=start_call.project_id,
         id=call_id,
@@ -2559,8 +2586,8 @@ def _start_call_for_insert_to_ch_insertable_start_call(
         op_name=start_call.op_name,
         started_at=start_call.started_at,
         attributes_dump=_dict_value_to_dump(start_call.attributes),
-        inputs_dump=_dict_value_to_dump(start_call.inputs),
-        input_refs=extract_refs_from_values(start_call.inputs),
+        inputs_dump=_dict_value_to_dump(inputs),
+        input_refs=input_refs,
         wb_run_id=start_call.wb_run_id,
         wb_run_step=start_call.wb_run_step,
         wb_user_id=start_call.wb_user_id,
@@ -2570,17 +2597,23 @@ def _start_call_for_insert_to_ch_insertable_start_call(
 
 def _end_call_for_insert_to_ch_insertable_end_call(
     end_call: tsi.EndedCallSchemaForInsert,
+    trace_server: Optional[tsi.TraceServerInterface] = None,
 ) -> CallEndCHInsertable:
     # Note: it is technically possible for the user to mess up and provide the
     # wrong trace id (one that does not match the parent_id)!
+
+    # Process outputs for base64 content if trace_server is provided
+    output = end_call.output
+    output_refs = extract_refs_from_values(output)
+
     return CallEndCHInsertable(
         project_id=end_call.project_id,
         id=end_call.id,
         exception=end_call.exception,
         ended_at=end_call.ended_at,
         summary_dump=_dict_value_to_dump(dict(end_call.summary)),
-        output_dump=_any_value_to_dump(end_call.output),
-        output_refs=extract_refs_from_values(end_call.output),
+        output_dump=_any_value_to_dump(output),
+        output_refs=output_refs,
     )
 
 
@@ -2913,7 +2946,9 @@ def _create_tracked_stream_wrapper(
                 output=aggregated_output,
                 summary=summary,
             )
-            end_call = _end_call_for_insert_to_ch_insertable_end_call(end)
+            end_call = _end_call_for_insert_to_ch_insertable_end_call(
+                end, None
+            )  # No trace_server in stream wrapper
             insert_call(end_call)
 
     return _stream_wrapper()
