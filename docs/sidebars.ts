@@ -204,7 +204,8 @@ const sidebars: SidebarsConfig = {
             "guides/integrations/agno",
             "guides/integrations/autogen",
             "guides/integrations/verdict",
-            "guides/integrations/js"
+            "guides/integrations/koog",
+            "guides/integrations/js",
           ],
         },
         {
