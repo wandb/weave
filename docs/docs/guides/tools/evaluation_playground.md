@@ -20,7 +20,7 @@ Follow the instructions in the next sections to set up your datasets, models, an
 
 ### Add a dataset
 
-[Datasets](../core-types/datasets) are organized collections example user inputs and your expected responses from models. During evaluation, the playground feeds each test input into your model, collects its output, and then scores the output based on a metric you've selected, such as correctness. You can choose to create a dataset in the UI, add an existing dataset already saved to your project, or upload a new dataset.
+[Datasets](../core-types/datasets) are organized collections of example user inputs and your expected responses from models. During evaluation, the playground feeds each test input into your model, collects its output, and then scores the output based on a metric you've selected, such as correctness. You can choose to create a dataset in the UI, add an existing dataset already saved to your project, or upload a new dataset.
 
 You can upload datasets in the following formats:
 
