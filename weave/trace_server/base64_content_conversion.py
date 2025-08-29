@@ -297,62 +297,80 @@ def reconstruct_base64_from_refs(
     Returns:
         Processed value with content references replaced by base64 where applicable
     """
+    import json
 
     def _visit(val: Any) -> Any:
         if isinstance(val, dict):
-            result = {}
-            for k, v in val.items():
-                result[k] = _visit(v)
-            return result
-        elif isinstance(val, list):
-            return [_visit(v) for v in val]
-        elif isinstance(val, str) and val.startswith("weave-internal:///"):
-            # Check if this is a content reference we created
-            try:
-                # Parse the reference to get the digest
-                # Format: weave-internal:///{project_id}/file/{digest}
-                parts = val.split("/")
-                if len(parts) >= 5 and parts[3] == "file":
-                    ref_project_id = parts[2]
-                    digest = parts[4]
-
-                    # Only process if it's from the same project
-                    if ref_project_id != project_id:
-                        return val
-
-                    # Read the file content and metadata
+            # Check if this is a Content object structure
+            if (
+                val.get("_type") == "CustomWeaveType"
+                and val.get("weave_type", {}).get("type") == "weave.type_wrappers.Content.content.Content"
+                and "files" in val
+            ):
+                files = val["files"]
+                
+                # We expect both content and metadata.json digests
+                if "content" not in files or "metadata.json" not in files:
+                    # Not a complete content object, process normally
+                    result = {}
+                    for k, v in val.items():
+                        result[k] = _visit(v)
+                    return result
+                
+                try:
                     from weave.trace_server.trace_server_interface import (
                         FileContentReadReq,
                     )
-
-                    file_req = FileContentReadReq(
+                    
+                    # First, read the metadata.json to check for _original_schema
+                    metadata_req = FileContentReadReq(
                         project_id=project_id,
-                        digest=digest,
+                        digest=files["metadata.json"],
                     )
-
-                    try:
-                        file_res = trace_server.file_content_read(file_req)
-                        content_bytes = file_res.content
-
-                        # Try to read the metadata to check for _original_schema
-                        # This would require reading the metadata.json if stored separately
-                        # For now, we'll need to store this information differently
-                        # or pass it through somehow. Let's check if we can detect
-                        # by trying to read associated metadata
-
-                        # Since we don't have direct access to metadata here,
-                        # we'll need a different approach. For now, return as-is.
-                        # This will be enhanced when we have metadata storage.
+                    metadata_res = trace_server.file_content_read(metadata_req)
+                    metadata = json.loads(metadata_res.content)
+                    
+                    # Check if this content has an original schema (was converted from base64)
+                    original_schema = metadata.get("metadata", {}).get("_original_schema")
+                    if not original_schema:
+                        # No original schema, this is a native Content object
+                        # Keep it as-is
                         return val
-
-                    except Exception:
-                        # If we can't read the file, leave the reference as-is
-                        return val
-
-            except Exception:
-                pass
-
-            return val
+                    
+                    # Read the actual content bytes
+                    content_req = FileContentReadReq(
+                        project_id=project_id,
+                        digest=files["content"],
+                    )
+                    content_res = trace_server.file_content_read(content_req)
+                    content_bytes = content_res.content
+                    
+                    # Reconstruct based on the original schema
+                    if original_schema == "{base64_content}":
+                        # Standalone base64
+                        return base64.b64encode(content_bytes).decode("ascii")
+                    elif (
+                        original_schema.startswith("data:")
+                        and "{base64_content}" in original_schema
+                    ):
+                        # Data URI format
+                        b64_content = base64.b64encode(content_bytes).decode("ascii")
+                        return original_schema.replace("{base64_content}", b64_content)
+                    
+                    # Unknown schema format, keep as-is
+                    return val
+                    
+                except Exception as e:
+                    logger.warning(f"Failed to reconstruct base64 from Content object: {e}")
+                    return val
+            else:
+                # Regular dict, process recursively
+                result = {}
+                for k, v in val.items():
+                    result[k] = _visit(v)
+                return result
+        elif isinstance(val, list):
+            return [_visit(v) for v in val]
         else:
             return val
 
