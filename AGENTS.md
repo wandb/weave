@@ -123,6 +123,34 @@ TODO: need to fill this out
 
 ---
 
+## Integration Patching
+
+### Implicit and Explicit Patching
+
+Weave supports both implicit and explicit patching for integrations:
+
+- **Implicit Patching**: Libraries imported BEFORE `weave.init()` are automatically patched
+- **Explicit Patching**: Libraries imported AFTER `weave.init()` require explicit `weave.patch_X()` calls
+
+Example:
+
+```python
+# Implicit patching (automatic)
+import openai  # Import BEFORE weave.init()
+import weave
+weave.init('my-project')  # OpenAI is automatically patched!
+
+# Explicit patching (manual)
+import weave
+weave.init('my-project')
+import anthropic  # Import AFTER weave.init()
+weave.patch_anthropic()  # Must explicitly patch
+```
+
+### Available Patch Functions
+
+All integrations have corresponding patch functions: `patch_openai()`, `patch_anthropic()`, `patch_mistral()`, etc.
+
 # Requests to Humans
 
 This section contains a list of questions, clarifications, or tasks that LLM agents wish to have humans complete.
