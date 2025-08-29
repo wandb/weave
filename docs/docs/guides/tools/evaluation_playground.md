@@ -10,7 +10,7 @@ For example, you can open the Evaluation Playground, add two models you've previ
 
 To set up an evaluation in the Evaluation Playground:
 
-1. Open the Weave UI, and then open the project that you want to perform the evaluation in. This opens the Traces page. 
+1. Open [the Weave UI](https://wandb.ai/wandb/quickstart_playground/weave/playground), and then open the project that you want to perform the evaluation in. This opens the Traces page. 
 2. From the Traces page, click the **Playground** icon in the left-menu, and then select the **Evaluate** tab on the Playground page. On the Evaluate page, you can either: 
     * **Load a demo example**: This loads a predefined configuration that evaluates MoonshotAI Kimi K2 model on expected output and uses an LLM judge to determine its correctness. You can use this configuration to experiment with the interface.
     * **Start from scratch**: This loads a blank configuration for you to build upon.
