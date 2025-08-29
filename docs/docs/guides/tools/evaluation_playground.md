@@ -86,7 +86,7 @@ To add a scorer in the Evaluation Playground:
         Is the model output correct?
         ```
 
-        You can use the fields from your datasets and responses as variables in the scoring prompt, such as `{user_input}` and `{output}`.
+        You can use the fields from your datasets and responses as variables in the scoring prompt, such as `{user_input}`, `{expected_output}`, and `{output}`. To see a list of available variables, click **Insert variable** in the UI.
 
 2. Optional: Click **Save** to save the scorer to your project for later use.
 
