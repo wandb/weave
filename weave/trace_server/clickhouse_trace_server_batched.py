@@ -157,6 +157,10 @@ from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker impo
     EvaluateModelArgs,
     EvaluateModelDispatcher,
 )
+from weave.trace_server.base64_content_conversion import (
+    process_call_req_to_content,
+    reconstruct_base64_for_call,
+)
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -276,14 +280,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # This does validation and conversion of the input data as well
         # as enforcing business rules and defaults
 
-        from weave.trace_server.base64_content_conversion import (
-            process_call_inputs_outputs,
-        )
-
-        processed_inputs = process_call_inputs_outputs(
-            req.start.inputs, req.start.project_id, self
-        )
-        req.start.inputs = processed_inputs
+        req = process_call_req_to_content(req, self)
         ch_call = _start_call_for_insert_to_ch_insertable_start_call(req.start, self)
 
         # Inserts the call into the clickhouse database, verifying that
@@ -305,15 +302,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # Converts the user-provided call details into a clickhouse schema.
         # This does validation and conversion of the input data as well
         # as enforcing business rules and defaults
-
-        from weave.trace_server.base64_content_conversion import (
-            process_call_inputs_outputs,
-        )
-
-        processed_output = process_call_inputs_outputs(
-            req.end.output, req.end.project_id, self
-        )
-        req.end.output = processed_output
+        req = process_call_req_to_content(req, self)
         ch_call = _end_call_for_insert_to_ch_insertable_end_call(req.end, self)
 
         # Inserts the call into the clickhouse database, verifying that
@@ -487,12 +476,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 self._expand_call_refs(
                     req.project_id, call_dicts, expand_columns, ref_cache
                 )
-
             if include_feedback:
                 self._add_feedback_to_calls(req.project_id, call_dicts)
 
             for call in call_dicts:
-                yield tsi.CallSchema.model_validate(call)
+                yield reconstruct_base64_for_call(tsi.CallSchema.model_validate(call), self)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._add_feedback_to_calls")
     def _add_feedback_to_calls(
@@ -2602,7 +2590,6 @@ def _end_call_for_insert_to_ch_insertable_end_call(
     # Note: it is technically possible for the user to mess up and provide the
     # wrong trace id (one that does not match the parent_id)!
 
-    # Process outputs for base64 content if trace_server is provided
     output = end_call.output
     output_refs = extract_refs_from_values(output)
 

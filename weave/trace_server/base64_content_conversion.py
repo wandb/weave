@@ -7,9 +7,12 @@ with content objects stored in bucket storage.
 import base64
 import logging
 import re
-from typing import Any, Optional, Tuple, TypeVar
+from typing import Any, Optional, Tuple, TypeVar, Union
 
 from weave.trace_server.trace_server_interface import (
+    CallEndReq,
+    CallSchema,
+    CallStartReq,
     FileCreateReq,
     TraceServerInterface,
 )
@@ -238,7 +241,7 @@ def replace_base64_with_content_objects(
                         original_schema,
                         project_id,
                         trace_server,
-                        None,  # No mimetype for standalone base64
+                        None,
                     )
 
                     logger.debug("Replaced standalone base64 with Content object")
@@ -255,12 +258,11 @@ def replace_base64_with_content_objects(
 
     return _visit(vals)
 
-
-def process_call_inputs_outputs(
-    data: T,
-    project_id: str,
+R = TypeVar("R", bound=Union[CallStartReq, CallEndReq])
+def process_call_req_to_content(
+    req: R,
     trace_server: TraceServerInterface,
-) -> T:
+) -> R:
     """Process call inputs/outputs to replace base64 content.
 
     This is the main entry point for processing trace data before insertion.
@@ -273,16 +275,18 @@ def process_call_inputs_outputs(
     Returns:
         Tuple of (processed_data, list_of_refs) with base64 content replaced by Content objects
     """
-    processed_data = replace_base64_with_content_objects(data, project_id, trace_server)
+    if isinstance(req, CallStartReq):
+        req.start.inputs = replace_base64_with_content_objects(req.start.inputs, req.start.project_id, trace_server)
+    else:
+        req.end.output = req.end.output = replace_base64_with_content_objects(req.end.output, req.end.project_id, trace_server)
 
-    return processed_data
+    return req
 
 
-def reconstruct_base64_from_refs(
-    vals: Any,
-    project_id: str,
+def reconstruct_base64_for_call(
+    call: CallSchema,
     trace_server: TraceServerInterface,
-) -> Any:
+) -> CallSchema:
     """Recursively reconstruct base64 content from content references.
 
     Only reconstructs content that has _original_schema metadata, indicating
@@ -325,7 +329,7 @@ def reconstruct_base64_from_refs(
 
                     # First, read the metadata.json to check for _original_schema
                     metadata_req = FileContentReadReq(
-                        project_id=project_id,
+                        project_id=call.project_id,
                         digest=files["metadata.json"],
                     )
                     metadata_res = trace_server.file_content_read(metadata_req)
@@ -342,7 +346,7 @@ def reconstruct_base64_from_refs(
 
                     # Read the actual content bytes
                     content_req = FileContentReadReq(
-                        project_id=project_id,
+                        project_id=call.project_id,
                         digest=files["content"],
                     )
                     content_res = trace_server.file_content_read(content_req)
@@ -379,7 +383,9 @@ def reconstruct_base64_from_refs(
         else:
             return val
 
-    return _visit(vals)
+    call.inputs = _visit(call.inputs)
+    call.output = _visit(call.output)
+    return call
 
 
 def reconstruct_base64_from_refs_with_metadata(
