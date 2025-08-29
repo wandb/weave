@@ -6,16 +6,21 @@ with content objects stored in bucket storage.
 
 import base64
 import logging
+import uuid
 import re
 from typing import Any, Optional, TypeVar, Union
 
+from weave.trace.refs import ObjectRef
 from weave.trace_server.trace_server_interface import (
     CallEndReq,
     CallSchema,
     CallStartReq,
     FileCreateReq,
+    ObjCreateReq,
+    ObjSchemaForInsert,
     TraceServerInterface,
 )
+from weave.trace_server.trace_server_interface_util import str_digest
 from weave.type_wrappers.Content.content import Content
 
 logger = logging.getLogger(__name__)
@@ -32,6 +37,8 @@ MAX_BASE64_SIZE = 100 * 1024 * 1024  # 100 MB
 
 # Minimum size for standalone base64 (to avoid false positives)
 MIN_BASE64_SIZE = 100  # 100 bytes
+
+MIN_TEXT_SIZE = 50 * 1024 # 50 KB
 
 
 def is_valid_base64(value: str) -> bool:
@@ -137,7 +144,8 @@ def create_content_object(
     project_id: str,
     trace_server: TraceServerInterface,
     mimetype: Optional[str] = None,
-) -> dict[str, Any]:
+    wb_user_id: Optional[str] = None
+) -> str:
     """Create a proper Content object structure and store its files.
 
     Args:
@@ -178,8 +186,22 @@ def create_content_object(
         "weave_type": {"type": "weave.type_wrappers.Content.content.Content"},
         "files": {"content": content_res.digest, "metadata.json": metadata_res.digest},
     }
+    content_obj_digest = str_digest(json.dumps(content_obj))
+    object_id = f"content_{content_obj_digest}"
+    ref_digest = trace_server.obj_create(
+        ObjCreateReq(
+            obj=ObjSchemaForInsert(
+                project_id=project_id,
+                object_id=object_id,
+                val=content_obj,
+                wb_user_id=wb_user_id
+            )
+        )
+    )
+    ref = f"weave-trace-internal:///{project_id}/object/{object_id}:{ref_digest.digest}"
+    print(f"REFFF!!!!!!!!!! {ref}")
+    return ref
 
-    return content_obj
 
 
 T = TypeVar("T")
@@ -189,6 +211,7 @@ def replace_base64_with_content_objects(
     vals: T,
     project_id: str,
     trace_server: TraceServerInterface,
+    wb_user_id: Optional[str] = None
 ) -> T:
     """Recursively replace base64 content with Content objects.
 
@@ -214,8 +237,7 @@ def replace_base64_with_content_objects(
             return [_visit(v) for v in val]
         elif isinstance(val, str):
             # Check for data URI pattern first
-            data_uri_content = extract_data_uri_content(val)
-            if data_uri_content:
+            if data_uri_content := extract_data_uri_content(val):
                 content_type, decoded_bytes, original_schema = data_uri_content
                 try:
                     # Create proper Content object structure
@@ -225,6 +247,7 @@ def replace_base64_with_content_objects(
                         project_id,
                         trace_server,
                         content_type,
+                        wb_user_id
                     )
 
                     logger.debug("Replaced data URI with Content object")
@@ -233,10 +256,7 @@ def replace_base64_with_content_objects(
                     return val
                 else:
                     return content_obj
-
-            # Check for standalone base64
-            standalone_content = extract_standalone_base64(val)
-            if standalone_content:
+            elif standalone_content := extract_standalone_base64(val):
                 decoded_bytes, original_schema = standalone_content
                 try:
                     # Create proper Content object structure
@@ -246,6 +266,7 @@ def replace_base64_with_content_objects(
                         project_id,
                         trace_server,
                         None,
+                        wb_user_id
                     )
 
                     logger.debug("Replaced standalone base64 with Content object")
@@ -256,7 +277,16 @@ def replace_base64_with_content_objects(
                     return val
                 else:
                     return content_obj
-
+            elif len(val) > MIN_TEXT_SIZE:
+                original_schema = "{text}"
+                return create_content_object(
+                    val.encode('utf-8'),
+                    original_schema,
+                    project_id,
+                    trace_server,
+                    None,
+                    wb_user_id
+                )
             return val
         else:
             return val
