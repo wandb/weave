@@ -49,7 +49,7 @@ It is also important to appropriately name the columns in your dataset `user_inp
 
 ### Add a model
 
-[Models](https://weave-docs.wandb.ai/guides/core-types/models) are systems that generate output based on user input. You can select existing models in your project to create new ones to evaluate. You can only use models created using the playground feature.
+[Models](https://weave-docs.wandb.ai/guides/core-types/models), in the context of Weave, are a combination of an AI model (such as GPT) and the environment (in this case the system prompt) that defines how the model will operates during the evaluation. You can select existing models in your project or create new ones to evaluate, and you can add multiple models at once to evaluate them simultaneously with the same dataset and scorer.
 
 To add a model in the **Models** section of the Evaluation Playground:
 
