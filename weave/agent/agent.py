@@ -2,11 +2,11 @@ from typing import Any
 
 from pydantic import Field
 
-import weave
 from weave.agent.chat_util import OpenAIStream
 from weave.agent.console import LogEvents
-from weave.object.obj import Object
 from weave.agent.tools import chat_call_tool_params, perform_tool_calls
+from weave.object.obj import Object
+from weave.trace.op import op
 
 
 class AgentState(Object):
@@ -20,7 +20,7 @@ class Agent(Object):
     system_message: str
     tools: list[Any] = Field(default_factory=list)
 
-    @weave.op
+    @op
     def step(self, state: AgentState) -> AgentState:
         """Run a step of the agent.
 

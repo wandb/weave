@@ -10,7 +10,6 @@ nox.options.stop_on_first_error = True
 SUPPORTED_PYTHON_VERSIONS = ["3.9", "3.10", "3.11", "3.12", "3.13"]
 PY313_INCOMPATIBLE_SHARDS = [
     "cohere",
-    "dspy",
     "notdiamond",
 ]
 PY39_INCOMPATIBLE_SHARDS = [
@@ -20,7 +19,7 @@ PY39_INCOMPATIBLE_SHARDS = [
     "smolagents",
     "dspy",
     "autogen_tests",
-    "langchain"
+    "langchain",
 ]
 NUM_TRACE_SERVER_SHARDS = 4
 
@@ -30,8 +29,17 @@ def lint(session):
     session.install("pre-commit", "jupyter")
     dry_run = session.posargs and "dry-run" in session.posargs
     all_files = session.posargs and "--all-files" in session.posargs
+    ruff_only = session.posargs and "--ruff-only" in session.posargs
 
-    if dry_run:
+    if ruff_only:
+        # Run only ruff checks on all files
+        session.run(
+            "pre-commit", "run", "--hook-stage=pre-push", "ruff-check", "--all-files"
+        )
+        session.run(
+            "pre-commit", "run", "--hook-stage=pre-push", "ruff-format", "--all-files"
+        )
+    elif dry_run:
         session.run(
             "pre-commit",
             "run",
@@ -166,8 +174,18 @@ def tests(session, shard):
         "--strict-markers",
         "--cov=weave",
         "--cov-report=html",
+        "--cov-report=xml",
         "--cov-branch",
     ]
+
+    # Memray not working with trace_server shard atm
+    if shard != "trace_server":
+        pytest_args.extend(
+            [
+                "--memray",
+                "--most-allocations=5",
+            ]
+        )
 
     # Handle trace sharding: run every 3rd test starting at different offsets
     if shard in trace_server_shards:

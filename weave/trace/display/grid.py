@@ -9,11 +9,9 @@ import sys
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal
 
-from rich.console import Console
-from rich.table import Table
-
 from weave.trace import util
-from weave.trace.rich import pydantic_util
+from weave.trace.display import display
+from weave.trace.display.rich import pydantic_util
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -109,12 +107,12 @@ class Row:
     def to_dict(self) -> dict[str, Any]:
         return {col.id: self[col.id] for col in self.grid.columns}
 
-    def to_rich_table(self) -> Table:
-        """Convert the row to a Rich table with key-value pairs."""
+    def to_rich_table(self) -> display.Table:
+        """Convert the row to a table with key-value pairs."""
         d = {col.display_name: display_value(self[col.id]) for col in self.grid.columns}
         return pydantic_util.dict_to_table(d)
 
-    def to_rich_table_str(self) -> Table:
+    def to_rich_table_str(self) -> str:
         table = self.to_rich_table()
         return pydantic_util.table_to_str(table)
 
@@ -259,13 +257,13 @@ class Column:
 
         self.grid.set_cell_value(index, self.column_id, value)
 
-    def to_rich_table(self) -> Table:
-        """Convert the column to a rich Table for pretty display.
+    def to_rich_table(self) -> display.Table:
+        """Convert the column to a Table for pretty display.
 
         Returns:
-            A rich Table with a single column containing all values from this column.
+            A Table with a single column containing all values from this column.
         """
-        table = Table()
+        table = display.Table()
 
         # Add a single column with the column name
         col_def = next(
@@ -508,9 +506,11 @@ class Grid:
         """Return the number of columns in the grid."""
         return len(self.columns)
 
-    def to_rich_table(self, row_start: int = 0, row_end: int | None = None) -> Table:
-        """Convert the grid spec (not calls) to a rich Table for pretty display."""
-        table = Table()
+    def to_rich_table(
+        self, row_start: int = 0, row_end: int | None = None
+    ) -> display.Table:
+        """Convert the grid spec (not calls) to a Table for pretty display."""
+        table = display.Table()
 
         # Add columns to the table
         for col in self.columns:
@@ -561,14 +561,14 @@ class Grid:
             1 if self.num_rows % rows_per_page else 0
         )
 
-        console = Console()
+        console = display.Console()
         while True:
             console.clear()
             console.print(f"Page {page + 1}/{total_pages}", style="bold magenta")
             paginated_table = self.to_rich_table(
                 page * rows_per_page, (page + 1) * rows_per_page
             )
-            console.print(paginated_table)
+            console.print(paginated_table.to_string(console))
             console.print(
                 "\nUse ← (left) / → (right) to navigate, 'q' to quit",
                 style="bold yellow",

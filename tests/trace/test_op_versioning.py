@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 
 import weave
+from weave.trace.op import as_op
 from weave.trace_server.trace_server_interface import FileContentReadReq, ObjReadReq
 
 
@@ -64,7 +65,7 @@ def test_object_op_versioning(client):
     obj = op_versioning_obj.MyTestObjWithOp(val=5)
     # Call it to publish
     obj.versioned_op(5)
-    ref = weave.obj_ref(obj.versioned_op)
+    ref = as_op(obj.versioned_op).ref
 
     saved_code = get_saved_code(client, ref)
     print("SAVED_CODE")
@@ -339,7 +340,7 @@ def test_op_versioning_2ops(client):
 
     cat()
 
-    ref = weave.obj_ref(cat)
+    ref = as_op(cat).ref
 
     saved_code = get_saved_code(client, ref)
 
@@ -368,7 +369,7 @@ def test_op_return_typeddict_annotation(
 
     assert some_d(1) == {"val": 1}
 
-    ref = weave.obj_ref(some_d)
+    ref = as_op(some_d).ref
     assert ref is not None
 
     saved_code = get_saved_code(client, ref)
@@ -410,7 +411,7 @@ def test_op_return_return_custom_class(
 
     assert some_d(1).val == 1
 
-    ref = weave.obj_ref(some_d)
+    ref = as_op(some_d).ref
     assert ref is not None
 
     saved_code = get_saved_code(client, ref)
@@ -443,7 +444,7 @@ def test_op_nested_function(
 
     assert some_d(1) == 4
 
-    ref = weave.obj_ref(some_d)
+    ref = as_op(some_d).ref
     assert ref is not None
 
     saved_code = get_saved_code(client, ref)
@@ -461,7 +462,7 @@ def test_op_basic_execution(client):
 
     assert adder(1) == 2
 
-    ref = weave.obj_ref(adder)
+    ref = as_op(adder).ref
     assert ref is not None
 
     op2 = weave.ref(ref.uri()).get()
@@ -502,7 +503,7 @@ def test_op_no_repeats(client):
         return SomeClass()
 
     some_d(SomeClass())
-    ref = weave.obj_ref(some_d)
+    ref = as_op(some_d).ref
     assert ref is not None
 
     saved_code = get_saved_code(client, ref)
@@ -541,7 +542,7 @@ def test_op_instance(client):
 
     t("hello")
 
-    ref = weave.obj_ref(t)
+    ref = as_op(t).ref
     assert ref is not None
 
     saved_code = get_saved_code(client, ref)
@@ -552,3 +553,57 @@ def test_op_instance(client):
     clean_saved_code = re.sub(r"0x[0-9a-fA-F]+", "0x000000000", saved_code)
 
     assert clean_saved_code == EXPECTED_INSTANCE_CODE
+
+
+EXPECTED_IMPORT_AS_CODE = """import weave
+import json as js
+
+@weave.op()
+def func(data: dict) -> str:
+    return js.dumps(data)
+"""
+
+
+def test_op_import_as(client):
+    import json as js
+
+    @weave.op
+    def func(data: dict) -> str:
+        return js.dumps(data)
+
+    func({"a": 1})
+
+    ref = as_op(func).ref
+    assert ref is not None
+
+    saved_code = get_saved_code(client, ref)
+    print(saved_code)
+
+    assert saved_code == EXPECTED_IMPORT_AS_CODE
+
+
+EXPECTED_IMPORT_FROM_AS_CODE = """import weave
+from json import dumps as ds
+
+@weave.op()
+def func(data: dict) -> str:
+    return ds(data)
+"""
+
+
+def test_op_import_from_as(client):
+    from json import dumps as ds
+
+    @weave.op
+    def func(data: dict) -> str:
+        return ds(data)
+
+    func({"a": 1})
+
+    ref = as_op(func).ref
+    assert ref is not None
+
+    saved_code = get_saved_code(client, ref)
+    print(saved_code)
+
+    assert saved_code == EXPECTED_IMPORT_FROM_AS_CODE

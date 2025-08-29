@@ -4,14 +4,17 @@ from abc import ABC, abstractmethod
 import ddtrace
 from pydantic import BaseModel, ConfigDict
 
+import weave
 from weave.evaluation.eval import Evaluation
 from weave.scorers.llm_as_a_judge_scorer import LLMAsAJudgeScorer
 from weave.trace.context.weave_client_context import require_weave_client
-from weave.trace.refs import parse_uri
+from weave.trace.refs import Ref
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server.interface.builtin_object_classes.llm_structured_model import (
     LLMStructuredCompletionModel,
 )
+
+EVALUATE_MODEL_WORKER_MARKER = {"_weave_eval_meta": {"evaluate_model_worker": True}}
 
 
 class EvaluateModelArgs(BaseModel):
@@ -47,7 +50,7 @@ def _evaluate_model(args: EvaluateModelArgs) -> None:
 
 @ddtrace.tracer.wrap(name="evaluate_model_worker.evaluate_model.get_valid_evaluation")
 def _get_valid_evaluation(client: WeaveClient, evaluation_ref: str) -> Evaluation:
-    loaded_evaluation = client.get(parse_uri(evaluation_ref))
+    loaded_evaluation = client.get(Ref.parse_uri(evaluation_ref))
 
     if not isinstance(loaded_evaluation, Evaluation):
         raise TypeError(
@@ -71,7 +74,7 @@ def _get_valid_evaluation(client: WeaveClient, evaluation_ref: str) -> Evaluatio
 def _get_valid_model(
     client: WeaveClient, model_ref: str
 ) -> LLMStructuredCompletionModel:
-    loaded_model = client.get(parse_uri(model_ref))
+    loaded_model = client.get(Ref.parse_uri(model_ref))
 
     if not isinstance(loaded_model, LLMStructuredCompletionModel):
         raise TypeError(
@@ -87,8 +90,9 @@ def _run_evaluation(
     loaded_model: LLMStructuredCompletionModel,
     evaluation_call_id: str,
 ) -> None:
-    return asyncio.run(
-        loaded_evaluation.evaluate(
-            loaded_model, __weave={"call_id": evaluation_call_id}
+    with weave.attributes(EVALUATE_MODEL_WORKER_MARKER):
+        return asyncio.run(
+            loaded_evaluation.evaluate(
+                loaded_model, __weave={"call_id": evaluation_call_id}
+            )
         )
-    )

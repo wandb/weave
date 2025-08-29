@@ -16,17 +16,18 @@ from typing import Any, Callable, TypedDict, get_args, get_origin
 
 from weave.trace import settings
 from weave.trace.context.weave_client_context import get_weave_client
-from weave.trace.ipython import (
+from weave.trace.op import as_op, is_op
+from weave.trace.op_protocol import Op
+from weave.trace.refs import ObjectRef
+from weave.trace.serialization import serializer
+from weave.trace.serialization.mem_artifact import MemTraceFilesArtifact
+from weave.trace_server.trace_server_interface_util import str_digest
+from weave.utils.ipython import (
     ClassNotFoundError,
     get_class_source,
     is_running_interactively,
 )
-from weave.trace.op import Op, as_op, is_op
-from weave.trace.refs import ObjectRef
-from weave.trace.sanitize import REDACTED_VALUE, should_redact
-from weave.trace.serialization import serializer
-from weave.trace.serialization.mem_artifact import MemTraceFilesArtifact
-from weave.trace_server.trace_server_interface_util import str_digest
+from weave.utils.sanitize import REDACTED_VALUE, should_redact
 
 logger = logging.getLogger(__name__)
 
@@ -417,7 +418,7 @@ def _get_code_deps(
                         f"from {var_value.__module__} import {var_value.__name__}"
                     )
                     if var_value.__name__ != var_name:
-                        import_line += f"as {var_name}"
+                        import_line += f" as {var_name}"
 
                     import_code.append(import_line)
 

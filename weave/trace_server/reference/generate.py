@@ -135,7 +135,7 @@ def generate_routes(
         req: tsi.OtelExportReq,
         service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
     ) -> tsi.OtelExportRes:
-        return service.trace_server_interface.export_trace(req)
+        return service.trace_server_interface.otel_export(req)
 
     @router.post("/call/start", tags=[CALLS_TAG_NAME])
     def call_start(

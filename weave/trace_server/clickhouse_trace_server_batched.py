@@ -36,7 +36,6 @@ from zoneinfo import ZoneInfo
 
 import clickhouse_connect
 import ddtrace
-import emoji
 from clickhouse_connect.driver.client import Client as CHClient
 from clickhouse_connect.driver.query import QueryResult
 from clickhouse_connect.driver.summary import QuerySummary
@@ -62,6 +61,7 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
 )
 from weave.trace_server.clickhouse_schema import (
     ALL_CALL_INSERT_COLUMNS,
+    ALL_CALL_JSON_COLUMNS,
     ALL_CALL_SELECT_COLUMNS,
     REQUIRED_CALL_COLUMNS,
     CallCHInsertable,
@@ -75,7 +75,6 @@ from weave.trace_server.clickhouse_schema import (
     SelectableCHObjSchema,
 )
 from weave.trace_server.constants import COMPLETIONS_CREATE_OP_NAME
-from weave.trace_server.emoji_util import detone_emojis
 from weave.trace_server.errors import (
     InsertTooLarge,
     InvalidRequest,
@@ -87,6 +86,9 @@ from weave.trace_server.errors import (
 )
 from weave.trace_server.feedback import (
     TABLE_FEEDBACK,
+    format_feedback_to_res,
+    format_feedback_to_row,
+    process_feedback_payload,
     validate_feedback_create_req,
     validate_feedback_purge_req,
 )
@@ -958,6 +960,25 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
         return tsi.TableUpdateRes(digest=digest, updated_row_digests=updated_digests)
 
+    def table_create_from_digests(
+        self, req: tsi.TableCreateFromDigestsReq
+    ) -> tsi.TableCreateFromDigestsRes:
+        """Create a table by specifying row digests, instead actual rows"""
+        # Calculate table digest from row digests
+        table_hasher = hashlib.sha256()
+        for row_digest in req.row_digests:
+            table_hasher.update(row_digest.encode())
+        digest = table_hasher.hexdigest()
+
+        # Insert into tables table
+        self._insert(
+            "tables",
+            data=[(req.project_id, digest, req.row_digests)],
+            column_names=["project_id", "digest", "row_digests"],
+        )
+
+        return tsi.TableCreateFromDigestsRes(digest=digest)
+
     def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
         rows = list(self.table_query_stream(req))
         return tsi.TableQueryRes(rows=rows)
@@ -1115,6 +1136,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # Business logic to ensure that we don't have raw TableRefs (not allowed)
         if any(isinstance(r, ri.InternalTableRef) for r in parsed_raw_refs):
             raise ValueError("Table refs not supported")
+
+        # Business logic to ensure that we don't have raw CallRefs (not allowed)
+        if any(isinstance(r, ri.InternalCallRef) for r in parsed_raw_refs):
+            raise ValueError(
+                "Call refs not supported in batch read, use calls_query_stream"
+            )
 
         parsed_refs = cast(ObjRefListType, parsed_raw_refs)
         vals = self._parsed_refs_read_batch(parsed_refs)
@@ -1459,6 +1486,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 # Unpack the results into the target rows
                 row_digest_vals = {r.digest: r.val for r in rows}
                 for index, row_digest in index_digests:
+                    if row_digest not in row_digest_vals:
+                        raise NotFoundError(f"Row digest {row_digest} not found")
                     extra_results[index] = PartialRefResult(
                         remaining_extra=extra_results[index].remaining_extra[2:],
                         val=row_digest_vals[row_digest],
@@ -1789,49 +1818,39 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         assert_non_null_wb_user_id(req)
         validate_feedback_create_req(req, self)
 
-        # Augment emoji with alias.
-        res_payload = {}
-        if req.feedback_type == "wandb.reaction.1":
-            em = req.payload["emoji"]
-            if emoji.emoji_count(em) != 1:
-                raise InvalidRequest(
-                    "Value of emoji key in payload must be exactly one emoji"
-                )
-            req.payload["alias"] = emoji.demojize(em)
-            detoned = detone_emojis(em)
-            req.payload["detoned"] = detoned
-            req.payload["detoned_alias"] = emoji.demojize(detoned)
-            res_payload = req.payload
-
-        feedback_id = generate_id()
-        created_at = datetime.datetime.now(ZoneInfo("UTC"))
-        # TODO: Any validation on weave_ref?
-        payload = _dict_value_to_dump(req.payload)
-        max_payload = 1 << 20  # 1 MiB
-        if len(payload) > max_payload:
-            raise InvalidRequest("Feedback payload too large")
-        row: Row = {
-            "id": feedback_id,
-            "project_id": req.project_id,
-            "weave_ref": req.weave_ref,
-            "wb_user_id": req.wb_user_id,
-            "creator": req.creator,
-            "feedback_type": req.feedback_type,
-            "payload": req.payload,
-            "created_at": created_at,
-            "annotation_ref": req.annotation_ref,
-            "runnable_ref": req.runnable_ref,
-            "call_ref": req.call_ref,
-            "trigger_ref": req.trigger_ref,
-        }
+        processed_payload = process_feedback_payload(req)
+        row = format_feedback_to_row(req, processed_payload)
         prepared = TABLE_FEEDBACK.insert(row).prepare(database_type="clickhouse")
         self._insert(TABLE_FEEDBACK.name, prepared.data, prepared.column_names)
-        return tsi.FeedbackCreateRes(
-            id=feedback_id,
-            created_at=created_at,
-            wb_user_id=req.wb_user_id,
-            payload=res_payload,
-        )
+
+        return format_feedback_to_res(row)
+
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.feedback_create_batch")
+    def feedback_create_batch(
+        self, req: tsi.FeedbackCreateBatchReq
+    ) -> tsi.FeedbackCreateBatchRes:
+        """Create multiple feedback items in a batch efficiently."""
+        rows_to_insert = []
+        results = []
+
+        for feedback_req in req.batch:
+            assert_non_null_wb_user_id(feedback_req)
+            validate_feedback_create_req(feedback_req, self)
+
+            processed_payload = process_feedback_payload(feedback_req)
+            row = format_feedback_to_row(feedback_req, processed_payload)
+            rows_to_insert.append(row)
+            results.append(format_feedback_to_res(row))
+
+        # Batch insert all rows at once
+        if rows_to_insert:
+            insert_query = TABLE_FEEDBACK.insert()
+            for row in rows_to_insert:
+                insert_query.row(row)
+            prepared = insert_query.prepare(database_type="clickhouse")
+            self._insert(TABLE_FEEDBACK.name, prepared.data, prepared.column_names)
+
+        return tsi.FeedbackCreateBatchRes(res=results)
 
     def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
         query = TABLE_FEEDBACK.select()
@@ -2507,44 +2526,58 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         except InsertTooLarge:
             logger.info("Retrying with large objects stripped.")
             batch = self._strip_large_values(self._call_batch)
-            self._insert_call_batch(batch)
+            # Insert rows one at a time after stripping large values
+            for row in batch:
+                self._insert_call_batch([row])
 
         self._call_batch = []
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._strip_large_values")
     def _strip_large_values(self, batch: list[list[Any]]) -> list[list[Any]]:
         """
-        Iterate through the batch and replace large values with placeholders.
+        Iterate through the batch and replace large JSON values with placeholders.
 
-        If values are larger than 1MiB replace them with placeholder values.
+        Only considers JSON dump columns and ensures their combined size stays under
+        the limit by selectively replacing the largest values.
         """
         stripped_count = 0
         final_batch = []
-        # Set the value byte limit to be anything over 1MiB to catch
-        # payloads with multiple large values that are still under the
-        # single row insert limit.
+
+        json_column_indices = [
+            ALL_CALL_INSERT_COLUMNS.index(f"{col}_dump")
+            for col in ALL_CALL_JSON_COLUMNS
+        ]
+        entity_too_large_payload_byte_size = _num_bytes(
+            ch_settings.ENTITY_TOO_LARGE_PAYLOAD
+        )
+
         for item in batch:
-            bytes_size = _num_bytes(str(item))
-            # If bytes_size > the limit, this item is too large,
-            # iterate through the json-dumped item values to find and
-            # replace the large values with a placeholder.
-            if bytes_size > ch_settings.CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT:
-                stripped_item = []
-                for value in item:
-                    # all the values should be json dumps, there are no
-                    # non json fields controlled by the user that can
-                    # be large enough to strip... (?)
-                    if (
-                        _num_bytes(value)
-                        > ch_settings.CLICKHOUSE_SINGLE_VALUE_BYTES_LIMIT
-                    ):
-                        stripped_item += [ch_settings.ENTITY_TOO_LARGE_PAYLOAD]
-                        stripped_count += 1
-                    else:
-                        stripped_item += [value]
-                final_batch.append(stripped_item)
-            else:
-                final_batch.append(item)
+            # Calculate only JSON dump bytes
+            json_idx_size_pairs = [
+                (i, _num_bytes(item[i])) for i in json_column_indices
+            ]
+            total_json_bytes = sum(size for _, size in json_idx_size_pairs)
+
+            # If over limit, try to optimize by selectively stripping largest JSON values
+            stripped_item = list(item)
+            sorted_json_idx_size_pairs = sorted(
+                json_idx_size_pairs, key=lambda x: x[1], reverse=True
+            )
+
+            # Try to get under the limit by replacing largest JSON values
+            for col_idx, size in sorted_json_idx_size_pairs:
+                if (
+                    total_json_bytes
+                    <= ch_settings.CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT
+                ):
+                    break
+
+                # Replace this large JSON value with placeholder, update running size
+                stripped_item[col_idx] = ch_settings.ENTITY_TOO_LARGE_PAYLOAD
+                total_json_bytes -= size - entity_too_large_payload_byte_size
+                stripped_count += 1
+
+            final_batch.append(stripped_item)
 
         ddtrace.tracer.current_span().set_tags(
             {

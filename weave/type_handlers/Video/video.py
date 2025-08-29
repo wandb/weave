@@ -2,28 +2,25 @@
 
 from __future__ import annotations
 
+import importlib
 import shutil
 from enum import Enum
 from typing import TYPE_CHECKING, Any
 
+from typing_extensions import TypeIs
+
 from weave.trace.serialization import serializer
 from weave.trace.serialization.custom_objs import MemTraceFilesArtifact
 
-try:
-    from moviepy.editor import (
-        VideoClip,
-        VideoFileClip,
-    )
-except ImportError:
-    dependencies_met = False
-else:
-    dependencies_met = True
-
 if TYPE_CHECKING:
-    from moviepy.editor import (
-        VideoClip,
-        VideoFileClip,
-    )
+    from moviepy.editor import VideoClip, VideoFileClip
+
+
+def _dependencies_met() -> bool:
+    """Check if the dependencies are met.  This import is deferred to avoid
+    an expensive module import at the top level.
+    """
+    return importlib.util.find_spec("moviepy") is not None
 
 
 class VideoFormat(str, Enum):
@@ -156,6 +153,8 @@ def save(
         artifact: The artifact to save to
         name: Ignored, see comment below
     """
+    from moviepy.editor import VideoFileClip
+
     is_video_file = isinstance(obj, VideoFileClip)
 
     try:
@@ -177,6 +176,8 @@ def load(artifact: MemTraceFilesArtifact, name: str) -> VideoClip:
     Returns:
         The loaded VideoClip
     """
+    from moviepy.editor import VideoFileClip
+
     # Assume there can only be 1 video in the artifact
     for filename in artifact.path_contents:
         path = artifact.path(filename)
@@ -186,12 +187,16 @@ def load(artifact: MemTraceFilesArtifact, name: str) -> VideoClip:
     raise ValueError("No video or found for artifact")
 
 
-def is_video_clip_instance(obj: Any) -> bool:
+def is_video_clip_instance(obj: Any) -> TypeIs[VideoClip]:
     """Check if the object is any subclass of VideoClip."""
+    from moviepy.editor import VideoClip
+
     return isinstance(obj, VideoClip)
 
 
 def register() -> None:
     """Register the video type handler with the serializer."""
-    if dependencies_met:
+    if _dependencies_met():
+        from moviepy.editor import VideoClip
+
         serializer.register_serializer(VideoClip, save, load, is_video_clip_instance)

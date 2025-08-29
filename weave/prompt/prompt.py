@@ -8,16 +8,16 @@ from pathlib import Path
 from typing import IO, Any, Optional, SupportsIndex, TypedDict, Union, cast, overload
 
 from pydantic import Field
-from rich.table import Table
 from typing_extensions import Self
 
 from weave.object.obj import Object
 from weave.prompt.common import ROLE_COLORS, color_role
 from weave.trace.api import publish as weave_publish
+from weave.trace.display import display
+from weave.trace.display.rich import pydantic_util
 from weave.trace.objectify import register_object
 from weave.trace.op import op
 from weave.trace.refs import ObjectRef
-from weave.trace.rich import pydantic_util
 from weave.trace.vals import WeaveObject
 
 
@@ -360,8 +360,8 @@ class EasyPrompt(UserList, Prompt):
         #       that shouldn't be necessary if we have loaded this from a ref.
         return weave_publish(self, name=name)
 
-    def messages_table(self, title: Optional[str] = None) -> Table:
-        table = Table(title=title, title_justify="left", show_header=False)
+    def messages_table(self, title: Optional[str] = None) -> display.Table:
+        table = display.Table(title=title, title_justify="left", show_header=False)
         table.add_column("Role", justify="right")
         table.add_column("Content")
         # TODO: Maybe we should inline the values here? Or highlight placeholders missing values in red?
@@ -372,16 +372,16 @@ class EasyPrompt(UserList, Prompt):
             )
         return table
 
-    def values_table(self, title: Optional[str] = None) -> Table:
-        table = Table(title=title, title_justify="left", show_header=False)
+    def values_table(self, title: Optional[str] = None) -> display.Table:
+        table = display.Table(title=title, title_justify="left", show_header=False)
         table.add_column("Parameter", justify="right")
         table.add_column("Value")
         for key, value in self._values.items():
             table.add_row(key, str(value))
         return table
 
-    def config_table(self, title: Optional[str] = None) -> Table:
-        table = Table(title=title, title_justify="left", show_header=False)
+    def config_table(self, title: Optional[str] = None) -> display.Table:
+        table = display.Table(title=title, title_justify="left", show_header=False)
         table.add_column("Key", justify="right")
         table.add_column("Value")
         for key, value in self.config.items():
@@ -391,7 +391,7 @@ class EasyPrompt(UserList, Prompt):
     def print(self) -> str:
         tables = []
         if self.name or self.description:
-            table1 = Table(show_header=False)
+            table1 = display.Table(show_header=False)
             table1.add_column("Key", justify="right", style="bold cyan")
             table1.add_column("Value")
             if self.name is not None:
@@ -405,8 +405,8 @@ class EasyPrompt(UserList, Prompt):
             tables.append(self.values_table(title="Parameters"))
         if self.config:
             tables.append(self.config_table(title="Config"))
-        tables = [pydantic_util.table_to_str(t) for t in tables]
-        return "\n".join(tables)
+        table_strings = [pydantic_util.table_to_str(t) for t in tables]
+        return "\n".join(table_strings)
 
     def __str__(self) -> str:
         """Return a single prompt string when str() is called on the object."""
