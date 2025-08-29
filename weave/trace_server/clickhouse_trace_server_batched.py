@@ -487,7 +487,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 self._add_feedback_to_calls(req.project_id, call_dicts)
 
             for call in call_dicts:
-                yield reconstruct_base64_for_call(tsi.CallSchema.model_validate(call), self)
+                if req.convert_content:
+                    yield reconstruct_base64_for_call(tsi.CallSchema.model_validate(call), self)
+                else:
+                    yield tsi.CallSchema.model_validate(call)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._add_feedback_to_calls")
     def _add_feedback_to_calls(
