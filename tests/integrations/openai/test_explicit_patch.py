@@ -36,7 +36,7 @@ def test_explicit_patch_traces(client_creator):
     with client_creator() as client:
         # Explicitly patch OpenAI
         weave.patch_openai()
-        
+
         oaiclient = OpenAI()
         oaiclient.chat.completions.create(
             model="gpt-4o",
@@ -53,6 +53,7 @@ def test_explicit_patch_traces(client_creator):
 )
 def test_explicit_patch_with_settings(client_creator):
     """Test explicit patching with custom settings."""
+
     def redact_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
         return dict.fromkeys(inputs, "REDACTED")
 
@@ -70,7 +71,7 @@ def test_explicit_patch_with_settings(client_creator):
             )
         )
         weave.patch_openai(settings)
-        
+
         oaiclient = OpenAI()
         oaiclient.chat.completions.create(
             model="gpt-4o",
@@ -94,7 +95,7 @@ def test_multiple_explicit_patches(client_creator):
         # Patch only OpenAI, not other integrations
         weave.patch_openai()
         # Could also do: weave.patch_anthropic(), weave.patch_mistral(), etc.
-        
+
         oaiclient = OpenAI()
         oaiclient.chat.completions.create(
             model="gpt-4o",
