@@ -6,12 +6,13 @@ To enable tracing for specific integrations, call `weave.init()` followed by the
 ```python
 import weave
 weave.init('my-project')
-weave.patch_openai()  # Enable OpenAI tracing
-weave.patch_anthropic()  # Enable Anthropic tracing
+weave.integrations.patch_openai()  # Enable OpenAI tracing
+weave.integrations.patch_anthropic()  # Enable Anthropic tracing
 ```
+
 :::
 
-W&B Weave provides logging integrations for popular LLM providers and orchestration frameworks. These integrations allow you to trace calls made through various libraries by explicitly enabling them, giving you control over which integrations to activate.
+W&B Weave provides logging integrations for popular LLM providers and orchestration frameworks. These integrations allow you to seamlessly trace calls made through various libraries, enhancing your ability to monitor and analyze your AI applications.
 
 ## LLM Providers
 

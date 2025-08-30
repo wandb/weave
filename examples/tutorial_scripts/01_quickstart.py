@@ -28,7 +28,7 @@ def extract_fruit(sentence: str) -> dict:
 weave.init("intro-example")
 
 # Enable OpenAI integration tracing
-weave.patch_openai()
+weave.integrations.patch_openai()
 
 sentence = "There are many fruits that were found on the recently discovered planet Goocrux. There are neoskizzles that grow there, which are purple and taste like candy."
 extract_fruit(sentence)

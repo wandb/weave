@@ -17,7 +17,7 @@ def patch_openai(settings: Optional[IntegrationSettings] = None) -> None:
     Example:
         import weave
         weave.init("my-project")
-        weave.patch_openai()
+        weave.integrations.patch_openai()
     """
     from weave.integrations.openai.openai_sdk import get_openai_patcher
 
