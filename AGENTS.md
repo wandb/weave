@@ -125,31 +125,42 @@ TODO: need to fill this out
 
 ## Integration Patching
 
-### Implicit and Explicit Patching
+### Automatic Implicit Patching
 
-Weave supports both implicit and explicit patching for integrations:
+Weave provides automatic implicit patching for all supported integrations using an import hook mechanism:
 
-- **Implicit Patching**: Libraries imported BEFORE `weave.init()` are automatically patched
-- **Explicit Patching**: Libraries imported AFTER `weave.init()` require explicit `weave.patch_X()` calls
+- **Automatic Patching**: Libraries are automatically patched regardless of when they are imported
+- **Import Hook**: An import hook intercepts library imports and applies patches automatically
+- **Explicit Patching**: Optional manual patching is still available for fine-grained control
 
 Example:
 
 ```python
-# Implicit patching (automatic)
-import openai  # Import BEFORE weave.init()
+# Automatic patching - works regardless of import order!
+
+# Option 1: Import before weave.init()
+import openai
 import weave
 weave.init('my-project')  # OpenAI is automatically patched!
 
-# Explicit patching (manual)
+# Option 2: Import after weave.init()
 import weave
 weave.init('my-project')
-import anthropic  # Import AFTER weave.init()
-weave.patch_anthropic()  # Must explicitly patch
+import anthropic  # Automatically patched via import hook!
+
+# Option 3: Explicit patching (optional)
+import weave
+weave.init('my-project')
+weave.patch_openai()  # Manually patch if needed
 ```
 
 ### Available Patch Functions
 
-All integrations have corresponding patch functions: `patch_openai()`, `patch_anthropic()`, `patch_mistral()`, etc.
+All integrations have corresponding patch functions for explicit control: `patch_openai()`, `patch_anthropic()`, `patch_mistral()`, etc.
+
+### Technical Implementation
+
+The import hook uses Python's `sys.meta_path` to intercept imports and automatically apply patches when supported libraries are imported. This ensures seamless integration tracking without requiring users to manage import order or make explicit patch calls.
 
 # Requests to Humans
 

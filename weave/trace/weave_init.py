@@ -134,11 +134,13 @@ def init_weave(
 
     weave_client_context.set_weave_client_global(client)
 
-    # Implicit patching: Check sys.modules and automatically patch any already-imported integrations
-    # Users can still explicitly call patch functions for integrations they import later
-    from weave.integrations.patch import implicit_patch
+    # Implicit patching:
+    # 1. Check sys.modules and automatically patch any already-imported integrations
+    # 2. Register import hook to patch integrations imported after weave.init()
+    from weave.integrations.patch import implicit_patch, register_import_hook
 
     implicit_patch()
+    register_import_hook()
 
     username = get_username()
 
@@ -226,5 +228,9 @@ def finish() -> None:
     if current_client is not None:
         weave_client_context.set_weave_client_global(None)
 
-    # Autopatch reset no longer needed since autopatching is removed
+    # Unregister the import hook
+    from weave.integrations.patch import unregister_import_hook
+
+    unregister_import_hook()
+
     trace_sentry.global_trace_sentry.end_session()
