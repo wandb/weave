@@ -7,7 +7,6 @@
 import logging
 from typing import Any, Optional
 
-import aiohttp
 import gql
 import graphql
 
@@ -221,9 +220,12 @@ class Api:
 
 class ApiAsync:
     def __init__(self) -> None:
+        import aiohttp
+
         self.connector = aiohttp.TCPConnector(limit=50)
 
     async def query(self, query: graphql.DocumentNode, **kwargs: Any) -> Any:
+        import aiohttp
         from gql.transport.aiohttp import AIOHTTPTransport
 
         wandb_context = get_wandb_api_context()
