@@ -87,7 +87,6 @@ def test_deepcopy_weaveobject_e2e(client, example_class):
     assert id(res) != id(o2)
 
 
-
 def test_deepcopy_model_e2e(client):
     class Model(weave.Model):
         system_prompt: str = "You are a helpful assistant."
