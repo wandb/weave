@@ -168,10 +168,10 @@ If you prefer explicit control over which integrations are patched, you can disa
 
 ```python
 # Via settings parameter
-weave.init('my-project', settings={'implicit_patch_enabled': False})
+weave.init('my-project', settings={'implicitly_patch_integrations': False})
 
 # Via environment variable
-export WEAVE_IMPLICIT_PATCH_ENABLED=false
+export WEAVE_IMPLICITLY_PATCH_INTEGRATIONS=false
 ```
 
 When disabled, you must explicitly call patch functions like `weave.patch_openai()` to enable tracing for integrations.

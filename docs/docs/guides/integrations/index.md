@@ -23,10 +23,10 @@ import anthropic  # Automatically patched via import hook!
 import weave
 
 # Option 1: Via settings parameter
-weave.init('my-project', settings={'implicit_patch_enabled': False})
+weave.init('my-project', settings={'implicitly_patch_integrations': False})
 
 # Option 2: Via environment variable
-# Set WEAVE_IMPLICIT_PATCH_ENABLED=false before running your script
+# Set WEAVE_IMPLICITLY_PATCH_INTEGRATIONS=false before running your script
 
 # With implicit patching disabled, you must explicitly patch integrations
 import openai
