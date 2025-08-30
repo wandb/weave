@@ -1,17 +1,23 @@
 # Integrations
 
 :::info[Integration Tracking]
-Weave supports both **implicit** and **explicit** patching for integrations:
+Weave provides **automatic implicit patching** for all supported integrations:
 
-**Implicit Patching (Automatic):** Libraries that are imported _before_ `weave.init()` are automatically patched.
+**Implicit Patching (Automatic):** Libraries are automatically patched regardless of when they are imported.
 
 ```python
-import openai  # Import BEFORE weave.init()
+# Option 1: Import before weave.init()
+import openai
 import weave
 weave.init('my-project')  # OpenAI is automatically patched!
+
+# Option 2: Import after weave.init()
+import weave
+weave.init('my-project')
+import anthropic  # Automatically patched via import hook!
 ```
 
-**Explicit Patching (Manual):** Libraries imported _after_ `weave.init()` require explicit patch calls.
+**Explicit Patching (Manual):** You can still explicitly patch integrations if needed for fine-grained control.
 
 ```python
 import weave
