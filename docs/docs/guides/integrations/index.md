@@ -1,10 +1,18 @@
 # Integrations
 
-:::success[Automatic Tracking]
-In most cases, all you need to do is call `weave.init()` at the top of your script or program in order for Weave to automatically patch and track any of these libraries!
+:::info[Explicit Integration Tracking]
+To enable tracing for specific integrations, call `weave.init()` followed by the corresponding patch function for each integration you want to use. For example:
+
+```python
+import weave
+weave.init('my-project')
+weave.integrations.patch_openai()  # Enable OpenAI tracing
+weave.integrations.patch_anthropic()  # Enable Anthropic tracing
+```
+
 :::
 
-W&B Weave provides automatic logging integrations for popular LLM providers and orchestration frameworks. These integrations allow you to seamlessly trace calls made through various libraries, enhancing your ability to monitor and analyze your AI applications.
+W&B Weave provides logging integrations for popular LLM providers and orchestration frameworks. These integrations allow you to seamlessly trace calls made through various libraries, enhancing your ability to monitor and analyze your AI applications.
 
 ## LLM Providers
 
