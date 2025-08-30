@@ -1,7 +1,7 @@
 # Integrations
 
 :::info[Integration Tracking]
-Weave provides **automatic implicit patching** for all supported integrations:
+Weave provides **automatic implicit patching** for all supported integrations by default:
 
 **Implicit Patching (Automatic):** Libraries are automatically patched regardless of when they are imported.
 
@@ -17,7 +17,23 @@ weave.init('my-project')
 import anthropic  # Automatically patched via import hook!
 ```
 
-**Explicit Patching (Manual):** You can still explicitly patch integrations if needed for fine-grained control.
+**Disabling Implicit Patching:** You can disable automatic patching if you prefer explicit control.
+
+```python
+import weave
+
+# Option 1: Via settings parameter
+weave.init('my-project', settings={'implicit_patch_enabled': False})
+
+# Option 2: Via environment variable
+# Set WEAVE_IMPLICIT_PATCH_ENABLED=false before running your script
+
+# With implicit patching disabled, you must explicitly patch integrations
+import openai
+weave.patch_openai()  # Now required for OpenAI tracing
+```
+
+**Explicit Patching (Manual):** You can explicitly patch integrations for fine-grained control.
 
 ```python
 import weave

@@ -392,7 +392,16 @@ def implicit_patch() -> None:
     This function is called during weave.init() to enable implicit patching.
     If a library is already imported when weave.init() is called, we automatically
     patch it without requiring an explicit patch_X() call.
+    
+    This respects the implicitly_patch_integrations setting - if disabled, no automatic
+    patching will occur.
     """
+    from weave.trace.settings import should_implicitly_patch_integrations
+    
+    # Check if implicit patching is enabled
+    if not should_implicitly_patch_integrations():
+        return
+    
     for module_name, patch_func in INTEGRATION_MODULE_MAPPING.items():
         # Check if the module is already imported and not yet patched
         if module_name in sys.modules and module_name not in _PATCHED_INTEGRATIONS:
@@ -406,7 +415,17 @@ def implicit_patch() -> None:
 
 
 def register_import_hook() -> None:
-    """Register the import hook to automatically patch integrations imported after weave.init()."""
+    """Register the import hook to automatically patch integrations imported after weave.init().
+    
+    This respects the implicitly_patch_integrations setting - if disabled, the import hook
+    will not be registered.
+    """
+    from weave.trace.settings import should_implicitly_patch_integrations
+    
+    # Check if implicit patching is enabled
+    if not should_implicitly_patch_integrations():
+        return
+        
     global _IMPORT_HOOK
 
     # Only register if not already registered
