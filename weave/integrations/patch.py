@@ -6,9 +6,8 @@ This module provides:
 3. Import hook for automatic patching of libraries imported after weave.init()
 """
 
-import importlib.abc
-import importlib.machinery
 import sys
+from importlib.abc import MetaPathFinder
 from typing import Callable, Optional
 
 from weave.trace.autopatch import IntegrationSettings
@@ -285,7 +284,7 @@ _PATCHED_INTEGRATIONS: set[str] = set()
 _IMPORT_HOOK: Optional["WeaveImportHook"] = None
 
 
-class WeaveImportHook(importlib.abc.MetaPathFinder):
+class WeaveImportHook(MetaPathFinder):
     """Import hook that automatically patches supported integrations when they are imported."""
 
     def find_spec(self, fullname, path, target=None):  # type: ignore
