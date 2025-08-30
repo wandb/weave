@@ -10,7 +10,6 @@ from typing import Any, Optional
 import aiohttp
 import gql
 import graphql
-from requests.auth import HTTPBasicAuth
 
 from weave.trace import env
 from weave.wandb_interface.context import get_wandb_api_context
@@ -21,6 +20,7 @@ logger = logging.getLogger(__name__)
 class Api:
     def query(self, query: graphql.DocumentNode, **kwargs: Any) -> Any:
         from gql.transport.requests import RequestsHTTPTransport
+        from requests.auth import HTTPBasicAuth
 
         wandb_context = get_wandb_api_context()
         headers = None
