@@ -288,6 +288,22 @@ class OpRef(ObjectRef):
             raise TypeError(f"URI is not for an Op: {uri}")
         return parsed
 
+    @property
+    def ui_url(self) -> str:
+        """Get the UI URL for this op version."""
+        from weave.trace import urls
+        return urls.op_version_path(self.entity, self.project, self.name, self.digest)
+
+    def _repr_html_(self) -> str:
+        """Display the OpRef as an iframe in Jupyter notebooks."""
+        try:
+            url = self.ui_url
+            # Return iframe HTML directly
+            return f'<iframe src="{url}" width="100%" height="600px" allow="clipboard-write"></iframe>'
+        except Exception:
+            # Fallback to text representation if URL generation fails
+            return f"<pre>OpRef(name={self.name}, digest={self.digest})</pre>"
+
 
 @dataclass(frozen=True)
 class CallRef(RefWithExtra):
@@ -319,6 +335,22 @@ class CallRef(RefWithExtra):
         if not isinstance(parsed := Ref.parse_uri(uri), CallRef):
             raise TypeError(f"URI is not for a Call: {uri}")
         return parsed
+
+    @property
+    def ui_url(self) -> str:
+        """Get the UI URL for this call."""
+        from weave.trace import urls
+        return urls.redirect_call(self.entity, self.project, self.id)
+
+    def _repr_html_(self) -> str:
+        """Display the CallRef as an iframe in Jupyter notebooks."""
+        try:
+            url = self.ui_url
+            # Return iframe HTML directly
+            return f'<iframe src="{url}" width="100%" height="600px" allow="clipboard-write"></iframe>'
+        except Exception:
+            # Fallback to text representation if URL generation fails
+            return f"<pre>CallRef(id={self.id})</pre>"
 
 
 @dataclass(frozen=True)

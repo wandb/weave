@@ -142,6 +142,16 @@ class Call:
 
         return CallRef(entity, project, self.id)
 
+    def _repr_html_(self) -> str:
+        """Display the Call as an iframe in Jupyter notebooks."""
+        try:
+            url = self.ui_url
+            # Return iframe HTML directly
+            return f'<iframe src="{url}" width="100%" height="600px" allow="clipboard-write"></iframe>'
+        except Exception:
+            # Fallback to text representation if URL generation fails
+            return f"<pre>Call(op_name={self.op_name}, id={self.id})</pre>"
+
     # These are the children if we're using Call at read-time
     def children(self, *, page_size: int = DEFAULT_CALLS_PAGE_SIZE) -> CallsIter:
         """
