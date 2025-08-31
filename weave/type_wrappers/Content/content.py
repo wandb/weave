@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Annotated, Any, Generic
 from urllib.parse import quote_from_bytes
 
-from pydantic import BaseModel, Field, PrivateAttr, field_serializer
+from pydantic import BaseModel, BeforeValidator, Field, PrivateAttr, field_serializer, model_validator
 from typing_extensions import Self, TypeVar
 
 from weave.trace.refs import Ref
@@ -36,7 +36,6 @@ class Content(BaseModel, Generic[T]):
     - from_bytes()
     - from_text()
     - from_base64()
-    - from_url()
     - from_data_url()
     """
 
@@ -83,6 +82,50 @@ class Content(BaseModel, Generic[T]):
             "For best results use a classmethod: from_path, from_bytes, from_text, or from_base64."
             "If you must accept arbitrary inputs, Content._from_guess infers which method to use."
         )
+
+    @classmethod
+    def model_validate(cls: type[Self], obj: Any, *, strict: bool | None = None, from_attributes: bool | None = None, context: dict[str, Any] | None = None) -> Self:
+        """
+        Override model_validate to handle Content reconstruction from dict.
+        """
+        if isinstance(obj, dict):
+            # Check if this is a full Content dict (from deserialization)
+            required_fields = {'id', 'data', 'size', 'mimetype', 'digest', 'filename', 'content_type', 'input_type'}
+            if required_fields.issubset(obj.keys()):
+                # Handle data field deserialization
+                data = obj.get('data')
+                if isinstance(data, str):
+                    # Check if it was base64 encoded during serialization
+                    content_type = obj.get('content_type', '')
+                    print(content_type)
+                    if 'base64' in content_type:
+                        print('true')
+                        # Decode from base64
+                        obj['data'] = base64.b64decode(data)
+                    else:
+                        # Decode from string using encoding
+                        encoding = obj.get('encoding', 'utf-8')
+                        obj['data'] = data.encode(encoding)
+                # Use model_construct to bypass __init__
+                return cls.model_construct(**obj)
+
+        # Fall back to parent implementation for other cases
+        return super().model_validate(obj, strict=strict, from_attributes=from_attributes, context=context)
+
+    @classmethod
+    def model_validate_json(cls: type[Self], json_data: str | bytes | bytearray, *, strict: bool | None = None, context: dict[str, Any] | None = None) -> Self:
+        """
+        Override model_validate_json to handle Content reconstruction from JSON.
+        """
+        import json as json_module
+
+        # Parse the JSON
+        if isinstance(json_data, (bytes, bytearray)):
+            json_data = json_data.decode('utf-8')
+        obj = json_module.loads(json_data)
+
+        # Use our custom model_validate
+        return cls.model_validate(obj, strict=strict, context=context)
 
     @classmethod
     def from_bytes(
@@ -318,7 +361,7 @@ class Content(BaseModel, Generic[T]):
             "digest": digest,
             "filename": filename,
             "content_type": content_type,
-            "input_type": full_name(data),
+            "input_type": full_name(url),
             "extension": extension,
             "encoding": encoding,
         }
@@ -393,7 +436,7 @@ class Content(BaseModel, Generic[T]):
         """
         When dumping model in json mode 
         """
-        if self.encoding.find("base64") != -1:
+        if self.content_type.find("base64") != -1:
             return base64.b64encode(data).decode("ascii")
 
         return data.decode(encoding=self.encoding)

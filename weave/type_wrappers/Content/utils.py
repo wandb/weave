@@ -28,7 +28,7 @@ MIME_DETECTION_BUFFER_SIZE = 2048
 _mimetypes_module: ModuleType | None = None
 
 DATA_URL_PATTERN = re.compile(
-    r'^data:(?P<media_type>[\w\/\-\+\.]+(?:;[\w\-\=\.]+)*)?(?P<base64>;base64)?,(?P<data>.*)$'
+    r'^data:(?P<media_type>[\w\/\-\+\.]+(?:;[\w\-]+\=[\w\-\.]+)*)?(?P<base64>;base64)?,(?P<data>.*)$'
 )
 
 def _get_mimetypes_module() -> ModuleType:
@@ -205,7 +205,7 @@ def get_mime_and_extension(
     return mimetype or default_mimetype, extension or default_extension
 
 def match_data_url(url: str) -> re.Match[str] | None:
-    DATA_URL_PATTERN.match(url)
+    return DATA_URL_PATTERN.match(url)
 
 def try_parse_data_url(url: str) -> DataUrl | None:
     """
