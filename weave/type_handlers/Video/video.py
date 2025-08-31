@@ -12,8 +12,14 @@ from typing_extensions import TypeIs
 from weave.trace.serialization import serializer
 from weave.trace.serialization.custom_objs import MemTraceFilesArtifact
 
+from .moviepy_patch import ensure_moviepy_patch_installed
+
 if TYPE_CHECKING:
     from moviepy.editor import VideoClip, VideoFileClip
+
+
+# Install the import hook when this module is imported
+ensure_moviepy_patch_installed()
 
 
 def _dependencies_met() -> bool:

@@ -8,7 +8,14 @@ from weave.trace.serialization import serializer
 from weave.trace.serialization.custom_objs import MemTraceFilesArtifact
 from weave.utils.invertable_dict import InvertableDict
 
+from .pil_patch import ensure_pil_patch_installed
+
+# Install the import hook when this module is imported
+ensure_pil_patch_installed()
+
 try:
+    from weave.initialization import ensure_patches_applied
+    ensure_patches_applied()
     from PIL import Image
 except ImportError:
     dependencies_met = False
