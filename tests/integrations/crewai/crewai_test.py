@@ -1,13 +1,24 @@
 import asyncio
+from collections.abc import Generator
 
 import pytest
 
+from weave.integrations.crewai import get_crewai_patcher
 from weave.integrations.integration_utilities import (
     flatten_calls,
     flattened_calls_to_names,
 )
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server.trace_server_interface import CallsFilter
+
+
+@pytest.fixture(autouse=True)
+def patch_crewai() -> Generator[None, None, None]:
+    """Patch CrewAI for all tests in this file."""
+    patcher = get_crewai_patcher()
+    patcher.attempt_patch()
+    yield
+    patcher.undo_patch()
 
 
 def get_crew():

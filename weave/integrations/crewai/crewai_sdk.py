@@ -86,6 +86,11 @@ def get_crewai_patcher(
     if _crewai_patcher is not None:
         return _crewai_patcher
 
+    # Import OpenAI patcher since CrewAI commonly uses OpenAI models
+    from weave.integrations.openai.openai_sdk import get_openai_patcher
+
+    openai_patcher = get_openai_patcher(settings)
+
     base = settings.op_settings
 
     # Create settings for different Crew methods
@@ -259,6 +264,12 @@ def get_crewai_patcher(
         *flow_patchers,
         *tools_patchers,
     ]
+
+    # Include OpenAI patcher in the multi-patcher
+    if isinstance(openai_patcher, MultiPatcher):
+        patchers.extend(openai_patcher.patchers)
+    elif not isinstance(openai_patcher, NoOpPatcher):
+        patchers.append(openai_patcher)
 
     _crewai_patcher = MultiPatcher(patchers)
 

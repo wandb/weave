@@ -1,8 +1,10 @@
+from collections.abc import Generator
 from typing import Literal
 
 import dspy
 import pytest
 
+from weave.integrations.dspy.dspy_sdk import get_dspy_patcher
 from weave.integrations.integration_utilities import (
     flatten_calls,
     flattened_calls_to_names,
@@ -10,6 +12,16 @@ from weave.integrations.integration_utilities import (
 )
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server.trace_server_interface import CallsFilter
+
+
+@pytest.fixture(autouse=True)
+def patch_dspy() -> Generator[None, None, None]:
+    """Patch DSPy for all tests in this file."""
+    patcher = get_dspy_patcher()
+    patcher.attempt_patch()
+    yield
+    patcher.undo_patch()
+
 
 SAMPLE_EVAL_DATASET = [
     dspy.Example(

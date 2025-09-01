@@ -1,9 +1,20 @@
 import os
+from collections.abc import Generator
 from typing import Optional
 
 import pytest
 
 from weave.integrations.integration_utilities import op_name_from_ref
+from weave.integrations.smolagents.smolagents_sdk import get_smolagents_patcher
+
+
+@pytest.fixture(autouse=True)
+def patch_smolagents() -> Generator[None, None, None]:
+    """Patch SmolAgents for all tests in this file."""
+    patcher = get_smolagents_patcher()
+    patcher.attempt_patch()
+    yield
+    patcher.undo_patch()
 
 
 @pytest.mark.skip_clickhouse_client

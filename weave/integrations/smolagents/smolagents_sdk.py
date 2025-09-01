@@ -100,6 +100,11 @@ def get_smolagents_patcher(
     if _smolagents_patcher is not None:
         return _smolagents_patcher
 
+    # Import OpenAI patcher since SmolAgents can use OpenAI models
+    from weave.integrations.openai.openai_sdk import get_openai_patcher
+
+    openai_patcher = get_openai_patcher(settings)
+
     base = settings.op_settings
     patchers = [
         patcher
@@ -146,6 +151,12 @@ def get_smolagents_patcher(
         # this should keep it generic for all Agent types
         if patcher is not None
     ]
+
+    # Include OpenAI patcher in the multi-patcher
+    if isinstance(openai_patcher, MultiPatcher):
+        patchers.extend(openai_patcher.patchers)
+    elif not isinstance(openai_patcher, NoOpPatcher):
+        patchers.append(openai_patcher)
 
     _smolagents_patcher = MultiPatcher(patchers)
     return _smolagents_patcher

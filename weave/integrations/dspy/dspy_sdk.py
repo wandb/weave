@@ -227,10 +227,23 @@ def get_dspy_patcher(
     if _dspy_patcher is not None:
         return _dspy_patcher
 
+    # Import OpenAI patcher since DSPy commonly uses OpenAI models
+    from weave.integrations.openai.openai_sdk import get_openai_patcher
+
+    openai_patcher = get_openai_patcher(settings)
+
     base = settings.op_settings
 
+    # Get the OpenAI patchers
+    openai_patchers = []
+    if isinstance(openai_patcher, MultiPatcher):
+        openai_patchers = openai_patcher.patchers
+    elif not isinstance(openai_patcher, NoOpPatcher):
+        openai_patchers = [openai_patcher]
+
     _dspy_patcher = DSPyPatcher(
-        [
+        openai_patchers
+        + [
             # Adapters
             get_symbol_patcher("dspy", "ChatAdapter.__call__", base),
             get_symbol_patcher("dspy", "JSONAdapter.__call__", base),
