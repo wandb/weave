@@ -17,6 +17,13 @@ def save_and_get_code(func: Callable) -> str:
     return saved_code
 
 
+STANDARD_FUNC_CODE = """import weave
+
+@weave.op()
+def standard_func(): ...
+"""
+
+
 def test_standard_import():
     """Test that standard import weave works correctly."""
 
@@ -24,18 +31,14 @@ def test_standard_import():
     def standard_func(): ...
 
     code = save_and_get_code(standard_func)
+    assert code == STANDARD_FUNC_CODE
 
-    # Should only have one import weave
-    import_lines = [
-        l for l in code.splitlines() if l.strip().startswith("import weave")
-    ]
-    assert len(import_lines) == 1
-    assert import_lines[0] == "import weave"
 
-    # Should only have one decorator
-    deco_lines = [l for l in code.splitlines() if "@" in l and "op" in l]
-    assert len(deco_lines) == 1
-    assert deco_lines[0] == "@weave.op()"
+ALIASED_FUNC_CODE = """import weave as wv
+
+@wv.op()
+def aliased_func(): ...
+"""
 
 
 def test_aliased_import_wv():
@@ -45,18 +48,14 @@ def test_aliased_import_wv():
     def aliased_func(): ...
 
     code = save_and_get_code(aliased_func)
+    assert code == ALIASED_FUNC_CODE
 
-    # Should have aliased import preserved
-    import_lines = [
-        l for l in code.splitlines() if l.strip().startswith("import weave")
-    ]
-    assert len(import_lines) == 1
-    assert import_lines[0] == "import weave as wv"
 
-    # Should only have one decorator using the alias
-    decorator_lines = [l for l in code.splitlines() if "@" in l and "op" in l]
-    assert len(decorator_lines) == 1
-    assert decorator_lines[0] == "@wv.op()"
+ALIASED_FUNC_CODE_WITH_PARENTHESES = """import weave as wv
+
+@wv.op()
+def aliased_func(): ...
+"""
 
 
 def test_op_with_parentheses():
@@ -66,40 +65,14 @@ def test_op_with_parentheses():
     def paren_func(): ...
 
     code = save_and_get_code(paren_func)
-
-    # Should have aliased import preserved
-    import_lines = [
-        l for l in code.splitlines() if l.strip().startswith("import weave")
-    ]
-    assert len(import_lines) == 1
-    assert import_lines[0] == "import weave as wv"
-
-    # Should only have one decorator using the alias
-    decorator_lines = [l for l in code.splitlines() if "@" in l and "op" in l]
-    assert len(decorator_lines) == 1
-    assert decorator_lines[0] == "@wv.op()"
+    assert code == ALIASED_FUNC_CODE_WITH_PARENTHESES
 
 
-def test_nested_function_with_alias():
-    """Test that nested functions with aliased imports work correctly - should preserve the alias."""
+NESTED_FUNC_CODE = """import weave as wv
 
-    def outer():
-        @wv.op
-        def inner(): ...
+def outer():
+    @wv.op()
+    def inner(): ...
 
-        return inner
-
-    inner_func = outer()
-    code = save_and_get_code(inner_func)
-
-    # Should have aliased import preserved
-    import_lines = [
-        l for l in code.splitlines() if l.strip().startswith("import weave")
-    ]
-    assert len(import_lines) == 1
-    assert import_lines[0] == "import weave as wv"
-
-    # Should have the decorator using the alias
-    decorator_lines = [l for l in code.splitlines() if "@" in l and "op" in l]
-    assert len(decorator_lines) == 1
-    assert decorator_lines[0] == "@wv.op()"
+    return inner
+"""
