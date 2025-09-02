@@ -9,12 +9,17 @@ from unittest import mock
 
 import pytest
 
+import weave.integrations.patch as patch_module
 from weave.integrations.patch import (
+    _IMPORT_HOOK,
+    _PATCHED_INTEGRATIONS,
+    _patch_if_needed,
     implicit_patch,
     register_import_hook,
     reset_patched_integrations,
     unregister_import_hook,
 )
+from weave.trace import weave_init
 
 
 def _reset_import(monkeypatch, module: str):
@@ -26,11 +31,6 @@ def _reset_import(monkeypatch, module: str):
 def _inject_fake_module(monkeypatch, module_name: str):
     """Inject a fake module into sys.modules."""
     m = cast(Any, types.ModuleType(module_name))
-
-    # Add some dummy attributes to make it look like a real integration
-    m.Client = type("Client", (), {})
-    m.__version__ = "1.0.0"
-
     monkeypatch.setitem(sys.modules, module_name, m)
     return m
 
@@ -38,10 +38,7 @@ def _inject_fake_module(monkeypatch, module_name: str):
 @pytest.fixture
 def setup_env(monkeypatch):
     """Reset the environment for each test."""
-    # Clear any existing patches - this creates a new set
     reset_patched_integrations()
-
-    # Unregister any existing import hook
     unregister_import_hook()
 
     # Clear environment variables
@@ -53,8 +50,6 @@ def setup_env(monkeypatch):
         _reset_import(monkeypatch, module)
 
     yield
-
-    # Cleanup after test
     reset_patched_integrations()
     unregister_import_hook()
 
@@ -168,15 +163,12 @@ def test_import_hook_disabled(setup_env, monkeypatch):
     register_import_hook()
 
     # Verify hook was not registered
-    from weave.integrations.patch import _IMPORT_HOOK
 
     assert _IMPORT_HOOK is None
 
 
 def test_no_double_patching(setup_env, monkeypatch):
     """Test that libraries are not patched multiple times."""
-    from weave.integrations.patch import _PATCHED_INTEGRATIONS
-
     # Inject fake openai module
     _inject_fake_module(monkeypatch, "openai")
 
@@ -239,7 +231,6 @@ def test_init_weave_calls_patching(setup_env, monkeypatch):
         ),
     ):
         # Now import weave_init - it will import the mocked functions
-        from weave.trace import weave_init
 
         # Mock the parts that would fail in test environment
         with (
@@ -312,8 +303,6 @@ def test_implicit_patching_disabled_via_settings(setup_env, monkeypatch):
 
 def test_patch_if_needed(setup_env, monkeypatch):
     """Test the _patch_if_needed helper function."""
-    from weave.integrations.patch import _PATCHED_INTEGRATIONS, _patch_if_needed
-
     # Inject fake openai module
     _inject_fake_module(monkeypatch, "openai")
 
@@ -340,8 +329,6 @@ def test_patch_if_needed(setup_env, monkeypatch):
 
 def test_explicit_patch_still_works(setup_env, monkeypatch):
     """Test that explicit patching still works alongside implicit patching."""
-    from weave.integrations.patch import _PATCHED_INTEGRATIONS
-
     # Inject fake openai module
     _inject_fake_module(monkeypatch, "openai")
 
@@ -368,8 +355,6 @@ def test_explicit_patch_still_works(setup_env, monkeypatch):
 
 def test_reset_patched_integrations(setup_env, monkeypatch):
     """Test that reset_patched_integrations clears the patched set."""
-    import weave.integrations.patch as patch_module
-
     # Add some integrations to the patched set
     patch_module._PATCHED_INTEGRATIONS.add("openai")
     patch_module._PATCHED_INTEGRATIONS.add("anthropic")
@@ -387,15 +372,9 @@ def test_unregister_import_hook(setup_env):
     """Test that unregister_import_hook removes the hook from sys.meta_path."""
     # Register the hook
     register_import_hook()
-
-    from weave.integrations.patch import _IMPORT_HOOK
-
     assert _IMPORT_HOOK is not None
     assert _IMPORT_HOOK in sys.meta_path
 
     # Unregister
     unregister_import_hook()
-
-    from weave.integrations.patch import _IMPORT_HOOK
-
     assert _IMPORT_HOOK is None
