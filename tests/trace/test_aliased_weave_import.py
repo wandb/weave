@@ -1,10 +1,21 @@
 """Test that aliased weave imports are handled correctly in code capture."""
 
+from collections.abc import Callable
+
 import weave
 import weave as weave_alias
 import weave as wv
 from weave.trace.serialization.mem_artifact import MemTraceFilesArtifact
 from weave.trace.serialization.op_type import save_instance
+
+
+def save_and_get_code(func: Callable) -> str:
+    artifact = MemTraceFilesArtifact()
+    save_instance(func, artifact, "obj")
+    saved_code = artifact.path_contents["obj.py"]
+    if isinstance(saved_code, bytes):
+        saved_code = saved_code.decode()
+    return saved_code
 
 
 def test_standard_import():
@@ -14,31 +25,19 @@ def test_standard_import():
     def standard_func():
         return "standard"
 
-    artifact = MemTraceFilesArtifact()
-    save_instance(standard_func, artifact, "obj")
-    saved_code = artifact.path_contents["obj.py"]
-    if isinstance(saved_code, bytes):
-        saved_code = saved_code.decode()
+    code = save_and_get_code(standard_func)
 
     # Should only have one import weave
     import_lines = [
-        line
-        for line in saved_code.split("\n")
-        if line.strip().startswith("import weave")
+        l for l in code.splitlines() if l.strip().startswith("import weave")
     ]
-    assert len(import_lines) == 1, (
-        f"Expected 1 import, got {len(import_lines)}: {import_lines}"
-    )
-    assert import_lines[0].strip() == "import weave"
+    assert len(import_lines) == 1
+    assert import_lines[0] == "import weave"
 
     # Should only have one decorator
-    decorator_lines = [
-        line for line in saved_code.split("\n") if "@" in line and "op" in line
-    ]
-    assert len(decorator_lines) == 1, (
-        f"Expected 1 decorator, got {len(decorator_lines)}: {decorator_lines}"
-    )
-    assert "@weave.op()" in decorator_lines[0]
+    deco_lines = [l for l in code.splitlines() if "@" in l and "op" in l]
+    assert len(deco_lines) == 1
+    assert deco_lines[0] == "@weave.op()"
 
 
 def test_aliased_import_wv():
@@ -48,31 +47,19 @@ def test_aliased_import_wv():
     def aliased_func():
         return "aliased"
 
-    artifact = MemTraceFilesArtifact()
-    save_instance(aliased_func, artifact, "obj")
-    saved_code = artifact.path_contents["obj.py"]
-    if isinstance(saved_code, bytes):
-        saved_code = saved_code.decode()
+    code = save_and_get_code(aliased_func)
 
     # Should have aliased import preserved
     import_lines = [
-        line
-        for line in saved_code.split("\n")
-        if line.strip().startswith("import weave")
+        l for l in code.splitlines() if l.strip().startswith("import weave")
     ]
-    assert len(import_lines) == 1, (
-        f"Expected 1 import, got {len(import_lines)}: {import_lines}"
-    )
-    assert import_lines[0].strip() == "import weave as wv"
+    assert len(import_lines) == 1
+    assert import_lines[0] == "import weave as wv"
 
     # Should only have one decorator using the alias
-    decorator_lines = [
-        line for line in saved_code.split("\n") if "@" in line and "op" in line
-    ]
-    assert len(decorator_lines) == 1, (
-        f"Expected 1 decorator, got {len(decorator_lines)}: {decorator_lines}"
-    )
-    assert "@wv.op()" in decorator_lines[0]
+    decorator_lines = [l for l in code.splitlines() if "@" in l and "op" in l]
+    assert len(decorator_lines) == 1
+    assert decorator_lines[0] == "@wv.op()"
 
 
 def test_aliased_import_custom_name():
@@ -82,31 +69,19 @@ def test_aliased_import_custom_name():
     def custom_alias_func():
         return "custom"
 
-    artifact = MemTraceFilesArtifact()
-    save_instance(custom_alias_func, artifact, "obj")
-    saved_code = artifact.path_contents["obj.py"]
-    if isinstance(saved_code, bytes):
-        saved_code = saved_code.decode()
+    code = save_and_get_code(custom_alias_func)
 
     # Should have aliased import preserved
     import_lines = [
-        line
-        for line in saved_code.split("\n")
-        if line.strip().startswith("import weave")
+        l for l in code.splitlines() if l.strip().startswith("import weave")
     ]
-    assert len(import_lines) == 1, (
-        f"Expected 1 import, got {len(import_lines)}: {import_lines}"
-    )
-    assert import_lines[0].strip() == "import weave as weave_alias"
+    assert len(import_lines) == 1
+    assert import_lines[0] == "import weave as weave_alias"
 
     # Should only have one decorator using the alias
-    decorator_lines = [
-        line for line in saved_code.split("\n") if "@" in line and "op" in line
-    ]
-    assert len(decorator_lines) == 1, (
-        f"Expected 1 decorator, got {len(decorator_lines)}: {decorator_lines}"
-    )
-    assert "@weave_alias.op()" in decorator_lines[0]
+    decorator_lines = [l for l in code.splitlines() if "@" in l and "op" in l]
+    assert len(decorator_lines) == 1
+    assert decorator_lines[0] == "@weave_alias.op()"
 
 
 def test_op_with_parentheses():
@@ -116,31 +91,19 @@ def test_op_with_parentheses():
     def paren_func():
         return "parentheses"
 
-    artifact = MemTraceFilesArtifact()
-    save_instance(paren_func, artifact, "obj")
-    saved_code = artifact.path_contents["obj.py"]
-    if isinstance(saved_code, bytes):
-        saved_code = saved_code.decode()
+    code = save_and_get_code(paren_func)
 
     # Should have aliased import preserved
     import_lines = [
-        line
-        for line in saved_code.split("\n")
-        if line.strip().startswith("import weave")
+        l for l in code.splitlines() if l.strip().startswith("import weave")
     ]
-    assert len(import_lines) == 1, (
-        f"Expected 1 import, got {len(import_lines)}: {import_lines}"
-    )
-    assert import_lines[0].strip() == "import weave as wv"
+    assert len(import_lines) == 1
+    assert import_lines[0] == "import weave as wv"
 
     # Should only have one decorator using the alias
-    decorator_lines = [
-        line for line in saved_code.split("\n") if "@" in line and "op" in line
-    ]
-    assert len(decorator_lines) == 1, (
-        f"Expected 1 decorator, got {len(decorator_lines)}: {decorator_lines}"
-    )
-    assert "@wv.op()" in decorator_lines[0]
+    decorator_lines = [l for l in code.splitlines() if "@" in l and "op" in l]
+    assert len(decorator_lines) == 1
+    assert decorator_lines[0] == "@wv.op()"
 
 
 def test_nested_function_with_alias():
@@ -154,23 +117,16 @@ def test_nested_function_with_alias():
         return inner
 
     inner_func = outer()
-
-    artifact = MemTraceFilesArtifact()
-    save_instance(inner_func, artifact, "obj")
-    saved_code = artifact.path_contents["obj.py"]
-    if isinstance(saved_code, bytes):
-        saved_code = saved_code.decode()
+    code = save_and_get_code(inner_func)
 
     # Should have aliased import preserved
     import_lines = [
-        line
-        for line in saved_code.split("\n")
-        if line.strip().startswith("import weave")
+        l for l in code.splitlines() if l.strip().startswith("import weave")
     ]
-    assert len(import_lines) == 1, (
-        f"Expected 1 import, got {len(import_lines)}: {import_lines}"
-    )
-    assert import_lines[0].strip() == "import weave as wv"
+    assert len(import_lines) == 1
+    assert import_lines[0] == "import weave as wv"
 
     # Should have the decorator using the alias
-    assert "@wv.op()" in saved_code
+    decorator_lines = [l for l in code.splitlines() if "@" in l and "op" in l]
+    assert len(decorator_lines) == 1
+    assert decorator_lines[0] == "@wv.op()"
