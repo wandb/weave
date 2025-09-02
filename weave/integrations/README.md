@@ -2,18 +2,36 @@
 
 # Integrations
 
-This directory contains various integrations for Weave. Currently, all integrations use explicit patching, requiring users to manually call patch functions after initializing Weave. There are 2 styles of libraries we are interested in patching: model vendors and orchestration frameworks.
+This directory contains various integrations for Weave. Weave provides automatic implicit patching for all supported integrations using an import hook mechanism, making integration seamless and effortless. There are 2 styles of libraries we are interested in patching: model vendors and orchestration frameworks.
 
 **Patch Methods**
 
-- `explicit patching`: Users must explicitly call patch functions after `weave.init()` to enable tracing for specific integrations.
+- `implicit patching` (default): Libraries are automatically patched regardless of when they are imported. An import hook intercepts library imports and applies patches automatically.
+
+  Example:
+
+  ```python
+  # Automatic patching - works regardless of import order!
+
+  # Option 1: Import before weave.init()
+  import openai
+  import weave
+  weave.init('my-project')  # OpenAI is automatically patched!
+
+  # Option 2: Import after weave.init()
+  import weave
+  weave.init('my-project')
+  import anthropic  # Automatically patched via import hook!
+  ```
+
+- `explicit patching`: Users can optionally call patch functions after `weave.init()` for fine-grained control over which integrations are enabled.
 
   Example:
 
   ```python
   import weave
   weave.init("my-project")
-  weave.integrations.patch_openai()  # Enable OpenAI tracing
+  weave.integrations.patch_openai()  # Manually patch if needed
   ```
 
 - `manual integration`: For frameworks where patching is not sufficient (or possible), we provide utilities like callbacks. For example, with orchestration frameworks such as `Langchain`, we provide a callback to fit into their program architecture more cleanly.
@@ -25,15 +43,44 @@ This directory contains various integrations for Weave. Currently, all integrati
 
 ## Using Integrations
 
-All integrations require explicit patching after initializing Weave:
+### Automatic Implicit Patching (Default)
+
+By default, Weave automatically patches all supported integrations using an import hook mechanism. This works regardless of import order:
+
+```python
+import weave
+import openai  # Can import before or after weave.init()
+
+weave.init("my-project")  # Integrations are automatically patched!
+
+# Use libraries as normal - they will be traced automatically
+client = openai.OpenAI()
+response = client.chat.completions.create(...)  # Automatically traced!
+```
+
+The import hook uses Python's `sys.meta_path` to intercept imports and automatically apply patches when supported libraries are imported, ensuring seamless integration tracking without requiring manual patch calls.
+
+### Disabling Implicit Patching
+
+If you prefer explicit control over which integrations are patched, you can disable implicit patching:
+
+```python
+# Via settings parameter
+weave.init('my-project', settings={'implicitly_patch_integrations': False})
+
+# Or via environment variable
+# export WEAVE_IMPLICITLY_PATCH_INTEGRATIONS=false
+```
+
+When disabled, you must explicitly call patch functions to enable tracing:
 
 ```python
 import weave
 
-# Initialize Weave first
-weave.init("my-project")
+# Initialize with implicit patching disabled
+weave.init("my-project", settings={'implicitly_patch_integrations': False})
 
-# Then enable specific integrations
+# Explicitly enable specific integrations
 weave.integrations.patch_openai()     # Enable OpenAI tracing
 weave.integrations.patch_anthropic()  # Enable Anthropic tracing
 weave.integrations.patch_mistral()    # Enable Mistral tracing
@@ -45,7 +92,13 @@ client = OpenAI()
 response = client.chat.completions.create(...)  # This will be traced
 ```
 
+### Available Patch Functions
+
+All integrations have corresponding patch functions for explicit control when needed: `patch_openai()`, `patch_anthropic()`, `patch_mistral()`, etc. These can be used even when implicit patching is enabled for manual control or to re-apply patches.
+
 ## Developing a Vendor Integration
+
+When developing a new integration, it will automatically work with both implicit and explicit patching if you follow these guidelines.
 
 1. Create a folder under `weave/integrations/` with the name of the library/vendor
 2. Add the following files:
@@ -146,17 +199,25 @@ response = client.chat.completions.create(...)  # This will be traced
 
    Please see the mistral example for how to write an accumulator to work with streaming results.
 
-7. Register the explicit patch function. Navigate to `weave/integrations/patch.py` and add a new patch function:
+7. Register the patch function to enable both implicit and explicit patching. Navigate to `weave/integrations/patch.py` and add a new patch function:
 
    ```python
    def patch_<vendor>(settings: Optional[IntegrationSettings] = None) -> None:
        """Enable Weave tracing for <Vendor>.
 
-       This must be called after `weave.init()` to enable <Vendor> tracing.
+       When implicit patching is enabled (default), this is called automatically
+       when the <vendor> library is imported. It can also be called explicitly
+       after `weave.init()` for manual control.
 
        Example:
+           # Automatic (implicit patching enabled by default):
            import weave
            weave.init("my-project")
+           import <vendor>  # Automatically patched!
+
+           # Manual (explicit patching):
+           import weave
+           weave.init("my-project", settings={'implicitly_patch_integrations': False})
            weave.integrations.patch_<vendor>()
        """
        from weave.integrations.<vendor>.<vendor>_sdk import get_<vendor>_patcher
@@ -165,6 +226,8 @@ response = client.chat.completions.create(...)  # This will be traced
            settings = IntegrationSettings()
        get_<vendor>_patcher(settings).attempt_patch()
    ```
+
+   Note: Once registered here, your integration will automatically work with implicit patching. The import hook will call this function when the vendor library is imported.
 
 8. Add the integration settings to `weave/trace/autopatch.py` in the `AutopatchSettings` class:
 
@@ -190,6 +253,7 @@ response = client.chat.completions.create(...)  # This will be traced
    ```
 
 10. Now, run the unit test again, for example: `MISTRAL_API_KEY=... pytest --record-mode=rewrite weave/integrations/mistral/mistral_test.py::test_mistral_quickstart`. If everything worked, you should now see a PASSING test!
+
     - Optional: if you want to see this in the UI, run `MISTRAL_API_KEY=... pytest --trace-server=prod --record-mode=rewrite weave/integrations/mistral/mistral_test.py::test_mistral_quickstart` (notice the `--trace-server=prod`). This tells the system to target prod so you can actually see the results of your integration in the UI and make sure everything looks good.
 11. Finally, when you are ready, save the network recordings:
     - Run `MISTRAL_API_KEY=... pytest --record-mode=rewrite weave/integrations/mistral/mistral_test.py::test_mistral_quickstart` to generate the recording
