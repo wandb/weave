@@ -106,7 +106,7 @@ def test_implicit_patch_already_imported_modules(
 
     def mock_patch_openai():
         patch_called.append(True)
-        _PATCHED_INTEGRATIONS.add("openai")
+        # Don't add to _PATCHED_INTEGRATIONS - implicit_patch does that
 
     monkeypatch.setattr("weave.integrations.patch.patch_openai", mock_patch_openai)
 
@@ -194,9 +194,12 @@ def test_import_hook_patches_on_import(clean_patching_state, client, monkeypatch
     # Register the import hook
     register_import_hook()
 
-    # Ensure openai is not imported or patched
-    if "openai" in sys.modules:
-        del sys.modules["openai"]
+    # Ensure openai is not patched but add a mock module to sys.modules
+    # (the patching logic requires the module to be present)
+    class MockOpenAI:
+        __name__ = "openai"
+
+    monkeypatch.setitem(sys.modules, "openai", MockOpenAI())
     assert "openai" not in _PATCHED_INTEGRATIONS
 
     # Mock the patch function
@@ -204,7 +207,7 @@ def test_import_hook_patches_on_import(clean_patching_state, client, monkeypatch
 
     def mock_patch_openai():
         patch_called.append(True)
-        _PATCHED_INTEGRATIONS.add("openai")
+        # Don't add to _PATCHED_INTEGRATIONS here - _patch_if_needed does that
 
     monkeypatch.setattr("weave.integrations.patch.patch_openai", mock_patch_openai)
 
@@ -214,9 +217,9 @@ def test_import_hook_patches_on_import(clean_patching_state, client, monkeypatch
 
     _patch_if_needed("openai")
 
-    # Verify patch was called
+    # Verify patch was called and module was marked as patched
     assert len(patch_called) == 1
-    assert "openai" in _PATCHED_INTEGRATIONS
+    assert "openai" in _PATCHED_INTEGRATIONS  # Added by _patch_if_needed
 
 
 def test_weave_init_enables_autopatching(
@@ -236,7 +239,7 @@ def test_weave_init_enables_autopatching(
 
         def mock_patch_openai():
             patch_called.append(True)
-            _PATCHED_INTEGRATIONS.add("openai")
+            # Don't add to _PATCHED_INTEGRATIONS - implicit_patch does that
 
         monkeypatch.setattr("weave.integrations.patch.patch_openai", mock_patch_openai)
 
@@ -311,11 +314,11 @@ def test_multiple_integrations_patched(
 
     def mock_patch_openai():
         openai_patched.append(True)
-        _PATCHED_INTEGRATIONS.add("openai")
+        # Don't add to _PATCHED_INTEGRATIONS - implicit_patch does that
 
     def mock_patch_anthropic():
         anthropic_patched.append(True)
-        _PATCHED_INTEGRATIONS.add("anthropic")
+        # Don't add to _PATCHED_INTEGRATIONS - implicit_patch does that
 
     monkeypatch.setattr("weave.integrations.patch.patch_openai", mock_patch_openai)
     monkeypatch.setattr(
@@ -340,7 +343,7 @@ def test_double_patching_prevented(
 
     def mock_patch_openai():
         patch_count.append(True)
-        _PATCHED_INTEGRATIONS.add("openai")
+        # Don't add to _PATCHED_INTEGRATIONS - implicit_patch does that
 
     monkeypatch.setattr("weave.integrations.patch.patch_openai", mock_patch_openai)
 
@@ -373,8 +376,9 @@ def test_patch_failure_handled_gracefully(
     # Run implicit patch - should not raise
     implicit_patch()
 
-    # Module should still be marked as patched to prevent retries
-    assert "openai" in _PATCHED_INTEGRATIONS
+    # Module should NOT be marked as patched when patching fails
+    # This allows retrying the patch later
+    assert "openai" not in _PATCHED_INTEGRATIONS
 
 
 def test_import_hook_with_submodules(clean_patching_state, client, monkeypatch):
@@ -395,7 +399,7 @@ def test_import_hook_with_submodules(clean_patching_state, client, monkeypatch):
 
     def mock_patch():
         patch_called.append(True)
-        _PATCHED_INTEGRATIONS.add("google.generativeai")
+        # Don't add to _PATCHED_INTEGRATIONS - _patch_if_needed does that
 
     monkeypatch.setattr("weave.integrations.patch.patch_google_genai", mock_patch)
 
