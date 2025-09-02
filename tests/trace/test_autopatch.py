@@ -42,10 +42,9 @@ from weave.trace import weave_init
 @pytest.fixture
 def clean_patching_state() -> Generator[None, None, None]:
     """Clean up patching state before and after tests."""
-    # Save current state with deep copies to ensure isolation
     original_patched = copy.deepcopy(_PATCHED_INTEGRATIONS)
     original_hook = _IMPORT_HOOK
-    original_meta_path = copy.deepcopy(sys.meta_path)
+    original_meta_path = sys.meta_path.copy()
 
     # Clear state
     _PATCHED_INTEGRATIONS.clear()
