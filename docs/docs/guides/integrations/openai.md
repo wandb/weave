@@ -25,7 +25,6 @@ It’s important to store traces of LLM applications in a central database, both
     Weave automatically patches OpenAI whether imported before or after `weave.init()`:
 
     ```python
-    # Import order doesn't matter - both work automatically!
     from openai import OpenAI
     import weave
 

@@ -12,6 +12,13 @@ from typing import Callable, Optional
 
 from weave.trace.autopatch import IntegrationSettings
 
+# Global set to track which integrations have been patched
+# This prevents double-patching when libraries are imported multiple times
+_PATCHED_INTEGRATIONS: set[str] = set()
+
+# Global reference to the import hook, so we can unregister it if needed
+_IMPORT_HOOK: Optional["WeaveImportHook"] = None
+
 
 def patch_openai(settings: Optional[IntegrationSettings] = None) -> None:
     """Enable Weave tracing for OpenAI.
@@ -274,14 +281,6 @@ INTEGRATION_MODULE_MAPPING: dict[str, Callable[[], None]] = {
     "langchain": patch_langchain,
     "llama_index": patch_llamaindex,
 }
-
-
-# Global set to track which integrations have been patched
-# This prevents double-patching when libraries are imported multiple times
-_PATCHED_INTEGRATIONS: set[str] = set()
-
-# Global reference to the import hook, so we can unregister it if needed
-_IMPORT_HOOK: Optional["WeaveImportHook"] = None
 
 
 class WeaveImportHook(MetaPathFinder):

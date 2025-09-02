@@ -102,7 +102,7 @@ class UserSettings(BaseModel):
 
     If True, supported libraries (OpenAI, Anthropic, etc.) are automatically patched
     when imported, regardless of import order. If False, you must explicitly call
-    patch functions like `weave.patch_openai()` to enable tracing for integrations.
+    patch functions like `weave.integrations.patch_openai()` to enable tracing for integrations.
     Can be overridden with the environment variable `WEAVE_IMPLICITLY_PATCH_INTEGRATIONS`"""
 
     redact_pii: bool = False

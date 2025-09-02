@@ -25,7 +25,6 @@ def extract_fruit(sentence: str) -> dict:
     return json.loads(extracted)
 
 
-# OpenAI will be automatically patched regardless of import order
 weave.init("intro-example")
 
 sentence = "There are many fruits that were found on the recently discovered planet Goocrux. There are neoskizzles that grow there, which are purple and taste like candy."

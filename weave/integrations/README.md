@@ -255,16 +255,6 @@ When developing a new integration, it will automatically work with both implicit
 10. Now, run the unit test again, for example: `MISTRAL_API_KEY=... pytest --record-mode=rewrite weave/integrations/mistral/mistral_test.py::test_mistral_quickstart`. If everything worked, you should now see a PASSING test!
 
     - Optional: if you want to see this in the UI, run `MISTRAL_API_KEY=... pytest --trace-server=prod --record-mode=rewrite weave/integrations/mistral/mistral_test.py::test_mistral_quickstart` (notice the `--trace-server=prod`). This tells the system to target prod so you can actually see the results of your integration in the UI and make sure everything looks good.
-    - Important: Test both implicit and explicit patching modes to ensure your integration works correctly in both scenarios:
-
-      ```bash
-      # Test with implicit patching (default)
-      MISTRAL_API_KEY=... pytest weave/integrations/mistral/mistral_test.py::test_mistral_quickstart
-
-      # Test with explicit patching only
-      WEAVE_IMPLICITLY_PATCH_INTEGRATIONS=false MISTRAL_API_KEY=... pytest weave/integrations/mistral/mistral_test.py::test_mistral_quickstart
-      ```
-
 11. Finally, when you are ready, save the network recordings:
     - Run `MISTRAL_API_KEY=... pytest --record-mode=rewrite weave/integrations/mistral/mistral_test.py::test_mistral_quickstart` to generate the recording
     - Run `MISTRAL_API_KEY=... pytest weave/integrations/mistral/mistral_test.py::test_mistral_quickstart` to validate it works!
