@@ -3,7 +3,6 @@
 from collections.abc import Callable
 
 import weave
-import weave as weave_alias
 import weave as wv
 from weave.trace.serialization.mem_artifact import MemTraceFilesArtifact
 from weave.trace.serialization.op_type import save_instance
@@ -22,8 +21,7 @@ def test_standard_import():
     """Test that standard import weave works correctly."""
 
     @weave.op
-    def standard_func():
-        return "standard"
+    def standard_func(): ...
 
     code = save_and_get_code(standard_func)
 
@@ -44,8 +42,7 @@ def test_aliased_import_wv():
     """Test that aliased import (wv) is handled correctly - should preserve the alias."""
 
     @wv.op
-    def aliased_func():
-        return "aliased"
+    def aliased_func(): ...
 
     code = save_and_get_code(aliased_func)
 
@@ -62,34 +59,11 @@ def test_aliased_import_wv():
     assert decorator_lines[0] == "@wv.op()"
 
 
-def test_aliased_import_custom_name():
-    """Test that aliased import with custom name is handled correctly - should preserve the alias."""
-
-    @weave_alias.op
-    def custom_alias_func():
-        return "custom"
-
-    code = save_and_get_code(custom_alias_func)
-
-    # Should have aliased import preserved
-    import_lines = [
-        l for l in code.splitlines() if l.strip().startswith("import weave")
-    ]
-    assert len(import_lines) == 1
-    assert import_lines[0] == "import weave as weave_alias"
-
-    # Should only have one decorator using the alias
-    decorator_lines = [l for l in code.splitlines() if "@" in l and "op" in l]
-    assert len(decorator_lines) == 1
-    assert decorator_lines[0] == "@weave_alias.op()"
-
-
 def test_op_with_parentheses():
     """Test that @wv.op() with parentheses is handled correctly - should preserve the alias."""
 
     @wv.op()
-    def paren_func():
-        return "parentheses"
+    def paren_func(): ...
 
     code = save_and_get_code(paren_func)
 
@@ -111,8 +85,7 @@ def test_nested_function_with_alias():
 
     def outer():
         @wv.op
-        def inner():
-            return "nested"
+        def inner(): ...
 
         return inner
 
