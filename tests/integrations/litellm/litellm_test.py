@@ -9,6 +9,7 @@ from packaging.version import parse as version_parse
 
 import weave
 from weave.integrations.litellm.litellm import get_litellm_patcher
+from weave.integrations.openai.openai_sdk import get_openai_patcher
 
 # This PR:
 # https://github.com/BerriAI/litellm/commit/fe2aa706e8ff4edbcd109897e5da6b83ef6ad693
@@ -38,9 +39,17 @@ def patch_litellm(request: Any) -> Generator[None, None, None]:
         yield
         return
 
-    get_litellm_patcher().attempt_patch()
+    # Patch both LiteLLM and OpenAI since LiteLLM uses OpenAI as backend
+    litellm_patcher = get_litellm_patcher()
+    openai_patcher = get_openai_patcher()
+
+    litellm_patcher.attempt_patch()
+    openai_patcher.attempt_patch()
+
     yield
-    get_litellm_patcher().undo_patch()
+
+    litellm_patcher.undo_patch()
+    openai_patcher.undo_patch()
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode

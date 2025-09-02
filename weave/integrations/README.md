@@ -2,33 +2,58 @@
 
 # Integrations
 
-This directory contains various integrations for Weave. As of this writing, there are 2 methods of patching: autopatching and manual integration. Furthermore, there are 2 styles of libraries we are interested in patching: model vendors and orchestration frameworks.
+This directory contains various integrations for Weave. Currently, all integrations use explicit patching, requiring users to manually call patch functions after initializing Weave. There are 2 styles of libraries we are interested in patching: model vendors and orchestration frameworks.
 
 **Patch Methods**
 
-- `autopatching`: autopatching is done automatically for the user when initializing Weave.
+- `explicit patching`: Users must explicitly call patch functions after `weave.init()` to enable tracing for specific integrations.
 
-  - Notes:
+  Example:
 
-    - we might want to expose an `autopatch` method that can be called independent of initialization for better code ergonomics.
-    - we will likely (but have not) exposed a way to configure the autopatcher (similar to DataDog's `patch` method)
+  ```python
+  import weave
+  weave.init("my-project")
+  weave.integrations.patch_openai()  # Enable OpenAI tracing
+  ```
 
-- `manual`: When patching is not sufficient (or possible), we can expose utilities for the user. For example, with an orchestration framework such as `Langchain`, we will provide a callback to fit into their program architecture more cleanly.
+- `manual integration`: For frameworks where patching is not sufficient (or possible), we provide utilities like callbacks. For example, with orchestration frameworks such as `Langchain`, we provide a callback to fit into their program architecture more cleanly.
 
 **Library Style**
 
 - `Model Vendor`: A model vendor is essentially an API that provides inference (eg. OpenAI). Users directly call these APIs. The integration is more simple here since we are just tracking a single call.
 - `Orchestration Framework`: there are many orchestration frameworks emerging (eg. Langchain) that help users compose a more sophisticated GenAI pipeline. In these cases the integration is a bit more complex as we must learn about and handle the specific nuances of the call stack for these frameworks.
 
-## Developing an Autopatch Vendor Integration
+## Using Integrations
 
-1. Create a folder under with the name of the library/vendor
+All integrations require explicit patching after initializing Weave:
+
+```python
+import weave
+
+# Initialize Weave first
+weave.init("my-project")
+
+# Then enable specific integrations
+weave.integrations.patch_openai()     # Enable OpenAI tracing
+weave.integrations.patch_anthropic()  # Enable Anthropic tracing
+weave.integrations.patch_mistral()    # Enable Mistral tracing
+# ... etc
+
+# Now use the libraries as normal - they will be traced
+from openai import OpenAI
+client = OpenAI()
+response = client.chat.completions.create(...)  # This will be traced
+```
+
+## Developing a Vendor Integration
+
+1. Create a folder under `weave/integrations/` with the name of the library/vendor
 2. Add the following files:
 
 ```
 .
 ├── __init__.py
-├── <vendor>.py
+├── <vendor>_sdk.py
 └── <vendor>_test.py
 ```
 
@@ -73,51 +98,104 @@ This directory contains various integrations for Weave. As of this writing, ther
    assert len(calls) == 1
    ```
 
-4. At this point, you should be able to run the unit test and see a failure at the `assert len(res.calls) == 1` line. If you see any different errors, fix them before moving forward. Note, to run the test, you will likely need a vendor key, for example: `MISTRAL_API_KEY=... pytest --record-mode=rewrite trace/integrations/mistral/mistral_test.py::test_mistral_quickstart`. Note: the `--record-mode=rewrite` tells the system to ignore any recorded network calls.
+4. At this point, you should be able to run the unit test and see a failure at the `assert len(calls) == 1` line. If you see any different errors, fix them before moving forward. Note, to run the test, you will likely need a vendor key, for example: `MISTRAL_API_KEY=... pytest --record-mode=rewrite weave/integrations/mistral/mistral_test.py::test_mistral_quickstart`. Note: the `--record-mode=rewrite` tells the system to ignore any recorded network calls.
 5. Now - time to implement the integration!
-6. Inside of `<vendor>.py`, implement the integration. The most basic form will look like this. Of course, you might need to do a lot here if there is sufficient complexity required. The key idea is to have a symbol called `<vendor>_patcher` exported at the end which is a subclass of `weave.integrations.patcher.Patcher`. _Note: this assumes non-generator return libraries. More work is required for those to work well._
+6. Inside of `<vendor>_sdk.py`, implement the integration. The most basic form will look like this. The key idea is to have a function called `get_<vendor>_patcher` that returns a Patcher object. _Note: this assumes non-generator return libraries. More work is required for those to work well._
 
-   ```
+   ```python
    import importlib
+   from typing import Optional
 
    import weave
-   from weave.integrations.patcher import SymbolPatcher, MultiPatcher
+   from weave.integrations.patcher import SymbolPatcher, MultiPatcher, NoOpPatcher
+   from weave.trace.autopatch import IntegrationSettings
 
+   _<vendor>_patcher: Optional[MultiPatcher] = None
 
-   <vendor>_patcher = MultiPatcher(                            # <vendor>_patcher.attempt_patch() will attempt to patch all patchers
-       [
-           SymbolPatcher(                                      # `SymbolPatcher` is a helper class for simple patching of a symbole
-               lambda: importlib.import_module(<import_path>), # Provide function that returns the base symbol - often an import
-               <path_to_symbol>,                               # provide the path to the target symbol from the base
-               weave.op(),                                     # provide a callback to perform the wrapping. `weave.op` should work in many cases
-           )
-       ]
-   )
+   def get_<vendor>_patcher(
+       settings: Optional[IntegrationSettings] = None,
+   ) -> MultiPatcher | NoOpPatcher:
+       if settings is None:
+           settings = IntegrationSettings()
+
+       if not settings.enabled:
+           return NoOpPatcher()
+
+       global _<vendor>_patcher
+       if _<vendor>_patcher is not None:
+           return _<vendor>_patcher
+
+       base = settings.op_settings
+       # Configure settings for the operation
+       op_settings = base.model_copy(
+           update={"name": base.name or "<vendor>.operation_name"}
+       )
+
+       _<vendor>_patcher = MultiPatcher(
+           [
+               SymbolPatcher(
+                   lambda: importlib.import_module(<import_path>),  # Base module import
+                   <path_to_symbol>,                                # Path to the target symbol
+                   weave.op(**op_settings.model_dump()),           # Wrapper with settings
+               )
+           ]
+       )
+
+       return _<vendor>_patcher
    ```
 
    Please see the mistral example for how to write an accumulator to work with streaming results.
 
-7. Register the autopatcher. Navigate to `weave/autopatch.py` and add a line to `def autopatch()` like:
+7. Register the explicit patch function. Navigate to `weave/integrations/patch.py` and add a new patch function:
 
+   ```python
+   def patch_<vendor>(settings: Optional[IntegrationSettings] = None) -> None:
+       """Enable Weave tracing for <Vendor>.
+
+       This must be called after `weave.init()` to enable <Vendor> tracing.
+
+       Example:
+           import weave
+           weave.init("my-project")
+           weave.integrations.patch_<vendor>()
+       """
+       from weave.integrations.<vendor>.<vendor>_sdk import get_<vendor>_patcher
+
+       if settings is None:
+           settings = IntegrationSettings()
+       get_<vendor>_patcher(settings).attempt_patch()
    ```
-   from .flow.integrations.<vendor>.<vendor> import <vendor>_patcher
 
-   <vendor>_patcher.attempt_patch()
+8. Add the integration settings to `weave/trace/autopatch.py` in the `AutopatchSettings` class:
+
+   ```python
+   class AutopatchSettings(BaseModel):
+       # ... existing fields ...
+       <vendor>: IntegrationSettings = Field(default_factory=IntegrationSettings)
    ```
 
-   This will ensure that the patch is applied when initializing weave.
+   This allows users to configure the integration via settings if needed.
 
-8. Next, add the patcher to the test. Note: this step should go away in the future. Inside of `patch_<vendor>` fixture, fill out:
-   ```
+9. Next, add the patcher to the test. Inside of `patch_<vendor>` fixture, fill out:
+
+   ```python
    @pytest.fixture()
    def patch_<vendor>() -> Generator[None, None, None]:
-       <vendor>_patcher.attempt_patch()
+       from weave.integrations.<vendor>.<vendor>_sdk import get_<vendor>_patcher
+
+       patcher = get_<vendor>_patcher()
+       patcher.attempt_patch()
        yield
-       <vendor>_patcher.undo_patch()
+       patcher.undo_patch()
    ```
-9. Now, run the unit test again, for example: `MISTRAL_API_KEY=... pytest --record-mode=rewrite flow/integrations/mistral/mistral_test.py::test_mistral_quickstart`. If everything worked, you should now see a PASSING test!
-   - Optional: if you want to see this in the UI, run `MISTRAL_API_KEY=... pytest --trace-server=prod --record-mode=rewrite flow/integrations/mistral/mistral_test.py::test_mistral_quickstart` (notice the `--trace-server=prod `). This tells the system to target prod so you can actually see the results of your integration in the UI and make sure everything looks good.
-10. Finally, when you are ready, save the network recordings:
-    - Run `MISTRAL_API_KEY=... pytest --record-mode=rewrite flow/integrations/mistral/mistral_test.py::test_mistral_quickstart` to generate the recording
-    - Run `MISTRAL_API_KEY=... pytest flow/integrations/mistral/mistral_test.py::test_mistral_quickstart` to validate it works!
-11. Add your integration to the docs (TBD best practices)!
+
+10. Now, run the unit test again, for example: `MISTRAL_API_KEY=... pytest --record-mode=rewrite weave/integrations/mistral/mistral_test.py::test_mistral_quickstart`. If everything worked, you should now see a PASSING test!
+    - Optional: if you want to see this in the UI, run `MISTRAL_API_KEY=... pytest --trace-server=prod --record-mode=rewrite weave/integrations/mistral/mistral_test.py::test_mistral_quickstart` (notice the `--trace-server=prod`). This tells the system to target prod so you can actually see the results of your integration in the UI and make sure everything looks good.
+11. Finally, when you are ready, save the network recordings:
+    - Run `MISTRAL_API_KEY=... pytest --record-mode=rewrite weave/integrations/mistral/mistral_test.py::test_mistral_quickstart` to generate the recording
+    - Run `MISTRAL_API_KEY=... pytest weave/integrations/mistral/mistral_test.py::test_mistral_quickstart` to validate it works!
+12. Export the patch function from `weave/integrations/__init__.py`:
+    ```python
+    from weave.integrations.patch import patch_<vendor>
+    ```
+13. Add your integration to the docs (TBD best practices)!

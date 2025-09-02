@@ -99,6 +99,21 @@ TODO: need to fill this out
 - Include meaningful error messages
 - Add error handling tests
 
+### Integration Testing
+
+- Since autopatching was removed from `weave.init()`, integration tests must explicitly patch their integrations
+- Add a fixture with `autouse=True` at the top of each integration test file to enable patching
+- Example pattern:
+  ```python
+  @pytest.fixture(autouse=True)
+  def patch_integration() -> Generator[None, None, None]:
+      patcher = get_integration_patcher()
+      patcher.attempt_patch()
+      yield
+      patcher.undo_patch()
+  ```
+- Some integrations (like instructor) may need to patch multiple libraries
+
 ### Documentation
 
 - Make sure to add end-user documentation inside the `docs` dir when creating new features.

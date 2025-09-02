@@ -1,13 +1,49 @@
 import asyncio
+from collections.abc import Generator
 
 import pytest
 
+from weave.integrations.crewai import get_crewai_patcher
 from weave.integrations.integration_utilities import (
     flatten_calls,
     flattened_calls_to_names,
 )
+from weave.integrations.litellm.litellm import get_litellm_patcher
+from weave.integrations.openai.openai_sdk import get_openai_patcher
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server.trace_server_interface import CallsFilter
+
+
+@pytest.fixture(autouse=True)
+def patch_crewai() -> Generator[None, None, None]:
+    """Patch CrewAI, LiteLLM, and OpenAI for all tests in this file."""
+    # Reset global patcher instances to ensure fresh patching
+    import weave.integrations.crewai.crewai_sdk as crewai_sdk
+    import weave.integrations.litellm.litellm as litellm_sdk
+    import weave.integrations.openai.openai_sdk as openai_sdk
+
+    crewai_sdk._crewai_patcher = None
+    litellm_sdk._litellm_patcher = None
+    openai_sdk._openai_patcher = None
+
+    crewai_patcher = get_crewai_patcher()
+    litellm_patcher = get_litellm_patcher()
+    openai_patcher = get_openai_patcher()
+
+    crewai_patcher.attempt_patch()
+    litellm_patcher.attempt_patch()
+    openai_patcher.attempt_patch()
+
+    yield
+
+    crewai_patcher.undo_patch()
+    litellm_patcher.undo_patch()
+    openai_patcher.undo_patch()
+
+    # Clean up after test
+    crewai_sdk._crewai_patcher = None
+    litellm_sdk._litellm_patcher = None
+    openai_sdk._openai_patcher = None
 
 
 def get_crew():
