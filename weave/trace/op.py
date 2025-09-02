@@ -26,7 +26,6 @@ from typing import (
     Any,
     Callable,
     Generic,
-    Optional,
     TypedDict,
     TypeVar,
     cast,
@@ -73,7 +72,7 @@ if sys.version_info < (3, 10):
     def aiter(obj: AsyncIterator[V]) -> AsyncIterator[V]:
         return obj.__aiter__()
 
-    async def anext(obj: AsyncIterator[V], default: V | None = None) -> V:  # noqa: UP045
+    async def anext(obj: AsyncIterator[V], default: V | None = None) -> V:
         try:
             return await obj.__anext__()
         except StopAsyncIteration:
