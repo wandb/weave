@@ -548,18 +548,52 @@ def save_instance(obj: Op, artifact: MemTraceFilesArtifact, name: str) -> None:
 
         op_function_code = redact_pii_string(op_function_code)
 
-    if not WEAVE_OP_PATTERN.search(op_function_code):
-        op_function_code = "@weave.op()\n" + op_function_code
+    # Check if there's a weave import (aliased or not) in import_code
+    has_weave_import = False
+    weave_alias = None
+    for imp in import_code:
+        if imp.strip().startswith("import weave"):
+            has_weave_import = True
+            if " as " in imp:
+                # Extract the alias (e.g., "wv" from "import weave as wv")
+                weave_alias = imp.strip().split()[-1]
+            break
+    
+    # If we found an aliased import, we need to ensure the decorator matches
+    if weave_alias:
+        # Check if the decorator uses the alias
+        alias_pattern = re.compile(rf"@{re.escape(weave_alias)}\.op(\(\))?")
+        if not alias_pattern.search(op_function_code):
+            # The decorator doesn't use the alias, check for @weave.op
+            if not WEAVE_OP_PATTERN.search(op_function_code):
+                # No decorator found, add one using the alias
+                op_function_code = f"@{weave_alias}.op()\n" + op_function_code
+            else:
+                # Has @weave.op but import uses alias - keep as is but normalize
+                op_function_code = WEAVE_OP_NO_PAREN_PATTERN.sub(
+                    "@weave.op()", op_function_code
+                )
+        else:
+            # Ensure the aliased decorator has parentheses
+            op_function_code = alias_pattern.sub(f"@{weave_alias}.op()", op_function_code)
     else:
-        op_function_code = WEAVE_OP_NO_PAREN_PATTERN.sub(
-            "@weave.op()", op_function_code
-        )
+        # No alias, use standard weave import and decorator
+        if not WEAVE_OP_PATTERN.search(op_function_code):
+            op_function_code = "@weave.op()\n" + op_function_code
+        else:
+            op_function_code = WEAVE_OP_NO_PAREN_PATTERN.sub(
+                "@weave.op()", op_function_code
+            )
     code.append(op_function_code)
 
     with artifact.new_file(f"{name}.py") as f:
         assert isinstance(f, io.StringIO)
         import_block = "\n".join(import_code)
-        import_lines = ["import weave"] + import_block.split("\n")
+        # Only add "import weave" if it's not already present
+        if has_weave_import:
+            import_lines = import_block.split("\n")
+        else:
+            import_lines = ["import weave"] + import_block.split("\n")
         import_lines = dedupe_list(import_lines)
         import_lines = [l for l in import_lines if "weave.api" not in l]
         import_block = "\n".join(import_lines)
