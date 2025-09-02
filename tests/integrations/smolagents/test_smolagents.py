@@ -4,6 +4,9 @@ from typing import Optional
 
 import pytest
 
+import weave.integrations.huggingface.huggingface_inference_client_sdk as hf_sdk
+import weave.integrations.openai.openai_sdk as openai_sdk
+import weave.integrations.smolagents.smolagents_sdk as smolagents_sdk
 from weave.integrations.huggingface.huggingface_inference_client_sdk import (
     get_huggingface_patcher,
 )
@@ -15,11 +18,6 @@ from weave.integrations.smolagents.smolagents_sdk import get_smolagents_patcher
 @pytest.fixture(autouse=True)
 def patch_smolagents() -> Generator[None, None, None]:
     """Patch SmolAgents, HuggingFace, and OpenAI for all tests in this file."""
-    # Reset global patcher instances to ensure fresh patching
-    import weave.integrations.huggingface.huggingface_inference_client_sdk as hf_sdk
-    import weave.integrations.openai.openai_sdk as openai_sdk
-    import weave.integrations.smolagents.smolagents_sdk as smolagents_sdk
-
     smolagents_sdk._smolagents_patcher = None
     hf_sdk._huggingface_patcher = None
     openai_sdk._openai_patcher = None

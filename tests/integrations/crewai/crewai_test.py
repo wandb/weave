@@ -3,6 +3,9 @@ from collections.abc import Generator
 
 import pytest
 
+import weave.integrations.crewai.crewai_sdk as crewai_sdk
+import weave.integrations.litellm.litellm as litellm_sdk
+import weave.integrations.openai.openai_sdk as openai_sdk
 from weave.integrations.crewai import get_crewai_patcher
 from weave.integrations.integration_utilities import (
     flatten_calls,
@@ -17,11 +20,6 @@ from weave.trace_server.trace_server_interface import CallsFilter
 @pytest.fixture(autouse=True)
 def patch_crewai() -> Generator[None, None, None]:
     """Patch CrewAI, LiteLLM, and OpenAI for all tests in this file."""
-    # Reset global patcher instances to ensure fresh patching
-    import weave.integrations.crewai.crewai_sdk as crewai_sdk
-    import weave.integrations.litellm.litellm as litellm_sdk
-    import weave.integrations.openai.openai_sdk as openai_sdk
-
     crewai_sdk._crewai_patcher = None
     litellm_sdk._litellm_patcher = None
     openai_sdk._openai_patcher = None
