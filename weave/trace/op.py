@@ -73,7 +73,7 @@ if sys.version_info < (3, 10):
     def aiter(obj: AsyncIterator[V]) -> AsyncIterator[V]:
         return obj.__aiter__()
 
-    async def anext(obj: AsyncIterator[V], default: Optional[V] = None) -> V:  # noqa: UP045
+    async def anext(obj: AsyncIterator[V], default: V | None = None) -> V:  # noqa: UP045
         try:
             return await obj.__anext__()
         except StopAsyncIteration:
@@ -666,7 +666,7 @@ def _call_sync_gen(
     __should_raise: bool = False,
     __require_explicit_finish: bool = False,
     **kwargs: Any,
-) -> tuple[Generator[Any, None, None], Call]:
+) -> tuple[Generator[Any], Call]:
     func = op.resolve_fn
     call = placeholder_call()
 
@@ -740,7 +740,7 @@ def _call_sync_gen(
     # Create the generator wrapper
     try:
         # Define the wrapper generator that will handle the call context properly
-        def wrapped_generator() -> Generator[Any, None, None]:
+        def wrapped_generator() -> Generator[Any]:
             nonlocal accumulated_state, has_finished
 
             # Set the call context before creating the original generator
@@ -857,7 +857,7 @@ def _call_sync_gen(
         if __should_raise:
             raise
 
-        def empty_sync_gen() -> Generator[Any, None, None]:
+        def empty_sync_gen() -> Generator[Any]:
             # Re-raise the original exception if __should_raise is False
             # but we're evaluating the generator, to maintain expected behavior
             if not has_finished:
@@ -1235,7 +1235,7 @@ def op(
                 @wraps(func)
                 async def wrapper(  # pyright: ignore[reportRedeclaration]
                     *args: P.args, **kwargs: P.kwargs
-                ) -> AsyncGenerator[R, None]:
+                ) -> AsyncGenerator[R]:
                     res, _ = await _call_async_gen(
                         cast(Op[P, R], wrapper), *args, __should_raise=True, **kwargs
                     )
