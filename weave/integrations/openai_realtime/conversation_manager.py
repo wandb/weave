@@ -114,6 +114,21 @@ class ConversationManager:
             return None
         return self.state.input_audio_buffer.get_segment_ms(start_ms, end_ms)
 
+    def _get_response_for_item(self, item_id: models.ItemID) -> Optional[models.ResponseID]:
+        """
+        Return the response id associated with the given item via the mapping
+        populated on response completion from previous_item_id.
+        """
+        # Direct mapping if the provided item_id is a prev input
+        rid = self.state.response_by_prev_item.get(item_id)
+        if rid is not None:
+            return rid
+        # If this is an output item, look up its prev and resolve
+        prev = self.state.prev_by_item.get(item_id)
+        if prev is not None:
+            return self.state.response_by_prev_item.get(prev)
+        return None
+
     def _get_or_create_turn_for_created(self, resp_id: models.ResponseID) -> TurnRecord:
         # Bind the earliest pending create to this response
         if self._pending_create_queue:
@@ -237,11 +252,7 @@ class ConversationManager:
 
         # Helper: response_id for an assistant message item
         def _response_id_for_item(iid: models.ItemID) -> Optional[models.ResponseID]:
-            for rid, r in self.state.responses.items():
-                for oit in getattr(r, "output", []) or []:
-                    if getattr(oit, "id", None) == iid:
-                        return rid
-            return None
+            return self._get_response_for_item(iid)
 
         # Helper: base64 encode a single user audio segment (if we have markers)
         def _encode_user_audio(iid: models.ItemID) -> Optional[Content]:
@@ -297,25 +308,17 @@ class ConversationManager:
                 })
                 continue
 
-            if isinstance(it, models.ServerAssistantMessageItem):
+            if isinstance(it, (models.ServerAssistantMessageItem, models.ResponseMessageItem)) and getattr(it, "role", None) == "assistant":
                 rid = _response_id_for_item(iid)
                 parts: list[dict[str, object]] = []
-                for idx, p in enumerate(it.content or []):
-                    if getattr(p, "type", None) == "audio":
-                        b64 = None
-                        if rid is not None:
-                            buf = self.state.resp_audio_bytes.get((rid, iid, idx))
-                            if buf:
-                                try:
-                                    b64 = base64.b64encode(bytes(buf)).decode("ascii")
-                                except Exception as e:
-                                    logger.warning("_build_inputs_payload: failed to base64-encode assistant audio (rid=%s,iid=%s,idx=%s): %s", rid, iid, idx, e)
-                                    b64 = None
+                for idx, p in enumerate(getattr(it, "content", []) or []):
+                    if getattr(p, "type", None) == "audio" and rid is not None:
+                        buf = self.state.resp_audio_bytes.get((rid, iid, idx))
                         parts.append({
                             "type": "audio",
                             "audio": {
                                 "transcript": getattr(p, "transcript", None) or "",
-                                "data": b64,
+                                "data": Content.from_bytes(pcm_to_wav(bytes(buf)), extension=".wav") if buf else None,
                                 "format": (sess.output_audio_format if sess else "pcm16"),
                             },
                         })
@@ -553,6 +556,14 @@ class ConversationManager:
     def _handle_input_audio_committed(self, msg: models.InputAudioBufferCommittedMessage) -> None:
         # Track commits against items for turn completeness checks
         self.state.committed_item_ids.add(msg.item_id)
+        # Wire up linked list pointers if we have a previous item
+        try:
+            prev = getattr(msg, "previous_item_id", None)
+            if prev is not None:
+                self.state.link_items(prev, msg.item_id)
+        except Exception:
+            # Don't let linkage failures affect core flow
+            pass
 
     def _handle_speech_started(self, msg: models.InputAudioBufferSpeechStartedMessage) -> None:
         self.state.speech_markers[msg.item_id] = {
@@ -573,6 +584,149 @@ class ConversationManager:
         item = msg.item
         self.state.items[item.id] = item
         self.state.timeline.append(item.id)
+        # Track linked list relationship if provided
+        try:
+            prev = getattr(msg, "previous_item_id", None)
+            if prev is not None:
+                self.state.link_items(prev, item.id)
+        except Exception:
+            # Non-fatal; state timeline still maintained
+            pass
+
+    def _build_message_input_payload(self, item_id: models.ItemID) -> list[dict[str, object]]:
+        """
+        Build a messages payload representing the full chain around a given item,
+        using the doubly-linked list derived from previous_item_id relations.
+        The returned list is ordered chronologically from the head of the chain
+        through to the tail, inclusive of the provided item if present in state.
+        """
+        sess = self.state.session
+
+        # Helper: response_id for an assistant message item
+        def _response_id_for_item(iid: models.ItemID) -> Optional[models.ResponseID]:
+            return self._get_response_for_item(iid)
+
+        # Helper: base64 encode a single user audio segment (if we have markers)
+        def _encode_user_audio(iid: models.ItemID) -> Optional[Content]:
+            seg = self.get_audio_segment(iid)
+            if not seg:
+                return None
+            try:
+                return Content.from_bytes(pcm_to_wav(seg), extension=".wav")
+            except Exception:
+                return None
+
+        messages: list[dict[str, object]] = []
+        chain_ids = self.state.get_timeline_chain_for(item_id)
+        for iid in chain_ids:
+            it = self.state.items.get(iid)
+            if it is None:
+                continue
+
+            # System
+            if isinstance(it, models.ServerSystemMessageItem):
+                texts: list[str] = []
+                for p in (it.content or []):
+                    if getattr(p, "type", None) in ("input_text", "text"):
+                        txt = getattr(p, "text", None)
+                        if txt:
+                            texts.append(txt)
+                messages.append({"role": "system", "content": "\n".join(texts) if texts else ""})
+                continue
+
+            # User
+            if isinstance(it, models.ServerUserMessageItem):
+                transcript: Optional[str] = None
+                for p in (it.content or []):
+                    if getattr(p, "type", None) == "input_audio":
+                        t = getattr(p, "transcript", None)
+                        if t:
+                            transcript = t
+                            break
+                messages.append({
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "audio",
+                            "audio": {
+                                "transcript": transcript or "",
+                                "data": _encode_user_audio(iid),
+                                "format": (sess.input_audio_format if sess else "pcm16"),
+                            },
+                        }
+                    ],
+                })
+                continue
+
+            # Assistant message
+            if isinstance(it, (models.ServerAssistantMessageItem, models.ResponseMessageItem)) and getattr(it, "role", None) == "assistant":
+                rid = _response_id_for_item(iid)
+                parts: list[dict[str, object]] = []
+                for idx, p in enumerate(getattr(it, "content", []) or []):
+                    if getattr(p, "type", None) == "audio":
+                        b64 = None
+                        if rid is not None:
+                            buf = self.state.resp_audio_bytes.get((rid, iid, idx))
+                            if buf:
+                                try:
+                                    b64 = base64.b64encode(bytes(buf)).decode("ascii")
+                                except Exception:
+                                    b64 = None
+                        parts.append({
+                            "type": "audio",
+                            "audio": {
+                                "transcript": getattr(p, "transcript", None) or "",
+                                "data": b64,
+                                "format": (sess.output_audio_format if sess else "pcm16"),
+                            },
+                        })
+                messages.append({
+                    "role": "assistant",
+                    "content": parts or None,
+                    "refusal": None,
+                    "annotations": [],
+                    "function_call": None,
+                    "tool_calls": None,
+                })
+                continue
+
+            # Function call
+            if getattr(it, "type", None) == "function_call":
+                messages.append({
+                    "role": "assistant",
+                    "content": None,
+                    "refusal": None,
+                    "annotations": [],
+                    "function_call": None,
+                    "tool_calls": [
+                        {
+                            "id": getattr(it, "call_id", None),
+                            "type": "function",
+                            "function": {
+                                "name": getattr(it, "name", None),
+                                "arguments": getattr(it, "arguments", None),
+                            },
+                        }
+                    ],
+                })
+                continue
+
+            # Function call output
+            if getattr(it, "type", None) == "function_call_output":
+                call_id = getattr(it, "call_id", None)
+                name = None
+                for other in self.state.items.values():
+                    if getattr(other, "type", None) == "function_call" and getattr(other, "call_id", None) == call_id:
+                        name = getattr(other, "name", None)
+                        break
+                messages.append({
+                    "role": "tool",
+                    "content": getattr(it, "output", None),
+                    "tool_call_id": call_id,
+                    "name": name,
+                })
+
+        return messages
 
     def _handle_item_truncated(self, msg: models.ItemTruncatedMessage) -> None:
         # If audio was truncated, adjust end marker for that item if present
@@ -672,6 +826,15 @@ class ConversationManager:
             logger.warning("_handle_response_done: missing TurnRecord for response_id=%s", msg.response.id)
             return
         rec.response_done = True
+        # Build mapping from previous item -> response id using any output items
+        try:
+            for oit in msg.response.output:
+                prev = self.state.prev_by_item.get(oit.id)
+                if prev is not None:
+                    self.state.response_by_prev_item[prev] = msg.response.id
+        except Exception:
+            # Non-fatal if mapping fails
+            pass
         self._handle_turn_completion(rec)
 
     def _handle_response_output_item_added(self, msg: models.ResponseOutputItemAddedMessage) -> None:
@@ -894,10 +1057,7 @@ class ConversationManager:
             logger.warning("_on_response_complete: response missing")
             return
         # Skip exports for non-message-only responses (e.g., pure function_call turns)
-        has_assistant_message = any(
-            isinstance(it, models.ResponseMessageItem) and getattr(it, "role", None) == "assistant"
-            for it in getattr(resp, "output", [])
-        )
+        has_assistant_message = any(isinstance(it, models.ResponseMessageItem) and it.role == "assistant" for it in resp.output)
         if not has_assistant_message:
             logger.debug("_on_response_complete: no assistant message in output; skipping export for response_id=%s", rec.response_id)
             return
