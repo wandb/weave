@@ -22,7 +22,6 @@ from weave.trace_server.interface.builtin_object_classes.test_only_example impor
     TestOnlyInheritedBaseObject,
     TestOnlyNestedBaseObject,
 )
-from weave.trace_server.interface.builtin_object_classes.alert_spec import AlertSpec
 
 BUILTIN_OBJECT_REGISTRY: dict[str, type[BaseObject]] = {}
 
@@ -48,4 +47,3 @@ register_base_object(ProviderModel)
 register_base_object(SavedView)
 register_base_object(LLMStructuredCompletionModel)
 register_base_object(ChartConfig)
-register_base_object(AlertSpec)

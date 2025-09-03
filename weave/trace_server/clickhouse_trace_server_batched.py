@@ -2106,39 +2106,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         return tsi.AlertMetricCreateRes(id=metric_id)
 
-    def alert_event_create(
-        self, req: tsi.AlertEventCreateReq
-    ) -> tsi.AlertEventCreateRes:
-        """Create a new alert event entry."""
-        event_id = generate_id()
-        created_at = datetime.datetime.now(datetime.timezone.utc)
-
-        self._insert(
-            "alert_events",
-            data=[
-                (
-                    req.project_id,
-                    event_id,
-                    req.alert_id,
-                    req.associated_call_ids,
-                    req.metric_values,
-                    created_at,
-                    req.level.value,
-                )
-            ],
-            column_names=[
-                "project_id",
-                "id",
-                "alert_id",
-                "associated_call_ids",
-                "metric_values",
-                "created_at",
-                "level",
-            ],
-        )
-
-        return tsi.AlertEventCreateRes(id=event_id)
-
     def alert_metrics_query(
         self, req: tsi.AlertMetricsQueryReq
     ) -> tsi.AlertMetricsQueryRes:
@@ -2199,65 +2166,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             )
 
         return tsi.AlertMetricsQueryRes(metrics=metrics)
-
-    def alert_events_query(
-        self, req: tsi.AlertEventsQueryReq
-    ) -> tsi.AlertEventsQueryRes:
-        """Query alert events with optional filters."""
-        pb = ParamBuilder()
-
-        conditions = [f"project_id = {{{pb.add_param(req.project_id)}: String}}"]
-
-        if req.alert_ids:
-            conditions.append(
-                f"alert_id IN {{{pb.add_param(req.alert_ids)}: Array(String)}}"
-            )
-
-        if req.levels:
-            level_values = [level.value for level in req.levels]
-            conditions.append(
-                f"level IN {{{pb.add_param(level_values)}: Array(String)}}"
-            )
-
-        if req.start_time:
-            conditions.append(
-                f"created_at >= {{{pb.add_param(req.start_time.timestamp())}: Float64}}"
-            )
-
-        if req.end_time:
-            conditions.append(
-                f"created_at <= {{{pb.add_param(req.end_time.timestamp())}: Float64}}"
-            )
-
-        query = f"""
-        SELECT id, project_id, alert_id, associated_call_ids, metric_values, created_at, level
-        FROM alert_events
-        WHERE {" AND ".join(conditions)}
-        ORDER BY created_at DESC
-        """
-
-        if req.limit:
-            query += f" LIMIT {{{pb.add_param(req.limit)}: Int64}}"
-        if req.offset:
-            query += f" OFFSET {{{pb.add_param(req.offset)}: Int64}}"
-
-        result = self._query(query, pb.get_params())
-
-        events = []
-        for row in result.result_rows:
-            events.append(
-                tsi.AlertEventSchema(
-                    id=row[0],
-                    project_id=row[1],
-                    alert_id=row[2],
-                    associated_call_ids=row[3],
-                    metric_values=row[4],
-                    created_at=_ensure_datetimes_have_tz_strict(row[5]),
-                    level=tsi.AlertLevel(row[6]),
-                )
-            )
-
-        return tsi.AlertEventsQueryRes(events=events)
 
     # Private Methods
     @property

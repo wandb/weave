@@ -1,17 +1,3 @@
-CREATE TABLE IF NOT EXISTS alert_events (
-   project_id String,
-   id String,
-   alert_id String,
-   created_at Datetime(3),
-   created_at_inv DateTime(3) MATERIALIZED toDateTime64(2147483647 - toUnixTimestamp64Milli(created_at), 3),
-   level Enum('ok', 'warn', 'alert', 'log'),
-   associated_call_ids Array(String),
-   metric_values Array(Float64),
-   
-   INDEX idx_associated_call_ids (associated_call_ids) TYPE bloom_filter(0.01) GRANULARITY 1
-) ENGINE = ReplacingMergeTree
-ORDER BY (project_id, alert_id, created_at_inv, id);
-
 CREATE TABLE IF NOT EXISTS alert_metrics (
    project_id String,
    id String, -- necessary?
