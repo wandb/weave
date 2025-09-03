@@ -107,12 +107,32 @@ def _set_current_summary(summary: dict) -> Iterator[None]:
         current_summary.reset(token)
 
 
+def _sanitize_class_name(name: str) -> str:
+    """Return a valid Python class name based on a string."""
+    # Remove characters that are not alphanumeric or underscore
+    class_name = re.sub(r"\W", "", name)
+    if not class_name:
+        return "GeneratedClass"
+
+    # Ensure it starts with a letter or underscore (prepend "C" if not)
+    first_char = class_name[0]
+    if not first_char.isalpha() and first_char != "_":
+        class_name = "C" + class_name
+
+    # Avoid Python keywords
+    if keyword.iskeyword(class_name):
+        class_name += "Class"
+
+    return class_name
+
+
 def _cast_to_cls(type_: type[T]) -> Callable[[str | dict | T], T]:
     def _convert_to_cls_inner(value: str | dict | T) -> T:
         if isinstance(value, str):
-            cls_name = value
-
             # Dynamically create the class if the user only provides a name
+            cls_name = _sanitize_class_name(value)
+
+            # Sanitization should have ensured a valid class name, but double check for safety
             cls_name = _validate_class_name(cls_name, type_.__name__)
 
             pydantic_config_dict = {
