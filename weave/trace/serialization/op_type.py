@@ -548,7 +548,7 @@ def save_instance(obj: Op, artifact: MemTraceFilesArtifact, name: str) -> None:
 
         op_function_code = redact_pii_string(op_function_code)
 
-    # Check if there's a weave import (aliased or not) in import_code
+    # Detect weave import and alias
     has_weave_import = False
     weave_alias = None
     for imp in import_code:
@@ -559,33 +559,29 @@ def save_instance(obj: Op, artifact: MemTraceFilesArtifact, name: str) -> None:
                 weave_alias = imp.strip().split()[-1]
             break
 
-    # If we found an aliased import, we need to ensure the decorator matches
-    if weave_alias:
-        # Check if the decorator uses the alias
-        alias_pattern = re.compile(rf"@{re.escape(weave_alias)}\.op(\(\))?")
-        if not alias_pattern.search(op_function_code):
-            # The decorator doesn't use the alias, check for @weave.op
-            if not WEAVE_OP_PATTERN.search(op_function_code):
-                # No decorator found, add one using the alias
-                op_function_code = f"@{weave_alias}.op()\n" + op_function_code
-            else:
-                # Has @weave.op but import uses alias - keep as is but normalize
-                op_function_code = WEAVE_OP_NO_PAREN_PATTERN.sub(
-                    "@weave.op()", op_function_code
-                )
-        else:
-            # Ensure the aliased decorator has parentheses
-            op_function_code = alias_pattern.sub(
-                f"@{weave_alias}.op()", op_function_code
-            )
+    # Determine the decorator pattern to use/check
+    decorator_prefix = weave_alias if weave_alias else "weave"
+    decorator_pattern = re.compile(rf"@{re.escape(decorator_prefix)}\.op(\(\))?")
+
+    # Check if the expected decorator exists
+    has_expected_decorator = decorator_pattern.search(op_function_code)
+
+    # Handle decorator normalization/addition
+    if has_expected_decorator:
+        # Normalize existing decorator to have parentheses
+        op_function_code = re.sub(
+            rf"@{re.escape(decorator_prefix)}\.op(?!\()",
+            f"@{decorator_prefix}.op()",
+            op_function_code,
+        )
+    elif weave_alias and WEAVE_OP_PATTERN.search(op_function_code):
+        # Has @weave.op but import uses alias - normalize to @weave.op()
+        op_function_code = WEAVE_OP_NO_PAREN_PATTERN.sub(
+            "@weave.op()", op_function_code
+        )
     else:
-        # No alias, use standard weave import and decorator
-        if not WEAVE_OP_PATTERN.search(op_function_code):
-            op_function_code = "@weave.op()\n" + op_function_code
-        else:
-            op_function_code = WEAVE_OP_NO_PAREN_PATTERN.sub(
-                "@weave.op()", op_function_code
-            )
+        # No decorator found, add one
+        op_function_code = f"@{decorator_prefix}.op()\n" + op_function_code
     code.append(op_function_code)
 
     with artifact.new_file(f"{name}.py") as f:
