@@ -4,15 +4,17 @@ import asyncio
 import base64
 from dataclasses import dataclass, field
 from threading import Lock
-from typing import Callable, Dict, List, Optional, Tuple, Union, TypeVar, cast, TypedDict, overload, Literal
+from typing import Callable, Optional, Tuple, Union, TypeVar, cast, overload, Literal
+from typing_extensions import TypedDict
 import threading
 import time
 import os
 import json
+import logging
 
 from pydantic import BaseModel, Field
 
-from models import (
+from weave.integrations.openai_realtime.models import (
     ClientItem,
     InputAudioBufferAppendMessage,
     InputAudioBufferClearedMessage,
@@ -57,6 +59,9 @@ from models import (
     InputAudioContentPart,
     ResponseMessageItem,
 )
+from weave.trace.weave_client import Call
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -80,10 +85,10 @@ class AudioBufferManager:
         """Decode base64 audio and append. Ignores invalid payloads gracefully."""
         try:
             self.buffer.extend(base64.b64decode(b64))
-        except Exception:
+        except Exception as e:
             # Some fixtures use placeholder strings like "<audio bytes>".
-            # Skip invalid base64 without failing the pipeline.
-            pass
+            # Skip invalid base64 without failing the pipeline, but log for visibility.
+            logger.warning("AudioBufferManager.append_base64: invalid base64; ignoring. error=%s preview=%r", e, b64[:20])
 
     def clear(self) -> None:
         self.buffer.clear()
@@ -105,12 +110,12 @@ StoredItem = Union[ServerItem, ResponseItem]
 
 
 class TimelineContext(TypedDict):
-    timeline_items: List[ItemID]
+    timeline_items: list[ItemID]
 
 
 class CustomInputContext(TypedDict, total=False):
-    input_items: List[ClientItem]
-    append_input_items: List[ClientItem]
+    input_items: list[ClientItem]
+    append_input_items: list[ClientItem]
 
 
 class ResponseContext(TypedDict):
@@ -127,35 +132,35 @@ class StateStore(BaseModel):
     model_config = {"arbitrary_types_allowed": True}
 
     session: Optional[Session] = None
-    items: Dict[ItemID, StoredItem] = Field(default_factory=dict)
-    responses: Dict[ResponseID, Response] = Field(default_factory=dict)
+    items: dict[ItemID, StoredItem] = Field(default_factory=dict)
+    responses: dict[ResponseID, Response] = Field(default_factory=dict)
 
     # Maintains timeline order of created items (IDs) to help derive context.
-    timeline: List[ItemID] = Field(default_factory=list)
+    timeline: list[ItemID] = Field(default_factory=list)
 
     # Input audio buffer and speech markers per item
     input_audio_buffer: AudioBufferManager = Field(default_factory=AudioBufferManager)
-    speech_markers: Dict[ItemID, Dict[str, Optional[int]]] = Field(default_factory=dict)
+    speech_markers: dict[ItemID, dict[str, Optional[int]]] = Field(default_factory=dict)
 
     # Delta accumulation helpers
     # - For user item input_audio transcription (by item_id -> text)
-    input_transcripts: Dict[Tuple[ItemID, int], str] = Field(default_factory=dict)
+    input_transcripts: dict[Tuple[ItemID, int], str] = Field(default_factory=dict)
 
     # - For response text parts (response_id, item_id, content_index) -> text
-    resp_text_parts: Dict[Tuple[ResponseID, ItemID, int], str] = Field(default_factory=dict)
+    resp_text_parts: dict[Tuple[ResponseID, ItemID, int], str] = Field(default_factory=dict)
 
     # - For response audio transcript parts (response_id, item_id, content_index) -> transcript text
-    resp_audio_transcripts: Dict[Tuple[ResponseID, ItemID, int], str] = Field(default_factory=dict)
+    resp_audio_transcripts: dict[Tuple[ResponseID, ItemID, int], str] = Field(default_factory=dict)
 
     # - For response audio raw bytes accumulation (response_id, item_id, content_index) -> bytes
-    resp_audio_bytes: Dict[Tuple[ResponseID, ItemID, int], bytearray] = Field(default_factory=dict)
+    resp_audio_bytes: dict[Tuple[ResponseID, ItemID, int], bytearray] = Field(default_factory=dict)
 
     # - For function call arguments accumulation (response_id, call_id) -> args string
-    resp_func_args: Dict[Tuple[ResponseID, str], str] = Field(default_factory=dict)
+    resp_func_args: dict[Tuple[ResponseID, str], str] = Field(default_factory=dict)
 
     # Response context mapping
     # Stores two views: user_context (what model used on user side) and assistant_context (full context)
-    response_context: Dict[ResponseID, ResponseContext] = Field(default_factory=dict)
+    response_context: dict[ResponseID, ResponseContext] = Field(default_factory=dict)
 
     # Pending custom context registered on ResponseCreateMessage until a ResponseCreatedMessage materializes
     pending_custom_context: Optional[CustomInputContext] = None
@@ -183,7 +188,7 @@ Handler = Callable[[MessageType], None]
 
 class EventHandlerRegistry:
     def __init__(self) -> None:
-        self._handlers: Dict[str, Handler] = {}
+        self._handlers: dict[str, Handler] = {}
 
     T_msg = TypeVar("T_msg", bound=MessageType)
 
@@ -194,7 +199,7 @@ class EventHandlerRegistry:
     def get(self, event_type: str) -> Optional[Handler]:
         return self._handlers.get(event_type)
 
-    def bulk_register(self, mapping: Dict[str, Handler]) -> None:
+    def bulk_register(self, mapping: dict[str, Handler]) -> None:
         self._handlers.update(mapping)
 
 
@@ -268,7 +273,7 @@ ResponseEvent = Union[
 
 class EventHandlerGroups:
     def __init__(self) -> None:
-        self._dispatch: Dict[str, Handler] = {}
+        self._dispatch: dict[str, Handler] = {}
 
     def _add(self, event_type: str, handler: Callable[..., None]) -> None:
         def wrapper(msg: MessageType, _h=handler) -> None:
@@ -345,7 +350,7 @@ class EventHandlerGroups:
     def register_response(self, event_type: ResponseEventType, handler: Callable[..., None]) -> None:
         self._add(event_type, handler)
 
-    def to_dispatch_table(self) -> Dict[str, Handler]:
+    def to_dispatch_table(self) -> dict[str, Handler]:
         return dict(self._dispatch)
 
 
@@ -366,16 +371,19 @@ class ConversationManager:
 
         # Turn tracking
         self._turn_counter = 0
-        self._pending_create_queue: List[TurnRecord] = []
-        self._turns_by_response: Dict[ResponseID, TurnRecord] = {}
-        self._debounce_timers: Dict[ResponseID, threading.Timer] = {}
+        self._pending_create_queue: list[TurnRecord] = []
+        self._turns_by_response: dict[ResponseID, TurnRecord] = {}
+        self._debounce_timers: dict[ResponseID, threading.Timer] = {}
         self.turn_export_dir: Optional[str] = None  # if set, export completed turns here
         # Export numbering (contiguous across exported turns only)
         self._export_counter: int = 0
         # Populated by connection wrappers if available
         self.client_base_url: Optional[str] = None
+        # Track weave call objects per response to finish later
+        self._weave_calls: dict[ResponseID, Call] = {}
 
     async def start(self) -> None:
+        logger.debug("ConversationManager.start: starting worker task")
         if self._worker_task is None:
             self._worker_task = asyncio.create_task(self._worker())
 
@@ -396,6 +404,7 @@ class ConversationManager:
         # Event objects have a 'type' field in pydantic models.
         event_type = getattr(event, "type", None)
         if not event_type:
+            logger.error("process_event: event missing 'type': %r", event)
             return
         handler = self._registry.get(event_type)
         if handler:
@@ -403,8 +412,10 @@ class ConversationManager:
                 handler(event)
                 # After every event, opportunistically check any pending input completions
                 self._maybe_check_all_turns()
+        else:
+            logger.warning("process_event: no handler registered for event type '%s'", event_type)
 
-    def get_conversation_history(self) -> List[StoredItem]:
+    def get_conversation_history(self) -> list[StoredItem]:
         return [self.state.items[iid] for iid in self.state.timeline if iid in self.state.items]
 
     def get_item(self, item_id: ItemID) -> Optional[StoredItem]:
@@ -422,20 +433,6 @@ class ConversationManager:
         if start_ms is None or end_ms is None:
             return None
         return self.state.input_audio_buffer.get_segment_ms(start_ms, end_ms)
-
-    def export_state(self) -> Dict[str, object]:
-        # Export a JSON-serializable snapshot of current state
-        items = {str(k): v.model_dump() for k, v in self.state.items.items()}
-        responses = {str(k): v.model_dump() for k, v in self.state.responses.items()}
-        speech_raw: Dict[str, Dict[str, Optional[int]]] = {str(k): v for k, v in self.state.speech_markers.items()}
-        speech = cast(Dict[str, object], speech_raw)
-        return {
-            "session": self.state.session.model_dump() if self.state.session else None,
-            "items": items,
-            "responses": responses,
-            "timeline": list(self.state.timeline),
-            "speech_markers": speech,
-        }
 
     def _get_or_create_turn_for_created(self, resp_id: ResponseID) -> TurnRecord:
         # Bind the earliest pending create to this response
@@ -460,7 +457,7 @@ class ConversationManager:
             rec = self._get_or_create_turn_for_created(resp_id)
         return rec
 
-    def _collect_input_item_ids(self, rec: TurnRecord) -> List[ItemID]:
+    def _collect_input_item_ids(self, rec: TurnRecord) -> list[ItemID]:
         # Prefer assistant_context timeline as full context snapshot
         if rec.assistant_context and isinstance(rec.assistant_context, dict) and "timeline_items" in rec.assistant_context:
             return list(cast(TimelineContext, rec.assistant_context)["timeline_items"])  # type: ignore[index]
@@ -514,26 +511,46 @@ class ConversationManager:
                 self._on_client_complete(rec)
 
     def _on_client_complete(self, _rec: TurnRecord) -> None:
-        # Hook for client-complete; currently no-op beyond debug
-        # Could log or emit signal; we'll defer actual export until response is done
-        pass
-
-    def _export_turn(self, rec: TurnRecord) -> None:
-        if not self.turn_export_dir:
+        logger.debug("_on_client_complete: inputs complete for response")
+        # Once inputs for a turn are completed, create a weave call for this turn
+        # using the same formatted inputs as the export function.
+        rec = _rec
+        if not rec.response_id:
+            logger.warning("_on_client_complete: missing response_id; cannot create call")
             return
-        os.makedirs(self.turn_export_dir, exist_ok=True)
-        # Use contiguous numbering for exported turns
-        self._export_counter += 1
-        export_idx = self._export_counter
-        path = os.path.join(self.turn_export_dir, f"turn_{export_idx}.json")
-        payload = {
-            "inputs": self._build_inputs_payload(rec),
-            "output": self._build_output_payload(rec),
-        }
-        with open(path, "w") as f:
-            json.dump(payload, f)
+        # Avoid creating duplicate calls
+        if rec.response_id in self._weave_calls:
+            logger.debug("_on_client_complete: call already exists for response_id=%s", rec.response_id)
+            return
+        # Ensure we have a session id to bind the thread context
+        sess = self.state.session
+        if not sess:
+            logger.warning("_on_client_complete: no session; skipping trace creation")
+            return
+        try:
+            import weave  # local import to avoid hard dependency at module import time
+            # Acquire client from context within a thread tied to the session id
+            with weave.thread(sess.id):
+                from weave.trace.context.weave_client_context import get_weave_client
+                client = get_weave_client()
+                if not client:
+                    logger.warning("_on_client_complete: no weave client in context; skipping")
+                    return
+                # Build inputs matching export formatting
+                inputs = self._build_inputs_payload(rec)
+                # Use the op name conversation_turn, like sessions.py
+                call = client.create_call(op="conversation_turn", inputs=inputs)
+                self._weave_calls[rec.response_id] = call
+                # If the response already finished, finish immediately here
+                if rec.response_done:
+                    outputs = self._build_output_payload(rec)
+                    client.finish_call(call, output=outputs)
+        except Exception as e:
+            logger.error(f"Error submitting trace in _on_client_complete - {e}")
+            # Never let tracing interfere with core flow
+            return
 
-    def _build_inputs_payload(self, rec: TurnRecord) -> Dict[str, object]:
+    def _build_inputs_payload(self, rec: TurnRecord) -> dict[str, object]:
         """Build Inputs payload matching the requested schema."""
         sess = self.state.session
         item_ids = self._collect_input_item_ids(rec)
@@ -553,10 +570,11 @@ class ConversationManager:
                 return None
             try:
                 return base64.b64encode(seg).decode("ascii")
-            except Exception:
+            except Exception as e:
+                logger.warning("_build_inputs_payload: failed to base64-encode user audio for item_id=%s: %s", iid, e)
                 return None
 
-        messages: List[Dict[str, object]] = []
+        messages: list[dict[str, object]] = []
 
         for iid in item_ids:
             it = self.state.items.get(iid)
@@ -564,7 +582,7 @@ class ConversationManager:
                 continue
 
             if isinstance(it, ServerSystemMessageItem):
-                texts: List[str] = []
+                texts: list[str] = []
                 for p in (it.content or []):
                     if getattr(p, "type", None) in ("input_text", "text"):
                         txt = getattr(p, "text", None)
@@ -601,7 +619,7 @@ class ConversationManager:
 
             if isinstance(it, ServerAssistantMessageItem):
                 rid = _response_id_for_item(iid)
-                parts: List[Dict[str, object]] = []
+                parts: list[dict[str, object]] = []
                 for idx, p in enumerate(it.content or []):
                     if getattr(p, "type", None) == "audio":
                         b64 = None
@@ -610,7 +628,8 @@ class ConversationManager:
                             if buf:
                                 try:
                                     b64 = base64.b64encode(bytes(buf)).decode("ascii")
-                                except Exception:
+                                except Exception as e:
+                                    logger.warning("_build_inputs_payload: failed to base64-encode assistant audio (rid=%s,iid=%s,idx=%s): %s", rid, iid, idx, e)
                                     b64 = None
                         parts.append({
                             "type": "audio",
@@ -695,18 +714,20 @@ class ConversationManager:
             "modalities": list(sess.modalities) if sess and sess.modalities is not None else ["audio", "text"],
         }
 
-    def _build_output_payload(self, rec: TurnRecord) -> Dict[str, object]:
+    def _build_output_payload(self, rec: TurnRecord) -> dict[str, object]:
         """Build Output payload matching the requested schema."""
         if not rec.response_id:
+            logger.warning("_build_output_payload: missing response_id; returning empty payload")
             return {}
         resp = self.get_response(rec.response_id)
         if not resp:
+            logger.warning("_build_output_payload: response not found for response_id=%s", rec.response_id)
             return {}
 
         sess = self.state.session
 
         # Build assistant message content
-        content: List[Dict[str, object]] = []
+        content: list[dict[str, object]] = []
         for it in resp.output:
             if isinstance(it, ResponseMessageItem) and getattr(it, "role", None) == "assistant":
                 for idx, p in enumerate(it.content or []):
@@ -716,7 +737,8 @@ class ConversationManager:
                         if buf:
                             try:
                                 b64 = base64.b64encode(bytes(buf)).decode("ascii")
-                            except Exception:
+                            except Exception as e:
+                                logger.warning("_build_output_payload: failed to base64-encode assistant audio (rid=%s,iid=%s,idx=%s): %s", resp.id, it.id, idx, e)
                                 b64 = None
                         content.append({
                             "type": "audio",
@@ -727,7 +749,7 @@ class ConversationManager:
                             },
                         })
 
-        assistant_message: Dict[str, object] = {
+        assistant_message: dict[str, object] = {
             "role": "assistant",
             "content": content or None,
             "refusal": None,
@@ -736,7 +758,7 @@ class ConversationManager:
             "tool_calls": None,
         }
 
-        usage_obj: Optional[Dict[str, object]] = None
+        usage_obj: Optional[dict[str, object]] = None
         if resp.usage is not None:
             u = resp.usage
             usage_obj = {
@@ -860,14 +882,14 @@ class ConversationManager:
         if markers and markers.get("audio_end_ms"):
             # Convert audio_end_ms (ms) to samples and then to ms boundary using session rate if desired
             # For now, trust provided ms and leave as-is, as we slice by ms.
-            pass
+            logger.debug("_handle_item_truncated: audio_end_ms already set for item_id=%s; leaving markers as-is", msg.item_id)
 
     def _handle_item_deleted(self, msg: ItemDeletedMessage) -> None:
         self.state.items.pop(msg.item_id, None)
         try:
             self.state.timeline.remove(msg.item_id)
         except ValueError:
-            pass
+            logger.debug("_handle_item_deleted: item_id=%s not present in timeline", msg.item_id)
 
     def _handle_item_input_audio_transcription_delta(self, msg: ItemInputAudioTranscriptionDeltaMessage) -> None:
         key = (msg.item_id, msg.content_index)
@@ -881,7 +903,9 @@ class ConversationManager:
                 part = item.content[msg.content_index]
                 if isinstance(part, InputAudioContentPart):
                     part.transcript = (part.transcript or "") + msg.delta
-            except Exception:
+            except Exception as e:
+                logger.error(f"Error _handle_item_input_audio_transcription_delta - {e}")
+                # continue without raising
                 pass
 
     def _handle_item_input_audio_transcription_completed(self, msg: ItemInputAudioTranscriptionCompletedMessage) -> None:
@@ -894,7 +918,9 @@ class ConversationManager:
                 part = item.content[msg.content_index]
                 if isinstance(part, InputAudioContentPart):
                     part.transcript = msg.transcript
-            except Exception:
+            except Exception as e:
+                logger.error("_handle_item_input_audio_transcription_completed: failed to set transcript for item_id=%s index=%s: %s", msg.item_id, msg.content_index, e)
+                # continue without raising
                 pass
 
     # Responses
@@ -946,6 +972,7 @@ class ConversationManager:
         # Mark output complete for this turn and handle export logic
         rec = self._ensure_turn_for_resp(msg.response.id)
         if not rec:
+            logger.warning("_handle_response_done: missing TurnRecord for response_id=%s", msg.response.id)
             return
         rec.response_done = True
         self._handle_turn_completion(rec)
@@ -985,11 +1012,13 @@ class ConversationManager:
     def _handle_response_content_part_added(self, msg: ResponseContentPartAddedMessage) -> None:
         resp = self.state.responses.get(msg.response_id)
         if not resp:
+            logger.warning("_handle_response_content_part_added: response not found for response_id=%s", msg.response_id)
             return
         # Ensure item exists in response output
         try:
             item = next(i for i in resp.output if i.id == msg.item_id)
         except StopIteration:
+            logger.warning("_handle_response_content_part_added: item_id=%s not found in response_id=%s output", msg.item_id, msg.response_id)
             return
         # Ensure content list has a slot for the index
         if isinstance(item, ResponseMessageItem):
@@ -1012,10 +1041,12 @@ class ConversationManager:
         # On done, write final values back into the response item content
         resp = self.state.responses.get(msg.response_id)
         if not resp:
+            logger.warning("_handle_response_content_part_done: response not found for response_id=%s", msg.response_id)
             return
         try:
             item = next(i for i in resp.output if i.id == msg.item_id)
         except StopIteration:
+            logger.warning("_handle_response_content_part_done: item_id=%s not found in response_id=%s output", msg.item_id, msg.response_id)
             return
         if isinstance(item, ResponseMessageItem):
             # Ensure content list index exists
@@ -1031,6 +1062,7 @@ class ConversationManager:
         # Mirror into the response item content if present
         resp = self.state.responses.get(msg.response_id)
         if not resp:
+            logger.warning("_handle_response_text_delta: response not found for response_id=%s", msg.response_id)
             return
         try:
             item = next(i for i in resp.output if i.id == msg.item_id)
@@ -1042,6 +1074,7 @@ class ConversationManager:
                 if isinstance(part, ResponseItemTextContentPart):
                     part.text = (part.text or "") + msg.delta
         except StopIteration:
+            logger.warning("_handle_response_text_delta: item_id=%s not found in response_id=%s output", msg.item_id, msg.response_id)
             return
 
     def _handle_response_text_done(self, msg: ResponseTextDoneMessage) -> None:
@@ -1050,6 +1083,7 @@ class ConversationManager:
 
         resp = self.state.responses.get(msg.response_id)
         if not resp:
+            logger.warning("_handle_response_text_done: response not found for response_id=%s", msg.response_id)
             return
         try:
             item = next(i for i in resp.output if i.id == msg.item_id)
@@ -1058,6 +1092,7 @@ class ConversationManager:
                     item.content.append(ResponseItemTextContentPart(type="text", text=""))
                 item.content[msg.content_index] = ResponseItemTextContentPart(type="text", text=msg.text)
         except StopIteration:
+            logger.warning("_handle_response_text_done: item_id=%s not found in response_id=%s output", msg.item_id, msg.response_id)
             return
 
     def _handle_response_audio_transcript_delta(self, msg: ResponseAudioTranscriptDeltaMessage) -> None:
@@ -1068,6 +1103,7 @@ class ConversationManager:
         # Mirror into ResponseMessageItem audio part transcript if present
         resp = self.state.responses.get(msg.response_id)
         if not resp:
+            logger.warning("_handle_response_audio_transcript_delta: response not found for response_id=%s", msg.response_id)
             return
         try:
             item = next(i for i in resp.output if i.id == msg.item_id)
@@ -1078,6 +1114,7 @@ class ConversationManager:
                 if isinstance(part, ResponseItemAudioContentPart):
                     part.transcript = (part.transcript or "") + msg.delta
         except StopIteration:
+            logger.warning("_handle_response_audio_transcript_delta: item_id=%s not found in response_id=%s output", msg.item_id, msg.response_id)
             return
 
     def _handle_response_audio_transcript_done(self, msg: ResponseAudioTranscriptDoneMessage) -> None:
@@ -1086,6 +1123,7 @@ class ConversationManager:
 
         resp = self.state.responses.get(msg.response_id)
         if not resp:
+            logger.warning("_handle_response_audio_transcript_done: response not found for response_id=%s", msg.response_id)
             return
         try:
             item = next(i for i in resp.output if i.id == msg.item_id)
@@ -1096,6 +1134,7 @@ class ConversationManager:
                     type="audio", transcript=msg.transcript
                 )
         except StopIteration:
+            logger.warning("_handle_response_audio_transcript_done: item_id=%s not found in response_id=%s output", msg.item_id, msg.response_id)
             return
 
     def _handle_response_audio_delta(self, msg: ResponseAudioDeltaMessage) -> None:
@@ -1103,13 +1142,14 @@ class ConversationManager:
         buf = self.state.resp_audio_bytes.setdefault(key, bytearray())
         try:
             buf.extend(base64.b64decode(msg.delta))
-        except Exception:
-            # Ignore placeholder strings in fixtures
+        except Exception as e:
+            # Ignore placeholder strings in fixtures, but log for visibility
+            logger.warning("_handle_response_audio_delta: failed to base64-decode audio (rid=%s,iid=%s,idx=%s): %s", msg.response_id, msg.item_id, msg.content_index, e)
             pass
 
     def _handle_response_audio_done(self, _msg: ResponseAudioDoneMessage) -> None:
         # No-op for now; bytes are accumulated in resp_audio_bytes
-        pass
+        logger.debug("_handle_response_audio_done: received audio done message")
 
     def _handle_response_function_call_arguments_delta(
         self, msg: ResponseFunctionCallArgumentsDeltaMessage
@@ -1125,6 +1165,7 @@ class ConversationManager:
         self.state.resp_func_args[key] = msg.arguments
 
     def _handle_turn_completion(self, rec: TurnRecord) -> None:
+        logger.debug("_handle_turn_completion: evaluating turn completion")
         # If inputs are not complete yet, debounce a check in 200ms
         if not rec.inputs_complete:
             # Cancel any existing timer
@@ -1138,7 +1179,7 @@ class ConversationManager:
                     self._on_client_complete(rec)
                 if rec.inputs_complete and rec.response_done:
                     self._on_response_complete(rec)
-            timer = threading.Timer(0.2, _cb)
+            timer = threading.Timer(0.1, _cb)
             self._debounce_timers[cast(ResponseID, rec.response_id)] = timer
             timer.start()
             return
@@ -1149,9 +1190,11 @@ class ConversationManager:
     def _on_response_complete(self, rec: TurnRecord) -> None:
         # Only export turns for completed responses (skip cancelled/incomplete)
         if not rec.response_id:
+            logger.warning("_on_response_complete: missing response_id; cannot finish call")
             return
         resp = self.get_response(rec.response_id)
         if not resp or getattr(resp, "status", None) != "completed":
+            logger.warning("_on_response_complete: response missing or not completed for response_id=%s", rec.response_id)
             return
         # Skip exports for non-message-only responses (e.g., pure function_call turns)
         has_assistant_message = any(
@@ -1159,6 +1202,39 @@ class ConversationManager:
             for it in getattr(resp, "output", [])
         )
         if not has_assistant_message:
+            logger.debug("_on_response_complete: no assistant message in output; skipping export for response_id=%s", rec.response_id)
             return
         # Export turn payload if configured
-        self._export_turn(rec)
+        # Finish the weave call for this response. If the call does not exist yet
+        # but inputs are already complete, create it here and immediately finish.
+        sess = self.state.session
+        if not sess:
+            logger.warning("_on_response_complete: no session; cannot create/finish call for response_id=%s", rec.response_id)
+            return
+        call = self._weave_calls.get(rec.response_id)
+        try:
+            import weave
+            with weave.thread(sess.id):
+                from weave.trace.context.weave_client_context import get_weave_client
+                client = get_weave_client()
+                if not client:
+                    logger.warning("_on_response_complete: no weave client in context; skipping finish for response_id=%s", rec.response_id)
+                    return
+                # Create call on-demand if missing but inputs are complete
+                if call is None and rec.inputs_complete:
+                    inputs = self._build_inputs_payload(rec)
+                    try:
+                        from sessions import conversation_turn  # type: ignore
+                    except Exception as e:
+                        logger.warning("_on_response_complete: failed to import conversation_turn op: %s", e)
+                        return
+                    call = client.create_call(op=conversation_turn, inputs=inputs)
+                    self._weave_calls[rec.response_id] = call
+                if call is None:
+                    logger.warning("_on_response_complete: call still None; cannot finish for response_id=%s", rec.response_id)
+                    return
+                outputs = self._build_output_payload(rec)
+                client.finish_call(call, output=outputs)
+        except Exception as e:
+            logger.error(f"Error submitting call in _on_response_complete - {e}")
+            return
