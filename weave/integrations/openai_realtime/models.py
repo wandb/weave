@@ -163,7 +163,11 @@ class InputTextContentPart(BaseModel):
 
 class InputAudioContentPart(BaseModel):
     type: Literal["input_audio"] = "input_audio"
-    audio: str
+    # Some server events (e.g., conversation.item.created) may omit the raw
+    # audio payload and only include a transcript placeholder. Make audio
+    # optional to be tolerant of such cases during replays and future API
+    # changes.
+    audio: Optional[str] = None
     transcript: Optional[str] = None
 
 
@@ -176,7 +180,7 @@ SystemContentPart = InputTextContentPart
 UserContentPart = Union[Annotated[Union[InputTextContentPart, InputAudioContentPart], Field(discriminator="type")]]
 AssistantContentPart = OutputTextContentPart
 
-ItemParamStatus = Literal["completed", "incomplete"]
+ItemParamStatus = Literal["completed", "incomplete", "in_progress"]
 
 # Base classes for items - common attributes
 class BaseMessageItem(BaseModel):
@@ -549,7 +553,7 @@ ResponseStatusDetails = Annotated[
 class TokenDetails(BaseModel):
     text_tokens: int
     audio_tokens: int
-    image_tokens: int
+    image_tokens: Optional[int] = 0
 
 class InputTokenDetails(TokenDetails):
     cached_tokens: int
@@ -828,11 +832,13 @@ def create_message_from_dict(data: dict) -> MessageType:
     Creates a message object from a dictionary based on its 'type'.
     """
     event_type = data.get("type") or ""
-    if event_type in USER_MESSAGE_CLASSES:
-        return create_user_message_from_dict(data)
+    if event_type in USER_MESSAGE_CLASSES.keys():
+        cls =  USER_MESSAGE_CLASSES[event_type]
+        return cls(**data)
 
-    elif event_type in SERVER_MESSAGE_CLASSES:
-        return create_server_message_from_dict(data)
+    elif event_type in SERVER_MESSAGE_CLASSES.keys():
+        cls =  SERVER_MESSAGE_CLASSES[event_type]
+        return cls(**data)
 
     return UnknownClientMessage(**data)
 
