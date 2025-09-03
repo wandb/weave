@@ -7,14 +7,14 @@ import websocket
 import weave
 
 # Use project-local modules (no package-relative imports here)
-from models import (
+from weave.integrations.openai_realtime.models import (
     create_server_message_from_dict,
     create_user_message_from_dict,
 )
-from conversation_manager import ConversationManager
+from weave.integrations.openai_realtime.conversation_manager import ConversationManager
 
 try:
-    from aiohttp import ClientWebSocketResponse, WSMsgType
+    from aiohttp import WSMsgType
 except ImportError:
     ClientWebSocketResponse = None
     WSMsgType = None
@@ -177,6 +177,7 @@ class WeaveAsyncWebsocketConnection:
             return await self.original_connection.send(*args, **kwargs)
 
     async def recv(self, *args: Any, **kwargs: Any) -> Any:
+        print('here')
         with weave.attributes({"websocket_id": self.id}):
             message = await self.original_connection.recv(*args, **kwargs)
             parsed_message = _try_json_load(message)
