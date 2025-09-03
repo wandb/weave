@@ -79,7 +79,11 @@ class StateStore(BaseModel):
     responses: dict[models.ResponseID, models.Response] = Field(default_factory=dict)
 
     # Maintains timeline order of created items (IDs) to help derive context.
+    # Note: We additionally track a doubly-linked list via prev/next maps to
+    # reconstruct a chain around any particular item using previous_item_id.
     timeline: list[models.ItemID] = Field(default_factory=list)
+    prev_by_item: dict[models.ItemID, Optional[models.ItemID]] = Field(default_factory=dict)
+    next_by_item: dict[models.ItemID, Optional[models.ItemID]] = Field(default_factory=dict)
 
     # Input audio buffer and speech markers per item
     input_audio_buffer: AudioBufferManager = Field(default_factory=AudioBufferManager)
@@ -105,6 +109,11 @@ class StateStore(BaseModel):
     # Stores two views: user_context (what model used on user side) and assistant_context (full context)
     response_context: dict[models.ResponseID, ResponseContext] = Field(default_factory=dict)
 
+    # Map from an input item (previous item in output chain) -> response id
+    # This is populated on response completion, using the prev linkage for any
+    # output items observed in that response.
+    response_by_prev_item: dict[models.ItemID, models.ResponseID] = Field(default_factory=dict)
+
     # Pending custom context registered on ResponseCreateMessage until a ResponseCreatedMessage materializes
     pending_custom_context: Optional[CustomInputContext] = None
 
@@ -121,3 +130,55 @@ class StateStore(BaseModel):
 
     def get_response(self, response_id: models.ResponseID) -> Optional[models.Response]:
         return self.responses.get(response_id)
+
+    # ---- Doubly linked list helpers ----
+    def link_items(self, prev_item_id: Optional[models.ItemID], curr_item_id: models.ItemID) -> None:
+        """
+        Record a linkage between two items as part of the conversation chain.
+        This uses the provided previous_item_id (if any) to update a doubly-linked
+        list structure so we can traverse the chain from any item.
+        """
+        # Ensure entries exist
+        if curr_item_id not in self.prev_by_item:
+            self.prev_by_item[curr_item_id] = None
+        if curr_item_id not in self.next_by_item:
+            self.next_by_item[curr_item_id] = None
+
+        # Link backwards pointer for current
+        self.prev_by_item[curr_item_id] = prev_item_id
+
+        # Link forward pointer for previous, if provided
+        if prev_item_id is not None:
+            self.next_by_item[prev_item_id] = curr_item_id
+            # Ensure prev node exists in maps
+            if prev_item_id not in self.prev_by_item:
+                self.prev_by_item[prev_item_id] = None
+            if prev_item_id not in self.next_by_item:
+                self.next_by_item[prev_item_id] = curr_item_id
+
+    def get_timeline_chain_for(self, item_id: models.ItemID) -> list[models.ItemID]:
+        """
+        Given an item_id (input or response item), walk backwards to the head
+        of the chain using prev_by_item, then forward using next_by_item to
+        construct the full ordered list of item IDs.
+        Returns at least [item_id] if no links exist.
+        """
+        if not item_id:
+            return []
+        # Find head
+        head = item_id
+        while True:
+            prev = self.prev_by_item.get(head)
+            if prev is None:
+                break
+            head = prev
+
+        # Walk forward from head
+        chain: list[models.ItemID] = []
+        curr: Optional[models.ItemID] = head
+        visited: set[models.ItemID] = set()
+        while curr is not None and curr not in visited:
+            chain.append(curr)
+            visited.add(curr)
+            curr = self.next_by_item.get(curr)
+        return chain
