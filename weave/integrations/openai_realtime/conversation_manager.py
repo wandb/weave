@@ -2,177 +2,27 @@ from __future__ import annotations
 
 import asyncio
 import base64
-from dataclasses import dataclass, field
 from threading import Lock
-from typing import Callable, Optional, Tuple, Union, TypeVar, cast, overload, Literal
-from typing_extensions import TypedDict
+from typing import Optional, Union, cast
 import threading
 import time
-import os
-import json
 import logging
 
 from pydantic import BaseModel, Field
 
-from weave.integrations.openai_realtime.models import (
-    ClientItem,
-    InputAudioBufferAppendMessage,
-    InputAudioBufferClearedMessage,
-    InputAudioBufferCommittedMessage,
-    InputAudioBufferSpeechStartedMessage,
-    InputAudioBufferSpeechStoppedMessage,
-    ItemCreatedMessage,
-    ItemDeletedMessage,
-    ItemID,
-    ItemInputAudioTranscriptionCompletedMessage,
-    ItemInputAudioTranscriptionDeltaMessage,
-    ItemTruncatedMessage,
-    MessageType,
-    Response,
-    ResponseAudioDeltaMessage,
-    ResponseAudioDoneMessage,
-    ResponseAudioTranscriptDeltaMessage,
-    ResponseAudioTranscriptDoneMessage,
-    ResponseContentPartAddedMessage,
-    ResponseContentPartDoneMessage,
-    ResponseCreateMessage,
-    ResponseCreatedMessage,
-    ResponseDoneMessage,
-    ResponseFunctionCallArgumentsDeltaMessage,
-    ResponseFunctionCallArgumentsDoneMessage,
-    ResponseID,
-    ResponseItem,
-    ResponseMessageItem,
-    ResponseItemTextContentPart,
-    ResponseItemAudioContentPart,
-    ResponseOutputItemAddedMessage,
-    ResponseOutputItemDoneMessage,
-    ResponseTextDeltaMessage,
-    ResponseTextDoneMessage,
-    Session,
-    SessionCreatedMessage,
-    SessionUpdatedMessage,
-    ServerItem,
-    ServerUserMessageItem,
-    ServerAssistantMessageItem,
-    ServerSystemMessageItem,
-    InputAudioContentPart,
-    ResponseMessageItem,
-)
+from weave.integrations.openai_realtime import models
+from weave.integrations.openai_realtime.handler_registry import EventHandlerGroups, EventHandlerRegistry
+from weave.integrations.openai_realtime.state_manager import CustomInputContext, StateStore, StoredItem, TimelineContext
 from weave.trace.weave_client import Call
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class AudioBufferManager:
-    """
-    Maintains a single, continuous PCM audio buffer for a conversation and
-    provides helpers to slice out segments by millisecond offsets.
-
-    Default format: 16-bit PCM, mono, 24kHz (extensible).
-    """
-
-    sample_rate_hz: int = 24000
-    bits_per_sample: int = 16
-    channels: int = 1
-    buffer: bytearray = field(default_factory=bytearray)
-
-    def bytes_per_sample(self) -> int:
-        return (self.bits_per_sample // 8) * self.channels
-
-    def append_base64(self, b64: str) -> None:
-        """Decode base64 audio and append. Ignores invalid payloads gracefully."""
-        try:
-            self.buffer.extend(base64.b64decode(b64))
-        except Exception as e:
-            # Some fixtures use placeholder strings like "<audio bytes>".
-            # Skip invalid base64 without failing the pipeline, but log for visibility.
-            logger.warning("AudioBufferManager.append_base64: invalid base64; ignoring. error=%s preview=%r", e, b64[:20])
-
-    def clear(self) -> None:
-        self.buffer.clear()
-
-    def _ms_to_byte_range(self, start_ms: int, end_ms: int) -> Tuple[int, int]:
-        bps = self.bytes_per_sample()
-        start_samples = int((start_ms / 1000.0) * self.sample_rate_hz)
-        end_samples = int((end_ms / 1000.0) * self.sample_rate_hz)
-        return start_samples * bps, end_samples * bps
-
-    def get_segment_ms(self, start_ms: int, end_ms: int) -> bytes:
-        start_b, end_b = self._ms_to_byte_range(start_ms, end_ms)
-        start_b = max(0, start_b)
-        end_b = min(len(self.buffer), max(start_b, end_b))
-        return bytes(self.buffer[start_b:end_b])
-
-
-StoredItem = Union[ServerItem, ResponseItem]
-
-
-class TimelineContext(TypedDict):
-    timeline_items: list[ItemID]
-
-
-class CustomInputContext(TypedDict, total=False):
-    input_items: list[ClientItem]
-    append_input_items: list[ClientItem]
-
-
-class ResponseContext(TypedDict):
-    user_context: Union[TimelineContext, CustomInputContext]
-    assistant_context: TimelineContext
-
-
-class StateStore(BaseModel):
-    """
-    Central state for a single conversation session.
-    Tracks session, items, responses, audio buffer, speech markers, and delta accumulators.
-    """
-
-    model_config = {"arbitrary_types_allowed": True}
-
-    session: Optional[Session] = None
-    items: dict[ItemID, StoredItem] = Field(default_factory=dict)
-    responses: dict[ResponseID, Response] = Field(default_factory=dict)
-
-    # Maintains timeline order of created items (IDs) to help derive context.
-    timeline: list[ItemID] = Field(default_factory=list)
-
-    # Input audio buffer and speech markers per item
-    input_audio_buffer: AudioBufferManager = Field(default_factory=AudioBufferManager)
-    speech_markers: dict[ItemID, dict[str, Optional[int]]] = Field(default_factory=dict)
-
-    # Delta accumulation helpers
-    # - For user item input_audio transcription (by item_id -> text)
-    input_transcripts: dict[Tuple[ItemID, int], str] = Field(default_factory=dict)
-
-    # - For response text parts (response_id, item_id, content_index) -> text
-    resp_text_parts: dict[Tuple[ResponseID, ItemID, int], str] = Field(default_factory=dict)
-
-    # - For response audio transcript parts (response_id, item_id, content_index) -> transcript text
-    resp_audio_transcripts: dict[Tuple[ResponseID, ItemID, int], str] = Field(default_factory=dict)
-
-    # - For response audio raw bytes accumulation (response_id, item_id, content_index) -> bytes
-    resp_audio_bytes: dict[Tuple[ResponseID, ItemID, int], bytearray] = Field(default_factory=dict)
-
-    # - For function call arguments accumulation (response_id, call_id) -> args string
-    resp_func_args: dict[Tuple[ResponseID, str], str] = Field(default_factory=dict)
-
-    # Response context mapping
-    # Stores two views: user_context (what model used on user side) and assistant_context (full context)
-    response_context: dict[ResponseID, ResponseContext] = Field(default_factory=dict)
-
-    # Pending custom context registered on ResponseCreateMessage until a ResponseCreatedMessage materializes
-    pending_custom_context: Optional[CustomInputContext] = None
-
-    # Input tracking helpers
-    committed_item_ids: set[ItemID] = Field(default_factory=set)
-
 
 class TurnRecord(BaseModel):
     """Tracks a single turn keyed by response_id."""
 
-    response_id: Optional[ResponseID] = None
+    response_id: Optional[models.ResponseID] = None
     created_at: float = Field(default_factory=lambda: time.time())
     user_context: Optional[Union[TimelineContext, CustomInputContext]] = None
     assistant_context: Optional[TimelineContext] = None
@@ -182,176 +32,6 @@ class TurnRecord(BaseModel):
     # Internal: we saw a user 'response.create' for this turn before server 'response.created'
     saw_response_create: bool = False
 
-
-Handler = Callable[[MessageType], None]
-
-
-class EventHandlerRegistry:
-    def __init__(self) -> None:
-        self._handlers: dict[str, Handler] = {}
-
-    T_msg = TypeVar("T_msg", bound=MessageType)
-
-    def register(self, event_type: str, handler: Callable[[T_msg], None]) -> None:
-        # Safe cast: the registry only dispatches the matching event type
-        self._handlers[event_type] = cast(Handler, handler)
-
-    def get(self, event_type: str) -> Optional[Handler]:
-        return self._handlers.get(event_type)
-
-    def bulk_register(self, mapping: dict[str, Handler]) -> None:
-        self._handlers.update(mapping)
-
-
-
-SessionEventType = Union[Literal["session.created"], Literal["session.updated"]]
-InputAudioEventType = Union[
-    Literal["input_audio_buffer.append"],
-    Literal["input_audio_buffer.cleared"],
-    Literal["input_audio_buffer.committed"],
-    Literal["input_audio_buffer.speech_started"],
-    Literal["input_audio_buffer.speech_stopped"],
-]
-ItemEventType = Union[
-    Literal["conversation.item.created"],
-    Literal["conversation.item.truncated"],
-    Literal["conversation.item.deleted"],
-    Literal["conversation.item.input_audio_transcription.delta"],
-    Literal["conversation.item.input_audio_transcription.completed"],
-]
-ResponseEventType = Union[
-    Literal["response.create"],
-    Literal["response.created"],
-    Literal["response.done"],
-    Literal["response.output_item.added"],
-    Literal["response.output_item.done"],
-    Literal["response.content_part.added"],
-    Literal["response.content_part.done"],
-    Literal["response.text.delta"],
-    Literal["response.text.done"],
-    Literal["response.audio_transcript.delta"],
-    Literal["response.audio_transcript.done"],
-    Literal["response.audio.delta"],
-    Literal["response.audio.done"],
-    Literal["response.function_call_arguments.delta"],
-    Literal["response.function_call_arguments.done"],
-]
-
-SessionMessage = Union[SessionCreatedMessage, SessionUpdatedMessage]
-InputAudioBufferMessage = Union[
-    InputAudioBufferAppendMessage,
-    InputAudioBufferClearedMessage,
-    InputAudioBufferCommittedMessage,
-    InputAudioBufferSpeechStartedMessage,
-    InputAudioBufferSpeechStoppedMessage,
-]
-ItemMessage = Union[
-    ItemCreatedMessage,
-    ItemTruncatedMessage,
-    ItemDeletedMessage,
-    ItemInputAudioTranscriptionDeltaMessage,
-    ItemInputAudioTranscriptionCompletedMessage,
-]
-ResponseEvent = Union[
-    ResponseCreateMessage,
-    ResponseCreatedMessage,
-    ResponseDoneMessage,
-    ResponseOutputItemAddedMessage,
-    ResponseOutputItemDoneMessage,
-    ResponseContentPartAddedMessage,
-    ResponseContentPartDoneMessage,
-    ResponseTextDeltaMessage,
-    ResponseTextDoneMessage,
-    ResponseAudioTranscriptDeltaMessage,
-    ResponseAudioTranscriptDoneMessage,
-    ResponseAudioDeltaMessage,
-    ResponseAudioDoneMessage,
-    ResponseFunctionCallArgumentsDeltaMessage,
-    ResponseFunctionCallArgumentsDoneMessage,
-]
-
-
-class EventHandlerGroups:
-    def __init__(self) -> None:
-        self._dispatch: dict[str, Handler] = {}
-
-    def _add(self, event_type: str, handler: Callable[..., None]) -> None:
-        def wrapper(msg: MessageType, _h=handler) -> None:
-            _h(msg)
-        self._dispatch[event_type] = wrapper
-
-    # Session
-    @overload
-    def register_session(self, event_type: Literal["session.created"], handler: Callable[[SessionCreatedMessage], None]) -> None: ...
-    @overload
-    def register_session(self, event_type: Literal["session.updated"], handler: Callable[[SessionUpdatedMessage], None]) -> None: ...
-    def register_session(self, event_type: SessionEventType, handler: Callable[..., None]) -> None:
-        self._add(event_type, handler)
-
-    # Input audio buffer
-    @overload
-    def register_input_audio(self, event_type: Literal["input_audio_buffer.append"], handler: Callable[[InputAudioBufferAppendMessage], None]) -> None: ...
-    @overload
-    def register_input_audio(self, event_type: Literal["input_audio_buffer.cleared"], handler: Callable[[InputAudioBufferClearedMessage], None]) -> None: ...
-    @overload
-    def register_input_audio(self, event_type: Literal["input_audio_buffer.committed"], handler: Callable[[InputAudioBufferCommittedMessage], None]) -> None: ...
-    @overload
-    def register_input_audio(self, event_type: Literal["input_audio_buffer.speech_started"], handler: Callable[[InputAudioBufferSpeechStartedMessage], None]) -> None: ...
-    @overload
-    def register_input_audio(self, event_type: Literal["input_audio_buffer.speech_stopped"], handler: Callable[[InputAudioBufferSpeechStoppedMessage], None]) -> None: ...
-    def register_input_audio(self, event_type: InputAudioEventType, handler: Callable[..., None]) -> None:
-        self._add(event_type, handler)
-
-    # Conversation items
-    @overload
-    def register_item(self, event_type: Literal["conversation.item.created"], handler: Callable[[ItemCreatedMessage], None]) -> None: ...
-    @overload
-    def register_item(self, event_type: Literal["conversation.item.truncated"], handler: Callable[[ItemTruncatedMessage], None]) -> None: ...
-    @overload
-    def register_item(self, event_type: Literal["conversation.item.deleted"], handler: Callable[[ItemDeletedMessage], None]) -> None: ...
-    @overload
-    def register_item(self, event_type: Literal["conversation.item.input_audio_transcription.delta"], handler: Callable[[ItemInputAudioTranscriptionDeltaMessage], None]) -> None: ...
-    @overload
-    def register_item(self, event_type: Literal["conversation.item.input_audio_transcription.completed"], handler: Callable[[ItemInputAudioTranscriptionCompletedMessage], None]) -> None: ...
-    def register_item(self, event_type: ItemEventType, handler: Callable[..., None]) -> None:
-        self._add(event_type, handler)
-
-    # Responses
-    @overload
-    def register_response(self, event_type: Literal["response.create"], handler: Callable[[ResponseCreateMessage], None]) -> None: ...
-    @overload
-    def register_response(self, event_type: Literal["response.created"], handler: Callable[[ResponseCreatedMessage], None]) -> None: ...
-    @overload
-    def register_response(self, event_type: Literal["response.done"], handler: Callable[[ResponseDoneMessage], None]) -> None: ...
-    @overload
-    def register_response(self, event_type: Literal["response.output_item.added"], handler: Callable[[ResponseOutputItemAddedMessage], None]) -> None: ...
-    @overload
-    def register_response(self, event_type: Literal["response.output_item.done"], handler: Callable[[ResponseOutputItemDoneMessage], None]) -> None: ...
-    @overload
-    def register_response(self, event_type: Literal["response.content_part.added"], handler: Callable[[ResponseContentPartAddedMessage], None]) -> None: ...
-    @overload
-    def register_response(self, event_type: Literal["response.content_part.done"], handler: Callable[[ResponseContentPartDoneMessage], None]) -> None: ...
-    @overload
-    def register_response(self, event_type: Literal["response.text.delta"], handler: Callable[[ResponseTextDeltaMessage], None]) -> None: ...
-    @overload
-    def register_response(self, event_type: Literal["response.text.done"], handler: Callable[[ResponseTextDoneMessage], None]) -> None: ...
-    @overload
-    def register_response(self, event_type: Literal["response.audio_transcript.delta"], handler: Callable[[ResponseAudioTranscriptDeltaMessage], None]) -> None: ...
-    @overload
-    def register_response(self, event_type: Literal["response.audio_transcript.done"], handler: Callable[[ResponseAudioTranscriptDoneMessage], None]) -> None: ...
-    @overload
-    def register_response(self, event_type: Literal["response.audio.delta"], handler: Callable[[ResponseAudioDeltaMessage], None]) -> None: ...
-    @overload
-    def register_response(self, event_type: Literal["response.audio.done"], handler: Callable[[ResponseAudioDoneMessage], None]) -> None: ...
-    @overload
-    def register_response(self, event_type: Literal["response.function_call_arguments.delta"], handler: Callable[[ResponseFunctionCallArgumentsDeltaMessage], None]) -> None: ...
-    @overload
-    def register_response(self, event_type: Literal["response.function_call_arguments.done"], handler: Callable[[ResponseFunctionCallArgumentsDoneMessage], None]) -> None: ...
-    def register_response(self, event_type: ResponseEventType, handler: Callable[..., None]) -> None:
-        self._add(event_type, handler)
-
-    def to_dispatch_table(self) -> dict[str, Handler]:
-        return dict(self._dispatch)
 
 
 class ConversationManager:
@@ -363,7 +43,7 @@ class ConversationManager:
     def __init__(self) -> None:
         self.state = StateStore()
         self._registry = EventHandlerRegistry()
-        self._queue: asyncio.Queue[MessageType] = asyncio.Queue()
+        self._queue: asyncio.Queue[models.MessageType] = asyncio.Queue()
         self._worker_task: Optional[asyncio.Task] = None
         self._lock = Lock()
 
@@ -372,15 +52,15 @@ class ConversationManager:
         # Turn tracking
         self._turn_counter = 0
         self._pending_create_queue: list[TurnRecord] = []
-        self._turns_by_response: dict[ResponseID, TurnRecord] = {}
-        self._debounce_timers: dict[ResponseID, threading.Timer] = {}
+        self._turns_by_response: dict[models.ResponseID, TurnRecord] = {}
+        self._debounce_timers: dict[models.ResponseID, threading.Timer] = {}
         self.turn_export_dir: Optional[str] = None  # if set, export completed turns here
         # Export numbering (contiguous across exported turns only)
         self._export_counter: int = 0
         # Populated by connection wrappers if available
         self.client_base_url: Optional[str] = None
         # Track weave call objects per response to finish later
-        self._weave_calls: dict[ResponseID, Call] = {}
+        self._weave_calls: dict[models.ResponseID, Call] = {}
 
     async def start(self) -> None:
         logger.debug("ConversationManager.start: starting worker task")
@@ -396,10 +76,10 @@ class ConversationManager:
                 pass
             self._worker_task = None
 
-    async def submit_event(self, event: MessageType) -> None:
+    async def submit_event(self, event: models.MessageType) -> None:
         await self._queue.put(event)
 
-    def process_event(self, event: MessageType) -> None:
+    def process_event(self, event: models.MessageType) -> None:
         """Process an event synchronously (useful for tests or simple flows)."""
         # Event objects have a 'type' field in pydantic models.
         event_type = getattr(event, "type", None)
@@ -418,13 +98,11 @@ class ConversationManager:
     def get_conversation_history(self) -> list[StoredItem]:
         return [self.state.items[iid] for iid in self.state.timeline if iid in self.state.items]
 
-    def get_item(self, item_id: ItemID) -> Optional[StoredItem]:
+    def get_item(self, item_id: models.ItemID) -> Optional[StoredItem]:
         return self.state.items.get(item_id)
 
-    def get_response(self, response_id: ResponseID) -> Optional[Response]:
-        return self.state.responses.get(response_id)
 
-    def get_audio_segment(self, item_id: ItemID) -> Optional[bytes]:
+    def get_audio_segment(self, item_id: models.ItemID) -> Optional[bytes]:
         markers = self.state.speech_markers.get(item_id)
         if not markers:
             return None
@@ -434,7 +112,7 @@ class ConversationManager:
             return None
         return self.state.input_audio_buffer.get_segment_ms(start_ms, end_ms)
 
-    def _get_or_create_turn_for_created(self, resp_id: ResponseID) -> TurnRecord:
+    def _get_or_create_turn_for_created(self, resp_id: models.ResponseID) -> TurnRecord:
         # Bind the earliest pending create to this response
         if self._pending_create_queue:
             rec = self._pending_create_queue.pop(0)
@@ -451,13 +129,13 @@ class ConversationManager:
         self._turns_by_response[resp_id] = rec
         return rec
 
-    def _ensure_turn_for_resp(self, resp_id: ResponseID) -> Optional[TurnRecord]:
+    def _ensure_turn_for_resp(self, resp_id: models.ResponseID) -> Optional[TurnRecord]:
         rec = self._turns_by_response.get(resp_id)
         if rec is None:
             rec = self._get_or_create_turn_for_created(resp_id)
         return rec
 
-    def _collect_input_item_ids(self, rec: TurnRecord) -> list[ItemID]:
+    def _collect_input_item_ids(self, rec: TurnRecord) -> list[models.ItemID]:
         # Prefer assistant_context timeline as full context snapshot
         if rec.assistant_context and isinstance(rec.assistant_context, dict) and "timeline_items" in rec.assistant_context:
             return list(cast(TimelineContext, rec.assistant_context)["timeline_items"])  # type: ignore[index]
@@ -490,11 +168,11 @@ class ConversationManager:
         # Gather checks for audio/transcripts
         for iid in item_ids:
             it = self.state.items.get(iid)
-            if not isinstance(it, (ServerUserMessageItem,)):
+            if not isinstance(it, (models.ServerUserMessageItem,)):
                 continue
             # Check each content part
             for part in getattr(it, "content", []) or []:
-                if isinstance(part, InputAudioContentPart):
+                if isinstance(part, models.InputAudioContentPart):
                     # Rule 3: corresponding item must be committed
                     if iid not in self.state.committed_item_ids:
                         return False
@@ -556,7 +234,7 @@ class ConversationManager:
         item_ids = self._collect_input_item_ids(rec)
 
         # Helper: response_id for an assistant message item
-        def _response_id_for_item(iid: ItemID) -> Optional[ResponseID]:
+        def _response_id_for_item(iid: models.ItemID) -> Optional[models.ResponseID]:
             for rid, r in self.state.responses.items():
                 for oit in getattr(r, "output", []) or []:
                     if getattr(oit, "id", None) == iid:
@@ -564,7 +242,7 @@ class ConversationManager:
             return None
 
         # Helper: base64 encode a single user audio segment (if we have markers)
-        def _encode_user_audio(iid: ItemID) -> Optional[str]:
+        def _encode_user_audio(iid: models.ItemID) -> Optional[str]:
             seg = self.get_audio_segment(iid)
             if not seg:
                 return None
@@ -581,7 +259,7 @@ class ConversationManager:
             if it is None:
                 continue
 
-            if isinstance(it, ServerSystemMessageItem):
+            if isinstance(it, models.ServerSystemMessageItem):
                 texts: list[str] = []
                 for p in (it.content or []):
                     if getattr(p, "type", None) in ("input_text", "text"):
@@ -594,7 +272,7 @@ class ConversationManager:
                 })
                 continue
 
-            if isinstance(it, ServerUserMessageItem):
+            if isinstance(it, models.ServerUserMessageItem):
                 transcript: Optional[str] = None
                 for p in (it.content or []):
                     if getattr(p, "type", None) == "input_audio":
@@ -617,7 +295,7 @@ class ConversationManager:
                 })
                 continue
 
-            if isinstance(it, ServerAssistantMessageItem):
+            if isinstance(it, models.ServerAssistantMessageItem):
                 rid = _response_id_for_item(iid)
                 parts: list[dict[str, object]] = []
                 for idx, p in enumerate(it.content or []):
@@ -719,7 +397,7 @@ class ConversationManager:
         if not rec.response_id:
             logger.warning("_build_output_payload: missing response_id; returning empty payload")
             return {}
-        resp = self.get_response(rec.response_id)
+        resp = self.state.get_response(rec.response_id)
         if not resp:
             logger.warning("_build_output_payload: response not found for response_id=%s", rec.response_id)
             return {}
@@ -729,7 +407,7 @@ class ConversationManager:
         # Build assistant message content
         content: list[dict[str, object]] = []
         for it in resp.output:
-            if isinstance(it, ResponseMessageItem) and getattr(it, "role", None) == "assistant":
+            if isinstance(it, models.ResponseMessageItem) and getattr(it, "role", None) == "assistant":
                 for idx, p in enumerate(it.content or []):
                     if getattr(p, "type", None) == "audio":
                         b64: Optional[str] = None
@@ -843,40 +521,40 @@ class ConversationManager:
         self._registry.bulk_register(groups.to_dispatch_table())
 
     # Session
-    def _handle_session_created(self, msg: SessionCreatedMessage) -> None:
+    def _handle_session_created(self, msg: models.SessionCreatedMessage) -> None:
         self.state.session = msg.session
 
-    def _handle_session_updated(self, msg: SessionUpdatedMessage) -> None:
+    def _handle_session_updated(self, msg: models.SessionUpdatedMessage) -> None:
         self.state.session = msg.session
 
     # Input audio buffer
-    def _handle_input_audio_append(self, msg: InputAudioBufferAppendMessage) -> None:
+    def _handle_input_audio_append(self, msg: models.InputAudioBufferAppendMessage) -> None:
         self.state.input_audio_buffer.append_base64(msg.audio)
 
-    def _handle_input_audio_cleared(self, _msg: InputAudioBufferClearedMessage) -> None:
+    def _handle_input_audio_cleared(self, _msg: models.InputAudioBufferClearedMessage) -> None:
         self.state.input_audio_buffer.clear()
 
-    def _handle_input_audio_committed(self, msg: InputAudioBufferCommittedMessage) -> None:
+    def _handle_input_audio_committed(self, msg: models.InputAudioBufferCommittedMessage) -> None:
         # Track commits against items for turn completeness checks
         self.state.committed_item_ids.add(msg.item_id)
 
-    def _handle_speech_started(self, msg: InputAudioBufferSpeechStartedMessage) -> None:
+    def _handle_speech_started(self, msg: models.InputAudioBufferSpeechStartedMessage) -> None:
         self.state.speech_markers[msg.item_id] = {
             "audio_start_ms": msg.audio_start_ms,
             "audio_end_ms": None,
         }
 
-    def _handle_speech_stopped(self, msg: InputAudioBufferSpeechStoppedMessage) -> None:
+    def _handle_speech_stopped(self, msg: models.InputAudioBufferSpeechStoppedMessage) -> None:
         markers = self.state.speech_markers.setdefault(msg.item_id, {"audio_start_ms": None, "audio_end_ms": None})
         markers["audio_end_ms"] = msg.audio_end_ms
 
     # Conversation items
-    def _handle_item_created(self, msg: ItemCreatedMessage) -> None:
+    def _handle_item_created(self, msg: models.ItemCreatedMessage) -> None:
         item = msg.item
         self.state.items[item.id] = item
         self.state.timeline.append(item.id)
 
-    def _handle_item_truncated(self, msg: ItemTruncatedMessage) -> None:
+    def _handle_item_truncated(self, msg: models.ItemTruncatedMessage) -> None:
         # If audio was truncated, adjust end marker for that item if present
         markers = self.state.speech_markers.get(msg.item_id)
         if markers and markers.get("audio_end_ms"):
@@ -884,39 +562,39 @@ class ConversationManager:
             # For now, trust provided ms and leave as-is, as we slice by ms.
             logger.debug("_handle_item_truncated: audio_end_ms already set for item_id=%s; leaving markers as-is", msg.item_id)
 
-    def _handle_item_deleted(self, msg: ItemDeletedMessage) -> None:
+    def _handle_item_deleted(self, msg: models.ItemDeletedMessage) -> None:
         self.state.items.pop(msg.item_id, None)
         try:
             self.state.timeline.remove(msg.item_id)
         except ValueError:
             logger.debug("_handle_item_deleted: item_id=%s not present in timeline", msg.item_id)
 
-    def _handle_item_input_audio_transcription_delta(self, msg: ItemInputAudioTranscriptionDeltaMessage) -> None:
+    def _handle_item_input_audio_transcription_delta(self, msg: models.ItemInputAudioTranscriptionDeltaMessage) -> None:
         key = (msg.item_id, msg.content_index)
         curr = self.state.input_transcripts.get(key, "")
         self.state.input_transcripts[key] = curr + msg.delta
 
         # Also mirror into the stored item content if present
         item = self.state.items.get(msg.item_id)
-        if isinstance(item, (ServerUserMessageItem, ServerAssistantMessageItem, ServerSystemMessageItem)):
+        if isinstance(item, (models.ServerUserMessageItem, models.ServerAssistantMessageItem, models.ServerSystemMessageItem)):
             try:
                 part = item.content[msg.content_index]
-                if isinstance(part, InputAudioContentPart):
+                if isinstance(part, models.InputAudioContentPart):
                     part.transcript = (part.transcript or "") + msg.delta
             except Exception as e:
                 logger.error(f"Error _handle_item_input_audio_transcription_delta - {e}")
                 # continue without raising
                 pass
 
-    def _handle_item_input_audio_transcription_completed(self, msg: ItemInputAudioTranscriptionCompletedMessage) -> None:
+    def _handle_item_input_audio_transcription_completed(self, msg: models.ItemInputAudioTranscriptionCompletedMessage) -> None:
         key = (msg.item_id, msg.content_index)
         self.state.input_transcripts[key] = msg.transcript
 
         item = self.state.items.get(msg.item_id)
-        if isinstance(item, (ServerUserMessageItem, ServerAssistantMessageItem, ServerSystemMessageItem)):
+        if isinstance(item, (models.ServerUserMessageItem, models.ServerAssistantMessageItem, models.ServerSystemMessageItem)):
             try:
                 part = item.content[msg.content_index]
-                if isinstance(part, InputAudioContentPart):
+                if isinstance(part, models.InputAudioContentPart):
                     part.transcript = msg.transcript
             except Exception as e:
                 logger.error("_handle_item_input_audio_transcription_completed: failed to set transcript for item_id=%s index=%s: %s", msg.item_id, msg.content_index, e)
@@ -924,29 +602,24 @@ class ConversationManager:
                 pass
 
     # Responses
-    def _handle_response_create(self, msg: ResponseCreateMessage) -> None:
+    def _handle_response_create(self, msg: models.ResponseCreateMessage) -> None:
         # Stash any provided custom input items to use as user-side context for the upcoming response
         ctx: Optional[CustomInputContext] = None
-        if msg.response:
-            tmp: CustomInputContext = {}
-            if msg.response.input_items is not None:
-                tmp["input_items"] = msg.response.input_items
-            if msg.response.append_input_items is not None:
-                tmp["append_input_items"] = msg.response.append_input_items
-            ctx = tmp or None
+        if msg.response and (msg.response.input_items or msg.response.append_input_items):
+            ctx = CustomInputContext(input_items=msg.response.input_items, append_input_items=msg.response.append_input_items)
         self.state.pending_custom_context = ctx
         # Record a pending turn awaiting server response.created
         tr = TurnRecord(saw_response_create=True)
         self._pending_create_queue.append(tr)
 
-    def _handle_response_created(self, msg: ResponseCreatedMessage) -> None:
+    def _handle_response_created(self, msg: models.ResponseCreatedMessage) -> None:
         resp = msg.response
         self.state.responses[resp.id] = resp
 
         # Associate context
         if self.state.pending_custom_context is not None:
             user_ctx: Union[TimelineContext, CustomInputContext]
-            user_ctx = self.state.pending_custom_context.copy()
+            user_ctx = self.state.pending_custom_context.model_copy()
         else:
             # In-band: use full conversation so far for the user-side turn
             user_ctx = cast(TimelineContext, {"timeline_items": list(self.state.timeline)})
@@ -967,7 +640,7 @@ class ConversationManager:
             # Already handled above, so nothing here
             pass
 
-    def _handle_response_done(self, msg: ResponseDoneMessage) -> None:
+    def _handle_response_done(self, msg: models.ResponseDoneMessage) -> None:
         self.state.responses[msg.response.id] = msg.response
         # Mark output complete for this turn and handle export logic
         rec = self._ensure_turn_for_resp(msg.response.id)
@@ -977,11 +650,11 @@ class ConversationManager:
         rec.response_done = True
         self._handle_turn_completion(rec)
 
-    def _handle_response_output_item_added(self, msg: ResponseOutputItemAddedMessage) -> None:
+    def _handle_response_output_item_added(self, msg: models.ResponseOutputItemAddedMessage) -> None:
         # Ensure response exists
         resp = self.state.responses.setdefault(
             msg.response_id,
-            Response(id=msg.response_id, status="in_progress", status_details=None, output=[], usage=None, conversation_id=None),
+            models.Response(id=msg.response_id, status="in_progress", status_details=None, output=[], usage=None, conversation_id=None),
         )
         # Append/merge the item
         # If it's already present in output list at index, replace; else append
@@ -999,7 +672,7 @@ class ConversationManager:
             "assistant_context": {"timeline_items": list(self.state.timeline)},
         })
 
-    def _handle_response_output_item_done(self, msg: ResponseOutputItemDoneMessage) -> None:
+    def _handle_response_output_item_done(self, msg: models.ResponseOutputItemDoneMessage) -> None:
         # Replace final item in response output
         resp = self.state.responses.get(msg.response_id)
         if resp is not None:
@@ -1009,7 +682,7 @@ class ConversationManager:
         # Update items store as well
         self.state.items[msg.item.id] = msg.item
 
-    def _handle_response_content_part_added(self, msg: ResponseContentPartAddedMessage) -> None:
+    def _handle_response_content_part_added(self, msg: models.ResponseContentPartAddedMessage) -> None:
         resp = self.state.responses.get(msg.response_id)
         if not resp:
             logger.warning("_handle_response_content_part_added: response not found for response_id=%s", msg.response_id)
@@ -1021,7 +694,7 @@ class ConversationManager:
             logger.warning("_handle_response_content_part_added: item_id=%s not found in response_id=%s output", msg.item_id, msg.response_id)
             return
         # Ensure content list has a slot for the index
-        if isinstance(item, ResponseMessageItem):
+        if isinstance(item, models.ResponseMessageItem):
             while len(item.content) <= msg.content_index:
                 # Placeholder text part to be filled by deltas; type is resolved on first delta/done
                 item.content.append(msg.part)
@@ -1037,7 +710,7 @@ class ConversationManager:
             self.state.resp_audio_transcripts.setdefault(key, "")
             self.state.resp_audio_bytes.setdefault(key, bytearray())
 
-    def _handle_response_content_part_done(self, msg: ResponseContentPartDoneMessage) -> None:
+    def _handle_response_content_part_done(self, msg: models.ResponseContentPartDoneMessage) -> None:
         # On done, write final values back into the response item content
         resp = self.state.responses.get(msg.response_id)
         if not resp:
@@ -1048,13 +721,13 @@ class ConversationManager:
         except StopIteration:
             logger.warning("_handle_response_content_part_done: item_id=%s not found in response_id=%s output", msg.item_id, msg.response_id)
             return
-        if isinstance(item, ResponseMessageItem):
+        if isinstance(item, models.ResponseMessageItem):
             # Ensure content list index exists
             while len(item.content) <= msg.content_index:
                 item.content.append(msg.part)
             item.content[msg.content_index] = msg.part
 
-    def _handle_response_text_delta(self, msg: ResponseTextDeltaMessage) -> None:
+    def _handle_response_text_delta(self, msg: models.ResponseTextDeltaMessage) -> None:
         key = (msg.response_id, msg.item_id, msg.content_index)
         curr = self.state.resp_text_parts.get(key, "")
         self.state.resp_text_parts[key] = curr + msg.delta
@@ -1066,18 +739,18 @@ class ConversationManager:
             return
         try:
             item = next(i for i in resp.output if i.id == msg.item_id)
-            if isinstance(item, ResponseMessageItem):
+            if isinstance(item, models.ResponseMessageItem):
                 # Ensure a text part exists at index
                 while len(item.content) <= msg.content_index:
-                    item.content.append(ResponseItemTextContentPart(type="text", text=""))
+                    item.content.append(models.ResponseItemTextContentPart(type="text", text=""))
                 part = item.content[msg.content_index]
-                if isinstance(part, ResponseItemTextContentPart):
+                if isinstance(part, models.ResponseItemTextContentPart):
                     part.text = (part.text or "") + msg.delta
         except StopIteration:
             logger.warning("_handle_response_text_delta: item_id=%s not found in response_id=%s output", msg.item_id, msg.response_id)
             return
 
-    def _handle_response_text_done(self, msg: ResponseTextDoneMessage) -> None:
+    def _handle_response_text_done(self, msg: models.ResponseTextDoneMessage) -> None:
         key = (msg.response_id, msg.item_id, msg.content_index)
         self.state.resp_text_parts[key] = msg.text
 
@@ -1087,15 +760,15 @@ class ConversationManager:
             return
         try:
             item = next(i for i in resp.output if i.id == msg.item_id)
-            if isinstance(item, ResponseMessageItem):
+            if isinstance(item, models.ResponseMessageItem):
                 while len(item.content) <= msg.content_index:
-                    item.content.append(ResponseItemTextContentPart(type="text", text=""))
-                item.content[msg.content_index] = ResponseItemTextContentPart(type="text", text=msg.text)
+                    item.content.append(models.ResponseItemTextContentPart(type="text", text=""))
+                item.content[msg.content_index] = models.ResponseItemTextContentPart(type="text", text=msg.text)
         except StopIteration:
             logger.warning("_handle_response_text_done: item_id=%s not found in response_id=%s output", msg.item_id, msg.response_id)
             return
 
-    def _handle_response_audio_transcript_delta(self, msg: ResponseAudioTranscriptDeltaMessage) -> None:
+    def _handle_response_audio_transcript_delta(self, msg: models.ResponseAudioTranscriptDeltaMessage) -> None:
         key = (msg.response_id, msg.item_id, msg.content_index)
         curr = self.state.resp_audio_transcripts.get(key, "")
         self.state.resp_audio_transcripts[key] = curr + msg.delta
@@ -1107,17 +780,17 @@ class ConversationManager:
             return
         try:
             item = next(i for i in resp.output if i.id == msg.item_id)
-            if isinstance(item, ResponseMessageItem):
+            if isinstance(item, models.ResponseMessageItem):
                 while len(item.content) <= msg.content_index:
-                    item.content.append(ResponseItemAudioContentPart(type="audio", transcript=""))
+                    item.content.append(models.ResponseItemAudioContentPart(type="audio", transcript=""))
                 part = item.content[msg.content_index]
-                if isinstance(part, ResponseItemAudioContentPart):
+                if isinstance(part, models.ResponseItemAudioContentPart):
                     part.transcript = (part.transcript or "") + msg.delta
         except StopIteration:
             logger.warning("_handle_response_audio_transcript_delta: item_id=%s not found in response_id=%s output", msg.item_id, msg.response_id)
             return
 
-    def _handle_response_audio_transcript_done(self, msg: ResponseAudioTranscriptDoneMessage) -> None:
+    def _handle_response_audio_transcript_done(self, msg: models.ResponseAudioTranscriptDoneMessage) -> None:
         key = (msg.response_id, msg.item_id, msg.content_index)
         self.state.resp_audio_transcripts[key] = msg.transcript
 
@@ -1127,17 +800,17 @@ class ConversationManager:
             return
         try:
             item = next(i for i in resp.output if i.id == msg.item_id)
-            if isinstance(item, ResponseMessageItem):
+            if isinstance(item, models.ResponseMessageItem):
                 while len(item.content) <= msg.content_index:
-                    item.content.append(ResponseItemAudioContentPart(type="audio", transcript=""))
-                item.content[msg.content_index] = ResponseItemAudioContentPart(
+                    item.content.append(models.ResponseItemAudioContentPart(type="audio", transcript=""))
+                item.content[msg.content_index] = models.ResponseItemAudioContentPart(
                     type="audio", transcript=msg.transcript
                 )
         except StopIteration:
             logger.warning("_handle_response_audio_transcript_done: item_id=%s not found in response_id=%s output", msg.item_id, msg.response_id)
             return
 
-    def _handle_response_audio_delta(self, msg: ResponseAudioDeltaMessage) -> None:
+    def _handle_response_audio_delta(self, msg: models.ResponseAudioDeltaMessage) -> None:
         key = (msg.response_id, msg.item_id, msg.content_index)
         buf = self.state.resp_audio_bytes.setdefault(key, bytearray())
         try:
@@ -1147,19 +820,19 @@ class ConversationManager:
             logger.warning("_handle_response_audio_delta: failed to base64-decode audio (rid=%s,iid=%s,idx=%s): %s", msg.response_id, msg.item_id, msg.content_index, e)
             pass
 
-    def _handle_response_audio_done(self, _msg: ResponseAudioDoneMessage) -> None:
+    def _handle_response_audio_done(self, _msg: models.ResponseAudioDoneMessage) -> None:
         # No-op for now; bytes are accumulated in resp_audio_bytes
         logger.debug("_handle_response_audio_done: received audio done message")
 
     def _handle_response_function_call_arguments_delta(
-        self, msg: ResponseFunctionCallArgumentsDeltaMessage
+        self, msg: models.ResponseFunctionCallArgumentsDeltaMessage
     ) -> None:
         key = (msg.response_id, msg.call_id)
         curr = self.state.resp_func_args.get(key, "")
         self.state.resp_func_args[key] = curr + msg.delta
 
     def _handle_response_function_call_arguments_done(
-        self, msg: ResponseFunctionCallArgumentsDoneMessage
+        self, msg: models.ResponseFunctionCallArgumentsDoneMessage
     ) -> None:
         key = (msg.response_id, msg.call_id)
         self.state.resp_func_args[key] = msg.arguments
@@ -1169,7 +842,7 @@ class ConversationManager:
         # If inputs are not complete yet, debounce a check in 200ms
         if not rec.inputs_complete:
             # Cancel any existing timer
-            t = self._debounce_timers.pop(cast(ResponseID, rec.response_id), None)
+            t = self._debounce_timers.pop(cast(models.ResponseID, rec.response_id), None)
             if t:
                 t.cancel()
             def _cb() -> None:
@@ -1180,7 +853,7 @@ class ConversationManager:
                 if rec.inputs_complete and rec.response_done:
                     self._on_response_complete(rec)
             timer = threading.Timer(0.1, _cb)
-            self._debounce_timers[cast(ResponseID, rec.response_id)] = timer
+            self._debounce_timers[cast(models.ResponseID, rec.response_id)] = timer
             timer.start()
             return
         # If inputs are complete and response is done, export
@@ -1192,13 +865,13 @@ class ConversationManager:
         if not rec.response_id:
             logger.warning("_on_response_complete: missing response_id; cannot finish call")
             return
-        resp = self.get_response(rec.response_id)
+        resp = self.state.get_response(rec.response_id)
         if not resp or getattr(resp, "status", None) != "completed":
             logger.warning("_on_response_complete: response missing or not completed for response_id=%s", rec.response_id)
             return
         # Skip exports for non-message-only responses (e.g., pure function_call turns)
         has_assistant_message = any(
-            isinstance(it, ResponseMessageItem) and getattr(it, "role", None) == "assistant"
+            isinstance(it, models.ResponseMessageItem) and getattr(it, "role", None) == "assistant"
             for it in getattr(resp, "output", [])
         )
         if not has_assistant_message:
