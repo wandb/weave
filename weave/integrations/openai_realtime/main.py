@@ -6,11 +6,11 @@ from pathlib import Path
 
 from conversation_manager import ConversationManager
 from exporters import DirectoryExportAdapter, JSONFileExportAdapter
-from models import (
+from weave.integrations.openai_realtime.models import (
     USER_MESSAGE_CLASSES,
     SERVER_MESSAGE_CLASSES,
     UnknownClientMessage,
-    UnknownServerMessage,
+    create_message_from_dict
 )
 
 
@@ -19,27 +19,7 @@ def _parse_message(data: dict):
     if et in USER_MESSAGE_CLASSES:
         return USER_MESSAGE_CLASSES[et](**data)
     if et in SERVER_MESSAGE_CLASSES:
-        # Normalize known sparse fixtures to satisfy model validation
-        norm = dict(data)
-        def _normalize_response_obj(resp: dict) -> None:
-            usage = resp.get("usage") or {}
-            if usage:
-                for key in ("input_token_details", "output_token_details"):
-                    td = usage.get(key)
-                    if isinstance(td, dict) and "image_tokens" not in td:
-                        td["image_tokens"] = 0
-        if et in ("response.done", "response.created") and isinstance(norm.get("response"), dict):
-            _normalize_response_obj(norm["response"])
-        if et == "conversation.item.created":
-            item = norm.get("item") or {}
-            if item.get("type") == "message" and item.get("role") == "user":
-                for part in item.get("content", []) or []:
-                    if isinstance(part, dict) and part.get("type") == "input_audio":
-                        part.setdefault("audio", "")
-            # Some fixtures mark status as 'in_progress' which isn't allowed by ItemParamStatus
-            if item.get("status") == "in_progress":
-                item["status"] = "incomplete"
-        return SERVER_MESSAGE_CLASSES[et](**norm)
+        return SERVER_MESSAGE_CLASSES[et](**data)
     # default to client unknown
     return UnknownClientMessage(**data)
 
@@ -59,8 +39,8 @@ def cmd_replay_jsonl(args: argparse.Namespace) -> int:
             rec = json.loads(line)
         except json.JSONDecodeError:
             continue
-        data = rec.get("data") or rec
-        msg = _parse_message(data)
+        print(rec)
+        msg = create_message_from_dict(rec)
         mgr.process_event(msg)
 
     # Export

@@ -821,20 +821,18 @@ def create_server_message_from_dict(data: dict) -> ServerMessageType:
         return UnknownServerMessage(**data)
 
     message_class = SERVER_MESSAGE_CLASSES.get(event_type, UnknownServerMessage)
-    return message_class.model_validate(**data)
+    return message_class(**data)
 
 def create_message_from_dict(data: dict) -> MessageType:
     """
     Creates a message object from a dictionary based on its 'type'.
     """
     event_type = data.get("type") or ""
-    if event_type in USER_MESSAGE_CLASSES.keys():
-        cls =  USER_MESSAGE_CLASSES[event_type]
-        return cls.model_validate(**data)
+    if event_type in USER_MESSAGE_CLASSES:
+        return create_user_message_from_dict(data)
 
-    elif event_type in SERVER_MESSAGE_CLASSES.keys():
-        cls =  SERVER_MESSAGE_CLASSES[event_type]
-        return cls.model_validate(**data)
+    elif event_type in SERVER_MESSAGE_CLASSES:
+        return create_server_message_from_dict(data)
 
     return UnknownClientMessage(**data)
 
