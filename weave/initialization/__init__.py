@@ -1,7 +1,9 @@
-from .moviepy_video_thread_safety import apply_threadsafe_patch_to_moviepy_video
-from .pil_image_thread_safety import apply_threadsafe_patch_to_pil_image
+from .deferred_patcher import install_deferred_patches
 
-apply_threadsafe_patch_to_pil_image()
-apply_threadsafe_patch_to_moviepy_video()
+# Install deferred patching mechanism
+# This will:
+# 1. Apply patches immediately if PIL or moviepy are already imported
+# 2. Otherwise, install import hooks to apply patches when they are imported later
+install_deferred_patches()
 
 __all__: list[str] = []
