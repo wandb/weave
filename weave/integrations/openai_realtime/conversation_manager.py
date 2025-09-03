@@ -415,22 +415,15 @@ class ConversationManager:
             if isinstance(it, models.ResponseMessageItem) and getattr(it, "role", None) == "assistant":
                 for idx, p in enumerate(it.content or []):
                     if getattr(p, "type", None) == "audio":
-                        b64: Optional[str] = None
-                        buf = self.state.resp_audio_bytes.get((resp.id, it.id, idx))
-                        if buf:
-                            try:
-                                b64 = base64.b64encode(bytes(buf)).decode("ascii")
-                            except Exception as e:
-                                logger.warning("_build_output_payload: failed to base64-encode assistant audio (rid=%s,iid=%s,idx=%s): %s", resp.id, it.id, idx, e)
-                                b64 = None
-                        content.append({
-                            "type": "audio",
-                            "audio": {
-                                "transcript": getattr(p, "transcript", None) or "",
-                                "data": b64,
-                                "format": (sess.output_audio_format if sess else "pcm16"),
-                            },
-                        })
+                        if buf := self.state.resp_audio_bytes.get((resp.id, it.id, idx)):
+                            content.append({
+                                "type": "audio",
+                                "audio": {
+                                    "transcript": getattr(p, "transcript", None) or "",
+                                    "data": Content.from_bytes(pcm_to_wav(bytes(buf)), extension=".wav"),
+                                    "format": (sess.output_audio_format if sess else "pcm16"),
+                                },
+                            })
 
         assistant_message: dict[str, object] = {
             "role": "assistant",
@@ -602,10 +595,6 @@ class ConversationManager:
         """
         sess = self.state.session
 
-        # Helper: response_id for an assistant message item
-        def _response_id_for_item(iid: models.ItemID) -> Optional[models.ResponseID]:
-            return self._get_response_for_item(iid)
-
         # Helper: base64 encode a single user audio segment (if we have markers)
         def _encode_user_audio(iid: models.ItemID) -> Optional[Content]:
             seg = self.get_audio_segment(iid)
@@ -660,7 +649,7 @@ class ConversationManager:
 
             # Assistant message
             if isinstance(it, (models.ServerAssistantMessageItem, models.ResponseMessageItem)) and getattr(it, "role", None) == "assistant":
-                rid = _response_id_for_item(iid)
+                rid = self._get_response_for_item(it.id)
                 parts: list[dict[str, object]] = []
                 for idx, p in enumerate(getattr(it, "content", []) or []):
                     if getattr(p, "type", None) == "audio":
