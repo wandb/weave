@@ -1,6 +1,6 @@
-
-## title: Handling and Redacting PII
-
+---
+title: Handling and Redacting PII
+---
 
 
 :::tip[This is a notebook]
@@ -12,7 +12,7 @@
 :::
 
 
-## 
+
 <!--- @wandbcode{cod-notebook} -->
 
 

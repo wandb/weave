@@ -66,6 +66,8 @@ def get_leaderboard_results(
             eval_obj_ref_uri = eval_obj_ref.uri()
             if c.evaluation_object_ref != eval_obj_ref_uri:
                 continue
+            if call.output is None:
+                continue
             val = call.output.get(c.scorer_name)
             for part in c.summary_metric_path.split("."):
                 if isinstance(val, dict):

@@ -80,7 +80,7 @@ def init() -> Token[WandbApiContext | None] | None:
 
 
 @contextmanager
-def from_environment() -> Generator[None, None, None]:
+def from_environment() -> Generator[None]:
     token = init()
     try:
         yield
