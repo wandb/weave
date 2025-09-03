@@ -233,14 +233,21 @@ def get_custom_provider_info(
         )
 
     # Parse the model name to extract provider_name and internal_model_id
-    # Format: <provider_name>/<internal_model_id>
-    # Split only on the FIRST "/" to support provider names with slashes
-    slash_index = model_name.find("/")
-    if slash_index == -1:
-        raise InvalidRequest(f"Invalid custom provider model format: {model_name}")
+    # Format: <provider_name>::<internal_model_id>
+    # Using :: delimiter
+    delimiter = "::"
+    delimiter_index = model_name.find(delimiter)
 
-    provider_name = model_name[:slash_index]
-    internal_model_id = model_name[slash_index + 1 :]
+    if delimiter_index == -1:
+        # Fallback: try legacy slash-based format for backwards compatibility
+        slash_index = model_name.find("/")
+        if slash_index == -1:
+            raise InvalidRequest(f"Invalid custom provider model format: {model_name}")
+        provider_name = model_name[:slash_index]
+        internal_model_id = model_name[slash_index + 1 :]
+    else:
+        provider_name = model_name[:delimiter_index]
+        internal_model_id = model_name[delimiter_index + len(delimiter) :]
 
     # Default values
     base_url = None

@@ -1,5 +1,5 @@
-from enum import Enum
 import uuid
+from enum import Enum
 
 from pydantic import Field
 
