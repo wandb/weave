@@ -558,7 +558,7 @@ def save_instance(obj: Op, artifact: MemTraceFilesArtifact, name: str) -> None:
                 # Extract the alias (e.g., "wv" from "import weave as wv")
                 weave_alias = imp.strip().split()[-1]
             break
-    
+
     # If we found an aliased import, we need to ensure the decorator matches
     if weave_alias:
         # Check if the decorator uses the alias
@@ -575,7 +575,9 @@ def save_instance(obj: Op, artifact: MemTraceFilesArtifact, name: str) -> None:
                 )
         else:
             # Ensure the aliased decorator has parentheses
-            op_function_code = alias_pattern.sub(f"@{weave_alias}.op()", op_function_code)
+            op_function_code = alias_pattern.sub(
+                f"@{weave_alias}.op()", op_function_code
+            )
     else:
         # No alias, use standard weave import and decorator
         if not WEAVE_OP_PATTERN.search(op_function_code):
