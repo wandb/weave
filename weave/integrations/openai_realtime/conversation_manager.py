@@ -450,7 +450,8 @@ class ConversationManager:
         return {
             "id": resp.id,
             "model": (sess.model if sess else None) or "gpt-4o-realtime",
-            "created": None,
+            "status": resp.status,
+            "status_details": resp.status_details,
             "object": "chat.completion",
             "usage": usage_obj,
             "choices": [
@@ -476,6 +477,7 @@ class ConversationManager:
         # Session
         groups.register_session("session.created", self._handle_session_created)
         groups.register_session("session.updated", self._handle_session_updated)
+        groups.register_session("session.update", self._handle_session_update)
 
         # Input audio buffer lifecycle
         groups.register_input_audio("input_audio_buffer.append", self._handle_input_audio_append)
@@ -485,6 +487,7 @@ class ConversationManager:
         groups.register_input_audio("input_audio_buffer.speech_stopped", self._handle_speech_stopped)
 
         # Conversation item changes
+        groups.register_item("conversation.item.create", self._handle_item_create)
         groups.register_item("conversation.item.created", self._handle_item_created)
         groups.register_item("conversation.item.truncated", self._handle_item_truncated)
         groups.register_item("conversation.item.deleted", self._handle_item_deleted)
@@ -500,6 +503,7 @@ class ConversationManager:
         # Response lifecycle and parts
         groups.register_response("response.create", self._handle_response_create)
         groups.register_response("response.created", self._handle_response_created)
+        groups.register_response("response.cancel", self._handle_response_cancel)
         groups.register_response("response.done", self._handle_response_done)
         groups.register_response("response.output_item.added", self._handle_response_output_item_added)
         groups.register_response("response.output_item.done", self._handle_response_output_item_done)
@@ -518,6 +522,12 @@ class ConversationManager:
             "response.function_call_arguments.done", self._handle_response_function_call_arguments_done
         )
 
+        # Error handling
+        groups.register_error("error", self._handle_error)
+
+        # Rate limits
+        groups.register_rate_limits("rate_limits.updated", self._handle_rate_limits_updated)
+
         self._registry.bulk_register(groups.to_dispatch_table())
 
     # Session
@@ -526,6 +536,10 @@ class ConversationManager:
 
     def _handle_session_updated(self, msg: models.SessionUpdatedMessage) -> None:
         self.state.session = msg.session
+
+    def _handle_session_update(self, msg: models.SessionUpdateMessage) -> None:
+        # Client-side session update request - no state changes needed
+        logger.debug("Session update request received: %s", msg.type)
 
     # Input audio buffer
     def _handle_input_audio_append(self, msg: models.InputAudioBufferAppendMessage) -> None:
@@ -549,6 +563,10 @@ class ConversationManager:
         markers["audio_end_ms"] = msg.audio_end_ms
 
     # Conversation items
+    def _handle_item_create(self, msg: models.ItemCreateMessage) -> None:
+        # Client-side item create request - no state changes needed yet
+        logger.debug("Item create request received: %s", msg.type)
+
     def _handle_item_created(self, msg: models.ItemCreatedMessage) -> None:
         item = msg.item
         self.state.items[item.id] = item
@@ -639,6 +657,10 @@ class ConversationManager:
         if not rec.saw_response_create and self._pending_create_queue:
             # Already handled above, so nothing here
             pass
+
+    def _handle_response_cancel(self, msg: models.ResponseCancelMessage) -> None:
+        # Client-side response cancel request
+        logger.debug("Response cancel request received: %s", msg.type)
 
     def _handle_response_done(self, msg: models.ResponseDoneMessage) -> None:
         self.state.responses[msg.response.id] = msg.response
@@ -866,8 +888,8 @@ class ConversationManager:
             logger.warning("_on_response_complete: missing response_id; cannot finish call")
             return
         resp = self.state.get_response(rec.response_id)
-        if not resp or getattr(resp, "status", None) != "completed":
-            logger.warning("_on_response_complete: response missing or not completed for response_id=%s", rec.response_id)
+        if not resp:
+            logger.warning("_on_response_complete: response missing")
             return
         # Skip exports for non-message-only responses (e.g., pure function_call turns)
         has_assistant_message = any(
@@ -911,3 +933,12 @@ class ConversationManager:
         except Exception as e:
             logger.error(f"Error submitting call in _on_response_complete - {e}")
             return
+
+    def _handle_error(self, msg: models.ErrorMessage) -> None:
+        # Log error messages
+        logger.error("API Error: type=%s, message=%s, code=%s", 
+                     msg.error.type, msg.error.message, msg.error.code)
+
+    def _handle_rate_limits_updated(self, msg: models.RateLimitsUpdatedMessage) -> None:
+        # Log rate limits for informational purposes
+        logger.debug("Rate limits updated: %s", msg.rate_limits)
