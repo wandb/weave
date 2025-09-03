@@ -3,6 +3,11 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import weave
+import dotenv
+dotenv.load_dotenv()
+
+weave.init("test_realtime")
 
 from conversation_manager import ConversationManager
 from exporters import DirectoryExportAdapter, JSONFileExportAdapter
@@ -13,15 +18,6 @@ from weave.integrations.openai_realtime.models import (
     create_message_from_dict
 )
 
-
-def _parse_message(data: dict):
-    et = data.get("type") or ""
-    if et in USER_MESSAGE_CLASSES:
-        return USER_MESSAGE_CLASSES[et](**data)
-    if et in SERVER_MESSAGE_CLASSES:
-        return SERVER_MESSAGE_CLASSES[et](**data)
-    # default to client unknown
-    return UnknownClientMessage(**data)
 
 
 def cmd_replay_jsonl(args: argparse.Namespace) -> int:
@@ -39,8 +35,10 @@ def cmd_replay_jsonl(args: argparse.Namespace) -> int:
             rec = json.loads(line)
         except json.JSONDecodeError:
             continue
-        print(rec)
-        msg = create_message_from_dict(rec)
+        try:
+            msg = create_message_from_dict(rec)
+        except Exception as e:
+            raise ValueError(f"create_message_from_dict for value: {rec} failed with error - {e}\n ") 
         mgr.process_event(msg)
 
     # Export
