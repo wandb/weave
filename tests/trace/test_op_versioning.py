@@ -349,8 +349,8 @@ def test_op_versioning_2ops(client):
     saved_code = get_saved_code(client, ref)
 
 
-EXPECTED_TYPEDICT_ANNO_CODE = """import weave
-import typing
+EXPECTED_TYPEDICT_ANNO_CODE = """import typing
+import weave
 
 class SomeDict(typing.TypedDict):
     val: int
@@ -559,8 +559,8 @@ def test_op_instance(client):
     assert clean_saved_code == EXPECTED_INSTANCE_CODE
 
 
-EXPECTED_IMPORT_AS_CODE = """import weave
-import json as js
+EXPECTED_IMPORT_AS_CODE = """import json as js
+import weave
 
 @weave.op()
 def func(data: dict) -> str:
@@ -586,8 +586,8 @@ def test_op_import_as(client):
     assert saved_code == EXPECTED_IMPORT_AS_CODE
 
 
-EXPECTED_IMPORT_FROM_AS_CODE = """import weave
-from json import dumps as ds
+EXPECTED_IMPORT_FROM_AS_CODE = """from json import dumps as ds
+import weave
 
 @weave.op()
 def func(data: dict) -> str:
