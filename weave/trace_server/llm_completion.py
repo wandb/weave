@@ -216,9 +216,8 @@ def get_custom_provider_info(
     Extract provider information from a custom provider model.
     Args:
         project_id: The project ID
-        model_name: The model name (format: <provider_id>/<provider_model_id>)
+        model_name: The model name (format: <provider_name>/<internal_model_id>)
         obj_read_func: Function to read objects from the database
-        secret_fetcher: Secret fetcher to get API keys
     Returns:
         CustomProviderInfo containing:
         - base_url: The base URL for the provider
@@ -233,14 +232,15 @@ def get_custom_provider_info(
             f"No secret fetcher found, cannot fetch API key for model {model_name}"
         )
 
-    # Parse the model name to extract provider_id and provider_model_id
-    # Format: <provider_id>/<provider_model_id>
-    parts = model_name.split("/")
-    if len(parts) < 2:
+    # Parse the model name to extract provider_name and internal_model_id
+    # Format: <provider_name>/<internal_model_id>
+    # Split only on the FIRST "/" to support provider names with slashes
+    slash_index = model_name.find("/")
+    if slash_index == -1:
         raise InvalidRequest(f"Invalid custom provider model format: {model_name}")
 
-    provider_id = parts[0]
-    provider_model_id = parts[1]
+    provider_name = model_name[:slash_index]
+    internal_model_id = model_name[slash_index + 1 :]
 
     # Default values
     base_url = None
@@ -250,10 +250,10 @@ def get_custom_provider_info(
     actual_model_name = model_name
 
     try:
-        # Fetch the provider object
+        # Fetch the provider object by name
         provider_obj_req = tsi.ObjReadReq(
             project_id=project_id,
-            object_id=provider_id,
+            object_id=provider_name,
             digest="latest",
             metadata_only=False,
         )
@@ -261,7 +261,7 @@ def get_custom_provider_info(
 
         if provider_obj_res.obj.base_object_class != "Provider":
             raise InvalidRequest(
-                f"Object {provider_id} is not a Provider, it is a {provider_obj_res.obj.base_object_class}"
+                f"Object {provider_name} is not a Provider, it is a {provider_obj_res.obj.base_object_class}"
             )
 
         provider_obj = Provider.model_validate(provider_obj_res.obj.val)
@@ -274,43 +274,75 @@ def get_custom_provider_info(
     except Exception as e:
         raise InvalidRequest(f"Failed to fetch provider information: {e!s}") from e
 
+    # Try new format first: lookup by internal_model_id directly
+    provider_model_obj = None
     try:
-        # Fetch the provider model object
-        # Provider models have the format: <provider_id>-<provider_model>
+        # New format: use internal_model_id directly as object_id
         provider_model_obj_req = tsi.ObjReadReq(
             project_id=project_id,
-            object_id=f"{provider_id}-{provider_model_id}",
+            object_id=internal_model_id,
             digest="latest",
             metadata_only=False,
         )
         provider_model_obj_res = obj_read_func(provider_model_obj_req)
 
-        if provider_model_obj_res.obj.base_object_class != "ProviderModel":
-            raise InvalidRequest(
-                f"Object {provider_model_id} is not a ProviderModel, it is a {provider_model_obj_res.obj.base_object_class}"
+        if provider_model_obj_res.obj.base_object_class == "ProviderModel":
+            provider_model_obj = ProviderModel.model_validate(
+                provider_model_obj_res.obj.val
+            )
+            # Verify this model belongs to the requested provider
+            if provider_model_obj.provider != provider_obj_res.obj.digest:
+                raise InvalidRequest(
+                    f"Model {internal_model_id} does not belong to provider {provider_name}"
+                )
+    except Exception:
+        # Fall back to legacy format for backwards compatibility
+        pass
+
+    # If new format failed, try legacy format: <provider_name>-<model_name>
+    if provider_model_obj is None:
+        try:
+            # Legacy format: concatenated provider and model names
+            legacy_object_id = f"{provider_name}-{internal_model_id}"
+            provider_model_obj_req = tsi.ObjReadReq(
+                project_id=project_id,
+                object_id=legacy_object_id,
+                digest="latest",
+                metadata_only=False,
+            )
+            provider_model_obj_res = obj_read_func(provider_model_obj_req)
+
+            if provider_model_obj_res.obj.base_object_class != "ProviderModel":
+                raise InvalidRequest(
+                    f"Object {legacy_object_id} is not a ProviderModel, it is a {provider_model_obj_res.obj.base_object_class}"
+                )
+
+            provider_model_obj = ProviderModel.model_validate(
+                provider_model_obj_res.obj.val
             )
 
-        provider_model_obj = ProviderModel.model_validate(
-            provider_model_obj_res.obj.val
+        except Exception as e:
+            raise InvalidRequest(
+                f"Failed to fetch provider_model information: {e!s}"
+            ) from e
+
+    if provider_model_obj is None:
+        raise InvalidRequest(
+            f"Could not find provider model with ID {internal_model_id} for provider {provider_name}"
         )
 
-        # Use the provider model's name as the actual model name for the API call
-        actual_model_name = provider_model_obj.name
-
-    except Exception as e:
-        raise InvalidRequest(
-            f"Failed to fetch provider_model information: {e!s}"
-        ) from e
+    # Use the provider model's name as the actual model name for the API call
+    actual_model_name = provider_model_obj.name
 
     # Get the API key
     if not secret_name:
-        raise InvalidRequest(f"No secret name found for provider {provider_id}")
+        raise InvalidRequest(f"No secret name found for provider {provider_name}")
 
     api_key = secret_fetcher.fetch(secret_name).get("secrets", {}).get(secret_name)
 
     if not api_key:
         raise MissingLLMApiKeyError(
-            f"No API key {secret_name} found for provider {provider_id}",
+            f"No API key {secret_name} found for provider {provider_name}",
             api_key_name=secret_name,
         )
 

@@ -1,4 +1,5 @@
 from enum import Enum
+import uuid
 
 from pydantic import Field
 
@@ -19,3 +20,6 @@ class Provider(base_object_def.BaseObject):
 class ProviderModel(base_object_def.BaseObject):
     provider: base_object_def.RefStr
     max_tokens: int
+    # Internal ID for stable references, independent of user-provided names
+    # This allows model names to contain any characters including "/"
+    internal_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
