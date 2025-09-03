@@ -283,6 +283,7 @@ def test_delete_all_object_versions_api(client: WeaveClient):
 
 def test_delete_all_op_versions_api(client: WeaveClient):
     """Test the public API for deleting all versions of an op."""
+
     @weave.op
     def test_op(x: int) -> int:
         return x + 1
@@ -322,7 +323,9 @@ def test_delete_object_versions_api(client: WeaveClient):
     assert len(objs) == 4
 
     # Delete multiple specific versions
-    num_deleted = client.delete_object_versions("obj_multi_delete", [v0.digest, v2.digest])
+    num_deleted = client.delete_object_versions(
+        "obj_multi_delete", [v0.digest, v2.digest]
+    )
     assert num_deleted == 2
 
     objs = _objs_query(client, "obj_multi_delete")
