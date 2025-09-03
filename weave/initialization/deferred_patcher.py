@@ -13,9 +13,6 @@ from importlib.machinery import ModuleSpec
 from types import ModuleType
 from typing import Optional, Sequence
 
-from .moviepy_video_thread_safety import apply_threadsafe_patch_to_moviepy_video
-from .pil_image_thread_safety import apply_threadsafe_patch_to_pil_image
-
 
 class BaseDeferredPatcher(MetaPathFinder, ABC):
     """Base class for deferred patching of modules."""
@@ -116,6 +113,8 @@ class PILDeferredPatcher(BaseDeferredPatcher):
 
     def apply_patch(self) -> None:
         """Apply thread-safety patch to PIL."""
+        # Import lazily to avoid importing PIL at module load time
+        from .pil_image_thread_safety import apply_threadsafe_patch_to_pil_image
         apply_threadsafe_patch_to_pil_image()
 
 
@@ -128,6 +127,8 @@ class MoviePyDeferredPatcher(BaseDeferredPatcher):
 
     def apply_patch(self) -> None:
         """Apply thread-safety patch to MoviePy."""
+        # Import lazily to avoid importing moviepy at module load time
+        from .moviepy_video_thread_safety import apply_threadsafe_patch_to_moviepy_video
         apply_threadsafe_patch_to_moviepy_video()
 
 
