@@ -387,7 +387,6 @@ class InputAudioBufferClearedMessage(ServerMessageBase):
     """
     Signals the server has cleared the audio buffer.
     """
-
     type: Literal["input_audio_buffer.cleared"] = "input_audio_buffer.cleared"
 
 
