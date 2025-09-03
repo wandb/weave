@@ -1,19 +1,17 @@
 import json
 import uuid
-from typing import Any, Union
+from typing import Any
 
 import websocket
 
 import weave
 
-from .models import (
-    ServerMessageType,
-    Session,
-    UserMessageType,
+# Use project-local modules (no package-relative imports here)
+from models import (
     create_server_message_from_dict,
     create_user_message_from_dict,
 )
-from .sessions import SessionManager, WeaveSession
+from conversation_manager import ConversationManager
 
 try:
     from aiohttp import ClientWebSocketResponse, WSMsgType
@@ -55,7 +53,13 @@ class WeaveMediaConnection:
         self.url = url
         self.header = header
         self.id = str(uuid.uuid4())
-        self.session_manager = SessionManager()
+        # Track conversation state for this connection
+        self.conversation_manager = ConversationManager()
+        # Attach base URL for downstream exports
+        try:
+            self.conversation_manager.client_base_url = self.url
+        except Exception:
+            pass
 
         # Wrap user-provided handlers with tracing and session management
         self.wrapped_on_open = self._wrap_handler("on_open", on_open)
@@ -82,14 +86,14 @@ class WeaveMediaConnection:
                 # Process outgoing events with session manager
                 parsed_data = _try_json_load(data)
                 if isinstance(parsed_data, dict):
-                    # Try to parse as typed message first
+                    # Convert to typed user message and forward to conversation manager
                     try:
                         typed_message = create_user_message_from_dict(parsed_data)
-                        with weave.attributes({"typed_message": typed_message.type}):
-                            self.session_manager.process_event(parsed_data)
+                        with weave.attributes({"typed_message": getattr(typed_message, "type", "unknown")}):
+                            self.conversation_manager.process_event(typed_message)
                     except Exception:
-                        # Fall back to raw dict processing
-                        self.session_manager.process_event(parsed_data)
+                        # If parsing fails, ignore for state tracking but still forward on the wire
+                        pass
                 return sender(data, opcode)
 
         return wrapper
@@ -116,14 +120,14 @@ class WeaveMediaConnection:
                     message = args[1]
                     parsed_message = _try_json_load(message)
                     if isinstance(parsed_message, dict):
-                        # Try to parse as typed message first
+                        # Convert to typed server message and forward to conversation manager
                         try:
                             typed_message = create_server_message_from_dict(parsed_message)
-                            with weave.attributes({"typed_message": typed_message.type}):
-                                self.session_manager.process_event(parsed_message)
+                            with weave.attributes({"typed_message": getattr(typed_message, "type", "unknown")}):
+                                self.conversation_manager.process_event(typed_message)
                         except Exception:
-                            # Fall back to raw dict processing
-                            self.session_manager.process_event(parsed_message)
+                            # If parsing fails, ignore for state tracking but still forward to handler
+                            pass
                 # Call the original handler
                 return handler(*args, **kwargs)
 
@@ -139,12 +143,11 @@ class WeaveMediaConnection:
         self.ws.close(**kwargs)
 
     def get_session(self) -> Any:
-        """Get the active session from the session manager."""
-        return self.session_manager.get_active_session()
+        """Convenience: return the current Session state from the conversation manager."""
+        return self.conversation_manager.state.session
 
-    def get_all_sessions(self) -> Any:
-        """Get all sessions from the session manager."""
-        return self.session_manager.sessions
+    def get_conversation_manager(self) -> ConversationManager:
+        return self.conversation_manager
 
 
 class WebSocketApp(WeaveMediaConnection):
@@ -157,25 +160,19 @@ class WeaveAsyncWebsocketConnection:
     def __init__(self, original_connection: Any):
         self.original_connection = original_connection
         self.id = str(uuid.uuid4())
-        self.session_manager = SessionManager()
+        self.conversation_manager = ConversationManager()
 
     async def send(self, *args: Any, **kwargs: Any) -> None:
         with weave.attributes({"websocket_id": self.id}):
             message = args[0] if args else None
             parsed_message = _try_json_load(message)
-            # Process outgoing events with session manager
+            # Forward outgoing user messages to conversation manager
             if isinstance(parsed_message, dict):
-                # Try to parse as typed message first
                 try:
                     typed_message = create_user_message_from_dict(parsed_message)
-                    with weave.attributes({"typed_message": typed_message.type, "data": parsed_message}):
-                        self.session_manager.process_event(parsed_message)
+                    with weave.attributes({"typed_message": getattr(typed_message, "type", "unknown"), "data": parsed_message}):
+                        self.conversation_manager.process_event(typed_message)
                 except Exception:
-                    # Fall back to raw dict processing
-                    with weave.attributes({"data": parsed_message}):
-                        self.session_manager.process_event(parsed_message)
-            else:
-                with weave.attributes({"data": parsed_message}):
                     pass
             return await self.original_connection.send(*args, **kwargs)
 
@@ -183,19 +180,13 @@ class WeaveAsyncWebsocketConnection:
         with weave.attributes({"websocket_id": self.id}):
             message = await self.original_connection.recv(*args, **kwargs)
             parsed_message = _try_json_load(message)
-            # Process incoming events with session manager
+            # Forward incoming server messages to conversation manager
             if isinstance(parsed_message, dict):
-                # Try to parse as typed message first
                 try:
                     typed_message = create_server_message_from_dict(parsed_message)
-                    with weave.attributes({"typed_message": typed_message.type, "data": parsed_message}):
-                        self.session_manager.process_event(parsed_message)
+                    with weave.attributes({"typed_message": getattr(typed_message, "type", "unknown"), "data": parsed_message}):
+                        self.conversation_manager.process_event(typed_message)
                 except Exception:
-                    # Fall back to raw dict processing
-                    with weave.attributes({"data": parsed_message}):
-                        self.session_manager.process_event(parsed_message)
-            else:
-                with weave.attributes({"data": parsed_message}):
                     pass
             return message
 
@@ -209,12 +200,10 @@ class WeaveAsyncWebsocketConnection:
             raise StopAsyncIteration from None
 
     def get_session(self) -> Any:
-        """Get the active session from the session manager."""
-        return self.session_manager.get_active_session()
+        return self.conversation_manager.state.session
 
-    def get_all_sessions(self) -> Any:
-        """Get all sessions from the session manager."""
-        return self.session_manager.sessions
+    def get_conversation_manager(self) -> ConversationManager:
+        return self.conversation_manager
 
     def __getattr__(self, name: str) -> Any:
         if name == "send":
@@ -223,8 +212,8 @@ class WeaveAsyncWebsocketConnection:
             return self.recv
         if name == "get_session":
             return self.get_session
-        if name == "get_all_sessions":
-            return self.get_all_sessions
+        if name == "get_conversation_manager":
+            return self.get_conversation_manager
         return getattr(self.original_connection, name)
 
 
@@ -236,31 +225,43 @@ class WeaveAiohttpWebsocketConnection:
     def __init__(self, original_ws: Any) -> None:
         self.original_ws = original_ws
         self.id = str(uuid.uuid4())
-        self.session_manager = SessionManager()
+        self.conversation_manager = ConversationManager()
 
     async def send_str(self, data: str, *args: Any, **kwargs: Any) -> None:
         with weave.attributes({"websocket_id": self.id}):
             parsed_data = _try_json_load(data)
-            # Process outgoing events with session manager
+            # Forward outgoing user messages to conversation manager
             if isinstance(parsed_data, dict):
-                self.session_manager.process_event(parsed_data)
+                try:
+                    typed_message = create_user_message_from_dict(parsed_data)
+                    self.conversation_manager.process_event(typed_message)
+                except Exception:
+                    pass
             with weave.attributes({"data": parsed_data}):
                 return await self.original_ws.send_str(data, *args, **kwargs)
 
     async def send_bytes(self, data: bytes, *args: Any, **kwargs: Any) -> None:
         with weave.attributes({"websocket_id": self.id}):
             parsed_data = _try_json_load(data)
-            # Process outgoing events with session manager
+            # Forward outgoing user messages to conversation manager
             if isinstance(parsed_data, dict):
-                self.session_manager.process_event(parsed_data)
+                try:
+                    typed_message = create_user_message_from_dict(parsed_data)
+                    self.conversation_manager.process_event(typed_message)
+                except Exception:
+                    pass
             with weave.attributes({"data": parsed_data}):
                 return await self.original_ws.send_bytes(data, *args, **kwargs)
 
     async def send_json(self, data: Any, *args: Any, **kwargs: Any) -> None:
         with weave.attributes({"websocket_id": self.id}):
-            # Process outgoing events with session manager
+            # Forward outgoing user messages to conversation manager
             if isinstance(data, dict):
-                self.session_manager.process_event(data)
+                try:
+                    typed_message = create_user_message_from_dict(data)
+                    self.conversation_manager.process_event(typed_message)
+                except Exception:
+                    pass
             with weave.attributes({"data": data}):
                 return await self.original_ws.send_json(data, *args, **kwargs)
 
@@ -269,9 +270,13 @@ class WeaveAiohttpWebsocketConnection:
             msg = await self.original_ws.receive(*args, **kwargs)
             if msg.type in (WSMsgType.TEXT, WSMsgType.BINARY) if WSMsgType else (1, 2):
                 parsed_data = _try_json_load(msg.data)
-                # Process incoming events with session manager
+                # Forward incoming server messages to conversation manager
                 if isinstance(parsed_data, dict):
-                    self.session_manager.process_event(parsed_data)
+                    try:
+                        typed_message = create_server_message_from_dict(parsed_data)
+                        self.conversation_manager.process_event(typed_message)
+                    except Exception:
+                        pass
                 with weave.attributes({"data": parsed_data}):
                     return msg
             return msg
@@ -289,13 +294,11 @@ class WeaveAiohttpWebsocketConnection:
             raise StopAsyncIteration
         return msg
 
-    def get_session(self) -> WeaveSession | None:
-        """Get the active session from the session manager."""
-        return self.session_manager.get_active_session()
+    def get_session(self) -> Any:
+        return self.conversation_manager.state.session
 
-    def get_all_sessions(self) -> Any:
-        """Get all sessions from the session manager."""
-        return self.session_manager.sessions
+    def get_conversation_manager(self) -> ConversationManager:
+        return self.conversation_manager
 
     def __getattr__(self, name: str) -> Any:
         # Delegate all other attributes to the original websocket
