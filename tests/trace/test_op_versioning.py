@@ -1,11 +1,15 @@
 import re
 import typing
+from collections.abc import Callable
 
 import numpy as np
 import pytest
 
 import weave
+import weave as wv
 from weave.trace.op import as_op
+from weave.trace.serialization.mem_artifact import MemTraceFilesArtifact
+from weave.trace.serialization.op_type import save_instance
 from weave.trace_server.trace_server_interface import FileContentReadReq, ObjReadReq
 
 
@@ -26,8 +30,8 @@ def get_saved_code(client, ref):
     return file_read_resp.content.decode()
 
 
-EXPECTED_SOLO_OP_CODE = """import weave
-import numpy as np
+EXPECTED_SOLO_OP_CODE = """import numpy as np
+import weave
 
 @weave.op()
 def solo_versioned_op(a: int) -> float:
@@ -49,8 +53,8 @@ def test_solo_op_versioning(client):
     assert saved_code == EXPECTED_SOLO_OP_CODE
 
 
-EXPECTED_OBJECT_OP_CODE = """import weave
-import numpy as np
+EXPECTED_OBJECT_OP_CODE = """import numpy as np
+import weave
 
 @weave.op()
 def versioned_op(self, a: int) -> float:
@@ -74,8 +78,8 @@ def test_object_op_versioning(client):
     assert saved_code == EXPECTED_OBJECT_OP_CODE
 
 
-EXPECTED_IMPORTFROM_OP_CODE = """import weave
-from numpy import array
+EXPECTED_IMPORTFROM_OP_CODE = """from numpy import array
+import weave
 
 @weave.op()
 def versioned_op_importfrom(a: int) -> float:
@@ -607,3 +611,63 @@ def test_op_import_from_as(client):
     print(saved_code)
 
     assert saved_code == EXPECTED_IMPORT_FROM_AS_CODE
+
+
+def save_and_get_code(func: Callable) -> str:
+    artifact = MemTraceFilesArtifact()
+    save_instance(func, artifact, "obj")
+    saved_code = artifact.path_contents["obj.py"]
+    if isinstance(saved_code, bytes):
+        saved_code = saved_code.decode()
+    return saved_code
+
+
+STANDARD_FUNC_CODE = """import weave
+
+@weave.op()
+def standard_func(): ...
+"""
+
+
+def test_standard_import():
+    """Test that standard import weave works correctly."""
+
+    @weave.op
+    def standard_func(): ...
+
+    code = save_and_get_code(standard_func)
+    assert code == STANDARD_FUNC_CODE
+
+
+ALIASED_FUNC_CODE = """import weave as wv
+
+@wv.op()
+def aliased_func(): ...
+"""
+
+
+def test_aliased_import_wv():
+    """Test that aliased import (wv) is handled correctly - should preserve the alias."""
+
+    @wv.op
+    def aliased_func(): ...
+
+    code = save_and_get_code(aliased_func)
+    assert code == ALIASED_FUNC_CODE
+
+
+PAREN_FUNC_CODE = """import weave as wv
+
+@wv.op()
+def paren_func(): ...
+"""
+
+
+def test_op_with_parentheses():
+    """Test that @wv.op() with parentheses is handled correctly - should preserve the alias."""
+
+    @wv.op()
+    def paren_func(): ...
+
+    code = save_and_get_code(paren_func)
+    assert code == PAREN_FUNC_CODE
