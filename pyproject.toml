@@ -384,6 +384,7 @@ exclude = ["weave_query", "rules"]
 "weave/flow/**" = ["TID251"]
 "tests/**" = ["TID251"]
 "docs/**" = ["TID251"]
+"scripts/**" = ["TID251"]
 
 [tool.pyright]
 include = ["weave"]
