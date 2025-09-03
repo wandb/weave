@@ -1015,6 +1015,45 @@ class WeaveClient:
         )
 
     @trace_sentry.global_trace_sentry.watch()
+    def delete_all_object_versions(self, object_name: str) -> int:
+        """Delete all versions of an object.
+        
+        Args:
+            object_name: The name of the object whose versions should be deleted.
+            
+        Returns:
+            The number of versions deleted.
+        """
+        result = self.server.obj_delete(
+            ObjDeleteReq(
+                project_id=self._project_id(),
+                object_id=object_name,
+                digests=None,
+            )
+        )
+        return result.num_deleted
+
+    @trace_sentry.global_trace_sentry.watch()
+    def delete_object_versions(self, object_name: str, digests: list[str]) -> int:
+        """Delete specific versions of an object.
+        
+        Args:
+            object_name: The name of the object whose versions should be deleted.
+            digests: List of digests to delete. Can include aliases like "latest" or "v0".
+            
+        Returns:
+            The number of versions deleted.
+        """
+        result = self.server.obj_delete(
+            ObjDeleteReq(
+                project_id=self._project_id(),
+                object_id=object_name,
+                digests=digests,
+            )
+        )
+        return result.num_deleted
+
+    @trace_sentry.global_trace_sentry.watch()
     def delete_op_version(self, op: OpRef) -> None:
         self.server.obj_delete(
             ObjDeleteReq(
@@ -1023,6 +1062,25 @@ class WeaveClient:
                 digests=[op.digest],
             )
         )
+
+    @trace_sentry.global_trace_sentry.watch()
+    def delete_all_op_versions(self, op_name: str) -> int:
+        """Delete all versions of an op.
+        
+        Args:
+            op_name: The name of the op whose versions should be deleted.
+            
+        Returns:
+            The number of versions deleted.
+        """
+        result = self.server.obj_delete(
+            ObjDeleteReq(
+                project_id=self._project_id(),
+                object_id=op_name,
+                digests=None,
+            )
+        )
+        return result.num_deleted
 
     def get_feedback(
         self,

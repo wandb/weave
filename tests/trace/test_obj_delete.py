@@ -258,3 +258,89 @@ def test_read_deleted_op(client: WeaveClient):
     )
     assert len(ref_res.vals) == 1
     assert ref_res.vals[0] is None
+
+
+def test_delete_all_object_versions_api(client: WeaveClient):
+    """Test the public API for deleting all versions of an object."""
+    v0 = weave.publish({"i": 1}, name="obj_test_all")
+    v1 = weave.publish({"i": 2}, name="obj_test_all")
+    v2 = weave.publish({"i": 3}, name="obj_test_all")
+
+    objs = _objs_query(client, "obj_test_all")
+    assert len(objs) == 3
+
+    # Delete all versions using the new public API
+    num_deleted = client.delete_all_object_versions("obj_test_all")
+    assert num_deleted == 3
+
+    objs = _objs_query(client, "obj_test_all")
+    assert len(objs) == 0
+
+    # Try to delete again when no versions exist
+    with pytest.raises(weave.trace_server.errors.NotFoundError):
+        client.delete_all_object_versions("obj_test_all")
+
+
+def test_delete_all_op_versions_api(client: WeaveClient):
+    """Test the public API for deleting all versions of an op."""
+    @weave.op
+    def test_op(x: int) -> int:
+        return x + 1
+
+    test_op(1)
+    test_op(2)
+
+    @weave.op
+    def test_op(x: int, y: int) -> int:
+        return x + y
+
+    test_op(1, 2)
+
+    objs = _objs_query(client, "test_op")
+    assert len(objs) == 2
+
+    # Delete all versions using the new public API
+    num_deleted = client.delete_all_op_versions("test_op")
+    assert num_deleted == 2
+
+    objs = _objs_query(client, "test_op")
+    assert len(objs) == 0
+
+    # Try to delete again when no versions exist
+    with pytest.raises(weave.trace_server.errors.NotFoundError):
+        client.delete_all_op_versions("test_op")
+
+
+def test_delete_object_versions_api(client: WeaveClient):
+    """Test the public API for deleting multiple specific versions of an object."""
+    v0 = weave.publish({"i": 1}, name="obj_multi_delete")
+    v1 = weave.publish({"i": 2}, name="obj_multi_delete")
+    v2 = weave.publish({"i": 3}, name="obj_multi_delete")
+    v3 = weave.publish({"i": 4}, name="obj_multi_delete")
+
+    objs = _objs_query(client, "obj_multi_delete")
+    assert len(objs) == 4
+
+    # Delete multiple specific versions
+    num_deleted = client.delete_object_versions("obj_multi_delete", [v0.digest, v2.digest])
+    assert num_deleted == 2
+
+    objs = _objs_query(client, "obj_multi_delete")
+    assert len(objs) == 2
+    assert objs[0].digest == v1.digest
+    assert objs[1].digest == v3.digest
+
+    # Delete using aliases
+    num_deleted = client.delete_object_versions("obj_multi_delete", ["latest"])
+    assert num_deleted == 1
+
+    objs = _objs_query(client, "obj_multi_delete")
+    assert len(objs) == 1
+    assert objs[0].digest == v1.digest
+
+    # Delete the last remaining version
+    num_deleted = client.delete_object_versions("obj_multi_delete", [v1.digest])
+    assert num_deleted == 1
+
+    objs = _objs_query(client, "obj_multi_delete")
+    assert len(objs) == 0
