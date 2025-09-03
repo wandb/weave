@@ -11,6 +11,8 @@ import logging
 from pydantic import BaseModel, Field
 
 from weave.integrations.openai_realtime import models
+from weave.integrations.openai_realtime.encoding import pcm_to_wav
+from weave.type_wrappers.Content import Content
 from weave.integrations.openai_realtime.handler_registry import EventHandlerGroups, EventHandlerRegistry
 from weave.integrations.openai_realtime.state_manager import CustomInputContext, StateStore, StoredItem, TimelineContext
 from weave.trace.weave_client import Call
@@ -242,12 +244,12 @@ class ConversationManager:
             return None
 
         # Helper: base64 encode a single user audio segment (if we have markers)
-        def _encode_user_audio(iid: models.ItemID) -> Optional[str]:
+        def _encode_user_audio(iid: models.ItemID) -> Optional[Content]:
             seg = self.get_audio_segment(iid)
             if not seg:
                 return None
             try:
-                return base64.b64encode(seg).decode("ascii")
+                return Content.from_bytes(pcm_to_wav(seg), extension=".wav")
             except Exception as e:
                 logger.warning("_build_inputs_payload: failed to base64-encode user audio for item_id=%s: %s", iid, e)
                 return None
