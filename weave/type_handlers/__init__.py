@@ -12,4 +12,7 @@ image.register()
 audio.register()
 datetime.register()
 markdown.register()
-video.register()
+
+# Video type handler registration is deferred until moviepy is imported
+# This happens via the moviepy import hook in weave.initialization.moviepy_video_thread_safety
+# video.register() is NOT called here to avoid importing moviepy unnecessarily

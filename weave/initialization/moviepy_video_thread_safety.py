@@ -153,8 +153,32 @@ def _undo_threadsafe_patch() -> None:
     _original_methods = {"__init__": None}
 
 
+# Global state for video type handler registration
+_video_handler_registered = False
+
+
+def _register_video_type_handler() -> None:
+    """Register the video type handler if not already registered.
+    
+    This is called after moviepy is imported to ensure the video type handler
+    is only registered when moviepy is actually available.
+    """
+    global _video_handler_registered
+    
+    if _video_handler_registered:
+        return
+    
+    try:
+        from weave.type_handlers.Video import video
+        video.register()
+        _video_handler_registered = True
+        logger.debug("Video type handler registered after moviepy import")
+    except Exception as e:
+        logger.debug(f"Failed to register video type handler: {e}")
+
+
 class MoviePyImportHookLoader(importlib.abc.Loader):
-    """Loader that applies patches after moviepy is loaded."""
+    """Loader that applies patches and registers video type handler after moviepy is loaded."""
     
     def __init__(self, original_loader: Any) -> None:
         self.original_loader = original_loader
@@ -165,9 +189,10 @@ class MoviePyImportHookLoader(importlib.abc.Loader):
         if hasattr(self.original_loader, 'exec_module'):
             self.original_loader.exec_module(module)
         
-        # Now apply our patch if this is the moviepy root module
+        # Now apply our patch and register video handler if this is the moviepy root module
         if module.__name__ == "moviepy" and not _patched:
             apply_threadsafe_patch_to_moviepy_video()
+            _register_video_type_handler()
     
     def create_module(self, spec: Any) -> Any:
         """Delegate module creation to the original loader."""
@@ -230,6 +255,7 @@ def register_moviepy_import_hook() -> None:
     
     This function uses Python's import hook mechanism to defer patching until
     moviepy is actually imported, improving startup performance when moviepy is not used.
+    It also defers the registration of the video type handler until moviepy is available.
     """
     global _moviepy_import_hook
     
@@ -239,8 +265,9 @@ def register_moviepy_import_hook() -> None:
     
     # Check if moviepy is already imported
     if "moviepy" in sys.modules:
-        # Already imported, apply patch immediately
+        # Already imported, apply patch and register video handler immediately
         apply_threadsafe_patch_to_moviepy_video()
+        _register_video_type_handler()
     else:
         # Register our import hook
         _moviepy_import_hook = MoviePyImportHook()
