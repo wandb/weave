@@ -52,15 +52,70 @@ def wandb_base_url() -> str:
 
 def wandb_frontend_base_url() -> str:
     public_url = os.getenv("WANDB_PUBLIC_BASE_URL", "").rstrip("/")
-    return public_url if public_url != "" else wandb_base_url()
+    if public_url:
+        return public_url
+    # Import here to avoid circular dependency
+    from weave.compat import wandb
+
+    # Transform API URL to frontend URL (e.g., https://api.wandb.ai -> https://wandb.ai)
+    return wandb.app_url(wandb_base_url())
+
+
+def weave_trace_server_base_url() -> str | None:
+    """Get the base URL for the trace server (without /traces suffix).
+
+    Returns None if using the default cloud environment.
+    Returns the base URL (e.g., 'http://localhost:9000') for local/custom environments.
+    """
+    trace_server_url = os.getenv("WF_TRACE_SERVER_URL")
+    if trace_server_url:
+        # Parse the URL to extract base components
+        parsed = urlparse(trace_server_url)
+        if parsed.hostname:
+            base_url = f"{parsed.scheme or 'http'}://{parsed.hostname}"
+            if parsed.port:
+                base_url += f":{parsed.port}"
+            return base_url
+        # Fallback for invalid URLs
+        return "http://localhost:9000"
+
+    # Check if we're using a non-default frontend URL
+    frontend_url = wandb_frontend_base_url()
+    if frontend_url != "https://wandb.ai":
+        return frontend_url
+
+    return None
+
+
+def weave_frontend_root_url() -> str:
+    """Get the root URL for frontend navigation (browser URLs).
+
+    Returns the appropriate base URL for constructing user-facing URLs
+    like call redirects, taking into account local development environments.
+    """
+    # Check for local/custom trace server first
+    base_url = weave_trace_server_base_url()
+    if base_url:
+        return base_url
+
+    # Default to the standard frontend URL
+    return wandb_frontend_base_url()
 
 
 def weave_trace_server_url() -> str:
-    base_url = wandb_frontend_base_url()
-    default = "https://trace.wandb.ai"
-    if base_url != "https://api.wandb.ai":
-        default = base_url + "/traces"
-    return os.getenv("WF_TRACE_SERVER_URL", default)
+    """Get the full URL for the trace server API endpoints."""
+    # Check for explicit override
+    trace_server_url = os.getenv("WF_TRACE_SERVER_URL")
+    if trace_server_url:
+        return trace_server_url
+
+    # Use base URL if available (local/custom environments)
+    base_url = weave_trace_server_base_url()
+    if base_url:
+        return base_url + "/traces"
+
+    # Default cloud environment
+    return "https://trace.wandb.ai"
 
 
 def _wandb_api_key_via_env() -> str | None:
