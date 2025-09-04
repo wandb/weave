@@ -149,14 +149,6 @@ const sidebars: SidebarsConfig = {
                 }
               ],
         },
-        {
-          type: "category",
-          collapsible: true,
-          collapsed: true,
-          label: "Tools & Utilities",
-          link: { type: "doc", id: "guides/tools/index" },
-          items: ["guides/tools/serve", "guides/tools/deploy", "guides/tracking/otel"],
-        },
       ],
     },
     {
