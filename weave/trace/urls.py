@@ -16,9 +16,8 @@ def project_weave_root_url(entity: str, project: str) -> str:
     Returns:
         The frontend URL for viewing the project in Weave
     """
-    # Always use the frontend base URL for browser navigation
-    base_url = env.wandb_frontend_base_url()
-
+    # Get the appropriate frontend URL (respects WF_TRACE_SERVER_URL if set)
+    base_url = env.weave_frontend_url()
     entity = quote(entity)
     project = quote(project)
 

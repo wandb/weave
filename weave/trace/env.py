@@ -71,6 +71,35 @@ def weave_trace_server_url() -> str:
     return os.getenv("WF_TRACE_SERVER_URL", default)
 
 
+def weave_frontend_url() -> str:
+    """Get the frontend URL for UI navigation.
+
+    This respects the WF_TRACE_SERVER_URL environment variable for custom deployments.
+    When WF_TRACE_SERVER_URL is set, extracts the base URL (scheme + host + port) from it.
+
+    Returns:
+        The base URL to use for frontend navigation
+    """
+    trace_server_url = os.getenv("WF_TRACE_SERVER_URL")
+
+    if trace_server_url:
+        # Parse the URL to extract scheme, host, and port
+        try:
+            parsed = urlparse(trace_server_url)
+            if parsed.scheme and parsed.netloc:
+                # Build base URL from scheme and netloc (host:port)
+                return f"{parsed.scheme}://{parsed.netloc}"
+            else:
+                # Invalid URL, fall back to localhost
+                return "http://localhost:9000"
+        except Exception:
+            # If parsing fails, fall back to localhost
+            return "http://localhost:9000"
+    else:
+        # Use the default frontend base URL
+        return wandb_frontend_base_url()
+
+
 def _wandb_api_key_via_env() -> str | None:
     api_key = os.environ.get("WANDB_API_KEY")
     return api_key
