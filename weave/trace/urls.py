@@ -1,5 +1,4 @@
-import os
-from urllib.parse import quote, urlparse
+from urllib.parse import quote
 
 from weave.trace import env
 
@@ -7,35 +6,23 @@ BROWSE3_PATH = "browse3"
 WEAVE_SLUG = "weave"
 
 
-def _get_base_url() -> str:
-    """Get the base URL for frontend navigation.
+def project_weave_root_url(entity: str, project: str) -> str:
+    """Get the frontend URL for viewing a Weave project.
 
-    Returns the appropriate base URL based on environment:
-    - If WF_TRACE_SERVER_URL is set, extract and use its base URL
-    - Otherwise, use the standard frontend URL
+    Args:
+        entity: The entity/organization name
+        project: The project name
+
+    Returns:
+        The frontend URL for viewing the project in Weave
     """
-    trace_server_url = os.getenv("WF_TRACE_SERVER_URL")
-    if trace_server_url:
-        # Parse the URL to extract base components for frontend navigation
-        parsed = urlparse(trace_server_url)
-        if parsed.hostname:
-            base_url = f"{parsed.scheme or 'http'}://{parsed.hostname}"
-            if parsed.port:
-                base_url += f":{parsed.port}"
-            return base_url
-        # Fallback for invalid URLs
-        return "http://localhost:9000"
+    # Always use the frontend base URL for browser navigation
+    base_url = env.wandb_frontend_base_url()
 
-    # Use standard frontend URL
-    return env.wandb_frontend_base_url()
+    entity = quote(entity)
+    project = quote(project)
 
-
-def remote_project_root_url(entity_name: str, project_name: str) -> str:
-    return f"{_get_base_url()}/{entity_name}/{quote(project_name)}"
-
-
-def project_weave_root_url(entity_name: str, project_name: str) -> str:
-    return f"{remote_project_root_url(entity_name, project_name)}/{WEAVE_SLUG}"
+    return f"{base_url}/{entity}/{project}/{WEAVE_SLUG}"
 
 
 def op_version_path(
