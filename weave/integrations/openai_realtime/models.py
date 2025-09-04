@@ -465,13 +465,13 @@ class ResponseMessageItem(ResponseItemBase):
 class ResponseFunctionCallItem(ResponseItemBase):
     type: Literal["function_call"] = "function_call"
     name: str
-    call_id: CallID  # Fixed typo: was Call_id
+    call_id: CallID
     arguments: str
 
 
 class ResponseFunctionCallOutputItem(ResponseItemBase):
     type: Literal["function_call_output"] = "function_call_output"
-    call_id: CallID  # Fixed typo: was Call_id
+    call_id: CallID
     output: str
 
 
