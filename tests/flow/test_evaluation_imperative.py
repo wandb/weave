@@ -605,3 +605,15 @@ def test_evaluation_logger_with_custom_attributes(client):
 
     calls = client.get_calls()
     assert calls[0].attributes["custom_attribute"] == "value"
+
+
+@pytest.mark.parametrize("model_name", ["for", "42", "a-b-c", "!"])
+def test_evaluation_invalid_model_name_fixable(model_name):
+    # Should not raise
+    weave.EvaluationLogger(model=model_name)
+
+
+@pytest.mark.parametrize("model_name", [""])
+def test_evaluation_invalid_model_name_not_fixable(model_name):
+    with pytest.raises(ValueError):
+        weave.EvaluationLogger(model=model_name)
