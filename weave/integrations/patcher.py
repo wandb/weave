@@ -92,11 +92,15 @@ class SymbolPatcher(Patcher):
 
     def attempt_patch(self) -> bool:
         if self._original_value:
+            # Already patched
             return True
         target = self._get_symbol_target()
         if target is None:
             return False
-        original_value = getattr(target.base_symbol, target.attr)
+        try:
+            original_value = getattr(target.base_symbol, target.attr)
+        except AttributeError:
+            return False
         try:
             new_val = self._make_new_value(original_value)
         except Exception:

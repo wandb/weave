@@ -102,11 +102,7 @@ def write_video(fp: str, clip: VideoClip) -> None:
     )
 
 
-def save_video_file_clip(
-    obj: VideoFileClip,
-    artifact: MemTraceFilesArtifact,
-    _: str,
-) -> None:
+def _save_video_file_clip(obj: VideoFileClip, artifact: MemTraceFilesArtifact) -> None:
     """Save a VideoFileClip to the artifact.
     Args:
         obj: The VideoFileClip
@@ -131,11 +127,7 @@ def save_video_file_clip(
             shutil.copy(obj.filename, fp)
 
 
-def save_non_file_clip(
-    obj: VideoClip,
-    artifact: MemTraceFilesArtifact,
-    _: str,
-) -> None:
+def _save_non_file_clip(obj: VideoClip, artifact: MemTraceFilesArtifact) -> None:
     ext = DEFAULT_VIDEO_FORMAT.value
     with artifact.writeable_file_path(f"video.{ext}") as fp:
         # If the format is unsupported, we need to convert it
@@ -159,9 +151,9 @@ def save(
 
     try:
         if is_video_file:
-            save_video_file_clip(obj, artifact, name)
+            _save_video_file_clip(obj, artifact)
         else:
-            save_non_file_clip(obj, artifact, name)
+            _save_non_file_clip(obj, artifact)
     except Exception as e:
         raise ValueError(f"Failed to write video file with error: {e}") from e
 

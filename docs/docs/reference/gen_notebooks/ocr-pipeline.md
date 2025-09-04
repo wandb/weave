@@ -1,3 +1,6 @@
+---
+title: Trace and Evaluate a Computer Vision Pipeline with Weave
+---
 
 
 :::tip[This is a notebook]
@@ -7,6 +10,8 @@
 <a href="https://github.com/wandb/weave/blob/master/docs/./notebooks/ocr-pipeline.ipynb" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link button button--secondary button--med margin-right--sm notebook-cta-button"><div><img src="https://upload.wikimedia.org/wikipedia/commons/9/91/Octicons-mark-github.svg" alt="View in Github" height="15px" /><div>View in Github</div></div></a>
 
 :::
+
+
 
 
 # Trace and Evaluate a Computer Vision Pipeline with Weave

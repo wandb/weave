@@ -51,6 +51,7 @@ const sidebars: SidebarsConfig = {
               id: "guides/core-types/media",
             },
             "guides/tools/playground",
+            "guides/tools/evaluation_playground",
             "guides/integrations/index",
             "guides/tools/saved-views",
             {

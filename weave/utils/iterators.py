@@ -116,7 +116,7 @@ class ThreadSafeLazyList(Sequence[T]):
             An iterator yielding all items in the sequence.
         """
 
-        def _iter() -> Generator[T, None, None]:
+        def _iter() -> Generator[T]:
             i = 0
             while True:
                 try:

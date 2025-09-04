@@ -1,6 +1,6 @@
-
-## title: Log Audio With Weave
-
+---
+title: Log Audio With Weave
+---
 
 
 :::tip[This is a notebook]
@@ -12,8 +12,6 @@
 :::
 
 
-## 
-<!--- @wandbcode{feedback-colab} -->
 
 
 # How to use Weave with Audio Data: An OpenAI Example
