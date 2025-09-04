@@ -569,6 +569,8 @@ def save_instance(obj: Op, artifact: MemTraceFilesArtifact, name: str) -> None:
     # Handle decorator normalization/addition
     if has_expected_decorator:
         # Normalize existing decorator to have parentheses
+        # Example: @weave.op -> @weave.op() or @wv.op -> @wv.op()
+        # (where decorator_prefix matches the actual import)
         op_function_code = re.sub(
             rf"@{re.escape(decorator_prefix)}\.op(?!\()",
             f"@{decorator_prefix}.op()",
@@ -576,11 +578,17 @@ def save_instance(obj: Op, artifact: MemTraceFilesArtifact, name: str) -> None:
         )
     elif weave_alias and WEAVE_OP_PATTERN.search(op_function_code):
         # Has @weave.op but import uses alias - normalize to @weave.op()
+        # Example: import weave as wv, but code has @weave.op instead of @wv.op
+        # Still normalizes: @weave.op -> @weave.op()
         op_function_code = WEAVE_OP_NO_PAREN_PATTERN.sub(
             "@weave.op()", op_function_code
         )
     else:
         # No decorator found, add one
+        # This happens when:
+        # - Op created programmatically: my_op = weave.op()(plain_func)
+        # - Anonymous ops: client.create_call("op_name", inputs)
+        # Example: plain function -> @weave.op() or @wv.op() prepended
         op_function_code = f"@{decorator_prefix}.op()\n" + op_function_code
     code.append(op_function_code)
 
