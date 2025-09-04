@@ -7,7 +7,7 @@ import weave
 import dotenv
 dotenv.load_dotenv()
 
-weave.init("test_realtime")
+weave.init("test_realtime_2")
 
 from conversation_manager import ConversationManager
 from exporters import DirectoryExportAdapter, JSONFileExportAdapter

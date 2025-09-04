@@ -4,51 +4,10 @@ from dataclasses import dataclass, field
 from typing import Optional, Union, cast
 from typing_extensions import Iterable, TypedDict
 from pydantic import BaseModel, Field
+from audio_buffer import AudioBufferManager
 from weave.integrations.openai_realtime import models
 
 logger = logging.getLogger(__name__)
-
-@dataclass
-class AudioBufferManager:
-    """
-    Maintains a single, continuous PCM audio buffer for a conversation and
-    provides helpers to slice out segments by millisecond offsets.
-
-    Default format: 16-bit PCM, mono, 24kHz (extensible).
-    """
-
-    sample_rate_hz: int = 24000
-    bits_per_sample: int = 16
-    channels: int = 1
-    buffer: bytearray = field(default_factory=bytearray)
-
-    def bytes_per_sample(self) -> int:
-        return (self.bits_per_sample // 8) * self.channels
-
-    def append_base64(self, b64: str) -> None:
-        """Decode base64 audio and append. Ignores invalid payloads gracefully."""
-        try:
-            self.buffer.extend(base64.b64decode(b64))
-        except Exception as e:
-            # Some fixtures use placeholder strings like "<audio bytes>".
-            # Skip invalid base64 without failing the pipeline, but log for visibility.
-            logger.warning("AudioBufferManager.append_base64: invalid base64; ignoring. error=%s preview=%r", e, b64[:20])
-
-    def clear(self) -> None:
-        self.buffer.clear()
-
-    def _ms_to_byte_range(self, start_ms: int, end_ms: int) -> tuple[int, int]:
-        bps = self.bytes_per_sample()
-        start_samples = int((start_ms / 1000.0) * self.sample_rate_hz)
-        end_samples = int((end_ms / 1000.0) * self.sample_rate_hz)
-        return start_samples * bps, end_samples * bps
-
-    def get_segment_ms(self, start_ms: int, end_ms: int) -> bytes:
-        start_b, end_b = self._ms_to_byte_range(start_ms, end_ms)
-        start_b = max(0, start_b)
-        end_b = min(len(self.buffer), max(start_b, end_b))
-        return bytes(self.buffer[start_b:end_b])
-
 
 StoredItem = Union[models.ServerItem, models.ResponseItem]
 
@@ -65,13 +24,11 @@ class ResponseContext(TypedDict):
     user_context: Union[TimelineContext, CustomInputContext]
     assistant_context: TimelineContext
 
-
 class StateStore(BaseModel):
     """
     Central state for a single conversation session.
     Tracks session, items, responses, audio buffer, speech markers, and delta accumulators.
     """
-
     model_config = {"arbitrary_types_allowed": True}
 
     session: Optional[models.Session] = None
@@ -84,6 +41,9 @@ class StateStore(BaseModel):
     timeline: list[models.ItemID] = Field(default_factory=list)
     prev_by_item: dict[models.ItemID, Optional[models.ItemID]] = Field(default_factory=dict)
     next_by_item: dict[models.ItemID, Optional[models.ItemID]] = Field(default_factory=dict)
+
+    call_by_id: dict[models.CallID, models.ResponseFunctionCallItem] = Field(default_factory=dict)
+    call_output_by_id: dict[models.CallID, models.ResponseFunctionCallItem] = Field(default_factory=dict)
 
     # Input audio buffer and speech markers per item
     input_audio_buffer: AudioBufferManager = Field(default_factory=AudioBufferManager)
@@ -98,21 +58,14 @@ class StateStore(BaseModel):
 
     # - For response audio transcript parts (response_id, item_id, content_index) -> transcript text
     resp_audio_transcripts: dict[tuple[models.ResponseID, models.ItemID, int], str] = Field(default_factory=dict)
-
     # - For response audio raw bytes accumulation (response_id, item_id, content_index) -> bytes
     resp_audio_bytes: dict[tuple[models.ResponseID, models.ItemID, int], bytearray] = Field(default_factory=dict)
-
     # - For function call arguments accumulation (response_id, call_id) -> args string
     resp_func_args: dict[tuple[models.ResponseID, str], str] = Field(default_factory=dict)
 
     # Response context mapping
     # Stores two views: user_context (what model used on user side) and assistant_context (full context)
     response_context: dict[models.ResponseID, ResponseContext] = Field(default_factory=dict)
-
-    # Map from an input item (previous item in output chain) -> response id
-    # This is populated on response completion, using the prev linkage for any
-    # output items observed in that response.
-    response_by_prev_item: dict[models.ItemID, models.ResponseID] = Field(default_factory=dict)
 
     # Pending custom context registered on ResponseCreateMessage until a ResponseCreatedMessage materializes
     pending_custom_context: Optional[CustomInputContext] = None
@@ -190,19 +143,11 @@ class StateStore(BaseModel):
             return None
         start_ms = markers.get("audio_start_ms")
         end_ms = markers.get("audio_end_ms")
+
         if start_ms is None or end_ms is None:
             return None
-        return self.input_audio_buffer.get_segment_ms(start_ms, end_ms)
 
-    def get_response_for_item(self, item_id: models.ItemID) -> Optional[models.ResponseID]:
-        """Resolve the response id associated with an item via prev/response maps."""
-        rid = self.response_by_prev_item.get(item_id)
-        if rid is not None:
-            return rid
-        prev = self.prev_by_item.get(item_id)
-        if prev is not None:
-            return self.response_by_prev_item.get(prev)
-        return None
+        return self.input_audio_buffer.get_segment_ms(start_ms, end_ms)
 
     # ---- Event application helpers (moved from ConversationManager) ----
     # Session
@@ -258,6 +203,19 @@ class StateStore(BaseModel):
         del _msg
 
     def apply_item_deleted(self, msg: models.ItemDeletedMessage) -> None:
+        item = self.items.get(msg.item_id, None)
+        if item:
+            next_item = self.next_by_item.get(item.id)
+            prev_item = self.prev_by_item.get(item.id)
+
+            if next_item and prev_item:
+                self.next_by_item[prev_item] = next_item
+                self.prev_by_item[next_item] = prev_item
+            elif next_item:
+                self.prev_by_item[next_item] = None
+            elif prev_item:
+                self.next_by_item[prev_item] = None
+
         self.items.pop(msg.item_id, None)
         try:
             self.timeline.remove(msg.item_id)
@@ -265,7 +223,7 @@ class StateStore(BaseModel):
             pass
 
     def apply_item_input_audio_transcription_delta(self, msg: models.ItemInputAudioTranscriptionDeltaMessage) -> None:
-        key = (msg.item_id, msg.content_index)
+        key = msg.item_id, msg.content_index
         curr = self.input_transcripts.get(key, "")
         self.input_transcripts[key] = curr + msg.delta
         # Mirror into stored item if present
@@ -316,14 +274,6 @@ class StateStore(BaseModel):
 
     def apply_response_done(self, msg: models.ResponseDoneMessage) -> None:
         self.responses[msg.response.id] = msg.response
-        # Build mapping from previous item -> response id
-        try:
-            for oit in msg.response.output:
-                prev = self.prev_by_item.get(oit.id)
-                if prev is not None:
-                    self.response_by_prev_item[prev] = msg.response.id
-        except Exception:
-            pass
 
     def apply_response_output_item_added(self, msg: models.ResponseOutputItemAddedMessage) -> None:
         resp = self.responses.setdefault(
