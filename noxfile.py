@@ -201,9 +201,30 @@ def tests(session, shard):
     if shard == "trace_no_server":
         pytest_args.extend(["-m", "not trace_server"])
 
-    session.run(
-        *pytest_args,
-        *session.posargs,
-        *test_dirs,
-        env=env,
-    )
+    # Check if user provided specific test files/patterns
+    # We need to distinguish between pytest options (like -n4, -v) and actual test paths
+    user_provided_tests = []
+    pytest_options = []
+
+    for arg in session.posargs:
+        # Arguments starting with '-' are pytest options, not test paths
+        if arg.startswith("-"):
+            pytest_options.append(arg)
+        else:
+            user_provided_tests.append(arg)
+
+    # If user provided specific tests, use only those; otherwise use default test_dirs
+    if user_provided_tests:
+        session.run(
+            *pytest_args,
+            *pytest_options,
+            *user_provided_tests,
+            env=env,
+        )
+    else:
+        session.run(
+            *pytest_args,
+            *pytest_options,
+            *test_dirs,
+            env=env,
+        )
