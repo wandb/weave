@@ -638,7 +638,7 @@ class ConversationManager:
         msg = self._format_item(it, response_id=rid)
         return msg or {}
 
-    
+
 
     def _build_message_output_payload(
         self,
@@ -649,7 +649,7 @@ class ConversationManager:
         msg = self._format_item(item, response_id=response_id)
         return msg or {}
 
-    
+
 
     # Responses
     def _handle_response_create(self, msg: models.ResponseCreateMessage) -> None:
