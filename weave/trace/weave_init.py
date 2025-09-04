@@ -9,7 +9,6 @@ from weave.trace import (
     autopatch,
     env,
     init_message,
-    wandb_termlog_patch,
     weave_client,
 )
 from weave.trace.context import weave_client_context as weave_client_context
@@ -107,8 +106,7 @@ def init_weave(
     if wandb_context is None:
         url = wandb.app_url(env.wandb_base_url())
         logger.info(f"Please login to Weights & Biases ({url}) to continue...")
-        wandb_termlog_patch.ensure_patched()
-        wandb.login(anonymous="never", force=True)  # type: ignore
+        wandb.login(anonymous="never", force=True, referrer="weave")  # type: ignore
 
         wandb_context_module.init()
         wandb_context = wandb_context_module.get_wandb_api_context()
