@@ -161,16 +161,14 @@ class ConversationManager:
         # Event objects have a 'type' field in pydantic models.
         event_type = getattr(event, "type", None)
         if not event_type:
-            logger.error("process_event: event missing 'type': %r", event)
             return
+
         handler = self._registry.get(event_type)
         if handler:
             with self._lock:
                 handler(event)
                 # After every event, opportunistically check any pending input completions
                 self._maybe_check_all_turns()
-        else:
-            logger.warning("process_event: no handler registered for event type '%s'", event_type)
 
     def get_conversation_history(self) -> list[StoredItem]:
         return [it for it in self.state.get_conversation_history()]
@@ -271,6 +269,40 @@ class ConversationManager:
         - Function call -> assistant tool_calls envelope
         - Function call output -> tool role message
         """
+        # The function call instance check fails so just use this
+        if getattr(item, "type", None) == "function_call":
+             return {
+                 "role": "assistant",
+                 "content": None,
+                 "refusal": None,
+                 "annotations": [],
+                 "function_call": None,
+                 "tool_calls": [
+                     {
+                         "id": getattr(item, "call_id", None),
+                         "type": "function",
+                         "function": {
+                             "name": getattr(item, "name", None),
+                             "arguments": getattr(item, "arguments", None),
+                         },
+                     }
+                 ],
+             }
+
+        if getattr(item, "type", None) == "function_call_output":
+            call_id = getattr(item, "call_id", None)
+            name = None
+            for other in self.state.items.values():
+                if getattr(other, "type", None) == "function_call" and getattr(other, "call_id", None) == call_id:
+                    name = getattr(other, "name", None)
+                    break
+
+                return {
+                    "role": "tool",
+                    "content": getattr(item, "output", None),
+                    "tool_call_id": call_id,
+                    "name": name,
+                }
         # System message
         if isinstance(item, (models.ClientSystemMessageItem, models.ServerSystemMessageItem)):
             parts: list[dict[str, object]] = []
@@ -306,46 +338,6 @@ class ConversationManager:
                 "function_call": None,
                 "tool_calls": None,
             }
-
-        # Function call (assistant tool call)
-        if isinstance(item, (models.ClientFunctionCallItem, models.ServerFunctionCallItem)):
-            return {
-                "role": "assistant",
-                "content": None,
-                "refusal": None,
-                "annotations": [],
-                "function_call": None,
-                "tool_calls": [
-                    {
-                        "id": getattr(item, "call_id", None),
-                        "type": "function",
-                        "function": {
-                            "name": getattr(item, "name", None),
-                            "arguments": getattr(item, "arguments", None),
-                        },
-                    }
-                ],
-            }
-
-        # Function call output -> tool role
-        if isinstance(item, (models.ClientFunctionCallOutputItem, models.ServerFunctionCallOutputItem)):
-            # Resolve name by looking up the original function call item if possible
-            call_id = getattr(item, "call_id", None)
-            name = None
-            try:
-                for other in self.state.items.values():
-                    if getattr(other, "type", None) == "function_call" and getattr(other, "call_id", None) == call_id:
-                        name = getattr(other, "name", None)
-                        break
-            except Exception:
-                name = None
-            return {
-                "role": "tool",
-                "content": getattr(item, "output", None),
-                "tool_call_id": call_id,
-                "name": name,
-            }
-        print("unhandled item: ", item)
 
         return None
 
@@ -654,15 +646,16 @@ class ConversationManager:
         rec.response_done = True
         self._handle_turn_completion(rec)
 
-    
+
 
     def _handle_response_audio_done(self, _msg: models.ResponseAudioDoneMessage) -> None:
         self.state.apply_response_audio_done(_msg)
         logger.debug("_handle_response_audio_done: received audio done message")
 
-    
+
 
     def _handle_turn_completion(self, rec: TurnRecord) -> None:
+        print('attempting turn complete')
         logger.debug("_handle_turn_completion: evaluating turn completion")
         # If inputs are not complete yet, debounce a check in 200ms
         if not rec.inputs_complete:
@@ -736,9 +729,8 @@ class ConversationManager:
             return
 
     def _handle_error(self, msg: models.ErrorMessage) -> None:
-        # Log error messages
-        logger.error("API Error: type=%s, message=%s, code=%s", 
-                     msg.error.type, msg.error.message, msg.error.code)
+        # Let the client handle api errors
+        pass
 
     def _handle_rate_limits_updated(self, msg: models.RateLimitsUpdatedMessage) -> None:
         # Log rate limits for informational purposes

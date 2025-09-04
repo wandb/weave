@@ -263,19 +263,8 @@ class ServerFunctionCallOutputItem(BaseFunctionCallOutputItem):
 # Union types for client and server items
 ClientMessageItem = Annotated[Union[ClientSystemMessageItem, ClientUserMessageItem, ClientAssistantMessageItem], Field(discriminator="role")]
 ServerMessageItem = Annotated[Union[ServerSystemMessageItem, ServerUserMessageItem, ServerAssistantMessageItem], Field(discriminator="role")]
-
 ClientItem = Annotated[Union[ClientMessageItem, ClientFunctionCallItem, ClientFunctionCallOutputItem], Field(discriminator="type")]
 ServerItem = Annotated[Union[ServerMessageItem, ServerFunctionCallItem, ServerFunctionCallOutputItem], Field(discriminator="type")]
-
-# Legacy aliases for backward compatibility (can be removed if not needed)
-SystemMessageItem = ClientSystemMessageItem
-UserMessageItem = ClientUserMessageItem
-AssistantMessageItem = ClientAssistantMessageItem
-MessageItem = ClientMessageItem
-FunctionCallItem = ClientFunctionCallItem
-FunctionCallOutputItem = ClientFunctionCallOutputItem
-Item = ClientItem
-
 
 class ItemCreateMessage(ClientMessageBase):
     type: Literal["conversation.item.create"] = "conversation.item.create"
