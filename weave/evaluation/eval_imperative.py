@@ -111,7 +111,7 @@ def _sanitize_class_name(name: str) -> str:
     """Return a valid Python class name based on a string."""
     # Remove characters that are not alphanumeric or underscore
     class_name = re.sub(r"\W", "", name)
-    if not class_name:
+    if class_name == "":
         return "GeneratedClass"
 
     # Ensure it starts with a letter or underscore (prepend "C" if not)
