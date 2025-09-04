@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import asyncio
 from threading import Lock
 from typing import Optional, Union, cast, Callable, TypeVar, Type
 import threading
 import time
 import logging
+from queue import Queue, Empty
 
 from pydantic import BaseModel, Field
 
@@ -79,8 +79,10 @@ class ConversationManager:
     def __init__(self) -> None:
         self.state = StateStore()
         self._registry = EventHandlerRegistry()
-        self._queue: asyncio.Queue[models.MessageType] = asyncio.Queue()
-        self._worker_task: Optional[asyncio.Task] = None
+        # Worker-thread based event queue + lifecycle
+        self._queue: Queue[models.MessageType] = Queue()
+        self._stop_event = threading.Event()
+        self._worker_thread: Optional[threading.Thread] = None
         self._lock = Lock()
 
         handlers: dict[str, Handler] = {
@@ -138,23 +140,38 @@ class ConversationManager:
         self.client_base_url: Optional[str] = None
         # Track weave call objects per response to finish later
         self._weave_calls: dict[models.ResponseID, Call] = {}
+        # Start the worker thread immediately so enqueue works out of the box
+        self._start_worker_thread()
 
     async def start(self) -> None:
-        logger.debug("ConversationManager.start: starting worker task")
-        if self._worker_task is None:
-            self._worker_task = asyncio.create_task(self._worker())
+        """Async-compatible start that spins up the worker thread."""
+        self._start_worker_thread()
 
     async def stop(self) -> None:
-        if self._worker_task is not None:
-            self._worker_task.cancel()
-            try:
-                await self._worker_task
-            except asyncio.CancelledError:
-                pass
-            self._worker_task = None
+        """Async-compatible stop that signals the worker thread to exit."""
+        self._stop_worker_thread()
 
     async def submit_event(self, event: models.MessageType) -> None:
-        await self._queue.put(event)
+        """Async-compatible enqueue; places the event onto the worker queue."""
+        self._queue.put(event)
+
+    def _start_worker_thread(self) -> None:
+        if self._worker_thread is not None and self._worker_thread.is_alive():
+            return
+        self._stop_event.clear()
+        t = threading.Thread(target=self._worker, name="ConversationManagerWorker", daemon=True)
+        t.start()
+        self._worker_thread = t
+
+    def _stop_worker_thread(self) -> None:
+        if self._worker_thread is None:
+            return
+        self._stop_event.set()
+        # Wake the thread if it's blocked waiting for an item
+        self._queue.put_nowait(cast(models.MessageType, None))  # type: ignore[arg-type]
+        # Don't block indefinitely; thread is daemon and will also exit on main-thread exit
+        self._worker_thread.join(timeout=1.0)
+        self._worker_thread = None
 
     def process_event(self, event: models.MessageType) -> None:
         """Process an event synchronously (useful for tests or simple flows)."""
@@ -584,13 +601,31 @@ class ConversationManager:
             ],
         }
 
-    async def _worker(self) -> None:
-        while True:
-            event = await self._queue.get()
+    def _worker(self) -> None:
+        """Worker loop running in a daemon thread, draining events from the queue.
+
+        Exits when `_stop_event` is set or when the main thread exits (daemon=True).
+        """
+        while not self._stop_event.is_set():
+            try:
+                event = self._queue.get(timeout=0.1)
+            except Empty:
+                continue
+            # Sentinel to unblock during shutdown
+            if event is None:  # type: ignore[truthy-function]
+                try:
+                    self._queue.task_done()
+                except ValueError:
+                    pass
+                continue
             try:
                 self.process_event(event)
             finally:
-                self._queue.task_done()
+                try:
+                    self._queue.task_done()
+                except ValueError:
+                    # If task_done called more times than items; guard against misuse
+                    pass
 
     def _build_message_input_payload(self, item_id: models.ItemID) -> dict[str, object]:
         """
