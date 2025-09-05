@@ -29,7 +29,7 @@ class OpenAIRealtimeSettings(IntegrationSettings):
     patch_websockets: bool = True
 
 
-def get_websocket_patcher(
+def get_openai_realtime_websocket_patcher(
     settings: IntegrationSettings | None = None,
 ) -> MultiPatcher | NoOpPatcher:
     if settings is None:
