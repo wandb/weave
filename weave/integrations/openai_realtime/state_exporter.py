@@ -46,7 +46,9 @@ class StateExporter(BaseModel):
 
     session: Optional[models.Session] = None
     conversation_calls: dict[models.ConversationID, Call] = Field(default_factory=dict)
-    timeline: list[models.ItemID | models.ResponseID] = Field(default_factory=list)
+    timeline: list[Union[models.ItemID, models.ResponseID]] = Field(
+        default_factory=list
+    )
     committed_item_ids: set[models.ItemID] = Field(default_factory=set)
 
     transcript_completed: set[models.ItemID] = Field(default_factory=set)
