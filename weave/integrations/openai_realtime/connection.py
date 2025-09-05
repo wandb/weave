@@ -2,8 +2,6 @@ import json
 import uuid
 from typing import Any
 
-import websocket
-
 from weave.integrations.openai_realtime.conversation_manager import ConversationManager
 
 # Use project-local modules (no package-relative imports here)
@@ -80,7 +78,9 @@ class WeaveMediaConnection:
         self.ws.send = self._wrap_sender(self.ws.send)
 
     def _wrap_sender(self, sender: Any) -> Any:
-        def wrapper(data: Any, opcode: int = websocket.ABNF.OPCODE_TEXT) -> Any:
+        def wrapper(
+            data: Any, opcode: int = 1
+        ) -> Any:  # opcode is websocket.ABNF.OPCODE_TEXT
             # Process outgoing events with session manager
             parsed_data = _try_json_load(data)
             if isinstance(parsed_data, dict):
@@ -127,7 +127,9 @@ class WeaveMediaConnection:
 
         return wrapper
 
-    def send(self, data: Any, opcode: int = websocket.ABNF.OPCODE_TEXT) -> Any:
+    def send(
+        self, data: Any, opcode: int = 1
+    ) -> Any:  # opcode is websocket.ABNF.OPCODE_TEXT
         self.ws.send(data, opcode)
 
     def run_forever(self, **kwargs: Any) -> Any:
