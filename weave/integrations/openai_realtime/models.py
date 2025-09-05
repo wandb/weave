@@ -1,57 +1,51 @@
 from __future__ import annotations
-from typing import Annotated, Any, Literal, Optional, Union, Type
-from pydantic import AliasChoices, BaseModel, Field, AfterValidator
-from typing import Annotated
+
+from typing import Annotated, Any, Literal, Union
+
+from pydantic import AfterValidator, AliasChoices, BaseModel, Field
 
 
 def is_conv_id(id: str) -> str:
-    """
-    ID for a conversation such as "conv_C9IkmOhAf8dw7uQyOtBFI"
-    """
+    """ID for a conversation such as "conv_C9IkmOhAf8dw7uQyToBFI"."""
     if id.startswith("conv_"):
         return id
     raise ValueError(f"ID {id} is not a conversation ID")
 
+
 def is_call_id(id: str) -> str:
-    """
-    ID for a function call such as call_mkaZeOUzwGFi8Xap
-    """
+    """ID for a function call such as call_mkaZeOUzwGFi8Xap."""
     if id.startswith("call_"):
         return id
     raise ValueError(f"ID {id} is not a call ID")
 
+
 def is_sess_id(id: str) -> str:
-    """
-    ID for a session such as sess_mkaZeOUzwGFi8Xap
-    """
+    """ID for a session such as sess_mkaZeOUzwGFi8Xap."""
     if id.startswith("sess_"):
         return id
     raise ValueError(f"ID {id} is not a session ID")
 
+
 def is_event_id(id: str) -> str:
-    """
-    ID for an event such as event_mkaZeOUzwGFi8Xap
-    """
+    """ID for an event such as event_mkaZeOUzwGFi8Xap."""
     if id.startswith("event_"):
         return id
     raise ValueError(f"ID {id} is not an event ID")
 
+
 def is_item_id(id: str) -> str:
-    """
-    ID for an item such as item_mkaZeOUzwGFi8Xap
-    """
+    """ID for an item such as item_mkaZeOUzwGFi8Xap."""
     if id.startswith("item_"):
         return id
     raise ValueError(f"ID {id} is not an item ID")
 
 
 def is_resp_id(id: str) -> str:
-    """
-    ID for an response such as resp_mkaZeOUzwGFi8Xap
-    """
+    """ID for an response such as resp_mkaZeOUzwGFi8Xap."""
     if id.startswith("resp_"):
         return id
     raise ValueError(f"ID {id} is not a response ID")
+
 
 SessionID = Annotated[str, AfterValidator(is_sess_id)]
 EventID = Annotated[str, AfterValidator(is_event_id)]
@@ -72,12 +66,14 @@ class NoTurnDetection(BaseModel):
 
 class ServerVAD(BaseModel):
     type: Literal["server_vad"] = "server_vad"
-    threshold: Optional[Annotated[float, Field(strict=True, ge=0.0, le=1.0)]] = None
-    prefix_padding_ms: Optional[int] = None
-    silence_duration_ms: Optional[int] = None
+    threshold: Annotated[float, Field(strict=True, ge=0.0, le=1.0)] | None = None
+    prefix_padding_ms: int | None = None
+    silence_duration_ms: int | None = None
 
 
-TurnDetection = Annotated[Union[NoTurnDetection, ServerVAD], Field(discriminator="type")]
+TurnDetection = Annotated[
+    Union[NoTurnDetection, ServerVAD], Field(discriminator="type")
+]
 
 
 class FunctionToolChoice(BaseModel):
@@ -95,7 +91,7 @@ class InputAudioTranscription(BaseModel):
 
 
 class ClientMessageBase(BaseModel):
-    event_id: Optional[EventID] = None
+    event_id: EventID | None = None
 
 
 Temperature = Annotated[float, Field(strict=True, ge=0.6, le=1.2)]
@@ -103,24 +99,22 @@ ToolsDefinition = list[Any]
 
 
 class SessionUpdateParams(BaseModel):
-    model: Optional[str] = None
-    modalities: Optional[set[Modality]] = None
-    voice: Optional[Voice] = None
-    instructions: Optional[str] = None
-    input_audio_format: Optional[AudioFormat] = None
-    output_audio_format: Optional[AudioFormat] = None
-    input_audio_transcription: Optional[InputAudioTranscription] = None
-    turn_detection: Optional[TurnDetection] = None
-    tools: Optional[ToolsDefinition] = None
-    tool_choice: Optional[ToolChoice] = None
-    temperature: Optional[Temperature] = None
-    max_response_output_tokens: Optional[int] = None
+    model: str | None = None
+    modalities: set[Modality] | None = None
+    voice: Voice | None = None
+    instructions: str | None = None
+    input_audio_format: AudioFormat | None = None
+    output_audio_format: AudioFormat | None = None
+    input_audio_transcription: InputAudioTranscription | None = None
+    turn_detection: TurnDetection | None = None
+    tools: ToolsDefinition | None = None
+    tool_choice: ToolChoice | None = None
+    temperature: Temperature | None = None
+    max_response_output_tokens: int | None = None
 
 
 class SessionUpdateMessage(ClientMessageBase):
-    """
-    Update the session configuration.
-    """
+    """Update the session configuration."""
 
     type: Literal["session.update"] = "session.update"
     session: SessionUpdateParams
@@ -146,9 +140,7 @@ class InputAudioBufferCommitMessage(ClientMessageBase):
 
 
 class InputAudioBufferClearMessage(ClientMessageBase):
-    """
-    Clear the user audio buffer, discarding any pending audio data.
-    """
+    """Clear the user audio buffer, discarding any pending audio data."""
 
     type: Literal["input_audio_buffer.clear"] = "input_audio_buffer.clear"
 
@@ -160,14 +152,15 @@ class InputTextContentPart(BaseModel):
     type: Literal["input_text"] = "input_text"
     text: str
 
+
 class InputAudioContentPart(BaseModel):
     type: Literal["input_audio"] = "input_audio"
     # Some server events (e.g., conversation.item.created) may omit the raw
     # audio payload and only include a transcript placeholder. Make audio
     # optional to be tolerant of such cases during replays and future API
     # changes.
-    audio: Optional[str] = None
-    transcript: Optional[str] = None
+    audio: str | None = None
+    transcript: str | None = None
 
 
 class OutputTextContentPart(BaseModel):
@@ -176,99 +169,143 @@ class OutputTextContentPart(BaseModel):
 
 
 SystemContentPart = InputTextContentPart
-UserContentPart = Union[Annotated[Union[InputTextContentPart, InputAudioContentPart], Field(discriminator="type")]]
+UserContentPart = Union[
+    Annotated[
+        Union[InputTextContentPart, InputAudioContentPart], Field(discriminator="type")
+    ]
+]
 AssistantContentPart = OutputTextContentPart
 
 ItemParamStatus = Literal["completed", "incomplete", "in_progress"]
 
+
 # Base classes for items - common attributes
 class BaseMessageItem(BaseModel):
     """Base class for message items with common attributes"""
+
     type: MessageItemType = "message"
     content: list[Any]  # Will be overridden in subclasses
-    status: Optional[ItemParamStatus] = None
+    status: ItemParamStatus | None = None
+
 
 class BaseFunctionCallItem(BaseModel):
     """Base class for function call items with common attributes"""
+
     type: Literal["function_call"] = "function_call"
     name: str
     call_id: CallID
     arguments: str
-    status: Optional[ItemParamStatus] = None
+    status: ItemParamStatus | None = None
+
 
 class BaseFunctionCallOutputItem(BaseModel):
     """Base class for function call output items with common attributes"""
+
     type: Literal["function_call_output"] = "function_call_output"
     call_id: CallID
     output: str
-    status: Optional[ItemParamStatus] = None
+    status: ItemParamStatus | None = None
+
 
 # Client-side items (no IDs)
 class ClientSystemMessageItem(BaseMessageItem):
     """System message item as sent by client"""
+
     role: Literal["system"] = "system"
     content: list[SystemContentPart]
 
+
 class ClientUserMessageItem(BaseMessageItem):
     """User message item as sent by client"""
+
     role: Literal["user"] = "user"
     content: list[UserContentPart]
 
+
 class ClientAssistantMessageItem(BaseMessageItem):
     """Assistant message item as sent by client"""
+
     role: Literal["assistant"] = "assistant"
     content: list[AssistantContentPart]
 
+
 class ClientFunctionCallItem(BaseFunctionCallItem):
     """Function call item as sent by client"""
+
     pass
+
 
 class ClientFunctionCallOutputItem(BaseFunctionCallOutputItem):
     """Function call output item as sent by client"""
+
     pass
+
 
 # Server-side items (with IDs and object field)
 class ServerSystemMessageItem(BaseMessageItem):
     """System message item as sent by server"""
+
     id: ItemID
     object: Literal["realtime.item"] = "realtime.item"
     role: Literal["system"] = "system"
     content: list[SystemContentPart]
 
+
 class ServerUserMessageItem(BaseMessageItem):
     """User message item as sent by server"""
+
     id: ItemID
     object: Literal["realtime.item"] = "realtime.item"
     role: Literal["user"] = "user"
     content: list[UserContentPart]
 
+
 class ServerAssistantMessageItem(BaseMessageItem):
     """Assistant message item as sent by server"""
+
     id: ItemID
     object: Literal["realtime.item"] = "realtime.item"
     role: Literal["assistant"] = "assistant"
     content: list[AssistantContentPart]
 
+
 class ServerFunctionCallItem(BaseFunctionCallItem):
     """Function call item as sent by server"""
+
     id: ItemID
     object: Literal["realtime.item"] = "realtime.item"
+
 
 class ServerFunctionCallOutputItem(BaseFunctionCallOutputItem):
     """Function call output item as sent by server"""
+
     id: ItemID
     object: Literal["realtime.item"] = "realtime.item"
 
-# Union types for client and server items
-ClientMessageItem = Annotated[Union[ClientSystemMessageItem, ClientUserMessageItem, ClientAssistantMessageItem], Field(discriminator="role")]
-ServerMessageItem = Annotated[Union[ServerSystemMessageItem, ServerUserMessageItem, ServerAssistantMessageItem], Field(discriminator="role")]
-ClientItem = Annotated[Union[ClientMessageItem, ClientFunctionCallItem, ClientFunctionCallOutputItem], Field(discriminator="type")]
 
-ServerItem = Annotated[Union[ServerMessageItem, ServerFunctionCallItem, ServerFunctionCallOutputItem], Field(discriminator="type")]
+# Union types for client and server items
+ClientMessageItem = Annotated[
+    Union[ClientSystemMessageItem, ClientUserMessageItem, ClientAssistantMessageItem],
+    Field(discriminator="role"),
+]
+ServerMessageItem = Annotated[
+    Union[ServerSystemMessageItem, ServerUserMessageItem, ServerAssistantMessageItem],
+    Field(discriminator="role"),
+]
+ClientItem = Annotated[
+    Union[ClientMessageItem, ClientFunctionCallItem, ClientFunctionCallOutputItem],
+    Field(discriminator="type"),
+]
+
+ServerItem = Annotated[
+    Union[ServerMessageItem, ServerFunctionCallItem, ServerFunctionCallOutputItem],
+    Field(discriminator="type"),
+]
+
 
 class ItemCreateMessage(ClientMessageBase):
     type: Literal["conversation.item.create"] = "conversation.item.create"
-    previous_item_id: Optional[ItemID] = None
+    previous_item_id: ItemID | None = None
     item: ClientItem
 
 
@@ -287,25 +324,23 @@ class ItemDeleteMessage(ClientMessageBase):
 class ResponseCreateParams(BaseModel):
     commit: bool = True
     cancel_previous: bool = True
-    append_input_items: Optional[list[ClientItem]] = None
-    input_items: Optional[list[ClientItem]] = None
-    instructions: Optional[str] = None
-    modalities: Optional[set[Modality]] = None
-    voice: Optional[Voice] = None
-    temperature: Optional[Temperature] = None
-    max_output_tokens: Optional[int] = None
-    tools: Optional[ToolsDefinition] = None
-    tool_choice: Optional[ToolChoice] = None
-    output_audio_format: Optional[AudioFormat] = None
+    append_input_items: list[ClientItem] | None = None
+    input_items: list[ClientItem] | None = None
+    instructions: str | None = None
+    modalities: set[Modality] | None = None
+    voice: Voice | None = None
+    temperature: Temperature | None = None
+    max_output_tokens: int | None = None
+    tools: ToolsDefinition | None = None
+    tool_choice: ToolChoice | None = None
+    output_audio_format: AudioFormat | None = None
 
 
 class ResponseCreateMessage(ClientMessageBase):
-    """
-    Trigger model inference to generate a model turn.
-    """
+    """Trigger model inference to generate a model turn."""
 
     type: Literal["response.create"] = "response.create"
-    response: Optional[ResponseCreateParams] = None
+    response: ResponseCreateParams | None = None
 
 
 class ResponseCancelMessage(ClientMessageBase):
@@ -314,10 +349,10 @@ class ResponseCancelMessage(ClientMessageBase):
 
 class RealtimeError(BaseModel):
     message: str
-    type: Optional[str] = None
-    code: Optional[str] = None
-    param: Optional[str] = None
-    event_id: Optional[EventID] = None
+    type: str | None = None
+    code: str | None = None
+    param: str | None = None
+    event_id: EventID | None = None
 
 
 class ServerMessageBase(BaseModel):
@@ -328,14 +363,16 @@ class ErrorMessage(ServerMessageBase):
     type: Literal["error"] = "error"
     error: RealtimeError
 
+
 class UnknownMessage(BaseModel):
     type: str = "unknown"
 
-class UnknownClientMessage(ClientMessageBase, UnknownMessage):
-    ...
 
-class UnknownServerMessage(ServerMessageBase, UnknownMessage):
-    ...
+class UnknownClientMessage(ClientMessageBase, UnknownMessage): ...
+
+
+class UnknownServerMessage(ServerMessageBase, UnknownMessage): ...
+
 
 class Session(BaseModel):
     id: SessionID
@@ -345,12 +382,12 @@ class Session(BaseModel):
     voice: Voice
     input_audio_format: AudioFormat
     output_audio_format: AudioFormat
-    input_audio_transcription: Optional[InputAudioTranscription]
+    input_audio_transcription: InputAudioTranscription | None
     turn_detection: TurnDetection
     tools: ToolsDefinition
     tool_choice: ToolChoice
     temperature: Temperature
-    max_response_output_tokens: Optional[Union[int, Literal["inf"]]]
+    max_response_output_tokens: int | Literal["inf"] | None
 
 
 class SessionCreatedMessage(ServerMessageBase):
@@ -362,20 +399,18 @@ class SessionUpdatedMessage(ServerMessageBase):
     type: Literal["session.updated"] = "session.updated"
     session: Session
 
+
 class InputAudioBufferCommittedMessage(ServerMessageBase):
-    """
-    Signals the server has received and processed the audio buffer.
-    """
+    """Signals the server has received and processed the audio buffer."""
 
     type: Literal["input_audio_buffer.committed"] = "input_audio_buffer.committed"
-    previous_item_id: Optional[ItemID]  # Fixed type: was Optional[str]
+    previous_item_id: ItemID | None  # Fixed type: was Optional[str]
     item_id: ItemID
 
 
 class InputAudioBufferClearedMessage(ServerMessageBase):
-    """
-    Signals the server has cleared the audio buffer.
-    """
+    """Signals the server has cleared the audio buffer."""
+
     type: Literal["input_audio_buffer.cleared"] = "input_audio_buffer.cleared"
 
 
@@ -387,7 +422,9 @@ class InputAudioBufferSpeechStartedMessage(ServerMessageBase):
     when speech stops.
     """
 
-    type: Literal["input_audio_buffer.speech_started"] = "input_audio_buffer.speech_started"
+    type: Literal["input_audio_buffer.speech_started"] = (
+        "input_audio_buffer.speech_started"
+    )
     audio_start_ms: int
     item_id: ItemID
 
@@ -400,7 +437,9 @@ class InputAudioBufferSpeechStoppedMessage(ServerMessageBase):
     when speech starts.
     """
 
-    type: Literal["input_audio_buffer.speech_stopped"] = "input_audio_buffer.speech_stopped"
+    type: Literal["input_audio_buffer.speech_stopped"] = (
+        "input_audio_buffer.speech_stopped"
+    )
     audio_end_ms: int
     item_id: ItemID
 
@@ -415,7 +454,7 @@ class ResponseItemInputTextContentPart(BaseModel):
 
 class ResponseItemInputAudioContentPart(BaseModel):
     type: Literal["input_audio"] = "input_audio"
-    transcript: Optional[str]
+    transcript: str | None
 
 
 class ResponseItemTextContentPart(BaseModel):
@@ -425,8 +464,8 @@ class ResponseItemTextContentPart(BaseModel):
 
 class ResponseItemAudioContentPart(BaseModel):
     type: Literal["audio"] = "audio"
-    audio: Optional[str] = None
-    transcript: Optional[str] = None
+    audio: str | None = None
+    transcript: str | None = None
 
 
 ResponseItemContentPart = Annotated[
@@ -442,6 +481,7 @@ ResponseItemContentPart = Annotated[
 
 class ResponseItemBase(BaseModel):
     """Base class for response items - these are always from server so always have IDs"""
+
     id: ItemID  # Always required for server responses
     status: ResponseItemStatus  # Always has a status
 
@@ -466,14 +506,16 @@ class ResponseFunctionCallOutputItem(ResponseItemBase):
 
 
 ResponseItem = Annotated[
-    Union[ResponseMessageItem, ResponseFunctionCallItem, ResponseFunctionCallOutputItem],
+    Union[
+        ResponseMessageItem, ResponseFunctionCallItem, ResponseFunctionCallOutputItem
+    ],
     Field(discriminator="type"),
 ]
 
 
 class ItemCreatedMessage(ServerMessageBase):
     type: Literal["conversation.item.created"] = "conversation.item.created"
-    previous_item_id: Optional[ItemID]
+    previous_item_id: ItemID | None
     item: ServerItem
 
 
@@ -516,7 +558,9 @@ class ItemInputAudioTranscriptionDeltaMessage(ServerMessageBase):
     delta: str
 
 
-ResponseStatus = Literal["in_progress", "completed", "cancelled", "incomplete", "failed"]
+ResponseStatus = Literal[
+    "in_progress", "completed", "cancelled", "incomplete", "failed"
+]
 
 
 class ResponseCancelledDetails(BaseModel):
@@ -539,29 +583,34 @@ ResponseStatusDetails = Annotated[
     Field(discriminator="type"),
 ]
 
+
 class TokenDetails(BaseModel):
     text_tokens: int
     audio_tokens: int
-    image_tokens: Optional[int] = 0
+    image_tokens: int | None = 0
+
 
 class InputTokenDetails(TokenDetails):
     cached_tokens: int
-    cached_tokens_details: Optional[TokenDetails]
+    cached_tokens_details: TokenDetails | None
+
 
 class Usage(BaseModel):
     total_tokens: int
     input_tokens: int
     output_tokens: int
-    input_token_details: Optional[InputTokenDetails]
-    output_token_details: Optional[TokenDetails]
+    input_token_details: InputTokenDetails | None
+    output_token_details: TokenDetails | None
+
 
 class Response(BaseModel):
     id: ResponseID  # Should be ResponseID, not str
     status: ResponseStatus
-    status_details: Optional[ResponseStatusDetails]
+    status_details: ResponseStatusDetails | None
     output: list[ResponseItem]
-    usage: Optional[Usage]
-    conversation_id: Optional[ConversationID]
+    usage: Usage | None
+    conversation_id: ConversationID | None
+
 
 class ResponseCreatedMessage(ServerMessageBase):
     type: Literal["response.created"] = "response.created"
@@ -594,7 +643,8 @@ class ResponseContentPartAddedMessage(ServerMessageBase):
     output_index: int
     content_index: int
     part: Annotated[
-        ResponseItemContentPart, Field(alias="part", validation_alias=AliasChoices("part", "content"))
+        ResponseItemContentPart,
+        Field(alias="part", validation_alias=AliasChoices("part", "content")),
     ]  # TODO: this alias won't be needed when AOAI and OAI are in sync.
 
 
@@ -605,7 +655,8 @@ class ResponseContentPartDoneMessage(ServerMessageBase):
     output_index: int
     content_index: int
     part: Annotated[
-        ResponseItemContentPart, Field(alias="part", validation_alias=AliasChoices("part", "content"))
+        ResponseItemContentPart,
+        Field(alias="part", validation_alias=AliasChoices("part", "content")),
     ]  # TODO: this alias won't be needed when AOAI and OAI are in sync.
 
 
@@ -663,7 +714,9 @@ class ResponseAudioDoneMessage(ServerMessageBase):
 
 
 class ResponseFunctionCallArgumentsDeltaMessage(ServerMessageBase):
-    type: Literal["response.function_call_arguments.delta"] = "response.function_call_arguments.delta"
+    type: Literal["response.function_call_arguments.delta"] = (
+        "response.function_call_arguments.delta"
+    )
     response_id: ResponseID
     item_id: ItemID
     output_index: int
@@ -672,7 +725,9 @@ class ResponseFunctionCallArgumentsDeltaMessage(ServerMessageBase):
 
 
 class ResponseFunctionCallArgumentsDoneMessage(ServerMessageBase):
-    type: Literal["response.function_call_arguments.done"] = "response.function_call_arguments.done"
+    type: Literal["response.function_call_arguments.done"] = (
+        "response.function_call_arguments.done"
+    )
     response_id: ResponseID
     item_id: ItemID
     output_index: int
@@ -704,7 +759,7 @@ UserMessageType = Annotated[
         ItemDeleteMessage,
         ResponseCreateMessage,
         ResponseCancelMessage,
-        UnknownClientMessage
+        UnknownClientMessage,
     ],
     Field(discriminator="type"),
 ]
@@ -739,13 +794,13 @@ ServerMessageType = Annotated[
         ResponseFunctionCallArgumentsDeltaMessage,
         ResponseFunctionCallArgumentsDoneMessage,
         RateLimitsUpdatedMessage,
-        UnknownServerMessage
+        UnknownServerMessage,
     ],
     Field(discriminator="type"),
 ]
 
 # Dictionary mapping user message types to their respective classes.
-USER_MESSAGE_CLASSES: dict[str, Type[UserMessageType]] = {
+USER_MESSAGE_CLASSES: dict[str, type[UserMessageType]] = {
     "session.update": SessionUpdateMessage,
     "input_audio_buffer.append": InputAudioBufferAppendMessage,
     "input_audio_buffer.commit": InputAudioBufferCommitMessage,
@@ -759,7 +814,7 @@ USER_MESSAGE_CLASSES: dict[str, Type[UserMessageType]] = {
 
 # Dictionary mapping server message types to their respective classes.
 # The type hint is changed to Type[ServerMessageType] for the same reason.
-SERVER_MESSAGE_CLASSES: dict[str, Type[ServerMessageType]] = {
+SERVER_MESSAGE_CLASSES: dict[str, type[ServerMessageType]] = {
     "error": ErrorMessage,
     "session.created": SessionCreatedMessage,
     "session.updated": SessionUpdatedMessage,
@@ -792,10 +847,9 @@ SERVER_MESSAGE_CLASSES: dict[str, Type[ServerMessageType]] = {
 
 MessageType = Union[UserMessageType, ServerMessageType]
 
+
 def create_user_message_from_dict(data: dict) -> UserMessageType:
-    """
-    Creates a user message object from a dictionary based on its 'type'.
-    """
+    """Create a user message object from a dictionary based on its 'type'."""
     event_type = data.get("type")
 
     if not event_type:
@@ -804,10 +858,9 @@ def create_user_message_from_dict(data: dict) -> UserMessageType:
     message_class = USER_MESSAGE_CLASSES.get(event_type, UnknownClientMessage)
     return message_class(**data)
 
+
 def create_server_message_from_dict(data: dict) -> ServerMessageType:
-    """
-    Creates a server message object from a dictionary based on its 'type'.
-    """
+    """Create a server message object from a dictionary based on its 'type'."""
     event_type = data.get("type")
 
     if not event_type:
@@ -816,37 +869,37 @@ def create_server_message_from_dict(data: dict) -> ServerMessageType:
     message_class = SERVER_MESSAGE_CLASSES.get(event_type, UnknownServerMessage)
     return message_class(**data)
 
+
 def create_message_from_dict(data: dict) -> MessageType:
-    """
-    Creates a message object from a dictionary based on its 'type'.
-    """
+    """Create a message object from a dictionary based on its 'type'."""
     event_type = data.get("type") or ""
     if event_type in USER_MESSAGE_CLASSES.keys():
-        cls =  USER_MESSAGE_CLASSES[event_type]
+        cls = USER_MESSAGE_CLASSES[event_type]
         return cls(**data)
 
     elif event_type in SERVER_MESSAGE_CLASSES.keys():
-        cls =  SERVER_MESSAGE_CLASSES[event_type]
+        cls = SERVER_MESSAGE_CLASSES[event_type]
         return cls(**data)
 
     return UnknownClientMessage(**data)
 
+
 # Whenever we get a response we have to acquire a lock and associate it with the last conversation.item.recated item
 # Whenever we get a delta event we have to acquire a lock
 
+
 def has_item_id(message: MessageType) -> bool:
-    """
-    Checks if a message has an item ID, either directly or on a nested item field.
-    """
-    if hasattr(message, "item_id") and getattr(message, "item_id") is not None:
+    """Check if a message has an item ID, directly or nested on item.id."""
+    if hasattr(message, "item_id") and message.item_id is not None:
         return True
 
     # Safely get the 'item' attribute, defaulting to None if it doesn't exist.
     item = getattr(message, "item", None)
-    if item is not None and hasattr(item, "id") and getattr(item, "id") is not None:
+    if item is not None and hasattr(item, "id") and item.id is not None:
         return True
 
     return False
+
 
 def get_item_id(message: MessageType) -> ItemID:
     """
@@ -854,27 +907,25 @@ def get_item_id(message: MessageType) -> ItemID:
     Handles both direct 'item_id' fields and nested 'item.id' fields.
     Raises ValueError if no item ID is found.
     """
-    if hasattr(message, "item_id") and (item_id := getattr(message, "item_id")) is not None:
+    if hasattr(message, "item_id") and (item_id := message.item_id) is not None:
         return item_id
 
     # Safely get the 'item' attribute before trying to access its 'id'.
     item = getattr(message, "item", None)
-    if item is not None and hasattr(item, "id") and (item_id := getattr(item, "id")) is not None:
+    if item is not None and hasattr(item, "id") and (item_id := item.id) is not None:
         return item_id
 
-    raise ValueError(f"Message of type {type(message).__name__} does not have an item ID.")
+    raise ValueError(
+        f"Message of type {type(message).__name__} does not have an item ID."
+    )
 
 
 def get_prev_item_id(message: MessageType) -> ItemID | None:
-    """
-    Retrieves the previous item ID from a message, if it exists.
-    """
+    """Retrieve the previous item ID from a message, if present."""
     return getattr(message, "previous_item_id", None)
 
 
 def get_response_output_item_ids(resp: Response) -> list[ItemID]:
-    """
-    Extracts all item IDs from the output items of a Response object.
-    """
+    """Extract all item IDs from the output items of a Response object."""
     # Response items always have IDs (no need to filter for None)
     return [item.id for item in resp.output]

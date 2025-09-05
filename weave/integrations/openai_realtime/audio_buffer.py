@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 
 logger = logging.getLogger(__name__)
 
+
 @dataclass
 class AudioBufferManager:
     """
@@ -28,7 +29,11 @@ class AudioBufferManager:
         except Exception as e:
             # Some fixtures use placeholder strings like "<audio bytes>".
             # Skip invalid base64 without failing the pipeline, but log for visibility.
-            logger.warning("AudioBufferManager.append_base64: invalid base64; ignoring. error=%s preview=%r", e, b64[:20])
+            logger.warning(
+                "AudioBufferManager.append_base64: invalid base64; ignoring. error=%s preview=%r",
+                e,
+                b64[:20],
+            )
 
     def clear(self) -> None:
         self.buffer.clear()
