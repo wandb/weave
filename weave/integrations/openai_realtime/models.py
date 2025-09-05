@@ -160,7 +160,6 @@ class InputTextContentPart(BaseModel):
     type: Literal["input_text"] = "input_text"
     text: str
 
-
 class InputAudioContentPart(BaseModel):
     type: Literal["input_audio"] = "input_audio"
     # Some server events (e.g., conversation.item.created) may omit the raw
@@ -426,7 +425,8 @@ class ResponseItemTextContentPart(BaseModel):
 
 class ResponseItemAudioContentPart(BaseModel):
     type: Literal["audio"] = "audio"
-    transcript: Optional[str]
+    audio: Optional[str] = None
+    transcript: Optional[str] = None
 
 
 ResponseItemContentPart = Annotated[
