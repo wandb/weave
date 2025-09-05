@@ -7,6 +7,10 @@
     "litellm_provider": "coreweave",
     "api_key_name": "WANDB_API_KEY"
   },
+  "zai-org/GLM-4.5": {
+    "litellm_provider": "coreweave",
+    "api_key_name": "WANDB_API_KEY"
+  },
   "Qwen/Qwen3-235B-A22B-Instruct-2507": {
     "litellm_provider": "coreweave",
     "api_key_name": "WANDB_API_KEY"
@@ -284,6 +288,14 @@
     "api_key_name": "OPENAI_API_KEY"
   },
   "gpt-4o-2024-11-20": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "gpt-realtime": {
+    "litellm_provider": "openai",
+    "api_key_name": "OPENAI_API_KEY"
+  },
+  "gpt-realtime-2025-08-28": {
     "litellm_provider": "openai",
     "api_key_name": "OPENAI_API_KEY"
   },
@@ -1411,6 +1423,18 @@
     "litellm_provider": "xai",
     "api_key_name": "XAI_API_KEY"
   },
+  "xai/grok-code-fast-1": {
+    "litellm_provider": "xai",
+    "api_key_name": "XAI_API_KEY"
+  },
+  "xai/grok-code-fast": {
+    "litellm_provider": "xai",
+    "api_key_name": "XAI_API_KEY"
+  },
+  "xai/grok-code-fast-1-0825": {
+    "litellm_provider": "xai",
+    "api_key_name": "XAI_API_KEY"
+  },
   "xai/grok-4": {
     "litellm_provider": "xai",
     "api_key_name": "XAI_API_KEY"
@@ -1447,10 +1471,6 @@
     "litellm_provider": "groq",
     "api_key_name": "GROQ_API_KEY"
   },
-  "groq/llama3-8b-8192": {
-    "litellm_provider": "groq",
-    "api_key_name": "GROQ_API_KEY"
-  },
   "groq/llama-3.2-1b-preview": {
     "litellm_provider": "groq",
     "api_key_name": "GROQ_API_KEY"
@@ -1472,10 +1492,6 @@
     "api_key_name": "GROQ_API_KEY"
   },
   "groq/llama-3.2-90b-vision-preview": {
-    "litellm_provider": "groq",
-    "api_key_name": "GROQ_API_KEY"
-  },
-  "groq/llama3-70b-8192": {
     "litellm_provider": "groq",
     "api_key_name": "GROQ_API_KEY"
   },
@@ -1631,6 +1647,10 @@
     "litellm_provider": "gemini",
     "api_key_name": "GEMINI_API_KEY"
   },
+  "gemini/gemini-2.5-flash-image-preview": {
+    "litellm_provider": "gemini",
+    "api_key_name": "GEMINI_API_KEY"
+  },
   "gemini/gemini-2.0-flash-live-001": {
     "litellm_provider": "gemini",
     "api_key_name": "GEMINI_API_KEY"
@@ -1715,6 +1735,18 @@
     "litellm_provider": "gemini",
     "api_key_name": "GEMINI_API_KEY"
   },
+  "gemini/veo-3.0-generate-preview": {
+    "litellm_provider": "gemini",
+    "api_key_name": "GEMINI_API_KEY"
+  },
+  "gemini/veo-3.0-fast-generate-preview": {
+    "litellm_provider": "gemini",
+    "api_key_name": "GEMINI_API_KEY"
+  },
+  "gemini/veo-2.0-generate-001": {
+    "litellm_provider": "gemini",
+    "api_key_name": "GEMINI_API_KEY"
+  },
   "gemini/gemini-1.5-flash-002": {
     "litellm_provider": "gemini",
     "api_key_name": "GEMINI_API_KEY"
@@ -1795,15 +1827,15 @@
     "litellm_provider": "gemini",
     "api_key_name": "GEMINI_API_KEY"
   },
-  "gemini/imagen-4.0-generate-preview-06-06": {
+  "gemini/imagen-4.0-generate-001": {
     "litellm_provider": "gemini",
     "api_key_name": "GEMINI_API_KEY"
   },
-  "gemini/imagen-4.0-ultra-generate-preview-06-06": {
+  "gemini/imagen-4.0-ultra-generate-001": {
     "litellm_provider": "gemini",
     "api_key_name": "GEMINI_API_KEY"
   },
-  "gemini/imagen-4.0-fast-generate-preview-06-06": {
+  "gemini/imagen-4.0-fast-generate-001": {
     "litellm_provider": "gemini",
     "api_key_name": "GEMINI_API_KEY"
   },
