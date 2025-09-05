@@ -93,7 +93,14 @@ class StateExporter(BaseModel):
     response_audio: dict[models.ItemID, bytes] = Field(default_factory=dict)
     response_calls: dict[models.ResponseID, Call] = Field(default_factory=dict)
     responses: dict[models.ResponseID, models.Response] = Field(default_factory=dict)
-    _debounce_timers: dict[models.ResponseID, threading.Timer] = {}
+    # Deprecated: per-response debounce timers caused out-of-order completions
+    debounce_timers: dict[models.ResponseID, threading.Timer] = {}
+
+    # FIFO completion control to ensure responses finish in submission order
+    completion_queue: list[models.ResponseID] = Field(default_factory=list)
+    pending_completions: dict[models.ResponseID, dict[str, Any]] = Field(default_factory=dict)
+    fifo_timer: Optional[threading.Timer] = None
+    fifo_lock: threading.Lock = Field(default_factory=threading.Lock)
 
     pending_response: Optional[models.Response] = None
     pending_create_params: Optional[models.ResponseCreateParams] = None
@@ -228,6 +235,8 @@ class StateExporter(BaseModel):
                 item.content[msg.content_index].__setattr__('transcript', msg.transcript)
         self.items[item.id] = item
         self.transcript_completed.add(item.id)
+        # A transcript becoming available may unblock the head of the FIFO
+        self._schedule_fifo_check()
 
     def _resolve_audio(self, msg: Union[models.ResponseItem, models.ServerItem]) -> Any:
         if not msg.type == "message":
@@ -243,54 +252,46 @@ class StateExporter(BaseModel):
                 msg_dict['content'][content_idx]["audio"] = Content.from_bytes(audio, extension=".wav")
         return msg_dict
 
-    def handle_response_done(self, msg: models.ResponseDoneMessage) -> None:
-        # Update our state to the completed version
-        self.responses[msg.response.id] = msg.response
-        for item in msg.response.output:
-            self.items[item.id] = item
+    def _handle_response_done_inner(
+        self,
+        msg: models.ResponseDoneMessage,
+        session: Optional[models.Session] = None,
+        pending_create_params: Optional[models.ResponseCreateParams] = None,
+        messages: list[Union[models.ResponseItem, models.ServerItem]] = []
+    ) -> None:
+        """
+        Note: This is pretty ugly but it achieves something that is worth the bloat.
+        Transcription results can occur far after a response to audio is recieved.
+        If we do not wait for them, then you will never see the transcript of your most recent item
+        This would mean that for the last turn in the conversation, the transcript goes missing
 
-        from weave.trace.context.weave_client_context import require_weave_client
+        The fix would be to add the ability to modify the inputs of a function for our client
+        but even that is a bit of a hack since the real issue is that there isn't a true
+        "input" "output" paradigm here. Each event sent can spawn dozens in return
 
-        pending_create_params = self.pending_create_params
-        pending_response = self.pending_response
-        if pending_response is None:
-            logger.error("Attempted to finish response that was never created")
-            return
-
-        inputs = pending_response.model_dump()
-        messages = self._get_input_item_list(msg.response.output)
-        # If inputs are not complete yet, debounce a check in 200ms
-        if self.session and "text" in self.session.modalities:
-            for message in messages:
-                if message.type == "message" and message.role == "user" and not message.id in self.transcript_completed:
-                    # Cancel any existing timer
-                    t = self._debounce_timers.pop(msg.response.id, None)
-                    if t:
-                        t.cancel()
-                    def _cb() -> None:
-                        # Recompute and if complete, export
-                        self.handle_response_done(msg)
-                    timer = threading.Timer(0.1, _cb)
-                    self._debounce_timers[cast(models.ResponseID, msg.response.id)] = timer
-                    timer.start()
-                return
+        Really transcription is an "output" but implementing that association would require an entirely
+        new data model
+        """
+        inputs = {}
         if len(messages) > 0:
             inputs['messages'] = list(map(self._resolve_audio, messages))
             inputs['messages'].reverse() # Reverse to put in order
 
-        if self.pending_create_params and self.pending_create_params.input_items:
-            for item in self.pending_create_params.input_items:
+        if pending_create_params and pending_create_params.input_items:
+            for item in pending_create_params.input_items:
                 inputs['messages'].append(item)
-        if self.pending_create_params and self.pending_create_params.append_input_items:
-            for item in self.pending_create_params.append_input_items:
+
+        if pending_create_params and pending_create_params.append_input_items:
+            for item in pending_create_params.append_input_items:
                 inputs['messages'].append(item)
 
 
 
         if pending_create_params is not None:
             inputs.update(pending_create_params.model_dump())
-            self.pending_create_params = None
+            pending_create_params = None
 
+        from weave.trace.context.weave_client_context import require_weave_client
         client = require_weave_client()
 
         resp_id = msg.response.id
@@ -303,8 +304,8 @@ class StateExporter(BaseModel):
             if not conv_call:
                 conv_call = client.create_call(op=conv_id, inputs={})
                 self.conversation_calls[conv_id] = conv_call
-        if self.session:
-            input_data['session'] = self.session
+        if session:
+            input_data['session'] = session
 
 
         call = client.create_call(resp_id, inputs=inputs, parent=conv_call)
@@ -325,6 +326,120 @@ class StateExporter(BaseModel):
                     output_dict["output"][output_idx]["content"][content_idx] = content_dict
         client.finish_call(call, output=output_dict)
 
+
+    def handle_response_done(self, msg: models.ResponseDoneMessage) -> None:
+        # Update state to the completed version and enqueue for FIFO completion.
+        self.responses[msg.response.id] = msg.response
+        for item in msg.response.output:
+            self.items[item.id] = item
+
+        session = self.session
+        pending_create_params = self.pending_create_params
+        pending_response = self.pending_response
+
+        if pending_response is None:
+            logger.error("Attempted to finish response that was never created")
+            return
+
+        messages = self._get_input_item_list(msg.response.output)
+
+        # Store the prepared context for this response id
+        ctx: dict[str, Any] = {
+            "msg": msg,
+            "session": session,
+            "pending_create_params": pending_create_params,
+            "pending_response": pending_response,
+            "messages": messages,
+        }
+
+        with self.fifo_lock:
+            rid = msg.response.id
+            self.pending_completions[rid] = ctx
+            if rid not in self.completion_queue:
+                self.completion_queue.append(rid)
+
+        # Check if we can advance the FIFO now or schedule retries
+        self._schedule_fifo_check()
+
+    def _transcripts_ready_for_ctx(self, ctx: dict[str, Any]) -> bool:
+        session = ctx.get("session")
+        messages = ctx.get("messages", [])
+        if session and "text" in getattr(session, "modalities", []):
+            for message in messages:
+                if (
+                    getattr(message, "type", None) == "message"
+                    and getattr(message, "role", None) == "user"
+                    and getattr(message, "id", None) not in self.transcript_completed
+                ):
+                    return False
+        return True
+
+    def _schedule_fifo_check(self) -> None:
+        """Schedule a short-latency check to advance FIFO completion.
+
+        Uses a single timer to avoid racing multiple callbacks and to ensure
+        completions occur strictly in submission order.
+        """
+        with self.fifo_lock:
+            # Cancel an existing timer to coalesce checks
+            if self.fifo_timer is not None:
+                try:
+                    self.fifo_timer.cancel()
+                except Exception:
+                    pass
+
+            def _cb() -> None:
+                try:
+                    self._advance_fifo()
+                finally:
+                    # If more remain and head not ready, a new timer will be scheduled
+                    pass
+
+            self.fifo_timer = threading.Timer(0.05, _cb)
+            self.fifo_timer.start()
+
+    def _advance_fifo(self) -> None:
+        """Attempt to finish the head response if ready; maintain order."""
+        while True:
+            with self.fifo_lock:
+                if not self.completion_queue:
+                    # Nothing pending
+                    self.fifo_timer = None
+                    return
+                head = self.completion_queue[0]
+                ctx = self.pending_completions.get(head)
+                if ctx is None:
+                    # Corrupt entry; drop and continue
+                    self.completion_queue.pop(0)
+                    continue
+
+                ready = self._transcripts_ready_for_ctx(ctx)
+
+            if not ready:
+                # Head not ready; reschedule a check and exit to preserve order
+                self._schedule_fifo_check()
+                return
+
+            # Finish the head outside the lock to avoid blocking
+            msg = cast(models.ResponseDoneMessage, ctx["msg"])
+            self._handle_response_done_inner(
+                msg,
+                ctx.get("session"),
+                ctx.get("pending_create_params"),
+                ctx.get("messages", []),
+            )
+
+            # Remove the head and continue to next (if it's immediately ready)
+            with self.fifo_lock:
+                rid = cast(models.ResponseID, msg.response.id)
+                if self.completion_queue and self.completion_queue[0] == rid:
+                    self.completion_queue.pop(0)
+                self.pending_completions.pop(rid, None)
+
+            # Loop to see if the next head is already ready; otherwise schedule check
+            # for later and return.
+            # The loop continues only if the immediate next is also ready now.
+            continue
 
         # content.append(self.resp_audio_transcripts.get
         # client.finish_call(call, )
