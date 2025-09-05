@@ -1,5 +1,6 @@
 from typing import Optional, Union, cast, Callable, TypeVar, Type, Any
 from pydantic import BaseModel, Field
+from audio_buffer import AudioBufferManager
 from weave.integrations.openai_realtime import models
 from weave.integrations.openai_realtime.encoding import pcm_to_wav
 from weave.type_wrappers.Content import Content
@@ -12,21 +13,87 @@ import logging
 from weave.integrations.openai_realtime.state_manager import StateStore
 logger = logging.getLogger(__name__)
 
+DeltaMessage = Union[
+    models.ResponseTextDeltaMessage,
+    models.ResponseAudioDeltaMessage,
+    models.ResponseAudioTranscriptDeltaMessage,
+    models.ResponseFunctionCallArgumentsDeltaMessage
+]
+# def update_response(response: models.Response, msg: DeltaMessage):
+#     if isinstance(msg, models.ResponseFunctionCallArgumentsDeltaMessage):
+#
+#     if msg.output_index >= len(response.output):
+#         response.output.append(
+class ResponseItemState:
+    create_params: Optional[models.ResponseCreateParams]
+    response: Optional[models.Response]
+
+# Each Item can have a content array
+# User Items have only content
+# Response Items have output array and optionally content for messages
+
+class UserItem:
+    id: models.ItemID
+    input_text: Optional[str]
+    input_audio: Optional[bytearray]
+    transcript: Optional[str]
 class StateExporter(StateStore):
     conversation_calls: dict[models.ConversationID, Call] = Field(default_factory=dict)
+
+    committed_item_ids: set[models.ItemID] = Field(default_factory=set)
+
+    input_buffer: AudioBufferManager = Field(default_factory=AudioBufferManager)
+    output_buffer: AudioBufferManager = Field(default_factory=AudioBufferManager)
+
     response_calls: dict[models.ResponseID, Call] = Field(default_factory=dict)
-    pending_response: Optional[models.ResponseCreatedMessage] = None
-    pending_create_params:Optional[models.ResponseCreateMessage] = None
+    responses: dict[models.ResponseID, models.Response] = Field(default_factory=dict)
+
+    pending_response: Optional[models.Response] = None
+    pending_create_params: Optional[models.ResponseCreateParams] = None
 
 
     def __init__(self):
         super().__init__()
 
-    def handle_response_create(self, msg: models.ResponseCreateMessage) -> None:
-        self.pending_create_params = msg
+    # def handle_conversation_item_created(msg: models.ItemCreatedMessage) -> None:
+    #     self.items[msg.item.id]
+    # def handle_response_output_audio_transcript_delta(self, msg: models.ResponseAudioTranscriptDeltaMessage) -> None:
+    # def handle_response_output_audio_delta(self, msg: models.ResponseAudioDeltaMessage) -> None:
+    # def handle_response_output_text_delta(self, msg: models.ResponseTextDeltaMessage) -> None:
+    # def handle_response_create(self, msg: models.ResponseCreateMessage) -> None:
+    #     self.pending_create_params = msg
+
+    def apply_input_audio_cleared(self, _msg: models.InputAudioBufferClearedMessage) -> None:
+        self.input_audio_buffer.clear()
+
+    def apply_input_audio_committed(self, msg: models.InputAudioBufferCommittedMessage) -> None:
+        # Track commits against items for turn completeness checks
+        self.committed_item_ids.add(msg.item_id)
 
     def handle_response_created(self, msg: models.ResponseCreatedMessage) -> None:
-        self.pending_response = msg
+        self.pending_response = msg.response
+
+    def handle_input_audio_append(self, msg: models.InputAudioBufferAppendMessage) -> None:
+        self.input_audio_buffer.append_base64(msg.audio)
+
+    def handle_response_audio_delta(self, msg: models.ResponseAudioDeltaMessage) -> None:
+        self.output_buffer.append_base64(msg.delta)
+
+
+    # def handle_response_output_item_added(self, msg: models.ResponseOutputItemAddedMessage):
+    #     pending_response = self.pending_response
+    #
+    #     if not self.pending_response:
+    #         logger.error("Tried to add item to response that does not exist")
+    #         return
+    #
+    #     if msg.output_index > len(self.pending_response.output) - 1:
+    #         self.pending_response.response.output.append(msg.item)
+    #
+    #     self.pending_response.response.output
+    # def handle_conversation_item_created(self, msg: models.ItemCreatedMessage) -> None:
+    #     if 
+    #     if msg.item.type == "function_call":
 
 
     def handle_response_done(self, msg: models.ResponseDoneMessage) -> None:
@@ -64,8 +131,8 @@ class StateExporter(StateStore):
             if output.type == "message":
                 item_id = output.id
                 for content_idx, content in enumerate(output.content):
-                    content_dict = output.content[content_idx].model_dump()
-                    if output.content[content_idx].type == "audio":
+                    content_dict = content.model_dump()
+                    if content.type == "audio":
                         content_dict = output.content[content_idx].model_dump()
                         audio_bytes = self.resp_audio_bytes[(resp_id, item_id, content_idx)]
                         if not audio_bytes:
@@ -302,59 +369,59 @@ class StateExporter(StateStore):
         return None
 
 
-    def _on_response_complete(self, rec: TurnRecord) -> None:
-        if not rec.response_id:
-            logger.warning("_on_response_complete: missing response_id; cannot finish call")
-            return
-        resp = self.state.get_response(rec.response_id)
-        if not resp:
-            logger.warning("_on_response_complete: response missing")
-            return
-
-        # Skip exports for non-message-only responses (e.g., pure function_call turns)
-        has_assistant_message = any(isinstance(it, models.ResponseMessageItem) and it.role == "assistant" for it in resp.output)
-        if not has_assistant_message:
-            logger.debug("_on_response_complete: no assistant message in output; skipping export for response_id=%s", rec.response_id)
-            return
-
-        # Export turn payload if configured
-        # Finish the weave call for this response. If the call does not exist yet
-        # but inputs are already complete, create it here and immediately finish.
-        sess = self.state.session
-        if not sess:
-            logger.warning("_on_response_complete: no session; cannot create/finish call for response_id=%s", rec.response_id)
-            return
-        call = self._weave_calls.get(rec.response_id)
-        try:
-            import weave
-            with weave.thread(sess.id):
-                from weave.trace.context.weave_client_context import get_weave_client
-                client = get_weave_client()
-                if not client:
-                    logger.warning("_on_response_complete: no weave client in context; skipping finish for response_id=%s", rec.response_id)
-                    return
-                # Create call on-demand if missing but inputs are complete
-                if call is None and rec.inputs_complete:
-                    inputs = self._build_inputs_payload(rec)
-                    try:
-                        from sessions import conversation_turn  # type: ignore
-                    except Exception as e:
-                        logger.warning("_on_response_complete: failed to import conversation_turn op: %s", e)
-                        return
-                    call = client.create_call(op=conversation_turn, inputs=inputs)
-                    self._weave_calls[rec.response_id] = call
-                if call is None:
-                    logger.warning("_on_response_complete: call still None; cannot finish for response_id=%s", rec.response_id)
-                    return
-                outputs = self._build_output_payload(rec)
-                client.finish_call(call, output=outputs)
-        except Exception as e:
-            logger.error(f"Error submitting call in _on_response_complete - {e}")
-            return
-
-    def _handle_error(self, msg: models.ErrorMessage) -> None:
-        # Let the client handle api errors
-        pass
+    # def _on_response_complete(self, rec: TurnRecord) -> None:
+    #     if not rec.response_id:
+    #         logger.warning("_on_response_complete: missing response_id; cannot finish call")
+    #         return
+    #     resp = self.state.get_response(rec.response_id)
+    #     if not resp:
+    #         logger.warning("_on_response_complete: response missing")
+    #         return
+    #
+    #     # Skip exports for non-message-only responses (e.g., pure function_call turns)
+    #     has_assistant_message = any(isinstance(it, models.ResponseMessageItem) and it.role == "assistant" for it in resp.output)
+    #     if not has_assistant_message:
+    #         logger.debug("_on_response_complete: no assistant message in output; skipping export for response_id=%s", rec.response_id)
+    #         return
+    #
+    #     # Export turn payload if configured
+    #     # Finish the weave call for this response. If the call does not exist yet
+    #     # but inputs are already complete, create it here and immediately finish.
+    #     sess = self.state.session
+    #     if not sess:
+    #         logger.warning("_on_response_complete: no session; cannot create/finish call for response_id=%s", rec.response_id)
+    #         return
+    #     call = self._weave_calls.get(rec.response_id)
+    #     try:
+    #         import weave
+    #         with weave.thread(sess.id):
+    #             from weave.trace.context.weave_client_context import get_weave_client
+    #             client = get_weave_client()
+    #             if not client:
+    #                 logger.warning("_on_response_complete: no weave client in context; skipping finish for response_id=%s", rec.response_id)
+    #                 return
+    #             # Create call on-demand if missing but inputs are complete
+    #             if call is None and rec.inputs_complete:
+    #                 inputs = self._build_inputs_payload(rec)
+    #                 try:
+    #                     from sessions import conversation_turn  # type: ignore
+    #                 except Exception as e:
+    #                     logger.warning("_on_response_complete: failed to import conversation_turn op: %s", e)
+    #                     return
+    #                 call = client.create_call(op=conversation_turn, inputs=inputs)
+    #                 self._weave_calls[rec.response_id] = call
+    #             if call is None:
+    #                 logger.warning("_on_response_complete: call still None; cannot finish for response_id=%s", rec.response_id)
+    #                 return
+    #             outputs = self._build_output_payload(rec)
+    #             client.finish_call(call, output=outputs)
+    #     except Exception as e:
+    #         logger.error(f"Error submitting call in _on_response_complete - {e}")
+    #         return
+    #
+    # def _handle_error(self, msg: models.ErrorMessage) -> None:
+    #     # Let the client handle api errors
+    #     pass
 
     def _handle_rate_limits_updated(self, msg: models.RateLimitsUpdatedMessage) -> None:
         # Log rate limits for informational purposes
