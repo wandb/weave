@@ -64,8 +64,10 @@ class ConversationManager:
         self._lock = Lock()
 
         handlers: dict[str, Handler] = {
+            # Session lifecycle
             "session.created": adapt_handler(models.SessionCreatedMessage, self.state.handle_session_created),
             "session.updated": adapt_handler(models.SessionUpdatedMessage, self.state.handle_session_updated),
+
             # Input audio buffer lifecycle
             "input_audio_buffer.append": adapt_handler(models.InputAudioBufferAppendMessage, self.state.handle_input_audio_append),
             "input_audio_buffer.cleared": adapt_handler(models.InputAudioBufferClearedMessage, self.state.handle_input_audio_cleared),
@@ -74,34 +76,19 @@ class ConversationManager:
             "input_audio_buffer.speech_stopped": adapt_handler(models.InputAudioBufferSpeechStoppedMessage, self.state.handle_speech_stopped),
 
             # Conversation item changes
-            # Unused "conversation.item.create": self._handle_item_create,
             "conversation.item.created": adapt_handler(models.ItemCreatedMessage, self.state.handle_item_created),
-            # "conversation.item.truncated": adapt_handler(models.ItemTruncatedMessage, self.state.handle_item_truncated),
             "conversation.item.deleted": adapt_handler(models.ItemDeletedMessage, self.state.handle_item_deleted),
-            # "conversation.item.input_audio_transcription.delta": adapt_handler(models.ItemInputAudioTranscriptionDeltaMessage, self.state.handle_item_input_audio_transcription_delta),
             "conversation.item.input_audio_transcription.completed": adapt_handler(models.ItemInputAudioTranscriptionCompletedMessage, self.state.handle_item_input_audio_transcription_completed),
 
             # Response lifecycle and parts
-            # "response.create": adapt_handler(models.ResponseCreateMessage, self.state.handle_response_create),
             "response.created": adapt_handler(models.ResponseCreatedMessage, self.state.handle_response_created),
             "response.done": adapt_handler(models.ResponseDoneMessage, self.state.handle_response_done),
-            # "response.output_item.added": adapt_handler(models.ResponseOutputItemAddedMessage, self.state.handle_response_output_item_added),
-            # "response.output_item.done": adapt_handler(models.ResponseOutputItemDoneMessage, self.state.handle_response_output_item_done),
-            # "response.content_part.added": adapt_handler(models.ResponseContentPartAddedMessage, self.state.handle_response_content_part_added),
-            # "response.content_part.done": adapt_handler(models.ResponseContentPartDoneMessage, self.state.handle_response_content_part_done),
-            # "response.text.delta": adapt_handler(models.ResponseTextDeltaMessage, self.state.handle_response_text_delta),
-            # "response.text.done": adapt_handler(models.ResponseTextDoneMessage, self.state.handle_response_text_done),
-            # "response.audio_transcript.delta": adapt_handler(models.ResponseAudioTranscriptDeltaMessage, self.state.handle_response_audio_transcript_delta),
-            # "response.audio_transcript.done": adapt_handler(models.ResponseAudioTranscriptDoneMessage, self.state.handle_response_audio_transcript_done),
             "response.audio.delta": adapt_handler(models.ResponseAudioDeltaMessage, self.state.handle_response_audio_delta),
             "response.audio.done": adapt_handler(models.ResponseAudioDoneMessage, self.state.handle_response_audio_done),
-            # "response.function_call_arguments.delta": adapt_handler(models.ResponseFunctionCallArgumentsDeltaMessage, self.state.handle_response_function_call_arguments_delta),
-            # "response.function_call_arguments.done": adapt_handler(models.ResponseFunctionCallArgumentsDoneMessage, self.state.handle_response_function_call_arguments_done),
         }
 
         self._registry.update(handlers)
         # Start the worker thread immediately so enqueue works out of the box
-        print('starting worker')
         self._start_worker_thread()
 
     async def start(self) -> None:
