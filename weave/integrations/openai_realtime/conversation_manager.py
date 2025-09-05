@@ -19,10 +19,9 @@ Handler = Callable[[models.MessageType], None]
 
 def adapt_handler(cls: type[T_specific], func: Callable[[T_specific], None]) -> Handler:
     """Adapt a concrete-typed handler into a generic registry handler.
-    ii
-        # This preserves runtime safety (checks isinstance before calling) and
-        side-steps contravariance issues that Pyright flagged for a heterogeneous
-        handler map.
+    # This preserves runtime safety (checks isinstance before calling) and
+    side-steps contravariance issues that Pyright flagged for a heterogeneous
+    handler map.
     """
 
     def _wrapped(msg: models.MessageType) -> None:
@@ -164,7 +163,7 @@ class ConversationManager:
             except Empty:
                 continue
             # Sentinel to unblock during shutdown
-            if event is None:  # type: ignore[truthy-function]
+            if event is None:
                 try:
                     self._queue.task_done()
                 except ValueError:
@@ -188,11 +187,8 @@ class ConversationManager:
         """Process an event synchronously"""
         # Event objects have a 'type' field in pydantic models.
         event_type = getattr(event, "type", None)
-        # print(event_type)
         if not event_type:
             return
-        # if event.type == "response.create":
-        #     self.state.handle_response_create(event)
 
         handler = self._registry.get(event_type)
         if handler:
