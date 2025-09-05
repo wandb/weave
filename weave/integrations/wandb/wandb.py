@@ -10,11 +10,23 @@ def wandb_init_hook() -> None:
     if os.environ.get("WANDB_DISABLE_WEAVE"):
         return
 
+    # Check if wandb is available
+    try:
+        import wandb
+        
+        # When wandb is available, set WEAVE_SILENT to true by default if not explicitly set
+        # This reduces log noise when using wandb
+        if os.getenv("WEAVE_SILENT") is None:
+            os.environ["WEAVE_SILENT"] = "true"
+            
+    except (ImportError, ModuleNotFoundError):
+        pass  # wandb not available, continue without setting WEAVE_SILENT
+
     # Try to get the active run path from wandb if we can
     try:
         from wandb.integration.weave import active_run_path
     except (ImportError, ModuleNotFoundError):
-        return  # wandb not available
+        return  # wandb integration not available
     except Exception as e:
         logger.debug(f"Unexpected wandb error: {e}")
         return
