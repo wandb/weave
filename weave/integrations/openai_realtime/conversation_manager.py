@@ -170,7 +170,6 @@ class ConversationManager:
                     pass
                 continue
             try:
-                print("processing")
                 self.process_event(event)
             finally:
                 try:
