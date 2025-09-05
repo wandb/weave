@@ -177,12 +177,12 @@ class StateExporter(BaseModel):
     def handle_input_audio_append(
         self, msg: models.InputAudioBufferAppendMessage
     ) -> None:
-        self.input_buffer.append_base64(msg.audio)
+        self.input_buffer.extend_base64(msg.audio)
 
     def handle_response_audio_delta(
         self, msg: models.ResponseAudioDeltaMessage
     ) -> None:
-        self.output_buffer.append_base64(msg.delta)
+        self.output_buffer.extend_base64(msg.delta)
 
     def handle_response_audio_done(self, msg: models.ResponseAudioDoneMessage) -> None:
         self.response_audio[msg.item_id] = bytes(self.output_buffer.buffer)

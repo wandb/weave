@@ -22,15 +22,15 @@ class AudioBufferManager:
     def bytes_per_sample(self) -> int:
         return (self.bits_per_sample // 8) * self.channels
 
-    def append_base64(self, b64: str) -> None:
-        """Decode base64 audio and append. Ignores invalid payloads gracefully."""
+    def extend_base64(self, b64: str) -> None:
+        """Decode base64 audio and extend buffer. Ignores invalid payloads gracefully."""
         try:
             self.buffer.extend(base64.b64decode(b64))
         except Exception as e:
             # Some fixtures use placeholder strings like "<audio bytes>".
             # Skip invalid base64 without failing the pipeline, but log for visibility.
             logger.warning(
-                "AudioBufferManager.append_base64: invalid base64; ignoring. error=%s preview=%r",
+                "AudioBufferManager.extend_base64: invalid base64; ignoring. error=%s preview=%r",
                 e,
                 b64[:20],
             )
