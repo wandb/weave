@@ -93,6 +93,7 @@ class StateExporter(BaseModel):
 
     def handle_session_updated(self, msg: models.SessionUpdatedMessage) -> None:
         self.session = msg.session
+
     def handle_speech_stopped(self, msg: models.InputAudioBufferSpeechStoppedMessage) -> None:
         markers = self.user_speech_markers.setdefault(msg.item_id, {"audio_start_ms": None, "audio_end_ms": None})
         markers["audio_end_ms"] = msg.audio_end_ms
@@ -270,7 +271,8 @@ class StateExporter(BaseModel):
 
         resp_id = msg.response.id
         # conv_id = msg.response.conversation_id
-        input_data = {}
+        if session:
+            inputs.update(session.model_dump())
 
         # Disable parent call for now since we don't have a way to populate it up
         # conv_call = None
@@ -279,10 +281,6 @@ class StateExporter(BaseModel):
         #     if not conv_call:
         #         conv_call = client.create_call(op=conv_id, inputs={})
         #         self.conversation_calls[conv_id] = conv_call
-        if session:
-            input_data['session'] = session
-
-
         call = client.create_call(resp_id, inputs=inputs, parent=None)
 
         output_dict = msg.response.model_dump()
@@ -308,7 +306,10 @@ class StateExporter(BaseModel):
         for item in msg.response.output:
             self.items[item.id] = item
 
-        session = self.session
+        session = None
+        if self.session:
+            session = self.session.model_copy()
+
         pending_create_params = self.pending_create_params
         pending_response = self.pending_response
 
