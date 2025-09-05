@@ -3,8 +3,6 @@ import uuid
 from typing import Any
 
 import websocket
-
-import weave
 from weave.integrations.openai_realtime.conversation_manager import ConversationManager
 
 # Use project-local modules (no package-relative imports here)
@@ -82,21 +80,17 @@ class WeaveMediaConnection:
 
     def _wrap_sender(self, sender: Any) -> Any:
         def wrapper(data: Any, opcode: int = websocket.ABNF.OPCODE_TEXT) -> Any:
-            with weave.attributes({"websocket_id": self.id}):
-                # Process outgoing events with session manager
-                parsed_data = _try_json_load(data)
-                if isinstance(parsed_data, dict):
-                    # Convert to typed user message and forward to conversation manager
-                    try:
-                        typed_message = create_user_message_from_dict(parsed_data)
-                        with weave.attributes(
-                            {"typed_message": getattr(typed_message, "type", "unknown")}
-                        ):
-                            self.conversation_manager.process_event(typed_message)
-                    except Exception:
-                        # If parsing fails, ignore for state tracking but still forward on the wire
-                        pass
-                return sender(data, opcode)
+            # Process outgoing events with session manager
+            parsed_data = _try_json_load(data)
+            if isinstance(parsed_data, dict):
+                # Convert to typed user message and forward to conversation manager
+                try:
+                    typed_message = create_user_message_from_dict(parsed_data)
+                    self.conversation_manager.process_event(typed_message)
+                except Exception:
+                    # If parsing fails, ignore for state tracking but still forward on the wire
+                    pass
+            return sender(data, opcode)
 
         return wrapper
 
@@ -105,9 +99,8 @@ class WeaveMediaConnection:
             return None
 
         def wrapper(*args: Any, **kwargs: Any) -> Any:
-            with weave.attributes({"websocket_id": self.id}):
-                # The first argument is always the websocket instance, so we skip it
-                return handler(*args, **kwargs)
+            # The first argument is always the websocket instance, so we skip it
+            return handler(*args, **kwargs)
 
         return wrapper
 
@@ -116,30 +109,22 @@ class WeaveMediaConnection:
             return None
 
         def wrapper(*args: Any, **kwargs: Any) -> Any:
-            with weave.attributes({"websocket_id": self.id}):
-                # Process incoming message events with session manager
-                if len(args) > 1:  # Message is the second argument
-                    message = args[1]
-                    parsed_message = _try_json_load(message)
-                    if isinstance(parsed_message, dict):
-                        # Convert to typed server message and forward to conversation manager
-                        try:
-                            typed_message = create_server_message_from_dict(
-                                parsed_message
-                            )
-                            with weave.attributes(
-                                {
-                                    "typed_message": getattr(
-                                        typed_message, "type", "unknown"
-                                    )
-                                }
-                            ):
-                                self.conversation_manager.process_event(typed_message)
-                        except Exception:
-                            # If parsing fails, ignore for state tracking but still forward to handler
-                            pass
-                # Call the original handler
-                return handler(*args, **kwargs)
+            # Process incoming message events with session manager
+            if len(args) > 1:  # Message is the second argument
+                message = args[1]
+                parsed_message = _try_json_load(message)
+                if isinstance(parsed_message, dict):
+                    # Convert to typed server message and forward to conversation manager
+                    try:
+                        typed_message = create_server_message_from_dict(
+                            parsed_message
+                        )
+                        self.conversation_manager.process_event(typed_message)
+                    except Exception:
+                        # If parsing fails, ignore for state tracking but still forward to handler
+                        pass
+            # Call the original handler
+            return handler(*args, **kwargs)
 
         return wrapper
 
@@ -173,43 +158,28 @@ class WeaveAsyncWebsocketConnection:
         self.conversation_manager = ConversationManager()
 
     async def send(self, *args: Any, **kwargs: Any) -> None:
-        with weave.attributes({"websocket_id": self.id}):
-            message = args[0] if args else None
-            parsed_message = _try_json_load(message)
-            # Forward outgoing user messages to conversation manager
-            if isinstance(parsed_message, dict):
-                try:
-                    typed_message = create_user_message_from_dict(parsed_message)
-                    with weave.attributes(
-                        {
-                            "typed_message": getattr(typed_message, "type", "unknown"),
-                            "data": parsed_message,
-                        }
-                    ):
-                        self.conversation_manager.process_event(typed_message)
-                except Exception:
-                    pass
-            return await self.original_connection.send(*args, **kwargs)
+        message = args[0] if args else None
+        parsed_message = _try_json_load(message)
+        # Forward outgoing user messages to conversation manager
+        if isinstance(parsed_message, dict):
+            try:
+                typed_message = create_user_message_from_dict(parsed_message)
+                self.conversation_manager.process_event(typed_message)
+            except Exception:
+                pass
+        return await self.original_connection.send(*args, **kwargs)
 
     async def recv(self, *args: Any, **kwargs: Any) -> Any:
-        print("here")
-        with weave.attributes({"websocket_id": self.id}):
-            message = await self.original_connection.recv(*args, **kwargs)
-            parsed_message = _try_json_load(message)
-            # Forward incoming server messages to conversation manager
-            if isinstance(parsed_message, dict):
-                try:
-                    typed_message = create_server_message_from_dict(parsed_message)
-                    with weave.attributes(
-                        {
-                            "typed_message": getattr(typed_message, "type", "unknown"),
-                            "data": parsed_message,
-                        }
-                    ):
-                        self.conversation_manager.process_event(typed_message)
-                except Exception:
-                    pass
-            return message
+        message = await self.original_connection.recv(*args, **kwargs)
+        parsed_message = _try_json_load(message)
+        # Forward incoming server messages to conversation manager
+        if isinstance(parsed_message, dict):
+            try:
+                typed_message = create_server_message_from_dict(parsed_message)
+                self.conversation_manager.process_event(typed_message)
+            except Exception:
+                pass
+        return message
 
     def __aiter__(self) -> Any:
         return self
@@ -249,62 +219,53 @@ class WeaveAiohttpWebsocketConnection:
         self.conversation_manager = ConversationManager()
 
     async def send_str(self, data: str, *args: Any, **kwargs: Any) -> None:
-        with weave.attributes({"websocket_id": self.id}):
-            parsed_data = _try_json_load(data)
-            # Forward outgoing user messages to conversation manager
-            if isinstance(parsed_data, dict):
-                try:
-                    typed_message = create_user_message_from_dict(parsed_data)
-                    self.conversation_manager.process_event(typed_message)
-                except Exception:
-                    pass
-            with weave.attributes({"data": parsed_data}):
-                return await self.original_ws.send_str(data, *args, **kwargs)
+        parsed_data = _try_json_load(data)
+        # Forward outgoing user messages to conversation manager
+        if isinstance(parsed_data, dict):
+            try:
+                typed_message = create_user_message_from_dict(parsed_data)
+                self.conversation_manager.process_event(typed_message)
+            except Exception:
+                pass
+        return await self.original_ws.send_str(data, *args, **kwargs)
 
     async def send_bytes(self, data: bytes, *args: Any, **kwargs: Any) -> None:
-        with weave.attributes({"websocket_id": self.id}):
-            parsed_data = _try_json_load(data)
-            # Forward outgoing user messages to conversation manager
-            if isinstance(parsed_data, dict):
-                try:
-                    typed_message = create_user_message_from_dict(parsed_data)
-                    self.conversation_manager.process_event(typed_message)
-                except Exception:
-                    pass
-            with weave.attributes({"data": parsed_data}):
-                return await self.original_ws.send_bytes(data, *args, **kwargs)
+        parsed_data = _try_json_load(data)
+        # Forward outgoing user messages to conversation manager
+        if isinstance(parsed_data, dict):
+            try:
+                typed_message = create_user_message_from_dict(parsed_data)
+                self.conversation_manager.process_event(typed_message)
+            except Exception:
+                pass
+        return await self.original_ws.send_bytes(data, *args, **kwargs)
 
     async def send_json(self, data: Any, *args: Any, **kwargs: Any) -> None:
-        with weave.attributes({"websocket_id": self.id}):
-            # Forward outgoing user messages to conversation manager
-            if isinstance(data, dict):
+        # Forward outgoing user messages to conversation manager
+        if isinstance(data, dict):
+            try:
+                typed_message = create_user_message_from_dict(data)
+                self.conversation_manager.process_event(typed_message)
+            except Exception:
+                pass
+            return await self.original_ws.send_json(data, *args, **kwargs)
+
+    async def receive(self, *args: Any, **kwargs: Any) -> Any:
+        msg = await self.original_ws.receive(*args, **kwargs)
+        if msg.type in (WSMsgType.TEXT, WSMsgType.BINARY) if WSMsgType else (1, 2):
+            parsed_data = _try_json_load(msg.data)
+            # Forward incoming server messages to conversation manager
+            if isinstance(parsed_data, dict):
                 try:
-                    typed_message = create_user_message_from_dict(data)
+                    typed_message = create_server_message_from_dict(parsed_data)
                     self.conversation_manager.process_event(typed_message)
                 except Exception:
                     pass
-            with weave.attributes({"data": data}):
-                return await self.original_ws.send_json(data, *args, **kwargs)
-
-    async def receive(self, *args: Any, **kwargs: Any) -> Any:
-        with weave.attributes({"websocket_id": self.id}):
-            msg = await self.original_ws.receive(*args, **kwargs)
-            if msg.type in (WSMsgType.TEXT, WSMsgType.BINARY) if WSMsgType else (1, 2):
-                parsed_data = _try_json_load(msg.data)
-                # Forward incoming server messages to conversation manager
-                if isinstance(parsed_data, dict):
-                    try:
-                        typed_message = create_server_message_from_dict(parsed_data)
-                        self.conversation_manager.process_event(typed_message)
-                    except Exception:
-                        pass
-                with weave.attributes({"data": parsed_data}):
-                    return msg
-            return msg
+                return msg
+        return msg
 
     async def close(self, *args: Any, **kwargs: Any) -> Any:
-        with weave.attributes({"websocket_id": self.id}):
-            return await self.original_ws.close(*args, **kwargs)
+        return await self.original_ws.close(*args, **kwargs)
 
     def __aiter__(self) -> Any:
         return self
