@@ -473,8 +473,8 @@ ResponseItem = Annotated[
 
 class ItemCreatedMessage(ServerMessageBase):
     type: Literal["conversation.item.created"] = "conversation.item.created"
-    previous_item_id: Optional[ItemID]  # Fixed type: was Optional[str]
-    item: ServerItem  # Changed to use ServerItem which has required IDs
+    previous_item_id: Optional[ItemID]
+    item: ServerItem
 
 
 class ItemTruncatedMessage(ServerMessageBase):
