@@ -7,7 +7,6 @@ from typing import (
     Callable,
     Optional,
     Protocol,
-    overload,
     runtime_checkable,
 )
 
