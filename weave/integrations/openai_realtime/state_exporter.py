@@ -152,6 +152,7 @@ class StateExporter(BaseModel):
 
     def handle_response_audio_done(self, msg: models.ResponseAudioDoneMessage) -> None:
         self.response_audio[msg.item_id] = bytes(self.output_buffer.buffer)
+        self.output_buffer.clear()
 
     def _response_with_audio(self, resp: models.Response) -> dict[str, Any]:
         response_dict = resp.model_dump()
@@ -212,12 +213,17 @@ class StateExporter(BaseModel):
         msg_dict = msg.model_dump()
         for content_idx, content in enumerate(msg.content):
             item_id = msg.id
+            audio = None
             if content.type == "input_audio":
                 audio = self._get_item_audio(item_id)
-                if not audio:
-                    return
-                audio = pcm_to_wav(audio)
-                msg_dict['content'][content_idx]["audio"] = Content.from_bytes(audio, extension=".wav")
+            elif content.type == "audio":
+                audio = self.response_audio[item_id]
+
+            if not audio:
+                return msg_dict
+            audio = pcm_to_wav(audio)
+            msg_dict['content'][content_idx]["audio"] = Content.from_bytes(audio, extension=".wav")
+
         return msg_dict
 
     def _handle_response_done_inner(
