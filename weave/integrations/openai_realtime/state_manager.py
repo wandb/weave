@@ -42,8 +42,8 @@ class StateStore(BaseModel):
     prev_by_item: dict[models.ItemID, Optional[models.ItemID]] = Field(default_factory=dict)
     next_by_item: dict[models.ItemID, Optional[models.ItemID]] = Field(default_factory=dict)
 
-    call_by_id: dict[models.CallID, models.ResponseFunctionCallItem] = Field(default_factory=dict)
-    call_output_by_id: dict[models.CallID, models.ResponseFunctionCallItem] = Field(default_factory=dict)
+    call_by_id: dict[models.CallID, models.ResponseFunctionCallItem]
+    call_output_by_id: dict[models.CallID, models.ResponseFunctionCallItem]
 
     # Input audio buffer and speech markers per item
     input_audio_buffer: AudioBufferManager = Field(default_factory=AudioBufferManager)
@@ -223,7 +223,7 @@ class StateStore(BaseModel):
             pass
 
     def apply_item_input_audio_transcription_delta(self, msg: models.ItemInputAudioTranscriptionDeltaMessage) -> None:
-        key = msg.item_id, msg.content_index
+        key = (msg.item_id, msg.content_index)
         curr = self.input_transcripts.get(key, "")
         self.input_transcripts[key] = curr + msg.delta
         # Mirror into stored item if present
