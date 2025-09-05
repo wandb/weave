@@ -4,10 +4,9 @@ import importlib
 from functools import wraps
 from typing import Any, Callable
 
+from weave.integrations.openai_realtime import connection
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace import autopatch
-
-from . import connection
 
 _openai_realtime_patcher: MultiPatcher | None = None
 
