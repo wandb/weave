@@ -5,13 +5,13 @@ from typing import Any
 import websocket
 
 import weave
+from weave.integrations.openai_realtime.conversation_manager import ConversationManager
 
 # Use project-local modules (no package-relative imports here)
 from weave.integrations.openai_realtime.models import (
     create_server_message_from_dict,
     create_user_message_from_dict,
 )
-from weave.integrations.openai_realtime.conversation_manager import ConversationManager
 
 try:
     from aiohttp import WSMsgType
@@ -89,7 +89,9 @@ class WeaveMediaConnection:
                     # Convert to typed user message and forward to conversation manager
                     try:
                         typed_message = create_user_message_from_dict(parsed_data)
-                        with weave.attributes({"typed_message": getattr(typed_message, "type", "unknown")}):
+                        with weave.attributes(
+                            {"typed_message": getattr(typed_message, "type", "unknown")}
+                        ):
                             self.conversation_manager.process_event(typed_message)
                     except Exception:
                         # If parsing fails, ignore for state tracking but still forward on the wire
@@ -122,8 +124,16 @@ class WeaveMediaConnection:
                     if isinstance(parsed_message, dict):
                         # Convert to typed server message and forward to conversation manager
                         try:
-                            typed_message = create_server_message_from_dict(parsed_message)
-                            with weave.attributes({"typed_message": getattr(typed_message, "type", "unknown")}):
+                            typed_message = create_server_message_from_dict(
+                                parsed_message
+                            )
+                            with weave.attributes(
+                                {
+                                    "typed_message": getattr(
+                                        typed_message, "type", "unknown"
+                                    )
+                                }
+                            ):
                                 self.conversation_manager.process_event(typed_message)
                         except Exception:
                             # If parsing fails, ignore for state tracking but still forward to handler
@@ -170,14 +180,19 @@ class WeaveAsyncWebsocketConnection:
             if isinstance(parsed_message, dict):
                 try:
                     typed_message = create_user_message_from_dict(parsed_message)
-                    with weave.attributes({"typed_message": getattr(typed_message, "type", "unknown"), "data": parsed_message}):
+                    with weave.attributes(
+                        {
+                            "typed_message": getattr(typed_message, "type", "unknown"),
+                            "data": parsed_message,
+                        }
+                    ):
                         self.conversation_manager.process_event(typed_message)
                 except Exception:
                     pass
             return await self.original_connection.send(*args, **kwargs)
 
     async def recv(self, *args: Any, **kwargs: Any) -> Any:
-        print('here')
+        print("here")
         with weave.attributes({"websocket_id": self.id}):
             message = await self.original_connection.recv(*args, **kwargs)
             parsed_message = _try_json_load(message)
@@ -185,7 +200,12 @@ class WeaveAsyncWebsocketConnection:
             if isinstance(parsed_message, dict):
                 try:
                     typed_message = create_server_message_from_dict(parsed_message)
-                    with weave.attributes({"typed_message": getattr(typed_message, "type", "unknown"), "data": parsed_message}):
+                    with weave.attributes(
+                        {
+                            "typed_message": getattr(typed_message, "type", "unknown"),
+                            "data": parsed_message,
+                        }
+                    ):
                         self.conversation_manager.process_event(typed_message)
                 except Exception:
                     pass
