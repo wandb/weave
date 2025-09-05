@@ -12,6 +12,7 @@ from weave.trace import (
     weave_client,
 )
 from weave.trace.context import weave_client_context as weave_client_context
+from weave.trace import settings
 from weave.trace.settings import should_redact_pii, use_server_cache
 from weave.trace_server.trace_server_interface import TraceServerInterface
 from weave.trace_server_bindings import remote_http_trace_server
@@ -105,7 +106,8 @@ def init_weave(
     wandb_context = wandb_context_module.get_wandb_api_context()
     if wandb_context is None:
         url = wandb.app_url(env.wandb_base_url())
-        logger.info(f"Please login to Weights & Biases ({url}) to continue...")
+        if not settings.should_be_silent():
+            logger.info(f"Please login to Weights & Biases ({url}) to continue...")
         wandb.login(anonymous="never", force=True, referrer="weave")  # type: ignore
 
         wandb_context_module.init()

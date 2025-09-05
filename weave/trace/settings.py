@@ -26,6 +26,15 @@ If True, prints a link to the Weave UI when calling a weave op.
 * Type: `bool`
 
 If True, enables parallel table upload chunking for large tables. If False, uses incremental upload method.
+
+## `silent`
+
+* Environment Variable: `WEAVE_SILENT`
+* Settings Key: `silent`
+* Default: `False`
+* Type: `bool`
+
+If True, disables all terminal logging output from Weave, including termlog, termwarn, and termerror messages.
 """
 
 import os
@@ -196,6 +205,13 @@ class UserSettings(BaseModel):
     Can be overridden with the environment variable `WEAVE_USE_PARALLEL_TABLE_UPLOAD`
     """
 
+    silent: bool = False
+    """Toggles silent mode for terminal output.
+
+    If True, disables all terminal logging output from Weave, including termlog, termwarn, and termerror messages.
+    Can be overridden with the environment variable `WEAVE_SILENT`
+    """
+
     model_config = ConfigDict(extra="forbid")
     _is_first_apply: bool = PrivateAttr(True)
 
@@ -306,6 +322,11 @@ def should_enable_disk_fallback() -> bool:
 def should_use_parallel_table_upload() -> bool:
     """Returns whether parallel table upload chunking should be used."""
     return _should("use_parallel_table_upload")
+
+
+def should_be_silent() -> bool:
+    """Returns whether terminal logging should be silenced."""
+    return _should("silent")
 
 
 def parse_and_apply_settings(

@@ -75,6 +75,7 @@ from weave.trace.serialization.serialize import (
 from weave.trace.serialization.serializer import get_serializer_for_obj
 from weave.trace.settings import (
     client_parallelism,
+    should_be_silent,
     should_capture_client_info,
     should_capture_system_info,
     should_print_call_link,
@@ -158,7 +159,7 @@ logger = logging.getLogger(__name__)
 
 
 def print_call_link(call: Call) -> None:
-    if settings.should_print_call_link():
+    if settings.should_print_call_link() and not settings.should_be_silent():
         logger.info(f"{TRACE_CALL_EMOJI} {call.ui_url}")
 
 

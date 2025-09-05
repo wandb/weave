@@ -12,7 +12,7 @@ from typing import Any, Union, cast
 # TODO: type_handlers is imported here to trigger registration of the image serializer.
 # There is probably a better place for this, but including here for now to get the fix in.
 from weave import type_handlers  # noqa: F401
-from weave.trace import urls, weave_client, weave_init
+from weave.trace import settings, urls, weave_client, weave_init
 from weave.trace.autopatch import AutopatchSettings
 from weave.trace.constants import TRACE_OBJECT_EMOJI
 from weave.trace.context import call_context
@@ -157,7 +157,8 @@ def publish(obj: Any, name: str | None = None) -> ObjectRef:
                 ref.name,
                 ref.digest,
             )
-        logger.info(f"{TRACE_OBJECT_EMOJI} Published to {url}")
+        if not settings.should_be_silent():
+            logger.info(f"{TRACE_OBJECT_EMOJI} Published to {url}")
     return ref
 
 
