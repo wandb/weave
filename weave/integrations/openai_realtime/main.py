@@ -10,11 +10,7 @@ dotenv.load_dotenv()
 weave.init("test_realtime_2")
 
 from conversation_manager import ConversationManager
-from exporters import DirectoryExportAdapter, JSONFileExportAdapter
 from weave.integrations.openai_realtime.models import (
-    USER_MESSAGE_CLASSES,
-    SERVER_MESSAGE_CLASSES,
-    UnknownClientMessage,
     create_message_from_dict
 )
 
@@ -41,21 +37,12 @@ def cmd_replay_jsonl(args: argparse.Namespace) -> int:
             raise ValueError(f"create_message_from_dict for value: {rec} failed with error - {e}\n ") 
         mgr.process_event(msg)
 
-    # Export
-    if args.export == "json":
-        JSONFileExportAdapter().export(mgr, args.out)
-    elif args.export == "dir":
-        DirectoryExportAdapter(audio_format=args.audio_format).export(mgr, args.out)
-    else:
-        # No export, print quick summary directly from state
-        print(f"Items: {len(mgr.state.items)}, Responses: {len(mgr.state.responses)}")
     return 0
 
 
 def cmd_replay_turns(args: argparse.Namespace) -> int:
     mgr = ConversationManager()
     out_dir = args.out
-    mgr.turn_export_dir = out_dir
 
     in_path = Path(args.input)
     if not in_path.exists():
