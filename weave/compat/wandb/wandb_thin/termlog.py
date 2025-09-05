@@ -62,7 +62,7 @@ def _log(
     prefix: bool = True,
 ) -> None:
     # Check if silent mode is enabled
-    if os.environ.get("WEAVE_SILENT", "").lower() in ("yes", "true", "1", "on"):
+    if os.getenv("WEAVE_SILENT", "").lower() in ("yes", "true", "1", "on"):
         return
     
     if string:
