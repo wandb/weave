@@ -31,7 +31,7 @@ If True, enables parallel table upload chunking for large tables. If False, uses
 
 * Environment Variable: `WEAVE_SILENT`
 * Settings Key: `silent`
-* Default: `False`
+* Default: `False` (automatically set to `True` when wandb is installed)
 * Type: `bool`
 
 If True, disables all terminal logging output from Weave, including termlog, termwarn, and termerror messages.
@@ -209,6 +209,7 @@ class UserSettings(BaseModel):
     """Toggles silent mode for terminal output.
 
     If True, disables all terminal logging output from Weave, including termlog, termwarn, and termerror messages.
+    Note: Automatically defaults to True when wandb is installed (unless explicitly set via environment variable).
     Can be overridden with the environment variable `WEAVE_SILENT`
     """
 

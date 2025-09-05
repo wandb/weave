@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import sys
 import types
 from dataclasses import dataclass
@@ -85,3 +86,36 @@ def test_wandb_init_hook_behavior(tc, install_fake_wandb, monkeypatch):
     weave.integrations.wandb.wandb.wandb_init_hook()
 
     assert calls == tc.expected_calls
+
+
+def test_wandb_init_hook_sets_weave_silent(install_fake_wandb, monkeypatch):
+    """Test that wandb_init_hook sets WEAVE_SILENT to true when wandb is available."""
+    # Clear WEAVE_SILENT if it's set
+    monkeypatch.delenv("WEAVE_SILENT", raising=False)
+    
+    # Install fake wandb with no active run
+    install_fake_wandb(None)
+    
+    # Verify WEAVE_SILENT is not set initially
+    assert os.getenv("WEAVE_SILENT") is None
+    
+    # Call the hook
+    weave.integrations.wandb.wandb.wandb_init_hook()
+    
+    # Verify WEAVE_SILENT is now set to "true"
+    assert os.getenv("WEAVE_SILENT") == "true"
+
+
+def test_wandb_init_hook_respects_existing_weave_silent(install_fake_wandb, monkeypatch):
+    """Test that wandb_init_hook respects existing WEAVE_SILENT setting."""
+    # Set WEAVE_SILENT to false
+    monkeypatch.setenv("WEAVE_SILENT", "false")
+    
+    # Install fake wandb with no active run
+    install_fake_wandb(None)
+    
+    # Call the hook
+    weave.integrations.wandb.wandb.wandb_init_hook()
+    
+    # Verify WEAVE_SILENT is still "false"
+    assert os.getenv("WEAVE_SILENT") == "false"
