@@ -3,6 +3,7 @@ import uuid
 from typing import Any
 
 import websocket
+
 from weave.integrations.openai_realtime.conversation_manager import ConversationManager
 
 # Use project-local modules (no package-relative imports here)
@@ -116,9 +117,7 @@ class WeaveMediaConnection:
                 if isinstance(parsed_message, dict):
                     # Convert to typed server message and forward to conversation manager
                     try:
-                        typed_message = create_server_message_from_dict(
-                            parsed_message
-                        )
+                        typed_message = create_server_message_from_dict(parsed_message)
                         self.conversation_manager.process_event(typed_message)
                     except Exception:
                         # If parsing fails, ignore for state tracking but still forward to handler
