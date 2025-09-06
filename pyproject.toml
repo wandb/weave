@@ -197,7 +197,7 @@ test = [
   "pytest-memray~=1.8",
   "clickhouse_connect==0.7.0",
   "fastapi>=0.110.0",
-  "sqlparse==0.5.0",
+  "sqlparse==0.5.3",
   "freezegun",
   "rich",
 
