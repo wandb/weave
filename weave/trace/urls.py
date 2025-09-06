@@ -1,18 +1,27 @@
 from urllib.parse import quote
 
-from weave.compat import wandb
 from weave.trace import env
 
 BROWSE3_PATH = "browse3"
 WEAVE_SLUG = "weave"
 
 
-def remote_project_root_url(entity_name: str, project_name: str) -> str:
-    return f"{wandb.app_url(env.wandb_base_url())}/{entity_name}/{quote(project_name)}"
+def project_weave_root_url(entity: str, project: str) -> str:
+    """Get the frontend URL for viewing a Weave project.
 
+    Args:
+        entity: The entity/organization name
+        project: The project name
 
-def project_weave_root_url(entity_name: str, project_name: str) -> str:
-    return f"{remote_project_root_url(entity_name, project_name)}/{WEAVE_SLUG}"
+    Returns:
+        The frontend URL for viewing the project in Weave
+    """
+    # Get the appropriate frontend URL (respects WF_TRACE_SERVER_URL if set)
+    base_url = env.weave_frontend_url()
+    entity = quote(entity)
+    project = quote(project)
+
+    return f"{base_url}/{entity}/{project}/{WEAVE_SLUG}"
 
 
 def op_version_path(
@@ -32,4 +41,4 @@ def leaderboard_path(entity_name: str, project_name: str, object_name: str) -> s
 
 
 def redirect_call(entity_name: str, project_name: str, call_id: str) -> str:
-    return f"{remote_project_root_url(entity_name, project_name)}/r/call/{call_id}"
+    return f"{project_weave_root_url(entity_name, project_name)}/r/call/{call_id}"
