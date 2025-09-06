@@ -1,3 +1,4 @@
+import logging
 import warnings
 from typing import Any
 
@@ -25,20 +26,34 @@ def safe_serialize_crewai_agent(obj: Any) -> dict[str, Any]:
     for attr in core_attributes:
         if hasattr(obj, attr):
             value = getattr(obj, attr)
-            if attr == "id" and value is not None:
-                result[attr] = stringify(value)
-            elif value is not None:
-                result[attr] = value
+            if value is not None:
+                # CRITICAL FIX: Filter logger objects
+                if isinstance(value, logging.Logger):
+                    result[attr] = f"<Logger: {value.name}>"
+                elif attr == "id":
+                    result[attr] = stringify(value)
+                else:
+                    result[attr] = value
 
-    with warnings.catch_warnings():
-        warnings.filterwarnings("ignore", category=UserWarning)
-        attr_dict = obj.model_dump(
-            exclude=EXCLUDE_AGENT_ATTRS,
-            exclude_none=True,
-        )
+    try:
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=UserWarning)
+            attr_dict = obj.model_dump(
+                exclude=EXCLUDE_AGENT_ATTRS,
+                exclude_none=True,
+            )
 
-    for attr, value in attr_dict.items():
-        result[attr] = stringify(value)
+        for attr, value in attr_dict.items():
+            # CRITICAL FIX: Skip or convert logger attributes
+            if isinstance(value, logging.Logger):
+                result[attr] = f"<Logger: {value.name}>"
+            elif hasattr(value, "__dict__"):
+                # Recursively clean nested objects
+                result[attr] = safe_serialize_crewai_object(value)
+            else:
+                result[attr] = stringify(value) if value is not None else None
+    except Exception as e:
+        result["serialization_error"] = str(e)
 
     return result
 
@@ -56,23 +71,36 @@ def safe_serialize_crewai_task(obj: Any) -> dict[str, Any]:
     for attr in core_attributes:
         if hasattr(obj, attr):
             value = getattr(obj, attr)
-            if attr == "id" and value is not None:
-                result[attr] = stringify(value)
-            elif value is not None:
-                result[attr] = value
+            if value is not None:
+                # CRITICAL FIX: Filter logger objects
+                if isinstance(value, logging.Logger):
+                    result[attr] = f"<Logger: {value.name}>"
+                elif attr == "id":
+                    result[attr] = stringify(value)
+                else:
+                    result[attr] = value
 
-    with warnings.catch_warnings():
-        warnings.filterwarnings("ignore", category=UserWarning)
-        attr_dict = obj.model_dump(
-            exclude=EXCLUDE_TASK_ATTRS,
-            exclude_none=True,
-        )
+    try:
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=UserWarning)
+            attr_dict = obj.model_dump(
+                exclude=EXCLUDE_TASK_ATTRS,
+                exclude_none=True,
+            )
 
-    for attr, value in attr_dict.items():
-        if attr.startswith("_") or value == "":
-            continue
-        else:
-            result[attr] = stringify(value)
+        for attr, value in attr_dict.items():
+            if attr.startswith("_") or value == "":
+                continue
+            # CRITICAL FIX: Skip or convert logger attributes
+            if isinstance(value, logging.Logger):
+                result[attr] = f"<Logger: {value.name}>"
+            elif hasattr(value, "__dict__"):
+                # Recursively clean nested objects
+                result[attr] = safe_serialize_crewai_object(value)
+            else:
+                result[attr] = stringify(value) if value is not None else None
+    except Exception as e:
+        result["serialization_error"] = str(e)
 
     return result
 
@@ -82,6 +110,14 @@ def safe_serialize_crewai_object(obj: Any) -> Any:
     # Return primitive types directly
     if obj is None or isinstance(obj, (str, int, float, bool)):
         return obj
+
+    # CRITICAL FIX: Handle Logger objects explicitly before other processing
+    if isinstance(obj, logging.Logger):
+        return f"<Logger: {obj.name} (level={logging.getLevelName(obj.level)})>"
+
+    # Handle other logging objects
+    if isinstance(obj, (logging.Manager, logging.Handler, logging.Filter)):
+        return f"<{obj.__class__.__name__}: {id(obj)}>"
 
     # Everything else is serialized as a dict
     if hasattr(obj, "__class__"):

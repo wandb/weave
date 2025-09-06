@@ -1,3 +1,6 @@
+import json
+import logging
+
 import openai
 from pydantic import BaseModel
 
@@ -210,6 +213,64 @@ def test_dictify_sanitizes_nested() -> None:
             "api_key": "REDACTED",
         },
     }
+
+
+def test_logger_serialization() -> None:
+    """Test that Logger objects are properly serialized without causing errors."""
+    # Create a logger with a specific name and level
+    logger = logging.getLogger("test_logger_serialization")
+    logger.setLevel(logging.DEBUG)
+
+    # Test 1: Direct logger serialization with dictify
+    logger_result = dictify(logger)
+    assert isinstance(logger_result, str)
+    assert "Logger: test_logger_serialization" in logger_result
+    assert "level=DEBUG" in logger_result
+
+    # Verify it's JSON serializable
+    json.dumps(logger_result)
+
+    # Test 2: Logger in nested structure with dictify
+    nested_data = {
+        "normal_field": "test_value",
+        "logger_field": logger,
+        "nested": {"inner_logger": logger, "data": [1, 2, logger, "text"]},
+    }
+
+    nested_result = dictify(nested_data)
+    assert nested_result["normal_field"] == "test_value"
+    assert isinstance(nested_result["logger_field"], str)
+    assert "Logger: test_logger_serialization" in nested_result["logger_field"]
+    assert isinstance(nested_result["nested"]["inner_logger"], str)
+    assert isinstance(nested_result["nested"]["data"][2], str)
+
+    # Verify the entire nested structure is JSON serializable
+    json.dumps(nested_result)
+
+
+def test_logger_serialization_to_json(client) -> None:
+    """Test that Logger objects work properly with to_json function."""
+    logger = logging.getLogger("test_to_json_logger")
+    logger.setLevel(logging.INFO)
+    project_id = "test/project"
+
+    # Test direct logger serialization
+    result = to_json(logger, project_id, client)
+    assert isinstance(result, str)
+    assert "Logger: test_to_json_logger" in result
+    assert "level=INFO" in result
+
+    # Test nested structure with logger
+    nested_data = {"config": "test", "logger": logger, "items": [1, logger, "test"]}
+
+    nested_result = to_json(nested_data, project_id, client)
+    assert nested_result["config"] == "test"
+    assert isinstance(nested_result["logger"], str)
+    assert "Logger:" in nested_result["logger"]
+    assert isinstance(nested_result["items"][1], str)
+
+    # Verify JSON serializable
+    json.dumps(nested_result)
 
 
 def test_is_pydantic_model_class() -> None:
