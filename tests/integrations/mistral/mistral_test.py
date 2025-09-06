@@ -1,9 +1,20 @@
 import os
+from collections.abc import Generator
 
 import pytest
 from mistralai import Mistral
 
 import weave
+from weave.integrations.mistral.mistral_sdk import get_mistral_patcher
+
+
+@pytest.fixture(autouse=True)
+def patch_mistral() -> Generator[None, None, None]:
+    """Patch Mistral for all tests in this file."""
+    patcher = get_mistral_patcher()
+    patcher.attempt_patch()
+    yield
+    patcher.undo_patch()
 
 
 @pytest.mark.skip_clickhouse_client
