@@ -2,6 +2,7 @@
 This file exposes functions to make the PIL ImageFile thread-safe and revert those changes:
 - `apply_threadsafe_patch_to_pil_image`
 - `undo_threadsafe_patch_to_pil_image`
+- `register_pil_import_hook` - Deferred patching using importlib MetaPathFinder
 
 There is a discussion here: https://github.com/python-pillow/Pillow/issues/4848#issuecomment-671339193 in which
 the author claims that the Pillow library is thread-safe. However, empirical evidence suggests otherwise.
@@ -13,10 +14,13 @@ Specifically, the `ImageFile.load` method is not thread-safe because it:
 Inside Weave, we use threads to parallelize work which may involve Images. This thread-safety issue has manifested
 not only in our persistence layer but also in user code where loaded images are accessed across threads.
 
-We call `apply_threadsafe_patch_to_pil_image` in the `__init__.py` file to ensure thread-safety for the ImageFile class.
+We use a MetaPathFinder to defer patching until PIL is actually imported, improving startup performance.
 """
 
+import importlib.abc
+import importlib.machinery
 import logging
+import sys
 import threading
 from functools import wraps
 from typing import Any, Callable, Optional
@@ -39,6 +43,9 @@ def apply_threadsafe_patch_to_pil_image() -> None:
 
     This function is idempotent - calling it multiple times has no additional effect.
     If PIL is not installed or if patching fails, the function will handle the error gracefully.
+    
+    Note: This function assumes PIL is already imported and will import PIL.ImageFile
+    to apply the patches.
     """
     global _patched
 
@@ -58,10 +65,15 @@ def apply_threadsafe_patch_to_pil_image() -> None:
 def _apply_threadsafe_patch() -> None:
     """Internal function that performs the actual thread-safety patching of PIL ImageFile.
 
+    This imports PIL.ImageFile and applies the patch. Should only be called when
+    PIL is already imported.
+
     Raises:
         ImportError: If PIL is not installed
         Exception: For any other unexpected errors during patching
     """
+    # Only import when we're actually applying the patch
+    # This ensures we don't eagerly load PIL
     from PIL.ImageFile import ImageFile
 
     global _original_methods
@@ -145,3 +157,108 @@ def _undo_threadsafe_patch() -> None:
         ImageFile.load = _original_methods["load"]  # type: ignore
 
     _original_methods = {"load": None}
+
+
+class PILImportHookLoader(importlib.abc.Loader):
+    """Loader that applies patches after PIL is loaded."""
+    
+    def __init__(self, original_loader: Any) -> None:
+        self.original_loader = original_loader
+    
+    def exec_module(self, module: Any) -> None:
+        """Execute the module and then apply our patch."""
+        # Let the original loader do its work
+        if hasattr(self.original_loader, 'exec_module'):
+            self.original_loader.exec_module(module)
+        
+        # Now apply our patch if this is the PIL root module
+        if module.__name__ == "PIL" and not _patched:
+            apply_threadsafe_patch_to_pil_image()
+    
+    def create_module(self, spec: Any) -> Any:
+        """Delegate module creation to the original loader."""
+        if hasattr(self.original_loader, 'create_module'):
+            return self.original_loader.create_module(spec)
+        return None
+
+
+class PILImportHook(importlib.abc.MetaPathFinder):
+    """MetaPathFinder that monitors PIL imports and applies patches."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._wrapped_specs: set[str] = set()
+
+    def find_spec(
+        self,
+        fullname: str,
+        path: Optional[list[str]] = None,
+        target: Optional[object] = None,
+    ) -> Optional[importlib.machinery.ModuleSpec]:
+        """Intercept PIL root import and wrap its loader."""
+        
+        # Only intercept the PIL root module
+        if fullname != "PIL" or _patched or fullname in self._wrapped_specs:
+            return None
+        
+        # Find the real spec using the rest of sys.meta_path
+        for finder in sys.meta_path:
+            if finder is self:
+                continue
+            
+            spec = None
+            if hasattr(finder, 'find_spec'):
+                spec = finder.find_spec(fullname, path, target)
+            elif hasattr(finder, 'find_module'):
+                # Fallback for older finders
+                loader = finder.find_module(fullname, path)
+                if loader:
+                    from importlib.machinery import ModuleSpec
+                    spec = ModuleSpec(fullname, loader)
+            
+            if spec and spec.loader:
+                # Wrap the loader to apply our patch after loading
+                with self._lock:
+                    if fullname not in self._wrapped_specs:
+                        self._wrapped_specs.add(fullname)
+                        spec.loader = PILImportHookLoader(spec.loader)
+                        return spec
+        
+        return None
+
+
+# Global instance of the import hook
+_pil_import_hook: Optional[PILImportHook] = None
+
+
+def register_pil_import_hook() -> None:
+    """Register an import hook to apply thread-safety patches when PIL is imported.
+    
+    This function uses Python's import hook mechanism to defer patching until
+    PIL is actually imported, improving startup performance when PIL is not used.
+    """
+    global _pil_import_hook
+    
+    # Check if hook is already registered
+    if _pil_import_hook is not None:
+        return
+    
+    # Check if PIL is already imported
+    if "PIL" in sys.modules:
+        # Already imported, apply patch immediately
+        apply_threadsafe_patch_to_pil_image()
+    else:
+        # Register our import hook
+        _pil_import_hook = PILImportHook()
+        # Insert at the beginning to catch imports early
+        sys.meta_path.insert(0, _pil_import_hook)
+
+
+def unregister_pil_import_hook() -> None:
+    """Remove the PIL import hook from sys.meta_path."""
+    global _pil_import_hook
+    
+    if _pil_import_hook and _pil_import_hook in sys.meta_path:
+        sys.meta_path.remove(_pil_import_hook)
+    
+    _pil_import_hook = None
