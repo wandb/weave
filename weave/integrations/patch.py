@@ -1,12 +1,23 @@
-"""Explicit patching functions for each integration.
+"""Explicit and implicit patching functions for each integration.
 
-Instead of automatic patching, users must explicitly call these functions
-to enable tracing for specific integrations.
+This module provides:
+1. Explicit patch functions that users can call manually
+2. Implicit patching for libraries imported before weave.init()
+3. Import hook for automatic patching of libraries imported after weave.init()
 """
 
-from typing import Optional
+import sys
+from importlib.abc import MetaPathFinder
+from typing import Callable, Optional
 
 from weave.trace.autopatch import IntegrationSettings
+
+# Global set to track which integrations have been patched
+# This prevents double-patching when libraries are imported multiple times
+_PATCHED_INTEGRATIONS: set[str] = set()
+
+# Global reference to the import hook, so we can unregister it if needed
+_IMPORT_HOOK: Optional["WeaveImportHook"] = None
 
 
 def patch_openai(settings: Optional[IntegrationSettings] = None) -> None:
@@ -23,7 +34,8 @@ def patch_openai(settings: Optional[IntegrationSettings] = None) -> None:
 
     if settings is None:
         settings = IntegrationSettings()
-    get_openai_patcher(settings).attempt_patch()
+    if get_openai_patcher(settings).attempt_patch():
+        _PATCHED_INTEGRATIONS.add("openai")
 
 
 def patch_anthropic(settings: Optional[IntegrationSettings] = None) -> None:
@@ -32,7 +44,8 @@ def patch_anthropic(settings: Optional[IntegrationSettings] = None) -> None:
 
     if settings is None:
         settings = IntegrationSettings()
-    get_anthropic_patcher(settings).attempt_patch()
+    if get_anthropic_patcher(settings).attempt_patch():
+        _PATCHED_INTEGRATIONS.add("anthropic")
 
 
 def patch_mistral(settings: Optional[IntegrationSettings] = None) -> None:
@@ -41,7 +54,8 @@ def patch_mistral(settings: Optional[IntegrationSettings] = None) -> None:
 
     if settings is None:
         settings = IntegrationSettings()
-    get_mistral_patcher(settings).attempt_patch()
+    if get_mistral_patcher(settings).attempt_patch():
+        _PATCHED_INTEGRATIONS.add("mistralai")
 
 
 def patch_groq(settings: Optional[IntegrationSettings] = None) -> None:
@@ -50,7 +64,8 @@ def patch_groq(settings: Optional[IntegrationSettings] = None) -> None:
 
     if settings is None:
         settings = IntegrationSettings()
-    get_groq_patcher(settings).attempt_patch()
+    if get_groq_patcher(settings).attempt_patch():
+        _PATCHED_INTEGRATIONS.add("groq")
 
 
 def patch_litellm(settings: Optional[IntegrationSettings] = None) -> None:
@@ -59,7 +74,8 @@ def patch_litellm(settings: Optional[IntegrationSettings] = None) -> None:
 
     if settings is None:
         settings = IntegrationSettings()
-    get_litellm_patcher(settings).attempt_patch()
+    if get_litellm_patcher(settings).attempt_patch():
+        _PATCHED_INTEGRATIONS.add("litellm")
 
 
 def patch_cerebras(settings: Optional[IntegrationSettings] = None) -> None:
@@ -68,7 +84,8 @@ def patch_cerebras(settings: Optional[IntegrationSettings] = None) -> None:
 
     if settings is None:
         settings = IntegrationSettings()
-    get_cerebras_patcher(settings).attempt_patch()
+    if get_cerebras_patcher(settings).attempt_patch():
+        _PATCHED_INTEGRATIONS.add("cerebras")
 
 
 def patch_cohere(settings: Optional[IntegrationSettings] = None) -> None:
@@ -77,7 +94,8 @@ def patch_cohere(settings: Optional[IntegrationSettings] = None) -> None:
 
     if settings is None:
         settings = IntegrationSettings()
-    get_cohere_patcher(settings).attempt_patch()
+    if get_cohere_patcher(settings).attempt_patch():
+        _PATCHED_INTEGRATIONS.add("cohere")
 
 
 def patch_google_genai(settings: Optional[IntegrationSettings] = None) -> None:
@@ -88,7 +106,8 @@ def patch_google_genai(settings: Optional[IntegrationSettings] = None) -> None:
 
     if settings is None:
         settings = IntegrationSettings()
-    get_google_genai_patcher(settings).attempt_patch()
+    if get_google_genai_patcher(settings).attempt_patch():
+        _PATCHED_INTEGRATIONS.add("google.generativeai")
 
 
 def patch_vertexai(settings: Optional[IntegrationSettings] = None) -> None:
@@ -97,7 +116,8 @@ def patch_vertexai(settings: Optional[IntegrationSettings] = None) -> None:
 
     if settings is None:
         settings = IntegrationSettings()
-    get_vertexai_patcher(settings).attempt_patch()
+    if get_vertexai_patcher(settings).attempt_patch():
+        _PATCHED_INTEGRATIONS.add("vertexai")
 
 
 def patch_huggingface(settings: Optional[IntegrationSettings] = None) -> None:
@@ -108,7 +128,8 @@ def patch_huggingface(settings: Optional[IntegrationSettings] = None) -> None:
 
     if settings is None:
         settings = IntegrationSettings()
-    get_huggingface_patcher(settings).attempt_patch()
+    if get_huggingface_patcher(settings).attempt_patch():
+        _PATCHED_INTEGRATIONS.add("huggingface_hub")
 
 
 def patch_instructor(settings: Optional[IntegrationSettings] = None) -> None:
@@ -117,7 +138,8 @@ def patch_instructor(settings: Optional[IntegrationSettings] = None) -> None:
 
     if settings is None:
         settings = IntegrationSettings()
-    get_instructor_patcher(settings).attempt_patch()
+    if get_instructor_patcher(settings).attempt_patch():
+        _PATCHED_INTEGRATIONS.add("instructor")
 
 
 def patch_dspy(settings: Optional[IntegrationSettings] = None) -> None:
@@ -126,7 +148,8 @@ def patch_dspy(settings: Optional[IntegrationSettings] = None) -> None:
 
     if settings is None:
         settings = IntegrationSettings()
-    get_dspy_patcher(settings).attempt_patch()
+    if get_dspy_patcher(settings).attempt_patch():
+        _PATCHED_INTEGRATIONS.add("dspy")
 
 
 def patch_crewai(settings: Optional[IntegrationSettings] = None) -> None:
@@ -135,7 +158,9 @@ def patch_crewai(settings: Optional[IntegrationSettings] = None) -> None:
 
     if settings is None:
         settings = IntegrationSettings()
-    get_crewai_patcher(settings).attempt_patch()
+    if get_crewai_patcher(settings).attempt_patch():
+        _PATCHED_INTEGRATIONS.add("crewai")
+        _PATCHED_INTEGRATIONS.add("crewai_tools")
 
 
 def patch_notdiamond(settings: Optional[IntegrationSettings] = None) -> None:
@@ -144,7 +169,8 @@ def patch_notdiamond(settings: Optional[IntegrationSettings] = None) -> None:
 
     if settings is None:
         settings = IntegrationSettings()
-    get_notdiamond_patcher(settings).attempt_patch()
+    if get_notdiamond_patcher(settings).attempt_patch():
+        _PATCHED_INTEGRATIONS.add("notdiamond")
 
 
 def patch_mcp(settings: Optional[IntegrationSettings] = None) -> None:
@@ -153,8 +179,10 @@ def patch_mcp(settings: Optional[IntegrationSettings] = None) -> None:
 
     if settings is None:
         settings = IntegrationSettings()
-    get_mcp_server_patcher(settings).attempt_patch()
-    get_mcp_client_patcher(settings).attempt_patch()
+    server_patched = get_mcp_server_patcher(settings).attempt_patch()
+    client_patched = get_mcp_client_patcher(settings).attempt_patch()
+    if server_patched or client_patched:
+        _PATCHED_INTEGRATIONS.add("mcp")
 
 
 def patch_nvidia(settings: Optional[IntegrationSettings] = None) -> None:
@@ -165,7 +193,8 @@ def patch_nvidia(settings: Optional[IntegrationSettings] = None) -> None:
 
     if settings is None:
         settings = IntegrationSettings()
-    get_nvidia_ai_patcher(settings).attempt_patch()
+    if get_nvidia_ai_patcher(settings).attempt_patch():
+        _PATCHED_INTEGRATIONS.add("langchain_nvidia_ai_endpoints")
 
 
 def patch_smolagents(settings: Optional[IntegrationSettings] = None) -> None:
@@ -174,7 +203,8 @@ def patch_smolagents(settings: Optional[IntegrationSettings] = None) -> None:
 
     if settings is None:
         settings = IntegrationSettings()
-    get_smolagents_patcher(settings).attempt_patch()
+    if get_smolagents_patcher(settings).attempt_patch():
+        _PATCHED_INTEGRATIONS.add("smolagents")
 
 
 def patch_openai_agents(settings: Optional[IntegrationSettings] = None) -> None:
@@ -183,7 +213,8 @@ def patch_openai_agents(settings: Optional[IntegrationSettings] = None) -> None:
 
     if settings is None:
         settings = IntegrationSettings()
-    get_openai_agents_patcher(settings).attempt_patch()
+    if get_openai_agents_patcher(settings).attempt_patch():
+        _PATCHED_INTEGRATIONS.add("openai_agents")
 
 
 def patch_verdict(settings: Optional[IntegrationSettings] = None) -> None:
@@ -192,7 +223,8 @@ def patch_verdict(settings: Optional[IntegrationSettings] = None) -> None:
 
     if settings is None:
         settings = IntegrationSettings()
-    get_verdict_patcher(settings).attempt_patch()
+    if get_verdict_patcher(settings).attempt_patch():
+        _PATCHED_INTEGRATIONS.add("verdict")
 
 
 def patch_autogen(settings: Optional[IntegrationSettings] = None) -> None:
@@ -201,18 +233,219 @@ def patch_autogen(settings: Optional[IntegrationSettings] = None) -> None:
 
     if settings is None:
         settings = IntegrationSettings()
-    get_autogen_patcher(settings).attempt_patch()
+    if get_autogen_patcher(settings).attempt_patch():
+        _PATCHED_INTEGRATIONS.add("autogen")
 
 
 def patch_langchain() -> None:
     """Enable Weave tracing for LangChain."""
     from weave.integrations.langchain.langchain import langchain_patcher
 
-    langchain_patcher.attempt_patch()
+    if langchain_patcher.attempt_patch():
+        _PATCHED_INTEGRATIONS.add("langchain")
 
 
 def patch_llamaindex() -> None:
     """Enable Weave tracing for LlamaIndex."""
     from weave.integrations.llamaindex.llamaindex import llamaindex_patcher
 
-    llamaindex_patcher.attempt_patch()
+    if llamaindex_patcher.attempt_patch():
+        _PATCHED_INTEGRATIONS.add("llama_index")
+
+
+# Mapping of module names to patch functions for implicit patching
+# When a module is already imported, we'll automatically call its patch function
+
+INTEGRATION_MODULE_MAPPING: dict[str, Callable[[], None]] = {
+    "openai": patch_openai,
+    "anthropic": patch_anthropic,
+    "mistralai": patch_mistral,
+    "groq": patch_groq,
+    "litellm": patch_litellm,
+    "cerebras": patch_cerebras,
+    "cohere": patch_cohere,
+    "google.generativeai": patch_google_genai,
+    "vertexai": patch_vertexai,
+    "huggingface_hub": patch_huggingface,
+    "instructor": patch_instructor,
+    "dspy": patch_dspy,
+    "crewai": patch_crewai,
+    "crewai_tools": patch_crewai,
+    "notdiamond": patch_notdiamond,
+    "mcp": patch_mcp,
+    "langchain_nvidia_ai_endpoints": patch_nvidia,
+    "smolagents": patch_smolagents,
+    "openai_agents": patch_openai_agents,
+    "verdict": patch_verdict,
+    "autogen": patch_autogen,
+    "langchain": patch_langchain,
+    "llama_index": patch_llamaindex,
+}
+
+
+class WeaveImportHook(MetaPathFinder):
+    """Import hook that automatically patches supported integrations when they are imported."""
+
+    def find_spec(self, fullname, path, target=None):  # type: ignore
+        """Called by Python's import system to find a module spec.
+
+        We don't actually find or load modules - we just detect when a supported
+        integration is being imported and schedule it for patching after import.
+        """
+        # Check if this is a root module we support (not a submodule)
+        root_module = fullname.split(".")[0]
+
+        # If this is one of our supported integrations and not yet patched,
+        # we'll patch it after it's imported
+        if (
+            root_module in INTEGRATION_MODULE_MAPPING
+            and root_module not in _PATCHED_INTEGRATIONS
+        ):
+            # We don't actually find the spec - let the normal import system do that
+            # But we'll use a Loader wrapper to patch after import
+            spec = None
+            for finder in sys.meta_path:
+                if finder is self:
+                    continue
+                if hasattr(finder, "find_spec"):
+                    spec = finder.find_spec(fullname, path, target)
+                    if spec is not None:
+                        break
+
+            if spec is not None and fullname == root_module:
+                # Wrap the loader to patch after import
+                spec.loader = PatchingLoader(spec.loader, root_module)
+                return spec
+
+        # Not our concern, let other finders handle it
+        return None
+
+    def find_module(self, fullname, path=None):  # type: ignore
+        """Legacy method for backwards compatibility with older Python versions."""
+        return None
+
+
+class PatchingLoader:
+    """Loader wrapper that patches an integration after it's imported."""
+
+    def __init__(self, original_loader, module_name: str):  # type: ignore
+        self.original_loader = original_loader
+        self.module_name = module_name
+
+    def load_module(self, fullname):  # type: ignore
+        """Load the module using the original loader, then patch it."""
+        # Use the original loader to actually load the module
+        if hasattr(self.original_loader, "load_module"):
+            module = self.original_loader.load_module(fullname)
+        else:
+            # Fallback for loaders that don't have load_module
+            module = sys.modules.get(fullname)
+
+        # Now patch it if it's the root module
+        if fullname == self.module_name:
+            _patch_if_needed(self.module_name)
+
+        return module
+
+    def exec_module(self, module):  # type: ignore
+        """Execute the module using the original loader, then patch it."""
+        # Use the original loader to execute the module
+        if hasattr(self.original_loader, "exec_module"):
+            self.original_loader.exec_module(module)
+
+        # Now patch it if it's the root module
+        if module.__name__ == self.module_name:
+            _patch_if_needed(self.module_name)
+
+    def create_module(self, spec):  # type: ignore
+        """Delegate module creation to the original loader."""
+        if hasattr(self.original_loader, "create_module"):
+            return self.original_loader.create_module(spec)
+        return None
+
+    def __getattr__(self, name):  # type: ignore
+        """Delegate any other attributes to the original loader."""
+        return getattr(self.original_loader, name)
+
+
+def _patch_if_needed(module_name: str) -> None:
+    """Apply patching for a module if it hasn't been patched yet."""
+    if (
+        module_name not in _PATCHED_INTEGRATIONS
+        and module_name in INTEGRATION_MODULE_MAPPING
+    ):
+        patch_func = INTEGRATION_MODULE_MAPPING[module_name]
+        try:
+            patch_func()
+            _PATCHED_INTEGRATIONS.add(module_name)
+        except Exception:
+            # Silently skip if patching fails - this maintains backward compatibility
+            # and doesn't break existing code if an integration can't be patched
+            pass
+
+
+def implicit_patch() -> None:
+    """Check sys.modules and automatically patch any already-imported integrations.
+
+    This function is called during weave.init() to enable implicit patching.
+    If a library is already imported when weave.init() is called, we automatically
+    patch it without requiring an explicit patch_X() call.
+
+    This respects the implicitly_patch_integrations setting - if disabled, no automatic
+    patching will occur.
+    """
+    from weave.trace.settings import should_implicitly_patch_integrations
+
+    # Check if implicit patching is enabled
+    if not should_implicitly_patch_integrations():
+        return
+
+    for module_name, patch_func in INTEGRATION_MODULE_MAPPING.items():
+        # Check if the module is already imported and not yet patched
+        if module_name in sys.modules and module_name not in _PATCHED_INTEGRATIONS:
+            try:
+                patch_func()
+                _PATCHED_INTEGRATIONS.add(module_name)
+            except Exception:
+                # Silently skip if patching fails - this maintains backward compatibility
+                # and doesn't break existing code if an integration can't be patched
+                pass
+
+
+def register_import_hook() -> None:
+    """Register the import hook to automatically patch integrations imported after weave.init().
+
+    This respects the implicitly_patch_integrations setting - if disabled, the import hook
+    will not be registered.
+    """
+    from weave.trace.settings import should_implicitly_patch_integrations
+
+    # Check if implicit patching is enabled
+    if not should_implicitly_patch_integrations():
+        return
+
+    global _IMPORT_HOOK
+
+    # Only register if not already registered
+    if _IMPORT_HOOK is None:
+        _IMPORT_HOOK = WeaveImportHook()
+        # Insert at the beginning of meta_path to ensure we intercept imports early
+        sys.meta_path.insert(0, _IMPORT_HOOK)
+
+
+def unregister_import_hook() -> None:
+    """Unregister the import hook (useful for testing or cleanup)."""
+    global _IMPORT_HOOK
+
+    if _IMPORT_HOOK is not None:
+        try:
+            sys.meta_path.remove(_IMPORT_HOOK)
+        except ValueError:
+            pass  # Already removed
+        _IMPORT_HOOK = None
+
+
+def reset_patched_integrations() -> None:
+    """Reset the set of patched integrations (useful for testing)."""
+    global _PATCHED_INTEGRATIONS
+    _PATCHED_INTEGRATIONS = set()

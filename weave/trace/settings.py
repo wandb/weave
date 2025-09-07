@@ -88,6 +88,14 @@ class UserSettings(BaseModel):
     may lead to unexpected behavior.  Make sure this is only set once at the start!
     """
 
+    implicitly_patch_integrations: bool = True
+    """Toggles implicit patching of integrations.
+
+    If True, supported libraries (OpenAI, Anthropic, etc.) are automatically patched
+    when imported, regardless of import order. If False, you must explicitly call
+    patch functions like `weave.integrations.patch_openai()` to enable tracing for integrations.
+    Can be overridden with the environment variable `WEAVE_IMPLICITLY_PATCH_INTEGRATIONS`"""
+
     redact_pii: bool = False
     """Toggles PII redaction using Microsoft Presidio.
 
@@ -306,6 +314,11 @@ def should_enable_disk_fallback() -> bool:
 def should_use_parallel_table_upload() -> bool:
     """Returns whether parallel table upload chunking should be used."""
     return _should("use_parallel_table_upload")
+
+
+def should_implicitly_patch_integrations() -> bool:
+    """Returns whether implicit patching of integrations is enabled."""
+    return _should("implicitly_patch_integrations")
 
 
 def parse_and_apply_settings(
