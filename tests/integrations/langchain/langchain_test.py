@@ -496,12 +496,12 @@ def test_agent_run_with_tools(
     from langchain.agents import AgentExecutor
     from langchain.agents.format_scratchpad import format_to_openai_function_messages
     from langchain.agents.output_parsers import OpenAIFunctionsAgentOutputParser
-    from pydantic import BaseModel, Field
     from langchain.tools import StructuredTool
     from langchain_core.messages import AIMessage, HumanMessage
     from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
     from langchain_core.utils.function_calling import convert_to_openai_tool
     from langchain_openai import ChatOpenAI
+    from pydantic import BaseModel, Field
 
     class CalculatorInput(BaseModel):
         a: int = Field(description="first number")
@@ -612,12 +612,12 @@ def test_agent_run_with_function_call(
     from langchain.agents import AgentExecutor
     from langchain.agents.format_scratchpad import format_to_openai_function_messages
     from langchain.agents.output_parsers import OpenAIFunctionsAgentOutputParser
-    from pydantic import BaseModel, Field
     from langchain.tools import StructuredTool
     from langchain_core.messages import AIMessage, HumanMessage
     from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
     from langchain_core.utils.function_calling import convert_to_openai_function
     from langchain_openai import ChatOpenAI
+    from pydantic import BaseModel, Field
 
     class CalculatorInput(BaseModel):
         a: int = Field(description="first number")
