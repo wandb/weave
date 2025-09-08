@@ -1151,7 +1151,8 @@ async def test_get_predict_calls_integration(client):
     
     # Verify each predict_and_score call has the expected structure
     for i, call in enumerate(predict_calls):
-        assert call.op_name.endswith("Evaluation.predict_and_score")
+        # The op_name is a full URI like weave:///entity/project/op/Evaluation.predict_and_score:hash
+        assert "Evaluation.predict_and_score" in call.op_name
         
         # Check the output structure
         assert "output" in call.output or "model_output" in call.output
