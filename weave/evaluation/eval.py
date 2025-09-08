@@ -354,7 +354,8 @@ class Evaluation(Object):
             predict_calls = [
                 call
                 for call in descendents
-                if call.summary.get("weave", {}).get("trace_name") == "Evaluation.predict_and_score"
+                if call.summary.get("weave", {}).get("trace_name")
+                == "Evaluation.predict_and_score"
             ]
             d[evaluate_call.trace_id] = predict_calls
 
