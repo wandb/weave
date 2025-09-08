@@ -1111,60 +1111,6 @@ async def test_evaluation_with_custom_name(client):
     assert call.display_name == "wow-custom!"
 
 
-@pytest.mark.asyncio
-async def test_get_predict_calls_integration(client):
-    """Integration test for get_predict_calls method."""
-
-    @weave.op
-    def simple_model(question: str) -> dict:
-        return {"answer": f"Response to: {question}"}
-
-    @weave.op
-    def scorer_func(expected: str, output: dict) -> dict:
-        return {"correct": expected in output.get("answer", "")}
-
-    dataset = [
-        {"question": "What is 2+2?", "expected": "4"},
-        {"question": "What is the capital of France?", "expected": "Paris"},
-        {"question": "What color is the sky?", "expected": "blue"},
-    ]
-
-    evaluation = weave.Evaluation(dataset=dataset, scorers=[scorer_func])
-
-    # Run the evaluation
-    await evaluation.evaluate(simple_model)
-
-    # Get predict_and_score calls
-    predict_calls_by_trace = evaluation.get_predict_calls()
-
-    # Should have one trace ID (one evaluation run)
-    assert len(predict_calls_by_trace) == 1
-
-    # Get the predict calls for this trace
-    trace_id, predict_calls = next(iter(predict_calls_by_trace.items()))
-
-    # Should have 3 predict_and_score calls (one for each dataset row)
-    assert len(predict_calls) == 3
-
-    # Verify each predict_and_score call has the expected structure
-    for call in predict_calls:
-        # The op_name is a full URI like weave:///entity/project/op/Evaluation.predict_and_score:hash
-        assert "Evaluation.predict_and_score" in call.op_name
-
-        # Check the output structure
-        assert "output" in call.output or "model_output" in call.output
-        assert "scores" in call.output
-        assert "model_latency" in call.output
-
-        # Check that scores include our scorer
-        assert "scorer_func" in call.output["scores"]
-        assert "correct" in call.output["scores"]["scorer_func"]
-
-        # Verify the model output is present
-        output_key = "output" if "output" in call.output else "model_output"
-        assert "answer" in call.output[output_key]
-
-
 def test_get_evaluate_calls(client, make_evals):
     ref, ref2 = make_evals
     ev = ref.get()
@@ -1215,7 +1161,7 @@ def test_get_predict_calls(client, make_evals):
 
     # Check that outputs contain the expected keys
     for call in predict_calls:
-        assert "output" in call.output or "model_output" in call.output
+        assert "output" in call.output
         assert "scores" in call.output
         assert "model_latency" in call.output
 
@@ -1227,7 +1173,7 @@ def test_get_predict_calls(client, make_evals):
 
     # Check that outputs contain the expected keys
     for call in predict_calls2:
-        assert "output" in call.output or "model_output" in call.output
+        assert "output" in call.output
         assert "scores" in call.output
         assert "model_latency" in call.output
 
