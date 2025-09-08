@@ -201,9 +201,25 @@ def tests(session, shard):
     if shard == "trace_no_server":
         pytest_args.extend(["-m", "not trace_server"])
 
-    session.run(
-        *pytest_args,
-        *session.posargs,
-        *test_dirs,
-        env=env,
+    # Check if posargs contains test files (ending with .py or containing :: for specific tests)
+    has_test_files = any(
+        arg.endswith('.py') or '::' in arg 
+        for arg in session.posargs 
+        if not arg.startswith('-')
     )
+    
+    # If specific test files are provided, don't add default test directories
+    if has_test_files:
+        session.run(
+            *pytest_args,
+            *session.posargs,
+            env=env,
+        )
+    else:
+        # Include default test directories when no specific files are provided
+        session.run(
+            *pytest_args,
+            *session.posargs,
+            *test_dirs,
+            env=env,
+        )
