@@ -13,6 +13,7 @@ from typing import Any, Union, cast
 # There is probably a better place for this, but including here for now to get the fix in.
 from weave import type_handlers  # noqa: F401
 from weave.trace import urls, weave_client, weave_init
+from weave.trace.autopatch import AutopatchSettings
 from weave.trace.constants import TRACE_OBJECT_EMOJI
 from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
@@ -20,7 +21,6 @@ from weave.trace.context.call_context import get_current_call, require_current_c
 from weave.trace.display.term import configure_logger
 from weave.trace.op import as_op, op
 from weave.trace.op_protocol import PostprocessInputsFunc, PostprocessOutputFunc
-from weave.trace.autopatch import AutopatchSettings
 from weave.trace.refs import ObjectRef, Ref
 from weave.trace.settings import (
     UserSettings,
@@ -88,15 +88,15 @@ def init(
 
     # Check if deprecated autopatch_settings is used
     if autopatch_settings is not None:
-        warnings.warn(
+        logger.warning(
             "The 'autopatch_settings' parameter is deprecated and will be removed in a future version. "
             "Please use explicit patching instead. For example:\n"
-            "  import weave\n"
-            "  weave.init('my-project')\n"
-            "  weave.integrations.patch_openai()\n"
+            "----------------------------------------\n"
+            "    import weave\n"
+            f"    weave.init('{project_name}')\n"
+            "    weave.integrations.patch_openai()\n"
+            "----------------------------------------\n"
             "See https://docs.wandb.ai/guides/integrations for more information.",
-            DeprecationWarning,
-            stacklevel=2,
         )
 
     parse_and_apply_settings(settings)
