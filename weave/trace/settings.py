@@ -8,24 +8,6 @@
 * Type: `bool`
 
 If True, all weave ops will behave like regular functions and no network requests will be made.
-
-## `print_call_link`
-
-* Environment Variable: `WEAVE_PRINT_CALL_LINK`
-* Settings Key: `print_call_link`
-* Default: `True`
-* Type: `bool`
-
-If True, prints a link to the Weave UI when calling a weave op.
-
-## `use_parallel_table_upload`
-
-* Environment Variable: `WEAVE_USE_PARALLEL_TABLE_UPLOAD`
-* Settings Key: `use_parallel_table_upload`
-* Default: `False`
-* Type: `bool`
-
-If True, enables parallel table upload chunking for large tables. If False, uses incremental upload method.
 """
 
 import os
