@@ -20,7 +20,15 @@ def _dependencies_met() -> bool:
     """Check if the dependencies are met.  This import is deferred to avoid
     an expensive module import at the top level.
     """
-    return importlib.util.find_spec("moviepy") is not None
+    import sys
+    # First check if already imported
+    if "moviepy" in sys.modules:
+        return True
+    # Otherwise check if it can be imported
+    try:
+        return importlib.util.find_spec("moviepy") is not None
+    except (ValueError, ImportError):
+        return False
 
 
 class VideoFormat(str, Enum):
@@ -145,6 +153,7 @@ def save(
         artifact: The artifact to save to
         name: Ignored, see comment below
     """
+    _ensure_registered()
     from moviepy.editor import VideoFileClip
 
     is_video_file = isinstance(obj, VideoFileClip)
@@ -168,6 +177,7 @@ def load(artifact: MemTraceFilesArtifact, name: str) -> VideoClip:
     Returns:
         The loaded VideoClip
     """
+    _ensure_registered()
     from moviepy.editor import VideoFileClip
 
     # Assume there can only be 1 video in the artifact
@@ -181,14 +191,27 @@ def load(artifact: MemTraceFilesArtifact, name: str) -> VideoClip:
 
 def is_video_clip_instance(obj: Any) -> TypeIs[VideoClip]:
     """Check if the object is any subclass of VideoClip."""
+    _ensure_registered()
     from moviepy.editor import VideoClip
 
     return isinstance(obj, VideoClip)
 
 
-def register() -> None:
-    """Register the video type handler with the serializer."""
-    if _dependencies_met():
-        from moviepy.editor import VideoClip
+_registered = False
 
+
+def register() -> None:
+    """Register the video type handler with the serializer.
+    
+    This function does nothing now - registration happens lazily when MoviePy is imported.
+    """
+    pass
+
+
+def _ensure_registered() -> None:
+    """Ensure the video type handler is registered if MoviePy is available."""
+    global _registered
+    if not _registered and _dependencies_met():
+        from moviepy.editor import VideoClip
         serializer.register_serializer(VideoClip, save, load, is_video_clip_instance)
+        _registered = True

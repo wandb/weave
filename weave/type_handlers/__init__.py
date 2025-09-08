@@ -5,6 +5,7 @@ from weave.type_handlers.File import file
 from weave.type_handlers.Image import image
 from weave.type_handlers.Markdown import markdown
 from weave.type_handlers.Video import video
+from weave.type_handlers.Video.lazy_import import install_hook
 
 file.register()
 content.register()
@@ -12,4 +13,6 @@ image.register()
 audio.register()
 datetime.register()
 markdown.register()
-video.register()
+
+# Install the lazy import hook for MoviePy instead of registering immediately
+install_hook()
