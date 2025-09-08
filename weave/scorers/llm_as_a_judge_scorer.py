@@ -19,4 +19,4 @@ class LLMAsAJudgeScorer(Scorer):
         model_input = [
             {"role": "user", "content": scoring_prompt},
         ]
-        return self.model.predict(model_input)
+        return self.model.predict(model_input)  # type: ignore[arg-type]

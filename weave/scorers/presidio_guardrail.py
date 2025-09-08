@@ -145,11 +145,11 @@ class PresidioScorer(weave.Scorer):
         analyzer_results = self._analyzer.analyze(
             text=str(output), entities=entities, language=self.language
         )
-        detected_entities = self.group_analyzer_results_by_entity_type(
+        detected_entities = self.group_analyzer_results_by_entity_type(  # type: ignore[call-arg, arg-type]
             output, analyzer_results
         )
-        reason = self.create_reason(detected_entities)
-        anonymized_text = self.anonymize_text(
+        reason = self.create_reason(detected_entities)  # type: ignore[call-arg, arg-type]
+        anonymized_text = self.anonymize_text(  # type: ignore[call-arg, arg-type]
             output, analyzer_results, detected_entities
         )
         return WeaveScorerResult(

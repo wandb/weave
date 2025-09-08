@@ -95,12 +95,12 @@ def evaluate_router(
 
         @weave.op
         def predict(self, prompt: str) -> dict[str, Any]:
-            return super().predict(prompt)
+            return super().predict(prompt)  # type: ignore[call-arg, arg-type]
 
     class NotDiamondRoutedModel(_DummyEvalModel):
         @weave.op
         def predict(self, prompt: str) -> dict[str, Any]:
-            return super().predict(prompt)
+            return super().predict(prompt)  # type: ignore[call-arg, arg-type]
 
     best_provider_model = BestRoutedModel(
         model_name=best_provider, model_results=model_results

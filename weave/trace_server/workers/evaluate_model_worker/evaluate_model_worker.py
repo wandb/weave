@@ -91,8 +91,8 @@ def _run_evaluation(
     evaluation_call_id: str,
 ) -> None:
     with weave.attributes(EVALUATE_MODEL_WORKER_MARKER):
-        return asyncio.run(
-            loaded_evaluation.evaluate(
+        asyncio.run(
+            loaded_evaluation.evaluate(  # type: ignore[arg-type, call-arg]
                 loaded_model, __weave={"call_id": evaluation_call_id}
             )
         )

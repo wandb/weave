@@ -187,8 +187,8 @@ class SummarizationScorer(LLMScorer):
               - "is_entity_dense": A boolean indicating if the summary meets the entity density threshold.
               - "entity_density": The calculated entity density ratio.
         """
-        extract_task = self._extract_entities(text=str(output))
-        evaluate_task = self._evaluate_summary(input=str(input), summary=str(output))
+        extract_task = self._extract_entities(text=str(output))  # type: ignore[call-arg]
+        evaluate_task = self._evaluate_summary(input=str(input), summary=str(output))  # type: ignore[call-arg]
         summary_entities, llm_eval = await asyncio.gather(extract_task, evaluate_task)
 
         result = {}

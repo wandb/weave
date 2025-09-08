@@ -158,7 +158,7 @@ class Completions:
             "top_p": top_p,
         }
         return (
-            self._create_op(**kwargs)
+            self._create_op(**kwargs)  # type: ignore[arg-type]
             if track_llm_call
             else self._create_non_op(**kwargs)
         )
