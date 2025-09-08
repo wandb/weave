@@ -16,11 +16,15 @@ if TYPE_CHECKING:
     from moviepy.editor import VideoClip, VideoFileClip
 
 
+_registered = False
+
+
 def _dependencies_met() -> bool:
     """Check if the dependencies are met.  This import is deferred to avoid
     an expensive module import at the top level.
     """
     import sys
+
     # First check if already imported
     if "moviepy" in sys.modules:
         return True
@@ -197,21 +201,11 @@ def is_video_clip_instance(obj: Any) -> TypeIs[VideoClip]:
     return isinstance(obj, VideoClip)
 
 
-_registered = False
-
-
-def register() -> None:
-    """Register the video type handler with the serializer.
-    
-    This function does nothing now - registration happens lazily when MoviePy is imported.
-    """
-    pass
-
-
 def _ensure_registered() -> None:
     """Ensure the video type handler is registered if MoviePy is available."""
     global _registered
     if not _registered and _dependencies_met():
         from moviepy.editor import VideoClip
+
         serializer.register_serializer(VideoClip, save, load, is_video_clip_instance)
         _registered = True
