@@ -44,6 +44,7 @@ INVALID_MODEL_ERROR = (
     "`Evaluation.evaluate` requires a `Model` or `Op` instance as the `model` argument. "
     + "If you are using a function, wrap it with `weave.op` to create an `Op` instance."
 )
+SCORER_CALL_ID_KEY = "__weave_scorer_call_ids"
 
 
 def default_evaluation_display_name(call: Call) -> str:
@@ -183,7 +184,7 @@ class Evaluation(Object):
                 self._output_key: None,
                 "scores": {},
                 "model_latency": apply_model_result.model_latency,
-                "_scorer_call_ids": {},
+                SCORER_CALL_ID_KEY: {},
             }
 
         model_output = apply_model_result.model_output
@@ -191,7 +192,7 @@ class Evaluation(Object):
         model_latency = apply_model_result.model_latency
 
         scores = {}
-        _scorer_call_ids = {}  # Internal tracking, prefixed with _ to indicate it's internal
+        scorer_call_ids = {}  # Internal tracking, prefixed with _ to indicate it's internal
         if scorers := self.scorers:
             # Run all scorer calls in parallel
             scorer_tasks = [
@@ -206,13 +207,13 @@ class Evaluation(Object):
                 scorer_attributes = get_scorer_attributes(scorer)
                 scorer_name = scorer_attributes.scorer_name
                 scores[scorer_name] = result
-                _scorer_call_ids[scorer_name] = score_call.id
+                scorer_call_ids[scorer_name] = score_call.id
 
         return {
             self._output_key: model_output,
             "scores": scores,
             "model_latency": model_latency,
-            "_scorer_call_ids": _scorer_call_ids,  # Keep internal for summary aggregation
+            SCORER_CALL_ID_KEY: scorer_call_ids,  # Keep internal for summary aggregation
         }
 
     @op
@@ -232,7 +233,7 @@ class Evaluation(Object):
                         score_table = scorer_stats[scorer_name]
                         scored = summarize_fn(score_table)
                         summary[scorer_name] = scored
-            elif name == "_scorer_call_ids":
+            elif name == SCORER_CALL_ID_KEY:
                 # Collect all scorer call IDs into a dict for the summary
                 scorer_call_ids_summary = {}
                 if scorers := self.scorers:
@@ -246,7 +247,7 @@ class Evaluation(Object):
                             scorer_call_ids_summary[scorer_name] = call_ids
                 # Only add to summary if we have any call IDs
                 if scorer_call_ids_summary:
-                    summary["scorer_call_ids"] = scorer_call_ids_summary
+                    summary[SCORER_CALL_ID_KEY] = scorer_call_ids_summary
             else:
                 model_output_summary = auto_summarize(vals)
                 if model_output_summary:
@@ -266,7 +267,7 @@ class Evaluation(Object):
             except Exception:
                 logger.info("Predict and score failed")
                 traceback.print_exc()
-                return {self._output_key: None, "scores": {}, "_scorer_call_ids": {}}
+                return {self._output_key: None, "scores": {}, SCORER_CALL_ID_KEY: {}}
             return eval_row
 
         n_complete = 0
@@ -284,19 +285,19 @@ class Evaluation(Object):
                 eval_row = {
                     self._output_key: None,
                     "scores": {},
-                    "_scorer_call_ids": {},
+                    SCORER_CALL_ID_KEY: {},
                 }
             else:
                 eval_row["scores"] = eval_row.get("scores", {})
-                eval_row["_scorer_call_ids"] = eval_row.get("_scorer_call_ids", {})
+                eval_row[SCORER_CALL_ID_KEY] = eval_row.get(SCORER_CALL_ID_KEY, {})
             if self.scorers:
                 for scorer in self.scorers:
                     scorer_attributes = get_scorer_attributes(scorer)
                     scorer_name = scorer_attributes.scorer_name
                     if scorer_name not in eval_row["scores"]:
                         eval_row["scores"][scorer_name] = {}
-                    if scorer_name not in eval_row["_scorer_call_ids"]:
-                        eval_row["_scorer_call_ids"][scorer_name] = None
+                    if scorer_name not in eval_row[SCORER_CALL_ID_KEY]:
+                        eval_row[SCORER_CALL_ID_KEY][scorer_name] = None
             eval_rows.append((index, eval_row))
         eval_rows.sort(key=lambda x: x[0])
         table_rows = [eval_row for _, eval_row in eval_rows]
