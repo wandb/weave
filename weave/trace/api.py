@@ -61,7 +61,7 @@ def init(
     Args:
         project_name: The name of the Weights & Biases project to log to.
         settings: Configuration for the Weave client generally.
-        autopatch_settings: Configuration for autopatch integrations, e.g. openai
+        autopatch_settings: (Deprecated) Configuration for autopatch integrations. Use explicit patching instead.
         global_postprocess_inputs: A function that will be applied to all inputs of all ops.
         global_postprocess_output: A function that will be applied to all outputs of all ops.
         global_attributes: A dictionary of attributes that will be applied to all traces.
@@ -86,6 +86,19 @@ def init(
             stacklevel=2,
         )
 
+    # Check if deprecated autopatch_settings is used
+    if autopatch_settings is not None:
+        logger.warning(
+            "The 'autopatch_settings' parameter is deprecated and will be removed in a future version. "
+            "Please use explicit patching instead. For example:\n"
+            "----------------------------------------\n"
+            "    import weave\n"
+            f"    weave.init('{project_name}')\n"
+            "    weave.integrations.patch_openai()\n"
+            "----------------------------------------\n"
+            "See https://docs.wandb.ai/guides/integrations for more information.",
+        )
+
     parse_and_apply_settings(settings)
 
     global _global_postprocess_inputs
@@ -101,7 +114,6 @@ def init(
 
     return weave_init.init_weave(
         project_name,
-        autopatch_settings=autopatch_settings,
     )
 
 

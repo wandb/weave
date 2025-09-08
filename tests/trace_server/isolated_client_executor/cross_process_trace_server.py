@@ -382,6 +382,12 @@ class CrossProcessTraceServerSender(tsi.TraceServerInterface):
         """Create a file."""
         return self._send_request("file_create", req)
 
+    def table_create_from_digests(
+        self, req: tsi.TableCreateFromDigestsReq
+    ) -> tsi.TableCreateFromDigestsRes:
+        """Create a table from digests."""
+        return self._send_request("table_create_from_digests", req)
+
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
         """Read file content."""
         return self._send_request("file_content_read", req)

@@ -16,7 +16,7 @@ import weave
 from tests.trace.util import DummyTestException
 from tests.trace_server.conftest import *
 from tests.trace_server.conftest import TEST_ENTITY, get_trace_server_flag
-from weave.trace import autopatch, weave_client, weave_init
+from weave.trace import weave_client, weave_init
 from weave.trace.context import weave_client_context
 from weave.trace.context.call_context import set_call_stack
 from weave.trace_server import trace_server_interface as tsi
@@ -361,7 +361,6 @@ def make_server_recorder(server: tsi.TraceServerInterface):  # type: ignore
 def create_client(
     request,
     trace_server,
-    autopatch_settings: typing.Optional[autopatch.AutopatchSettings] = None,
     global_attributes: typing.Optional[dict[str, typing.Any]] = None,
 ) -> weave_client.WeaveClient:
     trace_server_flag = get_trace_server_flag(request)
@@ -381,7 +380,6 @@ def create_client(
         TEST_ENTITY, "test-project", make_server_recorder(caching_server)
     )
     weave_client_context.set_weave_client_global(client)
-    autopatch.autopatch(autopatch_settings)
     if global_attributes is not None:
         weave.trace.api._global_attributes = global_attributes
 
@@ -403,7 +401,6 @@ def client(zero_stack, request, trace_server):
         yield client
     finally:
         weave_client_context.set_weave_client_global(None)
-        autopatch.reset_autopatch()
 
 
 @pytest.fixture
@@ -412,20 +409,16 @@ def client_creator(zero_stack, request, trace_server):
 
     @contextlib.contextmanager
     def client(
-        autopatch_settings: typing.Optional[autopatch.AutopatchSettings] = None,
         global_attributes: typing.Optional[dict[str, typing.Any]] = None,
         settings: typing.Optional[weave.trace.settings.UserSettings] = None,
     ):
         if settings is not None:
             weave.trace.settings.parse_and_apply_settings(settings)
-        client = create_client(
-            request, trace_server, autopatch_settings, global_attributes
-        )
+        client = create_client(request, trace_server, global_attributes)
         try:
             yield client
         finally:
             weave_client_context.set_weave_client_global(None)
-            autopatch.reset_autopatch()
             weave.trace.api._global_attributes = {}
             weave.trace.settings.parse_and_apply_settings(
                 weave.trace.settings.UserSettings()
@@ -481,6 +474,18 @@ def network_proxy_client(client):
         )
         return client.server.table_create(req)
 
+    @app.post("/table/create_from_digests")
+    def table_create_from_digests(
+        req: tsi.TableCreateFromDigestsReq,
+    ) -> tsi.TableCreateFromDigestsRes:
+        records.append(
+            (
+                "table_create_from_digests",
+                req,
+            )
+        )
+        return client.server.table_create_from_digests(req)
+
     @app.post("/table/update")
     def table_update(req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
         records.append(
@@ -512,6 +517,26 @@ def network_proxy_client(client):
             )
         )
         return client.server.feedback_create_batch(req)
+
+    @app.post("/obj/create")
+    def obj_create(req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
+        records.append(
+            (
+                "obj_create",
+                req,
+            )
+        )
+        return client.server.obj_create(req)
+
+    @app.post("/obj/read")
+    def obj_read(req: tsi.ObjReadReq) -> tsi.ObjReadRes:
+        records.append(
+            (
+                "obj_read",
+                req,
+            )
+        )
+        return client.server.obj_read(req)
 
     with TestClient(app) as c:
 
