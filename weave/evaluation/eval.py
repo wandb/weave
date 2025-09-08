@@ -183,6 +183,7 @@ class Evaluation(Object):
                 self._output_key: None,
                 "scores": {},
                 "model_latency": apply_model_result.model_latency,
+                "_scorer_call_ids": {},
             }
 
         model_output = apply_model_result.model_output
@@ -190,6 +191,7 @@ class Evaluation(Object):
         model_latency = apply_model_result.model_latency
 
         scores = {}
+        _scorer_call_ids = {}  # Internal tracking, prefixed with _ to indicate it's internal
         if scorers := self.scorers:
             # Run all scorer calls in parallel
             scorer_tasks = [
@@ -197,17 +199,20 @@ class Evaluation(Object):
             ]
             apply_scorer_results = await asyncio.gather(*scorer_tasks)
 
-            # Process results and build scores dict
+            # Process results and build scores dict and track call IDs internally
             for scorer, apply_scorer_result in zip(scorers, apply_scorer_results):
                 result = apply_scorer_result.result
+                score_call = apply_scorer_result.score_call
                 scorer_attributes = get_scorer_attributes(scorer)
                 scorer_name = scorer_attributes.scorer_name
                 scores[scorer_name] = result
+                _scorer_call_ids[scorer_name] = score_call.id
 
         return {
             self._output_key: model_output,
             "scores": scores,
             "model_latency": model_latency,
+            "_scorer_call_ids": _scorer_call_ids,  # Keep internal for summary aggregation
         }
 
     @op
@@ -227,6 +232,21 @@ class Evaluation(Object):
                         score_table = scorer_stats[scorer_name]
                         scored = summarize_fn(score_table)
                         summary[scorer_name] = scored
+            elif name == "_scorer_call_ids":
+                # Collect all scorer call IDs into a dict for the summary
+                scorer_call_ids_summary = {}
+                if scorers := self.scorers:
+                    for scorer in scorers:
+                        scorer_attributes = get_scorer_attributes(scorer)
+                        scorer_name = scorer_attributes.scorer_name
+                        call_ids = [
+                            row.get(scorer_name) for row in vals if row.get(scorer_name)
+                        ]
+                        if call_ids:  # Only add if there are actual call IDs
+                            scorer_call_ids_summary[scorer_name] = call_ids
+                # Only add to summary if we have any call IDs
+                if scorer_call_ids_summary:
+                    summary["scorer_call_ids"] = scorer_call_ids_summary
             else:
                 model_output_summary = auto_summarize(vals)
                 if model_output_summary:
@@ -246,7 +266,7 @@ class Evaluation(Object):
             except Exception:
                 logger.info("Predict and score failed")
                 traceback.print_exc()
-                return {self._output_key: None, "scores": {}}
+                return {self._output_key: None, "scores": {}, "_scorer_call_ids": {}}
             return eval_row
 
         n_complete = 0
@@ -261,15 +281,22 @@ class Evaluation(Object):
             n_complete += 1
             logger.info(f"Evaluated {n_complete} of {num_rows} examples")
             if eval_row is None:
-                eval_row = {self._output_key: None, "scores": {}}
+                eval_row = {
+                    self._output_key: None,
+                    "scores": {},
+                    "_scorer_call_ids": {},
+                }
             else:
                 eval_row["scores"] = eval_row.get("scores", {})
+                eval_row["_scorer_call_ids"] = eval_row.get("_scorer_call_ids", {})
             if self.scorers:
                 for scorer in self.scorers:
                     scorer_attributes = get_scorer_attributes(scorer)
                     scorer_name = scorer_attributes.scorer_name
                     if scorer_name not in eval_row["scores"]:
                         eval_row["scores"][scorer_name] = {}
+                    if scorer_name not in eval_row["_scorer_call_ids"]:
+                        eval_row["_scorer_call_ids"][scorer_name] = None
             eval_rows.append((index, eval_row))
         eval_rows.sort(key=lambda x: x[0])
         table_rows = [eval_row for _, eval_row in eval_rows]
