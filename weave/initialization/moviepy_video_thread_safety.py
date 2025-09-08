@@ -2,6 +2,7 @@
 This file exposes functions to make moviepy VideoFileClip thread-safe and revert those changes:
 - `apply_threadsafe_patch_to_moviepy_video`
 - `undo_threadsafe_patch_to_moviepy_video`
+- `install_moviepy_import_hook`
 
 Similar to Pillow's ImageFile, moviepy's VideoFileClip may not be thread-safe when
 loading and processing video content across multiple threads, which can lead to race conditions
@@ -10,11 +11,13 @@ and unpredictable behavior.
 Inside Weave, we use threads to parallelize work which may involve Videos. This thread-safety
 patch helps prevent issues when video files are accessed across threads.
 
-We call `apply_threadsafe_patch_to_moviepy_video` in the `__init__.py` file to ensure thread-safety
-for VideoFileClip loading operations.
+We call `install_moviepy_import_hook` in the `__init__.py` file to defer patching until moviepy
+is actually imported by the user.
 """
 
+import importlib.util
 import logging
+import sys
 import threading
 from functools import wraps
 from typing import Any, Callable, Optional
@@ -140,3 +143,45 @@ def _undo_threadsafe_patch() -> None:
         VideoFileClip.__init__ = _original_methods["__init__"]  # type: ignore
 
     _original_methods = {"__init__": None}
+
+
+def install_moviepy_import_hook() -> None:
+    """Install an import hook that patches moviepy when it's first imported.
+    
+    This allows us to defer the patching until moviepy is actually needed,
+    rather than trying to patch it eagerly during weave initialization.
+    """
+    global _patched
+    
+    # Don't install the hook if we've already patched
+    if _patched:
+        return
+    
+    # Check if moviepy.editor is already imported
+    if "moviepy.editor" in sys.modules:
+        # If it's already imported, patch it immediately
+        apply_threadsafe_patch_to_moviepy_video()
+        return
+    
+    # Install the import hook using importlib machinery
+    # Handle both module and dict forms of __builtins__
+    if isinstance(__builtins__, dict):
+        original_import = __builtins__["__import__"]
+    else:
+        original_import = __builtins__.__import__
+    
+    def patching_import(name, *args, **kwargs):
+        module = original_import(name, *args, **kwargs)
+        
+        # Check if moviepy.editor was just imported
+        if name == "moviepy.editor" or (name == "moviepy" and "moviepy.editor" in sys.modules):
+            # Apply the patch now that moviepy is available
+            apply_threadsafe_patch_to_moviepy_video()
+        
+        return module
+    
+    # Replace the built-in import function
+    if isinstance(__builtins__, dict):
+        __builtins__["__import__"] = patching_import
+    else:
+        __builtins__.__import__ = patching_import
