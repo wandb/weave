@@ -20,6 +20,7 @@ from weave.trace.context.call_context import get_current_call, require_current_c
 from weave.trace.display.term import configure_logger
 from weave.trace.op import as_op, op
 from weave.trace.op_protocol import PostprocessInputsFunc, PostprocessOutputFunc
+from weave.trace.autopatch import AutopatchSettings
 from weave.trace.refs import ObjectRef, Ref
 from weave.trace.settings import (
     UserSettings,
@@ -44,6 +45,7 @@ def init(
     project_name: str,
     *,
     settings: UserSettings | dict[str, Any] | None = None,
+    autopatch_settings: AutopatchSettings | None = None,
     global_postprocess_inputs: PostprocessInputsFunc | None = None,
     global_postprocess_output: PostprocessOutputFunc | None = None,
     global_attributes: dict[str, Any] | None = None,
@@ -59,6 +61,7 @@ def init(
     Args:
         project_name: The name of the Weights & Biases project to log to.
         settings: Configuration for the Weave client generally.
+        autopatch_settings: (Deprecated) Configuration for autopatch integrations. Use explicit patching instead.
         global_postprocess_inputs: A function that will be applied to all inputs of all ops.
         global_postprocess_output: A function that will be applied to all outputs of all ops.
         global_attributes: A dictionary of attributes that will be applied to all traces.
@@ -79,6 +82,19 @@ def init(
     if sys.version_info < (3, 10):
         warnings.warn(
             "Python 3.9 will reach end of life in October 2025, after which weave will drop support for it.  Please upgrade to Python 3.10 or later!",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
+    # Check if deprecated autopatch_settings is used
+    if autopatch_settings is not None:
+        warnings.warn(
+            "The 'autopatch_settings' parameter is deprecated and will be removed in a future version. "
+            "Please use explicit patching instead. For example:\n"
+            "  import weave\n"
+            "  weave.init('my-project')\n"
+            "  weave.integrations.patch_openai()\n"
+            "See https://docs.wandb.ai/guides/integrations for more information.",
             DeprecationWarning,
             stacklevel=2,
         )
