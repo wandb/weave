@@ -385,7 +385,7 @@ def _worker_loop(
 
 
 @contextmanager
-def _client_context(client: WeaveClient) -> Generator[None, None, None]:
+def _client_context(client: WeaveClient) -> Generator[None]:
     """
     Context manager for WeaveClient lifecycle management.
 

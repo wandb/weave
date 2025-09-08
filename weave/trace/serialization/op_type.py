@@ -418,7 +418,7 @@ def _get_code_deps(
                         f"from {var_value.__module__} import {var_value.__name__}"
                     )
                     if var_value.__name__ != var_name:
-                        import_line += f"as {var_name}"
+                        import_line += f" as {var_name}"
 
                     import_code.append(import_line)
 

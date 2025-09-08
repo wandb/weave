@@ -124,7 +124,7 @@ smolagents = [
 ]
 instructor = [
   "instructor>=1.4.3,<1.7.0; python_version <= '3.9'",
-  "instructor>=1.4.3; python_version > '3.9'",
+  "instructor>=1.4.3,<1.11.0; python_version > '3.9'",
   "google-genai>=1.5.0",
   "openai>=1.99.9,<1.100.0",
 ]
@@ -398,7 +398,7 @@ module = "weave_query.*"
 ignore_errors = true
 
 [tool.bumpversion]
-current_version = "0.52.5-dev0"
+current_version = "0.52.7-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.

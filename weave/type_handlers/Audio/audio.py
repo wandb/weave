@@ -6,17 +6,12 @@ import json
 import os
 import wave
 from pathlib import Path
-from typing import (
-    Any,
-    Generic,
-    Literal,
-    TypeVar,
-    cast,
-    get_args,
-)
+from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar, cast, get_args
 
 from weave.trace.serialization import serializer
-from weave.trace.serialization.custom_objs import MemTraceFilesArtifact
+
+if TYPE_CHECKING:
+    from weave.trace.serialization.custom_objs import MemTraceFilesArtifact
 
 METADATA_FILE_NAME = "_metadata.json"
 AUDIO_FILE_PREFIX = "audio."

@@ -79,8 +79,10 @@ from weave.trace.settings import (
     should_capture_system_info,
     should_print_call_link,
     should_redact_pii,
+    should_use_parallel_table_upload,
 )
 from weave.trace.table import Table
+from weave.trace.table_upload_chunking import ChunkingConfig, TableChunkManager
 from weave.trace.util import deprecated
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
 from weave.trace.weave_client_send_file_cache import WeaveClientSendFileCache
@@ -121,12 +123,18 @@ from weave.trace_server.trace_server_interface import (
     StartedCallSchemaForInsert,
     TableAppendSpec,
     TableAppendSpecPayload,
+    TableCreateFromDigestsReq,
     TableCreateReq,
     TableCreateRes,
     TableSchemaForInsert,
     TableUpdateReq,
     TraceServerInterface,
     TraceStatus,
+)
+from weave.trace_server_bindings.http_utils import (
+    REMOTE_REQUEST_BYTES_LIMIT,
+    ROW_COUNT_CHUNKING_THRESHOLD,
+    check_endpoint_exists,
 )
 from weave.utils.attributes_dict import AttributesDict
 from weave.utils.dict_utils import sum_dict_leaves, zip_dicts
@@ -1568,25 +1576,37 @@ class WeaveClient:
 
         return self._save_object_basic(op, name)
 
+    def _send_table_create(self, rows: list[Any]) -> TableCreateRes:
+        json_rows = to_json(rows, self._project_id(), self)
+        req = TableCreateReq(
+            table=TableSchemaForInsert(project_id=self._project_id(), rows=json_rows)
+        )
+        return self.server.table_create(req)
+
     @trace_sentry.global_trace_sentry.watch()
     def _save_table(self, table: Table | WeaveTable) -> TableRef:
         """Saves a Table to the weave server and returns the TableRef.
         This is the sister function to _save_object_basic but for Tables.
+
+        Uses chunking and parallel uploads for large tables, with fallback to
+        incremental table_update pattern if table_create_from_digests is not available.
         """
         # Skip saving the table if it is already persisted.
         if isinstance(table, WeaveTable) and table.table_ref is not None:
             return table.table_ref
 
-        def send_table_create() -> TableCreateRes:
-            rows = to_json(table.rows, self._project_id(), self)
-            req = TableCreateReq(
-                table=TableSchemaForInsert(project_id=self._project_id(), rows=rows)
+        chunking_config = self._should_use_chunking(table)
+        if not chunking_config.use_chunking:
+            # Simple case: defer the entire serialization and upload
+            res_future: Future[TableCreateRes] = self.future_executor.defer(
+                lambda: self._send_table_create(list(table.rows))
             )
-            return self.server.table_create(req)
-
-        res_future: Future[TableCreateRes] = self.future_executor.defer(
-            send_table_create
-        )
+        elif chunking_config.use_parallel_chunks:
+            # Need to chunk up, use parallelism
+            res_future = self._create_table_with_parallel_chunks(table)
+        else:
+            # Legacy method for large tables and old servers
+            res_future = self._create_table_with_incremental_updates(table)
 
         digest_future: Future[str] = self.future_executor.then(
             [res_future], lambda res: res[0].digest
@@ -1605,6 +1625,134 @@ class WeaveClient:
             table.table_ref = table_ref
 
         return table_ref
+
+    def _should_use_chunking(self, table: Table | WeaveTable) -> ChunkingConfig:
+        """Determine if we should use chunking and parallel chunks for a table."""
+        remote_request_bytes_limit = getattr(
+            self.server, "remote_request_bytes_limit", REMOTE_REQUEST_BYTES_LIMIT
+        )
+
+        # Primary heuristic: row count
+        use_chunking = len(table.rows) > ROW_COUNT_CHUNKING_THRESHOLD
+        # Secondary heuristic: basic size estimation for smaller tables
+        if not use_chunking and len(table.rows) > 0:
+            # Simple size estimation without full serialization
+            sample_row_size = len(str(table.rows[0]).encode("utf-8"))
+            estimated_bytes = sample_row_size * len(table.rows) * 2
+            use_chunking = estimated_bytes > remote_request_bytes_limit
+
+        # Determine parallel vs incremental chunking
+        use_parallel_chunks = False
+        if use_chunking and should_use_parallel_table_upload():
+            test_req = TableCreateFromDigestsReq(
+                project_id=self._project_id(), row_digests=[]
+            )
+
+            def test_func(req: TableCreateFromDigestsReq) -> Any:
+                server = self.server
+                if hasattr(server, "_next_trace_server"):
+                    server = server._next_trace_server
+
+                assert hasattr(server, "_generic_request_executor")
+                assert hasattr(server._generic_request_executor, "__wrapped__")
+                return server._generic_request_executor.__wrapped__(
+                    server, "/table/create_from_digests", req
+                )
+
+            use_parallel_chunks = check_endpoint_exists(
+                test_func, test_req, "table_create_from_digests"
+            )
+
+        return ChunkingConfig(
+            use_chunking=use_chunking, use_parallel_chunks=use_parallel_chunks
+        )
+
+    def _create_table_with_parallel_chunks(
+        self, table: Table | WeaveTable
+    ) -> Future[TableCreateRes]:
+        """Execute the actual parallel chunk upload."""
+        # Create chunks from raw table data (not serialized yet)
+        chunk_manager = TableChunkManager()
+        raw_chunks: list[list[Any]] = chunk_manager.create_chunks(table.rows)
+
+        # Create chunks in parallel using future_executor - defer serialization
+        chunk_futures = []
+        for raw_chunk in raw_chunks:
+            chunk_future = self.future_executor.defer(
+                lambda chunk=raw_chunk: self._send_table_create(chunk)
+            )
+            chunk_futures.append(chunk_future)
+
+        # Chain the operations using future_executor.then
+        def combine_chunks_and_create_table(
+            chunk_results: list[TableCreateRes],
+        ) -> TableCreateRes:
+            all_row_digests = []
+            for chunk_result in chunk_results:
+                all_row_digests.extend(chunk_result.row_digests)
+
+            # Create final table from digests
+            create_req = TableCreateFromDigestsReq(
+                project_id=self._project_id(), row_digests=all_row_digests
+            )
+            create_res = self.server.table_create_from_digests(create_req)
+
+            return TableCreateRes(
+                digest=create_res.digest,
+                row_digests=all_row_digests,
+            )
+
+        # Return a future that will complete when all chunks are done and combined
+        return self.future_executor.then(chunk_futures, combine_chunks_and_create_table)
+
+    def _create_table_with_incremental_updates(
+        self, table: Table | WeaveTable
+    ) -> Future[TableCreateRes]:
+        """Create table using incremental table_update pattern (fallback)."""
+        # Create chunks from raw table data (not serialized yet)
+        chunk_manager = TableChunkManager()
+        raw_chunks: list[list[Any]] = chunk_manager.create_chunks(table.rows)
+        if not raw_chunks:
+            return self.future_executor.defer(lambda: self._send_table_create([]))
+
+        # Create first chunk as the base table - defer serialization
+        first_raw_chunk = raw_chunks[0]
+
+        def create_first_chunk() -> TableCreateRes:
+            serialized_rows = to_json(first_raw_chunk, self._project_id(), self)
+            return self._send_table_create(serialized_rows)
+
+        base_future = self.future_executor.defer(create_first_chunk)
+
+        # Chain the incremental updates sequentially
+        def process_remaining_chunks(
+            base_results: list[TableCreateRes],
+        ) -> TableCreateRes:
+            base_result = base_results[0]
+            current_digest = base_result.digest
+            all_row_digests = list(base_result.row_digests)
+
+            # Process remaining chunks sequentially (each depends on previous)
+            for raw_chunk in raw_chunks[1:]:
+                # Serialize each chunk separately to avoid recursion
+                serialized_chunk = to_json(raw_chunk, self._project_id(), self)
+                payloads = [TableAppendSpecPayload(row=row) for row in serialized_chunk]
+                update_req = TableUpdateReq(
+                    project_id=self._project_id(),
+                    base_digest=current_digest,
+                    updates=[TableAppendSpec(append=payload) for payload in payloads],
+                )
+                update_result = self.server.table_update(update_req)
+                current_digest = update_result.digest
+                all_row_digests.extend(update_result.updated_row_digests)
+
+            return TableCreateRes(
+                digest=current_digest,
+                row_digests=all_row_digests,
+            )
+
+        # Chain the sequential processing after the base table is created
+        return self.future_executor.then([base_future], process_remaining_chunks)
 
     def _append_to_table(self, table_digest: str, rows: list[dict]) -> WeaveTable:
         payloads = [TableAppendSpecPayload(row=row) for row in rows]

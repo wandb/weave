@@ -1,15 +1,26 @@
 import asyncio
 import os
+from collections.abc import Generator
 from typing import Union
 
 import pytest
 
 import weave
+from weave.integrations.groq.groq_sdk import get_groq_patcher
 from weave.integrations.integration_utilities import (
     flatten_calls,
     flattened_calls_to_names,
 )
 from weave.trace_server.trace_server_interface import CallsFilter
+
+
+@pytest.fixture(autouse=True)
+def patch_groq() -> Generator[None, None, None]:
+    """Patch Groq for all tests in this file."""
+    patcher = get_groq_patcher()
+    patcher.attempt_patch()
+    yield
+    patcher.undo_patch()
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
