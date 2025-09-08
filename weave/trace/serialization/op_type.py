@@ -590,9 +590,9 @@ def save_instance(obj: Op, artifact: MemTraceFilesArtifact, name: str) -> None:
         import_block = "\n".join(import_code)
         # Only add "import weave" if it's not already present
         if has_weave_import:
-            import_lines = import_block.split("\n")
+            import_lines = import_block.splitlines()
         else:
-            import_lines = ["import weave"] + import_block.split("\n")
+            import_lines = ["import weave"] + import_block.splitlines()
         import_lines = dedupe_list(import_lines)
         import_lines = [l for l in import_lines if "weave.api" not in l]
         import_block = "\n".join(import_lines)
