@@ -203,11 +203,11 @@ def tests(session, shard):
 
     # Check if posargs contains test files (ending with .py or containing :: for specific tests)
     has_test_files = any(
-        arg.endswith('.py') or '::' in arg 
-        for arg in session.posargs 
-        if not arg.startswith('-')
+        arg.endswith(".py") or "::" in arg
+        for arg in session.posargs
+        if not arg.startswith("-")
     )
-    
+
     # If specific test files are provided, don't add default test directories
     if has_test_files:
         session.run(
