@@ -576,13 +576,6 @@ def save_instance(obj: Op, artifact: MemTraceFilesArtifact, name: str) -> None:
             f"@{decorator_prefix}.op()",
             op_function_code,
         )
-    elif weave_alias and WEAVE_OP_PATTERN.search(op_function_code):
-        # Has @weave.op but import uses alias - normalize to @weave.op()
-        # Example: import weave as wv, but code has @weave.op instead of @wv.op
-        # Still normalizes: @weave.op -> @weave.op()
-        op_function_code = WEAVE_OP_NO_PAREN_PATTERN.sub(
-            "@weave.op()", op_function_code
-        )
     else:
         # No decorator found, add one
         # This happens when:
