@@ -4,7 +4,8 @@ from collections.abc import Mapping
 from typing import Any, Callable
 
 from weave.trace.context.weave_client_context import require_weave_client
-from weave.trace.op import Op, is_op, op
+from weave.trace.op import is_op, op
+from weave.trace.op_protocol import Op
 from weave.trace.refs import ObjectRef, OpRef
 from weave.trace.serialization import (
     op_type,  # noqa: F401, Must import this to register op save/load

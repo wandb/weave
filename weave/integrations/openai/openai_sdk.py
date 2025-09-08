@@ -11,11 +11,10 @@ import weave
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.op import (
-    Op,
-    ProcessedInputs,
     _add_accumulator,
     _default_on_input_handler,
 )
+from weave.trace.op_protocol import Op, ProcessedInputs
 from weave.utils.stream_metrics import (
     WEAVE_STREAM_START_TIME,
     add_time_to_first_token_to_dict,
@@ -753,10 +752,10 @@ def get_openai_patcher(
         update={"name": base.name or "openai.chat.completions.create"}
     )
     completions_parse_settings = base.model_copy(
-        update={"name": base.name or "openai.beta.chat.completions.parse"}
+        update={"name": base.name or "openai.chat.completions.parse"}
     )
     async_completions_parse_settings = base.model_copy(
-        update={"name": base.name or "openai.beta.chat.completions.parse"}
+        update={"name": base.name or "openai.chat.completions.parse"}
     )
     moderation_create_settings = base.model_copy(
         update={"name": base.name or "openai.moderations.create"}
@@ -795,6 +794,17 @@ def get_openai_patcher(
                 "AsyncCompletions.create",
                 create_wrapper_async(settings=async_completions_create_settings),
             ),
+            SymbolPatcher(
+                lambda: importlib.import_module("openai.resources.chat.completions"),
+                "Completions.parse",
+                create_wrapper_sync(settings=completions_parse_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("openai.resources.chat.completions"),
+                "AsyncCompletions.parse",
+                create_wrapper_async(settings=async_completions_parse_settings),
+            ),
+            # Beta methods were removed in 1.92.0
             SymbolPatcher(
                 lambda: importlib.import_module(
                     "openai.resources.beta.chat.completions"

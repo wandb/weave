@@ -11,9 +11,26 @@ from weave.integrations.integration_utilities import (
     flatten_calls,
     op_name_from_ref,
 )
+from weave.integrations.langchain.langchain import langchain_patcher
+from weave.integrations.openai.openai_sdk import get_openai_patcher
+from weave.trace.call import Call
 from weave.trace.context import call_context
-from weave.trace.weave_client import Call, WeaveClient
+from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
+
+
+@pytest.fixture(autouse=True)
+def patch_langchain() -> Generator[None, None, None]:
+    """Patch LangChain and OpenAI for all tests in this file."""
+    openai_patcher = get_openai_patcher()
+
+    langchain_patcher.attempt_patch()
+    openai_patcher.attempt_patch()
+
+    yield
+
+    langchain_patcher.undo_patch()
+    openai_patcher.undo_patch()
 
 
 @pytest.fixture(scope="session", autouse=True)

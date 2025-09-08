@@ -13,13 +13,13 @@ from typing import Any, Union, cast
 # There is probably a better place for this, but including here for now to get the fix in.
 from weave import type_handlers  # noqa: F401
 from weave.trace import urls, weave_client, weave_init
-from weave.trace.autopatch import AutopatchSettings
 from weave.trace.constants import TRACE_OBJECT_EMOJI
 from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.context.call_context import get_current_call, require_current_call
 from weave.trace.display.term import configure_logger
-from weave.trace.op import PostprocessInputsFunc, PostprocessOutputFunc, as_op, op
+from weave.trace.op import as_op, op
+from weave.trace.op_protocol import PostprocessInputsFunc, PostprocessOutputFunc
 from weave.trace.refs import ObjectRef, Ref
 from weave.trace.settings import (
     UserSettings,
@@ -44,7 +44,6 @@ def init(
     project_name: str,
     *,
     settings: UserSettings | dict[str, Any] | None = None,
-    autopatch_settings: AutopatchSettings | None = None,
     global_postprocess_inputs: PostprocessInputsFunc | None = None,
     global_postprocess_output: PostprocessOutputFunc | None = None,
     global_attributes: dict[str, Any] | None = None,
@@ -60,7 +59,6 @@ def init(
     Args:
         project_name: The name of the Weights & Biases project to log to.
         settings: Configuration for the Weave client generally.
-        autopatch_settings: Configuration for autopatch integrations, e.g. openai
         global_postprocess_inputs: A function that will be applied to all inputs of all ops.
         global_postprocess_output: A function that will be applied to all outputs of all ops.
         global_attributes: A dictionary of attributes that will be applied to all traces.
@@ -73,6 +71,9 @@ def init(
     Returns:
         A Weave client.
     """
+    if not project_name or not project_name.strip():
+        raise ValueError("project_name must be non-empty")
+
     configure_logger()
 
     if sys.version_info < (3, 10):
@@ -97,7 +98,6 @@ def init(
 
     return weave_init.init_weave(
         project_name,
-        autopatch_settings=autopatch_settings,
     )
 
 
@@ -106,19 +106,17 @@ def get_client() -> weave_client.WeaveClient | None:
 
 
 def publish(obj: Any, name: str | None = None) -> ObjectRef:
-    """Save and version a python object.
+    """Save and version a Python object.
 
-    If an object with name already exists, and the content hash of obj does
-    not match the latest version of that object, a new version will be created.
-
-    TODO: Need to document how name works with this change.
+    Weave creates a new version of the object if the object's name already exists and its content hash does
+    not match the latest version of that object.
 
     Args:
         obj: The object to save and version.
         name: The name to save the object under.
 
     Returns:
-        A weave Ref to the saved object.
+        A Weave Ref to the saved object.
     """
     client = weave_client_context.require_weave_client()
 
@@ -160,16 +158,14 @@ def publish(obj: Any, name: str | None = None) -> ObjectRef:
 
 
 def ref(location: str) -> ObjectRef:
-    """Construct a Ref to a Weave object.
-
-    TODO: what happens if obj does not exist
+    """Creates a Ref to an existing Weave object. This does not directly retrieve
+    the object but allows you to pass it to other Weave API functions.
 
     Args:
-        location: A fully-qualified weave ref URI, or if weave.init() has been called, "name:version" or just "name" ("latest" will be used for version in this case).
-
+        location: A Weave Ref URI, or if `weave.init()` has been called, `name:version` or `name`. If no version is provided, `latest` is used.
 
     Returns:
-        A weave Ref to the object.
+        A Weave Ref to the object.
     """
     if "://" not in location:
         client = weave_client_context.get_weave_client()
