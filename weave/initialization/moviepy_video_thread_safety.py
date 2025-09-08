@@ -15,8 +15,12 @@ for VideoFileClip loading operations.
 """
 
 import logging
+import sys
 import threading
+from collections.abc import Sequence
 from functools import wraps
+from importlib.abc import MetaPathFinder
+from importlib.machinery import ModuleSpec
 from typing import Any, Callable, Optional
 
 logger = logging.getLogger(__name__)
@@ -37,22 +41,30 @@ def apply_threadsafe_patch_to_moviepy_video() -> None:
 
     This function is idempotent - calling it multiple times has no additional effect.
     If moviepy is not installed or if patching fails, the function will handle the error gracefully.
+
+    Note: This function now defers patching until MoviePy is actually imported to avoid
+    forcing the import of MoviePy at module initialization time.
     """
     global _patched
 
     if _patched:
         return
 
-    try:
-        _apply_threadsafe_patch()
-    except ImportError:
-        pass
-    except Exception as e:
-        logger.info(
-            f"Failed to patch moviepy.editor.VideoFileClip: Unexpected error - {e}"
-        )
+    # Check if MoviePy is already imported
+    import sys
+
+    if "moviepy" in sys.modules:
+        try:
+            _apply_threadsafe_patch()
+        except Exception as e:
+            logger.info(
+                f"Failed to patch moviepy.editor.VideoFileClip: Unexpected error - {e}"
+            )
+        else:
+            _patched = True
     else:
-        _patched = True
+        # Install a hook to patch when MoviePy is imported
+        _install_patch_hook()
 
 
 def _apply_threadsafe_patch() -> None:
@@ -140,3 +152,47 @@ def _undo_threadsafe_patch() -> None:
         VideoFileClip.__init__ = _original_methods["__init__"]  # type: ignore
 
     _original_methods = {"__init__": None}
+
+
+class MoviePyPatchHook(MetaPathFinder):
+    """Import hook that applies thread-safety patch when MoviePy is imported."""
+
+    _installed = False
+
+    def find_spec(
+        self,
+        fullname: str,
+        path: Optional[Sequence[str]],
+        target: Optional[object] = None,
+    ) -> Optional[ModuleSpec]:
+        """Check if MoviePy is being imported and apply patch."""
+        if not (fullname == "moviepy" or fullname.startswith("moviepy.")):
+            return None
+
+        # Remove ourselves from meta_path to avoid recursion
+        if self in sys.meta_path:
+            sys.meta_path.remove(self)
+
+        # Apply the thread-safety patch
+        global _patched
+        if _patched:
+            return None
+        try:
+            # Import will succeed now since we're in the import process
+            _apply_threadsafe_patch()
+        except Exception as e:
+            logger.info(
+                f"Failed to patch moviepy.editor.VideoFileClip during import: {e}"
+            )
+        else:
+            _patched = True
+        # Always return None to let the normal import mechanism handle it
+        return None
+
+
+def _install_patch_hook() -> None:
+    """Install the MoviePy patch import hook."""
+    if not MoviePyPatchHook._installed:
+        hook = MoviePyPatchHook()
+        sys.meta_path.insert(0, hook)
+        MoviePyPatchHook._installed = True
