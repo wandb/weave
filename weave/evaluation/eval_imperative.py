@@ -440,7 +440,7 @@ class EvaluationLogger(BaseModel):
             self.model.__dict__["predict"] = MethodType(predict, self.model)
 
         # Always create a context-aware predict method for use during log_prediction
-        @op(name="Model.predict", enable_code_capture=False)
+        @op(name="Model.predict", enable_code_capture=False)  # type: ignore[no-redef]
         def predict(self: Model, inputs: dict) -> Any:
             # Get the output from the context variable
             return current_output.get()
