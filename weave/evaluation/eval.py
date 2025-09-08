@@ -323,6 +323,43 @@ class Evaluation(Object):
             ),
         )
 
+    def get_predict_calls(self) -> dict[str, list[Call]]:
+        """
+        Retrieve predict_and_score calls for each evaluation run, grouped by trace ID.
+
+        Returns:
+            dict[str, list[Call]]: A dictionary mapping trace IDs to lists of predict_and_score Call objects.
+                Each trace ID represents one evaluation run, and the list contains all predict_and_score
+                calls executed during that run.
+
+        Examples:
+            ```python
+            evaluation = Evaluation(dataset=examples, scorers=[accuracy_scorer])
+            await evaluation.evaluate(model)
+            predict_calls = evaluation.get_predict_calls()
+            for trace_id, calls in predict_calls.items():
+                print(f"Trace {trace_id}: {len(calls)} predict_and_score calls")
+                for call in calls:
+                    print(f"  Output: {call.output.get('output')}")
+                    print(f"  Scores: {call.output.get('scores')}")
+                    print(f"  Latency: {call.output.get('model_latency')}")
+            ```
+        """
+        d = {}
+        client = require_weave_client()
+        for evaluate_call in self.get_evaluate_calls():
+            descendents = list(
+                client.get_calls(filter={"trace_ids": [evaluate_call.trace_id]})
+            )
+            predict_calls = [
+                call
+                for call in descendents
+                if call.summary.get("weave", {}).get("trace_name") == "Evaluation.predict_and_score"
+            ]
+            d[evaluate_call.trace_id] = predict_calls
+
+        return d
+
     def get_score_calls(self) -> dict[str, list[Call]]:
         """
         Retrieve scorer calls for each evaluation run, grouped by trace ID.
