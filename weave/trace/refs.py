@@ -8,8 +8,10 @@ from typing import Any, Union, cast
 
 from typing_extensions import Self
 
-from weave.trace_server import refs_internal
-from weave.trace_server.errors import ObjectDeletedError
+from weave.trace_server import refs_internal  # noqa: TID251
+from weave.trace_server.errors import (  # noqa: TID251 (this might be a real problem)
+    ObjectDeletedError,
+)
 
 DICT_KEY_EDGE_NAME = refs_internal.DICT_KEY_EDGE_NAME
 LIST_INDEX_EDGE_NAME = refs_internal.LIST_INDEX_EDGE_NAME

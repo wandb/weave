@@ -28,8 +28,10 @@ from weave.trace.settings import (
     should_disable_weave,
 )
 from weave.trace.table import Table
-from weave.trace_server.ids import generate_id
-from weave.trace_server.interface.builtin_object_classes import leaderboard
+from weave.trace_server.ids import generate_id  # noqa: TID251
+from weave.trace_server.interface.builtin_object_classes import (  # noqa: TID251
+    leaderboard,
+)
 
 logger = logging.getLogger(__name__)
 

@@ -6,7 +6,7 @@ from inspect import getmro, isclass
 from typing import Any, Callable
 
 from weave.trace.op import is_op
-from weave.trace_server.client_server_common.pydantic_util import (
+from weave.trace_server.client_server_common.pydantic_util import (  # noqa: TID251
     PydanticBaseModelGeneral,
     pydantic_asdict_one_level,
 )

@@ -2,7 +2,11 @@ from typing import Annotated, Any
 
 import pydantic
 
-from weave.trace_server.trace_server_interface import CallsFilter, Query, SortBy
+from weave.trace_server.trace_server_interface import (  # noqa: TID251
+    CallsFilter,
+    Query,
+    SortBy,
+)
 
 
 def cast_to_calls_filter(obj: Any) -> CallsFilter:
