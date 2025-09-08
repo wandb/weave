@@ -425,10 +425,11 @@ class EvaluationLogger(BaseModel):
         # objects that "look right" to our object saving system.
 
         # --- Setup the model object ---
-        # Only modify the predict method if the model doesn't already have one
+        # Store the original predict method if it exists
+        self._original_predict_method = None
         try:
             assert isinstance(self.model, Model)
-            self.model.get_infer_method()
+            self._original_predict_method = self.model.get_infer_method()
         except MissingInferenceMethodError:
 
             @op(name="Model.predict", enable_code_capture=False)
@@ -437,6 +438,14 @@ class EvaluationLogger(BaseModel):
                 return current_output.get()
 
             self.model.__dict__["predict"] = MethodType(predict, self.model)
+
+        # Always create a context-aware predict method for use during log_prediction
+        @op(name="Model.predict", enable_code_capture=False)  # type: ignore[no-redef]
+        def predict(self: Model, inputs: dict) -> Any:
+            # Get the output from the context variable
+            return current_output.get()
+
+        self._context_predict_method = MethodType(predict, self.model)
 
         # --- Setup the evaluation object ---
         @op(name="Evaluation.evaluate", enable_code_capture=False)
@@ -534,31 +543,43 @@ class EvaluationLogger(BaseModel):
         # Use set_call_stack to temporarily set the evaluation as the parent
         assert self._evaluate_call is not None
 
-        with call_context.set_call_stack([self._evaluate_call]):
-            # Make the prediction call
-            with _set_current_output(output):
-                with attributes(IMPERATIVE_EVAL_MARKER):
-                    _, predict_and_score_call = (
-                        self._pseudo_evaluation.predict_and_score.call(
-                            self._pseudo_evaluation,
-                            self.model,
-                            inputs,
-                            __require_explicit_finish=True,
+        # Temporarily swap the predict method to use our context-aware version
+        # This ensures we use the passed output instead of calling the model
+        original_method = self.model.__dict__.get("predict")
+        self.model.__dict__["predict"] = self._context_predict_method
+
+        try:
+            with call_context.set_call_stack([self._evaluate_call]):
+                # Make the prediction call
+                with _set_current_output(output):
+                    with attributes(IMPERATIVE_EVAL_MARKER):
+                        _, predict_and_score_call = (
+                            self._pseudo_evaluation.predict_and_score.call(
+                                self._pseudo_evaluation,
+                                self.model,
+                                inputs,
+                                __require_explicit_finish=True,
+                            )
                         )
-                    )
+        finally:
+            # Restore the original predict method
+            if original_method is not None:
+                self.model.__dict__["predict"] = original_method
+            else:
+                self.model.__dict__.pop("predict", None)
 
-            # Get the predict_call from the context variable
-            predict_call = current_predict_call.get()
-            if predict_call is None:
-                raise ValueError("predict_call should not be None")
+        # Get the predict_call from the context variable
+        predict_call = current_predict_call.get()
+        if predict_call is None:
+            raise ValueError("predict_call should not be None")
 
-            pred = ScoreLogger(
-                predict_and_score_call=predict_and_score_call,
-                evaluate_call=self._evaluate_call,
-                predict_call=predict_call,
-            )
-            self._accumulated_predictions.append(pred)
-            return pred
+        pred = ScoreLogger(
+            predict_and_score_call=predict_and_score_call,
+            evaluate_call=self._evaluate_call,
+            predict_call=predict_call,
+        )
+        self._accumulated_predictions.append(pred)
+        return pred
 
     def log_summary(
         self,
