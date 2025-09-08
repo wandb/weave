@@ -12,8 +12,7 @@ from typing import Any, Union, cast
 # TODO: type_handlers is imported here to trigger registration of the image serializer.
 # There is probably a better place for this, but including here for now to get the fix in.
 from weave import type_handlers  # noqa: F401
-from weave.trace import settings, urls, weave_client, weave_init
-from weave.trace.autopatch import AutopatchSettings
+from weave.trace import urls, weave_client, weave_init
 from weave.trace.constants import TRACE_OBJECT_EMOJI
 from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
@@ -45,7 +44,6 @@ def init(
     project_name: str,
     *,
     settings: UserSettings | dict[str, Any] | None = None,
-    autopatch_settings: AutopatchSettings | None = None,
     global_postprocess_inputs: PostprocessInputsFunc | None = None,
     global_postprocess_output: PostprocessOutputFunc | None = None,
     global_attributes: dict[str, Any] | None = None,
@@ -61,7 +59,6 @@ def init(
     Args:
         project_name: The name of the Weights & Biases project to log to.
         settings: Configuration for the Weave client generally.
-        autopatch_settings: Configuration for autopatch integrations, e.g. openai
         global_postprocess_inputs: A function that will be applied to all inputs of all ops.
         global_postprocess_output: A function that will be applied to all outputs of all ops.
         global_attributes: A dictionary of attributes that will be applied to all traces.
@@ -101,7 +98,6 @@ def init(
 
     return weave_init.init_weave(
         project_name,
-        autopatch_settings=autopatch_settings,
     )
 
 

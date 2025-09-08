@@ -6,7 +6,6 @@ import os
 from weave.compat import wandb
 from weave.telemetry import trace_sentry
 from weave.trace import (
-    autopatch,
     env,
     init_message,
     weave_client,
@@ -78,7 +77,6 @@ Args:
 def init_weave(
     project_name: str,
     ensure_project_exists: bool = True,
-    autopatch_settings: autopatch.AutopatchSettings | None = None,
 ) -> weave_client.WeaveClient:
     if not project_name or not project_name.strip():
         raise ValueError("project_name must be non-empty")
@@ -136,10 +134,13 @@ def init_weave(
 
     weave_client_context.set_weave_client_global(client)
 
-    # autopatching is only supported for the wandb client, because OpenAI calls are not
-    # logged in local mode currently. When that's fixed, this autopatch call can be
-    # moved elsewhere
-    autopatch.autopatch(autopatch_settings)
+    # Implicit patching:
+    # 1. Check sys.modules and automatically patch any already-imported integrations
+    # 2. Register import hook to patch integrations imported after weave.init()
+    from weave.integrations.patch import implicit_patch, register_import_hook
+
+    implicit_patch()
+    register_import_hook()
 
     username = get_username()
 
@@ -227,8 +228,9 @@ def finish() -> None:
     if current_client is not None:
         weave_client_context.set_weave_client_global(None)
 
-    # autopatching is only supported for the wandb client, because OpenAI calls are not
-    # logged in local mode currently. When that's fixed, this reset_autopatch call can be
-    # moved elsewhere
-    autopatch.reset_autopatch()
+    # Unregister the import hook
+    from weave.integrations.patch import unregister_import_hook
+
+    unregister_import_hook()
+
     trace_sentry.global_trace_sentry.end_session()
