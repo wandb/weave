@@ -4,7 +4,7 @@ This module should not require any dependencies beyond the standard library. It 
 check if libraries are installed and imported and patch in the case that they are.
 """
 
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Any, Callable, Optional, Union
 
 from pydantic import BaseModel, Field
 
@@ -31,11 +31,11 @@ class IntegrationSettings(BaseModel):
 
 class AutopatchSettings(BaseModel):
     """Configuration for autopatch integrations.
-    
+
     This class is deprecated. Please use explicit patching instead.
     For example: weave.integrations.patch_openai()
     """
-    
+
     openai: Optional[IntegrationSettings] = None
     anthropic: Optional[IntegrationSettings] = None
     mistral: Optional[IntegrationSettings] = None
