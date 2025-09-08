@@ -431,19 +431,20 @@ class EvaluationLogger(BaseModel):
             assert isinstance(self.model, Model)
             self._original_predict_method = self.model.get_infer_method()
         except MissingInferenceMethodError:
+
             @op(name="Model.predict", enable_code_capture=False)
             def predict(self: Model, inputs: dict) -> Any:
                 # Get the output from the context variable
                 return current_output.get()
-            
+
             self.model.__dict__["predict"] = MethodType(predict, self.model)
-        
+
         # Always create a context-aware predict method for use during log_prediction
-        @weave.op(name="Model.predict", enable_code_capture=False)
+        @op(name="Model.predict", enable_code_capture=False)
         def predict(self: Model, inputs: dict) -> Any:
             # Get the output from the context variable
             return current_output.get()
-        
+
         self._context_predict_method = MethodType(predict, self.model)
 
         # --- Setup the evaluation object ---
@@ -546,12 +547,12 @@ class EvaluationLogger(BaseModel):
         # This ensures we use the passed output instead of calling the model
         original_method = self.model.__dict__.get("predict")
         self.model.__dict__["predict"] = self._context_predict_method
-        
+
         try:
             with call_context.set_call_stack([self._evaluate_call]):
                 # Make the prediction call
                 with _set_current_output(output):
-                    with weave.attributes(IMPERATIVE_EVAL_MARKER):
+                    with attributes(IMPERATIVE_EVAL_MARKER):
                         _, predict_and_score_call = (
                             self._pseudo_evaluation.predict_and_score.call(
                                 self._pseudo_evaluation,

@@ -609,45 +609,42 @@ def test_evaluation_logger_with_custom_attributes(client):
 
 def test_evaluation_logger_uses_passed_output_not_model_predict(client):
     """Test that EvaluationLogger uses the passed output instead of calling model.predict.
-    
+
     This test validates the fix for the issue where log_prediction was calling
     model.predict(inputs) internally instead of using the passed outputs.
     """
-    
+
     class TestModel(weave.Model):
         @weave.op
         def predict(self, text: str) -> str:
             # This should NOT be called during log_prediction
             return "MODEL_PREDICTED_OUTPUT"
-    
+
     model = TestModel()
     ev = EvaluationLogger(model=model)
-    
+
     # Pass a different output than what the model would predict
     custom_output = "USER_PROVIDED_OUTPUT"
-    pred = ev.log_prediction(
-        inputs={"text": "test input"},
-        output=custom_output
-    )
+    pred = ev.log_prediction(inputs={"text": "test input"}, output=custom_output)
     pred.finish()
     ev.finish()
-    
+
     client.flush()
     calls = client.get_calls()
-    
+
     # Find the Model.predict call
     predict_call = None
     for call in calls:
         if op_name_from_call(call) == "Model.predict":
             predict_call = call
             break
-    
+
     assert predict_call is not None
     # The output should be the user-provided one, not the model's prediction
     assert predict_call.output == custom_output
     assert predict_call.output != "MODEL_PREDICTED_OUTPUT"
 
-    
+
 @pytest.mark.parametrize("model_name", ["for", "42", "a-b-c", "!"])
 def test_evaluation_invalid_model_name_fixable(model_name):
     # Should not raise
