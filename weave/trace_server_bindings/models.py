@@ -2,7 +2,7 @@ from typing import Union
 
 from pydantic import BaseModel
 
-from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server import trace_server_interface as tsi  # noqa: TID251
 
 
 class StartBatchItem(BaseModel):
