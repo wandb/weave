@@ -1,6 +1,6 @@
 import logging
 import threading
-from typing import Any, Optional, Union, cast
+from typing import Any, Optional, TypeVar, Union, cast
 
 from pydantic import BaseModel, Field
 
@@ -20,6 +20,40 @@ DeltaMessage = Union[
 ]
 StoredItem = Union[models.ServerItem, models.ResponseItem]
 
+T = TypeVar('T')
+
+# If any of these are in the key name it is senstive
+# e.g. AUTH, AUTHORIZATION, API_AUTH are all sensitive
+SENSITIVE_MARKERS = [
+    'auth',
+    'key',
+    'api',
+    'access'
+]
+# If this is in the string, it is not sensitive
+# e.g. API_AUTH_URL is not sensitive
+NON_SENSITIVE_MARKERS = [
+    "url"
+]
+def filter_sensitive(obj: T) -> T:
+    if isinstance(obj, list):
+        for i, item in enumerate(obj):
+            obj[i] = filter_sensitive(item)
+    elif isinstance(obj, dict):
+        for k, v in obj.items():
+            if not isinstance(k, str):
+                obj[k] = filter_sensitive(v)
+                continue
+            elif isinstance(v, (dict, list)):
+                obj[k] = filter_sensitive(v)
+            elif isinstance(v, str) and isinstance(k, str):
+                low = k.lower()
+                has_sensitive_marker = any(map(lambda x: x in low, SENSITIVE_MARKERS))
+                has_insensitive_marker = any(map(lambda x: x in low, NON_SENSITIVE_MARKERS))
+                if has_sensitive_marker and not has_insensitive_marker:
+                    obj[k] = "<redacted>"
+        return obj
+    return obj
 
 class ItemRegistry:
     speech_markers: dict[models.ItemID, dict[str, Optional[int]]] = Field(
@@ -108,10 +142,15 @@ class StateExporter(BaseModel):
         return self.input_buffer.get_segment_ms(start_ms, end_ms)
 
     def handle_session_created(self, msg: models.SessionCreatedMessage) -> None:
-        self.session = msg.session
+        filtered = filter_sensitive(msg.session.model_dump())
+        print('filtered', filtered)
+        self.session = models.Session(**filtered)
 
     def handle_session_updated(self, msg: models.SessionUpdatedMessage) -> None:
-        self.session = msg.session
+        session_dict = self.session.model_dump() if self.session else {}
+        session_dict.update(msg.session.model_dump())
+        filtered = filter_sensitive(session_dict)
+        self.session = models.Session(**filtered)
 
     def handle_speech_stopped(
         self, msg: models.InputAudioBufferSpeechStoppedMessage

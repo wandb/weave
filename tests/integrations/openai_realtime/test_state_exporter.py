@@ -286,3 +286,22 @@ def test_transcripts_not_required_when_text_modality_absent(monkeypatch):
     # Should finish quickly without waiting for any transcripts
     time.sleep(0.08)
     assert client.finished == ["resp_x"]
+
+def test_redact_auth():
+    import weave.integrations.openai_realtime.state_exporter as se
+    session_mock = {
+      "session": {
+        "type": "realtime",
+        "tools": [
+          {
+            "type": "mcp",
+            "server_label": "stripe",
+            "server_url": "https://mcp.stripe.com",
+            "authorization": "DUMMY_API_KEY",
+            "require_approval": "never"
+          }
+        ]
+      }
+    }
+    filtered = se.filter_sensitive(session_mock)
+    assert filtered['session']['tools'][0]["authorization"] == "<redacted>"
