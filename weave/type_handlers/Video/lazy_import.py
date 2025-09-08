@@ -19,15 +19,17 @@ class MoviePyImportHook(MetaPathFinder):
         target: Optional[object] = None,
     ) -> Optional[ModuleSpec]:
         """Check if MoviePy is being imported and trigger registration."""
-        if fullname == "moviepy" or fullname.startswith("moviepy."):
-            # Remove ourselves from meta_path to avoid recursion
-            if self in sys.meta_path:
-                sys.meta_path.remove(self)
+        if not (fullname == "moviepy" or fullname.startswith("moviepy.")):
+            return None
 
-            # Trigger the video type registration
-            from weave.type_handlers.Video import video
+        # Remove ourselves from meta_path to avoid recursion
+        if self in sys.meta_path:
+            sys.meta_path.remove(self)
 
-            video._ensure_registered()
+        # Trigger the video type registration
+        from weave.type_handlers.Video import video
+
+        video._ensure_registered()
 
         # Always return None to let the normal import mechanism handle it
         return None
