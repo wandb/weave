@@ -111,15 +111,20 @@ def capture_output(callbacks: list[Callable[[], None]]):
     captured_logs = io.StringIO()
 
     # Store original stdout and logging handlers
-    old_handlers = logging.getLogger().handlers[:]
+    root_logger = logging.getLogger()
+    weave_logger = logging.getLogger("weave")
+
+    old_root_handlers = root_logger.handlers[:]
+    old_weave_handlers = weave_logger.handlers[:]
 
     # Create a new handler for capturing logs
     log_handler = logging.StreamHandler(captured_logs)
     log_handler.setFormatter(logging.Formatter("%(message)s"))
 
     # Replace stdout and logging handlers
-    root_logger = logging.getLogger()
     root_logger.handlers = [log_handler]
+    # Also replace weave logger handlers to capture weave-specific logs
+    weave_logger.handlers = [log_handler]
 
     try:
         yield captured_logs
@@ -128,7 +133,8 @@ def capture_output(callbacks: list[Callable[[], None]]):
     finally:
         for callback in callbacks:
             callback()
-        root_logger.handlers = old_handlers
+        root_logger.handlers = old_root_handlers
+        weave_logger.handlers = old_weave_handlers
 
 
 def flushing_callback(client):
