@@ -146,3 +146,46 @@ jobs:
           DD_TRACE_ENABLED: false
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.shard }}')"
+
+  slack-notification:
+    name: Slack Notification on Failure
+    needs:
+      - nightly-tests
+
+    runs-on: ubuntu-latest
+    if: failure()
+
+    steps:
+      - name: Determine Failed Jobs
+        id: failed-jobs
+        env:
+          NEEDS: "${{ toJson(needs) }}"
+        run: |
+          jq -C . <<< "${NEEDS}" # debug
+
+          failed_jobs=$(
+            jq -r '
+              to_entries
+              | [
+                .[]
+                | select(.value.result == "failure")
+                | .key
+              ]
+              | join(", ")
+            ' <<< "${NEEDS}"
+          )
+
+          echo "failed_jobs=$failed_jobs" | tee -a "${GITHUB_OUTPUT}"
+
+      - name: Send Slack Notification
+        uses: slackapi/slack-github-action@v1.25.0
+        with:
+          channel-id: "C09CE03J867"
+          slack-message: >-
+            :x: Nightly Tests failed!
+            *Repository:* ${{ github.repository }}
+            *Commit:* ${{ github.sha }}
+            *Failed Jobs:* ${{ steps.failed-jobs.outputs.failed_jobs }}
+            *Build:* ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.WANDB_CI_SLACK_BOT_TOKEN }}
