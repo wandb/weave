@@ -112,6 +112,14 @@ def capture_output(callbacks: list[Callable[[], None]]):
 
     # Store original stdout and logging handlers
     old_handlers = logging.getLogger().handlers[:]
+    
+    # Also capture from the weave logger hierarchy
+    weave_logger = logging.getLogger("weave")
+    old_weave_handlers = weave_logger.handlers[:]
+    old_weave_propagate = weave_logger.propagate
+    weave_client_logger = logging.getLogger("weave.trace.weave_client")
+    old_weave_client_handlers = weave_client_logger.handlers[:]
+    old_weave_client_propagate = weave_client_logger.propagate
 
     # Create a new handler for capturing logs
     log_handler = logging.StreamHandler(captured_logs)
@@ -120,6 +128,12 @@ def capture_output(callbacks: list[Callable[[], None]]):
     # Replace stdout and logging handlers
     root_logger = logging.getLogger()
     root_logger.handlers = [log_handler]
+    
+    # Also set handlers for weave loggers
+    weave_logger.handlers = [log_handler]
+    weave_logger.propagate = False  # Don't propagate to avoid double capture
+    weave_client_logger.handlers = [log_handler]
+    weave_client_logger.propagate = False
 
     try:
         yield captured_logs
@@ -129,6 +143,10 @@ def capture_output(callbacks: list[Callable[[], None]]):
         for callback in callbacks:
             callback()
         root_logger.handlers = old_handlers
+        weave_logger.handlers = old_weave_handlers
+        weave_logger.propagate = old_weave_propagate
+        weave_client_logger.handlers = old_weave_client_handlers
+        weave_client_logger.propagate = old_weave_client_propagate
 
 
 def flushing_callback(client):
