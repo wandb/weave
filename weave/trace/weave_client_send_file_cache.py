@@ -9,7 +9,10 @@ from collections import OrderedDict
 from concurrent.futures import Future
 from typing import Generic, Optional, TypeVar
 
-from weave.trace_server.trace_server_interface import FileCreateReq, FileCreateRes
+from weave.trace_server.trace_server_interface import (  # noqa: TID251
+    FileCreateReq,
+    FileCreateRes,
+)
 
 # Define generic type variables
 K = TypeVar("K")  # Key type

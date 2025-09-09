@@ -16,9 +16,9 @@ from weave.trace.refs import CallRef, ObjectRef, OpRef
 from weave.trace.serialization.serialize import from_json
 from weave.trace.util import log_once
 from weave.trace.vals import WeaveObject
-from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH
-from weave.trace_server.interface.query import Query
-from weave.trace_server.trace_server_interface import (
+from weave.trace_server.constants import MAX_DISPLAY_NAME_LENGTH  # noqa: TID251
+from weave.trace_server.interface.query import Query  # noqa: TID251
+from weave.trace_server.trace_server_interface import (  # noqa: TID251
     CallSchema,
     CallsFilter,
     CallsQueryReq,

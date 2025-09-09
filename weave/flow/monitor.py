@@ -8,7 +8,7 @@ from weave.object.obj import Object
 from weave.trace.api import ObjectRef, publish
 from weave.trace.objectify import register_object
 from weave.trace.vals import WeaveObject
-from weave.trace_server.interface.query import Query
+from weave.trace_server.interface.query import Query  # noqa: TID251
 
 
 @register_object

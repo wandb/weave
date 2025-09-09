@@ -16,10 +16,13 @@ from weave.trace.display.rich import pydantic_util
 from weave.trace.refs import ObjectRef, OpRef
 from weave.trace.traverse import ObjectPath, get_paths
 from weave.trace.vals import WeaveObject
-from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.interface import query as tsi_query
-from weave.trace_server.interface.builtin_object_classes.saved_view import Column, Pin
-from weave.trace_server.interface.builtin_object_classes.saved_view import (
+from weave.trace_server import trace_server_interface as tsi  # noqa: TID251
+from weave.trace_server.interface import query as tsi_query  # noqa: TID251
+from weave.trace_server.interface.builtin_object_classes.saved_view import (  # noqa: TID251
+    Column,
+    Pin,
+)
+from weave.trace_server.interface.builtin_object_classes.saved_view import (  # noqa: TID251
     SavedView as SavedViewBase,
 )
 

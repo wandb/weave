@@ -86,14 +86,14 @@ from weave.trace.table_upload_chunking import ChunkingConfig, TableChunkManager
 from weave.trace.util import deprecated
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
 from weave.trace.weave_client_send_file_cache import WeaveClientSendFileCache
-from weave.trace_server.constants import MAX_OBJECT_NAME_LENGTH
-from weave.trace_server.ids import generate_id
-from weave.trace_server.interface.feedback_types import (
+from weave.trace_server.constants import MAX_OBJECT_NAME_LENGTH  # noqa: TID251
+from weave.trace_server.ids import generate_id  # noqa: TID251
+from weave.trace_server.interface.feedback_types import (  # noqa: TID251
     RUNNABLE_FEEDBACK_TYPE_PREFIX,
     runnable_feedback_output_selector,
     runnable_feedback_runnable_ref_selector,
 )
-from weave.trace_server.trace_server_interface import (
+from weave.trace_server.trace_server_interface import (  # noqa: TID251
     CallEndReq,
     CallsDeleteReq,
     CallsFilter,
