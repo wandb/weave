@@ -384,3 +384,46 @@ jobs:
         uses: re-actors/alls-green@release/v1
         with:
           jobs: ${{ toJSON(needs) }}
+
+  slack-notification:
+    name: Slack Notification on Failure
+    needs:
+      - the-nightly-tests-go-here
+
+    runs-on: ubuntu-latest
+    if: failure() && github.ref == 'refs/heads/master'
+
+    steps:
+      - name: Determine Failed Jobs
+        id: failed-jobs
+        env:
+          NEEDS: "${{ toJson(needs) }}"
+        run: |
+          jq -C . <<< "${NEEDS}" # debug
+
+          failed_jobs=$(
+            jq -r '
+              to_entries
+              | [
+                .[]
+                | select(.value.result == "failure")
+                | .key
+              ]
+              | join(", ")
+            ' <<< "${NEEDS}"
+          )
+
+          echo "failed_jobs=$failed_jobs" | tee -a "${GITHUB_OUTPUT}"
+
+      - name: Send Slack Notification
+        uses: slackapi/slack-github-action@v1.25.0
+        with:
+          channel-id: "C09CE03J867"
+          slack-message: >-
+            :x: Workflow *${{ github.workflow }}* failed on *${{ github.ref_name }}* branch!
+            *Repository:* ${{ github.repository }}
+            *Commit:* ${{ github.sha }}
+            *Failed Jobs:* ${{ steps.failed-jobs.outputs.failed_jobs }}
+            *Build:* ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.WANDB_CI_SLACK_BOT_TOKEN }}
