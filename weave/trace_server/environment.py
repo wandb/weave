@@ -27,6 +27,12 @@ def kafka_client_password() -> Optional[str]:
     return os.environ.get("KAFKA_CLIENT_PASSWORD")
 
 
+def kafka_producer_max_buffer_size() -> int:
+    """The maximum number of messages in the Kafka producer buffer."""
+    # Default to 10000 messages if not specified
+    return int(os.environ.get("KAFKA_PRODUCER_MAX_BUFFER_SIZE", 10000))
+
+
 # Scoring worker settings
 
 

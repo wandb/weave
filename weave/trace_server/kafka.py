@@ -1,6 +1,8 @@
+import logging
 import socket
 from typing import Any, Optional
 
+import ddtrace
 from confluent_kafka import Consumer as ConfluentKafkaConsumer
 from confluent_kafka import Producer as ConfluentKafkaProducer
 
@@ -10,9 +12,16 @@ from weave.trace_server.environment import (
     kafka_broker_port,
     kafka_client_password,
     kafka_client_user,
+    kafka_producer_max_buffer_size,
 )
 
 CALL_ENDED_TOPIC = "weave.call_ended"
+
+# Default max buffer size: 10000 messages
+# This is a sensible default that provides good throughput while preventing unbounded growth
+DEFAULT_MAX_BUFFER_SIZE = 10000
+
+logger = logging.getLogger(__name__)
 
 
 class KafkaProducer(ConfluentKafkaProducer):
@@ -20,15 +29,30 @@ class KafkaProducer(ConfluentKafkaProducer):
     Kafka producer for sending messages to the Kafka broker.
 
     Args:
-        additional_kafka_config (Optional[dict[str, Any]]): Additional Kafka configuration to pass to the producer.
+        config (dict[str, Any]): Kafka producer configuration.
+        max_buffer_size (int): Maximum number of messages in the producer buffer.
     """
+
+    def __init__(
+        self,
+        config: dict[str, Any],
+        max_buffer_size: int = DEFAULT_MAX_BUFFER_SIZE,
+    ):
+        super().__init__(config)
+        self.max_buffer_size = max_buffer_size
 
     @classmethod
     def from_env(
-        cls, additional_kafka_config: Optional[dict[str, Any]] = None
+        cls,
+        additional_kafka_config: Optional[dict[str, Any]] = None,
+        max_buffer_size: Optional[int] = None,
     ) -> "KafkaProducer":
         if additional_kafka_config is None:
             additional_kafka_config = {}
+
+        # Use environment variable if max_buffer_size not explicitly provided
+        if max_buffer_size is None:
+            max_buffer_size = kafka_producer_max_buffer_size()
 
         config = {
             "bootstrap.servers": _make_broker_host(),
@@ -38,11 +62,57 @@ class KafkaProducer(ConfluentKafkaProducer):
             **additional_kafka_config,
         }
 
-        return cls(config)
+        return cls(config, max_buffer_size=max_buffer_size)
 
     def produce_call_end(
         self, call_end: tsi.EndedCallSchemaForInsert, flush_immediately: bool = False
     ) -> None:
+        """
+        Produce a call_end message to Kafka with buffer size management.
+
+        Drops messages if buffer is full to prevent unbounded memory growth.
+        Logs warnings at 50% capacity and errors when dropping messages.
+        """
+        # Check current buffer size
+        buffer_size = len(self)
+
+        # Check if buffer is at capacity
+        if buffer_size >= self.max_buffer_size:
+            # Log error to DataDog and drop the message
+            logger.error(
+                "Kafka producer buffer full, dropping message",
+                extra={
+                    "buffer_size": buffer_size,
+                    "max_buffer_size": self.max_buffer_size,
+                    "project_id": call_end.project_id,
+                    "call_id": call_end.id,
+                },
+            )
+            if root_span := ddtrace.tracer.current_root_span():
+                root_span.set_tags({"kafka.producer.buffer_size": buffer_size})
+
+            # Drop the message - do not produce
+            return
+
+        # Log warning if buffer is at 50% capacity
+        if buffer_size >= self.max_buffer_size * 0.5:
+            buffer_percentage = (buffer_size / self.max_buffer_size) * 100
+            logger.warning(
+                "Kafka producer buffer at 50%% capacity or higher",
+                extra={
+                    "buffer_size": buffer_size,
+                    "max_buffer_size": self.max_buffer_size,
+                    "buffer_percentage": buffer_percentage,
+                },
+            )
+            if root_span := ddtrace.tracer.current_root_span():
+                root_span.set_tags(
+                    {
+                        "kafka.producer.buffer_size": buffer_size,
+                        "kafka.producer.buffer_percentage": buffer_percentage,
+                    }
+                )
+
         self.produce(
             topic=CALL_ENDED_TOPIC,
             value=call_end.model_dump_json(),
