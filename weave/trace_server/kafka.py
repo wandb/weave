@@ -17,8 +17,6 @@ from weave.trace_server.environment import (
 
 CALL_ENDED_TOPIC = "weave.call_ended"
 
-# Default max buffer size: 10000 messages
-# This is a sensible default that provides good throughput while preventing unbounded growth
 DEFAULT_MAX_BUFFER_SIZE = 10000
 
 logger = logging.getLogger(__name__)
@@ -33,26 +31,19 @@ class KafkaProducer(ConfluentKafkaProducer):
         max_buffer_size (int): Maximum number of messages in the producer buffer.
     """
 
-    def __init__(
-        self,
-        config: dict[str, Any],
-        max_buffer_size: int = DEFAULT_MAX_BUFFER_SIZE,
-    ):
+    def __init__(self, config: dict[str, Any]):
         super().__init__(config)
-        self.max_buffer_size = max_buffer_size
+        self.max_buffer_size = (
+            kafka_producer_max_buffer_size() or DEFAULT_MAX_BUFFER_SIZE
+        )
 
     @classmethod
     def from_env(
         cls,
         additional_kafka_config: Optional[dict[str, Any]] = None,
-        max_buffer_size: Optional[int] = None,
     ) -> "KafkaProducer":
         if additional_kafka_config is None:
             additional_kafka_config = {}
-
-        # Use environment variable if max_buffer_size not explicitly provided
-        if max_buffer_size is None:
-            max_buffer_size = kafka_producer_max_buffer_size()
 
         config = {
             "bootstrap.servers": _make_broker_host(),
@@ -62,7 +53,7 @@ class KafkaProducer(ConfluentKafkaProducer):
             **additional_kafka_config,
         }
 
-        return cls(config, max_buffer_size=max_buffer_size)
+        return cls(config)
 
     def produce_call_end(
         self, call_end: tsi.EndedCallSchemaForInsert, flush_immediately: bool = False
@@ -73,12 +64,9 @@ class KafkaProducer(ConfluentKafkaProducer):
         Drops messages if buffer is full to prevent unbounded memory growth.
         Logs warnings at 50% capacity and errors when dropping messages.
         """
-        # Check current buffer size
         buffer_size = len(self)
 
-        # Check if buffer is at capacity
         if buffer_size >= self.max_buffer_size:
-            # Log error to DataDog and drop the message
             logger.error(
                 "Kafka producer buffer full, dropping message",
                 extra={
