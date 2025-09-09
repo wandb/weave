@@ -2086,7 +2086,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         Each thread gets its own client instance to avoid session conflicts,
         but all clients share the same underlying connection pool via _CH_POOL_MANAGER.
-        This provides both session isolation and efficient connection reuse.
         """
         if not hasattr(self._thread_local, "ch_client"):
             self._thread_local.ch_client = self._mint_client()
