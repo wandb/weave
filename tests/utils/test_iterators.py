@@ -2,7 +2,79 @@ import threading
 
 import pytest
 
-from weave.utils.iterators import ThreadSafeLazyList
+from weave.utils.iterators import ThreadSafeLazyList, first
+
+
+def test_first_with_list():
+    # Test first() with a list
+    assert first([1, 2, 3]) == 1
+    assert first([42]) == 42
+    assert first(["a", "b", "c"]) == "a"
+
+
+def test_first_with_string():
+    # Test first() with a string
+    assert first("hello") == "h"
+    assert first("x") == "x"
+
+
+def test_first_with_range():
+    # Test first() with range objects
+    assert first(range(5)) == 0
+    assert first(range(10, 20)) == 10
+    assert first(range(100, 101)) == 100
+
+
+def test_first_with_generator():
+    # Test first() with a generator
+    def gen():
+        yield 10
+        yield 20
+        yield 30
+    
+    assert first(gen()) == 10
+
+
+def test_first_with_iterator():
+    # Test first() with an iterator
+    assert first(iter([7, 8, 9])) == 7
+    assert first(iter("abc")) == "a"
+
+
+def test_first_with_set():
+    # Test first() with a set (order may vary, but should return an element)
+    s = {42}
+    assert first(s) == 42
+
+
+def test_first_with_tuple():
+    # Test first() with a tuple
+    assert first((100, 200, 300)) == 100
+    assert first(("x",)) == "x"
+
+
+def test_first_with_empty_iterable():
+    # Test first() with empty iterables - should raise StopIteration
+    with pytest.raises(StopIteration):
+        first([])
+    
+    with pytest.raises(StopIteration):
+        first("")
+    
+    with pytest.raises(StopIteration):
+        first(range(0))
+    
+    with pytest.raises(StopIteration):
+        first(iter([]))
+
+
+def test_first_with_custom_iterable():
+    # Test first() with a custom iterable
+    class CustomIterable:
+        def __iter__(self):
+            return iter([99, 88, 77])
+    
+    assert first(CustomIterable()) == 99
 
 
 def test_basic_sequence_operations():
