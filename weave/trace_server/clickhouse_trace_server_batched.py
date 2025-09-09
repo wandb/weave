@@ -27,7 +27,6 @@ import datetime
 import hashlib
 import json
 import logging
-import threading
 from collections import defaultdict
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
@@ -37,6 +36,7 @@ from zoneinfo import ZoneInfo
 import clickhouse_connect
 import ddtrace
 from clickhouse_connect.driver.client import Client as CHClient
+from clickhouse_connect.driver.httputil import get_pool_manager
 from clickhouse_connect.driver.query import QueryResult
 from clickhouse_connect.driver.summary import QuerySummary
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
@@ -162,6 +162,10 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
+# Create a shared connection pool manager for all ClickHouse connections
+_CH_POOL_MANAGER = get_pool_manager(maxsize=16, num_pools=12)
+
+
 class ClickHouseTraceServer(tsi.TraceServerInterface):
     def __init__(
         self,
@@ -175,13 +179,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         evaluate_model_dispatcher: Optional[EvaluateModelDispatcher] = None,
     ):
         super().__init__()
-        self._thread_local = threading.local()
         self._host = host
         self._port = port
         self._user = user
         self._password = password
         self._database = database
         self._flush_immediately = True
+        # Create the shared client using the pool manager
+        self._ch_client = self._mint_client()
         self._call_batch: list[list[Any]] = []
         self._use_async_insert = use_async_insert
         self._model_to_provider_info_map = read_model_to_provider_info_map()
@@ -2075,18 +2080,22 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     # Private Methods
     @property
     def ch_client(self) -> CHClient:
-        """Returns and creates (if necessary) the clickhouse client"""
-        if not hasattr(self._thread_local, "ch_client"):
-            self._thread_local.ch_client = self._mint_client()
-        return self._thread_local.ch_client
+        """Returns the shared clickhouse client.
+
+        The client uses a connection pool managed by clickhouse_connect,
+        which handles connection lifecycle and thread safety automatically.
+        """
+        return self._ch_client
 
     def _mint_client(self) -> CHClient:
+        """Create a new ClickHouse client using the shared pool manager."""
         client = clickhouse_connect.get_client(
             host=self._host,
             port=self._port,
             user=self._user,
             password=self._password,
             secure=self._port == 8443,
+            pool_mgr=_CH_POOL_MANAGER,
         )
         # Safely create the database if it does not exist
         client.command(f"CREATE DATABASE IF NOT EXISTS {self._database}")
@@ -2105,16 +2114,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         ```
         """
         client = self._mint_client()
-        original_client = self.ch_client
-        self._thread_local.ch_client = client
+        original_client = self._ch_client
+        self._ch_client = client
         try:
             yield
         finally:
-            self._thread_local.ch_client = original_client
+            self._ch_client = original_client
             client.close()
-
-    # def __del__(self) -> None:
-    #     self.ch_client.close()
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call_batch")
     def _insert_call_batch(self, batch: list) -> None:
