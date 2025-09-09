@@ -91,6 +91,51 @@ def disable_datadog():
         del os.environ["DD_TRACE_ENABLED"]
 
 
+def pytest_addoption(parser):
+    parser.addoption(
+        "--job-num",
+        default=None,
+        help='Specify which job number to run (0-based) for test sharding',
+    )
+    parser.addoption(
+        "--num-jobs",
+        default=None,
+        help='Total number of jobs for test sharding (default: 2)',
+    )
+
+
+def pytest_collection_modifyitems(config, items):
+    # First, let any other conftest files do their modifications (like adding markers)
+    # This is important for trace_server tests that need markers added
+    
+    # Get the job number and total number of jobs from command line options
+    job_num = config.getoption("--job-num", default=None)
+    if job_num is None:
+        return
+
+    num_jobs = config.getoption("--num-jobs", default=None)
+    if num_jobs is None:
+        num_jobs = 2  # Default to 2 jobs (even/odd) for backward compatibility
+    
+    job_num = int(job_num)
+    num_jobs = int(num_jobs)
+    
+    if job_num >= num_jobs:
+        raise ValueError(f"job-num ({job_num}) must be less than num-jobs ({num_jobs})")
+
+    # Select every Nth test starting at job_num offset
+    selected_items = []
+    for index, item in enumerate(items):
+        if index % num_jobs == job_num:
+            selected_items.append(item)
+
+    # Clear the items list and add back only selected items
+    items[:] = selected_items
+    
+    # Log what we're doing for debugging
+    print(f"Job sharding: job_num={job_num}, num_jobs={num_jobs}, selected {len(selected_items)} out of {len(items) + len(selected_items) * (num_jobs - 1)} tests")
+
+
 def pytest_sessionfinish(session, exitstatus):
     if exitstatus == pytest.ExitCode.NO_TESTS_COLLECTED:
         session.exitstatus = 0

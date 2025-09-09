@@ -68,6 +68,14 @@ trace_server_shards = [f"trace{i}" for i in range(1, NUM_TRACE_SERVER_SHARDS + 1
         # subset, you can pass `-- test_your_thing.py` to nox.
         # For example,
         #   nox -e "tests-3.12(shard='custom')" -- test_your_thing.py
+        #
+        # Trace tests (trace, trace1-4, trace_no_server) now support --job-num and --num-jobs
+        # options for parallel test execution by splitting tests across multiple jobs:
+        #   nox -e "tests-3.12(shard='trace')" -- --job-num=0 --num-jobs=4  # runs tests 0,4,8,12...
+        #   nox -e "tests-3.12(shard='trace')" -- --job-num=1 --num-jobs=4  # runs tests 1,5,9,13...
+        #   nox -e "tests-3.12(shard='trace')" -- --job-num=2 --num-jobs=4  # runs tests 2,6,10,14...
+        #   nox -e "tests-3.12(shard='trace')" -- --job-num=3 --num-jobs=4  # runs tests 3,7,11,15...
+        # If --num-jobs is not specified, it defaults to 2 for backward compatibility
         "custom",
         "flow",
         "trace_server",
@@ -197,6 +205,13 @@ def tests(session, shard):
                 "-m trace_server",
             ]
         )
+    
+    # Add job number support for trace tests (similar to query tests)
+    # This allows running tests split across multiple jobs
+    if shard == "trace" or shard in trace_server_shards or shard == "trace_no_server":
+        # The --job-num and --num-jobs parameters will be passed through via session.posargs
+        # No special handling needed here as pytest will receive them directly
+        pass
 
     if shard == "trace_no_server":
         pytest_args.extend(["-m", "not trace_server"])
