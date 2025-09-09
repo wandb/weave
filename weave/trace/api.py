@@ -85,9 +85,9 @@ def init(
         WeaveClient: A Weave client.
 
     Examples:
-        >>> client = init("my-project")
+        >>> client = init("my-entity/my-project")
         >>> client = init("my-entity", "my-project")
-        >>> client = init("my-project", settings={"api_url": "https://my-weave-server"})
+        >>> client = init("my-entity", "my-project", settings={"api_url": "https://my-weave-server"})
     """
     if arg2 is None:
         project_name = arg1
@@ -118,6 +118,7 @@ def init(
     global_postprocess_inputs = init_kwargs.get("global_postprocess_inputs", None)
     global_postprocess_output = init_kwargs.get("global_postprocess_output", None)
     global_attributes = init_kwargs.get("global_attributes", None)
+
     # Check if deprecated autopatch_settings is used
     if autopatch_settings is not None:
         logger.warning(
