@@ -2,8 +2,8 @@ import queue
 import threading
 import time
 
-import pytest
 import httpx
+import pytest
 from flask import Flask
 
 import weave

@@ -1,8 +1,8 @@
 import datetime
 from unittest.mock import patch
 
-import pytest
 import httpx
+import pytest
 from pydantic import ValidationError
 
 from weave.trace_server import trace_server_interface as tsi

@@ -7,8 +7,8 @@ from queue import Full
 from types import MethodType
 from unittest.mock import MagicMock, patch
 
-import pytest
 import httpx
+import pytest
 import tenacity
 
 from weave.trace.display.term import configure_logger

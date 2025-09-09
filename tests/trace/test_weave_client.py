@@ -8,9 +8,9 @@ import sys
 import time
 import uuid
 
+import httpx
 import pydantic
 import pytest
-import httpx
 from pydantic import ValidationError
 
 import weave

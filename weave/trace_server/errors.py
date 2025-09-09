@@ -192,9 +192,7 @@ class ErrorRegistry:
         # HTTP client specific errors
         import httpx
 
-        self.register(
-            httpx.ReadTimeout, 504, lambda exc: {"reason": "Read timeout"}
-        )
+        self.register(httpx.ReadTimeout, 504, lambda exc: {"reason": "Read timeout"})
         self.register(
             httpx.ConnectTimeout,
             504,

@@ -4,11 +4,9 @@ import datetime
 import json
 import os
 import threading
-from time import time
 from typing import Any, Optional, Union
 
 import httpx
-from httpx import HTTPStatusError as HTTPError
 from httpx import Request, Response
 
 from weave.trace.display.display import Console, Text
