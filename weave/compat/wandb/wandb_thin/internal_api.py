@@ -18,8 +18,7 @@ logger = logging.getLogger(__name__)
 
 class Api:
     def query(self, query: graphql.DocumentNode, **kwargs: Any) -> Any:
-        from gql.transport.requests import RequestsHTTPTransport
-        from requests.auth import HTTPBasicAuth
+        from gql.transport.httpx import HTTPXTransport
 
         wandb_context = get_wandb_api_context()
         headers = None
@@ -29,9 +28,9 @@ class Api:
             headers = wandb_context.headers
             cookies = wandb_context.cookies
             if wandb_context.api_key is not None:
-                auth = HTTPBasicAuth("api", wandb_context.api_key)
+                auth = ("api", wandb_context.api_key)
         url_base = env.wandb_base_url()
-        transport = RequestsHTTPTransport(
+        transport = HTTPXTransport(
             url=url_base + "/graphql",
             headers=headers,
             cookies=cookies,
