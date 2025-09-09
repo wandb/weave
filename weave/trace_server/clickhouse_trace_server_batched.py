@@ -27,6 +27,7 @@ import datetime
 import hashlib
 import json
 import logging
+import threading
 from collections import defaultdict
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
@@ -163,7 +164,9 @@ logger.setLevel(logging.INFO)
 
 
 # Create a shared connection pool manager for all ClickHouse connections
-_CH_POOL_MANAGER = get_pool_manager(maxsize=16, num_pools=12)
+# maxsize: Maximum connections per pool (set higher than thread count to avoid blocking)
+# num_pools: Number of distinct connection pools (for different hosts/configs)
+_CH_POOL_MANAGER = get_pool_manager(maxsize=50, num_pools=2)
 
 
 class ClickHouseTraceServer(tsi.TraceServerInterface):
@@ -179,14 +182,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         evaluate_model_dispatcher: Optional[EvaluateModelDispatcher] = None,
     ):
         super().__init__()
+        self._thread_local = threading.local()
         self._host = host
         self._port = port
         self._user = user
         self._password = password
         self._database = database
         self._flush_immediately = True
-        # Create the shared client using the pool manager
-        self._ch_client = self._mint_client()
         self._call_batch: list[list[Any]] = []
         self._use_async_insert = use_async_insert
         self._model_to_provider_info_map = read_model_to_provider_info_map()
@@ -2080,12 +2082,15 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     # Private Methods
     @property
     def ch_client(self) -> CHClient:
-        """Returns the shared clickhouse client.
+        """Returns a thread-local clickhouse client.
 
-        The client uses a connection pool managed by clickhouse_connect,
-        which handles connection lifecycle and thread safety automatically.
+        Each thread gets its own client instance to avoid session conflicts,
+        but all clients share the same underlying connection pool via _CH_POOL_MANAGER.
+        This provides both session isolation and efficient connection reuse.
         """
-        return self._ch_client
+        if not hasattr(self._thread_local, "ch_client"):
+            self._thread_local.ch_client = self._mint_client()
+        return self._thread_local.ch_client
 
     def _mint_client(self) -> CHClient:
         """Create a new ClickHouse client using the shared pool manager."""
@@ -2114,12 +2119,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         ```
         """
         client = self._mint_client()
-        original_client = self._ch_client
-        self._ch_client = client
+        original_client = self.ch_client
+        self._thread_local.ch_client = client
         try:
             yield
         finally:
-            self._ch_client = original_client
+            self._thread_local.ch_client = original_client
             client.close()
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call_batch")
