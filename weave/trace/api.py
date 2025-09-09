@@ -89,13 +89,17 @@ def init(
         >>> client = init("my-entity", "my-project")
         >>> client = init("my-entity", "my-project", settings={"api_url": "https://my-weave-server"})
     """
+    # Parse arguments to support both (entity, project, ...) and (project_name, ...)
     if arg2 is None:
-        project_name = arg1
+        # Single argument pattern: init("entity/project")
+        final_project_name = arg1
     else:
+        # Two argument pattern: init("entity", "project")
         entity = arg1
         project = arg2
+        final_project_name = f"{entity}/{project}"
 
-    if not project_name or not project_name.strip():
+    if not final_project_name or not final_project_name.strip():
         raise ValueError("project_name must be non-empty")
 
     configure_logger()
@@ -106,12 +110,6 @@ def init(
             DeprecationWarning,
             stacklevel=2,
         )
-
-    # Parse arguments to support both (entity, project, ...) and (project_name, ...)
-    if project is not None:
-        final_project_name = f"{entity}/{project}"
-    else:
-        final_project_name = entity
 
     settings = init_kwargs.get("settings", None)
     autopatch_settings = init_kwargs.get("autopatch_settings", None)
@@ -126,7 +124,7 @@ def init(
             "Please use explicit patching instead. For example:\n"
             "----------------------------------------\n"
             "    import weave\n"
-            f"    weave.init('{project_name}')\n"
+            f"    weave.init('{final_project_name}')\n"
             "    weave.integrations.patch_openai()\n"
             "----------------------------------------\n"
             "See https://docs.wandb.ai/guides/integrations for more information.",
