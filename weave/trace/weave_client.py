@@ -237,7 +237,7 @@ def map_to_refs(obj: Any) -> Any:
         # Here, we expect ref to be empty since it would have short circuited
         # above with `_get_direct_ref`
         return _remove_empty_ref(obj.map_values(map_to_refs))
-    elif isinstance(obj, (pydantic.BaseModel, pydantic.v1.BaseModel)):
+    elif isinstance(obj, pydantic.BaseModel):
         # Check if this object has a custom serializer registered
         from weave.trace.serialization.serializer import get_serializer_for_obj
 
@@ -1525,7 +1525,7 @@ class WeaveClient:
             self._save_nested_objects(obj.rows)
 
         # Recursive traversal of other pydantic objects
-        elif isinstance(obj, (pydantic.BaseModel, pydantic.v1.BaseModel)):
+        elif isinstance(obj, pydantic.BaseModel):
             obj_rec = pydantic_object_record(obj)
             for v in obj_rec.__dict__.values():
                 self._save_nested_objects(v)

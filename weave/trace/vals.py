@@ -8,7 +8,6 @@ from copy import deepcopy
 from typing import Any, Literal, Optional, SupportsIndex, Union
 
 from pydantic import BaseModel
-from pydantic import v1 as pydantic_v1
 
 from weave.trace import box
 from weave.trace.context.tests_context import get_raise_on_captured_errors
@@ -884,7 +883,7 @@ def make_trace_obj(
         # val.call = partial(call, val, parent)
         val = maybe_bind_method(val, parent)
     box_val = box.box(val)
-    if isinstance(box_val, pydantic_v1.BaseModel) or is_op(val):
+    if is_op(val):
         box_val.__dict__["ref"] = new_ref
     elif box_val is None or isinstance(box_val, bool):
         # We intentionally don't box None and bools because it's impossible to
