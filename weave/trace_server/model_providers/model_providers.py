@@ -3,7 +3,7 @@ import logging
 import os
 from typing import TypedDict
 
-import requests
+import httpx
 
 model_providers_url = "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json"
 MODEL_PROVIDER_INFO_FILE = "model_providers.json"
@@ -73,9 +73,9 @@ def main(
 
     # Next add in information from the LiteLLM model provider info file
     try:
-        req = requests.get(model_providers_url)
+        req = httpx.get(model_providers_url)
         req.raise_for_status()
-    except requests.exceptions.RequestException as e:
+    except httpx.RequestError as e:
         print("Failed to fetch models:", e)
         return {}
 
