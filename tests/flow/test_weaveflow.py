@@ -1,4 +1,5 @@
 import logging
+from dataclasses import dataclass
 
 import numpy as np
 from pydantic import Field
@@ -78,11 +79,9 @@ def test_weaveflow_publish_numpy(client):
 
 
 def test_weaveflow_unknown_type_op_param_undeclared():
+    @dataclass
     class SomeUnknownObject:
         x: int
-
-        def __init__(self, x: int):
-            self.x = x
 
     @weave.op
     def op_with_unknown_param(v) -> int:
@@ -92,11 +91,9 @@ def test_weaveflow_unknown_type_op_param_undeclared():
 
 
 def test_weaveflow_unknown_type_op_param_declared():
+    @dataclass
     class SomeUnknownObject:
         x: int
-
-        def __init__(self, x: int):
-            self.x = x
 
     @weave.op
     def op_with_unknown_param(v: SomeUnknownObject) -> int:
@@ -106,11 +103,9 @@ def test_weaveflow_unknown_type_op_param_declared():
 
 
 def test_weaveflow_unknown_type_op_param_closure():
+    @dataclass
     class SomeUnknownObject:
         x: int
-
-        def __init__(self, x: int):
-            self.x = x
 
     v = SomeUnknownObject(x=10)
 

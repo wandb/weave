@@ -898,7 +898,7 @@ def make_trace_obj(
         pass
     else:
         if hasattr(box_val, "ref") and not isinstance(box_val, DeletedRef):
-            setattr(box_val, "ref", new_ref)
+            box_val.ref = new_ref
     return box_val
 
 

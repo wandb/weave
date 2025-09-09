@@ -97,7 +97,7 @@ def _apply_threadsafe_patch() -> None:
                     # Double-check pattern: verify the attribute still doesn't exist
                     # after acquiring the lock to prevent race conditions
                     if not hasattr(self, "_weave_load_lock"):
-                        setattr(self, "_weave_load_lock", threading.RLock())
+                        self._weave_load_lock = threading.RLock()
             lock = self._weave_load_lock
 
         except Exception:
