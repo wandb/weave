@@ -1,14 +1,16 @@
 import asyncio
 import json
 import os
-from collections.abc import Iterable
+from collections.abc import Generator, Iterable
 from typing import Any
 
 import pytest
 from pydantic import BaseModel
 
 import weave
+from weave.integrations.instructor.instructor_sdk import get_instructor_patcher
 from weave.integrations.integration_utilities import op_name_from_ref
+from weave.integrations.openai.openai_sdk import get_openai_patcher
 
 
 class Person(BaseModel):
@@ -28,6 +30,21 @@ class MeetingInfo(BaseModel):
     location: str
     budget: int
     deadline: str
+
+
+@pytest.fixture(autouse=True)
+def patch_instructor() -> Generator[None, None, None]:
+    """Patch Instructor for all tests in this file."""
+    instructor_patcher = get_instructor_patcher()
+    openai_patcher = get_openai_patcher()
+
+    instructor_patcher.attempt_patch()
+    openai_patcher.attempt_patch()
+
+    yield
+
+    instructor_patcher.undo_patch()
+    openai_patcher.undo_patch()
 
 
 @pytest.mark.skip_clickhouse_client

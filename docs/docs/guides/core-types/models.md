@@ -57,16 +57,6 @@ A `Model` in W&B Weave is a combination of data (which can include configuration
 
     After calling this, you will see that you now have two versions of this Model in the UI, each with different tracked calls.
 
-    ## Serve models
-
-    To serve a model, you can easily spin up a FastAPI server by calling:
-
-    ```bash
-    weave serve <your model ref>
-    ```
-
-    For additional instructions, see [serve](/guides/tools/serve).
-
     ## Track production calls
 
     To separate production calls, you can add an additional attribute to the predictions for easy filtering in the UI or API.

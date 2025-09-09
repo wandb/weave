@@ -1,7 +1,26 @@
+from collections.abc import Generator
+
 import pytest
 
 import weave
+from weave.integrations.autogen import get_autogen_patcher
 from weave.integrations.integration_utilities import flatten_calls, op_name_from_ref
+from weave.integrations.openai.openai_sdk import get_openai_patcher
+
+
+@pytest.fixture(autouse=True)
+def patch_autogen() -> Generator[None, None, None]:
+    """Patch AutoGen and OpenAI for all tests in this file."""
+    autogen_patcher = get_autogen_patcher()
+    openai_patcher = get_openai_patcher()
+
+    autogen_patcher.attempt_patch()
+    openai_patcher.attempt_patch()
+
+    yield
+
+    autogen_patcher.undo_patch()
+    openai_patcher.undo_patch()
 
 
 @pytest.mark.skip_clickhouse_client

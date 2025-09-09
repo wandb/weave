@@ -1599,15 +1599,14 @@ def optimized_project_contains_call_query(
     """Returns a query that checks if the project contains any calls."""
     return safely_format_sql(
         f"""SELECT
-    CASE
-        WHEN EXISTS (
-            SELECT 1
-            FROM calls_merged
-            WHERE project_id = {param_slot(param_builder.add_param(project_id), "String")}
-        )
-        THEN 1
-        ELSE 0
-        END AS has_any
+    toUInt8(count()) AS has_any
+    FROM
+    (
+        SELECT 1
+        FROM calls_merged
+        WHERE project_id = {param_slot(param_builder.add_param(project_id), "String")}
+        LIMIT 1
+    )
     """,
         logger,
     )

@@ -1,12 +1,23 @@
 import os
+from collections.abc import Generator
 
 import cohere
 import pytest
 
 import weave
+from weave.integrations.cohere.cohere_sdk import get_cohere_patcher
 from weave.integrations.integration_utilities import op_name_from_ref
 
 cohere_model = "command"  # You can change this to a specific model if needed
+
+
+@pytest.fixture(autouse=True)
+def patch_cohere() -> Generator[None, None, None]:
+    """Patch Cohere for all tests in this file."""
+    patcher = get_cohere_patcher()
+    patcher.attempt_patch()
+    yield
+    patcher.undo_patch()
 
 
 @pytest.mark.skip_clickhouse_client

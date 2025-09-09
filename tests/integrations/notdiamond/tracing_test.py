@@ -1,4 +1,5 @@
 import os
+from collections.abc import Generator
 
 import pytest
 
@@ -6,8 +7,18 @@ from weave.integrations.integration_utilities import (
     flatten_calls,
     flattened_calls_to_names,
 )
+from weave.integrations.notdiamond.tracing import get_notdiamond_patcher
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
+
+
+@pytest.fixture(autouse=True)
+def patch_notdiamond() -> Generator[None, None, None]:
+    """Patch NotDiamond for all tests in this file."""
+    patcher = get_notdiamond_patcher()
+    patcher.attempt_patch()
+    yield
+    patcher.undo_patch()
 
 
 @pytest.mark.skip_clickhouse_client

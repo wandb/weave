@@ -1,11 +1,22 @@
 import os
+from collections.abc import Generator
 
 import pytest
 from cerebras.cloud.sdk import AsyncCerebras, Cerebras
 
 import weave
+from weave.integrations.cerebras.cerebras_sdk import get_cerebras_patcher
 
 model = "llama3.1-8b"  # Cerebras model
+
+
+@pytest.fixture(autouse=True)
+def patch_cerebras() -> Generator[None, None, None]:
+    """Patch Cerebras for all tests in this file."""
+    patcher = get_cerebras_patcher()
+    patcher.attempt_patch()
+    yield
+    patcher.undo_patch()
 
 
 @pytest.mark.skip_clickhouse_client

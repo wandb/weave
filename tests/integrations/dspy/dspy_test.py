@@ -1,15 +1,50 @@
+from collections.abc import Generator
 from typing import Literal
 
 import dspy
 import pytest
 
+import weave.integrations.dspy.dspy_sdk as dspy_sdk
+import weave.integrations.litellm.litellm as litellm_sdk
+import weave.integrations.openai.openai_sdk as openai_sdk
+from weave.integrations.dspy.dspy_sdk import get_dspy_patcher
 from weave.integrations.integration_utilities import (
     flatten_calls,
     flattened_calls_to_names,
     op_name_from_ref,
 )
+from weave.integrations.litellm.litellm import get_litellm_patcher
+from weave.integrations.openai.openai_sdk import get_openai_patcher
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server.trace_server_interface import CallsFilter
+
+
+@pytest.fixture(autouse=True)
+def patch_dspy() -> Generator[None, None, None]:
+    """Patch DSPy, LiteLLM, and OpenAI for all tests in this file."""
+    dspy_sdk._dspy_patcher = None
+    litellm_sdk._litellm_patcher = None
+    openai_sdk._openai_patcher = None
+
+    dspy_patcher = get_dspy_patcher()
+    litellm_patcher = get_litellm_patcher()
+    openai_patcher = get_openai_patcher()
+
+    dspy_patcher.attempt_patch()
+    litellm_patcher.attempt_patch()
+    openai_patcher.attempt_patch()
+
+    yield
+
+    dspy_patcher.undo_patch()
+    litellm_patcher.undo_patch()
+    openai_patcher.undo_patch()
+
+    # Clean up after test
+    dspy_sdk._dspy_patcher = None
+    litellm_sdk._litellm_patcher = None
+    openai_sdk._openai_patcher = None
+
 
 SAMPLE_EVAL_DATASET = [
     dspy.Example(

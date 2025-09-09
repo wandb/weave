@@ -1,4 +1,5 @@
 import os
+from collections.abc import Generator
 
 import pytest
 from llama_index.core import (
@@ -27,8 +28,24 @@ from weave.integrations.integration_utilities import (
     flattened_calls_to_names,
     op_name_from_ref,
 )
+from weave.integrations.llamaindex.llamaindex import llamaindex_patcher
+from weave.integrations.openai.openai_sdk import get_openai_patcher
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server.trace_server_interface import CallsFilter
+
+
+@pytest.fixture(autouse=True)
+def patch_llamaindex() -> Generator[None, None, None]:
+    """Patch LlamaIndex for all tests in this file."""
+    # Patch both LlamaIndex and OpenAI since LlamaIndex uses OpenAI as backend
+    llamaindex_patcher.attempt_patch()
+    openai_patcher = get_openai_patcher()
+    openai_patcher.attempt_patch()
+
+    yield
+
+    llamaindex_patcher.undo_patch()
+    openai_patcher.undo_patch()
 
 
 @pytest.mark.skip_clickhouse_client

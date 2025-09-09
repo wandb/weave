@@ -228,23 +228,32 @@ However, often LLM applications have additional logic (such as pre/post processi
 
 <Tabs groupId="programming-language">
   <TabItem value="python" label="Python" default>
-    Sometimes it is useful to get a handle to the `Call` object itself. You can do this by calling the `op.call` method, which returns both the result and the `Call` object. For example:
+    The `Call` object contains various fields of meta data about your decatorated function calls, including their UUIDs, trace IDs, inputs, outputs, and execution times. This information can help you debug your functions and track their performance.
+    
+    To access the `Call` object's data, create a handle to it by calling the `op.call` method on your functions, like this:
 
     ```python showLineNumbers
-    result, call = my_function.call("World")
+    import weave
+
+    weave.init("weave-demo")
+
+    @weave.op
+    def greeting(name: str):
+        return f"Hello, {name}!"
+
+    # Uses `.call` method on `greeting` function
+    result, call = greeting.call("World")
+
+    print(call)
     ```
 
-    Then, `call` can be used to set / update / fetch additional properties (most commonly used to get the ID of the call to be used for feedback).
+    The above example prints the `Call` object. You can then access the object's properties as needed. For example, the following updated `print` statement returns the function calls UUID in your terminal:
 
-    :::note
-    If your op is a method on a class, you need to pass the instance as the first argument to the op (see example below).
-    :::
-
-    ```python showLineNumbers
-    # Notice that we pass the `instance` as the first argument.
-    print(instance.my_method.call(instance, "World"))
+    ```python
+    print(call.id)
     ```
 
+    If your op is a method on a class, you need to pass the instance as the first argument to the op, like this:
 
     ```python showLineNumbers
     import weave
@@ -260,9 +269,20 @@ However, often LLM applications have additional logic (such as pre/post processi
 
     instance = MyClass()
 
-    # Call your method -- Weave will automatically track inputs and outputs
+    # Notice how `instance` is passed as the first argument
     instance.my_method.call(instance, "World")
     ```
+
+    :::warning Exception Handling
+
+    Instead of raising exceptions, `.call()` captures exceptions and stores them in the `call.exception`. If you need to raise exceptions during execution, set the [`__should_raise` parameter](../../reference/python-sdk/weave/trace/weave.trace.op#function-call), like this:
+
+    ```python showLineNumbers
+    # This raises exceptions
+    result, call = foo.call(__should_raise=True)
+    ```
+    :::
+
   </TabItem>
   <TabItem value="typescript" label="TypeScript">
     ```plaintext

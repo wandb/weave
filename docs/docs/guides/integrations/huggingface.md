@@ -163,7 +163,7 @@ Weave also captures and visualizes function execution, helping you to understand
 
 Managing LLM experiments can be challenging when multiple components are involved. The Weave [`Model`](../core-types/models.md) class helps capture and organize experimental details, such as system prompts and model configurations, allowing you to easily compare different iterations.
 
-In addition to versioning code and capturing inputs/outputs, a `Model` stores structured parameters that control application behavior. This makes it easier to track which configurations produced the best results. You can also integrate a Weave `Model` with Weave [Serve](../tools/serve.md) and [Evaluations](../evaluation/scorers.md) for further insights.
+In addition to versioning code and capturing inputs/outputs, a `Model` stores structured parameters that control application behavior. This makes it easier to track which configurations produced the best results. You can also integrate a Weave `Model` with [Evaluations](../evaluation/scorers.md) for further insights.
 
 The example below demonstrates defines a `CityVisitRecommender` model for travel recommendations. Each modification to its parameters generates a new version, making experimentation easy.
 

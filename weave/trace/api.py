@@ -69,12 +69,12 @@ def init(
     to the specified project.
 
     Args:
-        project_name (str): The name of the Weights & Biases project to log to.
-        settings (UserSettings | dict[str, Any] | None): Configuration for the Weave client generally.
-        autopatch_settings (AutopatchSettings | None): Configuration for autopatch integrations, e.g. openai.
-        global_postprocess_inputs (PostprocessInputsFunc | None): A function that will be applied to all inputs of all ops.
-        global_postprocess_output (PostprocessOutputFunc | None): A function that will be applied to all outputs of all ops.
-        global_attributes (dict[str, Any] | None): A dictionary of attributes that will be applied to all traces.
+        project_name: The name of the Weights & Biases project to log to.
+        settings: Configuration for the Weave client generally.
+        autopatch_settings: (Deprecated) Configuration for autopatch integrations. Use explicit patching instead.
+        global_postprocess_inputs: A function that will be applied to all inputs of all ops.
+        global_postprocess_output: A function that will be applied to all outputs of all ops.
+        global_attributes: A dictionary of attributes that will be applied to all traces.
 
     NOTE: Global postprocessing settings are applied to all ops after each op's own
     postprocessing.  The order is always:
@@ -118,6 +118,18 @@ def init(
     global_postprocess_inputs = init_kwargs.get("global_postprocess_inputs", None)
     global_postprocess_output = init_kwargs.get("global_postprocess_output", None)
     global_attributes = init_kwargs.get("global_attributes", None)
+    # Check if deprecated autopatch_settings is used
+    if autopatch_settings is not None:
+        logger.warning(
+            "The 'autopatch_settings' parameter is deprecated and will be removed in a future version. "
+            "Please use explicit patching instead. For example:\n"
+            "----------------------------------------\n"
+            "    import weave\n"
+            f"    weave.init('{project_name}')\n"
+            "    weave.integrations.patch_openai()\n"
+            "----------------------------------------\n"
+            "See https://docs.wandb.ai/guides/integrations for more information.",
+        )
 
     parse_and_apply_settings(settings)
 
@@ -132,10 +144,7 @@ def init(
     if should_disable_weave():
         return weave_init.init_weave_disabled()
 
-    return weave_init.init_weave(
-        final_project_name,
-        autopatch_settings=autopatch_settings,
-    )
+    return weave_init.init_weave(final_project_name)
 
 
 def get_client() -> WeaveClient | None:

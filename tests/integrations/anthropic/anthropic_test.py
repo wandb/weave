@@ -1,12 +1,23 @@
 import os
+from collections.abc import Generator
 
 import pytest
 from anthropic import Anthropic, AsyncAnthropic
 
 import weave
+from weave.integrations.anthropic.anthropic_sdk import get_anthropic_patcher
 
 model = "claude-3-haiku-20240307"
 # model = "claude-3-opus-20240229"
+
+
+@pytest.fixture(autouse=True)
+def patch_anthropic() -> Generator[None, None, None]:
+    """Patch Anthropic for all tests in this file."""
+    patcher = get_anthropic_patcher()
+    patcher.attempt_patch()
+    yield
+    patcher.undo_patch()
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
