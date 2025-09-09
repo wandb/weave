@@ -54,13 +54,13 @@ def test_disabled_env(client):
 
 
 def test_print_call_link_setting(client_creator):
-    with client_creator(settings=UserSettings(print_call_link=False)) as client:
+    with client_creator(settings=UserSettings(print_call_link=False, silent=False)) as client:
         callbacks = [flushing_callback(client)]
         with capture_output(callbacks) as captured:
             func()
     assert TRACE_CALL_EMOJI not in captured.getvalue()
 
-    with client_creator(settings=UserSettings(print_call_link=True)) as client:
+    with client_creator(settings=UserSettings(print_call_link=True, silent=False)) as client:
         callbacks = [flushing_callback(client)]
         with capture_output(callbacks) as captured:
             func()
@@ -68,6 +68,12 @@ def test_print_call_link_setting(client_creator):
 
 
 def test_print_call_link_env(client):
+    # Save the original WEAVE_SILENT value
+    original_silent = os.environ.get("WEAVE_SILENT")
+    
+    # Set WEAVE_SILENT to false to ensure output is not suppressed
+    os.environ["WEAVE_SILENT"] = "false"
+    
     os.environ["WEAVE_PRINT_CALL_LINK"] = "false"
     callbacks = [flushing_callback(client)]
     with capture_output(callbacks) as captured:
@@ -84,6 +90,13 @@ def test_print_call_link_env(client):
 
     # Clean up after test
     del os.environ["WEAVE_PRINT_CALL_LINK"]
+    
+    # Restore the original WEAVE_SILENT value
+    if original_silent is not None:
+        os.environ["WEAVE_SILENT"] = original_silent
+    else:
+        if "WEAVE_SILENT" in os.environ:
+            del os.environ["WEAVE_SILENT"]
 
 
 def test_should_capture_code_setting(client):
@@ -362,31 +375,39 @@ def test_silent_setting(client_creator):
 
 def test_silent_env(client):
     """Test that WEAVE_SILENT environment variable disables terminal logging."""
-    # Test with WEAVE_SILENT=false - logs should appear
-    os.environ["WEAVE_SILENT"] = "false"
-    callbacks = [flushing_callback(client)]
-    with capture_output(callbacks) as captured:
-        termlog("Test log message")
-        termwarn("Test warning message")
-        termerror("Test error message")
-        func()
-    output = captured.getvalue()
-    assert "Test log message" in output
-    assert "Test warning message" in output
-    assert "Test error message" in output
+    # Save the original WEAVE_SILENT value
+    original_silent = os.environ.get("WEAVE_SILENT")
     
-    # Test with WEAVE_SILENT=true - logs should not appear
-    os.environ["WEAVE_SILENT"] = "true"
-    callbacks = [flushing_callback(client)]
-    with capture_output(callbacks) as captured:
-        termlog("Test log message")
-        termwarn("Test warning message")
-        termerror("Test error message")
-        func()
-    output = captured.getvalue()
-    assert "Test log message" not in output
-    assert "Test warning message" not in output
-    assert "Test error message" not in output
-    
-    # Clean up
-    del os.environ["WEAVE_SILENT"]
+    try:
+        # Test with WEAVE_SILENT=false - logs should appear
+        os.environ["WEAVE_SILENT"] = "false"
+        callbacks = [flushing_callback(client)]
+        with capture_output(callbacks) as captured:
+            termlog("Test log message")
+            termwarn("Test warning message")
+            termerror("Test error message")
+            func()
+        output = captured.getvalue()
+        assert "Test log message" in output
+        assert "Test warning message" in output
+        assert "Test error message" in output
+        
+        # Test with WEAVE_SILENT=true - logs should not appear
+        os.environ["WEAVE_SILENT"] = "true"
+        callbacks = [flushing_callback(client)]
+        with capture_output(callbacks) as captured:
+            termlog("Test log message")
+            termwarn("Test warning message")
+            termerror("Test error message")
+            func()
+        output = captured.getvalue()
+        assert "Test log message" not in output
+        assert "Test warning message" not in output
+        assert "Test error message" not in output
+    finally:
+        # Restore the original WEAVE_SILENT value
+        if original_silent is not None:
+            os.environ["WEAVE_SILENT"] = original_silent
+        else:
+            if "WEAVE_SILENT" in os.environ:
+                del os.environ["WEAVE_SILENT"]
