@@ -85,9 +85,11 @@ def init(
         WeaveClient: A Weave client.
 
     Examples:
+    ```python
         >>> client = init("my-entity/my-project")
         >>> client = init("my-entity", "my-project")
         >>> client = init("my-entity", "my-project", settings={"api_url": "https://my-weave-server"})
+    ```
     """
     # Parse arguments to support both (entity, project, ...) and (project_name, ...)
     if arg2 is None:
