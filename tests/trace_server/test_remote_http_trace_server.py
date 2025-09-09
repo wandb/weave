@@ -43,7 +43,8 @@ def trace_server():
 def test_ok(mock_post, trace_server):
     """Test successful call_start request."""
     call_id = generate_id()
-    mock_post.return_value = httpx.Response(200)
+    request = httpx.Request("POST", "http://test/call/start")
+    mock_post.return_value = httpx.Response(200, request=request)
     mock_post.return_value.json = lambda: dict(
         tsi.CallStartRes(id=call_id, trace_id="test_trace_id")
     )
@@ -57,7 +58,9 @@ def test_ok(mock_post, trace_server):
 def test_400_no_retry(mock_post, trace_server):
     """Test that 400 errors are not retried."""
     call_id = generate_id()
-    resp1 = httpx.Response(400)
+    # Create a proper httpx Response with a request
+    request = httpx.Request("POST", "http://test/call/start")
+    resp1 = httpx.Response(400, request=request)
     resp1.json = lambda: dict(tsi.CallStartRes(id=call_id, trace_id="test_trace_id"))
 
     mock_post.side_effect = [
@@ -83,17 +86,18 @@ def test_500_502_503_504_429_retry(mock_post, trace_server, monkeypatch):
     monkeypatch.setenv("WEAVE_RETRY_MAX_INTERVAL", "0.1")
     call_id = generate_id()
 
-    resp0 = httpx.Response(500)
+    request = httpx.Request("POST", "http://test/call/start")
+    resp0 = httpx.Response(500, request=request)
 
-    resp1 = httpx.Response(502)
+    resp1 = httpx.Response(502, request=request)
 
-    resp2 = httpx.Response(503)
+    resp2 = httpx.Response(503, request=request)
 
-    resp3 = httpx.Response(504)
+    resp3 = httpx.Response(504, request=request)
 
-    resp4 = httpx.Response(429)
+    resp4 = httpx.Response(429, request=request)
 
-    resp5 = httpx.Response(200)
+    resp5 = httpx.Response(200, request=request)
     resp5.json = lambda: dict(tsi.CallStartRes(id=call_id, trace_id="test_trace_id"))
 
     mock_post.side_effect = [resp0, resp1, resp2, resp3, resp4, resp5]
@@ -109,7 +113,8 @@ def test_other_error_retry(mock_post, trace_server, monkeypatch):
     monkeypatch.setenv("WEAVE_RETRY_MAX_INTERVAL", "0.1")
     call_id = generate_id()
 
-    resp2 = httpx.Response(200)
+    request = httpx.Request("POST", "http://test/call/start")
+    resp2 = httpx.Response(200, request=request)
     resp2.json = lambda: dict(tsi.CallStartRes(id=call_id, trace_id="test_trace_id"))
 
     mock_post.side_effect = [
