@@ -19,7 +19,7 @@ from weave.trace.vals import WeaveObject
 from weave.trace.weave_client import sanitize_object_name
 
 
-def _numpy():
+def _numpy() -> Optional[Any]:
     try:
         import numpy
     except ImportError:
