@@ -31,7 +31,7 @@ def test_first_with_generator():
         yield 10
         yield 20
         yield 30
-    
+
     assert first(gen()) == 10
 
 
@@ -57,13 +57,13 @@ def test_first_with_empty_iterable():
     # Test first() with empty iterables - should raise StopIteration
     with pytest.raises(StopIteration):
         first([])
-    
+
     with pytest.raises(StopIteration):
         first("")
-    
+
     with pytest.raises(StopIteration):
         first(range(0))
-    
+
     with pytest.raises(StopIteration):
         first(iter([]))
 
@@ -73,7 +73,7 @@ def test_first_with_custom_iterable():
     class CustomIterable:
         def __iter__(self):
             return iter([99, 88, 77])
-    
+
     assert first(CustomIterable()) == 99
 
 

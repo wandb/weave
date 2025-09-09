@@ -10,18 +10,18 @@ T = TypeVar("T")
 def first(iterable: Iterable[T]) -> T:
     """
     Returns the first element of an iterable.
-    
+
     Equivalent to next(iter(iterable)).
-    
+
     Args:
         iterable: Any iterable object.
-        
+
     Returns:
         The first element of the iterable.
-        
+
     Raises:
         StopIteration: If the iterable is empty.
-        
+
     Examples:
         >>> first([1, 2, 3])
         1
