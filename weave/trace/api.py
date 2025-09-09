@@ -57,7 +57,7 @@ def init(project_name: str, /, **kwargs: Unpack[InitKwargs]) -> WeaveClient: ...
 @overload
 def init(entity: str, project: str, /, **kwargs: Unpack[InitKwargs]) -> WeaveClient: ...
 def init(
-    entity: str, project: str | None = None, /, **init_kwargs: Unpack[InitKwargs]
+    arg1: str, arg2: str | None = None, /, **init_kwargs: Unpack[InitKwargs]
 ) -> WeaveClient:
     """
     Initialize weave tracking, logging to a wandb project.
@@ -89,6 +89,12 @@ def init(
         >>> client = init("my-entity", "my-project")
         >>> client = init("my-project", settings={"api_url": "https://my-weave-server"})
     """
+    if arg2 is None:
+        project_name = arg1
+    else:
+        entity = arg1
+        project = arg2
+
     if not project_name or not project_name.strip():
         raise ValueError("project_name must be non-empty")
 
