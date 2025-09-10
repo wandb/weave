@@ -26,14 +26,14 @@ class DummyCompletion:
 
 
 class NonCompletion:
-    """An object that doesn't match completion_instance_check requirements"""
+    """An object that doesn't match completion_instance_check requirements."""
 
     def __init__(self):
         self.data = "not a completion"
 
 
 def test_openai_on_input_handler_with_completion_instance():
-    """Test that openai_on_input_handler processes completion instances correctly"""
+    """Test that openai_on_input_handler processes completion instances correctly."""
     completion = DummyCompletion("https://api.openai.com", "1.2.3")
     mock_op = Mock()
     mock_op.name = "test_op"
@@ -68,7 +68,7 @@ def test_openai_on_input_handler_with_completion_instance():
 
 
 def test_openai_on_input_handler_with_non_completion_instance():
-    """Test that openai_on_input_handler handles non-completion instances correctly"""
+    """Test that openai_on_input_handler handles non-completion instances correctly."""
     mock_op = Mock()
     mock_op.name = "test_op"
     non_completion = NonCompletion()
@@ -90,7 +90,7 @@ def test_openai_on_input_handler_with_non_completion_instance():
 
 
 def test_openai_on_input_handler_with_easy_prompt():
-    """Test that openai_on_input_handler handles EasyPrompt correctly"""
+    """Test that openai_on_input_handler handles EasyPrompt correctly."""
     completion = DummyCompletion("https://api.openai.com")
     mock_op = Mock()
     mock_op.name = "test_op"
@@ -132,7 +132,7 @@ def test_openai_on_input_handler_with_easy_prompt():
 
 
 def test_openai_on_input_handler_preserves_original_args_kwargs():
-    """Test that openai_on_input_handler preserves original args and kwargs"""
+    """Test that openai_on_input_handler preserves original args and kwargs."""
     completion = DummyCompletion("https://api.mistral.ai", "0.9.0")
     mock_op = Mock()
     mock_op.name = "test_op"
@@ -148,7 +148,7 @@ def test_openai_on_input_handler_preserves_original_args_kwargs():
 
 
 def test_openai_on_input_handler_with_no_args():
-    """Test openai_on_input_handler behavior with no arguments"""
+    """Test openai_on_input_handler behavior with no arguments."""
     mock_op = Mock()
     mock_op.name = "test_op"
 

@@ -1,5 +1,4 @@
-"""
-Query optimization framework for call queries.
+"""Query optimization framework for call queries.
 
 Optimizes complex queries on call data before expensive database aggregation (groupby).
 Optimizations should be conservative, not guaranteed to full filter down but should
@@ -41,7 +40,7 @@ DATETIME_BUFFER_TIME_SECONDS = 60 * 5  # 5 minutes
 
 
 def _field_requires_null_check(field: str) -> bool:
-    """Returns whether a string is a start or end field
+    """Returns whether a string is a start or end field.
 
     Start and end fields require appending a NULL to all conditional
     checks when operating on the calls_merged table, as unmerged
@@ -65,8 +64,7 @@ def _can_optimize_datetime_field(field: str) -> bool:
 
 
 class QueryOptimizationProcessor(ABC):
-    """
-    Abstract base class for query optimization processors.
+    """Abstract base class for query optimization processors.
 
     This class defines the interface for optimization processors that convert
     query operations into optimized SQL conditions. Subclasses should implement
@@ -78,8 +76,7 @@ class QueryOptimizationProcessor(ABC):
         self.table_alias = table_alias
 
     def process_operand(self, operand: tsi_query.Operand) -> Optional[str]:
-        """
-        Process an operand and convert it to an optimized SQL condition if possible.
+        """Process an operand and convert it to an optimized SQL condition if possible.
 
         Ignores leaf operations like Literal and GetField.
 
@@ -98,15 +95,15 @@ class QueryOptimizationProcessor(ABC):
         return apply_processor(self, operand)
 
     def process_literal(self, operand: tsi_query.LiteralOperation) -> Optional[str]:
-        """Process literal operand"""
+        """Process literal operand."""
         return None
 
     def process_get_field(self, operand: tsi_query.GetFieldOperator) -> Optional[str]:
-        """Process get field operand"""
+        """Process get field operand."""
         return None
 
     def process_convert(self, operand: tsi_query.ConvertOperation) -> Optional[str]:
-        """Process convert operand"""
+        """Process convert operand."""
         field = self.process_operand(operand.convert_.input)
         if field is None:
             return None
@@ -125,8 +122,7 @@ class QueryOptimizationProcessor(ABC):
         return None
 
     def process_or(self, operation: tsi_query.OrOperation) -> Optional[str]:
-        """
-        Process OR operations into optimized SQL.
+        """Process OR operations into optimized SQL.
 
         Note: If any condition in an OR cannot be optimized, the entire OR
         cannot be optimized, so we return None.
@@ -183,8 +179,7 @@ class QueryOptimizationProcessor(ABC):
         pass
 
     def finalize_sql(self, result: Optional[str]) -> Optional[str]:
-        """
-        Final step to make valid SQL for the calls query.
+        """Final step to make valid SQL for the calls query.
 
         This method can be overridden by subclasses to apply additional
         transformations to the final SQL condition.
@@ -201,8 +196,7 @@ class QueryOptimizationProcessor(ABC):
 
 
 class HeavyFieldOptimizationProcessor(QueryOptimizationProcessor):
-    """
-    Optimization processor for heavy field operations.
+    """Optimization processor for heavy field operations.
 
     This processor creates LIKE-based SQL conditions to optimize queries
     on heavy fields (inputs, outputs, attributes) before aggregation, reducing memory pressure.
@@ -210,16 +204,14 @@ class HeavyFieldOptimizationProcessor(QueryOptimizationProcessor):
     """
 
     def process_eq(self, operation: tsi_query.EqOperation) -> Optional[str]:
-        """
-        Process equality operation on heavy fields.
+        """Process equality operation on heavy fields.
 
         Creates SQL condition using LIKE patterns for values in JSON fields.
         """
         return _create_like_optimized_eq_condition(operation, self.pb, self.table_alias)
 
     def process_contains(self, operation: tsi_query.ContainsOperation) -> Optional[str]:
-        """
-        Process contains operation on heavy fields.
+        """Process contains operation on heavy fields.
 
         Creates SQL condition using LIKE patterns for substrings in JSON fields.
         """
@@ -228,8 +220,7 @@ class HeavyFieldOptimizationProcessor(QueryOptimizationProcessor):
         )
 
     def process_in(self, operation: tsi_query.InOperation) -> Optional[str]:
-        """
-        Process IN operation on heavy fields.
+        """Process IN operation on heavy fields.
 
         Creates SQL conditions using LIKE patterns for multiple values.
         """
@@ -245,8 +236,7 @@ class HeavyFieldOptimizationProcessor(QueryOptimizationProcessor):
 
 
 class SortableDatetimeOptimizationProcessor(QueryOptimizationProcessor):
-    """
-    Optimization processor for sortable_datetime operations.
+    """Optimization processor for sortable_datetime operations.
 
     This processor creates SQL conditions that filter based on the
     `sortable_datetime` column, which can significantly reduce the dataset before
@@ -266,8 +256,7 @@ class SortableDatetimeOptimizationProcessor(QueryOptimizationProcessor):
         return None
 
     def process_gt(self, operation: tsi_query.GtOperation) -> Optional[str]:
-        """
-        Process GT operation on sortable_datetime fields using sortable_datetime optimization.
+        """Process GT operation on sortable_datetime fields using sortable_datetime optimization.
 
         Creates SQL condition that filters started_at with the sortable_datetime column.
         """
@@ -276,8 +265,7 @@ class SortableDatetimeOptimizationProcessor(QueryOptimizationProcessor):
         )
 
     def process_gte(self, operation: tsi_query.GteOperation) -> Optional[str]:
-        """
-        Process GTE operation on sortable_datetime fields using sortable_datetime optimization.
+        """Process GTE operation on sortable_datetime fields using sortable_datetime optimization.
 
         Creates SQL condition that filters started_at with the sortable_datetime column.
         """
@@ -361,8 +349,7 @@ def process_query_to_optimization_sql(
 
 
 def _create_like_pattern_for_value(value: Union[str, int, float, bool]) -> str:
-    """
-    Creates a LIKE pattern for a value based on its type in JSON format.
+    """Creates a LIKE pattern for a value based on its type in JSON format.
 
     Args:
         value: The value to create a pattern for

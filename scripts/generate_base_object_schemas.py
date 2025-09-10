@@ -18,8 +18,7 @@ OUTPUT_PATH = OUTPUT_DIR / "generated_builtin_object_class_schemas.json"
 
 
 def generate_schemas() -> None:
-    """
-    Generate JSON schemas for all registered base objects in BUILTIN_OBJECT_REGISTRY.
+    """Generate JSON schemas for all registered base objects in BUILTIN_OBJECT_REGISTRY.
     Creates a top-level schema that includes all registered objects and writes it
     to 'generated_builtin_object_class_schemas.json'.
     """

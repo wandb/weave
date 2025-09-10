@@ -1,5 +1,4 @@
-"""
-Tests for the IsolatedClientExecutor class.
+"""Tests for the IsolatedClientExecutor class.
 
 This module tests the process isolation, security validation, and error handling
 of the IsolatedClientExecutor class using the new callback-based API.
@@ -77,8 +76,7 @@ def create_test_client_factory_and_cleanup(
     entity: str = "test_entity",
     project: str = "test_project",
 ):
-    """
-    Create a client factory function and cleanup function for testing.
+    """Create a client factory function and cleanup function for testing.
 
     This function sets up cross-process trace server communication where the main process
     has the actual trace server and the child process communicates via queues.
@@ -118,8 +116,7 @@ async def runner_with_cleanup(
     project: str = "test_project",
     **runner_kwargs,
 ):
-    """
-    Async context manager that provides a IsolatedClientExecutor instance with automatic cleanup.
+    """Async context manager that provides a IsolatedClientExecutor instance with automatic cleanup.
 
     This eliminates the repetitive setup/teardown code in tests.
 

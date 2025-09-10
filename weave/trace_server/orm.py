@@ -1,5 +1,4 @@
-"""
-A lightweight ORM layer for ClickHouse/SQLite.
+"""A lightweight ORM layer for ClickHouse/SQLite.
 Abstracts away some of their differences and allows building up SQL queries in a safe way.
 """
 
@@ -513,7 +512,7 @@ def clickhouse_cast(
 def quote_json_path(path: str) -> str:
     """Helper function to quote a json path for use in a clickhouse query. Moreover,
     this converts index operations from dot notation (conforms to Mongo) to bracket
-    notation (required by clickhouse)
+    notation (required by clickhouse).
 
     See comments on `GetFieldOperator` for current limitations
     """

@@ -4,8 +4,7 @@ from pydantic import BaseModel
 
 
 def pydantic_asdict_one_level(obj: BaseModel) -> dict[str, Any]:
-    """
-    This is equivalent to `obj.model_dump(by_alias=True)`, but does not recursively
+    """This is equivalent to `obj.model_dump(by_alias=True)`, but does not recursively
     convert nested pydantic objects to dicts. This is particularly useful when you want
     manually iterate over the fields of a pydantic object and do something with them.
     """

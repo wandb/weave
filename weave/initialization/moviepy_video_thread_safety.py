@@ -1,7 +1,6 @@
-"""
-This file exposes functions to make moviepy VideoFileClip thread-safe and revert those changes:
+"""This file exposes functions to make moviepy VideoFileClip thread-safe and revert those changes:
 - `apply_threadsafe_patch_to_moviepy_video`
-- `undo_threadsafe_patch_to_moviepy_video`
+- `undo_threadsafe_patch_to_moviepy_video`.
 
 Similar to Pillow's ImageFile, moviepy's VideoFileClip may not be thread-safe when
 loading and processing video content across multiple threads, which can lead to race conditions

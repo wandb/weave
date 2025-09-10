@@ -79,8 +79,7 @@ def _validate_scorer_signature(scorer: Union[Callable, Op, Scorer]) -> bool:
 
 
 def variance(data: Sequence[Union[int, float]]) -> float:
-    """
-    Calculate the variance of a sequence of numeric values.
+    """Calculate the variance of a sequence of numeric values.
 
     Args:
         data (Sequence[Union[int, float]]): A sequence of numeric values.
@@ -104,8 +103,7 @@ def variance(data: Sequence[Union[int, float]]) -> float:
 
 
 def stderr(data: Sequence[Union[int, float]]) -> float:
-    """
-    Calculate the standard error of the mean for a sequence of numeric values.
+    """Calculate the standard error of the mean for a sequence of numeric values.
 
     Args:
         data (Sequence[Union[int, float]]): A sequence of numeric values.

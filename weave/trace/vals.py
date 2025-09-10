@@ -412,10 +412,9 @@ class WeaveTable(Traceable):
         super()._mark_dirty()
 
     def _local_iter_with_remote_fallback(self) -> Generator[dict, None, None]:
-        """
-        This is the case where we:
+        """This is the case where we:
         1. Have all the rows in memory
-        2. Have all the row digests
+        2. Have all the row digests.
 
         In this case, we don't need to make any calls and can just return the rows
         """

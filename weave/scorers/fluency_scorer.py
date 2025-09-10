@@ -12,9 +12,8 @@ FLUENCY_SCORER_THRESHOLD = 0.5
 
 
 class WeaveFluencyScorerV1(HuggingFacePipelineScorer):
-    """
-    The scorer uses an fine-tuned ModernBert model to score a given text's fluency,
-    https://github.com/AnswerDotAI/ModernBERT
+    """The scorer uses an fine-tuned ModernBert model to score a given text's fluency,
+    https://github.com/AnswerDotAI/ModernBERT.
 
     Args:
         threshold (float): The threshold for the non-fluent score. Defaults to 0.5.
@@ -42,7 +41,7 @@ class WeaveFluencyScorerV1(HuggingFacePipelineScorer):
     )
 
     def load_pipeline(self) -> None:
-        """Loads the _pipeline attribute using HF utilities"""
+        """Loads the _pipeline attribute using HF utilities."""
         from transformers import pipeline
 
         self._local_model_path = load_local_model_weights(

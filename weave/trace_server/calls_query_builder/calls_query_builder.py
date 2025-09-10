@@ -1,5 +1,4 @@
-"""
-This module builds on the orm.py module to provide a more hard-coded optimized
+"""This module builds on the orm.py module to provide a more hard-coded optimized
 query builder specifically for the "Calls" table (which is the `calls_merged`
 underlying table).
 
@@ -191,8 +190,7 @@ class CallsMergedFeedbackPayloadField(CallsMergedField):
 
     @classmethod
     def from_path(cls, path: str) -> "CallsMergedFeedbackPayloadField":
-        """
-        Expected format: `[feedback.type].dot.path`
+        """Expected format: `[feedback.type].dot.path`.
 
         feedback.type can be '*' to select all feedback types.
         """
@@ -375,11 +373,10 @@ class OrderField(BaseModel):
 
     @property
     def raw_field_path(self) -> str:
-        """
-        Returns the raw field path as a user would see it, i.e. the field path
+        """Returns the raw field path as a user would see it, i.e. the field path
         without the _dump suffix and includes the extra path dot separate.
 
-        example:
+        Example:
             OrderField(field=CallsMergedField(field="inputs_dump", extra_path=["model", "temperature"])).raw_field_path
                 -> inputs.model.temperature
         """
@@ -451,7 +448,7 @@ class Condition(BaseModel):
     def get_object_ref_conditions(
         self, expand_columns: Optional[list[str]] = None
     ) -> list[ObjectRefCondition]:
-        """Get any object ref conditions for CTE building"""
+        """Get any object ref conditions for CTE building."""
         expand_cols = expand_columns or []
         if not expand_cols or not is_object_ref_operand(self.operand, expand_cols):
             return []
@@ -577,8 +574,7 @@ class CallsQuery(BaseModel):
         return self
 
     def as_sql(self, pb: ParamBuilder, table_alias: str = "calls_merged") -> str:
-        """
-        This is the main entry point for building the query. This method will
+        """This is the main entry point for building the query. This method will
         determine the optimal query to build based on the fields and conditions
         that have been set.
 
@@ -1474,7 +1470,8 @@ def process_ref_filters_to_sql(
     To be used before group by. This filter is NOT guaranteed to return
     the correct results, as it can operate on call ends (output_refs) so it
     should be used in addition to the existing ref filters after group by
-    generated in process_calls_filter_to_conditions."""
+    generated in process_calls_filter_to_conditions.
+    """
     if hardcoded_filter is None or (
         not hardcoded_filter.filter.output_refs
         and not hardcoded_filter.filter.input_refs

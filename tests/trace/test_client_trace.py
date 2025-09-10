@@ -4012,7 +4012,7 @@ def clickhouse_client(client):
 
 
 def test_calls_query_with_storage_size_clickhouse(client, clickhouse_client):
-    """Test querying calls with storage size information"""
+    """Test querying calls with storage size information."""
     if client_is_sqlite(client):
         pytest.skip("Skipping test for sqlite clients")
 
@@ -4049,7 +4049,7 @@ def test_calls_query_with_storage_size_clickhouse(client, clickhouse_client):
 
 
 def test_calls_query_with_total_storage_size_clickhouse(client, clickhouse_client):
-    """Test querying calls with total storage size"""
+    """Test querying calls with total storage size."""
     if client_is_sqlite(client):
         pytest.skip("Skipping test for sqlite clients")
 
@@ -4104,7 +4104,7 @@ def test_calls_query_with_total_storage_size_clickhouse(client, clickhouse_clien
 
 
 def test_calls_query_with_both_storage_sizes_clickhouse(client, clickhouse_client):
-    """Test querying calls with total storage size"""
+    """Test querying calls with total storage size."""
     if client_is_sqlite(client):
         pytest.skip("Skipping test for sqlite clients")
 
@@ -4199,7 +4199,7 @@ def test_calls_hydrated(client):
 
 
 def test_obj_query_with_storage_size_clickhouse(client):
-    """Test querying objects with storage size information"""
+    """Test querying objects with storage size information."""
     if client_is_sqlite(client):
         pytest.skip("Skipping test for sqlite clients")
 
@@ -4493,7 +4493,7 @@ def test_calls_query_stats_with_limit(client):
 
 
 def test_calls_query_stats_total_storage_size_clickhouse(client, clickhouse_client):
-    """Test querying calls with total storage size"""
+    """Test querying calls with total storage size."""
     if client_is_sqlite(client):
         pytest.skip("Skipping test for sqlite clients")
 

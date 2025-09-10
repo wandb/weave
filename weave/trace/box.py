@@ -1,7 +1,8 @@
 """Alternate boxing implementation for Weave Trace.
 
 This copies many things from query service's box.py, but it notably
-does not box None and bool which simplify checks for trace users."""
+does not box None and bool which simplify checks for trace users.
+"""
 
 from __future__ import annotations
 
@@ -51,8 +52,7 @@ class BoxedTimedelta(datetime.timedelta):
 def box(
     obj: T,
 ) -> T | BoxedInt | BoxedFloat | BoxedStr | BoxedDatetime | BoxedTimedelta:
-    """
-    Box an object to add reference tracking capabilities.
+    """Box an object to add reference tracking capabilities.
 
     Args:
         obj: The object to box.
@@ -84,8 +84,7 @@ def box(
 def unbox(
     obj: T,
 ) -> T | int | float | str | datetime.datetime | datetime.timedelta:
-    """
-    Unbox an object to get the underlying value.
+    """Unbox an object to get the underlying value.
 
     Args:
         obj: The object to unbox.

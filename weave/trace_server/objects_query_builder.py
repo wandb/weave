@@ -70,8 +70,7 @@ def _make_conditions_part(conditions: Optional[list[str]]) -> str:
 def _make_object_id_conditions_part(
     object_id_conditions: Optional[list[str]], add_where_clause: bool = False
 ) -> str:
-    """
-    Formats object_id_conditions into a query string. In this file is it only
+    """Formats object_id_conditions into a query string. In this file is it only
     used after the WHERE project_id... clause, but passing add_where_clause=True
     adds a WHERE clause to the query string.
     """
@@ -155,8 +154,7 @@ class ObjectMetadataQueryBuilder:
     def _make_digest_condition(
         self, digest: str, param_key: Optional[str] = None, index: Optional[int] = None
     ) -> str:
-        """
-        If digest is "latest", return the condition for the latest version.
+        """If digest is "latest", return the condition for the latest version.
         Otherwise, return the condition for the version with the given digest.
         If digest is a version like "v123", return the condition for the version
         with the given version index.

@@ -277,14 +277,8 @@ markers = [
 preview = true
 select = [
   "B", # https://docs.astral.sh/ruff/rules/#flake8-bugbear-b
+  "D", # https://docs.astral.sh/ruff/rules/#pydoclint-doc
   #
-  "D200",    # https://docs.astral.sh/ruff/rules/fits-on-one-line/
-  "D201",    # https://docs.astral.sh/ruff/rules/no-blank-line-before-function/
-  "D202",    # https://docs.astral.sh/ruff/rules/no-blank-line-after-function/
-  "D204",    # https://docs.astral.sh/ruff/rules/one-blank-line-after-class/
-  "D210",    # https://docs.astral.sh/ruff/rules/surrounding-whitespace/
-  "D211",    # https://docs.astral.sh/ruff/rules/blank-line-before-class/
-  "D214",    # https://docs.astral.sh/ruff/rules/section-not-over-indented/
   "FIX001",  # https://beta.ruff.rs/docs/rules/#flake8-fixme-fix
   "FIX003",  # https://docs.astral.sh/ruff/rules/line-contains-xxx/
   "F541",    # https://docs.astral.sh/ruff/rules/f-string-missing-placeholders/
@@ -337,11 +331,12 @@ select = [
   "E713",    # https://docs.astral.sh/ruff/rules/not-in-test/
 ]
 ignore = [
-  # we use Google style
-  "D203", # https://docs.astral.sh/ruff/rules/one-blank-line-before-class/
-  "D213", # https://docs.astral.sh/ruff/rules/multi-line-summary-second-line/
-  "D215", # https://docs.astral.sh/ruff/rules/section-underline-not-over-indented/
-
+  # Fix these when possible.  They are formatting changes related to the docs!
+  "D10",
+  "D205",
+  "D414",
+  "D415",
+  "D417",
   # This is a more involved change, so disabling for now.
   "C901", # https://docs.astral.sh/ruff/rules/complex-structure/
 ]
@@ -349,6 +344,9 @@ exclude = ["weave_query"]
 
 [tool.ruff.lint.isort]
 known-third-party = ["wandb", "weave_query"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
 
 [tool.ruff.lint.flake8-pytest-style]
 mark-parentheses = false

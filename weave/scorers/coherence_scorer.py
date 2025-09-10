@@ -10,10 +10,10 @@ from weave.scorers.utils import load_local_model_weights
 
 
 class WeaveCoherenceScorerV1(HuggingFacePipelineScorer):
-    """
-    The scorer that assesses if the model output is coherent using a fine-tuned
+    """The scorer that assesses if the model output is coherent using a fine-tuned
     deberta-small-long-nli model from tasksource, https://huggingface.co/tasksource/deberta-small-long-nli
     Use wandb/coherence_scorer to check if the model output is coherent.
+
     Args:
         model_name: The name of the coherence scorer model to use. Defaults to `wandb/coherence_scorer`.
         model_max_length: The maximum length of the model output. Defaults to 1024.
@@ -89,8 +89,8 @@ class WeaveCoherenceScorerV1(HuggingFacePipelineScorer):
         context: Optional[Union[str, list[str]]] = None,
         **kwargs: Any,
     ) -> WeaveScorerResult:
-        """
-        Score the Coherence of the query and output.
+        """Score the Coherence of the query and output.
+
         Args:
             query: text to score, must be a string
             output: text to score, must be a string

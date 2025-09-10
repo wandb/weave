@@ -1,7 +1,6 @@
-"""
-This module provides integrations between Weave and CrewAI, allowing Weave to trace
+"""This module provides integrations between Weave and CrewAI, allowing Weave to trace
 CrewAI Agents, Tasks, LLM calls, Tools and Flows. For more details on CrewAI, visit:
-https://docs.crewai.com/introduction
+https://docs.crewai.com/introduction.
 """
 
 from __future__ import annotations
