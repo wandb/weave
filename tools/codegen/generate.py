@@ -235,7 +235,9 @@ def update_pyproject(
         location = (
             f"in [{optional_extra}]" if optional_extra else "in main dependencies"
         )
-        info(f"Updated {package_name} in [stainless] extra {location} to version: {version}")
+        info(
+            f"Updated {package_name} in [stainless] extra {location} to version: {version}"
+        )
     else:
         repo_info = _get_repo_info(python_output)
         remote_url = repo_info.remote_url
@@ -813,10 +815,7 @@ def _update_pyproject_toml(
             doc["project"]["optional-dependencies"]["stainless"] = stainless_deps
 
         dependencies = doc["project"]["optional-dependencies"]["stainless"]
-    else:
-        # Update in main dependencies (original behavior)
-        # Determine which dependencies list to update
-    if optional_extra:
+    elif optional_extra:
         # Update optional dependencies
         if "project" not in doc or "optional-dependencies" not in doc["project"]:
             error("No optional-dependencies section found in pyproject.toml")
@@ -836,14 +835,16 @@ def _update_pyproject_toml(
 
         dependencies = doc["project"]["optional-dependencies"][optional_extra]
     else:
+        # Update in main dependencies (original behavior)
+        # Determine which dependencies list to update
         # Update main dependencies
         # Ensure dependencies is a tomlkit array for consistent formatting
-            if not isinstance(doc["project"]["dependencies"], tomlkit.items.Array):
-                dependencies = tomlkit.array()
-                dependencies.extend(doc["project"]["dependencies"])
-                doc["project"]["dependencies"] = dependencies
+        if not isinstance(doc["project"]["dependencies"], tomlkit.items.Array):
+            dependencies = tomlkit.array()
+            dependencies.extend(doc["project"]["dependencies"])
+            doc["project"]["dependencies"] = dependencies
 
-            dependencies = doc["project"]["dependencies"]
+        dependencies = doc["project"]["dependencies"]
 
     # Update the matching dependency
 
