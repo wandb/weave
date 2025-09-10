@@ -7,9 +7,38 @@ import threading
 from typing import Any, Optional, Union
 
 import httpx
+from httpx import HTTPStatusError
 from httpx import Request, Response
 
 from weave.trace.display.display import Console, Text
+
+
+class HTTPError(HTTPStatusError):
+    """Compatibility wrapper for requests.HTTPError API."""
+    
+    def __init__(self, message: str, response: Optional[Response] = None, **kwargs: Any):
+        """Initialize HTTPError with backwards compatibility for requests API.
+        
+        Args:
+            message: Error message
+            response: HTTP response object (optional for compatibility)
+            **kwargs: Additional keyword arguments
+        """
+        if response is not None:
+            # If response has a request attribute, use it
+            if hasattr(response, 'request') and response.request is not None:
+                super().__init__(message, request=response.request, response=response)
+            else:
+                # Create a dummy request for compatibility
+                dummy_request = Request("GET", "http://unknown")
+                super().__init__(message, request=dummy_request, response=response)
+            self.response = response
+        else:
+            # For cases where no response is provided
+            dummy_request = Request("GET", "http://unknown")
+            dummy_response = Response(500)
+            super().__init__(message, request=dummy_request, response=dummy_response)
+            self.response = None
 
 console = Console()
 
