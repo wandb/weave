@@ -8,8 +8,6 @@ Personal workspaces are customizable dashboards in the UI that allow you to view
 
 For example, if you're fine-tuning an LLM model and your W&B workspace shows that accuracy drops at step 500, the integrated Weave traces can reveal exactly what happened, such as your model started generating overly verbose responses that failed the evaluation criteria.
 
-Additional Weave data, such as evaluation data, will be available for workspaces soon.
-
 ## Use Weave Panels
 
 [By decorating the functions with `@weave.op`](/quickstart) in your ML-pipelines, you automatically capture their execution information and access it in a personal workspace.
