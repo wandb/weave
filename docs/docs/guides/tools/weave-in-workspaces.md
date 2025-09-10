@@ -1,5 +1,7 @@
 # Log traces during model training runs
 
+![Weave Trace in Workspaces](../../../static/img/traces-in-workspace.png)
+
 You can now log Weave traces during model training runs and view them in your personal workspace. 
 
 Personal workspaces are customizable dashboards in the UI that allow you to view in-depth analysis and data visualizations of your model training runs. By adding Weave panels to your workspace, you can view and access trace data logged during model runs to help gain better insight into how your models perform during training.
