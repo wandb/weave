@@ -1151,31 +1151,57 @@ def test_get_score_calls(client, make_evals):
     assert score_calls2[3].output == 7878
 
 
-def test_get_predict_calls(client, make_evals):
+def test_get_predict_and_score_calls(client, make_evals):
     ref, ref2 = make_evals
     ev = ref.get()
-    predict_calls = next(iter(ev.get_predict_calls().values()))
+    predict_and_score_calls = next(iter(ev.get_predict_and_score_calls().values()))
 
     # Should have 2 predict_and_score calls (one for each prediction)
-    assert len(predict_calls) == 2
+    assert len(predict_and_score_calls) == 2
 
     # Check that outputs contain the expected keys
-    for call in predict_calls:
+    for call in predict_and_score_calls:
         assert "output" in call.output
         assert "scores" in call.output
         assert "model_latency" in call.output
 
     ev2 = ref2.get()
-    predict_calls2 = next(iter(ev2.get_predict_calls().values()))
+    predict_and_score_calls2 = next(iter(ev2.get_predict_and_score_calls().values()))
 
     # Should have 2 predict_and_score calls for the second evaluation
-    assert len(predict_calls2) == 2
+    assert len(predict_and_score_calls2) == 2
 
     # Check that outputs contain the expected keys
-    for call in predict_calls2:
+    for call in predict_and_score_calls2:
         assert "output" in call.output
         assert "scores" in call.output
         assert "model_latency" in call.output
+
+
+def test_get_predict_calls(client, make_evals):
+    ref, ref2 = make_evals
+    ev = ref.get()
+    predict_calls = next(iter(ev.get_predict_calls().values()))
+
+    # Should have 2 model prediction calls (one for each prediction)
+    assert len(predict_calls) == 2
+
+    # Check that these are the actual model prediction calls
+    # They should have model outputs (not wrapped with scores)
+    for call in predict_calls:
+        # The outputs should be the raw model outputs (2 and 3 for first eval)
+        assert call.output in [2, 3]
+
+    ev2 = ref2.get()
+    predict_calls2 = next(iter(ev2.get_predict_calls().values()))
+
+    # Should have 2 model prediction calls for the second evaluation
+    assert len(predict_calls2) == 2
+
+    # Check the outputs for the second evaluation
+    for call in predict_calls2:
+        # The outputs should be the raw model outputs (34 and 45 for second eval)
+        assert call.output in [34, 45]
 
 
 def test_get_scores(client, make_evals):
@@ -1193,3 +1219,52 @@ def test_get_scores(client, make_evals):
         "second_score": [56, 5656],
         "second_score2": [78, 7878],
     }
+
+
+@pytest.mark.asyncio
+async def test_get_predict_calls_with_real_evaluation(client):
+    """Test get_predict_calls and get_predict_and_score_calls with a real Evaluation."""
+    
+    @weave.op
+    def my_model(question: str) -> str:
+        # Simple model that always returns a fixed answer
+        return f"Answer to: {question}"
+    
+    @weave.op
+    def my_scorer(output: str, expected: str) -> dict:
+        return {"match": output == expected}
+    
+    dataset = [
+        {"question": "What is 2+2?", "expected": "4"},
+        {"question": "What is the capital of France?", "expected": "Paris"},
+    ]
+    
+    evaluation = weave.Evaluation(dataset=dataset, scorers=[my_scorer])
+    eval_result = await evaluation.evaluate(my_model)
+    
+    # Test get_predict_and_score_calls
+    predict_and_score_calls = evaluation.get_predict_and_score_calls()
+    assert len(predict_and_score_calls) == 1  # One trace for the evaluation
+    
+    trace_id = list(predict_and_score_calls.keys())[0]
+    pas_calls = predict_and_score_calls[trace_id]
+    assert len(pas_calls) == 2  # Two predict_and_score calls (one per dataset item)
+    
+    # Check that predict_and_score calls have the expected structure
+    for call in pas_calls:
+        assert "output" in call.output or "model_output" in call.output
+        assert "scores" in call.output
+        assert "model_latency" in call.output
+    
+    # Test get_predict_calls
+    predict_calls = evaluation.get_predict_calls()
+    assert len(predict_calls) == 1  # One trace for the evaluation
+    
+    model_calls = predict_calls[trace_id]
+    assert len(model_calls) == 2  # Two model calls (one per dataset item)
+    
+    # Check that predict calls are the actual model calls
+    for call in model_calls:
+        assert call.func_name == "my_model"
+        # The output should be the raw model output
+        assert call.output.startswith("Answer to:")

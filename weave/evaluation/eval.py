@@ -323,7 +323,7 @@ class Evaluation(Object):
             ),
         )
 
-    def get_predict_calls(self) -> dict[str, list[Call]]:
+    def get_predict_and_score_calls(self) -> dict[str, list[Call]]:
         """
         Retrieve predict_and_score calls for each evaluation run, grouped by trace ID.
 
@@ -336,8 +336,8 @@ class Evaluation(Object):
             ```python
             evaluation = Evaluation(dataset=examples, scorers=[accuracy_scorer])
             await evaluation.evaluate(model)
-            predict_calls = evaluation.get_predict_calls()
-            for trace_id, calls in predict_calls.items():
+            predict_and_score_calls = evaluation.get_predict_and_score_calls()
+            for trace_id, calls in predict_and_score_calls.items():
                 print(f"Trace {trace_id}: {len(calls)} predict_and_score calls")
                 for call in calls:
                     print(f"  Output: {call.output.get('output')}")
@@ -351,12 +351,81 @@ class Evaluation(Object):
             descendents = list(
                 client.get_calls(filter={"trace_ids": [evaluate_call.trace_id]})
             )
-            predict_calls = [
+            predict_and_score_calls = [
                 call
                 for call in descendents
                 if call.summary.get("weave", {}).get("trace_name")
                 == "Evaluation.predict_and_score"
             ]
+            d[evaluate_call.trace_id] = predict_and_score_calls
+
+        return d
+
+    def get_predict_calls(self) -> dict[str, list[Call]]:
+        """
+        Retrieve model prediction calls for each evaluation run, grouped by trace ID.
+
+        These are the actual calls to the model's predict/infer method, containing just the
+        model outputs without scores.
+
+        Returns:
+            dict[str, list[Call]]: A dictionary mapping trace IDs to lists of model prediction Call objects.
+                Each trace ID represents one evaluation run, and the list contains all model prediction
+                calls executed during that run.
+
+        Examples:
+            ```python
+            evaluation = Evaluation(dataset=examples, scorers=[accuracy_scorer])
+            await evaluation.evaluate(model)
+            predict_calls = evaluation.get_predict_calls()
+            for trace_id, calls in predict_calls.items():
+                print(f"Trace {trace_id}: {len(calls)} predict calls")
+                for call in calls:
+                    print(f"  Model: {call.op_name}")
+                    print(f"  Output: {call.output}")
+            ```
+        """
+        d = {}
+        client = require_weave_client()
+        for evaluate_call in self.get_evaluate_calls():
+            # Get all descendants of the evaluation call
+            descendents = list(
+                client.get_calls(filter={"trace_ids": [evaluate_call.trace_id]})
+            )
+
+            # First, find all predict_and_score calls
+            predict_and_score_calls = [
+                call
+                for call in descendents
+                if call.summary.get("weave", {}).get("trace_name")
+                == "Evaluation.predict_and_score"
+            ]
+
+            # For each predict_and_score call, find its child model prediction call
+            predict_calls = []
+            for pas_call in predict_and_score_calls:
+                # Find direct children of the predict_and_score call that are model predictions
+                # These are calls that have the predict_and_score call as their parent
+                # and are not scorer calls
+                children = [
+                    call
+                    for call in descendents
+                    if call.parent_id == pas_call.id
+                    and not call.op_name.startswith("Scorer.")
+                    and call.op_name
+                    not in ["Evaluation.predict_and_score", "Evaluation.summarize"]
+                ]
+                # The first non-scorer child should be the model prediction call
+                for child in children:
+                    # Check if this looks like a model prediction call
+                    # (not a scorer, not another evaluation method)
+                    if child.op_name and not any(
+                        child.op_name.startswith(scorer_name)
+                        for scorer_name in ["score", "Score", "scorer", "Scorer"]
+                    ):
+                        predict_calls.append(child)
+                        break
+
             d[evaluate_call.trace_id] = predict_calls
 
         return d
