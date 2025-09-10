@@ -255,29 +255,6 @@ def get_verifiers_patcher(
                     )
                 ),
             ),
-            # TextArenaEnv
-            SymbolPatcher(
-                lambda: importlib.import_module("verifiers.envs.textarena_env"),
-                "TextArenaEnv.is_completed",
-                _verifiers_wrapper_async(
-                    settings=base.model_copy(
-                        update={
-                            "name": base.name or "verifiers.TextArenaEnv.is_completed"
-                        }
-                    )
-                ),
-            ),
-            SymbolPatcher(
-                lambda: importlib.import_module("verifiers.envs.textarena_env"),
-                "TextArenaEnv.env_response",
-                _verifiers_wrapper_async(
-                    settings=base.model_copy(
-                        update={
-                            "name": base.name or "verifiers.TextArenaEnv.env_response"
-                        }
-                    )
-                ),
-            ),
             # Rubric
             SymbolPatcher(
                 lambda: importlib.import_module("verifiers.rubrics.rubric"),
