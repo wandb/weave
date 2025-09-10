@@ -33,7 +33,7 @@ DATA_URI_PATTERN = re.compile(r"^data:([^;]+);base64,([A-Za-z0-9+/=]+)$", re.IGN
 BASE64_PATTERN = re.compile(r"^[A-Za-z0-9+/]+={0,2}$")
 
 # Maximum size for base64 content to be processed (to avoid memory issues)
-MAX_BASE64_SIZE = 100 * 1024 * 1024  # 100 MB
+MAX_BASE64_SIZE = 100 * 1024 * 1024  # 100 MiB
 
 # Minimum size for standalone base64 (to avoid false positives)
 MIN_BASE64_SIZE = 100  # 100 bytes
