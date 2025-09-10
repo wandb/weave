@@ -37,6 +37,7 @@ from zoneinfo import ZoneInfo
 import clickhouse_connect
 import ddtrace
 from clickhouse_connect.driver.client import Client as CHClient
+from clickhouse_connect.driver.httputil import get_pool_manager
 from clickhouse_connect.driver.query import QueryResult
 from clickhouse_connect.driver.summary import QuerySummary
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
@@ -160,6 +161,12 @@ from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker impo
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
+
+# Create a shared connection pool manager for all ClickHouse connections
+# maxsize: Maximum connections per pool (set higher than thread count to avoid blocking)
+# num_pools: Number of distinct connection pools (for different hosts/configs)
+_CH_POOL_MANAGER = get_pool_manager(maxsize=50, num_pools=2)
 
 
 class ClickHouseTraceServer(tsi.TraceServerInterface):
@@ -2074,18 +2081,24 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     # Private Methods
     @property
     def ch_client(self) -> CHClient:
-        """Returns and creates (if necessary) the clickhouse client."""
+        """Returns a thread-local clickhouse client.
+
+        Each thread gets its own client instance to avoid session conflicts,
+        but all clients share the same underlying connection pool via _CH_POOL_MANAGER.
+        """
         if not hasattr(self._thread_local, "ch_client"):
             self._thread_local.ch_client = self._mint_client()
         return self._thread_local.ch_client
 
     def _mint_client(self) -> CHClient:
+        """Create a new ClickHouse client using the shared pool manager."""
         client = clickhouse_connect.get_client(
             host=self._host,
             port=self._port,
             user=self._user,
             password=self._password,
             secure=self._port == 8443,
+            pool_mgr=_CH_POOL_MANAGER,
         )
         # Safely create the database if it does not exist
         client.command(f"CREATE DATABASE IF NOT EXISTS {self._database}")
@@ -2111,9 +2124,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         finally:
             self._thread_local.ch_client = original_client
             client.close()
-
-    # def __del__(self) -> None:
-    #     self.ch_client.close()
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call_batch")
     def _insert_call_batch(self, batch: list) -> None:
