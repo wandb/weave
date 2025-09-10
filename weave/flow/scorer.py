@@ -19,13 +19,12 @@ from weave.trace.vals import WeaveObject
 from weave.trace.weave_client import sanitize_object_name
 
 
-def _numpy() -> Optional[Any]:
+def _import_numpy() -> Optional[Any]:
     try:
         import numpy
     except ImportError:
         return None
-    else:
-        return numpy
+    return numpy
 
 
 class Scorer(Object):
@@ -126,7 +125,7 @@ def stderr(data: Sequence[Union[int, float]]) -> float:
     if len(data) <= 1:
         return 0
 
-    if np := _numpy():
+    if np := _import_numpy():
         sample_variance = float(np.var(data, ddof=1))
         return float(np.sqrt(sample_variance / len(data)))
     else:
@@ -162,7 +161,7 @@ def auto_summarize(data: list) -> Optional[dict[str, Any]]:
             "true_fraction": true_count / len(data),
         }
     elif isinstance(val, Number):
-        if np := _numpy():
+        if np := _import_numpy():
             return {"mean": np.mean(data).item()}
         else:
             return {"mean": sum(data) / len(data)}
