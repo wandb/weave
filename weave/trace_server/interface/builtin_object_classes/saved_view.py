@@ -49,6 +49,7 @@ class SavedViewDefinition(BaseModel):
 
     pin: Optional[Pin] = Field(default=None)
     sort_by: Optional[list[tsi.SortBy]] = Field(default=None)
+    page: Optional[int] = Field(default=None)
     page_size: Optional[int] = Field(default=None)
     charts: Optional[list[ChartConfig]] = Field(default=None)
 
