@@ -385,6 +385,8 @@ class Evaluation(Object):
                     print(f"  Output: {call.output}")
             ```
         """
+        from weave.flow.model import INFER_METHOD_NAMES
+
         d = {}
         client = require_weave_client()
         for evaluate_call in self.get_evaluate_calls():
@@ -393,38 +395,32 @@ class Evaluation(Object):
                 client.get_calls(filter={"trace_ids": [evaluate_call.trace_id]})
             )
 
-            # First, find all predict_and_score calls
-            predict_and_score_calls = [
-                call
-                for call in descendents
-                if call.summary.get("weave", {}).get("trace_name")
-                == "Evaluation.predict_and_score"
-            ]
-
-            # For each predict_and_score call, find its child model prediction call
+            # Find calls that match common model inference method names
+            # We check both the trace_name (cleaner) and op_name (for compatibility)
             predict_calls = []
-            for pas_call in predict_and_score_calls:
-                # Find direct children of the predict_and_score call that are model predictions
-                # These are calls that have the predict_and_score call as their parent
-                # and are not scorer calls
-                children = [
-                    call
-                    for call in descendents
-                    if call.parent_id == pas_call.id
-                    and not call.op_name.startswith("Scorer.")
-                    and call.op_name
-                    not in ["Evaluation.predict_and_score", "Evaluation.summarize"]
-                ]
-                # The first non-scorer child should be the model prediction call
-                for child in children:
-                    # Check if this looks like a model prediction call
-                    # (not a scorer, not another evaluation method)
-                    if child.op_name and not any(
-                        child.op_name.startswith(scorer_name)
-                        for scorer_name in ["score", "Score", "scorer", "Scorer"]
-                    ):
-                        predict_calls.append(child)
-                        break
+            for call in descendents:
+                # Check trace_name first (cleaner and more reliable)
+                trace_name = call.summary.get("weave", {}).get("trace_name", "")
+                if trace_name and any(
+                    trace_name.endswith(f".{method_name}") or trace_name == method_name
+                    for method_name in INFER_METHOD_NAMES
+                ):
+                    predict_calls.append(call)
+                    continue
+
+                # Fallback to checking op_name for cases where trace_name is not set
+                # Check if op_name contains the method name (handles weave URIs)
+                if call.op_name:
+                    for method_name in INFER_METHOD_NAMES:
+                        # Check various patterns in op_name
+                        if (
+                            f".{method_name}:" in call.op_name
+                            or f"/{method_name}:" in call.op_name
+                            or call.op_name.endswith(f".{method_name}")
+                            or call.op_name == method_name
+                        ):
+                            predict_calls.append(call)
+                            break
 
             d[evaluate_call.trace_id] = predict_calls
 
