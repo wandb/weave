@@ -22,7 +22,7 @@ class MCPClient:
 
     @weave.op
     async def connect_to_server(self, server_script_path: str):
-        """Connect to an MCP server
+        """Connect to an MCP server.
 
         Args:
             server_script_path: Path to the server script (.py or .js)
@@ -69,7 +69,7 @@ class MCPClient:
 
     @weave.op
     async def call_tool(self, tool_name: str, arguments: dict[str, Any]):
-        """Call a tool on the MCP server
+        """Call a tool on the MCP server.
 
         Args:
             tool_name: Name of the tool to call
@@ -93,7 +93,7 @@ class MCPClient:
 
     @weave.op
     async def read_resource(self, uri: str):
-        """Read a resource from the MCP server
+        """Read a resource from the MCP server.
 
         Args:
             uri: URI of the resource to read
@@ -111,7 +111,7 @@ class MCPClient:
     async def get_prompt(
         self, prompt_name: str, arguments: dict[str, str] | None = None
     ):
-        """Get a prompt from the MCP server
+        """Get a prompt from the MCP server.
 
         Args:
             prompt_name: Name of the prompt to get
@@ -128,7 +128,7 @@ class MCPClient:
 
     @weave.op
     async def demo_all_tools(self):
-        """Demonstrate all available tools"""
+        """Demonstrate all available tools."""
         if not self.session:
             raise RuntimeError(
                 "Not connected to a server. Call connect_to_server first."
@@ -180,7 +180,7 @@ class MCPClient:
 
     @weave.op
     async def demo_all_resources(self):
-        """Demonstrate all available resources"""
+        """Demonstrate all available resources."""
         if not self.session:
             raise RuntimeError(
                 "Not connected to a server. Call connect_to_server first."
@@ -220,7 +220,7 @@ class MCPClient:
 
     @weave.op
     async def demo_all_prompts(self):
-        """Demonstrate all available prompts"""
+        """Demonstrate all available prompts."""
         if not self.session:
             raise RuntimeError(
                 "Not connected to a server. Call connect_to_server first."
@@ -257,7 +257,7 @@ class MCPClient:
 
     @weave.op
     async def interactive_session(self):
-        """Run an interactive session to use MCP tools and resources"""
+        """Run an interactive session to use MCP tools and resources."""
         if not self.session:
             raise RuntimeError(
                 "Not connected to a server. Call connect_to_server first."
@@ -401,13 +401,13 @@ class MCPClient:
                 print(f"Error: {e!s}")
 
     async def cleanup(self):
-        """Clean up resources"""
+        """Clean up resources."""
         await self.exit_stack.aclose()
 
 
 @weave.op
 async def run_client(server_path: str):
-    """Run the MCP client and connect to the specified server"""
+    """Run the MCP client and connect to the specified server."""
     client = MCPClient()
     try:
         await client.connect_to_server(server_path)

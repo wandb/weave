@@ -26,8 +26,7 @@ T = TypeVar("T", bound=str)
 
 
 class Content(BaseModel, Generic[T]):
-    """
-    A class to represent content from various sources, resolving them
+    """A class to represent content from various sources, resolving them
     to a unified byte-oriented representation with associated metadata.
 
     This class must be instantiated using one of its classmethods:
@@ -72,8 +71,7 @@ class Content(BaseModel, Generic[T]):
     _art: MemTraceFilesArtifact | None = PrivateAttr(None)
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
-        """
-        Direct initialization is disabled.
+        """Direct initialization is disabled.
         Please use a classmethod like `Content.from_path()` to create an instance.
         """
         raise NotImplementedError(
@@ -311,18 +309,16 @@ class Content(BaseModel, Generic[T]):
 
     @classmethod
     def _from_resolved_args(cls: type[Self], /, args: ResolvedContentArgs) -> Self:
-        """
-        Initializes Content from pre-existing ResolvedContentArgs
-        This is for internal use to reconstruct the Content object by the serialization layer
+        """Initializes Content from pre-existing ResolvedContentArgs
+        This is for internal use to reconstruct the Content object by the serialization layer.
         """
         return cls.model_construct(**args)
 
     def as_string(self) -> str:
-        """
-        Display the data as a string. Bytes are decoded using the `encoding` attribute
+        """Display the data as a string. Bytes are decoded using the `encoding` attribute
         If base64, the data will be re-encoded to base64 bytes then decoded to an ASCII string
         Returns:
-            str
+            str.
         """
         if self.encoding == "base64":
             return base64.b64encode(self.data).decode("ascii")
@@ -360,7 +356,7 @@ class Content(BaseModel, Generic[T]):
 
     def save(self, dest: str | Path) -> None:
         """Copy the file to the specified destination path.
-        Updates the filename and the path of the content to reflect the last saved copy
+        Updates the filename and the path of the content to reflect the last saved copy.
 
         Args:
             dest: Destination path where the file will be copied to (string or pathlib.Path)

@@ -74,8 +74,7 @@ class ServiceDependency:
         ] = (noop_trace_server_factory),
         auth_dependency: Callable[[], AuthParams] = lambda: AuthParams(),
     ):
-        """
-        Initialize with auth dependencies and server factory.
+        """Initialize with auth dependencies and server factory.
 
         Args:
             endpoint_auth_mapping: Dict mapping endpoint names directly to auth dependencies

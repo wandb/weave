@@ -10,8 +10,7 @@ WEAVE_TTFT = "_weave_time_to_first_token"
 
 
 def init_stream_tracking(obj: Any, start_time: float | None = None) -> None:
-    """
-    Initialize stream tracking on an object with a specific start time.
+    """Initialize stream tracking on an object with a specific start time.
 
     Args:
         obj: The object to track streaming metrics on.
@@ -40,8 +39,7 @@ def calculate_time_to_first_token(
     current_chunk: Any,
     content_detector: Callable,
 ) -> float | None:
-    """
-    Calculate time to first token if this is the first chunk with content.
+    """Calculate time to first token if this is the first chunk with content.
 
     Args:
         accumulator: The accumulated stream object with tracking attributes.
@@ -75,8 +73,7 @@ def calculate_time_to_first_token(
 
 
 def preserve_stream_attributes(source_obj: Any, target_obj: Any) -> None:
-    """
-    Preserve stream tracking attributes from source to target object.
+    """Preserve stream tracking attributes from source to target object.
 
     Args:
         source_obj: The object to copy attributes from.
@@ -99,8 +96,7 @@ def preserve_stream_attributes(source_obj: Any, target_obj: Any) -> None:
 
 
 def extract_time_to_first_token(obj: Any) -> float | None:
-    """
-    Extract the time to first token from an object.
+    """Extract the time to first token from an object.
 
     Args:
         obj: The object to extract TTFT from.
@@ -119,8 +115,7 @@ def extract_time_to_first_token(obj: Any) -> float | None:
 
 
 def add_time_to_first_token_to_dict(data_dict: dict, obj: Any) -> dict:
-    """
-    Add time to first token to a dictionary if available.
+    """Add time to first token to a dictionary if available.
 
     Args:
         data_dict: The dictionary to add TTFT to. Creates empty dict if None.

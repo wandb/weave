@@ -642,8 +642,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
     def _expand_refs(
         self, data: dict[str, Any], expand_columns: list[str]
     ) -> dict[str, Any]:
-        """
-        Recursively expand refs in the data. Only expand refs if requested in the
+        """Recursively expand refs in the data. Only expand refs if requested in the
         expand_columns list. expand_columns must be sorted by depth, shallowest first.
         """
         cols = sorted(expand_columns, key=lambda x: x.count("."))
@@ -1014,7 +1013,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
     def table_create_from_digests(
         self, req: tsi.TableCreateFromDigestsReq
     ) -> tsi.TableCreateFromDigestsRes:
-        """Create a table by specifying row digests, instead actual rows"""
+        """Create a table by specifying row digests, instead actual rows."""
         conn, cursor = get_conn_cursor(self.db_path)
 
         # Calculate table digest from row digests

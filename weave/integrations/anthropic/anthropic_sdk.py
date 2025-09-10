@@ -80,7 +80,7 @@ def should_use_accumulator(inputs: dict) -> bool:
 
 def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
-        "We need to do this so we can check if `stream` is used"
+        """We need to do this so we can check if `stream` is used."""
         op_kwargs = settings.model_dump()
         op = weave.op(fn, **op_kwargs)
         return _add_accumulator(

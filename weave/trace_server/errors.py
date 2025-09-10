@@ -113,18 +113,13 @@ class ErrorWithStatus:
 
 
 # Error Registry System
+@dataclass
 class ErrorDefinition:
     """Represents a single error handler definition."""
 
-    def __init__(
-        self,
-        exception_class: type,
-        status_code: int,
-        formatter: Callable[[Exception], dict[str, Any]],
-    ):
-        self.exception_class = exception_class
-        self.status_code = status_code
-        self.formatter = formatter
+    exception_class: type
+    status_code: int
+    formatter: Callable[[Exception], dict[str, Any]]
 
 
 # Global registry instance
@@ -248,8 +243,7 @@ def get_registered_error_classes() -> list[type[Exception]]:
 
 
 def handle_clickhouse_query_error(e: Exception) -> None:
-    """
-    Handle common ClickHouse query errors by raising appropriate custom exceptions.
+    """Handle common ClickHouse query errors by raising appropriate custom exceptions.
 
     Args:
         e: The original exception from ClickHouse

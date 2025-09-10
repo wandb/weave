@@ -1,4 +1,4 @@
-"""This module contains test utilities that are useful for mocking litellm completions responses (used by the playground and completion endpoints)"""
+"""This module contains test utilities that are useful for mocking litellm completions responses (used by the playground and completion endpoints)."""
 
 from contextlib import contextmanager
 from unittest.mock import patch
@@ -16,8 +16,7 @@ def with_mock_litellm_completion(response_dict: dict):
 
 @contextmanager
 def with_choice_mock_litellm_completion(choice_dict: dict):
-    """
-    Simple mock for litellm completions where you just want to return a fixed response.
+    """Simple mock for litellm completions where you just want to return a fixed response.
     This is useful for testing the completion endpoint.
     """
     with with_mock_litellm_completion(

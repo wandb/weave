@@ -1,5 +1,4 @@
-"""
-Tests for the CrossProcessTraceServer components.
+"""Tests for the CrossProcessTraceServer components.
 
 This module tests the low-level cross-process communication between
 child processes and the main process, including error handling,
@@ -329,7 +328,7 @@ class TestCrossProcessTraceServerReceiver:
             # This would normally be caught by the type system, but we're testing error handling
             with pytest.raises(AttributeError):
                 # This should fail because MockTraceServer doesn't have this method
-                mock_server.nonexistent_method
+                _ = mock_server.nonexistent_method
 
         finally:
             sender.stop()

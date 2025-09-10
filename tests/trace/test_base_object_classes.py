@@ -1,5 +1,4 @@
-"""
-This test file ensures the base_object_classes behavior is as expected. Specifically:
+"""This test file ensures the base_object_classes behavior is as expected. Specifically:
 1. We ensure that pythonic publishing and getting of objects:
     a. Results in the correct base_object_class filter in the query.
     b. Produces identical results.
@@ -32,8 +31,7 @@ def with_base_object_class_annotations(
     class_name: str,
     base_object_name: Optional[Literal["Object", "BaseObject"]] = None,
 ):
-    """
-    When serializing pydantic objects, add additional fields to indicate the class information. This is
+    """When serializing pydantic objects, add additional fields to indicate the class information. This is
     a utlity to perform that mapping for the purposes of testing. We want to ensure that both the client
     and server agree on this structure, therefore I am adding this utility here.
     """

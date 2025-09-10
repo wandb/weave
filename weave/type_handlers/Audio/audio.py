@@ -37,6 +37,7 @@ def audio_filename(ext: str) -> str:
 
 def get_format_from_filename(filename: str) -> str:
     """Get the file format from a filename.
+
     Args:
         filename: The filename to extract the format from
     Returns:

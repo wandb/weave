@@ -1458,11 +1458,10 @@ def row_gen(num_rows: int, approx_row_bytes: int = 1024):
 
 @pytest.mark.parametrize("use_parallel_table_upload", [False, True])
 def test_table_partitioning(network_proxy_client, use_parallel_table_upload):
-    """
-    This test is specifically testing the correctness
+    """This test is specifically testing the correctness
     of the table partitioning logic in the remote client.
     In particular, the ability to partition large dataset
-    creation into multiple updates
+    creation into multiple updates.
     """
     client, remote_client, records = network_proxy_client
 

@@ -405,7 +405,7 @@ from weave.trace_server import trace_server_interface as tsi
     ],
 )
 def test_general_arg_variations(client, fn, arg_variations):
-    """In this test, `fn` is expect to return the value of the inputs"""
+    """In this test, `fn` is expect to return the value of the inputs."""
     wrapped_fn = weave.op()(fn)
     for ndx, variation in enumerate(arg_variations):
         args = variation[0]

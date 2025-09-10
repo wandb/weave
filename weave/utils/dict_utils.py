@@ -136,8 +136,7 @@ def zip_dicts(base_dict: dict[str, Any], new_dict: dict[str, Any]) -> dict[str, 
 def flatten_attributes(
     data: dict[str, Any], json_attributes: Optional[list[str]] = None
 ) -> dict[str, Any]:
-    """
-    Flatten a nested Python dictionary into a flat dictionary with dot-separated keys.
+    """Flatten a nested Python dictionary into a flat dictionary with dot-separated keys.
 
     Args:
         data: Nested Python dictionary to flatten

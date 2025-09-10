@@ -28,7 +28,7 @@ def set_ref(obj: Any, ref: Ref | None) -> None:
         obj.ref = ref
     except:
         try:
-            setattr(obj, "ref", ref)
+            obj.ref = ref
         except:
             try:
                 obj.__dict__["ref"] = ref

@@ -35,8 +35,7 @@ class CacheRecorder(TypedDict):
 
 
 def digest_is_cacheable(digest: str) -> bool:
-    """
-    Check if a digest is cacheable.
+    """Check if a digest is cacheable.
 
     Examples:
     - v1 -> False
@@ -105,8 +104,7 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
             logger.exception("Error closing cache")
 
     def get_call_processor(self) -> AsyncBatchProcessor | None:
-        """
-        Custom method not defined on the formal TraceServerInterface to expose
+        """Custom method not defined on the formal TraceServerInterface to expose
         the underlying call processor. Should be formalized in a client-side interface.
         """
         if hasattr(self._next_trace_server, "get_call_processor"):
@@ -114,8 +112,7 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         return None
 
     def get_feedback_processor(self) -> AsyncBatchProcessor | None:
-        """
-        Custom method not defined on the formal TraceServerInterface to expose
+        """Custom method not defined on the formal TraceServerInterface to expose
         the underlying feedback processor. Should be formalized in a client-side interface.
         """
         if hasattr(self._next_trace_server, "get_feedback_processor"):

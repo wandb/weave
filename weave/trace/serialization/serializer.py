@@ -1,7 +1,6 @@
-"""Pluggable object serializers for Weave
+"""Pluggable object serializers for Weave.
 
 Example:
-
 ```
 import faiss
 

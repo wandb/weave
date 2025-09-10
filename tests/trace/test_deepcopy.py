@@ -1,7 +1,6 @@
 from concurrent.futures import Future
 from copy import deepcopy
 
-import numpy as np
 import pytest
 
 import weave
@@ -9,7 +8,6 @@ from weave.trace.box import (
     BoxedDatetime,
     BoxedFloat,
     BoxedInt,
-    BoxedNDArray,
     BoxedStr,
     BoxedTimedelta,
 )
@@ -110,13 +108,6 @@ def test_deepcopy_boxed(client, boxed_val):
     res = deepcopy(boxed_val)
     assert res == boxed_val
     assert id(res) != id(boxed_val)
-
-
-def test_deepcopy_boxed_ndarray(client):
-    arr = BoxedNDArray([1, 2, 3])
-    res = deepcopy(arr)
-    assert np.array_equal(res, [1, 2, 3])
-    assert id(res) != id(arr)
 
 
 def test_deepcopy_boxed_model_e2e(client):

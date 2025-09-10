@@ -101,8 +101,7 @@ class AnnotationSpec(base_object_def.BaseObject):
         return schema
 
     def value_is_valid(self, payload: Any) -> bool:
-        """
-        Validates a payload against this annotation spec's schema.
+        """Validates a payload against this annotation spec's schema.
 
         Args:
             payload: The data to validate against the schema

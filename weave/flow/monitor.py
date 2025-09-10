@@ -13,11 +13,9 @@ from weave.trace_server.interface.query import Query
 
 @register_object
 class Monitor(Object):
-    """
-    Sets up a monitor to score incoming calls automatically.
+    """Sets up a monitor to score incoming calls automatically.
 
     Examples:
-
     ```python
     import weave
     from weave.scorers import ValidJSONScorer

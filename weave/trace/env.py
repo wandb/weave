@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 class Settings:
-    """A minimal readonly implementation of wandb/old/settings.py for reading settings"""
+    """A minimal readonly implementation of wandb/old/settings.py for reading settings."""
 
     DEFAULT_SECTION = "default"
     DEFAULT_BASE_URL = "https://api.wandb.ai"

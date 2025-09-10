@@ -68,8 +68,7 @@ def check_cuda(device: str) -> None:
 
 
 class HuggingFacePipelineScorer(weave.Scorer):
-    """
-    Base class for using Hugging Face pipelines for moderation scoring.
+    """Base class for using Hugging Face pipelines for moderation scoring.
 
     This class simplifies the use of Hugging Face pipelines by handling the initialization and providing a common interface for scoring.
 
@@ -163,8 +162,7 @@ class HuggingFaceScorer(weave.Scorer):
 
 
 class RollingWindowScorer(HuggingFaceScorer):
-    """
-    Base Scorer class that handles rolling window processing for long inputs.
+    """Base Scorer class that handles rolling window processing for long inputs.
 
     Args:
         max_tokens: Maximum number of tokens per window.
@@ -187,8 +185,7 @@ class RollingWindowScorer(HuggingFaceScorer):
         raise NotImplementedError("Subclasses must implement predict_chunk method.")
 
     def _tokenize_input(self, prompt: str) -> "torch.Tensor":
-        """
-        Tokenize the input prompt without truncation.
+        """Tokenize the input prompt without truncation.
 
         Args:
             prompt: The input text to tokenize.
@@ -204,8 +201,7 @@ class RollingWindowScorer(HuggingFaceScorer):
     def _aggregate_predictions(
         self, all_predictions: list[list[Union[int, float]]]
     ) -> list[float]:
-        """
-        Aggregate predictions using the specified class attribute method.
+        """Aggregate predictions using the specified class attribute method.
 
         Args:
             all_predictions: List of prediction lists from chunks.
@@ -233,8 +229,7 @@ class RollingWindowScorer(HuggingFaceScorer):
         return aggregated
 
     def _predict_long(self, input_ids: "torch.Tensor") -> list[float]:
-        """
-        Handle prediction for long inputs by processing in overlapping windows.
+        """Handle prediction for long inputs by processing in overlapping windows.
 
         Args:
             input_ids: Tokenized input IDs.
@@ -260,8 +255,7 @@ class RollingWindowScorer(HuggingFaceScorer):
         return final_predictions
 
     def _predict(self, prompt: str) -> list[float]:
-        """
-        Predict scores for the input prompt, handling long inputs if necessary.
+        """Predict scores for the input prompt, handling long inputs if necessary.
 
         Args:
             prompt (str): The input text to evaluate.

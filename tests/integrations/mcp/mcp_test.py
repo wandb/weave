@@ -50,7 +50,7 @@ def mcp_server():
 
 
 async def run_client():
-    """Run the client and connect to the MCP server"""
+    """Run the client and connect to the MCP server."""
     # Configure the server parameters
     server_params = StdioServerParameters(
         command="python",
@@ -98,7 +98,7 @@ async def run_client():
 
 
 def main():
-    """Main entry point"""
+    """Main entry point."""
     asyncio.run(run_client())
 
 

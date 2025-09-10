@@ -64,8 +64,7 @@ def json_dump_field_as_sql(
     cast: Optional[tsi_query.CastTo] = None,
     use_agg_fn: bool = True,
 ) -> str:
-    """
-    Build SQL for JSON field access with optional type conversion.
+    """Build SQL for JSON field access with optional type conversion.
 
     Args:
         pb: Parameter builder for SQL parameters

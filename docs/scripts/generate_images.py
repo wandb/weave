@@ -21,8 +21,7 @@ async def generate_screenshot_from_browser(
     local_storage: Optional[dict[str, str]] = None,
     zoom: Optional[float] = None,
 ) -> None:
-    """
-    Generate a screenshot from a web page using a headless browser.
+    """Generate a screenshot from a web page using a headless browser.
 
     This function loads the specified URL in a headless browser, optionally performs
     a series of clicks, selects a specific DOM element, and captures a screenshot.

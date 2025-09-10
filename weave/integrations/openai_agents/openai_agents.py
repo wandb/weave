@@ -1,5 +1,4 @@
-"""
-A Weave integration for OpenAI Agents.
+"""A Weave integration for OpenAI Agents.
 
 This module provides a TracingProcessor implementation that logs OpenAI
 Agent traces and spans to Weave.
@@ -57,8 +56,7 @@ class WeaveDataDict(TypedDict):
 
 
 class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralTypeIssues]
-    """
-    A TracingProcessor implementation that logs OpenAI Agent traces and spans to Weave.
+    """A TracingProcessor implementation that logs OpenAI Agent traces and spans to Weave.
 
     This processor captures different types of spans from OpenAI Agents (agent execution,
     function calls, LLM generations, etc.) and logs them to Weave as structured trace data.
@@ -457,8 +455,7 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
 
 
 class OpenAIAgentsPatcher(Patcher):
-    """
-    A patcher for OpenAI Agents that manages the lifecycle of a WeaveTracingProcessor.
+    """A patcher for OpenAI Agents that manages the lifecycle of a WeaveTracingProcessor.
 
     Unlike other patchers that modify function behavior, this patcher installs and
     removes a processor from the OpenAI Agents tracing system.
@@ -494,8 +491,7 @@ class OpenAIAgentsPatcher(Patcher):
 def get_openai_agents_patcher(
     settings: IntegrationSettings | None = None,
 ) -> OpenAIAgentsPatcher | NoOpPatcher:
-    """
-    Get a patcher for OpenAI Agents integration.
+    """Get a patcher for OpenAI Agents integration.
 
     Args:
         settings: Optional integration settings to configure the patcher.

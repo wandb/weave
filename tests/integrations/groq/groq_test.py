@@ -306,7 +306,7 @@ def test_groq_tool_call(
 
     @weave.op
     def get_game_score(team_name: str) -> str:
-        """Get the current score for a given NBA game"""
+        """Get the current score for a given NBA game."""
         if "warriors" in team_name.lower():
             return json.dumps(
                 {

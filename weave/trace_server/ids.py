@@ -34,7 +34,7 @@ def _generate_uuidv7_bytes() -> bytes:
 def generate_id() -> str:
     """Should be used to generate IDs for trace calls.
     We use UUIDv7, which has a timestamp prefix, so that the IDs, while random,
-    are sortable by time. See RFC9562 https://www.rfc-editor.org/rfc/rfc9562
+    are sortable by time. See RFC9562 https://www.rfc-editor.org/rfc/rfc9562.
 
     Random space is 2^74, which is less than 2^122 (UUIDv4), but still plenty
     for our use case.

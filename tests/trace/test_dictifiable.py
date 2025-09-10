@@ -2,7 +2,7 @@ import weave
 
 
 def test_dictifiable(client):
-    class NonDictifiable:
+    class NonDictifiable:  # noqa: B903
         attr: int
 
         def __init__(self, attr: int):

@@ -47,7 +47,7 @@ def test_image_thread_safety(i):
     image = get_image()
 
     def load():
-        """Load the image in a thread to avoid blocking the event loop"""
+        """Load the image in a thread to avoid blocking the event loop."""
         for _ in range(10):
             image.load()
 
@@ -61,7 +61,8 @@ def test_image_thread_safety(i):
 @pytest.mark.asyncio
 async def test_async_image_loading():
     """Test that loading an image directly from multiple async coroutines works safely.
-    This test verifies that our locking works even with direct calls from async code."""
+    This test verifies that our locking works even with direct calls from async code.
+    """
     image = get_image()
 
     async def load_async():
@@ -77,11 +78,12 @@ async def test_async_image_loading():
 @pytest.mark.asyncio
 async def test_async_thread_image_loading():
     """Test that loading an image safely from multiple async coroutines using to_thread.
-    This test represents the recommended way to handle PIL operations in async code."""
+    This test represents the recommended way to handle PIL operations in async code.
+    """
     image = get_image()
 
     async def load_async():
-        """Load the image in a thread to avoid blocking the event loop"""
+        """Load the image in a thread to avoid blocking the event loop."""
         await asyncio.sleep(0.1)
         # Use to_thread to avoid blocking event loop with synchronous load()
         for _ in range(10):

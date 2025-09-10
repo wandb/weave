@@ -161,7 +161,7 @@ def resolve_var(fn: Callable, var_name: str) -> Any:
 
 
 class RefJSONEncoder(json.JSONEncoder):
-    """Json encoder used for convert storage.to_json_with_refs result to python code"""
+    """Json encoder used for convert storage.to_json_with_refs result to python code."""
 
     SPECIAL_REF_TOKEN = "__WEAVE_REF__"
 
@@ -478,7 +478,7 @@ def _has_memory_address(obj: Any) -> bool:
 
 
 def _replace_memory_address(json_val: str) -> str:
-    """Turn <Function object at 0x10c349010> into <Function object at 0x000000000>"""
+    """Turn <Function object at 0x10c349010> into <Function object at 0x000000000>."""
 
     def _replacement_with_same_length(match: re.Match[str]) -> str:
         # Get matched text and replace with 0s of the same length

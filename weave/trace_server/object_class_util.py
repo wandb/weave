@@ -54,8 +54,7 @@ class ProcessIncomingObjectResult(TypedDict):
 def process_incoming_object_val(
     val: Any, req_builtin_object_class: Optional[str] = None
 ) -> ProcessIncomingObjectResult:
-    """
-    This method is responsible for accepting an incoming object from the user and validating it
+    """This method is responsible for accepting an incoming object from the user and validating it
     against the object class. It adds the _class_name and _bases keys correctly and returns the object
     with the base object class set. It does not mutate the original object, but returns a new object
     with values set if needed.
@@ -151,8 +150,7 @@ def dump_object(val: BaseModel) -> dict:
 
 
 def _general_dump(val: Any) -> Any:
-    """
-    This is a helper function that dumps a value into a dict. It is used to convert
+    """This is a helper function that dumps a value into a dict. It is used to convert
     pydantic objects to dicts in a recursive manner.
     """
     if isinstance(val, BaseModel):

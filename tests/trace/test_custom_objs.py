@@ -53,7 +53,8 @@ def test_inline_custom_obj(client):
 def test_inline_custom_obj_needs_load_op(client):
     """Test the condition that the current version of the SDK doesn't know how to load the object.
 
-    In that case we fallback to the saved load op."""
+    In that case we fallback to the saved load op.
+    """
     md = rich.markdown.Markdown("# Hello")
 
     @weave.op

@@ -52,8 +52,7 @@ def stats_query(client: WeaveClient, query: Query) -> CallsQueryStatsReq:
 async def perform_scorer_tests(
     client: WeaveClient, s0_v0: Scorer | Op, s0_v1: Scorer | Op, s1_v0: Scorer | Op
 ):
-    """
-    This is a unified test for both scorer and op tests. It ensures that we can query for calls
+    """This is a unified test for both scorer and op tests. It ensures that we can query for calls
     that have been scored by any type of scorer and ensures that we correctly differentiate between
     versions of the same scorer.
 

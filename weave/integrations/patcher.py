@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import Any, Callable
 
 from weave.trace.context.tests_context import get_raise_on_captured_errors
@@ -55,10 +56,10 @@ class MultiPatcher(Patcher):
         return all_successful
 
 
+@dataclass
 class _SymbolTarget:
-    def __init__(self, base_symbol: Any, attr: str) -> None:
-        self.base_symbol = base_symbol
-        self.attr = attr
+    base_symbol: Any
+    attr: str
 
 
 class SymbolPatcher(Patcher):

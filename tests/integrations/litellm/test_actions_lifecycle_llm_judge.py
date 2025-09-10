@@ -1,6 +1,5 @@
-"""
-The only reason this test is here is to piggy back off the existing litellm test environment.
-TODO: merge this back into `test_actions_lifecycle.py`
+"""The only reason this test is here is to piggy back off the existing litellm test environment.
+TODO: merge this back into `test_actions_lifecycle.py`.
 """
 
 import os

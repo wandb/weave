@@ -1,5 +1,4 @@
-"""
-Weave SDK Code Generator
+"""Weave SDK Code Generator.
 
 This module provides a command line interface for generating code from the OpenAPI
 specification of the Weave SDK.
@@ -623,7 +622,7 @@ def all(
 
 
 def header(text: str):
-    """Display a prominent header"""
+    """Display a prominent header."""
     print(f"╔{'═' * (len(text) + 6)}╗")
     print(f"║   {text}   ║")
     print(f"╚{'═' * (len(text) + 6)}╝")

@@ -26,8 +26,7 @@ _mimetypes_module: ModuleType | None = None
 
 
 def _get_mimetypes_module() -> ModuleType:
-    """
-    Lazily import and initialize the mimetypes module.
+    """Lazily import and initialize the mimetypes module.
 
     This ensures the module is only loaded into memory when it's first needed
     and that its custom types are only added once.
