@@ -184,7 +184,7 @@ autogen_tests = [
   "autogen-ext[openai]>=0.5.7",
   "openai>=1.99.9,<1.100.0",
 ]
-verifiers = ["verifiers>=0.1.3.post0"]
+verifiers = ["verifiers>=0.1.3.post0", "nltk", "textarena"]
 
 test = [
   "nox",
