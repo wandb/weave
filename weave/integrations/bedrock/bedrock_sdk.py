@@ -8,8 +8,8 @@ from typing import TYPE_CHECKING, Any, Callable, Optional
 import boto3
 
 import weave
+from weave.trace.call import Call
 from weave.trace.op import _add_accumulator, _IteratorWrapper
-from weave.trace.weave_client import Call
 
 if TYPE_CHECKING:
     from botocore.client import BaseClient
@@ -237,6 +237,10 @@ def create_stream_wrapper(
                             self._iterator_or_ctx_manager.get("stream")
                         )
                     return self
+
+            def __getitem__(self, key: str) -> Any:
+                """Make the wrapper subscriptable by delegating to get method."""
+                return self.get(key)
 
         return _add_accumulator(
             op,

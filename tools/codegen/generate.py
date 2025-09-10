@@ -235,7 +235,7 @@ def update_pyproject(
         location = (
             f"in [{optional_extra}]" if optional_extra else "in main dependencies"
         )
-        info(f"Updated {package_name} dependency {location} to version: {version}")
+        info(f"Updated {package_name} in [stainless] extra {location} to version: {version}")
     else:
         repo_info = _get_repo_info(python_output)
         remote_url = repo_info.remote_url
@@ -243,13 +243,205 @@ def update_pyproject(
         if not sha:
             error(f"Failed to get git SHA (got: {sha=})")
             sys.exit(1)
-        _update_pyproject_toml(
-            package_name, f"{remote_url}@{sha}", False, optional_extra
+        _update_pyproject_toml(package_name, f"{remote_url}@{sha}", False)
+        info(f"Updated {package_name} in [stainless] extra to SHA: {sha}")
+
+
+@app.command()
+def merge_generated_code(
+    python_output: Annotated[
+        Path, typer.Argument(help="Path to generated Python code (weave-stainless)")
+    ],
+    package_name: Annotated[
+        str, typer.Argument(help="Name of the package to update in pyproject.toml")
+    ],
+) -> None:
+    """Create a branch from main with the generated code and update pyproject.toml.
+
+    This command:
+    1. Gets the current branch name from the weave repo
+    2. Switches to main and pulls latest in weave-stainless
+    3. Creates a new branch (weave/<current-branch>) from main
+    4. Uses 'git checkout <generation-branch> -- .' to replace content
+    5. Commits the changes to the new branch
+    6. Updates pyproject.toml with the new SHA
+
+    Note: This does NOT merge to main directly - it creates a feature branch.
+    """
+    header("Creating branch with generated code")
+
+    # Get current branch name in weave repo
+    try:
+        current_branch = subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=SUBPROCESS_TIMEOUT,
+            check=True,
+        ).stdout.strip()
+        info(f"Current weave branch: {current_branch}")
+    except subprocess.CalledProcessError as e:
+        error(f"Failed to get current branch: {e}")
+        sys.exit(1)
+    except subprocess.TimeoutExpired:
+        error("Timeout while getting current branch")
+        sys.exit(1)
+
+    # Navigate to weave-stainless repo
+    if not python_output.exists():
+        print(f"python_output: {python_output}")
+        # List contents of python_output directory for debugging
+        info(f"Listing contents of parent directory: {python_output.parent}")
+        try:
+            for item in python_output.parent.iterdir():
+                info(f"  {item.name} ({'dir' if item.is_dir() else 'file'})")
+        except Exception as e:
+            warning(f"Could not list parent directory: {e}")
+        error(f"Python output directory does not exist: {python_output}")
+        sys.exit(1)
+
+    try:
+        # The generated code is on the local main branch after stainless generation
+        # We need to create a branch from this main that has the generated code
+        info("Checking current branch in weave-stainless...")
+        current_stainless_branch = subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            cwd=python_output,
+            capture_output=True,
+            text=True,
+            timeout=SUBPROCESS_TIMEOUT,
+            check=True,
+        ).stdout.strip()
+        info(f"Currently on branch: {current_stainless_branch}")
+
+        # Ensure we're on main which should have the generated code
+        if current_stainless_branch != "main":
+            info("Switching to main branch (which has generated code)...")
+            subprocess.run(
+                ["git", "checkout", "main"],
+                cwd=python_output,
+                capture_output=True,
+                timeout=SUBPROCESS_TIMEOUT,
+                check=True,
+            )
+
+        # NOTE: Do NOT pull from origin here! That would overwrite the generated code.
+        # The main branch should already have the locally generated code from stainless.
+
+        # Create branch from main (with generated code) matching weave branch
+        mirror_branch = f"weave/{current_branch}"
+        info(f"Creating branch from main (with generated code): {mirror_branch}")
+
+        # Check if branch exists
+        branch_exists = (
+            subprocess.run(
+                ["git", "show-ref", "--verify", f"refs/heads/{mirror_branch}"],
+                cwd=python_output,
+                capture_output=True,
+                timeout=SUBPROCESS_TIMEOUT,
+            ).returncode
+            == 0
         )
-        location = (
-            f"in [{optional_extra}]" if optional_extra else "in main dependencies"
+
+        if branch_exists:
+            # Delete the existing branch first so we can recreate it from origin/main
+            info(
+                f"Deleting existing branch {mirror_branch} to recreate with new generated code..."
+            )
+            subprocess.run(
+                ["git", "branch", "-D", mirror_branch],
+                cwd=python_output,
+                capture_output=True,
+                timeout=SUBPROCESS_TIMEOUT,
+                check=True,
+            )
+
+        # Create new branch from ORIGIN/main (clean remote state)
+        info(f"Creating new branch {mirror_branch} from origin/main (clean base)...")
+        subprocess.run(
+            ["git", "checkout", "-b", mirror_branch, "origin/main"],
+            cwd=python_output,
+            capture_output=True,
+            timeout=SUBPROCESS_TIMEOUT,
+            check=True,
         )
-        info(f"Updated {package_name} dependency {location} to SHA: {sha}")
+
+        # Now checkout the generated code from LOCAL main into this branch
+        info("Applying generated code from local main branch...")
+        subprocess.run(
+            ["git", "checkout", "main", "--", "."],
+            cwd=python_output,
+            capture_output=True,
+            timeout=SUBPROCESS_TIMEOUT,
+            check=True,
+        )
+
+        # Check if there are changes to commit
+        status_result = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=python_output,
+            capture_output=True,
+            text=True,
+            timeout=SUBPROCESS_TIMEOUT,
+            check=True,
+        )
+
+        if status_result.stdout.strip():
+            # Stage all changes
+            info("Staging changes...")
+            subprocess.run(
+                ["git", "add", "."],
+                cwd=python_output,
+                capture_output=True,
+                timeout=SUBPROCESS_TIMEOUT,
+                check=True,
+            )
+
+            # Commit changes
+            commit_message = (
+                f"Update generated code from weave branch: {current_branch}"
+            )
+            info(f"Committing: {commit_message}")
+            subprocess.run(
+                ["git", "commit", "-m", commit_message],
+                cwd=python_output,
+                capture_output=True,
+                timeout=SUBPROCESS_TIMEOUT,
+                check=True,
+            )
+
+            # Push the branch
+            info(f"Pushing branch {mirror_branch}...")
+            subprocess.run(
+                ["git", "push", "origin", mirror_branch],
+                cwd=python_output,
+                capture_output=True,
+                timeout=SUBPROCESS_TIMEOUT,
+                check=True,
+            )
+        else:
+            info("No changes to commit (generated code may already be on origin/main)")
+
+        # Always update pyproject.toml with the current SHA, whether we committed or not
+        # Get the current SHA of the branch
+        repo_info = _get_repo_info(python_output)
+        sha = repo_info.sha
+        remote_url = repo_info.remote_url
+
+        # Update pyproject.toml with the SHA
+        info(f"Updating pyproject.toml [stainless] extra with SHA: {sha}")
+        _update_pyproject_toml(package_name, f"{remote_url}@{sha}", False)
+
+        info(f"Successfully updated {package_name} in [stainless] extra to SHA: {sha}")
+
+    except subprocess.CalledProcessError as e:
+        error(f"Git operation failed: {e}")
+        if e.stderr:
+            error(f"Error output: {e.stderr}")
+        sys.exit(1)
+    except subprocess.TimeoutExpired:
+        error("Git operation timed out")
+        sys.exit(1)
 
 
 @app.command()
@@ -285,6 +477,13 @@ def all(
         bool | None,
         Option("--release", help="Update to the latest version"),
     ] = None,
+    auto_merge: Annotated[
+        bool,
+        Option(
+            "--auto-merge",
+            help="Automatically create a branch with generated code after generation",
+        ),
+    ] = True,
 ) -> None:
     """Run all code generation commands in sequence.
 
@@ -292,6 +491,7 @@ def all(
     1. Retrieve the OpenAPI specification.
     2. Generate code using Stainless for the specified platforms.
     3. Update the pyproject.toml file with the generated package information.
+    4. (Optional) Create a branch from main with generated code using --auto-merge flag.
     Configurations can be provided via a YAML file or directly as command-line arguments.
     """
     header("Running weave codegen")
@@ -406,14 +606,24 @@ def all(
         typescript_path=typescript_path,
     )
 
-    # 3. Update pyproject.toml
+    # 3. Update pyproject.toml or create branch with generated code
     release = cfg.get("release", False)
-    _format_announce_invoke(
-        update_pyproject,
-        python_output=Path(str_path),
-        package_name=cfg["package_name"],
-        release=release,
-    )
+
+    if auto_merge:
+        # If auto-merge is enabled, create a branch with the generated code
+        _format_announce_invoke(
+            merge_generated_code,
+            python_output=Path(str_path),
+            package_name=cfg["package_name"],
+        )
+    else:
+        # Regular update without merge
+        _format_announce_invoke(
+            update_pyproject,
+            python_output=Path(str_path),
+            package_name=cfg["package_name"],
+            release=release,
+        )
 
     print("\n")
     header("Weave codegen completed successfully!")
@@ -563,6 +773,7 @@ def _update_pyproject_toml(
     value: str,
     is_version: bool,
     optional_extra: str | None = None,
+    use_stainless_extra: bool = True,
 ) -> None:
     """Update the dependency entry for the given package in the pyproject.toml file.
 
@@ -575,13 +786,36 @@ def _update_pyproject_toml(
         is_version: Whether the value is a version (True) or git SHA (False).
         optional_extra: If provided, update the dependency in this optional extra
                         instead of the main dependencies.
+
+    If use_stainless_extra is True, updates the package in the 'stainless' extra
+    under optional-dependencies instead of main dependencies.
     """
     pyproject_path = Path("pyproject.toml")
 
     with open(pyproject_path) as f:
         doc = tomlkit.parse(f.read())
 
-    # Determine which dependencies list to update
+    # Determine which dependencies section to update
+    if use_stainless_extra:
+        # Update in the stainless extra under optional-dependencies
+        if "optional-dependencies" not in doc["project"]:
+            doc["project"]["optional-dependencies"] = tomlkit.table()
+
+        if "stainless" not in doc["project"]["optional-dependencies"]:
+            doc["project"]["optional-dependencies"]["stainless"] = tomlkit.array()
+
+        # Ensure stainless is a tomlkit array for consistent formatting
+        if not isinstance(
+            doc["project"]["optional-dependencies"]["stainless"], tomlkit.items.Array
+        ):
+            stainless_deps = tomlkit.array()
+            stainless_deps.extend(doc["project"]["optional-dependencies"]["stainless"])
+            doc["project"]["optional-dependencies"]["stainless"] = stainless_deps
+
+        dependencies = doc["project"]["optional-dependencies"]["stainless"]
+    else:
+        # Update in main dependencies (original behavior)
+        # Determine which dependencies list to update
     if optional_extra:
         # Update optional dependencies
         if "project" not in doc or "optional-dependencies" not in doc["project"]:
@@ -604,14 +838,16 @@ def _update_pyproject_toml(
     else:
         # Update main dependencies
         # Ensure dependencies is a tomlkit array for consistent formatting
-        if not isinstance(doc["project"]["dependencies"], tomlkit.items.Array):
-            dependencies = tomlkit.array()
-            dependencies.extend(doc["project"]["dependencies"])
-            doc["project"]["dependencies"] = dependencies
+            if not isinstance(doc["project"]["dependencies"], tomlkit.items.Array):
+                dependencies = tomlkit.array()
+                dependencies.extend(doc["project"]["dependencies"])
+                doc["project"]["dependencies"] = dependencies
 
-        dependencies = doc["project"]["dependencies"]
+            dependencies = doc["project"]["dependencies"]
 
     # Update the matching dependency
+
+    # Update the package dependency
     for i, dep in enumerate(dependencies):
         if dep.startswith(package):
             if is_version:

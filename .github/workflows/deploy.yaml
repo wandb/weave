@@ -4,11 +4,10 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - '.github/workflows/deploy.yaml'
-      - 'docs/**'
+      - ".github/workflows/deploy.yaml"
+      - "docs/**"
     # Review gh actions docs if you want to further define triggers, paths, etc
     # https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#on
-
 
 jobs:
   deploy:
@@ -23,7 +22,7 @@ jobs:
         working-directory: docs
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v5
       - uses: actions/setup-node@v3
         with:
           node-version: 18
@@ -46,5 +45,3 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           # Build output to publish to the `gh-pages` branch:
           publish_dir: docs/build
-
-

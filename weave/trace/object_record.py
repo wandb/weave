@@ -5,9 +5,10 @@ import types
 from inspect import getmro, isclass
 from typing import Any, Callable
 
+from pydantic import BaseModel
+
 from weave.trace.op import is_op
 from weave.trace_server.client_server_common.pydantic_util import (
-    PydanticBaseModelGeneral,
     pydantic_asdict_one_level,
 )
 
@@ -65,7 +66,7 @@ def class_all_bases_names(cls: type) -> list[str]:
     return [c.__name__ for c in cls.mro()[1:-1]]
 
 
-def pydantic_object_record(obj: PydanticBaseModelGeneral) -> ObjectRecord:
+def pydantic_object_record(obj: BaseModel) -> ObjectRecord:
     attrs = pydantic_asdict_one_level(obj)
     for k, v in getmembers(obj, lambda x: is_op(x), lambda e: None):
         attrs[k] = types.MethodType(v, obj)

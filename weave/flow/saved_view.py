@@ -4,18 +4,18 @@ from datetime import datetime
 from typing import Any, Literal, TypedDict
 
 from pydantic import BaseModel
-from rich.table import Table
 
 from weave.trace import urls
 from weave.trace.api import publish as weave_publish
 from weave.trace.api import ref as weave_ref
+from weave.trace.call import CallsIter
 from weave.trace.context import weave_client_context
-from weave.trace.grid import Grid
-from weave.trace.refs import ObjectRef, parse_op_uri
-from weave.trace.rich import pydantic_util
+from weave.trace.display import display
+from weave.trace.display.grid import Grid
+from weave.trace.display.rich import pydantic_util
+from weave.trace.refs import ObjectRef, OpRef
 from weave.trace.traverse import ObjectPath, get_paths
 from weave.trace.vals import WeaveObject
-from weave.trace.weave_client import CallsIter
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.interface.builtin_object_classes.saved_view import Column, Pin
@@ -481,7 +481,7 @@ def render_status(value: Any) -> str:
 
 def render_cell(path: ObjectPath, value: Any) -> str:
     if path.elements[0] == "op_name":
-        op_ref = parse_op_uri(value)
+        op_ref = OpRef.parse_uri(value)
         return op_ref.name
     if path == ObjectPath(["summary", "weave", "status"]):
         return render_status(value)
@@ -765,7 +765,7 @@ class SavedView:
             p.text(self.to_rich_table_str())
 
     def to_rich_table_str(self) -> str:
-        table = Table(show_header=False)
+        table = display.Table(show_header=False)
         table.add_column("Key", justify="right", style="bold cyan")
         table.add_column("Value")
         table.add_row("Name", self.label)
@@ -786,7 +786,7 @@ class SavedView:
             try:
                 filters = query_to_filters(self.base.definition.query)
                 if filters:
-                    filters_table = Table()
+                    filters_table = display.Table()
                     filters_table.add_column("Field")
                     filters_table.add_column("Operator")
                     filters_table.add_column("Value")
@@ -799,7 +799,7 @@ class SavedView:
                 table.add_row("Query", str(self.base.definition.query))
 
         if self.base.definition.columns is not None:
-            columns_table = Table()
+            columns_table = display.Table()
             columns_table.add_column("Column")
             columns_table.add_column("Label")
             for col in self.base.definition.columns:
@@ -808,7 +808,7 @@ class SavedView:
         if self.base.definition.cols:
             # Create a nested table for column visibility
             # TODO: Maybe color the boolean value?
-            cols_table = Table()
+            cols_table = display.Table()
             cols_table.add_column("Column")
             cols_table.add_column("Show")
             for col_id, visible in self.base.definition.cols.items():

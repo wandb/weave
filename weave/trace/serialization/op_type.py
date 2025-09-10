@@ -16,17 +16,18 @@ from typing import Any, Callable, TypedDict, get_args, get_origin
 
 from weave.trace import settings
 from weave.trace.context.weave_client_context import get_weave_client
-from weave.trace.ipython import (
+from weave.trace.op import as_op, is_op
+from weave.trace.op_protocol import Op
+from weave.trace.refs import ObjectRef
+from weave.trace.serialization import serializer
+from weave.trace.serialization.mem_artifact import MemTraceFilesArtifact
+from weave.trace_server.trace_server_interface_util import str_digest
+from weave.utils.ipython import (
     ClassNotFoundError,
     get_class_source,
     is_running_interactively,
 )
-from weave.trace.op import Op, as_op, is_op
-from weave.trace.refs import ObjectRef
-from weave.trace.sanitize import REDACTED_VALUE, should_redact
-from weave.trace.serialization import serializer
-from weave.trace.serialization.mem_artifact import MemTraceFilesArtifact
-from weave.trace_server.trace_server_interface_util import str_digest
+from weave.utils.sanitize import REDACTED_VALUE, should_redact
 
 logger = logging.getLogger(__name__)
 
@@ -417,7 +418,7 @@ def _get_code_deps(
                         f"from {var_value.__module__} import {var_value.__name__}"
                     )
                     if var_value.__name__ != var_name:
-                        import_line += f"as {var_name}"
+                        import_line += f" as {var_name}"
 
                     import_code.append(import_line)
 
@@ -543,22 +544,55 @@ def save_instance(obj: Op, artifact: MemTraceFilesArtifact, name: str) -> None:
         code = []
 
     if settings.should_redact_pii():
-        from weave.trace.pii_redaction import redact_pii_string
+        from weave.utils.pii_redaction import redact_pii_string
 
         op_function_code = redact_pii_string(op_function_code)
 
-    if not WEAVE_OP_PATTERN.search(op_function_code):
-        op_function_code = "@weave.op()\n" + op_function_code
-    else:
-        op_function_code = WEAVE_OP_NO_PAREN_PATTERN.sub(
-            "@weave.op()", op_function_code
+    # Detect weave import and alias
+    has_weave_import = False
+    weave_alias = None
+    for imp in import_code:
+        if imp.strip().startswith("import weave"):
+            has_weave_import = True
+            if " as " in imp:
+                # Extract the alias (e.g., "wv" from "import weave as wv")
+                weave_alias = imp.strip().split()[-1]
+            break
+
+    # Determine the decorator pattern to use/check
+    decorator_prefix = weave_alias if weave_alias else "weave"
+    decorator_pattern = re.compile(rf"@{re.escape(decorator_prefix)}\.op(\(\))?")
+
+    # Check if the expected decorator exists
+    has_expected_decorator = decorator_pattern.search(op_function_code)
+
+    # Handle decorator normalization/addition
+    if has_expected_decorator:
+        # Normalize existing decorator to have parentheses
+        # Example: @weave.op -> @weave.op() or @wv.op -> @wv.op()
+        # (where decorator_prefix matches the actual import)
+        op_function_code = re.sub(
+            rf"@{re.escape(decorator_prefix)}\.op(?!\()",
+            f"@{decorator_prefix}.op()",
+            op_function_code,
         )
+    else:
+        # No decorator found, add one
+        # This happens when:
+        # - Op created programmatically: my_op = weave.op()(plain_func)
+        # - Anonymous ops: client.create_call("op_name", inputs)
+        # Example: plain function -> @weave.op() or @wv.op() prepended
+        op_function_code = f"@{decorator_prefix}.op()\n" + op_function_code
     code.append(op_function_code)
 
     with artifact.new_file(f"{name}.py") as f:
         assert isinstance(f, io.StringIO)
         import_block = "\n".join(import_code)
-        import_lines = ["import weave"] + import_block.split("\n")
+        # Only add "import weave" if it's not already present
+        if has_weave_import:
+            import_lines = import_block.splitlines()
+        else:
+            import_lines = ["import weave"] + import_block.splitlines()
         import_lines = dedupe_list(import_lines)
         import_lines = [l for l in import_lines if "weave.api" not in l]
         import_block = "\n".join(import_lines)

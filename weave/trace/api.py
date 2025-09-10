@@ -18,15 +18,16 @@ from weave.trace.constants import TRACE_OBJECT_EMOJI
 from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.context.call_context import get_current_call, require_current_call
-from weave.trace.op import PostprocessInputsFunc, PostprocessOutputFunc, as_op, op
-from weave.trace.refs import ObjectRef, parse_uri
+from weave.trace.display.term import configure_logger
+from weave.trace.op import as_op, op
+from weave.trace.op_protocol import PostprocessInputsFunc, PostprocessOutputFunc
+from weave.trace.refs import ObjectRef, Ref
 from weave.trace.settings import (
     UserSettings,
     parse_and_apply_settings,
     should_disable_weave,
 )
 from weave.trace.table import Table
-from weave.trace.term import configure_logger
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface.builtin_object_classes import leaderboard
 
@@ -60,7 +61,7 @@ def init(
     Args:
         project_name: The name of the Weights & Biases project to log to.
         settings: Configuration for the Weave client generally.
-        autopatch_settings: Configuration for autopatch integrations, e.g. openai
+        autopatch_settings: (Deprecated) Configuration for autopatch integrations. Use explicit patching instead.
         global_postprocess_inputs: A function that will be applied to all inputs of all ops.
         global_postprocess_output: A function that will be applied to all outputs of all ops.
         global_attributes: A dictionary of attributes that will be applied to all traces.
@@ -73,6 +74,9 @@ def init(
     Returns:
         A Weave client.
     """
+    if not project_name or not project_name.strip():
+        raise ValueError("project_name must be non-empty")
+
     configure_logger()
 
     if sys.version_info < (3, 10):
@@ -80,6 +84,19 @@ def init(
             "Python 3.9 will reach end of life in October 2025, after which weave will drop support for it.  Please upgrade to Python 3.10 or later!",
             DeprecationWarning,
             stacklevel=2,
+        )
+
+    # Check if deprecated autopatch_settings is used
+    if autopatch_settings is not None:
+        logger.warning(
+            "The 'autopatch_settings' parameter is deprecated and will be removed in a future version. "
+            "Please use explicit patching instead. For example:\n"
+            "----------------------------------------\n"
+            "    import weave\n"
+            f"    weave.init('{project_name}')\n"
+            "    weave.integrations.patch_openai()\n"
+            "----------------------------------------\n"
+            "See https://docs.wandb.ai/guides/integrations for more information.",
         )
 
     parse_and_apply_settings(settings)
@@ -93,57 +110,29 @@ def init(
     _global_attributes = global_attributes or {}
 
     if should_disable_weave():
-        return weave_init.init_weave_disabled().client
+        return weave_init.init_weave_disabled()
 
-    initialized_client = weave_init.init_weave(
+    return weave_init.init_weave(
         project_name,
-        autopatch_settings=autopatch_settings,
     )
-
-    return initialized_client.client
 
 
 def get_client() -> weave_client.WeaveClient | None:
     return weave_client_context.get_weave_client()
 
 
-@contextlib.contextmanager
-def remote_client(project_name: str) -> Iterator[weave_init.weave_client.WeaveClient]:
-    inited_client = weave_init.init_weave(project_name)
-    try:
-        yield inited_client.client
-    finally:
-        inited_client.reset()
-
-
-# This is currently an internal interface. We'll expose something like it though ("offline" mode)
-def init_local_client() -> weave_client.WeaveClient:
-    return weave_init.init_local().client
-
-
-@contextlib.contextmanager
-def local_client() -> Iterator[weave_client.WeaveClient]:
-    inited_client = weave_init.init_local()
-    try:
-        yield inited_client.client
-    finally:
-        inited_client.reset()
-
-
 def publish(obj: Any, name: str | None = None) -> ObjectRef:
-    """Save and version a python object.
+    """Save and version a Python object.
 
-    If an object with name already exists, and the content hash of obj does
-    not match the latest version of that object, a new version will be created.
-
-    TODO: Need to document how name works with this change.
+    Weave creates a new version of the object if the object's name already exists and its content hash does
+    not match the latest version of that object.
 
     Args:
         obj: The object to save and version.
         name: The name to save the object under.
 
     Returns:
-        A weave Ref to the saved object.
+        A Weave Ref to the saved object.
     """
     client = weave_client_context.require_weave_client()
 
@@ -185,16 +174,14 @@ def publish(obj: Any, name: str | None = None) -> ObjectRef:
 
 
 def ref(location: str) -> ObjectRef:
-    """Construct a Ref to a Weave object.
-
-    TODO: what happens if obj does not exist
+    """Creates a Ref to an existing Weave object. This does not directly retrieve
+    the object but allows you to pass it to other Weave API functions.
 
     Args:
-        location: A fully-qualified weave ref URI, or if weave.init() has been called, "name:version" or just "name" ("latest" will be used for version in this case).
-
+        location: A Weave Ref URI, or if `weave.init()` has been called, `name:version` or `name`. If no version is provided, `latest` is used.
 
     Returns:
-        A weave Ref to the object.
+        A Weave Ref to the object.
     """
     if "://" not in location:
         client = weave_client_context.get_weave_client()
@@ -209,10 +196,10 @@ def ref(location: str) -> ObjectRef:
             name, version = location.split(":")
         location = str(client._ref_uri(name, version, "obj"))
 
-    uri = parse_uri(location)
-    if not isinstance(uri, ObjectRef):
+    ref = Ref.parse_uri(location)
+    if not isinstance(ref, ObjectRef):
         raise TypeError("Expected an object ref")
-    return uri
+    return ref
 
 
 def get(uri: str | ObjectRef) -> Any:
@@ -240,20 +227,6 @@ def get(uri: str | ObjectRef) -> Any:
     if isinstance(uri, ObjectRef):
         return uri.get()
     return ref(uri).get()
-
-
-def obj_ref(obj: Any) -> ObjectRef | None:
-    return weave_client.get_ref(obj)
-
-
-def output_of(obj: Any) -> weave_client.Call | None:
-    client = weave_client_context.require_weave_client()
-
-    ref = obj_ref(obj)
-    if ref is None:
-        return ref
-
-    return client._ref_output_of(ref)
 
 
 @contextlib.contextmanager
@@ -386,15 +359,9 @@ __all__ = [
     "get_client",
     "get_current_call",
     "init",
-    "init_local_client",
-    "local_client",
-    "obj_ref",
     "op",
-    "output_of",
-    "parse_uri",
     "publish",
     "ref",
-    "remote_client",
     "require_current_call",
     "thread",
     "weave_client_context",

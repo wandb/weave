@@ -11,7 +11,7 @@ import pytest
 import requests
 import tenacity
 
-from weave.trace.term import configure_logger
+from weave.trace.display.term import configure_logger
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.ids import generate_id
 from weave.trace_server_bindings.remote_http_trace_server import (
@@ -87,6 +87,8 @@ def server(request):
 
     if server_.call_processor:
         server_.call_processor.stop_accepting_new_work_and_flush_queue()
+    if server_.feedback_processor:
+        server_.feedback_processor.stop_accepting_new_work_and_flush_queue()
 
 
 @pytest.mark.parametrize("server", ["small_limit"], indirect=True)
@@ -272,7 +274,7 @@ def test_non_uniform_batch_items(server):
     assert total_items_sent == len(batch)
 
 
-@patch("weave.trace_server.requests.post")
+@patch("weave.utils.http_requests.post")
 def test_timeout_retry_mechanism(mock_post, success_response):
     """Test that timeouts trigger the retry mechanism."""
     server = RemoteHTTPTraceServer("http://example.com", should_batch=True)
@@ -294,7 +296,7 @@ def test_timeout_retry_mechanism(mock_post, success_response):
 
 @pytest.mark.disable_logging_error_check
 @pytest.mark.parametrize("server", ["fast_retrying"], indirect=True)
-@patch("weave.trace_server.requests.post")
+@patch("weave.utils.http_requests.post")
 def test_post_timeout(mock_post, success_response, server, log_collector):
     """Test that we can still send new batches even if one batch times out.
 

@@ -36,9 +36,22 @@ def test_symbol_patcher_invalid_module():
 
 
 def test_symbol_patcher_invalid_attr():
+    # Attempt to patch a non-existent class in an existent module
     patcher = SymbolPatcher(
         lambda: importlib.import_module("tests.test_patcher_module.example_class"),
         "NotARealExampleClass.example_fn",
+        lambda original_fn: lambda self: 43,
+    )
+    # Should not raise, but should fail to patch
+    assert not patcher.attempt_patch()
+    assert not patcher.undo_patch()
+
+
+def test_symbol_patcher_invalid_attr_method():
+    # Attempt to patch a non-existent method on an existent class
+    patcher = SymbolPatcher(
+        lambda: importlib.import_module("tests.test_patcher_module.example_class"),
+        "ExampleClass.not_a_real_example_fn",
         lambda original_fn: lambda self: 43,
     )
     # Should not raise, but should fail to patch

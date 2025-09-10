@@ -11,12 +11,11 @@ Supported providers:
 """
 
 from collections import defaultdict
-from weave.trace.weave_client import Call
-from weave.trace_server.opentelemetry.helpers import flatten_attributes
-from weave.utils.dict_utils import convert_defaultdict_to_dict
-from weave.trace_server.trace_server_interface import LLMUsageSchema
-from typing import Any, cast
 from dataclasses import dataclass
+from typing import Any
+
+from weave.trace.call import Call
+from weave.utils.dict_utils import convert_defaultdict_to_dict, flatten_attributes
 
 
 @dataclass
@@ -92,12 +91,15 @@ def _find_full_model_name(output: Any, partial_model_name: str) -> str:
 
     flattened = flatten_attributes(output)
     best_match = partial_model_name
-    for key, value in flattened.items():
+    for value in flattened.values():
         # we use startswith here to avoid prefix matches like "models/gemini-1.5-pro"
         # and return if we find a better (longer) match
-        if isinstance(value, str) and value.startswith(partial_model_name):
-            if len(value) > len(best_match):
-                best_match = value
+        if (
+            isinstance(value, str)
+            and value.startswith(partial_model_name)
+            and len(value) > len(best_match)
+        ):
+            best_match = value
 
     return best_match
 
@@ -115,7 +117,7 @@ def _extract_usage_data(call: Call, output: Any) -> None:
     model_type = metadata.get("ls_model_type", "unknown")
 
     model_name = _find_full_model_name(output, partial_model_name)
-    usage_dict = defaultdict(lambda: defaultdict(int))
+    usage_dict: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
     generations = output.get("outputs", {}).get("generations", [])
 
     # Extract usage data from generations structure
@@ -141,14 +143,14 @@ def _extract_usage_data(call: Call, output: Any) -> None:
 
             if token_usage.prompt_tokens > 0 or token_usage.completion_tokens > 0:
                 usage_dict[model_name]["prompt_tokens"] += token_usage.prompt_tokens
-                usage_dict[model_name][
-                    "completion_tokens"
-                ] += token_usage.completion_tokens
+                usage_dict[model_name]["completion_tokens"] += (
+                    token_usage.completion_tokens
+                )
                 usage_dict[model_name]["total_tokens"] += token_usage.total_tokens
 
     if usage_dict:
         if call.summary is None:
             call.summary = {}
 
-        usage = cast(dict[str, LLMUsageSchema], convert_defaultdict_to_dict(usage_dict))
+        usage = convert_defaultdict_to_dict(usage_dict)
         call.summary.update({"usage": usage})

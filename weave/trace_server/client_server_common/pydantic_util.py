@@ -1,41 +1,15 @@
-from typing import TYPE_CHECKING, Any, Union
+from typing import Any
 
-import pydantic
-
-if TYPE_CHECKING:
-    from pydantic.v1 import BaseModel as PydanticBaseModelV1
+from pydantic import BaseModel
 
 
-def is_pydantic_v1_base_model(obj: Any) -> bool:
-    try:
-        from pydantic.v1 import BaseModel as PydanticBaseModelV1
-
-        return isinstance(obj, PydanticBaseModelV1)
-    except ImportError:
-        return False
-
-
-PydanticBaseModelGeneral = Union[pydantic.BaseModel, "PydanticBaseModelV1"]
-
-
-def pydantic_model_fields(
-    obj: PydanticBaseModelGeneral,
-) -> dict[str, pydantic.fields.FieldInfo]:
-    if isinstance(obj, pydantic.BaseModel):
-        return obj.model_fields
-    elif is_pydantic_v1_base_model(obj):
-        return obj.__fields__
-    else:
-        raise TypeError(f"{obj} is not a pydantic model")
-
-
-def pydantic_asdict_one_level(obj: PydanticBaseModelGeneral) -> dict[str, Any]:
+def pydantic_asdict_one_level(obj: BaseModel) -> dict[str, Any]:
     """
     This is equivalent to `obj.model_dump(by_alias=True)`, but does not recursively
     convert nested pydantic objects to dicts. This is particularly useful when you want
     manually iterate over the fields of a pydantic object and do something with them.
     """
-    fields = pydantic_model_fields(obj)
+    fields = obj.__class__.model_fields
     final = {}
     for prop_name, field in fields.items():
         use_name = prop_name

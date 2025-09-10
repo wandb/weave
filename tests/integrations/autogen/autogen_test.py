@@ -1,7 +1,26 @@
+from collections.abc import Generator
+
 import pytest
 
 import weave
+from weave.integrations.autogen import get_autogen_patcher
 from weave.integrations.integration_utilities import flatten_calls, op_name_from_ref
+from weave.integrations.openai.openai_sdk import get_openai_patcher
+
+
+@pytest.fixture(autouse=True)
+def patch_autogen() -> Generator[None, None, None]:
+    """Patch AutoGen and OpenAI for all tests in this file."""
+    autogen_patcher = get_autogen_patcher()
+    openai_patcher = get_openai_patcher()
+
+    autogen_patcher.attempt_patch()
+    openai_patcher.attempt_patch()
+
+    yield
+
+    autogen_patcher.undo_patch()
+    openai_patcher.undo_patch()
 
 
 @pytest.mark.skip_clickhouse_client
@@ -222,10 +241,10 @@ async def test_simple_cached_client_create_stream(
         ("autogen_ext.ChatCompletionCache-check_cache", 0),
         ("autogen_core.InMemoryStore.get", 1),
         ("autogen_core.InMemoryStore.get", 0),
-        ("autogen_core.InMemoryStore.set", 0),
         ("autogen_ext.OpenAIChatCompletionClient.create_stream", 0),
         ("openai.chat.completions.create", 1),
         ("openai.chat.completions.create", 0),
+        ("autogen_core.InMemoryStore.set", 0),
         ("autogen_ext.ChatCompletionCache.create_stream", 0),
         ("autogen_ext.ChatCompletionCache-check_cache", 0),
         ("autogen_core.InMemoryStore.get", 1),

@@ -14,7 +14,9 @@ import requests
 from pydantic import ValidationError
 
 import weave
+import weave.trace.call
 import weave.trace_server.trace_server_interface as tsi
+from tests.conftest import TestOnlyFlushingWeaveClient
 from tests.trace.testutil import ObjectRefStrMatcher
 from tests.trace.util import (
     AnyIntMatcher,
@@ -24,7 +26,7 @@ from tests.trace.util import (
 )
 from weave import Evaluation
 from weave.integrations.integration_utilities import op_name_from_call
-from weave.trace import refs, weave_client
+from weave.trace import refs, settings, table_upload_chunking, weave_client
 from weave.trace.context import call_context
 from weave.trace.context.call_context import tracing_disabled
 from weave.trace.isinstance import weave_isinstance
@@ -323,8 +325,8 @@ def test_call_create(client):
     call = client.create_call("x", {"a": 5, "b": 10})
     client.finish_call(call, "hello")
     result = client.get_call(call.id)
-    expected = weave_client.Call(
-        _op_name="weave:///shawn/test-project/op/x:tzUhDyzVm5bqQsuqh5RT4axEXSosyLIYZn9zbRyenaw",
+    expected = weave.trace.call.Call(
+        _op_name="weave:///shawn/test-project/op/x:C6hohMXy0DkNrsMMPocrTElTDygFB1lLVmY0mszublQ",
         project_id="shawn/test-project",
         trace_id=RegexStringMatcher(".*"),
         parent_id=None,
@@ -367,8 +369,8 @@ def test_calls_query(client):
     call2 = client.create_call("y", {"a": 5, "b": 10})
     result = list(client.get_calls(filter=tsi.CallsFilter(op_names=[call1.op_name])))
     assert len(result) == 2
-    assert result[0] == weave_client.Call(
-        _op_name="weave:///shawn/test-project/op/x:tzUhDyzVm5bqQsuqh5RT4axEXSosyLIYZn9zbRyenaw",
+    assert result[0] == weave.trace.call.Call(
+        _op_name="weave:///shawn/test-project/op/x:C6hohMXy0DkNrsMMPocrTElTDygFB1lLVmY0mszublQ",
         project_id="shawn/test-project",
         trace_id=RegexStringMatcher(".*"),
         parent_id=None,
@@ -393,8 +395,8 @@ def test_calls_query(client):
         started_at=DatetimeMatcher(),
         ended_at=None,
     )
-    assert result[1] == weave_client.Call(
-        _op_name="weave:///shawn/test-project/op/x:tzUhDyzVm5bqQsuqh5RT4axEXSosyLIYZn9zbRyenaw",
+    assert result[1] == weave.trace.call.Call(
+        _op_name="weave:///shawn/test-project/op/x:C6hohMXy0DkNrsMMPocrTElTDygFB1lLVmY0mszublQ",
         project_id="shawn/test-project",
         trace_id=RegexStringMatcher(".*"),
         parent_id=call0.id,
@@ -1259,6 +1261,12 @@ def test_refs_read_batch_multi_project(client):
     assert res.vals[2] == {"ab": [3, 4, 5]}
 
 
+def test_refs_read_batch_call_ref(client):
+    call_ref = refs.CallRef(entity="shawn", project="test-project", id="my-call")
+    with pytest.raises(ValueError, match="Call refs not supported"):
+        client.server.refs_read_batch(RefsReadBatchReq(refs=[call_ref.uri()]))
+
+
 def test_large_files(client):
     class CoolCustomThing:
         a: str
@@ -1448,7 +1456,8 @@ def row_gen(num_rows: int, approx_row_bytes: int = 1024):
         yield {"a": i, "b": "x" * approx_row_bytes}
 
 
-def test_table_partitioning(network_proxy_client):
+@pytest.mark.parametrize("use_parallel_table_upload", [False, True])
+def test_table_partitioning(network_proxy_client, use_parallel_table_upload):
     """
     This test is specifically testing the correctness
     of the table partitioning logic in the remote client.
@@ -1456,6 +1465,13 @@ def test_table_partitioning(network_proxy_client):
     creation into multiple updates
     """
     client, remote_client, records = network_proxy_client
+
+    # Set the parallel table upload setting for this test
+    test_settings = settings.UserSettings(
+        use_parallel_table_upload=use_parallel_table_upload
+    )
+    settings.parse_and_apply_settings(test_settings)
+
     num_rows = 16
     rows = list(row_gen(num_rows, 1024))
     exp_digest = "15696550bde28f9231173a085ce107c823e7eab6744a97adaa7da55bc9c93347"
@@ -1495,21 +1511,41 @@ def test_table_partitioning(network_proxy_client):
     remote_client.remote_request_bytes_limit = (
         4 * 1024
     )  # Small enough to get multiple updates
-    res = remote_client.table_create(
-        tsi.TableCreateReq(
-            table=tsi.TableSchemaForInsert(
-                project_id=client._project_id(),
-                rows=rows,
-            )
+
+    # Set the client to use the remote server so calls get recorded
+    client = TestOnlyFlushingWeaveClient(
+        entity=client.entity,
+        project=client.project,
+        server=remote_client,
+        ensure_project_exists=False,
+    )
+
+    # Create a Table object and save it to trigger chunking logic
+    table_obj = weave_client.Table(rows)
+    saved_table = client.save(table_obj, "table")
+
+    assert saved_table.table_ref._digest == exp_digest
+
+    if use_parallel_table_upload:
+        # Verify that chunking happened by checking for table_create_from_digests call
+        table_create_records = [r for r in records if r[0] == "table_create"]
+        table_create_from_digests_records = [
+            r for r in records if r[0] == "table_create_from_digests"
+        ]
+        obj_records = [r for r in records if r[0] in ["obj_create", "obj_read"]]
+
+        # Expected: 2 table_create calls (first + second) + 1 table_create_from_digests (chunking merge)
+        assert len(table_create_records) == 2, (
+            f"Expected 2 table_create calls, got {len(table_create_records)}"
         )
-    )
-    assert res.digest == exp_digest
-    assert res.row_digests == row_digests
-    assert len(records) == (
-        1  # The first create call,
-        + 1  # the second  create
-        + num_rows / 2  # updates - 2 per batch
-    )
+        # 1 for testing if the endpoint exists, 1 for the actual request
+        assert len(table_create_from_digests_records) == 2, (
+            f"Expected 2 table_create_from_digests calls, got {len(table_create_from_digests_records)}"
+        )
+        assert len(obj_records) == 2, (
+            f"Expected 2 obj_create/obj_read calls, got {len(obj_records)}"
+        )
+        assert len(records) == 6, f"Expected 6 total records, got {len(records)}"
 
 
 def test_table_partitioning_stainless(stainless_network_proxy_client):
@@ -2870,7 +2906,7 @@ def test_calls_query_sort_by_display_name_prioritized(client):
 
 def test_tracing_enabled_context(client):
     """Test that gc.create_call() and gc.finish_call() respect the _tracing_enabled context variable."""
-    from weave.trace.weave_client import Call
+    from weave.trace.call import Call
 
     @weave.op
     def test_op():
@@ -2885,7 +2921,9 @@ def test_tracing_enabled_context(client):
     # Test create_call with tracing disabled
     with tracing_disabled():
         call = client.create_call(test_op, {})
-        assert isinstance(call, weave_client.NoOpCall)  # Should be a NoOpCall instance
+        assert isinstance(
+            call, weave.trace.call.NoOpCall
+        )  # Should be a NoOpCall instance
         assert (
             len(list(client.get_calls())) == 1
         )  # Verify no additional calls were created
@@ -3621,3 +3659,332 @@ def test_get_evaluations(client, make_evals):
 
     assert evs[1].ref.uri() == ref2.uri()
     assert evs[1].dataset.rows[0] == {"dataset_id": "jkl"}
+
+
+def test_feedback_batching(network_proxy_client):
+    """Test that feedback batching works correctly when enabled."""
+    # Set up advanced client that uses the RemoteHttpTraceServer handler
+    # with batching
+    basic_client, remote_client, records = network_proxy_client
+    client = TestOnlyFlushingWeaveClient(
+        entity=basic_client.entity,
+        project=basic_client.project,
+        server=remote_client,
+        ensure_project_exists=False,
+    )
+    # Disably autoflush so we can manually control
+    client.set_autoflush(False)
+
+    # Create a test call to add feedback to
+    @weave.op
+    def test_op(x: int) -> int:
+        return x * 2
+
+    result = test_op(5)
+    client.flush()
+
+    test_call = client.get_calls()[0]
+    client.server.attribute_access_log = []
+
+    feedback_items = []
+    start = time.time()
+    for i in range(10):
+        id = test_call.feedback.add(
+            feedback_type=f"test_feedback_{i}",
+            payload={"score": i, "note": f"Test feedback {i}"},
+        )
+        assert id is not None
+        feedback_items.append(id)
+
+    # make sure we aren't actually waiting for 10 feedbacks, should be quick
+    assert time.time() - start < 0.2, "Feedback creation took too long"
+    assert client.server.get_feedback_processor() is not None
+
+    # Flush to ensure all feedback is processed
+    client.flush()
+
+    log = client.server.attribute_access_log
+    feedback_creates = [l for l in log if l == "feedback_create"]
+
+    assert_err = f"Expected 0 feedback creates, got {len(feedback_creates)}"
+    assert len(feedback_creates) == 0, assert_err
+
+    # Query feedback to verify all items were created
+    all_feedback = list(test_call.feedback)
+    created_feedback = [
+        f for f in all_feedback if f.feedback_type.startswith("test_feedback_")
+    ]
+    assert len(created_feedback) == 10
+
+    # Verify the feedback content
+    for i, feedback in enumerate(
+        sorted(created_feedback, key=lambda x: x.feedback_type)
+    ):
+        assert feedback.id in feedback_items, (
+            f"Feedback {i} not found in feedback_items"
+        )
+        assert feedback.feedback_type == f"test_feedback_{i}"
+        assert feedback.payload["score"] == i
+        assert feedback.payload["note"] == f"Test feedback {i}"
+
+
+@pytest.mark.disable_logging_error_check
+@pytest.mark.parametrize("use_parallel_table_upload", [False, True])
+def test_parallel_table_uploads_digest_consistency(
+    client, monkeypatch, use_parallel_table_upload
+):
+    """Test parallel table uploads are consistent with one shot uploads."""
+    # Set the parallel table upload setting for this test
+    test_settings = settings.UserSettings(
+        use_parallel_table_upload=use_parallel_table_upload
+    )
+    settings.parse_and_apply_settings(test_settings)
+
+    # Set up the mock before creating the client
+    # We'll use a mutable container to control the chunk size dynamically
+    current_chunk_size = [table_upload_chunking.TARGET_CHUNK_BYTES]
+    original_table_chunk_manager = table_upload_chunking.TableChunkManager
+
+    class MockTableChunkManager(original_table_chunk_manager):
+        def __init__(self, max_workers=None, target_chunk_bytes=None):
+            super().__init__(
+                max_workers=max_workers or table_upload_chunking.MAX_CONCURRENT_CHUNKS,
+                target_chunk_bytes=current_chunk_size[0],  # Use the dynamic value
+            )
+
+    # Apply the mock before creating the client
+    monkeypatch.setattr(
+        table_upload_chunking, "TableChunkManager", MockTableChunkManager
+    )
+
+    # Create large rows that will trigger chunking behavior
+    # Use 500KB per row with 3 rows = ~1.5MB total, much more efficient for testing
+    large_row_size = 500 * 1024  # 500KB per row (reduced from 12MB for performance)
+    large_data = "x" * large_row_size
+
+    # Create table with 3 large rows in order [1, 2, 3]
+    table1_rows = [
+        {"id": 1, "data": large_data + "_1", "order": "first"},
+        {"id": 2, "data": large_data + "_2", "order": "second"},
+        {"id": 3, "data": large_data + "_3", "order": "third"},
+    ]
+
+    # Use client.save() with Table object to trigger _save_table chunking logic
+    table1 = weave_client.Table(table1_rows)
+    saved_table1 = client.save(table1, "test-table-1")
+
+    # Get the table reference from the saved table
+    table1_ref = saved_table1.table_ref
+
+    # Get the digest information from the saved table
+    table1_res = client.server.table_query(
+        tsi.TableQueryReq(project_id=client._project_id(), digest=table1_ref.digest)
+    )
+    digest1 = table1_ref.digest
+    row_digests1 = [row.digest for row in table1_res.rows]
+
+    # Create table with same rows but scrambled order [3, 1, 2]
+    table2_rows = [
+        {"id": 3, "data": large_data + "_3", "order": "third"},
+        {"id": 1, "data": large_data + "_1", "order": "first"},
+        {"id": 2, "data": large_data + "_2", "order": "second"},
+    ]
+
+    # Use client.save() with Table object to trigger _save_table chunking logic
+    table2 = weave_client.Table(table2_rows)
+    saved_table2 = client.save(table2, "test-table-2")
+
+    # Get the table reference from the saved table
+    table2_ref = saved_table2.table_ref
+
+    # Get the digest information from the saved table
+    table2_res = client.server.table_query(
+        tsi.TableQueryReq(project_id=client._project_id(), digest=table2_ref.digest)
+    )
+    digest2 = table2_ref.digest
+    row_digests2 = [row.digest for row in table2_res.rows]
+
+    # Now switch to smaller chunk size to force more parallel uploads
+    # This will force chunking since each row is 500KB and chunk will be 300KB
+    small_chunk_size = 300 * 1024  # 300KB (smaller than our 500KB rows)
+
+    # Switch to the smaller chunk size
+    current_chunk_size[0] = small_chunk_size
+
+    # Create the same tables again with the smaller chunk size
+    # This should trigger parallel uploads since each row is larger than the chunk size
+
+    # Table 3: [1, 2, 3] with small chunk size
+    table3 = weave_client.Table(table1_rows)
+    saved_table3 = client.save(table3, "test-table-3")
+
+    # Get the table reference from the saved table
+    table3_ref = saved_table3.table_ref
+
+    # Get the digest information from the saved table
+    table3_res = client.server.table_query(
+        tsi.TableQueryReq(project_id=client._project_id(), digest=table3_ref.digest)
+    )
+    digest3 = table3_ref.digest
+    row_digests3 = [row.digest for row in table3_res.rows]
+
+    # Table 4: [3, 1, 2] with small chunk size
+    table4 = weave_client.Table(table2_rows)
+    saved_table4 = client.save(table4, "test-table-4")
+
+    # Get the table reference from the saved table
+    table4_ref = saved_table4.table_ref
+
+    # Get the digest information from the saved table
+    table4_res = client.server.table_query(
+        tsi.TableQueryReq(project_id=client._project_id(), digest=table4_ref.digest)
+    )
+    digest4 = table4_ref.digest
+    row_digests4 = [row.digest for row in table4_res.rows]
+
+    # Verify that digests are consistent:
+    # - digest1 and digest3 should be the same (same row order, different chunking)
+    # - digest2 and digest4 should be the same (same row order, different chunking)
+    # - digest1 and digest2 should be different (different row order)
+    # - digest3 and digest4 should be different (different row order)
+
+    assert digest1 == digest3, (
+        f"Digests should be same for same row order: {digest1} vs {digest3}"
+    )
+    assert digest2 == digest4, (
+        f"Digests should be same for same row order: {digest2} vs {digest4}"
+    )
+    assert digest1 != digest2, (
+        f"Digests should be different for different row order: {digest1} vs {digest2}"
+    )
+    assert digest3 != digest4, (
+        f"Digests should be different for different row order: {digest3} vs {digest4}"
+    )
+
+    # Verify row digests are also consistent
+    assert row_digests1 == row_digests3, "Row digests should be same for same row order"
+    assert row_digests2 == row_digests4, "Row digests should be same for same row order"
+    assert row_digests1 != row_digests2, (
+        "Row digests should be different for different row order"
+    )
+
+    # Verify that chunking actually happened by checking the access log
+    access_log = client.server.attribute_access_log
+
+    # Look for chunking-related method calls
+    table_create_calls = [call for call in access_log if "table_create" in call]
+    table_create_from_digests_calls = [
+        call for call in access_log if "table_create_from_digests" in call
+    ]
+    # Test with smaller chunk size to verify more aggressive chunking
+    # Set a very small chunk size to force chunking even on smaller data
+    test_chunk_size = 100 * 1024  # 100KB (much smaller than our 500KB rows)
+    current_chunk_size[0] = test_chunk_size
+
+    # Create another table with the aggressive chunking settings
+    table5 = weave_client.Table(table1_rows)
+    saved_table5 = client.save(table5, "test-table-5")
+
+    # Verify it was saved successfully
+    assert saved_table5.table_ref is not None
+
+
+def test_table_create_from_digests(network_proxy_client):
+    """Test that table_create_from_digests works correctly to merge existing row digests."""
+    basic_client, remote_client, records = network_proxy_client
+    client = TestOnlyFlushingWeaveClient(
+        entity=basic_client.entity,
+        project=basic_client.project,
+        server=remote_client,
+        ensure_project_exists=False,
+    )
+
+    # First, create some individual rows to get their digests
+    rows = [
+        {"id": 1, "name": "Alice", "value": 100},
+        {"id": 2, "name": "Bob", "value": 200},
+        {"id": 3, "name": "Charlie", "value": 300},
+    ]
+
+    # Create a table with these rows to get the row digests
+    table_res = client.server.table_create(
+        tsi.TableCreateReq(
+            table=tsi.TableSchemaForInsert(
+                project_id=client._project_id(),
+                rows=rows,
+            )
+        )
+    )
+
+    original_digest = table_res.digest
+    row_digests = table_res.row_digests
+
+    # Now create a new table using the same row digests
+    from_digests_res = client.server.table_create_from_digests(
+        tsi.TableCreateFromDigestsReq(
+            project_id=client._project_id(),
+            row_digests=row_digests,
+        )
+    )
+
+    # The digest should be the same since we're using the same rows
+    assert from_digests_res.digest == original_digest, (
+        f"Digests should match: {from_digests_res.digest} vs {original_digest}"
+    )
+
+    more_rows = [
+        {"id": 4, "name": "Dave", "value": 400},
+        {"id": 5, "name": "Eve", "value": 500},
+        {"id": 6, "name": "Frank", "value": 600},
+    ]
+
+    more_table_res = client.server.table_create(
+        tsi.TableCreateReq(
+            table=tsi.TableSchemaForInsert(
+                project_id=client._project_id(),
+                rows=more_rows,
+            )
+        )
+    )
+
+    combined_digests = row_digests + more_table_res.row_digests
+
+    # Test with a different order of row digests - should produce different digest
+    combined_res = client.server.table_create_from_digests(
+        tsi.TableCreateFromDigestsReq(
+            project_id=client._project_id(),
+            row_digests=combined_digests,
+        )
+    )
+
+    # now get the new table
+    new_table_res = basic_client.server.table_query(
+        tsi.TableQueryReq(
+            project_id=client._project_id(),
+            digest=combined_res.digest,
+        )
+    )
+    assert len(new_table_res.rows) == 6
+    new_table_rows = [row.val for row in new_table_res.rows]
+    assert new_table_rows == [
+        {"id": 1, "name": "Alice", "value": 100},
+        {"id": 2, "name": "Bob", "value": 200},
+        {"id": 3, "name": "Charlie", "value": 300},
+        {"id": 4, "name": "Dave", "value": 400},
+        {"id": 5, "name": "Eve", "value": 500},
+        {"id": 6, "name": "Frank", "value": 600},
+    ]
+
+    # Test with a different order of row digests - should produce different digest
+    shuffled_digests = [row_digests[2], row_digests[0], row_digests[1]]  # [3, 1, 2]
+    shuffled_res = client.server.table_create_from_digests(
+        tsi.TableCreateFromDigestsReq(
+            project_id=client._project_id(),
+            row_digests=shuffled_digests,
+        )
+    )
+
+    # Different order should produce different digest
+    assert shuffled_res.digest != original_digest, (
+        f"Different row order should produce different digest: {shuffled_res.digest} vs {original_digest}"
+    )

@@ -3,15 +3,6 @@ import json
 from dataclasses import dataclass
 from typing import Any, Callable, Optional
 
-import requests
-from clickhouse_connect.driver.exceptions import (
-    DatabaseError as CHDatabaseError,
-)
-from clickhouse_connect.driver.exceptions import (
-    OperationalError as CHOperationalError,
-)
-from gql.transport.exceptions import TransportQueryError
-
 
 class Error(Exception):
     """Base class for exceptions in this module."""
@@ -201,6 +192,10 @@ class ErrorRegistry:
 
         # Standard library exceptions
         self.register(ValueError, 400)
+        self.register(KeyError, 500, lambda exc: {"reason": "Internal backend error"})
+
+        # Requests specific errors
+        import requests
 
         self.register(
             requests.exceptions.ReadTimeout, 504, lambda exc: {"reason": "Read timeout"}
@@ -212,6 +207,13 @@ class ErrorRegistry:
         )
 
         # ClickHouse errors
+        from clickhouse_connect.driver.exceptions import (
+            DatabaseError as CHDatabaseError,
+        )
+        from clickhouse_connect.driver.exceptions import (
+            OperationalError as CHOperationalError,
+        )
+
         self.register(
             CHDatabaseError, 502, lambda exc: {"reason": "Temporary backend error"}
         )
@@ -220,6 +222,8 @@ class ErrorRegistry:
         )
 
         # GraphQL transport errors
+        from gql.transport.exceptions import TransportQueryError
+
         self.register(TransportQueryError, 403, lambda exc: {"reason": "Forbidden"})
 
 

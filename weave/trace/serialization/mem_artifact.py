@@ -94,7 +94,7 @@ class MemTraceFilesArtifact:
     #     return artifact_fs.ArtifactMetadata(self._metadata, {**self._metadata})
 
     @contextlib.contextmanager
-    def writeable_file_path(self, path: str) -> Generator[str, None, None]:
+    def writeable_file_path(self, path: str) -> Generator[str]:
         with tempfile.TemporaryDirectory() as tmpdir:
             full_path = os.path.join(tmpdir, path)
             os.makedirs(os.path.dirname(full_path), exist_ok=True)
