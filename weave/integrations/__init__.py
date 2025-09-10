@@ -20,6 +20,7 @@ __all__ = [
     "patch_nvidia",
     "patch_openai",
     "patch_openai_agents",
+    "patch_verifiers",
     "patch_smolagents",
     "patch_verdict",
     "patch_vertexai",
