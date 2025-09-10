@@ -375,19 +375,19 @@ class UnknownServerMessage(ServerMessageBase, UnknownMessage): ...
 
 
 class Session(BaseModel):
-    id: SessionID
-    model: str
-    modalities: set[Modality]
-    instructions: str
-    voice: Voice
-    input_audio_format: AudioFormat
-    output_audio_format: AudioFormat
+    id: SessionID | None = None
+    model: str | None = None
+    modalities: set[Modality] | None = None
+    instructions: str | None = None
+    voice: Voice | None = None
+    input_audio_format: AudioFormat | None = None
+    output_audio_format: AudioFormat | None = None
     input_audio_transcription: InputAudioTranscription | None
-    turn_detection: TurnDetection
-    tools: ToolsDefinition
-    tool_choice: ToolChoice
-    temperature: Temperature
-    max_response_output_tokens: int | Literal["inf"] | None
+    turn_detection: TurnDetection | None = None
+    tools: ToolsDefinition | None = None
+    tool_choice: ToolChoice | None = None
+    temperature: Temperature | None = None
+    max_response_output_tokens: int | Literal["inf"] | None = None
 
 
 class SessionCreatedMessage(ServerMessageBase):
