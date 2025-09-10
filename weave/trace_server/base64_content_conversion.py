@@ -4,16 +4,12 @@ This module handles automatic detection and replacement of base64 encoded conten
 with content objects stored in bucket storage.
 """
 
-import base64
 import logging
-import uuid
 import re
 from typing import Any, Optional, TypeVar, Union
 
-from weave.trace.refs import ObjectRef
 from weave.trace_server.trace_server_interface import (
     CallEndReq,
-    CallSchema,
     CallStartReq,
     FileCreateReq,
     ObjCreateReq,
@@ -41,8 +37,9 @@ MIN_BASE64_SIZE = 100  # 100 bytes
 MIN_TEXT_SIZE = 50 * 1024 # 50 KiB
 
 
-def is_valid_base64(value: str) -> bool:
-    """Check if a string is valid base64.
+def is_base64(value: str) -> bool:
+    """Huerestic to quickly check if a string is likely base64.
+    We do not decode here because Content already does decode based 'true' validation
 
     Args:
         value: String to check
@@ -50,9 +47,6 @@ def is_valid_base64(value: str) -> bool:
     Returns:
         True if the string is valid base64
     """
-    if not isinstance(value, str):
-        return False
-
     # Check minimum length to avoid false positives
     if len(value) < MIN_BASE64_SIZE:
         return False
@@ -61,89 +55,29 @@ def is_valid_base64(value: str) -> bool:
     if not BASE64_PATTERN.match(value):
         return False
 
-    # Validate by trying to decode
-    try:
-        # Check that length is multiple of 4 (with padding)
-        if len(value) % 4 != 0:
-            return False
-
-        base64.b64decode(value, validate=True)
-    except Exception:
+    # Check that length is multiple of 4 (with padding)
+    if len(value) % 4 != 0:
         return False
-    else:
-        return True
+
+    return True
 
 
-def extract_data_uri_content(data_uri: str) -> Optional[tuple[str, bytes, str]]:
+def is_data_uri(data_uri: str) -> bool:
     """Extract content type and decoded bytes from a data URI.
 
     Args:
         data_uri: Data URI string in format data:[content-type];base64,[data]
 
     Returns:
-        Tuple of (content_type, decoded_bytes, original_schema) or None if extraction fails
+        bool: True is match, else false
     """
     match = DATA_URI_PATTERN.match(data_uri)
-    if not match:
-        return None
+    return bool(match)
 
-    content_type = match.group(1)
-    base64_data = match.group(2)
-
-    try:
-        # Check size before decoding to avoid memory issues
-        estimated_size = len(base64_data) * 3 / 4
-        if estimated_size > MAX_BASE64_SIZE:
-            logger.warning(
-                f"Base64 content too large ({estimated_size} bytes), skipping conversion"
-            )
-            return None
-
-        decoded_bytes = base64.b64decode(base64_data, validate=True)
-    except Exception as e:
-        logger.warning(f"Failed to decode base64 data from data URI: {e}")
-        return None
-    else:
-        original_schema = f"data:{content_type};base64,{{base64_content}}"
-        return content_type, decoded_bytes, original_schema
-
-
-def extract_standalone_base64(value: str) -> Optional[tuple[bytes, str]]:
-    """Extract decoded bytes from a standalone base64 string.
-
-    Args:
-        value: Standalone base64 string
-
-    Returns:
-        Tuple of (decoded_bytes, original_schema) or None if extraction fails
-    """
-    if not is_valid_base64(value):
-        return None
-
-    try:
-        # Check size before decoding
-        estimated_size = len(value) * 3 / 4
-        if estimated_size > MAX_BASE64_SIZE:
-            logger.warning(
-                f"Base64 content too large ({estimated_size} bytes), skipping conversion"
-            )
-            return None
-
-        decoded_bytes = base64.b64decode(value, validate=True)
-    except Exception as e:
-        logger.warning(f"Failed to decode standalone base64: {e}")
-        return None
-    else:
-        original_schema = "{base64_content}"
-        return decoded_bytes, original_schema
-
-
-def create_content_object(
-    data: bytes,
-    original_schema: str,
+def store_content_object(
+    content_obj: Content,
     project_id: str,
     trace_server: TraceServerInterface,
-    mimetype: Optional[str] = None,
     wb_user_id: Optional[str] = None
 ) -> str:
     """Create a proper Content object structure and store its files.
@@ -160,12 +94,8 @@ def create_content_object(
     """
     import json
 
-    content_obj = Content.from_bytes(
-        data, mimetype=mimetype, metadata={"_original_schema": original_schema}
-    )
-
     content_data = content_obj.data
-    metadata_data = json.dumps(content_obj.model_dump(exclude={"data"})).encode("utf-8")
+    content_metadata = json.dumps(content_obj.model_dump(exclude={"data"})).encode("utf-8")
 
     # Create files in storage
     # 1. Store the actual content
@@ -176,32 +106,16 @@ def create_content_object(
 
     # 2. Store the metadata
     metadata_req = FileCreateReq(
-        project_id=project_id, name="metadata.json", content=metadata_data
+        project_id=project_id, name="metadata.json", content=content_metadata
     )
     metadata_res = trace_server.file_create(metadata_req)
 
     # We exclude the load op because it isn't possible to get from the server side
-    content_obj = {
+    return json.dumps({
         "_type": "CustomWeaveType",
         "weave_type": {"type": "weave.type_wrappers.Content.content.Content"},
         "files": {"content": content_res.digest, "metadata.json": metadata_res.digest},
-    }
-    content_obj_digest = str_digest(json.dumps(content_obj))
-    object_id = f"content_{content_obj_digest}"
-    ref_digest = trace_server.obj_create(
-        ObjCreateReq(
-            obj=ObjSchemaForInsert(
-                project_id=project_id,
-                object_id=object_id,
-                val=content_obj,
-                wb_user_id=wb_user_id
-            )
-        )
-    )
-    ref = f"weave-trace-internal:///{project_id}/object/{object_id}:{ref_digest.digest}"
-    print(f"REFFF!!!!!!!!!! {ref}")
-    return ref
-
+    })
 
 
 T = TypeVar("T")
@@ -237,59 +151,33 @@ def replace_base64_with_content_objects(
             return [_visit(v) for v in val]
         elif isinstance(val, str):
             # Check for data URI pattern first
-            if data_uri_content := extract_data_uri_content(val):
-                content_type, decoded_bytes, original_schema = data_uri_content
+            if is_data_uri(val):
                 try:
                     # Create proper Content object structure
-                    content_obj = create_content_object(
-                        decoded_bytes,
-                        original_schema,
+                    return store_content_object(
+                        Content.from_data_url(val),
                         project_id,
                         trace_server,
-                        content_type,
                         wb_user_id
                     )
-
-                    logger.debug("Replaced data URI with Content object")
                 except Exception as e:
-                    logger.warning(f"Failed to create content from data URI: {e}")
-                    return val
-                else:
-                    return content_obj
-            elif standalone_content := extract_standalone_base64(val):
-                decoded_bytes, original_schema = standalone_content
+                    logger.warning(f"Failed to create and store content from data URI with error {e}")
+
+            elif is_base64(val):
                 try:
-                    # Create proper Content object structure
-                    content_obj = create_content_object(
-                        decoded_bytes,
-                        original_schema,
+                    return store_content_object(
+                        Content.from_base64(val),
                         project_id,
                         trace_server,
-                        None,
                         wb_user_id
                     )
-
-                    logger.debug("Replaced standalone base64 with Content object")
                 except Exception as e:
                     logger.warning(
                         f"Failed to create content from standalone base64: {e}"
                     )
-                    return val
-                else:
-                    return content_obj
-            elif len(val) > MIN_TEXT_SIZE:
-                original_schema = "{text}"
-                return create_content_object(
-                    val.encode('utf-8'),
-                    original_schema,
-                    project_id,
-                    trace_server,
-                    None,
-                    wb_user_id
-                )
+
             return val
-        else:
-            return val
+        return val
 
     return _visit(vals)
 
@@ -323,187 +211,3 @@ def process_call_req_to_content(
         )
 
     return req
-
-
-def reconstruct_base64_for_call(
-    call: CallSchema,
-    trace_server: TraceServerInterface,
-) -> CallSchema:
-    """Recursively reconstruct base64 content from content references.
-
-    Only reconstructs content that has _original_schema metadata, indicating
-    it was originally base64 that we converted. Native Content objects are not
-    reconstructed.
-
-    Args:
-        vals: Value to process (can be dict, list, or primitive)
-        project_id: Project ID for storage
-        trace_server: Trace server instance for file retrieval
-
-    Returns:
-        Processed value with content references replaced by base64 where applicable
-    """
-    import json
-
-    def _visit(val: Any) -> Any:
-        if isinstance(val, dict):
-            # Check if this is a Content object structure
-            if (
-                val.get("_type") == "CustomWeaveType"
-                and val.get("weave_type", {}).get("type")
-                == "weave.type_wrappers.Content.content.Content"
-                and "files" in val
-            ):
-                files = val["files"]
-
-                # We expect both content and metadata.json digests
-                if "content" not in files or "metadata.json" not in files:
-                    # Not a complete content object, process normally
-                        result = {
-                            k: _visit(v) for k, v in val.items()
-                        }
-                    return result
-
-                try:
-                    from weave.trace_server.trace_server_interface import (
-                        FileContentReadReq,
-                    )
-
-                    # First, read the metadata.json to check for _original_schema
-                    metadata_req = FileContentReadReq(
-                        project_id=call.project_id,
-                        digest=files["metadata.json"],
-                    )
-                    metadata_res = trace_server.file_content_read(metadata_req)
-                    metadata = json.loads(metadata_res.content)
-
-                    # Check if this content has an original schema (was converted from base64)
-                    original_schema = metadata.get("metadata", {}).get(
-                        "_original_schema"
-                    )
-                    if not original_schema:
-                        # No original schema, this is a native Content object
-                        # Keep it as-is
-                        return val
-
-                    # Read the actual content bytes
-                    content_req = FileContentReadReq(
-                        project_id=call.project_id,
-                        digest=files["content"],
-                    )
-                    content_res = trace_server.file_content_read(content_req)
-                    content_bytes = content_res.content
-
-                    # Reconstruct based on the original schema
-                    if original_schema == "{base64_content}":
-                        # Standalone base64
-                        return base64.b64encode(content_bytes).decode("ascii")
-                    elif (
-                        original_schema.startswith("data:")
-                        and "{base64_content}" in original_schema
-                    ):
-                        # Data URI format
-                        b64_content = base64.b64encode(content_bytes).decode("ascii")
-                        return original_schema.replace("{base64_content}", b64_content)
-
-                except Exception as e:
-                    logger.warning(
-                        f"Failed to reconstruct base64 from Content object: {e}"
-                    )
-                    return val
-                else:
-                    # Unknown schema format, keep as-is
-                    return val
-            else:
-                # Regular dict, process recursively
-                result = {}
-                for k, v in val.items():
-                    result[k] = _visit(v)
-                return result
-        elif isinstance(val, list):
-            return [_visit(v) for v in val]
-        else:
-            return val
-
-    call.inputs = _visit(call.inputs)
-    call.output = _visit(call.output)
-    return call
-
-
-def reconstruct_base64_from_refs_with_metadata(
-    vals: Any,
-    project_id: str,
-    trace_server: TraceServerInterface,
-    refs_metadata: dict[str, dict[str, Any]],
-) -> Any:
-    """Recursively reconstruct base64 content from content references using metadata.
-
-    This version uses pre-fetched metadata to determine which refs should be
-    reconstructed to their original base64 format.
-
-    Args:
-        vals: Value to process (can be dict, list, or primitive)
-        project_id: Project ID for storage
-        trace_server: Trace server instance for file retrieval
-        refs_metadata: Dict mapping content refs to their metadata
-
-    Returns:
-        Processed value with content references replaced by base64 where applicable
-    """
-
-    def _visit(val: Any) -> Any:
-        if isinstance(val, dict):
-            result = {}
-            for k, v in val.items():
-                result[k] = _visit(v)
-            return result
-        elif isinstance(val, list):
-            return [_visit(v) for v in val]
-        elif isinstance(val, str) and val.startswith("weave-internal:///"):
-            # Check if we have metadata for this ref
-            metadata = refs_metadata.get(val, {})
-            original_schema = metadata.get("_original_schema")
-
-            if not original_schema:
-                # No original schema means this was not converted from base64
-                return val
-
-            try:
-                # Parse the reference to get the digest
-                parts = val.split("/")
-                if len(parts) >= 5 and parts[3] == "file":
-                    digest = parts[4]
-
-                    # Read the file content
-                    from weave.trace_server.trace_server_interface import (
-                        FileContentReadReq,
-                    )
-
-                    file_req = FileContentReadReq(
-                        project_id=project_id,
-                        digest=digest,
-                    )
-
-                    file_res = trace_server.file_content_read(file_req)
-                    content_bytes = file_res.content
-
-                    # Reconstruct based on the original schema
-                    if original_schema == "{base64_content}":
-                        # Standalone base64
-                        return base64.b64encode(content_bytes).decode("ascii")
-                    elif (
-                        original_schema.startswith("data:")
-                        and "{base64_content}" in original_schema
-                    ):
-                        # Data URI format
-                        b64_content = base64.b64encode(content_bytes).decode("ascii")
-                        return original_schema.replace("{base64_content}", b64_content)
-
-            except Exception as e:
-                logger.warning(f"Failed to reconstruct base64 from ref {val}: {e}")
-
-            return val
-        else:
-            return val
-
-    return _visit(vals)
