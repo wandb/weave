@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Annotated, Any, Generic
 from urllib.parse import quote_from_bytes
 
-from pydantic import BaseModel, BeforeValidator, Field, PrivateAttr, field_serializer, model_validator
+from pydantic import BaseModel, Field, PrivateAttr, field_serializer
 from typing_extensions import Self, TypeVar
 
 from weave.trace.refs import Ref
