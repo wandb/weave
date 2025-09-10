@@ -276,6 +276,8 @@ markers = [
 [tool.ruff.lint]
 preview = true
 select = [
+  "B", # https://docs.astral.sh/ruff/rules/#flake8-bugbear-b
+  #
   "D200",    # https://docs.astral.sh/ruff/rules/fits-on-one-line/
   "D201",    # https://docs.astral.sh/ruff/rules/no-blank-line-before-function/
   "D202",    # https://docs.astral.sh/ruff/rules/no-blank-line-after-function/
@@ -303,14 +305,6 @@ select = [
   "TRY401",  # https://docs.astral.sh/ruff/rules/verbose-log-message/
   "C",       # https://docs.astral.sh/ruff/rules/#convention-c
   "T201",    # https://docs.astral.sh/ruff/rules/print-statement/
-  "B006",    # https://docs.astral.sh/ruff/rules/mutable-argument-default/
-  "B007",    # https://docs.astral.sh/ruff/rules/unused-loop-control-variable/
-  "B008",    # https://docs.astral.sh/ruff/rules/function-call-in-default-argument/
-  "B009",    # https://docs.astral.sh/ruff/rules/get-attr-with-constant/
-  "B017",    # https://docs.astral.sh/ruff/rules/assert-raises-exception/
-  "B020",    # https://docs.astral.sh/ruff/rules/loop-variable-overrides-iterator/
-  "B028",    # https://docs.astral.sh/ruff/rules/no-explicit-stacklevel/
-  "B904",    # https://docs.astral.sh/ruff/rules/raise-without-from-inside-except/
   "SIM102",  # https://docs.astral.sh/ruff/rules/collapsible-if/,
   "N801",    # https://docs.astral.sh/ruff/rules/invalid-class-name/
   "N802",    # https://docs.astral.sh/ruff/rules/invalid-function-name/

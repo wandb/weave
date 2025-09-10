@@ -6,6 +6,7 @@ Abstracts away some of their differences and allows building up SQL queries in a
 import datetime
 import json
 import typing
+from dataclasses import dataclass
 
 from pydantic import BaseModel
 from typing_extensions import TypeAlias
@@ -208,17 +209,11 @@ class PreparedSelect(BaseModel):
     fields: list[str]
 
 
+@dataclass
 class Join:
-    join_type: typing.Optional[str]
     table: Table
     query: tsi.Query
-
-    def __init__(
-        self, table: Table, query: tsi.Query, join_type: typing.Optional[str] = None
-    ):
-        self.join_type = join_type
-        self.table = table
-        self.query = query
+    join_type: typing.Optional[str]
 
 
 class Select:

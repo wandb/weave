@@ -113,18 +113,13 @@ class ErrorWithStatus:
 
 
 # Error Registry System
+@dataclass
 class ErrorDefinition:
     """Represents a single error handler definition."""
 
-    def __init__(
-        self,
-        exception_class: type,
-        status_code: int,
-        formatter: Callable[[Exception], dict[str, Any]],
-    ):
-        self.exception_class = exception_class
-        self.status_code = status_code
-        self.formatter = formatter
+    exception_class: type
+    status_code: int
+    formatter: Callable[[Exception], dict[str, Any]]
 
 
 # Global registry instance
