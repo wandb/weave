@@ -1,5 +1,4 @@
-"""
-Module for reading and writing to netrc files.
+"""Module for reading and writing to netrc files.
 
 This module provides utilities for working with netrc files, which are used
 to store login credentials for various network services.
@@ -25,8 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 class Credentials(TypedDict):
-    """
-    Represents credentials for a machine in a netrc file.
+    """Represents credentials for a machine in a netrc file.
 
     Attributes:
         login (str): The login username.
@@ -40,16 +38,14 @@ class Credentials(TypedDict):
 
 
 class Netrc:
-    """
-    A class for managing netrc files with read and write capabilities.
+    """A class for managing netrc files with read and write capabilities.
 
     The netrc file format stores machine credentials in the following format:
     machine hostname login username password password_value
     """
 
     def __init__(self, path: str | Path | None = None):
-        """
-        Initialize the NetrcManager.
+        """Initialize the NetrcManager.
 
         Args:
             netrc_path (str | Path | None): Path to the netrc file. If None, uses default ~/.netrc
@@ -60,8 +56,7 @@ class Netrc:
             self.path = Path(path)
 
     def read(self) -> dict[str, Credentials]:
-        """
-        Read and parse the netrc file.
+        """Read and parse the netrc file.
 
         Returns:
             dict[str, Credentials]: Dictionary mapping machine names to
@@ -99,8 +94,7 @@ class Netrc:
             return result
 
     def write(self, credentials: dict[str, Credentials]) -> None:
-        """
-        Write credentials to the netrc file.
+        """Write credentials to the netrc file.
 
         Args:
             credentials (dict[str, Credentials]): Dictionary mapping machine names
@@ -136,8 +130,7 @@ class Netrc:
     def add_or_update_entry(
         self, machine: str, login: str, password: str, account: str = ""
     ) -> None:
-        """
-        Add or update an entry in the netrc file.
+        """Add or update an entry in the netrc file.
 
         Args:
             machine (str): The machine/hostname.
@@ -162,8 +155,7 @@ class Netrc:
         self.write(credentials)
 
     def delete_entry(self, machine: str) -> bool:
-        """
-        Remove an entry from the netrc file.
+        """Remove an entry from the netrc file.
 
         Args:
             machine (str): The machine/hostname to remove.
@@ -188,8 +180,7 @@ class Netrc:
         return False
 
     def get_credentials(self, machine: str) -> Credentials | None:
-        """
-        Get credentials for a specific machine.
+        """Get credentials for a specific machine.
 
         Args:
             machine (str): The machine/hostname.
@@ -210,8 +201,7 @@ class Netrc:
             return None
 
     def list_machines(self) -> list[str]:
-        """
-        List all machines in the netrc file.
+        """List all machines in the netrc file.
 
         Returns:
             list[str]: List of machine names.
@@ -260,8 +250,7 @@ def check_netrc_access(netrc_path: str) -> _NetrcPermissions:
 
 
 def get_netrc_file_path() -> str:
-    """
-    Get the path to the netrc file.
+    """Get the path to the netrc file.
 
     Returns:
         str: Path to the netrc file.

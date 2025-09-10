@@ -775,8 +775,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.ObjQueryRes(objs=[_ch_obj_to_obj_schema(obj) for obj in objs])
 
     def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
-        """
-        Delete object versions by digest, belonging to given object_id.
+        """Delete object versions by digest, belonging to given object_id.
         All deletion in this method is "soft". Deletion occurs by inserting
         a new row into the object_versions table with the deleted_at field set.
         Inserted rows share identical primary keys (order by) with original rows,
@@ -970,7 +969,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def table_create_from_digests(
         self, req: tsi.TableCreateFromDigestsReq
     ) -> tsi.TableCreateFromDigestsRes:
-        """Create a table by specifying row digests, instead actual rows"""
+        """Create a table by specifying row digests, instead actual rows."""
         # Calculate table digest from row digests
         table_hasher = hashlib.sha256()
         for row_digest in req.row_digests:
@@ -2156,8 +2155,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         object_query_builder: ObjectMetadataQueryBuilder,
         metadata_only: bool = False,
     ) -> list[SelectableCHObjSchema]:
-        """
-        Main query for fetching objects.
+        """Main query for fetching objects.
 
         conditions:
             conditions should include operations on version_index, digest, kind (is_op)
@@ -2357,8 +2355,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._strip_large_values")
     def _strip_large_values(self, batch: list[list[Any]]) -> list[list[Any]]:
-        """
-        Iterate through the batch and replace large JSON values with placeholders.
+        """Iterate through the batch and replace large JSON values with placeholders.
 
         Only considers JSON dump columns and ensures their combined size stays under
         the limit by selectively replacing the largest values.
@@ -2413,8 +2410,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
 
 def _num_bytes(data: Any) -> int:
-    """
-    Calculate the number of bytes in a string.
+    """Calculate the number of bytes in a string.
 
     This can be computationally expensive, only call when necessary.
     Never raise on a failed str cast, just return 0.

@@ -36,11 +36,10 @@ def _dependencies_met() -> bool:
 
 
 class VideoFormat(str, Enum):
-    """
-    These are NOT the list of formats we accept from the user
+    """These are NOT the list of formats we accept from the user
     Rather, these are the list of formats we can save to weave servers
     If we detect that the file is in these formats, we copy it over directly
-    Otherwise, we encode it to one of these formats using ffmpeg (mp4 by default)
+    Otherwise, we encode it to one of these formats using ffmpeg (mp4 by default).
     """
 
     GIF = "gif"
@@ -80,8 +79,7 @@ def get_format_from_filename(filename: str) -> VideoFormat:
 
 
 def write_video(fp: str, clip: VideoClip) -> None:
-    """
-    Takes a filepath and a VideoClip and writes the video to the file.
+    """Takes a filepath and a VideoClip and writes the video to the file.
     errors if the file does not end in a supported video extension.
     """
     try:
@@ -116,6 +114,7 @@ def write_video(fp: str, clip: VideoClip) -> None:
 
 def _save_video_file_clip(obj: VideoFileClip, artifact: MemTraceFilesArtifact) -> None:
     """Save a VideoFileClip to the artifact.
+
     Args:
         obj: The VideoFileClip
         artifact: The artifact to save to
@@ -152,6 +151,7 @@ def save(
     name: str,
 ) -> None:
     """Save a VideoClip to the artifact.
+
     Args:
         obj: The VideoClip or VideoWithPreview to save
         artifact: The artifact to save to

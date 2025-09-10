@@ -8,8 +8,7 @@ T = TypeVar("T")
 
 
 def first(iterable: Iterable[T]) -> T:
-    """
-    Returns the first element of an iterable.
+    """Returns the first element of an iterable.
 
     Equivalent to next(iter(iterable)).
 
@@ -35,8 +34,7 @@ def first(iterable: Iterable[T]) -> T:
 
 
 class ThreadSafeLazyList(Sequence[T]):
-    """
-    Provides a thread-safe, iterable sequence by caching results in memory.
+    """Provides a thread-safe, iterable sequence by caching results in memory.
 
     This class is thread-safe and supports multiple iterations over the same data and
     concurrent access.
@@ -62,8 +60,7 @@ class ThreadSafeLazyList(Sequence[T]):
         self._known_length = known_length
 
     def _seek_to_index(self, index: int) -> None:
-        """
-        Advances the iterator until the specified index is reached or iterator is exhausted.
+        """Advances the iterator until the specified index is reached or iterator is exhausted.
         Thread-safe operation.
         """
         with self._lock:
@@ -75,8 +72,7 @@ class ThreadSafeLazyList(Sequence[T]):
                     return
 
     def _seek_to_end(self) -> None:
-        """
-        Exhausts the iterator, caching all remaining values.
+        """Exhausts the iterator, caching all remaining values.
         Thread-safe operation.
         """
         with self._lock:
@@ -94,8 +90,7 @@ class ThreadSafeLazyList(Sequence[T]):
     def __getitem__(self, index: slice) -> Sequence[T]: ...
 
     def __getitem__(self, index: int | slice) -> T | Sequence[T]:
-        """
-        Returns the item at the specified index.
+        """Returns the item at the specified index.
 
         Args:
             index: The index of the desired item.
@@ -117,8 +112,7 @@ class ThreadSafeLazyList(Sequence[T]):
             return self._list[index]
 
     def __len__(self) -> int:
-        """
-        Returns the total length of the sequence.
+        """Returns the total length of the sequence.
 
         If known_length was provided at initialization, returns that value.
         Otherwise, exhausts the iterator to determine the length.
@@ -133,8 +127,7 @@ class ThreadSafeLazyList(Sequence[T]):
         return len(self._list)
 
     def __iter__(self) -> Iterator[T]:
-        """
-        Returns an iterator over the sequence.
+        """Returns an iterator over the sequence.
 
         The returned iterator is safe to use concurrently with other operations
         on this sequence.

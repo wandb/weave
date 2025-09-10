@@ -1,7 +1,6 @@
-"""
-This file exposes functions to make moviepy VideoFileClip thread-safe and revert those changes:
+"""This file exposes functions to make moviepy VideoFileClip thread-safe and revert those changes:
 - `apply_threadsafe_patch_to_moviepy_video`
-- `undo_threadsafe_patch_to_moviepy_video`
+- `undo_threadsafe_patch_to_moviepy_video`.
 
 Similar to Pillow's ImageFile, moviepy's VideoFileClip may not be thread-safe when
 loading and processing video content across multiple threads, which can lead to race conditions
@@ -97,7 +96,7 @@ def _apply_threadsafe_patch() -> None:
                     # Double-check pattern: verify the attribute still doesn't exist
                     # after acquiring the lock to prevent race conditions
                     if not hasattr(self, "_weave_load_lock"):
-                        setattr(self, "_weave_load_lock", threading.RLock())
+                        self._weave_load_lock = threading.RLock()
             lock = self._weave_load_lock
 
         except Exception:

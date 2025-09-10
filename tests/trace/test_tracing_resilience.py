@@ -1,5 +1,4 @@
-"""
-The purpose of this test suite is to ensure that Weave can handle various types of errors that can occur during tracing.
+"""The purpose of this test suite is to ensure that Weave can handle various types of errors that can occur during tracing.
 
 We should never be breaking the user's program with an error.
 """

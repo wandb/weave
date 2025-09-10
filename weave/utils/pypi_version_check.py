@@ -1,5 +1,4 @@
-"""
-This module contains code for checking if there is a new version of a PyPI package available.
+"""This module contains code for checking if there is a new version of a PyPI package available.
 
 It is a modified version of the code from the wandb library, located at:
 https://github.com/wandb/client/blob/main/wandb/sdk/internal/update.py
@@ -24,8 +23,7 @@ if TYPE_CHECKING:
 def check_available(
     current_version: str, module_name: str
 ) -> dict[str, str | None] | None:
-    """
-    Check if there is a new version of the module available on PyPI.
+    """Check if there is a new version of the module available on PyPI.
 
     Args:
         current_version (str): The current version of the module.

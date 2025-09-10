@@ -114,10 +114,9 @@ def evaluate_router(
 def _get_score_column(
     model: str, scores: dict, score_col_name: Optional[str] = None
 ) -> tuple[str, float]:
-    """
-    Extract a single score from the nested `scores` column.
-        - raise for multiple scores
-        - build score column name if not provided
+    """Extract a single score from the nested `scores` column.
+    - raise for multiple scores
+    - build score column name if not provided.
     """
     if len(scores) > 1:
         raise ValueError(

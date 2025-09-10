@@ -13,8 +13,7 @@ if TYPE_CHECKING:
 
 
 class OpenAIModerationScorer(LLMScorer):
-    """
-    Uses the OpenAI moderation API to check if the model output is safe.
+    """Uses the OpenAI moderation API to check if the model output is safe.
 
     This scorer sends the provided output to the OpenAI moderation API and returns a structured response
     indicating whether the output contains unsafe content.
@@ -32,8 +31,7 @@ class OpenAIModerationScorer(LLMScorer):
 
     @weave.op
     async def score(self, *, output: str, **kwargs: Any) -> dict:
-        """
-        Score the given text against the OpenAI moderation API.
+        """Score the given text against the OpenAI moderation API.
 
         Args:
             output: text to check for moderation, must be a string
@@ -58,8 +56,7 @@ TOXICITY_TOTAL_THRESHOLD = 5
 
 
 class WeaveToxicityScorerV1(RollingWindowScorer):
-    """
-    A moderation scorer using the Celadon model from PleIAs, https://huggingface.co/PleIAs/celadon
+    """A moderation scorer using the Celadon model from PleIAs, https://huggingface.co/PleIAs/celadon.
 
     Celadon is a DeBERTa-v3-small fine-tuned model with five classification heads, trained on 600k samples from the Toxic Commons dataset.
 
@@ -135,8 +132,7 @@ class WeaveToxicityScorerV1(RollingWindowScorer):
         self._tokenizer = AutoTokenizer.from_pretrained(self._local_model_path)
 
     def predict_chunk(self, input_ids: "Tensor") -> list[Union[int, float]]:
-        """
-        Predict toxicity scores for a chunk of tokenized input.
+        """Predict toxicity scores for a chunk of tokenized input.
 
         Args:
             input_ids: Tokenized input IDs for the chunk.
@@ -174,9 +170,8 @@ BIAS_SCORER_THRESHOLD = 0.60
 
 
 class WeaveBiasScorerV1(RollingWindowScorer):
-    """
-    The scorer that assesses gender and race/origin bias using a fine-tuned
-    deberta-small-long-nli model from tasksource, https://huggingface.co/tasksource/deberta-small-long-nli
+    """The scorer that assesses gender and race/origin bias using a fine-tuned
+    deberta-small-long-nli model from tasksource, https://huggingface.co/tasksource/deberta-small-long-nli.
 
     This model is trained from scratch on a custom dataset of 260k samples.
 
@@ -247,8 +242,7 @@ class WeaveBiasScorerV1(RollingWindowScorer):
     @validate_call
     @weave.op
     def score(self, *, output: str, **kwargs: Any) -> WeaveScorerResult:
-        """
-        Score the output.
+        """Score the output.
 
         Args:
             output: text to score, must be a string

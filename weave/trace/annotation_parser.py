@@ -42,9 +42,8 @@ class ContentAnnotation(BaseModel):
 
 
 def try_parse_annotation_with_hint(annotation_string: str) -> ContentAnnotation | None:
-    """
-    The function expects the string to be of the form:
-    typing.Annotated[<SomeType>, weave.type_wrappers.Content.content.Content[typing.Literal[<format>]]]
+    """The function expects the string to be of the form:
+    typing.Annotated[<SomeType>, weave.type_wrappers.Content.content.Content[typing.Literal[<format>]]].
 
     where <format> is a supported media format such as mp3 or wav and <SomeType> is a str (optionally base64) or bytes.
 
@@ -86,9 +85,8 @@ def try_parse_annotation_with_hint(annotation_string: str) -> ContentAnnotation 
 def try_parse_annotation_without_hint(
     annotation_string: str,
 ) -> ContentAnnotation | None:
-    """
-    The function expects the string to be of the form:
-    typing.Annotated[<SomeType>, <class 'weave.type_handlers.Content.content.Content'>]
+    """The function expects the string to be of the form:
+    typing.Annotated[<SomeType>, <class 'weave.type_handlers.Content.content.Content'>].
 
     where <SomeType> is a string or PathLike type
 
@@ -113,8 +111,7 @@ def try_parse_annotation_without_hint(
 def parse_content_annotation(
     annotation_string: str,
 ) -> ContentAnnotation | None:
-    """
-    Parses an content type annotation string.
+    """Parses an content type annotation string.
 
     The function expects the string to be one of three forms:
     1. typing.Annotated[SomeType, weave.type_wrappers.Content.content.Content[typing.Literal['format']]]

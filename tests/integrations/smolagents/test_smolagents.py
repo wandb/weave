@@ -159,8 +159,8 @@ def test_tool_calling_agent_weather(client):
 
     @tool
     def get_weather(location: str, celsius: Optional[bool] = False) -> str:
-        """
-        Get weather in the next days at given location.
+        """Get weather in the next days at given location.
+
         Args:
             location: the location
             celsius: whether to use Celsius for temperature
@@ -228,8 +228,8 @@ def test_code_agent_weather(client):
 
     @tool
     def get_weather(location: str, celsius: Optional[bool] = False) -> str:
-        """
-        Get weather in the next days at given location.
+        """Get weather in the next days at given location.
+
         Args:
             location: the location
             celsius: whether to use Celsius for temperature

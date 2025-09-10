@@ -9,8 +9,7 @@ if TYPE_CHECKING:
 
 
 class OpenAIStream:
-    """
-    A class that reconstructs a ChatCompletion from an OpenAI stream.
+    """A class that reconstructs a ChatCompletion from an OpenAI stream.
 
     Usage: initialize this class, iterate through all the chunks, then
     call final_response to get the final ChatCompletion.

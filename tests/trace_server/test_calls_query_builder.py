@@ -1650,7 +1650,7 @@ def test_query_with_summary_weave_trace_name_filter() -> None:
 
 
 def test_storage_size_fields():
-    """Test querying with storage size fields"""
+    """Test querying with storage size fields."""
     cq = CallsQuery(project_id="test/project", include_storage_size=True)
     cq.add_field("id")
     cq.add_field("storage_size_bytes")
@@ -1678,7 +1678,7 @@ def test_storage_size_fields():
 
 
 def test_total_storage_size():
-    """Test querying with total storage size"""
+    """Test querying with total storage size."""
     cq = CallsQuery(project_id="test/project", include_total_storage_size=True)
     cq.add_field("id")
     cq.add_field("total_storage_size_bytes")
@@ -1713,7 +1713,7 @@ def test_total_storage_size():
 
 
 def test_aggregated_data_size_field():
-    """Test the AggregatedDataSizeField class"""
+    """Test the AggregatedDataSizeField class."""
     field = AggregatedDataSizeField(
         field="total_storage_size_bytes", join_table_name="rolled_up_cms"
     )
@@ -2235,7 +2235,7 @@ def test_all_optimization_filters():
 
 
 def test_filter_length_validation():
-    """Test that filter length validation works"""
+    """Test that filter length validation works."""
     pb = ParamBuilder()
     cq = CallsQuery(project_id="test/project")
     cq.hardcoded_filter = HardCodedFilter(
@@ -2344,7 +2344,7 @@ def test_disallowed_fields():
 
 
 def test_thread_id_filter_eq():
-    """Test thread_id filter with single thread ID"""
+    """Test thread_id filter with single thread ID."""
     cq = CallsQuery(project_id="project")
     cq.add_field("id")
     cq.hardcoded_filter = HardCodedFilter(filter={"thread_ids": ["thread_123"]})
@@ -2367,7 +2367,7 @@ def test_thread_id_filter_eq():
 
 
 def test_thread_id_filter_in():
-    """Test thread_id filter with multiple thread IDs"""
+    """Test thread_id filter with multiple thread IDs."""
     cq = CallsQuery(project_id="project")
     cq.add_field("id")
     cq.hardcoded_filter = HardCodedFilter(
@@ -2396,7 +2396,7 @@ def test_thread_id_filter_in():
 
 
 def test_turn_id_filter_eq():
-    """Test turn_id filter with single turn ID"""
+    """Test turn_id filter with single turn ID."""
     cq = CallsQuery(project_id="project")
     cq.add_field("id")
     cq.hardcoded_filter = HardCodedFilter(filter={"turn_ids": ["turn_123"]})
@@ -2419,7 +2419,7 @@ def test_turn_id_filter_eq():
 
 
 def test_turn_id_filter_in():
-    """Test turn_id filter with multiple turn IDs"""
+    """Test turn_id filter with multiple turn IDs."""
     cq = CallsQuery(project_id="project")
     cq.add_field("id")
     cq.hardcoded_filter = HardCodedFilter(filter={"turn_ids": ["turn_123", "turn_456"]})
@@ -2446,7 +2446,7 @@ def test_turn_id_filter_in():
 
 
 def test_thread_id_and_turn_id_filter_combined():
-    """Test thread_id and turn_id filters together"""
+    """Test thread_id and turn_id filters together."""
     cq = CallsQuery(project_id="project")
     cq.add_field("id")
     cq.hardcoded_filter = HardCodedFilter(

@@ -662,8 +662,7 @@ def test_sort_field_validation_in_query():
 
 
 def test_turn_filtering_explanation():
-    """
-    Test that demonstrates the key behavior: only turn calls are included.
+    """Test that demonstrates the key behavior: only turn calls are included.
 
     This test is more about documenting the expected behavior than testing
     implementation details. It shows that the filtering `id = turn_id` ensures
@@ -1016,8 +1015,7 @@ def test_thread_id_filter_consistency():
 
 
 def test_query_structure_documentation():
-    """
-    Test that documents the structure and purpose of the threads query.
+    """Test that documents the structure and purpose of the threads query.
 
     This test serves AS living documentation of what the threads query does
     and why it's structured the way it is.

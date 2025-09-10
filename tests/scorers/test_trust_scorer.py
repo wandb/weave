@@ -10,7 +10,7 @@ from weave.scorers.trust_scorer import WeaveTrustScorerV1
 
 @pytest.fixture
 def dummy_scorer():
-    "Dummy scorer to test _filter_inputs_for_scorer functionality."
+    """Dummy scorer to test _filter_inputs_for_scorer functionality."""
 
     class DummyScorer(weave.Scorer):
         @weave.op

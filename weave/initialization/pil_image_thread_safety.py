@@ -1,7 +1,6 @@
-"""
-This file exposes functions to make the PIL ImageFile thread-safe and revert those changes:
+"""This file exposes functions to make the PIL ImageFile thread-safe and revert those changes:
 - `apply_threadsafe_patch_to_pil_image`
-- `undo_threadsafe_patch_to_pil_image`
+- `undo_threadsafe_patch_to_pil_image`.
 
 There is a discussion here: https://github.com/python-pillow/Pillow/issues/4848#issuecomment-671339193 in which
 the author claims that the Pillow library is thread-safe. However, empirical evidence suggests otherwise.
@@ -89,7 +88,7 @@ def _apply_threadsafe_patch() -> None:
                     # Double-check pattern: verify the attribute still doesn't exist
                     # after acquiring the lock to prevent race conditions
                     if not hasattr(self, "_weave_load_lock"):
-                        setattr(self, "_weave_load_lock", threading.RLock())
+                        self._weave_load_lock = threading.RLock()  # type: ignore[attr-defined]
             lock = getattr(self, "_weave_load_lock")  # noqa: B009
 
         except Exception:
