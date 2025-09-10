@@ -61,7 +61,12 @@ const sidebars: SidebarsConfig = {
             },
             "guides/tracking/trace-tree",
             "guides/tracking/otel",
-            "guides/tracking/trace-plots"
+            "guides/tracking/trace-plots",
+            {
+              type: "doc",
+              label: "Log Traces During Model Training Runs",
+              id: "guides/tools/weave-in-workspaces",
+            },
           ]
         },
         {
