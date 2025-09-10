@@ -60,8 +60,7 @@ def to_json_serializable(value: Any) -> Any:
 
 
 def resolve_pb_any_value(value: AnyValue) -> Any:
-    """
-    Resolve the value field of an AnyValue protobuf message.
+    """Resolve the value field of an AnyValue protobuf message.
 
     Args:
         value: An AnyValue protobuf message
@@ -91,8 +90,7 @@ def resolve_pb_any_value(value: AnyValue) -> Any:
 
 
 def resolve_pb_key_value(key_value: KeyValue) -> tuple[str, Any]:
-    """
-    Resolve a KeyValue protobuf message into a tuple of key and value.
+    """Resolve a KeyValue protobuf message into a tuple of key and value.
 
     Args:
         key_value: A KeyValue protobuf message
@@ -143,8 +141,7 @@ def _set_value_in_nested_dict(d: dict[str, Any], key: str, value: Any) -> None:
 def convert_numeric_keys_to_list(
     obj: dict[str, Any],
 ) -> Union[dict[str, Any], list[Any]]:
-    """
-    Convert dictionaries with numeric-only keys to lists.
+    """Convert dictionaries with numeric-only keys to lists.
 
     If all keys in a dictionary are numeric strings (0, 1, 2, ...),
     convert it to a list. Recursively processes nested dictionaries.
@@ -170,8 +167,7 @@ def convert_numeric_keys_to_list(
 
 
 def expand_attributes(kv: Iterable[tuple[str, Any]]) -> dict[str, Any]:
-    """
-    Expand a flattened JSON attributes file into a nested Python dictionary.
+    """Expand a flattened JSON attributes file into a nested Python dictionary.
 
     Args:
         file_path: Path to the JSON file with flattened attributes
@@ -205,8 +201,7 @@ def expand_attributes(kv: Iterable[tuple[str, Any]]) -> dict[str, Any]:
 def flatten_attributes(
     data: dict[str, Any], json_attributes: Optional[list[str]] = None
 ) -> dict[str, Any]:
-    """
-    Flatten a nested Python dictionary into a flat dictionary with dot-separated keys.
+    """Flatten a nested Python dictionary into a flat dictionary with dot-separated keys.
 
     Args:
         data: Nested Python dictionary to flatten
@@ -275,8 +270,7 @@ def flatten_attributes(
 
 
 def get_attribute(data: dict[str, Any], key: str) -> Any:
-    """
-    Get the value of a nested attribute from either a nested or flattened dictionary.
+    """Get the value of a nested attribute from either a nested or flattened dictionary.
 
     Args:
         data: dictionary to get value from
@@ -296,8 +290,7 @@ def get_attribute(data: dict[str, Any], key: str) -> Any:
 def unflatten_key_values(
     key_values: Iterable[KeyValue],
 ) -> dict[str, Any]:
-    """
-    Transform a list of KeyValue pairs into a nested dictionary structure.
+    """Transform a list of KeyValue pairs into a nested dictionary structure.
 
     Args:
         key_values: An iterable of KeyValue protobuf messages
@@ -459,10 +452,11 @@ def shorten_name(
 
 
 def try_parse_timestamp(x: Any) -> Any:
-    """
-    Try to parse a timestamp from various formats.
+    """Try to parse a timestamp from various formats.
+
     Args:
         x: The input value to parse as a timestamp.
+
     Returns:
         A datetime object if parsing is successful, otherwise returns None.
     """

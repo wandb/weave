@@ -214,7 +214,8 @@ def test_dictify_sanitizes_nested() -> None:
 
 def test_is_pydantic_model_class() -> None:
     """We expect is_pydantic_model_class to return True for Pydantic model classes, and False otherwise.
-    Notably it should return False for instances of Pydantic model classes."""
+    Notably it should return False for instances of Pydantic model classes.
+    """
     assert not is_pydantic_model_class(int)
     assert not is_pydantic_model_class(str)
     assert not is_pydantic_model_class(list)

@@ -1,5 +1,4 @@
-"""
-This script generates modelsFinal.json from modelsBegin.json.
+"""This script generates modelsFinal.json from modelsBegin.json.
 It uses the Hugging Face ID for each model to augment each model
 with information such as number of likes and downloads and license.
 """
@@ -20,8 +19,7 @@ file_out = dir_this / "modelsFinal.json"
 
 
 def pick_keys(d: dict[str, Any], keys: dict[str, str]) -> dict[str, Any]:
-    """
-    Return a new dictionary containing only the specified keys if they exist in the input dictionary,
+    """Return a new dictionary containing only the specified keys if they exist in the input dictionary,
     with optional key renaming.
 
     Args:
@@ -35,8 +33,7 @@ def pick_keys(d: dict[str, Any], keys: dict[str, str]) -> dict[str, Any]:
 
 
 def format_json_compact_arrays(obj: Any, indent: int = 2) -> str:
-    """
-    Format JSON with compact arrays (single line) while keeping other formatting.
+    """Format JSON with compact arrays (single line) while keeping other formatting.
     NOTE: This is a vibe coded hack - really we should be calling out to prettier.
     This is just convenient for not failing CI if you forgot to do that.
 
@@ -70,8 +67,7 @@ HF_KEYS_TO_KEEP = {
 
 # TODO: Add in any other fields we want
 def get_hf_info(model_name: str) -> dict[str, Any]:
-    """
-    Get HuggingFace information for a given model name.
+    """Get HuggingFace information for a given model name.
 
     Args:
         model_name (str): The HuggingFace model name/ID.
@@ -97,8 +93,7 @@ def write_models(file_out: Path, models: dict[str, Any] | list[dict[str, Any]]) 
 
 
 def main() -> None:
-    """
-    Main function to augment model data with HuggingFace info and write to a JSON file.
+    """Main function to augment model data with HuggingFace info and write to a JSON file.
 
     This function iterates over the source models data, augments each model with additional
     information from HuggingFace, adds the isNew flag if appropriate, and writes the resulting list to a JSON file.

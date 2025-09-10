@@ -1,5 +1,4 @@
-"""
-Tests for the CrossProcessTraceServer components.
+"""Tests for the CrossProcessTraceServer components.
 
 This module tests the low-level cross-process communication between
 child processes and the main process, including error handling,

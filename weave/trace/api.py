@@ -215,7 +215,6 @@ def get(uri: str | ObjectRef) -> Any:
         The object.
 
     Example:
-
     ```python
     weave.init("weave_get_example")
     dataset = weave.Dataset(rows=[{"a": 1, "b": 2}])
@@ -231,11 +230,9 @@ def get(uri: str | ObjectRef) -> Any:
 
 @contextlib.contextmanager
 def attributes(attributes: dict[str, Any]) -> Iterator:
-    """
-    Context manager for setting attributes on a call.
+    """Context manager for setting attributes on a call.
 
     Example:
-
     ```python
     with weave.attributes({'env': 'production'}):
         print(my_function.call("World"))
@@ -283,11 +280,9 @@ class ThreadContext:
 
 @contextlib.contextmanager
 def thread(thread_id: str | None | object = _AUTO_GENERATE) -> Iterator[ThreadContext]:
-    """
-    Context manager for setting thread_id on calls within the context.
+    """Context manager for setting thread_id on calls within the context.
 
     Examples:
-
     ```python
     # Auto-generate thread_id
     with weave.thread() as t:

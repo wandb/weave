@@ -23,8 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 class KafkaProducer(ConfluentKafkaProducer):
-    """
-    Kafka producer for sending messages to the Kafka broker.
+    """Kafka producer for sending messages to the Kafka broker.
 
     Args:
         config (dict[str, Any]): Kafka producer configuration.
@@ -58,8 +57,7 @@ class KafkaProducer(ConfluentKafkaProducer):
     def produce_call_end(
         self, call_end: tsi.EndedCallSchemaForInsert, flush_immediately: bool = False
     ) -> None:
-        """
-        Produce a call_end message to Kafka with buffer size management.
+        """Produce a call_end message to Kafka with buffer size management.
 
         Drops messages if buffer is full to prevent unbounded memory growth.
         Logs warnings at 50% capacity and errors when dropping messages.
@@ -111,8 +109,7 @@ class KafkaProducer(ConfluentKafkaProducer):
 
 
 class KafkaConsumer(ConfluentKafkaConsumer):
-    """
-    Kafka consumer for receiving messages from the Kafka broker.
+    """Kafka consumer for receiving messages from the Kafka broker.
 
     Args:
         group_id (str): The group ID for the consumer.

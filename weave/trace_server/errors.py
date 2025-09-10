@@ -248,8 +248,7 @@ def get_registered_error_classes() -> list[type[Exception]]:
 
 
 def handle_clickhouse_query_error(e: Exception) -> None:
-    """
-    Handle common ClickHouse query errors by raising appropriate custom exceptions.
+    """Handle common ClickHouse query errors by raising appropriate custom exceptions.
 
     Args:
         e: The original exception from ClickHouse

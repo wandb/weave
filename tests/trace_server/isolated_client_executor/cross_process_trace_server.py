@@ -1,5 +1,4 @@
-"""
-This module implements a cross-process trace server that can be used to
+"""This module implements a cross-process trace server that can be used to
 communicate with a trace server running in a different process.
 
 IMPORTANT: this is only intended to be used for testing purposes.
@@ -57,8 +56,7 @@ class CrossProcessTraceServerError(Exception):
 
 
 class RequestQueueItem(BaseModel):
-    """
-    Represents a request sent from child process to main process.
+    """Represents a request sent from child process to main process.
 
     Attributes:
         request_id: Unique identifier for tracking this specific request
@@ -72,8 +70,7 @@ class RequestQueueItem(BaseModel):
 
 
 class ResponseQueueItem(BaseModel):
-    """
-    Represents a response sent from main process to child process.
+    """Represents a response sent from main process to child process.
 
     Attributes:
         request_id: Matches the request_id from the original RequestQueueItem
@@ -87,8 +84,7 @@ class ResponseQueueItem(BaseModel):
 
 
 class CrossProcessTraceServerSender(tsi.TraceServerInterface):
-    """
-    TraceServerInterface implementation that sends requests to another process via queues.
+    """TraceServerInterface implementation that sends requests to another process via queues.
 
     This class runs in the child process and communicates with a receiver in the main process.
     It handles:
@@ -134,8 +130,7 @@ class CrossProcessTraceServerSender(tsi.TraceServerInterface):
     def _wait_for_response(
         self, request_id: str, method: str, timeout: int
     ) -> ResponseQueueItem:
-        """
-        Wait for a specific response, handling out-of-order delivery.
+        """Wait for a specific response, handling out-of-order delivery.
 
         Args:
             request_id: The request ID to wait for
@@ -167,8 +162,7 @@ class CrossProcessTraceServerSender(tsi.TraceServerInterface):
         return self._wait_for_response(request_id, method, timeout)
 
     def _send_request(self, method: str, payload: BaseModel) -> BaseModel:
-        """
-        Send a synchronous request and wait for its response.
+        """Send a synchronous request and wait for its response.
 
         Handles the complete request/response cycle:
         1. Generate unique request ID
@@ -210,8 +204,7 @@ class CrossProcessTraceServerSender(tsi.TraceServerInterface):
         return response_item.payload
 
     def _send_streaming_request(self, method: str, payload: BaseModel) -> Iterator[Any]:
-        """
-        Send a streaming request and yield responses as they arrive.
+        """Send a streaming request and yield responses as they arrive.
 
         Streaming methods return multiple responses over time, terminated by a
         special "STREAM_END" error message. This method handles the streaming
@@ -453,8 +446,7 @@ class CrossProcessTraceServerSender(tsi.TraceServerInterface):
 
 
 class CrossProcessTraceServerReceiver:
-    """
-    Receives requests from a child process and executes them on a local trace server.
+    """Receives requests from a child process and executes them on a local trace server.
 
     This class runs in the main process and handles:
     - Background worker thread for processing requests
@@ -495,8 +487,7 @@ class CrossProcessTraceServerReceiver:
         self._worker_thread.start()
 
     def _worker_loop(self) -> None:
-        """
-        Main worker loop that processes requests from the queue.
+        """Main worker loop that processes requests from the queue.
 
         This runs in a background thread and continuously:
         1. Gets requests from the queue (with timeout to check stop event)
@@ -585,8 +576,7 @@ class CrossProcessTraceServerReceiver:
         self.response_queue.put(response_item)
 
     def get_sender_trace_server(self) -> CrossProcessTraceServerSender:
-        """
-        Get a sender that can be used in another process to communicate with this receiver.
+        """Get a sender that can be used in another process to communicate with this receiver.
 
         Returns:
             CrossProcessTraceServerSender: Configured to send requests to this receiver
@@ -598,8 +588,7 @@ class CrossProcessTraceServerReceiver:
         )
 
     def stop(self) -> None:
-        """
-        Stop the receiver and clean up resources.
+        """Stop the receiver and clean up resources.
 
         This signals the worker thread to stop and waits for it to terminate.
         """

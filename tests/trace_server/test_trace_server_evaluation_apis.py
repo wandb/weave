@@ -263,8 +263,7 @@ def setup_test_objects(server: TraceServerInterface, entity: str, project: str):
 
 @pytest.mark.parametrize("direct_script_execution", [True, False])
 def test_evaluate_model(client: WeaveClient, direct_script_execution):
-    """
-    Test the evaluate_model API endpoint with isolated execution.
+    """Test the evaluate_model API endpoint with isolated execution.
 
     This test verifies that:
     1. Evaluations can be created and executed through the evaluate_model API

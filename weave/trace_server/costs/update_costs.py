@@ -82,8 +82,7 @@ def fetch_new_costs() -> dict[str, CostDetails]:
 
 
 def fetch_models_begin_costs() -> dict[str, CostDetails]:
-    """
-    Fetches costs from modelsBegin.json and converts them to the expected format.
+    """Fetches costs from modelsBegin.json and converts them to the expected format.
 
     Converts from cents per billion tokens to dollars per token:
     - priceCentsPerBillionTokensInput / 100,000,000,000 = input cost per token

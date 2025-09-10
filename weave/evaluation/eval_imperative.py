@@ -539,7 +539,8 @@ class EvaluationLogger(BaseModel):
         """Log a prediction to the Evaluation, and return a reference.
 
         The reference can be used to log scores which are attached to the specific
-        prediction instance."""
+        prediction instance.
+        """
         # Use set_call_stack to temporarily set the evaluation as the parent
         assert self._evaluate_call is not None
 

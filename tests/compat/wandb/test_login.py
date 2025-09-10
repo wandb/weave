@@ -91,27 +91,27 @@ all_hosts = ["saas", "aws", "gcp", "azure", "onprem"]
 
 @pytest.mark.parametrize("api_key", all_valid_keys, indirect=True)
 def test_validate_api_key_success(api_key):
-    """All valid API keys should work"""
+    """All valid API keys should work."""
     _validate_api_key(api_key)
 
 
 @pytest.mark.parametrize("api_key", all_invalid_keys, indirect=True)
 def test_validate_api_key_failure(api_key):
-    """All invalid API keys should raise ValueError"""
+    """All invalid API keys should raise ValueError."""
     with pytest.raises(ValueError, match="API key must be 40 characters long"):
         _validate_api_key(api_key)
 
 
 @pytest.mark.parametrize("host_and_base_url", all_hosts, indirect=True)
 def test_get_default_host_environment_variable(host_and_base_url):
-    """If the WANDB_BASE_URL env var is set, it should take precedence"""
+    """If the WANDB_BASE_URL env var is set, it should take precedence."""
     with patch.dict(os.environ, {"WANDB_BASE_URL": host_and_base_url.base_url}):
         assert _get_default_host() == host_and_base_url.host
 
 
 @pytest.mark.parametrize("host_and_base_url", all_hosts, indirect=True)
 def test_get_default_host_settings_file(tmp_path, host_and_base_url):
-    """If there is a settings file, it should be used"""
+    """If there is a settings file, it should be used."""
     settings_path = tmp_path / "settings"
 
     # Create settings file with base_url
@@ -127,7 +127,7 @@ def test_get_default_host_settings_file(tmp_path, host_and_base_url):
 
 
 def test_get_default_host_fallback():
-    """If there is no env var or settings file, it should fallback to api.wandb.ai"""
+    """If there is no env var or settings file, it should fallback to api.wandb.ai."""
     with patch.dict(os.environ, {}, clear=True):
         with patch(
             "weave.compat.wandb.wandb_thin.login._get_host_from_settings",
@@ -137,13 +137,13 @@ def test_get_default_host_fallback():
 
 
 def test_get_host_from_settings_missing_file(tmp_path):
-    """If there is no settings file, it should return None"""
+    """If there is no settings file, it should return None."""
     with patch.dict(os.environ, {"WANDB_CONFIG_DIR": str(tmp_path)}, clear=True):
         assert _get_host_from_settings() is None
 
 
 def test_set_setting(tmp_path):
-    """Setting values should be written to the settings file"""
+    """Setting values should be written to the settings file."""
     with patch.dict(os.environ, {"WANDB_CONFIG_DIR": str(tmp_path)}, clear=True):
         _set_setting("base_url", "https://test.wandb.ai")
 
@@ -159,7 +159,7 @@ def test_set_setting(tmp_path):
 
 
 def test_clear_setting(tmp_path):
-    """Clearing a setting should remove it from the settings file"""
+    """Clearing a setting should remove it from the settings file."""
     settings_path = tmp_path / "settings"
 
     # Create settings file with a setting
@@ -377,7 +377,7 @@ def test_full_login_flow_without_netrc(
 
 
 def test_wandb_context():
-    """Test that the wandb context can be set and retrieved without errors"""
+    """Test that the wandb context can be set and retrieved without errors."""
     token = set_wandb_api_context("test_user", "test_key", None, None)
 
     try:

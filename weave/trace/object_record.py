@@ -98,7 +98,8 @@ def getmembers(
     object: Any, predicate: Any = None, on_error: Any = None
 ) -> list[tuple[str, Any]]:
     """Return all members of an object as (name, value) pairs sorted by name.
-    Optionally, only return members that satisfy a given predicate."""
+    Optionally, only return members that satisfy a given predicate.
+    """
     if isclass(object):
         mro = (object,) + getmro(object)
     else:

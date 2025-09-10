@@ -29,7 +29,8 @@ class UserSettings(BaseModel):
     """User configuration for Weave.
 
     All configs can be overridden with environment variables.  The precedence is
-    environment variables > `weave.trace.settings.UserSettings`."""
+    environment variables > `weave.trace.settings.UserSettings`.
+    """
 
     disabled: bool = False
     """Toggles Weave tracing.
