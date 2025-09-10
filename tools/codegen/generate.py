@@ -142,6 +142,10 @@ def generate_code(
             "--typescript-path", help="Path to the TypeScript code generation output"
         ),
     ] = None,
+    java_path: Annotated[
+        str | None,
+        Option("--java-path", help="Path to the Java code generation output"),
+    ] = None,
 ) -> None:
     """Generate code from the OpenAPI spec using Stainless.
 
@@ -194,6 +198,8 @@ def generate_code(
         cmd.append(f"--+target=node:{node_path}")
     if typescript_path:
         cmd.append(f"--+target=typescript:{typescript_path}")
+    if java_path:
+        cmd.append(f"--+target=java:{java_path}")
 
     # Print the command being executed for visibility
     info(f"Running command: {' '.join(cmd)}")
@@ -601,11 +607,13 @@ def all(
     # Use python_output as python_output
     node_path = _ensure_absolute_path(cfg.get("node_output"))
     typescript_path = _ensure_absolute_path(cfg.get("typescript_output"))
+    java_path = _ensure_absolute_path(cfg.get("java_output"))
     _format_announce_invoke(
         generate_code,
         python_path=str_path,
         node_path=node_path,
         typescript_path=typescript_path,
+        java_path=java_path,
     )
 
     # 3. Update pyproject.toml or create branch with generated code

@@ -30,6 +30,11 @@ targets:
     package_name: weave-server-sdk
     publish:
       npm: false
+  java:
+    reverse_domain: com.weave.api
+    production_repo: null
+    publish:
+      maven: false
 
 # `client_settings` define settings for the API client, such as extra constructor
 # arguments (used for authentication), retry behavior, idempotency, etc.

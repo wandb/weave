@@ -23,6 +23,10 @@ python_output: /path/to/your/local/python/repo
 # Comment out or remove if not needed
 # typescript_output: /path/to/your/local/typescript/repo
 
+# Path to the Java package repository (optional)
+# Comment out or remove if not needed
+# java_output: /path/to/your/local/java/repo
+
 # ==========================
 # PROBABLY SHOULD NOT CHANGE
 # ==========================
