@@ -38,7 +38,7 @@ MAX_BASE64_SIZE = 100 * 1024 * 1024  # 100 MB
 # Minimum size for standalone base64 (to avoid false positives)
 MIN_BASE64_SIZE = 100  # 100 bytes
 
-MIN_TEXT_SIZE = 50 * 1024 # 50 KB
+MIN_TEXT_SIZE = 50 * 1024 # 50 KiB
 
 
 def is_valid_base64(value: str) -> bool:
