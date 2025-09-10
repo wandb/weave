@@ -1027,7 +1027,7 @@ async def test_feedback_is_correctly_linked(client):
         == CallRef(
             entity=client.entity,
             project=client.project,
-            id=next(iter(score.calls())).id,
+            id=first(score.calls()).id,
         ).uri()
     )
 
@@ -1134,7 +1134,7 @@ def test_get_evaluate_calls(client, make_evals):
 def test_get_score_calls(client, make_evals):
     ref, ref2 = make_evals
     ev = ref.get()
-    score_calls = next(iter(ev.get_score_calls().values()))
+    score_calls = first(ev.get_score_calls().values())
     assert len(score_calls) == 4
 
     assert score_calls[0].output == 3
@@ -1143,7 +1143,7 @@ def test_get_score_calls(client, make_evals):
     assert score_calls[3].output == 44
 
     ev2 = ref2.get()
-    score_calls2 = next(iter(ev2.get_score_calls().values()))
+    score_calls2 = first(ev2.get_score_calls().values())
     assert len(score_calls2) == 4
 
     assert score_calls2[0].output == 56
@@ -1155,7 +1155,7 @@ def test_get_score_calls(client, make_evals):
 def test_get_predict_and_score_calls(client, make_evals):
     ref, ref2 = make_evals
     ev = ref.get()
-    predict_and_score_calls = next(iter(ev.get_predict_and_score_calls().values()))
+    predict_and_score_calls = first(ev.get_predict_and_score_calls().values())
 
     # Should have 2 predict_and_score calls (one for each prediction)
     assert len(predict_and_score_calls) == 2
@@ -1167,7 +1167,7 @@ def test_get_predict_and_score_calls(client, make_evals):
         assert "model_latency" in call.output
 
     ev2 = ref2.get()
-    predict_and_score_calls2 = next(iter(ev2.get_predict_and_score_calls().values()))
+    predict_and_score_calls2 = first(ev2.get_predict_and_score_calls().values())
 
     # Should have 2 predict_and_score calls for the second evaluation
     assert len(predict_and_score_calls2) == 2
