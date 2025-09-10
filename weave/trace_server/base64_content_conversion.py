@@ -359,9 +359,9 @@ def reconstruct_base64_for_call(
                 # We expect both content and metadata.json digests
                 if "content" not in files or "metadata.json" not in files:
                     # Not a complete content object, process normally
-                    result = {}
-                    for k, v in val.items():
-                        result[k] = _visit(v)
+                        result = {
+                            k: _visit(v) for k, v in val.items()
+                        }
                     return result
 
                 try:
