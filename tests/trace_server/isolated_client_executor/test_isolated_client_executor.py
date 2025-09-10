@@ -11,6 +11,7 @@ ensuring the system can handle stuck processes.
 import os
 import time
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from typing import Optional
 
 import pytest
@@ -52,23 +53,12 @@ class TestRequest(BaseModel):
     arg_c: Optional[str] = "default"
 
 
+@dataclass
 class WeaveClientFactoryConfig:
     entity: str
     project: str
     server: TraceServerInterface
     ensure_project_exists: bool = False
-
-    def __init__(
-        self,
-        entity: str,
-        project: str,
-        server: TraceServerInterface,
-        ensure_project_exists: bool = False,
-    ):
-        self.entity = entity
-        self.project = project
-        self.server = server
-        self.ensure_project_exists = ensure_project_exists
 
 
 def weave_client_factory(config: WeaveClientFactoryConfig):

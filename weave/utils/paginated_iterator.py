@@ -49,7 +49,7 @@ class PaginatedIterator(Generic[T, R]):
         if limit is not None and limit <= 0:
             raise ValueError("limit must be greater than 0")
 
-    @lru_cache
+    @lru_cache  # noqa: B019
     def _fetch_page(self, index: int) -> list[T]:
         return self.fetch_func(index * self.page_size, self.page_size)
 

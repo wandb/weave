@@ -555,13 +555,6 @@ class CrossProcessTraceServerReceiver:
                     )
                     self._send_error_response(request_item.request_id, str(e))
 
-                except Exception as e:
-                    # Send error response for any processing failure
-                    logger.exception(
-                        f"Error processing request {request_item.request_id}"
-                    )
-                    self._send_error_response(request_item.request_id, str(e))
-
             except Exception as e:
                 # Log and continue on any unexpected errors
                 logger.exception("Error in worker loop")
