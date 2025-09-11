@@ -28,6 +28,8 @@ import hashlib
 import json
 import logging
 import threading
+import time
+import weakref
 from collections import defaultdict
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
@@ -167,6 +169,7 @@ logger.setLevel(logging.INFO)
 # maxsize: Maximum connections per pool (set higher than thread count to avoid blocking)
 # num_pools: Number of distinct connection pools (for different hosts/configs)
 _CH_POOL_MANAGER = get_pool_manager(maxsize=50, num_pools=2)
+THREAD_CLEANUP_INTERVAL = 60 * 5  # 5 minutes
 
 
 class ClickHouseTraceServer(tsi.TraceServerInterface):
@@ -195,6 +198,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._file_storage_client: Optional[FileStorageClient] = None
         self._kafka_producer: Optional[KafkaProducer] = None
         self._evaluate_model_dispatcher = evaluate_model_dispatcher
+        # Track clients for cleanup
+        self._client_cleanup_registry: dict[int, weakref.ref[CHClient]] = {}
+        self._registry_lock = threading.Lock()
+        self._start_cleanup_thread()
 
     @classmethod
     def from_env(
@@ -2087,8 +2094,68 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         but all clients share the same underlying connection pool via _CH_POOL_MANAGER.
         """
         if not hasattr(self._thread_local, "ch_client"):
-            self._thread_local.ch_client = self._mint_client()
+            client = self._mint_client()
+            self._thread_local.ch_client = client
+
+            # Register client for cleanup
+            thread_id = threading.get_ident()
+            with self._registry_lock:
+                self._client_cleanup_registry[thread_id] = weakref.ref(
+                    client,
+                    lambda ref: self._client_cleanup_registry.pop(thread_id, None),
+                )
         return self._thread_local.ch_client
+
+    def _cleanup_dead_clients(self) -> None:
+        """Clean up clients for threads that no longer exist.
+
+        This is called periodically (every 5 minutes) by an internal cleanup thread
+        to clean up thread-local ClickHouse clients from threads that have died.
+        Without this, clients accumulate in memory causing a leak over time.
+        """
+        with self._registry_lock:
+            dead_threads = []
+            active_threads = {t.ident for t in threading.enumerate()}
+
+            for thread_id, client_ref in self._client_cleanup_registry.items():
+                # Check if thread is dead or client was garbage collected
+                if thread_id not in active_threads or client_ref() is None:
+                    dead_threads.append(thread_id)
+                    # Try to close the client if it still exists
+                    client = client_ref() if thread_id in active_threads else None
+                    if client is not None:
+                        try:
+                            client.close()
+                        except Exception:
+                            pass
+
+            # Remove dead entries
+            for thread_id in dead_threads:
+                self._client_cleanup_registry.pop(thread_id, None)
+
+            if dead_threads:
+                logger.info(
+                    f"Cleaned up {len(dead_threads)} CH clients, "
+                    f"{len(self._client_cleanup_registry)} remain"
+                )
+
+    def _start_cleanup_thread(self) -> None:
+        """Start a background thread that periodically cleans up dead clients."""
+
+        def cleanup_worker() -> None:
+            """Background worker that runs cleanup every 5 minutes."""
+            while True:
+                time.sleep(THREAD_CLEANUP_INTERVAL)
+                try:
+                    self._cleanup_dead_clients()
+                except Exception:
+                    logger.exception("CH client cleanup failed")
+
+        cleanup_thread = threading.Thread(
+            target=cleanup_worker, name="ch-client-cleanup", daemon=True
+        )
+        cleanup_thread.start()
+        logger.info("Started ClickHouse client cleanup thread")
 
     def _mint_client(self) -> CHClient:
         """Create a new ClickHouse client using the shared pool manager."""
