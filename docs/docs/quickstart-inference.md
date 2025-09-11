@@ -35,7 +35,7 @@ When you run this code, Weave:
 - Logs inputs, outputs, latency, and token usage
 - Provides a link to view your trace in the Weave UI
 
-```python
+```python {5,10,11}
 import weave
 import openai
 
@@ -70,7 +70,7 @@ print(result)
 
 Next, try running this code, which is a basic summarization app that shows how Weave traces nested operations:
 
-```python
+```python {5,9,10}
 import weave
 import openai
 
@@ -93,7 +93,8 @@ def extract_key_points(text: str) -> list[str]:
             {"role": "user", "content": text}
         ],
     )
-    return response.choices[0].message.content.strip().split('\n')
+        # Returns response without blank lines
+        return [line for line in response.choices[0].message.content.strip().splitlines() if line.strip()]
 
 @weave.op()
 def create_summary(key_points: list[str]) -> str:
@@ -136,7 +137,7 @@ print("\nSummary:", result["summary"])
 
 W&B Inference provides access to multiple models. Use the following code to compare the performance between Llama and DeepSeek's respective responses:
 
-```python
+```python {5,9,10}
 import weave
 import openai
 
@@ -247,12 +248,12 @@ def evaluate_model(model: InferenceModel, dataset: list[dict]):
     
     # Log summary - Weave automatically aggregates the accuracy scores
     eval_logger.log_summary()
-    print(f"Evaluation complete for {model.model_name}. View results in the Weave UI.")
+    print(f"Evaluation complete for {model.model_name} (logged as: {safe_model_name}). View results in the Weave UI.")
 
 # Compare multiple models - a key feature of Weave's evaluation framework
 models_to_compare = [
-    InferenceModel(model_name="meta-llama/Llama-3.1-8B-Instruct"),
-    InferenceModel(model_name="deepseek-ai/DeepSeek-V3-0324"),
+    llama_model,
+    deepseek_model,
 ]
 
 for model in models_to_compare:
