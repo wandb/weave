@@ -3037,9 +3037,7 @@ def _setup_completion_model_info(
                 f"No secret fetcher found, cannot fetch API key for model {model_name}"
             )
 
-        api_key: Optional[str] = (
-            secret_fetcher.fetch(secret_name).get("secrets", {}).get(secret_name)
-        )
+        api_key = secret_fetcher.fetch(secret_name).get("secrets", {}).get(secret_name)
         provider = model_info.get("litellm_provider", "openai")
 
         if not api_key and provider not in ("bedrock", "bedrock_converse"):
