@@ -814,9 +814,9 @@ class CallsQuery(BaseModel):
                 having_conditions_sql, "AND"
             )
 
-        # The op_name, trace_id, trace_roots conditions REQUIRE conditioning on the
-        # started_at field after grouping in the HAVING clause. These filters remove
-        # call starts before grouping, creating orphan call ends. By conditioning
+        # The op_name, trace_id, trace_roots, wb_run_id conditions REQUIRE conditioning
+        # on the started_at field after grouping in the HAVING clause. These filters
+        # remove call starts before grouping, creating orphan call ends. By conditioning
         # on `NOT any(started_at) is NULL`, we filter out orphaned call ends, ensuring
         # all rows returned at least have a call start.
         op_name_sql = process_op_name_filter_to_sql(
@@ -835,6 +835,11 @@ class CallsQuery(BaseModel):
             table_alias,
         )
         turn_id_sql = process_turn_id_filter_to_sql(
+            self.hardcoded_filter,
+            pb,
+            table_alias,
+        )
+        wb_run_id_sql = process_wb_run_id_filter_to_sql(
             self.hardcoded_filter,
             pb,
             table_alias,
@@ -991,6 +996,7 @@ class CallsQuery(BaseModel):
         {id_mask_sql}
         {id_subquery_sql}
         {sortable_datetime_sql}
+        {wb_run_id_sql}
         {trace_roots_only_sql}
         {parent_ids_filter_sql}
         {op_name_sql}
@@ -1524,6 +1530,29 @@ def process_object_refs_filter_to_opt_sql(
         refs_filter_opt_sql += f"AND (length({table_alias}.output_refs) > 0 OR {table_alias}.ended_at IS NULL)"
 
     return refs_filter_opt_sql
+
+
+def process_wb_run_id_filter_to_sql(
+    hardcoded_filter: Optional[HardCodedFilter],
+    param_builder: ParamBuilder,
+    table_alias: str,
+) -> str:
+    """Pulls out the wb_run_id and returns a sql string if there are any wb_run_ids."""
+    if hardcoded_filter is None or not hardcoded_filter.filter.wb_run_ids:
+        return ""
+
+    wb_run_ids = hardcoded_filter.filter.wb_run_ids
+    assert_parameter_length_less_than_max("wb_run_ids", len(wb_run_ids))
+    wb_run_id_field = get_field_by_name("wb_run_id")
+    if not isinstance(wb_run_id_field, CallsMergedAggField):
+        raise TypeError("wb_run_id is not an aggregate field")
+
+    wb_run_id_field_sql = wb_run_id_field.as_sql(
+        param_builder, table_alias, use_agg_fn=False
+    )
+    wb_run_id_filter_sql = f"{wb_run_id_field_sql} IN {param_slot(param_builder.add_param(wb_run_ids), 'Array(String)')}"
+
+    return f"AND ({wb_run_id_filter_sql})"
 
 
 def process_calls_filter_to_conditions(
