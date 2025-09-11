@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import os
-import shutil
 import subprocess
 
 import pytest
+import verifiers as vf
 from openai import OpenAI
 
 from weave.integrations.integration_utilities import (
@@ -40,15 +40,8 @@ def test_verifiers_environment_evaluate(client: WeaveClient) -> None:
     We avoid external network calls by stubbing only the LLM response method on the
     environment instance, while exercising the real verifiers evaluation flow.
     """
-    pytest.importorskip("verifiers")
-
     # Ensure the gsm8k environment is available in CI by invoking the CLI installer
-    installer = shutil.which("vf-install")
-    if installer is None:
-        pytest.skip("vf-install CLI not available in environment")
-    subprocess.run([installer, "gsm8k", "--from-repo"], check=True)
-
-    import verifiers as vf
+    subprocess.run(["vf-install", "gsm8k", "--from-repo"], check=True)
 
     env = vf.load_environment("gsm8k")
 
