@@ -93,8 +93,8 @@ def extract_key_points(text: str) -> list[str]:
             {"role": "user", "content": text}
         ],
     )
-        # Returns response without blank lines
-        return [line for line in response.choices[0].message.content.strip().splitlines() if line.strip()]
+    # Returns response without blank lines
+    return [line for line in response.choices[0].message.content.strip().splitlines() if line.strip()]
 
 @weave.op()
 def create_summary(key_points: list[str]) -> str:
@@ -135,7 +135,7 @@ print("\nSummary:", result["summary"])
 
 ## Step 3: Compare multiple models
 
-W&B Inference provides access to multiple models. Use the following code to compare the performance between Llama and DeepSeek's respective responses:
+W&B Inference provides access to multiple models. Use the following code to compare the performance of Llama and DeepSeek's respective responses:
 
 ```python {5,9,10}
 import weave
