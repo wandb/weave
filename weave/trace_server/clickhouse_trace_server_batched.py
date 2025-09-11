@@ -1949,8 +1949,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             base_url=base_url,
             extra_headers=extra_headers,
             return_type=return_type,
-            trace_server=self,
-            project_id=req.project_id,
         )
 
         end_time = datetime.datetime.now()
@@ -2044,8 +2042,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             base_url=base_url,
             extra_headers=extra_headers,
             return_type=return_type,
-            trace_server=self,
-            project_id=req.project_id,
         )
 
         # If tracking not requested just return chunks directly

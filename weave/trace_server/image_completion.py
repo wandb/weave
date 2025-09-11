@@ -66,7 +66,7 @@ def create_content_object(
                 "image/png"
             )
     """
-    content_obj = Content.from_bytes(
+    content_obj: Content = Content.from_bytes(
         data, mimetype=mimetype, metadata={"_original_schema": original_schema}
     )
 
