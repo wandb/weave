@@ -168,12 +168,6 @@ class Content(BaseModel, Generic[T]):
         encoding: str = "utf-8",
     ) -> Self:
         """Initializes Content from raw bytes."""
-        from weave.type_wrappers.Content.utils import (
-            default_filename,
-            full_name,
-            get_mime_and_extension,
-        )
-
         if len(data) == 0:
             logger.warning("Content.from_bytes received empty data")
 
