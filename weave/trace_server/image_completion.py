@@ -1,21 +1,13 @@
 import base64
 import json
-from collections.abc import Iterator
-from typing import Any, Callable, Optional
+from typing import Any, Optional
 
 import requests
-from pydantic import BaseModel
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import (
     InvalidRequest,
-    MissingLLMApiKeyError,
 )
-from weave.trace_server.interface.builtin_object_classes.provider import (
-    Provider,
-    ProviderModel,
-)
-from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 from weave.trace_server.trace_server_interface_util import str_digest
 from weave.type_wrappers.Content.content import Content
 
@@ -149,7 +141,6 @@ def _process_image_data_item(
                 wb_user_id
             )
     """
-
     # Make a copy to avoid modifying the original
     processed_item = data_item.copy()
 
