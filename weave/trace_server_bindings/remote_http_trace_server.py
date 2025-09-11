@@ -666,6 +666,16 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         response = self.completions_create(req)
         yield {"response": response.response, "weave_call_id": response.weave_call_id}
 
+    def image_create(
+        self, req: tsi.ImageGenerationCreateReq
+    ) -> tsi.ImageGenerationCreateRes:
+        return self._generic_request(
+            "/image/create",
+            req,
+            tsi.ImageGenerationCreateReq,
+            tsi.ImageGenerationCreateRes,
+        )
+
     def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes:
         return self._generic_request(
             "/project/stats", req, tsi.ProjectStatsReq, tsi.ProjectStatsRes
