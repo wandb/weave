@@ -9,7 +9,6 @@ from typing import Any, Literal, Optional, SupportsIndex, Union
 
 from pydantic import BaseModel
 
-from weave.trace import box
 from weave.trace.context.tests_context import get_raise_on_captured_errors
 from weave.trace.context.weave_client_context import (
     get_weave_client,
@@ -881,24 +880,12 @@ def make_trace_obj(
         # not-yet-saved-method-op API which requires explicitly passing self
         # val.call = partial(call, val, parent)
         val = maybe_bind_method(val, parent)
-    box_val = box.box(val)
+    # No longer boxing values, just return the original value
     if is_op(val):
-        box_val.__dict__["ref"] = new_ref
-    elif box_val is None or isinstance(box_val, bool):
-        # We intentionally don't box None and bools because it's impossible to
-        # make them behave like the underlying True/False/None objects in python.
-        # This is unlike other objects (dict, list, int) that can be inherited
-        # from and compared.
-
-        # The tradeoff we're making here is:
-        # 1. We won't ref track bools or None when passed into a call; but
-        # 2. Users can compare them pythonically (e.g. `x is None` vs. `x == None`)
-
-        pass
-    else:
-        if hasattr(box_val, "ref") and not isinstance(box_val, DeletedRef):
-            box_val.ref = new_ref
-    return box_val
+        val.__dict__["ref"] = new_ref
+    elif hasattr(val, "ref") and not isinstance(val, DeletedRef):
+        val.ref = new_ref
+    return val
 
 
 class MissingSelfInstanceError(ValueError):

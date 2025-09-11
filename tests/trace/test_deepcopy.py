@@ -4,13 +4,6 @@ from copy import deepcopy
 import pytest
 
 import weave
-from weave.trace.box import (
-    BoxedDatetime,
-    BoxedFloat,
-    BoxedInt,
-    BoxedStr,
-    BoxedTimedelta,
-)
 from weave.trace.object_record import ObjectRecord
 from weave.trace.refs import ObjectRef
 from weave.trace.vals import WeaveDict, WeaveList, WeaveObject
@@ -94,25 +87,9 @@ def test_deepcopy_weaveobject_e2e(client, example_class):
     assert id(res) != id(o2)
 
 
-@pytest.mark.parametrize(
-    "boxed_val",
-    [
-        BoxedInt(1),
-        BoxedFloat(1.0),
-        BoxedStr("hello"),
-        BoxedDatetime(2024, 1, 1),
-        BoxedTimedelta(seconds=1),
-    ],
-)
-def test_deepcopy_boxed(client, boxed_val):
-    res = deepcopy(boxed_val)
-    assert res == boxed_val
-    assert id(res) != id(boxed_val)
-
-
-def test_deepcopy_boxed_model_e2e(client):
+def test_deepcopy_model_e2e(client):
     class Model(weave.Model):
-        system_prompt: str = "You are a helpful assistant."  # this will get boxed
+        system_prompt: str = "You are a helpful assistant."
 
         @weave.op
         def predict(self, question: str) -> str:
