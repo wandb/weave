@@ -47,6 +47,7 @@ class Content(BaseModel, Generic[T]):
     - from_path()
     - from_bytes()
     - from_text()
+    - from_url()
     - from_base64()
     - from_data_url()
     """
