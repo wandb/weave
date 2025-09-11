@@ -1663,10 +1663,10 @@ def test_storage_size_fields():
         FROM calls_merged
         LEFT JOIN
         (SELECT id,
-                sum(COALESCE(attributes_size_bytes, 0) + COALESCE(inputs_size_bytes, 0) + COALESCE(output_size_bytes, 0) + COALESCE(summary_size_bytes, 0)) as storage_size_bytes
+                sum(COALESCE(attributes_size_bytes, 0) + COALESCE(inputs_size_bytes, 0) + COALESCE(output_size_bytes, 0) + COALESCE(summary_size_bytes, 0)) AS storage_size_bytes
         FROM calls_merged_stats
         WHERE project_id = {pb_0:String}
-        GROUP BY id) as storage_size_tbl on calls_merged.id = storage_size_tbl.id
+        GROUP BY id) AS storage_size_tbl ON calls_merged.id = storage_size_tbl.id
         WHERE calls_merged.project_id = {pb_0:String}
         GROUP BY (calls_merged.project_id,
                 calls_merged.id)
@@ -1696,11 +1696,11 @@ def test_total_storage_size():
         FROM calls_merged
         LEFT JOIN (SELECT
             trace_id,
-            sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) as total_storage_size_bytes
+            sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) AS total_storage_size_bytes
         FROM calls_merged_stats
         WHERE project_id = {pb_0:String}
-        GROUP BY trace_id) as rolled_up_cms
-        on calls_merged.trace_id = rolled_up_cms.trace_id
+        GROUP BY trace_id) AS rolled_up_cms
+        ON calls_merged.trace_id = rolled_up_cms.trace_id
         WHERE calls_merged.project_id = {pb_0:String}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
@@ -2071,6 +2071,27 @@ def test_trace_id_filter_eq():
     )
 
 
+def test_wb_run_id_filter_eq():
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.hardcoded_filter = HardCodedFilter(filter={"wb_run_ids": ["wb_run_123"]})
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id
+        FROM calls_merged
+        WHERE calls_merged.project_id = {pb_1:String}
+            AND (calls_merged.wb_run_id IN {pb_0:Array(String)}
+                OR calls_merged.wb_run_id IS NULL)
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+        """,
+        {"pb_0": ["wb_run_123"], "pb_1": "project"},
+    )
+
+
 def test_trace_roots_only_filter_with_condition():
     cq = CallsQuery(project_id="project")
     cq.add_field("id")
@@ -2285,6 +2306,11 @@ def test_filter_length_validation():
 
     cq = CallsQuery(project_id="test/project")
     cq.hardcoded_filter = HardCodedFilter(filter={"turn_ids": ["turn_123"] * 1001})
+    with pytest.raises(ValueError):
+        cq.as_sql(pb)
+
+    cq = CallsQuery(project_id="test/project")
+    cq.hardcoded_filter = HardCodedFilter(filter={"wb_run_ids": ["wb_run_123"] * 1001})
     with pytest.raises(ValueError):
         cq.as_sql(pb)
 
