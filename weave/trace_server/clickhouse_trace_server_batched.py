@@ -2915,9 +2915,14 @@ def _create_tracked_stream_wrapper(
 
             # Prepare summary and end call
             summary: dict[str, Any] = {}
-            if aggregated_output and "usage" in aggregated_output:
+            if (
+                aggregated_output
+                and "usage" in aggregated_output
+                and model_name is not None
+            ):
                 summary["usage"] = {model_name: aggregated_output["usage"]}
-            if model_name is not None:
+
+            if aggregated_output is not None and model_name is not None:
                 aggregated_output["model"] = model_name
 
             end = tsi.EndedCallSchemaForInsert(
@@ -2944,8 +2949,8 @@ def _setup_completion_model_info(
     Note: api_key can be None for bedrock providers since they use AWS credentials instead.
     """
     model_name = req.inputs.model
-    api_key = None
-    provider = None
+    api_key: Optional[str] = None
+    provider: str = "openai"  # Default provider
     base_url: Optional[str] = None
     extra_headers: dict[str, str] = {}
     return_type: Optional[str] = None
@@ -3032,7 +3037,9 @@ def _setup_completion_model_info(
                 f"No secret fetcher found, cannot fetch API key for model {model_name}"
             )
 
-        api_key = secret_fetcher.fetch(secret_name).get("secrets", {}).get(secret_name)
+        api_key: Optional[str] = (
+            secret_fetcher.fetch(secret_name).get("secrets", {}).get(secret_name)
+        )
         provider = model_info.get("litellm_provider", "openai")
 
         if not api_key and provider not in ("bedrock", "bedrock_converse"):
