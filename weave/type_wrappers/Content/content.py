@@ -8,9 +8,10 @@ import os
 import subprocess
 import sys
 import uuid
+import re
 from pathlib import Path
 from typing import Annotated, Any, Generic
-from urllib.parse import quote_from_bytes
+from urllib.parse import quote_from_bytes, urlparse
 
 from pydantic import BaseModel, Field, PrivateAttr, field_serializer
 from typing_extensions import Self, TypeVar
@@ -400,6 +401,72 @@ class Content(BaseModel, Generic[T]):
         return cls.model_construct(**resolved_args)
 
     @classmethod
+    def from_url(
+            cls: type[Self], url: str, /, headers: dict[str, Any] | None = None, timeout: int | None = 30, metadata: dict[str, Any] | None = None
+    ) -> Self:
+        """Initializes Content by fetching bytes from an HTTP(S) URL.
+
+        Downloads the content, infers mimetype/extension from headers, URL path,
+        and data, and constructs a Content object from the resulting bytes.
+        """
+        # Local import to avoid importing requests unless needed and to use our
+        # logging adapter + shared session.
+        import requests
+        resp = requests.get(url, headers=headers, timeout=timeout)
+        resp.raise_for_status()
+
+        data = resp.content or b""
+        digest = hashlib.sha256(data).hexdigest()
+        size = len(data)
+
+        # Try to get mimetype from header (strip any charset)
+        header_ct = resp.headers.get("Content-Type", "")
+        mimetype_from_header = header_ct.split(";")[0].strip() if header_ct else None
+
+        # Try to get filename from Content-Disposition or URL path
+        filename_from_header = None
+        cd = resp.headers.get("Content-Disposition", "")
+        if "filename=" in cd:
+            # naive extraction; handles filename="..." or filename=...
+            match = re.search(r"filename\*=.*?''([^;\r\n]+)|filename=\"?([^;\r\n\"]+)\"?", cd)
+            if match:
+                filename_from_header = match.group(1) or match.group(2)
+
+        parsed_url = urlparse(url)
+        url_basename = Path(parsed_url.path).name if parsed_url.path else None
+        filename_hint = filename_from_header or url_basename
+
+        mimetype, extension = get_mime_and_extension(
+            mimetype=mimetype_from_header,
+            extension=Path(filename_hint).suffix if filename_hint else None,
+            filename=filename_hint,
+            buffer=data,
+        )
+
+        filename = (
+            filename_hint if filename_hint else default_filename(extension, mimetype, digest)
+        )
+
+        resolved_args: ResolvedContentArgs = {
+            "id": uuid.uuid4().hex,
+            "data": data,
+            "size": size,
+            "mimetype": mimetype,
+            "digest": digest,
+            "filename": filename,
+            "content_type": "url",
+            "input_type": full_name(url),
+            "extension": extension,
+            # Use requests-detected encoding if present, else utf-8
+            "encoding": resp.encoding or "utf-8",
+        }
+
+        if metadata:
+            resolved_args["metadata"] = metadata
+
+        return cls.model_construct(**resolved_args)
+
+    @classmethod
     def _from_guess(
         cls: type[Self],
         input: ValidContentInputs,
@@ -422,6 +489,9 @@ class Content(BaseModel, Generic[T]):
         elif isinstance(input, str):
             if match_data_url(input):
                 return cls.from_data_url(input)
+            # Match http or https URLs
+            if re.match(r"^https?://", input):
+                return cls.from_url(input)
 
             return cls.from_text(input, mimetype=mimetype, extension=extension)
 

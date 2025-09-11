@@ -10,6 +10,8 @@ from weave import Dataset
 from weave.trace.table import Table
 from weave.trace.weave_client import WeaveClient
 from weave.type_wrappers.Content.content import Content
+from weave.utils import http_requests as _http_requests
+from unittest.mock import patch
 
 
 @pytest.fixture(scope="session")
@@ -525,3 +527,53 @@ That's all for now. Have a great day! ☀️
         # Next guess from annotated value
         content = Content._from_guess(doc, extension=".md")
         assert content.mimetype == "text/markdown"
+
+    def test_content_from_url_basic(self):
+        class FakeResponse:
+            def __init__(self):
+                self.content = b"hello world"
+                self.headers = {"Content-Type": "text/plain; charset=utf-8"}
+                self.encoding = "utf-8"
+                self.status_code = 200
+
+            def raise_for_status(self):
+                if self.status_code >= 400:
+                    raise Exception("HTTP error")
+
+        url = "https://example.com/path/to/test.txt"
+        with patch.object(_http_requests, "get", return_value=FakeResponse()):
+            c = Content.from_url(url)
+
+        assert isinstance(c.data, bytes)
+        assert c.data == b"hello world"
+        assert c.mimetype == "text/plain"
+        assert c.extension == ".txt"
+        assert c.filename == "test.txt"
+        assert c.size == len(b"hello world")
+        assert c.content_type == "bytes"
+        assert c.input_type == "str"
+
+    def test__from_guess_http_url_with_content_disposition(self):
+        class FakeResponse:
+            def __init__(self):
+                self.content = b"%PDF-1.4 Mock PDF bytes"
+                self.headers = {
+                    "Content-Type": "application/pdf",
+                    "Content-Disposition": 'attachment; filename="report.pdf"',
+                }
+                self.encoding = None
+                self.status_code = 200
+
+            def raise_for_status(self):
+                if self.status_code >= 400:
+                    raise Exception("HTTP error")
+
+        url = "http://example.com/download"
+        with patch.object(_http_requests, "get", return_value=FakeResponse()):
+            c = Content._from_guess(url)
+
+        assert c.mimetype == "application/pdf"
+        assert c.extension == ".pdf"
+        assert c.filename == "report.pdf"
+        assert c.content_type == "bytes"
+        assert c.input_type == "str"
