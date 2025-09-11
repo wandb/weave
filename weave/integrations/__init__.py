@@ -22,5 +22,6 @@ __all__ = [
     "patch_openai_agents",
     "patch_smolagents",
     "patch_verdict",
+    "patch_verifiers",
     "patch_vertexai",
 ]

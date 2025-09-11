@@ -11,6 +11,7 @@ SUPPORTED_PYTHON_VERSIONS = ["3.9", "3.10", "3.11", "3.12", "3.13"]
 PY313_INCOMPATIBLE_SHARDS = [
     "cohere",
     "notdiamond",
+    "verifiers",
 ]
 PY39_INCOMPATIBLE_SHARDS = [
     "crewai",
@@ -20,6 +21,10 @@ PY39_INCOMPATIBLE_SHARDS = [
     "dspy",
     "autogen_tests",
     "langchain",
+    "verifiers",
+]
+PY310_INCOMPATIBLE_SHARDS = [
+    "verifiers",
 ]
 NUM_TRACE_SERVER_SHARDS = 4
 
@@ -97,6 +102,7 @@ trace_server_shards = [f"trace{i}" for i in range(1, NUM_TRACE_SERVER_SHARDS + 1
         "smolagents",
         "mcp",
         "verdict",
+        "verifiers",
         "autogen_tests",
         "trace",
         *trace_server_shards,
@@ -109,6 +115,9 @@ def tests(session, shard):
 
     if session.python.startswith("3.9") and shard in PY39_INCOMPATIBLE_SHARDS:
         session.skip(f"Skipping {shard=} as it is not compatible with Python 3.9")
+
+    if session.python.startswith("3.10") and shard in PY310_INCOMPATIBLE_SHARDS:
+        session.skip(f"Skipping {shard=} as it is not compatible with Python 3.10")
 
     session.install("-e", f".[{shard},test]")
     session.chdir("tests")
