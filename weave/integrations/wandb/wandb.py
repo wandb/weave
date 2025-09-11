@@ -13,12 +13,12 @@ def wandb_init_hook() -> None:
     # Check if wandb is available
     try:
         import wandb
-        
+
         # When wandb is available, set WEAVE_SILENT to true by default if not explicitly set
         # This reduces log noise when using wandb
         if os.getenv("WEAVE_SILENT") is None:
             os.environ["WEAVE_SILENT"] = "true"
-            
+
     except (ImportError, ModuleNotFoundError):
         pass  # wandb not available, continue without setting WEAVE_SILENT
 

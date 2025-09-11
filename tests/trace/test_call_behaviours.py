@@ -1,3 +1,5 @@
+import os
+
 import pytest
 
 import weave
@@ -6,6 +8,25 @@ from weave.trace.constants import TRACE_CALL_EMOJI
 from weave.trace.display.term import configure_logger
 
 configure_logger()
+
+
+@pytest.fixture(autouse=True)
+def ensure_output_not_silent():
+    """Ensure WEAVE_SILENT is false for tests that check output.
+
+    When wandb is installed, it automatically sets WEAVE_SILENT=true
+    to reduce log noise. This fixture ensures output is visible for
+    tests that specifically check for printed output.
+    """
+    original_silent = os.environ.get("WEAVE_SILENT")
+    os.environ["WEAVE_SILENT"] = "false"
+
+    yield
+
+    if original_silent is not None:
+        os.environ["WEAVE_SILENT"] = original_silent
+    else:
+        os.environ.pop("WEAVE_SILENT", None)
 
 
 @weave.op
