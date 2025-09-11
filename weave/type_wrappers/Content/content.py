@@ -26,6 +26,7 @@ from weave.type_wrappers.Content.utils import (
     default_filename,
     full_name,
     get_mime_and_extension,
+    is_valid_b64,
     is_valid_path,
     match_data_url,
     try_parse_data_url,
@@ -359,8 +360,6 @@ class Content(BaseModel, Generic[T]):
         cls: type[Self], url: str, /, metadata: dict[str, Any] | None = None
     ) -> Self:
         """Initializes Content from a data URL."""
-        from .utils import default_filename, full_name, get_mime_and_extension
-
         parsed = try_parse_data_url(url)
         if not parsed:
             raise ValueError("Invalid data URL provided.")
@@ -407,8 +406,6 @@ class Content(BaseModel, Generic[T]):
         extension: str | None = None,
         mimetype: str | None = None,
     ) -> Self:
-        from .utils import is_valid_b64, is_valid_path
-
         # First check if it is a path, we only check validity for str scenario
         # because we have dedicated error message for invalid path
         if isinstance(input, Path) or (isinstance(input, str) and is_valid_path(input)):
