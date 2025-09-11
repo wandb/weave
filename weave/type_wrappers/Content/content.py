@@ -26,6 +26,7 @@ from weave.type_wrappers.Content.utils import (
     default_filename,
     full_name,
     get_mime_and_extension,
+    is_valid_path,
     match_data_url,
     try_parse_data_url,
 )
@@ -313,8 +314,6 @@ class Content(BaseModel, Generic[T]):
         metadata: dict[str, Any] | None = None,
     ) -> Self:
         """Initializes Content from a local file path."""
-        from .utils import full_name, get_mime_and_extension, is_valid_path
-
         path_obj = Path(path)
         if not is_valid_path(path_obj):
             raise FileNotFoundError(f"File not found at path: {path_obj}")
