@@ -2070,6 +2070,7 @@ def test_trace_id_filter_eq():
         },
     )
 
+
 def test_wb_run_id_filter_eq():
     cq = CallsQuery(project_id="project")
     cq.add_field("id")
@@ -2089,7 +2090,6 @@ def test_wb_run_id_filter_eq():
         """,
         {"pb_0": ["wb_run_123"], "pb_1": "project"},
     )
-
 
 
 def test_trace_roots_only_filter_with_condition():
