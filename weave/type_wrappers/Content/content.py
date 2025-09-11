@@ -84,44 +84,64 @@ class Content(BaseModel, Generic[T]):
         )
 
     @classmethod
-    def model_validate(cls: type[Self], obj: Any, *, strict: bool | None = None, from_attributes: bool | None = None, context: dict[str, Any] | None = None) -> Self:
-        """
-        Override model_validate to handle Content reconstruction from dict.
-        """
+    def model_validate(
+        cls: type[Self],
+        obj: Any,
+        *,
+        strict: bool | None = None,
+        from_attributes: bool | None = None,
+        context: dict[str, Any] | None = None,
+    ) -> Self:
+        """Override model_validate to handle Content reconstruction from dict."""
         if isinstance(obj, dict):
             # Check if this is a full Content dict (from deserialization)
-            required_fields = {'id', 'data', 'size', 'mimetype', 'digest', 'filename', 'content_type', 'input_type'}
+            required_fields = {
+                "id",
+                "data",
+                "size",
+                "mimetype",
+                "digest",
+                "filename",
+                "content_type",
+                "input_type",
+            }
             if required_fields.issubset(obj.keys()):
                 # Handle data field deserialization
-                data = obj.get('data')
+                data = obj.get("data")
                 if isinstance(data, str):
                     # Check if it was base64 encoded during serialization
-                    content_type = obj.get('content_type', '')
+                    content_type = obj.get("content_type", "")
                     print(content_type)
-                    if 'base64' in content_type:
-                        print('true')
+                    if "base64" in content_type:
+                        print("true")
                         # Decode from base64
-                        obj['data'] = base64.b64decode(data)
+                        obj["data"] = base64.b64decode(data)
                     else:
                         # Decode from string using encoding
-                        encoding = obj.get('encoding', 'utf-8')
-                        obj['data'] = data.encode(encoding)
+                        encoding = obj.get("encoding", "utf-8")
+                        obj["data"] = data.encode(encoding)
                 # Use model_construct to bypass __init__
                 return cls.model_construct(**obj)
 
         # Fall back to parent implementation for other cases
-        return super().model_validate(obj, strict=strict, from_attributes=from_attributes, context=context)
+        return super().model_validate(
+            obj, strict=strict, from_attributes=from_attributes, context=context
+        )
 
     @classmethod
-    def model_validate_json(cls: type[Self], json_data: str | bytes | bytearray, *, strict: bool | None = None, context: dict[str, Any] | None = None) -> Self:
-        """
-        Override model_validate_json to handle Content reconstruction from JSON.
-        """
+    def model_validate_json(
+        cls: type[Self],
+        json_data: str | bytes | bytearray,
+        *,
+        strict: bool | None = None,
+        context: dict[str, Any] | None = None,
+    ) -> Self:
+        """Override model_validate_json to handle Content reconstruction from JSON."""
         import json as json_module
 
         # Parse the JSON
         if isinstance(json_data, (bytes, bytearray)):
-            json_data = json_data.decode('utf-8')
+            json_data = json_data.decode("utf-8")
         obj = json_module.loads(json_data)
 
         # Use our custom model_validate
@@ -330,7 +350,9 @@ class Content(BaseModel, Generic[T]):
         return cls.model_construct(**resolved_args)
 
     @classmethod
-    def from_data_url(cls: type[Self], url: str, /, metadata: dict[str, Any] | None = None) -> Self:
+    def from_data_url(
+        cls: type[Self], url: str, /, metadata: dict[str, Any] | None = None
+    ) -> Self:
         """Initializes Content from a data URL."""
         from .utils import default_filename, full_name, get_mime_and_extension
 
@@ -372,7 +394,6 @@ class Content(BaseModel, Generic[T]):
         # Use model_construct to bypass our custom __init__
         return cls.model_construct(**resolved_args)
 
-
     @classmethod
     def _from_guess(
         cls: type[Self],
@@ -409,33 +430,33 @@ class Content(BaseModel, Generic[T]):
         return cls.model_construct(**args)
 
     def to_data_url(self, use_base64: bool = True) -> str:
-        """
-        Constructs a data URL from the content.
+        """Constructs a data URL from the content.
 
         Args:
-            use_base64: If True, the data will be base64 encoded. 
+            use_base64: If True, the data will be base64 encoded.
                         Otherwise, it will be percent-encoded. Defaults to True.
 
         Returns:
             A data URL string.
         """
         header = f"data:{self.mimetype}"
-        if self.mimetype.startswith("text/") and self.content_type.find(":encoding") != -1:
-             # Only add charset for text types
+        if (
+            self.mimetype.startswith("text/")
+            and self.content_type.find(":encoding") != -1
+        ):
+            # Only add charset for text types
             header += f";charset={self.encoding}"
 
         if use_base64 or self.content_type.find(":base64"):
-            encoded_data = base64.b64encode(self.data).decode('ascii')
+            encoded_data = base64.b64encode(self.data).decode("ascii")
             return f"{header};base64,{encoded_data}"
         else:
             encoded_data = quote_from_bytes(self.data)
             return f"{header},{encoded_data}"
 
-    @field_serializer('data', when_used='json')
+    @field_serializer("data", when_used="json")
     def serialize_data(self, data: bytes) -> str:
-        """
-        When dumping model in json mode 
-        """
+        """When dumping model in json mode"""
         if self.content_type.find("base64") != -1:
             return base64.b64encode(data).decode("ascii")
 
