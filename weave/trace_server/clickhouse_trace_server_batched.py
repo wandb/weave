@@ -24,9 +24,11 @@
 
 import dataclasses
 import datetime
+import gc
 import hashlib
 import json
 import logging
+import resource
 import threading
 import time
 import weakref
@@ -2113,6 +2115,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         to clean up thread-local ClickHouse clients from threads that have died.
         Without this, clients accumulate in memory causing a leak over time.
         """
+        # Track memory before cleanup
+        mem_before = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+
         with self._registry_lock:
             dead_threads = []
             active_threads = {t.ident for t in threading.enumerate()}
@@ -2133,20 +2138,45 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             for thread_id in dead_threads:
                 self._client_cleanup_registry.pop(thread_id, None)
 
-            if dead_threads:
-                logger.info(
-                    f"Cleaned up {len(dead_threads)} CH clients, "
-                    f"{len(self._client_cleanup_registry)} remain"
-                )
+            registry_size = len(self._client_cleanup_registry)
+
+        # Force garbage collection after releasing the lock
+        if dead_threads:
+            gc.collect()
+
+        # Track memory after cleanup and GC
+        mem_after = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        # On Linux, ru_maxrss is in KB; on macOS, it's in bytes
+        mem_unit = "KB" if mem_after > 1024 * 1024 else "bytes"
+        mem_freed = mem_before - mem_after if mem_before > mem_after else 0
+
+        if dead_threads:
+            logger.info(
+                f"CH client cleanup: removed={len(dead_threads)}, "
+                f"remaining={registry_size}, "
+                f"memory_freed={mem_freed} {mem_unit}, "
+                f"current_memory={mem_after} {mem_unit}"
+            )
+        elif registry_size > 0:
+            # Log memory status even when no cleanup happened
+            logger.debug(
+                f"CH client cleanup: no dead threads, "
+                f"active_clients={registry_size}, "
+                f"current_memory={mem_after} {mem_unit}"
+            )
 
     def _start_cleanup_thread(self) -> None:
         """Start a background thread that periodically cleans up dead clients."""
 
         def cleanup_worker() -> None:
             """Background worker that runs cleanup every 5 minutes."""
+            cleanup_count = 0
+
             while True:
                 time.sleep(THREAD_CLEANUP_INTERVAL)
+                cleanup_count += 1
                 try:
+                    logger.info(f"Starting CH client cleanup #{cleanup_count}")
                     self._cleanup_dead_clients()
                 except Exception:
                     logger.exception("CH client cleanup failed")
@@ -2155,7 +2185,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             target=cleanup_worker, name="ch-client-cleanup", daemon=True
         )
         cleanup_thread.start()
-        logger.info("Started ClickHouse client cleanup thread")
+
+        # Log initial memory state
+        initial_mem = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        mem_unit = "KB" if initial_mem > 1024 * 1024 else "bytes"
+        logger.info(
+            f"Started ClickHouse client cleanup thread, "
+            f"initial_memory={initial_mem} {mem_unit}"
+        )
 
     def _mint_client(self) -> CHClient:
         """Create a new ClickHouse client using the shared pool manager."""
