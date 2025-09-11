@@ -75,7 +75,7 @@ To view the trace information in your workspace during or after a run, you can e
 To navigate to a workspace from the UI:
 
 1. Open the W&B UI and click the **Projects** tab. This opens a list of your projects.
-2. From the list of projects, click the project that you logged your run to. This automatically opens the **Traces** page.
-3. From the Traces page, in the left-menu, click **Workspace**. This opens a dashboard that contains the data visualizations and information about your run. The trace data for your run is under the **Weave** section of the workspace.
+2. From the list of projects, click the project that you logged your run to. This opens the **Workspaces** page.
+3. If you've set up your workspace as an automatic workspace, the workspace automatically populates with data visualizations and information about your run. The trace data for your run is under the **Weave** section of the workspace. If your workspace is a manual workspace, you can add Weave panels to by clicking **Add panels** and selecting new panels from the **Weave** section of the Add Panels menu.
 
-You can manually add Weave panels to a workspace by clicking **Add panels** and selecting new panels from the **Weave** section of the Add Panels menu.
+For more information about workspaces, see [View experiments results](https://docs.wandb.ai/guides/track/workspaces).
