@@ -1,27 +1,5 @@
 # Clickhouse Trace Server
 
-# A note on query structure:
-# There are four major kinds of things that we query:
-# - calls,
-# - object_versions,
-# - tables
-# - files
-#
-# calls are identified by ID.
-#
-# object_versions, tables, and files are identified by digest. For these kinds of
-# things, we dedupe at merge time using Clickhouse's ReplacingMergeTree, but we also
-# need to dedupe at query time.
-#
-# Previously, we did query time deduping in *_deduped VIEWs. But it turns out
-# clickhouse doesn't push down the project_id predicate into those views, so we were
-# always scanning whole tables.
-#
-# Now, we've just written the what were views before into this file directly as
-# subqueries, and put the project_id predicate in the innermost subquery, which fixes
-# the problem.
-
-
 import dataclasses
 import datetime
 import hashlib
@@ -1838,6 +1816,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         """Create multiple feedback items in a batch efficiently."""
         rows_to_insert = []
         results = []
+
+        set_root_span_dd_tags({"feedback_create_batch.count": len(req.batch)})
 
         for feedback_req in req.batch:
             assert_non_null_wb_user_id(feedback_req)
