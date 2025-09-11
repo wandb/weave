@@ -16,7 +16,7 @@ In this guide, you'll:
 
 ## Prerequisites
 
-Before you begin, you need a [W&B account](https://app.wandb.ai/login?signup=true) and an API key from from [https://wandb.ai/authorize](https://wandb.ai/authorize).
+Before you begin, you need a [W&B account](https://app.wandb.ai/login?signup=true) and an API key from [https://wandb.ai/authorize](https://wandb.ai/authorize).
 
 Then, in a Python environment running version 3.9 or later, install the required libraries: 
 
@@ -40,13 +40,13 @@ import weave
 import openai
 
 # Initialize Weave - replace with your-team/your-project
-weave.init("my-first-weave-project")
+weave.init("<team-name>/my-first-weave-project")
 
 # Create an OpenAI-compatible client pointing to W&B Inference
 client = openai.OpenAI(
     base_url='https://api.inference.wandb.ai/v1',
     api_key="YOUR_WANDB_API_KEY",  # Replace with your actual API key
-    project="my-first-weave-project",  # Required for usage tracking
+    project="<team-name>/my-first-weave-project",  # Required for usage tracking
 )
 
 # Decorate your function to enable tracing; use the standard OpenAI client
@@ -75,7 +75,13 @@ import weave
 import openai
 
 # Initialize Weave - replace with your-team/your-project
-weave.init("my-first-weave-project")
+weave.init("<team-name>/my-first-weave-project")
+
+client = openai.OpenAI(
+    base_url='https://api.inference.wandb.ai/v1',
+    api_key="YOUR_WANDB_API_KEY",  # Replace with your actual API key
+    project="<team-name>/my-first-weave-project",  # Required for usage tracking
+)
 
 @weave.op()
 def extract_key_points(text: str) -> list[str]:
@@ -128,9 +134,21 @@ print("\nSummary:", result["summary"])
 
 ## Step 3: Compare multiple models
 
-W&B Inference provides access to multiple models. Compare their performance:
+W&B Inference provides access to multiple models. Use the following code to compare the performance between Llama and DeepSeek's respective responses:
 
 ```python
+import weave
+import openai
+
+# Initialize Weave - replace with your-team/your-project
+weave.init("<team-name>/my-first-weave-project")
+
+client = openai.OpenAI(
+    base_url='https://api.inference.wandb.ai/v1',
+    api_key="YOUR_WANDB_API_KEY",  # Replace with your actual API key
+    project="<team-name>/my-first-weave-project",  # Required for usage tracking
+)
+
 # Define a Model class to compare different LLMs
 class InferenceModel(weave.Model):
     model_name: str
@@ -161,7 +179,9 @@ print(deepseek_model.predict(test_question))
 
 ## Step 4: Evaluate model performance
 
-Evaluate how well a model performs on a Q&A task using Weave's built-in `EvaluationLogger`. This provides structured evaluation tracking with automatic aggregation, token usage capture, and rich comparison features in the UI:
+Evaluate how well a model performs on a Q&A task using Weave's built-in `EvaluationLogger`. This provides structured evaluation tracking with automatic aggregation, token usage capture, and rich comparison features in the UI.
+
+Append the following code to the script you used in step 3:
 
 ```python
 from typing import Optional
@@ -192,8 +212,10 @@ def evaluate_model(model: InferenceModel, dataset: list[dict]):
     """Run evaluation on a dataset using Weave's built-in evaluation framework."""
     # Initialize EvaluationLogger BEFORE calling the model to capture token usage
     # This is especially important for W&B Inference to track costs
+    # Convert model name to a valid format (replace non-alphanumeric chars with underscores)
+    safe_model_name = model.model_name.replace("/", "_").replace("-", "_").replace(".", "_")
     eval_logger = EvaluationLogger(
-        model=model.model_name,
+        model=safe_model_name,
         dataset="qa_dataset"
     )
     
@@ -226,9 +248,6 @@ def evaluate_model(model: InferenceModel, dataset: list[dict]):
     # Log summary - Weave automatically aggregates the accuracy scores
     eval_logger.log_summary()
     print(f"Evaluation complete for {model.model_name}. View results in the Weave UI.")
-
-# Run evaluation for a single model
-evaluate_model(llama_model, dataset)
 
 # Compare multiple models - a key feature of Weave's evaluation framework
 models_to_compare = [
