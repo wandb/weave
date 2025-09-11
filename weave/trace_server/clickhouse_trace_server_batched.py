@@ -2915,15 +2915,11 @@ def _create_tracked_stream_wrapper(
 
             # Prepare summary and end call
             summary: dict[str, Any] = {}
-            if (
-                aggregated_output
-                and "usage" in aggregated_output
-                and model_name is not None
-            ):
-                summary["usage"] = {model_name: aggregated_output["usage"]}
-
             if aggregated_output is not None and model_name is not None:
                 aggregated_output["model"] = model_name
+
+                if "usage" in aggregated_output:
+                    summary["usage"] = {model_name: aggregated_output["usage"]}
 
             end = tsi.EndedCallSchemaForInsert(
                 project_id=project_id,

@@ -338,9 +338,9 @@ def test_custom_provider_completions_create(client):
                     )
 
             # Verify the response matches our mock
-            assert (
-                res.response == mock_response
-            ), f"Response mismatch. Expected {mock_response}, got {res.response}"
+            assert res.response == mock_response, (
+                f"Response mismatch. Expected {mock_response}, got {res.response}"
+            )
 
             # Verify LiteLLM was called with correct parameters
             mock_completion.assert_called_once()
@@ -348,9 +348,9 @@ def test_custom_provider_completions_create(client):
             expected_litellm_model = (
                 f"openai/{model_id}"  # Implementation prefixes with "openai/"
             )
-            assert (
-                call_args["model"] == expected_litellm_model
-            ), f"Model name mismatch. Expected '{expected_litellm_model}', got '{call_args['model']}'"
+            assert call_args["model"] == expected_litellm_model, (
+                f"Model name mismatch. Expected '{expected_litellm_model}', got '{call_args['model']}'"
+            )
             assert call_args["messages"] == inputs["messages"], (
                 f"Messages mismatch. Expected {inputs['messages']}, "
                 f"got {call_args['messages']}"
@@ -386,9 +386,9 @@ def test_custom_provider_completions_create(client):
             # The implementation modifies req.inputs.model before logging, so we expect the transformed model name
             expected_logged_inputs = inputs.copy()
             expected_logged_inputs["model"] = f"openai/{model_id}"
-            assert (
-                calls[0].inputs == expected_logged_inputs
-            ), f"Logged inputs mismatch. Expected {expected_logged_inputs}, got {calls[0].inputs}"
+            assert calls[0].inputs == expected_logged_inputs, (
+                f"Logged inputs mismatch. Expected {expected_logged_inputs}, got {calls[0].inputs}"
+            )
             assert calls[0].op_name == "weave.completions_create", (
                 f"Operation name mismatch. Expected 'weave.completions_create', "
                 f"got {calls[0].op_name}"
