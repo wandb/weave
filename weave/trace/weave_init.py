@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+from json import JSONDecodeError
 
 from weave.compat import wandb
 from weave.telemetry import trace_sentry
@@ -73,6 +74,19 @@ Args:
 """
 
 
+def _weave_is_available(server: remote_http_trace_server.RemoteHTTPTraceServer) -> bool:
+    try:
+        server.server_info()
+    except JSONDecodeError:
+        return False
+    except Exception:
+        logger.warning(
+            "Unexpected error when checking if Weave is available on the server.  Please contact support."
+        )
+        return False
+    return True
+
+
 def init_weave(
     project_name: str,
     ensure_project_exists: bool = True,
@@ -119,6 +133,10 @@ def init_weave(
         api_key = wandb_context.api_key
 
     remote_server = init_weave_get_server(api_key)
+    if not _weave_is_available(remote_server):
+        raise RuntimeError(
+            "Weave is not available on the server.  Please contact support."
+        )
     server: TraceServerInterface = remote_server
     if use_server_cache():
         server = CachingMiddlewareTraceServer.from_env(server)
