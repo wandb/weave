@@ -97,6 +97,7 @@ trace_server_shards = [f"trace{i}" for i in range(1, NUM_TRACE_SERVER_SHARDS + 1
         "smolagents",
         "mcp",
         "verdict",
+        "verifiers",
         "autogen_tests",
         "trace",
         *trace_server_shards,

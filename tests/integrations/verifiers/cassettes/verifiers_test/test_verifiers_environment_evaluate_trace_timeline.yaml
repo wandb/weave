@@ -1,0 +1,1215 @@
+interactions:
+- request:
+    body: ''
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - identity
+      Connection:
+      - keep-alive
+      X-Amzn-Trace-Id:
+      - e7bf9a7a-ef9a-488b-8390-784dc5a641a3
+      user-agent:
+      - datasets/4.0.0; hf_hub/0.34.4; python/3.12.11; huggingface_hub/0.34.4; pyarrow/21.0.0
+    method: HEAD
+    uri: https://huggingface.co/datasets/openai/gsm8k/resolve/main/README.md
+  response:
+    body:
+      string: ''
+    headers:
+      Accept-Ranges:
+      - bytes
+      Access-Control-Allow-Origin:
+      - https://huggingface.co
+      Access-Control-Expose-Headers:
+      - X-Repo-Commit,X-Request-Id,X-Error-Code,X-Error-Message,X-Total-Count,ETag,Link,Accept-Ranges,Content-Range,X-Linked-Size,X-Linked-ETag,X-Xet-Hash
+      Access-Control-Max-Age:
+      - '86400'
+      Connection:
+      - keep-alive
+      Content-Disposition:
+      - inline; filename*=UTF-8''README.md; filename="README.md";
+      Content-Length:
+      - '237'
+      Content-Security-Policy:
+      - default-src 'none'; sandbox
+      Content-Type:
+      - text/plain; charset=utf-8
+      Date:
+      - Thu, 11 Sep 2025 09:21:35 GMT
+      Location:
+      - /api/resolve-cache/datasets/openai/gsm8k/e53f048856ff4f594e959d75785d2c2d37b678ee/README.md?%2Fdatasets%2Fopenai%2Fgsm8k%2Fresolve%2Fmain%2FREADME.md=&etag=%22aec2504ff01cd8c60ae9435e96347d8db32235a2%22
+      RateLimit-Limit:
+      - '40000'
+      RateLimit-Remaining:
+      - '39999'
+      RateLimit-Reset:
+      - '205'
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Vary:
+      - Origin, Accept
+      Via:
+      - 1.1 f9f58a8db93f58fd77ac2380835772ba.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - xCYfFitzeTOLTL8jYb85DM559g4moT5dUnlYx5Kl5U_q8U5kBqc0Zw==
+      X-Amz-Cf-Pop:
+      - CCU50-P6
+      X-Cache:
+      - Miss from cloudfront
+      X-Hub-Cache:
+      - HIT
+      X-Linked-ETag:
+      - '"aec2504ff01cd8c60ae9435e96347d8db32235a2"'
+      X-Powered-By:
+      - huggingface-moon
+      X-Repo-Commit:
+      - e53f048856ff4f594e959d75785d2c2d37b678ee
+      X-Request-Id:
+      - Root=1-68c2949f-3b73ea9b15ca0ce420b39152;e7bf9a7a-ef9a-488b-8390-784dc5a641a3
+      cross-origin-opener-policy:
+      - same-origin
+    status:
+      code: 307
+      message: Temporary Redirect
+- request:
+    body: ''
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - identity
+      Connection:
+      - keep-alive
+      X-Amzn-Trace-Id:
+      - f7901f94-3dba-4665-9eb2-37115f372900
+      user-agent:
+      - datasets/4.0.0; hf_hub/0.34.4; python/3.12.11; huggingface_hub/0.34.4; pyarrow/21.0.0
+    method: HEAD
+    uri: https://huggingface.co/api/resolve-cache/datasets/openai/gsm8k/e53f048856ff4f594e959d75785d2c2d37b678ee/README.md
+  response:
+    body:
+      string: ''
+    headers:
+      Accept-Ranges:
+      - bytes
+      Access-Control-Allow-Origin:
+      - https://huggingface.co
+      Access-Control-Expose-Headers:
+      - X-Repo-Commit,X-Request-Id,X-Error-Code,X-Error-Message,X-Total-Count,ETag,Link,Accept-Ranges,Content-Range,X-Linked-Size,X-Linked-ETag,X-Xet-Hash
+      Age:
+      - '6727042'
+      Connection:
+      - keep-alive
+      Content-Disposition:
+      - inline; filename*=UTF-8''README.md; filename="README.md";
+      Content-Length:
+      - '7940'
+      Content-Security-Policy:
+      - default-src 'none'; sandbox
+      Content-Type:
+      - text/plain; charset=utf-8
+      Date:
+      - Wed, 25 Jun 2025 12:44:13 GMT
+      ETag:
+      - '"aec2504ff01cd8c60ae9435e96347d8db32235a2"'
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Vary:
+      - Origin
+      Via:
+      - 1.1 e10d1e1da9f1e956786f111834ae43fa.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - h-jtHEuSmvCWNld44g7aVefJR7K9RI6u_1oqUG6F7_5Mez1NOE_-rA==
+      X-Amz-Cf-Pop:
+      - CCU50-P6
+      X-Cache:
+      - Hit from cloudfront
+      X-Hub-Cache:
+      - HIT
+      X-Powered-By:
+      - huggingface-moon
+      X-Repo-Commit:
+      - e53f048856ff4f594e959d75785d2c2d37b678ee
+      X-Request-Id:
+      - Root=1-685bef1d-3011d75264b8e5467fc3f82f;349e5fc0-f923-4a0f-8b25-6fb2db0f1223
+      cross-origin-opener-policy:
+      - same-origin
+    status:
+      code: 200
+      message: OK
+- request:
+    body: ''
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - identity
+      Connection:
+      - keep-alive
+      X-Amzn-Trace-Id:
+      - 444a8813-1381-4cad-93f6-5b4043f9f44f
+      user-agent:
+      - datasets/4.0.0; hf_hub/0.34.4; python/3.12.11; huggingface_hub/0.34.4; pyarrow/21.0.0
+    method: HEAD
+    uri: https://huggingface.co/datasets/openai/gsm8k/resolve/e53f048856ff4f594e959d75785d2c2d37b678ee/gsm8k.py
+  response:
+    body:
+      string: ''
+    headers:
+      Accept-Ranges:
+      - bytes
+      Access-Control-Allow-Origin:
+      - https://huggingface.co
+      Access-Control-Expose-Headers:
+      - X-Repo-Commit,X-Request-Id,X-Error-Code,X-Error-Message,X-Total-Count,ETag,Link,Accept-Ranges,Content-Range,X-Linked-Size,X-Linked-ETag,X-Xet-Hash
+      Access-Control-Max-Age:
+      - '86400'
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '15'
+      Content-Type:
+      - text/plain; charset=utf-8
+      Date:
+      - Thu, 11 Sep 2025 09:21:35 GMT
+      ETag:
+      - W/"f-mY2VvLxuxB7KhsoOdQTlMTccuAQ"
+      RateLimit-Limit:
+      - '40000'
+      RateLimit-Remaining:
+      - '39998'
+      RateLimit-Reset:
+      - '205'
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Vary:
+      - Origin
+      Via:
+      - 1.1 d0628adedaf891ceb1c39bb1d9b5d74a.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - lel1jiJCQBIg1PbVjATf19yjzHFVDYLU1Qkx915QJpuufELrDQ5AnQ==
+      X-Amz-Cf-Pop:
+      - CCU50-P6
+      X-Cache:
+      - Error from cloudfront
+      X-Error-Code:
+      - EntryNotFound
+      X-Error-Message:
+      - Entry not found
+      X-Hub-Cache:
+      - MISS
+      X-Powered-By:
+      - huggingface-moon
+      X-Repo-Commit:
+      - e53f048856ff4f594e959d75785d2c2d37b678ee
+      X-Request-Id:
+      - Root=1-68c2949f-46eacfce24a04de24cb504a4;444a8813-1381-4cad-93f6-5b4043f9f44f
+      cross-origin-opener-policy:
+      - same-origin
+    status:
+      code: 404
+      message: Not Found
+- request:
+    body: ''
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      User-Agent:
+      - datasets/4.0.0; python/3.12.11; huggingface_hub/0.34.4; pyarrow/21.0.0
+      X-Amzn-Trace-Id:
+      - b471c8dd-3c4a-40e5-a5ef-33f08b2eeadc
+    method: HEAD
+    uri: https://s3.amazonaws.com/datasets.huggingface.co/datasets/datasets/openai/gsm8k/openai/gsm8k.py
+  response:
+    body:
+      string: ''
+    headers:
+      Content-Type:
+      - application/xml
+      Date:
+      - Thu, 11 Sep 2025 09:21:36 GMT
+      Server:
+      - AmazonS3
+      Transfer-Encoding:
+      - chunked
+      x-amz-id-2:
+      - dbNBx7XhVHCUt2j3Bhsxz4kUnSn+tHs995SxQFb1Pir2EPtrSyQr0PQmRzNCGL2z+DDw5QiKnhbxmKWtoaPy8Sh0AECUztmC
+      x-amz-request-id:
+      - 5ZJABRWD3924TZ7J
+    status:
+      code: 404
+      message: Not Found
+- request:
+    body: ''
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      X-Amzn-Trace-Id:
+      - 711352cf-0a93-4cff-992a-23825cb492cd
+      user-agent:
+      - unknown/None; hf_hub/0.34.4; python/3.12.11
+    method: GET
+    uri: https://huggingface.co/api/datasets/openai/gsm8k/revision/e53f048856ff4f594e959d75785d2c2d37b678ee
+  response:
+    body:
+      string: "{\"_id\":\"625552d2b339bb03abe3432d\",\"id\":\"openai/gsm8k\",\"author\":\"openai\",\"sha\":\"e53f048856ff4f594e959d75785d2c2d37b678ee\",\"lastModified\":\"2024-01-04T12:05:15.000Z\",\"private\":false,\"gated\":false,\"disabled\":false,\"tags\":[\"annotations_creators:crowdsourced\",\"language_creators:crowdsourced\",\"multilinguality:monolingual\",\"source_datasets:original\",\"language:en\",\"license:mit\",\"size_categories:10K<n<100K\",\"format:parquet\",\"modality:text\",\"library:datasets\",\"library:pandas\",\"library:mlcroissant\",\"library:polars\",\"arxiv:2110.14168\",\"region:us\",\"math-word-problems\"],\"citation\":null,\"description\":\"\\n\\t\\n\\t\\t\\n\\t\\tDataset
+        Card for GSM8K\\n\\t\\n\\n\\n\\t\\n\\t\\t\\n\\t\\tDataset Summary\\n\\t\\n\\nGSM8K
+        (Grade School Math 8K) is a dataset of 8.5K high quality linguistically diverse
+        grade school math word problems. The dataset was created to support the task
+        of question answering on basic mathematical problems that require multi-step
+        reasoning.\\n\\nThese problems take between 2 and 8 steps to solve.\\nSolutions
+        primarily involve performing a sequence of elementary calculations using basic
+        arithmetic operations (+ \u2212 \xD7\xF7) to reach the\u2026 See the full
+        description on the dataset page: https://huggingface.co/datasets/openai/gsm8k.\",\"paperswithcode_id\":\"gsm8k\",\"downloads\":425086,\"likes\":859,\"cardData\":{\"annotations_creators\":[\"crowdsourced\"],\"language_creators\":[\"crowdsourced\"],\"language\":[\"en\"],\"license\":[\"mit\"],\"multilinguality\":[\"monolingual\"],\"size_categories\":[\"1K<n<10K\"],\"source_datasets\":[\"original\"],\"task_categories\":[\"text2text-generation\"],\"task_ids\":[],\"paperswithcode_id\":\"gsm8k\",\"pretty_name\":\"Grade
+        School Math 8K\",\"tags\":[\"math-word-problems\"],\"dataset_info\":[{\"config_name\":\"main\",\"features\":[{\"name\":\"question\",\"dtype\":\"string\"},{\"name\":\"answer\",\"dtype\":\"string\"}],\"splits\":[{\"name\":\"train\",\"num_bytes\":3963202,\"num_examples\":7473},{\"name\":\"test\",\"num_bytes\":713732,\"num_examples\":1319}],\"download_size\":2725633,\"dataset_size\":4676934},{\"config_name\":\"socratic\",\"features\":[{\"name\":\"question\",\"dtype\":\"string\"},{\"name\":\"answer\",\"dtype\":\"string\"}],\"splits\":[{\"name\":\"train\",\"num_bytes\":5198108,\"num_examples\":7473},{\"name\":\"test\",\"num_bytes\":936859,\"num_examples\":1319}],\"download_size\":3164254,\"dataset_size\":6134967}],\"configs\":[{\"config_name\":\"main\",\"data_files\":[{\"split\":\"train\",\"path\":\"main/train-*\"},{\"split\":\"test\",\"path\":\"main/test-*\"}]},{\"config_name\":\"socratic\",\"data_files\":[{\"split\":\"train\",\"path\":\"socratic/train-*\"},{\"split\":\"test\",\"path\":\"socratic/test-*\"}]}]},\"siblings\":[{\"rfilename\":\".gitattributes\"},{\"rfilename\":\"README.md\"},{\"rfilename\":\"main/test-00000-of-00001.parquet\"},{\"rfilename\":\"main/train-00000-of-00001.parquet\"},{\"rfilename\":\"socratic/test-00000-of-00001.parquet\"},{\"rfilename\":\"socratic/train-00000-of-00001.parquet\"}],\"createdAt\":\"2022-04-12T10:22:10.000Z\",\"usedStorage\":95470379}"
+    headers:
+      Access-Control-Allow-Origin:
+      - https://huggingface.co
+      Access-Control-Expose-Headers:
+      - X-Repo-Commit,X-Request-Id,X-Error-Code,X-Error-Message,X-Total-Count,ETag,Link,Accept-Ranges,Content-Range,X-Linked-Size,X-Linked-ETag,X-Xet-Hash
+      Access-Control-Max-Age:
+      - '86400'
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '2822'
+      Content-Type:
+      - application/json; charset=utf-8
+      Date:
+      - Thu, 11 Sep 2025 09:21:37 GMT
+      ETag:
+      - W/"b06-cmIICMeN7ko9wEPx7lJhIvmxOns"
+      RateLimit-Limit:
+      - '10000'
+      RateLimit-Remaining:
+      - '9999'
+      RateLimit-Reset:
+      - '203'
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Vary:
+      - Origin
+      Via:
+      - 1.1 1b893d289944e46379df722f37952b6c.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - K__gkCfU6iCD1H9IhKLbb1MTvyKR1ntnnp_rANThfm5HEp4h6FLe7A==
+      X-Amz-Cf-Pop:
+      - CCU50-P6
+      X-Cache:
+      - Miss from cloudfront
+      X-Powered-By:
+      - huggingface-moon
+      X-Request-Id:
+      - Root=1-68c294a1-1ee6c2b624a4aaf02c1cda38;711352cf-0a93-4cff-992a-23825cb492cd
+      cross-origin-opener-policy:
+      - same-origin
+    status:
+      code: 200
+      message: OK
+- request:
+    body: ''
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - identity
+      Connection:
+      - keep-alive
+      X-Amzn-Trace-Id:
+      - 84d3da0c-c979-4834-b32a-4b04df15b1c8
+      user-agent:
+      - datasets/4.0.0; hf_hub/0.34.4; python/3.12.11; huggingface_hub/0.34.4; pyarrow/21.0.0
+    method: HEAD
+    uri: https://huggingface.co/datasets/openai/gsm8k/resolve/e53f048856ff4f594e959d75785d2c2d37b678ee/.huggingface.yaml
+  response:
+    body:
+      string: ''
+    headers:
+      Accept-Ranges:
+      - bytes
+      Access-Control-Allow-Origin:
+      - https://huggingface.co
+      Access-Control-Expose-Headers:
+      - X-Repo-Commit,X-Request-Id,X-Error-Code,X-Error-Message,X-Total-Count,ETag,Link,Accept-Ranges,Content-Range,X-Linked-Size,X-Linked-ETag,X-Xet-Hash
+      Access-Control-Max-Age:
+      - '86400'
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '15'
+      Content-Type:
+      - text/plain; charset=utf-8
+      Date:
+      - Thu, 11 Sep 2025 09:21:37 GMT
+      ETag:
+      - W/"f-mY2VvLxuxB7KhsoOdQTlMTccuAQ"
+      RateLimit-Limit:
+      - '40000'
+      RateLimit-Remaining:
+      - '39997'
+      RateLimit-Reset:
+      - '203'
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Vary:
+      - Origin
+      Via:
+      - 1.1 b6cbeecee2596af504d59cbb2c94a876.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - gEk2Kr4n_ktmL4bJcRZez8xTaUTiIkNLoJVjm0nFvsnJOqbXLj46ug==
+      X-Amz-Cf-Pop:
+      - CCU50-P6
+      X-Cache:
+      - Error from cloudfront
+      X-Error-Code:
+      - EntryNotFound
+      X-Error-Message:
+      - Entry not found
+      X-Hub-Cache:
+      - MISS
+      X-Powered-By:
+      - huggingface-moon
+      X-Repo-Commit:
+      - e53f048856ff4f594e959d75785d2c2d37b678ee
+      X-Request-Id:
+      - Root=1-68c294a1-456e66e705ab3a7f45ffd5fa;84d3da0c-c979-4834-b32a-4b04df15b1c8
+      cross-origin-opener-policy:
+      - same-origin
+    status:
+      code: 404
+      message: Not Found
+- request:
+    body: ''
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      X-Amzn-Trace-Id:
+      - 0b1fe12c-9f5c-458f-b240-baba2a40641d
+      user-agent:
+      - datasets/4.0.0; hf_hub/0.34.4; python/3.12.11
+    method: GET
+    uri: https://datasets-server.huggingface.co/info?dataset=openai/gsm8k
+  response:
+    body:
+      string: '{"dataset_info":{"main":{"description":"","citation":"","homepage":"","license":"","features":{"question":{"dtype":"string","_type":"Value"},"answer":{"dtype":"string","_type":"Value"}},"builder_name":"parquet","dataset_name":"gsm8k","config_name":"main","version":{"version_str":"0.0.0","major":0,"minor":0,"patch":0},"splits":{"train":{"name":"train","num_bytes":3939429,"num_examples":7473,"dataset_name":null},"test":{"name":"test","num_bytes":707759,"num_examples":1319,"dataset_name":null}},"download_size":2725633,"dataset_size":4647188},"socratic":{"description":"","citation":"","homepage":"","license":"","features":{"question":{"dtype":"string","_type":"Value"},"answer":{"dtype":"string","_type":"Value"}},"builder_name":"parquet","dataset_name":"gsm8k","config_name":"socratic","version":{"version_str":"0.0.0","major":0,"minor":0,"patch":0},"splits":{"train":{"name":"train","num_bytes":5170658,"num_examples":7473,"dataset_name":null},"test":{"name":"test","num_bytes":928309,"num_examples":1319,"dataset_name":null}},"download_size":3164254,"dataset_size":6098967}},"pending":[],"failed":[],"partial":false}'
+    headers:
+      Connection:
+      - keep-alive
+      Content-Type:
+      - application/json
+      Date:
+      - Thu, 11 Sep 2025 09:21:38 GMT
+      Transfer-Encoding:
+      - chunked
+      Via:
+      - 1.1 7ab61ce3d7d648e0eaae5b45a81a89dc.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - zDkQ8HFXDAJeGJplFWATwa9zlCap-AX5gcmhat4QmuA7PDvhp0J6Gg==
+      X-Amz-Cf-Pop:
+      - CCU50-P4
+      X-Cache:
+      - Miss from cloudfront
+      cache-control:
+      - max-age=120
+      content-encoding:
+      - gzip
+      server:
+      - uvicorn
+      vary:
+      - Accept-Encoding
+      x-revision:
+      - e53f048856ff4f594e959d75785d2c2d37b678ee
+    status:
+      code: 200
+      message: OK
+- request:
+    body: ''
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      X-Amzn-Trace-Id:
+      - 697b8cf3-331a-42fe-bc1b-1db5df098a1d
+      user-agent:
+      - unknown/None; hf_hub/0.34.4; python/3.12.11
+    method: GET
+    uri: https://huggingface.co/api/datasets/openai/gsm8k/revision/e53f048856ff4f594e959d75785d2c2d37b678ee
+  response:
+    body:
+      string: "{\"_id\":\"625552d2b339bb03abe3432d\",\"id\":\"openai/gsm8k\",\"author\":\"openai\",\"sha\":\"e53f048856ff4f594e959d75785d2c2d37b678ee\",\"lastModified\":\"2024-01-04T12:05:15.000Z\",\"private\":false,\"gated\":false,\"disabled\":false,\"tags\":[\"annotations_creators:crowdsourced\",\"language_creators:crowdsourced\",\"multilinguality:monolingual\",\"source_datasets:original\",\"language:en\",\"license:mit\",\"size_categories:10K<n<100K\",\"format:parquet\",\"modality:text\",\"library:datasets\",\"library:pandas\",\"library:mlcroissant\",\"library:polars\",\"arxiv:2110.14168\",\"region:us\",\"math-word-problems\"],\"citation\":null,\"description\":\"\\n\\t\\n\\t\\t\\n\\t\\tDataset
+        Card for GSM8K\\n\\t\\n\\n\\n\\t\\n\\t\\t\\n\\t\\tDataset Summary\\n\\t\\n\\nGSM8K
+        (Grade School Math 8K) is a dataset of 8.5K high quality linguistically diverse
+        grade school math word problems. The dataset was created to support the task
+        of question answering on basic mathematical problems that require multi-step
+        reasoning.\\n\\nThese problems take between 2 and 8 steps to solve.\\nSolutions
+        primarily involve performing a sequence of elementary calculations using basic
+        arithmetic operations (+ \u2212 \xD7\xF7) to reach the\u2026 See the full
+        description on the dataset page: https://huggingface.co/datasets/openai/gsm8k.\",\"paperswithcode_id\":\"gsm8k\",\"downloads\":425086,\"likes\":859,\"cardData\":{\"annotations_creators\":[\"crowdsourced\"],\"language_creators\":[\"crowdsourced\"],\"language\":[\"en\"],\"license\":[\"mit\"],\"multilinguality\":[\"monolingual\"],\"size_categories\":[\"1K<n<10K\"],\"source_datasets\":[\"original\"],\"task_categories\":[\"text2text-generation\"],\"task_ids\":[],\"paperswithcode_id\":\"gsm8k\",\"pretty_name\":\"Grade
+        School Math 8K\",\"tags\":[\"math-word-problems\"],\"dataset_info\":[{\"config_name\":\"main\",\"features\":[{\"name\":\"question\",\"dtype\":\"string\"},{\"name\":\"answer\",\"dtype\":\"string\"}],\"splits\":[{\"name\":\"train\",\"num_bytes\":3963202,\"num_examples\":7473},{\"name\":\"test\",\"num_bytes\":713732,\"num_examples\":1319}],\"download_size\":2725633,\"dataset_size\":4676934},{\"config_name\":\"socratic\",\"features\":[{\"name\":\"question\",\"dtype\":\"string\"},{\"name\":\"answer\",\"dtype\":\"string\"}],\"splits\":[{\"name\":\"train\",\"num_bytes\":5198108,\"num_examples\":7473},{\"name\":\"test\",\"num_bytes\":936859,\"num_examples\":1319}],\"download_size\":3164254,\"dataset_size\":6134967}],\"configs\":[{\"config_name\":\"main\",\"data_files\":[{\"split\":\"train\",\"path\":\"main/train-*\"},{\"split\":\"test\",\"path\":\"main/test-*\"}]},{\"config_name\":\"socratic\",\"data_files\":[{\"split\":\"train\",\"path\":\"socratic/train-*\"},{\"split\":\"test\",\"path\":\"socratic/test-*\"}]}]},\"siblings\":[{\"rfilename\":\".gitattributes\"},{\"rfilename\":\"README.md\"},{\"rfilename\":\"main/test-00000-of-00001.parquet\"},{\"rfilename\":\"main/train-00000-of-00001.parquet\"},{\"rfilename\":\"socratic/test-00000-of-00001.parquet\"},{\"rfilename\":\"socratic/train-00000-of-00001.parquet\"}],\"createdAt\":\"2022-04-12T10:22:10.000Z\",\"usedStorage\":95470379}"
+    headers:
+      Access-Control-Allow-Origin:
+      - https://huggingface.co
+      Access-Control-Expose-Headers:
+      - X-Repo-Commit,X-Request-Id,X-Error-Code,X-Error-Message,X-Total-Count,ETag,Link,Accept-Ranges,Content-Range,X-Linked-Size,X-Linked-ETag,X-Xet-Hash
+      Access-Control-Max-Age:
+      - '86400'
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '2822'
+      Content-Type:
+      - application/json; charset=utf-8
+      Date:
+      - Thu, 11 Sep 2025 09:21:38 GMT
+      ETag:
+      - W/"b06-cmIICMeN7ko9wEPx7lJhIvmxOns"
+      RateLimit-Limit:
+      - '10000'
+      RateLimit-Remaining:
+      - '9998'
+      RateLimit-Reset:
+      - '202'
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Vary:
+      - Origin
+      Via:
+      - 1.1 79b0078a9fffc3eb8f13f38ce6dbed0a.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - KsCPZUXEm8hWWi5_1OQgP3GelatnF77Vm7w7Jv8D-ifv5Lkg2lb5QA==
+      X-Amz-Cf-Pop:
+      - CCU50-P6
+      X-Cache:
+      - Miss from cloudfront
+      X-Powered-By:
+      - huggingface-moon
+      X-Request-Id:
+      - Root=1-68c294a2-78c406d521c5a5f66835fdb8;697b8cf3-331a-42fe-bc1b-1db5df098a1d
+      cross-origin-opener-policy:
+      - same-origin
+    status:
+      code: 200
+      message: OK
+- request:
+    body: ''
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      X-Amzn-Trace-Id:
+      - 4891155f-e04c-4077-8ae9-ce69d8186eba
+      user-agent:
+      - unknown/None; hf_hub/0.34.4; python/3.12.11
+    method: GET
+    uri: https://huggingface.co/api/datasets/openai/gsm8k/tree/e53f048856ff4f594e959d75785d2c2d37b678ee?recursive=False&expand=False
+  response:
+    body:
+      string: '[{"type":"directory","oid":"e18478d6a7d94ad93b3dc8aee31c8acb1cd1dd43","size":0,"path":"main"},{"type":"directory","oid":"a60f7e4e24edc97ec53e5303cb0f3f11ad0d6bb7","size":0,"path":"socratic"},{"type":"file","oid":"227449ad6054efe1ce07c6aa12090bc57103f85f","size":1610,"path":".gitattributes"},{"type":"file","oid":"aec2504ff01cd8c60ae9435e96347d8db32235a2","size":7940,"path":"README.md"}]'
+    headers:
+      Access-Control-Allow-Origin:
+      - https://huggingface.co
+      Access-Control-Expose-Headers:
+      - X-Repo-Commit,X-Request-Id,X-Error-Code,X-Error-Message,X-Total-Count,ETag,Link,Accept-Ranges,Content-Range,X-Linked-Size,X-Linked-ETag,X-Xet-Hash
+      Access-Control-Max-Age:
+      - '86400'
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '388'
+      Content-Type:
+      - application/json; charset=utf-8
+      Date:
+      - Thu, 11 Sep 2025 09:21:39 GMT
+      ETag:
+      - W/"184-GTNml2in/NFmXgTtW6P3Y16W1V4"
+      RateLimit-Limit:
+      - '10000'
+      RateLimit-Remaining:
+      - '9997'
+      RateLimit-Reset:
+      - '201'
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Vary:
+      - Origin
+      Via:
+      - 1.1 9d794390fcb503c24f1f48632406f114.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - sgXHCxOIgwSVWdd6CxexK_M7S6dQ_qU9GvdIbrdKmqPIXQa6DCsMSg==
+      X-Amz-Cf-Pop:
+      - CCU50-P6
+      X-Cache:
+      - Miss from cloudfront
+      X-Powered-By:
+      - huggingface-moon
+      X-Request-Id:
+      - Root=1-68c294a3-38dd2e8719a34d9f4e085aef;4891155f-e04c-4077-8ae9-ce69d8186eba
+      cross-origin-opener-policy:
+      - same-origin
+    status:
+      code: 200
+      message: OK
+- request:
+    body: ''
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      X-Amzn-Trace-Id:
+      - 67f4588c-d12e-4a6b-97c3-eb39270f703d
+      user-agent:
+      - unknown/None; hf_hub/0.34.4; python/3.12.11
+    method: GET
+    uri: https://huggingface.co/api/datasets/openai/gsm8k/tree/e53f048856ff4f594e959d75785d2c2d37b678ee/main?recursive=False&expand=False
+  response:
+    body:
+      string: '[{"type":"file","oid":"861005fb045993f46d198aa797440f4096f9aa17","size":419088,"lfs":{"oid":"ee7b8da9e381df27b9e3f7758a159ab2bdaa4dbaa910546cbbc47e0cb44e4f59","size":419088,"pointerSize":131},"xetHash":"ad526cbfe3eb75568603d62295066ebd2491137403f012186c30f9416839141d","path":"main/test-00000-of-00001.parquet"},{"type":"file","oid":"61b47c916c27533feaa3763484ae0ea58f92b056","size":2306545,"lfs":{"oid":"ea82612ea9582142387730c793eb67d3b12849002bc0b7fa6f8efafa7351419d","size":2306545,"pointerSize":132},"xetHash":"2a53b35a9aa11e1e9da03cd3f0c0b78df3a6f15b4648b563755a0c644e246ae4","path":"main/train-00000-of-00001.parquet"}]'
+    headers:
+      Access-Control-Allow-Origin:
+      - https://huggingface.co
+      Access-Control-Expose-Headers:
+      - X-Repo-Commit,X-Request-Id,X-Error-Code,X-Error-Message,X-Total-Count,ETag,Link,Accept-Ranges,Content-Range,X-Linked-Size,X-Linked-ETag,X-Xet-Hash
+      Access-Control-Max-Age:
+      - '86400'
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '626'
+      Content-Type:
+      - application/json; charset=utf-8
+      Date:
+      - Thu, 11 Sep 2025 09:21:39 GMT
+      ETag:
+      - W/"272-99nyx78W/XeZdSx4HPHn5A8ZqNw"
+      RateLimit-Limit:
+      - '10000'
+      RateLimit-Remaining:
+      - '9996'
+      RateLimit-Reset:
+      - '201'
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Vary:
+      - Origin
+      Via:
+      - 1.1 b0cf080aa77a5b4d57194b0b0150ba46.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - s7ruPlgOSs-SXhWq-ThSgE941Ks8jHtsy35I947ggJHt3QJYWr06aA==
+      X-Amz-Cf-Pop:
+      - CCU50-P6
+      X-Cache:
+      - Miss from cloudfront
+      X-Powered-By:
+      - huggingface-moon
+      X-Request-Id:
+      - Root=1-68c294a3-3958ad8910180fdd7139b0c0;67f4588c-d12e-4a6b-97c3-eb39270f703d
+      cross-origin-opener-policy:
+      - same-origin
+    status:
+      code: 200
+      message: OK
+- request:
+    body: ''
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      X-Amzn-Trace-Id:
+      - f815c99b-994c-4bd5-9d13-8a951ca00641
+      user-agent:
+      - unknown/None; hf_hub/0.34.4; python/3.12.11
+    method: GET
+    uri: https://huggingface.co/api/datasets/openai/gsm8k/revision/e53f048856ff4f594e959d75785d2c2d37b678ee
+  response:
+    body:
+      string: "{\"_id\":\"625552d2b339bb03abe3432d\",\"id\":\"openai/gsm8k\",\"author\":\"openai\",\"sha\":\"e53f048856ff4f594e959d75785d2c2d37b678ee\",\"lastModified\":\"2024-01-04T12:05:15.000Z\",\"private\":false,\"gated\":false,\"disabled\":false,\"tags\":[\"annotations_creators:crowdsourced\",\"language_creators:crowdsourced\",\"multilinguality:monolingual\",\"source_datasets:original\",\"language:en\",\"license:mit\",\"size_categories:10K<n<100K\",\"format:parquet\",\"modality:text\",\"library:datasets\",\"library:pandas\",\"library:mlcroissant\",\"library:polars\",\"arxiv:2110.14168\",\"region:us\",\"math-word-problems\"],\"citation\":null,\"description\":\"\\n\\t\\n\\t\\t\\n\\t\\tDataset
+        Card for GSM8K\\n\\t\\n\\n\\n\\t\\n\\t\\t\\n\\t\\tDataset Summary\\n\\t\\n\\nGSM8K
+        (Grade School Math 8K) is a dataset of 8.5K high quality linguistically diverse
+        grade school math word problems. The dataset was created to support the task
+        of question answering on basic mathematical problems that require multi-step
+        reasoning.\\n\\nThese problems take between 2 and 8 steps to solve.\\nSolutions
+        primarily involve performing a sequence of elementary calculations using basic
+        arithmetic operations (+ \u2212 \xD7\xF7) to reach the\u2026 See the full
+        description on the dataset page: https://huggingface.co/datasets/openai/gsm8k.\",\"paperswithcode_id\":\"gsm8k\",\"downloads\":425086,\"likes\":859,\"cardData\":{\"annotations_creators\":[\"crowdsourced\"],\"language_creators\":[\"crowdsourced\"],\"language\":[\"en\"],\"license\":[\"mit\"],\"multilinguality\":[\"monolingual\"],\"size_categories\":[\"1K<n<10K\"],\"source_datasets\":[\"original\"],\"task_categories\":[\"text2text-generation\"],\"task_ids\":[],\"paperswithcode_id\":\"gsm8k\",\"pretty_name\":\"Grade
+        School Math 8K\",\"tags\":[\"math-word-problems\"],\"dataset_info\":[{\"config_name\":\"main\",\"features\":[{\"name\":\"question\",\"dtype\":\"string\"},{\"name\":\"answer\",\"dtype\":\"string\"}],\"splits\":[{\"name\":\"train\",\"num_bytes\":3963202,\"num_examples\":7473},{\"name\":\"test\",\"num_bytes\":713732,\"num_examples\":1319}],\"download_size\":2725633,\"dataset_size\":4676934},{\"config_name\":\"socratic\",\"features\":[{\"name\":\"question\",\"dtype\":\"string\"},{\"name\":\"answer\",\"dtype\":\"string\"}],\"splits\":[{\"name\":\"train\",\"num_bytes\":5198108,\"num_examples\":7473},{\"name\":\"test\",\"num_bytes\":936859,\"num_examples\":1319}],\"download_size\":3164254,\"dataset_size\":6134967}],\"configs\":[{\"config_name\":\"main\",\"data_files\":[{\"split\":\"train\",\"path\":\"main/train-*\"},{\"split\":\"test\",\"path\":\"main/test-*\"}]},{\"config_name\":\"socratic\",\"data_files\":[{\"split\":\"train\",\"path\":\"socratic/train-*\"},{\"split\":\"test\",\"path\":\"socratic/test-*\"}]}]},\"siblings\":[{\"rfilename\":\".gitattributes\"},{\"rfilename\":\"README.md\"},{\"rfilename\":\"main/test-00000-of-00001.parquet\"},{\"rfilename\":\"main/train-00000-of-00001.parquet\"},{\"rfilename\":\"socratic/test-00000-of-00001.parquet\"},{\"rfilename\":\"socratic/train-00000-of-00001.parquet\"}],\"createdAt\":\"2022-04-12T10:22:10.000Z\",\"usedStorage\":95470379}"
+    headers:
+      Access-Control-Allow-Origin:
+      - https://huggingface.co
+      Access-Control-Expose-Headers:
+      - X-Repo-Commit,X-Request-Id,X-Error-Code,X-Error-Message,X-Total-Count,ETag,Link,Accept-Ranges,Content-Range,X-Linked-Size,X-Linked-ETag,X-Xet-Hash
+      Access-Control-Max-Age:
+      - '86400'
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '2822'
+      Content-Type:
+      - application/json; charset=utf-8
+      Date:
+      - Thu, 11 Sep 2025 09:21:39 GMT
+      ETag:
+      - W/"b06-cmIICMeN7ko9wEPx7lJhIvmxOns"
+      RateLimit-Limit:
+      - '10000'
+      RateLimit-Remaining:
+      - '9995'
+      RateLimit-Reset:
+      - '201'
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Vary:
+      - Origin
+      Via:
+      - 1.1 e3ced74aa26c808e10b8610b17aab852.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - YD-W5q_n7fFvtbiN4cJ2cbqmJqX94_dQEDT-9nyHPCmDE_dsi7gtiQ==
+      X-Amz-Cf-Pop:
+      - CCU50-P6
+      X-Cache:
+      - Miss from cloudfront
+      X-Powered-By:
+      - huggingface-moon
+      X-Request-Id:
+      - Root=1-68c294a3-54e52bdb194233103c04fbe9;f815c99b-994c-4bd5-9d13-8a951ca00641
+      cross-origin-opener-policy:
+      - same-origin
+    status:
+      code: 200
+      message: OK
+- request:
+    body: ''
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - identity
+      Connection:
+      - keep-alive
+      X-Amzn-Trace-Id:
+      - 3041c69c-71c2-43be-ba31-75e209e54a07
+      user-agent:
+      - datasets/4.0.0; hf_hub/0.34.4; python/3.12.11; huggingface_hub/0.34.4; pyarrow/21.0.0
+    method: HEAD
+    uri: https://huggingface.co/datasets/openai/gsm8k/resolve/e53f048856ff4f594e959d75785d2c2d37b678ee/dataset_infos.json
+  response:
+    body:
+      string: ''
+    headers:
+      Accept-Ranges:
+      - bytes
+      Access-Control-Allow-Origin:
+      - https://huggingface.co
+      Access-Control-Expose-Headers:
+      - X-Repo-Commit,X-Request-Id,X-Error-Code,X-Error-Message,X-Total-Count,ETag,Link,Accept-Ranges,Content-Range,X-Linked-Size,X-Linked-ETag,X-Xet-Hash
+      Access-Control-Max-Age:
+      - '86400'
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '15'
+      Content-Type:
+      - text/plain; charset=utf-8
+      Date:
+      - Thu, 11 Sep 2025 09:21:40 GMT
+      ETag:
+      - W/"f-mY2VvLxuxB7KhsoOdQTlMTccuAQ"
+      RateLimit-Limit:
+      - '40000'
+      RateLimit-Remaining:
+      - '39996'
+      RateLimit-Reset:
+      - '200'
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Vary:
+      - Origin
+      Via:
+      - 1.1 e4773799763f9062c09320ea013975e4.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - JjisdawN19uxNa10fXs6p2v8sMQnWsTwS0vx1wUR58Le81OjmL_iuw==
+      X-Amz-Cf-Pop:
+      - CCU50-P6
+      X-Cache:
+      - Error from cloudfront
+      X-Error-Code:
+      - EntryNotFound
+      X-Error-Message:
+      - Entry not found
+      X-Hub-Cache:
+      - MISS
+      X-Powered-By:
+      - huggingface-moon
+      X-Repo-Commit:
+      - e53f048856ff4f594e959d75785d2c2d37b678ee
+      X-Request-Id:
+      - Root=1-68c294a4-536a72cd580e7f3e3352abc2;3041c69c-71c2-43be-ba31-75e209e54a07
+      cross-origin-opener-policy:
+      - same-origin
+    status:
+      code: 404
+      message: Not Found
+- request:
+    body: ''
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - identity
+      Connection:
+      - keep-alive
+      X-Amzn-Trace-Id:
+      - d81b69cf-1e56-42a9-bc75-96351accb172
+      user-agent:
+      - datasets/4.0.0; hf_hub/0.34.4; python/3.12.11; huggingface_hub/0.34.4; pyarrow/21.0.0
+    method: HEAD
+    uri: https://huggingface.co/datasets/openai/gsm8k/resolve/main/README.md
+  response:
+    body:
+      string: ''
+    headers:
+      Accept-Ranges:
+      - bytes
+      Access-Control-Allow-Origin:
+      - https://huggingface.co
+      Access-Control-Expose-Headers:
+      - X-Repo-Commit,X-Request-Id,X-Error-Code,X-Error-Message,X-Total-Count,ETag,Link,Accept-Ranges,Content-Range,X-Linked-Size,X-Linked-ETag,X-Xet-Hash
+      Access-Control-Max-Age:
+      - '86400'
+      Connection:
+      - keep-alive
+      Content-Disposition:
+      - inline; filename*=UTF-8''README.md; filename="README.md";
+      Content-Length:
+      - '237'
+      Content-Security-Policy:
+      - default-src 'none'; sandbox
+      Content-Type:
+      - text/plain; charset=utf-8
+      Date:
+      - Thu, 11 Sep 2025 09:21:40 GMT
+      Location:
+      - /api/resolve-cache/datasets/openai/gsm8k/e53f048856ff4f594e959d75785d2c2d37b678ee/README.md?%2Fdatasets%2Fopenai%2Fgsm8k%2Fresolve%2Fmain%2FREADME.md=&etag=%22aec2504ff01cd8c60ae9435e96347d8db32235a2%22
+      RateLimit-Limit:
+      - '40000'
+      RateLimit-Remaining:
+      - '39995'
+      RateLimit-Reset:
+      - '200'
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Vary:
+      - Origin, Accept
+      Via:
+      - 1.1 b0cf080aa77a5b4d57194b0b0150ba46.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - qI05oMTFeVx9Cs60nkPF0pSBpkMXVeTfdPBfLqcTfrPt5rl7HgPWQg==
+      X-Amz-Cf-Pop:
+      - CCU50-P6
+      X-Cache:
+      - Miss from cloudfront
+      X-Hub-Cache:
+      - HIT
+      X-Linked-ETag:
+      - '"aec2504ff01cd8c60ae9435e96347d8db32235a2"'
+      X-Powered-By:
+      - huggingface-moon
+      X-Repo-Commit:
+      - e53f048856ff4f594e959d75785d2c2d37b678ee
+      X-Request-Id:
+      - Root=1-68c294a4-708716b502c5b7db538b44ce;d81b69cf-1e56-42a9-bc75-96351accb172
+      cross-origin-opener-policy:
+      - same-origin
+    status:
+      code: 307
+      message: Temporary Redirect
+- request:
+    body: ''
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - identity
+      Connection:
+      - keep-alive
+      X-Amzn-Trace-Id:
+      - a208d7a2-8244-458e-b0ef-05cf11cc3c6c
+      user-agent:
+      - datasets/4.0.0; hf_hub/0.34.4; python/3.12.11; huggingface_hub/0.34.4; pyarrow/21.0.0
+    method: HEAD
+    uri: https://huggingface.co/api/resolve-cache/datasets/openai/gsm8k/e53f048856ff4f594e959d75785d2c2d37b678ee/README.md
+  response:
+    body:
+      string: ''
+    headers:
+      Accept-Ranges:
+      - bytes
+      Access-Control-Allow-Origin:
+      - https://huggingface.co
+      Access-Control-Expose-Headers:
+      - X-Repo-Commit,X-Request-Id,X-Error-Code,X-Error-Message,X-Total-Count,ETag,Link,Accept-Ranges,Content-Range,X-Linked-Size,X-Linked-ETag,X-Xet-Hash
+      Age:
+      - '6727048'
+      Connection:
+      - keep-alive
+      Content-Disposition:
+      - inline; filename*=UTF-8''README.md; filename="README.md";
+      Content-Length:
+      - '7940'
+      Content-Security-Policy:
+      - default-src 'none'; sandbox
+      Content-Type:
+      - text/plain; charset=utf-8
+      Date:
+      - Wed, 25 Jun 2025 12:44:13 GMT
+      ETag:
+      - '"aec2504ff01cd8c60ae9435e96347d8db32235a2"'
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Vary:
+      - Origin
+      Via:
+      - 1.1 f920dd8e3cececd7b15deec9cf062d10.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - LD5YAZRHiZJeVmvXhJfS1X1_AMb7JN6FEmyhR-NDvz3g9PW-U_HXGQ==
+      X-Amz-Cf-Pop:
+      - CCU50-P6
+      X-Cache:
+      - Hit from cloudfront
+      X-Hub-Cache:
+      - HIT
+      X-Powered-By:
+      - huggingface-moon
+      X-Repo-Commit:
+      - e53f048856ff4f594e959d75785d2c2d37b678ee
+      X-Request-Id:
+      - Root=1-685bef1d-3011d75264b8e5467fc3f82f;349e5fc0-f923-4a0f-8b25-6fb2db0f1223
+      cross-origin-opener-policy:
+      - same-origin
+    status:
+      code: 200
+      message: OK
+- request:
+    body: ''
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - identity
+      Connection:
+      - keep-alive
+      X-Amzn-Trace-Id:
+      - 20bd2cbc-4454-44d9-aa11-dc8400cc7569
+      user-agent:
+      - datasets/4.0.0; hf_hub/0.34.4; python/3.12.11; huggingface_hub/0.34.4; pyarrow/21.0.0
+    method: HEAD
+    uri: https://huggingface.co/datasets/openai/gsm8k/resolve/e53f048856ff4f594e959d75785d2c2d37b678ee/gsm8k.py
+  response:
+    body:
+      string: ''
+    headers:
+      Accept-Ranges:
+      - bytes
+      Access-Control-Allow-Origin:
+      - https://huggingface.co
+      Access-Control-Expose-Headers:
+      - X-Repo-Commit,X-Request-Id,X-Error-Code,X-Error-Message,X-Total-Count,ETag,Link,Accept-Ranges,Content-Range,X-Linked-Size,X-Linked-ETag,X-Xet-Hash
+      Access-Control-Max-Age:
+      - '86400'
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '15'
+      Content-Type:
+      - text/plain; charset=utf-8
+      Date:
+      - Thu, 11 Sep 2025 09:21:41 GMT
+      ETag:
+      - W/"f-mY2VvLxuxB7KhsoOdQTlMTccuAQ"
+      RateLimit-Limit:
+      - '40000'
+      RateLimit-Remaining:
+      - '39994'
+      RateLimit-Reset:
+      - '199'
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Vary:
+      - Origin
+      Via:
+      - 1.1 e9caaf69d03faf78cf0161aae33f7708.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - VLhtt02BscBw0p9Cc0CNxyAYixu_G7znaj6cdR9ao_riHKOLM08Wpg==
+      X-Amz-Cf-Pop:
+      - CCU50-P6
+      X-Cache:
+      - Error from cloudfront
+      X-Error-Code:
+      - EntryNotFound
+      X-Error-Message:
+      - Entry not found
+      X-Hub-Cache:
+      - MISS
+      X-Powered-By:
+      - huggingface-moon
+      X-Repo-Commit:
+      - e53f048856ff4f594e959d75785d2c2d37b678ee
+      X-Request-Id:
+      - Root=1-68c294a5-2b151b2c04d1ff5f68a0f103;20bd2cbc-4454-44d9-aa11-dc8400cc7569
+      cross-origin-opener-policy:
+      - same-origin
+    status:
+      code: 404
+      message: Not Found
+- request:
+    body: ''
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      User-Agent:
+      - datasets/4.0.0; python/3.12.11; huggingface_hub/0.34.4; pyarrow/21.0.0
+      X-Amzn-Trace-Id:
+      - 9c3afdcd-a712-4194-a541-9df8e6af889e
+    method: HEAD
+    uri: https://s3.amazonaws.com/datasets.huggingface.co/datasets/datasets/openai/gsm8k/openai/gsm8k.py
+  response:
+    body:
+      string: ''
+    headers:
+      Content-Type:
+      - application/xml
+      Date:
+      - Thu, 11 Sep 2025 09:21:41 GMT
+      Server:
+      - AmazonS3
+      Transfer-Encoding:
+      - chunked
+      x-amz-id-2:
+      - 32bjnnVdefktGqQ72ysQYn/k3wgiAStOmIUi3q5tjrvJKq6fjurzQfgbRvHSyt3lZQ/yHvLR80I=
+      x-amz-request-id:
+      - GF0X6CZ7WESE3RTN
+    status:
+      code: 404
+      message: Not Found
+- request:
+    body: ''
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - identity
+      Connection:
+      - keep-alive
+      X-Amzn-Trace-Id:
+      - 65964988-9abd-4488-8c39-a73693a038fa
+      user-agent:
+      - datasets/4.0.0; hf_hub/0.34.4; python/3.12.11; huggingface_hub/0.34.4; pyarrow/21.0.0
+    method: HEAD
+    uri: https://huggingface.co/datasets/openai/gsm8k/resolve/e53f048856ff4f594e959d75785d2c2d37b678ee/.huggingface.yaml
+  response:
+    body:
+      string: ''
+    headers:
+      Accept-Ranges:
+      - bytes
+      Access-Control-Allow-Origin:
+      - https://huggingface.co
+      Access-Control-Expose-Headers:
+      - X-Repo-Commit,X-Request-Id,X-Error-Code,X-Error-Message,X-Total-Count,ETag,Link,Accept-Ranges,Content-Range,X-Linked-Size,X-Linked-ETag,X-Xet-Hash
+      Access-Control-Max-Age:
+      - '86400'
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '15'
+      Content-Type:
+      - text/plain; charset=utf-8
+      Date:
+      - Thu, 11 Sep 2025 09:21:42 GMT
+      ETag:
+      - W/"f-mY2VvLxuxB7KhsoOdQTlMTccuAQ"
+      RateLimit-Limit:
+      - '40000'
+      RateLimit-Remaining:
+      - '39993'
+      RateLimit-Reset:
+      - '198'
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Vary:
+      - Origin
+      Via:
+      - 1.1 f5a20b6dc3447fe14013d7d00f3345a4.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - TKFEP7QLFH_qeda4c7Ig7PgZZ2QPhQJl1DwFZS87RafLNHdF6K1jTw==
+      X-Amz-Cf-Pop:
+      - CCU50-P6
+      X-Cache:
+      - Error from cloudfront
+      X-Error-Code:
+      - EntryNotFound
+      X-Error-Message:
+      - Entry not found
+      X-Hub-Cache:
+      - MISS
+      X-Powered-By:
+      - huggingface-moon
+      X-Repo-Commit:
+      - e53f048856ff4f594e959d75785d2c2d37b678ee
+      X-Request-Id:
+      - Root=1-68c294a6-1214d6ef72ff584f19895986;65964988-9abd-4488-8c39-a73693a038fa
+      cross-origin-opener-policy:
+      - same-origin
+    status:
+      code: 404
+      message: Not Found
+- request:
+    body: ''
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, zstd
+      Connection:
+      - keep-alive
+      X-Amzn-Trace-Id:
+      - cab2bca2-5db7-4e6c-9164-8465dc4df5b3
+      user-agent:
+      - datasets/4.0.0; hf_hub/0.34.4; python/3.12.11
+    method: GET
+    uri: https://datasets-server.huggingface.co/info?dataset=openai/gsm8k
+  response:
+    body:
+      string: '{"dataset_info":{"main":{"description":"","citation":"","homepage":"","license":"","features":{"question":{"dtype":"string","_type":"Value"},"answer":{"dtype":"string","_type":"Value"}},"builder_name":"parquet","dataset_name":"gsm8k","config_name":"main","version":{"version_str":"0.0.0","major":0,"minor":0,"patch":0},"splits":{"train":{"name":"train","num_bytes":3939429,"num_examples":7473,"dataset_name":null},"test":{"name":"test","num_bytes":707759,"num_examples":1319,"dataset_name":null}},"download_size":2725633,"dataset_size":4647188},"socratic":{"description":"","citation":"","homepage":"","license":"","features":{"question":{"dtype":"string","_type":"Value"},"answer":{"dtype":"string","_type":"Value"}},"builder_name":"parquet","dataset_name":"gsm8k","config_name":"socratic","version":{"version_str":"0.0.0","major":0,"minor":0,"patch":0},"splits":{"train":{"name":"train","num_bytes":5170658,"num_examples":7473,"dataset_name":null},"test":{"name":"test","num_bytes":928309,"num_examples":1319,"dataset_name":null}},"download_size":3164254,"dataset_size":6098967}},"pending":[],"failed":[],"partial":false}'
+    headers:
+      Connection:
+      - keep-alive
+      Content-Type:
+      - application/json
+      Date:
+      - Thu, 11 Sep 2025 09:21:43 GMT
+      Transfer-Encoding:
+      - chunked
+      Via:
+      - 1.1 d5cd038617a87be7fffeb86d2af3d7e6.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - fReirnYRYh3MIwmmWRDe-y02BJ16jS3NLguw-9RDfskQugqdCRfMcA==
+      X-Amz-Cf-Pop:
+      - CCU50-P4
+      X-Cache:
+      - Miss from cloudfront
+      cache-control:
+      - max-age=120
+      content-encoding:
+      - gzip
+      server:
+      - uvicorn
+      vary:
+      - Accept-Encoding
+      x-revision:
+      - e53f048856ff4f594e959d75785d2c2d37b678ee
+    status:
+      code: 200
+      message: OK
+- request:
+    body: ''
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - identity
+      Connection:
+      - keep-alive
+      X-Amzn-Trace-Id:
+      - 3aa96b59-1e9e-4c79-8366-f1d69b638914
+      user-agent:
+      - datasets/4.0.0; hf_hub/0.34.4; python/3.12.11; huggingface_hub/0.34.4; pyarrow/21.0.0
+    method: HEAD
+    uri: https://huggingface.co/datasets/openai/gsm8k/resolve/e53f048856ff4f594e959d75785d2c2d37b678ee/dataset_infos.json
+  response:
+    body:
+      string: ''
+    headers:
+      Accept-Ranges:
+      - bytes
+      Access-Control-Allow-Origin:
+      - https://huggingface.co
+      Access-Control-Expose-Headers:
+      - X-Repo-Commit,X-Request-Id,X-Error-Code,X-Error-Message,X-Total-Count,ETag,Link,Accept-Ranges,Content-Range,X-Linked-Size,X-Linked-ETag,X-Xet-Hash
+      Access-Control-Max-Age:
+      - '86400'
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '15'
+      Content-Type:
+      - text/plain; charset=utf-8
+      Date:
+      - Thu, 11 Sep 2025 09:21:43 GMT
+      ETag:
+      - W/"f-mY2VvLxuxB7KhsoOdQTlMTccuAQ"
+      RateLimit-Limit:
+      - '40000'
+      RateLimit-Remaining:
+      - '39992'
+      RateLimit-Reset:
+      - '197'
+      Referrer-Policy:
+      - strict-origin-when-cross-origin
+      Vary:
+      - Origin
+      Via:
+      - 1.1 fc75bc708873135739b2141a45821018.cloudfront.net (CloudFront)
+      X-Amz-Cf-Id:
+      - phfqC7rwNjJVKLDSq7_bh4QGbNInC_SKYGkORKpYj3a7UCKVagygSw==
+      X-Amz-Cf-Pop:
+      - CCU50-P6
+      X-Cache:
+      - Error from cloudfront
+      X-Error-Code:
+      - EntryNotFound
+      X-Error-Message:
+      - Entry not found
+      X-Hub-Cache:
+      - MISS
+      X-Powered-By:
+      - huggingface-moon
+      X-Repo-Commit:
+      - e53f048856ff4f594e959d75785d2c2d37b678ee
+      X-Request-Id:
+      - Root=1-68c294a7-2a9d50f56e2a55bd61100e13;3aa96b59-1e9e-4c79-8366-f1d69b638914
+      cross-origin-opener-policy:
+      - same-origin
+    status:
+      code: 404
+      message: Not Found
+version: 1
