@@ -16,6 +16,7 @@ from weave.utils import http_requests as _http_requests
 
 class _FakeHTTPError(Exception):
     """Custom exception used by FakeResponse.raise_for_status in tests."""
+
     pass
 
 
