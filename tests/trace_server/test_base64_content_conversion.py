@@ -215,9 +215,7 @@ class TestBase64Replacement:
         processed_start = process_call_req_to_content(start_req, trace_server)
         assert processed_start.start.inputs["text"] == "Some normal text"
         assert isinstance(processed_start.start.inputs["image"], dict)
-        assert (
-            processed_start.start.inputs["image"]["_type"] == "CustomWeaveType"
-        )
+        assert processed_start.start.inputs["image"]["_type"] == "CustomWeaveType"
 
         # End request with standalone base64 in output (ensure length >= min threshold)
         long_bytes = b"b" * 100
