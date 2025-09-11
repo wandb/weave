@@ -34,7 +34,7 @@ from typing import (
 
 from typing_extensions import ParamSpec, TypeIs
 
-from weave.trace import box, settings
+from weave.trace import settings
 from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.context.call_context import (
@@ -508,7 +508,7 @@ def _call_sync_func(
         finish(exception=e)
         raise
 
-    res = box.box(res)
+    # No longer boxing results
     try:
         # Here we do a try/catch because we don't want to
         # break the user process if we trip up on processing
@@ -639,7 +639,7 @@ async def _call_async_func(
         finish(exception=e)
         raise
 
-    res = box.box(res)
+    # No longer boxing results
     try:
         # Here we do a try/catch because we don't want to
         # break the user process if we trip up on processing
@@ -790,8 +790,8 @@ def _call_sync_gen(
                         if current_call is None or current_call.id != call.id:
                             call_context.push_call(call)
 
-                        # Box the value
-                        boxed_value = box.box(value)
+                        # No longer boxing values
+                        boxed_value = value
 
                         # Accumulate if we have an accumulator
                         if acc:
@@ -1000,8 +1000,8 @@ async def _call_async_gen(
                         if current_call is None or current_call.id != call.id:
                             call_context.push_call(call)
 
-                        # Box the value
-                        boxed_value = box.box(value)
+                        # No longer boxing values
+                        boxed_value = value
 
                         # Accumulate if we have an accumulator
                         if acc:
