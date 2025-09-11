@@ -417,6 +417,7 @@ class Content(BaseModel, Generic[T]):
         # Use our shared HTTP session with logging adapter
         # Local import to prevent importing requests unless necessary
         from weave.utils import http_requests as http_requests
+
         resp = http_requests.get(url, headers=headers, timeout=timeout)
         resp.raise_for_status()
 
