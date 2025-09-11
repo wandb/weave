@@ -8,7 +8,7 @@ from weave.trace_server_bindings import remote_http_trace_server
 
 
 def test_weave_is_available_json_decode_error():
-    """Test that _weave_is_available returns False when server_info() raises JSONDecodeError."""
+    """Test that _weave_is_available returns False server is not available."""
     mock_server = MagicMock(spec=remote_http_trace_server.RemoteHTTPTraceServer)
     mock_server.server_info.side_effect = json.JSONDecodeError("test error", "doc", 0)
 
@@ -19,7 +19,7 @@ def test_weave_is_available_json_decode_error():
 
 
 def test_weave_is_available_success():
-    """Test that _weave_is_available returns True when server_info() succeeds."""
+    """Test that _weave_is_available returns True when server is available."""
     mock_server = MagicMock(spec=remote_http_trace_server.RemoteHTTPTraceServer)
     mock_server.server_info.return_value = {"version": "1.0.0"}
 
