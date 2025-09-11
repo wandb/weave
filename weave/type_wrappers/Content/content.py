@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import json
 import logging
 import os
 import subprocess
@@ -9,14 +10,27 @@ import sys
 import uuid
 from pathlib import Path
 from typing import Annotated, Any, Generic
+from urllib.parse import quote_from_bytes
 
-from pydantic import BaseModel, Field, PrivateAttr
+from pydantic import BaseModel, Field, PrivateAttr, field_serializer
 from typing_extensions import Self, TypeVar
 
 from weave.trace.refs import Ref
 from weave.trace.serialization.mem_artifact import MemTraceFilesArtifact
-
-from .content_types import ContentType, ResolvedContentArgs, ValidContentInputs
+from weave.type_wrappers.Content.content_types import (
+    ContentType,
+    ResolvedContentArgs,
+    ValidContentInputs,
+)
+from weave.type_wrappers.Content.utils import (
+    default_filename,
+    full_name,
+    get_mime_and_extension,
+    is_valid_b64,
+    is_valid_path,
+    match_data_url,
+    try_parse_data_url,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +48,7 @@ class Content(BaseModel, Generic[T]):
     - from_bytes()
     - from_text()
     - from_base64()
+    - from_data_url()
     """
 
     # This is required due to some attribute setting done by our serialization layer
@@ -81,6 +96,66 @@ class Content(BaseModel, Generic[T]):
         )
 
     @classmethod
+    def model_validate(
+        cls: type[Self],
+        obj: Any,
+        *,
+        strict: bool | None = None,
+        from_attributes: bool | None = None,
+        context: dict[str, Any] | None = None,
+    ) -> Self:
+        """Override model_validate to handle Content reconstruction from dict."""
+        if isinstance(obj, dict):
+            # Check if this is a full Content dict (from deserialization)
+            required_fields = {
+                "id",
+                "data",
+                "size",
+                "mimetype",
+                "digest",
+                "filename",
+                "content_type",
+                "input_type",
+            }
+            if required_fields.issubset(obj.keys()):
+                # Handle data field deserialization
+                data = obj.get("data")
+                if isinstance(data, str):
+                    # Check if it was base64 encoded during serialization
+                    content_type = obj.get("content_type", "")
+                    if "base64" in content_type:
+                        # Decode from base64
+                        obj["data"] = base64.b64decode(data)
+                    else:
+                        # Decode from string using encoding
+                        encoding = obj.get("encoding", "utf-8")
+                        obj["data"] = data.encode(encoding)
+                # Use model_construct to bypass __init__
+                return cls.model_construct(**obj)
+
+        # Fall back to parent implementation for other cases
+        return super().model_validate(
+            obj, strict=strict, from_attributes=from_attributes, context=context
+        )
+
+    @classmethod
+    def model_validate_json(
+        cls: type[Self],
+        json_data: str | bytes | bytearray,
+        *,
+        strict: bool | None = None,
+        context: dict[str, Any] | None = None,
+    ) -> Self:
+        """Override model_validate_json to handle Content reconstruction from JSON."""
+        # Parse the JSON
+        if isinstance(json_data, (bytes, bytearray)):
+            json_data = json_data.decode("utf-8")
+        obj = json.loads(json_data)
+
+        # Use our custom model_validate
+        return cls.model_validate(obj, strict=strict, context=context)
+
+    @classmethod
     def from_bytes(
         cls: type[Self],
         data: bytes,
@@ -91,8 +166,6 @@ class Content(BaseModel, Generic[T]):
         encoding: str = "utf-8",
     ) -> Self:
         """Initializes Content from raw bytes."""
-        from .utils import default_filename, full_name, get_mime_and_extension
-
         if len(data) == 0:
             logger.warning("Content.from_bytes received empty data")
 
@@ -135,8 +208,6 @@ class Content(BaseModel, Generic[T]):
         encoding: str = "utf-8",
     ) -> Self:
         """Initializes Content from a string of text."""
-        from .utils import default_filename, full_name, get_mime_and_extension
-
         if len(text) == 0:
             logger.warning("Content.from_text received empty text")
 
@@ -186,8 +257,6 @@ class Content(BaseModel, Generic[T]):
         metadata: dict[str, Any] | None = None,
     ) -> Self:
         """Initializes Content from a base64 encoded string or bytes."""
-        from .utils import default_filename, full_name, get_mime_and_extension
-
         if len(b64_data) == 0:
             logger.warning("Content.from_base64 received empty input")
 
@@ -240,8 +309,6 @@ class Content(BaseModel, Generic[T]):
         metadata: dict[str, Any] | None = None,
     ) -> Self:
         """Initializes Content from a local file path."""
-        from .utils import full_name, get_mime_and_extension, is_valid_path
-
         path_obj = Path(path)
         if not is_valid_path(path_obj):
             raise FileNotFoundError(f"File not found at path: {path_obj}")
@@ -283,6 +350,49 @@ class Content(BaseModel, Generic[T]):
         return cls.model_construct(**resolved_args)
 
     @classmethod
+    def from_data_url(
+        cls: type[Self], url: str, /, metadata: dict[str, Any] | None = None
+    ) -> Self:
+        """Initializes Content from a data URL."""
+        parsed = try_parse_data_url(url)
+        if not parsed:
+            raise ValueError("Invalid data URL provided.")
+
+        content_type = parsed.params.content_type
+        encoding = parsed.params.encoding
+        data = parsed.params.data
+        mimetype = parsed.params.mimetype
+
+        digest = hashlib.sha256(data).hexdigest()
+        size = len(data)
+
+        mimetype, extension = get_mime_and_extension(
+            mimetype=mimetype, extension=None, filename=None, buffer=data
+        )
+        filename = default_filename(
+            extension=extension, mimetype=mimetype, digest=digest
+        )
+
+        resolved_args: ResolvedContentArgs = {
+            "id": uuid.uuid4().hex,
+            "data": data,
+            "size": size,
+            "mimetype": mimetype,
+            "digest": digest,
+            "filename": filename,
+            "content_type": content_type,
+            "input_type": full_name(url),
+            "extension": extension,
+            "encoding": encoding,
+        }
+
+        if metadata:
+            resolved_args["metadata"] = metadata
+
+        # Use model_construct to bypass our custom __init__
+        return cls.model_construct(**resolved_args)
+
+    @classmethod
     def _from_guess(
         cls: type[Self],
         input: ValidContentInputs,
@@ -290,8 +400,6 @@ class Content(BaseModel, Generic[T]):
         extension: str | None = None,
         mimetype: str | None = None,
     ) -> Self:
-        from .utils import is_valid_b64, is_valid_path
-
         # First check if it is a path, we only check validity for str scenario
         # because we have dedicated error message for invalid path
         if isinstance(input, Path) or (isinstance(input, str) and is_valid_path(input)):
@@ -303,6 +411,9 @@ class Content(BaseModel, Generic[T]):
 
         # If it is still a str - treat as raw text
         elif isinstance(input, str):
+            if match_data_url(input):
+                return cls.from_data_url(input)
+
             return cls.from_text(input, mimetype=mimetype, extension=extension)
 
         return cls.from_bytes(input, mimetype=mimetype, extension=extension)
@@ -313,6 +424,39 @@ class Content(BaseModel, Generic[T]):
         This is for internal use to reconstruct the Content object by the serialization layer.
         """
         return cls.model_construct(**args)
+
+    def to_data_url(self, use_base64: bool = True) -> str:
+        """Constructs a data URL from the content.
+
+        Args:
+            use_base64: If True, the data will be base64 encoded.
+                        Otherwise, it will be percent-encoded. Defaults to True.
+
+        Returns:
+            A data URL string.
+        """
+        header = f"data:{self.mimetype}"
+        if (
+            self.mimetype.startswith("text/")
+            and self.content_type.find(":encoding") != -1
+        ):
+            # Only add charset for text types
+            header += f";charset={self.encoding}"
+
+        if use_base64 or self.content_type.find(":base64"):
+            encoded_data = base64.b64encode(self.data).decode("ascii")
+            return f"{header};base64,{encoded_data}"
+        else:
+            encoded_data = quote_from_bytes(self.data)
+            return f"{header},{encoded_data}"
+
+    @field_serializer("data", when_used="json")
+    def serialize_data(self, data: bytes) -> str:
+        """When dumping model in json mode"""
+        if self.content_type.find("base64") != -1:
+            return base64.b64encode(data).decode("ascii")
+
+        return data.decode(encoding=self.encoding)
 
     def as_string(self) -> str:
         """Display the data as a string. Bytes are decoded using the `encoding` attribute
