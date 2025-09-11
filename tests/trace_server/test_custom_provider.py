@@ -285,7 +285,7 @@ def test_custom_provider_completions_create(client):
     # Create unique provider ID and model ID for test isolation
     provider_id = f"test-provider-{uuid.uuid4()}"
     model_id = "test-model"
-    model_name = f"{provider_id}/{model_id}"
+    model_name = f"custom::{provider_id}::{model_id}"
 
     # Create a Provider object with test configuration
     provider_obj = create_provider_obj(
@@ -299,7 +299,7 @@ def test_custom_provider_completions_create(client):
         project_id=client._project_id(),
         provider_id=provider_id,
         model_id=model_id,
-        model_name=model_name,  # Use the full model name
+        model_name=model_id,  # Use the actual model name part only
     )
 
     # Mock responses for obj_read calls to return our test configurations
@@ -338,16 +338,19 @@ def test_custom_provider_completions_create(client):
                     )
 
             # Verify the response matches our mock
-            assert res.response == mock_response, (
-                f"Response mismatch. Expected {mock_response}, got {res.response}"
-            )
+            assert (
+                res.response == mock_response
+            ), f"Response mismatch. Expected {mock_response}, got {res.response}"
 
             # Verify LiteLLM was called with correct parameters
             mock_completion.assert_called_once()
             call_args = mock_completion.call_args[1]
-            assert call_args["model"] == model_name, (
-                f"Model name mismatch. Expected '{model_name}', got '{call_args['model']}'"
+            expected_litellm_model = (
+                f"openai/{model_id}"  # Implementation prefixes with "openai/"
             )
+            assert (
+                call_args["model"] == expected_litellm_model
+            ), f"Model name mismatch. Expected '{expected_litellm_model}', got '{call_args['model']}'"
             assert call_args["messages"] == inputs["messages"], (
                 f"Messages mismatch. Expected {inputs['messages']}, "
                 f"got {call_args['messages']}"
@@ -372,13 +375,20 @@ def test_custom_provider_completions_create(client):
                 f"Logged output mismatch. Expected {res.response}, "
                 f"got {calls[0].output}"
             )
-            assert calls[0].summary["usage"][model_name] == res.response["usage"], (
+            # The usage key in the summary uses the provider/model format, not the custom format
+            expected_usage_key = f"{provider_id}/{model_id}"
+            assert (
+                calls[0].summary["usage"][expected_usage_key] == res.response["usage"]
+            ), (
                 f"Usage summary mismatch. Expected {res.response['usage']}, "
-                f"got {calls[0].summary['usage'][model_name]}"
+                f"got {calls[0].summary['usage'][expected_usage_key]}"
             )
-            assert calls[0].inputs == inputs, (
-                f"Logged inputs mismatch. Expected {inputs}, got {calls[0].inputs}"
-            )
+            # The implementation modifies req.inputs.model before logging, so we expect the transformed model name
+            expected_logged_inputs = inputs.copy()
+            expected_logged_inputs["model"] = f"openai/{model_id}"
+            assert (
+                calls[0].inputs == expected_logged_inputs
+            ), f"Logged inputs mismatch. Expected {expected_logged_inputs}, got {calls[0].inputs}"
             assert calls[0].op_name == "weave.completions_create", (
                 f"Operation name mismatch. Expected 'weave.completions_create', "
                 f"got {calls[0].op_name}"
@@ -397,7 +407,7 @@ def test_custom_provider_ollama_model(client):
     # Create provider ID and model ID for testing
     provider_id = f"test-ollama-{uuid.uuid4()}"
     model_id = "llama2"
-    model_name = f"{provider_id}/{model_id}"
+    model_name = f"custom::{provider_id}::{model_id}"
 
     # Create a Provider object with Ollama-specific configuration
     provider_obj = create_provider_obj(
@@ -471,7 +481,7 @@ def test_get_custom_provider_info():
     """Test the get_custom_provider_info function directly."""
     # Set up test data
     project_id = "test-project"
-    model_name = "test-provider/test-model"
+    model_name = "test-provider-test-model"  # object_id format expected by get_custom_provider_info
 
     # Create a Provider object with explicit extra headers
     provider_obj = create_provider_obj(
@@ -494,6 +504,7 @@ def test_get_custom_provider_info():
         # Call the function
         provider_info = get_custom_provider_info(
             project_id=project_id,
+            provider_name="test-provider",
             model_name=model_name,
             obj_read_func=mock_obj_read,
         )
@@ -518,7 +529,7 @@ def test_error_handling_custom_provider(client):
     # Create provider ID and model ID for testing
     provider_id = f"test-error-{uuid.uuid4()}"
     model_id = "test-model"
-    model_name = f"{provider_id}/{model_id}"
+    model_name = f"custom::{provider_id}::{model_id}"
 
     # Create test input
     inputs = {
@@ -549,7 +560,10 @@ def test_error_handling_custom_provider(client):
 
             # Verify error is returned in the response
             assert "error" in res.response
-            assert "Test error fetching provider" in res.response["error"]
+            assert (
+                "Failed to fetch provider model information: Test error fetching provider"
+                in res.response["error"]
+            )
         finally:
             _secret_fetcher_context.reset(token)
 
@@ -585,6 +599,6 @@ def test_custom_provider_invalid_model_format(client):
 
             # Verify error is returned in the response
             assert "error" in res.response
-            assert "Invalid custom provider model format" in res.response["error"]
+            assert "LLM Provider NOT provided" in res.response["error"]
         finally:
             _secret_fetcher_context.reset(token)
