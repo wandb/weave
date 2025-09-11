@@ -6,17 +6,14 @@ with content objects stored in bucket storage.
 
 import logging
 import re
-from typing import Any, Optional, TypeVar, Union
+from typing import Any, TypeVar, Union
 
 from weave.trace_server.trace_server_interface import (
     CallEndReq,
     CallStartReq,
     FileCreateReq,
-    ObjCreateReq,
-    ObjSchemaForInsert,
     TraceServerInterface,
 )
-from weave.trace_server.trace_server_interface_util import str_digest
 from weave.type_wrappers.Content.content import Content
 
 logger = logging.getLogger(__name__)
@@ -34,7 +31,7 @@ MAX_BASE64_SIZE = 100 * 1024 * 1024  # 100 MiB
 # Minimum size for standalone base64 (to avoid false positives)
 MIN_BASE64_SIZE = 100  # 100 bytes
 
-MIN_TEXT_SIZE = 50 * 1024 # 50 KiB
+MIN_TEXT_SIZE = 50 * 1024  # 50 KiB
 
 
 def is_base64(value: str) -> bool:
@@ -74,6 +71,7 @@ def is_data_uri(data_uri: str) -> bool:
     match = DATA_URI_PATTERN.match(data_uri)
     return bool(match)
 
+
 def store_content_object(
     content_obj: Content,
     project_id: str,
@@ -94,7 +92,9 @@ def store_content_object(
     import json
 
     content_data = content_obj.data
-    content_metadata = json.dumps(content_obj.model_dump(exclude={"data"})).encode("utf-8")
+    content_metadata = json.dumps(content_obj.model_dump(exclude={"data"})).encode(
+        "utf-8"
+    )
 
     # Create files in storage
     # 1. Store the actual content
@@ -158,7 +158,9 @@ def replace_base64_with_content_objects(
                         trace_server,
                     )
                 except Exception as e:
-                    logger.warning(f"Failed to create and store content from data URI with error {e}")
+                    logger.warning(
+                        f"Failed to create and store content from data URI with error {e}"
+                    )
 
             elif is_base64(val):
                 try:

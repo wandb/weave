@@ -1,4 +1,4 @@
-"""Tests for base64 content conversion functionality."""
+"""Tests for base64 content conversion functionality (updated for new API)."""
 
 import base64
 import json
@@ -7,71 +7,55 @@ from unittest.mock import MagicMock
 import pytest
 
 from weave.trace_server.base64_content_conversion import (
-    create_content_object,
-    extract_data_uri_content,
-    extract_standalone_base64,
-    is_valid_base64,
-    process_call_inputs_outputs,
+    is_base64,
+    is_data_uri,
+    process_call_req_to_content,
     replace_base64_with_content_objects,
+    store_content_object,
 )
-from weave.trace_server.trace_server_interface import FileCreateRes
+from weave.trace_server.trace_server_interface import (
+    CallEndReq,
+    CallStartReq,
+    EndedCallSchemaForInsert,
+    FileCreateRes,
+    StartedCallSchemaForInsert,
+)
+from weave.type_wrappers.Content.content import Content
 
 
-class TestBase64Detection:
-    """Test base64 detection functionality."""
+class TestBase64AndDataURIDetection:
+    """Test detection heuristics for base64 and data URIs."""
 
-    def test_is_valid_base64_valid(self):
-        """Test valid base64 strings are detected."""
+    def test_is_base64_valid(self):
+        """Valid base64 strings over the min length are detected."""
         valid_b64 = base64.b64encode(b"a" * 100).decode("ascii")
-        assert is_valid_base64(valid_b64)
+        assert is_base64(valid_b64)
 
-    def test_is_valid_base64_invalid(self):
-        """Test invalid base64 strings are rejected."""
-        assert not is_valid_base64("not base64")
-        assert not is_valid_base64("abc")  # Too short
-        assert not is_valid_base64("a" * 50)  # Too short
-        assert not is_valid_base64("abc@#$%")  # Invalid chars
+    def test_is_base64_invalid(self):
+        """Invalid base64 or too-short strings are rejected."""
+        assert not is_base64("not base64")
+        assert not is_base64("abc")  # Too short
+        assert not is_base64("a" * 50)  # Too short
+        assert not is_base64("abc@#$%")  # Invalid chars
 
-    def test_extract_data_uri_content(self):
-        """Test extraction from data URI format."""
+    def test_is_data_uri_valid(self):
+        """Valid base64 data URIs are detected."""
         test_data = b"Hello, World!"
         b64_data = base64.b64encode(test_data).decode("ascii")
         data_uri = f"data:text/plain;base64,{b64_data}"
+        assert is_data_uri(data_uri)
 
-        result = extract_data_uri_content(data_uri)
-        assert result is not None
-        content_type, decoded_bytes, original_schema = result
-        assert content_type == "text/plain"
-        assert decoded_bytes == test_data
-        assert "text/plain" in original_schema
-
-    def test_extract_data_uri_content_invalid(self):
-        """Test invalid data URIs are rejected."""
-        assert extract_data_uri_content("not a data uri") is None
-        assert extract_data_uri_content("data:text/plain,not base64") is None
-
-    def test_extract_standalone_base64(self):
-        """Test extraction of standalone base64 strings."""
-        test_data = b"a" * 100
-        b64_data = base64.b64encode(test_data).decode("ascii")
-
-        result = extract_standalone_base64(b64_data)
-        assert result is not None
-        decoded_bytes, original_schema = result
-        assert decoded_bytes == test_data
-        assert original_schema == "{base64_content}"
-
-    def test_extract_standalone_base64_invalid(self):
-        """Test invalid standalone base64 is rejected."""
-        assert extract_standalone_base64("not base64") is None
-        assert extract_standalone_base64("short") is None
+    def test_is_data_uri_invalid(self):
+        """Invalid data URIs are rejected."""
+        assert not is_data_uri("not a data uri")
+        assert not is_data_uri("data:text/plain,not base64")
 
 
-class TestContentObjectCreation:
-    """Test Content object creation."""
+class TestContentObjectStorage:
+    """Test Content object storage and structure."""
 
-    def test_create_content_object(self):
-        """Test creating a Content object from bytes."""
+    def test_store_content_object(self):
+        """Test storing a Content object persists content and metadata files."""
         # Mock trace server
         trace_server = MagicMock()
         trace_server.file_create = MagicMock(
@@ -82,10 +66,10 @@ class TestContentObjectCreation:
         )
 
         test_data = b"Test content"
-        mimetype = "text/plain"
         project_id = "test_project"
 
-        result = create_content_object(test_data, mimetype, project_id, trace_server)
+        content_obj = Content.from_bytes(test_data)
+        result = store_content_object(content_obj, project_id, trace_server)
 
         # Verify structure
         assert result["_type"] == "CustomWeaveType"
@@ -96,13 +80,6 @@ class TestContentObjectCreation:
         assert "files" in result
         assert result["files"]["content"] == "content_digest"
         assert result["files"]["metadata.json"] == "metadata_digest"
-        # Load op should be present for consistency
-        assert "load_op" in result
-        assert "weave-trace-internal:///" in result["load_op"]
-
-        # Verify the exact load_op format
-        expected_load_op = "weave-trace-internal:///UHJvamVjdEludGVybmFsSWQ6dGVzdF9wcm9qZWN0/op/load_weave.type_wrappers.Content.content.Content:pHK80K8ec7lRHbNwjR2LjWQXRxAV8n5BmkixcTamz2k"
-        assert result["load_op"] == expected_load_op
 
         # Verify file_create was called
         assert trace_server.file_create.call_count == 2
@@ -119,8 +96,10 @@ class TestContentObjectCreation:
         assert metadata_call.project_id == project_id
         assert metadata_call.name == "metadata.json"
         metadata = json.loads(metadata_call.content)
-        assert metadata["mimetype"] == mimetype
-        assert metadata["size"] == len(test_data)
+        # Ensure key metadata fields are present and correct
+        assert metadata["mimetype"] == content_obj.mimetype
+        assert metadata["size"] == content_obj.size
+        assert metadata["filename"] == content_obj.filename
 
 
 class TestBase64Replacement:
@@ -148,7 +127,7 @@ class TestBase64Replacement:
             "nested": {"field3": f"data:image/png;base64,{b64_data}"},
         }
 
-        result, refs = replace_base64_with_content_objects(
+        result = replace_base64_with_content_objects(
             input_data, "test_project", trace_server
         )
 
@@ -158,13 +137,15 @@ class TestBase64Replacement:
         # Check standalone base64 was replaced
         assert isinstance(result["field2"], dict)
         assert result["field2"]["_type"] == "CustomWeaveType"
+        assert set(result["field2"]["files"].keys()) == {"content", "metadata.json"}
 
         # Check data URI was replaced
         assert isinstance(result["nested"]["field3"], dict)
         assert result["nested"]["field3"]["_type"] == "CustomWeaveType"
-
-        # Check refs were collected (load_op refs)
-        assert len(refs) == 2  # One for each base64 replacement
+        assert set(result["nested"]["field3"]["files"].keys()) == {
+            "content",
+            "metadata.json",
+        }
 
     def test_replace_base64_in_list(self):
         """Test replacing base64 in list structures."""
@@ -188,7 +169,7 @@ class TestBase64Replacement:
             {"nested": f"data:text/plain;base64,{b64_data}"},
         ]
 
-        result, refs = replace_base64_with_content_objects(
+        result = replace_base64_with_content_objects(
             input_data, "test_project", trace_server
         )
 
@@ -200,37 +181,60 @@ class TestBase64Replacement:
         assert isinstance(result[2]["nested"], dict)
         assert result[2]["nested"]["_type"] == "CustomWeaveType"
 
-        # Check refs were collected
-        assert len(refs) == 2  # One for each base64 replacement
-
-    def test_process_call_inputs_outputs(self):
-        """Test the main entry point for processing call data."""
+    def test_process_call_req_to_content_start_and_end(self):
+        """Test the main entry point for processing CallStartReq and CallEndReq."""
         # Mock trace server
         trace_server = MagicMock()
+        # Two files for start (content + metadata), two for end
         trace_server.file_create = MagicMock(
             side_effect=[
-                FileCreateRes(digest="content_digest"),
-                FileCreateRes(digest="metadata_digest"),
+                FileCreateRes(digest="content_digest_start"),
+                FileCreateRes(digest="metadata_digest_start"),
+                FileCreateRes(digest="content_digest_end"),
+                FileCreateRes(digest="metadata_digest_end"),
             ]
         )
 
         test_data = b"Test image data"
         b64_data = base64.b64encode(test_data).decode("ascii")
 
-        input_data = {
-            "image": f"data:image/png;base64,{b64_data}",
-            "text": "Some normal text",
-        }
-
-        result, refs = process_call_inputs_outputs(
-            input_data, "test_project", trace_server
+        # Start request with data URI in inputs
+        start_req = CallStartReq(
+            start=StartedCallSchemaForInsert(
+                project_id="proj",
+                op_name="op",
+                started_at=__import__("datetime").datetime.utcnow(),
+                attributes={},
+                inputs={
+                    "image": f"data:image/png;base64,{b64_data}",
+                    "text": "Some normal text",
+                },
+            )
         )
 
-        # Verify processing
-        assert result["text"] == "Some normal text"
-        assert isinstance(result["image"], dict)
-        assert result["image"]["_type"] == "CustomWeaveType"
-        assert len(refs) == 1  # One load_op ref
+        processed_start = process_call_req_to_content(start_req, trace_server)
+        assert processed_start.start.inputs["text"] == "Some normal text"
+        assert isinstance(processed_start.start.inputs["image"], dict)
+        assert (
+            processed_start.start.inputs["image"]["_type"] == "CustomWeaveType"
+        )
+
+        # End request with standalone base64 in output (ensure length >= min threshold)
+        long_bytes = b"b" * 100
+        long_b64 = base64.b64encode(long_bytes).decode("ascii")
+        end_req = CallEndReq(
+            end=EndedCallSchemaForInsert(
+                project_id="proj",
+                id="call-id",
+                ended_at=__import__("datetime").datetime.utcnow(),
+                summary={"usage": {}, "status_counts": {}},
+                output=long_b64,
+            )
+        )
+
+        processed_end = process_call_req_to_content(end_req, trace_server)
+        assert isinstance(processed_end.end.output, dict)
+        assert processed_end.end.output["_type"] == "CustomWeaveType"
 
 
 if __name__ == "__main__":
