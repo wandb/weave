@@ -420,11 +420,6 @@ class CallsQueryReq(BaseModelStrict):
         description="Beta, subject to change. If true, the response will"
         " include the total storage size for a trace.",
     )
-    convert_content: Optional[bool] = Field(
-        default=False,
-        description="Beta, subject to change. If true, the response will"
-        " turn any object auto-converted to Content back to it's original value.",
-    )
 
     # TODO: type this with call schema columns, following the same rules as
     # SortBy and thus GetFieldOperator.get_field_ (without direction)
