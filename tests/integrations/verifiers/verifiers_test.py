@@ -11,6 +11,7 @@ from weave.integrations.integration_utilities import (
     filter_body,
     flatten_calls,
     flattened_calls_to_names,
+    op_name_from_ref,
 )
 from weave.integrations.verifiers.verifiers import get_verifiers_patcher
 from weave.trace.weave_client import WeaveClient
@@ -130,3 +131,7 @@ def test_verifiers_environment_evaluate(client: WeaveClient) -> None:
         ("verifiers.ThinkParser.parse", 0),
         ("verifiers.ThinkParser.format_reward", 0),
     ]
+
+    call_0, _ = flattened[0]
+    assert op_name_from_ref(call_0.op_name) == "verifiers.Environment.evaluate"
+    assert call_0.started_at < call_0.ended_at
