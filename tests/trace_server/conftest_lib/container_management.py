@@ -1,7 +1,7 @@
 import time
 import urllib
 
-import httpx
+import requests
 
 
 def check_server_up(host, port, num_retries=30) -> bool:
@@ -28,11 +28,11 @@ def _check_server_health(
 ) -> bool:
     for _ in range(num_retries):
         try:
-            response = httpx.get(urllib.parse.urljoin(base_url, endpoint))
+            response = requests.get(urllib.parse.urljoin(base_url, endpoint))
             if response.status_code == 200:
                 return True
             time.sleep(sleep_time)
-        except httpx.ConnectError:
+        except requests.exceptions.ConnectionError:
             time.sleep(sleep_time)
 
     print(
