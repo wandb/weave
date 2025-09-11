@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import json
 import logging
 import os
 import subprocess
@@ -16,9 +17,18 @@ from typing_extensions import Self, TypeVar
 
 from weave.trace.refs import Ref
 from weave.trace.serialization.mem_artifact import MemTraceFilesArtifact
-
-from .content_types import ContentType, ResolvedContentArgs, ValidContentInputs
-from .utils import match_data_url, try_parse_data_url
+from weave.type_wrappers.Content.content_types import (
+    ContentType,
+    ResolvedContentArgs,
+    ValidContentInputs,
+)
+from weave.type_wrappers.Content.utils import (
+    default_filename,
+    full_name,
+    get_mime_and_extension,
+    match_data_url,
+    try_parse_data_url,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -111,9 +121,7 @@ class Content(BaseModel, Generic[T]):
                 if isinstance(data, str):
                     # Check if it was base64 encoded during serialization
                     content_type = obj.get("content_type", "")
-                    print(content_type)
                     if "base64" in content_type:
-                        print("true")
                         # Decode from base64
                         obj["data"] = base64.b64decode(data)
                     else:
@@ -137,12 +145,10 @@ class Content(BaseModel, Generic[T]):
         context: dict[str, Any] | None = None,
     ) -> Self:
         """Override model_validate_json to handle Content reconstruction from JSON."""
-        import json as json_module
-
         # Parse the JSON
         if isinstance(json_data, (bytes, bytearray)):
             json_data = json_data.decode("utf-8")
-        obj = json_module.loads(json_data)
+        obj = json.loads(json_data)
 
         # Use our custom model_validate
         return cls.model_validate(obj, strict=strict, context=context)
@@ -158,7 +164,11 @@ class Content(BaseModel, Generic[T]):
         encoding: str = "utf-8",
     ) -> Self:
         """Initializes Content from raw bytes."""
-        from .utils import default_filename, full_name, get_mime_and_extension
+        from weave.type_wrappers.Content.utils import (
+            default_filename,
+            full_name,
+            get_mime_and_extension,
+        )
 
         if len(data) == 0:
             logger.warning("Content.from_bytes received empty data")
@@ -202,8 +212,6 @@ class Content(BaseModel, Generic[T]):
         encoding: str = "utf-8",
     ) -> Self:
         """Initializes Content from a string of text."""
-        from .utils import default_filename, full_name, get_mime_and_extension
-
         if len(text) == 0:
             logger.warning("Content.from_text received empty text")
 
@@ -253,8 +261,6 @@ class Content(BaseModel, Generic[T]):
         metadata: dict[str, Any] | None = None,
     ) -> Self:
         """Initializes Content from a base64 encoded string or bytes."""
-        from .utils import default_filename, full_name, get_mime_and_extension
-
         if len(b64_data) == 0:
             logger.warning("Content.from_base64 received empty input")
 
