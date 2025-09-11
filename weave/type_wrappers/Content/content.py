@@ -5,12 +5,13 @@ import hashlib
 import json
 import logging
 import os
+import re
 import subprocess
 import sys
 import uuid
 from pathlib import Path
 from typing import Annotated, Any, Generic
-from urllib.parse import quote_from_bytes
+from urllib.parse import quote_from_bytes, urlparse
 
 from pydantic import BaseModel, Field, PrivateAttr, field_serializer
 from typing_extensions import Self, TypeVar
@@ -26,7 +27,6 @@ from weave.type_wrappers.Content.utils import (
     default_filename,
     full_name,
     get_mime_and_extension,
-    is_valid_b64,
     is_valid_path,
     match_data_url,
     try_parse_data_url,
@@ -47,6 +47,7 @@ class Content(BaseModel, Generic[T]):
     - from_path()
     - from_bytes()
     - from_text()
+    - from_url()
     - from_base64()
     - from_data_url()
     """
@@ -166,6 +167,12 @@ class Content(BaseModel, Generic[T]):
         encoding: str = "utf-8",
     ) -> Self:
         """Initializes Content from raw bytes."""
+        from weave.type_wrappers.Content.utils import (
+            default_filename,
+            full_name,
+            get_mime_and_extension,
+        )
+
         if len(data) == 0:
             logger.warning("Content.from_bytes received empty data")
 
@@ -354,6 +361,8 @@ class Content(BaseModel, Generic[T]):
         cls: type[Self], url: str, /, metadata: dict[str, Any] | None = None
     ) -> Self:
         """Initializes Content from a data URL."""
+        from .utils import default_filename, full_name, get_mime_and_extension
+
         parsed = try_parse_data_url(url)
         if not parsed:
             raise ValueError("Invalid data URL provided.")
@@ -393,6 +402,82 @@ class Content(BaseModel, Generic[T]):
         return cls.model_construct(**resolved_args)
 
     @classmethod
+    def from_url(
+        cls: type[Self],
+        url: str,
+        /,
+        headers: dict[str, Any] | None = None,
+        timeout: int | None = 30,
+        metadata: dict[str, Any] | None = None,
+    ) -> Self:
+        """Initializes Content by fetching bytes from an HTTP(S) URL.
+
+        Downloads the content, infers mimetype/extension from headers, URL path,
+        and data, and constructs a Content object from the resulting bytes.
+        """
+        # Use our shared HTTP session with logging adapter
+        # Local import to prevent importing requests unless necessary
+        from weave.utils import http_requests as http_requests
+
+        resp = http_requests.get(url, headers=headers, timeout=timeout)
+        resp.raise_for_status()
+
+        data = resp.content or b""
+        digest = hashlib.sha256(data).hexdigest()
+        size = len(data)
+
+        # Try to get mimetype from header (strip any charset)
+        header_ct = resp.headers.get("Content-Type", "")
+        mimetype_from_header = header_ct.split(";")[0].strip() if header_ct else None
+
+        # Try to get filename from Content-Disposition or URL path
+        filename_from_header = None
+        cd = resp.headers.get("Content-Disposition", "")
+        if "filename=" in cd:
+            # naive extraction; handles filename="..." or filename=...
+            match = re.search(
+                r"filename\*=.*?''([^;\r\n]+)|filename=\"?([^;\r\n\"]+)\"?", cd
+            )
+            if match:
+                filename_from_header = match.group(1) or match.group(2)
+
+        parsed_url = urlparse(url)
+        url_basename = Path(parsed_url.path).name if parsed_url.path else None
+        filename_hint = filename_from_header or url_basename
+
+        mimetype, extension = get_mime_and_extension(
+            mimetype=mimetype_from_header,
+            extension=Path(filename_hint).suffix if filename_hint else None,
+            filename=filename_hint,
+            buffer=data,
+        )
+
+        filename = (
+            filename_hint
+            if filename_hint
+            else default_filename(extension, mimetype, digest)
+        )
+
+        resolved_args: ResolvedContentArgs = {
+            "id": uuid.uuid4().hex,
+            "data": data,
+            "size": size,
+            "mimetype": mimetype,
+            "digest": digest,
+            "filename": filename,
+            "content_type": "bytes",
+            "input_type": full_name(url),
+            "extension": extension,
+            # Use requests-detected encoding if present, else utf-8
+            "encoding": resp.encoding or "utf-8",
+        }
+
+        if metadata:
+            resolved_args["metadata"] = metadata
+
+        return cls.model_construct(**resolved_args)
+
+    @classmethod
     def _from_guess(
         cls: type[Self],
         input: ValidContentInputs,
@@ -400,6 +485,8 @@ class Content(BaseModel, Generic[T]):
         extension: str | None = None,
         mimetype: str | None = None,
     ) -> Self:
+        from .utils import is_valid_b64, is_valid_path
+
         # First check if it is a path, we only check validity for str scenario
         # because we have dedicated error message for invalid path
         if isinstance(input, Path) or (isinstance(input, str) and is_valid_path(input)):
@@ -413,6 +500,9 @@ class Content(BaseModel, Generic[T]):
         elif isinstance(input, str):
             if match_data_url(input):
                 return cls.from_data_url(input)
+            # Match http or https URLs
+            if re.match(r"^https?://", input):
+                return cls.from_url(input)
 
             return cls.from_text(input, mimetype=mimetype, extension=extension)
 
