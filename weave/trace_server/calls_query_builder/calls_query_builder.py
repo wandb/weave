@@ -839,7 +839,7 @@ class CallsQuery(BaseModel):
             pb,
             table_alias,
         )
-        wb_run_id_sql = process_wb_run_id_filter_to_sql(
+        wb_run_id_sql = process_wb_run_ids_filter_to_sql(
             self.hardcoded_filter,
             pb,
             table_alias,
@@ -1532,7 +1532,7 @@ def process_object_refs_filter_to_opt_sql(
     return refs_filter_opt_sql
 
 
-def process_wb_run_id_filter_to_sql(
+def process_wb_run_ids_filter_to_sql(
     hardcoded_filter: Optional[HardCodedFilter],
     param_builder: ParamBuilder,
     table_alias: str,
@@ -1608,6 +1608,11 @@ def process_calls_filter_to_conditions(
     if filter.wb_user_ids:
         conditions.append(
             f"{get_field_by_name('wb_user_id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.wb_user_ids), 'Array(String)')}"
+        )
+
+    if filter.wb_run_ids:
+        conditions.append(
+            f"{get_field_by_name('wb_run_id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.wb_run_ids), 'Array(String)')}"
         )
 
     return conditions
