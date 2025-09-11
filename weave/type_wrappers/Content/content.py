@@ -5,10 +5,10 @@ import hashlib
 import json
 import logging
 import os
+import re
 import subprocess
 import sys
 import uuid
-import re
 from pathlib import Path
 from typing import Annotated, Any, Generic
 from urllib.parse import quote_from_bytes, urlparse
@@ -402,7 +402,12 @@ class Content(BaseModel, Generic[T]):
 
     @classmethod
     def from_url(
-            cls: type[Self], url: str, /, headers: dict[str, Any] | None = None, timeout: int | None = 30, metadata: dict[str, Any] | None = None
+        cls: type[Self],
+        url: str,
+        /,
+        headers: dict[str, Any] | None = None,
+        timeout: int | None = 30,
+        metadata: dict[str, Any] | None = None,
     ) -> Self:
         """Initializes Content by fetching bytes from an HTTP(S) URL.
 
@@ -412,6 +417,7 @@ class Content(BaseModel, Generic[T]):
         # Local import to avoid importing requests unless needed and to use our
         # logging adapter + shared session.
         import requests
+
         resp = requests.get(url, headers=headers, timeout=timeout)
         resp.raise_for_status()
 
@@ -428,7 +434,9 @@ class Content(BaseModel, Generic[T]):
         cd = resp.headers.get("Content-Disposition", "")
         if "filename=" in cd:
             # naive extraction; handles filename="..." or filename=...
-            match = re.search(r"filename\*=.*?''([^;\r\n]+)|filename=\"?([^;\r\n\"]+)\"?", cd)
+            match = re.search(
+                r"filename\*=.*?''([^;\r\n]+)|filename=\"?([^;\r\n\"]+)\"?", cd
+            )
             if match:
                 filename_from_header = match.group(1) or match.group(2)
 
@@ -444,7 +452,9 @@ class Content(BaseModel, Generic[T]):
         )
 
         filename = (
-            filename_hint if filename_hint else default_filename(extension, mimetype, digest)
+            filename_hint
+            if filename_hint
+            else default_filename(extension, mimetype, digest)
         )
 
         resolved_args: ResolvedContentArgs = {

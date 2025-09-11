@@ -1,6 +1,7 @@
 import base64
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 from util import generate_media
@@ -11,7 +12,11 @@ from weave.trace.table import Table
 from weave.trace.weave_client import WeaveClient
 from weave.type_wrappers.Content.content import Content
 from weave.utils import http_requests as _http_requests
-from unittest.mock import patch
+
+
+class _FakeHTTPError(Exception):
+    """Custom exception used by FakeResponse.raise_for_status in tests."""
+    pass
 
 
 @pytest.fixture(scope="session")
@@ -538,7 +543,7 @@ That's all for now. Have a great day! ☀️
 
             def raise_for_status(self):
                 if self.status_code >= 400:
-                    raise Exception("HTTP error")
+                    raise _FakeHTTPError("HTTP error")
 
         url = "https://example.com/path/to/test.txt"
         with patch.object(_http_requests, "get", return_value=FakeResponse()):
@@ -566,7 +571,7 @@ That's all for now. Have a great day! ☀️
 
             def raise_for_status(self):
                 if self.status_code >= 400:
-                    raise Exception("HTTP error")
+                    raise _FakeHTTPError("HTTP error")
 
         url = "http://example.com/download"
         with patch.object(_http_requests, "get", return_value=FakeResponse()):
