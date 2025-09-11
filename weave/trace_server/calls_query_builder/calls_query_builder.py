@@ -1552,7 +1552,7 @@ def process_wb_run_id_filter_to_sql(
     )
     wb_run_id_filter_sql = f"{wb_run_id_field_sql} IN {param_slot(param_builder.add_param(wb_run_ids), 'Array(String)')}"
 
-    return f"AND ({wb_run_id_filter_sql})"
+    return f"AND ({wb_run_id_filter_sql} OR {wb_run_id_field_sql} IS NULL)"
 
 
 def process_calls_filter_to_conditions(
@@ -1608,11 +1608,6 @@ def process_calls_filter_to_conditions(
     if filter.wb_user_ids:
         conditions.append(
             f"{get_field_by_name('wb_user_id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.wb_user_ids), 'Array(String)')}"
-        )
-
-    if filter.wb_run_ids:
-        conditions.append(
-            f"{get_field_by_name('wb_run_id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.wb_run_ids), 'Array(String)')}"
         )
 
     return conditions
