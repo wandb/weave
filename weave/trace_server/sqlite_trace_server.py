@@ -92,6 +92,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         cursor.execute("DROP TABLE IF EXISTS objects")
         cursor.execute("DROP TABLE IF EXISTS tables")
         cursor.execute("DROP TABLE IF EXISTS table_rows")
+        cursor.execute("DROP TABLE IF EXISTS alert_metrics")
 
     def setup_tables(self) -> None:
         conn, cursor = get_conn_cursor(self.db_path)
@@ -171,6 +172,19 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             """
         )
         cursor.execute(TABLE_FEEDBACK.create_sql())
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS alert_metrics (
+                project_id TEXT,
+                id TEXT PRIMARY KEY,
+                call_id TEXT,
+                alert_ids TEXT,  -- JSON array of alert ids
+                created_at TEXT,
+                metric_key TEXT,
+                metric_value REAL
+            )
+            """
+        )
 
     def call_start_batch(self, req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
         res = []
@@ -1577,6 +1591,130 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         self, req: tsi.EvaluationStatusReq
     ) -> tsi.EvaluationStatusRes:
         return evaluation_status(self, req)
+
+    def alert_metrics_create(
+        self, req: tsi.AlertMetricsCreateReq
+    ) -> tsi.AlertMetricsCreateRes:
+        """Create multiple alert metric entries in batch.
+
+        Args:
+            req: Request containing batch of metric details.
+
+        Returns:
+            Response containing the created metric IDs.
+        """
+        conn, cursor = get_conn_cursor(self.db_path)
+        metric_ids = []
+        rows_to_insert = []
+
+        for metric in req.metrics:
+            metric_id = generate_id()
+            metric_ids.append(metric_id)
+            rows_to_insert.append(
+                (
+                    req.project_id,
+                    metric_id,
+                    metric.call_id,
+                    json.dumps(metric.alert_ids),  # Store as JSON string
+                    metric.created_at.isoformat(),
+                    metric.metric_key,
+                    metric.metric_value,
+                )
+            )
+
+        if rows_to_insert:
+            with self.lock:
+                cursor.executemany(
+                    """INSERT INTO alert_metrics (
+                        project_id,
+                        id,
+                        call_id,
+                        alert_ids,
+                        created_at,
+                        metric_key,
+                        metric_value
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                    rows_to_insert,
+                )
+                conn.commit()
+
+        return tsi.AlertMetricsCreateRes(ids=metric_ids)
+
+    def alert_metrics_query(
+        self, req: tsi.AlertMetricsQueryReq
+    ) -> tsi.AlertMetricsQueryRes:
+        """Query alert metrics with optional filters.
+
+        Args:
+            req: Request containing query filters.
+
+        Returns:
+            Response containing list of matching metrics.
+        """
+        conn, cursor = get_conn_cursor(self.db_path)
+
+        # Build query conditions
+        conditions = ["project_id = ?"]
+        parameters = [req.project_id]
+
+        if req.metric_keys:
+            placeholders = ",".join(["?" for _ in req.metric_keys])
+            conditions.append(f"metric_key IN ({placeholders})")
+            parameters.extend(req.metric_keys)
+
+        if req.alert_ids:
+            # For SQLite, we need to check if any alert_id is in the JSON array
+            # We'll use a subquery or multiple OR conditions
+            alert_conditions = []
+            for alert_id in req.alert_ids:
+                alert_conditions.append("json_extract(alert_ids, '$') LIKE ?")
+                parameters.append(f'%"{alert_id}"%')
+            if alert_conditions:
+                conditions.append(f"({' OR '.join(alert_conditions)})")
+
+        if req.start_time:
+            conditions.append("datetime(created_at) >= datetime(?)")
+            parameters.append(req.start_time.isoformat())
+
+        if req.end_time:
+            conditions.append("datetime(created_at) <= datetime(?)")
+            parameters.append(req.end_time.isoformat())
+
+        # Build the query
+        query = f"""
+            SELECT id, project_id, alert_ids, created_at, metric_key, metric_value
+            FROM alert_metrics
+            WHERE {" AND ".join(conditions)}
+            ORDER BY created_at DESC
+        """
+
+        # Add pagination
+        if req.limit:
+            query += f" LIMIT {req.limit}"
+        if req.offset:
+            if req.limit is None:
+                query += " LIMIT -1"
+            query += f" OFFSET {req.offset}"
+
+        # Execute query
+        cursor.execute(query, parameters)
+        query_result = cursor.fetchall()
+
+        # Parse results
+        metrics = []
+        for row in query_result:
+            metrics.append(
+                tsi.AlertMetricSchema(
+                    id=row[0],
+                    project_id=row[1],
+                    alert_ids=json.loads(row[2]),  # Parse JSON string back to list
+                    created_at=datetime.datetime.fromisoformat(row[3]),
+                    metric_key=row[4],
+                    metric_value=row[5],
+                )
+            )
+
+        return tsi.AlertMetricsQueryRes(metrics=metrics)
 
     def _table_row_read(self, project_id: str, row_digest: str) -> tsi.TableRowSchema:
         conn, cursor = get_conn_cursor(self.db_path)

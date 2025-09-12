@@ -2063,6 +2063,107 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     ) -> tsi.EvaluationStatusRes:
         return evaluation_status(self, req)
 
+    # Alert API
+    def alert_metrics_create(
+        self, req: tsi.AlertMetricsCreateReq
+    ) -> tsi.AlertMetricsCreateRes:
+        """Create multiple alert metric entries in batch."""
+        metric_ids = []
+        data_to_insert = []
+
+        for metric in req.metrics:
+            metric_id = generate_id()
+            metric_ids.append(metric_id)
+            data_to_insert.append(
+                (
+                    req.project_id,
+                    metric_id,
+                    metric.alert_ids,
+                    metric.created_at,
+                    metric.metric_key,
+                    metric.metric_value,
+                    metric.call_id,
+                )
+            )
+
+        if data_to_insert:
+            self._insert(
+                "alert_metrics",
+                data=data_to_insert,
+                column_names=[
+                    "project_id",
+                    "id",
+                    "alert_ids",
+                    "created_at",
+                    "metric_key",
+                    "metric_value",
+                    "call_id",
+                ],
+            )
+
+        return tsi.AlertMetricsCreateRes(ids=metric_ids)
+
+    def alert_metrics_query(
+        self, req: tsi.AlertMetricsQueryReq
+    ) -> tsi.AlertMetricsQueryRes:
+        """Query alert metrics with optional filters."""
+        pb = ParamBuilder()
+
+        conditions = [f"project_id = {{{pb.add_param(req.project_id)}: String}}"]
+
+        if req.metric_keys:
+            conditions.append(
+                f"metric_key IN {{{pb.add_param(req.metric_keys)}: Array(String)}}"
+            )
+
+        if req.alert_ids:
+            conditions.append(
+                f"hasAny(alert_ids, {{{pb.add_param(req.alert_ids)}: Array(String)}})"
+            )
+
+        if req.start_time:
+            conditions.append(
+                f"created_at >= {{{pb.add_param(req.start_time.timestamp())}: Float64}}"
+            )
+
+        if req.end_time:
+            conditions.append(
+                f"created_at <= {{{pb.add_param(req.end_time.timestamp())}: Float64}}"
+            )
+
+        # TODO: break out into query builder
+        # TODO: add streaming
+        # TODO: add pagination + sort
+
+        query = f"""
+        SELECT id, project_id, alert_ids, created_at, metric_key, metric_value
+        FROM alert_metrics
+        WHERE {" AND ".join(conditions)}
+        ORDER BY created_at_inv ASC
+        """
+
+        if req.limit:
+            query += f" LIMIT {{{pb.add_param(req.limit)}: Int64}}"
+        if req.offset:
+            query += f" OFFSET {{{pb.add_param(req.offset)}: Int64}}"
+
+        result = self._query(query, pb.get_params())
+
+        metrics = []
+        for row in result.result_rows:
+            metrics.append(
+                tsi.AlertMetricSchema(
+                    id=row[0],
+                    project_id=row[1],
+                    alert_ids=row[2],
+                    created_at=_ensure_datetimes_have_tz_strict(row[3]),
+                    metric_key=row[4],
+                    metric_value=row[5],
+                )
+            )
+
+        return tsi.AlertMetricsQueryRes(metrics=metrics)
+
     # Private Methods
     @property
     def ch_client(self) -> CHClient:

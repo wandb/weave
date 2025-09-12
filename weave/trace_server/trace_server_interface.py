@@ -1218,6 +1218,53 @@ class EvaluationStatusRes(BaseModel):
     ]
 
 
+class AlertMetricItem(BaseModel):
+    """Individual metric item for batch creation."""
+
+    alert_ids: list[str]
+    metric_key: str
+    metric_value: float
+    call_id: str
+    created_at: datetime.datetime
+
+
+class AlertMetricsCreateReq(BaseModelStrict):
+    """Request to create multiple alert metrics in batch."""
+
+    project_id: str
+    metrics: list[AlertMetricItem]
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class AlertMetricsCreateRes(BaseModel):
+    """Response containing IDs of created metrics."""
+
+    ids: list[str]
+
+
+class AlertMetricsQueryReq(BaseModelStrict):
+    project_id: str
+    metric_keys: Optional[list[str]] = None
+    alert_ids: Optional[list[str]] = None
+    start_time: Optional[datetime.datetime] = None
+    end_time: Optional[datetime.datetime] = None
+    limit: Optional[int] = None
+    offset: Optional[int] = None
+
+
+class AlertMetricSchema(BaseModel):
+    id: str
+    project_id: str
+    alert_ids: list[str]
+    created_at: datetime.datetime
+    metric_key: str
+    metric_value: float
+
+
+class AlertMetricsQueryRes(BaseModel):
+    metrics: list[AlertMetricSchema]
+
+
 class TraceServerInterface(Protocol):
     def ensure_project_exists(
         self, entity: str, project: str
@@ -1311,3 +1358,12 @@ class TraceServerInterface(Protocol):
     # Evaluation API
     def evaluate_model(self, req: EvaluateModelReq) -> EvaluateModelRes: ...
     def evaluation_status(self, req: EvaluationStatusReq) -> EvaluationStatusRes: ...
+
+    # Alert API
+    def alert_metrics_create(
+        self, req: AlertMetricsCreateReq
+    ) -> AlertMetricsCreateRes: ...
+
+    def alert_metrics_query(
+        self, req: AlertMetricsQueryReq
+    ) -> AlertMetricsQueryRes: ...
