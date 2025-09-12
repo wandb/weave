@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS alert_metrics_history (
 )
 ENGINE = AggregatingMergeTree
 ORDER BY (project_id, metric_key, bucket_start)
-TTL bucket_start + INTERVAL 3 MONTH;
+TTL toDateTime(bucket_start) + INTERVAL 3 MONTH;
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS alert_metrics_history_view
 TO alert_metrics_history AS
