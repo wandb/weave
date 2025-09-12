@@ -22,32 +22,32 @@ mcp = FastMCP("Demo")
 # Add an addition tool
 @mcp.tool()
 def add(a: int, b: int) -> int:
-    """Add two numbers"""
+    """Add two numbers."""
     return a + b
 
 
 # Add a dynamic greeting resource
 @mcp.resource("greeting://{name}")
 def get_greeting(name: str) -> str:
-    """Get a personalized greeting"""
+    """Get a personalized greeting."""
     return f"Hello, {name}!"
 
 
 @mcp.resource("config://app")
 def get_config() -> str:
-    """Static configuration data"""
+    """Static configuration data."""
     return "App configuration here"
 
 
 @mcp.resource("users://{user_id}/profile")
 def get_user_profile(user_id: str) -> str:
-    """Dynamic user data"""
+    """Dynamic user data."""
     return f"Profile data for user {user_id}"
 
 
 @mcp.tool()
 def calculate_bmi(weight_kg: float, height_m: float) -> float:
-    """Calculate BMI given weight in kg and height in meters"""
+    """Calculate BMI given weight in kg and height in meters."""
     return weight_kg / (height_m**2)
 
 
@@ -57,7 +57,7 @@ class StationNameResponse(BaseModel):
 
 @mcp.tool()
 async def fetch_weather(city: str) -> str:
-    """Fetch current weather for a city"""
+    """Fetch current weather for a city."""
     async with httpx.AsyncClient() as client:
         response = await client.get("https://api.weather.gov/stations")
         get_stations = response.json()
@@ -118,7 +118,7 @@ def debug_error(error: str) -> list[base.Message]:
 
 @mcp.tool()
 def create_thumbnail() -> Image:
-    """Create a thumbnail from an image"""
+    """Create a thumbnail from an image."""
     img = PILImage.open("docs/docs/media/codegen/eval_trace.png")
     img.thumbnail((100, 100))
     return Image(data=img.tobytes(), format="png")

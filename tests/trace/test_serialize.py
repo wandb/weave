@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 import openai
 from pydantic import BaseModel
 
@@ -36,13 +38,10 @@ def test_dictify_simple() -> None:
 
 
 def test_dictify_complex() -> None:
+    @dataclass
     class Point:
         x: int
         y: int
-
-        def __init__(self, x: int, y: int) -> None:
-            self.x = x
-            self.y = y
 
     class Points:
         def __init__(self) -> None:
@@ -164,11 +163,9 @@ def test_fallback_encode_dictify_fails() -> None:
 
 
 def test_dictify_sanitizes() -> None:
+    @dataclass
     class MyClass:
         api_key: str
-
-        def __init__(self, secret: str) -> None:
-            self.api_key = secret
 
     instance = MyClass("sk-1234567890qwertyuiop")
     assert dictify(instance) == {
@@ -182,17 +179,13 @@ def test_dictify_sanitizes() -> None:
 
 
 def test_dictify_sanitizes_nested() -> None:
+    @dataclass
     class MyClassA:
         api_key: str
 
-        def __init__(self, secret: str) -> None:
-            self.api_key = secret
-
+    @dataclass
     class MyClassB:
         a: MyClassA
-
-        def __init__(self, a: MyClassA) -> None:
-            self.a = a
 
     instance = MyClassB(MyClassA("sk-1234567890qwertyuiop"))
     assert dictify(instance) == {
@@ -214,7 +207,8 @@ def test_dictify_sanitizes_nested() -> None:
 
 def test_is_pydantic_model_class() -> None:
     """We expect is_pydantic_model_class to return True for Pydantic model classes, and False otherwise.
-    Notably it should return False for instances of Pydantic model classes."""
+    Notably it should return False for instances of Pydantic model classes.
+    """
     assert not is_pydantic_model_class(int)
     assert not is_pydantic_model_class(str)
     assert not is_pydantic_model_class(list)

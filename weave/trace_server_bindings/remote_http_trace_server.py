@@ -169,8 +169,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         )
 
     def get_call_processor(self) -> Union[AsyncBatchProcessor, None]:
-        """
-        Custom method not defined on the formal TraceServerInterface to expose
+        """Custom method not defined on the formal TraceServerInterface to expose
         the underlying call processor. Should be formalized in a client-side interface.
         """
         return self.call_processor
@@ -256,8 +255,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         )
 
     def get_feedback_processor(self) -> Union[AsyncBatchProcessor, None]:
-        """
-        Custom method not defined on the formal TraceServerInterface to expose
+        """Custom method not defined on the formal TraceServerInterface to expose
         the underlying feedback processor. Should be formalized in a client-side interface.
         """
         return self.feedback_processor

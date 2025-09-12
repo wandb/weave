@@ -184,6 +184,7 @@ autogen_tests = [
   "autogen-ext[openai]>=0.5.7",
   "openai>=1.99.9,<1.100.0",
 ]
+verifiers = ["verifiers>=0.1.3.post0"]
 
 test = [
   "nox",
@@ -276,13 +277,9 @@ markers = [
 [tool.ruff.lint]
 preview = true
 select = [
-  "D200",    # https://docs.astral.sh/ruff/rules/fits-on-one-line/
-  "D201",    # https://docs.astral.sh/ruff/rules/no-blank-line-before-function/
-  "D202",    # https://docs.astral.sh/ruff/rules/no-blank-line-after-function/
-  "D204",    # https://docs.astral.sh/ruff/rules/one-blank-line-after-class/
-  "D210",    # https://docs.astral.sh/ruff/rules/surrounding-whitespace/
-  "D211",    # https://docs.astral.sh/ruff/rules/blank-line-before-class/
-  "D214",    # https://docs.astral.sh/ruff/rules/section-not-over-indented/
+  "B", # https://docs.astral.sh/ruff/rules/#flake8-bugbear-b
+  "D", # https://docs.astral.sh/ruff/rules/#pydoclint-doc
+  #
   "FIX001",  # https://beta.ruff.rs/docs/rules/#flake8-fixme-fix
   "FIX003",  # https://docs.astral.sh/ruff/rules/line-contains-xxx/
   "F541",    # https://docs.astral.sh/ruff/rules/f-string-missing-placeholders/
@@ -303,14 +300,6 @@ select = [
   "TRY401",  # https://docs.astral.sh/ruff/rules/verbose-log-message/
   "C",       # https://docs.astral.sh/ruff/rules/#convention-c
   "T201",    # https://docs.astral.sh/ruff/rules/print-statement/
-  "B006",    # https://docs.astral.sh/ruff/rules/mutable-argument-default/
-  "B007",    # https://docs.astral.sh/ruff/rules/unused-loop-control-variable/
-  "B008",    # https://docs.astral.sh/ruff/rules/function-call-in-default-argument/
-  "B009",    # https://docs.astral.sh/ruff/rules/get-attr-with-constant/
-  "B017",    # https://docs.astral.sh/ruff/rules/assert-raises-exception/
-  "B020",    # https://docs.astral.sh/ruff/rules/loop-variable-overrides-iterator/
-  "B028",    # https://docs.astral.sh/ruff/rules/no-explicit-stacklevel/
-  "B904",    # https://docs.astral.sh/ruff/rules/raise-without-from-inside-except/
   "SIM102",  # https://docs.astral.sh/ruff/rules/collapsible-if/,
   "N801",    # https://docs.astral.sh/ruff/rules/invalid-class-name/
   "N802",    # https://docs.astral.sh/ruff/rules/invalid-function-name/
@@ -343,11 +332,12 @@ select = [
   "E713",    # https://docs.astral.sh/ruff/rules/not-in-test/
 ]
 ignore = [
-  # we use Google style
-  "D203", # https://docs.astral.sh/ruff/rules/one-blank-line-before-class/
-  "D213", # https://docs.astral.sh/ruff/rules/multi-line-summary-second-line/
-  "D215", # https://docs.astral.sh/ruff/rules/section-underline-not-over-indented/
-
+  # Fix these when possible.  They are formatting changes related to the docs!
+  "D10",
+  "D205",
+  "D414",
+  "D415",
+  "D417",
   # This is a more involved change, so disabling for now.
   "C901", # https://docs.astral.sh/ruff/rules/complex-structure/
 ]
@@ -355,6 +345,9 @@ exclude = ["weave_query"]
 
 [tool.ruff.lint.isort]
 known-third-party = ["wandb", "weave_query"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
 
 [tool.ruff.lint.flake8-pytest-style]
 mark-parentheses = false
@@ -398,7 +391,7 @@ module = "weave_query.*"
 ignore_errors = true
 
 [tool.bumpversion]
-current_version = "0.52.6-dev0"
+current_version = "0.52.8-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.

@@ -278,6 +278,7 @@ jobs:
             "mistral",
             "notdiamond",
             "openai",
+            "verifiers",
             "vertexai",
             "pandas-test",
             "mcp",

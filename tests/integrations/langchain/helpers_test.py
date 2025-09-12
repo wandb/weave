@@ -1,5 +1,4 @@
-"""
-Unit tests for langchain integration helpers.
+"""Unit tests for langchain integration helpers.
 
 Tests the usage metadata extraction and processing functions that handle
 different provider formats (OpenAI, Google GenAI, Google Vertex AI).

@@ -26,7 +26,6 @@ from typing import (
     Any,
     Callable,
     Generic,
-    Optional,
     TypedDict,
     TypeVar,
     cast,
@@ -73,7 +72,7 @@ if sys.version_info < (3, 10):
     def aiter(obj: AsyncIterator[V]) -> AsyncIterator[V]:
         return obj.__aiter__()
 
-    async def anext(obj: AsyncIterator[V], default: Optional[V] = None) -> V:  # noqa: UP045
+    async def anext(obj: AsyncIterator[V], default: V | None = None) -> V:
         try:
             return await obj.__anext__()
         except StopAsyncIteration:
@@ -217,7 +216,7 @@ def _set_on_finish_handler(func: Op, on_finish: OnFinishHandlerType) -> None:
 
 
 def _is_unbound_method(func: Callable) -> bool:
-    """Check if a function is a function defined on a class (an "unbound" method)
+    """Check if a function is a function defined on a class (an "unbound" method).
 
     In python3, the "unbound" method is just a function, but that distinction is
     not enough for our decorator because it needs to operate on both regular funcs
@@ -666,7 +665,7 @@ def _call_sync_gen(
     __should_raise: bool = False,
     __require_explicit_finish: bool = False,
     **kwargs: Any,
-) -> tuple[Generator[Any, None, None], Call]:
+) -> tuple[Generator[Any], Call]:
     func = op.resolve_fn
     call = placeholder_call()
 
@@ -740,7 +739,7 @@ def _call_sync_gen(
     # Create the generator wrapper
     try:
         # Define the wrapper generator that will handle the call context properly
-        def wrapped_generator() -> Generator[Any, None, None]:
+        def wrapped_generator() -> Generator[Any]:
             nonlocal accumulated_state, has_finished
 
             # Set the call context before creating the original generator
@@ -857,7 +856,7 @@ def _call_sync_gen(
         if __should_raise:
             raise
 
-        def empty_sync_gen() -> Generator[Any, None, None]:
+        def empty_sync_gen() -> Generator[Any]:
             # Re-raise the original exception if __should_raise is False
             # but we're evaluating the generator, to maintain expected behavior
             if not has_finished:
@@ -1096,8 +1095,7 @@ def call(
     __require_explicit_finish: bool = False,
     **kwargs: Any,
 ) -> tuple[Any, Call] | Coroutine[Any, Any, tuple[Any, Call]]:
-    """
-    Executes the op and returns both the result and a Call representing the execution.
+    """Executes the op and returns both the result and a Call representing the execution.
 
     This function will never raise.  Any errors are captured in the Call object.
 
@@ -1133,8 +1131,7 @@ def call(
 
 
 def calls(op: Op) -> CallsIter:
-    """
-    Get an iterator over all calls to this op.
+    """Get an iterator over all calls to this op.
 
     This method is automatically bound to any function decorated with `@weave.op`,
     allowing for usage like:
@@ -1196,8 +1193,7 @@ def op(
     enable_code_capture: bool = True,
     accumulator: Callable[[Any | None, Any], Any] | None = None,
 ) -> Callable[[Callable[P, R]], Op[P, R]] | Op[P, R]:
-    """
-    A decorator to weave op-ify a function or method. Works for both sync and async.
+    """A decorator to weave op-ify a function or method. Works for both sync and async.
     Automatically detects iterator functions and applies appropriate behavior.
     """
     if not isinstance(tracing_sample_rate, (int, float)):
@@ -1235,7 +1231,7 @@ def op(
                 @wraps(func)
                 async def wrapper(  # pyright: ignore[reportRedeclaration]
                     *args: P.args, **kwargs: P.kwargs
-                ) -> AsyncGenerator[R, None]:
+                ) -> AsyncGenerator[R]:
                     res, _ = await _call_async_gen(
                         cast(Op[P, R], wrapper), *args, __should_raise=True, **kwargs
                     )
@@ -1330,7 +1326,7 @@ def get_captured_code(op: Op) -> str:
 
 
 def maybe_bind_method(func: Callable, self: Any = None) -> Callable | MethodType:
-    """Bind a function to any object (even if it's not a class)
+    """Bind a function to any object (even if it's not a class).
 
     If self is None, return the function as is.
     """

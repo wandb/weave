@@ -1,4 +1,5 @@
 import asyncio
+from collections.abc import Generator
 
 import pytest
 from mcp import ClientSession, StdioServerParameters
@@ -9,8 +10,25 @@ from weave.integrations.integration_utilities import (
     flatten_calls,
     flattened_calls_to_names,
 )
+from weave.integrations.mcp import get_mcp_client_patcher, get_mcp_server_patcher
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server.trace_server_interface import CallsFilter
+
+
+@pytest.fixture(autouse=True)
+def patch_mcp() -> Generator[None, None, None]:
+    """Patch MCP for all tests in this file."""
+    # Patch both client and server for MCP
+    client_patcher = get_mcp_client_patcher()
+    server_patcher = get_mcp_server_patcher()
+
+    client_patcher.attempt_patch()
+    server_patcher.attempt_patch()
+
+    yield
+
+    client_patcher.undo_patch()
+    server_patcher.undo_patch()
 
 
 def mcp_server():
@@ -32,7 +50,7 @@ def mcp_server():
 
 
 async def run_client():
-    """Run the client and connect to the MCP server"""
+    """Run the client and connect to the MCP server."""
     # Configure the server parameters
     server_params = StdioServerParameters(
         command="python",
@@ -80,7 +98,7 @@ async def run_client():
 
 
 def main():
-    """Main entry point"""
+    """Main entry point."""
     asyncio.run(run_client())
 
 

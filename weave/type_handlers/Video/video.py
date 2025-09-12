@@ -16,19 +16,30 @@ if TYPE_CHECKING:
     from moviepy.editor import VideoClip, VideoFileClip
 
 
+_registered = False
+
+
 def _dependencies_met() -> bool:
     """Check if the dependencies are met.  This import is deferred to avoid
     an expensive module import at the top level.
     """
-    return importlib.util.find_spec("moviepy") is not None
+    import sys
+
+    # First check if already imported
+    if "moviepy" in sys.modules:
+        return True
+    # Otherwise check if it can be imported
+    try:
+        return importlib.util.find_spec("moviepy") is not None
+    except (ValueError, ImportError):
+        return False
 
 
 class VideoFormat(str, Enum):
-    """
-    These are NOT the list of formats we accept from the user
+    """These are NOT the list of formats we accept from the user
     Rather, these are the list of formats we can save to weave servers
     If we detect that the file is in these formats, we copy it over directly
-    Otherwise, we encode it to one of these formats using ffmpeg (mp4 by default)
+    Otherwise, we encode it to one of these formats using ffmpeg (mp4 by default).
     """
 
     GIF = "gif"
@@ -68,8 +79,7 @@ def get_format_from_filename(filename: str) -> VideoFormat:
 
 
 def write_video(fp: str, clip: VideoClip) -> None:
-    """
-    Takes a filepath and a VideoClip and writes the video to the file.
+    """Takes a filepath and a VideoClip and writes the video to the file.
     errors if the file does not end in a supported video extension.
     """
     try:
@@ -102,12 +112,9 @@ def write_video(fp: str, clip: VideoClip) -> None:
     )
 
 
-def save_video_file_clip(
-    obj: VideoFileClip,
-    artifact: MemTraceFilesArtifact,
-    _: str,
-) -> None:
+def _save_video_file_clip(obj: VideoFileClip, artifact: MemTraceFilesArtifact) -> None:
     """Save a VideoFileClip to the artifact.
+
     Args:
         obj: The VideoFileClip
         artifact: The artifact to save to
@@ -131,11 +138,7 @@ def save_video_file_clip(
             shutil.copy(obj.filename, fp)
 
 
-def save_non_file_clip(
-    obj: VideoClip,
-    artifact: MemTraceFilesArtifact,
-    _: str,
-) -> None:
+def _save_non_file_clip(obj: VideoClip, artifact: MemTraceFilesArtifact) -> None:
     ext = DEFAULT_VIDEO_FORMAT.value
     with artifact.writeable_file_path(f"video.{ext}") as fp:
         # If the format is unsupported, we need to convert it
@@ -148,20 +151,22 @@ def save(
     name: str,
 ) -> None:
     """Save a VideoClip to the artifact.
+
     Args:
         obj: The VideoClip or VideoWithPreview to save
         artifact: The artifact to save to
         name: Ignored, see comment below
     """
+    _ensure_registered()
     from moviepy.editor import VideoFileClip
 
     is_video_file = isinstance(obj, VideoFileClip)
 
     try:
         if is_video_file:
-            save_video_file_clip(obj, artifact, name)
+            _save_video_file_clip(obj, artifact)
         else:
-            save_non_file_clip(obj, artifact, name)
+            _save_non_file_clip(obj, artifact)
     except Exception as e:
         raise ValueError(f"Failed to write video file with error: {e}") from e
 
@@ -176,6 +181,7 @@ def load(artifact: MemTraceFilesArtifact, name: str) -> VideoClip:
     Returns:
         The loaded VideoClip
     """
+    _ensure_registered()
     from moviepy.editor import VideoFileClip
 
     # Assume there can only be 1 video in the artifact
@@ -189,14 +195,17 @@ def load(artifact: MemTraceFilesArtifact, name: str) -> VideoClip:
 
 def is_video_clip_instance(obj: Any) -> TypeIs[VideoClip]:
     """Check if the object is any subclass of VideoClip."""
+    _ensure_registered()
     from moviepy.editor import VideoClip
 
     return isinstance(obj, VideoClip)
 
 
-def register() -> None:
-    """Register the video type handler with the serializer."""
-    if _dependencies_met():
+def _ensure_registered() -> None:
+    """Ensure the video type handler is registered if MoviePy is available."""
+    global _registered
+    if not _registered and _dependencies_met():
         from moviepy.editor import VideoClip
 
         serializer.register_serializer(VideoClip, save, load, is_video_clip_instance)
+        _registered = True

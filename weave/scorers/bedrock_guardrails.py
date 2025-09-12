@@ -8,8 +8,7 @@ from weave.integrations.bedrock import patch_client
 
 
 class BedrockGuardrailScorer(weave.Scorer):
-    """
-    The `BedrockGuardrailScorer` class is a guardrail that leverages AWS Bedrock's
+    """The `BedrockGuardrailScorer` class is a guardrail that leverages AWS Bedrock's
     guardrail functionality to detect and filter content based on configured policies.
 
     Attributes:

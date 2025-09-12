@@ -27,7 +27,23 @@ Weave supports [numerous LLM providers, local models, frameworks, protocols, and
 
 ## Get started
 
-Are you new to Weave? Set up and start using Weave with the [Python quickstart](/quickstart) or [TypeScript quickstart](./reference/generated_typescript_docs/intro-notebook.md).
+Choose your path to get started with Weave:
+
+### Recommended: Start with W&B Inference
+[Try Weave with W&B Inference](/quickstart-inference) - The fastest way to experience Weave
+- No API keys needed - start building immediately
+- Free credits included with all plans
+- Learn tracing, evaluation, and monitoring with real models
+- Access to live instances of powerful models like Llama, GPT-OSS, Qwen, and DeepSeek
+
+### Have your own API keys?
+[Track LLM Calls](/quickstart) - Connect your existing LLM providers
+- Works with OpenAI, Anthropic, and [more](./guides/integrations/index.md)
+- Automatic tracing and cost tracking
+- Perfect if you already have LLM infrastructure
+
+### Using TypeScript
+[TypeScript quickstart](./reference/generated_typescript_docs/intro-notebook.md) - Get started with Weave in TypeScript
 
 ## Advanced guides
 

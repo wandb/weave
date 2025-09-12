@@ -14,6 +14,7 @@ IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".tiff", ".tif", ".webp"}
 
 def strip_exif(image_path: Path) -> bool:
     """Strip EXIF data from an image file if present.
+
     Args:
         image_path: Path to the image file
     Returns:
