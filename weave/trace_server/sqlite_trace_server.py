@@ -1592,45 +1592,53 @@ class SqliteTraceServer(tsi.TraceServerInterface):
     ) -> tsi.EvaluationStatusRes:
         return evaluation_status(self, req)
 
-    def alert_metric_create(
-        self, req: tsi.AlertMetricCreateReq
-    ) -> tsi.AlertMetricCreateRes:
-        """Create a new alert metric entry.
+    def alert_metrics_create(
+        self, req: tsi.AlertMetricsCreateReq
+    ) -> tsi.AlertMetricsCreateRes:
+        """Create multiple alert metric entries in batch.
 
         Args:
-            req: Request containing metric details.
+            req: Request containing batch of metric details.
 
         Returns:
-            Response containing the created metric ID.
+            Response containing the created metric IDs.
         """
         conn, cursor = get_conn_cursor(self.db_path)
-        metric_id = generate_id()
-        created_at = datetime.datetime.now(datetime.timezone.utc)
+        metric_ids = []
+        rows_to_insert = []
 
-        with self.lock:
-            cursor.execute(
-                """INSERT INTO alert_metrics (
-                    project_id,
-                    id,
-                    call_id,
-                    alert_ids,
-                    created_at,
-                    metric_key,
-                    metric_value
-                ) VALUES (?, ?, ?, ?, ?, ?, ?)""",
+        for metric in req.metrics:
+            metric_id = generate_id()
+            metric_ids.append(metric_id)
+            rows_to_insert.append(
                 (
                     req.project_id,
                     metric_id,
-                    req.call_id,
-                    json.dumps(req.alert_ids),  # Store as JSON string
-                    created_at.isoformat(),
-                    req.metric_key,
-                    req.metric_value,
-                ),
+                    metric.call_id,
+                    json.dumps(metric.alert_ids),  # Store as JSON string
+                    metric.created_at.isoformat(),
+                    metric.metric_key,
+                    metric.metric_value,
+                )
             )
-            conn.commit()
 
-        return tsi.AlertMetricCreateRes(id=metric_id)
+        if rows_to_insert:
+            with self.lock:
+                cursor.executemany(
+                    """INSERT INTO alert_metrics (
+                        project_id,
+                        id,
+                        call_id,
+                        alert_ids,
+                        created_at,
+                        metric_key,
+                        metric_value
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                    rows_to_insert,
+                )
+                conn.commit()
+
+        return tsi.AlertMetricsCreateRes(ids=metric_ids)
 
     def alert_metrics_query(
         self, req: tsi.AlertMetricsQueryReq
@@ -1698,6 +1706,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             metrics.append(
                 tsi.AlertMetricSchema(
                     id=row[0],
+                    project_id=row[1],
                     alert_ids=json.loads(row[2]),  # Parse JSON string back to list
                     created_at=datetime.datetime.fromisoformat(row[3]),
                     metric_key=row[4],

@@ -2064,38 +2064,44 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return evaluation_status(self, req)
 
     # Alert API
-    def alert_metric_create(
-        self, req: tsi.AlertMetricCreateReq
-    ) -> tsi.AlertMetricCreateRes:
-        """Create a new alert metric entry."""
-        metric_id = generate_id()
-        created_at = datetime.datetime.now(datetime.timezone.utc)
+    def alert_metrics_create(
+        self, req: tsi.AlertMetricsCreateReq
+    ) -> tsi.AlertMetricsCreateRes:
+        """Create multiple alert metric entries in batch."""
+        metric_ids = []
+        data_to_insert = []
 
-        self._insert(
-            "alert_metrics",
-            data=[
+        for metric in req.metrics:
+            metric_id = generate_id()
+            metric_ids.append(metric_id)
+            data_to_insert.append(
                 (
                     req.project_id,
                     metric_id,
-                    req.alert_ids,
-                    created_at,
-                    req.metric_key,
-                    req.metric_value,
-                    req.call_id,
+                    metric.alert_ids,
+                    metric.created_at,
+                    metric.metric_key,
+                    metric.metric_value,
+                    metric.call_id,
                 )
-            ],
-            column_names=[
-                "project_id",
-                "id",
-                "alert_ids",
-                "created_at",
-                "metric_key",
-                "metric_value",
-                "call_id",
-            ],
-        )
+            )
 
-        return tsi.AlertMetricCreateRes(id=metric_id)
+        if data_to_insert:
+            self._insert(
+                "alert_metrics",
+                data=data_to_insert,
+                column_names=[
+                    "project_id",
+                    "id",
+                    "alert_ids",
+                    "created_at",
+                    "metric_key",
+                    "metric_value",
+                    "call_id",
+                ],
+            )
+
+        return tsi.AlertMetricsCreateRes(ids=metric_ids)
 
     def alert_metrics_query(
         self, req: tsi.AlertMetricsQueryReq
