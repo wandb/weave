@@ -18,8 +18,7 @@ logger = logging.getLogger(__name__)
 
 class Api:
     def query(self, query: graphql.DocumentNode, **kwargs: Any) -> Any:
-        from gql.transport.requests import RequestsHTTPTransport
-        from requests.auth import HTTPBasicAuth
+        from gql.transport.httpx import HTTPXTransport
 
         wandb_context = get_wandb_api_context()
         headers = None
@@ -29,20 +28,16 @@ class Api:
             headers = wandb_context.headers
             cookies = wandb_context.cookies
             if wandb_context.api_key is not None:
-                auth = HTTPBasicAuth("api", wandb_context.api_key)
+                auth = ("api", wandb_context.api_key)
         url_base = env.wandb_base_url()
-        transport = RequestsHTTPTransport(
+        transport = HTTPXTransport(
             url=url_base + "/graphql",
             headers=headers,
             cookies=cookies,
             auth=auth,
         )
-        # Warning: we do not use the recommended context manager pattern, because we're
-        # using connector_owner to tell the session not to close our connection pool.
-        # There is a bug in aiohttp that causes session close to hang for the ssl_close_timeout
-        # which is 10 seconds by default. See issue: https://github.com/graphql-python/gql/issues/381
-        # Closing the session just closes the connector, which we don't want anyway, so we don't
-        # bother.
+        # Note: httpx handles connection pooling more gracefully than the previous aiohttp implementation.
+        # We maintain a persistent client for better performance.
         client = gql.Client(transport=transport, fetch_schema_from_transport=False)
         session = client.connect_sync()  # type: ignore
         return session.execute(query, variable_values=kwargs)
@@ -220,13 +215,13 @@ class Api:
 
 class ApiAsync:
     def __init__(self) -> None:
-        import aiohttp
+        import httpx
 
-        self.connector = aiohttp.TCPConnector(limit=50)
+        self.client = httpx.AsyncClient(limits=httpx.Limits(max_connections=50))
 
     async def query(self, query: graphql.DocumentNode, **kwargs: Any) -> Any:
-        import aiohttp
-        from gql.transport.aiohttp import AIOHTTPTransport
+        import httpx
+        from gql.transport.httpx import HTTPXAsyncTransport
 
         wandb_context = get_wandb_api_context()
         headers = None
@@ -236,33 +231,23 @@ class ApiAsync:
             headers = wandb_context.headers
             cookies = wandb_context.cookies
             if wandb_context.api_key is not None:
-                auth = aiohttp.BasicAuth("api", wandb_context.api_key)
+                auth = httpx.BasicAuth("api", wandb_context.api_key)
         # TODO: This is currently used by our FastAPI auth helper, there's probably a better way.
         api_key_override = kwargs.pop("api_key", None)
         if api_key_override:
-            auth = aiohttp.BasicAuth("api", api_key_override)
+            auth = httpx.BasicAuth("api", api_key_override)
         url_base = env.wandb_base_url()
-        transport = AIOHTTPTransport(
+        transport = HTTPXAsyncTransport(
             url=url_base + "/graphql",
-            client_session_args={
-                "connector": self.connector,
-                "connector_owner": False,
-            },
+            client=self.client,
             headers=headers,
             cookies=cookies,
             auth=auth,
         )
-        # Warning: we do not use the recommended context manager pattern, because we're
-        # using connector_owner to tell the session not to close our connection pool.
-        # There is a bug in aiohttp that causes session close to hang for the ssl_close_timeout
-        # which is 10 seconds by default. See issue: https://github.com/graphql-python/gql/issues/381
-        # Closing the session just closes the connector, which we don't want anyway, so we don't
-        # bother.
+        # Using httpx which handles connection pooling more gracefully
         client = gql.Client(transport=transport, fetch_schema_from_transport=False)
         session = await client.connect_async(reconnecting=False)  # type: ignore
         result = await session.execute(query, variable_values=kwargs)
-        # Manually reset the connection, bypassing the SSL bug, avoiding ERROR:asyncio:Unclosed client session
-        await transport.session.close()
         return result
 
     SERVER_INFO_QUERY = gql.gql(

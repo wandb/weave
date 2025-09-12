@@ -5,7 +5,7 @@ import logging
 from functools import wraps
 from typing import Any, Callable, TypeVar
 
-import requests
+import httpx
 import tenacity
 from pydantic import ValidationError
 
@@ -67,7 +67,7 @@ def _is_retryable_exception(e: BaseException) -> bool:
         return False
 
     # Don't retry on HTTP 4xx (except 429)
-    if isinstance(e, requests.HTTPError) and e.response is not None:
+    if isinstance(e, httpx.HTTPError) and e.response is not None:
         code_class = e.response.status_code // 100
 
         # Bad request, not rate-limiting
