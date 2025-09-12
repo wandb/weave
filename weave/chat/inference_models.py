@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-import httpx
+import requests
 from pydantic import ValidationError
 
 from weave.chat.types.models import (
@@ -36,11 +36,10 @@ class InferenceModels:
             "Content-Type": "application/json",
         }
         url = f"https://{INFERENCE_HOST}/v1/models"
-        response = httpx.post(url, headers=headers)
+        response = requests.post(url, headers=headers)
         if response.status_code == 401:
-            raise httpx.HTTPStatusError(
-                f"{response.reason_phrase} - please make sure inference is enabled for entity {self._client.entity}",
-                request=response.request,
+            raise requests.HTTPError(
+                f"{response.reason} - please make sure inference is enabled for entity {self._client.entity}",
                 response=response,
             )
 
