@@ -8,7 +8,7 @@ DataUrlContentType = Literal[
     "data_url", "data_url:base64", "data_url:encoding", "data_url:encoding:base64"
 ]
 
-ContentType = Literal["bytes", "text", "base64", "file", DataUrlContentType]
+ContentType = Literal["bytes", "text", "base64", "file", "url", DataUrlContentType]
 
 ValidContentInputs = Union[bytes, str, Path]
 
