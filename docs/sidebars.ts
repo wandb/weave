@@ -56,6 +56,7 @@ const sidebars: SidebarsConfig = {
               id: "guides/core-types/media",
             },
             "guides/tools/playground",
+            "guides/tools/evaluation_playground",
             "guides/integrations/index",
             "guides/tools/saved-views",
             {
@@ -65,7 +66,6 @@ const sidebars: SidebarsConfig = {
             },
             "guides/tracking/trace-tree",
             "guides/tracking/otel",
-            "guides/tracking/video",
             "guides/tracking/trace-plots"
           ]
         },
@@ -154,14 +154,6 @@ const sidebars: SidebarsConfig = {
                 }
               ],
         },
-        {
-          type: "category",
-          collapsible: true,
-          collapsed: true,
-          label: "Tools & Utilities",
-          link: { type: "doc", id: "guides/tools/index" },
-          items: ["guides/tools/serve", "guides/tools/deploy", "guides/tracking/otel"],
-        },
       ],
     },
     {
@@ -210,7 +202,8 @@ const sidebars: SidebarsConfig = {
             "guides/integrations/agno",
             "guides/integrations/autogen",
             "guides/integrations/verdict",
-            "guides/integrations/js"
+            "guides/integrations/koog",
+            "guides/integrations/js",
           ],
         },
         {

@@ -3,7 +3,9 @@ from __future__ import annotations
 import atexit
 import datetime
 import json
+import keyword
 import logging
+import re
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -19,23 +21,29 @@ from pydantic import (
     PrivateAttr,
 )
 
-import weave
 from weave.dataset.dataset import Dataset
 from weave.evaluation.eval import Evaluation, default_evaluation_display_name
 from weave.flow.model import MissingInferenceMethodError, Model
 from weave.flow.scorer import Scorer
 from weave.flow.scorer import auto_summarize as auto_summarize_fn
 from weave.flow.util import make_memorable_name
+from weave.object.obj import Object
+from weave.trace.api import attributes
 from weave.trace.call import Call
 from weave.trace.context import call_context
 from weave.trace.context.weave_client_context import require_weave_client
-from weave.trace.op import Op
+from weave.trace.op import op
+from weave.trace.op_protocol import Op
+from weave.trace.table import Table
 
 T = TypeVar("T")
 ID = str
 ScoreType = Union[float, bool, dict]
 
 logger = logging.getLogger(__name__)
+
+# Class names should start with a letter or underscore and contain only alphanumeric characters and underscores
+VALID_CLASS_NAME_REGEX = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
 
 # Registry to track active EvaluationLogger instances
 _active_evaluation_loggers: list[EvaluationLogger] = []
@@ -99,13 +107,33 @@ def _set_current_summary(summary: dict) -> Iterator[None]:
         current_summary.reset(token)
 
 
+def _sanitize_class_name(name: str) -> str:
+    """Return a valid Python class name based on a string."""
+    # Remove characters that are not alphanumeric or underscore
+    class_name = re.sub(r"\W", "", name)
+    if class_name == "":
+        return "GeneratedClass"
+
+    # Ensure it starts with a letter or underscore (prepend "C" if not)
+    first_char = class_name[0]
+    if not first_char.isalpha() and first_char != "_":
+        class_name = "C" + class_name
+
+    # Avoid Python keywords
+    if keyword.iskeyword(class_name):
+        class_name += "Class"
+
+    return class_name
+
+
 def _cast_to_cls(type_: type[T]) -> Callable[[str | dict | T], T]:
     def _convert_to_cls_inner(value: str | dict | T) -> T:
         if isinstance(value, str):
-            cls_name = value
-
             # Dynamically create the class if the user only provides a name
-            cls_name = _validate_class_name(cls_name)
+            cls_name = _sanitize_class_name(value)
+
+            # Sanitization should have ensured a valid class name, but double check for safety
+            cls_name = _validate_class_name(cls_name, type_.__name__)
 
             pydantic_config_dict = {
                 "__annotations__": {"name": str},
@@ -130,7 +158,7 @@ def _cast_to_cls(type_: type[T]) -> Callable[[str | dict | T], T]:
 
         elif isinstance(value, type_):
             instance = value
-            if isinstance(instance, weave.Object) and not instance.name:
+            if isinstance(instance, Object) and not instance.name:
                 instance.name = instance.__class__.__name__
             return instance
 
@@ -141,9 +169,9 @@ def _cast_to_cls(type_: type[T]) -> Callable[[str | dict | T], T]:
 
 def _cast_to_imperative_dataset(value: Dataset | list[dict] | str) -> Dataset:
     if isinstance(value, str):
-        return Dataset(name=value, rows=weave.Table([{"dataset_id": value}]))
+        return Dataset(name=value, rows=Table([{"dataset_id": value}]))
     elif isinstance(value, list):
-        return Dataset(rows=weave.Table(value))
+        return Dataset(rows=Table(value))
     elif isinstance(value, Dataset):
         return value
     else:
@@ -156,28 +184,23 @@ def _default_dataset_name() -> str:
     return f"{date}-{unique_name}-dataset"
 
 
-def _validate_class_name(name: str) -> str:
-    """Validate the scorer name to be a valid class name."""
+def _validate_class_name(name: str, base_class_name: str = "Class") -> str:
+    """Validate the class name to be a valid Python class name."""
     # Check if name is not empty
     if not name:
-        raise ValueError("Scorer name cannot be empty")
+        raise ValueError(f"{base_class_name} name cannot be empty")
 
-    # Check if name follows Python class naming conventions
-    # Class names should start with a letter or underscore and contain only
-    # alphanumeric characters and underscores
-    import re
-
-    if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", name):
+    if not VALID_CLASS_NAME_REGEX.match(name):
         raise ValueError(
-            f"Invalid scorer name: '{name}'. Scorer names must start with a letter or underscore "
+            f"Invalid `{base_class_name}` name: '{name}'. `{base_class_name}` names must start with a letter or underscore "
             "and contain only alphanumeric characters and underscores."
         )
 
     # Check if name is not a Python keyword
-    import keyword
-
     if keyword.iskeyword(name):
-        raise ValueError(f"Scorer name '{name}' cannot be a Python keyword")
+        raise ValueError(
+            f"`{base_class_name}` name '{name}' cannot be a Python keyword"
+        )
 
     return name
 
@@ -282,7 +305,7 @@ class ScoreLogger(BaseModel):
         # this is safe; pydantic casting is done in validator above
         scorer = cast(Scorer, scorer)
 
-        @weave.op(name=scorer.name, enable_code_capture=False)
+        @op(name=scorer.name, enable_code_capture=False)
         def score_method(self: Scorer, *, output: Any, inputs: Any) -> ScoreType:
             # TODO: can't use score here because it will cause version mismatch
             # return score
@@ -295,7 +318,7 @@ class ScoreLogger(BaseModel):
             [self.evaluate_call, self.predict_and_score_call]
         ):
             with _set_current_score(score):
-                with weave.attributes(IMPERATIVE_SCORE_MARKER):
+                with attributes(IMPERATIVE_SCORE_MARKER):
                     await self.predict_call.apply_scorer(scorer)
 
         # this is always true because of how the scorer is created in the validator
@@ -346,7 +369,7 @@ class EvaluationLogger(BaseModel):
         BeforeValidator(_cast_to_imperative_dataset),
         Field(
             default_factory=lambda: Dataset(
-                rows=weave.Table([{"dataset_id": _default_dataset_name()}]),
+                rows=Table([{"dataset_id": _default_dataset_name()}]),
             ),
             description="(Optional): A metadata-only Dataset used for comparisons."
             "If you already know your rows ahead of time, you can pass either"
@@ -402,27 +425,36 @@ class EvaluationLogger(BaseModel):
         # objects that "look right" to our object saving system.
 
         # --- Setup the model object ---
-        # Only modify the predict method if the model doesn't already have one
+        # Store the original predict method if it exists
+        self._original_predict_method = None
         try:
             assert isinstance(self.model, Model)
-            self.model.get_infer_method()
+            self._original_predict_method = self.model.get_infer_method()
         except MissingInferenceMethodError:
 
-            @weave.op(name="Model.predict", enable_code_capture=False)
+            @op(name="Model.predict", enable_code_capture=False)
             def predict(self: Model, inputs: dict) -> Any:
                 # Get the output from the context variable
                 return current_output.get()
 
             self.model.__dict__["predict"] = MethodType(predict, self.model)
 
+        # Always create a context-aware predict method for use during log_prediction
+        @op(name="Model.predict", enable_code_capture=False)  # type: ignore[no-redef]
+        def predict(self: Model, inputs: dict) -> Any:
+            # Get the output from the context variable
+            return current_output.get()
+
+        self._context_predict_method = MethodType(predict, self.model)
+
         # --- Setup the evaluation object ---
-        @weave.op(name="Evaluation.evaluate", enable_code_capture=False)
+        @op(name="Evaluation.evaluate", enable_code_capture=False)
         def evaluate(self: Evaluation, model: Model) -> None: ...
 
-        @weave.op(name="Evaluation.predict_and_score", enable_code_capture=False)
+        @op(name="Evaluation.predict_and_score", enable_code_capture=False)
         def predict_and_score(self: Evaluation, model: Model, example: dict) -> dict:
             predict_method = cast(Op, model.get_infer_method())
-            with weave.attributes(IMPERATIVE_EVAL_MARKER):
+            with attributes(IMPERATIVE_EVAL_MARKER):
                 output, predict_call = predict_method.call(model, example)
                 current_predict_call.set(predict_call)
 
@@ -434,7 +466,7 @@ class EvaluationLogger(BaseModel):
                 "model_latency": None,
             }
 
-        @weave.op(name="Evaluation.summarize", enable_code_capture=False)
+        @op(name="Evaluation.summarize", enable_code_capture=False)
         def summarize(self: Evaluation) -> dict:
             return cast(dict, current_summary.get())
 
@@ -507,35 +539,48 @@ class EvaluationLogger(BaseModel):
         """Log a prediction to the Evaluation, and return a reference.
 
         The reference can be used to log scores which are attached to the specific
-        prediction instance."""
+        prediction instance.
+        """
         # Use set_call_stack to temporarily set the evaluation as the parent
         assert self._evaluate_call is not None
 
-        with call_context.set_call_stack([self._evaluate_call]):
-            # Make the prediction call
-            with _set_current_output(output):
-                with weave.attributes(IMPERATIVE_EVAL_MARKER):
-                    _, predict_and_score_call = (
-                        self._pseudo_evaluation.predict_and_score.call(
-                            self._pseudo_evaluation,
-                            self.model,
-                            inputs,
-                            __require_explicit_finish=True,
+        # Temporarily swap the predict method to use our context-aware version
+        # This ensures we use the passed output instead of calling the model
+        original_method = self.model.__dict__.get("predict")
+        self.model.__dict__["predict"] = self._context_predict_method
+
+        try:
+            with call_context.set_call_stack([self._evaluate_call]):
+                # Make the prediction call
+                with _set_current_output(output):
+                    with attributes(IMPERATIVE_EVAL_MARKER):
+                        _, predict_and_score_call = (
+                            self._pseudo_evaluation.predict_and_score.call(
+                                self._pseudo_evaluation,
+                                self.model,
+                                inputs,
+                                __require_explicit_finish=True,
+                            )
                         )
-                    )
+        finally:
+            # Restore the original predict method
+            if original_method is not None:
+                self.model.__dict__["predict"] = original_method
+            else:
+                self.model.__dict__.pop("predict", None)
 
-            # Get the predict_call from the context variable
-            predict_call = current_predict_call.get()
-            if predict_call is None:
-                raise ValueError("predict_call should not be None")
+        # Get the predict_call from the context variable
+        predict_call = current_predict_call.get()
+        if predict_call is None:
+            raise ValueError("predict_call should not be None")
 
-            pred = ScoreLogger(
-                predict_and_score_call=predict_and_score_call,
-                evaluate_call=self._evaluate_call,
-                predict_call=predict_call,
-            )
-            self._accumulated_predictions.append(pred)
-            return pred
+        pred = ScoreLogger(
+            predict_and_score_call=predict_and_score_call,
+            evaluate_call=self._evaluate_call,
+            predict_call=predict_call,
+        )
+        self._accumulated_predictions.append(pred)
+        return pred
 
     def log_summary(
         self,
@@ -578,7 +623,7 @@ class EvaluationLogger(BaseModel):
         with call_context.set_call_stack([self._evaluate_call]):
             try:
                 with _set_current_summary(final_summary):
-                    with weave.attributes(IMPERATIVE_EVAL_MARKER):
+                    with attributes(IMPERATIVE_EVAL_MARKER):
                         self._pseudo_evaluation.summarize()
             except Exception:
                 logger.error("Error during execution of summarize op.", exc_info=True)

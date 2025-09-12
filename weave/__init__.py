@@ -5,6 +5,9 @@ from weave.trace.api import *
 
 __version__ = version.VERSION
 
+from weave.integrations.wandb import wandb_init_hook
+
+wandb_init_hook()
 
 from weave.agent.agent import Agent as Agent
 from weave.agent.agent import AgentState as AgentState

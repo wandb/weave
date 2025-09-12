@@ -25,8 +25,7 @@ SUPPORTED_MODELS = ["gpt-4o", "gpt-4o-mini", "o1-preview", "o1-mini", "o1", "o3-
 
 
 class PromptInjectionLLMGuardrail(LLMScorer):
-    """
-    The `PromptInjectionLLMGuardrail` uses an LLM to assess whether a prompt
+    """The `PromptInjectionLLMGuardrail` uses an LLM to assess whether a prompt
     is a prompt injection attack or not. It uses a prompting strategy that is based on
     a summarized version of the research paper
     [An Early Categorization of Prompt Injection Attacks on Large Language Models](https://arxiv.org/abs/2402.00898)

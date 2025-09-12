@@ -9,7 +9,6 @@ from typing import Any, Callable, Literal, Optional, Union
 from pydantic import PrivateAttr
 from typing_extensions import Self
 
-import weave
 from weave.dataset.dataset import Dataset
 from weave.flow import util
 from weave.flow.casting import DatasetLike, ScorerLike
@@ -31,8 +30,10 @@ from weave.trace.call import Call, CallsIter
 from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.env import get_weave_parallelism
 from weave.trace.objectify import maybe_objectify, register_object
-from weave.trace.op import CallDisplayNameFunc, Op, OpCallError, as_op, is_op
+from weave.trace.op import OpCallError, as_op, is_op, op
+from weave.trace.op_protocol import CallDisplayNameFunc, Op
 from weave.trace.refs import ObjectRef
+from weave.trace.table import Table
 from weave.trace.vals import WeaveObject
 from weave.trace.weave_client import get_ref
 from weave.trace_server.trace_server_interface import CallsFilter
@@ -52,13 +53,12 @@ def default_evaluation_display_name(call: Call) -> str:
 
 
 class EvaluationResults(Object):
-    rows: weave.Table
+    rows: Table
 
 
 @register_object
 class Evaluation(Object):
-    """
-    Sets up an evaluation which includes a set of scorers and a dataset.
+    """Sets up an evaluation which includes a set of scorers and a dataset.
 
     Calling evaluation.evaluate(model) will pass in rows from a dataset into a model matching
         the names of the columns of the dataset to the argument names in model.predict.
@@ -69,7 +69,6 @@ class Evaluation(Object):
     to preprocess_model_input.
 
     Examples:
-
     ```python
     # Collect your examples
     examples = [
@@ -171,7 +170,7 @@ class Evaluation(Object):
         if self.name is None and self.dataset.name is not None:
             self.name = self.dataset.name + "-evaluation"  # type: ignore
 
-    @weave.op
+    @op
     async def predict_and_score(self, model: Union[Op, Model], example: dict) -> dict:
         apply_model_result = await apply_model_async(
             model, example, self.preprocess_model_input
@@ -209,7 +208,7 @@ class Evaluation(Object):
             "model_latency": model_latency,
         }
 
-    @weave.op
+    @op
     async def summarize(self, eval_table: EvaluationResults) -> dict:
         eval_table_rows = list(eval_table.rows)
         cols = transpose(eval_table_rows)
@@ -272,9 +271,9 @@ class Evaluation(Object):
             eval_rows.append((index, eval_row))
         eval_rows.sort(key=lambda x: x[0])
         table_rows = [eval_row for _, eval_row in eval_rows]
-        return EvaluationResults(rows=weave.Table(table_rows))
+        return EvaluationResults(rows=Table(table_rows))
 
-    @weave.op(call_display_name=default_evaluation_display_name)
+    @op(call_display_name=default_evaluation_display_name)
     async def evaluate(self, model: Union[Op, Model]) -> dict:
         eval_results = await self.get_eval_results(model)
         summary = await self.summarize(eval_results)
@@ -286,8 +285,7 @@ class Evaluation(Object):
         return summary
 
     def get_evaluate_calls(self) -> CallsIter:
-        """
-        Retrieve all evaluation calls that used this Evaluation object.
+        """Retrieve all evaluation calls that used this Evaluation object.
 
         Note that this returns a CallsIter instead of a single call because it's
         possible to have multiple evaluation calls for a single evaluation (e.g.
@@ -323,8 +321,7 @@ class Evaluation(Object):
         )
 
     def get_score_calls(self) -> dict[str, list[Call]]:
-        """
-        Retrieve scorer calls for each evaluation run, grouped by trace ID.
+        """Retrieve scorer calls for each evaluation run, grouped by trace ID.
 
         Returns:
             dict[str, list[Call]]: A dictionary mapping trace IDs to lists of scorer Call objects.
@@ -363,8 +360,7 @@ class Evaluation(Object):
         return d
 
     def get_scores(self) -> dict[str, dict[str, list[Any]]]:
-        """
-        Extract and organize scorer outputs from evaluation runs.
+        """Extract and organize scorer outputs from evaluation runs.
 
         Returns:
             dict[str, dict[str, list[Any]]]: A nested dictionary structure where:

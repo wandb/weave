@@ -49,7 +49,6 @@ from weave.trace.object_record import (
 )
 from weave.trace.objectify import maybe_objectify
 from weave.trace.op import (
-    Op,
     as_op,
     is_op,
     is_placeholder_call,
@@ -59,6 +58,7 @@ from weave.trace.op import (
     should_skip_tracing_for_op,
 )
 from weave.trace.op import op as op_deco
+from weave.trace.op_protocol import Op
 from weave.trace.ref_util import get_ref, remove_ref, set_ref
 from weave.trace.refs import (
     CallRef,
@@ -79,8 +79,10 @@ from weave.trace.settings import (
     should_capture_system_info,
     should_print_call_link,
     should_redact_pii,
+    should_use_parallel_table_upload,
 )
 from weave.trace.table import Table
+from weave.trace.table_upload_chunking import ChunkingConfig, TableChunkManager
 from weave.trace.util import deprecated
 from weave.trace.vals import WeaveObject, WeaveTable, make_trace_obj
 from weave.trace.weave_client_send_file_cache import WeaveClientSendFileCache
@@ -121,12 +123,18 @@ from weave.trace_server.trace_server_interface import (
     StartedCallSchemaForInsert,
     TableAppendSpec,
     TableAppendSpecPayload,
+    TableCreateFromDigestsReq,
     TableCreateReq,
     TableCreateRes,
     TableSchemaForInsert,
     TableUpdateReq,
     TraceServerInterface,
     TraceStatus,
+)
+from weave.trace_server_bindings.http_utils import (
+    REMOTE_REQUEST_BYTES_LIMIT,
+    ROW_COUNT_CHUNKING_THRESHOLD,
+    check_endpoint_exists,
 )
 from weave.utils.attributes_dict import AttributesDict
 from weave.utils.dict_utils import sum_dict_leaves, zip_dicts
@@ -229,7 +237,7 @@ def map_to_refs(obj: Any) -> Any:
         # Here, we expect ref to be empty since it would have short circuited
         # above with `_get_direct_ref`
         return _remove_empty_ref(obj.map_values(map_to_refs))
-    elif isinstance(obj, (pydantic.BaseModel, pydantic.v1.BaseModel)):
+    elif isinstance(obj, pydantic.BaseModel):
         # Check if this object has a custom serializer registered
         from weave.trace.serialization.serializer import get_serializer_for_obj
 
@@ -432,8 +440,7 @@ class WeaveClient:
     ################ Query API ################
 
     def get_evaluation(self, uri: str) -> Evaluation:
-        """
-        Retrieve a specific Evaluation object by its URI.
+        """Retrieve a specific Evaluation object by its URI.
 
         Evaluation URIs typically follow the format:
         `weave:///entity/project/object/Evaluation:version`
@@ -468,8 +475,7 @@ class WeaveClient:
     # TODO: Make into EvaluationsIter
     # TODO: Add option to select a subset of evaluations
     def get_evaluations(self) -> list[Evaluation]:
-        """
-        Retrieve all Evaluation objects from the current project.
+        """Retrieve all Evaluation objects from the current project.
 
         Returns:
             list[Evaluation]: A list of all Evaluation objects in the current project.
@@ -525,8 +531,7 @@ class WeaveClient:
         scored_by: str | list[str] | None = None,
         page_size: int = DEFAULT_CALLS_PAGE_SIZE,
     ) -> CallsIter:
-        """
-        Retrieve a list of traced calls (operations) for this project.
+        """Retrieve a list of traced calls (operations) for this project.
 
         This method provides a powerful and flexible interface for querying trace data.
         It supports pagination, filtering, sorting, field projection, and scoring metadata,
@@ -598,8 +603,7 @@ class WeaveClient:
         include_feedback: bool = False,
         columns: list[str] | None = None,
     ) -> WeaveObject:
-        """
-        Get a single call by its ID.
+        """Get a single call by its ID.
 
         Args:
             call_id: The ID of the call to get.
@@ -1007,6 +1011,45 @@ class WeaveClient:
         )
 
     @trace_sentry.global_trace_sentry.watch()
+    def delete_all_object_versions(self, object_name: str) -> int:
+        """Delete all versions of an object.
+
+        Args:
+            object_name: The name of the object whose versions should be deleted.
+
+        Returns:
+            The number of versions deleted.
+        """
+        result = self.server.obj_delete(
+            ObjDeleteReq(
+                project_id=self._project_id(),
+                object_id=object_name,
+                digests=None,
+            )
+        )
+        return result.num_deleted
+
+    @trace_sentry.global_trace_sentry.watch()
+    def delete_object_versions(self, object_name: str, digests: list[str]) -> int:
+        """Delete specific versions of an object.
+
+        Args:
+            object_name: The name of the object whose versions should be deleted.
+            digests: List of digests to delete. Can include aliases like "latest" or "v0".
+
+        Returns:
+            The number of versions deleted.
+        """
+        result = self.server.obj_delete(
+            ObjDeleteReq(
+                project_id=self._project_id(),
+                object_id=object_name,
+                digests=digests,
+            )
+        )
+        return result.num_deleted
+
+    @trace_sentry.global_trace_sentry.watch()
     def delete_op_version(self, op: OpRef) -> None:
         self.server.obj_delete(
             ObjDeleteReq(
@@ -1015,6 +1058,25 @@ class WeaveClient:
                 digests=[op.digest],
             )
         )
+
+    @trace_sentry.global_trace_sentry.watch()
+    def delete_all_op_versions(self, op_name: str) -> int:
+        """Delete all versions of an op.
+
+        Args:
+            op_name: The name of the op whose versions should be deleted.
+
+        Returns:
+            The number of versions deleted.
+        """
+        result = self.server.obj_delete(
+            ObjDeleteReq(
+                project_id=self._project_id(),
+                object_id=op_name,
+                digests=None,
+            )
+        )
+        return result.num_deleted
 
     def get_feedback(
         self,
@@ -1133,7 +1195,6 @@ class WeaveClient:
         """Add a cost to the current project.
 
         Examples:
-
             ```python
             client.add_cost(llm_id="my_expensive_custom_model", prompt_token_cost=1, completion_token_cost=2)
             client.add_cost(llm_id="my_expensive_custom_model", prompt_token_cost=500, completion_token_cost=1000, effective_date=datetime(1998, 10, 3))
@@ -1171,7 +1232,6 @@ class WeaveClient:
         """Purge costs from the current project.
 
         Examples:
-
             ```python
             client.purge_costs([ids])
             client.purge_costs(ids)
@@ -1202,7 +1262,6 @@ class WeaveClient:
         """Query project for costs.
 
         Examples:
-
             ```python
             # Fetch a specific cost object.
             # Note that this still returns a collection, which is expected
@@ -1406,7 +1465,7 @@ class WeaveClient:
             - `_save_table` (for `weave.trace.Table` and `weave.trace.vals.WeaveTable` instances)
         3. Otherwise, traverse all values within `obj` recursively, applying the above logic to each value.
         Important notes to developers: This method does not return anything - it _mutates_ the
-        values that it traverses (specifically, it attaches `ref` values to them)
+        values that it traverses (specifically, it attaches `ref` values to them).
 
         Important: This method calls low level save methods directly - causing network events. Until
         these are backgrounded, they should not be invoked from inside a critical path.
@@ -1459,7 +1518,7 @@ class WeaveClient:
             self._save_nested_objects(obj.rows)
 
         # Recursive traversal of other pydantic objects
-        elif isinstance(obj, (pydantic.BaseModel, pydantic.v1.BaseModel)):
+        elif isinstance(obj, pydantic.BaseModel):
             obj_rec = pydantic_object_record(obj)
             for v in obj_rec.__dict__.values():
                 self._save_nested_objects(v)
@@ -1551,34 +1610,45 @@ class WeaveClient:
 
     @trace_sentry.global_trace_sentry.watch()
     def _save_op(self, op: Op, name: str | None = None) -> ObjectRef:
-        """
-        Saves an Op to the weave server and returns the Ref. This is the sister
-        function to _save_object_basic, but for Ops
+        """Saves an Op to the weave server and returns the Ref. This is the sister
+        function to _save_object_basic, but for Ops.
         """
         if name is None:
             name = op.name
 
         return self._save_object_basic(op, name)
 
+    def _send_table_create(self, rows: list[Any]) -> TableCreateRes:
+        json_rows = to_json(rows, self._project_id(), self)
+        req = TableCreateReq(
+            table=TableSchemaForInsert(project_id=self._project_id(), rows=json_rows)
+        )
+        return self.server.table_create(req)
+
     @trace_sentry.global_trace_sentry.watch()
     def _save_table(self, table: Table | WeaveTable) -> TableRef:
         """Saves a Table to the weave server and returns the TableRef.
         This is the sister function to _save_object_basic but for Tables.
+
+        Uses chunking and parallel uploads for large tables, with fallback to
+        incremental table_update pattern if table_create_from_digests is not available.
         """
         # Skip saving the table if it is already persisted.
         if isinstance(table, WeaveTable) and table.table_ref is not None:
             return table.table_ref
 
-        def send_table_create() -> TableCreateRes:
-            rows = to_json(table.rows, self._project_id(), self)
-            req = TableCreateReq(
-                table=TableSchemaForInsert(project_id=self._project_id(), rows=rows)
+        chunking_config = self._should_use_chunking(table)
+        if not chunking_config.use_chunking:
+            # Simple case: defer the entire serialization and upload
+            res_future: Future[TableCreateRes] = self.future_executor.defer(
+                lambda: self._send_table_create(list(table.rows))
             )
-            return self.server.table_create(req)
-
-        res_future: Future[TableCreateRes] = self.future_executor.defer(
-            send_table_create
-        )
+        elif chunking_config.use_parallel_chunks:
+            # Need to chunk up, use parallelism
+            res_future = self._create_table_with_parallel_chunks(table)
+        else:
+            # Legacy method for large tables and old servers
+            res_future = self._create_table_with_incremental_updates(table)
 
         digest_future: Future[str] = self.future_executor.then(
             [res_future], lambda res: res[0].digest
@@ -1597,6 +1667,134 @@ class WeaveClient:
             table.table_ref = table_ref
 
         return table_ref
+
+    def _should_use_chunking(self, table: Table | WeaveTable) -> ChunkingConfig:
+        """Determine if we should use chunking and parallel chunks for a table."""
+        remote_request_bytes_limit = getattr(
+            self.server, "remote_request_bytes_limit", REMOTE_REQUEST_BYTES_LIMIT
+        )
+
+        # Primary heuristic: row count
+        use_chunking = len(table.rows) > ROW_COUNT_CHUNKING_THRESHOLD
+        # Secondary heuristic: basic size estimation for smaller tables
+        if not use_chunking and len(table.rows) > 0:
+            # Simple size estimation without full serialization
+            sample_row_size = len(str(table.rows[0]).encode("utf-8"))
+            estimated_bytes = sample_row_size * len(table.rows) * 2
+            use_chunking = estimated_bytes > remote_request_bytes_limit
+
+        # Determine parallel vs incremental chunking
+        use_parallel_chunks = False
+        if use_chunking and should_use_parallel_table_upload():
+            test_req = TableCreateFromDigestsReq(
+                project_id=self._project_id(), row_digests=[]
+            )
+
+            def test_func(req: TableCreateFromDigestsReq) -> Any:
+                server = self.server
+                if hasattr(server, "_next_trace_server"):
+                    server = server._next_trace_server
+
+                assert hasattr(server, "_generic_request_executor")
+                assert hasattr(server._generic_request_executor, "__wrapped__")
+                return server._generic_request_executor.__wrapped__(
+                    server, "/table/create_from_digests", req
+                )
+
+            use_parallel_chunks = check_endpoint_exists(
+                test_func, test_req, "table_create_from_digests"
+            )
+
+        return ChunkingConfig(
+            use_chunking=use_chunking, use_parallel_chunks=use_parallel_chunks
+        )
+
+    def _create_table_with_parallel_chunks(
+        self, table: Table | WeaveTable
+    ) -> Future[TableCreateRes]:
+        """Execute the actual parallel chunk upload."""
+        # Create chunks from raw table data (not serialized yet)
+        chunk_manager = TableChunkManager()
+        raw_chunks: list[list[Any]] = chunk_manager.create_chunks(table.rows)
+
+        # Create chunks in parallel using future_executor - defer serialization
+        chunk_futures = []
+        for raw_chunk in raw_chunks:
+            chunk_future = self.future_executor.defer(
+                lambda chunk=raw_chunk: self._send_table_create(chunk)
+            )
+            chunk_futures.append(chunk_future)
+
+        # Chain the operations using future_executor.then
+        def combine_chunks_and_create_table(
+            chunk_results: list[TableCreateRes],
+        ) -> TableCreateRes:
+            all_row_digests = []
+            for chunk_result in chunk_results:
+                all_row_digests.extend(chunk_result.row_digests)
+
+            # Create final table from digests
+            create_req = TableCreateFromDigestsReq(
+                project_id=self._project_id(), row_digests=all_row_digests
+            )
+            create_res = self.server.table_create_from_digests(create_req)
+
+            return TableCreateRes(
+                digest=create_res.digest,
+                row_digests=all_row_digests,
+            )
+
+        # Return a future that will complete when all chunks are done and combined
+        return self.future_executor.then(chunk_futures, combine_chunks_and_create_table)
+
+    def _create_table_with_incremental_updates(
+        self, table: Table | WeaveTable
+    ) -> Future[TableCreateRes]:
+        """Create table using incremental table_update pattern (fallback)."""
+        # Create chunks from raw table data (not serialized yet)
+        chunk_manager = TableChunkManager()
+        raw_chunks: list[list[Any]] = chunk_manager.create_chunks(table.rows)
+        if not raw_chunks:
+            return self.future_executor.defer(lambda: self._send_table_create([]))
+
+        # Create first chunk as the base table - defer serialization
+        first_raw_chunk = raw_chunks[0]
+
+        def create_first_chunk() -> TableCreateRes:
+            serialized_rows = to_json(first_raw_chunk, self._project_id(), self)
+            return self._send_table_create(serialized_rows)
+
+        base_future = self.future_executor.defer(create_first_chunk)
+
+        # Chain the incremental updates sequentially
+        def process_remaining_chunks(
+            base_results: list[TableCreateRes],
+        ) -> TableCreateRes:
+            base_result = base_results[0]
+            current_digest = base_result.digest
+            all_row_digests = list(base_result.row_digests)
+
+            # Process remaining chunks sequentially (each depends on previous)
+            for raw_chunk in raw_chunks[1:]:
+                # Serialize each chunk separately to avoid recursion
+                serialized_chunk = to_json(raw_chunk, self._project_id(), self)
+                payloads = [TableAppendSpecPayload(row=row) for row in serialized_chunk]
+                update_req = TableUpdateReq(
+                    project_id=self._project_id(),
+                    base_digest=current_digest,
+                    updates=[TableAppendSpec(append=payload) for payload in payloads],
+                )
+                update_result = self.server.table_update(update_req)
+                current_digest = update_result.digest
+                all_row_digests.extend(update_result.updated_row_digests)
+
+            return TableCreateRes(
+                digest=current_digest,
+                row_digests=all_row_digests,
+            )
+
+        # Chain the sequential processing after the base table is created
+        return self.future_executor.then([base_future], process_remaining_chunks)
 
     def _append_to_table(self, table_digest: str, rows: list[dict]) -> WeaveTable:
         payloads = [TableAppendSpecPayload(row=row) for row in rows]
@@ -1698,8 +1896,7 @@ class WeaveClient:
 
     @property
     def num_outstanding_jobs(self) -> int:
-        """
-        Returns the total number of pending jobs across all executors and the server.
+        """Returns the total number of pending jobs across all executors and the server.
 
         This property can be used to check the progress of background tasks
         without blocking the main thread.
@@ -1724,8 +1921,7 @@ class WeaveClient:
         use_progress_bar: bool = True,
         callback: Callable[[FlushStatus], None] | None = None,
     ) -> None:
-        """
-        Flushes all background tasks to ensure they are processed.
+        """Flushes all background tasks to ensure they are processed.
 
         This method blocks until all currently enqueued jobs are processed,
         displaying a progress bar to show the status of the pending tasks.

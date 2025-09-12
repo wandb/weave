@@ -13,8 +13,9 @@ from typing_extensions import Self
 
 from weave.trace import api
 from weave.trace.objectify import Objectifyable
-from weave.trace.op import ObjectRef, Op
+from weave.trace.op_protocol import Op
 from weave.trace.ref_util import get_ref
+from weave.trace.refs import ObjectRef
 from weave.trace.vals import WeaveObject, pydantic_getattribute
 
 logger = logging.getLogger(__name__)
@@ -23,8 +24,7 @@ T = TypeVar("T")
 
 
 def deprecated_field(new_field_name: str) -> Callable[[Callable[[Any], T]], property]:
-    """
-    Create a deprecated property decorator that issues warnings when accessed.
+    """Create a deprecated property decorator that issues warnings when accessed.
 
     This decorator factory creates a property that acts as a deprecated alias
     for another field. When the deprecated property is accessed (either for
@@ -72,8 +72,7 @@ def deprecated_field(new_field_name: str) -> Callable[[Callable[[Any], T]], prop
 
 
 class Object(BaseModel):
-    """
-    Base class for Weave objects that can be tracked and versioned.
+    """Base class for Weave objects that can be tracked and versioned.
 
     This class extends Pydantic's BaseModel to provide Weave-specific functionality
     for object tracking, referencing, and serialization. Objects can have names,
@@ -113,8 +112,7 @@ class Object(BaseModel):
 
     @classmethod
     def from_uri(cls, uri: str, *, objectify: bool = True) -> Self:
-        """
-        Create an object instance from a Weave URI.
+        """Create an object instance from a Weave URI.
 
         Args:
             uri (str): The Weave URI pointing to the object.
@@ -143,8 +141,7 @@ class Object(BaseModel):
     def handle_relocatable_object(
         cls, v: Any, handler: ValidatorFunctionWrapHandler, info: ValidationInfo
     ) -> Any:
-        """
-        Handle validation of relocatable objects including ObjectRef and WeaveObject.
+        """Handle validation of relocatable objects including ObjectRef and WeaveObject.
 
         This validator handles special cases where the input is an ObjectRef or
         WeaveObject that needs to be properly converted to a standard Object instance.

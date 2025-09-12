@@ -78,6 +78,29 @@ def test_get_entity_project_from_project_name_success(
         mock_wandb_api.default_entity_name.assert_called_once()
 
 
+def test_get_entity_project_from_project_name_with_wandb_entity_env(
+    mock_wandb_api, monkeypatch
+):
+    """Test that WANDB_ENTITY environment variable is respected."""
+    # Set WANDB_ENTITY environment variable
+    monkeypatch.setenv("WANDB_ENTITY", "env_entity")
+
+    # Test that env var is used when project has no entity
+    entity, project = get_entity_project_from_project_name("test_project")
+    assert entity == "env_entity"
+    assert project == "test_project"
+
+    # Verify wandb API was not called since we used env var
+    mock_wandb_api.default_entity_name.assert_not_called()
+
+    # Test that explicit entity in project name overrides env var
+    entity, project = get_entity_project_from_project_name(
+        "explicit_entity/test_project"
+    )
+    assert entity == "explicit_entity"
+    assert project == "test_project"
+
+
 @pytest.mark.parametrize(
     "case",
     [

@@ -1,5 +1,4 @@
-"""
-This module provides a simple interface to the Sentry SDK.
+"""This module provides a simple interface to the Sentry SDK.
 It is a thin wrapper around the Sentry SDK that provides a few
 convenience methods for logging exceptions and marking sessions.
 Furthermore, it ensures that the Sentry SDK is properly set up

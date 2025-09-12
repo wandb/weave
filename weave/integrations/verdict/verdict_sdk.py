@@ -95,7 +95,7 @@ if not _import_failed:
 def create_pipeline_init_wrapper(
     tracer: Any,
 ) -> Callable[[Callable], Callable]:
-    """Create a wrapper that injects the default tracer into Pipeline.__init__"""
+    """Create a wrapper that injects the default tracer into Pipeline.__init__."""
 
     def wrapper(original_init: Callable) -> Callable:
         def pipeline_init(

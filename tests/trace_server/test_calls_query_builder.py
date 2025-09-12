@@ -1650,7 +1650,7 @@ def test_query_with_summary_weave_trace_name_filter() -> None:
 
 
 def test_storage_size_fields():
-    """Test querying with storage size fields"""
+    """Test querying with storage size fields."""
     cq = CallsQuery(project_id="test/project", include_storage_size=True)
     cq.add_field("id")
     cq.add_field("storage_size_bytes")
@@ -1663,10 +1663,10 @@ def test_storage_size_fields():
         FROM calls_merged
         LEFT JOIN
         (SELECT id,
-                sum(COALESCE(attributes_size_bytes, 0) + COALESCE(inputs_size_bytes, 0) + COALESCE(output_size_bytes, 0) + COALESCE(summary_size_bytes, 0)) as storage_size_bytes
+                sum(COALESCE(attributes_size_bytes, 0) + COALESCE(inputs_size_bytes, 0) + COALESCE(output_size_bytes, 0) + COALESCE(summary_size_bytes, 0)) AS storage_size_bytes
         FROM calls_merged_stats
         WHERE project_id = {pb_0:String}
-        GROUP BY id) as storage_size_tbl on calls_merged.id = storage_size_tbl.id
+        GROUP BY id) AS storage_size_tbl ON calls_merged.id = storage_size_tbl.id
         WHERE calls_merged.project_id = {pb_0:String}
         GROUP BY (calls_merged.project_id,
                 calls_merged.id)
@@ -1678,7 +1678,7 @@ def test_storage_size_fields():
 
 
 def test_total_storage_size():
-    """Test querying with total storage size"""
+    """Test querying with total storage size."""
     cq = CallsQuery(project_id="test/project", include_total_storage_size=True)
     cq.add_field("id")
     cq.add_field("total_storage_size_bytes")
@@ -1696,11 +1696,11 @@ def test_total_storage_size():
         FROM calls_merged
         LEFT JOIN (SELECT
             trace_id,
-            sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) as total_storage_size_bytes
+            sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) AS total_storage_size_bytes
         FROM calls_merged_stats
         WHERE project_id = {pb_0:String}
-        GROUP BY trace_id) as rolled_up_cms
-        on calls_merged.trace_id = rolled_up_cms.trace_id
+        GROUP BY trace_id) AS rolled_up_cms
+        ON calls_merged.trace_id = rolled_up_cms.trace_id
         WHERE calls_merged.project_id = {pb_0:String}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         HAVING (
@@ -1713,7 +1713,7 @@ def test_total_storage_size():
 
 
 def test_aggregated_data_size_field():
-    """Test the AggregatedDataSizeField class"""
+    """Test the AggregatedDataSizeField class."""
     field = AggregatedDataSizeField(
         field="total_storage_size_bytes", join_table_name="rolled_up_cms"
     )
@@ -2071,6 +2071,27 @@ def test_trace_id_filter_eq():
     )
 
 
+def test_wb_run_id_filter_eq():
+    cq = CallsQuery(project_id="project")
+    cq.add_field("id")
+    cq.hardcoded_filter = HardCodedFilter(filter={"wb_run_ids": ["wb_run_123"]})
+    assert_sql(
+        cq,
+        """
+        SELECT
+            calls_merged.id AS id
+        FROM calls_merged
+        WHERE calls_merged.project_id = {pb_1:String}
+            AND (calls_merged.wb_run_id IN {pb_0:Array(String)}
+                OR calls_merged.wb_run_id IS NULL)
+        GROUP BY (calls_merged.project_id, calls_merged.id)
+        HAVING (((any(calls_merged.deleted_at) IS NULL))
+            AND ((NOT ((any(calls_merged.started_at) IS NULL)))))
+        """,
+        {"pb_0": ["wb_run_123"], "pb_1": "project"},
+    )
+
+
 def test_trace_roots_only_filter_with_condition():
     cq = CallsQuery(project_id="project")
     cq.add_field("id")
@@ -2235,7 +2256,7 @@ def test_all_optimization_filters():
 
 
 def test_filter_length_validation():
-    """Test that filter length validation works"""
+    """Test that filter length validation works."""
     pb = ParamBuilder()
     cq = CallsQuery(project_id="test/project")
     cq.hardcoded_filter = HardCodedFilter(
@@ -2285,6 +2306,11 @@ def test_filter_length_validation():
 
     cq = CallsQuery(project_id="test/project")
     cq.hardcoded_filter = HardCodedFilter(filter={"turn_ids": ["turn_123"] * 1001})
+    with pytest.raises(ValueError):
+        cq.as_sql(pb)
+
+    cq = CallsQuery(project_id="test/project")
+    cq.hardcoded_filter = HardCodedFilter(filter={"wb_run_ids": ["wb_run_123"] * 1001})
     with pytest.raises(ValueError):
         cq.as_sql(pb)
 
@@ -2344,7 +2370,7 @@ def test_disallowed_fields():
 
 
 def test_thread_id_filter_eq():
-    """Test thread_id filter with single thread ID"""
+    """Test thread_id filter with single thread ID."""
     cq = CallsQuery(project_id="project")
     cq.add_field("id")
     cq.hardcoded_filter = HardCodedFilter(filter={"thread_ids": ["thread_123"]})
@@ -2367,7 +2393,7 @@ def test_thread_id_filter_eq():
 
 
 def test_thread_id_filter_in():
-    """Test thread_id filter with multiple thread IDs"""
+    """Test thread_id filter with multiple thread IDs."""
     cq = CallsQuery(project_id="project")
     cq.add_field("id")
     cq.hardcoded_filter = HardCodedFilter(
@@ -2396,7 +2422,7 @@ def test_thread_id_filter_in():
 
 
 def test_turn_id_filter_eq():
-    """Test turn_id filter with single turn ID"""
+    """Test turn_id filter with single turn ID."""
     cq = CallsQuery(project_id="project")
     cq.add_field("id")
     cq.hardcoded_filter = HardCodedFilter(filter={"turn_ids": ["turn_123"]})
@@ -2419,7 +2445,7 @@ def test_turn_id_filter_eq():
 
 
 def test_turn_id_filter_in():
-    """Test turn_id filter with multiple turn IDs"""
+    """Test turn_id filter with multiple turn IDs."""
     cq = CallsQuery(project_id="project")
     cq.add_field("id")
     cq.hardcoded_filter = HardCodedFilter(filter={"turn_ids": ["turn_123", "turn_456"]})
@@ -2446,7 +2472,7 @@ def test_turn_id_filter_in():
 
 
 def test_thread_id_and_turn_id_filter_combined():
-    """Test thread_id and turn_id filters together"""
+    """Test thread_id and turn_id filters together."""
     cq = CallsQuery(project_id="project")
     cq.add_field("id")
     cq.hardcoded_filter = HardCodedFilter(

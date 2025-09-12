@@ -212,8 +212,8 @@ def get_custom_provider_info(
     model_name: str,
     obj_read_func: Callable,
 ) -> CustomProviderInfo:
-    """
-    Extract provider information from a custom provider model.
+    """Extract provider information from a custom provider model.
+
     Args:
         project_id: The project ID
         model_name: The model name (format: <provider_id>/<provider_model_id>)

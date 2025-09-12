@@ -633,6 +633,15 @@ class TableCreateReq(BaseModelStrict):
     table: TableSchemaForInsert
 
 
+class TableCreateFromDigestsReq(BaseModelStrict):
+    project_id: str
+    row_digests: list[str]
+
+
+class TableCreateFromDigestsRes(BaseModel):
+    digest: str
+
+
 """
 The `TableUpdateSpec` pattern is as follows, where `OPERATION` is globally unique. This
 follows a similar pattern as our `Query` definitions.
@@ -1136,8 +1145,7 @@ class ThreadsQueryFilter(BaseModelStrict):
 
 
 class ThreadsQueryReq(BaseModelStrict):
-    """
-    Query threads with aggregated statistics based on turn calls only.
+    """Query threads with aggregated statistics based on turn calls only.
 
     Turn calls are the immediate children of thread contexts (where call.id == turn_id).
     This provides meaningful conversation-level statistics rather than including all
@@ -1248,6 +1256,10 @@ class TraceServerInterface(Protocol):
 
     # Table API
     def table_create(self, req: TableCreateReq) -> TableCreateRes: ...
+    def table_create_from_digests(
+        self, req: TableCreateFromDigestsReq
+    ) -> TableCreateFromDigestsRes: ...
+
     def table_update(self, req: TableUpdateReq) -> TableUpdateRes: ...
     def table_query(self, req: TableQueryReq) -> TableQueryRes: ...
     def table_query_stream(self, req: TableQueryReq) -> Iterator[TableRowSchema]: ...

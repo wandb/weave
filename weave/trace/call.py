@@ -10,7 +10,7 @@ from weave.trace import urls
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.feedback import RefFeedbackQuery
 from weave.trace.isinstance import weave_isinstance
-from weave.trace.op import Op
+from weave.trace.op_protocol import Op
 from weave.trace.ref_util import get_ref
 from weave.trace.refs import CallRef, ObjectRef, OpRef
 from weave.trace.serialization.serialize import from_json
@@ -92,8 +92,7 @@ class Call:
 
     @property
     def func_name(self) -> str:
-        """
-        The decorated function's name that produced this call.
+        """The decorated function's name that produced this call.
 
         This is different from `op_name` which is usually the ref of the op.
         """
@@ -144,8 +143,7 @@ class Call:
 
     # These are the children if we're using Call at read-time
     def children(self, *, page_size: int = DEFAULT_CALLS_PAGE_SIZE) -> CallsIter:
-        """
-        Get the children of the call.
+        """Get the children of the call.
 
         Args:
             page_size: Tune performance by changing the number of calls fetched at a time.
@@ -173,14 +171,12 @@ class Call:
         return True
 
     def set_display_name(self, name: str | None) -> None:
-        """
-        Set the display name for the call.
+        """Set the display name for the call.
 
         Args:
             name: The display name to set for the call.
 
         Example:
-
         ```python
         result, call = my_function.call("World")
         call.set_display_name("My Custom Display Name")
@@ -204,8 +200,7 @@ class Call:
         scorer: Op | Scorer,
         additional_scorer_kwargs: dict[str, Any] | None = None,
     ) -> ApplyScorerResult:
-        """
-        `apply_scorer` is a method that applies a Scorer to a Call. This is useful
+        """`apply_scorer` is a method that applies a Scorer to a Call. This is useful
         for guarding application logic with a scorer and/or monitoring the quality
         of critical ops. Scorers are automatically logged to Weave as Feedback and
         can be used in queries & analysis.
