@@ -1,13 +1,13 @@
 import json
 import os
 
-import httpx
+import requests
 
 
 def get_raw_json():
-    response = httpx.get("https://trace.wandb.ai/openapi.json")
+    response = requests.get("https://trace.wandb.ai/openapi.json")
     # Used for Dev
-    # response = httpx.get("http://trace_server.wandb.test/openapi.json")
+    # response = requests.get("http://trace_server.wandb.test/openapi.json")
     response.raise_for_status()
     return response.json()
 

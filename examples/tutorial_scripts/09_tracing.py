@@ -1,6 +1,6 @@
 import random
 
-import httpx
+import requests
 from openai import OpenAI
 
 import weave
@@ -21,13 +21,13 @@ POKEMON = [
 @weave.op
 def get_pokemon_data(pokemon_name):
     url = f"https://pokeapi.co/api/v2/pokemon/{pokemon_name}"
-    response = httpx.get(url)
+    response = requests.get(url)
     if response.status_code == 200:
         data = response.json()
         name = data["name"]
         types = [t["type"]["name"] for t in data["types"]]
         species_url = data["species"]["url"]
-        species_response = httpx.get(species_url)
+        species_response = requests.get(species_url)
         evolved_from = "Unknown"
         if species_response.status_code == 200:
             species_data = species_response.json()

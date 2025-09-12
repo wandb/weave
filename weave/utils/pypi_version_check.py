@@ -14,7 +14,7 @@ import sys
 import threading
 from typing import TYPE_CHECKING, Any, Callable
 
-import httpx
+import requests
 
 if TYPE_CHECKING:
     import packaging.version  # type: ignore[import-not-found]
@@ -118,7 +118,7 @@ def _find_available(
     pypi_url = f"https://pypi.org/pypi/{module_name}/json"
     yanked_dict = {}
     try:
-        async_requests_get = _async_call(httpx.get, timeout=5)
+        async_requests_get = _async_call(requests.get, timeout=5)
         data, thread = async_requests_get(pypi_url, timeout=3)
         if not data or isinstance(data, Exception):
             return None

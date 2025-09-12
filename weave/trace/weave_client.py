@@ -16,7 +16,7 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Any, Callable, TypedDict, cast
 
 import pydantic
-from httpx import HTTPStatusError as HTTPError
+from requests import HTTPError
 
 from weave import version
 from weave.chat.chat import Chat

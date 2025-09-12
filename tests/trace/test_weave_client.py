@@ -8,9 +8,9 @@ import sys
 import time
 import uuid
 
-import httpx
 import pydantic
 import pytest
+import requests
 from pydantic import ValidationError
 
 import weave
@@ -1447,7 +1447,7 @@ def test_weave_server(client):
     ref = client._save_object(model, "my-model")
 
     url = weave.serve(ref, thread=True)
-    response = httpx.post(url + "/predict", json={"input": "x"})
+    response = requests.post(url + "/predict", json={"input": "x"})
     assert response.json() == {"result": "input is: x"}
 
 

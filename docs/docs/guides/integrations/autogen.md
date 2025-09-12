@@ -277,7 +277,7 @@ import os
 from pathlib import Path
 
 import aiofiles
-import httpx
+import aiohttp
 
 from autogen_core.memory import Memory, MemoryContent, MemoryMimeType
 from autogen_ext.memory.chromadb import (
@@ -292,9 +292,9 @@ class SimpleDocumentIndexer:
 
     async def _fetch_content(self, source: str) -> str:
         if source.startswith(("http://", "https://")):
-            async with httpx.AsyncClient() as client:
-                response = await client.get(source)
-                return response.text
+            async with aiohttp.ClientSession() as session:
+                async with session.get(source) as response:
+                    return await response.text()
         else:
             async with aiofiles.open(source, "r", encoding="utf-8") as f:
                 return await f.read()

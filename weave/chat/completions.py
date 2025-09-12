@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any, Literal
 
-import httpx
+import requests
 from pydantic import ValidationError
 
 from weave.chat.stream import ChatCompletionChunkStream
@@ -240,7 +240,7 @@ class Completions:
 
         request_stream = stream is True
 
-        response = httpx.post(
+        response = requests.post(
             url,
             auth=auth,
             headers=headers,
@@ -249,9 +249,8 @@ class Completions:
         )
 
         if response.status_code == 401:
-            raise httpx.HTTPStatusError(
-                f"{response.reason_phrase} - please make sure inference is enabled for entity {self._client.entity}",
-                request=response.request,
+            raise requests.HTTPError(
+                f"{response.reason} - please make sure inference is enabled for entity {self._client.entity}",
                 response=response,
             )
 
