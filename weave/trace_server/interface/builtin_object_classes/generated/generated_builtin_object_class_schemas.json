@@ -51,65 +51,6 @@
       "title": "ActionSpec",
       "type": "object"
     },
-    "AlertSpec": {
-      "properties": {
-        "name": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Name"
-        },
-        "description": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Description"
-        },
-        "spec": {
-          "additionalProperties": true,
-          "default": {},
-          "title": "Spec",
-          "type": "object"
-        },
-        "op_scope": {
-          "anyOf": [
-            {
-              "items": {
-                "type": "string"
-              },
-              "type": "array"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "examples": [
-            [
-              "weave:///entity/project/op/name:digest"
-            ],
-            [
-              "weave:///entity/project/op/name:*"
-            ]
-          ],
-          "title": "Op Scope"
-        }
-      },
-      "title": "AlertSpec",
-      "type": "object"
-    },
     "AndOperation": {
       "description": "Logical AND. All conditions must evaluate to true.\n\nExample:\n    ```\n    {\n        \"$and\": [\n            {\"$eq\": [{\"$getField\": \"op_name\"}, {\"$literal\": \"predict\"}]},\n            {\"$gt\": [{\"$getField\": \"summary.usage.tokens\"}, {\"$literal\": 1000}]}\n        ]\n    }\n    ```",
       "properties": {
@@ -188,7 +129,6 @@
           "title": "Description"
         },
         "field_schema": {
-          "additionalProperties": true,
           "default": {},
           "description": "Expected to be valid JSON Schema. Can be provided as a dict, a Pydantic model class, a tuple of a primitive type and a Pydantic Field, or primitive type",
           "examples": [
@@ -1307,7 +1247,6 @@
           "anyOf": [
             {
               "items": {
-                "additionalProperties": true,
                 "type": "object"
               },
               "type": "array"
@@ -1478,7 +1417,6 @@
           "type": "string"
         },
         "response_schema": {
-          "additionalProperties": true,
           "title": "Response Schema",
           "type": "object"
         }
@@ -1505,7 +1443,6 @@
             },
             {
               "items": {
-                "additionalProperties": true,
                 "type": "object"
               },
               "type": "array"
@@ -1532,7 +1469,6 @@
         "function_call": {
           "anyOf": [
             {
-              "additionalProperties": true,
               "type": "object"
             },
             {
@@ -2231,9 +2167,6 @@
     },
     "ChartConfig": {
       "$ref": "#/$defs/ChartConfig"
-    },
-    "AlertSpec": {
-      "$ref": "#/$defs/AlertSpec"
     }
   },
   "required": [
@@ -2247,8 +2180,7 @@
     "ProviderModel",
     "SavedView",
     "LLMStructuredCompletionModel",
-    "ChartConfig",
-    "AlertSpec"
+    "ChartConfig"
   ],
   "title": "CompositeBaseObject",
   "type": "object"
