@@ -1218,14 +1218,6 @@ class EvaluationStatusRes(BaseModel):
     ]
 
 
-# Alert API Models
-class AlertLevel(str, Enum):
-    LOG = "log"
-    OK = "ok"
-    WARN = "warn"
-    ALERT = "alert"
-
-
 class AlertMetricCreateReq(BaseModelStrict):
     project_id: str
     alert_ids: list[str]
@@ -1236,19 +1228,6 @@ class AlertMetricCreateReq(BaseModelStrict):
 
 
 class AlertMetricCreateRes(BaseModel):
-    id: str
-
-
-class AlertEventCreateReq(BaseModelStrict):
-    project_id: str
-    alert_id: str
-    level: AlertLevel
-    associated_call_ids: list[str]
-    metric_values: list[float]
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
-
-
-class AlertEventCreateRes(BaseModel):
     id: str
 
 
@@ -1273,29 +1252,6 @@ class AlertMetricSchema(BaseModel):
 
 class AlertMetricsQueryRes(BaseModel):
     metrics: list[AlertMetricSchema]
-
-
-class AlertEventsQueryReq(BaseModelStrict):
-    project_id: str
-    alert_ids: Optional[list[str]] = None
-    levels: Optional[list[AlertLevel]] = None
-    start_time: Optional[datetime.datetime] = None
-    end_time: Optional[datetime.datetime] = None
-    limit: Optional[int] = None
-    offset: Optional[int] = None
-
-
-class AlertEventSchema(BaseModel):
-    id: str
-    project_id: str
-    alert_ref: str
-    alert_id: str
-    created_at: datetime.datetime
-    level: AlertLevel
-
-
-class AlertEventsQueryRes(BaseModel):
-    events: list[AlertEventSchema]
 
 
 class TraceServerInterface(Protocol):
