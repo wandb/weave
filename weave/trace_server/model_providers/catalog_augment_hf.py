@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-import httpx
+import requests
 
 dir_this = Path(__file__).parent
 file_in = dir_this / "modelsBegin.json"
@@ -76,7 +76,7 @@ def get_hf_info(model_name: str) -> dict[str, Any]:
         Dict[str, Any]: Dictionary containing filtered HuggingFace model information.
     """
     url = f"https://huggingface.co/api/models/{model_name}"
-    response = httpx.get(url)
+    response = requests.get(url)
     d = response.json()
     filtered = pick_keys(d, HF_KEYS_TO_KEEP)
     license = d.get("cardData", {}).get("license")
