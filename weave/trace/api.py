@@ -7,12 +7,14 @@ import logging
 import sys
 import warnings
 from collections.abc import Iterator
-from typing import Any, Union, cast
+from typing import Any, TypedDict, Union, cast, overload
+
+from typing_extensions import Unpack
 
 # TODO: type_handlers is imported here to trigger registration of the image serializer.
 # There is probably a better place for this, but including here for now to get the fix in.
 from weave import type_handlers  # noqa: F401
-from weave.trace import urls, weave_client, weave_init
+from weave.trace import urls, weave_init
 from weave.trace.autopatch import AutopatchSettings
 from weave.trace.constants import TRACE_OBJECT_EMOJI
 from weave.trace.context import call_context
@@ -21,13 +23,14 @@ from weave.trace.context.call_context import get_current_call, require_current_c
 from weave.trace.display.term import configure_logger
 from weave.trace.op import as_op, op
 from weave.trace.op_protocol import PostprocessInputsFunc, PostprocessOutputFunc
-from weave.trace.refs import ObjectRef, Ref
+from weave.trace.refs import ObjectRef, OpRef, Ref
 from weave.trace.settings import (
     UserSettings,
     parse_and_apply_settings,
     should_disable_weave,
 )
 from weave.trace.table import Table
+from weave.trace.weave_client import WeaveClient
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface.builtin_object_classes import leaderboard
 
@@ -41,16 +44,23 @@ _global_postprocess_output: PostprocessOutputFunc | None = None
 _global_attributes: dict[str, Any] = {}
 
 
+class InitKwargs(TypedDict, total=False):
+    settings: UserSettings | dict[str, Any] | None
+    autopatch_settings: AutopatchSettings | None
+    global_postprocess_inputs: PostprocessInputsFunc | None
+    global_postprocess_output: PostprocessOutputFunc | None
+    global_attributes: dict[str, Any] | None
+
+
+@overload
+def init(project_name: str, /, **kwargs: Unpack[InitKwargs]) -> WeaveClient: ...
+@overload
+def init(entity: str, project: str, /, **kwargs: Unpack[InitKwargs]) -> WeaveClient: ...
 def init(
-    project_name: str,
-    *,
-    settings: UserSettings | dict[str, Any] | None = None,
-    autopatch_settings: AutopatchSettings | None = None,
-    global_postprocess_inputs: PostprocessInputsFunc | None = None,
-    global_postprocess_output: PostprocessOutputFunc | None = None,
-    global_attributes: dict[str, Any] | None = None,
-) -> weave_client.WeaveClient:
-    """Initialize weave tracking, logging to a wandb project.
+    arg1: str, arg2: str | None = None, /, **init_kwargs: Unpack[InitKwargs]
+) -> WeaveClient:
+    """
+    Initialize weave tracking, logging to a wandb project.
 
     Logging is initialized globally, so you do not need to keep a reference
     to the return value of init.
@@ -72,9 +82,26 @@ def init(
     2. Global postprocessing
 
     Returns:
-        A Weave client.
+        WeaveClient: A Weave client.
+
+    Examples:
+    ```python
+        >>> client = init("my-entity/my-project")
+        >>> client = init("my-entity", "my-project")
+        >>> client = init("my-entity", "my-project", settings={"api_url": "https://my-weave-server"})
+    ```
     """
-    if not project_name or not project_name.strip():
+    # Parse arguments to support both (entity, project, ...) and (project_name, ...)
+    if arg2 is None:
+        # Single argument pattern: init("entity/project")
+        final_project_name = arg1
+    else:
+        # Two argument pattern: init("entity", "project")
+        entity = arg1
+        project = arg2
+        final_project_name = f"{entity}/{project}"
+
+    if not final_project_name or not final_project_name.strip():
         raise ValueError("project_name must be non-empty")
 
     configure_logger()
@@ -86,6 +113,12 @@ def init(
             stacklevel=2,
         )
 
+    settings = init_kwargs.get("settings", None)
+    autopatch_settings = init_kwargs.get("autopatch_settings", None)
+    global_postprocess_inputs = init_kwargs.get("global_postprocess_inputs", None)
+    global_postprocess_output = init_kwargs.get("global_postprocess_output", None)
+    global_attributes = init_kwargs.get("global_attributes", None)
+
     # Check if deprecated autopatch_settings is used
     if autopatch_settings is not None:
         logger.warning(
@@ -93,7 +126,7 @@ def init(
             "Please use explicit patching instead. For example:\n"
             "----------------------------------------\n"
             "    import weave\n"
-            f"    weave.init('{project_name}')\n"
+            f"    weave.init('{final_project_name}')\n"
             "    weave.integrations.patch_openai()\n"
             "----------------------------------------\n"
             "See https://docs.wandb.ai/guides/integrations for more information.",
@@ -112,12 +145,18 @@ def init(
     if should_disable_weave():
         return weave_init.init_weave_disabled()
 
-    return weave_init.init_weave(
-        project_name,
-    )
+    return weave_init.init_weave(final_project_name)
 
 
-def get_client() -> weave_client.WeaveClient | None:
+def get_client() -> WeaveClient | None:
+    """Get the current global Weave client, or None if not initialized.
+
+    Returns:
+        WeaveClient | None: The current Weave client, or None if not initialized.
+
+    Examples:
+        >>> client = get_client()
+    """
     return weave_client_context.get_weave_client()
 
 
@@ -147,7 +186,7 @@ def publish(obj: Any, name: str | None = None) -> ObjectRef:
     ref = client._save_object(obj, save_name, "latest")
 
     if isinstance(ref, ObjectRef):
-        if isinstance(ref, weave_client.OpRef):
+        if isinstance(ref, OpRef):
             url = urls.op_version_path(
                 ref.entity,
                 ref.project,
