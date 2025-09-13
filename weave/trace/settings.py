@@ -8,6 +8,33 @@
 * Type: `bool`
 
 If True, all weave ops will behave like regular functions and no network requests will be made.
+
+## `print_call_link`
+
+* Environment Variable: `WEAVE_PRINT_CALL_LINK`
+* Settings Key: `print_call_link`
+* Default: `True`
+* Type: `bool`
+
+If True, prints a link to the Weave UI when calling a weave op.
+
+## `use_parallel_table_upload`
+
+* Environment Variable: `WEAVE_USE_PARALLEL_TABLE_UPLOAD`
+* Settings Key: `use_parallel_table_upload`
+* Default: `False`
+* Type: `bool`
+
+If True, enables parallel table upload chunking for large tables. If False, uses incremental upload method.
+
+## `silent`
+
+* Environment Variable: `WEAVE_SILENT`
+* Settings Key: `silent`
+* Default: `False` (automatically set to `True` when wandb is installed)
+* Type: `bool`
+
+If True, disables all terminal logging output from Weave, including termlog, termwarn, and termerror messages.
 """
 
 import os
@@ -187,6 +214,14 @@ class UserSettings(BaseModel):
     Can be overridden with the environment variable `WEAVE_USE_PARALLEL_TABLE_UPLOAD`
     """
 
+    silent: bool = False
+    """Toggles silent mode for terminal output.
+
+    If True, disables all terminal logging output from Weave, including termlog, termwarn, and termerror messages.
+    Note: Automatically defaults to True when wandb is installed (unless explicitly set via environment variable).
+    Can be overridden with the environment variable `WEAVE_SILENT`
+    """
+
     model_config = ConfigDict(extra="forbid")
     _is_first_apply: bool = PrivateAttr(True)
 
@@ -299,6 +334,11 @@ def should_use_parallel_table_upload() -> bool:
     return _should("use_parallel_table_upload")
 
 
+def should_be_silent() -> bool:
+    """Returns whether terminal logging should be silenced."""
+    return _should("silent")
+
+  
 def should_implicitly_patch_integrations() -> bool:
     """Returns whether implicit patching of integrations is enabled."""
     return _should("implicitly_patch_integrations")

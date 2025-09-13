@@ -2,6 +2,7 @@
 the file more standalone.
 """
 
+import os
 import sys
 from typing import Any
 
@@ -60,6 +61,10 @@ def _log(
     repeat: bool = True,
     prefix: bool = True,
 ) -> None:
+    # Check if silent mode is enabled
+    if os.getenv("WEAVE_SILENT", "").lower() in ("yes", "true", "1", "on"):
+        return
+    
     if string:
         if prefix:
             line = "\n".join([f"{LOG_STRING}: {s}" for s in string.split("\n")])
