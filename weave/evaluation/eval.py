@@ -238,7 +238,7 @@ class Evaluation(Object):
 
         async def eval_example(example: dict) -> dict:
             try:
-                eval_row = await self.predict_and_score(model, example)
+                eval_row = await self.predict_and_score(model, example)  # type: ignore[arg-type, call-arg]
             except OpCallError as e:
                 raise e
             except Exception:
@@ -276,7 +276,7 @@ class Evaluation(Object):
     @op(call_display_name=default_evaluation_display_name)
     async def evaluate(self, model: Union[Op, Model]) -> dict:
         eval_results = await self.get_eval_results(model)
-        summary = await self.summarize(eval_results)
+        summary = await self.summarize(eval_results)  # type: ignore[call-arg]
 
         summary_str = _safe_summarize_to_str(summary)
         if summary_str:
@@ -426,7 +426,7 @@ def evaluate(
     eval = Evaluation(
         dataset=dataset, scorers=scorers, preprocess_model_input=preprocess_model_input
     )
-    return asyncio.run(eval.evaluate(model))
+    return asyncio.run(eval.evaluate(model))  # type: ignore[arg-type, call-arg]
 
 
 def is_valid_model(model: Any) -> bool:
