@@ -320,6 +320,109 @@ class Evaluation(Object):
             ),
         )
 
+    def get_predict_and_score_calls(self) -> dict[str, list[Call]]:
+        """
+        Retrieve predict_and_score calls for each evaluation run, grouped by trace ID.
+
+        Returns:
+            dict[str, list[Call]]: A dictionary mapping trace IDs to lists of predict_and_score Call objects.
+                Each trace ID represents one evaluation run, and the list contains all predict_and_score
+                calls executed during that run.
+
+        Examples:
+            ```python
+            evaluation = Evaluation(dataset=examples, scorers=[accuracy_scorer])
+            await evaluation.evaluate(model)
+            predict_and_score_calls = evaluation.get_predict_and_score_calls()
+            for trace_id, calls in predict_and_score_calls.items():
+                print(f"Trace {trace_id}: {len(calls)} predict_and_score calls")
+                for call in calls:
+                    print(f"  Output: {call.output.get('output')}")
+                    print(f"  Scores: {call.output.get('scores')}")
+                    print(f"  Latency: {call.output.get('model_latency')}")
+            ```
+        """
+        d = {}
+        client = require_weave_client()
+        for evaluate_call in self.get_evaluate_calls():
+            descendents = list(
+                client.get_calls(filter={"trace_ids": [evaluate_call.trace_id]})
+            )
+            predict_and_score_calls = [
+                call
+                for call in descendents
+                if call.summary.get("weave", {}).get("trace_name")
+                == "Evaluation.predict_and_score"
+            ]
+            d[evaluate_call.trace_id] = predict_and_score_calls
+
+        return d
+
+    def get_predict_calls(self) -> dict[str, list[Call]]:
+        """
+        Retrieve model prediction calls for each evaluation run, grouped by trace ID.
+
+        These are the actual calls to the model's predict/infer method, containing just the
+        model outputs without scores.
+
+        Returns:
+            dict[str, list[Call]]: A dictionary mapping trace IDs to lists of model prediction Call objects.
+                Each trace ID represents one evaluation run, and the list contains all model prediction
+                calls executed during that run.
+
+        Examples:
+            ```python
+            evaluation = Evaluation(dataset=examples, scorers=[accuracy_scorer])
+            await evaluation.evaluate(model)
+            predict_calls = evaluation.get_predict_calls()
+            for trace_id, calls in predict_calls.items():
+                print(f"Trace {trace_id}: {len(calls)} predict calls")
+                for call in calls:
+                    print(f"  Model: {call.op_name}")
+                    print(f"  Output: {call.output}")
+            ```
+        """
+        from weave.flow.model import INFER_METHOD_NAMES
+
+        d = {}
+        client = require_weave_client()
+        for evaluate_call in self.get_evaluate_calls():
+            # Get all descendants of the evaluation call
+            descendents = list(
+                client.get_calls(filter={"trace_ids": [evaluate_call.trace_id]})
+            )
+
+            # Find calls that match common model inference method names
+            # We check both the trace_name (cleaner) and op_name (for compatibility)
+            predict_calls = []
+            for call in descendents:
+                # Check trace_name first (cleaner and more reliable)
+                trace_name = call.summary.get("weave", {}).get("trace_name", "")
+                if trace_name and any(
+                    trace_name.endswith(f".{method_name}") or trace_name == method_name
+                    for method_name in INFER_METHOD_NAMES
+                ):
+                    predict_calls.append(call)
+                    continue
+
+                # Fallback to checking op_name for cases where trace_name is not set
+                # Check if op_name contains the method name (handles weave URIs)
+                if call.op_name:
+                    for method_name in INFER_METHOD_NAMES:
+                        # Check various patterns in op_name
+                        if (
+                            f".{method_name}:" in call.op_name
+                            or f"/{method_name}:" in call.op_name
+                            or call.op_name.endswith(f".{method_name}")
+                            or call.op_name == method_name
+                        ):
+                            predict_calls.append(call)
+                            break
+
+            d[evaluate_call.trace_id] = predict_calls
+
+        return d
+
     def get_score_calls(self) -> dict[str, list[Call]]:
         """Retrieve scorer calls for each evaluation run, grouped by trace ID.
 
