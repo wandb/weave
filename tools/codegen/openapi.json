@@ -3628,6 +3628,21 @@
       },
       "FeedbackCreateReq": {
         "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id",
+            "description": "If provided by the client, this ID will be used for the feedback row instead of a server-generated one.",
+            "examples": [
+              "018f1f2a-9c2b-7d3e-b5a1-8c9d2e4f6a7b"
+            ]
+          },
           "project_id": {
             "type": "string",
             "title": "Project Id",
@@ -3917,6 +3932,21 @@
       },
       "FeedbackReplaceReq": {
         "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id",
+            "description": "If provided by the client, this ID will be used for the feedback row instead of a server-generated one.",
+            "examples": [
+              "018f1f2a-9c2b-7d3e-b5a1-8c9d2e4f6a7b"
+            ]
+          },
           "project_id": {
             "type": "string",
             "title": "Project Id",

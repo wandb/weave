@@ -141,6 +141,10 @@ def generate_code(
             "--typescript-path", help="Path to the TypeScript code generation output"
         ),
     ] = None,
+    java_path: Annotated[
+        str | None,
+        Option("--java-path", help="Path to the Java code generation output"),
+    ] = None,
 ) -> None:
     """Generate code from the OpenAPI spec using Stainless.
 
@@ -193,6 +197,8 @@ def generate_code(
         cmd.append(f"--+target=node:{node_path}")
     if typescript_path:
         cmd.append(f"--+target=typescript:{typescript_path}")
+    if java_path:
+        cmd.append(f"--+target=java:{java_path}")
 
     # Print the command being executed for visibility
     info(f"Running command: {' '.join(cmd)}")
@@ -224,10 +230,19 @@ def update_pyproject(
     (if --release is specified) or a git SHA reference.
     """
     header("Updating pyproject.toml")
+
+    # weave_server_sdk always goes under the stainless optional extra
+    optional_extra = "stainless" if package_name == "weave_server_sdk" else None
+
     if release:
         version = _get_package_version(python_output)
-        _update_pyproject_toml(package_name, version, True)
-        info(f"Updated {package_name} in [stainless] extra to version: {version}")
+        _update_pyproject_toml(package_name, version, True, optional_extra)
+        location = (
+            f"in [{optional_extra}]" if optional_extra else "in main dependencies"
+        )
+        info(
+            f"Updated {package_name} in [stainless] extra {location} to version: {version}"
+        )
     else:
         repo_info = _get_repo_info(python_output)
         remote_url = repo_info.remote_url
@@ -591,11 +606,13 @@ def all(
     # Use python_output as python_output
     node_path = _ensure_absolute_path(cfg.get("node_output"))
     typescript_path = _ensure_absolute_path(cfg.get("typescript_output"))
+    java_path = _ensure_absolute_path(cfg.get("java_output"))
     _format_announce_invoke(
         generate_code,
         python_path=str_path,
         node_path=node_path,
         typescript_path=typescript_path,
+        java_path=java_path,
     )
 
     # 3. Update pyproject.toml or create branch with generated code
@@ -764,12 +781,20 @@ def _update_pyproject_toml(
     package: str,
     value: str,
     is_version: bool,
+    optional_extra: str | None = None,
     use_stainless_extra: bool = True,
 ) -> None:
     """Update the dependency entry for the given package in the pyproject.toml file.
 
     If is_version is True, the dependency is set to the package version (==version),
     otherwise, it's set to a git SHA reference.
+
+    Args:
+        package: The package name to update.
+        value: The version or git SHA reference.
+        is_version: Whether the value is a version (True) or git SHA (False).
+        optional_extra: If provided, update the dependency in this optional extra
+                        instead of the main dependencies.
 
     If use_stainless_extra is True, updates the package in the 'stainless' extra
     under optional-dependencies instead of main dependencies.
@@ -797,8 +822,29 @@ def _update_pyproject_toml(
             doc["project"]["optional-dependencies"]["stainless"] = stainless_deps
 
         dependencies = doc["project"]["optional-dependencies"]["stainless"]
+    elif optional_extra:
+        # Update optional dependencies
+        if "project" not in doc or "optional-dependencies" not in doc["project"]:
+            error("No optional-dependencies section found in pyproject.toml")
+            return
+
+        if optional_extra not in doc["project"]["optional-dependencies"]:
+            error(f"Optional extra '{optional_extra}' not found in pyproject.toml")
+            return
+
+        # Ensure optional dependencies is a tomlkit array for consistent formatting
+        if not isinstance(
+            doc["project"]["optional-dependencies"][optional_extra], tomlkit.items.Array
+        ):
+            dependencies = tomlkit.array()
+            dependencies.extend(doc["project"]["optional-dependencies"][optional_extra])
+            doc["project"]["optional-dependencies"][optional_extra] = dependencies
+
+        dependencies = doc["project"]["optional-dependencies"][optional_extra]
     else:
         # Update in main dependencies (original behavior)
+        # Determine which dependencies list to update
+        # Update main dependencies
         # Ensure dependencies is a tomlkit array for consistent formatting
         if not isinstance(doc["project"]["dependencies"], tomlkit.items.Array):
             dependencies = tomlkit.array()
@@ -806,6 +852,8 @@ def _update_pyproject_toml(
             doc["project"]["dependencies"] = dependencies
 
         dependencies = doc["project"]["dependencies"]
+
+    # Update the matching dependency
 
     # Update the package dependency
     for i, dep in enumerate(dependencies):

@@ -7,6 +7,7 @@ from collections.abc import Iterator
 from datetime import datetime
 from unittest.mock import MagicMock, patch
 
+import httpx
 import pytest
 from fastapi import FastAPI
 from fastapi.responses import StreamingResponse
@@ -20,7 +21,10 @@ from weave.trace import weave_client, weave_init
 from weave.trace.context import weave_client_context
 from weave.trace.context.call_context import set_call_stack
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server_bindings import remote_http_trace_server
+from weave.trace_server_bindings import (
+    remote_http_trace_server,
+    stainless_trace_server,
+)
 from weave.trace_server_bindings.caching_middleware_trace_server import (
     CachingMiddlewareTraceServer,
 )
@@ -551,6 +555,73 @@ def network_proxy_client(client):
         yield (client, remote_client, records)
 
         weave.utils.http_requests.post = orig_post
+
+
+BASE_URL = "http://test"
+
+
+@pytest.fixture
+@pytest.mark.respx(base_url=BASE_URL, assert_all_called=False)
+def stainless_network_proxy_client(client, respx_mock):
+    """
+    Mock fixture for testing stainless network proxy client using respx.
+
+    This fixture sets up respx mocking to intercept HTTP requests made by the
+    RemoteHTTPTraceServer and delegates them to the local test server.
+    """
+    records = []
+
+    # Mock table/create endpoint
+    def handle_table_create(request):
+        # Parse the JSON request body
+        req_data = request.content.decode("utf-8")
+        req_dict = json.loads(req_data)
+        req = tsi.TableCreateReq(**req_dict)
+
+        # Record the request
+        records.append(("table_create", req))
+
+        # Process through the local server
+        res = client.server.table_create(req)
+
+        # Return the response
+        return httpx.Response(
+            status_code=200,
+            json=dict(res),
+            headers={"content-type": "application/json"},
+        )
+
+    # Mock table/update endpoint
+    def handle_table_update(request):
+        # Parse the JSON request body
+        req_data = request.content.decode("utf-8")
+        req_dict = json.loads(req_data)
+        req = tsi.TableUpdateReq(**req_dict)
+
+        # Record the request
+        records.append(("table_update", req))
+
+        # Process through the local server
+        res = client.server.table_update(req)
+
+        # Return the response
+        return httpx.Response(
+            status_code=200,
+            json=dict(res),
+            headers={"content-type": "application/json"},
+        )
+
+    # Register the mock routes
+    respx_mock.post("/table/create").mock(side_effect=handle_table_create)
+    respx_mock.post("/table/update").mock(side_effect=handle_table_update)
+
+    # Create the remote client with the mocked URL
+    remote_client = stainless_trace_server.RemoteHTTPTraceServer(
+        trace_server_url=BASE_URL,
+        remote_request_bytes_limit=1024 * 1024,
+    )
+
+    return client, remote_client, records
 
 
 @pytest.fixture(autouse=True)
