@@ -67,8 +67,6 @@ STAINLESS_OAS_PATH = f"{CODEGEN_ROOT_RELPATH}/openapi.json"
 app = Typer(help="Weave code generation tools")
 console = Console()
 
-# Configure logging with rich handler for better formatting
-
 # Create custom RichHandler with specific colors for each level
 rich_handler = RichHandler(
     console=console,
@@ -77,7 +75,6 @@ rich_handler = RichHandler(
     omit_repeated_times=False,
     log_time_format="%H:%M:%S",
 )
-
 logging.basicConfig(
     level=logging.INFO,
     format="%(message)s",
@@ -110,7 +107,7 @@ def get_openapi_spec(
     # Kill any existing process on the port (if there is one)
     _kill_port(WEAVE_PORT)
 
-    _info("Starting server...")
+    logger.info("Starting server...")
     server = subprocess.Popen(
         [
             "uvicorn",
@@ -123,29 +120,29 @@ def get_openapi_spec(
 
     try:
         if not _wait_for_server(f"http://localhost:{WEAVE_PORT}"):
-            _error("Server failed to start within timeout")
+            logger.exception("Server failed to start within timeout")
             server_out, server_err = server.communicate()
-            _error(f"Server output: {server_out.decode()}")
-            _error(f"Server error: {server_err.decode()}")
+            logger.exception(f"Server output: {server_out.decode()}")
+            logger.exception(f"Server error: {server_err.decode()}")
             sys.exit(1)
 
-        _info("Fetching OpenAPI spec...")
+        logger.info("Fetching OpenAPI spec...")
         response = httpx.get(f"http://localhost:{WEAVE_PORT}/openapi.json")
         spec = response.json()
 
         with open(output_file, "w") as f:
             json.dump(spec, f, indent=2)
-        _info(f"Saved to {output_file}")
+        logger.info(f"Saved to {output_file}")
 
     finally:
         # Try to cleanly shut down the server
-        _info("Shutting down server...")
+        logger.info("Shutting down server...")
         server.terminate()
         server.wait(timeout=5)
 
         # Force kill if server hasn't shut down
         if server.poll() is None:
-            _warning("Force killing server...")
+            logger.warning("Force killing server...")
             server.kill()
             server.wait()
 
@@ -179,7 +176,7 @@ def generate_code(
     _header("Generating code with Stainless")
 
     if not any([python_path, node_path, typescript_path, java_path]):
-        _error(
+        logger.exception(
             "At least one of --python-path, --node-path, --typescript-path, or --java-path must be provided"
         )
         sys.exit(1)
@@ -194,7 +191,7 @@ def generate_code(
     ]
 
     if missing_vars:
-        _error(
+        logger.exception(
             "Missing required environment variables: "
             + ", ".join(
                 f"{var} ({desc})"
@@ -232,10 +229,12 @@ def generate_code(
         # Run without capture_output to stream output live to terminal
         subprocess.run(cmd, check=True, timeout=SUBPROCESS_TIMEOUT)
     except subprocess.CalledProcessError as e:
-        _error(f"Code generation failed with exit code {e.returncode}")
+        logger.exception(f"Code generation failed with exit code {e.returncode}")
         sys.exit(1)
     except subprocess.TimeoutExpired:
-        _error(f"Code generation timed out after {SUBPROCESS_TIMEOUT} seconds")
+        logger.exception(
+            f"Code generation timed out after {SUBPROCESS_TIMEOUT} seconds"
+        )
         sys.exit(1)
 
 
@@ -263,7 +262,7 @@ def update_pyproject(
         location = (
             f"in [{optional_extra}]" if optional_extra else "in main dependencies"
         )
-        _info(
+        logger.info(
             f"Updated {package_name} in [stainless] extra {location} to version: {version}"
         )
     else:
@@ -271,10 +270,10 @@ def update_pyproject(
         remote_url = repo_info.remote_url
         sha = repo_info.sha
         if not sha:
-            _error(f"Failed to get git SHA (got: {sha=})")
+            logger.exception(f"Failed to get git SHA (got: {sha=})")
             sys.exit(1)
         _update_pyproject_toml(package_name, f"{remote_url}@{sha}", False)
-        _info(f"Updated {package_name} in [stainless] extra to SHA: {sha}")
+        logger.info(f"Updated {package_name} in [stainless] extra to SHA: {sha}")
 
 
 @app.command()
@@ -309,31 +308,31 @@ def merge_generated_code(
             timeout=SUBPROCESS_TIMEOUT,
             check=True,
         ).stdout.strip()
-        _info(f"Current weave branch: {current_branch}")
+        logger.info(f"Current weave branch: {current_branch}")
     except subprocess.CalledProcessError as e:
-        _error(f"Failed to get current branch: {e}")
+        logger.exception("Failed to get current branch")
         sys.exit(1)
     except subprocess.TimeoutExpired:
-        _error("Timeout while getting current branch")
+        logger.exception("Timeout while getting current branch")
         sys.exit(1)
 
     # Navigate to weave-stainless repo
     if not python_output.exists():
         console.print(f"python_output: {python_output}")
         # List contents of python_output directory for debugging
-        _info(f"Listing contents of parent directory: {python_output.parent}")
+        logger.info(f"Listing contents of parent directory: {python_output.parent}")
         try:
             for item in python_output.parent.iterdir():
-                _info(f"  {item.name} ({'dir' if item.is_dir() else 'file'})")
+                logger.info(f"  {item.name} ({'dir' if item.is_dir() else 'file'})")
         except Exception as e:
-            _warning(f"Could not list parent directory: {e}")
-        _error(f"Python output directory does not exist: {python_output}")
+            logger.warning(f"Could not list parent directory: {e}")
+        logger.exception(f"Python output directory does not exist: {python_output}")
         sys.exit(1)
 
     try:
         # The generated code is on the local main branch after stainless generation
         # We need to create a branch from this main that has the generated code
-        _info("Checking current branch in weave-stainless...")
+        logger.info("Checking current branch in weave-stainless...")
         current_stainless_branch = subprocess.run(
             ["git", "rev-parse", "--abbrev-ref", "HEAD"],
             cwd=python_output,
@@ -342,11 +341,11 @@ def merge_generated_code(
             timeout=SUBPROCESS_TIMEOUT,
             check=True,
         ).stdout.strip()
-        _info(f"Currently on branch: {current_stainless_branch}")
+        logger.info(f"Currently on branch: {current_stainless_branch}")
 
         # Ensure we're on main which should have the generated code
         if current_stainless_branch != "main":
-            _info("Switching to main branch (which has generated code)...")
+            logger.info("Switching to main branch (which has generated code)...")
             subprocess.run(
                 ["git", "checkout", "main"],
                 cwd=python_output,
@@ -360,7 +359,7 @@ def merge_generated_code(
 
         # Create branch from main (with generated code) matching weave branch
         mirror_branch = f"weave/{current_branch}"
-        _info(f"Creating branch from main (with generated code): {mirror_branch}")
+        logger.info(f"Creating branch from main (with generated code): {mirror_branch}")
 
         # Check if branch exists
         branch_exists = (
@@ -375,7 +374,7 @@ def merge_generated_code(
 
         if branch_exists:
             # Delete the existing branch first so we can recreate it from origin/main
-            _info(
+            logger.info(
                 f"Deleting existing branch {mirror_branch} to recreate with new generated code..."
             )
             subprocess.run(
@@ -387,7 +386,9 @@ def merge_generated_code(
             )
 
         # Create new branch from ORIGIN/main (clean remote state)
-        _info(f"Creating new branch {mirror_branch} from origin/main (clean base)...")
+        logger.info(
+            f"Creating new branch {mirror_branch} from origin/main (clean base)..."
+        )
         subprocess.run(
             ["git", "checkout", "-b", mirror_branch, "origin/main"],
             cwd=python_output,
@@ -397,7 +398,7 @@ def merge_generated_code(
         )
 
         # Now checkout the generated code from LOCAL main into this branch
-        _info("Applying generated code from local main branch...")
+        logger.info("Applying generated code from local main branch...")
         subprocess.run(
             ["git", "checkout", "main", "--", "."],
             cwd=python_output,
@@ -418,7 +419,7 @@ def merge_generated_code(
 
         if status_result.stdout.strip():
             # Stage all changes
-            _info("Staging changes...")
+            logger.info("Staging changes...")
             subprocess.run(
                 ["git", "add", "."],
                 cwd=python_output,
@@ -431,7 +432,7 @@ def merge_generated_code(
             commit_message = (
                 f"Update generated code from weave branch: {current_branch}"
             )
-            _info(f"Committing: {commit_message}")
+            logger.info(f"Committing: {commit_message}")
             subprocess.run(
                 ["git", "commit", "-m", commit_message],
                 cwd=python_output,
@@ -441,7 +442,7 @@ def merge_generated_code(
             )
 
             # Push the branch
-            _info(f"Pushing branch {mirror_branch}...")
+            logger.info(f"Pushing branch {mirror_branch}...")
             subprocess.run(
                 ["git", "push", "origin", mirror_branch],
                 cwd=python_output,
@@ -450,7 +451,9 @@ def merge_generated_code(
                 check=True,
             )
         else:
-            _info("No changes to commit (generated code may already be on origin/main)")
+            logger.info(
+                "No changes to commit (generated code may already be on origin/main)"
+            )
 
         # Always update pyproject.toml with the current SHA, whether we committed or not
         # Get the current SHA of the branch
@@ -459,18 +462,20 @@ def merge_generated_code(
         remote_url = repo_info.remote_url
 
         # Update pyproject.toml with the SHA
-        _info(f"Updating pyproject.toml [stainless] extra with SHA: {sha}")
+        logger.info(f"Updating pyproject.toml [stainless] extra with SHA: {sha}")
         _update_pyproject_toml(package_name, f"{remote_url}@{sha}", False)
 
-        _info(f"Successfully updated {package_name} in [stainless] extra to SHA: {sha}")
+        logger.info(
+            f"Successfully updated {package_name} in [stainless] extra to SHA: {sha}"
+        )
 
     except subprocess.CalledProcessError as e:
-        _error(f"Git operation failed: {e}")
+        logger.exception("Git operation failed")
         if e.stderr:
-            _error(f"Error output: {e.stderr}")
+            logger.exception(f"Error output: {e.stderr}")
         sys.exit(1)
     except subprocess.TimeoutExpired:
-        _error("Git operation timed out")
+        logger.exception("Git operation timed out")
         sys.exit(1)
 
 
@@ -529,7 +534,7 @@ def all(
     # Initialize config dict
     config_path = _ensure_absolute_path(config)
     if config_path is None:
-        _error("Config path cannot be None")
+        logger.exception("Config path cannot be None")
         sys.exit(1)
 
     cfg = _load_config(config_path)
@@ -550,7 +555,7 @@ def all(
 
     # Validate required config
     if not cfg.get("python_output") or not cfg.get("package_name"):
-        _warning(
+        logger.warning(
             "python_output and package_name must be specified either in config file or as arguments. "
             "Creating a config file with user inputs..."
         )
@@ -568,7 +573,7 @@ def all(
                 "\nPlease enter the absolute path to your local Python repository: "
             )
             if not python_output_input:
-                _error("Repository path cannot be empty")
+                logger.exception("Repository path cannot be empty")
                 sys.exit(1)
 
             # Expand user path (e.g., ~/repo becomes /home/user/repo)
@@ -576,14 +581,14 @@ def all(
 
             # Ensure the path exists
             if not os.path.exists(python_output_input):
-                _warning(
+                logger.warning(
                     f"Repository path '{python_output_input}' does not exist. Please make sure it's correct."
                 )
                 create_anyway = input(
                     "Continue creating config anyway? (y/n): "
                 ).lower()
                 if create_anyway != "y":
-                    _error("Config creation aborted")
+                    logger.exception("Config creation aborted")
                     sys.exit(1)
 
             # Replace the template python_output with the provided value
@@ -596,23 +601,23 @@ def all(
             with open(config_file_path, "w") as dst:
                 dst.write(config_content)
 
-            _info(f"Config file created at: {config_file_path}")
+            logger.info(f"Config file created at: {config_file_path}")
 
             # Reload the config file to get all values including package_name
             cfg = _load_config(config_file_path)
-            _info(
+            logger.info(
                 f"Loaded config with package_name: {cfg.get('package_name', 'weave_server_sdk')}"
             )
         else:
-            _error(f"Template file not found: {template_path}")
-            _error(
+            logger.exception(f"Template file not found: {template_path}")
+            logger.exception(
                 "python_output and package_name must be specified either in config file or as arguments"
             )
             sys.exit(1)
 
     str_path = _ensure_absolute_path(cfg["python_output"])
     if str_path is None:
-        _error("python_output cannot be None")
+        logger.exception("python_output cannot be None")
         sys.exit(1)
 
     # 1. Get OpenAPI spec
@@ -620,7 +625,7 @@ def all(
     # Convert output_file to absolute path if relative
     output_path = _ensure_absolute_path(output_file)
     if output_path is None:
-        _error("output_path cannot be None")
+        logger.exception("output_path cannot be None")
         sys.exit(1)
     # Call get_openapi_spec with --output-file argument
     _format_announce_invoke(get_openapi_spec, output_file=output_path)
@@ -677,7 +682,7 @@ def _get_repo_info(python_output: Path) -> _RepoInfo:
 
     Executes git commands in the specified repository path to obtain repository metadata.
     """
-    _info(f"Getting SHA for {python_output}")
+    logger.info(f"Getting SHA for {python_output}")
     try:
         sha = subprocess.run(
             ["git", "rev-parse", "HEAD"],
@@ -695,7 +700,7 @@ def _get_repo_info(python_output: Path) -> _RepoInfo:
             timeout=SUBPROCESS_TIMEOUT,
         ).stdout.strip()
     except subprocess.TimeoutExpired:
-        _error("Timeout while getting git repository information")
+        logger.exception("Timeout while getting git repository information")
         sys.exit(1)
     else:
         return _RepoInfo(sha=sha, remote_url=remote_url)
@@ -756,11 +761,13 @@ def _update_pyproject_toml(
     elif optional_extra:
         # Update optional dependencies
         if "project" not in doc or "optional-dependencies" not in doc["project"]:
-            _error("No optional-dependencies section found in pyproject.toml")
+            logger.exception("No optional-dependencies section found in pyproject.toml")
             return
 
         if optional_extra not in doc["project"]["optional-dependencies"]:
-            _error(f"Optional extra '{optional_extra}' not found in pyproject.toml")
+            logger.exception(
+                f"Optional extra '{optional_extra}' not found in pyproject.toml"
+            )
             return
 
         # Ensure optional dependencies is a tomlkit array for consistent formatting
@@ -875,12 +882,12 @@ def _load_config(config_path: str | Path) -> dict[str, Any]:
     try:
         with open(config_path) as f:
             cfg = yaml.safe_load(f) or {}
-        _info(f"Loaded config from {config_path}")
+        logger.info(f"Loaded config from {config_path}")
     except yaml.YAMLError as e:
-        _error(f"Failed to parse config file: {e}")
+        logger.exception("Failed to parse config file")
         sys.exit(1)
     except OSError as e:
-        _error(f"Failed to read config file: {e}")
+        logger.exception("Failed to read config file")
         sys.exit(1)
     else:
         return cfg
@@ -910,7 +917,7 @@ def _header(text: str, color: str = "white"):
 
 # Legacy function aliases for backward compatibility
 # Colors are configured in the RichHandler level_styles above
-_error = logger.error
+_error = logger.exception
 _warning = logger.warning
 _info = logger.info
 _debug = logger.debug
@@ -932,14 +939,14 @@ def _kill_port(port: int) -> bool:
             check=False,
         )
     except subprocess.TimeoutExpired:
-        _error(f"Timeout while finding processes on port {port}")
+        logger.exception(f"Timeout while finding processes on port {port}")
         return False
     except Exception as e:
-        _error(f"Unexpected error finding processes on port {port}: {e}")
+        logger.exception(f"Unexpected error finding processes on port {port}")
         return False
 
     if result.returncode != 0 or not result.stdout.strip():
-        _info(f"No process found listening on port {port}")
+        logger.info(f"No process found listening on port {port}")
         return False
 
     # Get the PIDs from the output
@@ -958,14 +965,14 @@ def _kill_port(port: int) -> bool:
                 timeout=SUBPROCESS_TIMEOUT,
                 check=True,
             )
-            _info(f"Killed process {pid} on port {port}")
+            logger.info(f"Killed process {pid} on port {port}")
             killed_any = True
         except subprocess.TimeoutExpired:
-            _warning(f"Timeout while killing process {pid}")
+            logger.warning(f"Timeout while killing process {pid}")
         except subprocess.CalledProcessError as e:
-            _warning(f"Failed to kill process {pid}: {e}")
+            logger.warning(f"Failed to kill process {pid}: {e}")
         except Exception as e:
-            _warning(f"Unexpected error killing process {pid}: {e}")
+            logger.warning(f"Unexpected error killing process {pid}: {e}")
 
     return killed_any
 
@@ -983,13 +990,13 @@ def _wait_for_server(
         try:
             httpx.get(url, timeout=interval)
         except httpx.ConnectError:
-            _debug("Failed to connect to server, retrying...")
+            logger.debug("Failed to connect to server, retrying...")
             time.sleep(interval)
         except httpx.TimeoutException:
-            _debug("Server request timed out, retrying...")
+            logger.debug("Server request timed out, retrying...")
             time.sleep(interval)
         else:
-            _info("Server is healthy!")
+            logger.info("Server is healthy!")
             return True
     return False
 
@@ -999,9 +1006,9 @@ def _print_command(cmd: list[str]) -> None:
     lines: list[str] = []
     lines.append(f"  {cmd[0]}")
     lines.extend([f"    {line}" for line in cmd[1:]])
-    _info("Running command:")
+    logger.info("Running command:")
     for line in lines:
-        _info(line)
+        logger.info(line)
 
 
 if __name__ == "__main__":
