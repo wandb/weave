@@ -89,8 +89,7 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 @app.command()
 def get_openapi_spec(
     output_file: Annotated[
-        str | None,
-        Option("-o", "--output-file", help="Output file path for the OpenAPI spec"),
+        str | None, Option("-o", "--output-file", help="Output path for OpenAPI spec")
     ] = None,
 ) -> None:
     """Retrieve the OpenAPI specification from a temporary FastAPI server.
@@ -150,22 +149,16 @@ def get_openapi_spec(
 @app.command()
 def generate_code(
     python_path: Annotated[
-        str | None,
-        Option("--python-path", help="Path to the Python code generation output"),
+        str | None, Option("--python-path", help="Output path for Python SDK")
     ] = None,
     node_path: Annotated[
-        str | None,
-        Option("--node-path", help="Path to the Node.js code generation output"),
+        str | None, Option("--node-path", help="Output path for Node SDK")
     ] = None,
     typescript_path: Annotated[
-        str | None,
-        Option(
-            "--typescript-path", help="Path to the TypeScript code generation output"
-        ),
+        str | None, Option("--typescript-path", help="Output path for TypeScript SDK")
     ] = None,
     java_path: Annotated[
-        str | None,
-        Option("--java-path", help="Path to the Java code generation output"),
+        str | None, Option("--java-path", help="Output path for Java SDK")
     ] = None,
 ) -> None:
     """Generate code from the OpenAPI spec using Stainless.
@@ -240,10 +233,16 @@ def generate_code(
 
 @app.command()
 def update_pyproject(
-    python_output: Annotated[Path, Argument(help="Path to Python output", exists=True)],
-    package_name: Annotated[str, Argument(help="Name of the package")],
+    python_output: Annotated[
+        Path, Argument(help="Input path for Python SDK", exists=True)
+    ],
+    package_name: Annotated[str, Argument(help="Name of the Python SDK package")],
     release: Annotated[
-        bool, Option("--release", help="Update to the latest version")
+        bool,
+        Option(
+            "--release",
+            help="Update the latest version of the Python SDK in pyproject.toml",
+        ),
     ] = False,
 ) -> None:
     """Update the pyproject.toml file with the latest version of the generated code.
@@ -279,10 +278,10 @@ def update_pyproject(
 @app.command()
 def merge_generated_code(
     python_output: Annotated[
-        Path, Argument(help="Path to generated Python code (weave-stainless)")
+        Path, Argument(help="Input path for Python SDK (weave-stainless)")
     ],
     package_name: Annotated[
-        str, Argument(help="Name of the package to update in pyproject.toml")
+        str, Argument(help="Name of the Python SDK package to update in pyproject.toml")
     ],
 ) -> None:
     """Create a branch from main with the generated code and update pyproject.toml.
@@ -482,41 +481,43 @@ def merge_generated_code(
 @app.command()
 def all(
     config: Annotated[
-        str, Option("--config", help="Path to config file")
+        str, Option("--config", help="Path to the config file")
     ] = CODEGEN_ROOT_RELPATH + "/generate_config.yaml",
     python_output: Annotated[
         str | None,
-        Option("--python-output", help="Path for Python code generation output"),
+        Option("--python-output", help="Output path for Python SDK"),
     ] = None,
     package_name: Annotated[
         str | None,
         Option(
-            "--package-name", help="Name of the package to update in pyproject.toml"
+            "--package-name",
+            help="Name of the Python SDK package to update in pyproject.toml",
         ),
     ] = None,
     openapi_output: Annotated[
         str | None,
-        Option("--openapi-output", help="Path to save the OpenAPI spec"),
+        Option("--openapi-output", help="Output path for OpenAPI spec"),
     ] = None,
     node_output: Annotated[
         str | None,
-        Option("--node-output", help="Path for Node.js code generation output"),
+        Option("--node-output", help="Output path for Node SDK"),
     ] = None,
     typescript_output: Annotated[
         str | None,
-        Option(
-            "--typescript-output", help="Path for TypeScript code generation output"
-        ),
+        Option("--typescript-output", help="Output path for TypeScript SDK"),
     ] = None,
     release: Annotated[
         bool | None,
-        Option("--release", help="Update to the latest version"),
+        Option(
+            "--release",
+            help="Update the latest version of the Python SDK in pyproject.toml",
+        ),
     ] = None,
     auto_merge: Annotated[
         bool,
         Option(
             "--auto-merge",
-            help="Automatically create a branch with generated code after generation",
+            help="Automatically create a branch with generated code after generation and update pyproject.toml",
         ),
     ] = True,
 ) -> None:
@@ -861,7 +862,9 @@ def _ensure_absolute_path(path: str | None) -> str | None:
     if path is None:
         return None
     p = Path(path)
-    return str(Path.cwd() / p) if not p.is_absolute() else str(p)
+    if p.is_absolute():
+        return str(p)
+    return str(Path.cwd() / p)
 
 
 def _format_announce_invoke(command: Callable, **kwargs) -> None:
@@ -872,25 +875,14 @@ def _format_announce_invoke(command: Callable, **kwargs) -> None:
 
 
 def _load_config(config_path: str | Path) -> dict[str, Any]:
-    """Load and parse a YAML configuration file from the specified path.
-    Returns a dictionary of configuration values, or an empty dictionary if the file does not exist.
-    """
+    """Load and parse a YAML configuration file from the specified path."""
     config_path = Path(config_path)
     if not config_path.exists():
-        return {}
+        raise FileNotFoundError(f"Config file not found: {config_path}")
 
-    try:
-        with open(config_path) as f:
-            cfg = yaml.safe_load(f) or {}
-        logger.info(f"Loaded config from {config_path}")
-    except yaml.YAMLError as e:
-        logger.exception("Failed to parse config file")
-        sys.exit(1)
-    except OSError as e:
-        logger.exception("Failed to read config file")
-        sys.exit(1)
-    else:
-        return cfg
+    logger.info(f"Loading config from {config_path}")
+    with open(config_path) as f:
+        return yaml.safe_load(f)
 
 
 def _random_branch_name() -> str:
@@ -913,14 +905,6 @@ def _header(text: str, color: str = "white"):
         f"║{' ' * left_padding}{text_with_padding}{' ' * right_padding}║", style=color
     )
     console.print(f"╚{'═' * (width - 2)}╝", style=color)
-
-
-# Legacy function aliases for backward compatibility
-# Colors are configured in the RichHandler level_styles above
-_error = logger.exception
-_warning = logger.warning
-_info = logger.info
-_debug = logger.debug
 
 
 def _kill_port(port: int) -> bool:
