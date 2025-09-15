@@ -92,7 +92,6 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         cursor.execute("DROP TABLE IF EXISTS objects")
         cursor.execute("DROP TABLE IF EXISTS tables")
         cursor.execute("DROP TABLE IF EXISTS table_rows")
-        cursor.execute("DROP TABLE IF EXISTS alert_metrics")
 
     def setup_tables(self) -> None:
         conn, cursor = get_conn_cursor(self.db_path)

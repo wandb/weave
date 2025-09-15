@@ -2068,6 +2068,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self, req: tsi.AlertMetricsCreateReq
     ) -> tsi.AlertMetricsCreateRes:
         """Create multiple alert metric entries in batch."""
+        if not req.metrics:
+            return tsi.AlertMetricsCreateRes(ids=[])
+
         metric_ids = []
         data_to_insert = []
 
@@ -2086,20 +2089,19 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 )
             )
 
-        if data_to_insert:
-            self._insert(
-                "alert_metrics",
-                data=data_to_insert,
-                column_names=[
-                    "project_id",
-                    "id",
-                    "alert_ids",
-                    "created_at",
-                    "metric_key",
-                    "metric_value",
-                    "call_id",
-                ],
-            )
+        self._insert(
+            "alert_metrics",
+            data=data_to_insert,
+            column_names=[
+                "project_id",
+                "id",
+                "alert_ids",
+                "created_at",
+                "metric_key",
+                "metric_value",
+                "call_id",
+            ],
+        )
 
         return tsi.AlertMetricsCreateRes(ids=metric_ids)
 
