@@ -25,6 +25,48 @@ def _verifiers_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
     return inputs
 
 
+def _remove_logprobs_from_responses(responses: list[Any]) -> None:
+    """Remove logprobs from a list of response objects."""
+    for response in responses:
+        if isinstance(response, dict) and "choices" in response:
+            for choice in response.get("choices", []):
+                if isinstance(choice, dict) and "logprobs" in choice:
+                    # TODO: redact instead?
+                    del choice["logprobs"]
+
+
+def _verifiers_postprocess_outputs_no_logprobs(outputs: Any) -> Any:
+    """Remove logprobs from the outputs to reduce size and noise in the UI."""
+    if outputs is None:
+        return outputs
+
+    # For a_generate output structure: state -> responses -> choices -> logprobs
+    if (
+        isinstance(outputs, dict)
+        and "state" in outputs
+        and isinstance(outputs["state"], list)
+    ):
+        for state_item in outputs["state"]:
+            if isinstance(state_item, dict) and "responses" in state_item:
+                _remove_logprobs_from_responses(state_item.get("responses", []))
+
+    return outputs
+
+
+def _verifiers_postprocess_inputs_no_logprobs(inputs: dict[str, Any]) -> dict[str, Any]:
+    """Remove logprobs from score_rollouts inputs and normalize self."""
+    # First apply the standard input processing
+    inputs = _verifiers_postprocess_inputs(inputs)
+
+    # For score_rollouts input structure: states -> responses -> choices -> logprobs
+    if "states" in inputs and isinstance(inputs["states"], list):
+        for state_item in inputs["states"]:
+            if isinstance(state_item, dict) and "responses" in state_item:
+                _remove_logprobs_from_responses(state_item.get("responses", []))
+
+    return inputs
+
+
 def _verifiers_wrapper(settings: OpSettings) -> Callable:
     """Return a sync wrapper that converts a function into a Weave op."""
 
@@ -128,13 +170,20 @@ def get_verifiers_patcher(
         update={"name": base.name or "verifiers.Environment.evaluate"}
     )
     a_generate_settings = base.model_copy(
-        update={"name": base.name or "verifiers.Environment.a_generate"}
+        update={
+            "name": base.name or "verifiers.Environment.a_generate",
+            "postprocess_output": _verifiers_postprocess_outputs_no_logprobs,
+        }
     )
     generate_settings = base.model_copy(
         update={"name": base.name or "verifiers.Environment.generate"}
     )
     score_rollouts_settings = base.model_copy(
-        update={"name": base.name or "verifiers.Rubric.score_rollouts"}
+        update={
+            "name": base.name or "verifiers.Rubric.score_rollouts",
+            "postprocess_inputs": _verifiers_postprocess_inputs_no_logprobs,
+            "postprocess_output": _verifiers_postprocess_outputs_no_logprobs,
+        }
     )
     score_rollout_settings = base.model_copy(
         update={"name": base.name or "verifiers.Rubric.score_rollout"}
