@@ -29,6 +29,7 @@ Environment:
 from __future__ import annotations
 
 import json
+import logging
 import os
 import random
 import string
@@ -43,6 +44,7 @@ import httpx
 import tomlkit
 import yaml
 from rich.console import Console
+from rich.logging import RichHandler
 from typer import Argument, Option, Typer
 
 # Server configuration
@@ -64,6 +66,27 @@ STAINLESS_OAS_PATH = f"{CODEGEN_ROOT_RELPATH}/openapi.json"
 # Create the Typer app
 app = Typer(help="Weave code generation tools")
 console = Console()
+
+# Configure logging with rich handler for better formatting
+
+# Create custom RichHandler with specific colors for each level
+rich_handler = RichHandler(
+    console=console,
+    show_path=False,
+    show_time=True,
+    omit_repeated_times=False,
+    log_time_format="%H:%M:%S",
+)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(message)s",
+    handlers=[rich_handler],
+)
+logger = logging.getLogger(__name__)
+
+# Suppress httpx INFO logs (only show warnings and errors)
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
 @app.command()
@@ -501,7 +524,7 @@ def all(
     4. (Optional) Create a branch from main with generated code using --auto-merge flag.
     Configurations can be provided via a YAML file or directly as command-line arguments.
     """
-    _header("Running weave codegen")
+    _header("Running weave codegen", color="yellow")
 
     # Initialize config dict
     config_path = _ensure_absolute_path(config)
@@ -635,7 +658,7 @@ def all(
         )
 
     console.print("\n")
-    _header("Weave codegen completed successfully!")
+    _header("Weave codegen completed successfully!", color="yellow")
 
 
 # -----------------------------------------------------------------------------
@@ -869,27 +892,28 @@ def _random_branch_name() -> str:
     return f"tmp/{random_string}"
 
 
-def _header(text: str):
-    """Display a prominent header"""
-    console.print(f"╔{'═' * (len(text) + 6)}╗")
-    console.print(f"║   {text}   ║")
-    console.print(f"╚{'═' * (len(text) + 6)}╝")
+def _header(text: str, color: str = "white"):
+    """Display a prominent header that spans the full console width"""
+    width = console.width
+    # Calculate padding to center the text
+    text_with_padding = f"   {text}   "
+    padding_needed = width - len(text_with_padding) - 2  # -2 for the border characters
+    left_padding = padding_needed // 2
+    right_padding = padding_needed - left_padding
+
+    console.print(f"╔{'═' * (width - 2)}╗", style=color)
+    console.print(
+        f"║{' ' * left_padding}{text_with_padding}{' ' * right_padding}║", style=color
+    )
+    console.print(f"╚{'═' * (width - 2)}╝", style=color)
 
 
-def _error(text: str):
-    console.print(f"ERROR:   {text}")
-
-
-def _warning(text: str):
-    console.print(f"WARNING: {text}")
-
-
-def _info(text: str):
-    console.print(f"INFO:    {text}")
-
-
-def _debug(text: str):
-    console.print(f"DEBUG:   {text}")
+# Legacy function aliases for backward compatibility
+# Colors are configured in the RichHandler level_styles above
+_error = logger.error
+_warning = logger.warning
+_info = logger.info
+_debug = logger.debug
 
 
 def _kill_port(port: int) -> bool:
