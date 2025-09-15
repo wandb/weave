@@ -142,12 +142,6 @@ class TestOnlyUserInjectingExternalTraceServer(
         req.wb_user_id = self._user_id
         return super().alert_metrics_create(req)
 
-    def alert_metrics_query(
-        self, req: tsi.AlertMetricsQueryReq
-    ) -> tsi.AlertMetricsQueryRes:
-        req.wb_user_id = self._user_id
-        return super().alert_metrics_query(req)
-
 
 def externalize_trace_server(
     trace_server: tsi.TraceServerInterface,
