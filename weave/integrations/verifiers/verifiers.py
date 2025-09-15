@@ -40,7 +40,6 @@ def _verifiers_postprocess_outputs_no_logprobs(outputs: Any) -> Any:
     if outputs is None:
         return outputs
 
-    # For a_generate output structure: state -> responses -> choices -> logprobs
     if (
         isinstance(outputs, dict)
         and "state" in outputs
@@ -58,7 +57,6 @@ def _verifiers_postprocess_inputs_no_logprobs(inputs: dict[str, Any]) -> dict[st
     # First apply the standard input processing
     inputs = _verifiers_postprocess_inputs(inputs)
 
-    # For score_rollouts input structure: states -> responses -> choices -> logprobs
     if "states" in inputs and isinstance(inputs["states"], list):
         for state_item in inputs["states"]:
             if isinstance(state_item, dict) and "responses" in state_item:
