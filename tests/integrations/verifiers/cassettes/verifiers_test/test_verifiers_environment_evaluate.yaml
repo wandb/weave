@@ -9,9 +9,9 @@ interactions:
       Connection:
       - keep-alive
       X-Amzn-Trace-Id:
-      - 6bcc1e7c-5cb9-4a35-9a2d-00636cc5cec1
+      - 5dc05218-07b7-4ecd-aee4-bd0b11728b12
       user-agent:
-      - datasets/4.0.0; hf_hub/0.34.4; python/3.12.11; huggingface_hub/0.34.4; pyarrow/21.0.0
+      - datasets/4.1.0; hf_hub/0.34.5; python/3.11.11; huggingface_hub/0.34.5; pyarrow/21.0.0
     method: HEAD
     uri: https://huggingface.co/datasets/openai/gsm8k/resolve/main/README.md
   response:
@@ -37,25 +37,25 @@ interactions:
       Content-Type:
       - text/plain; charset=utf-8
       Date:
-      - Thu, 11 Sep 2025 09:49:43 GMT
+      - Mon, 15 Sep 2025 23:29:35 GMT
       Location:
       - /api/resolve-cache/datasets/openai/gsm8k/e53f048856ff4f594e959d75785d2c2d37b678ee/README.md?%2Fdatasets%2Fopenai%2Fgsm8k%2Fresolve%2Fmain%2FREADME.md=&etag=%22aec2504ff01cd8c60ae9435e96347d8db32235a2%22
       RateLimit-Limit:
-      - '40000'
+      - '5000'
       RateLimit-Remaining:
-      - '39975'
+      - '4999'
       RateLimit-Reset:
-      - '17'
+      - '25'
       Referrer-Policy:
       - strict-origin-when-cross-origin
       Vary:
       - Origin, Accept
       Via:
-      - 1.1 e4773799763f9062c09320ea013975e4.cloudfront.net (CloudFront)
+      - 1.1 0e761f7a5b2481acd893422a702c9fa8.cloudfront.net (CloudFront)
       X-Amz-Cf-Id:
-      - A5HI2_gSEFB8C69fSKvPKSLAO2V_m9_O0fToOuKeiNxaB1AUgr2ViA==
+      - T7Irf6yzz1ecFDGCkb9yjKCoSzFdSHGK0dJjy5YUtjNUJ-aVZaPoCg==
       X-Amz-Cf-Pop:
-      - CCU50-P6
+      - YTO50-P2
       X-Cache:
       - Miss from cloudfront
       X-Hub-Cache:
@@ -67,7 +67,7 @@ interactions:
       X-Repo-Commit:
       - e53f048856ff4f594e959d75785d2c2d37b678ee
       X-Request-Id:
-      - Root=1-68c29b37-7981b377755eedd765e2196c;6bcc1e7c-5cb9-4a35-9a2d-00636cc5cec1
+      - Root=1-68c8a15f-3a77d9377a68f02f7473d79b;5dc05218-07b7-4ecd-aee4-bd0b11728b12
       cross-origin-opener-policy:
       - same-origin
     status:
@@ -83,9 +83,9 @@ interactions:
       Connection:
       - keep-alive
       X-Amzn-Trace-Id:
-      - d32215cd-6e24-4d3c-9aad-203b4f2a9b61
+      - f85e7ad4-c7ea-4e1b-b95c-23c870bdf890
       user-agent:
-      - datasets/4.0.0; hf_hub/0.34.4; python/3.12.11; huggingface_hub/0.34.4; pyarrow/21.0.0
+      - datasets/4.1.0; hf_hub/0.34.5; python/3.11.11; huggingface_hub/0.34.5; pyarrow/21.0.0
     method: HEAD
     uri: https://huggingface.co/api/resolve-cache/datasets/openai/gsm8k/e53f048856ff4f594e959d75785d2c2d37b678ee/README.md
   response:
@@ -99,7 +99,7 @@ interactions:
       Access-Control-Expose-Headers:
       - X-Repo-Commit,X-Request-Id,X-Error-Code,X-Error-Message,X-Total-Count,ETag,Link,Accept-Ranges,Content-Range,X-Linked-Size,X-Linked-ETag,X-Xet-Hash
       Age:
-      - '6728730'
+      - '7123522'
       Connection:
       - keep-alive
       Content-Disposition:
@@ -119,11 +119,11 @@ interactions:
       Vary:
       - Origin
       Via:
-      - 1.1 d0628adedaf891ceb1c39bb1d9b5d74a.cloudfront.net (CloudFront)
+      - 1.1 fdbf0bf4022c61868d8dad6b7d72a71a.cloudfront.net (CloudFront)
       X-Amz-Cf-Id:
-      - UtElPKxizapBKKIzE1eyvaYHIKql42gOyZ3gxHhd2sVeJT6xlhtU5Q==
+      - WYLd6FKZ_yhd5X2xQs7iPWeVY3dvmG7FzlxSUUWcDxZ0V0jKl34NmQ==
       X-Amz-Cf-Pop:
-      - CCU50-P6
+      - YTO50-P2
       X-Cache:
       - Hit from cloudfront
       X-Hub-Cache:
@@ -149,9 +149,9 @@ interactions:
       Connection:
       - keep-alive
       X-Amzn-Trace-Id:
-      - e2e22eec-1796-4b4c-b198-8cd728edb961
+      - a8933695-c65e-4b34-833e-756ebfd08201
       user-agent:
-      - datasets/4.0.0; hf_hub/0.34.4; python/3.12.11; huggingface_hub/0.34.4; pyarrow/21.0.0
+      - datasets/4.1.0; hf_hub/0.34.5; python/3.11.11; huggingface_hub/0.34.5; pyarrow/21.0.0
     method: HEAD
     uri: https://huggingface.co/datasets/openai/gsm8k/resolve/e53f048856ff4f594e959d75785d2c2d37b678ee/gsm8k.py
   response:
@@ -173,25 +173,25 @@ interactions:
       Content-Type:
       - text/plain; charset=utf-8
       Date:
-      - Thu, 11 Sep 2025 09:49:43 GMT
+      - Mon, 15 Sep 2025 23:29:35 GMT
       ETag:
       - W/"f-mY2VvLxuxB7KhsoOdQTlMTccuAQ"
       RateLimit-Limit:
-      - '40000'
+      - '5000'
       RateLimit-Remaining:
-      - '39974'
+      - '4998'
       RateLimit-Reset:
-      - '17'
+      - '25'
       Referrer-Policy:
       - strict-origin-when-cross-origin
       Vary:
       - Origin
       Via:
-      - 1.1 41f162e00e937ca42179cb2f6519d5ae.cloudfront.net (CloudFront)
+      - 1.1 cdd327922be1fd75b18f2ae0982269cc.cloudfront.net (CloudFront)
       X-Amz-Cf-Id:
-      - 33zARy5mFE2_7PXcWVah9V3UCRm4VtEGC2-iZrybeVPi5T_tNm4oig==
+      - 4C3BJZVelnEGID76FsNjGWrF1dMCKrveyqukX0E_R2lHIeuUtpg0Uw==
       X-Amz-Cf-Pop:
-      - CCU50-P6
+      - YTO50-P2
       X-Cache:
       - Error from cloudfront
       X-Error-Code:
@@ -205,7 +205,7 @@ interactions:
       X-Repo-Commit:
       - e53f048856ff4f594e959d75785d2c2d37b678ee
       X-Request-Id:
-      - Root=1-68c29b37-4e0957c60a1f37337f3cda5b;e2e22eec-1796-4b4c-b198-8cd728edb961
+      - Root=1-68c8a15f-7ea1e6d14930d75915b354bd;a8933695-c65e-4b34-833e-756ebfd08201
       cross-origin-opener-policy:
       - same-origin
     status:
@@ -221,9 +221,9 @@ interactions:
       Connection:
       - keep-alive
       User-Agent:
-      - datasets/4.0.0; python/3.12.11; huggingface_hub/0.34.4; pyarrow/21.0.0
+      - datasets/4.1.0; python/3.11.11; huggingface_hub/0.34.5; pyarrow/21.0.0
       X-Amzn-Trace-Id:
-      - e425dab0-28d5-403a-93f2-4c8bf47b2d7b
+      - 4fdf74d4-9890-4b74-8661-528aa799e171
     method: HEAD
     uri: https://s3.amazonaws.com/datasets.huggingface.co/datasets/datasets/openai/gsm8k/openai/gsm8k.py
   response:
@@ -233,15 +233,15 @@ interactions:
       Content-Type:
       - application/xml
       Date:
-      - Thu, 11 Sep 2025 09:49:44 GMT
+      - Mon, 15 Sep 2025 23:29:35 GMT
       Server:
       - AmazonS3
       Transfer-Encoding:
       - chunked
       x-amz-id-2:
-      - u66jPpbX6bTvG0t51rrvJCdnEFGd6oX7xCpc/FF2IheYqJwG47vPidGLTvZVyqy184KoPCn1bxa9LiocdQ+i4IIbXZ3CcobCse4CKP4eY2s=
+      - +Fv3AskDRxhplgbT23Y8q7nJ0lVcvf8nHh7mjdga5eU3yTK6DZawRd5E9RyAxDsGVAAToiKc/AvgEa9etbr5Y+VU9MdajvuU
       x-amz-request-id:
-      - 6SQZ6C2PM0VN5D30
+      - A2JSD9NH4VFBTQPC
     status:
       code: 404
       message: Not Found
@@ -255,9 +255,9 @@ interactions:
       Connection:
       - keep-alive
       X-Amzn-Trace-Id:
-      - a5b781f1-8e12-48a1-92ee-6200c1349efd
+      - bc9e1808-69c0-4ff3-966c-79f7bb54239e
       user-agent:
-      - unknown/None; hf_hub/0.34.4; python/3.12.11
+      - unknown/None; hf_hub/0.34.5; python/3.11.11
     method: GET
     uri: https://huggingface.co/api/datasets/openai/gsm8k/revision/e53f048856ff4f594e959d75785d2c2d37b678ee
   response:
@@ -270,7 +270,7 @@ interactions:
         reasoning.\\n\\nThese problems take between 2 and 8 steps to solve.\\nSolutions
         primarily involve performing a sequence of elementary calculations using basic
         arithmetic operations (+ \u2212 \xD7\xF7) to reach the\u2026 See the full
-        description on the dataset page: https://huggingface.co/datasets/openai/gsm8k.\",\"paperswithcode_id\":\"gsm8k\",\"downloads\":425086,\"likes\":859,\"cardData\":{\"annotations_creators\":[\"crowdsourced\"],\"language_creators\":[\"crowdsourced\"],\"language\":[\"en\"],\"license\":[\"mit\"],\"multilinguality\":[\"monolingual\"],\"size_categories\":[\"1K<n<10K\"],\"source_datasets\":[\"original\"],\"task_categories\":[\"text2text-generation\"],\"task_ids\":[],\"paperswithcode_id\":\"gsm8k\",\"pretty_name\":\"Grade
+        description on the dataset page: https://huggingface.co/datasets/openai/gsm8k.\",\"paperswithcode_id\":\"gsm8k\",\"downloads\":414164,\"likes\":859,\"cardData\":{\"annotations_creators\":[\"crowdsourced\"],\"language_creators\":[\"crowdsourced\"],\"language\":[\"en\"],\"license\":[\"mit\"],\"multilinguality\":[\"monolingual\"],\"size_categories\":[\"1K<n<10K\"],\"source_datasets\":[\"original\"],\"task_categories\":[\"text2text-generation\"],\"task_ids\":[],\"paperswithcode_id\":\"gsm8k\",\"pretty_name\":\"Grade
         School Math 8K\",\"tags\":[\"math-word-problems\"],\"dataset_info\":[{\"config_name\":\"main\",\"features\":[{\"name\":\"question\",\"dtype\":\"string\"},{\"name\":\"answer\",\"dtype\":\"string\"}],\"splits\":[{\"name\":\"train\",\"num_bytes\":3963202,\"num_examples\":7473},{\"name\":\"test\",\"num_bytes\":713732,\"num_examples\":1319}],\"download_size\":2725633,\"dataset_size\":4676934},{\"config_name\":\"socratic\",\"features\":[{\"name\":\"question\",\"dtype\":\"string\"},{\"name\":\"answer\",\"dtype\":\"string\"}],\"splits\":[{\"name\":\"train\",\"num_bytes\":5198108,\"num_examples\":7473},{\"name\":\"test\",\"num_bytes\":936859,\"num_examples\":1319}],\"download_size\":3164254,\"dataset_size\":6134967}],\"configs\":[{\"config_name\":\"main\",\"data_files\":[{\"split\":\"train\",\"path\":\"main/train-*\"},{\"split\":\"test\",\"path\":\"main/test-*\"}]},{\"config_name\":\"socratic\",\"data_files\":[{\"split\":\"train\",\"path\":\"socratic/train-*\"},{\"split\":\"test\",\"path\":\"socratic/test-*\"}]}]},\"siblings\":[{\"rfilename\":\".gitattributes\"},{\"rfilename\":\"README.md\"},{\"rfilename\":\"main/test-00000-of-00001.parquet\"},{\"rfilename\":\"main/train-00000-of-00001.parquet\"},{\"rfilename\":\"socratic/test-00000-of-00001.parquet\"},{\"rfilename\":\"socratic/train-00000-of-00001.parquet\"}],\"createdAt\":\"2022-04-12T10:22:10.000Z\",\"usedStorage\":95470379}"
     headers:
       Access-Control-Allow-Origin:
@@ -286,31 +286,31 @@ interactions:
       Content-Type:
       - application/json; charset=utf-8
       Date:
-      - Thu, 11 Sep 2025 09:49:45 GMT
+      - Mon, 15 Sep 2025 23:29:35 GMT
       ETag:
-      - W/"b06-cmIICMeN7ko9wEPx7lJhIvmxOns"
+      - W/"b06-XF8tCxxb6LdVSF4Spdvbe7VsdD4"
       RateLimit-Limit:
-      - '10000'
+      - '1000'
       RateLimit-Remaining:
-      - '9983'
+      - '999'
       RateLimit-Reset:
-      - '15'
+      - '25'
       Referrer-Policy:
       - strict-origin-when-cross-origin
       Vary:
       - Origin
       Via:
-      - 1.1 99e2a15882eaf5a1132c20fde99e9aa8.cloudfront.net (CloudFront)
+      - 1.1 5e2f1ed3ba0ab1e08304bb3d134360de.cloudfront.net (CloudFront)
       X-Amz-Cf-Id:
-      - PCTJUzfwByvbgfAgdMkgyLs3RFdnmBkNhIlTY3zssqIKeLBdF-Cotg==
+      - mD_gFEyyYaju06tUXWMOKxsZmwOfxNJCDgF0Rop3gKh_zu-HJMB9hw==
       X-Amz-Cf-Pop:
-      - CCU50-P6
+      - YTO50-P2
       X-Cache:
       - Miss from cloudfront
       X-Powered-By:
       - huggingface-moon
       X-Request-Id:
-      - Root=1-68c29b39-270fb45a53b0e33d29ac1371;a5b781f1-8e12-48a1-92ee-6200c1349efd
+      - Root=1-68c8a15f-14bcebea7cc84dbe218fcdbc;bc9e1808-69c0-4ff3-966c-79f7bb54239e
       cross-origin-opener-policy:
       - same-origin
     status:
@@ -326,9 +326,9 @@ interactions:
       Connection:
       - keep-alive
       X-Amzn-Trace-Id:
-      - c4d8b6a7-258b-4689-a174-69d50075ea98
+      - 18464022-c3e0-4dac-b45d-31d683dd7817
       user-agent:
-      - datasets/4.0.0; hf_hub/0.34.4; python/3.12.11; huggingface_hub/0.34.4; pyarrow/21.0.0
+      - datasets/4.1.0; hf_hub/0.34.5; python/3.11.11; huggingface_hub/0.34.5; pyarrow/21.0.0
     method: HEAD
     uri: https://huggingface.co/datasets/openai/gsm8k/resolve/e53f048856ff4f594e959d75785d2c2d37b678ee/.huggingface.yaml
   response:
@@ -350,25 +350,25 @@ interactions:
       Content-Type:
       - text/plain; charset=utf-8
       Date:
-      - Thu, 11 Sep 2025 09:49:45 GMT
+      - Mon, 15 Sep 2025 23:29:35 GMT
       ETag:
       - W/"f-mY2VvLxuxB7KhsoOdQTlMTccuAQ"
       RateLimit-Limit:
-      - '40000'
+      - '5000'
       RateLimit-Remaining:
-      - '39973'
+      - '4997'
       RateLimit-Reset:
-      - '15'
+      - '25'
       Referrer-Policy:
       - strict-origin-when-cross-origin
       Vary:
       - Origin
       Via:
-      - 1.1 57002de9bce089b5fd5d362d2b483df4.cloudfront.net (CloudFront)
+      - 1.1 cdd327922be1fd75b18f2ae0982269cc.cloudfront.net (CloudFront)
       X-Amz-Cf-Id:
-      - jnduCdxiNPQUhnjIGmrtPd64JrbkeTHzeTB7gzDBFFdfXh0yMTv62A==
+      - mifLGT2UT2qn93KpAuIGWKRDboNr-orcUt7r_ZrN7RBhK6diOJZ0sw==
       X-Amz-Cf-Pop:
-      - CCU50-P6
+      - YTO50-P2
       X-Cache:
       - Error from cloudfront
       X-Error-Code:
@@ -382,7 +382,7 @@ interactions:
       X-Repo-Commit:
       - e53f048856ff4f594e959d75785d2c2d37b678ee
       X-Request-Id:
-      - Root=1-68c29b39-0342e35228c8fff059dff958;c4d8b6a7-258b-4689-a174-69d50075ea98
+      - Root=1-68c8a15f-3d20f2bc3fad6ab16b587fb2;18464022-c3e0-4dac-b45d-31d683dd7817
       cross-origin-opener-policy:
       - same-origin
     status:
@@ -398,9 +398,9 @@ interactions:
       Connection:
       - keep-alive
       X-Amzn-Trace-Id:
-      - e662d297-9c58-4122-ac3b-21a76cba2eb1
+      - b06148c8-abee-4655-980d-402ca9444596
       user-agent:
-      - datasets/4.0.0; hf_hub/0.34.4; python/3.12.11
+      - datasets/4.1.0; hf_hub/0.34.5; python/3.11.11
     method: GET
     uri: https://datasets-server.huggingface.co/info?dataset=openai/gsm8k
   response:
@@ -412,15 +412,15 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Thu, 11 Sep 2025 09:49:45 GMT
+      - Mon, 15 Sep 2025 23:29:36 GMT
       Transfer-Encoding:
       - chunked
       Via:
-      - 1.1 7ab61ce3d7d648e0eaae5b45a81a89dc.cloudfront.net (CloudFront)
+      - 1.1 f0b5ff1c80ac588b3de0f130e6e2c0b6.cloudfront.net (CloudFront)
       X-Amz-Cf-Id:
-      - hs1TYlHTrp3Tg2t5FhI5uRfZkQolglu2bE4FQP6RWOVWOpUTPP4U_A==
+      - KZdnlpXLPEDH8aMNqDcFxVXkKTDrWZSXlqOpbp3t5xjP-KTGr4CB_A==
       X-Amz-Cf-Pop:
-      - CCU50-P4
+      - YTO50-P1
       X-Cache:
       - Miss from cloudfront
       cache-control:
@@ -446,9 +446,9 @@ interactions:
       Connection:
       - keep-alive
       X-Amzn-Trace-Id:
-      - 78b857b0-bf15-4998-942d-78d7fdd60d65
+      - b5855d49-54f9-43fa-8944-f971606d7eb7
       user-agent:
-      - unknown/None; hf_hub/0.34.4; python/3.12.11
+      - unknown/None; hf_hub/0.34.5; python/3.11.11
     method: GET
     uri: https://huggingface.co/api/datasets/openai/gsm8k/revision/e53f048856ff4f594e959d75785d2c2d37b678ee
   response:
@@ -461,7 +461,7 @@ interactions:
         reasoning.\\n\\nThese problems take between 2 and 8 steps to solve.\\nSolutions
         primarily involve performing a sequence of elementary calculations using basic
         arithmetic operations (+ \u2212 \xD7\xF7) to reach the\u2026 See the full
-        description on the dataset page: https://huggingface.co/datasets/openai/gsm8k.\",\"paperswithcode_id\":\"gsm8k\",\"downloads\":425086,\"likes\":859,\"cardData\":{\"annotations_creators\":[\"crowdsourced\"],\"language_creators\":[\"crowdsourced\"],\"language\":[\"en\"],\"license\":[\"mit\"],\"multilinguality\":[\"monolingual\"],\"size_categories\":[\"1K<n<10K\"],\"source_datasets\":[\"original\"],\"task_categories\":[\"text2text-generation\"],\"task_ids\":[],\"paperswithcode_id\":\"gsm8k\",\"pretty_name\":\"Grade
+        description on the dataset page: https://huggingface.co/datasets/openai/gsm8k.\",\"paperswithcode_id\":\"gsm8k\",\"downloads\":414164,\"likes\":859,\"cardData\":{\"annotations_creators\":[\"crowdsourced\"],\"language_creators\":[\"crowdsourced\"],\"language\":[\"en\"],\"license\":[\"mit\"],\"multilinguality\":[\"monolingual\"],\"size_categories\":[\"1K<n<10K\"],\"source_datasets\":[\"original\"],\"task_categories\":[\"text2text-generation\"],\"task_ids\":[],\"paperswithcode_id\":\"gsm8k\",\"pretty_name\":\"Grade
         School Math 8K\",\"tags\":[\"math-word-problems\"],\"dataset_info\":[{\"config_name\":\"main\",\"features\":[{\"name\":\"question\",\"dtype\":\"string\"},{\"name\":\"answer\",\"dtype\":\"string\"}],\"splits\":[{\"name\":\"train\",\"num_bytes\":3963202,\"num_examples\":7473},{\"name\":\"test\",\"num_bytes\":713732,\"num_examples\":1319}],\"download_size\":2725633,\"dataset_size\":4676934},{\"config_name\":\"socratic\",\"features\":[{\"name\":\"question\",\"dtype\":\"string\"},{\"name\":\"answer\",\"dtype\":\"string\"}],\"splits\":[{\"name\":\"train\",\"num_bytes\":5198108,\"num_examples\":7473},{\"name\":\"test\",\"num_bytes\":936859,\"num_examples\":1319}],\"download_size\":3164254,\"dataset_size\":6134967}],\"configs\":[{\"config_name\":\"main\",\"data_files\":[{\"split\":\"train\",\"path\":\"main/train-*\"},{\"split\":\"test\",\"path\":\"main/test-*\"}]},{\"config_name\":\"socratic\",\"data_files\":[{\"split\":\"train\",\"path\":\"socratic/train-*\"},{\"split\":\"test\",\"path\":\"socratic/test-*\"}]}]},\"siblings\":[{\"rfilename\":\".gitattributes\"},{\"rfilename\":\"README.md\"},{\"rfilename\":\"main/test-00000-of-00001.parquet\"},{\"rfilename\":\"main/train-00000-of-00001.parquet\"},{\"rfilename\":\"socratic/test-00000-of-00001.parquet\"},{\"rfilename\":\"socratic/train-00000-of-00001.parquet\"}],\"createdAt\":\"2022-04-12T10:22:10.000Z\",\"usedStorage\":95470379}"
     headers:
       Access-Control-Allow-Origin:
@@ -477,31 +477,31 @@ interactions:
       Content-Type:
       - application/json; charset=utf-8
       Date:
-      - Thu, 11 Sep 2025 09:49:46 GMT
+      - Mon, 15 Sep 2025 23:29:36 GMT
       ETag:
-      - W/"b06-cmIICMeN7ko9wEPx7lJhIvmxOns"
+      - W/"b06-XF8tCxxb6LdVSF4Spdvbe7VsdD4"
       RateLimit-Limit:
-      - '10000'
+      - '1000'
       RateLimit-Remaining:
-      - '9982'
+      - '998'
       RateLimit-Reset:
-      - '14'
+      - '24'
       Referrer-Policy:
       - strict-origin-when-cross-origin
       Vary:
       - Origin
       Via:
-      - 1.1 295a67abd01583736d0fc1ca131c2324.cloudfront.net (CloudFront)
+      - 1.1 890304274d84dce52c3c8a65cb402758.cloudfront.net (CloudFront)
       X-Amz-Cf-Id:
-      - Z13HP9mzxgd30Ms6q3IbGmnrUsZH6ez7z7W9qvpiho7xoeRdFKbJ1A==
+      - Y7d78I6sybqkHXHb-fx6s-o4o9vvZS5MoOIav-NWEDpVayTcfCg3cw==
       X-Amz-Cf-Pop:
-      - CCU50-P6
+      - YTO50-P2
       X-Cache:
       - Miss from cloudfront
       X-Powered-By:
       - huggingface-moon
       X-Request-Id:
-      - Root=1-68c29b3a-7f7cdc193a6ea0e1252494f0;78b857b0-bf15-4998-942d-78d7fdd60d65
+      - Root=1-68c8a160-080db8895a81cfb82ce46d60;b5855d49-54f9-43fa-8944-f971606d7eb7
       cross-origin-opener-policy:
       - same-origin
     status:
@@ -517,9 +517,9 @@ interactions:
       Connection:
       - keep-alive
       X-Amzn-Trace-Id:
-      - 5c3e5b4e-8c9a-4115-88ce-5b69aa2161a7
+      - 24d9b235-b31e-4408-82c2-117c0f5b4372
       user-agent:
-      - unknown/None; hf_hub/0.34.4; python/3.12.11
+      - unknown/None; hf_hub/0.34.5; python/3.11.11
     method: GET
     uri: https://huggingface.co/api/datasets/openai/gsm8k/tree/e53f048856ff4f594e959d75785d2c2d37b678ee?recursive=False&expand=False
   response:
@@ -539,31 +539,31 @@ interactions:
       Content-Type:
       - application/json; charset=utf-8
       Date:
-      - Thu, 11 Sep 2025 09:49:46 GMT
+      - Mon, 15 Sep 2025 23:29:36 GMT
       ETag:
       - W/"184-GTNml2in/NFmXgTtW6P3Y16W1V4"
       RateLimit-Limit:
-      - '10000'
+      - '1000'
       RateLimit-Remaining:
-      - '9981'
+      - '997'
       RateLimit-Reset:
-      - '14'
+      - '24'
       Referrer-Policy:
       - strict-origin-when-cross-origin
       Vary:
       - Origin
       Via:
-      - 1.1 e10d1e1da9f1e956786f111834ae43fa.cloudfront.net (CloudFront)
+      - 1.1 16808c837fedc33331e77d172952efee.cloudfront.net (CloudFront)
       X-Amz-Cf-Id:
-      - q9Fj8SHpNMakhVHsQ-ejURpp8mI0i3vFYegBMud5Hoq3R1BlbSWvWw==
+      - zaEjqWN283v1k8HJYduhYuC_RsoDE0Ca1qz9-Y9loQm6dXZ5TPDT7Q==
       X-Amz-Cf-Pop:
-      - CCU50-P6
+      - YTO50-P2
       X-Cache:
       - Miss from cloudfront
       X-Powered-By:
       - huggingface-moon
       X-Request-Id:
-      - Root=1-68c29b3a-462535983e88bbac3c1a2da1;5c3e5b4e-8c9a-4115-88ce-5b69aa2161a7
+      - Root=1-68c8a160-4cbea8577dd4dee0236de827;24d9b235-b31e-4408-82c2-117c0f5b4372
       cross-origin-opener-policy:
       - same-origin
     status:
@@ -579,9 +579,9 @@ interactions:
       Connection:
       - keep-alive
       X-Amzn-Trace-Id:
-      - b81fe85c-cf25-440b-bbc6-b2ba22413ed2
+      - ba0e660c-eb1b-41c2-9214-1847592bcfa0
       user-agent:
-      - unknown/None; hf_hub/0.34.4; python/3.12.11
+      - unknown/None; hf_hub/0.34.5; python/3.11.11
     method: GET
     uri: https://huggingface.co/api/datasets/openai/gsm8k/tree/e53f048856ff4f594e959d75785d2c2d37b678ee/main?recursive=False&expand=False
   response:
@@ -601,31 +601,31 @@ interactions:
       Content-Type:
       - application/json; charset=utf-8
       Date:
-      - Thu, 11 Sep 2025 09:49:47 GMT
+      - Mon, 15 Sep 2025 23:29:36 GMT
       ETag:
       - W/"272-99nyx78W/XeZdSx4HPHn5A8ZqNw"
       RateLimit-Limit:
-      - '10000'
+      - '1000'
       RateLimit-Remaining:
-      - '9980'
+      - '996'
       RateLimit-Reset:
-      - '13'
+      - '24'
       Referrer-Policy:
       - strict-origin-when-cross-origin
       Vary:
       - Origin
       Via:
-      - 1.1 18cc43bcbfc82fc33f8460d796fc24a0.cloudfront.net (CloudFront)
+      - 1.1 019b4503d2ffede0ae900992ff140770.cloudfront.net (CloudFront)
       X-Amz-Cf-Id:
-      - DP_a3NK3APT4fB8qeMPAX-b2zGw6EPE6_cvY0217yNbdt13L_qbtVg==
+      - qgtI5KejS_ZbCiIzq2ojRDdC73XMEOFo12o6-bbPtUwhmo1Cgvizxw==
       X-Amz-Cf-Pop:
-      - CCU50-P6
+      - YTO50-P2
       X-Cache:
       - Miss from cloudfront
       X-Powered-By:
       - huggingface-moon
       X-Request-Id:
-      - Root=1-68c29b3b-3e88b6ca6ae1b32b627799bd;b81fe85c-cf25-440b-bbc6-b2ba22413ed2
+      - Root=1-68c8a160-6205ad7e16c0e731071d59bb;ba0e660c-eb1b-41c2-9214-1847592bcfa0
       cross-origin-opener-policy:
       - same-origin
     status:
@@ -641,9 +641,9 @@ interactions:
       Connection:
       - keep-alive
       X-Amzn-Trace-Id:
-      - f296c1b8-f295-4935-9c9b-fe030af78bf4
+      - cc90ba95-2baa-4ed3-83c9-085c258d753a
       user-agent:
-      - unknown/None; hf_hub/0.34.4; python/3.12.11
+      - unknown/None; hf_hub/0.34.5; python/3.11.11
     method: GET
     uri: https://huggingface.co/api/datasets/openai/gsm8k/revision/e53f048856ff4f594e959d75785d2c2d37b678ee
   response:
@@ -656,7 +656,7 @@ interactions:
         reasoning.\\n\\nThese problems take between 2 and 8 steps to solve.\\nSolutions
         primarily involve performing a sequence of elementary calculations using basic
         arithmetic operations (+ \u2212 \xD7\xF7) to reach the\u2026 See the full
-        description on the dataset page: https://huggingface.co/datasets/openai/gsm8k.\",\"paperswithcode_id\":\"gsm8k\",\"downloads\":425086,\"likes\":859,\"cardData\":{\"annotations_creators\":[\"crowdsourced\"],\"language_creators\":[\"crowdsourced\"],\"language\":[\"en\"],\"license\":[\"mit\"],\"multilinguality\":[\"monolingual\"],\"size_categories\":[\"1K<n<10K\"],\"source_datasets\":[\"original\"],\"task_categories\":[\"text2text-generation\"],\"task_ids\":[],\"paperswithcode_id\":\"gsm8k\",\"pretty_name\":\"Grade
+        description on the dataset page: https://huggingface.co/datasets/openai/gsm8k.\",\"paperswithcode_id\":\"gsm8k\",\"downloads\":414164,\"likes\":859,\"cardData\":{\"annotations_creators\":[\"crowdsourced\"],\"language_creators\":[\"crowdsourced\"],\"language\":[\"en\"],\"license\":[\"mit\"],\"multilinguality\":[\"monolingual\"],\"size_categories\":[\"1K<n<10K\"],\"source_datasets\":[\"original\"],\"task_categories\":[\"text2text-generation\"],\"task_ids\":[],\"paperswithcode_id\":\"gsm8k\",\"pretty_name\":\"Grade
         School Math 8K\",\"tags\":[\"math-word-problems\"],\"dataset_info\":[{\"config_name\":\"main\",\"features\":[{\"name\":\"question\",\"dtype\":\"string\"},{\"name\":\"answer\",\"dtype\":\"string\"}],\"splits\":[{\"name\":\"train\",\"num_bytes\":3963202,\"num_examples\":7473},{\"name\":\"test\",\"num_bytes\":713732,\"num_examples\":1319}],\"download_size\":2725633,\"dataset_size\":4676934},{\"config_name\":\"socratic\",\"features\":[{\"name\":\"question\",\"dtype\":\"string\"},{\"name\":\"answer\",\"dtype\":\"string\"}],\"splits\":[{\"name\":\"train\",\"num_bytes\":5198108,\"num_examples\":7473},{\"name\":\"test\",\"num_bytes\":936859,\"num_examples\":1319}],\"download_size\":3164254,\"dataset_size\":6134967}],\"configs\":[{\"config_name\":\"main\",\"data_files\":[{\"split\":\"train\",\"path\":\"main/train-*\"},{\"split\":\"test\",\"path\":\"main/test-*\"}]},{\"config_name\":\"socratic\",\"data_files\":[{\"split\":\"train\",\"path\":\"socratic/train-*\"},{\"split\":\"test\",\"path\":\"socratic/test-*\"}]}]},\"siblings\":[{\"rfilename\":\".gitattributes\"},{\"rfilename\":\"README.md\"},{\"rfilename\":\"main/test-00000-of-00001.parquet\"},{\"rfilename\":\"main/train-00000-of-00001.parquet\"},{\"rfilename\":\"socratic/test-00000-of-00001.parquet\"},{\"rfilename\":\"socratic/train-00000-of-00001.parquet\"}],\"createdAt\":\"2022-04-12T10:22:10.000Z\",\"usedStorage\":95470379}"
     headers:
       Access-Control-Allow-Origin:
@@ -672,31 +672,31 @@ interactions:
       Content-Type:
       - application/json; charset=utf-8
       Date:
-      - Thu, 11 Sep 2025 09:49:47 GMT
+      - Mon, 15 Sep 2025 23:29:36 GMT
       ETag:
-      - W/"b06-cmIICMeN7ko9wEPx7lJhIvmxOns"
+      - W/"b06-XF8tCxxb6LdVSF4Spdvbe7VsdD4"
       RateLimit-Limit:
-      - '10000'
+      - '1000'
       RateLimit-Remaining:
-      - '9979'
+      - '995'
       RateLimit-Reset:
-      - '13'
+      - '24'
       Referrer-Policy:
       - strict-origin-when-cross-origin
       Vary:
       - Origin
       Via:
-      - 1.1 f5a20b6dc3447fe14013d7d00f3345a4.cloudfront.net (CloudFront)
+      - 1.1 d03af248468c898a111754f0666c2316.cloudfront.net (CloudFront)
       X-Amz-Cf-Id:
-      - MYp66HowOOxkZLZeuI4R8wP4aRjpECJUe2ZQSVF9_f6_eW7qi2DOAQ==
+      - Tnm9-xgqvgsGME8-0TXrWwUZsuyGFE09adEtoPwNB70aessdinOAUQ==
       X-Amz-Cf-Pop:
-      - CCU50-P6
+      - YTO50-P2
       X-Cache:
       - Miss from cloudfront
       X-Powered-By:
       - huggingface-moon
       X-Request-Id:
-      - Root=1-68c29b3b-1f0269d64e07db4c49c80acc;f296c1b8-f295-4935-9c9b-fe030af78bf4
+      - Root=1-68c8a160-7382228c2fabd44a31f205cf;cc90ba95-2baa-4ed3-83c9-085c258d753a
       cross-origin-opener-policy:
       - same-origin
     status:
@@ -712,9 +712,9 @@ interactions:
       Connection:
       - keep-alive
       X-Amzn-Trace-Id:
-      - e12dcb82-1199-42b0-9c3c-b2782a113344
+      - c293ef8b-7f8e-423c-ba8a-a5b4f383ffbb
       user-agent:
-      - datasets/4.0.0; hf_hub/0.34.4; python/3.12.11; huggingface_hub/0.34.4; pyarrow/21.0.0
+      - datasets/4.1.0; hf_hub/0.34.5; python/3.11.11; huggingface_hub/0.34.5; pyarrow/21.0.0
     method: HEAD
     uri: https://huggingface.co/datasets/openai/gsm8k/resolve/e53f048856ff4f594e959d75785d2c2d37b678ee/dataset_infos.json
   response:
@@ -736,25 +736,25 @@ interactions:
       Content-Type:
       - text/plain; charset=utf-8
       Date:
-      - Thu, 11 Sep 2025 09:49:48 GMT
+      - Mon, 15 Sep 2025 23:29:36 GMT
       ETag:
       - W/"f-mY2VvLxuxB7KhsoOdQTlMTccuAQ"
       RateLimit-Limit:
-      - '40000'
+      - '5000'
       RateLimit-Remaining:
-      - '39972'
+      - '4996'
       RateLimit-Reset:
-      - '12'
+      - '24'
       Referrer-Policy:
       - strict-origin-when-cross-origin
       Vary:
       - Origin
       Via:
-      - 1.1 d0628adedaf891ceb1c39bb1d9b5d74a.cloudfront.net (CloudFront)
+      - 1.1 8e6145785e47042f882be946f6c05880.cloudfront.net (CloudFront)
       X-Amz-Cf-Id:
-      - Nw_QTp6EV_3OCxxI4uLWvUinIsJrOAg5_ZxVWRe6nEYADRDIveSzWw==
+      - wWwLS0u3beWMcM1D3DFcVitizTdTEBiPmMGlewSE9z1ESV_DhIVFvg==
       X-Amz-Cf-Pop:
-      - CCU50-P6
+      - YTO50-P2
       X-Cache:
       - Error from cloudfront
       X-Error-Code:
@@ -768,7 +768,7 @@ interactions:
       X-Repo-Commit:
       - e53f048856ff4f594e959d75785d2c2d37b678ee
       X-Request-Id:
-      - Root=1-68c29b3c-5f347cff558225cd27c3cce8;e12dcb82-1199-42b0-9c3c-b2782a113344
+      - Root=1-68c8a160-1ddda9e90577d72d40837bb0;c293ef8b-7f8e-423c-ba8a-a5b4f383ffbb
       cross-origin-opener-policy:
       - same-origin
     status:
@@ -784,9 +784,9 @@ interactions:
       Connection:
       - keep-alive
       X-Amzn-Trace-Id:
-      - 2caf5bbe-b89b-462b-a78c-e2e767d81115
+      - 19bbdf93-5d38-4ccf-a1ea-ee9e7a7ad502
       user-agent:
-      - datasets/4.0.0; hf_hub/0.34.4; python/3.12.11; huggingface_hub/0.34.4; pyarrow/21.0.0
+      - datasets/4.1.0; hf_hub/0.34.5; python/3.11.11; huggingface_hub/0.34.5; pyarrow/21.0.0
     method: HEAD
     uri: https://huggingface.co/datasets/openai/gsm8k/resolve/main/README.md
   response:
@@ -812,29 +812,29 @@ interactions:
       Content-Type:
       - text/plain; charset=utf-8
       Date:
-      - Thu, 11 Sep 2025 09:49:48 GMT
+      - Mon, 15 Sep 2025 23:29:36 GMT
       Location:
       - /api/resolve-cache/datasets/openai/gsm8k/e53f048856ff4f594e959d75785d2c2d37b678ee/README.md?%2Fdatasets%2Fopenai%2Fgsm8k%2Fresolve%2Fmain%2FREADME.md=&etag=%22aec2504ff01cd8c60ae9435e96347d8db32235a2%22
       RateLimit-Limit:
-      - '40000'
+      - '5000'
       RateLimit-Remaining:
-      - '39971'
+      - '4995'
       RateLimit-Reset:
-      - '12'
+      - '24'
       Referrer-Policy:
       - strict-origin-when-cross-origin
       Vary:
       - Origin, Accept
       Via:
-      - 1.1 79b0078a9fffc3eb8f13f38ce6dbed0a.cloudfront.net (CloudFront)
+      - 1.1 2ffb622580a0a24837f798fa62268b12.cloudfront.net (CloudFront)
       X-Amz-Cf-Id:
-      - gCmh7h-uKba7wlw8Pcb4dx2WqWZsPf0ZdRuktf59_68wDVs9vEeuHA==
+      - GqvLRLwM9KoMwg8Bm3G3mRB5X3fgS5vEh5EvqGU8lxKNNtayPS8h2A==
       X-Amz-Cf-Pop:
-      - CCU50-P6
+      - YTO50-P2
       X-Cache:
       - Miss from cloudfront
       X-Hub-Cache:
-      - MISS
+      - HIT
       X-Linked-ETag:
       - '"aec2504ff01cd8c60ae9435e96347d8db32235a2"'
       X-Powered-By:
@@ -842,7 +842,7 @@ interactions:
       X-Repo-Commit:
       - e53f048856ff4f594e959d75785d2c2d37b678ee
       X-Request-Id:
-      - Root=1-68c29b3c-7a091754176965b5665b3d87;2caf5bbe-b89b-462b-a78c-e2e767d81115
+      - Root=1-68c8a160-10e917276d6b296a2c009dc3;19bbdf93-5d38-4ccf-a1ea-ee9e7a7ad502
       cross-origin-opener-policy:
       - same-origin
     status:
@@ -858,9 +858,9 @@ interactions:
       Connection:
       - keep-alive
       X-Amzn-Trace-Id:
-      - ff5ceb78-1715-42eb-8b15-70d9c2e8eb6d
+      - edde579b-4a35-4960-b0d3-34645a1f5c09
       user-agent:
-      - datasets/4.0.0; hf_hub/0.34.4; python/3.12.11; huggingface_hub/0.34.4; pyarrow/21.0.0
+      - datasets/4.1.0; hf_hub/0.34.5; python/3.11.11; huggingface_hub/0.34.5; pyarrow/21.0.0
     method: HEAD
     uri: https://huggingface.co/api/resolve-cache/datasets/openai/gsm8k/e53f048856ff4f594e959d75785d2c2d37b678ee/README.md
   response:
@@ -874,7 +874,7 @@ interactions:
       Access-Control-Expose-Headers:
       - X-Repo-Commit,X-Request-Id,X-Error-Code,X-Error-Message,X-Total-Count,ETag,Link,Accept-Ranges,Content-Range,X-Linked-Size,X-Linked-ETag,X-Xet-Hash
       Age:
-      - '6728735'
+      - '7123523'
       Connection:
       - keep-alive
       Content-Disposition:
@@ -894,11 +894,11 @@ interactions:
       Vary:
       - Origin
       Via:
-      - 1.1 f920dd8e3cececd7b15deec9cf062d10.cloudfront.net (CloudFront)
+      - 1.1 d03af248468c898a111754f0666c2316.cloudfront.net (CloudFront)
       X-Amz-Cf-Id:
-      - 7LyA630LfuHeBexKzeawFIyo10QKNShLyxt92Q6iS3ghF0pHuafH2Q==
+      - yIAi2ZK5F2LkzHppN92vjDRBSS9XNo0gqGY_Gfl6OIHiczAfwu9qxA==
       X-Amz-Cf-Pop:
-      - CCU50-P6
+      - YTO50-P2
       X-Cache:
       - Hit from cloudfront
       X-Hub-Cache:
@@ -924,9 +924,9 @@ interactions:
       Connection:
       - keep-alive
       X-Amzn-Trace-Id:
-      - a3bfd9db-4a76-47b8-b500-51df3fa876b4
+      - f69e586d-05aa-4f7f-abd4-d99beace062f
       user-agent:
-      - datasets/4.0.0; hf_hub/0.34.4; python/3.12.11; huggingface_hub/0.34.4; pyarrow/21.0.0
+      - datasets/4.1.0; hf_hub/0.34.5; python/3.11.11; huggingface_hub/0.34.5; pyarrow/21.0.0
     method: HEAD
     uri: https://huggingface.co/datasets/openai/gsm8k/resolve/e53f048856ff4f594e959d75785d2c2d37b678ee/gsm8k.py
   response:
@@ -948,25 +948,25 @@ interactions:
       Content-Type:
       - text/plain; charset=utf-8
       Date:
-      - Thu, 11 Sep 2025 09:49:49 GMT
+      - Mon, 15 Sep 2025 23:29:36 GMT
       ETag:
       - W/"f-mY2VvLxuxB7KhsoOdQTlMTccuAQ"
       RateLimit-Limit:
-      - '40000'
+      - '5000'
       RateLimit-Remaining:
-      - '39970'
+      - '4994'
       RateLimit-Reset:
-      - '11'
+      - '24'
       Referrer-Policy:
       - strict-origin-when-cross-origin
       Vary:
       - Origin
       Via:
-      - 1.1 d0628adedaf891ceb1c39bb1d9b5d74a.cloudfront.net (CloudFront)
+      - 1.1 36c050103b969d83a8b90ba7cba12542.cloudfront.net (CloudFront)
       X-Amz-Cf-Id:
-      - j7ZoA1KfqORePyYAG0XuYwPGhTq9iul-J4B38aUuMoWOLwBY0dOF_Q==
+      - hj8_cbDRN_wuURAaBy5R7Z-qTYkMPibcZqEh1xMZI7zJl0V9gc_Brg==
       X-Amz-Cf-Pop:
-      - CCU50-P6
+      - YTO50-P2
       X-Cache:
       - Error from cloudfront
       X-Error-Code:
@@ -980,7 +980,7 @@ interactions:
       X-Repo-Commit:
       - e53f048856ff4f594e959d75785d2c2d37b678ee
       X-Request-Id:
-      - Root=1-68c29b3d-436383036925cef451fb7bf7;a3bfd9db-4a76-47b8-b500-51df3fa876b4
+      - Root=1-68c8a160-572865487d8fe90a7099c261;f69e586d-05aa-4f7f-abd4-d99beace062f
       cross-origin-opener-policy:
       - same-origin
     status:
@@ -996,9 +996,9 @@ interactions:
       Connection:
       - keep-alive
       User-Agent:
-      - datasets/4.0.0; python/3.12.11; huggingface_hub/0.34.4; pyarrow/21.0.0
+      - datasets/4.1.0; python/3.11.11; huggingface_hub/0.34.5; pyarrow/21.0.0
       X-Amzn-Trace-Id:
-      - 28d69976-3ef8-4fa7-8db0-8297b4951b53
+      - 99943b75-090b-4053-8748-17a0e575b9c7
     method: HEAD
     uri: https://s3.amazonaws.com/datasets.huggingface.co/datasets/datasets/openai/gsm8k/openai/gsm8k.py
   response:
@@ -1008,15 +1008,15 @@ interactions:
       Content-Type:
       - application/xml
       Date:
-      - Thu, 11 Sep 2025 09:49:50 GMT
+      - Mon, 15 Sep 2025 23:29:36 GMT
       Server:
       - AmazonS3
       Transfer-Encoding:
       - chunked
       x-amz-id-2:
-      - 1ZctQX+e4TA+mr/jUsvowyLYcYwgTpTObkJXabDmL0qV6MU8/qZMAWQ0/A+xqHevGdUbGGI/fiCgoy57JJu+m9Le3N7czP3SdN93wGmtF7M=
+      - OueSUV3WKbheyVe+wxbfLGdcu5rdkPo7ZiXFFffK+xYHD9dBe2ql36zWav7nEL6JBRpV/gZdQ4I=
       x-amz-request-id:
-      - 091N2PQMCDBDSGHH
+      - VFV7AYW8MKM1TEJ8
     status:
       code: 404
       message: Not Found
@@ -1030,9 +1030,9 @@ interactions:
       Connection:
       - keep-alive
       X-Amzn-Trace-Id:
-      - 1f36885b-d5dd-4ca9-ac4a-2658e0ac8c4e
+      - d36a683a-8060-41b9-89c2-453b2a8d5266
       user-agent:
-      - datasets/4.0.0; hf_hub/0.34.4; python/3.12.11; huggingface_hub/0.34.4; pyarrow/21.0.0
+      - datasets/4.1.0; hf_hub/0.34.5; python/3.11.11; huggingface_hub/0.34.5; pyarrow/21.0.0
     method: HEAD
     uri: https://huggingface.co/datasets/openai/gsm8k/resolve/e53f048856ff4f594e959d75785d2c2d37b678ee/.huggingface.yaml
   response:
@@ -1054,25 +1054,25 @@ interactions:
       Content-Type:
       - text/plain; charset=utf-8
       Date:
-      - Thu, 11 Sep 2025 09:49:51 GMT
+      - Mon, 15 Sep 2025 23:29:37 GMT
       ETag:
       - W/"f-mY2VvLxuxB7KhsoOdQTlMTccuAQ"
       RateLimit-Limit:
-      - '40000'
+      - '5000'
       RateLimit-Remaining:
-      - '39969'
+      - '4993'
       RateLimit-Reset:
-      - '9'
+      - '23'
       Referrer-Policy:
       - strict-origin-when-cross-origin
       Vary:
       - Origin
       Via:
-      - 1.1 57002de9bce089b5fd5d362d2b483df4.cloudfront.net (CloudFront)
+      - 1.1 b734db9b28028c2ed717c3d72b3b45b8.cloudfront.net (CloudFront)
       X-Amz-Cf-Id:
-      - CFFRKFrPzhXK6Az4xh4GbY8p3QiJb1zPLbXn6_An3JoHxauyMNZsbw==
+      - KRXrbIlFP9MCvL2syL0YCHgKqKsBmfDmW0Tua1gQ1SX8RGnP_0BVsA==
       X-Amz-Cf-Pop:
-      - CCU50-P6
+      - YTO50-P2
       X-Cache:
       - Error from cloudfront
       X-Error-Code:
@@ -1086,7 +1086,7 @@ interactions:
       X-Repo-Commit:
       - e53f048856ff4f594e959d75785d2c2d37b678ee
       X-Request-Id:
-      - Root=1-68c29b3f-594b42cb2c0405a761f0a4ee;1f36885b-d5dd-4ca9-ac4a-2658e0ac8c4e
+      - Root=1-68c8a161-6f727f6d72d266e90d0ac69b;d36a683a-8060-41b9-89c2-453b2a8d5266
       cross-origin-opener-policy:
       - same-origin
     status:
@@ -1102,9 +1102,9 @@ interactions:
       Connection:
       - keep-alive
       X-Amzn-Trace-Id:
-      - 565dfb22-f259-41e9-98c6-776fd36ece25
+      - bc7e0e49-4fea-4dfc-b28b-89ac9b3162f3
       user-agent:
-      - datasets/4.0.0; hf_hub/0.34.4; python/3.12.11
+      - datasets/4.1.0; hf_hub/0.34.5; python/3.11.11
     method: GET
     uri: https://datasets-server.huggingface.co/info?dataset=openai/gsm8k
   response:
@@ -1116,15 +1116,15 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Thu, 11 Sep 2025 09:49:51 GMT
+      - Mon, 15 Sep 2025 23:29:37 GMT
       Transfer-Encoding:
       - chunked
       Via:
-      - 1.1 eee51fa774c120038fff1a69be429a80.cloudfront.net (CloudFront)
+      - 1.1 f92b450b48c98e711c027c1986c59944.cloudfront.net (CloudFront)
       X-Amz-Cf-Id:
-      - yPmu514M7Q3Qz3qXxIdOA9-EiUKETHCqKOcqlDNMhP1qEb4es9vHBw==
+      - 248ZGEte-BV4QZ9OeX1EjvRJkm7ZFgjt69W69N_LDYAmjsm4qubJYw==
       X-Amz-Cf-Pop:
-      - CCU50-P4
+      - YTO50-P1
       X-Cache:
       - Miss from cloudfront
       cache-control:
@@ -1150,9 +1150,9 @@ interactions:
       Connection:
       - keep-alive
       X-Amzn-Trace-Id:
-      - d31f7428-5812-4299-a973-0f43270abfa9
+      - 287a6859-f4c7-4b12-85e2-83511e2bf2a5
       user-agent:
-      - datasets/4.0.0; hf_hub/0.34.4; python/3.12.11; huggingface_hub/0.34.4; pyarrow/21.0.0
+      - datasets/4.1.0; hf_hub/0.34.5; python/3.11.11; huggingface_hub/0.34.5; pyarrow/21.0.0
     method: HEAD
     uri: https://huggingface.co/datasets/openai/gsm8k/resolve/e53f048856ff4f594e959d75785d2c2d37b678ee/dataset_infos.json
   response:
@@ -1174,25 +1174,25 @@ interactions:
       Content-Type:
       - text/plain; charset=utf-8
       Date:
-      - Thu, 11 Sep 2025 09:49:51 GMT
+      - Mon, 15 Sep 2025 23:29:37 GMT
       ETag:
       - W/"f-mY2VvLxuxB7KhsoOdQTlMTccuAQ"
       RateLimit-Limit:
-      - '40000'
+      - '5000'
       RateLimit-Remaining:
-      - '39999'
+      - '4992'
       RateLimit-Reset:
-      - '9'
+      - '23'
       Referrer-Policy:
       - strict-origin-when-cross-origin
       Vary:
       - Origin
       Via:
-      - 1.1 41f162e00e937ca42179cb2f6519d5ae.cloudfront.net (CloudFront)
+      - 1.1 12aa3fefbdb5e80269e58f34f94a99e8.cloudfront.net (CloudFront)
       X-Amz-Cf-Id:
-      - LQNDf2PLhzfxEAOMB0JW_o55V60g2xbvaqjjgGtXcy1NEDQ_70kkqQ==
+      - VquLH44jhgCD4DapieXBEhI-2oG_h_EN_2-kuDTvZCqesoRnOuU4Jw==
       X-Amz-Cf-Pop:
-      - CCU50-P6
+      - YTO50-P2
       X-Cache:
       - Error from cloudfront
       X-Error-Code:
@@ -1206,7 +1206,7 @@ interactions:
       X-Repo-Commit:
       - e53f048856ff4f594e959d75785d2c2d37b678ee
       X-Request-Id:
-      - Root=1-68c29b3f-51f9f6f1298d8564651bb8b1;d31f7428-5812-4299-a973-0f43270abfa9
+      - Root=1-68c8a161-60d3c7253f6387cb49a911e2;287a6859-f4c7-4b12-85e2-83511e2bf2a5
       cross-origin-opener-policy:
       - same-origin
     status:
@@ -1228,7 +1228,7 @@ interactions:
       host:
       - api.openai.com
       user-agent:
-      - AsyncOpenAI/Python 1.106.1
+      - AsyncOpenAI/Python 1.99.9
       x-stainless-arch:
       - arm64
       x-stainless-async:
@@ -1238,7 +1238,7 @@ interactions:
       x-stainless-os:
       - MacOS
       x-stainless-package-version:
-      - 1.106.1
+      - 1.99.9
       x-stainless-read-timeout:
       - '600'
       x-stainless-retry-count:
@@ -1246,27 +1246,26 @@ interactions:
       x-stainless-runtime:
       - CPython
       x-stainless-runtime-version:
-      - 3.12.11
+      - 3.11.11
     method: POST
     uri: https://api.openai.com/v1/chat/completions
   response:
     body:
       string: !!binary |
-        H4sIAAAAAAAAAwAAAP//jFNda9swFH3Pr7iIQdsQFztxmg/owxh9W2GDQBlTMbJ05WiRJSMpJWnJ
-        fx+yWzvdOtiLhXXOufdI9+hlBECUIGsgfMsCrxudfLn7cTe3h035wD6nT6VNF/er5833w4Y/bASZ
-        RIUtfyEPb6prbutGY1DWdDB3yALGqtlivpgv82w1a4HaCtRRVjUhya+zpFZGJdN0Ok/SPMnyV/nW
-        Ko6erOHnCADgpf1Go0bggawhnbzt1Og9q5CsexIAcVbHHcK8Vz4wE8hkALk1AU3r/SuGCw/MMH18
-        RghbhMbZUmMNPmCTlMckrmtqqMmuYTze2MA0YFV50EwJaNCBYMf1eAzZTbcP1Ewj9S7+xEswIK2D
-        0iHbSeZD5M566qyn7j2Kjsl2ylRQ76VUxkd63tPznq5RBggWPGodOUANAFB6md1AAjNIIIdbWFF6
-        1YvnUfzNKY6tb6wqYAEkczU6fwE1czts7X2aRvpNpN9bg0eomUCQztZtu+gu1nzXdgWUBlWjhync
-        QraMjYXVmjkfb4/SS0pLe0Dxki1PlF6dD8Sh3HsWU2H2Wp8BzBgbWExVG4XHV+TUD1/bKg7M/yEl
-        Uhnlt4VD5q2Jg/bBNqRFTyOAxzZk+3e5IY2zdROKYHfYtluuunJkyPYAZtkbGmIkBmCaLicf1CsE
-        Bqa0P4sp4YxvUQzSIdNsL5Q9A0Znp/7bzke1u5MrU/1P+QHgHJuAomgcCsXfH3mgOYxv/1+0/pZb
-        w8Sje1Ici6DQxUkIlGyvuwdJ/NEHrAupTIWucap7lbIpcskxXSyWTJLRafQbAAD//wMAgillnaQE
-        AAA=
+        H4sIAAAAAAAAAwAAAP//jFPdatswFL7PUxxEL9o17uI0reNALkYpg9Ex2EoZzMUo0rGtxZZcHXk0
+        K4G9xl5vTzIkt3G6dbAbX5zvx5/0HT2MAJiSbAFMVNyJpq2ji7cX33h7fTfBWFxd6ss3nz+8v5l9
+        v7m6c2XMxl5hVl9RuCfViTBNW6NTRvewsMgdetc4OUvSZJ4m8wA0RmLtZWXrotlJHDVKq2g6mZ5F
+        k1kUzx7llVECiS3gywgA4CF8fVAt8Z4tYDJ+mjRIxEtkix0JgFlT+wnjRIoc146NB1AY7VCH7O+4
+        Rvfrx08C2Yk1Qc03EJ8DliVBixYk35xkOtOfKgTkjuC0xwpjYWWRrwtObsfoCAlmPcMZWPE1QtMV
+        hdIUONcVgjOO1z2FniSHwfo4COgIlnAKxzCDJSSBGLQfseFKK13u7AnrGpY+bgQJLCEdyD6MhwmQ
+        i8rPQ+KDaR8jRGiMxg00XOJOC6/gYPras5dwEM8DOcsOs2xl7lE+xPNtlh3t36TFoiPu69RdXe8B
+        XGvjuF+H0OHtI7LdtVabsrVmRX9IWaG0oiq3yMlo3xA507KAbkcAt2E7umeFs9aapnW5M2sMv5un
+        vR0blnIA0+QRDEUM83h+Pn7BLpfouKppb72Y4KJCOUiHXeSdVGYPGO0d+u80L3n3B1e6/B/7ARAC
+        W4cyby1KJZ6feKBZ9G/2X7TdJYfAjNB+UwJzp9D6IiQWvKv7h8RoQw6bvFC6RNta1b+mos3PZSKF
+        SHk6Z6Pt6DcAAAD//wMAYF/SilwEAAA=
     headers:
       CF-RAY:
-      - 97d641f2fc31cbb5-CCU
+      - 97fbe84499ac38e4-YYZ
       Connection:
       - keep-alive
       Content-Encoding:
@@ -1274,14 +1273,14 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Thu, 11 Sep 2025 09:49:54 GMT
+      - Mon, 15 Sep 2025 23:29:39 GMT
       Server:
       - cloudflare
       Set-Cookie:
-      - __cf_bm=3MHFc9tzUz8K.q68vS1vtTkO2mrXb0KGNdz6hrNMYCw-1757584194-1.0.1.1-v.1FTQC9OjlVrCynE_4RVoNXhXt7Wm9VR.92lBWRKDDcPpXTlgPjUvtK7XPf2T3Rwkc3u906quMVhyC65MV2zf2kSuMlY9ATG7_PF2OWb3A;
-        path=/; expires=Thu, 11-Sep-25 10:19:54 GMT; domain=.api.openai.com; HttpOnly;
+      - __cf_bm=urTdHnMUXaPC8Czdb81mn_DxZpXt8n8SwAiGDmIDz1M-1757978979-1.0.1.1-dINeDge8b4W8B1bTzVCVDBvS.QLlQikKIpsIFY7IC9IuChlcqgLIOhXT_dMwuaE_twnkAuGpJzZpZqnwrIr3vECOOhBKzDVoC4E9lFU9wLU;
+        path=/; expires=Mon, 15-Sep-25 23:59:39 GMT; domain=.api.openai.com; HttpOnly;
         Secure; SameSite=None
-      - _cfuvid=CpfIcu30GnxlS6IJu31J_Ms16IKTpzMPjfuvhga.FeE-1757584194696-0.0.1.1-604800000;
+      - _cfuvid=CdPkNXZKMoShD.Q3DN2.JHgXGpyOENxfQBG65rlFn.Y-1757978979546-0.0.1.1-604800000;
         path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
       Strict-Transport-Security:
       - max-age=31536000; includeSubDomains; preload
@@ -1298,13 +1297,13 @@ interactions:
       openai-organization:
       - wandb
       openai-processing-ms:
-      - '1615'
+      - '1346'
       openai-project:
-      - proj_vHqAX8ekonC4rpcxKzZuuzUT
+      - proj_XOvNaWkk3XBc6SlumjiopokE
       openai-version:
       - '2020-10-01'
       x-envoy-upstream-service-time:
-      - '1689'
+      - '1420'
       x-openai-proxy-wasm:
       - v0.1
       x-ratelimit-limit-requests:
@@ -1320,7 +1319,7 @@ interactions:
       x-ratelimit-reset-tokens:
       - 0s
       x-request-id:
-      - req_77ef7fbe795e49798f062ad7f4fb21cc
+      - req_eca9399b0acd43deb0083953ae5006da
     status:
       code: 200
       message: OK
@@ -1340,7 +1339,7 @@ interactions:
       host:
       - api.openai.com
       user-agent:
-      - AsyncOpenAI/Python 1.106.1
+      - AsyncOpenAI/Python 1.99.9
       x-stainless-arch:
       - arm64
       x-stainless-async:
@@ -1350,7 +1349,7 @@ interactions:
       x-stainless-os:
       - MacOS
       x-stainless-package-version:
-      - 1.106.1
+      - 1.99.9
       x-stainless-read-timeout:
       - '600'
       x-stainless-retry-count:
@@ -1358,27 +1357,27 @@ interactions:
       x-stainless-runtime:
       - CPython
       x-stainless-runtime-version:
-      - 3.12.11
+      - 3.11.11
     method: POST
     uri: https://api.openai.com/v1/chat/completions
   response:
     body:
       string: !!binary |
-        H4sIAAAAAAAAA4xUXWvbMBR9z6+4iMJaGpfacb4MfShbCx2MQbeXUBejSNeOFlvyJLk0C/kd+0H7
-        Y0OyGydbO/ZisM45955rnevtAIAIThIgbEUtq+oyeH+zuIkni3I2Wozixef7u+f773eNuL6+/YEf
-        yNAp1PIbMvuiumCqqku0QskWZhqpRVc1nI6n41kcziMPVIpj6WRFbYP4IgwqIUUQXUbj4DIOwriT
-        r5RgaEgCDwMAgK1/OqOS4zNJ4HL4clKhMbRAkuxJAESr0p0QaowwlkpLhj3IlLQovfcvFmsIE7gV
-        koNVlpaARWGgpIJDjRo43SSpDCCceCCVqfSaKIEbR3RTSsiVhqVGus6psZ4/OqaPOnpjkLdsuhay
-        gKrJcyGNl8THkriTGFVyoBbsCiGnukJt3kFF9RrbTl971wGcYm/qvD3ct+x6nXXjBHA6gnOIz+Cq
-        fZ3CFcyPPYwT+KQkbqCiHP33wKLwXU+iPWmSdB6qnvoPv20L+PUTTiK4gpNw5iql6YN7LNUz8m04
-        27mXRwd8pBItVHSNBtL0NE2dID0DfEK9cdfzRq+LwxvXmDeGutjJpiwPACqlstTF1mftsUN2+3SV
-        qqi1Wpo/pCQXUphVppEaJV2SjFU18ehuAPDoU9wcBZPUWlW1zaxao283m7flSL88PRiOxx3qY9kD
-        URwPX6mXcbRUlOZgDwijbIW8l/ZLQxsu1AEwOJj6bzuv1W4nF7L4n/I9wBjWFnlWa+SCHY/c0zS6
-        n8tbtP1X9oaJQf0kGGZWoHY3wTGnTdluPDEbY7HKciEL1LUW7drndTbhU87YnM5nZLAb/AYAAP//
-        AwCZABI4BQUAAA==
+        H4sIAAAAAAAAAwAAAP//jFTfT9swEH7vX3GykGCjqUib0jZSX0DTJjQBm/YyUVRd7Utq6tiR7QAV
+        6v8+OQlNYUzaiyPf9913P3yXlx4Ak4KlwPgaPS9KFV1+vXzEy+30xqzGP75dXShxO/t58Xt17R8e
+        nlg/eJjVA3H/6jXgpigVeWl0A3NL6CmoxpPxZDaZzibTGiiMIBXc8tJHySCOCqllNDwbjqOzJIqT
+        1n1tJCfHUrjrAQC81GdIVAt6Zimc9V8tBTmHObF0TwJg1qhgYeicdB61Z/0O5EZ70nXu38kfO1hZ
+        wg0I86TBrwlKa1aKCnCeSlht62+60AsdD+CX8aiA8tyBQilAoFTbFOLz2rbQwwF8CWCoXgfnK9Tk
+        ITO2iZKh8ymMWvaoZVeORMPBjdQ5FFWWSe1SSFpi0hItFSh1oHgDjpSC+WFKEZxQF/20MQbdVvAT
+        wEIDwDwkHMHJCE4heWec7K+zNvh4ALdWcoKSbDCBM0rAHI6GoSnX5qkPHBWvFHqqG1g3BaTmpiDI
+        rCnqVEPWQTANARpt+AxHw73sHI7iaZBcLO7CsTLPJF7i6S5c7gPQNLPADbnABXokuwWBW0BfR87Q
+        FmTdMRRoN+QHh89uKaschtnTlVIHAGptPIbZrQfuvkV2+xFTJg8z4d65skxq6dZLS+iMDuPkvClZ
+        je56APf1KFdvppOV1hSlX3qzoTrcdNbIsW6DOjBOxi3qwyN3wHCU9D/QWwryKJU7WAbGka9JdK7d
+        5mAlpDkAegdV/53OR9pN5VLn/yPfAZxT6UksS0tC8rcldzRL4Q/zL9q+y3XCzJF9lJyWXpINLyEo
+        w0o1a8/c1nkqlpnUOdnSymb3s3J5LiaC8xnOpqy36/0BAAD//wMAezKyuAoFAAA=
     headers:
       CF-RAY:
-      - 97d641f2feb5f64c-CCU
+      - 97fbe8449a8636be-YYZ
       Connection:
       - keep-alive
       Content-Encoding:
@@ -1386,14 +1385,14 @@ interactions:
       Content-Type:
       - application/json
       Date:
-      - Thu, 11 Sep 2025 09:49:55 GMT
+      - Mon, 15 Sep 2025 23:29:39 GMT
       Server:
       - cloudflare
       Set-Cookie:
-      - __cf_bm=Wl6xeUCukkLPtvWdvg6YP_y7xomKZ2VdfQNFPB1u.rA-1757584195-1.0.1.1-4hjnr.2KwmyQcj4dRhzoHnhc5PY37Uwvaszkbdu3R5iOLCj.hDXzGcQb_oKR88.CvKIHRpbAojeFKuTghRByKO.TULIM2QPQFwQUALFyaLQ;
-        path=/; expires=Thu, 11-Sep-25 10:19:55 GMT; domain=.api.openai.com; HttpOnly;
+      - __cf_bm=YvPEnQ9O9SXFotZMn1aLg.YwtKyfPQbfPIhT1fMLqsY-1757978979-1.0.1.1-QPBllqdvvhI3e1_Yn.fQELYL68f7kpyyXM576UmmSY3Wdvo15t14wbVf47x5xxbEHfk29NPZ9cV0HhU_Q03m8UntfIPsJhXOtyOPS6vMXX8;
+        path=/; expires=Mon, 15-Sep-25 23:59:39 GMT; domain=.api.openai.com; HttpOnly;
         Secure; SameSite=None
-      - _cfuvid=HEY_zXRZK33.rCriqOXfGddvyFODsvPQx4dGdrpPgsE-1757584195252-0.0.1.1-604800000;
+      - _cfuvid=SlIXPloWo7I9ZIKbi0DnWjToWYSrC.GaSad2lelYd1c-1757978979955-0.0.1.1-604800000;
         path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None
       Strict-Transport-Security:
       - max-age=31536000; includeSubDomains; preload
@@ -1410,13 +1409,13 @@ interactions:
       openai-organization:
       - wandb
       openai-processing-ms:
-      - '2389'
+      - '1504'
       openai-project:
-      - proj_vHqAX8ekonC4rpcxKzZuuzUT
+      - proj_XOvNaWkk3XBc6SlumjiopokE
       openai-version:
       - '2020-10-01'
       x-envoy-upstream-service-time:
-      - '2400'
+      - '1607'
       x-openai-proxy-wasm:
       - v0.1
       x-ratelimit-limit-requests:
@@ -1432,7 +1431,7 @@ interactions:
       x-ratelimit-reset-tokens:
       - 0s
       x-request-id:
-      - req_4c0d982acf844bd2bd2073abe1197725
+      - req_584d9f1c6e304130b9458e373632d4bd
     status:
       code: 200
       message: OK

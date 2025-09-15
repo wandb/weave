@@ -213,6 +213,7 @@ jobs:
         python-version-major: ["3"]
         python-version-minor: [
             "9",
+            "11",
             "13",
             #
           ]
@@ -251,6 +252,7 @@ jobs:
         python-version-major: ["3"]
         python-version-minor: [
             "9",
+            "11",
             "13",
             #
           ]

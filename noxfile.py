@@ -210,6 +210,12 @@ def tests(session, shard):
     if shard == "trace_no_server":
         pytest_args.extend(["-m", "not trace_server"])
 
+    if shard == "verifiers":
+        # Pinning to this commit because the latest version of the gsm8k environment is broken.
+        session.install(
+            "git+https://github.com/willccbb/verifiers.git@b4d851db42cebbab2358b827fd0ed19773631937#subdirectory=environments/gsm8k"
+        )
+
     # Check if posargs contains test files (ending with .py or containing :: for specific tests)
     has_test_files = any(
         arg.endswith(".py") or "::" in arg

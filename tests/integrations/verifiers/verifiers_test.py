@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import subprocess
 
 import pytest
 import verifiers as vf
@@ -33,6 +32,7 @@ def patch_verifiers() -> None:
     filter_headers=["authorization", "x-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
+    match_on=["scheme", "host", "port", "path", "query"],
 )
 def test_verifiers_environment_evaluate(client: WeaveClient) -> None:
     """Run a real verifiers environment evaluation and assert trace timeline.
@@ -41,7 +41,8 @@ def test_verifiers_environment_evaluate(client: WeaveClient) -> None:
     environment instance, while exercising the real verifiers evaluation flow.
     """
     # Ensure the gsm8k environment is available in CI by invoking the CLI installer
-    subprocess.run(["vf-install", "gsm8k", "--from-repo"], check=True)
+    # This install is pinned to a specific commit in noxfile.py because the latest version of the gsm8k environment is broken.
+    # subprocess.run(["vf-install", "gsm8k", "--from-repo"], check=True)
 
     env = vf.load_environment("gsm8k")
 
