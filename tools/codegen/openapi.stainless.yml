@@ -44,7 +44,7 @@ client_settings:
       type: string
       description: Username for HTTP Basic authentication
       nullable: false
-      read_env: USERNAME
+      read_env: WANDB_USERNAME
       auth:
         security_scheme: HTTPBasic
         role: username
@@ -52,7 +52,7 @@ client_settings:
       type: string
       description: Password for HTTP Basic authentication
       nullable: false
-      read_env: PASSWORD
+      read_env: WANDB_API_KEY
       auth:
         security_scheme: HTTPBasic
         role: password
