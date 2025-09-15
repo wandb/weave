@@ -4,6 +4,7 @@ This module handles automatic detection and replacement of base64 encoded conten
 with content objects stored in bucket storage.
 """
 
+import json
 import logging
 import re
 from typing import Any, TypeVar, Union
@@ -32,6 +33,8 @@ MAX_BASE64_SIZE = 100 * 1024 * 1024  # 100 MiB
 MIN_BASE64_SIZE = 100  # 100 bytes
 
 MIN_TEXT_SIZE = 50 * 1024  # 50 KiB
+
+CONTENT_CLASS = "weave.type_wrappers.Content.content.Content"
 
 
 def is_base64(value: str) -> bool:
@@ -89,8 +92,6 @@ def store_content_object(
     Returns:
         Dict representing the Content object in the proper format
     """
-    import json
-
     content_data = content_obj.data
     content_metadata = json.dumps(content_obj.model_dump(exclude={"data"})).encode(
         "utf-8"
@@ -112,7 +113,7 @@ def store_content_object(
     # We exclude the load op because it isn't possible to get from the server side
     return {
         "_type": "CustomWeaveType",
-        "weave_type": {"type": "weave.type_wrappers.Content.content.Content"},
+        "weave_type": {"type": CONTENT_CLASS},
         "files": {"content": content_res.digest, "metadata.json": metadata_res.digest},
     }
 
