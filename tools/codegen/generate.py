@@ -42,6 +42,7 @@ from typing import Annotated, Any, Callable
 import httpx
 import tomlkit
 import yaml
+from rich.console import Console
 from typer import Argument, Option, Typer
 
 # Server configuration
@@ -62,6 +63,7 @@ STAINLESS_OAS_PATH = f"{CODEGEN_ROOT_RELPATH}/openapi.json"
 
 # Create the Typer app
 app = Typer(help="Weave code generation tools")
+console = Console()
 
 
 @app.command()
@@ -153,9 +155,9 @@ def generate_code(
     """
     _header("Generating code with Stainless")
 
-    if not any([python_path, node_path, typescript_path]):
+    if not any([python_path, node_path, typescript_path, java_path]):
         _error(
-            "At least one of --python-path, --node-path, or --typescript-path must be provided"
+            "At least one of --python-path, --node-path, --typescript-path, or --java-path must be provided"
         )
         sys.exit(1)
 
@@ -201,7 +203,7 @@ def generate_code(
         cmd.append(f"--+target=java:{java_path}")
 
     # Print the command being executed for visibility
-    _info(f"Running command: {' '.join(cmd)}")
+    _print_command(cmd)
 
     try:
         # Run without capture_output to stream output live to terminal
@@ -294,7 +296,7 @@ def merge_generated_code(
 
     # Navigate to weave-stainless repo
     if not python_output.exists():
-        print(f"python_output: {python_output}")
+        console.print(f"python_output: {python_output}")
         # List contents of python_output directory for debugging
         _info(f"Listing contents of parent directory: {python_output.parent}")
         try:
@@ -632,7 +634,7 @@ def all(
             release=release,
         )
 
-    print("\n")
+    console.print("\n")
     _header("Weave codegen completed successfully!")
 
 
@@ -818,7 +820,8 @@ def _format_command(command_name: str, **kwargs) -> str:
 
 def _announce_command(cmd: str) -> None:
     """Display the command that is about to be executed."""
-    print(f"\nINFO:    Running command: {cmd}")
+    command = cmd.split(" ")
+    _print_command(command)
 
 
 def _ensure_absolute_path(path: str | None) -> str | None:
@@ -868,21 +871,25 @@ def _random_branch_name() -> str:
 
 def _header(text: str):
     """Display a prominent header"""
-    print(f"╔{'═' * (len(text) + 6)}╗")
-    print(f"║   {text}   ║")
-    print(f"╚{'═' * (len(text) + 6)}╝")
+    console.print(f"╔{'═' * (len(text) + 6)}╗")
+    console.print(f"║   {text}   ║")
+    console.print(f"╚{'═' * (len(text) + 6)}╝")
 
 
 def _error(text: str):
-    print(f"ERROR:   {text}")
+    console.print(f"ERROR:   {text}")
 
 
 def _warning(text: str):
-    print(f"WARNING: {text}")
+    console.print(f"WARNING: {text}")
 
 
 def _info(text: str):
-    print(f"INFO:    {text}")
+    console.print(f"INFO:    {text}")
+
+
+def _debug(text: str):
+    console.print(f"DEBUG:   {text}")
 
 
 def _kill_port(port: int) -> bool:
@@ -952,15 +959,25 @@ def _wait_for_server(
         try:
             httpx.get(url, timeout=interval)
         except httpx.ConnectError:
-            _warning("Failed to connect to server, retrying...")
+            _debug("Failed to connect to server, retrying...")
             time.sleep(interval)
         except httpx.TimeoutException:
-            _warning("Server request timed out, retrying...")
+            _debug("Server request timed out, retrying...")
             time.sleep(interval)
         else:
             _info("Server is healthy!")
             return True
     return False
+
+
+def _print_command(cmd: list[str]) -> None:
+    """Print a command to the console."""
+    lines: list[str] = []
+    lines.append(f"  {cmd[0]}")
+    lines.extend([f"    {line}" for line in cmd[1:]])
+    _info("Running command:")
+    for line in lines:
+        _info(line)
 
 
 if __name__ == "__main__":
