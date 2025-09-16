@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-from collections.abc import Iterable
 from typing import Any
 
 import pytest
@@ -81,11 +80,9 @@ def test_verifiers_environment_evaluate_with_mock_env(client: WeaveClient) -> No
                     >>> parser = ThinkParser()
                     >>> _ = _parse_reward([{ 'role': 'assistant', 'content': 'hi'}], parser=parser)
                 """
-                texts: Iterable[str] = (
-                    m["content"] for m in completion if m.get("role") == "assistant"
-                )
-                for text in texts:
-                    parser.parse(text)
+                for m in completion:
+                    if m.get("role") == "assistant":
+                        parser.parse(m["content"])
                 return 1.0
 
             self.rubric.add_reward_func(_parse_reward)
@@ -113,6 +110,7 @@ def test_verifiers_environment_evaluate_with_mock_env(client: WeaveClient) -> No
     # Validate that the expected weave ops were traced
     calls = list(client.get_calls())
     flattened = flatten_calls(calls)
+    assert len(flattened) == 43
 
     assert flattened_calls_to_names(flattened) == [
         ("verifiers.Environment.evaluate", 0),
