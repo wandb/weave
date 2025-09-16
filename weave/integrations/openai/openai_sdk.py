@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import importlib
 import logging
 import time
@@ -729,6 +730,21 @@ def create_wrapper_responses_async(
     return wrapper
 
 
+def _check_openai_logprobs_enabled() -> bool:
+    """Check if the LOG_OPENAI_LOGPROBS environment variable is enabled."""
+    return os.getenv("LOG_OPENAI_LOGPROBS") in ("true", "True", "1")
+
+
+def _openai_postprocess_output_no_logprobs(value: Any) -> Any:
+    if _check_openai_logprobs_enabled():
+        return value
+    if hasattr(value, "choices"):
+        for choice in value.choices:
+            if hasattr(choice, "logprobs"):
+                del choice["logprobs"]
+    return value
+
+
 def get_openai_patcher(
     settings: IntegrationSettings | None = None,
 ) -> MultiPatcher | NoOpPatcher:
@@ -745,10 +761,16 @@ def get_openai_patcher(
     base = settings.op_settings
 
     completions_create_settings = base.model_copy(
-        update={"name": base.name or "openai.chat.completions.create"}
+        update={
+            "name": base.name or "openai.chat.completions.create",
+            "postprocess_output": _openai_postprocess_output_no_logprobs,
+        } 
     )
     async_completions_create_settings = base.model_copy(
-        update={"name": base.name or "openai.chat.completions.create"}
+        update={
+            "name": base.name or "openai.chat.completions.create",
+            "postprocess_output": _openai_postprocess_output_no_logprobs,
+        }
     )
     completions_parse_settings = base.model_copy(
         update={"name": base.name or "openai.chat.completions.parse"}
