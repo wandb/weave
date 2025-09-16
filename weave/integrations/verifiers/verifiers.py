@@ -1,16 +1,17 @@
 from __future__ import annotations
 
+import copy
 import importlib
 from functools import wraps
 from typing import Any, Callable
 
-import weave
-from pydantic import BaseModel
-from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
-from weave.trace.autopatch import IntegrationSettings, OpSettings
-
 from openai.types.chat.chat_completion import ChatCompletion
 from openai.types.completion import Completion
+from pydantic import BaseModel
+
+import weave
+from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
+from weave.trace.autopatch import IntegrationSettings, OpSettings
 
 ModelResponse = Completion | ChatCompletion
 
@@ -31,16 +32,32 @@ def _verifiers_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
     return inputs
 
 
-def _remove_logprobs_from_responses(responses: list[Any]) -> None:
-    """Remove logprobs from a list of response objects."""
+def _remove_logprobs_from_responses(responses: list[Any]) -> list[Any]:
+    """Return a copy of responses with logprobs removed, without mutating originals."""
+    sanitized: list[Any] = []
     for response in responses:
         if isinstance(response, ModelResponse):
-            for choice in response.choices:
-                choice.logprobs = None
+            # Prefer pydantic v2 deep copy if available; fall back to deepcopy
+            try:
+                response_copy = response.model_copy(deep=True)  # type: ignore[attr-defined]
+            except Exception:
+                response_copy = copy.deepcopy(response)
+            # Strip logprobs from the copied response
+            for choice in getattr(response_copy, "choices", []) or []:
+                if hasattr(choice, "logprobs"):
+                    choice.logprobs = None
+            sanitized.append(response_copy)
+        else:
+            sanitized.append(response)
+    return sanitized
 
 
 def _verifiers_postprocess_outputs_no_logprobs(outputs: Any) -> Any:
-    """Remove logprobs from the outputs to reduce size and noise in the UI."""
+    """Return a logging-safe copy of outputs with logprobs removed.
+
+    IMPORTANT: Do not mutate the original outputs, as they are consumed by the
+    training pipeline which expects `logprobs` to be present.
+    """
     if outputs is None:
         return outputs
 
@@ -52,22 +69,35 @@ def _verifiers_postprocess_outputs_no_logprobs(outputs: Any) -> Any:
         for state_item in outputs.state:
             # ref: https://github.com/willccbb/verifiers/blob/37d7243703a38944be6e44fd4afe9b22c696b449/verifiers/types.py#L41
             if isinstance(state_item, dict) and "responses" in state_item:
-                _remove_logprobs_from_responses(state_item.get("responses", []))
+                state_item["responses"] = _remove_logprobs_from_responses(
+                    state_item.get("responses", [])
+                )
 
     return outputs
 
 
 def _verifiers_postprocess_inputs_no_logprobs(inputs: dict[str, Any]) -> dict[str, Any]:
-    """Remove logprobs from score_rollouts inputs and normalize self."""
-    # First apply the standard input processing
-    inputs = _verifiers_postprocess_inputs(inputs)
+    """Return a logging-safe copy of inputs with logprobs removed and normalized `self`.
 
-    if "states" in inputs and isinstance(inputs["states"], list):
-        for state_item in inputs["states"]:
+    Do not mutate original inputs to avoid affecting the live function call.
+    """
+    # First apply the standard input processing (which returns a new dict for logging)
+    processed_inputs = _verifiers_postprocess_inputs(inputs)
+
+    if "states" in processed_inputs and isinstance(processed_inputs["states"], list):
+        new_states: list[Any] = []
+        for state_item in processed_inputs["states"]:
             if isinstance(state_item, dict) and "responses" in state_item:
-                _remove_logprobs_from_responses(state_item.get("responses", []))
+                new_item = dict(state_item)
+                new_item["responses"] = _remove_logprobs_from_responses(
+                    state_item.get("responses", [])
+                )
+                new_states.append(new_item)
+            else:
+                new_states.append(state_item)
+        processed_inputs["states"] = new_states
 
-    return inputs
+    return processed_inputs
 
 
 def _verifiers_wrapper(settings: OpSettings) -> Callable:
@@ -184,7 +214,7 @@ def get_verifiers_patcher(
     generate_settings = base.model_copy(
         update={
             "name": base.name or "verifiers.Environment.generate",
-            "postprocess_output": _verifiers_postprocess_outputs_no_logprobs
+            "postprocess_output": _verifiers_postprocess_outputs_no_logprobs,
         }
     )
     score_rollouts_settings = base.model_copy(

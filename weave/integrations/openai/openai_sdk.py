@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import importlib
 import logging
 import time
@@ -748,7 +747,7 @@ def get_openai_patcher(
     completions_create_settings = base.model_copy(
         update={
             "name": base.name or "openai.chat.completions.create",
-        } 
+        }
     )
     async_completions_create_settings = base.model_copy(
         update={
