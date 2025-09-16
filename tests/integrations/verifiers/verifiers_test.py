@@ -27,6 +27,14 @@ def patch_verifiers() -> None:
         patcher.undo_patch()
 
 
+@pytest.fixture(scope="module")
+def vcr_config():
+    return {
+        "match_on": ["scheme", "host", "port", "path", "query"],
+        "filter_headers": ["authorization", "x-api-key"],
+    }
+
+
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
