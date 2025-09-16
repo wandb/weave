@@ -35,6 +35,8 @@ def patch_verifiers() -> None:
         "localhost",
         "trace.wandb.ai",
         "huggingface.co",
+        "datasets-server.huggingface.co",
+        "s3.amazonaws.com",
     ],
     before_record_request=filter_body,
     # match_on=["scheme", "host", "port", "path", "query"],
