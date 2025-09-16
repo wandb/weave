@@ -7,8 +7,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class AudioBufferManager:
-    """
-    Maintains a single, continuous PCM audio buffer for a conversation and
+    """Maintains a single, continuous PCM audio buffer for a conversation and
     provides helpers to slice out segments by millisecond offsets.
 
     Default format: 16-bit PCM, mono, 24kHz (extensible).

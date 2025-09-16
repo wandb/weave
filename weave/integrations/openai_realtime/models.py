@@ -121,8 +121,7 @@ class SessionUpdateMessage(ClientMessageBase):
 
 
 class InputAudioBufferAppendMessage(ClientMessageBase):
-    """
-    Append audio data to the user audio buffer, this should be in the format specified by
+    """Append audio data to the user audio buffer, this should be in the format specified by
     input_audio_format in the session config.
     """
 
@@ -131,8 +130,7 @@ class InputAudioBufferAppendMessage(ClientMessageBase):
 
 
 class InputAudioBufferCommitMessage(ClientMessageBase):
-    """
-    Commit the pending user audio buffer, which creates a user message item with the audio content
+    """Commit the pending user audio buffer, which creates a user message item with the audio content
     and clears the buffer.
     """
 
@@ -415,8 +413,7 @@ class InputAudioBufferClearedMessage(ServerMessageBase):
 
 
 class InputAudioBufferSpeechStartedMessage(ServerMessageBase):
-    """
-    If the server VAD is enabled, this event is sent when speech is detected in the user audio buffer.
+    """If the server VAD is enabled, this event is sent when speech is detected in the user audio buffer.
     It tells you where in the audio stream (in milliseconds) the speech started, plus an item_id
     which will be used in the corresponding speech_stopped event and the item created in the conversation
     when speech stops.
@@ -430,8 +427,7 @@ class InputAudioBufferSpeechStartedMessage(ServerMessageBase):
 
 
 class InputAudioBufferSpeechStoppedMessage(ServerMessageBase):
-    """
-    If the server VAD is enabled, this event is sent when speech stops in the user audio buffer.
+    """If the server VAD is enabled, this event is sent when speech stops in the user audio buffer.
     It tells you where in the audio stream (in milliseconds) the speech stopped, plus an item_id
     which will be used in the corresponding speech_started event and the item created in the conversation
     when speech starts.
