@@ -7,7 +7,6 @@ from unittest.mock import MagicMock
 import pytest
 
 from weave.trace_server.base64_content_conversion import (
-    is_base64,
     is_data_uri,
     process_call_req_to_content,
     replace_base64_with_content_objects,
@@ -24,19 +23,7 @@ from weave.type_wrappers.Content.content import Content
 
 
 class TestBase64AndDataURIDetection:
-    """Test detection heuristics for base64 and data URIs."""
-
-    def test_is_base64_valid(self):
-        """Valid base64 strings over the min length are detected."""
-        valid_b64 = base64.b64encode(b"a" * 100).decode("ascii")
-        assert is_base64(valid_b64)
-
-    def test_is_base64_invalid(self):
-        """Invalid base64 or too-short strings are rejected."""
-        assert not is_base64("not base64")
-        assert not is_base64("abc")  # Too short
-        assert not is_base64("a" * 50)  # Too short
-        assert not is_base64("abc@#$%")  # Invalid chars
+    """Test detection heuristics for data URIs only (raw base64 no longer auto-encoded)."""
 
     def test_is_data_uri_valid(self):
         """Valid base64 data URIs are detected."""
@@ -105,8 +92,8 @@ class TestContentObjectStorage:
 class TestBase64Replacement:
     """Test base64 replacement in data structures."""
 
-    def test_replace_base64_in_dict(self):
-        """Test replacing base64 in nested dict structures."""
+    def test_replace_data_uri_in_dict_only(self):
+        """Only base64 data URIs are replaced; raw base64 is left untouched."""
         # Mock trace server
         trace_server = MagicMock()
         trace_server.file_create = MagicMock(
@@ -123,7 +110,7 @@ class TestBase64Replacement:
 
         input_data = {
             "field1": "normal string",
-            "field2": b64_data,
+            "field2": b64_data,  # raw base64 should remain unchanged
             "nested": {"field3": f"data:image/png;base64,{b64_data}"},
         }
 
@@ -134,10 +121,8 @@ class TestBase64Replacement:
         # Check normal string is unchanged
         assert result["field1"] == "normal string"
 
-        # Check standalone base64 was replaced
-        assert isinstance(result["field2"], dict)
-        assert result["field2"]["_type"] == "CustomWeaveType"
-        assert set(result["field2"]["files"].keys()) == {"content", "metadata.json"}
+        # Check standalone base64 is NOT replaced
+        assert result["field2"] == b64_data
 
         # Check data URI was replaced
         assert isinstance(result["nested"]["field3"], dict)
@@ -147,8 +132,8 @@ class TestBase64Replacement:
             "metadata.json",
         }
 
-    def test_replace_base64_in_list(self):
-        """Test replacing base64 in list structures."""
+    def test_replace_data_uri_in_list_only(self):
+        """Only base64 data URIs are replaced in lists; raw base64 is left untouched."""
         # Mock trace server
         trace_server = MagicMock()
         trace_server.file_create = MagicMock(
@@ -165,7 +150,7 @@ class TestBase64Replacement:
 
         input_data = [
             "normal string",
-            b64_data,
+            b64_data,  # raw base64 should remain unchanged
             {"nested": f"data:text/plain;base64,{b64_data}"},
         ]
 
@@ -176,8 +161,8 @@ class TestBase64Replacement:
         # Check list structure is preserved
         assert len(result) == 3
         assert result[0] == "normal string"
-        assert isinstance(result[1], dict)
-        assert result[1]["_type"] == "CustomWeaveType"
+        # Raw base64 remains a string
+        assert result[1] == b64_data
         assert isinstance(result[2]["nested"], dict)
         assert result[2]["nested"]["_type"] == "CustomWeaveType"
 
@@ -217,7 +202,7 @@ class TestBase64Replacement:
         assert isinstance(processed_start.start.inputs["image"], dict)
         assert processed_start.start.inputs["image"]["_type"] == "CustomWeaveType"
 
-        # End request with standalone base64 in output (ensure length >= min threshold)
+        # End request with standalone base64 in output should NOT be replaced
         long_bytes = b"b" * 100
         long_b64 = base64.b64encode(long_bytes).decode("ascii")
         end_req = CallEndReq(
@@ -231,8 +216,7 @@ class TestBase64Replacement:
         )
 
         processed_end = process_call_req_to_content(end_req, trace_server)
-        assert isinstance(processed_end.end.output, dict)
-        assert processed_end.end.output["_type"] == "CustomWeaveType"
+        assert processed_end.end.output == long_b64
 
 
 if __name__ == "__main__":

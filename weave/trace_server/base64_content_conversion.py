@@ -4,6 +4,7 @@ This module handles automatic detection and replacement of base64 encoded conten
 with content objects stored in bucket storage.
 """
 
+import json
 import logging
 import re
 from typing import Any, TypeVar, Union
@@ -22,9 +23,6 @@ logger = logging.getLogger(__name__)
 # Format: data:[content-type];base64,[base64_data]
 DATA_URI_PATTERN = re.compile(r"^data:([^;]+);base64,([A-Za-z0-9+/=]+)$", re.IGNORECASE)
 
-# Pattern to match standalone base64 strings
-BASE64_PATTERN = re.compile(r"^[A-Za-z0-9+/]+={0,2}$")
-
 # Maximum size for base64 content to be processed (to avoid memory issues)
 MAX_BASE64_SIZE = 100 * 1024 * 1024  # 100 MiB
 
@@ -32,31 +30,6 @@ MAX_BASE64_SIZE = 100 * 1024 * 1024  # 100 MiB
 MIN_BASE64_SIZE = 100  # 100 bytes
 
 MIN_TEXT_SIZE = 50 * 1024  # 50 KiB
-
-
-def is_base64(value: str) -> bool:
-    """Huerestic to quickly check if a string is likely base64.
-    We do not decode here because Content already does decode based 'true' validation
-
-    Args:
-        value: String to check
-
-    Returns:
-        True if the string is valid base64
-    """
-    # Check minimum length to avoid false positives
-    if len(value) < MIN_BASE64_SIZE:
-        return False
-
-    # Check if it matches base64 pattern
-    if not BASE64_PATTERN.match(value):
-        return False
-
-    # Check that length is multiple of 4 (with padding)
-    if len(value) % 4 != 0:
-        return False
-
-    return True
 
 
 def is_data_uri(data_uri: str) -> bool:
@@ -89,8 +62,6 @@ def store_content_object(
     Returns:
         Dict representing the Content object in the proper format
     """
-    import json
-
     content_data = content_obj.data
     content_metadata = json.dumps(content_obj.model_dump(exclude={"data"})).encode(
         "utf-8"
@@ -160,18 +131,6 @@ def replace_base64_with_content_objects(
                 except Exception as e:
                     logger.warning(
                         f"Failed to create and store content from data URI with error {e}"
-                    )
-
-            elif is_base64(val):
-                try:
-                    return store_content_object(
-                        Content.from_base64(val),
-                        project_id,
-                        trace_server,
-                    )
-                except Exception as e:
-                    logger.warning(
-                        f"Failed to create content from standalone base64: {e}"
                     )
 
             return val
