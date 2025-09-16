@@ -40,7 +40,7 @@ def vcr_config():
     filter_headers=["authorization", "x-api-key"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
-    match_on=["scheme", "host", "port", "path", "query"],
+    # match_on=["scheme", "host", "port", "path", "query"],
 )
 def test_verifiers_environment_evaluate(client: WeaveClient) -> None:
     """Run a real verifiers environment evaluation and assert trace timeline.
