@@ -27,18 +27,15 @@ def patch_verifiers() -> None:
         patcher.undo_patch()
 
 
-@pytest.fixture(scope="module")
-def vcr_config():
-    return {
-        "match_on": ["scheme", "host", "port", "path", "query"],
-        "filter_headers": ["authorization", "x-api-key"],
-    }
-
-
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(
     filter_headers=["authorization", "x-api-key"],
-    allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+    allowed_hosts=[
+        "api.wandb.ai",
+        "localhost",
+        "trace.wandb.ai",
+        "huggingface.co",
+    ],
     before_record_request=filter_body,
     # match_on=["scheme", "host", "port", "path", "query"],
 )
