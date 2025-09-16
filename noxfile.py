@@ -11,7 +11,7 @@ SUPPORTED_PYTHON_VERSIONS = ["3.9", "3.10", "3.11", "3.12", "3.13"]
 PY313_INCOMPATIBLE_SHARDS = [
     "cohere",
     "notdiamond",
-    "verifiers",
+    "verifiers_test",
 ]
 PY39_INCOMPATIBLE_SHARDS = [
     "crewai",
@@ -21,10 +21,10 @@ PY39_INCOMPATIBLE_SHARDS = [
     "dspy",
     "autogen_tests",
     "langchain",
-    "verifiers",
+    "verifiers_test",
 ]
 PY310_INCOMPATIBLE_SHARDS = [
-    "verifiers",
+    "verifiers_test",
 ]
 NUM_TRACE_SERVER_SHARDS = 4
 
@@ -102,7 +102,7 @@ trace_server_shards = [f"trace{i}" for i in range(1, NUM_TRACE_SERVER_SHARDS + 1
         "smolagents",
         "mcp",
         "verdict",
-        "verififers_test",
+        "verifiers_test",
         "autogen_tests",
         "trace",
         *trace_server_shards,
@@ -210,7 +210,7 @@ def tests(session, shard):
     if shard == "trace_no_server":
         pytest_args.extend(["-m", "not trace_server"])
 
-    if shard == "verifiers":
+    if shard == "verifiers_test":
         # Pinning to this commit because the latest version of the gsm8k environment is broken.
         session.install(
             "git+https://github.com/willccbb/verifiers.git@b4d851db42cebbab2358b827fd0ed19773631937#subdirectory=environments/gsm8k"
