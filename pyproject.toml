@@ -185,6 +185,11 @@ autogen_tests = [
   "openai>=1.99.9,<1.100.0",
 ]
 verifiers = ["verifiers>=0.1.3.post0"]
+verififers_test = [
+  "verifiers>=0.1.3.post0",
+  "huggingface_hub>=0.34.6",
+  "datasets>=4.1.0"
+]
 
 test = [
   "nox",
