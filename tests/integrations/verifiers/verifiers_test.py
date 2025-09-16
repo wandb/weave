@@ -39,7 +39,7 @@ def patch_verifiers() -> None:
         "s3.amazonaws.com",
     ],
     before_record_request=filter_body,
-    # match_on=["scheme", "host", "port", "path", "query"],
+    match_on=["scheme", "host", "port", "path", "query"],
 )
 def test_verifiers_environment_evaluate(client: WeaveClient) -> None:
     """Run a real verifiers environment evaluation and assert trace timeline.
