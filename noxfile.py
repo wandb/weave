@@ -165,6 +165,7 @@ def tests(session, shard):
         "mistral": ["integrations/mistral/"],
         "scorers": ["scorers/"],
         "autogen_tests": ["integrations/autogen/"],
+        "verifiers_test": ["integrations/verifiers/"],
         "trace": ["trace/"],
         **{shard: ["trace/"] for shard in trace_server_shards},
         "trace_no_server": ["trace/"],
