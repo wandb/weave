@@ -61,19 +61,29 @@ def _verifiers_postprocess_outputs_no_logprobs(outputs: Any) -> Any:
     if outputs is None:
         return outputs
 
+    # Deep copy the entire outputs structure for logging only
+    try:
+        outputs_copy = (
+            outputs.model_copy(deep=True)  # type: ignore[attr-defined]
+            if isinstance(outputs, BaseModel)
+            else copy.deepcopy(outputs)
+        )
+    except Exception:
+        outputs_copy = copy.deepcopy(outputs)
+
     if (
-        isinstance(outputs, BaseModel)
-        and hasattr(outputs, "state")
-        and isinstance(outputs.state, list)
+        isinstance(outputs_copy, BaseModel)
+        and hasattr(outputs_copy, "state")
+        and isinstance(outputs_copy.state, list)
     ):
-        for state_item in outputs.state:
+        for state_item in outputs_copy.state:
             # ref: https://github.com/willccbb/verifiers/blob/37d7243703a38944be6e44fd4afe9b22c696b449/verifiers/types.py#L41
             if isinstance(state_item, dict) and "responses" in state_item:
                 state_item["responses"] = _remove_logprobs_from_responses(
                     state_item.get("responses", [])
                 )
 
-    return outputs
+    return outputs_copy
 
 
 def _verifiers_postprocess_inputs_no_logprobs(inputs: dict[str, Any]) -> dict[str, Any]:
