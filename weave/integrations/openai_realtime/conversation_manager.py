@@ -49,8 +49,7 @@ class EventHandlerRegistry:
 
 
 class ConversationManager:
-    """
-    Orchestrates event-driven state management for a conversation.
+    """Orchestrates event-driven state management for a conversation.
     Provides async queue submission and direct processing.
     """
 

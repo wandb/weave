@@ -279,8 +279,7 @@ class StateExporter(BaseModel):
         pending_create_params: Optional[models.ResponseCreateParams] = None,
         messages: Optional[list[Union[models.ResponseItem, models.ServerItem]]] = None,
     ) -> None:
-        """
-        Note: This is pretty ugly but it achieves something that is worth the bloat.
+        """Note: This is pretty ugly but it achieves something that is worth the bloat.
         Transcription results can occur far after a response to audio is received.
         If we do not wait for them, then you will never see the transcript of your most recent item
         This would mean that for the last turn in the conversation, the transcript goes missing
