@@ -5,8 +5,14 @@ from functools import wraps
 from typing import Any, Callable
 
 import weave
+from pydantic import BaseModel
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
+
+from openai.types.chat.chat_completion import ChatCompletion
+from openai.types.completion import Completion
+
+ModelResponse = Completion | ChatCompletion
 
 _verifiers_patcher: MultiPatcher | None = None
 
@@ -28,11 +34,9 @@ def _verifiers_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
 def _remove_logprobs_from_responses(responses: list[Any]) -> None:
     """Remove logprobs from a list of response objects."""
     for response in responses:
-        if isinstance(response, dict) and "choices" in response:
-            for choice in response.get("choices", []):
-                if isinstance(choice, dict) and "logprobs" in choice:
-                    # TODO: redact instead?
-                    del choice["logprobs"]
+        if isinstance(response, ModelResponse):
+            for choice in response.choices:
+                choice.logprobs = None
 
 
 def _verifiers_postprocess_outputs_no_logprobs(outputs: Any) -> Any:
@@ -41,11 +45,12 @@ def _verifiers_postprocess_outputs_no_logprobs(outputs: Any) -> Any:
         return outputs
 
     if (
-        isinstance(outputs, dict)
-        and "state" in outputs
-        and isinstance(outputs["state"], list)
+        isinstance(outputs, BaseModel)
+        and hasattr(outputs, "state")
+        and isinstance(outputs.state, list)
     ):
-        for state_item in outputs["state"]:
+        for state_item in outputs.state:
+            # ref: https://github.com/willccbb/verifiers/blob/37d7243703a38944be6e44fd4afe9b22c696b449/verifiers/types.py#L41
             if isinstance(state_item, dict) and "responses" in state_item:
                 _remove_logprobs_from_responses(state_item.get("responses", []))
 
@@ -165,7 +170,10 @@ def get_verifiers_patcher(
         }
     )
     evaluate_settings = base.model_copy(
-        update={"name": base.name or "verifiers.Environment.evaluate"}
+        update={
+            "name": base.name or "verifiers.Environment.evaluate",
+            "postprocess_output": _verifiers_postprocess_outputs_no_logprobs,
+        }
     )
     a_generate_settings = base.model_copy(
         update={
@@ -174,7 +182,10 @@ def get_verifiers_patcher(
         }
     )
     generate_settings = base.model_copy(
-        update={"name": base.name or "verifiers.Environment.generate"}
+        update={
+            "name": base.name or "verifiers.Environment.generate",
+            "postprocess_output": _verifiers_postprocess_outputs_no_logprobs
+        }
     )
     score_rollouts_settings = base.model_copy(
         update={
