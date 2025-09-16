@@ -26,6 +26,12 @@ This tool generates code from the OpenAPI specification for Python, Node.js, and
 
    Note: Your local `generate_config.yaml` will be ignored by git to prevent checking in personal paths.
 
+4. Install Stainless CLI:
+
+   ```bash
+   brew install stainless-api/tap/stl
+   ```
+
 ## Commands / ARGS
 
 Note: If you run `make generate-bindings` from the weave root directory as suggested below, you'll need to pass the commands as with `ARGS=`, for example `ARGS="all"`. See more below.

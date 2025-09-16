@@ -1,15 +1,26 @@
 import json
 import os
+from collections.abc import Generator
 from typing import Optional
 
 import pytest
 import yaml
 
 import weave
-from weave.flow.eval import EvaluationResults
+from weave.evaluation.eval import EvaluationResults
 from weave.integrations.notdiamond.custom_router import evaluate_router, train_router
+from weave.integrations.notdiamond.tracing import get_notdiamond_patcher
 from weave.integrations.notdiamond.util import get_model_evals
 from weave.trace.weave_client import WeaveClient
+
+
+@pytest.fixture(autouse=True)
+def patch_notdiamond() -> Generator[None, None, None]:
+    """Patch NotDiamond for all tests in this file."""
+    patcher = get_notdiamond_patcher()
+    patcher.attempt_patch()
+    yield
+    patcher.undo_patch()
 
 
 @pytest.fixture

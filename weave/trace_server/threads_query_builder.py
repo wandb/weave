@@ -16,8 +16,7 @@ def make_threads_query(
     sortable_datetime_before: Optional[datetime.datetime] = None,
     thread_ids: Optional[list[str]] = None,
 ) -> str:
-    """
-    Generate a query to fetch threads with aggregated statistics from turn calls only.
+    """Generate a query to fetch threads with aggregated statistics from turn calls only.
 
     IMPORTANT: This filters to only include turn calls (where id = turn_id) to provide
     meaningful thread statistics based on conversation turns rather than all nested calls.
@@ -200,8 +199,7 @@ def make_threads_query_sqlite(
     sortable_datetime_before: Optional[datetime.datetime] = None,
     thread_ids: Optional[list[str]] = None,
 ) -> tuple[str, list]:
-    """
-    Generate a SQLite query to fetch threads with aggregated statistics from turn calls only.
+    """Generate a SQLite query to fetch threads with aggregated statistics from turn calls only.
 
     This filters to only include turn calls (where id = turn_id) to provide meaningful
     thread statistics based on conversation turns rather than all nested calls.
@@ -311,8 +309,7 @@ def make_threads_query_sqlite(
 
 
 def _validate_and_map_sort_field(field: str) -> str:
-    """
-    Validate and map sort field names to their SQL equivalents.
+    """Validate and map sort field names to their SQL equivalents.
 
     Args:
         field: The field name from the API request

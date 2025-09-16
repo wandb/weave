@@ -8,8 +8,7 @@ from typing import TYPE_CHECKING, Any
 from pydantic import BaseModel
 
 from weave.trace.object_record import ObjectRecord
-from weave.trace.refs import ObjectRef, TableRef, parse_uri
-from weave.trace.sanitize import REDACTED_VALUE, should_redact
+from weave.trace.refs import ObjectRef, Ref, TableRef
 from weave.trace.serialization import custom_objs
 from weave.trace.serialization.dictifiable import try_to_dict
 from weave.trace_server.trace_server_interface import (
@@ -18,6 +17,7 @@ from weave.trace_server.trace_server_interface import (
     TraceServerInterface,
 )
 from weave.trace_server.trace_server_interface_util import bytes_digest
+from weave.utils.sanitize import REDACTED_VALUE, should_redact
 
 if TYPE_CHECKING:
     from weave.trace.weave_client import WeaveClient
@@ -39,7 +39,8 @@ def is_pydantic_model_class(obj: Any) -> bool:
 def _is_inline_custom_obj(encoded: dict) -> bool:
     """Custom object values may be inline or backed by a file.
 
-    This separate function for readability checks which we are dealing with."""
+    This separate function for readability checks which we are dealing with.
+    """
     return "val" in encoded
 
 
@@ -328,6 +329,6 @@ def from_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
             {k: from_json(v, project_id, server) for k, v in obj.items()}
         )
     elif isinstance(obj, str) and obj.startswith("weave://"):
-        return parse_uri(obj)
+        return Ref.parse_uri(obj)
 
     return obj

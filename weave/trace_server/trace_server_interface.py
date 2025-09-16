@@ -18,6 +18,12 @@ WB_USER_ID_DESCRIPTION = (
 )
 
 
+class BaseModelStrict(BaseModel):
+    """Base model with strict validation that forbids extra fields."""
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class ExtraKeysTypedDict(TypedDict):
     pass
 
@@ -259,7 +265,7 @@ class OtelExportRes(BaseModel):
     )
 
 
-class CallStartReq(BaseModel):
+class CallStartReq(BaseModelStrict):
     start: StartedCallSchemaForInsert
 
 
@@ -268,7 +274,7 @@ class CallStartRes(BaseModel):
     trace_id: str
 
 
-class CallEndReq(BaseModel):
+class CallEndReq(BaseModelStrict):
     end: EndedCallSchemaForInsert
 
 
@@ -286,7 +292,7 @@ class CallBatchEndMode(BaseModel):
     req: CallEndReq
 
 
-class CallCreateBatchReq(BaseModel):
+class CallCreateBatchReq(BaseModelStrict):
     batch: list[Union[CallBatchStartMode, CallBatchEndMode]]
 
 
@@ -294,7 +300,7 @@ class CallCreateBatchRes(BaseModel):
     res: list[Union[CallStartRes, CallEndRes]]
 
 
-class CallReadReq(BaseModel):
+class CallReadReq(BaseModelStrict):
     project_id: str
     id: str
     include_costs: Optional[bool] = False
@@ -306,7 +312,7 @@ class CallReadRes(BaseModel):
     call: Optional[CallSchema]
 
 
-class CallsDeleteReq(BaseModel):
+class CallsDeleteReq(BaseModelStrict):
     project_id: str
     call_ids: list[str]
 
@@ -331,6 +337,7 @@ class CompletionsCreateRequestInputs(BaseModel):
     modalities: Optional[list] = None
     presence_penalty: Optional[float] = None
     frequency_penalty: Optional[float] = None
+    stream: Optional[bool] = None
     logit_bias: Optional[dict] = None
     user: Optional[str] = None
     # openai v1.0+ new params
@@ -348,7 +355,7 @@ class CompletionsCreateRequestInputs(BaseModel):
     api_version: Optional[str] = None
 
 
-class CompletionsCreateReq(BaseModel):
+class CompletionsCreateReq(BaseModelStrict):
     project_id: str
     inputs: CompletionsCreateRequestInputs
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
@@ -362,9 +369,7 @@ class CompletionsCreateRes(BaseModel):
     weave_call_id: Optional[str] = None
 
 
-class CallsFilter(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
+class CallsFilter(BaseModelStrict):
     op_names: Optional[list[str]] = None
     input_refs: Optional[list[str]] = None
     output_refs: Optional[list[str]] = None
@@ -378,9 +383,7 @@ class CallsFilter(BaseModel):
     wb_run_ids: Optional[list[str]] = None
 
 
-class SortBy(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
+class SortBy(BaseModelStrict):
     # Field should be a key of `CallSchema`. For dictionary fields
     # (`attributes`, `inputs`, `outputs`, `summary`), the field can be
     # dot-separated.
@@ -389,7 +392,7 @@ class SortBy(BaseModel):
     direction: Literal["asc", "desc"]
 
 
-class CallsQueryReq(BaseModel):
+class CallsQueryReq(BaseModelStrict):
     project_id: str
     filter: Optional[CallsFilter] = None
     limit: Optional[int] = None
@@ -453,7 +456,7 @@ class CallsQueryRes(BaseModel):
     calls: list[CallSchema]
 
 
-class CallsQueryStatsReq(BaseModel):
+class CallsQueryStatsReq(BaseModelStrict):
     project_id: str
     filter: Optional[CallsFilter] = None
     query: Optional[Query] = None
@@ -474,7 +477,7 @@ class CallsQueryStatsRes(BaseModel):
     total_storage_size_bytes: Optional[int] = None
 
 
-class CallUpdateReq(BaseModel):
+class CallUpdateReq(BaseModelStrict):
     # required for all updates
     project_id: str
     call_id: str
@@ -490,7 +493,7 @@ class CallUpdateRes(BaseModel):
     pass
 
 
-class OpCreateReq(BaseModel):
+class OpCreateReq(BaseModelStrict):
     op_obj: ObjSchemaForInsert
 
 
@@ -498,7 +501,7 @@ class OpCreateRes(BaseModel):
     digest: str
 
 
-class OpReadReq(BaseModel):
+class OpReadReq(BaseModelStrict):
     project_id: str
     name: str
     digest: str
@@ -513,7 +516,7 @@ class OpVersionFilter(BaseModel):
     latest_only: Optional[bool] = None
 
 
-class OpQueryReq(BaseModel):
+class OpQueryReq(BaseModelStrict):
     project_id: str
     filter: Optional[OpVersionFilter] = None
 
@@ -522,7 +525,7 @@ class OpQueryRes(BaseModel):
     op_objs: list[ObjSchema]
 
 
-class ObjCreateReq(BaseModel):
+class ObjCreateReq(BaseModelStrict):
     obj: ObjSchemaForInsert
 
 
@@ -530,7 +533,7 @@ class ObjCreateRes(BaseModel):
     digest: str  #
 
 
-class ObjReadReq(BaseModel):
+class ObjReadReq(BaseModelStrict):
     project_id: str
     object_id: str
     digest: str
@@ -546,7 +549,7 @@ class ObjReadRes(BaseModel):
     obj: ObjSchema
 
 
-class ObjectVersionFilter(BaseModel):
+class ObjectVersionFilter(BaseModelStrict):
     base_object_classes: Optional[list[str]] = Field(
         default=None,
         description="Filter objects by their base classes",
@@ -574,7 +577,7 @@ class ObjectVersionFilter(BaseModel):
     )
 
 
-class ObjQueryReq(BaseModel):
+class ObjQueryReq(BaseModelStrict):
     project_id: str = Field(
         description="The ID of the project to query", examples=["user/project"]
     )
@@ -609,7 +612,7 @@ class ObjQueryReq(BaseModel):
     )
 
 
-class ObjDeleteReq(BaseModel):
+class ObjDeleteReq(BaseModelStrict):
     project_id: str
     object_id: str
     digests: Optional[list[str]] = Field(
@@ -626,8 +629,17 @@ class ObjQueryRes(BaseModel):
     objs: list[ObjSchema]
 
 
-class TableCreateReq(BaseModel):
+class TableCreateReq(BaseModelStrict):
     table: TableSchemaForInsert
+
+
+class TableCreateFromDigestsReq(BaseModelStrict):
+    project_id: str
+    row_digests: list[str]
+
+
+class TableCreateFromDigestsRes(BaseModel):
+    digest: str
 
 
 """
@@ -709,7 +721,7 @@ class TableInsertSpec(BaseModel):
 TableUpdateSpec = Union[TableAppendSpec, TablePopSpec, TableInsertSpec]
 
 
-class TableUpdateReq(BaseModel):
+class TableUpdateReq(BaseModelStrict):
     project_id: str
     base_digest: str
     updates: list[TableUpdateSpec]
@@ -753,7 +765,7 @@ class TableCreateRes(BaseModel):
     )
 
 
-class TableRowFilter(BaseModel):
+class TableRowFilter(BaseModelStrict):
     row_digests: Optional[list[str]] = Field(
         default=None,
         description="List of row digests to filter by",
@@ -766,7 +778,7 @@ class TableRowFilter(BaseModel):
     )
 
 
-class TableQueryReq(BaseModel):
+class TableQueryReq(BaseModelStrict):
     project_id: str = Field(
         description="The ID of the project", examples=["my_entity/my_project"]
     )
@@ -805,7 +817,7 @@ class TableQueryRes(BaseModel):
     rows: list[TableRowSchema]
 
 
-class TableQueryStatsReq(BaseModel):
+class TableQueryStatsReq(BaseModelStrict):
     project_id: str = Field(
         description="The ID of the project", examples=["my_entity/my_project"]
     )
@@ -814,7 +826,7 @@ class TableQueryStatsReq(BaseModel):
     )
 
 
-class TableQueryStatsBatchReq(BaseModel):
+class TableQueryStatsBatchReq(BaseModelStrict):
     project_id: str = Field(
         description="The ID of the project", examples=["my_entity/my_project"]
     )
@@ -847,7 +859,7 @@ class TableQueryStatsBatchRes(BaseModel):
     tables: list[TableStatsRow]
 
 
-class RefsReadBatchReq(BaseModel):
+class RefsReadBatchReq(BaseModelStrict):
     refs: list[str]
 
 
@@ -855,7 +867,12 @@ class RefsReadBatchRes(BaseModel):
     vals: list[Any]
 
 
-class FeedbackCreateReq(BaseModel):
+class FeedbackCreateReq(BaseModelStrict):
+    id: Optional[str] = Field(
+        default=None,
+        description="If provided by the client, this ID will be used for the feedback row instead of a server-generated one.",
+        examples=["018f1f2a-9c2b-7d3e-b5a1-8c9d2e4f6a7b"],
+    )
     project_id: str = Field(examples=["entity/project"])
     weave_ref: str = Field(examples=["weave:///entity/project/object/name:digest"])
     creator: Optional[str] = Field(default=None, examples=["Jane Smith"])
@@ -896,11 +913,12 @@ class FeedbackCreateRes(BaseModel):
 
 
 class Feedback(FeedbackCreateReq):
-    id: str
+    # Feedback is stricter than the create request, and must always have an id
+    id: str  # type: ignore[reportIncompatibleVariableOverride]
     created_at: datetime.datetime
 
 
-class FeedbackQueryReq(BaseModel):
+class FeedbackQueryReq(BaseModelStrict):
     project_id: str = Field(examples=["entity/project"])
     fields: Optional[list[str]] = Field(
         default=None, examples=[["id", "feedback_type", "payload.note"]]
@@ -918,7 +936,7 @@ class FeedbackQueryRes(BaseModel):
     result: list[dict[str, Any]]
 
 
-class FeedbackPurgeReq(BaseModel):
+class FeedbackPurgeReq(BaseModelStrict):
     project_id: str = Field(examples=["entity/project"])
     query: Query
 
@@ -935,7 +953,15 @@ class FeedbackReplaceRes(FeedbackCreateRes):
     pass
 
 
-class FileCreateReq(BaseModel):
+class FeedbackCreateBatchReq(BaseModelStrict):
+    batch: list[FeedbackCreateReq]
+
+
+class FeedbackCreateBatchRes(BaseModel):
+    res: list[FeedbackCreateRes]
+
+
+class FileCreateReq(BaseModelStrict):
     project_id: str
     name: str
     content: bytes
@@ -945,12 +971,12 @@ class FileCreateRes(BaseModel):
     digest: str
 
 
-class FileContentReadReq(BaseModel):
+class FileContentReadReq(BaseModelStrict):
     project_id: str
     digest: str
 
 
-class FilesStatsReq(BaseModel):
+class FilesStatsReq(BaseModelStrict):
     project_id: str
 
 
@@ -966,7 +992,7 @@ class EnsureProjectExistsRes(BaseModel):
     project_name: str
 
 
-class CostCreateInput(BaseModel):
+class CostCreateInput(BaseModelStrict):
     prompt_token_cost: float
     completion_token_cost: float
     prompt_token_cost_unit: Optional[str] = Field(
@@ -985,7 +1011,7 @@ class CostCreateInput(BaseModel):
     )
 
 
-class CostCreateReq(BaseModel):
+class CostCreateReq(BaseModelStrict):
     project_id: str = Field(examples=["entity/project"])
     costs: dict[str, CostCreateInput]
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
@@ -996,7 +1022,7 @@ class CostCreateRes(BaseModel):
     ids: list[tuple[str, str]]
 
 
-class CostQueryReq(BaseModel):
+class CostQueryReq(BaseModelStrict):
     project_id: str = Field(examples=["entity/project"])
     fields: Optional[list[str]] = Field(
         default=None,
@@ -1039,7 +1065,7 @@ class CostQueryRes(BaseModel):
     results: list[CostQueryOutput]
 
 
-class CostPurgeReq(BaseModel):
+class CostPurgeReq(BaseModelStrict):
     project_id: str = Field(examples=["entity/project"])
     query: Query
 
@@ -1048,7 +1074,7 @@ class CostPurgeRes(BaseModel):
     pass
 
 
-class ActionsExecuteBatchReq(BaseModel):
+class ActionsExecuteBatchReq(BaseModelStrict):
     project_id: str
     action_ref: str
     call_ids: list[str]
@@ -1059,7 +1085,7 @@ class ActionsExecuteBatchRes(BaseModel):
     pass
 
 
-class ProjectStatsReq(BaseModel):
+class ProjectStatsReq(BaseModelStrict):
     project_id: str
     include_trace_storage_size: Optional[bool] = True
     include_object_storage_size: Optional[bool] = True
@@ -1100,7 +1126,7 @@ class ThreadSchema(BaseModel):
     )
 
 
-class ThreadsQueryFilter(BaseModel):
+class ThreadsQueryFilter(BaseModelStrict):
     after_datetime: Optional[datetime.datetime] = Field(
         default=None,
         description="Only include threads with start_time after this timestamp",
@@ -1118,9 +1144,8 @@ class ThreadsQueryFilter(BaseModel):
     )
 
 
-class ThreadsQueryReq(BaseModel):
-    """
-    Query threads with aggregated statistics based on turn calls only.
+class ThreadsQueryReq(BaseModelStrict):
+    """Query threads with aggregated statistics based on turn calls only.
 
     Turn calls are the immediate children of thread contexts (where call.id == turn_id).
     This provides meaningful conversation-level statistics rather than including all
@@ -1145,7 +1170,7 @@ class ThreadsQueryReq(BaseModel):
     )
 
 
-class EvaluateModelReq(BaseModel):
+class EvaluateModelReq(BaseModelStrict):
     project_id: str
     evaluation_ref: str
     model_ref: str
@@ -1159,29 +1184,29 @@ class EvaluateModelRes(BaseModel):
     call_id: str
 
 
-class EvaluationStatusReq(BaseModel):
+class EvaluationStatusReq(BaseModelStrict):
     project_id: str
     call_id: str
 
 
-class EvaluationStatusNotFound(BaseModel):
+class EvaluationStatusNotFound(BaseModelStrict):
     code: Literal["not_found"] = "not_found"
 
 
-class EvaluationStatusRunning(BaseModel):
+class EvaluationStatusRunning(BaseModelStrict):
     code: Literal["running"] = "running"
     completed_rows: int
     total_rows: int
 
 
-class EvaluationStatusFailed(BaseModel):
+class EvaluationStatusFailed(BaseModelStrict):
     code: Literal["failed"] = "failed"
     error: Optional[str] = None
 
 
-class EvaluationStatusComplete(BaseModel):
+class EvaluationStatusComplete(BaseModelStrict):
     code: Literal["complete"] = "complete"
-    output: Optional[Any] = None
+    output: dict[str, Any]
 
 
 class EvaluationStatusRes(BaseModel):
@@ -1231,6 +1256,10 @@ class TraceServerInterface(Protocol):
 
     # Table API
     def table_create(self, req: TableCreateReq) -> TableCreateRes: ...
+    def table_create_from_digests(
+        self, req: TableCreateFromDigestsReq
+    ) -> TableCreateFromDigestsRes: ...
+
     def table_update(self, req: TableUpdateReq) -> TableUpdateRes: ...
     def table_query(self, req: TableQueryReq) -> TableQueryRes: ...
     def table_query_stream(self, req: TableQueryReq) -> Iterator[TableRowSchema]: ...
@@ -1249,6 +1278,10 @@ class TraceServerInterface(Protocol):
 
     # Feedback API
     def feedback_create(self, req: FeedbackCreateReq) -> FeedbackCreateRes: ...
+    def feedback_create_batch(
+        self, req: FeedbackCreateBatchReq
+    ) -> FeedbackCreateBatchRes: ...
+
     def feedback_query(self, req: FeedbackQueryReq) -> FeedbackQueryRes: ...
     def feedback_purge(self, req: FeedbackPurgeReq) -> FeedbackPurgeRes: ...
     def feedback_replace(self, req: FeedbackReplaceReq) -> FeedbackReplaceRes: ...

@@ -1,3 +1,6 @@
+---
+title: Trace and Evaluate a Computer Vision Pipeline with Weave
+---
 
 
 :::tip[This is a notebook]
@@ -7,6 +10,8 @@
 <a href="https://github.com/wandb/weave/blob/master/docs/./notebooks/ocr-pipeline.ipynb" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link button button--secondary button--med margin-right--sm notebook-cta-button"><div><img src="https://upload.wikimedia.org/wikipedia/commons/9/91/Octicons-mark-github.svg" alt="View in Github" height="15px" /><div>View in Github</div></div></a>
 
 :::
+
+
 
 
 # Trace and Evaluate a Computer Vision Pipeline with Weave
@@ -188,9 +193,9 @@ def named_entity_recognation(image_base64, id):
         # 2) parse JSON exactly once
         result = json.loads(output_text)
 
-        print(f"Processed: {str(id)}")
+        print(f"Processed: {id!s}")
     except Exception as e:
-        print(f"Failed to process {str(id)}: {e}")
+        print(f"Failed to process {id!s}: {e}")
     return result
 ```
 

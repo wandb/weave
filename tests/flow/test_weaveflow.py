@@ -1,10 +1,11 @@
 import logging
+from dataclasses import dataclass
 
 import numpy as np
 from pydantic import Field
 
 import weave
-from weave.flow.obj import deprecated_field
+from weave.object.obj import deprecated_field
 
 
 def test_weaveflow_op_wandb(client):
@@ -78,11 +79,9 @@ def test_weaveflow_publish_numpy(client):
 
 
 def test_weaveflow_unknown_type_op_param_undeclared():
+    @dataclass
     class SomeUnknownObject:
         x: int
-
-        def __init__(self, x: int):
-            self.x = x
 
     @weave.op
     def op_with_unknown_param(v) -> int:
@@ -92,11 +91,9 @@ def test_weaveflow_unknown_type_op_param_undeclared():
 
 
 def test_weaveflow_unknown_type_op_param_declared():
+    @dataclass
     class SomeUnknownObject:
         x: int
-
-        def __init__(self, x: int):
-            self.x = x
 
     @weave.op
     def op_with_unknown_param(v: SomeUnknownObject) -> int:
@@ -106,11 +103,9 @@ def test_weaveflow_unknown_type_op_param_declared():
 
 
 def test_weaveflow_unknown_type_op_param_closure():
+    @dataclass
     class SomeUnknownObject:
         x: int
-
-        def __init__(self, x: int):
-            self.x = x
 
     v = SomeUnknownObject(x=10)
 
@@ -169,7 +164,7 @@ def test_construct_eval_with_dataset_get(client):
     dataset = client.save(
         weave.Dataset(rows=[{"x": 1, "y": 3}, {"x": 2, "y": 16}]), "my-dataset"
     )
-    ref = weave.obj_ref(dataset)
+    ref = dataset.ref
     assert ref is not None
     dataset2 = weave.ref(ref.uri()).get()
     weave.Evaluation(dataset=dataset2)

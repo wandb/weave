@@ -14,36 +14,11 @@ permissions:
   packages: write
 
 jobs:
-  publish-package:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Configure npm for GitHub Packages
-        run: |
-          echo "//npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }}" >> weave-js/.npmrc
-
-      - name: Publish package
-        run: |
-          cd weave-js
-          yarn install --frozen-lockfile
-          npm version 0.0.0-${{ github.sha }} --no-git-tag-version
-          yarn generate
-          cp package.json README.md .npmrc src/
-          cd src
-          # E409 means the package already exists, in which case we don't want to fail this job
-          if [ "${{ github.ref }}" = "refs/heads/master" ]; then
-            npm publish 2>&1 | tee publish_output.log || grep -q "E409" publish_output.log
-          else
-            npm publish --tag prerelease 2>&1 | tee publish_output.log || grep -q "E409" publish_output.log
-          fi
-
   check-which-tests-to-run:
     uses: ./.github/workflows/check-which-tests-to-run.yaml
 
   notify-wandb-core:
-    needs: [check-which-tests-to-run, publish-package]
+    needs: [check-which-tests-to-run]
     runs-on: ubuntu-latest
 
     steps:
@@ -57,7 +32,8 @@ jobs:
             {
               "ref_name": "${{ github.ref_name }}",
               "sha": "${{ github.sha }}",
-              "run_weave_js_tests": ${{ needs.check-which-tests-to-run.outputs.weave_js_tests }},
               "run_weave_query_tests": ${{ needs.check-which-tests-to-run.outputs.weave_query_tests }},
-              "run_trace_server_tests": ${{ needs.check-which-tests-to-run.outputs.trace_server_tests }}
+              "run_trace_server_tests": ${{ needs.check-which-tests-to-run.outputs.trace_server_tests }},
+              "actor": "${{ github.actor }}",
+              "actor_id": "${{ github.actor_id }}"
             }

@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import logging
+import os
+from json import JSONDecodeError
 
+from weave.compat import wandb
+from weave.telemetry import trace_sentry
 from weave.trace import (
-    autopatch,
+    env,
     init_message,
-    trace_sentry,
-    wandb_termlog_patch,
     weave_client,
 )
 from weave.trace.context import weave_client_context as weave_client_context
@@ -20,22 +22,8 @@ from weave.trace_server_bindings.caching_middleware_trace_server import (
 logger = logging.getLogger(__name__)
 
 
-class InitializedClient:
-    def __init__(self, client: weave_client.WeaveClient):
-        self.client = client
-        weave_client_context.set_weave_client_global(client)
-
-    def reset(self) -> None:
-        weave_client_context.set_weave_client_global(None)
-
-
-_current_inited_client: InitializedClient | None = None
-
-
 def get_username() -> str | None:
-    from weave.wandb_interface import wandb_api
-
-    api = wandb_api.get_wandb_api_sync()
+    api = wandb.Api()
     try:
         return api.username()
     except AttributeError:
@@ -46,16 +34,21 @@ class WeaveWandbAuthenticationException(Exception): ...
 
 
 def get_entity_project_from_project_name(project_name: str) -> tuple[str, str]:
-    from weave.wandb_interface import wandb_api
+    if not project_name or not project_name.strip():
+        raise ValueError("project_name must be non-empty")
 
     fields = project_name.split("/")
     if len(fields) == 1:
-        api = wandb_api.get_wandb_api_sync()
-        entity_name = api.default_entity_name()
+        # First check for WANDB_ENTITY environment variable
+        entity_name = os.environ.get("WANDB_ENTITY")
         if entity_name is None:
-            raise WeaveWandbAuthenticationException(
-                'weave init requires wandb. Run "wandb login"'
-            )
+            # Fall back to wandb default entity
+            api = wandb.Api()
+            entity_name = api.default_entity_name()
+            if entity_name is None:
+                raise WeaveWandbAuthenticationException(
+                    'weave init requires wandb. Run "wandb login"'
+                )
         project_name = fields[0]
     elif len(fields) == 2:
         entity_name, project_name = fields
@@ -81,42 +74,56 @@ Args:
 """
 
 
+def _weave_is_available(server: remote_http_trace_server.RemoteHTTPTraceServer) -> bool:
+    try:
+        server.server_info()
+    except JSONDecodeError:
+        return False
+    except Exception:
+        logger.warning(
+            "Unexpected error when checking if Weave is available on the server.  Please contact support."
+        )
+        return False
+    return True
+
+
 def init_weave(
     project_name: str,
     ensure_project_exists: bool = True,
-    autopatch_settings: autopatch.AutopatchSettings | None = None,
-) -> InitializedClient:
-    global _current_inited_client
-    if _current_inited_client is not None:
+) -> weave_client.WeaveClient:
+    if not project_name or not project_name.strip():
+        raise ValueError("project_name must be non-empty")
+
+    current_client = weave_client_context.get_weave_client()
+    if current_client is not None:
         # TODO: Prob should move into settings
         if (
-            _current_inited_client.client.project == project_name
-            and _current_inited_client.client.ensure_project_exists
-            == ensure_project_exists
+            current_client.project == project_name
+            and current_client.ensure_project_exists == ensure_project_exists
         ):
-            return _current_inited_client
+            return current_client
         else:
             # Flush any pending calls before switching to a new project
-            _current_inited_client.client.finish()
-            _current_inited_client.reset()
+            current_client.finish()
+            weave_client_context.set_weave_client_global(None)
 
-    from weave.wandb_interface import wandb_api  # type: ignore
+    from weave.wandb_interface import (
+        context as wandb_context_module,  # type: ignore
+    )
 
     # Must init to read ensure we've read auth from the environment, in
     # case we're on a new thread.
-    wandb_api.init()
-    wandb_context = wandb_api.get_wandb_api_context()
+    wandb_context_module.init()
+    wandb_context = wandb_context_module.get_wandb_api_context()
     if wandb_context is None:
-        import wandb
+        url = wandb.app_url(env.wandb_base_url())
+        logger.info(f"Please login to Weights & Biases ({url}) to continue...")
+        wandb.login(anonymous="never", force=True, referrer="weave")  # type: ignore
 
-        logger.info(
-            "Please login to Weights & Biases (https://wandb.ai/) to continue..."
-        )
-        wandb_termlog_patch.ensure_patched()
-        wandb.login(anonymous="never", force=True)  # type: ignore
-        wandb_api.init()
-        wandb_context = wandb_api.get_wandb_api_context()
+        wandb_context_module.init()
+        wandb_context = wandb_context_module.get_wandb_api_context()
 
+    # Resolve entity name after authentication is ensured
     entity_name, project_name = get_entity_project_from_project_name(project_name)
     wandb_run_id = weave_client.safe_current_wb_run_id()
     weave_client.check_wandb_run_matches(wandb_run_id, entity_name, project_name)
@@ -126,6 +133,10 @@ def init_weave(
         api_key = wandb_context.api_key
 
     remote_server = init_weave_get_server(api_key)
+    if not _weave_is_available(remote_server):
+        raise RuntimeError(
+            "Weave is not available on the server.  Please contact support."
+        )
     server: TraceServerInterface = remote_server
     if use_server_cache():
         server = CachingMiddlewareTraceServer.from_env(server)
@@ -137,18 +148,21 @@ def init_weave(
     # If the project name was formatted by init, update the project name
     project_name = client.project
 
-    _current_inited_client = InitializedClient(client)
+    weave_client_context.set_weave_client_global(client)
 
-    # autopatching is only supported for the wandb client, because OpenAI calls are not
-    # logged in local mode currently. When that's fixed, this autopatch call can be
-    # moved to InitializedClient.__init__
-    autopatch.autopatch(autopatch_settings)
+    # Implicit patching:
+    # 1. Check sys.modules and automatically patch any already-imported integrations
+    # 2. Register import hook to patch integrations imported after weave.init()
+    from weave.integrations.patch import implicit_patch, register_import_hook
+
+    implicit_patch()
+    register_import_hook()
 
     username = get_username()
 
     # This is a temporary event to track the number of users who have enabled PII redaction.
     if should_redact_pii():
-        from weave.trace.pii_redaction import track_pii_redaction_enabled
+        from weave.utils.pii_redaction import track_pii_redaction_enabled
 
         track_pii_redaction_enabled(username or "unknown", entity_name, project_name)
 
@@ -176,10 +190,10 @@ def init_weave(
         }
     )
 
-    return _current_inited_client
+    return client
 
 
-def init_weave_disabled() -> InitializedClient:
+def init_weave_disabled() -> weave_client.WeaveClient:
     """Initialize a dummy client that does nothing.
 
     This is used when the program is execuring with Weave disabled.
@@ -190,9 +204,9 @@ def init_weave_disabled() -> InitializedClient:
     make requests (eg. publishing, fetching, querying) while disabled
     will fail.
     """
-    global _current_inited_client
-    if _current_inited_client is not None:
-        _current_inited_client.reset()
+    current_client = weave_client_context.get_weave_client()
+    if current_client is not None:
+        weave_client_context.set_weave_client_global(None)
 
     client = weave_client.WeaveClient(
         "DISABLED",
@@ -201,7 +215,8 @@ def init_weave_disabled() -> InitializedClient:
         ensure_project_exists=False,
     )
 
-    return InitializedClient(client)
+    weave_client_context.set_weave_client_global(client)
+    return client
 
 
 def init_weave_get_server(
@@ -214,23 +229,24 @@ def init_weave_get_server(
     return res
 
 
-def init_local() -> InitializedClient:
+def init_local() -> weave_client.WeaveClient:
     from weave.trace_server import sqlite_trace_server
 
     server = sqlite_trace_server.SqliteTraceServer("weave.db")
     server.setup_tables()
     client = weave_client.WeaveClient("none", "none", server)
-    return InitializedClient(client)
+    weave_client_context.set_weave_client_global(client)
+    return client
 
 
 def finish() -> None:
-    global _current_inited_client
-    if _current_inited_client is not None:
-        _current_inited_client.reset()
-        _current_inited_client = None
+    current_client = weave_client_context.get_weave_client()
+    if current_client is not None:
+        weave_client_context.set_weave_client_global(None)
 
-    # autopatching is only supported for the wandb client, because OpenAI calls are not
-    # logged in local mode currently. When that's fixed, this reset_autopatch call can be
-    # moved to InitializedClient.reset
-    autopatch.reset_autopatch()
+    # Unregister the import hook
+    from weave.integrations.patch import unregister_import_hook
+
+    unregister_import_hook()
+
     trace_sentry.global_trace_sentry.end_session()

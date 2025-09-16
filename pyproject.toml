@@ -40,21 +40,15 @@ dependencies = [
   "pydantic>=2.0.0",
   "packaging>=21.0",          # For version parsing in integrations
   "tenacity>=8.3.0,!=8.4.0",  # Excluding 8.4.0 because it had a bug on import of AsyncRetrying
-  "rich",                     # Used for special formatting of tables (should be made optional)
   "click",                    # Used for terminal/stdio printing
   "gql[aiohttp,requests]",    # Used exclusively in wandb_api.py
   "jsonschema>=4.23.0",       # Used by scorers for field validation
   "diskcache==5.6.3",         # Used for data caching
   "nest-asyncio==1.6.0",      # Used to support nested event loops in asyncio
 
-  # This dependency will be updated each time we regenerate the trace server bindings.
-  # 1. For normal dev, pin to a SHA and allow direct references.  This will look like:
-  #    weave_server_sdk @ git+https://github.com/wandb/weave-stainless@daf91fdd07535c570eb618b343e2d125f9b09e25
-  # 2. For deploys, pin to a specific version and remove allow-direct-references.  This will look like:
-  #    weave_server_sdk==0.0.1
-
-  # TODO: Uncomment when ready to commit to the new bindings.
-  # "weave_server_sdk @ git+https://github.com/wandb/weave-stainless@9f62f9b3422d2afa7ad56f853ff510a81c1abb73",
+  # Used for content type detection
+  # Remove once license content filtering is upstreamed
+  "polyfile-weave",
 
   # This transforms X | Y into typing.Union[X, Y] and list[X] into typing.List[X] etc.
   # It allows us to use those type annotations in Python 3.9 with Pydantic.
@@ -63,10 +57,21 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+wandb = ["wandb>=0.17.1"]
+rich = ["rich"]           # Optional dependency for enhanced console output
+# stainless = [
+#   # This dependency will be updated each time we regenerate the trace server bindings.
+#   # 1. For normal dev, pin to a SHA and allow direct references.  This will look like:
+#   #    weave_server_sdk @ git+https://github.com/wandb/weave-stainless@daf91fdd07535c570eb618b343e2d125f9b09e25
+#   # 2. For deploys, pin to a specific version and remove allow-direct-references.  This will look like:
+#   #    weave_server_sdk==0.0.1
+
+#   # TODO: Uncomment when ready to commit to the new bindings.
+#   "weave_server_sdk @ git+https://github.com/wandb/weave-stainless.git@3e65c0a8e0adb642bbde81e64f03b333d9d57686",
+# ]
 # `trace_server` is the dependency list of the trace server itself. We eventually will extract
 # this to a separate package. Note, when that happens, we will need to pull along some of the
-#default dependencies as well.
-wandb = ["wandb>=0.17.1"]
+# default dependencies as well.
 trace_server = [
   "ddtrace>=2.7.0",
   # BYOB - S3
@@ -87,6 +92,7 @@ trace_server = [
 trace_server_tests = [
   # BYOB - S3
   "moto[s3]>=5.0.0",
+  "openai<1.100.0",
 ]
 docs = [
   "playwright",
@@ -100,14 +106,17 @@ anthropic = ["anthropic>=0.18.0"]
 cerebras = ["cerebras-cloud-sdk"]
 cohere = ["cohere>=5.9.1,<5.9.3"]
 # Pin until https://github.com/crewAIInc/crewAI/pull/2553 is released
-crewai = ["crewai>=0.100.1,<=0.108.0", "crewai-tools>=0.38.0"]
-dspy = ["dspy>=2.6.27"]
-google_ai_studio = ["google-generativeai>=0.8.3"]
+crewai = [
+  "crewai>=0.100.1,<=0.108.0",
+  "crewai-tools>=0.38.0",
+  "openai>=1.99.9,<1.100.0",
+]
+dspy = ["dspy>=2.6.27", "litellm[proxy]", "openai>=1.99.9,<1.100.0"]
 google_genai = ["google-genai>=1.0.0,<=1.23.0", "pillow>=11.1.0"]
 groq = ["groq>=0.13.0"]
 huggingface = ["huggingface-hub>=0.28.1"]
 smolagents = [
-  "openai>=1.0.0",
+  "openai>=1.99.9,<1.100.0",
   "litellm>=1.58",
   "smolagents>=1.17.0,<1.19.0",
   "huggingface-hub>=0.28.1",
@@ -115,8 +124,9 @@ smolagents = [
 ]
 instructor = [
   "instructor>=1.4.3,<1.7.0; python_version <= '3.9'",
-  "instructor>=1.4.3; python_version > '3.9'",
+  "instructor>=1.4.3,<1.11.0; python_version > '3.9'",
   "google-genai>=1.5.0",
+  "openai>=1.99.9,<1.100.0",
 ]
 langchain = [
   "langchain-core>=0.2.1",
@@ -125,18 +135,24 @@ langchain = [
   "langchain-google-vertexai>=2.0.24",
   "langchain-google-genai>=2.1.5",
   "langchain-anthropic>=0.3.15",
+  "langchain-cohere>=0.4.5",
+  "langchain-litellm>=0.2.2",
   "chromadb>=0.5.0",
   "pysqlite3",
   "opentelemetry-exporter-otlp",
-  "openai<1.92.0",
+  "openai>=1.99.9,<1.100.0",
 ]
 langchain_nvidia_ai_endpoints = [
   "langchain-core>=0.2.1",
   "langchain-nvidia-ai-endpoints",
 ]
-litellm = ["litellm>=1.36.1"]
+litellm = ["litellm>=1.36.1", "openai>=1.99.9,<1.100.0"]
 # temporary max pin b/c 0.12.50 changes call structure and therefor tests
-llamaindex = ["llama-index>=0.10.35,<0.12.50", "llama-index-core<0.12.50", "openai<1.92.0"]
+llamaindex = [
+  "llama-index>=0.10.35,<0.12.50",
+  "llama-index-core<0.12.50",
+  "openai>=1.99.9,<1.100.0",
+]
 mistral = ["mistralai>=1.0.0"]
 scorers = [
   "numpy>1.21.0",
@@ -150,10 +166,10 @@ scorers = [
   "pip>=20.0",                    # this is needed for presidio-analyzer to pull the spacy models
   "presidio-analyzer>=2.2.0",
   "presidio-anonymizer>=2.2.0",
-  "huggingface_hub>=0.28.1"
+  "huggingface_hub>=0.28.1",
 ]
 notdiamond = ["notdiamond>=0.3.21", "litellm<=1.49.1"]
-openai = ["openai>=1.0.0,<1.92.0"]
+openai = ["openai>=1.99.9,<1.100.0"]
 openai_agents = ["openai-agents>=0.0.4"]
 pandas-test = ["pandas>=2.2.3"]
 presidio = ["presidio-analyzer==2.2.357", "presidio-anonymizer==2.2.357"]
@@ -163,7 +179,12 @@ vertexai = ["vertexai>=1.70.0", "shapely<=2.0.6"] # shapely is busted on 2.0.7
 bedrock = ["boto3", "moto[bedrock]>=5.0.24"]
 verdict = ["verdict>=0.2.3"]
 autogen = ["autogen-agentchat>=0.5.7"]
-autogen_tests = ["autogen-agentchat>=0.5.7", "autogen-ext[openai]>=0.5.7"]
+autogen_tests = [
+  "autogen-agentchat>=0.5.7",
+  "autogen-ext[openai]>=0.5.7",
+  "openai>=1.99.9,<1.100.0",
+]
+verifiers = ["verifiers>=0.1.3.post0"]
 
 test = [
   "nox",
@@ -174,10 +195,12 @@ test = [
   "pytest-rerunfailures>=12.0",
   "pytest-rerunfailures>=14.0",
   "pytest-shard==0.1.2",
+  "pytest-memray~=1.8",
   "clickhouse_connect==0.7.0",
   "fastapi>=0.110.0",
   "sqlparse==0.5.0",
   "freezegun",
+  "rich",
 
   # Integration Tests
   "pytest-recording>=0.13.2",
@@ -190,6 +213,10 @@ test = [
   "moviepy<=1.0.3",
   "filelock",
   "httpx",
+
+  # Media Generation
+  "opencv-python", # Video generation
+  "reportlab",     # PDF generation
 
   "confluent-kafka",
 
@@ -222,16 +249,16 @@ path = "weave/version.py"
 include = ["weave"]
 exclude = [
   "weave_query",
-  "weave-js",
   "examples",
   "tests",
   "docs",
   "dev_docs",
   "weave/clear_cache.py",
+  "weave/trace_server/model_providers",
 ]
 
-# [tool.hatch.metadata]
-# allow-direct-references = true
+[tool.hatch.metadata]
+allow-direct-references = true
 [tool.pytest.ini_options]
 filterwarnings = [
   # treat warnings as errors
@@ -250,13 +277,9 @@ markers = [
 [tool.ruff.lint]
 preview = true
 select = [
-  "D200",    # https://docs.astral.sh/ruff/rules/fits-on-one-line/
-  "D201",    # https://docs.astral.sh/ruff/rules/no-blank-line-before-function/
-  "D202",    # https://docs.astral.sh/ruff/rules/no-blank-line-after-function/
-  "D204",    # https://docs.astral.sh/ruff/rules/one-blank-line-after-class/
-  "D210",    # https://docs.astral.sh/ruff/rules/surrounding-whitespace/
-  "D211",    # https://docs.astral.sh/ruff/rules/blank-line-before-class/
-  "D214",    # https://docs.astral.sh/ruff/rules/section-not-over-indented/
+  "B", # https://docs.astral.sh/ruff/rules/#flake8-bugbear-b
+  "D", # https://docs.astral.sh/ruff/rules/#pydoclint-doc
+  #
   "FIX001",  # https://beta.ruff.rs/docs/rules/#flake8-fixme-fix
   "FIX003",  # https://docs.astral.sh/ruff/rules/line-contains-xxx/
   "F541",    # https://docs.astral.sh/ruff/rules/f-string-missing-placeholders/
@@ -277,14 +300,6 @@ select = [
   "TRY401",  # https://docs.astral.sh/ruff/rules/verbose-log-message/
   "C",       # https://docs.astral.sh/ruff/rules/#convention-c
   "T201",    # https://docs.astral.sh/ruff/rules/print-statement/
-  "B006",    # https://docs.astral.sh/ruff/rules/mutable-argument-default/
-  "B007",    # https://docs.astral.sh/ruff/rules/unused-loop-control-variable/
-  "B008",    # https://docs.astral.sh/ruff/rules/function-call-in-default-argument/
-  "B009",    # https://docs.astral.sh/ruff/rules/get-attr-with-constant/
-  "B017",    # https://docs.astral.sh/ruff/rules/assert-raises-exception/
-  "B020",    # https://docs.astral.sh/ruff/rules/loop-variable-overrides-iterator/
-  "B028",    # https://docs.astral.sh/ruff/rules/no-explicit-stacklevel/
-  "B904",    # https://docs.astral.sh/ruff/rules/raise-without-from-inside-except/
   "SIM102",  # https://docs.astral.sh/ruff/rules/collapsible-if/,
   "N801",    # https://docs.astral.sh/ruff/rules/invalid-class-name/
   "N802",    # https://docs.astral.sh/ruff/rules/invalid-function-name/
@@ -317,11 +332,12 @@ select = [
   "E713",    # https://docs.astral.sh/ruff/rules/not-in-test/
 ]
 ignore = [
-  # we use Google style
-  "D203", # https://docs.astral.sh/ruff/rules/one-blank-line-before-class/
-  "D213", # https://docs.astral.sh/ruff/rules/multi-line-summary-second-line/
-  "D215", # https://docs.astral.sh/ruff/rules/section-underline-not-over-indented/
-
+  # Fix these when possible.  They are formatting changes related to the docs!
+  "D10",
+  "D205",
+  "D414",
+  "D415",
+  "D417",
   # This is a more involved change, so disabling for now.
   "C901", # https://docs.astral.sh/ruff/rules/complex-structure/
 ]
@@ -329,6 +345,9 @@ exclude = ["weave_query"]
 
 [tool.ruff.lint.isort]
 known-third-party = ["wandb", "weave_query"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
 
 [tool.ruff.lint.flake8-pytest-style]
 mark-parentheses = false
@@ -372,7 +391,7 @@ module = "weave_query.*"
 ignore_errors = true
 
 [tool.bumpversion]
-current_version = "0.51.57-dev0"
+current_version = "0.52.8-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.
@@ -415,3 +434,7 @@ BoxedNDArray = "BoxedNDArray"
 [tool.fixit]
 enable = [".rules.op_deco", ".rules.legacy_methods"]
 disable = ["fixit.rules"]
+
+[tool.coverage.report]
+exclude_also = ["if TYPE_CHECKING:", "@abstractmethod"]
+omit = ["weave_query/**", "weave/agent/**"]

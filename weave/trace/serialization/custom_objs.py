@@ -4,8 +4,9 @@ from collections.abc import Mapping
 from typing import Any, Callable
 
 from weave.trace.context.weave_client_context import require_weave_client
-from weave.trace.op import Op, is_op, op
-from weave.trace.refs import ObjectRef, OpRef, parse_uri
+from weave.trace.op import is_op, op
+from weave.trace.op_protocol import Op
+from weave.trace.refs import ObjectRef, OpRef
 from weave.trace.serialization import (
     op_type,  # noqa: F401, Must import this to register op save/load
 )
@@ -32,6 +33,7 @@ KNOWN_TYPES = {
     "datetime.datetime",
     "rich.markdown.Markdown",
     "moviepy.video.VideoClip.VideoClip",
+    "weave.type_wrappers.Content.content.Content",
 }
 
 
@@ -101,12 +103,9 @@ def decode_custom_inline_obj(obj: dict) -> Any:
     if load_op_uri is None:
         raise ValueError(f"No serializer found for `{type_}`")
 
-    ref = parse_uri(load_op_uri)
-    if not isinstance(ref, OpRef):
-        raise TypeError(f"Expected OpRef, got `{type(ref)}`")
-
+    op_ref = OpRef.parse_uri(load_op_uri)
     wc = require_weave_client()
-    load_instance_op = wc.get(ref)
+    load_instance_op = wc.get(op_ref)
     if load_instance_op is None:
         raise ValueError(
             f"Failed to load op needed to decode object of type `{type_}`. See logs above for more information."
@@ -153,12 +152,9 @@ def decode_custom_files_obj(
         if load_instance_op_uri is None:
             raise ValueError(f"No serializer found for `{type_}`")
 
-        ref = parse_uri(load_instance_op_uri)
-        if not isinstance(ref, ObjectRef):
-            raise TypeError(f"Expected ObjectRef, got `{type(ref)}`")
-
+        obj_ref = ObjectRef.parse_uri(load_instance_op_uri)
         wc = require_weave_client()
-        load_instance_op = wc.get(ref)
+        load_instance_op = wc.get(obj_ref)
         if load_instance_op is None:
             raise ValueError(
                 f"Failed to load op needed to decode object of type `{type_}`. See logs above for more information."

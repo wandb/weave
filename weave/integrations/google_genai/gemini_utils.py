@@ -3,9 +3,9 @@ from typing import TYPE_CHECKING, Any, Callable, Optional
 
 import weave
 from weave.trace.autopatch import OpSettings
+from weave.trace.call import Call
 from weave.trace.op import _add_accumulator
 from weave.trace.serialization.serialize import dictify
-from weave.trace.weave_client import Call
 
 if TYPE_CHECKING:
     from google.genai.types import GenerateContentResponse
@@ -17,8 +17,7 @@ SKIP_TRACING_FUNCTIONS = [
 
 
 def google_genai_gemini_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
-    """
-    Postprocess inputs of the trace for the Google GenAI Gemini API to be used in
+    """Postprocess inputs of the trace for the Google GenAI Gemini API to be used in
     the trace visualization in the Weave UI. If the parameter `self` is present
     (i.e, if the function being traced is a stateful method), it is converted to a
     dictionary of attributes that can be displayed in the Weave UI.
@@ -39,8 +38,7 @@ def google_genai_gemini_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, 
 def google_genai_gemini_on_finish(
     call: Call, output: Any, exception: Optional[BaseException] = None
 ) -> None:
-    """
-    On finish handler for the Google GenAI Gemini API integration that ensures the usage
+    """On finish handler for the Google GenAI Gemini API integration that ensures the usage
     metadata is added to the summary of the trace.
     """
     if not (model_name := call.inputs.get("model")):

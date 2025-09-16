@@ -277,6 +277,14 @@ class ExternalTraceServer(tsi.TraceServerInterface):
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(self._internal_trace_server.table_update, req)
 
+    def table_create_from_digests(
+        self, req: tsi.TableCreateFromDigestsReq
+    ) -> tsi.TableCreateFromDigestsRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(
+            self._internal_trace_server.table_create_from_digests, req
+        )
+
     def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(self._internal_trace_server.table_query, req)
@@ -327,6 +335,20 @@ class ExternalTraceServer(tsi.TraceServerInterface):
         if res.wb_user_id != req.wb_user_id:
             raise ValueError("Internal Error - User Mismatch")
         res.wb_user_id = original_user_id
+        return res
+
+    def feedback_create_batch(
+        self, req: tsi.FeedbackCreateBatchReq
+    ) -> tsi.FeedbackCreateBatchRes:
+        for feedback_req in req.batch:
+            feedback_req.project_id = self._idc.ext_to_int_project_id(
+                feedback_req.project_id
+            )
+            if feedback_req.wb_user_id is not None:
+                feedback_req.wb_user_id = self._idc.ext_to_int_user_id(
+                    feedback_req.wb_user_id
+                )
+        res = self._ref_apply(self._internal_trace_server.feedback_create_batch, req)
         return res
 
     def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:

@@ -3,7 +3,7 @@ import TabItem from '@theme/TabItem';
 
 # Models
 
-A `Model` is a combination of data (which can include configuration, trained model weights, or other information) and code that defines how the model operates. By structuring your code to be compatible with this API, you benefit from a structured way to version your application so you can more systematically keep track of your experiments.
+A `Model` in W&B Weave is a combination of data (which can include configuration, trained model weights, or other information) and code that defines how the model operates. By structuring your code to be compatible with this API, you benefit from a structured way to version your application so you can more systematically keep track of your experiments.
 
 <Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
@@ -56,16 +56,6 @@ A `Model` is a combination of data (which can include configuration, trained mod
     ```
 
     After calling this, you will see that you now have two versions of this Model in the UI, each with different tracked calls.
-
-    ## Serve models
-
-    To serve a model, you can easily spin up a FastAPI server by calling:
-
-    ```bash
-    weave serve <your model ref>
-    ```
-
-    For additional instructions, see [serve](/guides/tools/serve).
 
     ## Track production calls
 

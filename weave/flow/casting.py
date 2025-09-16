@@ -5,9 +5,11 @@ from typing import Annotated, Any, Union
 from pydantic import BeforeValidator
 
 import weave
-from weave.flow.dataset import Dataset
+from weave.dataset.dataset import Dataset
 from weave.flow.scorer import Scorer, _validate_scorer_signature
-from weave.trace.op import Op, as_op, is_op
+from weave.trace.isinstance import weave_isinstance
+from weave.trace.op import as_op, is_op
+from weave.trace.op_protocol import Op
 from weave.trace.refs import ObjectRef, OpRef
 from weave.trace.vals import WeaveObject
 
@@ -32,6 +34,8 @@ def cast_to_scorer(obj: Any) -> Scorer | Op:
     res: Scorer | Op
     if isinstance(obj, Scorer):
         res = obj
+    elif weave_isinstance(obj, Scorer):
+        res = Scorer.from_obj(obj)
     elif isinstance(obj, type):
         raise TypeError(
             f"Scorer {obj.__name__} must be an instance, not a class. Did you instantiate?"

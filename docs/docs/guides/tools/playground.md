@@ -2,11 +2,11 @@
 
 :::tip
 For a limited time, the new W&B Inference service is included in your free tier. W&B Inference provides access to leading open-source foundation models via API and the Weave Playground. 
-- [Developer documentation](../integrations/inference.md)
+- [Developer documentation](https://docs.wandb.ai/guides/inference/)
 - [Product page](https://wandb.ai/site/inference) 
 :::
 
-Evaluating LLM prompts and responses is challenging. The Weave Playground is designed to simplify the process of iterating on LLM prompts and responses, making it easier to experiment with different models and prompts. With features like prompt editing, message retrying, and model comparison, Playground helps you to quickly test and improve your LLM applications. Playground currently supports models from OpenAI, Anthropic, Google, Groq, Amazon Bedrock, and Microsoft Azure, as well as [custom providers](#add-a-custom-provider).
+Evaluating LLM prompts and responses is challenging. The W&B Weave Playground is designed to simplify the process of iterating on LLM prompts and responses, making it easier to experiment with different models and prompts. With features like prompt editing, message retrying, and model comparison, Playground helps you to quickly test and improve your LLM applications. Playground currently supports models from OpenAI, Anthropic, Google, Groq, Amazon Bedrock, and Microsoft Azure, as well as [custom providers](#add-a-custom-provider).
 
 - **Quick access:** Open the Playground from the W&B sidebar for a fresh session or from the Call page to test an existing project.
 - **Message controls:** Edit, retry, or delete messages directly within the chat.
@@ -24,7 +24,7 @@ Get started with the Playground to optimize your LLM interactions and streamline
   - [Access the Playground](#access-the-playground)
 - [Select an LLM](#select-an-llm)
 - [Customize settings](#customize-settings)
-- [Message controls](#add-retry-edit-and-delete-messages)
+- [Message controls](#retry-edit-and-delete-messages)
 - [Compare LLMs](#compare-llms)
 - [Custom providers](#custom-providers)
 - [Saved models](#saved-models) 
@@ -452,3 +452,12 @@ Edit an existing [saved model](#save-a-model) to fine-tune parameters or refresh
 3. In the upper right corner of the Playground UI, click **Chat settings** to open the chat settings window.
 4. In the chat settings window, adjust parameters as desired. You can also toggle Weave call tracking on or off, and [add a function](#add-a-function).
 5. Click **Update model**. The model is updated and accesible from **Saved Models** in the LLM dropdown.
+
+### Structured output
+
+By default, the response format for all models in Playground is text. You can change this setting to output a JSON object. To change the response format, do the following:
+
+1. In the upper right corner of the Playground UI, click **Chat settings** to open the parameter settings dropdown.
+2. Under **Response format**, click the dropdown.
+3. Select **text** (default) or **json_object**.
+3. Click **Publish model** to close the dropdown and save your changes.

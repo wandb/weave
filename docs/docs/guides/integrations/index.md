@@ -1,16 +1,56 @@
 # Integrations
 
-:::success[Automatic Tracking]
-In most cases, all you need to do is call `weave.init()` at the top of your script or program in order for Weave to automatically patch and track any of these libraries!
+:::info[Integration Tracking]
+Weave provides **automatic implicit patching** for all supported integrations by default:
+
+**Implicit Patching (Automatic):** Libraries are automatically patched regardless of when they are imported.
+
+```python
+# Option 1: Import before weave.init()
+import openai
+import weave
+weave.init('my-project')  # OpenAI is automatically patched!
+
+# Option 2: Import after weave.init()
+import weave
+weave.init('my-project')
+import anthropic  # Automatically patched via import hook!
+```
+
+**Disabling Implicit Patching:** You can disable automatic patching if you prefer explicit control.
+
+```python
+import weave
+
+# Option 1: Via settings parameter
+weave.init('my-project', settings={'implicitly_patch_integrations': False})
+
+# Option 2: Via environment variable
+# Set WEAVE_IMPLICITLY_PATCH_INTEGRATIONS=false before running your script
+
+# With implicit patching disabled, you must explicitly patch integrations
+import openai
+weave.patch_openai()  # Now required for OpenAI tracing
+```
+
+**Explicit Patching (Manual):** You can explicitly patch integrations for fine-grained control.
+
+```python
+import weave
+weave.init('my-project')
+weave.integrations.patch_openai()  # Enable OpenAI tracing
+weave.integrations.patch_anthropic()  # Enable Anthropic tracing
+```
+
 :::
 
-Weave provides automatic logging integrations for popular LLM providers and orchestration frameworks. These integrations allow you to seamlessly trace calls made through various libraries, enhancing your ability to monitor and analyze your AI applications.
+W&B Weave provides logging integrations for popular LLM providers and orchestration frameworks. These integrations allow you to seamlessly trace calls made through various libraries, enhancing your ability to monitor and analyze your AI applications.
 
 ## LLM Providers
 
 LLM providers are the vendors that offer access to large language models for generating predictions. Weave integrates with these providers to log and trace the interactions with their APIs:
 
-- **[W&B Inference Service](/guides/integrations/inference)**
+- **[W&B Inference Service](https://docs.wandb.ai/guides/inference/)**
 - **[Amazon Bedrock](/guides/integrations/bedrock)**
 - **[Anthropic](/guides/integrations/anthropic)**
 - **[Cerebras](/guides/integrations/cerebras)**
@@ -44,6 +84,8 @@ Frameworks help orchestrate the actual execution pipelines in AI applications. T
 - **[AutoGen](/guides/integrations/autogen)**
 - **[Verdict](/guides/integrations/verdict)**
 - **[TypeScript SDK](/guides/integrations/js)**
+- **[Agno](/guides/integrations/agno.md)**
+- **[Koog](/guides/integrations/koog.md)**
 
 ## Protocols
 

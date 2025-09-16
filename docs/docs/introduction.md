@@ -6,7 +6,7 @@ slug: /
 
 :::tip
 For a limited time, the new W&B Inference service is included in your free tier. W&B Inference provides access to leading open-source foundation models via API and the Weave [Playground](./guides/tools/playground.md). 
-- [Developer documentation](./guides/integrations/inference.md)
+- [Developer documentation](https://docs.wandb.ai/guides/inference/)
 - [Product page](https://wandb.ai/site/inference) 
 :::
 
@@ -15,7 +15,7 @@ Weights & Biases (W&B) Weave is a framework for tracking, experimenting with, ev
 - **Tracing & Monitoring**: [Track LLM calls and application logic](./guides/tracking/) to debug and analyze production systems.
 - **Systematic Iteration**: Refine and iterate on [prompts](./guides/core-types/prompts.md), [datasets](./guides/core-types/datasets.md), and [models](./guides/core-types/models.md).
 - **Experimentation**: Experiment with different models and prompts in the [LLM Playground](./guides/tools/playground.md). 
-- **Evaluation**: Use custom or [pre-built scorers](./guides/evaluation/scorers#predefined-scorers) alongside our [comparison tools](./guides/tools/comparison.md) to systematically assess and enhance application performance.
+- **Evaluation**: Use custom or [pre-built scorers](./guides/evaluation/builtin_scorers.mdx) alongside our [comparison tools](./guides/tools/comparison.md) to systematically assess and enhance application performance.
 - **Guardrails**: Protect your application with [pre- and post-safeguards](./guides/evaluation/guardrails_and_monitors.md) for content moderation, prompt safety, and more.
 
 Integrate Weave with your existing development stack via the:
@@ -27,7 +27,23 @@ Weave supports [numerous LLM providers, local models, frameworks, protocols, and
 
 ## Get started
 
-Are you new to Weave? Set up and start using Weave with the [Python quickstart](/quickstart) or [TypeScript quickstart](./reference/generated_typescript_docs/intro-notebook.md).
+Choose your path to get started with Weave:
+
+### Recommended: Start with W&B Inference
+[Try Weave with W&B Inference](/quickstart-inference) - The fastest way to experience Weave
+- No API keys needed - start building immediately
+- Free credits included with all plans
+- Learn tracing, evaluation, and monitoring with real models
+- Access to live instances of powerful models like Llama, GPT-OSS, Qwen, and DeepSeek
+
+### Have your own API keys?
+[Track LLM Calls](/quickstart) - Connect your existing LLM providers
+- Works with OpenAI, Anthropic, and [more](./guides/integrations/index.md)
+- Automatic tracing and cost tracking
+- Perfect if you already have LLM infrastructure
+
+### Using TypeScript
+[TypeScript quickstart](./reference/generated_typescript_docs/intro-notebook.md) - Get started with Weave in TypeScript
 
 ## Advanced guides
 

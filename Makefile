@@ -15,7 +15,7 @@ build:
 	uv build
 
 prerelease-dry-run:
-	uv run ./weave/scripts/prerelease_dry_run.py
+	uv run ./scripts/prerelease_dry_run.py
 
 prepare-release: docs build
 
@@ -24,4 +24,4 @@ synchronize-base-object-schemas:
 	cd ../../../../frontends/weave && yarn generate-schemas
 
 generate-bindings:
-	python tools/codegen/generate.py $(ARGS)
+	uv run tools/codegen/generate.py $(ARGS)

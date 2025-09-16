@@ -1,5 +1,4 @@
-"""
-Weave SDK Code Generator
+"""Weave SDK Code Generator.
 
 This module provides a command line interface for generating code from the OpenAPI
 specification of the Weave SDK.
@@ -14,28 +13,42 @@ Environment:
  - A local uvicorn server is used to fetch the OpenAPI spec.
 """
 
+#!/usr/bin/env -S uv run --script
+# /// script
+# dependencies = [
+#     "typer==0.16.0",
+#     "click==8.2.1",
+#     "httpx==0.28.1",
+#     "tomlkit==0.13.3",
+#     "PyYAML==6.0.2",
+#     "rich==14.0.0",
+# ]
+# ///
+
 from __future__ import annotations
 
 import json
 import os
+import random
+import string
 import subprocess
 import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any, Callable
 
-import click
 import httpx
 import tomlkit
+import typer
 import yaml
-from rich import print
+from typer import Option
 
 # Server configuration
 WEAVE_PORT = 6345
 SERVER_TIMEOUT = 5  # seconds
 SERVER_CHECK_INTERVAL = 1  # seconds
-SUBPROCESS_TIMEOUT = 30  # seconds
+SUBPROCESS_TIMEOUT = 60  # seconds
 
 # Stainless configuration
 STAINLESS_ORG_NAME = "weights-biases"
@@ -47,15 +60,17 @@ CODEGEN_BUNDLE_PATH = f"{CODEGEN_ROOT_RELPATH}/stainless.js"
 STAINLESS_CONFIG_PATH = f"{CODEGEN_ROOT_RELPATH}/openapi.stainless.yml"
 STAINLESS_OAS_PATH = f"{CODEGEN_ROOT_RELPATH}/openapi.json"
 
-
-@click.group()
-def cli() -> None:
-    """Weave code generation tools"""
+# Create the Typer app
+app = typer.Typer(help="Weave code generation tools")
 
 
-@cli.command()  # type: ignore
-@click.option("-o", "--output-file", help="Output file path for the OpenAPI spec")
-def get_openapi_spec(output_file: str | None = None) -> None:
+@app.command()
+def get_openapi_spec(
+    output_file: Annotated[
+        str | None,
+        Option("-o", "--output-file", help="Output file path for the OpenAPI spec"),
+    ] = None,
+) -> None:
     """Retrieve the OpenAPI specification from a temporary FastAPI server.
 
     This command launches a uvicorn server running the trace server application,
@@ -67,9 +82,8 @@ def get_openapi_spec(output_file: str | None = None) -> None:
     if output_file is None:
         output_file = str(Path.cwd() / STAINLESS_OAS_PATH)
 
-    if not _kill_port(WEAVE_PORT):
-        error("Failed to kill process on port 6345")
-        sys.exit(1)
+    # Kill any existing process on the port (if there is one)
+    _kill_port(WEAVE_PORT)
 
     info("Starting server...")
     server = subprocess.Popen(
@@ -111,14 +125,22 @@ def get_openapi_spec(output_file: str | None = None) -> None:
             server.wait()
 
 
-@cli.command()  # type: ignore
-@click.option("--python-path", help="Path to the Python code generation output")
-@click.option("--node-path", help="Path to the Node.js code generation output")
-@click.option("--typescript-path", help="Path to the TypeScript code generation output")
+@app.command()
 def generate_code(
-    python_path: str | None = None,
-    node_path: str | None = None,
-    typescript_path: str | None = None,
+    python_path: Annotated[
+        str | None,
+        Option("--python-path", help="Path to the Python code generation output"),
+    ] = None,
+    node_path: Annotated[
+        str | None,
+        Option("--node-path", help="Path to the Node.js code generation output"),
+    ] = None,
+    typescript_path: Annotated[
+        str | None,
+        Option(
+            "--typescript-path", help="Path to the TypeScript code generation output"
+        ),
+    ] = None,
 ) -> None:
     """Generate code from the OpenAPI spec using Stainless.
 
@@ -154,38 +176,47 @@ def generate_code(
         sys.exit(1)
 
     cmd = [
-        "node",
-        f"{CODEGEN_BUNDLE_PATH}",
-        f"--org-name={STAINLESS_ORG_NAME}",
-        f"--project-name={STAINLESS_PROJECT_NAME}",
-        f"--config-path={STAINLESS_CONFIG_PATH}",
-        f"--oas-path={STAINLESS_OAS_PATH}",
+        "stl",
+        "builds",
+        "create",
+        f"--project={STAINLESS_PROJECT_NAME}",
+        f"--config={STAINLESS_CONFIG_PATH}",
+        f"--oas={STAINLESS_OAS_PATH}",
+        # f"--branch={_random_branch_name()}",
+        "--branch=main",  # TODO: temporary until fix is deployed by stainless.  Without this, the generated SDK will not work.
+        "--pull",
+        "--allow-empty",
     ]
     if python_path:
-        cmd.append(f"--output-python={python_path}")
+        cmd.append(f"--+target=python:{python_path}")
     if node_path:
-        cmd.append(f"--output-node={node_path}")
+        cmd.append(f"--+target=node:{node_path}")
     if typescript_path:
-        cmd.append(f"--output-typescript={typescript_path}")
+        cmd.append(f"--+target=typescript:{typescript_path}")
+
+    # Print the command being executed for visibility
+    info(f"Running command: {' '.join(cmd)}")
 
     try:
+        # Run without capture_output to stream output live to terminal
         subprocess.run(cmd, check=True, timeout=SUBPROCESS_TIMEOUT)
     except subprocess.CalledProcessError as e:
         error(f"Code generation failed with exit code {e.returncode}")
-        if e.output:
-            error(f"Output: {e.output.decode()}")
         sys.exit(1)
     except subprocess.TimeoutExpired:
         error(f"Code generation timed out after {SUBPROCESS_TIMEOUT} seconds")
         sys.exit(1)
 
 
-@cli.command()  # type: ignore
-@click.argument("python_output", type=click.Path(exists=True))
-@click.argument("package_name")
-@click.option("--release", is_flag=True, help="Update to the latest version")
+@app.command()
 def update_pyproject(
-    python_output: str, package_name: str, release: bool = False
+    python_output: Annotated[
+        Path, typer.Argument(help="Path to Python output", exists=True)
+    ],
+    package_name: Annotated[str, typer.Argument(help="Name of the package")],
+    release: Annotated[
+        bool, Option("--release", help="Update to the latest version")
+    ] = False,
 ) -> None:
     """Update the pyproject.toml file with the latest version of the generated code.
 
@@ -193,42 +224,258 @@ def update_pyproject(
     (if --release is specified) or a git SHA reference.
     """
     header("Updating pyproject.toml")
-    path = Path(python_output)
     if release:
-        version = _get_package_version(path)
+        version = _get_package_version(python_output)
         _update_pyproject_toml(package_name, version, True)
-        info(f"Updated {package_name} dependency to version: {version}")
+        info(f"Updated {package_name} in [stainless] extra to version: {version}")
     else:
-        repo_info = _get_repo_info(path)
+        repo_info = _get_repo_info(python_output)
         remote_url = repo_info.remote_url
         sha = repo_info.sha
         if not sha:
             error(f"Failed to get git SHA (got: {sha=})")
             sys.exit(1)
         _update_pyproject_toml(package_name, f"{remote_url}@{sha}", False)
-        info(f"Updated {package_name} dependency to SHA: {sha}")
+        info(f"Updated {package_name} in [stainless] extra to SHA: {sha}")
 
 
-@cli.command()  # type: ignore
-@click.option(
-    "--config",
-    default=CODEGEN_ROOT_RELPATH + "/generate_config.yaml",
-    help="Path to config file",
-)
-@click.option("--python-output", help="Path for Python code generation output")
-@click.option("--package-name", help="Name of the package to update in pyproject.toml")
-@click.option("--openapi-output", help="Path to save the OpenAPI spec")
-@click.option("--node-output", help="Path for Node.js code generation output")
-@click.option("--typescript-output", help="Path for TypeScript code generation output")
-@click.option("--release", is_flag=True, help="Update to the latest version")
+@app.command()
+def merge_generated_code(
+    python_output: Annotated[
+        Path, typer.Argument(help="Path to generated Python code (weave-stainless)")
+    ],
+    package_name: Annotated[
+        str, typer.Argument(help="Name of the package to update in pyproject.toml")
+    ],
+) -> None:
+    """Create a branch from main with the generated code and update pyproject.toml.
+
+    This command:
+    1. Gets the current branch name from the weave repo
+    2. Switches to main and pulls latest in weave-stainless
+    3. Creates a new branch (weave/<current-branch>) from main
+    4. Uses 'git checkout <generation-branch> -- .' to replace content
+    5. Commits the changes to the new branch
+    6. Updates pyproject.toml with the new SHA
+
+    Note: This does NOT merge to main directly - it creates a feature branch.
+    """
+    header("Creating branch with generated code")
+
+    # Get current branch name in weave repo
+    try:
+        current_branch = subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=SUBPROCESS_TIMEOUT,
+            check=True,
+        ).stdout.strip()
+        info(f"Current weave branch: {current_branch}")
+    except subprocess.CalledProcessError as e:
+        error(f"Failed to get current branch: {e}")
+        sys.exit(1)
+    except subprocess.TimeoutExpired:
+        error("Timeout while getting current branch")
+        sys.exit(1)
+
+    # Navigate to weave-stainless repo
+    if not python_output.exists():
+        print(f"python_output: {python_output}")
+        # List contents of python_output directory for debugging
+        info(f"Listing contents of parent directory: {python_output.parent}")
+        try:
+            for item in python_output.parent.iterdir():
+                info(f"  {item.name} ({'dir' if item.is_dir() else 'file'})")
+        except Exception as e:
+            warning(f"Could not list parent directory: {e}")
+        error(f"Python output directory does not exist: {python_output}")
+        sys.exit(1)
+
+    try:
+        # The generated code is on the local main branch after stainless generation
+        # We need to create a branch from this main that has the generated code
+        info("Checking current branch in weave-stainless...")
+        current_stainless_branch = subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            cwd=python_output,
+            capture_output=True,
+            text=True,
+            timeout=SUBPROCESS_TIMEOUT,
+            check=True,
+        ).stdout.strip()
+        info(f"Currently on branch: {current_stainless_branch}")
+
+        # Ensure we're on main which should have the generated code
+        if current_stainless_branch != "main":
+            info("Switching to main branch (which has generated code)...")
+            subprocess.run(
+                ["git", "checkout", "main"],
+                cwd=python_output,
+                capture_output=True,
+                timeout=SUBPROCESS_TIMEOUT,
+                check=True,
+            )
+
+        # NOTE: Do NOT pull from origin here! That would overwrite the generated code.
+        # The main branch should already have the locally generated code from stainless.
+
+        # Create branch from main (with generated code) matching weave branch
+        mirror_branch = f"weave/{current_branch}"
+        info(f"Creating branch from main (with generated code): {mirror_branch}")
+
+        # Check if branch exists
+        branch_exists = (
+            subprocess.run(
+                ["git", "show-ref", "--verify", f"refs/heads/{mirror_branch}"],
+                cwd=python_output,
+                capture_output=True,
+                timeout=SUBPROCESS_TIMEOUT,
+            ).returncode
+            == 0
+        )
+
+        if branch_exists:
+            # Delete the existing branch first so we can recreate it from origin/main
+            info(
+                f"Deleting existing branch {mirror_branch} to recreate with new generated code..."
+            )
+            subprocess.run(
+                ["git", "branch", "-D", mirror_branch],
+                cwd=python_output,
+                capture_output=True,
+                timeout=SUBPROCESS_TIMEOUT,
+                check=True,
+            )
+
+        # Create new branch from ORIGIN/main (clean remote state)
+        info(f"Creating new branch {mirror_branch} from origin/main (clean base)...")
+        subprocess.run(
+            ["git", "checkout", "-b", mirror_branch, "origin/main"],
+            cwd=python_output,
+            capture_output=True,
+            timeout=SUBPROCESS_TIMEOUT,
+            check=True,
+        )
+
+        # Now checkout the generated code from LOCAL main into this branch
+        info("Applying generated code from local main branch...")
+        subprocess.run(
+            ["git", "checkout", "main", "--", "."],
+            cwd=python_output,
+            capture_output=True,
+            timeout=SUBPROCESS_TIMEOUT,
+            check=True,
+        )
+
+        # Check if there are changes to commit
+        status_result = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=python_output,
+            capture_output=True,
+            text=True,
+            timeout=SUBPROCESS_TIMEOUT,
+            check=True,
+        )
+
+        if status_result.stdout.strip():
+            # Stage all changes
+            info("Staging changes...")
+            subprocess.run(
+                ["git", "add", "."],
+                cwd=python_output,
+                capture_output=True,
+                timeout=SUBPROCESS_TIMEOUT,
+                check=True,
+            )
+
+            # Commit changes
+            commit_message = (
+                f"Update generated code from weave branch: {current_branch}"
+            )
+            info(f"Committing: {commit_message}")
+            subprocess.run(
+                ["git", "commit", "-m", commit_message],
+                cwd=python_output,
+                capture_output=True,
+                timeout=SUBPROCESS_TIMEOUT,
+                check=True,
+            )
+
+            # Push the branch
+            info(f"Pushing branch {mirror_branch}...")
+            subprocess.run(
+                ["git", "push", "origin", mirror_branch],
+                cwd=python_output,
+                capture_output=True,
+                timeout=SUBPROCESS_TIMEOUT,
+                check=True,
+            )
+        else:
+            info("No changes to commit (generated code may already be on origin/main)")
+
+        # Always update pyproject.toml with the current SHA, whether we committed or not
+        # Get the current SHA of the branch
+        repo_info = _get_repo_info(python_output)
+        sha = repo_info.sha
+        remote_url = repo_info.remote_url
+
+        # Update pyproject.toml with the SHA
+        info(f"Updating pyproject.toml [stainless] extra with SHA: {sha}")
+        _update_pyproject_toml(package_name, f"{remote_url}@{sha}", False)
+
+        info(f"Successfully updated {package_name} in [stainless] extra to SHA: {sha}")
+
+    except subprocess.CalledProcessError as e:
+        error(f"Git operation failed: {e}")
+        if e.stderr:
+            error(f"Error output: {e.stderr}")
+        sys.exit(1)
+    except subprocess.TimeoutExpired:
+        error("Git operation timed out")
+        sys.exit(1)
+
+
+@app.command()
 def all(
-    config: str,
-    python_output: str | None,
-    package_name: str | None,
-    openapi_output: str | None,
-    node_output: str | None,
-    typescript_output: str | None,
-    release: bool | None,
+    config: Annotated[
+        str, Option("--config", help="Path to config file")
+    ] = CODEGEN_ROOT_RELPATH + "/generate_config.yaml",
+    python_output: Annotated[
+        str | None,
+        Option("--python-output", help="Path for Python code generation output"),
+    ] = None,
+    package_name: Annotated[
+        str | None,
+        Option(
+            "--package-name", help="Name of the package to update in pyproject.toml"
+        ),
+    ] = None,
+    openapi_output: Annotated[
+        str | None,
+        Option("--openapi-output", help="Path to save the OpenAPI spec"),
+    ] = None,
+    node_output: Annotated[
+        str | None,
+        Option("--node-output", help="Path for Node.js code generation output"),
+    ] = None,
+    typescript_output: Annotated[
+        str | None,
+        Option(
+            "--typescript-output", help="Path for TypeScript code generation output"
+        ),
+    ] = None,
+    release: Annotated[
+        bool | None,
+        Option("--release", help="Update to the latest version"),
+    ] = None,
+    auto_merge: Annotated[
+        bool,
+        Option(
+            "--auto-merge",
+            help="Automatically create a branch with generated code after generation",
+        ),
+    ] = True,
 ) -> None:
     """Run all code generation commands in sequence.
 
@@ -236,6 +483,7 @@ def all(
     1. Retrieve the OpenAPI specification.
     2. Generate code using Stainless for the specified platforms.
     3. Update the pyproject.toml file with the generated package information.
+    4. (Optional) Create a branch from main with generated code using --auto-merge flag.
     Configurations can be provided via a YAML file or directly as command-line arguments.
     """
     header("Running weave codegen")
@@ -300,9 +548,6 @@ def all(
                     error("Config creation aborted")
                     sys.exit(1)
 
-            # Set the python_output in the config
-            cfg["python_output"] = python_output_input
-
             # Replace the template python_output with the provided value
             config_content = config_content.replace(
                 "/path/to/your/local/python/repo", python_output_input
@@ -314,6 +559,12 @@ def all(
                 dst.write(config_content)
 
             info(f"Config file created at: {config_file_path}")
+
+            # Reload the config file to get all values including package_name
+            cfg = _load_config(config_file_path)
+            info(
+                f"Loaded config with package_name: {cfg.get('package_name', 'weave_server_sdk')}"
+            )
         else:
             error(f"Template file not found: {template_path}")
             error(
@@ -334,48 +585,55 @@ def all(
         error("output_path cannot be None")
         sys.exit(1)
     # Call get_openapi_spec with --output-file argument
-    ctx = click.get_current_context()
-    _format_announce_invoke(ctx, get_openapi_spec, output_file=output_path)
+    _format_announce_invoke(get_openapi_spec, output_file=output_path)
 
     # 2. Generate code
     # Use python_output as python_output
     node_path = _ensure_absolute_path(cfg.get("node_output"))
     typescript_path = _ensure_absolute_path(cfg.get("typescript_output"))
     _format_announce_invoke(
-        ctx,
         generate_code,
         python_path=str_path,
         node_path=node_path,
         typescript_path=typescript_path,
     )
 
-    # 3. Update pyproject.toml
+    # 3. Update pyproject.toml or create branch with generated code
     release = cfg.get("release", False)
-    _format_announce_invoke(
-        ctx,
-        update_pyproject,
-        python_output=str_path,
-        package_name=cfg["package_name"],
-        release=release,
-    )
+
+    if auto_merge:
+        # If auto-merge is enabled, create a branch with the generated code
+        _format_announce_invoke(
+            merge_generated_code,
+            python_output=Path(str_path),
+            package_name=cfg["package_name"],
+        )
+    else:
+        # Regular update without merge
+        _format_announce_invoke(
+            update_pyproject,
+            python_output=Path(str_path),
+            package_name=cfg["package_name"],
+            release=release,
+        )
 
     print("\n")
     header("Weave codegen completed successfully!")
 
 
 def header(text: str):
-    """Display a prominent header"""
-    print(f"[bold blue]╔{'═' * (len(text) + 6)}╗[/bold blue]")
-    print(f"[bold blue]║   {text}   ║[/bold blue]")
-    print(f"[bold blue]╚{'═' * (len(text) + 6)}╝[/bold blue]")
+    """Display a prominent header."""
+    print(f"╔{'═' * (len(text) + 6)}╗")
+    print(f"║   {text}   ║")
+    print(f"╚{'═' * (len(text) + 6)}╝")
 
 
 def error(text: str):
-    print(f"[red bold]ERROR:   {text}[/red bold]")
+    print(f"ERROR:   {text}")
 
 
 def warning(text: str):
-    print(f"[yellow]WARNING: {text}[/yellow]")
+    print(f"WARNING: {text}")
 
 
 def info(text: str):
@@ -385,24 +643,55 @@ def info(text: str):
 def _kill_port(port: int) -> bool:
     """Terminate any process listening on the specified port.
 
-    Executes a shell command to kill the process using the specified port.
-    Returns True if a process was successfully terminated, False otherwise.
+    Returns True if at least one process was successfully terminated, False if no process was found or all kills failed.
     """
-    cmd = f"lsof -i :{port} | grep LISTEN | awk '{{print $2}}' | xargs kill -9"
+    # First, find the process listening on the port
     try:
-        subprocess.run(
-            cmd, shell=True, stderr=subprocess.PIPE, timeout=SUBPROCESS_TIMEOUT
+        # Use lsof to find processes listening on the port
+        result = subprocess.run(
+            ["lsof", "-ti", f":{port}"],
+            capture_output=True,
+            text=True,
+            timeout=SUBPROCESS_TIMEOUT,
+            check=False,
         )
-    except subprocess.CalledProcessError as e:
-        info(f"No process found on port {port}")
-        warning(f"Command failed with error: {e}")
-        return False
     except subprocess.TimeoutExpired:
-        error(f"Timeout while trying to kill process on port {port}")
+        error(f"Timeout while finding processes on port {port}")
         return False
-    else:
-        info(f"Successfully killed process on port {port}")
-        return True
+    except Exception as e:
+        error(f"Unexpected error finding processes on port {port}: {e}")
+        return False
+
+    if result.returncode != 0 or not result.stdout.strip():
+        info(f"No process found listening on port {port}")
+        return False
+
+    # Get the PIDs from the output
+    pids = result.stdout.strip().split("\n")
+    killed_any = False
+
+    # Kill each process
+    for pid in pids:
+        if not pid:
+            continue
+
+        try:
+            subprocess.run(
+                ["kill", "-9", pid],
+                capture_output=True,
+                timeout=SUBPROCESS_TIMEOUT,
+                check=True,
+            )
+            info(f"Killed process {pid} on port {port}")
+            killed_any = True
+        except subprocess.TimeoutExpired:
+            warning(f"Timeout while killing process {pid}")
+        except subprocess.CalledProcessError as e:
+            warning(f"Failed to kill process {pid}: {e}")
+        except Exception as e:
+            warning(f"Unexpected error killing process {pid}: {e}")
+
+    return killed_any
 
 
 def _wait_for_server(
@@ -475,24 +764,50 @@ def _update_pyproject_toml(
     package: str,
     value: str,
     is_version: bool,
+    use_stainless_extra: bool = True,
 ) -> None:
     """Update the dependency entry for the given package in the pyproject.toml file.
 
     If is_version is True, the dependency is set to the package version (==version),
     otherwise, it's set to a git SHA reference.
+
+    If use_stainless_extra is True, updates the package in the 'stainless' extra
+    under optional-dependencies instead of main dependencies.
     """
     pyproject_path = Path("pyproject.toml")
 
     with open(pyproject_path) as f:
         doc = tomlkit.parse(f.read())
 
-    # Ensure dependencies is a tomlkit array for consistent formatting
-    if not isinstance(doc["project"]["dependencies"], tomlkit.items.Array):
-        dependencies = tomlkit.array()
-        dependencies.extend(doc["project"]["dependencies"])
-        doc["project"]["dependencies"] = dependencies
+    # Determine which dependencies section to update
+    if use_stainless_extra:
+        # Update in the stainless extra under optional-dependencies
+        if "optional-dependencies" not in doc["project"]:
+            doc["project"]["optional-dependencies"] = tomlkit.table()
 
-    dependencies = doc["project"]["dependencies"]
+        if "stainless" not in doc["project"]["optional-dependencies"]:
+            doc["project"]["optional-dependencies"]["stainless"] = tomlkit.array()
+
+        # Ensure stainless is a tomlkit array for consistent formatting
+        if not isinstance(
+            doc["project"]["optional-dependencies"]["stainless"], tomlkit.items.Array
+        ):
+            stainless_deps = tomlkit.array()
+            stainless_deps.extend(doc["project"]["optional-dependencies"]["stainless"])
+            doc["project"]["optional-dependencies"]["stainless"] = stainless_deps
+
+        dependencies = doc["project"]["optional-dependencies"]["stainless"]
+    else:
+        # Update in main dependencies (original behavior)
+        # Ensure dependencies is a tomlkit array for consistent formatting
+        if not isinstance(doc["project"]["dependencies"], tomlkit.items.Array):
+            dependencies = tomlkit.array()
+            dependencies.extend(doc["project"]["dependencies"])
+            doc["project"]["dependencies"] = dependencies
+
+        dependencies = doc["project"]["dependencies"]
+
+    # Update the package dependency
     for i, dep in enumerate(dependencies):
         if dep.startswith(package):
             if is_version:
@@ -562,13 +877,11 @@ def _ensure_absolute_path(path: str | None) -> str | None:
     return str(Path.cwd() / p) if not p.is_absolute() else str(p)
 
 
-def _format_announce_invoke(
-    ctx: click.Context, command: click.Command, **kwargs
-) -> None:
-    """Helper to format, announce, and invoke a click command with the given parameters."""
-    cmd = _format_command(command.name, **kwargs)
+def _format_announce_invoke(command: Callable, **kwargs) -> None:
+    """Helper to format, announce, and invoke a command function with the given parameters."""
+    cmd = _format_command(command.__name__, **kwargs)
     _announce_command(cmd)
-    ctx.invoke(command, **kwargs)
+    command(**kwargs)
 
 
 def _load_config(config_path: str | Path) -> dict[str, Any]:
@@ -593,5 +906,11 @@ def _load_config(config_path: str | Path) -> dict[str, Any]:
         return cfg
 
 
+def _random_branch_name() -> str:
+    ascii_letters_and_digits = string.ascii_letters + string.digits
+    random_string = "".join(random.choices(ascii_letters_and_digits, k=16))
+    return f"tmp/{random_string}"
+
+
 if __name__ == "__main__":
-    cli()
+    app()

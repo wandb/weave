@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from typing_extensions import Self
 
 from weave import version
-from weave.trace.refs import ObjectRef, parse_uri
+from weave.trace.refs import ObjectRef, Ref
 from weave.trace.settings import (
     server_cache_dir,
     server_cache_size_limit,
@@ -35,8 +35,7 @@ class CacheRecorder(TypedDict):
 
 
 def digest_is_cacheable(digest: str) -> bool:
-    """
-    Check if a digest is cacheable.
+    """Check if a digest is cacheable.
 
     Examples:
     - v1 -> False
@@ -105,12 +104,19 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
             logger.exception("Error closing cache")
 
     def get_call_processor(self) -> AsyncBatchProcessor | None:
-        """
-        Custom method not defined on the formal TraceServerInterface to expose
+        """Custom method not defined on the formal TraceServerInterface to expose
         the underlying call processor. Should be formalized in a client-side interface.
         """
         if hasattr(self._next_trace_server, "get_call_processor"):
             return self._next_trace_server.get_call_processor()
+        return None
+
+    def get_feedback_processor(self) -> AsyncBatchProcessor | None:
+        """Custom method not defined on the formal TraceServerInterface to expose
+        the underlying feedback processor. Should be formalized in a client-side interface.
+        """
+        if hasattr(self._next_trace_server, "get_feedback_processor"):
+            return self._next_trace_server.get_feedback_processor()
         return None
 
     @classmethod
@@ -372,7 +378,7 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
 
                 # Only cache if the ref has a cacheable digest
                 try:
-                    parsed_ref = parse_uri(needed_ref)
+                    parsed_ref = Ref.parse_uri(needed_ref)
                     if isinstance(parsed_ref, ObjectRef) and digest_is_cacheable(
                         parsed_ref.digest
                     ):
@@ -472,11 +478,21 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
         return self._next_trace_server.table_create(req)
 
+    def table_create_from_digests(
+        self, req: tsi.TableCreateFromDigestsReq
+    ) -> tsi.TableCreateFromDigestsRes:
+        return self._next_trace_server.table_create_from_digests(req)
+
     def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
         return self._next_trace_server.table_update(req)
 
     def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
         return self._next_trace_server.feedback_create(req)
+
+    def feedback_create_batch(
+        self, req: tsi.FeedbackCreateBatchReq
+    ) -> tsi.FeedbackCreateBatchRes:
+        return self._next_trace_server.feedback_create_batch(req)
 
     def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
         return self._next_trace_server.feedback_query(req)

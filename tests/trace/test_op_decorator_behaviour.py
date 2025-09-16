@@ -4,10 +4,10 @@ from typing import Any, Optional, get_type_hints
 import pytest
 
 import weave
+from weave.trace.call import Call
 from weave.trace.op import OpCallError, is_op, op
-from weave.trace.refs import ObjectRef, parse_uri
+from weave.trace.refs import ObjectRef, Ref
 from weave.trace.vals import MissingSelfInstanceError
-from weave.trace.weave_client import Call
 
 
 @pytest.fixture
@@ -417,7 +417,7 @@ def test_op_name(client):
     calls = list(client.get_calls())
     call = calls[0]
 
-    parsed = parse_uri(call.op_name)
+    parsed = Ref.parse_uri(call.op_name)
     assert parsed.name == "custom_name"
 
 

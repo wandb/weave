@@ -8,21 +8,12 @@
 * Type: `bool`
 
 If True, all weave ops will behave like regular functions and no network requests will be made.
-
-## `print_call_link`
-
-* Environment Variable: `WEAVE_PRINT_CALL_LINK`
-* Settings Key: `print_call_link`
-* Default: `True`
-* Type: `bool`
-
-If True, prints a link to the Weave UI when calling a weave op.
 """
 
 import os
 from contextvars import ContextVar
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any, Literal, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, PrivateAttr
 
@@ -38,7 +29,8 @@ class UserSettings(BaseModel):
     """User configuration for Weave.
 
     All configs can be overridden with environment variables.  The precedence is
-    environment variables > `weave.trace.settings.UserSettings`."""
+    environment variables > `weave.trace.settings.UserSettings`.
+    """
 
     disabled: bool = False
     """Toggles Weave tracing.
@@ -59,6 +51,16 @@ class UserSettings(BaseModel):
     Valid values are: DEBUG, INFO, WARNING, ERROR, CRITICAL
     Can be overridden with the environment variable `WEAVE_LOG_LEVEL`"""
 
+    display_viewer: Literal["auto", "rich", "print"] = "auto"
+    """Sets the display viewer for console output.
+
+    Controls which viewer implementation to use for display operations.
+    Valid values are: auto, rich, print
+    - auto: Automatically selects rich if available, otherwise falls back to print
+    - rich: Uses the rich library for enhanced terminal output
+    - print: Uses basic print functions for output
+    Can be overridden with the environment variable `WEAVE_DISPLAY_VIEWER`"""
+
     capture_code: bool = True
     """Toggles code capture for ops.
 
@@ -68,6 +70,14 @@ class UserSettings(BaseModel):
     WARNING: Switching between `save_code=True` and `save_code=False` mid-script
     may lead to unexpected behavior.  Make sure this is only set once at the start!
     """
+
+    implicitly_patch_integrations: bool = True
+    """Toggles implicit patching of integrations.
+
+    If True, supported libraries (OpenAI, Anthropic, etc.) are automatically patched
+    when imported, regardless of import order. If False, you must explicitly call
+    patch functions like `weave.integrations.patch_openai()` to enable tracing for integrations.
+    Can be overridden with the environment variable `WEAVE_IMPLICITLY_PATCH_INTEGRATIONS`"""
 
     redact_pii: bool = False
     """Toggles PII redaction using Microsoft Presidio.
@@ -168,6 +178,15 @@ class UserSettings(BaseModel):
     Can be overridden with the environment variable `WEAVE_ENABLE_DISK_FALLBACK`
     """
 
+    use_parallel_table_upload: bool = False
+    """
+    Toggles parallel table upload chunking.
+
+    If True, enables parallel upload of table chunks when tables are large enough
+    to require chunking. If False, uses incremental upload method.
+    Can be overridden with the environment variable `WEAVE_USE_PARALLEL_TABLE_UPLOAD`
+    """
+
     model_config = ConfigDict(extra="forbid")
     _is_first_apply: bool = PrivateAttr(True)
 
@@ -196,6 +215,15 @@ def should_print_call_link() -> bool:
 
 def log_level() -> str:
     return _optional_str("log_level") or "INFO"
+
+
+def display_viewer() -> str:
+    """Returns the configured display viewer.
+
+    Returns:
+        The display viewer to use (auto, rich, or print).
+    """
+    return _optional_str("display_viewer") or "auto"
 
 
 def should_capture_code() -> bool:
@@ -264,6 +292,16 @@ def retry_max_interval() -> float:
 def should_enable_disk_fallback() -> bool:
     """Returns whether disk fallback should be enabled for dropped items."""
     return _should("enable_disk_fallback")
+
+
+def should_use_parallel_table_upload() -> bool:
+    """Returns whether parallel table upload chunking should be used."""
+    return _should("use_parallel_table_upload")
+
+
+def should_implicitly_patch_integrations() -> bool:
+    """Returns whether implicit patching of integrations is enabled."""
+    return _should("implicitly_patch_integrations")
 
 
 def parse_and_apply_settings(

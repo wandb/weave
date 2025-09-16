@@ -3,7 +3,7 @@ import TabItem from '@theme/TabItem';
 
 # Ops
 
-A Weave op is a versioned function that automatically logs all calls.
+A W&B Weave op is a versioned function that automatically logs all calls.
 
 <Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
@@ -25,8 +25,6 @@ A Weave op is a versioned function that automatically logs all calls.
     :::note
     Functions decorated with `@weave.op()` will behave normally (without code versioning and tracking), if you don't call `weave.init('your-project-name')` before calling them.
     :::
-
-    Ops can be [served](/guides/tools/serve) or [deployed](/guides/tools/deploy) using the Weave toolbelt.
 
   </TabItem>
   <TabItem value="typescript" label="TypeScript">

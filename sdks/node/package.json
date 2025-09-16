@@ -1,6 +1,6 @@
 {
   "name": "weave",
-  "version": "0.9.2",
+  "version": "0.9.3",
   "description": "AI development toolkit",
   "types": "dist/index.d.ts",
   "main": "dist/index.js",
@@ -148,7 +148,8 @@
     "module-details-from-path": "^1.0.4",
     "openai": "^4.68.4",
     "semifies": "^1.0.0",
-    "uuidv7": "^1.0.1"
+    "uuidv7": "^1.0.1",
+    "form-data": "^4.0.4"
   },
   "devDependencies": {
     "@types/cli-progress": "^3.11.6",

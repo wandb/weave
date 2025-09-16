@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import Any, Callable
 
 from weave.trace.context.tests_context import get_raise_on_captured_errors
@@ -33,7 +34,8 @@ class MultiPatcher(Patcher):
         all_successful = True
         for patcher in self.patchers:
             try:
-                all_successful = all_successful and patcher.attempt_patch()
+                result = patcher.attempt_patch()
+                all_successful = all_successful and result
             except Exception as e:
                 if get_raise_on_captured_errors():
                     raise
@@ -54,10 +56,10 @@ class MultiPatcher(Patcher):
         return all_successful
 
 
+@dataclass
 class _SymbolTarget:
-    def __init__(self, base_symbol: Any, attr: str) -> None:
-        self.base_symbol = base_symbol
-        self.attr = attr
+    base_symbol: Any
+    attr: str
 
 
 class SymbolPatcher(Patcher):
@@ -91,11 +93,15 @@ class SymbolPatcher(Patcher):
 
     def attempt_patch(self) -> bool:
         if self._original_value:
+            # Already patched
             return True
         target = self._get_symbol_target()
         if target is None:
             return False
-        original_value = getattr(target.base_symbol, target.attr)
+        try:
+            original_value = getattr(target.base_symbol, target.attr)
+        except AttributeError:
+            return False
         try:
             new_val = self._make_new_value(original_value)
         except Exception:

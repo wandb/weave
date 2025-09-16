@@ -1,11 +1,12 @@
 import asyncio
 import inspect
+import json
 from typing import Callable, TypedDict
 
 import pytest
 
 import weave
-from weave.flow.eval_imperative import EvaluationLogger, Model, Scorer
+from weave.evaluation.eval_imperative import EvaluationLogger, Model, Scorer
 from weave.integrations.integration_utilities import op_name_from_call
 from weave.trace.context import call_context
 from weave.trace_server.trace_server_interface import ObjectVersionFilter
@@ -476,6 +477,21 @@ def test_evaluation_no_auto_summarize(client):
     assert summarize_call.output == {"output": {}}
 
 
+def test_evaluation_fail_with_exception(client):
+    ev = weave.EvaluationLogger()
+    ex = ValueError("test")
+    ev.fail(exception=ex)
+    client.flush()
+
+    calls = client.get_calls()
+    assert len(calls) == 1
+    finish_call = calls[0]
+    assert finish_call.output is None
+    assert finish_call.exception == json.dumps(
+        {"type": "ValueError", "message": "test"}
+    )
+
+
 def test_evaluation_no_auto_summarize_with_custom_dict(client):
     ev = weave.EvaluationLogger()
     pred = ev.log_prediction(inputs={"a": 1, "b": 2}, output=3)
@@ -580,3 +596,62 @@ def test_evaluation_logger_model_with_different_inference_method_names(client):
         )
         pred.finish()
         ev.finish()
+
+
+def test_evaluation_logger_with_custom_attributes(client):
+    ev = weave.EvaluationLogger(eval_attributes={"custom_attribute": "value"})
+    ev.finish()
+    client.flush()
+
+    calls = client.get_calls()
+    assert calls[0].attributes["custom_attribute"] == "value"
+
+
+def test_evaluation_logger_uses_passed_output_not_model_predict(client):
+    """Test that EvaluationLogger uses the passed output instead of calling model.predict.
+
+    This test validates the fix for the issue where log_prediction was calling
+    model.predict(inputs) internally instead of using the passed outputs.
+    """
+
+    class TestModel(weave.Model):
+        @weave.op
+        def predict(self, text: str) -> str:
+            # This should NOT be called during log_prediction
+            return "MODEL_PREDICTED_OUTPUT"
+
+    model = TestModel()
+    ev = EvaluationLogger(model=model)
+
+    # Pass a different output than what the model would predict
+    custom_output = "USER_PROVIDED_OUTPUT"
+    pred = ev.log_prediction(inputs={"text": "test input"}, output=custom_output)
+    pred.finish()
+    ev.finish()
+
+    client.flush()
+    calls = client.get_calls()
+
+    # Find the Model.predict call
+    predict_call = None
+    for call in calls:
+        if op_name_from_call(call) == "Model.predict":
+            predict_call = call
+            break
+
+    assert predict_call is not None
+    # The output should be the user-provided one, not the model's prediction
+    assert predict_call.output == custom_output
+    assert predict_call.output != "MODEL_PREDICTED_OUTPUT"
+
+
+@pytest.mark.parametrize("model_name", ["for", "42", "a-b-c", "!"])
+def test_evaluation_invalid_model_name_fixable(model_name):
+    # Should not raise
+    weave.EvaluationLogger(model=model_name)
+
+
+@pytest.mark.parametrize("model_name", [""])
+def test_evaluation_invalid_model_name_not_fixable(model_name):
+    with pytest.raises(ValueError):
+        weave.EvaluationLogger(model=model_name)

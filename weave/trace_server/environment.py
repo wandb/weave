@@ -7,14 +7,36 @@ logger = logging.getLogger(__name__)
 # Kafka Settings
 
 
-def wf_kafka_broker_host() -> str:
+def kafka_broker_host() -> str:
     """The host of the kafka broker."""
-    return os.environ.get("WF_KAFKA_BROKER_HOST", "localhost")
+    return os.environ.get("KAFKA_BROKER_HOST", "localhost")
 
 
-def wf_kafka_broker_port() -> int:
+def kafka_broker_port() -> int:
     """The port of the kafka broker."""
-    return int(os.environ.get("WF_KAFKA_BROKER_PORT", 9092))
+    return int(os.environ.get("KAFKA_BROKER_PORT", 9092))
+
+
+def kafka_client_user() -> Optional[str]:
+    """The username for the kafka client."""
+    return os.environ.get("KAFKA_CLIENT_USER")
+
+
+def kafka_client_password() -> Optional[str]:
+    """The password for the kafka client."""
+    return os.environ.get("KAFKA_CLIENT_PASSWORD")
+
+
+def kafka_producer_max_buffer_size() -> Optional[int]:
+    """The maximum number of messages in the Kafka producer buffer."""
+    size = os.environ.get("KAFKA_PRODUCER_MAX_BUFFER_SIZE")
+    if size is None:
+        return None
+    try:
+        return int(size)
+    except ValueError:
+        logger.exception(f"KAFKA_PRODUCER_MAX_BUFFER_SIZE value '{size}' is not valid")
+        return None
 
 
 # Scoring worker settings
@@ -70,7 +92,7 @@ def wf_clickhouse_max_memory_usage() -> Optional[int]:
         return None
     try:
         return int(mem)
-    except ValueError as e:
+    except ValueError:
         logger.exception(f"WF_CLICKHOUSE_MAX_MEMORY_USAGE value '{mem}' is not valid")
         return None
 
@@ -82,7 +104,7 @@ def wf_clickhouse_max_execution_time() -> Optional[int]:
         return None
     try:
         return int(time)
-    except ValueError as e:
+    except ValueError:
         logger.exception(
             f"WF_CLICKHOUSE_MAX_EXECUTION_TIME value '{time}' is not valid"
         )

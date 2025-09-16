@@ -14,7 +14,8 @@ except ImportError:
 import weave
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
-from weave.trace.op import Op, ProcessedInputs, _add_accumulator
+from weave.trace.op import _add_accumulator
+from weave.trace.op_protocol import Op, ProcessedInputs
 
 _lc_nvidia_patcher: MultiPatcher | None = None
 
@@ -34,8 +35,7 @@ def nvidia_accumulator(acc: Any | None, value: Any) -> Any:
 
 # Post processor to transform output into OpenAI's ChatCompletion format -- need to handle stream and non-stream outputs
 def postprocess_output_to_openai_format(output: Any) -> dict:
-    """
-    Need to post process the output reported to weave to send it on openai format so that Weave front end renders
+    """Need to post process the output reported to weave to send it on openai format so that Weave front end renders
     chat view. This only affects what is sent to weave.
     """
     if isinstance(output, ChatResult):  # its ChatResult
@@ -113,8 +113,7 @@ def postprocess_output_to_openai_format(output: Any) -> dict:
 def postprocess_inputs_to_openai_format(
     func: Op, args: tuple, kwargs: dict
 ) -> ProcessedInputs:
-    """
-    Need to process the input reported to weave to send it on openai format so that Weave front end renders
+    """Need to process the input reported to weave to send it on openai format so that Weave front end renders
     chat view. This only affects what is sent to weave.
     """
     original_args = args

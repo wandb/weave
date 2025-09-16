@@ -1,12 +1,23 @@
 import asyncio
 import os
+from collections.abc import Generator
 
 import pytest
 from google import genai
 from google.genai.types import GenerateImagesConfig
 from pydantic import BaseModel
 
+from weave.integrations.google_genai.google_genai_sdk import get_google_genai_patcher
 from weave.integrations.integration_utilities import op_name_from_ref
+
+
+@pytest.fixture(autouse=True)
+def patch_google_genai() -> Generator[None, None, None]:
+    """Patch Google GenAI for all tests in this file."""
+    patcher = get_google_genai_patcher()
+    patcher.attempt_patch()
+    yield
+    patcher.undo_patch()
 
 
 class Recipe(BaseModel):

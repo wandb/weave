@@ -13,8 +13,6 @@ title: Log Audio With Weave
 
 
 
-<!--- @wandbcode{feedback-colab} -->
-
 
 # How to use Weave with Audio Data: An OpenAI Example
 
@@ -139,18 +137,14 @@ def prompt_endpoint_and_log_trace(system_prompt=None, user_prompt=None):
                 hasattr(chunk, "choices")
                 and chunk.choices is not None
                 and len(chunk.choices) > 0
+                and hasattr(chunk.choices[0].delta, "audio")
+                and chunk.choices[0].delta.audio.get("data") is not None
             ):
-                if (
-                    hasattr(chunk.choices[0].delta, "audio")
-                    and chunk.choices[0].delta.audio.get("data") is not None
-                ):
-                    # Decode the base64 audio data
-                    audio_data = base64.b64decode(
-                        chunk.choices[0].delta.audio.get("data")
-                    )
+                # Decode the base64 audio data
+                audio_data = base64.b64decode(chunk.choices[0].delta.audio.get("data"))
 
-                    # Write the current chunk to the wave file
-                    wav_file.writeframes(audio_data)
+                # Write the current chunk to the wave file
+                wav_file.writeframes(audio_data)
 
     # Return the file to Weave op
     return wave.open("output.wav", "rb")
@@ -164,7 +158,7 @@ After running the cell, click the link next to the "🍩" emoji to view your tra
 
 
 ```python
-from IPython.display import Audio, display
+from IPython.display import Audio
 
 # Call the function to write the audio stream
 prompt_endpoint_and_log_trace(
@@ -208,16 +202,12 @@ Please note:
 
 
 ```python
-import base64
 import io
 import json
 import os
 import threading
-import time
-import wave
 from typing import Optional
 
-import numpy as np
 import pyaudio
 import resampy
 import websocket
@@ -283,7 +273,7 @@ The OpenAI Python SDK does not yet provide Realtime API support. We implement th
 
 ```python
 from enum import Enum
-from typing import Any, Literal, Optional, Union
+from typing import Any, Literal, Union
 
 from pydantic import BaseModel, Field, ValidationError
 
@@ -883,7 +873,7 @@ def parse_server_event(event_data: dict) -> ServerEvent:
     try:
         return model_class(**event_data)
     except ValidationError as e:
-        raise ValueError(f"Failed to parse event of type {event_type}: {str(e)}")
+        raise ValueError(f"Failed to parse event of type {event_type}: {e!s}") from e
 ```
 
 </details>

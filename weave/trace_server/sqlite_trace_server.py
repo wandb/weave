@@ -8,23 +8,22 @@ import sqlite3
 import threading
 from collections.abc import Iterator
 from typing import Any, Optional, cast
-from zoneinfo import ZoneInfo
 
-import emoji
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
     ExportTraceServiceRequest,
 )
 
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.emoji_util import detone_emojis
 from weave.trace_server.errors import (
-    InvalidRequest,
     NotFoundError,
     ObjectDeletedError,
 )
 from weave.trace_server.feedback import (
     TABLE_FEEDBACK,
+    format_feedback_to_res,
+    format_feedback_to_row,
+    process_feedback_payload,
     validate_feedback_create_req,
     validate_feedback_purge_req,
 )
@@ -33,7 +32,7 @@ from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.methods.evaluation_status import evaluation_status
 from weave.trace_server.object_class_util import process_incoming_object_val
 from weave.trace_server.opentelemetry.python_spans import ResourceSpans
-from weave.trace_server.orm import Row, quote_json_path
+from weave.trace_server.orm import quote_json_path
 from weave.trace_server.threads_query_builder import make_threads_query_sqlite
 from weave.trace_server.trace_server_common import (
     assert_parameter_length_less_than_max,
@@ -53,6 +52,10 @@ from weave.trace_server.trace_server_interface_util import (
     str_digest,
 )
 from weave.trace_server.validation import object_id_validator
+from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker import (
+    EvaluateModelArgs,
+    EvaluateModelDispatcher,
+)
 
 _conn_cursor: contextvars.ContextVar[
     Optional[tuple[sqlite3.Connection, sqlite3.Cursor]]
@@ -73,9 +76,14 @@ def get_conn_cursor(db_path: str) -> tuple[sqlite3.Connection, sqlite3.Cursor]:
 
 
 class SqliteTraceServer(tsi.TraceServerInterface):
-    def __init__(self, db_path: str):
+    def __init__(
+        self,
+        db_path: str,
+        evaluate_model_dispatcher: Optional[EvaluateModelDispatcher] = None,
+    ):
         self.lock = threading.Lock()
         self.db_path = db_path
+        self._evaluate_model_dispatcher = evaluate_model_dispatcher
 
     def drop_tables(self) -> None:
         conn, cursor = get_conn_cursor(self.db_path)
@@ -634,8 +642,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
     def _expand_refs(
         self, data: dict[str, Any], expand_columns: list[str]
     ) -> dict[str, Any]:
-        """
-        Recursively expand refs in the data. Only expand refs if requested in the
+        """Recursively expand refs in the data. Only expand refs if requested in the
         expand_columns list. expand_columns must be sorted by depth, shallowest first.
         """
         cols = sorted(expand_columns, key=lambda x: x.count("."))
@@ -1003,6 +1010,27 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
         return tsi.TableCreateRes(digest=digest, row_digests=row_digests)
 
+    def table_create_from_digests(
+        self, req: tsi.TableCreateFromDigestsReq
+    ) -> tsi.TableCreateFromDigestsRes:
+        """Create a table by specifying row digests, instead actual rows."""
+        conn, cursor = get_conn_cursor(self.db_path)
+
+        # Calculate table digest from row digests
+        table_hasher = hashlib.sha256()
+        for row_digest in req.row_digests:
+            table_hasher.update(row_digest.encode())
+        digest = table_hasher.hexdigest()
+
+        with self.lock:
+            cursor.execute(
+                "INSERT OR IGNORE INTO tables (project_id, digest, row_digests) VALUES (?, ?, ?)",
+                (req.project_id, digest, json.dumps(req.row_digests)),
+            )
+            conn.commit()
+
+        return tsi.TableCreateFromDigestsRes(digest=digest)
+
     def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
         conn, cursor = get_conn_cursor(self.db_path)
         # conds = ["project_id = {project_id: String}"]
@@ -1213,6 +1241,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         parsed_refs = [ri.parse_internal_uri(r) for r in req.refs]
         if any(isinstance(r, ri.InternalTableRef) for r in parsed_refs):
             raise ValueError("Table refs not supported")
+        if any(isinstance(r, ri.InternalCallRef) for r in parsed_refs):
+            raise ValueError("Call refs not supported")
         parsed_obj_refs = cast(list[ri.InternalObjectRef], parsed_refs)
 
         def read_ref(r: ri.InternalObjectRef) -> Any:
@@ -1267,52 +1297,45 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         assert_non_null_wb_user_id(req)
         validate_feedback_create_req(req, self)
 
-        # Augment emoji with alias.
-        res_payload = {}
-        if req.feedback_type == "wandb.reaction.1":
-            em = req.payload["emoji"]
-            if emoji.emoji_count(em) != 1:
-                raise InvalidRequest(
-                    "Value of emoji key in payload must be exactly one emoji"
-                )
-            req.payload["alias"] = emoji.demojize(em)
-            detoned = detone_emojis(em)
-            req.payload["detoned"] = detoned
-            req.payload["detoned_alias"] = emoji.demojize(detoned)
-            res_payload = req.payload
-
-        feedback_id = generate_id()
-        created_at = datetime.datetime.now(ZoneInfo("UTC"))
-        # TODO: Any validation on weave_ref?
-        payload = json.dumps(req.payload)
-        max_payload = 1024
-        if len(payload) > max_payload:
-            raise InvalidRequest("Feedback payload too large")
-        row: Row = {
-            "id": feedback_id,
-            "project_id": req.project_id,
-            "weave_ref": req.weave_ref,
-            "wb_user_id": req.wb_user_id,
-            "creator": req.creator,
-            "feedback_type": req.feedback_type,
-            "payload": req.payload,
-            "created_at": created_at,
-            "annotation_ref": req.annotation_ref,
-            "runnable_ref": req.runnable_ref,
-            "call_ref": req.call_ref,
-            "trigger_ref": req.trigger_ref,
-        }
+        processed_payload = process_feedback_payload(req)
+        row = format_feedback_to_row(req, processed_payload)
         conn, cursor = get_conn_cursor(self.db_path)
         with self.lock:
             prepared = TABLE_FEEDBACK.insert(row).prepare(database_type="sqlite")
             cursor.executemany(prepared.sql, prepared.data)
             conn.commit()
-        return tsi.FeedbackCreateRes(
-            id=feedback_id,
-            created_at=created_at,
-            wb_user_id=req.wb_user_id,
-            payload=res_payload,
-        )
+
+        return format_feedback_to_res(row)
+
+    def feedback_create_batch(
+        self, req: tsi.FeedbackCreateBatchReq
+    ) -> tsi.FeedbackCreateBatchRes:
+        """Create multiple feedback items in a batch efficiently."""
+        rows_to_insert = []
+        results = []
+
+        for feedback_req in req.batch:
+            assert_non_null_wb_user_id(feedback_req)
+            validate_feedback_create_req(feedback_req, self)
+
+            processed_payload = process_feedback_payload(feedback_req)
+            row = format_feedback_to_row(feedback_req, processed_payload)
+            rows_to_insert.append(row)
+            results.append(format_feedback_to_res(row))
+
+        # Batch insert all rows at once
+        if rows_to_insert:
+            conn, cursor = get_conn_cursor(self.db_path)
+            with self.lock:
+                # Insert each row individually but in a single transaction
+                for row in rows_to_insert:
+                    prepared = TABLE_FEEDBACK.insert(row).prepare(
+                        database_type="sqlite"
+                    )
+                    cursor.executemany(prepared.sql, prepared.data)
+                conn.commit()
+
+        return tsi.FeedbackCreateBatchRes(res=results)
 
     def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
         conn, cursor = get_conn_cursor(self.db_path)
@@ -1534,9 +1557,21 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             )
 
     def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
-        raise NotImplementedError(
-            "evaluate_model is not implemented for SQLite trace server"
+        if self._evaluate_model_dispatcher is None:
+            raise ValueError("Evaluate model dispatcher is not set")
+        if req.wb_user_id is None:
+            raise ValueError("wb_user_id is required")
+        call_id = generate_id()
+        self._evaluate_model_dispatcher.dispatch(
+            EvaluateModelArgs(
+                project_id=req.project_id,
+                evaluation_ref=req.evaluation_ref,
+                model_ref=req.model_ref,
+                wb_user_id=req.wb_user_id,
+                evaluation_call_id=call_id,
+            )
         )
+        return tsi.EvaluateModelRes(call_id=call_id)
 
     def evaluation_status(
         self, req: tsi.EvaluationStatusReq

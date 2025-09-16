@@ -28,7 +28,7 @@ jobs:
 
     # if: github.ref == 'refs/heads/master' || needs.check-which-tests-to-run.outputs.weave_query_tests
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 2
 
@@ -141,53 +141,13 @@ jobs:
         with:
           jobs: ${{ toJSON(needs) }}
 
-  # ==== Weave UI Jobs ====
-  weavejs-lint-compile:
-    name: WeaveJS Lint and Compile
-    runs-on: ubuntu-latest
-    needs:
-      - check-which-tests-to-run
-    steps:
-      - uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Check if lint and compile should run
-        id: check_run
-        run: |
-          if [[ "${{ github.ref }}" == "refs/heads/master" || "${{ needs.check-which-tests-to-run.outputs.weave_js_tests }}" == "true" ]]; then
-            echo "Lint and compile should run"
-            echo "should_lint_and_compile=true" >> $GITHUB_OUTPUT
-          else
-            echo "Lint and compile should not run"
-            echo "should_lint_and_compile=false" >> $GITHUB_OUTPUT
-          fi
-      - uses: actions/setup-node@v1
-        if: steps.check_run.outputs.should_lint_and_compile == 'true'
-        with:
-          node-version: "20.x"
-      - name: Configure npm for GitHub Packages
-        run: |
-          echo "//npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }}" >> .npmrc
-      - name: Run WeaveJS Lint and Compile
-        if: steps.check_run.outputs.should_lint_and_compile == 'true'
-        run: |
-          set -e
-          cd weave-js
-          yarn install --frozen-lockfile
-          yarn generate
-          yarn eslint --max-warnings=0
-          yarn prettier
-          yarn run tsc
-          yarn testci
-
   weave-ts-sdk-lint:
     name: Weave TS SDK Lint
     runs-on: ubuntu-latest
     needs:
       - check-which-tests-to-run
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - name: Check if lint should run
@@ -216,7 +176,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v5
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -224,7 +184,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install nox uv
+          pip install nox uv==0.8.6
       - name: Run nox
         run: nox -e lint
 
@@ -234,7 +194,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v5
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
@@ -253,9 +213,6 @@ jobs:
         python-version-major: ["3"]
         python-version-minor: [
             "9",
-            "10",
-            "11",
-            "12",
             "13",
             #
           ]
@@ -263,7 +220,7 @@ jobs:
       fail-fast: false
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v5
       - name: Set up Python ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
         uses: actions/setup-python@v5
         with:
@@ -271,11 +228,19 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install nox uv
+          pip install nox uv==0.8.6
       - name: Run nox (Non Trace Server)
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
             -m "not trace_server"
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./tests/coverage.xml
+          flags: trace-no-server
+          name: trace-no-server-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   trace-tests:
     name: Trace nox tests
@@ -286,13 +251,11 @@ jobs:
         python-version-major: ["3"]
         python-version-minor: [
             "9",
-            "10",
-            "11",
-            "12",
             "13",
             #
           ]
-        nox-shard: [
+        nox-shard:
+          [
             "trace1",
             "trace2",
             "trace3",
@@ -307,8 +270,6 @@ jobs:
             "crewai",
             "dspy",
             "groq",
-            # "huggingface",
-            "google_ai_studio",
             "google_genai",
             "instructor",
             "langchain",
@@ -317,6 +278,7 @@ jobs:
             "mistral",
             "notdiamond",
             "openai",
+            "verifiers",
             "vertexai",
             "pandas-test",
             "mcp",
@@ -359,7 +321,7 @@ jobs:
         options: --health-cmd "wget -nv -O- 'http://localhost:8123/ping' || exit 1" --health-interval=5s --health-timeout=3s
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v5
       - name: Enable debug logging
         run: echo "ACTIONS_STEP_DEBUG=true" >> $GITHUB_ENV
       - name: Install SQLite dev package
@@ -371,7 +333,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install nox uv
+          pip install nox uv==0.8.6
       - name: Run nox (Sqlite Trace Server)
         env:
           WEAVE_SENTRY_ENV: ci
@@ -398,9 +360,18 @@ jobs:
           WF_CLICKHOUSE_HOST: localhost
           WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
           DD_TRACE_ENABLED: false
+          OPENAI_API_KEY: dummyapikey
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- \
             -m "trace_server and not skip_clickhouse_client"
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./tests/coverage.xml
+          flags: trace-tests
+          name: trace-tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}-${{ matrix.nox-shard }}
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
   trace-tests-matrix-check: # This job does nothing and is only used for the branch protection
     if: always()
 

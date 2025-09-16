@@ -1,5 +1,4 @@
-"""
-This module builds on the orm.py module to provide a more hard-coded optimized
+"""This module builds on the orm.py module to provide a more hard-coded optimized
 query builder specifically for the "Calls" table (which is the `calls_merged`
 underlying table).
 
@@ -191,8 +190,7 @@ class CallsMergedFeedbackPayloadField(CallsMergedField):
 
     @classmethod
     def from_path(cls, path: str) -> "CallsMergedFeedbackPayloadField":
-        """
-        Expected format: `[feedback.type].dot.path`
+        """Expected format: `[feedback.type].dot.path`.
 
         feedback.type can be '*' to select all feedback types.
         """
@@ -375,18 +373,17 @@ class OrderField(BaseModel):
 
     @property
     def raw_field_path(self) -> str:
-        """
-        Returns the raw field path as a user would see it, i.e. the field path
+        """Returns the raw field path as a user would see it, i.e. the field path
         without the _dump suffix and includes the extra path dot separate.
 
-        example:
+        Example:
             OrderField(field=CallsMergedField(field="inputs_dump", extra_path=["model", "temperature"])).raw_field_path
                 -> inputs.model.temperature
         """
         field_path = self.field.field
         if field_path.endswith("_dump"):
             field_path = field_path[:-5]
-        if hasattr(self.field, "extra_path"):
+        if hasattr(self.field, "extra_path") and self.field.extra_path:
             field_path += "." + ".".join(self.field.extra_path)
         return field_path
 
@@ -451,7 +448,7 @@ class Condition(BaseModel):
     def get_object_ref_conditions(
         self, expand_columns: Optional[list[str]] = None
     ) -> list[ObjectRefCondition]:
-        """Get any object ref conditions for CTE building"""
+        """Get any object ref conditions for CTE building."""
         expand_cols = expand_columns or []
         if not expand_cols or not is_object_ref_operand(self.operand, expand_cols):
             return []
@@ -577,8 +574,7 @@ class CallsQuery(BaseModel):
         return self
 
     def as_sql(self, pb: ParamBuilder, table_alias: str = "calls_merged") -> str:
-        """
-        This is the main entry point for building the query. This method will
+        """This is the main entry point for building the query. This method will
         determine the optimal query to build based on the fields and conditions
         that have been set.
 
@@ -818,9 +814,9 @@ class CallsQuery(BaseModel):
                 having_conditions_sql, "AND"
             )
 
-        # The op_name, trace_id, trace_roots conditions REQUIRE conditioning on the
-        # started_at field after grouping in the HAVING clause. These filters remove
-        # call starts before grouping, creating orphan call ends. By conditioning
+        # The op_name, trace_id, trace_roots, wb_run_id conditions REQUIRE conditioning
+        # on the started_at field after grouping in the HAVING clause. These filters
+        # remove call starts before grouping, creating orphan call ends. By conditioning
         # on `NOT any(started_at) is NULL`, we filter out orphaned call ends, ensuring
         # all rows returned at least have a call start.
         op_name_sql = process_op_name_filter_to_sql(
@@ -839,6 +835,11 @@ class CallsQuery(BaseModel):
             table_alias,
         )
         turn_id_sql = process_turn_id_filter_to_sql(
+            self.hardcoded_filter,
+            pb,
+            table_alias,
+        )
+        wb_run_id_sql = process_wb_run_ids_filter_to_sql(
             self.hardcoded_filter,
             pb,
             table_alias,
@@ -892,7 +893,7 @@ class CallsQuery(BaseModel):
         sortable_datetime_sql = (
             optimization_conditions.sortable_datetime_filters_sql or ""
         )
-        str_filter_opt_sql = optimization_conditions.str_filter_opt_sql or ""
+        heavy_filter_opt_sql = optimization_conditions.heavy_filter_opt_sql or ""
 
         order_by_sql = ""
         if len(self.order_fields) > 0:
@@ -995,13 +996,14 @@ class CallsQuery(BaseModel):
         {id_mask_sql}
         {id_subquery_sql}
         {sortable_datetime_sql}
+        {wb_run_id_sql}
         {trace_roots_only_sql}
         {parent_ids_filter_sql}
         {op_name_sql}
         {trace_id_sql}
         {thread_id_sql}
         {turn_id_sql}
-        {str_filter_opt_sql}
+        {heavy_filter_opt_sql}
         {ref_filter_opt_sql}
         {object_refs_filter_opt_sql}
         GROUP BY (calls_merged.project_id, calls_merged.id)
@@ -1474,7 +1476,8 @@ def process_ref_filters_to_sql(
     To be used before group by. This filter is NOT guaranteed to return
     the correct results, as it can operate on call ends (output_refs) so it
     should be used in addition to the existing ref filters after group by
-    generated in process_calls_filter_to_conditions."""
+    generated in process_calls_filter_to_conditions.
+    """
     if hardcoded_filter is None or (
         not hardcoded_filter.filter.output_refs
         and not hardcoded_filter.filter.input_refs
@@ -1527,6 +1530,29 @@ def process_object_refs_filter_to_opt_sql(
         refs_filter_opt_sql += f"AND (length({table_alias}.output_refs) > 0 OR {table_alias}.ended_at IS NULL)"
 
     return refs_filter_opt_sql
+
+
+def process_wb_run_ids_filter_to_sql(
+    hardcoded_filter: Optional[HardCodedFilter],
+    param_builder: ParamBuilder,
+    table_alias: str,
+) -> str:
+    """Pulls out the wb_run_id and returns a sql string if there are any wb_run_ids."""
+    if hardcoded_filter is None or not hardcoded_filter.filter.wb_run_ids:
+        return ""
+
+    wb_run_ids = hardcoded_filter.filter.wb_run_ids
+    assert_parameter_length_less_than_max("wb_run_ids", len(wb_run_ids))
+    wb_run_id_field = get_field_by_name("wb_run_id")
+    if not isinstance(wb_run_id_field, CallsMergedAggField):
+        raise TypeError("wb_run_id is not an aggregate field")
+
+    wb_run_id_field_sql = wb_run_id_field.as_sql(
+        param_builder, table_alias, use_agg_fn=False
+    )
+    wb_run_id_filter_sql = f"{wb_run_id_field_sql} IN {param_slot(param_builder.add_param(wb_run_ids), 'Array(String)')}"
+
+    return f"AND ({wb_run_id_filter_sql} OR {wb_run_id_field_sql} IS NULL)"
 
 
 def process_calls_filter_to_conditions(
@@ -1599,15 +1625,14 @@ def optimized_project_contains_call_query(
     """Returns a query that checks if the project contains any calls."""
     return safely_format_sql(
         f"""SELECT
-    CASE
-        WHEN EXISTS (
-            SELECT 1
-            FROM calls_merged
-            WHERE project_id = {param_slot(param_builder.add_param(project_id), "String")}
-        )
-        THEN 1
-        ELSE 0
-        END AS has_any
+    toUInt8(count()) AS has_any
+    FROM
+    (
+        SELECT 1
+        FROM calls_merged
+        WHERE project_id = {param_slot(param_builder.add_param(project_id), "String")}
+        LIMIT 1
+    )
     """,
         logger,
     )
