@@ -231,6 +231,7 @@ const sidebars: SidebarsConfig = {
       label: "🛠️ Tools & Resources",
       ...CATEGORY_SECTION_HEADER_MIXIN,
       items: [
+        "details/limits",
         "guides/core-types/env-vars",
         "guides/troubleshooting",
         "guides/tracking/faqs",

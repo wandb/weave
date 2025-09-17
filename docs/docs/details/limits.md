@@ -11,7 +11,7 @@
 
 * [Dedicated Weave instances](../../guides/platform/weave-self-managed) use a different OpenTelemetry ingress URL. Use `{WANDB_HOST}/traces/otel/v1/traces` to access your traces on a dedicated instance. For example, if your host your instance at `acme.wandb.io`, trace information is accessible at `https://acme.wandb.io/traces/otel/v1/traces`.
 
-* Weave sometimes truncates large trace data objects. This occurs because default trace output is a raw, custom Python object that Weave doesn’t know how to serialize. To ensure that large trace data isn't cut off, define a dictionary of strings to return all trace data, like this: 
+* Weave sometimes truncates large trace data objects. This occurs because default trace output is a raw, custom Python object that Weave doesn’t know how to serialize. To return all of your trace data, define a dictionary of strings, like this: 
 
     ```python
     import weave
