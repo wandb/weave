@@ -62,7 +62,6 @@ def get_openai_realtime_websocket_patcher(
                 except (AttributeError, TypeError):
                     pass
 
-        wrapper._weave_initialized = True
         return wrapper
 
     # Patcher for 'websockets'
@@ -75,7 +74,6 @@ def get_openai_realtime_websocket_patcher(
             original_connection = await original_connect(*args, **kwargs)
             return connection.WeaveAsyncWebsocketConnection(original_connection)
 
-        wrapper._weave_initialized = True
         return wrapper
 
     # Patcher for 'aiohttp'
@@ -88,7 +86,6 @@ def get_openai_realtime_websocket_patcher(
             original_ws = await original_ws_connect(*args, **kwargs)
             return connection.WeaveAiohttpWebsocketConnection(original_ws)
 
-        wrapper._weave_initialized = True
         return wrapper
 
     _websocket_patcher = MultiPatcher(
@@ -143,7 +140,6 @@ def wrap_websocket_sync(websocket_app_class: type) -> Any:
             except (AttributeError, TypeError):
                 pass
 
-    wrapper._weave_initialized = True
     return wrapper
 
 
@@ -188,5 +184,4 @@ def wrap_websocket_connect(connect_func: Callable) -> Callable:
         original_connection = await connect_func(*args, **kwargs)
         return connection.WeaveAsyncWebsocketConnection(original_connection)
 
-    wrapper._weave_initialized = True
     return wrapper
