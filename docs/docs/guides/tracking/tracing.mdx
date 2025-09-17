@@ -610,14 +610,42 @@ You can also track class and object methods.
 
     print(call)
     ```
-    
-    ### Customize rendered traces with `weave.Markdown`
 
-    Weave makes it easy to tailor how your traced operations are displayed without losing the original data. 
-    With `weave.Markdown`, you can render inputs and outputs as clean, readable blocks of formatted content while preserving the underlying structured data for programmatic access.
-    Use `postprocess_inputs` and `postprocess_output` in your `@weave.op` decorator to enhance trace readability.
+    </TabItem>
+    <TabItem value="typescript" label="TypeScript">
+    ```typescript showLineNumbers
+    import * as weave from 'weave'
 
-    The following code sample uses postprocessors to render a call in Weave to with emojis and nicer formatting:
+    // Initialize the client
+    const client = await weave.init('intro-example')
+
+    // Get a specific call by its ID
+    const call = await client.getCall('call-uuid-here')
+
+    console.log(call)
+    ```
+    </TabItem>
+
+    <TabItem value="service_api" label="HTTP API">
+    To view a call using the Service API, you can make a request to the [`/call/read`](../../reference/service-api/call-read-call-read-post.api.mdx) endpoint.
+
+    ```bash
+    curl -L 'https://trace.wandb.ai/call/read' \
+    -H 'Content-Type: application/json' \
+    -H 'Accept: application/json' \
+    -d '{
+        "project_id": "string",
+        "id": "string",
+    }'
+    ```
+    </TabItem>
+</Tabs>
+
+### Customize rendered traces with `weave.Markdown`
+
+You can use `weave.Markdown` to customize how your trace information is displayed without losing the original data. This allows you to render your inputs and outputs as readable blocks of formatted content while preserving the underlying data structure.
+
+Use `postprocess_inputs` and `postprocess_output` functions in your `@weave.op` decorator to format your trace data. The following code sample uses postprocessors to render a call in Weave with emojis and more readable formatting:
     
     <pre>
     ```python
@@ -679,37 +707,6 @@ You can also track class and object methods.
     </pre>
 
     ![A call rendered in the Weave UI using the code sample.](imgs/md-call-render.png)
-
-    </TabItem>
-    <TabItem value="typescript" label="TypeScript">
-    ```typescript showLineNumbers
-    import * as weave from 'weave'
-
-    // Initialize the client
-    const client = await weave.init('intro-example')
-
-    // Get a specific call by its ID
-    const call = await client.getCall('call-uuid-here')
-
-    console.log(call)
-    ```
-    </TabItem>
-
-    <TabItem value="service_api" label="HTTP API">
-    To view a call using the Service API, you can make a request to the [`/call/read`](../../reference/service-api/call-read-call-read-post.api.mdx) endpoint.
-
-    ```bash
-    curl -L 'https://trace.wandb.ai/call/read' \
-    -H 'Content-Type: application/json' \
-    -H 'Accept: application/json' \
-    -d '{
-        "project_id": "string",
-        "id": "string",
-    }'
-    ```
-    </TabItem>
-</Tabs>
-
 
 ## Updating Calls
 
