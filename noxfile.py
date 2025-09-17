@@ -212,6 +212,8 @@ def tests(session, shard):
     # Run all trace tests when shard is "trace"
     if shard == "trace":
         pytest_args.extend(["-m", "trace_server"])
+        # Use high parallelism on the large 16-core runner
+        session.posargs.insert(0, "-n16")
 
     if shard == "trace_no_server":
         pytest_args.extend(["-m", "not trace_server"])
