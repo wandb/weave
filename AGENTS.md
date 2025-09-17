@@ -123,6 +123,15 @@ TODO: need to fill this out
 
 ---
 
+## Logging
+
+- We configure a namespaced `weave` logger in `weave/trace/display/term.py` via `configure_logger()`.
+- The `weave` logger attaches a `StreamHandler` with a custom formatter and sets `logger.propagate = False` to avoid duplicate log lines when the root logger also has handlers (common under pytest).
+- Tests that capture logs (see `tests/trace/util.py: capture_output`) replace both root and `weave` handlers with the same handler; disabling propagation ensures each message appears once.
+- Prefer `logging.getLogger(__name__)` in modules; messages will be handled by the `weave` logger through the hierarchy without double-printing.
+
+---
+
 ## Integration Patching
 
 ### Automatic Implicit Patching
