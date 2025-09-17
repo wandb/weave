@@ -86,13 +86,18 @@ class AsyncBatchProcessor(Generic[T]):
                     self._dropped_item_count += 1
                     item_id = id(item)
                     error_message = f"Queue is full. Dropping item. Item ID: {item_id}. Max queue size: {self.queue.maxsize}"
-                    
+
                     # Only log every 1000th dropped item
                     if self._dropped_item_count % 1000 == 0:
-                        logger.warning(f"{error_message}. Total dropped items: {self._dropped_item_count}")
+                        logger.warning(
+                            f"{error_message}. Total dropped items: {self._dropped_item_count}"
+                        )
                         if SENTRY_AVAILABLE:
-                            sentry_sdk.capture_message(f"Queue full - dropped {self._dropped_item_count} items total", level="warning")
-                    
+                            sentry_sdk.capture_message(
+                                f"Queue full - dropped {self._dropped_item_count} items total",
+                                level="warning",
+                            )
+
                     self._write_item_to_disk(item, error_message)
 
     def stop_accepting_new_work_and_flush_queue(self) -> None:
