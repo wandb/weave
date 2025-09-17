@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-
 from typing import Annotated, Any, Literal, Union
 
 from pydantic import AfterValidator, AliasChoices, BaseModel, Field
@@ -863,7 +862,9 @@ def create_user_message_from_dict(data: dict) -> UserMessageType | None:
     try:
         return cls(**data)
     except ValidationError as e:
-        logger.error(f"Failed to construct message class with error - {e}")
+        logger.debug(
+            f"Failed to construct message for type {event_type} with error - {e}"
+        )
 
     return None
 
@@ -881,7 +882,9 @@ def create_server_message_from_dict(data: dict) -> ServerMessageType | None:
     try:
         return cls(**data)
     except ValidationError as e:
-        logger.error(f"Failed to construct message class with error - {e}")
+        logger.debug(
+            f"Failed to construct message for type {event_type} with error - {e}"
+        )
 
     return None
 
@@ -897,4 +900,3 @@ def create_message_from_dict(data: dict) -> MessageType | None:
 
     logger.warning(f"Unknown message type - {event_type}")
     return None
-

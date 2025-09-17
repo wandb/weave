@@ -1,5 +1,5 @@
-import logging
 import json
+import logging
 import uuid
 from typing import Any
 
@@ -86,7 +86,9 @@ class WeaveMediaConnection:
         ) -> Any:  # opcode is websocket.ABNF.OPCODE_TEXT
             # Process outgoing events with session manager
             parsed_data = _try_json_load(data)
-            if isinstance(parsed_data, dict) and (typed_message := create_user_message_from_dict(parsed_data)):
+            if isinstance(parsed_data, dict) and (
+                typed_message := create_user_message_from_dict(parsed_data)
+            ):
                 self.conversation_manager.process_event(typed_message)
             return sender(data, opcode)
 
@@ -111,7 +113,9 @@ class WeaveMediaConnection:
             if len(args) > 1:  # Message is the second argument
                 data = args[1]
                 parsed_data = _try_json_load(data)
-                if isinstance(parsed_data, dict) and (typed_message := create_server_message_from_dict(parsed_data)):
+                if isinstance(parsed_data, dict) and (
+                    typed_message := create_server_message_from_dict(parsed_data)
+                ):
                     self.conversation_manager.process_event(typed_message)
             # Call the original handler
             return handler(*args, **kwargs)
@@ -153,7 +157,9 @@ class WeaveAsyncWebsocketConnection:
         data = args[0] if args else None
         parsed_data = _try_json_load(data)
         # Forward outgoing user messages to conversation manager
-        if isinstance(parsed_data, dict) and (typed_message := create_user_message_from_dict(parsed_data)):
+        if isinstance(parsed_data, dict) and (
+            typed_message := create_user_message_from_dict(parsed_data)
+        ):
             self.conversation_manager.process_event(typed_message)
         return await self.original_connection.send(*args, **kwargs)
 
@@ -161,7 +167,9 @@ class WeaveAsyncWebsocketConnection:
         data = await self.original_connection.recv(*args, **kwargs)
         parsed_data = _try_json_load(data)
         # Forward incoming server messages to conversation manager
-        if isinstance(parsed_data, dict) and (typed_message := create_server_message_from_dict(parsed_data)):
+        if isinstance(parsed_data, dict) and (
+            typed_message := create_server_message_from_dict(parsed_data)
+        ):
             self.conversation_manager.process_event(typed_message)
         return data
 
@@ -205,30 +213,40 @@ class WeaveAiohttpWebsocketConnection:
     async def send_str(self, data: str, *args: Any, **kwargs: Any) -> None:
         parsed_data = _try_json_load(data)
         # Forward outgoing user messages to conversation manager
-        if isinstance(parsed_data, dict) and (typed_message := create_user_message_from_dict(parsed_data)):
+        if isinstance(parsed_data, dict) and (
+            typed_message := create_user_message_from_dict(parsed_data)
+        ):
             self.conversation_manager.process_event(typed_message)
         return await self.original_ws.send_str(data, *args, **kwargs)
 
     async def send_bytes(self, data: bytes, *args: Any, **kwargs: Any) -> None:
         parsed_data = _try_json_load(data)
         # Forward outgoing user messages to conversation manager
-        if isinstance(parsed_data, dict) and (typed_message := create_user_message_from_dict(parsed_data)):
+        if isinstance(parsed_data, dict) and (
+            typed_message := create_user_message_from_dict(parsed_data)
+        ):
             self.conversation_manager.process_event(typed_message)
         return await self.original_ws.send_bytes(data, *args, **kwargs)
 
     async def send_json(self, data: Any, *args: Any, **kwargs: Any) -> None:
         # Forward outgoing user messages to conversation manager
-        if isinstance(data, dict) and (typed_message := create_user_message_from_dict(data)):
+        if isinstance(data, dict) and (
+            typed_message := create_user_message_from_dict(data)
+        ):
             self.conversation_manager.process_event(typed_message)
         return await self.original_ws.send_json(data, *args, **kwargs)
 
     async def receive(self, *args: Any, **kwargs: Any) -> Any:
         msg = await self.original_ws.receive(*args, **kwargs)
-        if not (msg.type in (WSMsgType.TEXT, WSMsgType.BINARY) if WSMsgType else (1, 2)):
+        if not (
+            msg.type in (WSMsgType.TEXT, WSMsgType.BINARY) if WSMsgType else (1, 2)
+        ):
             return msg
         # Forward outgoing user messages to conversation manager
         parsed_data = _try_json_load(msg.data)
-        if isinstance(parsed_data, dict) and (typed_message := create_server_message_from_dict(parsed_data)):
+        if isinstance(parsed_data, dict) and (
+            typed_message := create_server_message_from_dict(parsed_data)
+        ):
             self.conversation_manager.process_event(typed_message)
         return msg
 
