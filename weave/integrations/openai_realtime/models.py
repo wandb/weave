@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+import logging
+
 from typing import Annotated, Any, Literal, Union
 
 from pydantic import AfterValidator, AliasChoices, BaseModel, Field
+from pydantic_core import ValidationError
+
+logger = logging.getLogger(__name__)
 
 
 def is_conv_id(id: str) -> str:
@@ -844,37 +849,52 @@ SERVER_MESSAGE_CLASSES: dict[str, type[ServerMessageType]] = {
 MessageType = Union[UserMessageType, ServerMessageType]
 
 
-def create_user_message_from_dict(data: dict) -> UserMessageType:
+def create_user_message_from_dict(data: dict) -> UserMessageType | None:
     """Create a user message object from a dictionary based on its 'type'."""
     event_type = data.get("type")
-
     if not event_type:
-        return UnknownClientMessage(**data)
+        return None
     # Use .get() to look up the class, providing a default if the key is not found.
-    message_class = USER_MESSAGE_CLASSES.get(event_type, UnknownClientMessage)
-    return message_class(**data)
+    cls = USER_MESSAGE_CLASSES.get(event_type, None)
+
+    if not cls:
+        return None
+
+    try:
+        return cls(**data)
+    except ValidationError as e:
+        logger.error(f"Failed to construct message class with error - {e}")
+
+    return None
 
 
-def create_server_message_from_dict(data: dict) -> ServerMessageType:
-    """Create a server message object from a dictionary based on its 'type'."""
+def create_server_message_from_dict(data: dict) -> ServerMessageType | None:
     event_type = data.get("type")
-
     if not event_type:
-        return UnknownServerMessage(**data)
+        return None
+    # Use .get() to look up the class, providing a default if the key is not found.
+    cls = SERVER_MESSAGE_CLASSES.get(event_type, None)
 
-    message_class = SERVER_MESSAGE_CLASSES.get(event_type, UnknownServerMessage)
-    return message_class(**data)
+    if not cls:
+        return None
+
+    try:
+        return cls(**data)
+    except ValidationError as e:
+        logger.error(f"Failed to construct message class with error - {e}")
+
+    return None
 
 
-def create_message_from_dict(data: dict) -> MessageType:
+def create_message_from_dict(data: dict) -> MessageType | None:
     """Create a message object from a dictionary based on its 'type'."""
     event_type = data.get("type") or ""
     if event_type in USER_MESSAGE_CLASSES.keys():
-        cls = USER_MESSAGE_CLASSES[event_type]
-        return cls(**data)
+        return create_user_message_from_dict(data)
 
     elif event_type in SERVER_MESSAGE_CLASSES.keys():
-        cls = SERVER_MESSAGE_CLASSES[event_type]
-        return cls(**data)
+        return create_server_message_from_dict(data)
 
-    return UnknownClientMessage(**data)
+    logger.warning(f"Unknown message type - {event_type}")
+    return None
+
