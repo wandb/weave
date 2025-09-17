@@ -26,7 +26,7 @@ PY39_INCOMPATIBLE_SHARDS = [
 PY310_INCOMPATIBLE_SHARDS = [
     "verifiers_test",
 ]
-NUM_TRACE_SERVER_SHARDS = 4
+# NUM_TRACE_SERVER_SHARDS = 4  # No longer using sharding for trace tests
 
 
 @nox.session
@@ -61,7 +61,7 @@ def lint(session):
         session.run("pre-commit", "run", "--hook-stage=pre-push")
 
 
-trace_server_shards = [f"trace{i}" for i in range(1, NUM_TRACE_SERVER_SHARDS + 1)]
+# trace_server_shards = [f"trace{i}" for i in range(1, NUM_TRACE_SERVER_SHARDS + 1)]  # No longer using sharding
 
 
 @nox.session(python=SUPPORTED_PYTHON_VERSIONS)
@@ -105,7 +105,7 @@ trace_server_shards = [f"trace{i}" for i in range(1, NUM_TRACE_SERVER_SHARDS + 1
         "verifiers_test",
         "autogen_tests",
         "trace",
-        *trace_server_shards,
+        # *trace_server_shards,  # No longer using sharding for trace tests
         "trace_no_server",
     ],
 )
@@ -167,7 +167,7 @@ def tests(session, shard):
         "autogen_tests": ["integrations/autogen/"],
         "verifiers_test": ["integrations/verifiers/"],
         "trace": ["trace/"],
-        **{shard: ["trace/"] for shard in trace_server_shards},
+        # **{shard: ["trace/"] for shard in trace_server_shards},  # No longer using sharding
         "trace_no_server": ["trace/"],
     }
 
@@ -198,16 +198,20 @@ def tests(session, shard):
             ]
         )
 
-    # Handle trace sharding: run every 3rd test starting at different offsets
-    if shard in trace_server_shards:
-        shard_id = int(shard[-1]) - 1
-        pytest_args.extend(
-            [
-                f"--shard-id={shard_id}",
-                f"--num-shards={NUM_TRACE_SERVER_SHARDS}",
-                "-m trace_server",
-            ]
-        )
+    # # Handle trace sharding: run every 3rd test starting at different offsets
+    # if shard in trace_server_shards:
+    #     shard_id = int(shard[-1]) - 1
+    #     pytest_args.extend(
+    #         [
+    #             f"--shard-id={shard_id}",
+    #             f"--num-shards={NUM_TRACE_SERVER_SHARDS}",
+    #             "-m trace_server",
+    #         ]
+    #     )
+    
+    # Run all trace tests when shard is "trace"
+    if shard == "trace":
+        pytest_args.extend(["-m", "trace_server"])
 
     if shard == "trace_no_server":
         pytest_args.extend(["-m", "not trace_server"])
