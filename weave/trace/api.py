@@ -13,6 +13,7 @@ from typing import Any, Union, cast
 # There is probably a better place for this, but including here for now to get the fix in.
 from weave import type_handlers  # noqa: F401
 from weave.trace import urls, weave_client, weave_init
+from weave.trace.autopatch import AutopatchSettings
 from weave.trace.constants import TRACE_OBJECT_EMOJI
 from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
@@ -44,6 +45,7 @@ def init(
     project_name: str,
     *,
     settings: UserSettings | dict[str, Any] | None = None,
+    autopatch_settings: AutopatchSettings | None = None,
     global_postprocess_inputs: PostprocessInputsFunc | None = None,
     global_postprocess_output: PostprocessOutputFunc | None = None,
     global_attributes: dict[str, Any] | None = None,
@@ -59,6 +61,7 @@ def init(
     Args:
         project_name: The name of the Weights & Biases project to log to.
         settings: Configuration for the Weave client generally.
+        autopatch_settings: (Deprecated) Configuration for autopatch integrations. Use explicit patching instead.
         global_postprocess_inputs: A function that will be applied to all inputs of all ops.
         global_postprocess_output: A function that will be applied to all outputs of all ops.
         global_attributes: A dictionary of attributes that will be applied to all traces.
@@ -81,6 +84,19 @@ def init(
             "Python 3.9 will reach end of life in October 2025, after which weave will drop support for it.  Please upgrade to Python 3.10 or later!",
             DeprecationWarning,
             stacklevel=2,
+        )
+
+    # Check if deprecated autopatch_settings is used
+    if autopatch_settings is not None:
+        logger.warning(
+            "The 'autopatch_settings' parameter is deprecated and will be removed in a future version. "
+            "Please use explicit patching instead. For example:\n"
+            "----------------------------------------\n"
+            "    import weave\n"
+            f"    weave.init('{project_name}')\n"
+            "    weave.integrations.patch_openai()\n"
+            "----------------------------------------\n"
+            "See https://docs.wandb.ai/guides/integrations for more information.",
         )
 
     parse_and_apply_settings(settings)
@@ -199,7 +215,6 @@ def get(uri: str | ObjectRef) -> Any:
         The object.
 
     Example:
-
     ```python
     weave.init("weave_get_example")
     dataset = weave.Dataset(rows=[{"a": 1, "b": 2}])
@@ -215,11 +230,9 @@ def get(uri: str | ObjectRef) -> Any:
 
 @contextlib.contextmanager
 def attributes(attributes: dict[str, Any]) -> Iterator:
-    """
-    Context manager for setting attributes on a call.
+    """Context manager for setting attributes on a call.
 
     Example:
-
     ```python
     with weave.attributes({'env': 'production'}):
         print(my_function.call("World"))
@@ -267,11 +280,9 @@ class ThreadContext:
 
 @contextlib.contextmanager
 def thread(thread_id: str | None | object = _AUTO_GENERATE) -> Iterator[ThreadContext]:
-    """
-    Context manager for setting thread_id on calls within the context.
+    """Context manager for setting thread_id on calls within the context.
 
     Examples:
-
     ```python
     # Auto-generate thread_id
     with weave.thread() as t:

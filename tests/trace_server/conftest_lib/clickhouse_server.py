@@ -15,8 +15,7 @@ from weave.trace_server import environment as ts_env
 def ensure_clickhouse_db_container_running(
     host: str, port: int
 ) -> typing.Callable[[], None]:
-    """
-    ClickHouse server fixture that automatically starts a server if one isn't already running.
+    """ClickHouse server fixture that automatically starts a server if one isn't already running.
 
     This fixture checks if a ClickHouse server is already running on the configured host/port.
     If not, it automatically starts a Docker-based ClickHouse server for testing.
@@ -95,8 +94,7 @@ def ensure_clickhouse_db_container_running(
 def ensure_clickhouse_db_process_running(
     host: str, port: int
 ) -> typing.Callable[[], None]:
-    """
-    ClickHouse server fixture that automatically starts a server process if one isn't already running.
+    """ClickHouse server fixture that automatically starts a server process if one isn't already running.
 
     This fixture checks if a ClickHouse server is already running on the configured host/port.
     If not, it automatically starts a ClickHouse server process for testing.

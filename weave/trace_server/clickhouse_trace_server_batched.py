@@ -1,27 +1,5 @@
 # Clickhouse Trace Server
 
-# A note on query structure:
-# There are four major kinds of things that we query:
-# - calls,
-# - object_versions,
-# - tables
-# - files
-#
-# calls are identified by ID.
-#
-# object_versions, tables, and files are identified by digest. For these kinds of
-# things, we dedupe at merge time using Clickhouse's ReplacingMergeTree, but we also
-# need to dedupe at query time.
-#
-# Previously, we did query time deduping in *_deduped VIEWs. But it turns out
-# clickhouse doesn't push down the project_id predicate into those views, so we were
-# always scanning whole tables.
-#
-# Now, we've just written the what were views before into this file directly as
-# subqueries, and put the project_id predicate in the innermost subquery, which fixes
-# the problem.
-
-
 import dataclasses
 import datetime
 import hashlib
@@ -37,6 +15,7 @@ from zoneinfo import ZoneInfo
 import clickhouse_connect
 import ddtrace
 from clickhouse_connect.driver.client import Client as CHClient
+from clickhouse_connect.driver.httputil import get_pool_manager
 from clickhouse_connect.driver.query import QueryResult
 from clickhouse_connect.driver.summary import QuerySummary
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
@@ -49,6 +28,9 @@ from weave.trace_server import environment as wf_env
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.actions_worker.dispatcher import execute_batch
+from weave.trace_server.base64_content_conversion import (
+    process_call_req_to_content,
+)
 from weave.trace_server.calls_query_builder.calls_query_builder import (
     CallsQuery,
     HardCodedFilter,
@@ -160,6 +142,12 @@ from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker impo
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
+
+# Create a shared connection pool manager for all ClickHouse connections
+# maxsize: Maximum connections per pool (set higher than thread count to avoid blocking)
+# num_pools: Number of distinct connection pools (for different hosts/configs)
+_CH_POOL_MANAGER = get_pool_manager(maxsize=50, num_pools=2)
 
 
 class ClickHouseTraceServer(tsi.TraceServerInterface):
@@ -275,7 +263,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # Converts the user-provided call details into a clickhouse schema.
         # This does validation and conversion of the input data as well
         # as enforcing business rules and defaults
-        ch_call = _start_call_for_insert_to_ch_insertable_start_call(req.start)
+
+        req = process_call_req_to_content(req, self)
+        ch_call = _start_call_for_insert_to_ch_insertable_start_call(req.start, self)
 
         # Inserts the call into the clickhouse database, verifying that
         # the call does not already exist
@@ -296,7 +286,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # Converts the user-provided call details into a clickhouse schema.
         # This does validation and conversion of the input data as well
         # as enforcing business rules and defaults
-        ch_call = _end_call_for_insert_to_ch_insertable_end_call(req.end)
+        req = process_call_req_to_content(req, self)
+        ch_call = _end_call_for_insert_to_ch_insertable_end_call(req.end, self)
 
         # Inserts the call into the clickhouse database, verifying that
         # the call does not already exist
@@ -469,7 +460,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 self._expand_call_refs(
                     req.project_id, call_dicts, expand_columns, ref_cache
                 )
-
             if include_feedback:
                 self._add_feedback_to_calls(req.project_id, call_dicts)
 
@@ -768,8 +758,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.ObjQueryRes(objs=[_ch_obj_to_obj_schema(obj) for obj in objs])
 
     def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
-        """
-        Delete object versions by digest, belonging to given object_id.
+        """Delete object versions by digest, belonging to given object_id.
         All deletion in this method is "soft". Deletion occurs by inserting
         a new row into the object_versions table with the deleted_at field set.
         Inserted rows share identical primary keys (order by) with original rows,
@@ -963,7 +952,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def table_create_from_digests(
         self, req: tsi.TableCreateFromDigestsReq
     ) -> tsi.TableCreateFromDigestsRes:
-        """Create a table by specifying row digests, instead actual rows"""
+        """Create a table by specifying row digests, instead actual rows."""
         # Calculate table digest from row digests
         table_hasher = hashlib.sha256()
         for row_digest in req.row_digests:
@@ -1833,6 +1822,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         rows_to_insert = []
         results = []
 
+        set_root_span_dd_tags({"feedback_create_batch.count": len(req.batch)})
+
         for feedback_req in req.batch:
             assert_non_null_wb_user_id(feedback_req)
             validate_feedback_create_req(feedback_req, self)
@@ -1960,7 +1951,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             inputs={**req.inputs.model_dump(exclude_none=True)},
             attributes={},
         )
-        start_call = _start_call_for_insert_to_ch_insertable_start_call(start)
+        start_call = _start_call_for_insert_to_ch_insertable_start_call(start, self)
         end = tsi.EndedCallSchemaForInsert(
             project_id=req.project_id,
             id=start_call.id,
@@ -1973,7 +1964,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         if "error" in res.response:
             end.exception = res.response["error"]
-        end_call = _end_call_for_insert_to_ch_insertable_end_call(end)
+        end_call = _end_call_for_insert_to_ch_insertable_end_call(end, self)
         calls: list[Union[CallStartCHInsertable, CallEndCHInsertable]] = [
             start_call,
             end_call,
@@ -2026,7 +2017,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 inputs={**req.inputs.model_dump(exclude_none=True)},
                 attributes={},
             )
-            start_call = _start_call_for_insert_to_ch_insertable_start_call(start)
+            start_call = _start_call_for_insert_to_ch_insertable_start_call(start, self)
             # Insert immediately so that callers can see the call in progress
             self._insert_call(start_call)
 
@@ -2075,18 +2066,24 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     # Private Methods
     @property
     def ch_client(self) -> CHClient:
-        """Returns and creates (if necessary) the clickhouse client"""
+        """Returns a thread-local clickhouse client.
+
+        Each thread gets its own client instance to avoid session conflicts,
+        but all clients share the same underlying connection pool via _CH_POOL_MANAGER.
+        """
         if not hasattr(self._thread_local, "ch_client"):
             self._thread_local.ch_client = self._mint_client()
         return self._thread_local.ch_client
 
     def _mint_client(self) -> CHClient:
+        """Create a new ClickHouse client using the shared pool manager."""
         client = clickhouse_connect.get_client(
             host=self._host,
             port=self._port,
             user=self._user,
             password=self._password,
             secure=self._port == 8443,
+            pool_mgr=_CH_POOL_MANAGER,
         )
         # Safely create the database if it does not exist
         client.command(f"CREATE DATABASE IF NOT EXISTS {self._database}")
@@ -2112,9 +2109,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         finally:
             self._thread_local.ch_client = original_client
             client.close()
-
-    # def __del__(self) -> None:
-    #     self.ch_client.close()
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call_batch")
     def _insert_call_batch(self, batch: list) -> None:
@@ -2146,8 +2140,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         object_query_builder: ObjectMetadataQueryBuilder,
         metadata_only: bool = False,
     ) -> list[SelectableCHObjSchema]:
-        """
-        Main query for fetching objects.
+        """Main query for fetching objects.
 
         conditions:
             conditions should include operations on version_index, digest, kind (is_op)
@@ -2347,8 +2340,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._strip_large_values")
     def _strip_large_values(self, batch: list[list[Any]]) -> list[list[Any]]:
-        """
-        Iterate through the batch and replace large JSON values with placeholders.
+        """Iterate through the batch and replace large JSON values with placeholders.
 
         Only considers JSON dump columns and ensures their combined size stays under
         the limit by selectively replacing the largest values.
@@ -2403,8 +2395,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
 
 def _num_bytes(data: Any) -> int:
-    """
-    Calculate the number of bytes in a string.
+    """Calculate the number of bytes in a string.
 
     This can be computationally expensive, only call when necessary.
     Never raise on a failed str cast, just return 0.
@@ -2544,11 +2535,16 @@ def _ch_table_stats_to_table_stats_schema(
 
 def _start_call_for_insert_to_ch_insertable_start_call(
     start_call: tsi.StartedCallSchemaForInsert,
+    trace_server: Optional[tsi.TraceServerInterface] = None,
 ) -> CallStartCHInsertable:
     # Note: it is technically possible for the user to mess up and provide the
     # wrong trace id (one that does not match the parent_id)!
     call_id = start_call.id or generate_id()
     trace_id = start_call.trace_id or generate_id()
+    # Process inputs for base64 content if trace_server is provided
+    inputs = start_call.inputs
+    input_refs = extract_refs_from_values(inputs)
+
     return CallStartCHInsertable(
         project_id=start_call.project_id,
         id=call_id,
@@ -2559,8 +2555,8 @@ def _start_call_for_insert_to_ch_insertable_start_call(
         op_name=start_call.op_name,
         started_at=start_call.started_at,
         attributes_dump=_dict_value_to_dump(start_call.attributes),
-        inputs_dump=_dict_value_to_dump(start_call.inputs),
-        input_refs=extract_refs_from_values(start_call.inputs),
+        inputs_dump=_dict_value_to_dump(inputs),
+        input_refs=input_refs,
         wb_run_id=start_call.wb_run_id,
         wb_run_step=start_call.wb_run_step,
         wb_user_id=start_call.wb_user_id,
@@ -2570,17 +2566,22 @@ def _start_call_for_insert_to_ch_insertable_start_call(
 
 def _end_call_for_insert_to_ch_insertable_end_call(
     end_call: tsi.EndedCallSchemaForInsert,
+    trace_server: Optional[tsi.TraceServerInterface] = None,
 ) -> CallEndCHInsertable:
     # Note: it is technically possible for the user to mess up and provide the
     # wrong trace id (one that does not match the parent_id)!
+
+    output = end_call.output
+    output_refs = extract_refs_from_values(output)
+
     return CallEndCHInsertable(
         project_id=end_call.project_id,
         id=end_call.id,
         exception=end_call.exception,
         ended_at=end_call.ended_at,
         summary_dump=_dict_value_to_dump(dict(end_call.summary)),
-        output_dump=_any_value_to_dump(end_call.output),
-        output_refs=extract_refs_from_values(end_call.output),
+        output_dump=_any_value_to_dump(output),
+        output_refs=output_refs,
     )
 
 
@@ -2913,7 +2914,9 @@ def _create_tracked_stream_wrapper(
                 output=aggregated_output,
                 summary=summary,
             )
-            end_call = _end_call_for_insert_to_ch_insertable_end_call(end)
+            end_call = _end_call_for_insert_to_ch_insertable_end_call(
+                end, None
+            )  # No trace_server in stream wrapper
             insert_call(end_call)
 
     return _stream_wrapper()

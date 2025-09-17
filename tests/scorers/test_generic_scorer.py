@@ -5,8 +5,7 @@ from weave.flow.scorer import Scorer, prepare_scorer_op_args
 
 
 def test_skips_kwargs_parameter_with_column_map():
-    """
-    Test that prepare_scorer_op_args correctly skips the 'kwargs' parameter
+    """Test that prepare_scorer_op_args correctly skips the 'kwargs' parameter
     when building score arguments with column mapping.
 
     This tests the specific change that adds "kwargs" to the list of
@@ -48,8 +47,7 @@ def test_skips_kwargs_parameter_with_column_map():
 
 
 def test_skips_output_and_model_output_parameters():
-    """
-    Test that prepare_scorer_op_args continues to correctly skip
+    """Test that prepare_scorer_op_args continues to correctly skip
     'output' and 'model_output' parameters as before.
     """
 
@@ -79,8 +77,7 @@ def test_skips_output_and_model_output_parameters():
 
 
 def test_all_skipped_parameters_together():
-    """
-    Test that all three parameters (output, model_output, kwargs)
+    """Test that all three parameters (output, model_output, kwargs)
     are correctly skipped when they appear together.
     """
 

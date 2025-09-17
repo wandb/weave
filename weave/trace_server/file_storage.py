@@ -1,8 +1,7 @@
-"""
-Currently 3 storage backends are supported:
+"""Currently 3 storage backends are supported:
 - AWS S3
 - Google Cloud Storage
-- Azure Blob Storage
+- Azure Blob Storage.
 
 Each of these can be configured at the application layer, or at the environment layer.
 
@@ -93,7 +92,8 @@ RETRY_MAX_WAIT = 10  # seconds
 
 class FileStorageClient:
     """Abstract base class defining the interface for cloud storage operations.
-    Implementations are provided for AWS S3, Google Cloud Storage, and Azure Blob Storage."""
+    Implementations are provided for AWS S3, Google Cloud Storage, and Azure Blob Storage.
+    """
 
     base_uri: FileStorageURI
 
@@ -368,7 +368,8 @@ class AzureStorageClient(FileStorageClient):
 
 def maybe_get_storage_client_from_env() -> Optional[FileStorageClient]:
     """Factory method that returns appropriate storage client based on URI type.
-    Supports S3, GCS, and Azure storage URIs."""
+    Supports S3, GCS, and Azure storage URIs.
+    """
     file_storage_uri = wf_file_storage_uri()
     if not file_storage_uri:
         return None

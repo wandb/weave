@@ -812,7 +812,7 @@ def test_object_ref_filter_heavily_nested_keys() -> None:
 
 
 def test_object_ref_filter_complex_nested_path() -> None:
-    """Test the specific case mentioned: path = "a.b.c.d.e" with expand_columns=["a.b", "a.b.c.d"]"""
+    """Test the specific case mentioned: path = "a.b.c.d.e" with expand_columns=["a.b", "a.b.c.d"]."""
     cq = CallsQuery(project_id="project")
     cq.add_field("id")
     cq.add_condition(

@@ -108,8 +108,7 @@ class HallucinationResponse(BaseModel):
 
 
 class HallucinationFreeScorer(LLMScorer):
-    """
-    A Scorer that uses an LLM to determine if the model output contains any hallucinations
+    """A Scorer that uses an LLM to determine if the model output contains any hallucinations
     based on the input data.
 
     Note:
@@ -175,9 +174,8 @@ HALLUCINATION_SCORER_THRESHOLD = 0.35
 
 
 class WeaveHallucinationScorerV1(HuggingFacePipelineScorer):
-    """
-    A scorer that detects hallucinations in the output, given an query and context. This scorer
-    uses the HHEM 2.1 model from Vectara, https://huggingface.co/vectara/hallucination_evaluation_model
+    """A scorer that detects hallucinations in the output, given an query and context. This scorer
+    uses the HHEM 2.1 model from Vectara, https://huggingface.co/vectara/hallucination_evaluation_model.
 
     This scorer uses a fine-tuned LLM to analyze whether model outputs contain information not supported
     by the given context.
@@ -286,8 +284,7 @@ class WeaveHallucinationScorerV1(HuggingFacePipelineScorer):
         output: str,
         **kwargs: Any,
     ) -> WeaveScorerResult:
-        """
-        Score the hallucination of the query and context.
+        """Score the hallucination of the query and context.
 
         Args:
             query: str, The query to score, must be a string

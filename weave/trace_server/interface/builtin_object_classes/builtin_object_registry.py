@@ -27,8 +27,7 @@ BUILTIN_OBJECT_REGISTRY: dict[str, type[BaseObject]] = {}
 
 
 def register_base_object(cls: type[BaseObject]) -> None:
-    """
-    Register a BaseObject class in the global registry.
+    """Register a BaseObject class in the global registry.
 
     Args:
         cls: The BaseObject class to register
