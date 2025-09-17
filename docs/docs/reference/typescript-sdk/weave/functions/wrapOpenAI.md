@@ -1,4 +1,4 @@
-[**weave**](../README.md) • **Docs**
+[**weave**](../README.md)
 
 ***
 
@@ -8,15 +8,21 @@
 
 > **wrapOpenAI**\<`T`\>(`openai`): `T`
 
+Defined in: [integrations/openai.ts:469](https://github.com/wandb/weave/blob/69f1caabebc727846756574d549b7e7dda458b63/sdks/node/src/integrations/openai.ts#L469)
+
 Wraps the OpenAI API to enable function tracing for OpenAI calls.
 
 ## Type Parameters
 
-• **T** *extends* `OpenAIAPI`
+### T
+
+`T` *extends* `OpenAIAPI`
 
 ## Parameters
 
-• **openai**: `T`
+### openai
+
+`T`
 
 ## Returns
 
@@ -31,7 +37,3 @@ const result = await openai.chat.completions.create({
   messages: [{ role: 'user', content: 'Hello, world!' }]
 });
 ```
-
-## Defined in
-
-[integrations/openai.ts:159](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/integrations/openai.ts#L159)

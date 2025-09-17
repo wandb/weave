@@ -2,34 +2,37 @@
 
 ***
 
-[weave](../README.md) / WeaveObject
+[weave](../README.md) / MessagesPrompt
 
-# Class: WeaveObject
+# Class: MessagesPrompt
 
-Defined in: [weaveObject.ts:48](https://github.com/wandb/weave/blob/69f1caabebc727846756574d549b7e7dda458b63/sdks/node/src/weaveObject.ts#L48)
+Defined in: [prompt.ts:30](https://github.com/wandb/weave/blob/69f1caabebc727846756574d549b7e7dda458b63/sdks/node/src/prompt.ts#L30)
 
-## Extended by
+## Extends
 
-- [`Dataset`](Dataset.md)
-- [`Evaluation`](Evaluation.md)
+- `Prompt`
 
 ## Constructors
 
 ### Constructor
 
-> **new WeaveObject**(`_baseParameters`): `WeaveObject`
+> **new MessagesPrompt**(`parameters`): `MessagesPrompt`
 
-Defined in: [weaveObject.ts:51](https://github.com/wandb/weave/blob/69f1caabebc727846756574d549b7e7dda458b63/sdks/node/src/weaveObject.ts#L51)
+Defined in: [prompt.ts:33](https://github.com/wandb/weave/blob/69f1caabebc727846756574d549b7e7dda458b63/sdks/node/src/prompt.ts#L33)
 
 #### Parameters
 
-##### \_baseParameters
+##### parameters
 
-`WeaveObjectParameters`
+`MessagesPromptParameters`
 
 #### Returns
 
-`WeaveObject`
+`MessagesPrompt`
+
+#### Overrides
+
+`Prompt.constructor`
 
 ## Properties
 
@@ -39,6 +42,10 @@ Defined in: [weaveObject.ts:51](https://github.com/wandb/weave/blob/69f1caabebc7
 
 Defined in: [weaveObject.ts:49](https://github.com/wandb/weave/blob/69f1caabebc727846756574d549b7e7dda458b63/sdks/node/src/weaveObject.ts#L49)
 
+#### Inherited from
+
+`Prompt.__savedRef`
+
 ***
 
 ### \_baseParameters
@@ -46,6 +53,18 @@ Defined in: [weaveObject.ts:49](https://github.com/wandb/weave/blob/69f1caabebc7
 > `protected` **\_baseParameters**: `WeaveObjectParameters`
 
 Defined in: [weaveObject.ts:51](https://github.com/wandb/weave/blob/69f1caabebc727846756574d549b7e7dda458b63/sdks/node/src/weaveObject.ts#L51)
+
+#### Inherited from
+
+`Prompt._baseParameters`
+
+***
+
+### messages
+
+> **messages**: `Record`\<`string`, `any`\>[]
+
+Defined in: [prompt.ts:31](https://github.com/wandb/weave/blob/69f1caabebc727846756574d549b7e7dda458b63/sdks/node/src/prompt.ts#L31)
 
 ## Accessors
 
@@ -61,6 +80,10 @@ Defined in: [weaveObject.ts:80](https://github.com/wandb/weave/blob/69f1caabebc7
 
 `undefined` \| `string`
 
+#### Inherited from
+
+`Prompt.description`
+
 ***
 
 ### name
@@ -75,6 +98,10 @@ Defined in: [weaveObject.ts:76](https://github.com/wandb/weave/blob/69f1caabebc7
 
 `string`
 
+#### Inherited from
+
+`Prompt.name`
+
 ## Methods
 
 ### className()
@@ -87,6 +114,28 @@ Defined in: [weaveObject.ts:53](https://github.com/wandb/weave/blob/69f1caabebc7
 
 `any`
 
+#### Inherited from
+
+`Prompt.className`
+
+***
+
+### format()
+
+> **format**(`values`): `Record`\<`string`, `any`\>[]
+
+Defined in: [prompt.ts:60](https://github.com/wandb/weave/blob/69f1caabebc727846756574d549b7e7dda458b63/sdks/node/src/prompt.ts#L60)
+
+#### Parameters
+
+##### values
+
+`Record`\<`string`, `any`\> = `{}`
+
+#### Returns
+
+`Record`\<`string`, `any`\>[]
+
 ***
 
 ### saveAttrs()
@@ -98,3 +147,7 @@ Defined in: [weaveObject.ts:57](https://github.com/wandb/weave/blob/69f1caabebc7
 #### Returns
 
 `object`
+
+#### Inherited from
+
+`Prompt.saveAttrs`
