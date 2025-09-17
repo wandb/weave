@@ -1,24 +1,27 @@
 # Verifiers
 
-[Verifiers](https://github.com/willccbb/verifiers) is a flexible framework for creating RL environments and evaluations with custom multi-turn interaction protocols. The Weave integration automatically traces Verifiers environments, rollouts, rubric scoring, parser logic, and tool calls so you can debug, compare, and monitor training and evaluation runs.
+[Verifiers](https://github.com/willccbb/verifiers) is a library of modular components for creating RL environments and training LLM agents. Environments built with Verifiers can be used as LLM evaluations, synthetic data pipelines, agent harnesses for any OpenAI‑compatible endpoint, and for RL training.
 
-Learn more in the Verifiers docs: [Overview](https://verifiers.readthedocs.io/en/latest/), [Environments](https://verifiers.readthedocs.io/en/latest/environments.html), [Training](https://verifiers.readthedocs.io/en/latest/training.html).
+With Weave, you get automatic tracing purpose‑built for Agentic RL workflows. Agentic RL involves multiple turns of conversations, tool invocations, and environment/user interactions during rollouts. Just tracking the loss, reward and other timeseries data points are not sufficient to efficiently debug this workflow.
 
-## What gets traced
-
-Weave captures the most important Verifiers ops and removes `logprobs` from logged copies to keep traces lightweight while preserving training-time data in-memory. Traced entry points include (non-exhaustive):
-
-- Environment: `Environment.evaluate`, `Environment.generate`, `Environment.a_generate`, `Environment.get_model_response`
-- Multi-turn: `MultiTurnEnv.rollout`, `EnvGroup.rollout`, `SingleTurnEnv.env_response`
-- Tool use: `ToolEnv.is_completed`, `ToolEnv.env_response`, `ToolEnv.call_tool`, `StatefulToolEnv.update_tool_args`, `StatefulToolEnv.call_tool`, `StatefulToolEnv.env_response`
-- Rubrics: `Rubric.score_rollouts`, `Rubric.score_rollout`
-- Parsers: `Parser.parse`, `Parser.get_format_reward_func()` and its returned function; specialized parsers like `ThinkParser` and `XMLParser` methods
-
-You’ll see a hierarchical trace of rollouts and scoring for each example, with inputs, outputs, timing, token/cost (when model usage is available), and any parser/rubric sub-ops.
+Weave record inputs, outputs, and timestamps for each step so you can inspect how data transforms at every turn, debug complex multi‑round conversations, and optimize training results.
 
 ## Getting started
 
 Weave enables implicit patching by default. As long as you call `weave.init()` in your script, Verifiers will be auto-patched when imported.
+
+Install (uv recommended):
+
+```bash
+# Local dev / evaluation with API models
+uv add verifiers
+
+# Trainer + GPU support
+uv add 'verifiers[all]' && uv pip install flash-attn --no-build-isolation
+
+# Latest main branch
+uv add verifiers @ git+https://github.com/willccbb/verifiers.git
+```
 
 ```python
 import os
