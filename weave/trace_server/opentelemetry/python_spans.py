@@ -282,7 +282,7 @@ class Span:
         )
 
     def to_call(
-        self, project_id: str, wb_user_id: Optional[str]
+        self, project_id: str, wb_user_id: Optional[str] = None
     ) -> tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]:
         events = [SpanEvent(e.as_dict()) for e in self.events]
         usage = get_weave_usage(self.attributes) or {}
