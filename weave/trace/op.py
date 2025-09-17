@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import datetime
+
 import atexit
 import inspect
 import logging
@@ -461,6 +463,9 @@ def _call_sync_func(
                 call_context.pop_call(call.id)
 
     def on_output(output: Any) -> Any:
+        # Normalize naive datetimes to UTC so returned values match decoded refs
+        if isinstance(output, datetime.datetime) and output.tzinfo is None:
+            output = output.replace(tzinfo=datetime.timezone.utc)
         if handler := getattr(op, "_on_output_handler", None):
             return handler(output, finish, call.inputs)
 
@@ -604,6 +609,9 @@ async def _call_async_func(
                 call_context.pop_call(call.id)
 
     def on_output(output: Any) -> Any:
+        # Normalize naive datetimes to UTC so returned values match decoded refs
+        if isinstance(output, datetime.datetime) and output.tzinfo is None:
+            output = output.replace(tzinfo=datetime.timezone.utc)
         if handler := getattr(op, "_on_output_handler", None):
             return handler(output, finish, call.inputs)
 
