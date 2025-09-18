@@ -245,8 +245,8 @@ jobs:
 
   trace-tests:
     name: Trace nox tests
-    timeout-minutes: 30
-    runs-on: ubuntu-latest-16-cores
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         python-version-major: ["3"]
