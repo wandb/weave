@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import datetime
+
 import atexit
 import inspect
 import logging
@@ -34,7 +36,7 @@ from typing import (
 
 from typing_extensions import ParamSpec, TypeIs
 
-from weave.trace import box, settings
+from weave.trace import settings
 from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.context.call_context import (
@@ -461,6 +463,9 @@ def _call_sync_func(
                 call_context.pop_call(call.id)
 
     def on_output(output: Any) -> Any:
+        # Normalize naive datetimes to UTC so returned values match decoded refs
+        if isinstance(output, datetime.datetime) and output.tzinfo is None:
+            output = output.replace(tzinfo=datetime.timezone.utc)
         if handler := getattr(op, "_on_output_handler", None):
             return handler(output, finish, call.inputs)
 
@@ -508,7 +513,7 @@ def _call_sync_func(
         finish(exception=e)
         raise
 
-    res = box.box(res)
+    # No longer boxing results
     try:
         # Here we do a try/catch because we don't want to
         # break the user process if we trip up on processing
@@ -604,6 +609,9 @@ async def _call_async_func(
                 call_context.pop_call(call.id)
 
     def on_output(output: Any) -> Any:
+        # Normalize naive datetimes to UTC so returned values match decoded refs
+        if isinstance(output, datetime.datetime) and output.tzinfo is None:
+            output = output.replace(tzinfo=datetime.timezone.utc)
         if handler := getattr(op, "_on_output_handler", None):
             return handler(output, finish, call.inputs)
 
@@ -639,7 +647,7 @@ async def _call_async_func(
         finish(exception=e)
         raise
 
-    res = box.box(res)
+    # No longer boxing results
     try:
         # Here we do a try/catch because we don't want to
         # break the user process if we trip up on processing
@@ -790,8 +798,8 @@ def _call_sync_gen(
                         if current_call is None or current_call.id != call.id:
                             call_context.push_call(call)
 
-                        # Box the value
-                        boxed_value = box.box(value)
+                        # No longer boxing values
+                        boxed_value = value
 
                         # Accumulate if we have an accumulator
                         if acc:
@@ -1000,8 +1008,8 @@ async def _call_async_gen(
                         if current_call is None or current_call.id != call.id:
                             call_context.push_call(call)
 
-                        # Box the value
-                        boxed_value = box.box(value)
+                        # No longer boxing values
+                        boxed_value = value
 
                         # Accumulate if we have an accumulator
                         if acc:
