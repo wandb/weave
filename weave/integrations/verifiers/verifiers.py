@@ -1,12 +1,19 @@
 from __future__ import annotations
 
+import copy
 import importlib
 from functools import wraps
 from typing import Any, Callable
 
+from openai.types.chat.chat_completion import ChatCompletion
+from openai.types.completion import Completion
+from pydantic import BaseModel
+
 import weave
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
+
+ModelResponse = Completion | ChatCompletion
 
 _verifiers_patcher: MultiPatcher | None = None
 
@@ -23,6 +30,84 @@ def _verifiers_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
             }
         }
     return inputs
+
+
+def _remove_logprobs_from_responses(responses: list[Any]) -> list[Any]:
+    """Return a copy of responses with logprobs removed, without mutating originals."""
+    sanitized: list[Any] = []
+    for response in responses:
+        if isinstance(response, ModelResponse):
+            # Prefer pydantic v2 deep copy if available; fall back to deepcopy
+            try:
+                response_copy = response.model_copy(deep=True)  # type: ignore[attr-defined]
+            except Exception:
+                response_copy = copy.deepcopy(response)
+            # Strip logprobs from the copied response
+            for choice in getattr(response_copy, "choices", []) or []:
+                if hasattr(choice, "logprobs"):
+                    choice.logprobs = None
+            sanitized.append(response_copy)
+        else:
+            sanitized.append(response)
+    return sanitized
+
+
+def _verifiers_postprocess_outputs_no_logprobs(outputs: Any) -> Any:
+    """Return a logging-safe copy of outputs with logprobs removed.
+
+    IMPORTANT: Do not mutate the original outputs, as they are consumed by the
+    training pipeline which expects `logprobs` to be present.
+    """
+    if outputs is None:
+        return outputs
+
+    # Deep copy the entire outputs structure for logging only
+    try:
+        outputs_copy = (
+            outputs.model_copy(deep=True)  # type: ignore[attr-defined]
+            if isinstance(outputs, BaseModel)
+            else copy.deepcopy(outputs)
+        )
+    except Exception:
+        outputs_copy = copy.deepcopy(outputs)
+
+    if (
+        isinstance(outputs_copy, BaseModel)
+        and hasattr(outputs_copy, "state")
+        and isinstance(outputs_copy.state, list)
+    ):
+        for state_item in outputs_copy.state:
+            # ref: https://github.com/willccbb/verifiers/blob/37d7243703a38944be6e44fd4afe9b22c696b449/verifiers/types.py#L41
+            if isinstance(state_item, dict) and "responses" in state_item:
+                state_item["responses"] = _remove_logprobs_from_responses(
+                    state_item.get("responses", [])
+                )
+
+    return outputs_copy
+
+
+def _verifiers_postprocess_inputs_no_logprobs(inputs: dict[str, Any]) -> dict[str, Any]:
+    """Return a logging-safe copy of inputs with logprobs removed and normalized `self`.
+
+    Do not mutate original inputs to avoid affecting the live function call.
+    """
+    # First apply the standard input processing (which returns a new dict for logging)
+    processed_inputs = _verifiers_postprocess_inputs(inputs)
+
+    if "states" in processed_inputs and isinstance(processed_inputs["states"], list):
+        new_states: list[Any] = []
+        for state_item in processed_inputs["states"]:
+            if isinstance(state_item, dict) and "responses" in state_item:
+                new_item = dict(state_item)
+                new_item["responses"] = _remove_logprobs_from_responses(
+                    state_item.get("responses", [])
+                )
+                new_states.append(new_item)
+            else:
+                new_states.append(state_item)
+        processed_inputs["states"] = new_states
+
+    return processed_inputs
 
 
 def _verifiers_wrapper(settings: OpSettings) -> Callable:
@@ -125,16 +210,29 @@ def get_verifiers_patcher(
         }
     )
     evaluate_settings = base.model_copy(
-        update={"name": base.name or "verifiers.Environment.evaluate"}
+        update={
+            "name": base.name or "verifiers.Environment.evaluate",
+            "postprocess_output": _verifiers_postprocess_outputs_no_logprobs,
+        }
     )
     a_generate_settings = base.model_copy(
-        update={"name": base.name or "verifiers.Environment.a_generate"}
+        update={
+            "name": base.name or "verifiers.Environment.a_generate",
+            "postprocess_output": _verifiers_postprocess_outputs_no_logprobs,
+        }
     )
     generate_settings = base.model_copy(
-        update={"name": base.name or "verifiers.Environment.generate"}
+        update={
+            "name": base.name or "verifiers.Environment.generate",
+            "postprocess_output": _verifiers_postprocess_outputs_no_logprobs,
+        }
     )
     score_rollouts_settings = base.model_copy(
-        update={"name": base.name or "verifiers.Rubric.score_rollouts"}
+        update={
+            "name": base.name or "verifiers.Rubric.score_rollouts",
+            "postprocess_inputs": _verifiers_postprocess_inputs_no_logprobs,
+            "postprocess_output": _verifiers_postprocess_outputs_no_logprobs,
+        }
     )
     score_rollout_settings = base.model_copy(
         update={"name": base.name or "verifiers.Rubric.score_rollout"}

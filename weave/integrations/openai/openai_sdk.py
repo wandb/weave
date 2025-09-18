@@ -745,10 +745,14 @@ def get_openai_patcher(
     base = settings.op_settings
 
     completions_create_settings = base.model_copy(
-        update={"name": base.name or "openai.chat.completions.create"}
+        update={
+            "name": base.name or "openai.chat.completions.create",
+        }
     )
     async_completions_create_settings = base.model_copy(
-        update={"name": base.name or "openai.chat.completions.create"}
+        update={
+            "name": base.name or "openai.chat.completions.create",
+        }
     )
     completions_parse_settings = base.model_copy(
         update={"name": base.name or "openai.chat.completions.parse"}
