@@ -8,6 +8,8 @@ import logging
 from collections.abc import Iterator
 from typing import Any, Optional, Union, cast
 
+from typing_extensions import Self
+
 logger = logging.getLogger(__name__)
 
 try:
@@ -97,8 +99,8 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         )
 
     @classmethod
-    def from_env(cls, should_batch: bool = False) -> "RemoteHTTPTraceServer":
-        return RemoteHTTPTraceServer(weave_trace_server_url(), should_batch)
+    def from_env(cls, should_batch: bool = False) -> Self:
+        return cls(weave_trace_server_url(), should_batch)
 
     def set_auth(self, auth: tuple[str, str]) -> None:
         self._auth = auth
