@@ -10,7 +10,7 @@ from weave.type_wrappers import Content
 
 logger = logging.getLogger(__name__)
 
-CONTENT_CLASS_NAME = f"{Content.__module__}.{Content.__qualname__}"
+CONTENT_CLASS_NAME = f"{Content.__module__}.{Content.__qualname__}"  # type: ignore[attr-defined]
 
 # Content annotation with a nested Literal type
 # Example: "typing.Annotated[str, weave.type_handlers.Content.content.Content[Literal['pdf']]'>]"

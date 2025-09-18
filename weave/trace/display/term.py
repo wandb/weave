@@ -47,9 +47,9 @@ def configure_logger() -> None:
 
     # Add the handler to the logger
     logger.addHandler(console_handler)
-    # Only disable propagation in colab to avoid double output
-    if in_colab():
-        logger.propagate = False
+    # Disable propagation to avoid duplicate output when root logger also has handlers
+    # Tests capture both root and weave loggers; propagating causes double prints.
+    logger.propagate = False
 
     # Set the log level based on environment variable
     log_level = settings.log_level()
