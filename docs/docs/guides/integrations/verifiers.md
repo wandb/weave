@@ -1,16 +1,16 @@
 # Verifiers
 
-[Verifiers](https://github.com/willccbb/verifiers) is a library of modular components for creating RL environments and training LLM agents. Environments built with Verifiers can be used as LLM evaluations, synthetic data pipelines, agent harnesses for any OpenAI‑compatible endpoint, and for RL training.
+[Verifiers](https://github.com/willccbb/verifiers) is a library of modular components for creating RL environments and training LLM agents. Environments built with Verifiers can serve as LLM evaluations, synthetic data pipelines, agent harnesses for any OpenAI‑compatible endpoint, and RL training.
 
-With Weave, you get automatic tracing purpose‑built for Agentic RL workflows. Agentic RL involves multiple turns of conversations, tool invocations, and environment/user interactions during rollouts. Just tracking the loss, reward and other timeseries data points are not sufficient to efficiently debug this workflow.
+With Weave, you get automatic tracing purpose‑built for agentic RL workflows. Agentic RL involves multi‑turn conversations, tool invocations, and environment/user interactions during rollouts. Simply tracking loss, reward, and other time series metrics is not sufficient to debug these workflows efficiently.
 
-Weave record inputs, outputs, and timestamps for each step so you can inspect how data transforms at every turn, debug complex multi‑round conversations, and optimize training results.
+Weave records inputs, outputs, and timestamps for each step so you can inspect how data transforms at every turn, debug complex multi‑round conversations, and optimize training results.
+
+![verifiers wandb run page](imgs/verifiers/verifiers.gif)
 
 ## Getting started
 
-Weave enables implicit patching by default. As long as you call `weave.init()` in your script, Verifiers will be auto-patched when imported.
-
-Install (uv recommended):
+Install Verifiers:
 
 ```bash
 # Local dev / evaluation with API models
@@ -23,6 +23,18 @@ uv add 'verifiers[all]' && uv pip install flash-attn --no-build-isolation
 uv add verifiers @ git+https://github.com/willccbb/verifiers.git
 ```
 
+Install Weave and W&B:
+
+```bash
+uv pip install weave wandb
+```
+
+Weave enables implicit patching by default. Learn more about it [here](../integrations/index.md).
+
+### Trace rollouts and evaluate
+
+Run a small evaluation on a `SingleTurnEnv` and inspect the trace in Weave.
+
 ```python
 import os
 from openai import OpenAI
@@ -33,9 +45,6 @@ os.environ["OPENAI_API_KEY"] = "<YOUR-OPENAI-API-KEY>"
 
 # Initialize Weave
 weave.init("verifiers_demo")
-
-# Optional: explicit patch if you disabled implicit patching
-# weave.integrations.patch_verifiers()
 
 # Minimal single-turn environment
 dataset = vf.load_example_dataset("gsm8k", split="train").select(range(2))
@@ -58,40 +67,54 @@ client = OpenAI()
 results = env.evaluate(
     client, "gpt-4.1-mini", num_examples=2, rollouts_per_example=2, max_concurrent=8
 )
-
-print(results.metrics)
 ```
 
-## Multi-turn with tools
+### Fine-tune a model with experiment tracking and tracing
 
-```python
-import verifiers as vf
+The true potential of Weave traces shows up during RL fine‑tuning. Pair traces with W&B runs to unlock rich charts, tables, and comparisons alongside step‑level detail. To log metrics, configs, artifacts, and traces, simply `import wandb; wandb.init(...)`.
 
-def calculate(expression: str) -> float:
-    return eval(expression)
+The `verifiers` repository includes ready‑to‑run [examples](https://github.com/willccbb/verifiers/tree/main/examples/grpo) to help you get started.
 
-parser = vf.ThinkParser()
-rubric = vf.Rubric(funcs=[parser.get_format_reward_func()])
+1. Install the framework from source:
 
-dataset = vf.load_example_dataset("gsm8k", split="test").select(range(1))
-
-env = vf.ToolEnv(
-    dataset=dataset,
-    tools=[calculate],
-    parser=parser,
-    rubric=rubric,
-)
-
-# Now run env.evaluate(...) as above; Weave will trace tool calls and env responses
+```bash
+git clone https://github.com/willccbb/verifiers
+cd verifiers
+uv sync --all-extras && uv pip install flash-attn --no-build-isolation
 ```
 
-## Tips
+2. Install an off-the-shelf environment:
 
-- Traces will omit `logprobs` in logged copies to keep payloads small while leaving originals intact for training.
-- For larger runs, use Verifiers async generation (`a_generate`) and increase `max_concurrent` to speed up logging and evaluation.
-- Combine Weave’s comparison tools to compare Verifiers evaluations over time or across models.
+```bash
+vf-install gsm8k --from-repo
+```
+
+3. Train your model.
+
+The example sets `report_to=wandb` by default, so you don't need to call `wandb.init` separately. You'll be prompted to authenticate this machine to log metrics to W&B.
+
+```bash
+# inference (shell 0)
+CUDA_VISIBLE_DEVICES=0 vf-vllm --model willcb/Qwen3-0.6B --enforce-eager --disable-log-requests
+
+# training (shell 1)
+CUDA_VISIBLE_DEVICES=1 accelerate launch --num-processes 1 --config-file configs/zero3.yaml examples/grpo/train_gsm8k.py
+```
+
+:::note
+We tested the example on 2xH100s. The following settings of env vars helped run it successfully. You might not need it but sharing in case you run into NCCL errors.
+
+```bash
+# In BOTH shells (server and trainer) before launch
+export NCCL_CUMEM_ENABLE=0
+export NCCL_CUMEM_HOST_ENABLE=0
+```
+:::
+
+:::info
+Traces will omit `logprobs` for the `Environment.a_generate` and `Rubric.score_rollouts` methods. This is done to keep payloads small while leaving originals intact for training.
+:::
 
 ## See also
 
-- Verifiers docs: [Overview](https://verifiers.readthedocs.io/en/latest/), [Environments](https://verifiers.readthedocs.io/en/latest/environments.html), [Training](https://verifiers.readthedocs.io/en/latest/training.html)
-
+Verifiers has first‑class integration with W&B Models. See [Monitoring](https://verifiers.readthedocs.io/en/latest/training.html#monitoring) to learn more.
