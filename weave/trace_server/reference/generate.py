@@ -197,7 +197,7 @@ def generate_routes(
                     "application/jsonl": {
                         "schema": {
                             "type": "array",
-                            "items": {"$ref": "#/components/schemas/Schema"},
+                            "items": {"$ref": "#/components/schemas/CallSchema"},
                         }
                     }
                 },
@@ -279,7 +279,7 @@ def generate_routes(
                     "application/jsonl": {
                         "schema": {
                             "type": "array",
-                            "items": {"$ref": "#/components/schemas/Schema"},
+                            "items": {"$ref": "#/components/schemas/CallSchema"},
                         }
                     }
                 },
