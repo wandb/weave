@@ -105,6 +105,8 @@ class Evaluation(Object):
     preprocess_model_input: Optional[PreprocessModelInput] = None
     trials: int = 1
 
+    attributes: Optional[dict[str, Any]] = None
+
     # Custom evaluation name for display in the UI.  This is the same API as passing a
     # custom `call_display_name` to `weave.op` (see that for more details).
     evaluation_name: Optional[Union[str, CallDisplayNameFunc]] = None
