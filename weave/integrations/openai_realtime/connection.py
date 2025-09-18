@@ -1,5 +1,7 @@
+import atexit
 import json
 import logging
+import threading
 import uuid
 from typing import Any
 
@@ -36,6 +38,24 @@ def _try_json_load(data: Any) -> Any:
 
 class WeaveMediaConnection:
     _weave_initialized = True
+    # Global config set by patcher
+    _finish_timeout_seconds: float | None = 3.0
+    _skip_on_exit: bool = False
+
+    @classmethod
+    def _configure_finish_behavior(cls, finish_timeout: float | None) -> None:
+        # None => skip on_exit entirely
+        if finish_timeout is None:
+            cls._skip_on_exit = True
+            cls._finish_timeout_seconds = None
+            return
+        try:
+            cls._finish_timeout_seconds = float(finish_timeout)
+            cls._skip_on_exit = False
+        except Exception:
+            # Fall back to default
+            cls._finish_timeout_seconds = 3.0
+            cls._skip_on_exit = False
 
     def __init__(
         self,
@@ -79,6 +99,14 @@ class WeaveMediaConnection:
             **kwargs,
         )
         self.ws.send = self._wrap_sender(self.ws.send)
+        # Ensure on-exit runs if process exits abruptly
+        self._exit_ran = False
+        self._atexit_registered = False
+        try:
+            atexit.register(self._run_exit_handler_once)
+            self._atexit_registered = True
+        except Exception:
+            pass
 
     def _wrap_sender(self, sender: Any) -> Any:
         def wrapper(
@@ -96,11 +124,20 @@ class WeaveMediaConnection:
 
     def _wrap_handler(self, name: str, handler: Any) -> Any:
         if handler is None:
+            # If this is an on_close handler, still run our exit logic
+            if name == "on_close":
+                def _default_on_close(*_args: Any, **_kwargs: Any) -> None:
+                    self._run_exit_handler_once()
+                return _default_on_close
             return None
 
         def wrapper(*args: Any, **kwargs: Any) -> Any:
             # The first argument is always the websocket instance, so we skip it
-            return handler(*args, **kwargs)
+            try:
+                return handler(*args, **kwargs)
+            finally:
+                if name == "on_close":
+                    self._run_exit_handler_once()
 
         return wrapper
 
@@ -131,7 +168,10 @@ class WeaveMediaConnection:
         self.ws.run_forever(**kwargs)
 
     def close(self, **kwargs: Any) -> Any:
-        self.ws.close(**kwargs)
+        try:
+            return self.ws.close(**kwargs)
+        finally:
+            self._run_exit_handler_once()
 
     def get_session(self) -> Any:
         """Convenience: return the current Session state from the conversation manager."""
@@ -139,6 +179,35 @@ class WeaveMediaConnection:
 
     def get_conversation_manager(self) -> ConversationManager:
         return self.conversation_manager
+
+    # ---- Exit handling ----
+    def _run_exit_handler_once(self) -> None:
+        if getattr(self, "_exit_ran", False):
+            return
+        self._exit_ran = True
+        try:
+            # Optionally skip on_exit entirely
+            if self._skip_on_exit:
+                return
+
+            timeout = self._finish_timeout_seconds
+            def _target() -> None:
+                try:
+                    self.conversation_manager.state.on_exit()
+                except Exception:
+                    logger.exception("Error in realtime on_exit handler")
+
+            t = threading.Thread(target=_target, name="WeaveRealtimeOnExit", daemon=True)
+            t.start()
+            # If timeout is None, treat as immediate return
+            if isinstance(timeout, (int, float)) and timeout is not None:
+                t.join(timeout=float(timeout))
+        finally:
+            # Stop the worker thread promptly
+            try:
+                self.conversation_manager._stop_worker_thread()
+            except Exception:
+                pass
 
 
 class WebSocketApp(WeaveMediaConnection):
@@ -152,6 +221,11 @@ class WeaveAsyncWebsocketConnection:
         self.original_connection = original_connection
         self.id = str(uuid.uuid4())
         self.conversation_manager = ConversationManager()
+        self._exit_ran = False
+        try:
+            atexit.register(self._run_exit_handler_once)
+        except Exception:
+            pass
 
     async def send(self, *args: Any, **kwargs: Any) -> None:
         data = args[0] if args else None
@@ -173,6 +247,12 @@ class WeaveAsyncWebsocketConnection:
             self.conversation_manager.process_event(typed_message)
         return data
 
+    async def close(self, *args: Any, **kwargs: Any) -> Any:
+        try:
+            return await self.original_connection.close(*args, **kwargs)
+        finally:
+            self._run_exit_handler_once()
+
     def __aiter__(self) -> Any:
         return self
 
@@ -193,11 +273,39 @@ class WeaveAsyncWebsocketConnection:
             return self.send
         if name == "recv":
             return self.recv
+        if name == "close":
+            return self.close
         if name == "get_session":
             return self.get_session
         if name == "get_conversation_manager":
             return self.get_conversation_manager
         return getattr(self.original_connection, name)
+
+    # ---- Exit handling ----
+    def _run_exit_handler_once(self) -> None:
+        if getattr(self, "_exit_ran", False):
+            return
+        self._exit_ran = True
+        try:
+            timeout = WeaveMediaConnection._finish_timeout_seconds
+            if WeaveMediaConnection._skip_on_exit:
+                return
+
+            def _target() -> None:
+                try:
+                    self.conversation_manager.state.on_exit()
+                except Exception:
+                    logger.exception("Error in realtime on_exit handler")
+
+            t = threading.Thread(target=_target, name="WeaveRealtimeOnExit", daemon=True)
+            t.start()
+            if isinstance(timeout, (int, float)) and timeout is not None:
+                t.join(timeout=float(timeout))
+        finally:
+            try:
+                self.conversation_manager._stop_worker_thread()
+            except Exception:
+                pass
 
 
 class WeaveAiohttpWebsocketConnection:
@@ -209,6 +317,11 @@ class WeaveAiohttpWebsocketConnection:
         self.original_ws = original_ws
         self.id = str(uuid.uuid4())
         self.conversation_manager = ConversationManager()
+        self._exit_ran = False
+        try:
+            atexit.register(self._run_exit_handler_once)
+        except Exception:
+            pass
 
     async def send_str(self, data: str, *args: Any, **kwargs: Any) -> None:
         parsed_data = _try_json_load(data)
@@ -251,7 +364,10 @@ class WeaveAiohttpWebsocketConnection:
         return msg
 
     async def close(self, *args: Any, **kwargs: Any) -> Any:
-        return await self.original_ws.close(*args, **kwargs)
+        try:
+            return await self.original_ws.close(*args, **kwargs)
+        finally:
+            self._run_exit_handler_once()
 
     def __aiter__(self) -> Any:
         return self
@@ -271,3 +387,38 @@ class WeaveAiohttpWebsocketConnection:
     def __getattr__(self, name: str) -> Any:
         # Delegate all other attributes to the original websocket
         return getattr(self.original_ws, name)
+
+    # ---- Exit handling ----
+    def _run_exit_handler_once(self) -> None:
+        if getattr(self, "_exit_ran", False):
+            return
+        self._exit_ran = True
+        try:
+            # Leverage the same class-level config as sync connection
+            timeout = WeaveMediaConnection._finish_timeout_seconds
+            if WeaveMediaConnection._skip_on_exit:
+                return
+
+            def _target() -> None:
+                try:
+                    self.conversation_manager.state.on_exit()
+                except Exception:
+                    logger.exception("Error in realtime on_exit handler")
+
+            t = threading.Thread(target=_target, name="WeaveRealtimeOnExit", daemon=True)
+            t.start()
+            if isinstance(timeout, (int, float)) and timeout is not None:
+                t.join(timeout=float(timeout))
+        finally:
+            try:
+                self.conversation_manager._stop_worker_thread()
+            except Exception:
+                pass
+
+# ---- Module-level configuration API called by the patcher ----
+def configure_realtime_finish_timeout(value: float | None) -> None:
+    try:
+        WeaveMediaConnection._configure_finish_behavior(value)
+    except Exception:
+        # Best-effort; leave defaults
+        logger.exception("Failed to set realtime finish timeout; keeping defaults")
