@@ -24,9 +24,14 @@ class OpenAIRealtimeSettings(IntegrationSettings):
         enabled: Whether the integration is enabled at all
         op_settings: Operation settings for traced functions
         patch_websockets: Whether to globally patch websocket modules (default: True)
+        finish_timeout: Maximum seconds to wait for realtime exit handler.
+            - float value N: run on_exit and wait up to N seconds (default: 3.0)
+            - None: skip on_exit and exit immediately
     """
 
     patch_websockets: bool = True
+    # Default to 3 seconds; None means skip exit handling
+    finish_timeout: float | None = 3.0
 
 
 def get_openai_realtime_websocket_patcher(
@@ -41,6 +46,17 @@ def get_openai_realtime_websocket_patcher(
             return NoOpPatcher()
     elif not settings.enabled:
         return NoOpPatcher()
+
+    # Configure connection-level graceful-exit behavior
+    try:
+        # Import late to avoid circulars at module import time
+        from weave.integrations.openai_realtime import connection as _conn
+        if isinstance(settings, OpenAIRealtimeSettings):
+            _conn.configure_realtime_finish_timeout(settings.finish_timeout)
+        else:
+            _conn.configure_realtime_finish_timeout(3.0)
+    except Exception:
+        logger.exception("Failed to configure realtime finish timeout; using default")
 
     global _websocket_patcher
     if _websocket_patcher is not None:

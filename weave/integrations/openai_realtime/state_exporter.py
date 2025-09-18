@@ -104,10 +104,11 @@ class ItemRegistry:
 class StateExporter(BaseModel):
     model_config = {"arbitrary_types_allowed": True}
     session_span: Optional[SessionSpan] = None
-    conversation_calls: dict[str, Call] = {}
-
-    conversation_responses: dict[models.ConversationID, list[models.ResponseID]]
-
+    # Map conversation -> response ids
+    conversation_responses: dict[models.ConversationID, list[models.ResponseID]] = Field(
+        default_factory=dict
+    )
+    # Map conversation -> call
     conversation_calls: dict[models.ConversationID, Call] = Field(default_factory=dict)
     timeline: list[Union[models.ItemID, models.ResponseID]] = Field(
         default_factory=list
@@ -143,7 +144,9 @@ class StateExporter(BaseModel):
     response_calls: dict[models.ResponseID, Call] = Field(default_factory=dict)
     responses: dict[models.ResponseID, models.Response] = Field(default_factory=dict)
     # Deprecated: per-response debounce timers caused out-of-order completions
-    debounce_timers: dict[models.ResponseID, threading.Timer] = {}
+    debounce_timers: dict[models.ResponseID, threading.Timer] = Field(
+        default_factory=dict
+    )
 
     # FIFO completion control to ensure responses finish in submission order
     completion_queue: list[models.ResponseID] = Field(default_factory=list)
@@ -569,7 +572,8 @@ class StateExporter(BaseModel):
                 if not item:
                     break
                 items.append(item)
-                next_item_id = self.next_by_item.get(item_id)
+                next_item_id = self.next_by_item.get(item.id)
+                print(next_item_id)
             return items
 
         for call in self.conversation_calls.values():
