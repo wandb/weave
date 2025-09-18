@@ -216,7 +216,7 @@ def _set_on_finish_handler(func: Op, on_finish: OnFinishHandlerType) -> None:
 
 
 def _is_unbound_method(func: Callable) -> bool:
-    """Check if a function is a function defined on a class (an "unbound" method)
+    """Check if a function is a function defined on a class (an "unbound" method).
 
     In python3, the "unbound" method is just a function, but that distinction is
     not enough for our decorator because it needs to operate on both regular funcs
@@ -1095,8 +1095,7 @@ def call(
     __require_explicit_finish: bool = False,
     **kwargs: Any,
 ) -> tuple[Any, Call] | Coroutine[Any, Any, tuple[Any, Call]]:
-    """
-    Executes the op and returns both the result and a Call representing the execution.
+    """Executes the op and returns both the result and a Call representing the execution.
 
     This function will never raise.  Any errors are captured in the Call object.
 
@@ -1132,8 +1131,7 @@ def call(
 
 
 def calls(op: Op) -> CallsIter:
-    """
-    Get an iterator over all calls to this op.
+    """Get an iterator over all calls to this op.
 
     This method is automatically bound to any function decorated with `@weave.op`,
     allowing for usage like:
@@ -1195,8 +1193,7 @@ def op(
     enable_code_capture: bool = True,
     accumulator: Callable[[Any | None, Any], Any] | None = None,
 ) -> Callable[[Callable[P, R]], Op[P, R]] | Op[P, R]:
-    """
-    A decorator to weave op-ify a function or method. Works for both sync and async.
+    """A decorator to weave op-ify a function or method. Works for both sync and async.
     Automatically detects iterator functions and applies appropriate behavior.
     """
     if not isinstance(tracing_sample_rate, (int, float)):
@@ -1329,7 +1326,7 @@ def get_captured_code(op: Op) -> str:
 
 
 def maybe_bind_method(func: Callable, self: Any = None) -> Callable | MethodType:
-    """Bind a function to any object (even if it's not a class)
+    """Bind a function to any object (even if it's not a class).
 
     If self is None, return the function as is.
     """

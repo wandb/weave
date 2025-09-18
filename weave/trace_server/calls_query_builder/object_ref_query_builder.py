@@ -1,5 +1,4 @@
-"""
-Object reference query builder for call queries. Calls can log basic payloads, which
+"""Object reference query builder for call queries. Calls can log basic payloads, which
 appear as text in the inputs/outpt, but objects and table rows are saved to the
 object_versions and table_rows tables with a ref in the call field. Example:
 
@@ -83,7 +82,7 @@ MAX_CTES_PER_QUERY = 10
 
 
 class ObjectRefCondition(BaseModel):
-    """Base class for object reference conditions"""
+    """Base class for object reference conditions."""
 
     field_path: str
     expand_columns: list[str]
@@ -118,7 +117,7 @@ class ObjectRefCondition(BaseModel):
     def get_object_property_path(self) -> str:
         """Get the property path within the object (after the shortest expand column)
         this represents the path that contains object references that need to be expanded
-        e.g. "inputs.model.config.temperature.val" -> "config.temperature.val"
+        e.g. "inputs.model.config.temperature.val" -> "config.temperature.val".
 
         where expand_columns = ["inputs.model", "inputs.model.config"]
         """
@@ -130,7 +129,7 @@ class ObjectRefCondition(BaseModel):
     def get_leaf_object_property_path(self) -> str:
         """Get the property path within the object (after the longest expand column)
         this represents the path that **doesn't** contain object references
-        e.g. "inputs.model.config.temperature.val" -> "temperature.val"
+        e.g. "inputs.model.config.temperature.val" -> "temperature.val".
 
         where expand_columns = ["inputs.model", "inputs.model.config"]
         """
@@ -140,14 +139,13 @@ class ObjectRefCondition(BaseModel):
         return self.field_path
 
     def get_root_field(self) -> str:
-        """Get the root field name (e.g., 'inputs_dump' from 'inputs.model.config.temperature')"""
+        """Get the root field name (e.g., 'inputs_dump' from 'inputs.model.config.temperature')."""
         field_parts = self.field_path.split(".")
         root = field_parts[0] + "_dump"
         return root
 
     def get_intermediate_object_refs(self) -> list[str]:
-        """
-        Get the intermediate object reference property paths between the shortest and longest expand columns.
+        """Get the intermediate object reference property paths between the shortest and longest expand columns.
 
         Args:
             condition: The object reference condition
@@ -187,8 +185,7 @@ class ObjectRefCondition(BaseModel):
         return intermediate_refs
 
     def get_accessor_key(self) -> str:
-        """
-        Get the JSON accessor key for this objects *first* ref
+        """Get the JSON accessor key for this objects *first* ref.
 
         This extracts the key that should be used in JSON_VALUE operations to access
         the object reference within the root field's JSON structure. This is non trivial
@@ -225,8 +222,7 @@ class ObjectRefCondition(BaseModel):
     @property
     @abstractmethod
     def unique_key(self) -> str:
-        """
-        Map a unique condition key to the final CTE name.
+        """Map a unique condition key to the final CTE name.
         Must be implemented by child classes.
 
         Returns:
@@ -242,8 +238,7 @@ class ObjectRefCondition(BaseModel):
         use_agg_fn: bool = True,
         is_order_join: bool = False,
     ) -> str:
-        """
-        Generate SQL condition for this object reference condition.
+        """Generate SQL condition for this object reference condition.
 
         Args:
             pb: Parameter builder for SQL parameters
@@ -292,16 +287,15 @@ class ObjectRefCondition(BaseModel):
 
 
 class ObjectRefFilterCondition(ObjectRefCondition):
-    """Represents a condition that filters on object references"""
+    """Represents a condition that filters on object references."""
 
     operation_type: str
     value: Union[str, int, float, bool, list, dict, None]
 
     @property
     def unique_key(self) -> str:
-        """
-        Map a unique condition key to the final CTE name.
-        Use field_path + operation + value to create unique key for each condition
+        """Map a unique condition key to the final CTE name.
+        Use field_path + operation + value to create unique key for each condition.
 
         Returns:
             str: A unique key identifying this condition
@@ -310,12 +304,11 @@ class ObjectRefFilterCondition(ObjectRefCondition):
 
 
 class ObjectRefOrderCondition(ObjectRefCondition):
-    """Represents an order condition on object references"""
+    """Represents an order condition on object references."""
 
     @property
     def unique_key(self) -> str:
-        """
-        Map a unique condition key to the final CTE name.
+        """Map a unique condition key to the final CTE name.
         For ordering, we only need the field path since we include all objects.
 
         Returns:
@@ -325,8 +318,7 @@ class ObjectRefOrderCondition(ObjectRefCondition):
 
 
 class ObjectRefConditionHandler:
-    """
-    Handles the creation of SQL conditions for object reference filtering.
+    """Handles the creation of SQL conditions for object reference filtering.
 
     This class encapsulates the logic for building SQL conditions for different
     operation types while reducing code duplication.
@@ -339,8 +331,7 @@ class ObjectRefConditionHandler:
     def _create_json_extract_expression(
         self, conversion_type: Optional[tsi_query.CastTo] = None
     ) -> str:
-        """
-        Creates a JSON_VALUE expression with optional type conversion.
+        """Creates a JSON_VALUE expression with optional type conversion.
 
         Args:
             conversion_type: Optional type to convert the extracted value to
@@ -364,8 +355,7 @@ class ObjectRefConditionHandler:
         return json_extract
 
     def _create_filter_param(self, value: Any) -> tuple[str, str]:
-        """
-        Creates a filter parameter and determines its type.
+        """Creates a filter parameter and determines its type.
 
         Args:
             value: The value to create a parameter for
@@ -386,8 +376,7 @@ class ObjectRefConditionHandler:
     def handle_comparison_operation(
         self, condition: ObjectRefFilterCondition, operator: str
     ) -> str:
-        """
-        Handle simple binary operations (=, >, >=) for object references.
+        """Handle simple binary operations (=, >, >=) for object references.
 
         Args:
             condition: The object reference filter condition
@@ -402,8 +391,7 @@ class ObjectRefConditionHandler:
         return f"{json_extract} {operator} {param_slot(filter_param, filter_type)}"
 
     def handle_contains_operation(self, condition: ObjectRefFilterCondition) -> str:
-        """
-        Handle contains operations for object references.
+        """Handle contains operations for object references.
 
         Args:
             condition: The object reference filter condition
@@ -420,8 +408,7 @@ class ObjectRefConditionHandler:
             return f"{json_extract} LIKE {param_slot(filter_param, 'String')}"
 
     def handle_in_operation(self, condition: ObjectRefFilterCondition) -> str:
-        """
-        Handle IN operations for object references.
+        """Handle IN operations for object references.
 
         Args:
             condition: The object reference filter condition
@@ -443,8 +430,7 @@ class ObjectRefConditionHandler:
 
 
 class ObjectRefQueryProcessor:
-    """
-    Processes query operands for object reference conditions.
+    """Processes query operands for object reference conditions.
 
     This class handles the recursive processing of query operands to identify
     and transform object reference conditions into appropriate SQL.
@@ -521,7 +507,7 @@ class ObjectRefQueryProcessor:
 
 
 class ObjectRefFilterToCTEProcessor(QueryOptimizationProcessor):
-    """Processes a calls query to identify and transform object reference conditions"""
+    """Processes a calls query to identify and transform object reference conditions."""
 
     def __init__(self, pb: "ParamBuilder", table_alias: str, expand_columns: list[str]):
         self.pb = pb
@@ -531,7 +517,7 @@ class ObjectRefFilterToCTEProcessor(QueryOptimizationProcessor):
         self.field_to_cte_map: dict[str, str] = {}  # Maps field paths to CTE names
 
     def _is_object_ref_field(self, field_path: str) -> bool:
-        """Check if this field path is an object ref based on expand_columns"""
+        """Check if this field path is an object ref based on expand_columns."""
         for expand_col in self.expand_columns:
             if field_path.startswith(expand_col + "."):
                 return True
@@ -540,8 +526,7 @@ class ObjectRefFilterToCTEProcessor(QueryOptimizationProcessor):
     def _extract_field_operand(
         self, operand: "tsi_query.Operand"
     ) -> tuple[Optional["tsi_query.GetFieldOperator"], Optional[str]]:
-        """
-        Extract field operand and conversion type from an operand.
+        """Extract field operand and conversion type from an operand.
 
         Returns:
             tuple: (field_operand, conversion_type) or (None, None) if not extractable
@@ -563,8 +548,7 @@ class ObjectRefFilterToCTEProcessor(QueryOptimizationProcessor):
         operation_type: str,
         **kwargs: Any,
     ) -> Optional[str]:
-        """
-        Process binary operations (eq, gt, gte) with common logic.
+        """Process binary operations (eq, gt, gte) with common logic.
 
         Args:
             operands: Tuple of operands from the operation
@@ -607,12 +591,12 @@ class ObjectRefFilterToCTEProcessor(QueryOptimizationProcessor):
         return None
 
     def process_eq(self, operation: tsi_query.EqOperation) -> Optional[str]:
-        """Process equality operation for object refs"""
+        """Process equality operation for object refs."""
         self._process_binary_operation(operation.eq_, "eq")
         return None
 
     def process_contains(self, operation: tsi_query.ContainsOperation) -> Optional[str]:
-        """Process contains operation for object refs"""
+        """Process contains operation for object refs."""
         if isinstance(operation.contains_.input, tsi_query.GetFieldOperator):
             field_path = operation.contains_.input.get_field_
             if self._is_object_ref_field(field_path) and isinstance(
@@ -629,17 +613,17 @@ class ObjectRefFilterToCTEProcessor(QueryOptimizationProcessor):
         return None
 
     def process_gt(self, operation: tsi_query.GtOperation) -> Optional[str]:
-        """Process greater than operation for object refs"""
+        """Process greater than operation for object refs."""
         self._process_binary_operation(operation.gt_, "gt")
         return None
 
     def process_gte(self, operation: tsi_query.GteOperation) -> Optional[str]:
-        """Process greater than or equal operation for object refs"""
+        """Process greater than or equal operation for object refs."""
         self._process_binary_operation(operation.gte_, "gte")
         return None
 
     def process_in(self, operation: tsi_query.InOperation) -> Optional[str]:
-        """Process in operation for object refs"""
+        """Process in operation for object refs."""
         if isinstance(operation.in_[0], tsi_query.GetFieldOperator):
             field_path = operation.in_[0].get_field_
             if self._is_object_ref_field(field_path):
@@ -661,7 +645,7 @@ class ObjectRefFilterToCTEProcessor(QueryOptimizationProcessor):
 
 
 def _get_cte_name(i: int) -> tuple[str, int]:
-    """Generate a unique CTE name for this condition"""
+    """Generate a unique CTE name for this condition."""
     return f"obj_filter_{i}", i + 1
 
 
@@ -670,8 +654,7 @@ def build_object_ref_ctes(
     project_id: str,
     object_ref_conditions: list[ObjectRefCondition],
 ) -> tuple[str, dict[str, str]]:
-    """
-    Build CTEs (Common Table Expressions) for object reference filtering and ordering.
+    """Build CTEs (Common Table Expressions) for object reference filtering and ordering.
 
     This function creates CTEs that check both object_versions and table_rows tables,
     unioning the results to ensure we don't miss data regardless of which table contains it.
@@ -861,8 +844,7 @@ def _build_intermediate_cte_sql(
 
 
 def has_object_ref_field(field_path: str, expand_columns: list[str]) -> bool:
-    """
-    Check if an order field references object fields based on expand_columns.
+    """Check if an order field references object fields based on expand_columns.
 
     Args:
         field_path: The field path to check (e.g., "inputs.model.temperature")
@@ -880,8 +862,7 @@ def has_object_ref_field(field_path: str, expand_columns: list[str]) -> bool:
 def is_object_ref_operand(
     operand: "tsi_query.Operand", expand_columns: list[str]
 ) -> bool:
-    """
-    Check if an operand references object fields based on expand_columns.
+    """Check if an operand references object fields based on expand_columns.
 
     Args:
         operand: The operand to check
@@ -928,8 +909,7 @@ def process_query_for_object_refs(
     table_alias: str,
     expand_columns: list[str],
 ) -> list[ObjectRefCondition]:
-    """
-    Process a query to identify and extract object reference conditions.
+    """Process a query to identify and extract object reference conditions.
 
     Returns:
         - List of object ref conditions that were extracted
@@ -948,8 +928,7 @@ def get_all_object_ref_conditions(
     order_fields: list["OrderField"],
     expand_columns: list[str],
 ) -> list[ObjectRefCondition]:
-    """
-    Get all object reference conditions from a list of conditions.
+    """Get all object reference conditions from a list of conditions.
 
     Args:
         conditions: List of conditions to process

@@ -11,6 +11,7 @@ SUPPORTED_PYTHON_VERSIONS = ["3.9", "3.10", "3.11", "3.12", "3.13"]
 PY313_INCOMPATIBLE_SHARDS = [
     "cohere",
     "notdiamond",
+    "verifiers_test",
 ]
 PY39_INCOMPATIBLE_SHARDS = [
     "crewai",
@@ -20,6 +21,10 @@ PY39_INCOMPATIBLE_SHARDS = [
     "dspy",
     "autogen_tests",
     "langchain",
+    "verifiers_test",
+]
+PY310_INCOMPATIBLE_SHARDS = [
+    "verifiers_test",
 ]
 NUM_TRACE_SERVER_SHARDS = 4
 
@@ -97,6 +102,7 @@ trace_server_shards = [f"trace{i}" for i in range(1, NUM_TRACE_SERVER_SHARDS + 1
         "smolagents",
         "mcp",
         "verdict",
+        "verifiers_test",
         "autogen_tests",
         "trace",
         *trace_server_shards,
@@ -109,6 +115,9 @@ def tests(session, shard):
 
     if session.python.startswith("3.9") and shard in PY39_INCOMPATIBLE_SHARDS:
         session.skip(f"Skipping {shard=} as it is not compatible with Python 3.9")
+
+    if session.python.startswith("3.10") and shard in PY310_INCOMPATIBLE_SHARDS:
+        session.skip(f"Skipping {shard=} as it is not compatible with Python 3.10")
 
     session.install("-e", f".[{shard},test]")
     session.chdir("tests")
@@ -156,6 +165,7 @@ def tests(session, shard):
         "mistral": ["integrations/mistral/"],
         "scorers": ["scorers/"],
         "autogen_tests": ["integrations/autogen/"],
+        "verifiers_test": ["integrations/verifiers/"],
         "trace": ["trace/"],
         **{shard: ["trace/"] for shard in trace_server_shards},
         "trace_no_server": ["trace/"],
@@ -201,9 +211,31 @@ def tests(session, shard):
     if shard == "trace_no_server":
         pytest_args.extend(["-m", "not trace_server"])
 
-    session.run(
-        *pytest_args,
-        *session.posargs,
-        *test_dirs,
-        env=env,
+    if shard == "verifiers_test":
+        # Pinning to this commit because the latest version of the gsm8k environment is broken.
+        session.install(
+            "git+https://github.com/willccbb/verifiers.git@b4d851db42cebbab2358b827fd0ed19773631937#subdirectory=environments/gsm8k"
+        )
+
+    # Check if posargs contains test files (ending with .py or containing :: for specific tests)
+    has_test_files = any(
+        arg.endswith(".py") or "::" in arg
+        for arg in session.posargs
+        if not arg.startswith("-")
     )
+
+    # If specific test files are provided, don't add default test directories
+    if has_test_files:
+        session.run(
+            *pytest_args,
+            *session.posargs,
+            env=env,
+        )
+    else:
+        # Include default test directories when no specific files are provided
+        session.run(
+            *pytest_args,
+            *session.posargs,
+            *test_dirs,
+            env=env,
+        )

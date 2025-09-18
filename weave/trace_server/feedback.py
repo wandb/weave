@@ -53,8 +53,7 @@ TABLE_FEEDBACK = Table(
 def process_feedback_payload(
     feedback_req: tsi.FeedbackCreateReq,
 ) -> dict[str, Any]:
-    """
-    Process feedback payload and return the processed payload.
+    """Process feedback payload and return the processed payload.
 
     Args:
         feedback_req: The feedback create request.
@@ -206,8 +205,7 @@ def format_feedback_to_row(
     feedback_req: tsi.FeedbackCreateReq,
     processed_payload: dict[str, Any],
 ) -> Row:
-    """
-    Create a feedback row from a feedback request and processed payload.
+    """Create a feedback row from a feedback request and processed payload.
 
     Args:
         feedback_req: The feedback create request.

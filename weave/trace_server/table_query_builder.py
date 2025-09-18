@@ -17,8 +17,7 @@ def make_natural_sort_table_query(
     offset: Optional[int] = None,
     natural_direction: str = "ASC",
 ) -> str:
-    """
-    Generate a query for natural sorting of table rows.
+    """Generate a query for natural sorting of table rows.
     This query is optimized for performance when sorting by the original row order.
     """
     project_id_name = pb.add_param(project_id)
@@ -69,8 +68,7 @@ def make_standard_table_query(
     limit: Optional[int] = None,
     offset: Optional[int] = None,
 ) -> str:
-    """
-    Generate a standard query for table rows with custom sorting and filtering.
+    """Generate a standard query for table rows with custom sorting and filtering.
     This query is more flexible but may be less performant than the natural sort query.
     """
     project_id_name = pb.add_param(project_id)

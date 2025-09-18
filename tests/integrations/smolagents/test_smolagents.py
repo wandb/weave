@@ -1,9 +1,45 @@
 import os
+from collections.abc import Generator
 from typing import Optional
 
 import pytest
 
+import weave.integrations.huggingface.huggingface_inference_client_sdk as hf_sdk
+import weave.integrations.openai.openai_sdk as openai_sdk
+import weave.integrations.smolagents.smolagents_sdk as smolagents_sdk
+from weave.integrations.huggingface.huggingface_inference_client_sdk import (
+    get_huggingface_patcher,
+)
 from weave.integrations.integration_utilities import op_name_from_ref
+from weave.integrations.openai.openai_sdk import get_openai_patcher
+from weave.integrations.smolagents.smolagents_sdk import get_smolagents_patcher
+
+
+@pytest.fixture(autouse=True)
+def patch_smolagents() -> Generator[None, None, None]:
+    """Patch SmolAgents, HuggingFace, and OpenAI for all tests in this file."""
+    smolagents_sdk._smolagents_patcher = None
+    hf_sdk._huggingface_patcher = None
+    openai_sdk._openai_patcher = None
+
+    smolagents_patcher = get_smolagents_patcher()
+    huggingface_patcher = get_huggingface_patcher()
+    openai_patcher = get_openai_patcher()
+
+    smolagents_patcher.attempt_patch()
+    huggingface_patcher.attempt_patch()
+    openai_patcher.attempt_patch()
+
+    yield
+
+    smolagents_patcher.undo_patch()
+    huggingface_patcher.undo_patch()
+    openai_patcher.undo_patch()
+
+    # Clean up after test
+    smolagents_sdk._smolagents_patcher = None
+    hf_sdk._huggingface_patcher = None
+    openai_sdk._openai_patcher = None
 
 
 @pytest.mark.skip_clickhouse_client
@@ -123,8 +159,8 @@ def test_tool_calling_agent_weather(client):
 
     @tool
     def get_weather(location: str, celsius: Optional[bool] = False) -> str:
-        """
-        Get weather in the next days at given location.
+        """Get weather in the next days at given location.
+
         Args:
             location: the location
             celsius: whether to use Celsius for temperature
@@ -192,8 +228,8 @@ def test_code_agent_weather(client):
 
     @tool
     def get_weather(location: str, celsius: Optional[bool] = False) -> str:
-        """
-        Get weather in the next days at given location.
+        """Get weather in the next days at given location.
+
         Args:
             location: the location
             celsius: whether to use Celsius for temperature

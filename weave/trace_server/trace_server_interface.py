@@ -1166,8 +1166,7 @@ class ThreadsQueryFilter(BaseModelStrict):
 
 
 class ThreadsQueryReq(BaseModelStrict):
-    """
-    Query threads with aggregated statistics based on turn calls only.
+    """Query threads with aggregated statistics based on turn calls only.
 
     Turn calls are the immediate children of thread contexts (where call.id == turn_id).
     This provides meaningful conversation-level statistics rather than including all

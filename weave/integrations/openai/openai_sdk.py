@@ -151,8 +151,7 @@ def openai_on_finish_post_processor(value: ChatCompletionChunk | None) -> dict |
 
 
 def _openai_chunk_has_content(chunk: ChatCompletionChunk) -> bool:
-    """
-    Detect if an OpenAI chunk contains actual content (first token).
+    """Detect if an OpenAI chunk contains actual content (first token).
 
     Args:
         chunk: The OpenAI ChatCompletionChunk to check.
@@ -406,7 +405,7 @@ def openai_on_input_handler(
 
 def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
-        "We need to do this so we can check if `stream` is used"
+        """We need to do this so we can check if `stream` is used."""
 
         def _add_stream_options(fn: Callable) -> Callable:
             @wraps(fn)
@@ -451,7 +450,7 @@ def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
 # it manually here...
 def create_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
-        "We need to do this so we can check if `stream` is used"
+        """We need to do this so we can check if `stream` is used."""
 
         def _add_stream_options(fn: Callable) -> Callable:
             @wraps(fn)
@@ -746,10 +745,14 @@ def get_openai_patcher(
     base = settings.op_settings
 
     completions_create_settings = base.model_copy(
-        update={"name": base.name or "openai.chat.completions.create"}
+        update={
+            "name": base.name or "openai.chat.completions.create",
+        }
     )
     async_completions_create_settings = base.model_copy(
-        update={"name": base.name or "openai.chat.completions.create"}
+        update={
+            "name": base.name or "openai.chat.completions.create",
+        }
     )
     completions_parse_settings = base.model_copy(
         update={"name": base.name or "openai.chat.completions.parse"}

@@ -11,8 +11,7 @@ def presidio_entity_recognition_guardrail():
 
 
 def test_presidio_email_detection(presidio_entity_recognition_guardrail):
-    """
-    Given a text that contains an email address, the scorer should detect the email
+    """Given a text that contains an email address, the scorer should detect the email
     and mark the result as not passing.
     """
     input_text = "My is thomas@gmail.com"
@@ -39,7 +38,7 @@ class NumbersRecognizer(EntityRecognizer):
     def analyze(
         self, text: str, entities: list[str], nlp_artifacts: NlpArtifacts
     ) -> list[RecognizerResult]:
-        "Analyze the text to locate tokens which represent numbers"
+        """Analyze the text to locate tokens which represent numbers."""
         results = []
         for token in nlp_artifacts.tokens:
             if token.like_num:
@@ -54,8 +53,7 @@ class NumbersRecognizer(EntityRecognizer):
 
 
 def test_presidio_scoring_with_custom_number_recognizer():
-    """
-    Given a text with numerical tokens, the custom numbers recognizer should
+    """Given a text with numerical tokens, the custom numbers recognizer should
     detect each number correctly and the overall result should fail.
     """
     # Instantiate the custom numbers recognizer.

@@ -39,7 +39,8 @@ def is_pydantic_model_class(obj: Any) -> bool:
 def _is_inline_custom_obj(encoded: dict) -> bool:
     """Custom object values may be inline or backed by a file.
 
-    This separate function for readability checks which we are dealing with."""
+    This separate function for readability checks which we are dealing with.
+    """
     return "val" in encoded
 
 

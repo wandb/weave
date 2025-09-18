@@ -17,6 +17,11 @@ const sidebars: SidebarsConfig = {
         "introduction",
         {
           type: "doc",
+          label: "Learn Weave with W&B Inference",
+          id: "quickstart-inference",
+        },
+        {
+          type: "doc",
           label: "Quickstart: Track LLM Calls",
           id: "quickstart",
         },
@@ -61,7 +66,12 @@ const sidebars: SidebarsConfig = {
             },
             "guides/tracking/trace-tree",
             "guides/tracking/otel",
-            "guides/tracking/trace-plots"
+            "guides/tracking/trace-plots",
+            {
+              type: "doc",
+              label: "Log Traces During Model Training Runs",
+              id: "guides/tools/weave-in-workspaces",
+            },
           ]
         },
         {
@@ -148,14 +158,6 @@ const sidebars: SidebarsConfig = {
                   autoAddBaseUrl: true,
                 }
               ],
-        },
-        {
-          type: "category",
-          collapsible: true,
-          collapsed: true,
-          label: "Tools & Utilities",
-          link: { type: "doc", id: "guides/tools/index" },
-          items: ["guides/tools/serve", "guides/tools/deploy", "guides/tracking/otel"],
         },
       ],
     },
