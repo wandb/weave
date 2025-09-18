@@ -134,6 +134,7 @@ jobs:
         env:
           WEAVE_SENTRY_ENV: ci
           CI: 1
+          WEAVE_USE_MEMRAY: 1
           WB_SERVER_HOST: http://wandbservice
           WF_CLICKHOUSE_HOST: weave_clickhouse
           WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
