@@ -1,6 +1,9 @@
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Verifiers
 
-[Verifiers](https://github.com/willccbb/verifiers) is a library of modular components for creating RL environments and training LLM agents. Environments built with Verifiers can serve as LLM evaluations, synthetic data pipelines, agent harnesses for any OpenAI‑compatible endpoint, and RL training.
+[Verifiers](https://github.com/willccbb/verifiers) is a library of modular components for creating Reinforcement Leaning (RL) environments and training LLM agents. Environments built with Verifiers can serve as LLM evaluations, synthetic data pipelines, agent harnesses for any OpenAI‑compatible endpoint, and RL training.
 
 With Weave, you get automatic tracing purpose‑built for agentic RL workflows. Agentic RL involves multi‑turn conversations, tool invocations, and environment/user interactions during rollouts. Simply tracking loss, reward, and other time series metrics is not sufficient to debug these workflows efficiently.
 
@@ -10,30 +13,50 @@ Weave records inputs, outputs, and timestamps for each step so you can inspect h
 
 ## Getting started
 
-Install Verifiers:
+To integrate Verifiers with Weave, start by installing the Verifiers library. Select your preferred Python package manager and then use one of the following commands to install the library:
 
-```bash
-# Local dev / evaluation with API models
-uv add verifiers
+<Tabs groupId="package-manager" queryString>
+  <TabItem value="pip" label="pip" default>
+    ```bash
+    # Installs core library for local development and API-based models
+    pip install verifier
 
-# Trainer + GPU support
-uv add 'verifiers[all]' && uv pip install flash-attn --no-build-isolation
+    # Installs full version of library with all optional dependencies, including PyTorch and GPsupport
+    pip install 'verifiers[all]' && pip install flash-attn --no-build-isolatio
+    
+    # Installs latest version of library directly from GitHUb, including latest unreleased featureand fixes
+    pip install git+https://github.com/willccbb/verifiers.git
+     ```
+  </TabItem>
+  <TabItem value="uv" label="uv">
+    ```bash
+    # Installs core library for local development and API-based models
+    uv add verifier
 
-# Latest main branch
-uv add verifiers @ git+https://github.com/willccbb/verifiers.git
-```
+    # Installs full version of library with all optional dependencies, including PyTorch and GPU support
+    uv add 'verifiers[all]' && uv pip install flash-attn --no-build-isolation
 
-Install Weave and W&B:
+    # Installs latest version of library directly from GitHUb, including latest unreleased features anfixes
+    uv add verifiers @ git+https://github.com/willccbb/verifiers.git
+    ```
+  </TabItem>
+</Tabs>
+
+Then install Weave and W&B:
 
 ```bash
 uv pip install weave wandb
 ```
 
-Weave enables implicit patching by default. Learn more about it [here](../integrations/index.md).
+Weave enables [implicit patching](../integrations/index.md) for the library by default. This allows you to use Weave with Verifiers without requiring explicit call patch functions.
 
 ### Trace rollouts and evaluate
 
-Run a small evaluation on a `SingleTurnEnv` and inspect the trace in Weave.
+Once you've installed the necessary libraries, you can use Weave and Verifiers together to run evaluations.
+
+The following example script demonstrates how to run an evaluation with Verifiers and log the results to Weave. The script tests the LLM's ability to solve math problems using the [GSM8K dataset](https://huggingface.co/datasets/openai/gsm8k). It asks GPT-4 to solve two math problems, extracts the numerical value from each response, and then grades the attempt.
+
+Run the example and inspect the results in Weave:
 
 ```python
 import os
@@ -71,7 +94,7 @@ results = env.evaluate(
 
 ### Fine-tune a model with experiment tracking and tracing
 
-The true potential of Weave traces shows up during RL fine‑tuning. Pair traces with W&B runs to unlock rich charts, tables, and comparisons alongside step‑level detail. To log metrics, configs, artifacts, and traces, simply `import wandb; wandb.init(...)`.
+Weave can be a powerful tool in your RL fine‑tuning workflows by providing insight into how your model is performing during training. Using traces with W&B runs, you can unlock rich charts, tables, and comparisons alongside step‑level detail. To log metrics, configs, artifacts, and traces, `import wandb; wandb.init(...)`.
 
 The `verifiers` repository includes ready‑to‑run [examples](https://github.com/willccbb/verifiers/tree/main/examples/grpo) to help you get started.
 
@@ -102,7 +125,7 @@ CUDA_VISIBLE_DEVICES=1 accelerate launch --num-processes 1 --config-file configs
 ```
 
 :::note
-We tested the example on 2xH100s. The following settings of env vars helped run it successfully. You might not need it but sharing in case you run into NCCL errors.
+We successfully tested this example on 2xH100s and set the following environment variables:
 
 ```bash
 # In BOTH shells (server and trainer) before launch
@@ -112,7 +135,7 @@ export NCCL_CUMEM_HOST_ENABLE=0
 :::
 
 :::info
-Traces will omit `logprobs` for the `Environment.a_generate` and `Rubric.score_rollouts` methods. This is done to keep payloads small while leaving originals intact for training.
+Traces omits `logprobs` for the `Environment.a_generate` and `Rubric.score_rollouts` methods. This keeps payloads small while leaving the originals intact for training.
 :::
 
 ## See also
