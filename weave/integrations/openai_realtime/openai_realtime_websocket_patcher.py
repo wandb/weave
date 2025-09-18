@@ -17,6 +17,44 @@ _websocket_patcher: MultiPatcher | None = None
 logger = logging.getLogger(__name__)
 
 
+def _to_str_or_none(value: Any) -> str | None:
+    try:
+        if value is None:
+            return None
+        return str(value)
+    except Exception:
+        return None
+
+
+def _is_valid_realtime_url(url: Any) -> bool:
+    """Return True if url points to OpenAI Realtime service.
+
+    Criteria:
+    - URL starts with either 'wss://api.openai.com' or 'api.openai.com'
+    """
+    s = _to_str_or_none(url)
+    if not s:
+        return False
+    s_lower = s.lower()
+    print(url)
+    return s_lower.startswith("wss://api.openai.com") or s_lower.startswith("api.openai.com")
+
+
+def _extract_url_from_args_kwargs(
+    args: tuple[Any, ...], kwargs: dict[str, Any], *, pos: int = 0, kw: str | None = None
+) -> Any:
+    # Prefer positional at given index if present
+    if len(args) > pos:
+        return args[pos]
+    # Else fallback to provided kw name if any
+    if kw is not None and kw in kwargs:
+        return kwargs.get(kw)
+    # Common alternates used by various libs
+    for candidate in ("url", "uri", "wsuri"):
+        if candidate in kwargs:
+            return kwargs.get(candidate)
+    return None
+
 class OpenAIRealtimeSettings(IntegrationSettings):
     """Settings for OpenAI Realtime integration.
 
@@ -68,6 +106,11 @@ def get_openai_realtime_websocket_patcher(
             return original_class
 
         def wrapper(*args: Any, **kwargs: Any) -> Any:
+            # Extract URL and validate against OpenAI Realtime expectations
+            supplied_url = _extract_url_from_args_kwargs(args, kwargs, pos=0, kw="url")
+            if not _is_valid_realtime_url(supplied_url):
+                # Autopatcher case: return unwrapped instance
+                return original_class(*args, **kwargs)
             kwargs["original_websocket_app"] = original_class
             return connection.WebSocketApp(*args, **kwargs)
 
@@ -87,6 +130,10 @@ def get_openai_realtime_websocket_patcher(
 
         @wraps(original_connect)
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
+            supplied_url = _extract_url_from_args_kwargs(args, kwargs, pos=0, kw="uri")
+            if not _is_valid_realtime_url(supplied_url):
+                # Autopatcher case: return unwrapped original connection
+                return await original_connect(*args, **kwargs)
             original_connection = await original_connect(*args, **kwargs)
             return connection.WeaveAsyncWebsocketConnection(original_connection)
 
@@ -99,6 +146,16 @@ def get_openai_realtime_websocket_patcher(
 
         @wraps(original_ws_connect)
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
+            # We only get a relative url here, base url is in the parent class
+            # No relative url supplied
+            if len(args) < 2:
+                return await original_ws_connect(*args, **kwargs)
+
+            rel_url = args[1]
+
+            if not rel_url or not isinstance(rel_url, str) or not "realtime" in rel_url:
+                return await original_ws_connect(*args, **kwargs)
+
             original_ws = await original_ws_connect(*args, **kwargs)
             return connection.WeaveAiohttpWebsocketConnection(original_ws)
 
@@ -146,6 +203,14 @@ def wrap_websocket_sync(websocket_app_class: type) -> Any:
         return websocket_app_class
 
     def wrapper(*args: Any, **kwargs: Any) -> Any:
+        supplied_url = _extract_url_from_args_kwargs(args, kwargs, pos=0, kw="url")
+        if not _is_valid_realtime_url(supplied_url):
+            logger.error(
+                "Cannot patch non-realtime websocket connection %s. Expected url to start with wss://api.openai.com",
+                _to_str_or_none(supplied_url),
+            )
+            # Return unwrapped instance
+            return websocket_app_class(*args, **kwargs)
         kwargs["original_websocket_app"] = websocket_app_class
         return connection.WebSocketApp(*args, **kwargs)
 
@@ -197,6 +262,14 @@ def wrap_websocket_connect(connect_func: Callable) -> Callable:
 
     @wraps(connect_func)
     async def wrapper(*args: Any, **kwargs: Any) -> Any:
+        supplied_url = _extract_url_from_args_kwargs(args, kwargs, pos=0, kw="uri")
+        if not _is_valid_realtime_url(supplied_url):
+            logger.error(
+                "Cannot patch non-realtime websocket connection %s. Expected url to start with wss://api.openai.com",
+                _to_str_or_none(supplied_url),
+            )
+            # Return unwrapped original connection
+            return await connect_func(*args, **kwargs)
         original_connection = await connect_func(*args, **kwargs)
         return connection.WeaveAsyncWebsocketConnection(original_connection)
 

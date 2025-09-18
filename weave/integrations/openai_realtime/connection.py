@@ -173,10 +173,6 @@ class WeaveMediaConnection:
         finally:
             self._run_exit_handler_once()
 
-    def get_session(self) -> Any:
-        """Convenience: return the current Session state from the conversation manager."""
-        return self.conversation_manager.state.session
-
     def get_conversation_manager(self) -> ConversationManager:
         return self.conversation_manager
 
@@ -262,9 +258,6 @@ class WeaveAsyncWebsocketConnection:
         except self.original_connection.ConnectionClosed:
             raise StopAsyncIteration from None
 
-    def get_session(self) -> Any:
-        return self.conversation_manager.state.session
-
     def get_conversation_manager(self) -> ConversationManager:
         return self.conversation_manager
 
@@ -275,8 +268,6 @@ class WeaveAsyncWebsocketConnection:
             return self.recv
         if name == "close":
             return self.close
-        if name == "get_session":
-            return self.get_session
         if name == "get_conversation_manager":
             return self.get_conversation_manager
         return getattr(self.original_connection, name)
@@ -378,8 +369,6 @@ class WeaveAiohttpWebsocketConnection:
             raise StopAsyncIteration
         return msg
 
-    def get_session(self) -> Any:
-        return self.conversation_manager.state.session
 
     def get_conversation_manager(self) -> ConversationManager:
         return self.conversation_manager
