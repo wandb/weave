@@ -168,11 +168,11 @@ resources:
   completions:
     methods:
       create: post /completions/create
-      create_stream: post /completions/create_stream
+      # create_stream: post /completions/create_stream
 
-  threads:
-    methods:
-      stream_query: post /threads/stream_query
+  # threads:
+  #   methods:
+  #     stream_query: post /threads/stream_query
 
 settings:
   license: Apache-2.0

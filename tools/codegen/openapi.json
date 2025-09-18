@@ -510,6 +510,52 @@
         }
       }
     },
+    "/calls/query": {
+      "post": {
+        "tags": [
+          "Calls"
+        ],
+        "summary": "Calls Query",
+        "operationId": "calls_query_calls_query_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CallsQueryReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CallsQueryRes"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
+      }
+    },
     "/obj/create": {
       "post": {
         "tags": [
@@ -830,64 +876,6 @@
             "HTTPBasic": []
           }
         ]
-      }
-    },
-    "/table/query_stream": {
-      "post": {
-        "summary": "Table Query Stream",
-        "operationId": "table_query_stream_table_query_stream_post",
-        "security": [
-          {
-            "HTTPBasic": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "accept",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "default": "application/jsonl",
-              "title": "Accept"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TableQueryReq"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Stream of data in JSONL format",
-            "content": {
-              "application/jsonl": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/CallSchema"
-                  }
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
       }
     },
     "/table/query_stats": {
@@ -1419,104 +1407,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/CompletionsCreateRes"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBasic": []
-          }
-        ]
-      }
-    },
-    "/completions/create_stream": {
-      "post": {
-        "tags": [
-          "Completions"
-        ],
-        "summary": "Completions Create Stream",
-        "operationId": "completions_create_stream_completions_create_stream_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CompletionsCreateReq"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Stream of data in JSONL format",
-            "content": {
-              "application/jsonl": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/Schema"
-                  },
-                  "type": "array"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBasic": []
-          }
-        ]
-      }
-    },
-    "/threads/stream_query": {
-      "post": {
-        "tags": [
-          "Threads"
-        ],
-        "summary": "Threads Query Stream",
-        "operationId": "threads_query_stream_threads_stream_query_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ThreadsQueryReq"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Stream of data in JSONL format",
-            "content": {
-              "application/jsonl": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/Schema"
-                  },
-                  "type": "array"
                 }
               }
             }
@@ -2422,6 +2312,22 @@
           "project_id"
         ],
         "title": "CallsQueryReq"
+      },
+      "CallsQueryRes": {
+        "properties": {
+          "calls": {
+            "items": {
+              "$ref": "#/components/schemas/CallSchema"
+            },
+            "type": "array",
+            "title": "Calls"
+          }
+        },
+        "type": "object",
+        "required": [
+          "calls"
+        ],
+        "title": "CallsQueryRes"
       },
       "CallsQueryStatsReq": {
         "properties": {
@@ -5904,144 +5810,6 @@
           "digest"
         ],
         "title": "TableUpdateRes"
-      },
-      "ThreadsQueryFilter": {
-        "properties": {
-          "after_datetime": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "After Datetime",
-            "description": "Only include threads with start_time after this timestamp",
-            "examples": [
-              "2024-01-01T00:00:00Z"
-            ]
-          },
-          "before_datetime": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Before Datetime",
-            "description": "Only include threads with last_updated before this timestamp",
-            "examples": [
-              "2024-12-31T23:59:59Z"
-            ]
-          },
-          "thread_ids": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Thread Ids",
-            "description": "Only include threads with thread_ids in this list",
-            "examples": [
-              [
-                "thread_1",
-                "thread_2",
-                "my_thread_id"
-              ]
-            ]
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "title": "ThreadsQueryFilter"
-      },
-      "ThreadsQueryReq": {
-        "properties": {
-          "project_id": {
-            "type": "string",
-            "title": "Project Id",
-            "description": "The ID of the project",
-            "examples": [
-              "my_entity/my_project"
-            ]
-          },
-          "filter": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ThreadsQueryFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Filter criteria for the threads query"
-          },
-          "limit": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Limit",
-            "description": "Maximum number of threads to return"
-          },
-          "offset": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Offset",
-            "description": "Number of threads to skip"
-          },
-          "sort_by": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/SortBy"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Sort By",
-            "description": "Sorting criteria for the threads. Supported fields: 'thread_id', 'turn_count', 'start_time', 'last_updated', 'p50_turn_duration_ms', 'p99_turn_duration_ms'.",
-            "examples": [
-              [
-                {
-                  "direction": "desc",
-                  "field": "last_updated"
-                }
-              ]
-            ]
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "project_id"
-        ],
-        "title": "ThreadsQueryReq",
-        "description": "Query threads with aggregated statistics based on turn calls only.\n\nTurn calls are the immediate children of thread contexts (where call.id == turn_id).\nThis provides meaningful conversation-level statistics rather than including all\nnested implementation details."
       },
       "TraceStatus": {
         "type": "string",
