@@ -188,8 +188,9 @@ def tests(session, shard):
         "--cov-branch",
     ]
 
-    # Memray not working with trace_server shard atm
-    if shard != "trace_server":
+    # Memray profiling is optional and controlled via environment variable
+    # (not working with trace_server shard atm)
+    if os.getenv("WEAVE_USE_MEMRAY") == "1" and shard != "trace_server":
         pytest_args.extend(
             [
                 "--memray",
