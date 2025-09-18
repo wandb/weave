@@ -1,6 +1,7 @@
 CREATE TABLE IF NOT EXISTS alert_metrics (
    project_id String,
    id String, -- necessary?
+   wb_user_id String,
    call_id String, -- id of call that generated the metric
    alert_ids Array(String), -- multiple alerts can have the same metric
    created_at Datetime(3),
@@ -15,6 +16,7 @@ ORDER BY (project_id, metric_key, created_at_inv, id);
 -- Aggregate hourly, used to serve week old data
 CREATE TABLE IF NOT EXISTS alert_metrics_history (
 	project_id String, 
+  wb_user_id String,
   metric_key String,
   bucket_start DateTime64(3),
     

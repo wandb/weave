@@ -5817,9 +5817,6 @@ def test_calls_query_filter_contains_in_message_array(client):
 
 
 def test_alert_metrics_create_query(client):
-    # Create single metric
-    print(f"Client server type: {type(client.server)}")
-    print(f"Has alert_metrics_create: {hasattr(client.server, 'alert_metrics_create')}")
     res = client.server.alert_metrics_create(
         tsi.AlertMetricsCreateReq(
             project_id=client._project_id(),
@@ -5834,7 +5831,6 @@ def test_alert_metrics_create_query(client):
             ],
         )
     )
-    print(f"Response: {res}")
     assert res is not None, "Response should not be None"
     assert len(res.ids) == 1
     assert res.ids[0] is not None

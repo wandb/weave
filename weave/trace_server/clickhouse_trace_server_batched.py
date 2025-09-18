@@ -2098,6 +2098,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     metric.metric_key,
                     metric.metric_value,
                     metric.call_id,
+                    metric.wb_user_id,
                 )
             )
 
@@ -2112,6 +2113,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 "metric_key",
                 "metric_value",
                 "call_id",
+                "wb_user_id",
             ],
         )
 

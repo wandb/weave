@@ -139,7 +139,8 @@ class TestOnlyUserInjectingExternalTraceServer(
     def alert_metrics_create(
         self, req: tsi.AlertMetricsCreateReq
     ) -> tsi.AlertMetricsCreateRes:
-        req.wb_user_id = self._user_id
+        for metric in req.metrics:
+            metric.wb_user_id = self._user_id
         return super().alert_metrics_create(req)
 
 
