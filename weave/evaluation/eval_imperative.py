@@ -269,12 +269,35 @@ class ScoreLogger(BaseModel):
         # we need special handling to avoid "already running" errors
         try:
             loop = asyncio.get_running_loop()
+            # If we're in an async context, we need to handle this differently
+            # Instead of using nest_asyncio, we'll create a new thread with proper context propagation
             if asyncio.current_task() is not None:
-                # We're in an async context, just run the coroutine synchronously
-                import nest_asyncio
-
-                nest_asyncio.apply()
-                return loop.run_until_complete(self.alog_score(scorer, score))
+                from weave.trace.util import Thread
+                
+                result = None
+                exception = None
+                
+                def run_in_new_loop():
+                    nonlocal result, exception
+                    try:
+                        # Create a new event loop for this thread
+                        new_loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(new_loop)
+                        try:
+                            result = new_loop.run_until_complete(self.alog_score(scorer, score))
+                        finally:
+                            new_loop.close()
+                    except Exception as e:
+                        exception = e
+                
+                # Use weave.Thread to ensure proper context propagation
+                thread = Thread(target=run_in_new_loop)
+                thread.start()
+                thread.join()
+                
+                if exception:
+                    raise exception
+                return result
             else:
                 # We're not in an async context, but a loop exists
                 return loop.run_until_complete(self.alog_score(scorer, score))
