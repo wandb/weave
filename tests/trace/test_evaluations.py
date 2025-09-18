@@ -12,6 +12,7 @@ from weave import Evaluation, Model
 from weave.trace.ref_util import get_ref
 from weave.trace.refs import CallRef
 from weave.trace_server import trace_server_interface as tsi
+from weave.utils.iterators import first
 
 
 def flatten_calls(
@@ -1025,7 +1026,7 @@ async def test_feedback_is_correctly_linked(client):
         == CallRef(
             entity=client.entity,
             project=client.project,
-            id=next(iter(score.calls())).id,
+            id=first(score.calls()).id,
         ).uri()
     )
 
@@ -1132,7 +1133,7 @@ def test_get_evaluate_calls(client, make_evals):
 def test_get_score_calls(client, make_evals):
     ref, ref2 = make_evals
     ev = ref.get()
-    score_calls = next(iter(ev.get_score_calls().values()))
+    score_calls = first(ev.get_score_calls().values())
     assert len(score_calls) == 4
 
     assert score_calls[0].output == 3
@@ -1141,7 +1142,7 @@ def test_get_score_calls(client, make_evals):
     assert score_calls[3].output == 44
 
     ev2 = ref2.get()
-    score_calls2 = next(iter(ev2.get_score_calls().values()))
+    score_calls2 = first(ev2.get_score_calls().values())
     assert len(score_calls2) == 4
 
     assert score_calls2[0].output == 56
@@ -1150,17 +1151,70 @@ def test_get_score_calls(client, make_evals):
     assert score_calls2[3].output == 7878
 
 
+def test_get_predict_and_score_calls(client, make_evals):
+    ref, ref2 = make_evals
+    ev = ref.get()
+    predict_and_score_calls = first(ev.get_predict_and_score_calls().values())
+
+    # Should have 2 predict_and_score calls (one for each prediction)
+    assert len(predict_and_score_calls) == 2
+
+    # Check that outputs contain the expected keys
+    for call in predict_and_score_calls:
+        assert "output" in call.output
+        assert "scores" in call.output
+        assert "model_latency" in call.output
+
+    ev2 = ref2.get()
+    predict_and_score_calls2 = first(ev2.get_predict_and_score_calls().values())
+
+    # Should have 2 predict_and_score calls for the second evaluation
+    assert len(predict_and_score_calls2) == 2
+
+    # Check that outputs contain the expected keys
+    for call in predict_and_score_calls2:
+        assert "output" in call.output
+        assert "scores" in call.output
+        assert "model_latency" in call.output
+
+
+def test_get_predict_calls(client, make_evals):
+    ref, ref2 = make_evals
+    ev = ref.get()
+    predict_calls = first(ev.get_predict_calls().values())
+
+    # Should have 2 model prediction calls (one for each prediction)
+    assert len(predict_calls) == 2
+
+    # Check that these are the actual model prediction calls
+    # They should have model outputs (not wrapped with scores)
+    for call, val in zip(predict_calls, [2, 3]):
+        # The outputs should be the raw model outputs (2 and 3 for first eval)
+        assert call.output == val
+
+    ev2 = ref2.get()
+    predict_calls2 = first(ev2.get_predict_calls().values())
+
+    # Should have 2 model prediction calls for the second evaluation
+    assert len(predict_calls2) == 2
+
+    # Check the outputs for the second evaluation
+    for call, val in zip(predict_calls2, [34, 45]):
+        # The outputs should be the raw model outputs (34 and 45 for second eval)
+        assert call.output == val
+
+
 def test_get_scores(client, make_evals):
     ref, ref2 = make_evals
     ev = ref.get()
-    scores = next(iter(ev.get_scores().values()))
+    scores = first(ev.get_scores().values())
     assert scores == {
         "score": [3, 33],
         "score2": [4, 44],
     }
 
     ev2 = ref2.get()
-    scores2 = next(iter(ev2.get_scores().values()))
+    scores2 = first(ev2.get_scores().values())
     assert scores2 == {
         "second_score": [56, 5656],
         "second_score2": [78, 7878],
