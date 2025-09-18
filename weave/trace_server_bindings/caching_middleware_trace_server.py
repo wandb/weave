@@ -536,10 +536,10 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
     ) -> tsi.AlertMetricsCreateRes:
         return self._next_trace_server.alert_metrics_create(req)
 
-    def alert_metrics_query(
+    def alert_metrics_query_stream(
         self, req: tsi.AlertMetricsQueryReq
-    ) -> tsi.AlertMetricsQueryRes:
-        return self._next_trace_server.alert_metrics_query(req)
+    ) -> Iterator[tsi.AlertMetricSchema]:
+        return self._next_trace_server.alert_metrics_query_stream(req)
 
 
 def pydantic_bytes_safe_dump(obj: BaseModel) -> str:

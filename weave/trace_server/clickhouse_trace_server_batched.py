@@ -29,6 +29,15 @@ from weave.trace_server import environment as wf_env
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.actions_worker.dispatcher import execute_batch
+from weave.trace_server.alert_metrics import (
+    ALERT_METRICS_CREATE_COLUMNS,
+    ALERT_METRICS_QUERY_COLUMNS,
+    TABLE_ALERT_METRICS,
+    format_row_to_alert_metric_schema,
+)
+from weave.trace_server.alert_metrics.alert_metrics_query_builder import (
+    build_alert_metrics_query_conditions,
+)
 from weave.trace_server.base64_content_conversion import (
     process_call_req_to_content,
 )
@@ -2105,80 +2114,48 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._insert(
             "alert_metrics",
             data=data_to_insert,
-            column_names=[
-                "project_id",
-                "id",
-                "alert_ids",
-                "created_at",
-                "metric_key",
-                "metric_value",
-                "call_id",
-                "wb_user_id",
-            ],
+            column_names=ALERT_METRICS_CREATE_COLUMNS,
         )
 
         return tsi.AlertMetricsCreateRes(ids=metric_ids)
 
-    def alert_metrics_query(
+    def alert_metrics_query_stream(
         self, req: tsi.AlertMetricsQueryReq
-    ) -> tsi.AlertMetricsQueryRes:
-        """Query alert metrics with optional filters."""
-        pb = ParamBuilder()
+    ) -> Iterator[tsi.AlertMetricSchema]:
+        """Stream alert metrics with optional filters using ORM."""
+        # Create a select query using the ORM
+        select = (
+            TABLE_ALERT_METRICS.select()
+            .project_id(req.project_id)
+            .fields(ALERT_METRICS_QUERY_COLUMNS)
+            .order_by([tsi.SortBy(field="created_at", direction="asc")])
+        )
 
-        conditions = [f"project_id = {{{pb.add_param(req.project_id)}: String}}"]
-
-        if req.metric_keys:
-            conditions.append(
-                f"metric_key IN {{{pb.add_param(req.metric_keys)}: Array(String)}}"
-            )
-
-        if req.alert_ids:
-            conditions.append(
-                f"hasAny(alert_ids, {{{pb.add_param(req.alert_ids)}: Array(String)}})"
-            )
-
-        if req.start_time:
-            conditions.append(
-                f"created_at >= {{{pb.add_param(req.start_time.timestamp())}: Float64}}"
-            )
-
-        if req.end_time:
-            conditions.append(
-                f"created_at <= {{{pb.add_param(req.end_time.timestamp())}: Float64}}"
-            )
-
-        # TODO: break out into query builder
-        # TODO: add streaming
-        # TODO: add pagination + sort
-
-        query = f"""
-        SELECT id, project_id, alert_ids, created_at, metric_key, metric_value
-        FROM alert_metrics
-        WHERE {" AND ".join(conditions)}
-        ORDER BY created_at_inv ASC
-        """
+        # Build query conditions using helper function
+        combined_query = build_alert_metrics_query_conditions(req)
+        if combined_query:
+            select = select.where(combined_query)
 
         if req.limit:
-            query += f" LIMIT {{{pb.add_param(req.limit)}: Int64}}"
+            select = select.limit(req.limit)
+
         if req.offset:
-            query += f" OFFSET {{{pb.add_param(req.offset)}: Int64}}"
+            select = select.offset(req.offset)
 
-        result = self._query(query, pb.get_params())
+        # Execute the prepared query
+        prepared = select.prepare("clickhouse")
+        result = self._query(prepared.sql, prepared.parameters)
 
-        metrics = []
+        # Stream the results
         for row in result.result_rows:
-            metrics.append(
-                tsi.AlertMetricSchema(
-                    id=row[0],
-                    project_id=row[1],
-                    alert_ids=row[2],
-                    created_at=_ensure_datetimes_have_tz_strict(row[3]),
-                    metric_key=row[4],
-                    metric_value=row[5],
-                )
-            )
+            # Convert tuple row to dictionary using the table's tuple_to_row method
+            row_dict = TABLE_ALERT_METRICS.tuple_to_row(row, prepared.fields)
+            # Ensure datetime has timezone
+            created_at = row_dict.get("created_at")
+            if created_at and isinstance(created_at, datetime.datetime):
+                row_dict["created_at"] = _ensure_datetimes_have_tz(created_at)
 
-        return tsi.AlertMetricsQueryRes(metrics=metrics)
+            yield format_row_to_alert_metric_schema(row_dict)
 
     # Private Methods
     @property

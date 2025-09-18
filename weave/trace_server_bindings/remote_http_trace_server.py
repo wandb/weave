@@ -694,14 +694,14 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             tsi.AlertMetricsCreateRes,
         )
 
-    def alert_metrics_query(
+    def alert_metrics_query_stream(
         self, req: tsi.AlertMetricsQueryReq
-    ) -> tsi.AlertMetricsQueryRes:
+    ) -> Iterator[tsi.AlertMetricSchema]:
         return self._generic_request(
             "/alert/metrics/query",
             req,
             tsi.AlertMetricsQueryReq,
-            tsi.AlertMetricsQueryRes,
+            tsi.AlertMetricSchema,
         )
 
 

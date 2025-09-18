@@ -1246,7 +1246,6 @@ class AlertMetricsQueryReq(BaseModelStrict):
     project_id: str
     metric_keys: Optional[list[str]] = None
     alert_ids: Optional[list[str]] = None
-    start_time: Optional[datetime.datetime] = None
     end_time: Optional[datetime.datetime] = None
     limit: Optional[int] = None
     offset: Optional[int] = None
@@ -1259,10 +1258,6 @@ class AlertMetricSchema(BaseModel):
     created_at: datetime.datetime
     metric_key: str
     metric_value: float
-
-
-class AlertMetricsQueryRes(BaseModel):
-    metrics: list[AlertMetricSchema]
 
 
 class TraceServerInterface(Protocol):
@@ -1364,6 +1359,6 @@ class TraceServerInterface(Protocol):
         self, req: AlertMetricsCreateReq
     ) -> AlertMetricsCreateRes: ...
 
-    def alert_metrics_query(
+    def alert_metrics_query_stream(
         self, req: AlertMetricsQueryReq
-    ) -> AlertMetricsQueryRes: ...
+    ) -> Iterator[AlertMetricSchema]: ...
