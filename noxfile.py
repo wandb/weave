@@ -212,7 +212,7 @@ def tests(session, shard):
     # Run all trace tests when shard is "trace"
     if shard == "trace":
         pytest_args.extend(["-m", "trace_server"])
-        # Use moderate parallelism since we're on standard runners
+        # Use parallelism with unique databases per worker
         session.posargs.insert(0, "-n4")
 
     if shard == "trace_no_server":

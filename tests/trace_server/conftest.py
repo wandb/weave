@@ -1,3 +1,4 @@
+import os
 from typing import Callable
 
 import pytest
@@ -68,9 +69,28 @@ def get_trace_server_flag(request):
 @pytest.fixture
 def get_ch_trace_server(
     ensure_clickhouse_db,
+    request,
 ) -> Callable[[], TestOnlyUserInjectingExternalTraceServer]:
     def ch_trace_server_inner() -> TestOnlyUserInjectingExternalTraceServer:
         host, port = next(ensure_clickhouse_db())
+        
+        # Get pytest-xdist worker id if running in parallel
+        # worker_id will be 'gw0', 'gw1', etc. when running with -n
+        # or 'master' when running without parallelization
+        worker_id = getattr(request.config, 'workerinput', {}).get('workerid', 'master')
+        
+        # Create a unique database name for this worker
+        if worker_id == 'master':
+            db_suffix = ''
+        else:
+            # Extract the numeric part from 'gw0', 'gw1', etc.
+            db_suffix = f"_{worker_id.replace('gw', 'worker')}"
+        
+        # Override the database name for this worker
+        original_db = os.environ.get('WF_CLICKHOUSE_DATABASE', 'default')
+        unique_db = f"{original_db}{db_suffix}"
+        os.environ['WF_CLICKHOUSE_DATABASE'] = unique_db
+        
         id_converter = DummyIdConverter()
         ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer(
             host=host,
@@ -79,15 +99,23 @@ def get_ch_trace_server(
                 id_converter=id_converter
             ),
         )
-        ch_server.ch_client.command("DROP DATABASE IF EXISTS db_management")
+        ch_server.ch_client.command(f"DROP DATABASE IF EXISTS db_management{db_suffix}")
         ch_server.ch_client.command(
-            f"DROP DATABASE IF EXISTS {ts_env.wf_clickhouse_database()}"
+            f"DROP DATABASE IF EXISTS {unique_db}"
         )
         ch_server._run_migrations()
 
-        return externalize_trace_server(
+        result = externalize_trace_server(
             ch_server, TEST_ENTITY, id_converter=id_converter
         )
+        
+        # Restore the original database name
+        if original_db is None:
+            os.environ.pop('WF_CLICKHOUSE_DATABASE', None)
+        else:
+            os.environ['WF_CLICKHOUSE_DATABASE'] = original_db
+            
+        return result
 
     return ch_trace_server_inner
 
