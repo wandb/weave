@@ -18,24 +18,26 @@ logger = logging.getLogger(__name__)
 
 class Api:
     def query(self, query: graphql.DocumentNode, **kwargs: Any) -> Any:
-        from gql.transport.requests import RequestsHTTPTransport
-        from requests.auth import HTTPBasicAuth
+        from gql.transport.httpx import HTTPXTransport
 
         wandb_context = get_wandb_api_context()
-        headers = None
+        headers = {}
         cookies = None
         auth = None
         if wandb_context is not None:
-            headers = wandb_context.headers
+            if wandb_context.headers:
+                headers.update(wandb_context.headers)
             cookies = wandb_context.cookies
             if wandb_context.api_key is not None:
-                auth = HTTPBasicAuth("api", wandb_context.api_key)
+                # For httpx, we use headers for basic auth
+                import base64
+                auth_string = base64.b64encode(f"api:{wandb_context.api_key}".encode()).decode()
+                headers["Authorization"] = f"Basic {auth_string}"
         url_base = env.wandb_base_url()
-        transport = RequestsHTTPTransport(
+        transport = HTTPXTransport(
             url=url_base + "/graphql",
             headers=headers,
             cookies=cookies,
-            auth=auth,
         )
         # Warning: we do not use the recommended context manager pattern, because we're
         # using connector_owner to tell the session not to close our connection pool.

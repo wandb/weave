@@ -42,7 +42,7 @@ dependencies = [
   "tenacity>=8.3.0,!=8.4.0",  # Excluding 8.4.0 because it had a bug on import of AsyncRetrying
   "click",                    # Used for terminal/stdio printing
   "httpx",                    # Used for HTTP requests throughout the codebase
-  "gql[aiohttp,requests]",    # Used exclusively in wandb_api.py
+  "gql[httpx]",               # Used exclusively in wandb_api.py
   "jsonschema>=4.23.0",       # Used by scorers for field validation
   "diskcache==5.6.3",         # Used for data caching
   "nest-asyncio==1.6.0",      # Used to support nested event loops in asyncio

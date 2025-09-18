@@ -8,7 +8,7 @@ from time import time
 from typing import Any, Optional, Union
 
 import httpx
-from httpx import HTTPError as HTTPError, Request, Response
+from httpx import HTTPError as HTTPError, HTTPStatusError, Request, Response
 
 from weave.trace.display.display import Console, Text
 
@@ -115,7 +115,7 @@ def pprint_response(response: Response) -> None:
     elif response.status_code >= 400:
         status_style = STYLE_STATUS_ERROR
     status_code_text = Text(f"{response.status_code}", style=status_style)
-    reason_text = Text(f"{response.reason}", style=status_style)
+    reason_text = Text(f"{response.reason_phrase}", style=status_style)
     console.print(Text("Status Code: ", style=STYLE_LABEL), status_code_text, sep="")
     console.print(Text("Reason: ", style=STYLE_LABEL), reason_text, sep="")
     console.print(Text("Headers:", style=STYLE_LABEL))
@@ -170,3 +170,9 @@ def post(
 ) -> Response:
     """Send a POST request with optional logging."""
     return client.post(url, data=data, json=json, **kwargs)
+
+
+# Export these for compatibility with code expecting requests module
+__all__ = ["HTTPError", "HTTPStatusError", "Response", "get", "post", "session", "client"]
+# For backward compatibility, alias client as session
+session = client

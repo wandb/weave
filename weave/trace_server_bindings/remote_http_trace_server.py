@@ -210,9 +210,9 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         def send_feedback_batch(encoded_data: bytes) -> None:
             try:
                 self._send_feedback_batch_to_server(encoded_data)
-            except requests.HTTPError as e:
+            except (requests.HTTPError, requests.HTTPStatusError) as e:
                 # If batching endpoint doesn't exist (404) fall back to individual calls
-                if e.response.status_code == 404:
+                if hasattr(e, 'response') and e.response and e.response.status_code == 404:
                     logger.debug(
                         f"Batching endpoint not available, falling back to individual feedback creation: {e}"
                     )

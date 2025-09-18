@@ -46,6 +46,7 @@ def test_ok(mock_post, trace_server):
     mock_response = httpx.Response(
         200,
         json=dict(tsi.CallStartRes(id=call_id, trace_id="test_trace_id")),
+        request=httpx.Request("POST", "http://test.com"),
     )
     mock_post.return_value = mock_response
     start = generate_start(call_id)
@@ -57,9 +58,11 @@ def test_ok(mock_post, trace_server):
 def test_400_no_retry(mock_post, trace_server):
     """Test that 400 errors are not retried."""
     call_id = generate_id()
+    # Create a mock response that behaves like httpx Response
     resp1 = httpx.Response(
         400,
         json=dict(tsi.CallStartRes(id=call_id, trace_id="test_trace_id")),
+        request=httpx.Request("POST", "http://test.com"),  # Add request to make raise_for_status work
     )
 
     mock_post.side_effect = [
@@ -85,19 +88,20 @@ def test_500_502_503_504_429_retry(mock_post, trace_server, monkeypatch):
     monkeypatch.setenv("WEAVE_RETRY_MAX_INTERVAL", "0.1")
     call_id = generate_id()
 
-    resp0 = httpx.Response(500)
+    resp0 = httpx.Response(500, request=httpx.Request("POST", "http://test.com"))
 
-    resp1 = httpx.Response(502)
+    resp1 = httpx.Response(502, request=httpx.Request("POST", "http://test.com"))
 
-    resp2 = httpx.Response(503)
+    resp2 = httpx.Response(503, request=httpx.Request("POST", "http://test.com"))
 
-    resp3 = httpx.Response(504)
+    resp3 = httpx.Response(504, request=httpx.Request("POST", "http://test.com"))
 
-    resp4 = httpx.Response(429)
+    resp4 = httpx.Response(429, request=httpx.Request("POST", "http://test.com"))
 
     resp5 = httpx.Response(
         200,
         json=dict(tsi.CallStartRes(id=call_id, trace_id="test_trace_id")),
+        request=httpx.Request("POST", "http://test.com"),
     )
 
     mock_post.side_effect = [resp0, resp1, resp2, resp3, resp4, resp5]
@@ -116,6 +120,7 @@ def test_other_error_retry(mock_post, trace_server, monkeypatch):
     resp2 = httpx.Response(
         200,
         json=dict(tsi.CallStartRes(id=call_id, trace_id="test_trace_id")),
+        request=httpx.Request("POST", "http://test.com"),
     )
 
     mock_post.side_effect = [
