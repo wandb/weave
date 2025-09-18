@@ -3,7 +3,7 @@ import threading
 import time
 
 import pytest
-import requests
+import httpx
 from flask import Flask
 
 import weave
@@ -35,7 +35,8 @@ def flask_server(client):
 
 def test_flask_server(flask_server):
     url = flask_server
-    response = requests.get(url)
+    with httpx.Client() as client:
+        response = client.get(url)
     assert response.status_code == 200
     assert response.text == "0xTDJ6hEmsx8Wg9H75y42bL2WgvW5l4IXjuhHcrMh7A"
 

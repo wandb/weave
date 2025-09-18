@@ -8,7 +8,7 @@ from types import MethodType
 from unittest.mock import MagicMock, patch
 
 import pytest
-import requests
+import httpx
 import tenacity
 
 from weave.trace.display.term import configure_logger
@@ -281,8 +281,8 @@ def test_timeout_retry_mechanism(mock_post, success_response):
 
     # Mock server to raise errors twice, then succeed
     mock_post.side_effect = [
-        requests.exceptions.Timeout("Connection timed out"),
-        requests.exceptions.HTTPError("500 Server Error"),
+        httpx.TimeoutException("Connection timed out"),
+        httpx.HTTPStatusError("500 Server Error", request=MagicMock(), response=MagicMock(status_code=500)),
         success_response,
     ]
 
@@ -307,8 +307,8 @@ def test_post_timeout(mock_post, success_response, server, log_collector):
     # Configure mock to timeout twice to exhaust retries
     mock_post.side_effect = [
         # First batch times out twice
-        requests.exceptions.Timeout("Connection timed out"),
-        requests.exceptions.Timeout("Connection timed out"),
+        httpx.TimeoutException("Connection timed out"),
+        httpx.TimeoutException("Connection timed out"),
     ]
 
     # Phase 1: Try but fail to process the first batch
@@ -321,7 +321,7 @@ def test_post_timeout(mock_post, success_response, server, log_collector):
     # Phase 2: Reset mock and verify we can still process a new batch
     mock_post.reset_mock()
     mock_post.side_effect = [
-        requests.exceptions.Timeout("Connection timed out"),
+        httpx.TimeoutException("Connection timed out"),
         success_response,
     ]
 
@@ -378,7 +378,7 @@ def test_requeue_after_max_retries(server, caplog):
     # Mock enqueue to verify it gets called, and _send_batch_to_server to throw an exception
     server.call_processor.enqueue = MagicMock()
     server._send_batch_to_server = MagicMock(
-        side_effect=requests.ConnectionError("Connection error")
+        side_effect=httpx.ConnectError("Connection error")
     )
 
     # Create a batch

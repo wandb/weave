@@ -2,7 +2,7 @@ import datetime
 from unittest.mock import patch
 
 import pytest
-import requests
+import httpx
 from pydantic import ValidationError
 
 from weave.trace_server import trace_server_interface as tsi
@@ -43,11 +43,11 @@ def trace_server():
 def test_ok(mock_post, trace_server):
     """Test successful call_start request."""
     call_id = generate_id()
-    mock_post.return_value = requests.Response()
-    mock_post.return_value.json = lambda: dict(
-        tsi.CallStartRes(id=call_id, trace_id="test_trace_id")
+    mock_response = httpx.Response(
+        200,
+        json=dict(tsi.CallStartRes(id=call_id, trace_id="test_trace_id")),
     )
-    mock_post.return_value.status_code = 200
+    mock_post.return_value = mock_response
     start = generate_start(call_id)
     trace_server.call_start(tsi.CallStartReq(start=start))
     mock_post.assert_called_once()
@@ -57,16 +57,17 @@ def test_ok(mock_post, trace_server):
 def test_400_no_retry(mock_post, trace_server):
     """Test that 400 errors are not retried."""
     call_id = generate_id()
-    resp1 = requests.Response()
-    resp1.json = lambda: dict(tsi.CallStartRes(id=call_id, trace_id="test_trace_id"))
-    resp1.status_code = 400
+    resp1 = httpx.Response(
+        400,
+        json=dict(tsi.CallStartRes(id=call_id, trace_id="test_trace_id")),
+    )
 
     mock_post.side_effect = [
         resp1,
     ]
 
     start = generate_start(call_id)
-    with pytest.raises(requests.HTTPError):
+    with pytest.raises(httpx.HTTPStatusError):
         trace_server.call_start(tsi.CallStartReq(start=start))
 
 
@@ -84,24 +85,20 @@ def test_500_502_503_504_429_retry(mock_post, trace_server, monkeypatch):
     monkeypatch.setenv("WEAVE_RETRY_MAX_INTERVAL", "0.1")
     call_id = generate_id()
 
-    resp0 = requests.Response()
-    resp0.status_code = 500
+    resp0 = httpx.Response(500)
 
-    resp1 = requests.Response()
-    resp1.status_code = 502
+    resp1 = httpx.Response(502)
 
-    resp2 = requests.Response()
-    resp2.status_code = 503
+    resp2 = httpx.Response(503)
 
-    resp3 = requests.Response()
-    resp3.status_code = 504
+    resp3 = httpx.Response(504)
 
-    resp4 = requests.Response()
-    resp4.status_code = 429
+    resp4 = httpx.Response(429)
 
-    resp5 = requests.Response()
-    resp5.json = lambda: dict(tsi.CallStartRes(id=call_id, trace_id="test_trace_id"))
-    resp5.status_code = 200
+    resp5 = httpx.Response(
+        200,
+        json=dict(tsi.CallStartRes(id=call_id, trace_id="test_trace_id")),
+    )
 
     mock_post.side_effect = [resp0, resp1, resp2, resp3, resp4, resp5]
     start = generate_start(call_id)
@@ -116,9 +113,10 @@ def test_other_error_retry(mock_post, trace_server, monkeypatch):
     monkeypatch.setenv("WEAVE_RETRY_MAX_INTERVAL", "0.1")
     call_id = generate_id()
 
-    resp2 = requests.Response()
-    resp2.json = lambda: dict(tsi.CallStartRes(id=call_id, trace_id="test_trace_id"))
-    resp2.status_code = 200
+    resp2 = httpx.Response(
+        200,
+        json=dict(tsi.CallStartRes(id=call_id, trace_id="test_trace_id")),
+    )
 
     mock_post.side_effect = [
         ConnectionResetError(),
