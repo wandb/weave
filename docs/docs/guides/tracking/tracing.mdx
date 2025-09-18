@@ -228,23 +228,32 @@ However, often LLM applications have additional logic (such as pre/post processi
 
 <Tabs groupId="programming-language">
   <TabItem value="python" label="Python" default>
-    Sometimes it is useful to get a handle to the `Call` object itself. You can do this by calling the `op.call` method, which returns both the result and the `Call` object. For example:
+    The `Call` object contains various fields of meta data about your decatorated function calls, including their UUIDs, trace IDs, inputs, outputs, and execution times. This information can help you debug your functions and track their performance.
+    
+    To access the `Call` object's data, create a handle to it by calling the `op.call` method on your functions, like this:
 
     ```python showLineNumbers
-    result, call = my_function.call("World")
+    import weave
+
+    weave.init("weave-demo")
+
+    @weave.op
+    def greeting(name: str):
+        return f"Hello, {name}!"
+
+    # Uses `.call` method on `greeting` function
+    result, call = greeting.call("World")
+
+    print(call)
     ```
 
-    Then, `call` can be used to set / update / fetch additional properties (most commonly used to get the ID of the call to be used for feedback).
+    The above example prints the `Call` object. You can then access the object's properties as needed. For example, the following updated `print` statement returns the function calls UUID in your terminal:
 
-    :::note
-    If your op is a method on a class, you need to pass the instance as the first argument to the op (see example below).
-    :::
-
-    ```python showLineNumbers
-    # Notice that we pass the `instance` as the first argument.
-    print(instance.my_method.call(instance, "World"))
+    ```python
+    print(call.id)
     ```
 
+    If your op is a method on a class, you need to pass the instance as the first argument to the op, like this:
 
     ```python showLineNumbers
     import weave
@@ -260,9 +269,20 @@ However, often LLM applications have additional logic (such as pre/post processi
 
     instance = MyClass()
 
-    # Call your method -- Weave will automatically track inputs and outputs
+    # Notice how `instance` is passed as the first argument
     instance.my_method.call(instance, "World")
     ```
+
+    :::warning Exception Handling
+
+    Instead of raising exceptions, `.call()` captures exceptions and stores them in the `call.exception`. If you need to raise exceptions during execution, set the [`__should_raise` parameter](../../reference/python-sdk/weave/trace/weave.trace.op#function-call), like this:
+
+    ```python showLineNumbers
+    # This raises exceptions
+    result, call = foo.call(__should_raise=True)
+    ```
+    :::
+
   </TabItem>
   <TabItem value="typescript" label="TypeScript">
     ```plaintext
@@ -590,14 +610,42 @@ You can also track class and object methods.
 
     print(call)
     ```
-    
-    ### Customize rendered traces with `weave.Markdown`
 
-    Weave makes it easy to tailor how your traced operations are displayed without losing the original data. 
-    With `weave.Markdown`, you can render inputs and outputs as clean, readable blocks of formatted content while preserving the underlying structured data for programmatic access.
-    Use `postprocess_inputs` and `postprocess_output` in your `@weave.op` decorator to enhance trace readability.
+    </TabItem>
+    <TabItem value="typescript" label="TypeScript">
+    ```typescript showLineNumbers
+    import * as weave from 'weave'
 
-    The following code sample uses postprocessors to render a call in Weave to with emojis and nicer formatting:
+    // Initialize the client
+    const client = await weave.init('intro-example')
+
+    // Get a specific call by its ID
+    const call = await client.getCall('call-uuid-here')
+
+    console.log(call)
+    ```
+    </TabItem>
+
+    <TabItem value="service_api" label="HTTP API">
+    To view a call using the Service API, you can make a request to the [`/call/read`](../../reference/service-api/call-read-call-read-post.api.mdx) endpoint.
+
+    ```bash
+    curl -L 'https://trace.wandb.ai/call/read' \
+    -H 'Content-Type: application/json' \
+    -H 'Accept: application/json' \
+    -d '{
+        "project_id": "string",
+        "id": "string",
+    }'
+    ```
+    </TabItem>
+</Tabs>
+
+### Customize rendered traces with `weave.Markdown`
+
+You can use `weave.Markdown` to customize how your trace information is displayed without losing the original data. This allows you to render your inputs and outputs as readable blocks of formatted content while preserving the underlying data structure.
+
+Use `postprocess_inputs` and `postprocess_output` functions in your `@weave.op` decorator to format your trace data. The following code sample uses postprocessors to render a call in Weave with emojis and more readable formatting:
     
     <pre>
     ```python
@@ -658,38 +706,9 @@ You can also track class and object methods.
     ```
     </pre>
 
+In the following screenshot, you can view the difference between the unformatted and formatted outputs, respectively.
+
     ![A call rendered in the Weave UI using the code sample.](imgs/md-call-render.png)
-
-    </TabItem>
-    <TabItem value="typescript" label="TypeScript">
-    ```typescript showLineNumbers
-    import * as weave from 'weave'
-
-    // Initialize the client
-    const client = await weave.init('intro-example')
-
-    // Get a specific call by its ID
-    const call = await client.getCall('call-uuid-here')
-
-    console.log(call)
-    ```
-    </TabItem>
-
-    <TabItem value="service_api" label="HTTP API">
-    To view a call using the Service API, you can make a request to the [`/call/read`](../../reference/service-api/call-read-call-read-post.api.mdx) endpoint.
-
-    ```bash
-    curl -L 'https://trace.wandb.ai/call/read' \
-    -H 'Content-Type: application/json' \
-    -H 'Accept: application/json' \
-    -d '{
-        "project_id": "string",
-        "id": "string",
-    }'
-    ```
-    </TabItem>
-</Tabs>
-
 
 ## Updating Calls
 

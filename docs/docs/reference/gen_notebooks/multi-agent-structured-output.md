@@ -1,6 +1,6 @@
-
-## title: Structured Outputs for Multi-Agent Systems
-
+---
+title: Configure Structured Outputs for Multi-Agent Systems
+---
 
 
 :::tip[This is a notebook]
@@ -12,7 +12,7 @@
 :::
 
 
-## 
+
 <!--- @wandbcode{openai-structured-output} -->
 
 

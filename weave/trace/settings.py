@@ -8,24 +8,6 @@
 * Type: `bool`
 
 If True, all weave ops will behave like regular functions and no network requests will be made.
-
-## `print_call_link`
-
-* Environment Variable: `WEAVE_PRINT_CALL_LINK`
-* Settings Key: `print_call_link`
-* Default: `True`
-* Type: `bool`
-
-If True, prints a link to the Weave UI when calling a weave op.
-
-## `use_parallel_table_upload`
-
-* Environment Variable: `WEAVE_USE_PARALLEL_TABLE_UPLOAD`
-* Settings Key: `use_parallel_table_upload`
-* Default: `False`
-* Type: `bool`
-
-If True, enables parallel table upload chunking for large tables. If False, uses incremental upload method.
 """
 
 import os
@@ -47,7 +29,8 @@ class UserSettings(BaseModel):
     """User configuration for Weave.
 
     All configs can be overridden with environment variables.  The precedence is
-    environment variables > `weave.trace.settings.UserSettings`."""
+    environment variables > `weave.trace.settings.UserSettings`.
+    """
 
     disabled: bool = False
     """Toggles Weave tracing.
@@ -87,6 +70,14 @@ class UserSettings(BaseModel):
     WARNING: Switching between `save_code=True` and `save_code=False` mid-script
     may lead to unexpected behavior.  Make sure this is only set once at the start!
     """
+
+    implicitly_patch_integrations: bool = True
+    """Toggles implicit patching of integrations.
+
+    If True, supported libraries (OpenAI, Anthropic, etc.) are automatically patched
+    when imported, regardless of import order. If False, you must explicitly call
+    patch functions like `weave.integrations.patch_openai()` to enable tracing for integrations.
+    Can be overridden with the environment variable `WEAVE_IMPLICITLY_PATCH_INTEGRATIONS`"""
 
     redact_pii: bool = False
     """Toggles PII redaction using Microsoft Presidio.
@@ -306,6 +297,11 @@ def should_enable_disk_fallback() -> bool:
 def should_use_parallel_table_upload() -> bool:
     """Returns whether parallel table upload chunking should be used."""
     return _should("use_parallel_table_upload")
+
+
+def should_implicitly_patch_integrations() -> bool:
+    """Returns whether implicit patching of integrations is enabled."""
+    return _should("implicitly_patch_integrations")
 
 
 def parse_and_apply_settings(

@@ -63,7 +63,7 @@ def init(
     Args:
         project_name: The name of the Weights & Biases project to log to.
         settings: Configuration for the Weave client generally.
-        autopatch_settings: Configuration for autopatch integrations, e.g. openai
+        autopatch_settings: (Deprecated) Configuration for autopatch integrations. Use explicit patching instead.
         global_postprocess_inputs: A function that will be applied to all inputs of all ops.
         global_postprocess_output: A function that will be applied to all outputs of all ops.
         global_attributes: A dictionary of attributes that will be applied to all traces.
@@ -88,6 +88,19 @@ def init(
             stacklevel=2,
         )
 
+    # Check if deprecated autopatch_settings is used
+    if autopatch_settings is not None:
+        logger.warning(
+            "The 'autopatch_settings' parameter is deprecated and will be removed in a future version. "
+            "Please use explicit patching instead. For example:\n"
+            "----------------------------------------\n"
+            "    import weave\n"
+            f"    weave.init('{project_name}')\n"
+            "    weave.integrations.patch_openai()\n"
+            "----------------------------------------\n"
+            "See https://docs.wandb.ai/guides/integrations for more information.",
+        )
+
     parse_and_apply_settings(settings)
 
     global _global_postprocess_inputs
@@ -103,7 +116,6 @@ def init(
 
     return weave_init.init_weave(
         project_name,
-        autopatch_settings=autopatch_settings,
     )
 
 
@@ -205,7 +217,6 @@ def get(uri: str | ObjectRef) -> Any:
         The object.
 
     Example:
-
     ```python
     weave.init("weave_get_example")
     dataset = weave.Dataset(rows=[{"a": 1, "b": 2}])
@@ -221,11 +232,9 @@ def get(uri: str | ObjectRef) -> Any:
 
 @contextlib.contextmanager
 def attributes(attributes: dict[str, Any]) -> Iterator:
-    """
-    Context manager for setting attributes on a call.
+    """Context manager for setting attributes on a call.
 
     Example:
-
     ```python
     with weave.attributes({'env': 'production'}):
         print(my_function.call("World"))
@@ -273,11 +282,9 @@ class ThreadContext:
 
 @contextlib.contextmanager
 def thread(thread_id: str | None | object = _AUTO_GENERATE) -> Iterator[ThreadContext]:
-    """
-    Context manager for setting thread_id on calls within the context.
+    """Context manager for setting thread_id on calls within the context.
 
     Examples:
-
     ```python
     # Auto-generate thread_id
     with weave.thread() as t:

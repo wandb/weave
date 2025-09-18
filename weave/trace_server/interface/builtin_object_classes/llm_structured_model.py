@@ -40,7 +40,7 @@ class Message(BaseModel):
 def _substitute_template_variables(
     messages: list[Message], template_vars: dict[str, Any]
 ) -> list[Message]:
-    """Substitute template variables using Python's .format()"""
+    """Substitute template variables using Python's .format()."""
     substituted_messages = []
 
     for message in messages:
@@ -139,8 +139,7 @@ class LLMStructuredCompletionModel(Model):
         config: Optional[LLMStructuredModelParamsLike] = None,
         **template_vars: Any,
     ) -> Union[Message, str, dict[str, Any]]:
-        """
-        Generates a prediction by preparing messages (template + user_input)
+        """Generates a prediction by preparing messages (template + user_input)
         and calling the LLM completions endpoint with overridden config, using the provided client.
 
         Args:
@@ -265,8 +264,7 @@ def _prepare_llm_messages(
     template_messages: Optional[list[Message]],
     user_input: list[Message],
 ) -> list[dict[str, Any]]:
-    """
-    Prepares a list of message dictionaries for the LLM API from a message template and user input.
+    """Prepares a list of message dictionaries for the LLM API from a message template and user input.
     Helper function for PlaygroundModel.predict.
     Returns a list of message dictionaries.
     """

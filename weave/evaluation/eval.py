@@ -58,8 +58,7 @@ class EvaluationResults(Object):
 
 @register_object
 class Evaluation(Object):
-    """
-    Sets up an evaluation which includes a set of scorers and a dataset.
+    """Sets up an evaluation which includes a set of scorers and a dataset.
 
     Calling evaluation.evaluate(model) will pass in rows from a dataset into a model matching
         the names of the columns of the dataset to the argument names in model.predict.
@@ -70,7 +69,6 @@ class Evaluation(Object):
     to preprocess_model_input.
 
     Examples:
-
     ```python
     # Collect your examples
     examples = [
@@ -287,8 +285,7 @@ class Evaluation(Object):
         return summary
 
     def get_evaluate_calls(self) -> CallsIter:
-        """
-        Retrieve all evaluation calls that used this Evaluation object.
+        """Retrieve all evaluation calls that used this Evaluation object.
 
         Note that this returns a CallsIter instead of a single call because it's
         possible to have multiple evaluation calls for a single evaluation (e.g.
@@ -324,8 +321,7 @@ class Evaluation(Object):
         )
 
     def get_score_calls(self) -> dict[str, list[Call]]:
-        """
-        Retrieve scorer calls for each evaluation run, grouped by trace ID.
+        """Retrieve scorer calls for each evaluation run, grouped by trace ID.
 
         Returns:
             dict[str, list[Call]]: A dictionary mapping trace IDs to lists of scorer Call objects.
@@ -364,8 +360,7 @@ class Evaluation(Object):
         return d
 
     def get_scores(self) -> dict[str, dict[str, list[Any]]]:
-        """
-        Extract and organize scorer outputs from evaluation runs.
+        """Extract and organize scorer outputs from evaluation runs.
 
         Returns:
             dict[str, dict[str, list[Any]]]: A nested dictionary structure where:

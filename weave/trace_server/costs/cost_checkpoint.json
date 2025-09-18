@@ -10678,5 +10678,837 @@
       "output": 0.0,
       "created_at": "2025-08-28 11:04:13"
     }
+  ],
+  "gpt-realtime": [
+    {
+      "provider": "openai",
+      "input": 4e-06,
+      "output": 1.6e-05,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "gpt-realtime-2025-08-28": [
+    {
+      "provider": "openai",
+      "input": 4e-06,
+      "output": 1.6e-05,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "xai/grok-code-fast-1": [
+    {
+      "provider": "xai",
+      "input": 2e-07,
+      "output": 1.5e-06,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "xai/grok-code-fast": [
+    {
+      "provider": "xai",
+      "input": 2e-07,
+      "output": 1.5e-06,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "xai/grok-code-fast-1-0825": [
+    {
+      "provider": "xai",
+      "input": 2e-07,
+      "output": 1.5e-06,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vertex_ai/openai/gpt-oss-20b-maas": [
+    {
+      "provider": "vertex_ai-openai_models",
+      "input": 7.5e-08,
+      "output": 3e-07,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vertex_ai/openai/gpt-oss-120b-maas": [
+    {
+      "provider": "vertex_ai-openai_models",
+      "input": 1.5e-07,
+      "output": 6e-07,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "openrouter/openai/gpt-4.1": [
+    {
+      "provider": "openrouter",
+      "input": 2e-06,
+      "output": 8e-06,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "openrouter/openai/gpt-4.1-2025-04-14": [
+    {
+      "provider": "openrouter",
+      "input": 2e-06,
+      "output": 8e-06,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "openrouter/openai/gpt-4.1-mini": [
+    {
+      "provider": "openrouter",
+      "input": 4e-07,
+      "output": 1.6e-06,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "openrouter/openai/gpt-4.1-mini-2025-04-14": [
+    {
+      "provider": "openrouter",
+      "input": 4e-07,
+      "output": 1.6e-06,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "openrouter/openai/gpt-4.1-nano": [
+    {
+      "provider": "openrouter",
+      "input": 1e-07,
+      "output": 4e-07,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "openrouter/openai/gpt-4.1-nano-2025-04-14": [
+    {
+      "provider": "openrouter",
+      "input": 1e-07,
+      "output": 4e-07,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "together_ai/deepseek-ai/DeepSeek-V3.1": [
+    {
+      "provider": "together_ai",
+      "input": 6e-07,
+      "output": 1.7e-06,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/alibaba/qwen3-coder": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 4e-07,
+      "output": 1.6e-06,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/mistral/codestral-embed": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 1.5e-07,
+      "output": 0.0,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/google/gemini-2.5-pro": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 2.5e-06,
+      "output": 1e-05,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/deepseek/deepseek-v3": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 9e-07,
+      "output": 9e-07,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/amazon/nova-lite": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 6e-08,
+      "output": 2.4e-07,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/meta/llama-4-scout": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 1e-07,
+      "output": 3e-07,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/meta/llama-3.2-1b": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 1e-07,
+      "output": 1e-07,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/mistral/mistral-small": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 1e-07,
+      "output": 3e-07,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/google/gemini-2.5-flash": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 3e-07,
+      "output": 2.5e-06,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/inception/mercury-coder-small": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 2.5e-07,
+      "output": 1e-06,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/openai/text-embedding-3-small": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 2e-08,
+      "output": 0.0,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/xai/grok-2-vision": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 2e-06,
+      "output": 1e-05,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/xai/grok-2": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 2e-06,
+      "output": 1e-05,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/deepseek/deepseek-r1-distill-llama-70b": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 7.5e-07,
+      "output": 9.9e-07,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/meta/llama-3.1-70b": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 7.2e-07,
+      "output": 7.2e-07,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/xai/grok-3": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/alibaba/qwen-3-235b": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 2e-07,
+      "output": 6e-07,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/xai/grok-3-fast": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 5e-06,
+      "output": 2.5e-05,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/vercel/v0-1.5-md": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/openai/o4-mini": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 1.1e-06,
+      "output": 4.4e-06,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/mistral/magistral-medium": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 2e-06,
+      "output": 5e-06,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/amazon/titan-embed-text-v2": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 2e-08,
+      "output": 0.0,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/alibaba/qwen-3-30b": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 1e-07,
+      "output": 3e-07,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/zai/glm-4.5-air": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 2e-07,
+      "output": 1.1e-06,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/openai/gpt-4-turbo": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 1e-05,
+      "output": 3e-05,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/mistral/mistral-large": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 2e-06,
+      "output": 6e-06,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/perplexity/sonar-pro": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/meta/llama-3.2-90b": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 7.2e-07,
+      "output": 7.2e-07,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/meta/llama-3-8b": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 5e-08,
+      "output": 8e-08,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/google/text-embedding-005": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 2.5e-08,
+      "output": 0.0,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/mistral/pixtral-large": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 2e-06,
+      "output": 6e-06,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/anthropic/claude-3.5-sonnet": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/amazon/nova-micro": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 3.5e-08,
+      "output": 1.4e-07,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/cohere/command-r": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 1.5e-07,
+      "output": 6e-07,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/morph/morph-v3-large": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 9e-07,
+      "output": 1.9e-06,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/mistral/mixtral-8x22b-instruct": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 1.2e-06,
+      "output": 1.2e-06,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/xai/grok-4": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/meta/llama-3.1-8b": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 5e-08,
+      "output": 8e-08,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/anthropic/claude-3-opus": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 1.5e-05,
+      "output": 7.5e-05,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/zai/glm-4.5": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 6e-07,
+      "output": 2.2e-06,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/openai/gpt-4o": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 2.5e-06,
+      "output": 1e-05,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/openai/o3-mini": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 1.1e-06,
+      "output": 4.4e-06,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/mistral/ministral-8b": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 1e-07,
+      "output": 1e-07,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/openai/o3": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 2e-06,
+      "output": 8e-06,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/vercel/v0-1.0-md": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/google/text-multilingual-embedding-002": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 2.5e-08,
+      "output": 0.0,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/amazon/nova-pro": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 8e-07,
+      "output": 3.2e-06,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/morph/morph-v3-fast": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 8e-07,
+      "output": 1.2e-06,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/openai/gpt-3.5-turbo": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 5e-07,
+      "output": 1.5e-06,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/mistral/codestral": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 3e-07,
+      "output": 9e-07,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/meta/llama-3.2-11b": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 1.6e-07,
+      "output": 1.6e-07,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/meta/llama-3-70b": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 5.9e-07,
+      "output": 7.9e-07,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/xai/grok-3-mini-fast": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 6e-07,
+      "output": 4e-06,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/openai/text-embedding-3-large": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 1.3e-07,
+      "output": 0.0,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/google/gemini-2.0-flash-lite": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 7.5e-08,
+      "output": 3e-07,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/mistral/ministral-3b": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 4e-08,
+      "output": 4e-08,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/perplexity/sonar-reasoning-pro": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 2e-06,
+      "output": 8e-06,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/google/gemini-embedding-001": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 1.5e-07,
+      "output": 0.0,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/anthropic/claude-3-haiku": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 2.5e-07,
+      "output": 1.25e-06,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/openai/o1": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 1.5e-05,
+      "output": 6e-05,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/deepseek/deepseek-r1": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 5.5e-07,
+      "output": 2.19e-06,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/mistral/mistral-embed": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 1e-07,
+      "output": 0.0,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/openai/gpt-4.1-mini": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 4e-07,
+      "output": 1.6e-06,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/openai/gpt-4o-mini": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 1.5e-07,
+      "output": 6e-07,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/alibaba/qwen-3-14b": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 8e-08,
+      "output": 2.4e-07,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/anthropic/claude-4-opus": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 1.5e-05,
+      "output": 7.5e-05,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/mistral/mistral-saba-24b": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 7.9e-07,
+      "output": 7.9e-07,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/perplexity/sonar-reasoning": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 1e-06,
+      "output": 5e-06,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/anthropic/claude-3.5-haiku": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 8e-07,
+      "output": 4e-06,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/cohere/command-a": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 2.5e-06,
+      "output": 1e-05,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/google/gemma-2-9b": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 2e-07,
+      "output": 2e-07,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/meta/llama-3.2-3b": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 1.5e-07,
+      "output": 1.5e-07,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/openai/gpt-4.1-nano": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 1e-07,
+      "output": 4e-07,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/anthropic/claude-4-sonnet": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/perplexity/sonar": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 1e-06,
+      "output": 1e-06,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/meta/llama-4-maverick": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 2e-07,
+      "output": 6e-07,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/openai/text-embedding-ada-002": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 1e-07,
+      "output": 0.0,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/xai/grok-3-mini": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 3e-07,
+      "output": 5e-07,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/cohere/embed-v4.0": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 1.2e-07,
+      "output": 0.0,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/meta/llama-3.3-70b": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 7.2e-07,
+      "output": 7.2e-07,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/cohere/command-r-plus": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 2.5e-06,
+      "output": 1e-05,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/openai/gpt-3.5-turbo-instruct": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 1.5e-06,
+      "output": 2e-06,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/mistral/devstral-small": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 7e-08,
+      "output": 2.8e-07,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/anthropic/claude-3.7-sonnet": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 3e-06,
+      "output": 1.5e-05,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/google/gemini-2.0-flash": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 1.5e-07,
+      "output": 6e-07,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/mistral/pixtral-12b": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 1.5e-07,
+      "output": 1.5e-07,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/mistral/magistral-small": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 5e-07,
+      "output": 1.5e-06,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/moonshotai/kimi-k2": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 5.5e-07,
+      "output": 2.2e-06,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/alibaba/qwen-3-32b": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 1e-07,
+      "output": 3e-07,
+      "created_at": "2025-09-03 09:01:00"
+    }
+  ],
+  "vercel_ai_gateway/openai/gpt-4.1": [
+    {
+      "provider": "vercel_ai_gateway",
+      "input": 2e-06,
+      "output": 8e-06,
+      "created_at": "2025-09-03 09:01:00"
+    }
   ]
 }

@@ -1,5 +1,4 @@
-"""
-In memory cache of files sent to the server to avoid sending the same file
+"""In memory cache of files sent to the server to avoid sending the same file
 multiple times, using an LRU (Least Recently Used) eviction policy.
 """
 

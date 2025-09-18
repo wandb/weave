@@ -92,11 +92,9 @@ class Completions:
         # extra_body: Body | None = None,
         # timeout: float | httpx.Timeout | None | NotGiven = NOT_GIVEN,
     ) -> ChatCompletion | ChatCompletionChunkStream:
-        """
-        Creates a completion for the provided prompt and parameters.
+        """Creates a completion for the provided prompt and parameters.
 
         Args:
-
           endpoint: "playground" to use Weave's playground API, "inference" to use the inference service API.
 
           track_llm_call: Whether to track the LLM call.

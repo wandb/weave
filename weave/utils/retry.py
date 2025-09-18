@@ -21,11 +21,10 @@ _retry_id: contextvars.ContextVar[str] = contextvars.ContextVar("retry_id")
 
 
 def with_retry(func: Callable[..., T]) -> Callable[..., T]:
-    """
-    Decorator that applies configurable retry logic to a function.
+    """Decorator that applies configurable retry logic to a function.
     Retry configuration is determined by:
     1. Values from weave.trace.settings (if available)
-    2. Values set via configure_retry()
+    2. Values set via configure_retry().
 
     Automatically generates a retry ID for request correlation across all attempts.
     """

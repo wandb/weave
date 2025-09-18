@@ -1,13 +1,24 @@
 import os
+from collections.abc import Generator
 
 import pytest
 from openai import AsyncOpenAI, OpenAI
 
 import weave
 from weave.integrations.integration_utilities import op_name_from_ref
+from weave.integrations.openai.openai_sdk import get_openai_patcher
 from weave.trace.weave_client import WeaveClient
 
 model = "gpt-4o"
+
+
+@pytest.fixture(autouse=True)
+def patch_openai() -> Generator[None, None, None]:
+    """Patch OpenAI for all tests in this file."""
+    patcher = get_openai_patcher()
+    patcher.attempt_patch()
+    yield
+    patcher.undo_patch()
 
 
 @pytest.mark.skip_clickhouse_client  # TODO:VCR recording does not seem to allow us to make requests to the clickhouse db in non-recording mode
