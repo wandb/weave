@@ -9,10 +9,15 @@ import tenacity
 
 import weave
 from tests.trace.util import capture_output, flushing_callback
+from weave.compat.wandb import termerror, termlog, termwarn
 from weave.trace.constants import TRACE_CALL_EMOJI
+from weave.trace.display.term import configure_logger
 from weave.trace.settings import UserSettings, parse_and_apply_settings
 from weave.trace.weave_client import get_parallelism_settings
 from weave.utils.retry import with_retry
+
+# Configure the logger to ensure proper logging setup
+configure_logger()
 
 
 @weave.op
@@ -52,14 +57,34 @@ def test_disabled_env(client):
     )
 
 
-def test_print_call_link_setting(client_creator):
-    with client_creator(settings=UserSettings(print_call_link=False)) as client:
+def test_print_call_link_setting(client_creator, monkeypatch):
+    # The wandb integration sets WEAVE_SILENT=true which overrides our settings
+    # We need to mock os.getenv to return None for WEAVE_SILENT
+    import os
+
+    original_getenv = os.getenv
+
+    def mock_getenv(key, default=None):
+        # Return None for WEAVE_SILENT to ensure our settings take effect
+        if key == "WEAVE_SILENT":
+            return None
+        return original_getenv(key, default)
+
+    monkeypatch.setattr(os, "getenv", mock_getenv)
+
+    # Now test with print_call_link=False
+    with client_creator(
+        settings=UserSettings(print_call_link=False, silent=False)
+    ) as client:
         callbacks = [flushing_callback(client)]
         with capture_output(callbacks) as captured:
             func()
     assert TRACE_CALL_EMOJI not in captured.getvalue()
 
-    with client_creator(settings=UserSettings(print_call_link=True)) as client:
+    # Test with print_call_link=True
+    with client_creator(
+        settings=UserSettings(print_call_link=True, silent=False)
+    ) as client:
         callbacks = [flushing_callback(client)]
         with capture_output(callbacks) as captured:
             func()
@@ -67,6 +92,12 @@ def test_print_call_link_setting(client_creator):
 
 
 def test_print_call_link_env(client):
+    # Save the original WEAVE_SILENT value
+    original_silent = os.environ.get("WEAVE_SILENT")
+
+    # Set WEAVE_SILENT to false to ensure output is not suppressed
+    os.environ["WEAVE_SILENT"] = "false"
+
     os.environ["WEAVE_PRINT_CALL_LINK"] = "false"
     callbacks = [flushing_callback(client)]
     with capture_output(callbacks) as captured:
@@ -83,6 +114,13 @@ def test_print_call_link_env(client):
 
     # Clean up after test
     del os.environ["WEAVE_PRINT_CALL_LINK"]
+
+    # Restore the original WEAVE_SILENT value
+    if original_silent is not None:
+        os.environ["WEAVE_SILENT"] = original_silent
+    else:
+        if "WEAVE_SILENT" in os.environ:
+            del os.environ["WEAVE_SILENT"]
 
 
 def test_should_capture_code_setting(client):
@@ -326,3 +364,74 @@ def test_retry_max_interval_env(caplog, monkeypatch) -> None:
     assert 25.0 in call_args
 
     del os.environ["WEAVE_RETRY_MAX_INTERVAL"]
+
+
+def test_silent_setting(client_creator):
+    """Test that WEAVE_SILENT disables terminal logging output."""
+    # Test with silent=False (default) - logs should appear
+    with client_creator(settings=UserSettings(silent=False)) as client:
+        callbacks = [flushing_callback(client)]
+        with capture_output(callbacks) as captured:
+            termlog("Test log message")
+            termwarn("Test warning message")
+            termerror("Test error message")
+            func()  # This should print call link
+        output = captured.getvalue()
+        assert "Test log message" in output
+        assert "Test warning message" in output
+        assert "Test error message" in output
+        assert TRACE_CALL_EMOJI in output
+
+    # Test with silent=True - logs should not appear
+    with client_creator(settings=UserSettings(silent=True)) as client:
+        callbacks = [flushing_callback(client)]
+        with capture_output(callbacks) as captured:
+            termlog("Test log message")
+            termwarn("Test warning message")
+            termerror("Test error message")
+            func()  # This should not print call link
+        output = captured.getvalue()
+        assert "Test log message" not in output
+        assert "Test warning message" not in output
+        assert "Test error message" not in output
+        assert TRACE_CALL_EMOJI not in output
+
+
+def test_silent_env(client):
+    """Test that WEAVE_SILENT environment variable disables terminal logging."""
+    # Save the original WEAVE_SILENT value
+    original_silent = os.environ.get("WEAVE_SILENT")
+
+    try:
+        # Test with WEAVE_SILENT=false - logs should appear
+        os.environ["WEAVE_SILENT"] = "false"
+        callbacks = [flushing_callback(client)]
+        with capture_output(callbacks) as captured:
+            termlog("Test log message")
+            termwarn("Test warning message")
+            termerror("Test error message")
+            func()
+        output = captured.getvalue()
+        assert "Test log message" in output
+        assert "Test warning message" in output
+        assert "Test error message" in output
+
+        # Test with WEAVE_SILENT=true - logs should not appear
+        os.environ["WEAVE_SILENT"] = "true"
+        callbacks = [flushing_callback(client)]
+        with capture_output(callbacks) as captured:
+            termlog("Test log message")
+            termwarn("Test warning message")
+            termerror("Test error message")
+            func()
+        output = captured.getvalue()
+        assert "Test log message" not in output
+        assert "Test warning message" not in output
+        assert "Test error message" not in output
+    finally:
+        # Restore the original WEAVE_SILENT value
+        if original_silent is not None:
+            os.environ["WEAVE_SILENT"] = original_silent
+        else:
+            if "WEAVE_SILENT" in os.environ:
+                del os.environ["WEAVE_SILENT"]
