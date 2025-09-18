@@ -8,7 +8,7 @@ from typing import Any, Callable
 from pydantic import BaseModel
 
 from weave.trace.op import is_op
-from weave.trace_server.client_server_common.pydantic_util import (
+from weave.trace_server.client_server_common.pydantic_util import (  # noqa: TID251
     pydantic_asdict_one_level,
 )
 
