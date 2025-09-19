@@ -8,6 +8,28 @@ from pydantic_core import ValidationError
 
 logger = logging.getLogger(__name__)
 
+"""
+Heavily inspired/originally based on this file from Azure:
+https://raw.githubusercontent.com/Azure-Samples/aoai-realtime-audio-sdk/refs/heads/main/python/rtclient/models.py
+
+Note that this file defines types for the OpenAI beta API and does not support the GA release
+
+Modifications for ease of development were made to:
+    1. Specify when IDs are definitely present or not instead of making them optional
+    2. Seperating what was originally the same class when it has or lacks fields depending on the source (client or server)
+
+
+Ideally we would move to the types in the openai sdk
+beta - https://github.com/openai/openai-python/tree/main/src/openai/types/beta/realtime
+GA - https://github.com/openai/openai-python/tree/main/src/openai/types/realtime
+
+Unfortunately model validation for incoming/outgoing messages for perfectly functional clients continually fails for these types
+Additionally, development is much simpler by 
+The official sdk provides wrappers for interacting with the websockets that likely validate and modify missing fields from the user
+It's likely that the types will stabilize or we can wrap them in some way to be less strict, but for now this file is necessary
+
+This will get a second pass when support for the GA version of realtime is added and be deleted in the future.
+"""
 
 def is_conv_id(id: str) -> str:
     """ID for a conversation such as "conv_C9IkmOhAf8dw7uQyToBFI"."""
