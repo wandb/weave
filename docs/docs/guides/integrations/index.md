@@ -87,6 +87,9 @@ Frameworks help orchestrate the actual execution pipelines in AI applications. T
 - **[Agno](/guides/integrations/agno.md)**
 - **[Koog](/guides/integrations/koog.md)**
 
+## RL Frameworks
+- **[Verifiers](/guides/integrations/verifiers)**
+
 ## Protocols
 
 Weave integrates with standardized protocols that enable communication between AI applications and their supporting services:

@@ -214,6 +214,15 @@ const sidebars: SidebarsConfig = {
         {
           type: "category",
           collapsible: true,
+          collapsed: true,
+          label: "RL Frameworks",
+          items: [
+            "guides/integrations/verifiers",
+          ],
+        },
+        {
+          type: "category",
+          collapsible: true,
           collapsed: false,
           label: "Protocols",
           link: { type: "doc", id: "guides/integrations/index"},
