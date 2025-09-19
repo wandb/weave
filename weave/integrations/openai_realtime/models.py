@@ -24,12 +24,12 @@ beta - https://github.com/openai/openai-python/tree/main/src/openai/types/beta/r
 GA - https://github.com/openai/openai-python/tree/main/src/openai/types/realtime
 
 Unfortunately model validation for incoming/outgoing messages for perfectly functional clients continually fails for these types
-Additionally, development is much simpler by 
 The official sdk provides wrappers for interacting with the websockets that likely validate and modify missing fields from the user
 It's likely that the types will stabilize or we can wrap them in some way to be less strict, but for now this file is necessary
 
 This will get a second pass when support for the GA version of realtime is added and be deleted in the future.
 """
+
 
 def is_conv_id(id: str) -> str:
     """ID for a conversation such as "conv_C9IkmOhAf8dw7uQyToBFI"."""
@@ -81,7 +81,18 @@ CallID = Annotated[str, AfterValidator(is_call_id)]
 ConversationID = Annotated[str, AfterValidator(is_conv_id)]
 
 # https://platform.openai.com/docs/api-reference/realtime-client-events/session/update
-Voice=Literal["alloy", "ash", "ballad", "coral", "echo", "sage", "shimmer", "verse", "marin", "cedar"]
+Voice = Literal[
+    "alloy",
+    "ash",
+    "ballad",
+    "coral",
+    "echo",
+    "sage",
+    "shimmer",
+    "verse",
+    "marin",
+    "cedar",
+]
 AudioFormat = Literal["pcm16", "g711-ulaw", "g711-alaw"]
 Modality = Literal["text", "audio"]
 
