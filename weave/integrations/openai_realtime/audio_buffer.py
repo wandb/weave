@@ -1,4 +1,5 @@
 import base64
+import binascii
 import logging
 from dataclasses import dataclass, field
 
@@ -25,7 +26,7 @@ class AudioBufferManager:
         """Decode base64 audio and extend buffer. Ignores invalid payloads gracefully."""
         try:
             self.buffer.extend(base64.b64decode(b64))
-        except Exception as e:
+        except binascii.Error as e:
             # Some fixtures use placeholder strings like "<audio bytes>".
             # Skip invalid base64 without failing the pipeline, but log for visibility.
             logger.warning(
