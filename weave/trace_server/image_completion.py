@@ -73,7 +73,7 @@ def _process_image_data_item(
 
     except Exception as e:
         # Don't raise - just log the error and return the original item
-        processed_item["processing_error"] = str(e)
+        processed_item["error"] = str(e)
 
     return processed_item
 
@@ -181,23 +181,20 @@ def lite_llm_image_generation(
 
         # Convert images to Content objects and create message format
         if "data" in response_data:
-            try:
-                data_list = response_data.get("data", [])
-                if isinstance(data_list, list):
-                    for index, data_item in enumerate(data_list):
-                        if isinstance(data_item, dict):
-                            processed_item = _process_image_data_item(
-                                data_item, index, trace_server, project_id, wb_user_id
-                            )
+            data_list = response_data.get("data", [])
+            if isinstance(data_list, list):
+                for index, data_item in enumerate(data_list):
+                    if isinstance(data_item, dict):
+                        processed_item = _process_image_data_item(
+                            data_item, index, trace_server, project_id, wb_user_id
+                        )
 
-                            if "b64_json" in processed_item:
-                                data_item["b64_json"] = processed_item["b64_json"]
-                            if "url" in processed_item:
-                                data_item["url"] = processed_item["url"]
-
-            except Exception as e:
-                # Continue without failing - the response will still contain the original data
-                pass
+                        if "b64_json" in processed_item:
+                            data_item["b64_json"] = processed_item["b64_json"]
+                        if "url" in processed_item:
+                            data_item["url"] = processed_item["url"]
+                        if "error" in processed_item:
+                            response_data["error"] = processed_item["error"]
 
         return tsi.ImageGenerationCreateRes(response=response_data)
     except Exception as e:
