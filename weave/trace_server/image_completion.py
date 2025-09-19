@@ -65,8 +65,6 @@ def _process_image_data_item(
                 b64_data,
                 metadata={"source_index": index, "_original_schema": "b64_json"},
             )
-            # Clear/mark the original base64 data as converted
-            processed_item["b64_json"] = "Converted to Content"
 
         # Store the Content object if we created one
         if content_obj is not None:

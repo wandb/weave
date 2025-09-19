@@ -2068,19 +2068,19 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             tsi.ImageGenerationCreateRes: The image generation response.
         """
         # Validate input parameters
-        if not req.inputs.model:
+        if req.inputs.model is None:
             return tsi.ImageGenerationCreateRes(
                 response={"error": "No model specified in request"}
             )
 
-        if not req.inputs.prompt:
+        if req.inputs.prompt is None:
             return tsi.ImageGenerationCreateRes(
                 response={"error": "No prompt specified in request"}
             )
 
         # Get API key from secret fetcher
         secret_fetcher = _secret_fetcher_context.get()
-        if not secret_fetcher:
+        if secret_fetcher is None:
             return tsi.ImageGenerationCreateRes(
                 response={"error": "No secret fetcher available"}
             )
@@ -2091,7 +2091,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             .get("OPENAI_API_KEY")
         )
 
-        if not api_key:
+        if api_key is None:
             return tsi.ImageGenerationCreateRes(
                 response={"error": "No OpenAI API key found"}
             )
@@ -2119,7 +2119,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         end_time = datetime.datetime.now()
 
         # Return response directly if not tracking calls
-        if not req.track_llm_call:
+        if req.track_llm_call is False:
             return res
 
         # Capture all input fields for call tracking
