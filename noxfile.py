@@ -94,6 +94,7 @@ trace_server_shards = [f"trace{i}" for i in range(1, NUM_TRACE_SERVER_SHARDS + 1
         "notdiamond",
         "openai",
         "openai_agents",
+        "openai_realtime",
         "vertexai",
         "bedrock",
         "scorers",
