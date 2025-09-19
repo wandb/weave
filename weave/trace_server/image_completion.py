@@ -1,113 +1,11 @@
-import base64
-import json
 from typing import Any, Optional
 
-import requests
-
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.base64_content_conversion import store_content_object
 from weave.trace_server.errors import (
     InvalidRequest,
 )
-from weave.trace_server.trace_server_interface_util import str_digest
 from weave.type_wrappers.Content.content import Content
-
-
-def _download_image_from_url(url: str) -> bytes:
-    response = requests.get(url, timeout=30)
-    response.raise_for_status()
-    return response.content
-
-
-def _decode_base64_image(b64_data: str) -> bytes:
-    # Remove data URL prefix if present (e.g., "data:image/png;base64,")
-    if b64_data.startswith("data:"):
-        b64_data = b64_data.split(",", 1)[1]
-
-    # Validate base64 before decoding
-    import re
-
-    if not re.match(r"^[A-Za-z0-9+/]*={0,2}$", b64_data):
-        raise ValueError("Invalid base64 characters in image data")
-
-    decoded = base64.b64decode(b64_data, validate=True)
-    return decoded
-
-
-def create_content_object(
-    data: bytes,
-    original_schema: str,
-    project_id: str,
-    trace_server: Any,
-    mimetype: Optional[str] = None,
-    wb_user_id: Optional[str] = None,
-) -> str:
-    """
-    Create a proper Content object structure and store its files.
-
-    Args:
-        data: Raw byte content
-        original_schema: The schema to restore the original base64 string
-        project_id: Project ID for storage
-        trace_server: Trace server instance for file storage
-        mimetype: MIME type of the content
-        wb_user_id: User ID for object creation
-
-    Returns:
-        str: Weave internal reference URI to the stored Content object
-
-    Examples:
-        Create and store a Content object::
-
-            ref = create_content_object(
-                image_data,
-                "url",
-                project_id,
-                trace_server,
-                "image/png"
-            )
-    """
-    content_obj: Content = Content.from_bytes(
-        data, mimetype=mimetype, metadata={"_original_schema": original_schema}
-    )
-
-    content_data = content_obj.data
-    metadata_data = json.dumps(content_obj.model_dump(exclude={"data"})).encode("utf-8")
-
-    # Create files in storage
-    # 1. Store the actual content
-    content_req = tsi.FileCreateReq(
-        project_id=project_id, name="content", content=content_data
-    )
-    content_res = trace_server.file_create(content_req)
-
-    # 2. Store the metadata
-    metadata_req = tsi.FileCreateReq(
-        project_id=project_id, name="metadata.json", content=metadata_data
-    )
-    metadata_res = trace_server.file_create(metadata_req)
-
-    # We exclude the load op because it isn't possible to get from the server side
-    content_obj_dict = {
-        "_type": "CustomWeaveType",
-        "weave_type": {"type": "weave.type_wrappers.Content.content.Content"},
-        "files": {"content": content_res.digest, "metadata.json": metadata_res.digest},
-    }
-    content_obj_digest = str_digest(json.dumps(content_obj_dict))
-    object_id = f"content_{content_obj_digest}"
-
-    ref_digest = trace_server.obj_create(
-        tsi.ObjCreateReq(
-            obj=tsi.ObjSchemaForInsert(
-                project_id=project_id,
-                object_id=object_id,
-                val=content_obj_dict,
-                wb_user_id=wb_user_id,
-            )
-        )
-    )
-
-    ref = f"weave-trace-internal:///{project_id}/object/{object_id}:{ref_digest.digest}"
-    return ref
 
 
 def _process_image_data_item(
@@ -117,8 +15,7 @@ def _process_image_data_item(
     project_id: Optional[str] = None,
     wb_user_id: Optional[str] = None,
 ) -> dict[str, Any]:
-    """
-    Process a single image data item, downloading/decoding and creating Content objects.
+    """Process a single image data item, creating Content objects from URLs or base64 data.
 
     Args:
         data_item (dict): The image data item from the API response.
@@ -145,28 +42,15 @@ def _process_image_data_item(
     processed_item = data_item.copy()
 
     try:
+        content_obj = None
+
         # Handle URL-based images
         if "url" in data_item and data_item["url"] and trace_server and project_id:
             url = data_item["url"]
-            image_data = _download_image_from_url(url)
-
-            # Try to infer mimetype from URL
-            mimetype = "image/png"  # Default
-            if url.lower().endswith(".jpg") or url.lower().endswith(".jpeg"):
-                mimetype = "image/jpeg"
-            elif url.lower().endswith(".webp"):
-                mimetype = "image/webp"
-
-            # Create proper Content object with file storage
-            content_ref = create_content_object(
-                data=image_data,
-                original_schema="url",
-                project_id=project_id,
-                trace_server=trace_server,
-                mimetype=mimetype,
-                wb_user_id=wb_user_id,
+            # Use Content.from_url() to handle download and content creation
+            content_obj = Content.from_url(
+                url, metadata={"source_index": index, "_original_schema": "url"}
             )
-            processed_item["content_ref"] = content_ref
 
         # Handle base64-encoded images
         elif (
@@ -176,21 +60,19 @@ def _process_image_data_item(
             and project_id
         ):
             b64_data = data_item["b64_json"]
-            image_data = _decode_base64_image(b64_data)
-
-            # Create proper Content object with file storage
-            content_ref = create_content_object(
-                data=image_data,
-                original_schema="b64_json",
-                project_id=project_id,
-                trace_server=trace_server,
-                mimetype="image/png",  # Base64 images are typically PNG
-                wb_user_id=wb_user_id,
+            # Use Content.from_base64() to handle decoding and content creation
+            content_obj = Content.from_base64(
+                b64_data,
+                metadata={"source_index": index, "_original_schema": "b64_json"},
             )
-            processed_item["content_ref"] = content_ref
-
             # Clear/mark the original base64 data as converted
             processed_item["b64_json"] = "Converted to Content"
+
+        # Store the Content object if we created one
+        if content_obj is not None:
+            # Use the existing store_content_object helper
+            content_dict = store_content_object(content_obj, project_id, trace_server)
+            processed_item["content"] = content_dict
 
     except Exception as e:
         # Don't raise - just log the error and return the original item
@@ -209,8 +91,7 @@ def lite_llm_image_generation(
     project_id: Optional[str] = None,
     wb_user_id: Optional[str] = None,
 ) -> tsi.ImageGenerationCreateRes:
-    """
-    Generate images using LiteLLM image generation.
+    """Generate images using LiteLLM image generation.
 
     Args:
         api_key (Optional[str]): The API key for the LLM provider.
@@ -301,21 +182,30 @@ def lite_llm_image_generation(
             )
             response_data["usage"]["total_tokens"] = usage.get("total_tokens") or 0
 
-        # Process and convert images to Content objects
+        # Convert images to Content objects and create message format
         if "data" in response_data:
             try:
                 data_list = response_data.get("data", [])
                 if isinstance(data_list, list):
-                    processed_data = []
+                    content_items = []
                     for index, data_item in enumerate(data_list):
                         if isinstance(data_item, dict):
                             processed_item = _process_image_data_item(
                                 data_item, index, trace_server, project_id, wb_user_id
                             )
-                            processed_data.append(processed_item)
-                        else:
-                            processed_data.append(data_item)
-                    response_data["data"] = processed_data
+
+                            # If we created a Content object, add it directly to content
+                            if "content" in processed_item:
+                                content_items.append(
+                                    {
+                                        "type": "image",
+                                        "image": processed_item["content"],
+                                    }
+                                )
+
+                    # Create a message-style response that MessagePanel can render
+                    response_data["content"] = content_items
+
             except Exception as e:
                 # Continue without failing - the response will still contain the original data
                 pass

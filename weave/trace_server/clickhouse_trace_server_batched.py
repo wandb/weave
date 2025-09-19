@@ -2059,8 +2059,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def image_create(
         self, req: tsi.ImageGenerationCreateReq
     ) -> tsi.ImageGenerationCreateRes:
-        """
-        Create images using LLM image generation.
+        """Create images using LLM image generation.
 
         Args:
             req (tsi.ImageGenerationCreateReq): The image generation request.
