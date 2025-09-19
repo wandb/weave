@@ -655,3 +655,45 @@ def test_evaluation_invalid_model_name_fixable(model_name):
 def test_evaluation_invalid_model_name_not_fixable(model_name):
     with pytest.raises(ValueError):
         weave.EvaluationLogger(model=model_name)
+
+
+def test_evaluation_logger_with_predefined_scorers(client, caplog):
+    """Test that EvaluationLogger can track predefined scorers and warn when using unlisted ones."""
+    import logging
+
+    # Create evaluation with predefined scorer names
+    ev = EvaluationLogger(
+        model="test_model",
+        dataset=[{"input": 1}],
+        scorers=["accuracy", "precision"],  # List of allowed scorer names
+    )
+
+    with caplog.at_level(logging.WARNING):
+        pred = ev.log_prediction({"input": 1}, 1)
+
+        # These should not warn (in the predefined list)
+        pred.log_score("accuracy", 0.9)
+        pred.log_score({"name": "precision"}, 0.85)
+
+        # This should warn (not in the predefined list)
+        pred.log_score("recall", 0.8)
+
+        pred.finish()
+
+    # Verify warning was issued for unlisted scorer
+    warning_messages = [r.message for r in caplog.records]
+    assert any(
+        "recall" in msg and "not in the predefined scorers list" in msg
+        for msg in warning_messages
+    )
+    assert any(
+        "Expected one of: ['accuracy', 'precision']" in msg for msg in warning_messages
+    )
+
+    ev.finish()
+    client.flush()
+
+    # Verify scorers are stored in evaluation attributes
+    calls = client.get_calls()
+    eval_call = next(c for c in calls if op_name_from_call(c) == "Evaluation.evaluate")
+    assert eval_call.inputs["self"].attributes["scorers"] == ["accuracy", "precision"]
