@@ -69,6 +69,9 @@ class ConversationManager:
             "session.created": adapt_handler(
                 models.SessionCreatedMessage, self.state.handle_session_created
             ),
+            "session.update": adapt_handler(
+                models.SessionUpdateMessage, self.state.handle_session_update
+            ),
             "session.updated": adapt_handler(
                 models.SessionUpdatedMessage, self.state.handle_session_updated
             ),
