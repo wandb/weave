@@ -92,12 +92,11 @@ class Status:
 
     def as_weave_status(self) -> Optional[tsi.TraceStatus]:
         """Convert from protobuf enum value to StatusCode."""
-        if self.code == StatusCode.OK:
-            return tsi.TraceStatus.SUCCESS
-        elif self.code == StatusCode.ERROR:
+        if self.code == StatusCode.ERROR:
             return tsi.TraceStatus.ERROR
-        # UNSET: This is not 'running' because if the trace was sent the call completed
-        return None
+        else:
+            # UNSET or OK: This is not 'running' because if the trace was sent the call completed
+            return tsi.TraceStatus.SUCCESS
 
     def as_dict(self) -> dict[str, Any]:
         return to_json_serializable(
@@ -330,9 +329,6 @@ class Span:
             if model_parameters:
                 model = model_parameters.get("model")
 
-        usage_key = model or "usage"
-        summary_insert_map = tsi.SummaryInsertMap(usage={usage_key: llm_usage})
-
         has_attributes = len(attributes) > 0
         has_inputs = len(inputs) > 0
         # Outputs might be str, int, bytes
@@ -370,6 +366,15 @@ class Span:
                 use_delimiter_in_abbr=False,
             )
 
+        weave_summary = tsi.WeaveSummarySchema(
+            status=self.status.as_weave_status(),
+            latency_ms=int(self.duration_ms),
+            trace_name=op_name,
+        )
+
+        usage_key = model or "usage"
+
+        summary_map = tsi.SummaryMap(weave=weave_summary, usage={usage_key: llm_usage})
         start_call = tsi.StartedCallSchemaForInsert(
             project_id=project_id,
             id=self.span_id,
@@ -396,7 +401,7 @@ class Span:
             ended_at=end_time,
             exception=exception_msg,
             output=outputs,
-            summary=summary_insert_map,
+            summary=summary_map,
         )
         return (start_call, end_call)
 
