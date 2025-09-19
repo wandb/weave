@@ -69,7 +69,7 @@ class SessionSpan(BaseModel):
             self.last_update = None
             return
 
-        if isinstance(self.last_update, Callable):
+        if not isinstance(self.last_update, Call):
             call = self.last_update(self.root_call)
         else:
             call = self.last_update
@@ -81,7 +81,7 @@ class SessionSpan(BaseModel):
         self.session = models.Session.model_validate(msg.session.model_dump())
         wc = require_weave_client()
         if not self.session or not self.session.id:
-            # Registed a CB since updated will run after created
+            # Registered a CB since updated will run after created
             def update_cb(root_call: Call) -> Call:
                 return wc.create_call(
                     "realtime.session.update",
@@ -126,7 +126,6 @@ class StateExporter(BaseModel):
         Field(default_factory=dict)
     )
     # Map conversation -> call
-    conversation_responses: dict[models.ConversationID, list[models.ResponseID]] = {}
     conversation_calls: dict[models.ConversationID, Call] = Field(default_factory=dict)
     timeline: list[Union[models.ItemID, models.ResponseID]] = Field(
         default_factory=list
@@ -596,7 +595,7 @@ class StateExporter(BaseModel):
             next_item_id = self.next_by_item.get(item.id)
         return items
 
-    def on_exit(self):
+    def on_exit(self) -> None:
         wc = require_weave_client()
         if self.session_span and self.session_span.root_call:
             # Complete it with the final state of the session
