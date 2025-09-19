@@ -1,8 +1,11 @@
+from __future__ import annotations
+
 import logging
 import threading
-from typing import Any, Callable, Optional, Self, Union, cast
+from typing import Any, Callable, cast
 
 from pydantic import BaseModel, Field
+from typing_extensions import Self
 
 from weave.integrations.openai_realtime import models
 from weave.integrations.openai_realtime.audio_buffer import AudioBufferManager
@@ -13,20 +16,20 @@ from weave.type_wrappers.Content import Content
 
 logger = logging.getLogger(__name__)
 
-DeltaMessage = Union[
-    models.ResponseTextDeltaMessage,
-    models.ResponseAudioDeltaMessage,
-    models.ResponseAudioTranscriptDeltaMessage,
-    models.ResponseFunctionCallArgumentsDeltaMessage,
-]
-StoredItem = Union[models.ServerItem, models.ResponseItem]
+DeltaMessage = (
+    models.ResponseTextDeltaMessage
+    | models.ResponseAudioDeltaMessage
+    | models.ResponseAudioTranscriptDeltaMessage
+    | models.ResponseFunctionCallArgumentsDeltaMessage
+)
+StoredItem = models.ServerItem | models.ResponseItem
 
 
 class SessionSpan(BaseModel):
     model_config = {"arbitrary_types_allowed": True}
-    root_call: Optional[Call] = None
-    last_update: Optional[Union[Call, Callable[[Call], Call]]] = None
-    session: Optional[models.Session] = None
+    root_call: Call | None = None
+    last_update: Call | Callable[[Call], Call] | None = None
+    session: models.Session | None = None
 
     def get_root_call(self) -> Call | None:
         return self.root_call
@@ -35,7 +38,7 @@ class SessionSpan(BaseModel):
         return self.session
 
     @classmethod
-    def from_session(cls, session: Optional[models.Session] = None) -> Self:
+    def from_session(cls, session: models.Session | None = None) -> Self:
         root_call = None
         if session:
             wc = require_weave_client()
@@ -99,13 +102,13 @@ class SessionSpan(BaseModel):
 
 
 class ItemRegistry:
-    speech_markers: dict[models.ItemID, dict[str, Optional[int]]] = Field(
+    speech_markers: dict[models.ItemID, dict[str, int | None]] = Field(
         default_factory=dict
     )
     input_audio_buffer: AudioBufferManager = Field(default_factory=AudioBufferManager)
 
     # ---- Convenience lookups ----
-    def get_audio_segment(self, item_id: models.ItemID) -> Optional[bytes]:
+    def get_audio_segment(self, item_id: models.ItemID) -> bytes | None:
         markers = self.speech_markers.get(item_id)
         if not markers:
             return None
@@ -120,30 +123,30 @@ class ItemRegistry:
 
 class StateExporter(BaseModel):
     model_config = {"arbitrary_types_allowed": True}
-    session_span: Optional[SessionSpan] = None
+    session_span: SessionSpan | None = None
     # Map conversation -> response ids
     conversation_responses: dict[models.ConversationID, list[models.ResponseID]] = (
         Field(default_factory=dict)
     )
     # Map conversation -> call
     conversation_calls: dict[models.ConversationID, Call] = Field(default_factory=dict)
-    timeline: list[Union[models.ItemID, models.ResponseID]] = Field(
+    timeline: list[models.ItemID | models.ResponseID] = Field(
         default_factory=list
     )
     committed_item_ids: set[models.ItemID] = Field(default_factory=set)
 
     transcript_completed: set[models.ItemID] = Field(default_factory=set)
-    items: dict[models.ItemID, Union[models.ServerItem, models.ResponseItem]] = Field(
+    items: dict[models.ItemID, models.ServerItem | models.ResponseItem] = Field(
         default_factory=dict
     )
-    last_input_item_id: Optional[models.ItemID] = (
+    last_input_item_id: models.ItemID | None = (
         None  # Last message item not generated as part ofa response
     )
 
-    prev_by_item: dict[models.ItemID, Optional[models.ItemID]] = Field(
+    prev_by_item: dict[models.ItemID, models.ItemID | None] = Field(
         default_factory=dict
     )
-    next_by_item: dict[models.ItemID, Optional[models.ItemID]] = Field(
+    next_by_item: dict[models.ItemID, models.ItemID | None] = Field(
         default_factory=dict
     )
 
@@ -153,7 +156,7 @@ class StateExporter(BaseModel):
     user_messages: dict[models.ItemID, models.ClientUserMessageItem] = Field(
         default_factory=dict
     )  # For efficiency we don't convert back to base64
-    user_speech_markers: dict[models.ItemID, dict[str, Optional[int]]] = Field(
+    user_speech_markers: dict[models.ItemID, dict[str, int | None]] = Field(
         default_factory=dict
     )
 
@@ -170,16 +173,16 @@ class StateExporter(BaseModel):
     pending_completions: dict[models.ResponseID, dict[str, Any]] = Field(
         default_factory=dict
     )
-    fifo_timer: Optional[threading.Timer] = None
+    fifo_timer: threading.Timer | None = None
     fifo_lock: threading.Lock = Field(default_factory=threading.Lock)
 
-    pending_response: Optional[models.Response] = None
-    pending_create_params: Optional[models.ResponseCreateParams] = None
+    pending_response: models.Response | None = None
+    pending_create_params: models.ResponseCreateParams | None = None
 
     def __init__(self) -> None:
         super().__init__()
 
-    def _get_item_audio(self, item_id: models.ItemID) -> Optional[bytes]:
+    def _get_item_audio(self, item_id: models.ItemID) -> bytes | None:
         markers = self.user_speech_markers.get(item_id)
         if not markers:
             return None
@@ -298,7 +301,7 @@ class StateExporter(BaseModel):
 
     def _get_input_item_list(
         self, output: list[models.ResponseItem]
-    ) -> list[Union[models.ResponseItem, models.ServerItem]]:
+    ) -> list[models.ResponseItem | models.ServerItem]:
         if len(output) > 1:
             logger.error("Inputs for multi-output responses are not yet supported")
             return []
@@ -311,7 +314,7 @@ class StateExporter(BaseModel):
         else:
             item = output[0]
         prev_id = self.prev_by_item.get(item.id)
-        inputs: list[Union[models.ResponseItem, models.ServerItem]] = []
+        inputs: list[models.ResponseItem | models.ServerItem] = []
         if not prev_id:
             return inputs
         prev_item = self.items.get(prev_id)
@@ -344,7 +347,7 @@ class StateExporter(BaseModel):
         # A transcript becoming available may unblock the head of the FIFO
         self._schedule_fifo_check()
 
-    def _resolve_audio(self, msg: Union[models.ResponseItem, models.ServerItem]) -> Any:
+    def _resolve_audio(self, msg: models.ResponseItem | models.ServerItem) -> Any:
         if not msg.type == "message":
             return msg.model_dump()
         msg_dict = msg.model_dump()
@@ -368,9 +371,9 @@ class StateExporter(BaseModel):
     def _handle_response_done_inner(
         self,
         msg: models.ResponseDoneMessage,
-        session: Optional[models.Session] = None,
-        pending_create_params: Optional[models.ResponseCreateParams] = None,
-        messages: Optional[list[Union[models.ResponseItem, models.ServerItem]]] = None,
+        session: models.Session | None = None,
+        pending_create_params: models.ResponseCreateParams | None = None,
+        messages: list[models.ResponseItem | models.ServerItem] | None = None,
     ) -> None:
         """Note: This is pretty ugly but it achieves something that is worth the bloat.
         Transcription results can occur far after a response to audio is received.
@@ -574,7 +577,7 @@ class StateExporter(BaseModel):
 
     def build_conversation_forward(
         self, item_id: models.ItemID
-    ) -> list[Union[models.ResponseItem, models.ServerItem]]:
+    ) -> list[models.ResponseItem | models.ServerItem]:
         item = self.items.get(item_id)
         if not item:
             return []
