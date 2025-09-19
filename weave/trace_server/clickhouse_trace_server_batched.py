@@ -2063,7 +2063,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         Args:
                     req (tsi.ImageGenerationCreateReq): The image generation request.
-        yeop
                 Returns:
                     tsi.ImageGenerationCreateRes: The image generation response.
         """
