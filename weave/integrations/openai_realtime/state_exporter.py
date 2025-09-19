@@ -16,14 +16,6 @@ from weave.type_wrappers.Content import Content
 
 logger = logging.getLogger(__name__)
 
-DeltaMessage = (
-    models.ResponseTextDeltaMessage
-    | models.ResponseAudioDeltaMessage
-    | models.ResponseAudioTranscriptDeltaMessage
-    | models.ResponseFunctionCallArgumentsDeltaMessage
-)
-StoredItem = models.ServerItem | models.ResponseItem
-
 
 class SessionSpan(BaseModel):
     model_config = {"arbitrary_types_allowed": True}
