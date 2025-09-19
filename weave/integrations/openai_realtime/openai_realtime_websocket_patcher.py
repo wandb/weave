@@ -3,14 +3,11 @@ from __future__ import annotations
 import importlib
 import logging
 from functools import wraps
-from typing import TYPE_CHECKING, Any, Callable
+from typing import Any, Callable
 
 from weave.integrations.openai_realtime import connection
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings
-
-if TYPE_CHECKING:
-    pass
 
 _websocket_patcher: MultiPatcher | None = None
 

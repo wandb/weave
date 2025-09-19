@@ -58,8 +58,8 @@ ResponseID = Annotated[str, AfterValidator(is_resp_id)]
 CallID = Annotated[str, AfterValidator(is_call_id)]
 ConversationID = Annotated[str, AfterValidator(is_conv_id)]
 
-
-Voice = Literal["alloy", "shimmer", "echo"]
+# https://platform.openai.com/docs/api-reference/realtime-client-events/session/update
+Voice=Literal["alloy", "ash", "ballad", "coral", "echo", "sage", "shimmer", "verse", "marin", "cedar"]
 AudioFormat = Literal["pcm16", "g711-ulaw", "g711-alaw"]
 Modality = Literal["text", "audio"]
 
