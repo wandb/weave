@@ -2062,10 +2062,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         """Create images using LLM image generation.
 
         Args:
-            req (tsi.ImageGenerationCreateReq): The image generation request.
-
-        Returns:
-            tsi.ImageGenerationCreateRes: The image generation response.
+                    req (tsi.ImageGenerationCreateReq): The image generation request.
+        yeop
+                Returns:
+                    tsi.ImageGenerationCreateRes: The image generation response.
         """
         # Validate input parameters
         if req.inputs.model is None:

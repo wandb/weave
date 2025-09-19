@@ -60,11 +60,14 @@ def _process_image_data_item(
             and project_id
         ):
             b64_data = data_item["b64_json"]
-            # Use Content.from_base64() to handle decoding and content creation
+
             content_obj = Content.from_base64(
                 b64_data,
+                mimetype="image/png",
                 metadata={"source_index": index, "_original_schema": "b64_json"},
             )
+
+            processed_item["b64_json"] = "Converted to content object"
 
         # Store the Content object if we created one
         if content_obj is not None:
@@ -185,24 +188,21 @@ def lite_llm_image_generation(
             try:
                 data_list = response_data.get("data", [])
                 if isinstance(data_list, list):
-                    content_items = []
                     for index, data_item in enumerate(data_list):
                         if isinstance(data_item, dict):
                             processed_item = _process_image_data_item(
                                 data_item, index, trace_server, project_id, wb_user_id
                             )
 
+                            if "b64_json" in processed_item:
+                                data_item["b64_json"] = processed_item["b64_json"]
+
                             # If we created a Content object, add it directly to content
                             if "content" in processed_item:
-                                content_items.append(
-                                    {
-                                        "type": "image",
-                                        "image": processed_item["content"],
-                                    }
-                                )
-
-                    # Create a message-style response that MessagePanel can render
-                    response_data["content"] = content_items
+                                data_item["content"] = {
+                                    "type": "output_image",
+                                    "image": processed_item["content"],
+                                }
 
             except Exception as e:
                 # Continue without failing - the response will still contain the original data
