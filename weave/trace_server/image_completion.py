@@ -51,6 +51,8 @@ def _process_image_data_item(
             content_obj = Content.from_url(
                 url, metadata={"source_index": index, "_original_schema": "url"}
             )
+            content_dict = store_content_object(content_obj, project_id, trace_server)
+            processed_item["url"] = content_dict
 
         # Handle base64-encoded images
         elif (
@@ -66,14 +68,8 @@ def _process_image_data_item(
                 mimetype="image/png",
                 metadata={"source_index": index, "_original_schema": "b64_json"},
             )
-
-            processed_item["b64_json"] = "Converted to content object"
-
-        # Store the Content object if we created one
-        if content_obj is not None:
-            # Use the existing store_content_object helper
             content_dict = store_content_object(content_obj, project_id, trace_server)
-            processed_item["content"] = content_dict
+            processed_item["b64_json"] = content_dict
 
     except Exception as e:
         # Don't raise - just log the error and return the original item
@@ -196,13 +192,8 @@ def lite_llm_image_generation(
 
                             if "b64_json" in processed_item:
                                 data_item["b64_json"] = processed_item["b64_json"]
-
-                            # If we created a Content object, add it directly to content
-                            if "content" in processed_item:
-                                data_item["content"] = {
-                                    "type": "output_image",
-                                    "image": processed_item["content"],
-                                }
+                            if "url" in processed_item:
+                                data_item["url"] = processed_item["url"]
 
             except Exception as e:
                 # Continue without failing - the response will still contain the original data

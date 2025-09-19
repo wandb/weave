@@ -2063,7 +2063,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         Args:
                     req (tsi.ImageGenerationCreateReq): The image generation request.
-                Returns:
+
+        Returns:
                     tsi.ImageGenerationCreateRes: The image generation response.
         """
         # Validate input parameters
