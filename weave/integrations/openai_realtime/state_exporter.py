@@ -1,14 +1,15 @@
 import logging
 import threading
 from typing import Any, Callable, Optional, Self, Union, cast
+
 from pydantic import BaseModel, Field
 
 from weave.integrations.openai_realtime import models
 from weave.integrations.openai_realtime.audio_buffer import AudioBufferManager
 from weave.integrations.openai_realtime.encoding import pcm_to_wav
+from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.weave_client import Call
 from weave.type_wrappers.Content import Content
-from weave.trace.context.weave_client_context import require_weave_client
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +20,7 @@ DeltaMessage = Union[
     models.ResponseFunctionCallArgumentsDeltaMessage,
 ]
 StoredItem = Union[models.ServerItem, models.ResponseItem]
+
 
 class SessionSpan(BaseModel):
     model_config = {"arbitrary_types_allowed": True}
@@ -37,33 +39,33 @@ class SessionSpan(BaseModel):
         root_call = None
         if session:
             wc = require_weave_client()
-            root_call = wc.create_call("realtime.session", inputs = session.model_dump())
-        inst = cls(
-            session=session,
-            root_call=root_call
-        )
+            root_call = wc.create_call("realtime.session", inputs=session.model_dump())
+        inst = cls(session=session, root_call=root_call)
         return inst
-
 
     def on_created(self, msg: models.SessionCreatedMessage) -> None:
         self.session = msg.session
         wc = require_weave_client()
         if not self.root_call:
-            self.root_call = wc.create_call("realtime.session", inputs = msg.session.model_dump())
+            self.root_call = wc.create_call(
+                "realtime.session", inputs=msg.session.model_dump()
+            )
 
     def on_updated(self, msg: models.SessionUpdatedMessage) -> None:
         self.session = msg.session
         wc = require_weave_client()
 
         if not self.root_call:
-            self.root_call = wc.create_call("realtime.session", inputs = msg.session.model_dump())
+            self.root_call = wc.create_call(
+                "realtime.session", inputs=msg.session.model_dump()
+            )
 
         # Return after confirming initialization if we can't properly complete
         if not self.last_update:
             return
 
         if not self.root_call:
-            logger.error(f"Missing session in on_updated - this should never occur")
+            logger.error("Missing session in on_updated - this should never occur")
             self.last_update = None
             return
 
@@ -81,10 +83,20 @@ class SessionSpan(BaseModel):
         if not self.session or not self.session.id:
             # Registed a CB since updated will run after created
             def update_cb(root_call: Call) -> Call:
-                return wc.create_call("realtime.session.update", inputs = msg.session.model_dump(), parent=root_call)
+                return wc.create_call(
+                    "realtime.session.update",
+                    inputs=msg.session.model_dump(),
+                    parent=root_call,
+                )
+
             self.last_update = update_cb
         else:
-            self.last_update = wc.create_call("realtime.session.update", inputs = msg.session.model_dump(), parent=self.root_call)
+            self.last_update = wc.create_call(
+                "realtime.session.update",
+                inputs=msg.session.model_dump(),
+                parent=self.root_call,
+            )
+
 
 class ItemRegistry:
     speech_markers: dict[models.ItemID, dict[str, Optional[int]]] = Field(
@@ -105,12 +117,13 @@ class ItemRegistry:
 
         return self.input_audio_buffer.get_segment_ms(start_ms, end_ms)
 
+
 class StateExporter(BaseModel):
     model_config = {"arbitrary_types_allowed": True}
     session_span: Optional[SessionSpan] = None
     # Map conversation -> response ids
-    conversation_responses: dict[models.ConversationID, list[models.ResponseID]] = Field(
-        default_factory=dict
+    conversation_responses: dict[models.ConversationID, list[models.ResponseID]] = (
+        Field(default_factory=dict)
     )
     # Map conversation -> call
     conversation_responses: dict[models.ConversationID, list[models.ResponseID]] = {}
@@ -287,7 +300,6 @@ class StateExporter(BaseModel):
     def _get_input_item_list(
         self, output: list[models.ResponseItem]
     ) -> list[Union[models.ResponseItem, models.ServerItem]]:
-
         if len(output) > 1:
             logger.error("Inputs for multi-output responses are not yet supported")
             return []
@@ -412,13 +424,17 @@ class StateExporter(BaseModel):
         if conv_id and (conv_call := self.conversation_calls.get(conv_id)):
             response_parent = conv_call
         elif conv_id:
-            conv_call = client.create_call(op="realtime.conversation", inputs={"id": conv_id}, parent=session_call)
+            conv_call = client.create_call(
+                op="realtime.conversation", inputs={"id": conv_id}, parent=session_call
+            )
             self.conversation_calls[conv_id] = conv_call
             response_parent = conv_call
         else:
             response_parent = session_call
 
-        call = client.create_call("realtime.response", inputs=inputs, parent=response_parent)
+        call = client.create_call(
+            "realtime.response", inputs=inputs, parent=response_parent
+        )
 
         output_dict = msg.response.model_dump()
         for output_idx, output in enumerate(msg.response.output):
@@ -557,7 +573,9 @@ class StateExporter(BaseModel):
             # The loop continues only if the immediate next is also ready now.
             continue
 
-    def build_conversation_forward(self, item_id: models.ItemID) -> list[Union[models.ResponseItem, models.ServerItem]]:
+    def build_conversation_forward(
+        self, item_id: models.ItemID
+    ) -> list[Union[models.ResponseItem, models.ServerItem]]:
         item = self.items.get(item_id)
         if not item:
             return []
@@ -582,7 +600,9 @@ class StateExporter(BaseModel):
         wc = require_weave_client()
         if self.session_span and self.session_span.root_call:
             # Complete it with the final state of the session
-            wc.finish_call(self.session_span.root_call, output=self.session_span.session)
+            wc.finish_call(
+                self.session_span.root_call, output=self.session_span.session
+            )
 
         for call in self.conversation_calls.values():
             conv_id = call.inputs["id"]

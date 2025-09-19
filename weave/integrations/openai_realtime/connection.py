@@ -126,8 +126,10 @@ class WeaveMediaConnection:
         if handler is None:
             # If this is an on_close handler, still run our exit logic
             if name == "on_close":
+
                 def _default_on_close(*_args: Any, **_kwargs: Any) -> None:
                     self._run_exit_handler_once()
+
                 return _default_on_close
             return None
 
@@ -187,13 +189,16 @@ class WeaveMediaConnection:
                 return
 
             timeout = self._finish_timeout_seconds
+
             def _target() -> None:
                 try:
                     self.conversation_manager.state.on_exit()
                 except Exception:
                     logger.exception("Error in realtime on_exit handler")
 
-            t = threading.Thread(target=_target, name="WeaveRealtimeOnExit", daemon=True)
+            t = threading.Thread(
+                target=_target, name="WeaveRealtimeOnExit", daemon=True
+            )
             t.start()
             # If timeout is None, treat as immediate return
             if isinstance(timeout, (int, float)) and timeout is not None:
@@ -288,7 +293,9 @@ class WeaveAsyncWebsocketConnection:
                 except Exception:
                     logger.exception("Error in realtime on_exit handler")
 
-            t = threading.Thread(target=_target, name="WeaveRealtimeOnExit", daemon=True)
+            t = threading.Thread(
+                target=_target, name="WeaveRealtimeOnExit", daemon=True
+            )
             t.start()
             if isinstance(timeout, (int, float)) and timeout is not None:
                 t.join(timeout=float(timeout))
@@ -369,7 +376,6 @@ class WeaveAiohttpWebsocketConnection:
             raise StopAsyncIteration
         return msg
 
-
     def get_conversation_manager(self) -> ConversationManager:
         return self.conversation_manager
 
@@ -394,7 +400,9 @@ class WeaveAiohttpWebsocketConnection:
                 except Exception:
                     logger.exception("Error in realtime on_exit handler")
 
-            t = threading.Thread(target=_target, name="WeaveRealtimeOnExit", daemon=True)
+            t = threading.Thread(
+                target=_target, name="WeaveRealtimeOnExit", daemon=True
+            )
             t.start()
             if isinstance(timeout, (int, float)) and timeout is not None:
                 t.join(timeout=float(timeout))
@@ -403,6 +411,7 @@ class WeaveAiohttpWebsocketConnection:
                 self.conversation_manager._stop_worker_thread()
             except Exception:
                 pass
+
 
 # ---- Module-level configuration API called by the patcher ----
 def configure_realtime_finish_timeout(value: float | None) -> None:
