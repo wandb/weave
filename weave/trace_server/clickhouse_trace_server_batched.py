@@ -2081,8 +2081,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # Get API key from secret fetcher
         secret_fetcher = _secret_fetcher_context.get()
         if secret_fetcher is None:
+            logger.error("No secret fetcher available for image generation request")
             return tsi.ImageGenerationCreateRes(
-                response={"error": "No secret fetcher available"}
+                response={
+                    "error": "Unable to access required credentials for image generation"
+                }
             )
 
         api_key = (
