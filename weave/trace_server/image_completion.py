@@ -42,8 +42,6 @@ def _process_image_data_item(
     processed_item = data_item.copy()
 
     try:
-        content_obj = None
-
         # Handle URL-based images
         if "url" in data_item and data_item["url"] and trace_server and project_id:
             url = data_item["url"]
