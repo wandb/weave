@@ -269,31 +269,31 @@ def generate_routes(
     ) -> tsi.TableQueryRes:
         return service.trace_server_interface.table_query(req)
 
-    # @router.post(
-    #     "/table/query_stream",
-    #     response_class=StreamingResponse,
-    #     responses={
-    #         200: {
-    #             "description": "Stream of data in JSONL format",
-    #             "content": {
-    #                 "application/jsonl": {
-    #                     "schema": {
-    #                         "type": "array",
-    #                         "items": {"$ref": "#/components/schemas/CallSchema"},
-    #                     }
-    #                 }
-    #             },
-    #         }
-    #     },
-    # )
-    # def table_query_stream(
-    #     req: tsi.TableQueryReq,
-    #     service: weave.trace_server.trace_service.TraceService = Depends(get_service),
-    #     accept: Annotated[str, Header()] = "application/jsonl",
-    # ) -> StreamingResponse:
-    #     return StreamingResponse(
-    #         service.trace_server_interface.table_query_stream(req), media_type=accept
-    #     )
+    @router.post(
+        "/table/query_stream",
+        response_class=StreamingResponse,
+        responses={
+            200: {
+                "description": "Stream of data in JSONL format",
+                "content": {
+                    "application/jsonl": {
+                        "schema": {
+                            "type": "array",
+                            "items": {"$ref": "#/components/schemas/CallSchema"},
+                        }
+                    }
+                },
+            }
+        },
+    )
+    def table_query_stream(
+        req: tsi.TableQueryReq,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),
+        accept: Annotated[str, Header()] = "application/jsonl",
+    ) -> StreamingResponse:
+        return StreamingResponse(
+            service.trace_server_interface.table_query_stream(req), media_type=accept
+        )
 
     @router.post("/table/query_stats", tags=[TABLES_TAG_NAME])
     def table_query_stats(

@@ -5,7 +5,7 @@ This module provides a command line interface for generating code from the OpenA
 specification of the Weave SDK.
 It supports the following commands:
  - get_openapi_spec: Launches a temporary FastAPI server to retrieve and save the OpenAPI spec.
- - generate_code: Uses Stainless to generate code for Python, Node.js, and TypeScript from the OpenAPI spec.
+ - generate_code: Uses Stainless to generate code for Python, TypeScript, and Java from the OpenAPI spec.
  - update_pyproject: Updates the pyproject.toml file with the latest version or SHA of the generated package.
  - all: Runs the entire code generation pipeline based on a configuration file.
 
@@ -51,7 +51,7 @@ from typer import Argument, Option, Typer
 WEAVE_PORT = 6345
 SERVER_TIMEOUT = 5  # seconds
 SERVER_CHECK_INTERVAL = 1  # seconds
-SUBPROCESS_TIMEOUT = 300  # seconds
+SUBPROCESS_TIMEOUT = 600  # seconds
 
 # Stainless configuration
 STAINLESS_ORG_NAME = "weights-biases"
@@ -151,9 +151,6 @@ def generate_code(
     python_path: Annotated[
         str | None, Option("--python-path", help="Output path for Python SDK")
     ] = None,
-    node_path: Annotated[
-        str | None, Option("--node-path", help="Output path for Node SDK")
-    ] = None,
     typescript_path: Annotated[
         str | None, Option("--typescript-path", help="Output path for TypeScript SDK")
     ] = None,
@@ -163,14 +160,14 @@ def generate_code(
 ) -> None:
     """Generate code from the OpenAPI spec using Stainless.
 
-    At least one of --python-path, --node-path, or --typescript-path must be provided.
+    At least one of --python-path, --typescript-path, or --java-path must be provided.
     Generates code for the specified platforms based on the fetched OpenAPI specification.
     """
     _header("Generating code with Stainless")
 
-    if not any([python_path, node_path, typescript_path, java_path]):
+    if not any([python_path, typescript_path, java_path]):
         logger.exception(
-            "At least one of --python-path, --node-path, --typescript-path, or --java-path must be provided"
+            "At least one of --python-path, --typescript-path, or --java-path must be provided"
         )
         sys.exit(1)
 
@@ -208,8 +205,6 @@ def generate_code(
     ]
     if python_path:
         cmd.append(f"--+target=python:{python_path}")
-    if node_path:
-        cmd.append(f"--+target=node:{node_path}")
     if typescript_path:
         cmd.append(f"--+target=typescript:{typescript_path}")
     if java_path:
@@ -498,10 +493,6 @@ def all(
         str | None,
         Option("--openapi-output", help="Output path for OpenAPI spec"),
     ] = None,
-    node_output: Annotated[
-        str | None,
-        Option("--node-output", help="Output path for Node SDK"),
-    ] = None,
     typescript_output: Annotated[
         str | None,
         Option("--typescript-output", help="Output path for TypeScript SDK"),
@@ -547,8 +538,6 @@ def all(
         cfg["package_name"] = package_name
     if openapi_output is not None:
         cfg["openapi_output"] = openapi_output
-    if node_output is not None:
-        cfg["node_output"] = node_output
     if typescript_output is not None:
         cfg["typescript_output"] = typescript_output
     if release is not None:
@@ -633,13 +622,11 @@ def all(
 
     # 2. Generate code
     # Use python_output as python_output
-    node_path = _ensure_absolute_path(cfg.get("node_output"))
     typescript_path = _ensure_absolute_path(cfg.get("typescript_output"))
     java_path = _ensure_absolute_path(cfg.get("java_output"))
     _format_announce_invoke(
         generate_code,
         python_path=str_path,
-        node_path=node_path,
         typescript_path=typescript_path,
         java_path=java_path,
     )
