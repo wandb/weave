@@ -29,7 +29,8 @@ def log_dropped_call_batch(
     batch: list[Union["StartBatchItem", "EndBatchItem"]], e: Exception
 ) -> None:
     """Log details about a dropped call batch for debugging purposes."""
-    logger.error(f"Error sending batch of {len(batch)} call events to server")
+    # Use warning instead of error to be less alarming
+    logger.warning(f"Failed to send batch of {len(batch)} call events to Weave server (your code will continue to run)")
     dropped_start_ids = []
     dropped_end_ids = []
     for item in batch:
@@ -41,35 +42,45 @@ def log_dropped_call_batch(
             # For end items, access the end request
             dropped_end_ids.append(item.req.end.id)
     if dropped_start_ids:
-        logger.error(f"dropped call start ids: {dropped_start_ids}")
+        logger.warning(f"dropped call start ids: {dropped_start_ids}")
     if dropped_end_ids:
-        logger.error(f"dropped call end ids: {dropped_end_ids}")
+        logger.warning(f"dropped call end ids: {dropped_end_ids}")
     if isinstance(e, requests.HTTPError) and e.response is not None:
-        logger.error(f"status code: {e.response.status_code}")
-        logger.error(f"reason: {e.response.reason}")
-        logger.error(f"text: {e.response.text}")
+        status_code = e.response.status_code
+        if status_code == 429:
+            logger.warning(f"Rate limit exceeded (429): Calls will continue without tracing")
+        elif status_code >= 500:
+            logger.warning(f"Server error ({status_code}): {e.response.reason}. Calls will continue without tracing")
+        else:
+            logger.warning(f"status code: {status_code}, reason: {e.response.reason}")
+        logger.debug(f"response text: {e.response.text}")
     else:
-        logger.error(f"error: {e}")
+        logger.warning(f"error: {e}")
 
 
 def log_dropped_feedback_batch(
     batch: list[tsi.FeedbackCreateReq], e: Exception
 ) -> None:
     """Log details about a dropped feedback batch for debugging purposes."""
-    logger.error(f"Error sending batch of {len(batch)} feedback events to server")
+    logger.warning(f"Failed to send batch of {len(batch)} feedback events to Weave server (your code will continue to run)")
     dropped_feedback_types = []
     for item in batch:
         if hasattr(item, "req"):
             item = item.req
         dropped_feedback_types.append(item.feedback_type)
     if dropped_feedback_types:
-        logger.error(f"dropped feedback types: {dropped_feedback_types}")
+        logger.warning(f"dropped feedback types: {dropped_feedback_types}")
     if isinstance(e, requests.HTTPError) and e.response is not None:
-        logger.error(f"status code: {e.response.status_code}")
-        logger.error(f"reason: {e.response.reason}")
-        logger.error(f"text: {e.response.text}")
+        status_code = e.response.status_code
+        if status_code == 429:
+            logger.warning(f"Rate limit exceeded (429): Feedback will not be recorded")
+        elif status_code >= 500:
+            logger.warning(f"Server error ({status_code}): {e.response.reason}. Feedback will not be recorded")
+        else:
+            logger.warning(f"status code: {status_code}, reason: {e.response.reason}")
+        logger.debug(f"response text: {e.response.text}")
     else:
-        logger.error(f"error: {e}")
+        logger.warning(f"error: {e}")
 
 
 def process_batch_with_retry(
@@ -161,14 +172,13 @@ def process_batch_with_retry(
             if log_dropped_fn:
                 log_dropped_fn(batch, e)
             else:
-                logger.exception(
-                    f"Error sending batch of {len(batch)} {batch_name} to server.",
-                    exc_info=True,
+                logger.warning(
+                    f"Failed to send batch of {len(batch)} {batch_name} to Weave server (your code will continue to run). Error: {e}"
                 )
         else:
             # Add items back to the queue for later processing, but only if the processor is still accepting work
-            logger.warning(
-                f"{batch_name.capitalize()} batch failed after max retries, requeuing batch with {len(batch)=} for later processing",
+            logger.info(
+                f"Weave server temporarily unavailable. Requeuing {len(batch)} {batch_name} for later processing.",
             )
 
             # only if debug mode
@@ -186,8 +196,8 @@ def process_batch_with_retry(
             ):
                 processor_obj.enqueue(batch)
             else:
-                logger.exception(
-                    f"Failed to enqueue {batch_name} batch of size {len(batch)} - Processor is shutting down"
+                logger.debug(
+                    f"Cannot requeue {batch_name} batch of size {len(batch)} - Processor is shutting down"
                 )
 
 
