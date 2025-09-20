@@ -1,8 +1,8 @@
 import datetime
 from unittest.mock import patch
 
-import pytest
 import httpx
+import pytest
 from pydantic import ValidationError
 
 from weave.trace_server import trace_server_interface as tsi
@@ -62,7 +62,9 @@ def test_400_no_retry(mock_post, trace_server):
     resp1 = httpx.Response(
         400,
         json=dict(tsi.CallStartRes(id=call_id, trace_id="test_trace_id")),
-        request=httpx.Request("POST", "http://test.com"),  # Add request to make raise_for_status work
+        request=httpx.Request(
+            "POST", "http://test.com"
+        ),  # Add request to make raise_for_status work
     )
 
     mock_post.side_effect = [

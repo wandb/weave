@@ -31,7 +31,10 @@ class Api:
             if wandb_context.api_key is not None:
                 # For httpx, we use headers for basic auth
                 import base64
-                auth_string = base64.b64encode(f"api:{wandb_context.api_key}".encode()).decode()
+
+                auth_string = base64.b64encode(
+                    f"api:{wandb_context.api_key}".encode()
+                ).decode()
                 headers["Authorization"] = f"Basic {auth_string}"
         url_base = env.wandb_base_url()
         transport = HTTPXTransport(

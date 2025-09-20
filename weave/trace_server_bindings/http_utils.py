@@ -44,7 +44,11 @@ def log_dropped_call_batch(
         logger.error(f"dropped call start ids: {dropped_start_ids}")
     if dropped_end_ids:
         logger.error(f"dropped call end ids: {dropped_end_ids}")
-    if isinstance(e, (requests.HTTPError, requests.HTTPStatusError)) and hasattr(e, 'response') and e.response is not None:
+    if (
+        isinstance(e, (requests.HTTPError, requests.HTTPStatusError))
+        and hasattr(e, "response")
+        and e.response is not None
+    ):
         logger.error(f"status code: {e.response.status_code}")
         logger.error(f"reason: {e.response.reason}")
         logger.error(f"text: {e.response.text}")
@@ -64,7 +68,11 @@ def log_dropped_feedback_batch(
         dropped_feedback_types.append(item.feedback_type)
     if dropped_feedback_types:
         logger.error(f"dropped feedback types: {dropped_feedback_types}")
-    if isinstance(e, (requests.HTTPError, requests.HTTPStatusError)) and hasattr(e, 'response') and e.response is not None:
+    if (
+        isinstance(e, (requests.HTTPError, requests.HTTPStatusError))
+        and hasattr(e, "response")
+        and e.response is not None
+    ):
         logger.error(f"status code: {e.response.status_code}")
         logger.error(f"reason: {e.response.reason}")
         logger.error(f"text: {e.response.text}")
@@ -236,8 +244,10 @@ def handle_response_error(response: requests.Response, url: str) -> None:
         message = f"{response.status_code} Error for url {url}: Request failed"
 
     # For httpx, we need to use HTTPStatusError with request and response
-    if hasattr(response, 'request'):
-        raise requests.HTTPStatusError(message, request=response.request, response=response)
+    if hasattr(response, "request"):
+        raise requests.HTTPStatusError(
+            message, request=response.request, response=response
+        )
     else:
         # Fallback for cases where request is not available
         raise requests.HTTPError(message)

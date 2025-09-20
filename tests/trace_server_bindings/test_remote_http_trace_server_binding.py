@@ -7,8 +7,8 @@ from queue import Full
 from types import MethodType
 from unittest.mock import MagicMock, patch
 
-import pytest
 import httpx
+import pytest
 import tenacity
 
 from weave.trace.display.term import configure_logger
@@ -282,7 +282,9 @@ def test_timeout_retry_mechanism(mock_post, success_response):
     # Mock server to raise errors twice, then succeed
     mock_post.side_effect = [
         httpx.TimeoutException("Connection timed out"),
-        httpx.HTTPStatusError("500 Server Error", request=MagicMock(), response=MagicMock(status_code=500)),
+        httpx.HTTPStatusError(
+            "500 Server Error", request=MagicMock(), response=MagicMock(status_code=500)
+        ),
         success_response,
     ]
 

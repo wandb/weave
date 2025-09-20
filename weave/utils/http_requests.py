@@ -8,7 +8,8 @@ from time import time
 from typing import Any, Optional, Union
 
 import httpx
-from httpx import HTTPError as HTTPError, HTTPStatusError, Request, Response
+from httpx import HTTPError as HTTPError
+from httpx import HTTPStatusError, Request, Response
 
 from weave.trace.display.display import Console, Text
 
@@ -173,6 +174,14 @@ def post(
 
 
 # Export these for compatibility with code expecting requests module
-__all__ = ["HTTPError", "HTTPStatusError", "Response", "get", "post", "session", "client"]
+__all__ = [
+    "HTTPError",
+    "HTTPStatusError",
+    "Response",
+    "client",
+    "get",
+    "post",
+    "session",
+]
 # For backward compatibility, alias client as session
 session = client
