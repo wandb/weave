@@ -79,25 +79,45 @@ def _is_retryable_exception(e: BaseException) -> bool:
 
 
 def _log_retry(retry_state: tenacity.RetryCallState) -> None:
+    exception = retry_state.outcome.exception()
+    msg = "retry_attempt"
+    
+    # Add context for rate limiting
+    if isinstance(exception, requests.HTTPError) and exception.response is not None:
+        if exception.response.status_code == 429:
+            msg = "Rate limit hit, retrying with exponential backoff"
+        elif exception.response.status_code >= 500:
+            msg = "Server error, retrying with exponential backoff"
+    
     logger.info(
-        "retry_attempt",
+        msg,
         extra={
             "fn": retry_state.fn,
             "retry_id": get_current_retry_id(),
             "attempt_number": retry_state.attempt_number,
-            "exception": str(retry_state.outcome.exception()),
+            "exception": str(exception),
         },
     )
 
 
 def _log_failure(retry_state: tenacity.RetryCallState) -> Any:
+    exception = retry_state.outcome.exception()
+    msg = "Weave server request failed after retries (your code will continue to run)"
+    
+    # Add specific context for different failure types
+    if isinstance(exception, requests.HTTPError) and exception.response is not None:
+        if exception.response.status_code == 429:
+            msg = "Weave server rate limit exceeded after retries (your code will continue to run)"
+        elif exception.response.status_code >= 500:
+            msg = "Weave server unavailable after retries (your code will continue to run)"
+    
     logger.info(
-        "retry_failed",
+        msg,
         extra={
             "fn": retry_state.fn,
             "retry_id": get_current_retry_id(),
             "attempt_number": retry_state.attempt_number,
-            "exception": str(retry_state.outcome.exception()),
+            "exception": str(exception),
         },
     )
     return retry_state.outcome.result()

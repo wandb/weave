@@ -85,10 +85,10 @@ if sys.version_info < (3, 10):
 logger = logging.getLogger(__name__)
 
 
-CALL_CREATE_MSG = "Error creating call:\n{}"
-ASYNC_CALL_CREATE_MSG = "Error creating async call:\n{}"
-ON_OUTPUT_MSG = "Error capturing call output:\n{}"
-UNINITIALIZED_MSG = "Warning: Traces will not be logged. Call weave.init to log your traces to a project.\n"
+CALL_CREATE_MSG = "Failed to log call to Weave server (your code will continue to run). Error details:\n{}"
+ASYNC_CALL_CREATE_MSG = "Failed to log async call to Weave server (your code will continue to run). Error details:\n{}"
+ON_OUTPUT_MSG = "Failed to capture call output for logging (your code will continue to run). Error details:\n{}"
+UNINITIALIZED_MSG = "Weave tracing is not initialized. Call weave.init(<project_name>) to enable tracing.\n"
 
 
 class DisplayNameFuncError(ValueError): ...
