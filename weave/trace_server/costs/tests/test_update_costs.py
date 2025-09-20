@@ -3,7 +3,7 @@ import unittest
 from datetime import datetime
 from unittest.mock import ANY, MagicMock, mock_open, patch
 
-import requests
+import httpx
 
 from weave.trace_server.costs.update_costs import (
     COST_FILE,
@@ -52,7 +52,7 @@ class TestUpdateCosts(unittest.TestCase):
         with self.assertRaises(json.JSONDecodeError):
             get_current_costs()
 
-    @patch("requests.get")
+    @patch("httpx.Client.get")
     def test_fetch_new_costs_success(self, mock_get):
         """Test fetch_new_costs with a successful response."""
         mock_response = MagicMock()
@@ -73,14 +73,14 @@ class TestUpdateCosts(unittest.TestCase):
         self.assertEqual(costs["model1"]["provider"], "test_provider")
         self.assertEqual(costs["model1"]["created_at"], current_time)
 
-    @patch("requests.get")
+    @patch("httpx.Client.get")
     def test_fetch_new_costs_request_exception(self, mock_get):
         """Test fetch_new_costs when a RequestException occurs."""
-        mock_get.side_effect = requests.exceptions.RequestException("Test exception")
-        with self.assertRaises(requests.exceptions.RequestException):
+        mock_get.side_effect = httpx.RequestError("Test exception")
+        with self.assertRaises(httpx.RequestError):
             fetch_new_costs()
 
-    @patch("requests.get")
+    @patch("httpx.Client.get")
     def test_fetch_new_costs_invalid_json(self, mock_get):
         """Test fetch_new_costs when the response contains invalid JSON."""
         mock_response = MagicMock()
