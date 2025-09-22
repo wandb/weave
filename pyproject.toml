@@ -148,10 +148,7 @@ langchain_nvidia_ai_endpoints = [
 ]
 litellm = ["litellm>=1.36.1", "openai>=1.99.9,<1.100.0"]
 # temporary max pin b/c 0.12.50 changes call structure and therefor tests
-llamaindex = [
-  "llama-index>=0.10.35",
-  "openai>=1.99.9,<1.100.0",
-]
+llamaindex = ["llama-index>=0.10.35", "openai>=1.99.9,<1.100.0"]
 mistral = ["mistralai>=1.0.0"]
 scorers = [
   "numpy>1.21.0",
@@ -183,11 +180,11 @@ autogen_tests = [
   "autogen-ext[openai]>=0.5.7",
   "openai>=1.99.9,<1.100.0",
 ]
-verifiers = ["verifiers>=0.1.3.post0"]
+verifiers = ["verifiers>=0.1.3.post0,<0.1.4"]
 verifiers_test = [
   "verifiers>=0.1.3.post0",
   "huggingface_hub>=0.34.6",
-  "datasets>=4.1.0"
+  "datasets>=4.1.0",
 ]
 
 test = [
