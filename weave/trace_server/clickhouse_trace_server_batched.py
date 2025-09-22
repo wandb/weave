@@ -57,7 +57,10 @@ from weave.trace_server.clickhouse_schema import (
     ObjRefListType,
     SelectableCHObjSchema,
 )
-from weave.trace_server.constants import COMPLETIONS_CREATE_OP_NAME
+from weave.trace_server.constants import (
+    COMPLETIONS_CREATE_OP_NAME,
+    IMAGE_GENERATION_CREATE_OP_NAME,
+)
 from weave.trace_server.errors import (
     InsertTooLarge,
     InvalidRequest,
@@ -86,6 +89,7 @@ from weave.trace_server.file_storage import (
 )
 from weave.trace_server.file_storage_uris import FileStorageURI
 from weave.trace_server.ids import generate_id
+from weave.trace_server.image_completion import lite_llm_image_generation
 from weave.trace_server.kafka import KafkaProducer
 from weave.trace_server.llm_completion import (
     get_custom_provider_info,
@@ -2050,6 +2054,123 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             start_call,
             model_name,
             req.project_id,
+        )
+
+    def image_create(
+        self, req: tsi.ImageGenerationCreateReq
+    ) -> tsi.ImageGenerationCreateRes:
+        """Create images using LLM image generation.
+
+        Args:
+            req (tsi.ImageGenerationCreateReq): The image generation request.
+
+        Returns:
+            tsi.ImageGenerationCreateRes: The image generation response.
+        """
+        # Validate input parameters
+        if req.inputs.model is None:
+            return tsi.ImageGenerationCreateRes(
+                response={"error": "No model specified in request"}
+            )
+
+        if req.inputs.prompt is None:
+            return tsi.ImageGenerationCreateRes(
+                response={"error": "No prompt specified in request"}
+            )
+
+        # Get API key from secret fetcher
+        secret_fetcher = _secret_fetcher_context.get()
+        if secret_fetcher is None:
+            logger.error("No secret fetcher available for image generation request")
+            return tsi.ImageGenerationCreateRes(
+                response={
+                    "error": "Unable to access required credentials for image generation"
+                }
+            )
+
+        api_key = (
+            secret_fetcher.fetch("OPENAI_API_KEY")
+            .get("secrets", {})
+            .get("OPENAI_API_KEY")
+        )
+
+        if api_key is None:
+            return tsi.ImageGenerationCreateRes(
+                response={"error": "No OpenAI API key found"}
+            )
+
+        # Now that we have the API key, we can make the API call
+        start_time = datetime.datetime.now()
+
+        try:
+            res = lite_llm_image_generation(
+                api_key=api_key,
+                inputs=req.inputs.model_dump(exclude_none=True),
+                trace_server=self,
+                project_id=req.project_id,
+                wb_user_id=req.wb_user_id,
+            )
+            if "error" in res.response:
+                return tsi.ImageGenerationCreateRes(
+                    response={"error": res.response["error"]}
+                )
+        except Exception as e:
+            return tsi.ImageGenerationCreateRes(
+                response={"error": f"Image generation failed: {e!s}"}
+            )
+
+        end_time = datetime.datetime.now()
+
+        # Return response directly if not tracking calls
+        if req.track_llm_call is False:
+            return res
+
+        # Capture all input fields for call tracking
+        input_data = req.inputs.model_dump(exclude_none=False)
+
+        start = tsi.StartedCallSchemaForInsert(
+            project_id=req.project_id,
+            wb_user_id=req.wb_user_id,
+            op_name=IMAGE_GENERATION_CREATE_OP_NAME,
+            started_at=start_time,
+            inputs=input_data,
+            attributes={},
+        )
+        start_call = _start_call_for_insert_to_ch_insertable_start_call(start)
+
+        end = tsi.EndedCallSchemaForInsert(
+            project_id=req.project_id,
+            id=start_call.id,
+            ended_at=end_time,
+            output=res.response,
+            summary={},
+        )
+
+        if "usage" in res.response:
+            end.summary["usage"] = {req.inputs.model: res.response["usage"]}
+
+        if "error" in res.response:
+            end.exception = res.response["error"]
+
+        end_call = _end_call_for_insert_to_ch_insertable_end_call(end)
+        calls: list[Union[CallStartCHInsertable, CallEndCHInsertable]] = [
+            start_call,
+            end_call,
+        ]
+        batch_data = []
+        for call in calls:
+            call_dict = call.model_dump()
+            values = [call_dict.get(col) for col in ALL_CALL_INSERT_COLUMNS]
+            batch_data.append(values)
+
+        try:
+            self._insert_call_batch(batch_data)
+        except Exception as e:
+            # Log error but don't fail the response
+            print(f"Error inserting call batch for image generation: {e}", flush=True)
+
+        return tsi.ImageGenerationCreateRes(
+            response=res.response, weave_call_id=start_call.id
         )
 
     def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
