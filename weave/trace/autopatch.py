@@ -59,3 +59,4 @@ class AutopatchSettings(BaseModel):
     autogen: Optional[IntegrationSettings] = None
     langchain: Optional[IntegrationSettings] = None
     llamaindex: Optional[IntegrationSettings] = None
+    openai_realtime: Optional[IntegrationSettings] = None

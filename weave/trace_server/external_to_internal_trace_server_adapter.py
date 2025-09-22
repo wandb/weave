@@ -430,6 +430,13 @@ class ExternalTraceServer(tsi.TraceServerInterface):
         # forward directly without additional ref conversion.
         return self._internal_trace_server.completions_create_stream(req)
 
+    def image_create(
+        self, req: tsi.ImageGenerationCreateReq
+    ) -> tsi.ImageGenerationCreateRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        res = self._ref_apply(self._internal_trace_server.image_create, req)
+        return res
+
     def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(self._internal_trace_server.project_stats, req)
