@@ -213,6 +213,7 @@ openapi:
         target:
           - "$.components.schemas.ContainsSpec.properties.substr"
         object:
+          anyOf: null
           $ref: "#/components/schemas/Operation"
 
     - command: mergeObject
@@ -228,6 +229,7 @@ openapi:
           - "$.components.schemas.OrOperation.properties.$or"
         object:
           items:
+            anyOf: null
             $ref: "#/components/schemas/Operation"
           prefixItems: null
 

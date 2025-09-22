@@ -510,52 +510,6 @@
         }
       }
     },
-    "/calls/query": {
-      "post": {
-        "tags": [
-          "Calls"
-        ],
-        "summary": "Calls Query",
-        "operationId": "calls_query_calls_query_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CallsQueryReq"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CallsQueryRes"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBasic": []
-          }
-        ]
-      }
-    },
     "/obj/create": {
       "post": {
         "tags": [
@@ -876,64 +830,6 @@
             "HTTPBasic": []
           }
         ]
-      }
-    },
-    "/table/query_stream": {
-      "post": {
-        "summary": "Table Query Stream",
-        "operationId": "table_query_stream_table_query_stream_post",
-        "security": [
-          {
-            "HTTPBasic": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "accept",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "default": "application/jsonl",
-              "title": "Accept"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TableQueryReq"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Stream of data in JSONL format",
-            "content": {
-              "application/jsonl": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/CallSchema"
-                  }
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
       }
     },
     "/table/query_stats": {
@@ -2370,22 +2266,6 @@
           "project_id"
         ],
         "title": "CallsQueryReq"
-      },
-      "CallsQueryRes": {
-        "properties": {
-          "calls": {
-            "items": {
-              "$ref": "#/components/schemas/CallSchema"
-            },
-            "type": "array",
-            "title": "Calls"
-          }
-        },
-        "type": "object",
-        "required": [
-          "calls"
-        ],
-        "title": "CallsQueryRes"
       },
       "CallsQueryStatsReq": {
         "properties": {

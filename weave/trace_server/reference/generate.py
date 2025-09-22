@@ -213,13 +213,6 @@ def generate_routes(
             service.trace_server_interface.calls_query_stream(req), media_type=accept
         )
 
-    @router.post("/calls/query", tags=[CALLS_TAG_NAME], include_in_schema=True)
-    def calls_query(
-        req: tsi.CallsQueryReq,
-        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
-    ) -> tsi.CallsQueryRes:
-        return service.trace_server_interface.calls_query(req)
-
     @router.post("/obj/create", tags=[OBJECTS_TAG_NAME])
     def obj_create(
         req: tsi.ObjCreateReq,
@@ -268,32 +261,6 @@ def generate_routes(
         service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
     ) -> tsi.TableQueryRes:
         return service.trace_server_interface.table_query(req)
-
-    @router.post(
-        "/table/query_stream",
-        response_class=StreamingResponse,
-        responses={
-            200: {
-                "description": "Stream of data in JSONL format",
-                "content": {
-                    "application/jsonl": {
-                        "schema": {
-                            "type": "array",
-                            "items": {"$ref": "#/components/schemas/CallSchema"},
-                        }
-                    }
-                },
-            }
-        },
-    )
-    def table_query_stream(
-        req: tsi.TableQueryReq,
-        service: weave.trace_server.trace_service.TraceService = Depends(get_service),
-        accept: Annotated[str, Header()] = "application/jsonl",
-    ) -> StreamingResponse:
-        return StreamingResponse(
-            service.trace_server_interface.table_query_stream(req), media_type=accept
-        )
 
     @router.post("/table/query_stats", tags=[TABLES_TAG_NAME])
     def table_query_stats(
