@@ -194,7 +194,7 @@ def generate_routes(
             200: {
                 "description": "Stream of data in JSONL format",
                 "content": {
-                    "application/jsonl": {
+                    "application/x-ndjson": {
                         "schema": {
                             "type": "array",
                             "items": {"$ref": "#/components/schemas/CallSchema"},
@@ -207,7 +207,7 @@ def generate_routes(
     def calls_query_stream(
         req: tsi.CallsQueryReq,
         service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
-        accept: Annotated[str, Header()] = "application/jsonl",
+        accept: Annotated[str, Header()] = "application/x-ndjson",
     ) -> StreamingResponse:
         return StreamingResponse(
             service.trace_server_interface.calls_query_stream(req), media_type=accept
@@ -400,32 +400,25 @@ def generate_routes(
     ) -> tsi.CompletionsCreateRes:
         return service.trace_server_interface.completions_create(req)
 
-    # @router.post(
-    #     "/completions/create_stream",
-    #     tags=[COMPLETIONS_TAG_NAME],
-    #     response_class=StreamingResponse,
-    #     responses={
-    #         200: {
-    #             "description": "Stream of data in JSONL format",
-    #             "content": {
-    #                 "application/jsonl": {
-    #                     "schema": {
-    #                         "type": "array",
-    #                         "items": {"$ref": "#/components/schemas/Schema"},
-    #                     }
-    #                 }
-    #             },
-    #         }
-    #     },
-    # )
-    # def completions_create_stream(
-    #     req: tsi.CompletionsCreateReq,
-    #     service: weave.trace_server.trace_service.TraceService = Depends(get_service),
-    # ) -> StreamingResponse:
-    #     return StreamingResponse(
-    #         service.trace_server_interface.completions_create_stream(req),
-    #         media_type="application/jsonl",
-    #     )
+    @router.post(
+        "/completions/create_stream",
+        tags=[COMPLETIONS_TAG_NAME],
+        response_class=StreamingResponse,
+        responses={
+            200: {
+                "description": "Server-Sent Events stream",
+                "content": {"text/event-stream": {"schema": {"type": "string"}}},
+            }
+        },
+    )
+    def completions_create_stream(
+        req: tsi.CompletionsCreateReq,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),
+    ) -> StreamingResponse:
+        return StreamingResponse(
+            service.trace_server_interface.completions_create_stream(req),
+            media_type="text/event-stream",
+        )
 
     # TODO: This is mislabeled in the core impl.  Keeping it the same here for now.
     @router.post("/project/stats", tags=["project"], include_in_schema=False)
@@ -435,31 +428,31 @@ def generate_routes(
     ) -> tsi.ProjectStatsRes:
         return service.trace_server_interface.project_stats(req)
 
-    # @router.post(
-    #     "/threads/stream_query",
-    #     tags=[THREADS_TAG_NAME],
-    #     response_class=StreamingResponse,
-    #     responses={
-    #         200: {
-    #             "description": "Stream of data in JSONL format",
-    #             "content": {
-    #                 "application/jsonl": {
-    #                     "schema": {
-    #                         "type": "array",
-    #                         "items": {"$ref": "#/components/schemas/Schema"},
-    #                     }
-    #                 }
-    #             },
-    #         }
-    #     },
-    # )
-    # def threads_query_stream(
-    #     req: tsi.ThreadsQueryReq,
-    #     service: weave.trace_server.trace_service.TraceService = Depends(get_service),
-    # ) -> StreamingResponse:
-    #     return StreamingResponse(
-    #         service.trace_server_interface.threads_query_stream(req),
-    #         media_type="application/jsonl",
-    #     )
+    @router.post(
+        "/threads/stream_query",
+        tags=[THREADS_TAG_NAME],
+        response_class=StreamingResponse,
+        responses={
+            200: {
+                "description": "Stream of data in JSONL format",
+                "content": {
+                    "application/x-ndjson": {
+                        "schema": {
+                            "type": "array",
+                            "items": {"$ref": "#/components/schemas/ThreadSchema"},
+                        }
+                    }
+                },
+            }
+        },
+    )
+    def threads_query_stream(
+        req: tsi.ThreadsQueryReq,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),
+    ) -> StreamingResponse:
+        return StreamingResponse(
+            service.trace_server_interface.threads_query_stream(req),
+            media_type="application/x-ndjson",
+        )
 
     return router
