@@ -178,7 +178,7 @@ class UserSettings(BaseModel):
     Can be overridden with the environment variable `WEAVE_ENABLE_DISK_FALLBACK`
     """
 
-    use_parallel_table_upload: bool = False
+    use_parallel_table_upload: bool = True
     """
     Toggles parallel table upload chunking.
 

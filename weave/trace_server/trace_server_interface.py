@@ -369,6 +369,27 @@ class CompletionsCreateRes(BaseModel):
     weave_call_id: Optional[str] = None
 
 
+class ImageGenerationRequestInputs(BaseModel):
+    model: str
+    prompt: str
+    n: Optional[int] = None
+
+
+class ImageGenerationCreateReq(BaseModel):
+    project_id: str
+    inputs: ImageGenerationRequestInputs
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    track_llm_call: Optional[bool] = Field(
+        True,
+        description="Whether to track this image generation call in the trace server",
+    )
+
+
+class ImageGenerationCreateRes(BaseModel):
+    response: dict[str, Any]
+    weave_call_id: Optional[str] = None
+
+
 class CallsFilter(BaseModelStrict):
     op_names: Optional[list[str]] = None
     input_refs: Optional[list[str]] = None
@@ -1301,6 +1322,11 @@ class TraceServerInterface(Protocol):
     def completions_create_stream(
         self, req: CompletionsCreateReq
     ) -> Iterator[dict[str, Any]]: ...
+
+    # Execute Image Generation API
+    def image_create(
+        self, req: ImageGenerationCreateReq
+    ) -> ImageGenerationCreateRes: ...
 
     # Project statistics API
     def project_stats(self, req: ProjectStatsReq) -> ProjectStatsRes: ...
