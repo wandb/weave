@@ -9,6 +9,7 @@ import threading
 from collections import defaultdict
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
+from re import sub
 from typing import Any, Callable, Optional, Union, cast
 from zoneinfo import ZoneInfo
 
@@ -56,7 +57,10 @@ from weave.trace_server.clickhouse_schema import (
     ObjRefListType,
     SelectableCHObjSchema,
 )
-from weave.trace_server.constants import COMPLETIONS_CREATE_OP_NAME
+from weave.trace_server.constants import (
+    COMPLETIONS_CREATE_OP_NAME,
+    IMAGE_GENERATION_CREATE_OP_NAME,
+)
 from weave.trace_server.errors import (
     InsertTooLarge,
     InvalidRequest,
@@ -85,6 +89,7 @@ from weave.trace_server.file_storage import (
 )
 from weave.trace_server.file_storage_uris import FileStorageURI
 from weave.trace_server.ids import generate_id
+from weave.trace_server.image_completion import lite_llm_image_generation
 from weave.trace_server.kafka import KafkaProducer
 from weave.trace_server.llm_completion import (
     get_custom_provider_info,
@@ -1996,9 +2001,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # --- Shared setup logic (copy of completions_create up to litellm call)
         model_info = self._model_to_provider_info_map.get(req.inputs.model)
         try:
-            model_name, api_key, provider, base_url, extra_headers, return_type = (
-                _setup_completion_model_info(model_info, req, self.obj_read)
-            )
+            (
+                model_name,
+                api_key,
+                provider,
+                base_url,
+                extra_headers,
+                return_type,
+            ) = _setup_completion_model_info(model_info, req, self.obj_read)
         except Exception as e:
             # Yield error as single chunk then stop.
             def _single_error_iter(e: Exception) -> Iterator[dict[str, str]]:
@@ -2009,12 +2019,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # Track start call if requested
         start_call: Optional[CallStartCHInsertable] = None
         if req.track_llm_call:
+            inputs = req.inputs.model_dump(exclude_none=True)
+            inputs["model"] = model_name
             start = tsi.StartedCallSchemaForInsert(
                 project_id=req.project_id,
                 wb_user_id=req.wb_user_id,
                 op_name=COMPLETIONS_CREATE_OP_NAME,
                 started_at=datetime.datetime.now(),
-                inputs={**req.inputs.model_dump(exclude_none=True)},
+                inputs={**inputs},
                 attributes={},
             )
             start_call = _start_call_for_insert_to_ch_insertable_start_call(start, self)
@@ -2037,7 +2049,128 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         # Otherwise, wrap the iterator with tracking
         return _create_tracked_stream_wrapper(
-            self._insert_call, chunk_iter, start_call, model_name, req.project_id
+            self._insert_call,
+            chunk_iter,
+            start_call,
+            model_name,
+            req.project_id,
+        )
+
+    def image_create(
+        self, req: tsi.ImageGenerationCreateReq
+    ) -> tsi.ImageGenerationCreateRes:
+        """Create images using LLM image generation.
+
+        Args:
+            req (tsi.ImageGenerationCreateReq): The image generation request.
+
+        Returns:
+            tsi.ImageGenerationCreateRes: The image generation response.
+        """
+        # Validate input parameters
+        if req.inputs.model is None:
+            return tsi.ImageGenerationCreateRes(
+                response={"error": "No model specified in request"}
+            )
+
+        if req.inputs.prompt is None:
+            return tsi.ImageGenerationCreateRes(
+                response={"error": "No prompt specified in request"}
+            )
+
+        # Get API key from secret fetcher
+        secret_fetcher = _secret_fetcher_context.get()
+        if secret_fetcher is None:
+            logger.error("No secret fetcher available for image generation request")
+            return tsi.ImageGenerationCreateRes(
+                response={
+                    "error": "Unable to access required credentials for image generation"
+                }
+            )
+
+        api_key = (
+            secret_fetcher.fetch("OPENAI_API_KEY")
+            .get("secrets", {})
+            .get("OPENAI_API_KEY")
+        )
+
+        if api_key is None:
+            return tsi.ImageGenerationCreateRes(
+                response={"error": "No OpenAI API key found"}
+            )
+
+        # Now that we have the API key, we can make the API call
+        start_time = datetime.datetime.now()
+
+        try:
+            res = lite_llm_image_generation(
+                api_key=api_key,
+                inputs=req.inputs.model_dump(exclude_none=True),
+                trace_server=self,
+                project_id=req.project_id,
+                wb_user_id=req.wb_user_id,
+            )
+            if "error" in res.response:
+                return tsi.ImageGenerationCreateRes(
+                    response={"error": res.response["error"]}
+                )
+        except Exception as e:
+            return tsi.ImageGenerationCreateRes(
+                response={"error": f"Image generation failed: {e!s}"}
+            )
+
+        end_time = datetime.datetime.now()
+
+        # Return response directly if not tracking calls
+        if req.track_llm_call is False:
+            return res
+
+        # Capture all input fields for call tracking
+        input_data = req.inputs.model_dump(exclude_none=False)
+
+        start = tsi.StartedCallSchemaForInsert(
+            project_id=req.project_id,
+            wb_user_id=req.wb_user_id,
+            op_name=IMAGE_GENERATION_CREATE_OP_NAME,
+            started_at=start_time,
+            inputs=input_data,
+            attributes={},
+        )
+        start_call = _start_call_for_insert_to_ch_insertable_start_call(start)
+
+        end = tsi.EndedCallSchemaForInsert(
+            project_id=req.project_id,
+            id=start_call.id,
+            ended_at=end_time,
+            output=res.response,
+            summary={},
+        )
+
+        if "usage" in res.response:
+            end.summary["usage"] = {req.inputs.model: res.response["usage"]}
+
+        if "error" in res.response:
+            end.exception = res.response["error"]
+
+        end_call = _end_call_for_insert_to_ch_insertable_end_call(end)
+        calls: list[Union[CallStartCHInsertable, CallEndCHInsertable]] = [
+            start_call,
+            end_call,
+        ]
+        batch_data = []
+        for call in calls:
+            call_dict = call.model_dump()
+            values = [call_dict.get(col) for col in ALL_CALL_INSERT_COLUMNS]
+            batch_data.append(values)
+
+        try:
+            self._insert_call_batch(batch_data)
+        except Exception as e:
+            # Log error but don't fail the response
+            print(f"Error inserting call batch for image generation: {e}", flush=True)
+
+        return tsi.ImageGenerationCreateRes(
+            response=res.response, weave_call_id=start_call.id
         )
 
     def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
@@ -2904,8 +3037,11 @@ def _create_tracked_stream_wrapper(
 
             # Prepare summary and end call
             summary: dict[str, Any] = {}
-            if aggregated_output and "usage" in aggregated_output:
-                summary["usage"] = {model_name: aggregated_output["usage"]}
+            if aggregated_output is not None and model_name is not None:
+                aggregated_output["model"] = model_name
+
+                if "usage" in aggregated_output:
+                    summary["usage"] = {model_name: aggregated_output["usage"]}
 
             end = tsi.EndedCallSchemaForInsert(
                 project_id=project_id,
@@ -2933,11 +3069,14 @@ def _setup_completion_model_info(
     Note: api_key can be None for bedrock providers since they use AWS credentials instead.
     """
     model_name = req.inputs.model
-    api_key = None
-    provider = None
+    api_key: Optional[str] = None
+    provider: str = "openai"  # Default provider
     base_url: Optional[str] = None
     extra_headers: dict[str, str] = {}
     return_type: Optional[str] = None
+
+    # Check for explicit custom provider prefix
+    is_explicit_custom = model_name.startswith("custom::")
 
     is_coreweave = (
         model_info and model_info.get("litellm_provider") == "coreweave"
@@ -2954,6 +3093,59 @@ def _setup_completion_model_info(
             extra_headers = req.inputs.extra_headers
             req.inputs.extra_headers = None
         return_type = "openai"
+    elif is_explicit_custom:
+        # Custom provider path - model_name format: custom::<provider>::<model>
+        # Parse provider and model names, create sanitized object_id for lookup
+        name_part = model_name.replace("custom::", "")
+
+        if "::" in name_part:
+            # Format: custom::<provider>::<model>
+            provider_name, model_name_part = name_part.split("::", 1)
+
+            # Create sanitized object_id to match what was created during provider setup
+
+            sanitized_provider = _sanitize_name_for_object_id(provider_name)
+            sanitized_model = _sanitize_name_for_object_id(model_name_part)
+            sanitized_object_id = f"{sanitized_provider}-{sanitized_model}"
+        else:
+            # Fallback: assume it's already in object_id format
+            # Extract names from object_id (this is a fallback case)
+            parts = name_part.split("-", 1) if "-" in name_part else [name_part, ""]
+            provider_name = parts[0]  # May be sanitized
+            model_name_part = parts[1] if len(parts) > 1 else ""
+            sanitized_provider = provider_name  # Already sanitized
+            sanitized_object_id = name_part
+
+        custom_provider_info = get_custom_provider_info(
+            project_id=req.project_id,
+            provider_name=sanitized_provider,
+            model_name=sanitized_object_id,
+            obj_read_func=obj_read,
+        )
+
+        base_url = custom_provider_info.base_url
+        final_model_name = custom_provider_info.actual_model_name
+        provider_model_name = (
+            f"{provider_name}/{final_model_name}"
+            if "::" in name_part
+            else final_model_name
+        )
+
+        # prefix the model name with "ollama/" if it is an ollama model else with openai/
+        req.inputs.model = (
+            "ollama/" + final_model_name
+            if "ollama" in provider_name.lower()
+            else "openai/" + final_model_name
+        )
+
+        return (
+            provider_model_name,
+            custom_provider_info.api_key,
+            "custom",  # return "custom" as provider
+            base_url,
+            custom_provider_info.extra_headers,
+            custom_provider_info.return_type,
+        )
     elif model_info:
         secret_name = model_info.get("api_key_name")
         if not secret_name:
@@ -2973,25 +3165,16 @@ def _setup_completion_model_info(
                 f"No API key {secret_name} found for model {model_name}",
                 api_key_name=secret_name,
             )
-    else:
-        # Custom provider path
-        custom_provider_info = get_custom_provider_info(
-            project_id=req.project_id,
-            model_name=model_name,
-            obj_read_func=obj_read,
-        )
 
-        base_url = custom_provider_info.base_url
-        api_key = custom_provider_info.api_key
-        extra_headers = custom_provider_info.extra_headers
-        return_type = custom_provider_info.return_type
-        actual_model_name = custom_provider_info.actual_model_name
+    return (
+        model_name,
+        api_key,
+        provider,
+        base_url,
+        extra_headers,
+        return_type,
+    )
 
-        provider = "custom"
-        req.inputs.model = (
-            "ollama/" + actual_model_name
-            if "ollama" in model_name
-            else actual_model_name
-        )
 
-    return model_name, api_key, provider, base_url, extra_headers, return_type
+def _sanitize_name_for_object_id(name: str) -> str:
+    return sub(r"[^a-zA-Z0-9_-]", "_", name)

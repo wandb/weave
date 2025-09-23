@@ -94,6 +94,7 @@ trace_server_shards = [f"trace{i}" for i in range(1, NUM_TRACE_SERVER_SHARDS + 1
         "notdiamond",
         "openai",
         "openai_agents",
+        "openai_realtime",
         "vertexai",
         "bedrock",
         "scorers",
@@ -188,8 +189,9 @@ def tests(session, shard):
         "--cov-branch",
     ]
 
-    # Memray not working with trace_server shard atm
-    if shard != "trace_server":
+    # Memray profiling is optional and controlled via environment variable
+    # (not working with trace_server shard atm)
+    if os.getenv("WEAVE_USE_MEMRAY") == "1" and shard != "trace_server":
         pytest_args.extend(
             [
                 "--memray",
