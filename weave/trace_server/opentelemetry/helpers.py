@@ -123,19 +123,89 @@ def _get_value_from_nested_dict(d: dict[str, Any], key: str) -> Any:
     return current
 
 
+class AttributePathConflictError(ValueError):
+    def __init__(
+        self,
+        *,
+        parent_key: str,
+        attempted_subkey: str,
+        existing_type: type,
+        message: Optional[str] = None,
+    ) -> None:
+        if message is None:
+            message = (
+                "Invalid attribute structure: cannot set subkey '"
+                f"{attempted_subkey}' under parent key '{parent_key}' because it "
+                f"is already a {existing_type.__name__}. "
+                "Do not mix a primitive value and nested keys for the same path. "
+                "Either send only nested keys (e.g. '"
+                f"{parent_key}.…') or rename the parent (e.g. '{parent_key}_value')."
+            )
+        super().__init__(message)
+        self.parent_key = parent_key
+        self.attempted_subkey = attempted_subkey
+        self.existing_type = existing_type
+
+
 def _set_value_in_nested_dict(d: dict[str, Any], key: str, value: Any) -> None:
-    """Set a value in a nested dictionary using a dot-separated key."""
+    """Set a value in a nested dictionary using a dot-separated key.
+
+    Raises AttributePathConflictError when a parent path already holds a non-dict value
+    and a nested subkey is being set or when attempting to overwrite an existing mapping
+    with a primitive while subkeys exist.
+    """
     if "." not in key:
+        # If there is already a mapping at this key, assigning a primitive would drop subkeys
+        existing = d.get(key, None)
+        if isinstance(existing, (dict, list)) and not isinstance(value, (dict, list)):
+            raise AttributePathConflictError(
+                parent_key=key,
+                attempted_subkey="<root>",
+                existing_type=type(existing),
+                message=(
+                    f"Invalid attribute structure: key '{key}' already has nested values, "
+                    "but a non-object value was also provided. Do not send both '"
+                    f"{key}' and '{key}.*' keys. Either: (1) remove the primitive '"
+                    f"{key}', (2) move it under a different name (e.g. '{key}_value'), or "
+                    f"(3) represent it as a field, e.g. '{key}.value'."
+                ),
+            )
         d[key] = value
         return
 
     parts = key.split(".")
     current = d
-    for _, part in enumerate(parts[:-1]):
+    # Walk down to the parent map, creating dicts as needed, but fail if we need
+    # to descend into a non-dict value.
+    for i, part in enumerate(parts[:-1]):
+        parent_path = ".".join(parts[: i + 1])
         if part not in current:
             current[part] = {}
+        elif not isinstance(current[part], dict):
+            # We must descend, but parent is a primitive -> conflict
+            raise AttributePathConflictError(
+                parent_key=parent_path,
+                attempted_subkey=parts[i + 1],
+                existing_type=type(current[part]),
+            )
         current = current[part]
-    current[parts[-1]] = value
+
+    last = parts[-1]
+    existing_leaf = current.get(last, None)
+    if isinstance(existing_leaf, (dict, list)) and not isinstance(value, (dict, list)):
+        # Overwriting an existing mapping (created by prior subkeys) with a primitive -> conflict
+        raise AttributePathConflictError(
+            parent_key=".".join(parts),
+            attempted_subkey="<root>",
+            existing_type=type(existing_leaf),
+            message=(
+                f"Invalid attribute structure: received both nested subkeys for '{'.'.join(parts)}' "
+                "and a non-object value for the same key. Do not send both '"
+                f"{'.'.join(parts)}' and '{'.'.join(parts)}.*'. Either keep only nested keys or "
+                f"use a different key for the primitive (e.g. '{'.'.join(parts)}_value')."
+            ),
+        )
+    current[last] = value
 
 
 def convert_numeric_keys_to_list(

@@ -31,7 +31,8 @@ from weave.trace_server.ids import generate_id
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.methods.evaluation_status import evaluation_status
 from weave.trace_server.object_class_util import process_incoming_object_val
-from weave.trace_server.opentelemetry.python_spans import ResourceSpans
+from weave.trace_server.opentelemetry.python_spans import Resource, Span, ResourceSpans
+from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.orm import quote_json_path
 from weave.trace_server.threads_query_builder import make_threads_query_sqlite
 from weave.trace_server.trace_server_common import (
@@ -1466,26 +1467,53 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 "Expected traces as ExportTraceServiceRequest, got {type(req.traces)}"
             )
 
-        traces_data = [
-            ResourceSpans.from_proto(span) for span in req.traces.resource_spans
-        ]
-
-        calls = []
-        for resource_spans in traces_data:
-            for scope_spans in resource_spans.scope_spans:
-                for span in scope_spans.spans:
-                    start_call, end_call = span.to_call(req.project_id)
-                    calls.extend(
-                        [
-                            {
-                                "mode": "start",
-                                "req": tsi.CallStartReq(start=start_call),
-                            },
-                            {"mode": "end", "req": tsi.CallEndReq(end=end_call)},
-                        ]
-                    )
+        calls: list[dict[str, object]] = []
+        rejected_spans = 0
+        error_messages: list[str] = []
+        for proto_resource_spans in req.traces.resource_spans:
+            resource = Resource.from_proto(proto_resource_spans.resource)
+            for proto_scope_spans in proto_resource_spans.scope_spans:
+                for proto_span in proto_scope_spans.spans:
+                    try:
+                        span = Span.from_proto(proto_span, resource)
+                        start_call, end_call = span.to_call(req.project_id)
+                        calls.extend(
+                            [
+                                {
+                                    "mode": "start",
+                                    "req": tsi.CallStartReq(start=start_call),
+                                },
+                                {"mode": "end", "req": tsi.CallEndReq(end=end_call)},
+                            ]
+                        )
+                    except AttributePathConflictError as e:
+                        rejected_spans += 1
+                        try:
+                            trace_id = proto_span.trace_id.hex()
+                            span_id = proto_span.span_id.hex()
+                            name = getattr(proto_span, "name", "")
+                        except Exception:
+                            trace_id = ""
+                            span_id = ""
+                            name = ""
+                        span_ident = (
+                            f"name='{name}' trace_id='{trace_id}' span_id='{span_id}'"
+                        )
+                        error_messages.append(
+                            f"Rejected span ({span_ident}): {str(e)}"
+                        )
         res = self.call_start_batch(tsi.CallCreateBatchReq(batch=calls))
-        # Return the empty ExportTraceServiceResponse as per the OTLP spec
+        # Return spec-compliant response; include partial_success if needed
+        if rejected_spans > 0:
+            return tsi.OtelExportRes(
+                partial_success=tsi.ExportTracePartialSuccess(
+                    rejected_spans=rejected_spans,
+                    error_message=(
+                        "; ".join(error_messages[:20])
+                        + ("; ..." if len(error_messages) > 20 else "")
+                    ),
+                )
+            )
         return tsi.OtelExportRes()
 
     def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes:
