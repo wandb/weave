@@ -724,7 +724,7 @@ class TestAttributes:
 
         try:
             expand_attributes(flat_attrs)
-            assert False, "Expected AttributePathConflictError"
+            raise AssertionError("Expected AttributePathConflictError")
         except AttributePathConflictError as e:
             msg = str(e)
             assert "gen_ai.prompt" in msg
@@ -740,7 +740,7 @@ class TestAttributes:
 
         try:
             expand_attributes(flat_attrs)
-            assert False, "Expected AttributePathConflictError"
+            raise AssertionError("Expected AttributePathConflictError")
         except AttributePathConflictError as e:
             msg = str(e)
             assert "gen_ai.prompt" in msg
