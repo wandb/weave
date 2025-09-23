@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import atexit
 import datetime
 import json
@@ -35,6 +36,7 @@ from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.op import op
 from weave.trace.op_protocol import Op
 from weave.trace.table import Table
+from weave.trace.util import Thread
 
 T = TypeVar("T")
 ID = str
@@ -263,21 +265,39 @@ class ScoreLogger(BaseModel):
 
     def log_score(self, scorer: Scorer | dict | str, score: ScoreType) -> None:
         """Log a score synchronously."""
-        import asyncio
-
         # When in an active asyncio test environment (like pytest.mark.asyncio),
         # we need special handling to avoid "already running" errors
         try:
             loop = asyncio.get_running_loop()
-            if asyncio.current_task() is not None:
-                # We're in an async context, just run the coroutine synchronously
-                import nest_asyncio
-
-                nest_asyncio.apply()
-                return loop.run_until_complete(self.alog_score(scorer, score))
-            else:
+            if asyncio.current_task() is None:
                 # We're not in an async context, but a loop exists
                 return loop.run_until_complete(self.alog_score(scorer, score))
+
+            # We're in an async context, we need to handle this differently
+            result = None
+            exception = None
+
+            def run_in_new_loop() -> None:
+                nonlocal result, exception
+                try:
+                    # Create a new event loop for this thread
+                    new_loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(new_loop)
+                    try:
+                        result = new_loop.run_until_complete(
+                            self.alog_score(scorer, score)
+                        )
+                    finally:
+                        new_loop.close()
+                except Exception as e:
+                    exception = e
+
+            thread = Thread(target=run_in_new_loop)
+            thread.start()
+            thread.join()
+
+            if exception:
+                raise exception
         except RuntimeError:
             # No event loop exists, create one with asyncio.run
             return asyncio.run(self.alog_score(scorer, score))
