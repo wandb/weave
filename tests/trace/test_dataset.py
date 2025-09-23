@@ -38,13 +38,12 @@ def test_pythonic_access(client):
 
 
 def _top_level_logs(log):
-    """Strip out internal logs from the log list"""
+    """Strip out internal logs from the log list."""
     return [l for l in log if not l.startswith("_")]
 
 
 def test_dataset_laziness(client):
-    """
-    The intention of this test is to show that local construction of
+    """The intention of this test is to show that local construction of
     a dataset does not trigger any remote operations.
     """
     dataset = Dataset(rows=[{"input": i} for i in range(300)])
@@ -74,8 +73,7 @@ def test_dataset_laziness(client):
 
 
 def test_published_dataset_laziness(client):
-    """
-    The intention of this test is to show that publishing a dataset,
+    """The intention of this test is to show that publishing a dataset,
     then iterating through the "gotten" version of the dataset has
     minimal remote operations - and importantly delays the fetching
     of the rows until they are actually needed.

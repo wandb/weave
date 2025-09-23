@@ -5,7 +5,7 @@ import pytest
 import weave
 from tests.trace.util import client_is_sqlite
 from weave import Scorer
-from weave.trace.op import Op
+from weave.trace.op_protocol import Op
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server.trace_server_interface import (
     CallsQueryReq,
@@ -52,8 +52,7 @@ def stats_query(client: WeaveClient, query: Query) -> CallsQueryStatsReq:
 async def perform_scorer_tests(
     client: WeaveClient, s0_v0: Scorer | Op, s0_v1: Scorer | Op, s1_v0: Scorer | Op
 ):
-    """
-    This is a unified test for both scorer and op tests. It ensures that we can query for calls
+    """This is a unified test for both scorer and op tests. It ensures that we can query for calls
     that have been scored by any type of scorer and ensures that we correctly differentiate between
     versions of the same scorer.
 

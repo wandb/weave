@@ -642,8 +642,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
     def _expand_refs(
         self, data: dict[str, Any], expand_columns: list[str]
     ) -> dict[str, Any]:
-        """
-        Recursively expand refs in the data. Only expand refs if requested in the
+        """Recursively expand refs in the data. Only expand refs if requested in the
         expand_columns list. expand_columns must be sorted by depth, shallowest first.
         """
         cols = sorted(expand_columns, key=lambda x: x.count("."))
@@ -1010,6 +1009,27 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             conn.commit()
 
         return tsi.TableCreateRes(digest=digest, row_digests=row_digests)
+
+    def table_create_from_digests(
+        self, req: tsi.TableCreateFromDigestsReq
+    ) -> tsi.TableCreateFromDigestsRes:
+        """Create a table by specifying row digests, instead actual rows."""
+        conn, cursor = get_conn_cursor(self.db_path)
+
+        # Calculate table digest from row digests
+        table_hasher = hashlib.sha256()
+        for row_digest in req.row_digests:
+            table_hasher.update(row_digest.encode())
+        digest = table_hasher.hexdigest()
+
+        with self.lock:
+            cursor.execute(
+                "INSERT OR IGNORE INTO tables (project_id, digest, row_digests) VALUES (?, ?, ?)",
+                (req.project_id, digest, json.dumps(req.row_digests)),
+            )
+            conn.commit()
+
+        return tsi.TableCreateFromDigestsRes(digest=digest)
 
     def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
         conn, cursor = get_conn_cursor(self.db_path)
@@ -1432,6 +1452,13 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         # Fall back to non-streaming completion
         response = self.completions_create(req)
         yield {"response": response.response, "weave_call_id": response.weave_call_id}
+
+    def image_create(
+        self, req: tsi.ImageGenerationCreateReq
+    ) -> tsi.ImageGenerationCreateRes:
+        # TODO: This is not implemented for the sqlite trace server
+        # Currently, this will only be called from the weave file, so we return an empty dict for now
+        return tsi.ImageGenerationCreateRes(response={})
 
     def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
         if not isinstance(req.traces, ExportTraceServiceRequest):

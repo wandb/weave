@@ -35,7 +35,7 @@ class BlockingTraceServer(tsi.TraceServerInterface):
             return super().__getattribute__(item)
         internal_trace_server = super().__getattribute__("internal_trace_server")
 
-        if item == "attribute_access_log":
+        if item in ("attribute_access_log", "remote_request_bytes_limit"):
             return getattr(internal_trace_server, item)
 
         def wrapper(*args, **kwargs):

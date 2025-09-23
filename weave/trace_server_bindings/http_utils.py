@@ -1,15 +1,22 @@
 import json
 import logging
-from typing import TYPE_CHECKING, Callable, Optional, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Callable, Optional, TypeVar, Union
 
-from weave.trace_server import requests
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
+from weave.utils import http_requests as requests
 
 if TYPE_CHECKING:
     from weave.trace_server_bindings.models import EndBatchItem, StartBatchItem
 
 logger = logging.getLogger(__name__)
+
+# Global cache for endpoint availability to avoid repeated checks
+_ENDPOINT_CACHE: set[str] = set()
+
+# Default remote request bytes limit (32 MiB real limit - 1 MiB buffer)
+REMOTE_REQUEST_BYTES_LIMIT = (32 - 1) * 1024 * 1024
+ROW_COUNT_CHUNKING_THRESHOLD = 1000
 
 # Type variable for batch items
 T = TypeVar("T")
@@ -46,7 +53,7 @@ def log_dropped_call_batch(
 
 
 def log_dropped_feedback_batch(
-    batch: list["tsi.FeedbackCreateReq"], e: Exception
+    batch: list[tsi.FeedbackCreateReq], e: Exception
 ) -> None:
     """Log details about a dropped feedback batch for debugging purposes."""
     logger.error(f"Error sending batch of {len(batch)} feedback events to server")
@@ -77,8 +84,7 @@ def process_batch_with_retry(
     log_dropped_fn: Optional[Callable[[list[T], Exception], None]] = None,
     encode_batch_fn: Callable[[list[T]], bytes],
 ) -> None:
-    """
-    Process a batch with common retry and error handling logic.
+    """Process a batch with common retry and error handling logic.
 
     This function handles the common pattern of:
     - Dynamic batch size adjustment
@@ -186,8 +192,7 @@ def process_batch_with_retry(
 
 
 def handle_response_error(response: requests.Response, url: str) -> None:
-    """
-    Handle HTTP response errors with user-friendly messages.
+    """Handle HTTP response errors with user-friendly messages.
 
     Args:
         response: The HTTP response object
@@ -231,3 +236,47 @@ def handle_response_error(response: requests.Response, url: str) -> None:
         message = f"{response.status_code} Error for url {url}: Request failed"
 
     raise requests.HTTPError(message, response=response)
+
+
+def check_endpoint_exists(
+    func: Callable, test_req: Any, cache_key: Union[str, None] = None
+) -> bool:
+    """Check if a function/endpoint exists and works by calling it with a test request.
+
+    This allows bypassing retry logic by passing the unwrapped function directly,
+    or testing any callable with consistent caching and error handling.
+
+    Args:
+        func: The function to test (e.g., server.table_create_from_digests or
+              server._generic_request_executor.__wrapped__)
+        test_req: A test request to use for checking the function
+        cache_key: Optional cache key. If not provided, uses id(func)
+
+    Returns:
+        True if function exists and works, False otherwise
+    """
+    # Generate cache key
+    if cache_key is None:
+        cache_key = str(id(func))
+
+    # Check cache first
+    if cache_key in _ENDPOINT_CACHE:
+        return True
+
+    try:
+        # Try calling the function with test request
+        func(test_req)
+    except Exception as e:
+        # Check if this is a 404 (method not found)
+        response = getattr(e, "response", None)
+        status_code = getattr(response, "status_code", None) if response else None
+        if status_code:
+            endpoint_exists = status_code != 404
+        else:
+            endpoint_exists = False
+    else:
+        endpoint_exists = True
+
+    if endpoint_exists:
+        _ENDPOINT_CACHE.add(cache_key)
+    return endpoint_exists

@@ -10,7 +10,7 @@ from pydantic import BaseModel
 import weave
 from weave.integrations.patcher import SymbolPatcher
 from weave.trace.autopatch import OpSettings
-from weave.trace.op import Op
+from weave.trace.op_protocol import Op
 from weave.trace.serialization.serialize import is_primitive, stringify
 from weave.utils.sanitize import REDACTED_VALUE, should_redact
 

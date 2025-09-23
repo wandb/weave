@@ -474,8 +474,7 @@ class Grid:
         return Column(self, column_id)
 
     def __getitem__(self, key: str | int | slice) -> Column | Row | Grid:
-        """
-        Allow accessing column values using grid['column_name'] syntax,
+        """Allow accessing column values using grid['column_name'] syntax,
         accessing a row using grid[row_index] syntax,
         or slicing rows using grid[start:end] syntax.
         """

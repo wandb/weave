@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from weave.trace import urls
 from weave.trace.api import publish as weave_publish
 from weave.trace.api import ref as weave_ref
+from weave.trace.call import CallsIter
 from weave.trace.context import weave_client_context
 from weave.trace.display import display
 from weave.trace.display.grid import Grid
@@ -15,7 +16,6 @@ from weave.trace.display.rich import pydantic_util
 from weave.trace.refs import ObjectRef, OpRef
 from weave.trace.traverse import ObjectPath, get_paths
 from weave.trace.vals import WeaveObject
-from weave.trace.weave_client import CallsIter
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.interface.builtin_object_classes.saved_view import Column, Pin
@@ -154,7 +154,7 @@ FIELDS_NO_FLOAT_CONVERT = {"summary.weave.latency_ms"}
 
 
 def py_to_api_filter(filter: tsi.CallsFilter | None) -> tsi.CallsFilter | None:
-    """Convert Saved View Filter to API Filter"""
+    """Convert Saved View Filter to API Filter."""
     if filter is None:
         return None
     return tsi.CallsFilter(
@@ -751,7 +751,8 @@ class SavedView:
     def ui_url(self) -> str | None:
         """URL to show this saved view in the UI.
 
-        Note this is the "result" page with traces etc, not the URL for the view object."""
+        Note this is the "result" page with traces etc, not the URL for the view object.
+        """
         if self.ref and self.entity and self.project:
             weave_root = urls.project_weave_root_url(self.entity, self.project)
             return f"{weave_root}/{self.view_type}?view={self.ref.name}"

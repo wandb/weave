@@ -209,7 +209,7 @@ class _WandbLogin:
             Tuple of API key and status.
         """
         url = app_url(f"https://{self._host}")
-        authorize_url = f"{url}/authorize"
+        authorize_url = f"{url}/authorize?ref={referrer}"
         logger.info("Logging into Weights & Biases")
         logger.info(f"You can find your API key in your browser here: {authorize_url}")
         logger.info("Paste an API key from your profile and hit enter:")

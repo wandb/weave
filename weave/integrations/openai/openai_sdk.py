@@ -11,11 +11,10 @@ import weave
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.op import (
-    Op,
-    ProcessedInputs,
     _add_accumulator,
     _default_on_input_handler,
 )
+from weave.trace.op_protocol import Op, ProcessedInputs
 from weave.utils.stream_metrics import (
     WEAVE_STREAM_START_TIME,
     add_time_to_first_token_to_dict,
@@ -152,8 +151,7 @@ def openai_on_finish_post_processor(value: ChatCompletionChunk | None) -> dict |
 
 
 def _openai_chunk_has_content(chunk: ChatCompletionChunk) -> bool:
-    """
-    Detect if an OpenAI chunk contains actual content (first token).
+    """Detect if an OpenAI chunk contains actual content (first token).
 
     Args:
         chunk: The OpenAI ChatCompletionChunk to check.
@@ -407,7 +405,7 @@ def openai_on_input_handler(
 
 def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
-        "We need to do this so we can check if `stream` is used"
+        """We need to do this so we can check if `stream` is used."""
 
         def _add_stream_options(fn: Callable) -> Callable:
             @wraps(fn)
@@ -452,7 +450,7 @@ def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
 # it manually here...
 def create_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
-        "We need to do this so we can check if `stream` is used"
+        """We need to do this so we can check if `stream` is used."""
 
         def _add_stream_options(fn: Callable) -> Callable:
             @wraps(fn)
@@ -747,16 +745,20 @@ def get_openai_patcher(
     base = settings.op_settings
 
     completions_create_settings = base.model_copy(
-        update={"name": base.name or "openai.chat.completions.create"}
+        update={
+            "name": base.name or "openai.chat.completions.create",
+        }
     )
     async_completions_create_settings = base.model_copy(
-        update={"name": base.name or "openai.chat.completions.create"}
+        update={
+            "name": base.name or "openai.chat.completions.create",
+        }
     )
     completions_parse_settings = base.model_copy(
-        update={"name": base.name or "openai.beta.chat.completions.parse"}
+        update={"name": base.name or "openai.chat.completions.parse"}
     )
     async_completions_parse_settings = base.model_copy(
-        update={"name": base.name or "openai.beta.chat.completions.parse"}
+        update={"name": base.name or "openai.chat.completions.parse"}
     )
     moderation_create_settings = base.model_copy(
         update={"name": base.name or "openai.moderations.create"}
@@ -795,6 +797,17 @@ def get_openai_patcher(
                 "AsyncCompletions.create",
                 create_wrapper_async(settings=async_completions_create_settings),
             ),
+            SymbolPatcher(
+                lambda: importlib.import_module("openai.resources.chat.completions"),
+                "Completions.parse",
+                create_wrapper_sync(settings=completions_parse_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("openai.resources.chat.completions"),
+                "AsyncCompletions.parse",
+                create_wrapper_async(settings=async_completions_parse_settings),
+            ),
+            # Beta methods were removed in 1.92.0
             SymbolPatcher(
                 lambda: importlib.import_module(
                     "openai.resources.beta.chat.completions"

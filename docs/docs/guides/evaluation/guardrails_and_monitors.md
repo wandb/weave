@@ -188,7 +188,7 @@ Learn how to [create a monitor in general](#create-a-monitor) or try out the [en
         - **Judge model**: Select the model that will score your ops. Three types of models are available:
             - [Saved models](../tools/playground.md#saved-models)
             - Models from providers configured by your W&B admin
-            - [W&B Inference models](https://docs.wandb.ai/guides/inference/)
+            - [W&B Inference models](https://docs.wandb.ai/guides/inference/models/)
         
         For the selected model, configure the following settings:
             - **Configuration name**
