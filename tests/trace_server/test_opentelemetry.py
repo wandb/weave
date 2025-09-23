@@ -20,6 +20,7 @@ from opentelemetry.proto.trace.v1.trace_pb2 import (
     Span,
     TracesData,
 )
+from opentelemetry.semconv_ai import SpanAttributes as OTSpanAttr
 
 from weave.trace import weave_client
 from weave.trace_server import trace_server_interface as tsi
@@ -52,7 +53,6 @@ from weave.trace_server.opentelemetry.python_spans import (
     StatusCode,
 )
 from weave.trace_server.opentelemetry.python_spans import TracesData as PyTracesData
-from opentelemetry.semconv_ai import SpanAttributes as OTSpanAttr
 
 
 def create_test_span():
@@ -65,7 +65,7 @@ def create_test_span():
     span.end_time_unix_nano = (
         span.start_time_unix_nano + 1_000_000_000
     )  # 1 second later
-    span.kind = 1 # type: ignore
+    span.kind = 1  # type: ignore
 
     # Add some attributes
     kv1 = KeyValue()
@@ -97,7 +97,7 @@ def create_test_span():
     span.attributes.append(kv4)
 
     # Set status
-    span.status.code = StatusCode.OK.value #type: ignore
+    span.status.code = StatusCode.OK.value  # type: ignore
     span.status.message = "Success"
 
     return span
@@ -746,6 +746,7 @@ class TestAttributes:
             assert "gen_ai.prompt" in msg
             assert "Do not" in msg or "Invalid attribute structure" in msg
 
+
 def create_attributes(d: dict[str, Any]):
     return expand_attributes(d.items())
 
@@ -1060,6 +1061,7 @@ class TestSemanticConventionParsing:
         assert usage.get("completion_tokens") == 25
         assert usage.get("total_tokens") == 40
 
+
 class TestHelpers:
     def test_capture_parts(self):
         """Test capturing parts of a string split by delimiters."""
@@ -1270,7 +1272,10 @@ class TestSpanOverrides:
         overrides = get_span_overrides(attributes)
         assert overrides == {}
 
-def test_otel_export_partial_success_on_attribute_conflict(client: weave_client.WeaveClient):
+
+def test_otel_export_partial_success_on_attribute_conflict(
+    client: weave_client.WeaveClient,
+):
     """A batch with one good span and one conflicting span returns partial success.
 
     The good span is ingested; the conflicting span is rejected with a helpful message.
@@ -1316,7 +1321,9 @@ def test_otel_export_partial_success_on_attribute_conflict(client: weave_client.
 
     # Cleanup the good call
     client.server.calls_delete(
-        tsi.CallsDeleteReq(project_id=project_id, call_ids=[good_span_id], wb_user_id=None)
+        tsi.CallsDeleteReq(
+            project_id=project_id, call_ids=[good_span_id], wb_user_id=None
+        )
     )
 
     # Test with multiple prompts

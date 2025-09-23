@@ -31,8 +31,8 @@ from weave.trace_server.ids import generate_id
 from weave.trace_server.interface import query as tsi_query
 from weave.trace_server.methods.evaluation_status import evaluation_status
 from weave.trace_server.object_class_util import process_incoming_object_val
-from weave.trace_server.opentelemetry.python_spans import Resource, Span, ResourceSpans
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
+from weave.trace_server.opentelemetry.python_spans import Resource, Span
 from weave.trace_server.orm import quote_json_path
 from weave.trace_server.threads_query_builder import make_threads_query_sqlite
 from weave.trace_server.trace_server_common import (
@@ -1499,9 +1499,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                         span_ident = (
                             f"name='{name}' trace_id='{trace_id}' span_id='{span_id}'"
                         )
-                        error_messages.append(
-                            f"Rejected span ({span_ident}): {str(e)}"
-                        )
+                        error_messages.append(f"Rejected span ({span_ident}): {e!s}")
         res = self.call_start_batch(tsi.CallCreateBatchReq(batch=calls))
         # Return spec-compliant response; include partial_success if needed
         if rejected_spans > 0:

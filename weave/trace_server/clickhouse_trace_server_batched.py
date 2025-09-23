@@ -107,8 +107,8 @@ from weave.trace_server.objects_query_builder import (
     format_metadata_objects_from_query_result,
     make_objects_val_query_and_parameters,
 )
-from weave.trace_server.opentelemetry.python_spans import Resource, Span, ResourceSpans
 from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
+from weave.trace_server.opentelemetry.python_spans import Resource, Span
 from weave.trace_server.orm import ParamBuilder, Row
 from weave.trace_server.project_query_builder import make_project_stats_query
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
@@ -252,9 +252,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         span_ident = (
                             f"name='{name}' trace_id='{trace_id}' span_id='{span_id}'"
                         )
-                        error_messages.append(
-                            f"Rejected span ({span_ident}): {str(e)}"
-                        )
+                        error_messages.append(f"Rejected span ({span_ident}): {e!s}")
         # TODO: Actually populate the error fields if call_start_batch fails
         self.call_start_batch(tsi.CallCreateBatchReq(batch=calls))
         if rejected_spans > 0:
