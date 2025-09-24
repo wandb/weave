@@ -28,6 +28,7 @@ ALERT_METRICS_QUERY_COLUMNS = [
     "created_at",
     "metric_key",
     "metric_value",
+    "metric_type",
 ]
 
 TABLE_ALERT_METRICS = Table(
@@ -68,6 +69,7 @@ def format_row_to_alert_metric_schema(row: Row) -> tsi.AlertMetricSchema:
         >>> schema = format_row_to_alert_metric_schema(row)
         >>> assert schema.id == "test_id"
         >>> assert schema.metric_key == "accuracy"
+        >>> assert schema.metric_type == "float"
     """
     assert row["id"] is not None
     assert isinstance(row["id"], str)
@@ -81,6 +83,10 @@ def format_row_to_alert_metric_schema(row: Row) -> tsi.AlertMetricSchema:
     assert isinstance(row["metric_value"], (int, float))
     assert row["metric_type"] is not None
     assert isinstance(row["metric_type"], str)
+    assert row["call_id"] is not None
+    assert isinstance(row["call_id"], str)
+    assert row["wb_user_id"] is not None
+    assert isinstance(row["wb_user_id"], str)
 
     # Ensure alert_ids is a list of strings
     alert_ids = row["alert_ids"]
@@ -97,4 +103,6 @@ def format_row_to_alert_metric_schema(row: Row) -> tsi.AlertMetricSchema:
         metric_key=row["metric_key"],
         metric_value=row["metric_value"],
         metric_type=row["metric_type"],
+        call_id=row["call_id"],
+        wb_user_id=row["wb_user_id"],
     )

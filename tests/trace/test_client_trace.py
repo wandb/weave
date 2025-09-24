@@ -5867,7 +5867,7 @@ def test_alert_metrics_create_query(client):
         tsi.AlertMetricsCreateReq(
             project_id=client._project_id(),
             metrics=[
-                tsi.AlertMetricItem(
+                tsi.AlertMetricInsertItem(
                     alert_ids=["alert-1"],
                     metric_key="accuracy",
                     metric_value=0.95,
@@ -5887,17 +5887,18 @@ def test_alert_metrics_create_query(client):
         tsi.AlertMetricsCreateReq(
             project_id=client._project_id(),
             metrics=[
-                tsi.AlertMetricItem(
+                tsi.AlertMetricInsertItem(
                     alert_ids=["alert-1", "alert-2"],
                     metric_key="loss",
                     metric_value=0.123,
                     call_id="call-456",
                     created_at=created_at,
                 ),
-                tsi.AlertMetricItem(
+                tsi.AlertMetricInsertItem(
                     alert_ids=["alert-2"],
                     metric_key="f1_score",
                     metric_value=0.89,
+                    metric_type="float",
                     call_id="call-789",
                     created_at=created_at + datetime.timedelta(seconds=1),
                 ),

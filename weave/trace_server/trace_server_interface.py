@@ -1239,22 +1239,26 @@ class EvaluationStatusRes(BaseModel):
     ]
 
 
-class AlertMetricItem(BaseModel):
-    """Individual metric item for batch creation."""
-
+class AlertMetricInsertItem(BaseModel):
     alert_ids: list[str]
     metric_key: str
     metric_value: float
+    metric_type: str = "float"
     call_id: str
     created_at: datetime.datetime
     wb_user_id: str = Field(description=WB_USER_ID_DESCRIPTION)
+
+
+class AlertMetricSchema(AlertMetricInsertItem):
+    id: str
+    project_id: str
 
 
 class AlertMetricsCreateReq(BaseModelStrict):
     """Request to create multiple alert metrics in batch."""
 
     project_id: str
-    metrics: list[AlertMetricItem]
+    metrics: list[AlertMetricInsertItem]
 
 
 class AlertMetricsCreateRes(BaseModel):
@@ -1270,16 +1274,6 @@ class AlertMetricsQueryReq(BaseModelStrict):
     end_time: Optional[datetime.datetime] = None
     limit: Optional[int] = None
     offset: Optional[int] = None
-
-
-class AlertMetricSchema(BaseModel):
-    id: str
-    project_id: str
-    alert_ids: list[str]
-    created_at: datetime.datetime
-    metric_key: str
-    metric_value: float
-    metric_type: str = "float"  # float, bool...
 
 
 class TraceServerInterface(Protocol):

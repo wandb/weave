@@ -2249,6 +2249,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     metric.created_at,
                     metric.metric_key,
                     metric.metric_value,
+                    metric.metric_type,
                     metric.call_id,
                     metric.wb_user_id,
                 )
