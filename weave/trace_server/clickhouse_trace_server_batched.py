@@ -29,14 +29,14 @@ from weave.trace_server import environment as wf_env
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.actions_worker.dispatcher import execute_batch
-from weave.trace_server.alert_metrics import (
+from weave.trace_server.alert_metrics.alert_metrics_query_builder import (
+    build_alert_metrics_query_conditions,
+)
+from weave.trace_server.alert_metrics.schema import (
     ALERT_METRICS_CREATE_COLUMNS,
     ALERT_METRICS_QUERY_COLUMNS,
     TABLE_ALERT_METRICS,
     format_row_to_alert_metric_schema,
-)
-from weave.trace_server.alert_metrics.alert_metrics_query_builder import (
-    build_alert_metrics_query_conditions,
 )
 from weave.trace_server.base64_content_conversion import (
     process_call_req_to_content,
@@ -2291,9 +2291,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         # Stream the results
         for row in result.result_rows:
-            # Convert tuple row to dictionary using the table's tuple_to_row method
             row_dict = TABLE_ALERT_METRICS.tuple_to_row(row, prepared.fields)
-            # Ensure datetime has timezone
             created_at = row_dict.get("created_at")
             if created_at and isinstance(created_at, datetime.datetime):
                 row_dict["created_at"] = _ensure_datetimes_have_tz(created_at)

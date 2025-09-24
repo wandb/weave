@@ -5929,6 +5929,20 @@ def test_alert_metrics_create_query(client):
     assert len(query_res.metrics) == 2
     assert all("alert-2" in m.alert_ids for m in query_res.metrics)
 
+    # Query by metric key, alert ID, and time range
+    query_res = client.server.alert_metrics_query(
+        tsi.AlertMetricsQueryReq(
+            project_id=client._project_id(),
+            metric_keys=["f1_score"],
+            alert_ids=["alert-2"],
+            end_time=created_at + datetime.timedelta(minutes=2),
+        )
+    )
+    assert len(query_res.metrics) == 1
+    assert query_res.metrics[0].metric_key == "f1_score"
+    assert query_res.metrics[0].metric_value == 0.89
+    assert "alert-2" in query_res.metrics[0].alert_ids
+
     # Query with time range
     query_res = client.server.alert_metrics_query(
         tsi.AlertMetricsQueryReq(

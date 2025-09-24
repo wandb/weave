@@ -1,25 +1,26 @@
 CREATE TABLE IF NOT EXISTS alert_metrics (
    project_id String,
-   id String, -- necessary?
+   id String,
    wb_user_id String,
-   call_id String, -- id of call that generated the metric
-   alert_ids Array(String), -- multiple alerts can have the same metric
+   call_id String,
+   alert_ids Array(String),
    created_at Datetime(3),
    created_at_inv DateTime(3) MATERIALIZED toDateTime64(2147483647 - toUnixTimestamp64Milli(created_at), 3),
    metric_key String,
-   metric_value Float64, -- can this ever not be float?
-   
+   metric_value Float64,
+   metric_type String,
+
    INDEX idx_alert_ids (alert_ids) TYPE bloom_filter(0.01) GRANULARITY 1
 ) ENGINE = MergeTree
 ORDER BY (project_id, metric_key, created_at_inv, id);
-   
+
 -- Aggregate hourly, used to serve week old data
 CREATE TABLE IF NOT EXISTS alert_metrics_history (
 	project_id String, 
   wb_user_id String,
   metric_key String,
   bucket_start DateTime64(3),
-    
+
 	alert_ids AggregateFunction(groupUniqArray, Array(String)),
 	min_created_at SimpleAggregateFunction(min, Datetime(3)),
 	max_created_at SimpleAggregateFunction(max, Datetime(3)),
@@ -34,6 +35,7 @@ CREATE MATERIALIZED VIEW IF NOT EXISTS alert_metrics_history_view
 TO alert_metrics_history AS
 SELECT
   project_id,
+  wb_user_id,
   metric_key,
   bucket_start,
   groupUniqArrayState(alert_ids)          AS alert_ids,

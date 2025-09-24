@@ -16,7 +16,7 @@ from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
 
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.alert_metrics import ALERT_METRICS_QUERY_COLUMNS
+from weave.trace_server.alert_metrics.schema import ALERT_METRICS_QUERY_COLUMNS
 from weave.trace_server.errors import (
     InvalidRequest,
     NotFoundError,

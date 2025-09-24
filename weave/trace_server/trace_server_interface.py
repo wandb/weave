@@ -1279,6 +1279,7 @@ class AlertMetricSchema(BaseModel):
     created_at: datetime.datetime
     metric_key: str
     metric_value: float
+    metric_type: str = "float"  # float, bool...
 
 
 class TraceServerInterface(Protocol):
