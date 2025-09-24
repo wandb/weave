@@ -223,7 +223,10 @@ class Select:
     action: Action
 
     _project_id: typing.Optional[str]
+    # Fields from the user that must be transformed to internal field names
+    # like "inputs.my_field" or "payload.value"
     _fields: typing.Optional[list[str]]
+    # Fields that we have constructed internally, like cost query fields
     _raw_sql_fields: typing.Optional[list[str]]
     _query: typing.Optional[tsi.Query]
     _order_by: typing.Optional[list[tsi.SortBy]]
