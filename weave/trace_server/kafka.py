@@ -102,11 +102,14 @@ class KafkaProducer(ConfluentKafkaProducer):
                     }
                 )
 
-        # Use project_id as key to ensure all messages for a project
+        # TODO: Use project_id as key to ensure all messages for a project
         # go to the same partition for sequential processing by one worker
+        # This is NOT implemented currently due to performance concerns for
+        # online monitors, which will likely hotspot as individual projects
+        # would all be serviced by a single worker.
         self.produce(
             topic=CALL_ENDED_TOPIC,
-            key=call_end.project_id.encode("utf-8"),
+            # key=call_end.project_id.encode("utf-8"),
             value=call_end.model_dump_json(),
         )
 

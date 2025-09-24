@@ -1247,7 +1247,7 @@ class AlertMetricItem(BaseModel):
     metric_value: float
     call_id: str
     created_at: datetime.datetime
-    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    wb_user_id: str = Field(description=WB_USER_ID_DESCRIPTION)
 
 
 class AlertMetricsCreateReq(BaseModelStrict):

@@ -2206,6 +2206,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return evaluation_status(self, req)
 
     # Alert API
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.alert_metrics_create")
     def alert_metrics_create(
         self, req: tsi.AlertMetricsCreateReq
     ) -> tsi.AlertMetricsCreateRes:
