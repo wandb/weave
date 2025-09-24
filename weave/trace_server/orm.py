@@ -266,7 +266,13 @@ class Select:
         return self
 
     def raw_sql_fields(self, raw_fields: typing.Optional[list[str]]) -> "Select":
-        """Add raw SQL expressions that don't need external-to-internal field transformation."""
+        """Add raw SQL expressions that don't need external-to-internal field transformation.
+
+        Example: fields like cost query fields that are aggregations and custom-defined
+
+        Using raw_sql_fields cirucumvents some basic field validation, do not use
+           user-controlled fields without handling validation before adding.
+        """
         self._raw_sql_fields = raw_fields or []
         return self
 
