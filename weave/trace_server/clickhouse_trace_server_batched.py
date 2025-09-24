@@ -234,7 +234,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         for resource_spans in traces_data:
             for scope_spans in resource_spans.scope_spans:
                 for span in scope_spans.spans:
-                    start_call, end_call = span.to_call(req.project_id)
+                    start_call, end_call = span.to_call(req.project_id, req.wb_user_id)
                     calls.extend(
                         [
                             {
@@ -999,8 +999,29 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         sort_fields = []
         if req.sort_by:
             for sort in req.sort_by:
+                # Validate sort field to prevent empty JSON paths
+                if not sort.field or not sort.field.strip():
+                    raise InvalidRequest("Sort field cannot be empty")
+
+                # Check for invalid dot patterns that would create malformed JSON paths
+                if (
+                    sort.field.startswith(".")
+                    or sort.field.endswith(".")
+                    or ".." in sort.field
+                ):
+                    raise InvalidRequest(
+                        f"Invalid sort field '{sort.field}': field names cannot start/end with dots or contain consecutive dots"
+                    )
+
                 # TODO: better splitting of escaped dots (.) in field names
                 extra_path = sort.field.split(".")
+
+                # Additional validation: ensure no empty path components
+                if any(not component.strip() for component in extra_path):
+                    raise InvalidRequest(
+                        f"Invalid sort field '{sort.field}': field path components cannot be empty"
+                    )
+
                 field = OrderField(
                     field=QueryBuilderDynamicField(
                         field=VAL_DUMP_COLUMN_NAME, extra_path=extra_path
