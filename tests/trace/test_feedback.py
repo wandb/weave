@@ -722,7 +722,7 @@ def test_feedback_query_bad_json_path(client) -> None:
 
     # Add feedback with a known structure
     trace_object = client.get_call(call.id)
-    feedback_id = trace_object.feedback.add_note("test note")
+    trace_object.feedback.add_note("test note")
 
     # Try to query for a field that doesn't exist in the feedback table schema
     # "inputs" is not a valid column or JSON field in the feedback table
