@@ -225,7 +225,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         for resource_spans in traces_data:
             for scope_spans in resource_spans.scope_spans:
                 for span in scope_spans.spans:
-                    start_call, end_call = span.to_call(req.project_id)
+                    start_call, end_call = span.to_call(req.project_id, req.wb_user_id)
                     calls.extend(
                         [
                             {
