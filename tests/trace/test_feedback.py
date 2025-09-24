@@ -726,7 +726,6 @@ def test_feedback_query_bad_json_path(client) -> None:
 
     # Try to query for a field that doesn't exist in the feedback table schema
     # "inputs" is not a valid column or JSON field in the feedback table
-    # This should now properly raise a ValueError due to the improved prefix validation
     with pytest.raises(ValueError, match="Unknown field: inputs.message_id"):
         client.server.feedback_query(
             FeedbackQueryReq(
