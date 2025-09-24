@@ -224,6 +224,7 @@ class Select:
 
     _project_id: typing.Optional[str]
     _fields: typing.Optional[list[str]]
+    _raw_sql_fields: typing.Optional[list[str]]
     _query: typing.Optional[tsi.Query]
     _order_by: typing.Optional[list[tsi.SortBy]]
     _limit: typing.Optional[int]
@@ -238,6 +239,7 @@ class Select:
 
         self._project_id = None
         self._fields = []
+        self._raw_sql_fields = []
         self._query = None
         self._order_by = None
         self._limit = None
@@ -258,6 +260,11 @@ class Select:
 
     def fields(self, fields: typing.Optional[list[str]]) -> "Select":
         self._fields = fields
+        return self
+
+    def raw_sql_fields(self, raw_fields: typing.Optional[list[str]]) -> "Select":
+        """Add raw SQL expressions that don't need external-to-internal field transformation."""
+        self._raw_sql_fields = raw_fields or []
         return self
 
     def where(self, query: typing.Optional[tsi.Query]) -> "Select":
@@ -312,6 +319,9 @@ class Select:
                 )[0]
                 for f in fieldnames
             ]
+            # Add raw SQL fields without transformation
+            if self._raw_sql_fields:
+                internal_fields.extend(self._raw_sql_fields)
             joined_fields = ", ".join(internal_fields)
             sql = f"SELECT {joined_fields}\n"
         elif self.action == "DELETE":
