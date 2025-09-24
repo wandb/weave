@@ -673,7 +673,7 @@ def test_evaluation_logger_with_predefined_scorers(client, caplog):
 
         # These should not warn (in the predefined list)
         pred.log_score("accuracy", 0.9)
-        pred.log_score({"name": "precision"}, 0.85)
+        pred.log_score("precision", 0.85)
 
         # This should warn (not in the predefined list)
         pred.log_score("recall", 0.8)
@@ -696,4 +696,8 @@ def test_evaluation_logger_with_predefined_scorers(client, caplog):
     # Verify scorers are stored in evaluation attributes
     calls = client.get_calls()
     eval_call = next(c for c in calls if op_name_from_call(c) == "Evaluation.evaluate")
-    assert eval_call.inputs["self"].attributes["scorers"] == ["accuracy", "precision"]
+    assert eval_call.inputs["self"].metadata["scorers"] == ["accuracy", "precision"]
+
+    # verify we can get the eval object separately by ref and see metadata
+    eval_object = ev._pseudo_evaluation.ref.get()
+    assert eval_object.metadata["scorers"] == ["accuracy", "precision"]

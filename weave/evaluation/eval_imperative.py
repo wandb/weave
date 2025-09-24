@@ -458,7 +458,7 @@ class EvaluationLogger(BaseModel):
         self._pseudo_evaluation = Evaluation(
             dataset=cast(Dataset, self.dataset),
             scorers=[],
-            attributes={"scorers": self.scorers, **self.eval_attributes},
+            metadata={"scorers": self.scorers, **self.eval_attributes},
         )
 
         # The following section is a "hacky" way to create Model and Evaluation
