@@ -709,3 +709,37 @@ def test_get_feedback_with_dict_query(client) -> None:
 
     no_results = client.get_feedback(query=no_results_query)
     assert len(list(no_results)) == 0
+
+
+def test_feedback_query_bad_json_path(client) -> None:
+    """Test that querying for nonexistent JSON paths raises appropriate error."""
+    # Create some test feedback
+    project_id = client._project_id()
+
+    # Create a call to attach feedback to
+    call = client.create_call("test_op", {"input": "test"})
+    client.finish_call(call, {"output": "test"})
+
+    # Add feedback with a known structure
+    trace_object = client.get_call(call.id)
+    feedback_id = trace_object.feedback.add_note("test note")
+
+    # Try to query for a field that doesn't exist in the feedback table schema
+    # "inputs" is not a valid column or JSON field in the feedback table
+    # This should now properly raise a ValueError due to the improved prefix validation
+    with pytest.raises(ValueError, match="Unknown field: inputs.message_id"):
+        client.server.feedback_query(
+            FeedbackQueryReq(
+                project_id=project_id,
+                query=Query(
+                    **{
+                        "$expr": {
+                            "$contains": {
+                                "input": {"$getField": "inputs.message_id"},
+                                "substr": {"$literal": "test-id"},
+                            }
+                        }
+                    }
+                ),
+            )
+        )
