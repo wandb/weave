@@ -229,16 +229,6 @@ def init_weave_get_server(
     return res
 
 
-def init_local() -> weave_client.WeaveClient:
-    from weave.trace_server import sqlite_trace_server
-
-    server = sqlite_trace_server.SqliteTraceServer("weave.db")
-    server.setup_tables()
-    client = weave_client.WeaveClient("none", "none", server)
-    weave_client_context.set_weave_client_global(client)
-    return client
-
-
 def finish() -> None:
     current_client = weave_client_context.get_weave_client()
     if current_client is not None:
