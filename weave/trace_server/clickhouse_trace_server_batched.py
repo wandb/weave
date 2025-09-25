@@ -2667,7 +2667,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         complete_calls = []
         incomplete_calls = []
 
-        for call_id, call_data in calls_by_id.items():
+        for call_data in calls_by_id.values():
             starts = call_data["starts"]
             ends = call_data["ends"]
 

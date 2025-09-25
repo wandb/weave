@@ -16,6 +16,7 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Any, Callable, TypedDict, cast
 
 import pydantic
+from cachetools import TTLCache
 from requests import HTTPError
 
 from weave import version
@@ -350,7 +351,10 @@ class WeaveClient:
         self.send_file_cache = WeaveClientSendFileCache()
 
         # Cache to store call starts so they can be sent with call ends
-        self._call_start_cache: dict[str, CallStartReq] = {}
+        self._call_start_cache: TTLCache[str, CallStartReq] = TTLCache(
+            maxsize=10_000,
+            ttl=60 * 60,  # 60 minute TTL
+        )
 
     ################ High Level Convenience Methods ################
 
@@ -801,7 +805,6 @@ class WeaveClient:
                     attributes=attributes_dict.unwrap(),
                     wb_run_id=current_wb_run_id,
                     wb_run_step=current_wb_run_step,
-                    wb_user_id=None,  # Will be set by the server
                     thread_id=thread_id,
                     turn_id=turn_id,
                 )
@@ -814,9 +817,7 @@ class WeaveClient:
                     "Inputs may be dropped."
                 )
 
-            # Cache the start request for later use with call_end
             self._call_start_cache[call_id] = call_start_req
-            # Also send immediately so users can see in progress calls
             self.server.call_start(call_start_req)
             return True
 
@@ -954,6 +955,7 @@ class WeaveClient:
             output_json = to_json(
                 maybe_redacted_output_as_refs, project_id, self, use_dictify=False
             )
+            assert call.id is not None
             call_end_req = CallEndReq(
                 end=EndedCallSchemaForInsert(
                     project_id=project_id,
@@ -971,14 +973,7 @@ class WeaveClient:
                     "Output may be dropped."
                 )
 
-            # Get cached start request
-            call_id = call.id
-            if call_id is None:
-                # This shouldn't happen since we always generate call id...
-                self.server.call_end(call_end_req)
-                return
-
-            cached_start = self._call_start_cache.get(call_id)
+            cached_start = self._call_start_cache.get(call.id)
             if cached_start is not None:
                 # Send complete call (start + end)
                 batch_req = CallCreateBatchReq(
@@ -988,7 +983,7 @@ class WeaveClient:
                     ]
                 )
                 self.server.call_start_batch(batch_req)
-                del self._call_start_cache[call_id]
+                del self._call_start_cache[call.id]
             else:
                 # Fallback: just send end (shouldn't happen normally)
                 self.server.call_end(call_end_req)
