@@ -12,5 +12,6 @@ export {weaveAudio, weaveImage, WeaveAudio, WeaveImage} from './media';
 export {op} from './op';
 export * from './types';
 export {WeaveObject} from './weaveObject';
+export {MessagesPrompt, StringPrompt} from './prompt';
 import './utils/commonJSLoader';
 import './integrations/hooks';

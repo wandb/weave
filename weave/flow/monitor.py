@@ -4,7 +4,7 @@ from pydantic import Field
 from typing_extensions import Self
 
 from weave.flow.casting import Scorer
-from weave.flow.obj import Object
+from weave.object.obj import Object
 from weave.trace.api import ObjectRef, publish
 from weave.trace.objectify import register_object
 from weave.trace.vals import WeaveObject
@@ -13,11 +13,9 @@ from weave.trace_server.interface.query import Query
 
 @register_object
 class Monitor(Object):
-    """
-    Sets up a monitor to score incoming calls automatically.
+    """Sets up a monitor to score incoming calls automatically.
 
     Examples:
-
     ```python
     import weave
     from weave.scorers import ValidJSONScorer

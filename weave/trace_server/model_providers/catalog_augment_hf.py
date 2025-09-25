@@ -1,11 +1,13 @@
-"""
-This script generates modelsFinal.json from modelsBegin.json.
+"""This script generates modelsFinal.json from modelsBegin.json.
 It uses the Hugging Face ID for each model to augment each model
 with information such as number of likes and downloads and license.
 """
 
+from __future__ import annotations
+
 import json
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -16,12 +18,8 @@ file_in = dir_this / "modelsBegin.json"
 file_out = dir_this / "modelsFinal.json"
 
 
-MODELS = json.load(open(file_in))
-
-
 def pick_keys(d: dict[str, Any], keys: dict[str, str]) -> dict[str, Any]:
-    """
-    Return a new dictionary containing only the specified keys if they exist in the input dictionary,
+    """Return a new dictionary containing only the specified keys if they exist in the input dictionary,
     with optional key renaming.
 
     Args:
@@ -35,8 +33,7 @@ def pick_keys(d: dict[str, Any], keys: dict[str, str]) -> dict[str, Any]:
 
 
 def format_json_compact_arrays(obj: Any, indent: int = 2) -> str:
-    """
-    Format JSON with compact arrays (single line) while keeping other formatting.
+    """Format JSON with compact arrays (single line) while keeping other formatting.
     NOTE: This is a vibe coded hack - really we should be calling out to prettier.
     This is just convenient for not failing CI if you forgot to do that.
 
@@ -70,8 +67,7 @@ HF_KEYS_TO_KEEP = {
 
 # TODO: Add in any other fields we want
 def get_hf_info(model_name: str) -> dict[str, Any]:
-    """
-    Get HuggingFace information for a given model name.
+    """Get HuggingFace information for a given model name.
 
     Args:
         model_name (str): The HuggingFace model name/ID.
@@ -89,20 +85,31 @@ def get_hf_info(model_name: str) -> dict[str, Any]:
     return filtered
 
 
-def main() -> None:
-    """
-    Main function to augment model data with HuggingFace info and write to a JSON file.
+def write_models(file_out: Path, models: dict[str, Any] | list[dict[str, Any]]) -> None:
+    with open(file_out, "w") as f:
+        formatted_json = format_json_compact_arrays(models)
+        f.write(formatted_json)
+        f.write("\n")
 
-    This function iterates over the MODELS list, augments each model with additional
-    information from HuggingFace, and writes the resulting list to a JSON file.
+
+def main() -> None:
+    """Main function to augment model data with HuggingFace info and write to a JSON file.
+
+    This function iterates over the source models data, augments each model with additional
+    information from HuggingFace, adds the isNew flag if appropriate, and writes the resulting list to a JSON file.
 
     Examples:
         >>> main()
         Augmenting some-model-id
         JSON file written, you may wish to run prettier on it
     """
+    with open(file_in) as f:
+        models = json.load(f)
+
     models_data: list[dict[str, Any]] = []
-    for model in MODELS:
+
+    # Augment models with HuggingFace info
+    for model in models:
         model_id = model["idHuggingFace"]
         print(f"Augmenting {model_id}")
         # This order puts our fields first, keeps id overriding
@@ -110,11 +117,23 @@ def main() -> None:
         info = {**model, **get_hf_info(model_id), "id": our_id}
         models_data.append(info)
 
-    with open(file_out, "w") as f:
-        formatted_json = format_json_compact_arrays({"models": models_data})
-        f.write(formatted_json)
-        f.write("\n")
+    # Set isNew flag for models that are less than one month old
+    current_date = datetime.now(timezone.utc)
+    for model in models_data:
+        launch_date = model.get("launchDate")
+        if launch_date:
+            try:
+                launch_datetime = datetime.fromisoformat(
+                    launch_date.replace("Z", "+00:00")
+                )
+                # Calculate if more than one month old
+                if (current_date - launch_datetime).days <= 30:
+                    model["isNew"] = True
+            except (ValueError, TypeError):
+                # Skip models with invalid launch dates
+                continue
 
+    write_models(file_out, {"models": models_data})
     print("JSON file written, you may wish to run prettier on it")
 
 

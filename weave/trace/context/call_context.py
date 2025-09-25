@@ -8,14 +8,15 @@ from collections.abc import Iterator
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from weave.trace.weave_client import Call
+    from weave.trace.call import Call
 
 
 class NoCurrentCallError(Exception): ...
 
 
 _call_stack: contextvars.ContextVar[list[Call]] = contextvars.ContextVar(
-    "call", default=[]
+    "call",
+    default=[],  # noqa: B039
 )
 
 logger = logging.getLogger(__name__)
@@ -153,7 +154,8 @@ def set_call_stack(stack: list[Call]) -> Iterator[list[Call]]:
 
 
 call_attributes: contextvars.ContextVar[dict[str, Any]] = contextvars.ContextVar(
-    "call_attributes", default={}
+    "call_attributes",
+    default={},  # noqa: B039
 )
 
 

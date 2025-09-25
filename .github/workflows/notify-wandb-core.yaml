@@ -33,5 +33,7 @@ jobs:
               "ref_name": "${{ github.ref_name }}",
               "sha": "${{ github.sha }}",
               "run_weave_query_tests": ${{ needs.check-which-tests-to-run.outputs.weave_query_tests }},
-              "run_trace_server_tests": ${{ needs.check-which-tests-to-run.outputs.trace_server_tests }}
+              "run_trace_server_tests": ${{ needs.check-which-tests-to-run.outputs.trace_server_tests }},
+              "actor": "${{ github.actor }}",
+              "actor_id": "${{ github.actor_id }}"
             }

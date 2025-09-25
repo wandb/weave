@@ -1,5 +1,4 @@
-"""
-GitHub Activity Digest Generator
+"""GitHub Activity Digest Generator.
 
 This module generates comprehensive activity digests for GitHub repositories, with optional Slack integration.
 It tracks commits, pull requests, and categorizes changes across different areas of the codebase.
@@ -123,14 +122,6 @@ CATEGORIES = [
         column_header="Server",
         emoji="🤖",
         matcher=re.compile(r"^weave/trace_server/"),
-    ),
-    CategoryRule(
-        name="UI",
-        column_header="UI",
-        emoji="🎨",
-        matcher=re.compile(
-            r"^weave-js/src/components/PagePanelComponents/Home/Browse3/"
-        ),
     ),
     CategoryRule(
         name="TypeScript SDK",

@@ -4,6 +4,7 @@ This module provides functions for safely accessing and manipulating nested dict
 particularly useful when dealing with JSON-like data where keys might not exist at any level.
 """
 
+import json
 import numbers
 from collections import defaultdict
 from typing import Any, Optional, TypeVar, Union
@@ -130,3 +131,74 @@ def zip_dicts(base_dict: dict[str, Any], new_dict: dict[str, Any]) -> dict[str, 
             final_dict[key] = value
 
     return final_dict
+
+
+def flatten_attributes(
+    data: dict[str, Any], json_attributes: Optional[list[str]] = None
+) -> dict[str, Any]:
+    """Flatten a nested Python dictionary into a flat dictionary with dot-separated keys.
+
+    Args:
+        data: Nested Python dictionary to flatten
+        json_attributes: list of attributes to stringify as JSON
+
+    Returns:
+        A flattened dictionary with dot-separated keys
+    """
+    if json_attributes is None:
+        json_attributes = []
+
+    result: dict[str, Any] = {}
+
+    def _flatten(obj: Union[dict[str, Any], list[Any]], prefix: str = "") -> None:
+        # Check if the entire object should be stringified as JSON
+        should_stringify_entire_obj = any(
+            prefix.rstrip(".") == attr for attr in json_attributes
+        )
+
+        if should_stringify_entire_obj:
+            result[prefix.rstrip(".")] = json.dumps(obj)
+            return
+
+        if isinstance(obj, dict):
+            for key, value in obj.items():
+                new_key = f"{prefix}{key}" if prefix else key
+
+                # Check if this exact key's value should be stringified as JSON
+                should_stringify_as_json = any(
+                    new_key == attr for attr in json_attributes
+                )
+
+                if (
+                    isinstance(value, dict) or isinstance(value, list)
+                ) and not should_stringify_as_json:
+                    # Recursively flatten nested dictionaries or lists
+                    _flatten(value, f"{new_key}.")
+                else:
+                    # If the value matches a JSON attribute, stringify it
+                    if should_stringify_as_json and not isinstance(value, str):
+                        value = json.dumps(value)
+                    result[new_key] = value
+        elif isinstance(obj, list):
+            # Handle lists by using numeric indices as keys
+            for i, item in enumerate(obj):
+                new_key = f"{prefix}{i}"
+
+                # Check if this exact key's value should be stringified as JSON
+                should_stringify_as_json = any(
+                    new_key == attr for attr in json_attributes
+                )
+
+                if (
+                    isinstance(item, dict) or isinstance(item, list)
+                ) and not should_stringify_as_json:
+                    # Recursively flatten nested dictionaries or lists
+                    _flatten(item, f"{new_key}.")
+                else:
+                    # If the item matches a JSON attribute, stringify it
+                    if should_stringify_as_json and not isinstance(item, str):
+                        item = json.dumps(item)
+                    result[new_key] = item
+
+    _flatten(data)
+    return result

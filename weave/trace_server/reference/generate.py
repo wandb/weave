@@ -74,8 +74,7 @@ class ServiceDependency:
         ] = (noop_trace_server_factory),
         auth_dependency: Callable[[], AuthParams] = lambda: AuthParams(),
     ):
-        """
-        Initialize with auth dependencies and server factory.
+        """Initialize with auth dependencies and server factory.
 
         Args:
             endpoint_auth_mapping: Dict mapping endpoint names directly to auth dependencies
@@ -135,7 +134,7 @@ def generate_routes(
         req: tsi.OtelExportReq,
         service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
     ) -> tsi.OtelExportRes:
-        return service.trace_server_interface.export_trace(req)
+        return service.trace_server_interface.otel_export(req)
 
     @router.post("/call/start", tags=[CALLS_TAG_NAME])
     def call_start(
@@ -426,9 +425,7 @@ def generate_routes(
     ) -> tsi.ActionsExecuteBatchRes:
         return service.trace_server_interface.actions_execute_batch(req)
 
-    @router.post(
-        "/completions/create", tags=[COMPLETIONS_TAG_NAME], include_in_schema=False
-    )
+    @router.post("/completions/create", tags=[COMPLETIONS_TAG_NAME])
     def completions_create(
         req: tsi.CompletionsCreateReq,
         service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
@@ -438,7 +435,6 @@ def generate_routes(
     @router.post(
         "/completions/create_stream",
         tags=[COMPLETIONS_TAG_NAME],
-        include_in_schema=False,
         response_class=StreamingResponse,
         responses={
             200: {
@@ -463,7 +459,7 @@ def generate_routes(
             media_type="application/jsonl",
         )
 
-    # TODO: This is mislabled in the core impl.  Keeping it the same here for now.
+    # TODO: This is mislabeled in the core impl.  Keeping it the same here for now.
     @router.post("/project/stats", tags=["project"], include_in_schema=False)
     def project_stats(
         req: tsi.ProjectStatsReq,

@@ -5,7 +5,7 @@ from rich import print
 from rich.console import Console
 
 import weave
-from weave.flow.agent import Agent, AgentState
+from weave.agent.agent import Agent, AgentState
 
 WELCOME = """
 Welcome to programmer.

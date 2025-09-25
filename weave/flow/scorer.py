@@ -9,20 +9,22 @@ from typing import Any, Callable, Optional, Union, cast
 from pydantic import BaseModel, Field
 from typing_extensions import Self
 
-import weave
-from weave.flow.obj import Object
+from weave.object.obj import Object
+from weave.trace.call import Call
 from weave.trace.isinstance import weave_isinstance
-from weave.trace.op import Op, OpCallError, as_op, is_op
+from weave.trace.op import OpCallError, as_op, is_op, op
 from weave.trace.op_caller import async_call_op
+from weave.trace.op_protocol import Op
 from weave.trace.vals import WeaveObject
-from weave.trace.weave_client import Call, sanitize_object_name
+from weave.trace.weave_client import sanitize_object_name
 
-try:
-    import numpy as np
-except ImportError:
-    _NUMPY_AVAILABLE = False
-else:
-    _NUMPY_AVAILABLE = True
+
+def _import_numpy() -> Optional[Any]:
+    try:
+        import numpy
+    except ImportError:
+        return None
+    return numpy
 
 
 class Scorer(Object):
@@ -35,11 +37,11 @@ class Scorer(Object):
         super().model_post_init(__context)
         _validate_scorer_signature(self)
 
-    @weave.op
+    @op
     def score(self, *, output: Any, **kwargs: Any) -> Any:
         raise NotImplementedError
 
-    @weave.op
+    @op
     def summarize(self, score_rows: list) -> Optional[dict]:
         return auto_summarize(score_rows)
 
@@ -78,8 +80,7 @@ def _validate_scorer_signature(scorer: Union[Callable, Op, Scorer]) -> bool:
 
 
 def variance(data: Sequence[Union[int, float]]) -> float:
-    """
-    Calculate the variance of a sequence of numeric values.
+    """Calculate the variance of a sequence of numeric values.
 
     Args:
         data (Sequence[Union[int, float]]): A sequence of numeric values.
@@ -103,8 +104,7 @@ def variance(data: Sequence[Union[int, float]]) -> float:
 
 
 def stderr(data: Sequence[Union[int, float]]) -> float:
-    """
-    Calculate the standard error of the mean for a sequence of numeric values.
+    """Calculate the standard error of the mean for a sequence of numeric values.
 
     Args:
         data (Sequence[Union[int, float]]): A sequence of numeric values.
@@ -123,7 +123,7 @@ def stderr(data: Sequence[Union[int, float]]) -> float:
     if len(data) <= 1:
         return 0
 
-    if _NUMPY_AVAILABLE:
+    if np := _import_numpy():
         sample_variance = float(np.var(data, ddof=1))
         return float(np.sqrt(sample_variance / len(data)))
     else:
@@ -159,7 +159,7 @@ def auto_summarize(data: list) -> Optional[dict[str, Any]]:
             "true_fraction": true_count / len(data),
         }
     elif isinstance(val, Number):
-        if _NUMPY_AVAILABLE:
+        if np := _import_numpy():
             return {"mean": np.mean(data).item()}
         else:
             return {"mean": sum(data) / len(data)}
@@ -208,7 +208,7 @@ def get_scorer_attributes(
                 raise TypeError(
                     f"Scorer {scorer_name} must implement `score` as a weave.op() decorated function."
                 )
-            score_op = scorer.score
+            score_op = as_op(scorer.score)
             summarize_fn = scorer.summarize  # type: ignore
 
         except AttributeError:
@@ -252,7 +252,7 @@ class ApplyScorerSuccess:
 ApplyScorerResult = ApplyScorerSuccess
 
 
-def preparer_scorer_op_args(
+def prepare_scorer_op_args(
     scorer: Union[Op, Scorer], example: dict[str, Any], model_output: Any
 ) -> tuple[Op, dict[str, Any]]:
     # Extract the core components of the scorer
@@ -402,7 +402,7 @@ async def apply_scorer_async(
     if weave_isinstance(scorer, Scorer):
         scorer_self = scorer
 
-    score_op, score_args = preparer_scorer_op_args(scorer, example, model_output)
+    score_op, score_args = prepare_scorer_op_args(scorer, example, model_output)
 
     try:
         # Execute the scoring operation

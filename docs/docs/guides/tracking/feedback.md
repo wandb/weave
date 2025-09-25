@@ -237,19 +237,27 @@ You can delete feedback from a particular call by specifying a UUID.
 
 ## Add human annotations
 
-Human annotations are supported in the Weave UI. To make human annotations, you must first create a Human Annotation scorer using either the [UI](#create-a-human-annotation-scorer-in-the-ui) or the [API](#create-a-human-annotation-scorer-using-the-api). Then, you can [use the scorer in the UI to make annotations](#use-the-human-annotation-scorer-in-the-ui), and [modify your annotation scorers using the API](#modify-a-human-annotation-scorer-using-the-api).
+Human annotations allow you to log feedback about traces from human users. Logging human feedback can help you more accurately assess the behavior of your LLMs, such as ensuring that their responses are accurate and helpful. 
+
+To make human annotations, you must first create a human annotation scorer using either the [UI](#create-a-human-annotation-scorer-in-the-ui) or the [API](#create-a-human-annotation-scorer-using-the-api). Then, you can [use the scorer in the UI to make annotations](#use-the-human-annotation-scorer-in-the-ui), and [modify your annotation scorers using the API](#modify-a-human-annotation-scorer-using-the-api).
 
 ### Create a human annotation scorer in the UI
+ 
+To create a human annotation scorer in the UI:
 
-To create a human annotation scorer in the UI, do the following:
+1. From the sidebar, click **Assets** and then click **Scorers** from the list of assets.
+2. In the upper-right corner, click **+New scorer**.
+3. In the configuration page, set the following fields:
+   - `Scorer type`: Defines whether to use a human or programmatic annotation. Set to **Human annotation**.
+   - `Name`: Define a unique name for the scorer.
+   - `Description`: Use this field to instruct users on how to use the scorer, such as, "Was agent's response helpful?"
+   - `Type`: Define the type of feedback the scorer collects. You can choose the following types of feedback: 
+        - `Boolean`: Collects `True` and `False` values.
+        - `Integer`: Collects whole number values. Optionally, you can set a range of minimum and maxmimum values for users to select from.
+        - `Number`: Collects number values, including floats. Optionally, you can set a range of minimum and maxmimum values for users to select from.
+        - `String`: Collects user feedback as a string.
+        - `Select`: Allows you to create an arbitrary list of responses for the user to select from, such as `Good`, `Bad`, and `Okay`.
 
-1. In the sidebar, navigate to **Scorers**.
-2. In the upper right corner, click **+ Create scorer**.
-3. In the configuration page, set:
-   - `Scorer type` to `Human annotation`
-   - `Name`
-   - `Description`
-   - `Type`, which determines the type of feedback that will be collected, such as `boolean` or `integer`.
 4. Click **Create scorer**. Now, you can [use your scorer to make annotations](#use-the-human-annotation-scorer-in-the-ui).
 
 In the following example, a human annotator is asked to select which type of document the LLM ingested. As such, the `Type` selected for the score configuration is an `enum` containing the possible document types.
@@ -329,7 +337,9 @@ In the following example, two scorers are created. The first scorer, `Temperatur
 
 Expanding on [creating a human annotation scorer using the API](#create-a-human-annotation-scorer-using-the-api), the following example creates an updated version of the `Temperature` scorer, by using the original object ID (`temperature-scorer`) on `publish`. The result is an updated object, with a history of all versions.
 
-> You can view human annotation scorer object history in the **Scorers** tab under **Human annotations**.
+To view previous versions of scorers in the UI: 
+1. From the sidebar, click **Assets** and then click **Scorers** from the list of assets to open a list of scorers in your project.
+2. The **Versions** column displays the number of available versions of for each scorer in your project. Click the **(x) versions** link to open a list of versions for the selected scorer.
 
 <Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
@@ -359,8 +369,6 @@ Expanding on [creating a human annotation scorer using the API](#create-a-human-
     ```
   </TabItem>
 </Tabs>
-
-![Human Annotation scorer history](./imgs/human-annotation-scorer-history.png)
 
 ### Use a human annotation scorer using the API
 

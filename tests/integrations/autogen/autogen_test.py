@@ -1,7 +1,26 @@
+from collections.abc import Generator
+
 import pytest
 
 import weave
+from weave.integrations.autogen import get_autogen_patcher
 from weave.integrations.integration_utilities import flatten_calls, op_name_from_ref
+from weave.integrations.openai.openai_sdk import get_openai_patcher
+
+
+@pytest.fixture(autouse=True)
+def patch_autogen() -> Generator[None, None, None]:
+    """Patch AutoGen and OpenAI for all tests in this file."""
+    autogen_patcher = get_autogen_patcher()
+    openai_patcher = get_openai_patcher()
+
+    autogen_patcher.attempt_patch()
+    openai_patcher.attempt_patch()
+
+    yield
+
+    autogen_patcher.undo_patch()
+    openai_patcher.undo_patch()
 
 
 @pytest.mark.skip_clickhouse_client
@@ -103,7 +122,7 @@ async def test_simple_client_create_stream(
         [UserMessage(content="Hello, how are you?", source="user")]
     )
     async for _ in response:
-        _
+        pass
 
     calls = list(client.get_calls())
     assert len(calls) == 2
@@ -206,11 +225,11 @@ async def test_simple_cached_client_create_stream(
     async for _ in cache_client.create_stream(
         [UserMessage(content="Hello, how are you?", source="user")]
     ):
-        _
+        pass
     async for _ in cache_client.create_stream(
         [UserMessage(content="Hello, how are you?", source="user")]
     ):
-        _
+        pass
     calls = list(client.get_calls())
     assert len(calls) == 9
     flattened = flatten_calls(calls)
@@ -222,10 +241,10 @@ async def test_simple_cached_client_create_stream(
         ("autogen_ext.ChatCompletionCache-check_cache", 0),
         ("autogen_core.InMemoryStore.get", 1),
         ("autogen_core.InMemoryStore.get", 0),
-        ("autogen_core.InMemoryStore.set", 0),
         ("autogen_ext.OpenAIChatCompletionClient.create_stream", 0),
         ("openai.chat.completions.create", 1),
         ("openai.chat.completions.create", 0),
+        ("autogen_core.InMemoryStore.set", 0),
         ("autogen_ext.ChatCompletionCache.create_stream", 0),
         ("autogen_ext.ChatCompletionCache-check_cache", 0),
         ("autogen_core.InMemoryStore.get", 1),
@@ -344,7 +363,7 @@ async def test_agentchat_run_stream_with_tool(
     )
     # Simulate a chat task
     async for _ in agent.run_stream(task="What is the weather in New York?"):
-        _
+        pass
     calls = list(client.get_calls())
     assert len(calls) == 7
     call = calls[0]
@@ -435,7 +454,7 @@ async def test_agentchat_group_chat(
 
     # Run the team with a task and print the messages to the console.
     async for _ in team.run_stream(task="Increment the number 1 to 3."):
-        _
+        pass
     await model_client.close()
     calls = list(client.get_calls())
     call = calls[0]

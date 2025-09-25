@@ -4,7 +4,8 @@ import pandas as pd
 from notdiamond.toolkit.custom_router import CustomRouter
 
 import weave
-from weave.flow.eval import EvaluationResults
+from weave.evaluation.eval import EvaluationResults
+from weave.utils.iterators import first
 
 
 @weave.op(
@@ -113,17 +114,16 @@ def evaluate_router(
 def _get_score_column(
     model: str, scores: dict, score_col_name: Optional[str] = None
 ) -> tuple[str, float]:
-    """
-    Extract a single score from the nested `scores` column.
-        - raise for multiple scores
-        - build score column name if not provided
+    """Extract a single score from the nested `scores` column.
+    - raise for multiple scores
+    - build score column name if not provided.
     """
     if len(scores) > 1:
         raise ValueError(
             f"Multiple eval scores for {model}. Please specify a single score column."
         )
 
-    score_column, score_val = next(iter(scores.items()))
+    score_column, score_val = first(scores.items())
     not_diamond_score_column = f"{score_column}_score"
     if score_col_name is not None and not_diamond_score_column != score_col_name:
         raise ValueError(

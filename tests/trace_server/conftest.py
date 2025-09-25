@@ -34,6 +34,12 @@ def pytest_addoption(parser):
             help="Use clickhouse server (shorthand for --trace-server=clickhouse)",
         )
         parser.addoption(
+            "--sq",
+            "--sqlite",
+            action="store_true",
+            help="Use sqlite server (shorthand for --trace-server=sqlite)",
+        )
+        parser.addoption(
             "--clickhouse-process",
             action="store",
             default="false",
@@ -53,6 +59,8 @@ def pytest_collection_modifyitems(config, items):
 def get_trace_server_flag(request):
     if request.config.getoption("--clickhouse"):
         return "clickhouse"
+    if request.config.getoption("--sqlite"):
+        return "sqlite"
     weave_server_flag = request.config.getoption("--trace-server")
     return weave_server_flag
 

@@ -16,9 +16,8 @@ from weave.trace_server import trace_server_interface as tsi
 
 def flatten_calls(
     calls: list[tsi.CallSchema], parent_id: Optional[str] = None, depth: int = 0
-) -> list:
-    """
-    Flatten calls is a technique we use in the integration tests to assert the correct
+) -> list[tuple[tsi.CallSchema, int]]:
+    """Flatten calls is a technique we use in the integration tests to assert the correct
     ordering of calls. This is used to assert that the calls are in the correct order
     as well as nested in the correct way. The returned list is the ordered list of calls
     with the depth of each call.
@@ -36,6 +35,25 @@ def flatten_calls(
     return res
 
 
+def normalize_scorers_in_flattened(
+    flattened: list[tuple[tsi.CallSchema, int]],
+    scorer_block_start_ndxs: list[int],
+    scorer_order: list[str],
+) -> list[tuple[tsi.CallSchema, int]]:
+    num_scorer_calls = len(scorer_order)
+    res = [*flattened]
+    for start_ndx in scorer_block_start_ndxs:
+        got_block = res[start_ndx : start_ndx + num_scorer_calls]
+        sorted_got_block = sorted(
+            got_block,
+            key=lambda x: scorer_order.index(
+                op_name_from_ref(op_name_from_ref(x[0].op_name))
+            ),
+        )
+        res[start_ndx : start_ndx + num_scorer_calls] = sorted_got_block
+    return res
+
+
 def op_name_from_ref(ref: str) -> str:
     return ref.split("/")[-1].split(":")[0]
 
@@ -49,7 +67,7 @@ class MyModel(Model):
 
 
 async def do_quickstart():
-    """This is the basic example from the README/quickstart/docs"""
+    """This is the basic example from the README/quickstart/docs."""
     examples = [
         {"question": "What is the capital of France?", "expected": "Paris"},
         {"question": "Who wrote 'To Kill a Mockingbird'?", "expected": "Harper Lee"},
@@ -86,7 +104,7 @@ async def test_basic_evaluation(client):
 
     flattened_calls = flatten_calls(calls.calls)
     assert len(flattened_calls) == 14
-    got = [(op_name_from_ref(c.op_name), d) for (c, d) in flattened_calls]
+
     exp = [
         ("Evaluation.evaluate", 0),
         ("Evaluation.predict_and_score", 1),
@@ -103,6 +121,15 @@ async def test_basic_evaluation(client):
         ("match_score2", 2),
         ("Evaluation.summarize", 1),
     ]
+
+    exp_scorer_block_start_ndxs = [
+        i for i, (op_name, _) in enumerate(exp) if op_name == "match_score1"
+    ]
+    flattened_calls = normalize_scorers_in_flattened(
+        flattened_calls, exp_scorer_block_start_ndxs, ["match_score1", "match_score2"]
+    )
+    got = [(op_name_from_ref(c.op_name), d) for (c, d) in flattened_calls]
+
     assert got == exp
 
     def is_object_ref_with_name(val: Any, name: str):
@@ -335,7 +362,7 @@ async def test_evaluation_data_topology(client):
     )
     flattened = flatten_calls(calls.calls)
     assert len(flattened) == 50
-    got = [(op_name_from_ref(c.op_name), d) for (c, d) in flattened]
+
     predict_and_score_block = lambda model_pred_name: [
         ("Evaluation.predict_and_score", 1),
         (model_pred_name, 2),
@@ -366,7 +393,28 @@ async def test_evaluation_data_topology(client):
         *eval_block("SimpleModelWithConfidence.predict"),
     ]
 
+    # Since scorers are executed out of order, we need to normalize
+    # the order of the calls to make sure the order of the scorers is consistent
+    scorer_order = [
+        "score_int",
+        "score_float",
+        "score_bool",
+        "score_dict",
+        "MyDictScorerWithCustomFloatSummary.score",
+        "MyDictScorerWithCustomBoolSummary.score",
+        "MyDictScorerWithCustomDictSummary.score",
+    ]
+    exp_scorer_block_start_ndxs = [
+        i for i, (op_name, _) in enumerate(exp) if op_name == "score_int"
+    ]
+    flattened = normalize_scorers_in_flattened(
+        flattened, exp_scorer_block_start_ndxs, scorer_order
+    )
+
     # First, let's assert the topology of the calls
+
+    got = [(op_name_from_ref(c.op_name), d) for (c, d) in flattened]
+
     assert got == exp
     flat_calls = [c[0] for c in flattened]
 

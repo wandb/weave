@@ -5,8 +5,7 @@ from weave.flow.util import transpose
 
 
 def p_r_f1(tp: int, fp: int, fn: int) -> tuple[float, float, float]:
-    """
-    Compute precision, recall, and F1 score based on true positives (tp), false positives (fp), and false negatives (fn).
+    """Compute precision, recall, and F1 score based on true positives (tp), false positives (fp), and false negatives (fn).
 
     If any denominator is zero, the corresponding metric is set to zero.
 
@@ -31,8 +30,7 @@ def p_r_f1(tp: int, fp: int, fn: int) -> tuple[float, float, float]:
 
 
 class MultiTaskBinaryClassificationF1(weave.Scorer):
-    """
-    Multi-task binary classification scorer that computes precision, recall, and F1 score for each target class based on
+    """Multi-task binary classification scorer that computes precision, recall, and F1 score for each target class based on
     the model output and ground truth labels.
 
     Attributes:
@@ -51,8 +49,7 @@ class MultiTaskBinaryClassificationF1(weave.Scorer):
 
     @weave.op
     def summarize(self, score_rows: list) -> Optional[dict]:
-        """
-        Aggregate scoring results and compute precision, recall, and F1 score for each class.
+        """Aggregate scoring results and compute precision, recall, and F1 score for each class.
 
         Args:
             score_rows (list[dict]): A list of score dictionaries for each sample where each dictionary
@@ -82,8 +79,7 @@ class MultiTaskBinaryClassificationF1(weave.Scorer):
     def score(
         self, *, target: dict, model_output: Optional[dict], **kwargs: Any
     ) -> dict:
-        """
-        Compare target labels with model outputs to determine correctness for each class.
+        """Compare target labels with model outputs to determine correctness for each class.
 
         Args:
             target (dict): A dictionary mapping each class name to the ground truth label.
@@ -94,6 +90,7 @@ class MultiTaskBinaryClassificationF1(weave.Scorer):
             dict: A dictionary mapping each class name to a dictionary containing:
                 - "correct": True if the target label matches the model output.
                 - "negative": True if the model output is missing or false.
+
         Note:
             This method uses the `model_output` key for backwards compatibility.
         """

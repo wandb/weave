@@ -17,6 +17,7 @@ import pytest
 from pydantic import BaseModel, ValidationError
 
 import weave
+import weave.trace.call
 from tests.trace.util import (
     AnyIntMatcher,
     DatetimeMatcher,
@@ -35,12 +36,12 @@ from weave.trace.context.weave_client_context import (
     get_weave_client,
     set_weave_client_global,
 )
-from weave.trace.refs import parse_uri
+from weave.trace.refs import TableRef
 from weave.trace.vals import MissingSelfInstanceError
 from weave.trace.weave_client import sanitize_object_name
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_trace_server_settings import ENTITY_TOO_LARGE_PAYLOAD
-from weave.trace_server.errors import InsertTooLarge, InvalidFieldError
+from weave.trace_server.errors import InsertTooLarge, InvalidFieldError, InvalidRequest
 from weave.trace_server.ids import generate_id
 from weave.trace_server.refs_internal import extra_value_quoter
 from weave.trace_server.token_costs import COST_OBJECT_NAME
@@ -108,7 +109,7 @@ def test_simple_op(client):
     expected_name = (
         f"{TRACE_REF_SCHEME}:///{client.entity}/{client.project}/op/my_op:{digest}"
     )
-    assert fetched_call == weave_client.Call(
+    assert fetched_call == weave.trace.call.Call(
         _op_name=expected_name,
         project_id=f"{client.entity}/{client.project}",
         trace_id=fetched_call.trace_id,
@@ -1644,6 +1645,52 @@ def test_dataset_row_ref(client):
     assert inner.ref.uri() == exp_ref
     gotten = weave.ref(exp_ref).get()
     assert gotten == 5
+
+
+def test_table_query_empty_sort_field_validation(client):
+    """Test that empty or invalid sort fields in table queries are properly validated."""
+    # Create a dataset with table data
+    d = weave.Dataset(name="test_dataset", rows=[{"a": 5, "b": 6}, {"a": 7, "b": 10}])
+    weave.publish(d)
+
+    # Query the object to get its val
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=get_client_project_id(client),
+            filter={"object_ids": ["test_dataset"]},
+        )
+    )
+    assert len(res.objs) == 1
+    queried_obj = res.objs[0]
+
+    # Get table reference from the dataset
+    table_ref = TableRef.parse_uri(queried_obj.val["rows"])
+
+    # Test various invalid sort field scenarios that should trigger validation errors
+    invalid_sort_fields = [
+        "",  # Empty field
+        ".",  # Just a dot
+        "..",  # Multiple dots
+        "...",  # More dots
+        "a.",  # Field ending with dot
+        ".a",  # Field starting with dot
+        "a..b",  # Double dots in middle
+    ]
+
+    for invalid_field in invalid_sort_fields:
+        with pytest.raises((ValueError, InvalidRequest)) as exc_info:
+            # This should fail with a validation error, not a ClickHouse jsonpath error
+            list(
+                client.server.table_query_stream(
+                    tsi.TableQueryReq(
+                        project_id=get_client_project_id(client),
+                        digest=table_ref.digest,
+                        sort_by=[tsi.SortBy(field=invalid_field, direction="asc")],
+                    )
+                )
+            )
+        # The error should be a validation error, not a ClickHouse error
+        assert "jsonpath" not in str(exc_info.value).lower()
 
 
 def test_tuple_support(client):
@@ -3395,11 +3442,12 @@ def test_large_keys_are_stripped_call(client, caplog, monkeypatch):
         return
 
     original_insert_call_batch = weave.trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer._insert_call_batch
+    max_size = 10 * 1024
 
     # Patch _insert_call_batch to raise InsertTooLarge
     def mock_insert_call_batch(self, batch):
         # mock raise insert error
-        if len(str(batch)) > 10 * 1024:
+        if len(str(batch)) > max_size:
             raise InsertTooLarge(
                 "Database insertion failed. Record too large. "
                 "A likely cause is that a single row or cell exceeded "
@@ -3410,12 +3458,7 @@ def test_large_keys_are_stripped_call(client, caplog, monkeypatch):
     monkeypatch.setattr(
         weave.trace_server.clickhouse_trace_server_settings,
         "CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT",
-        10 * 1024,  # 1KB
-    )
-    monkeypatch.setattr(
-        weave.trace_server.clickhouse_trace_server_settings,
-        "CLICKHOUSE_SINGLE_VALUE_BYTES_LIMIT",
-        1 * 1024,  # 1KB
+        max_size,
     )
     monkeypatch.setattr(
         weave.trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer,
@@ -3423,8 +3466,8 @@ def test_large_keys_are_stripped_call(client, caplog, monkeypatch):
         mock_insert_call_batch,
     )
 
-    # Use a smaller dictionary that will still exceed our new 10KB limit
-    data = {"dictionary": {f"{i}": i for i in range(10_000)}}
+    # Use a dictionary that will exceed our new 10KB limit
+    data = {"dictionary": {f"{i}": i for i in range(max_size // 10)}}
 
     @weave.op
     def test_op_dict(input_data: dict):
@@ -3467,18 +3510,88 @@ def test_large_keys_are_stripped_call(client, caplog, monkeypatch):
     for error_message in error_messages:
         assert "Retrying with large objects stripped" in error_message
 
+    # test that when inputs + output > max_size but input < max_size
+    # we only strip the inputs
+    smaller_data = {"dictionary": {f"{i}": i for i in range(max_size // 16)}}
+
+    @weave.op
+    def test_op_strip_inputs(input_data: dict):
+        # combined output is larger than single row size
+        return {"output1": input_data, "output2": smaller_data}
+
+    def _compare_inputs(inputs, expected):
+        for k, v in expected.items():
+            assert inputs[k] == v
+
+    test_op_strip_inputs(smaller_data)
+
+    calls = list(test_op_strip_inputs.calls())
+    assert len(calls) == 1
+    assert calls[0].output == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
+    _compare_inputs(calls[0].inputs, {"input_data": smaller_data})
+
+    # test when inputs + output + attributes > max_size and attributes is largest
+    # we strip the attributes
+    @weave.op
+    def test_op_strip_summary(input_data: dict):
+        return "really_small"
+
+    with weave.attributes({"slightly_larger_data": smaller_data | {"a": 1}}):
+        test_op_strip_summary(smaller_data)
+
+    call = next(iter(test_op_strip_summary.calls()))
+    assert call.attributes == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
+    assert call.output == "really_small"
+    _compare_inputs(call.inputs, {"input_data": smaller_data})
+
+    # Test case where we have a batch with mixed sizes - some calls need stripping, some don't
+    # This ensures we hit the lines where total_json_bytes <= limit (lines 2355-2357)
+    # for items that don't need stripping within a batch that overall needs stripping
+
+    @weave.op
+    def test_op_mixed_batch_small(input_data: str):
+        return input_data
+
+    @weave.op
+    def test_op_mixed_batch_large(input_data: dict):
+        return {"large_output": input_data}
+
+    # Create a small call that fits under the limit
+    test_op_mixed_batch_small("tiny data")
+
+    # Create a large call that needs stripping
+    large_data = {"dictionary": {f"{i}": i for i in range(max_size // 10)}}
+    test_op_mixed_batch_large(large_data)
+
+    # Create another small call
+    test_op_mixed_batch_small("another tiny piece")
+
+    # Flush to ensure they're in the same batch
+    client.flush()
+
+    # Check that the small calls preserved their data while the large one was stripped
+    small_calls = list(test_op_mixed_batch_small.calls())
+    assert len(small_calls) == 2
+    assert small_calls[0].output == "tiny data"
+    assert small_calls[0].inputs == {"input_data": "tiny data"}
+    assert small_calls[1].output == "another tiny piece"
+    assert small_calls[1].inputs == {"input_data": "another tiny piece"}
+
+    large_calls = list(test_op_mixed_batch_large.calls())
+    assert len(large_calls) == 1
+    # The large call should have been stripped
+    assert large_calls[0].output == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
+    assert large_calls[0].inputs == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
+
 
 def test_weave_finish_unsets_client(client):
     @weave.op
     def foo():
         return 1
 
-    set_weave_client_global(None)
-    weave.trace.weave_init._current_inited_client = (
-        weave.trace.weave_init.InitializedClient(client)
-    )
-    weave_client = weave.trace.weave_init._current_inited_client.client
-    assert weave.trace.weave_init._current_inited_client is not None
+    set_weave_client_global(client)
+    weave_client = get_weave_client()
+    assert get_weave_client() is not None
 
     foo()
     assert len(list(weave_client.get_calls())) == 1
@@ -3487,7 +3600,7 @@ def test_weave_finish_unsets_client(client):
 
     foo()
     assert len(list(weave_client.get_calls())) == 1
-    assert weave.trace.weave_init._current_inited_client is None
+    assert get_weave_client() is None
 
 
 def test_op_sampling(client):
@@ -3945,7 +4058,7 @@ def clickhouse_client(client):
 
 
 def test_calls_query_with_storage_size_clickhouse(client, clickhouse_client):
-    """Test querying calls with storage size information"""
+    """Test querying calls with storage size information."""
     if client_is_sqlite(client):
         pytest.skip("Skipping test for sqlite clients")
 
@@ -3982,7 +4095,7 @@ def test_calls_query_with_storage_size_clickhouse(client, clickhouse_client):
 
 
 def test_calls_query_with_total_storage_size_clickhouse(client, clickhouse_client):
-    """Test querying calls with total storage size"""
+    """Test querying calls with total storage size."""
     if client_is_sqlite(client):
         pytest.skip("Skipping test for sqlite clients")
 
@@ -4037,7 +4150,7 @@ def test_calls_query_with_total_storage_size_clickhouse(client, clickhouse_clien
 
 
 def test_calls_query_with_both_storage_sizes_clickhouse(client, clickhouse_client):
-    """Test querying calls with total storage size"""
+    """Test querying calls with total storage size."""
     if client_is_sqlite(client):
         pytest.skip("Skipping test for sqlite clients")
 
@@ -4132,7 +4245,7 @@ def test_calls_hydrated(client):
 
 
 def test_obj_query_with_storage_size_clickhouse(client):
-    """Test querying objects with storage size information"""
+    """Test querying objects with storage size information."""
     if client_is_sqlite(client):
         pytest.skip("Skipping test for sqlite clients")
 
@@ -4157,7 +4270,7 @@ def test_obj_query_with_storage_size_clickhouse(client):
     assert queried_obj.size_bytes == 257  # Should have some size due to the test data
 
     # Test that a table is created and its size is correct
-    table_ref = parse_uri(queried_obj.val["rows"])
+    table_ref = TableRef.parse_uri(queried_obj.val["rows"])
     res = client.server.table_query_stats_batch(
         tsi.TableQueryStatsBatchReq(
             project_id=client._project_id(),
@@ -4426,7 +4539,7 @@ def test_calls_query_stats_with_limit(client):
 
 
 def test_calls_query_stats_total_storage_size_clickhouse(client, clickhouse_client):
-    """Test querying calls with total storage size"""
+    """Test querying calls with total storage size."""
     if client_is_sqlite(client):
         pytest.skip("Skipping test for sqlite clients")
 

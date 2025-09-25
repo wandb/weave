@@ -19,7 +19,7 @@ def download_model_from_wandb(artifact_path: Union[str, Path]) -> Path:
         ) from None
 
     api = Api()
-    art = api.artifact(
+    art = api._artifact(
         type="model",
         name=str(artifact_path),
     )
@@ -35,8 +35,7 @@ def get_model_path(model_name: str) -> str:
 
 
 def stringify(output: Any) -> str:
-    """
-    Convert any output to a string. If the output is a Pydantic BaseModel,
+    """Convert any output to a string. If the output is a Pydantic BaseModel,
     convert it to a JSON string using the model's dump_json method.
     """
     if isinstance(output, str):
@@ -67,8 +66,7 @@ def ensure_hf_imports() -> None:
 
 
 def download_model_from_huggingface_hub(model_name: str) -> str:
-    """
-    Download a model from the Hugging Face Hub to a specified directory.
+    """Download a model from the Hugging Face Hub to a specified directory.
 
     Args:
         model_name (str): The name of the model on Hugging Face Hub.

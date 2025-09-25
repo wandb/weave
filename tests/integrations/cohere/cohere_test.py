@@ -1,12 +1,23 @@
 import os
+from collections.abc import Generator
 
 import cohere
 import pytest
 
 import weave
+from weave.integrations.cohere.cohere_sdk import get_cohere_patcher
 from weave.integrations.integration_utilities import op_name_from_ref
 
 cohere_model = "command"  # You can change this to a specific model if needed
+
+
+@pytest.fixture(autouse=True)
+def patch_cohere() -> Generator[None, None, None]:
+    """Patch Cohere for all tests in this file."""
+    patcher = get_cohere_patcher()
+    patcher.attempt_patch()
+    yield
+    patcher.undo_patch()
 
 
 @pytest.mark.skip_clickhouse_client
@@ -273,14 +284,14 @@ def test_cohere_v2(
 
     assert (
         output.usage.billed_units.input_tokens
-        == response.meta["billed_units"]["input_tokens"]
+        == response.usage.billed_units.input_tokens
     )
     assert (
         output.usage.billed_units.output_tokens
-        == response.meta["billed_units"]["output_tokens"]
+        == response.usage.billed_units.output_tokens
     )
-    assert output.usage.tokens.input_tokens == response.meta["tokens"]["input_tokens"]
-    assert output.usage.tokens.output_tokens == response.meta["tokens"]["output_tokens"]
+    assert output.usage.tokens.input_tokens == response.usage.tokens.input_tokens
+    assert output.usage.tokens.output_tokens == response.usage.tokens.output_tokens
 
 
 @pytest.mark.asyncio
@@ -321,14 +332,14 @@ async def test_cohere_async_v2(
 
     assert (
         output.usage.billed_units.input_tokens
-        == response.meta["billed_units"]["input_tokens"]
+        == response.usage.billed_units.input_tokens
     )
     assert (
         output.usage.billed_units.output_tokens
-        == response.meta["billed_units"]["output_tokens"]
+        == response.usage.billed_units.output_tokens
     )
-    assert output.usage.tokens.input_tokens == response.meta["tokens"]["input_tokens"]
-    assert output.usage.tokens.output_tokens == response.meta["tokens"]["output_tokens"]
+    assert output.usage.tokens.input_tokens == response.usage.tokens.input_tokens
+    assert output.usage.tokens.output_tokens == response.usage.tokens.output_tokens
 
 
 @pytest.mark.skip_clickhouse_client
@@ -370,7 +381,7 @@ def test_cohere_stream_v2(
     assert op_name_from_ref(call.op_name) == "cohere.ClientV2.chat_stream"
     output = call.output
 
-    assert output.message.content[0] == all_content
+    assert output.message.content[0].text == all_content
     assert output.id == id
     assert output.finish_reason == finish_reason
     assert output.message.role == role
@@ -421,7 +432,7 @@ async def test_cohere_async_stream_v2(
     assert op_name_from_ref(call.op_name) == "cohere.AsyncClientV2.chat_stream"
     output = call.output
 
-    assert output.message.content[0] == all_content
+    assert output.message.content[0].text == all_content
     assert output.id == id
     assert output.finish_reason == finish_reason
     assert output.message.role == role

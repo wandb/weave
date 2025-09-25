@@ -26,8 +26,6 @@ A W&B Weave op is a versioned function that automatically logs all calls.
     Functions decorated with `@weave.op()` will behave normally (without code versioning and tracking), if you don't call `weave.init('your-project-name')` before calling them.
     :::
 
-    Ops can be [served](/guides/tools/serve) or [deployed](/guides/tools/deploy) using the Weave toolbelt.
-
   </TabItem>
   <TabItem value="typescript" label="TypeScript">
     To create an op, wrap a typescript function with `weave.op`

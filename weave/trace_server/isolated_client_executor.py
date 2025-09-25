@@ -1,5 +1,4 @@
-"""
-The purpose of this module is to expose a pattern/utility that allows a runtime
+"""The purpose of this module is to expose a pattern/utility that allows a runtime
 to execute a workload on behalf of a user. This is particularly useful for our
 backend workers that need to execute scorers / evals for users. The primary
 interface exposed is the `IsolatedClientExecutor` class. This class is constructed with a
@@ -45,9 +44,11 @@ from typing import TYPE_CHECKING, Any, Callable, Optional, TypeVar, Union, overl
 
 from pydantic import BaseModel
 
-from weave.trace.context.weave_client_context import get_weave_client
+from weave.trace.context.weave_client_context import (
+    get_weave_client,
+    set_weave_client_global,
+)
 from weave.trace.weave_client import WeaveClient
-from weave.trace.weave_init import InitializedClient
 
 logger = logging.getLogger(__name__)
 
@@ -103,8 +104,7 @@ class IsolatedClientExecutorTimeoutError(IsolatedClientExecutorError):
 
 
 class IsolatedClientExecutor:
-    """
-    Execute functions within an isolated client context.
+    """Execute functions within an isolated client context.
 
     This class provides a secure way to execute user code in a separate process
     with proper WeaveClient initialization and cleanup. It accepts a client factory
@@ -133,8 +133,7 @@ class IsolatedClientExecutor:
         client_factory_config: FC,
         timeout_seconds: float = DEFAULT_EXECUTION_TIMEOUT_SECONDS,
     ) -> None:
-        """
-        Initialize the IsolatedClientExecutor with a client factory.
+        """Initialize the IsolatedClientExecutor with a client factory.
 
         Args:
             client_factory: A callable that returns a configured WeaveClient.
@@ -184,8 +183,7 @@ class IsolatedClientExecutor:
         *,
         timeout_seconds: float | None = None,
     ) -> tuple[R | None, Exception | None]:
-        """
-        Execute a function in an isolated process with the configured client.
+        """Execute a function in an isolated process with the configured client.
 
         This method supports both synchronous and asynchronous functions.
         Async functions will be properly awaited in the worker process.
@@ -213,8 +211,7 @@ class IsolatedClientExecutor:
         return result, exception
 
     def stop(self, timeout_seconds: float = DEFAULT_SHUTDOWN_TIMEOUT_SECONDS) -> None:
-        """
-        Stop the worker process gracefully.
+        """Stop the worker process gracefully.
 
         Args:
             timeout_seconds: Maximum time to wait for the process to stop.
@@ -258,8 +255,7 @@ class IsolatedClientExecutor:
     async def _execute_with_timeout(
         self, func: AnyCallable[T, R], request: T, timeout_seconds: float
     ) -> R:
-        """
-        Execute a function with timeout handling.
+        """Execute a function with timeout handling.
 
         Args:
             func: Function to execute
@@ -357,8 +353,7 @@ def _worker_loop(
     request_queue: RequestQueue,
     response_queue: ResponseQueue,
 ) -> None:
-    """
-    Main loop for the worker process.
+    """Main loop for the worker process.
 
     Handles both synchronous and asynchronous function execution.
     """
@@ -383,9 +378,8 @@ def _worker_loop(
 
 
 @contextmanager
-def _client_context(client: WeaveClient) -> Generator[None, None, None]:
-    """
-    Context manager for WeaveClient lifecycle management.
+def _client_context(client: WeaveClient) -> Generator[None]:
+    """Context manager for WeaveClient lifecycle management.
 
     Args:
         client: The WeaveClient to manage
@@ -398,19 +392,18 @@ def _client_context(client: WeaveClient) -> Generator[None, None, None]:
             "Unsafe to run as user with existing weave client"
         )
 
-    ic = InitializedClient(client)
+    set_weave_client_global(client)
     try:
         yield
     finally:
-        _cleanup_client(client, ic)
+        _cleanup_client(client)
 
 
 def _execute_function(
     func: Any,
     request: Any,
 ) -> ResponseTuple:
-    """
-    Execute a function and return the result or error.
+    """Execute a function and return the result or error.
 
     Args:
         func: Function to execute
@@ -434,13 +427,11 @@ def _execute_function(
     return result, None
 
 
-def _cleanup_client(client: WeaveClient, ic: InitializedClient) -> None:
-    """
-    Clean up the client and initialized client.
+def _cleanup_client(client: WeaveClient) -> None:
+    """Clean up the client.
 
     Args:
         client: The weave client to finish
-        ic: The initialized client to reset
     """
     try:
         client.finish(use_progress_bar=False)
@@ -448,6 +439,6 @@ def _cleanup_client(client: WeaveClient, ic: InitializedClient) -> None:
         logger.error(f"Error finishing client: {e}", exc_info=True)
 
     try:
-        ic.reset()
+        set_weave_client_global(None)
     except Exception as e:
         logger.error(f"Error resetting client: {e}", exc_info=True)
