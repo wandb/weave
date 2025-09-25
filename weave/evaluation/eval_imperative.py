@@ -238,6 +238,7 @@ class ScoreLogger(BaseModel):
     predict_and_score_call: Call
     evaluate_call: Call
     predict_call: Call
+    predefined_scorers: list[str] | None = None
 
     _captured_scores: dict[str, ScoreType] = PrivateAttr(default_factory=dict)
     _has_finished: bool = PrivateAttr(False)
@@ -325,6 +326,16 @@ class ScoreLogger(BaseModel):
         # this is safe; pydantic casting is done in validator above
         scorer = cast(Scorer, scorer)
 
+        # Check if scorer is in predefined list
+        if self.predefined_scorers:
+            predefined_names = self.predefined_scorers
+            scorer_name = cast(str, scorer.name)
+            if scorer_name not in predefined_names:
+                logger.warning(
+                    f"Scorer '{scorer_name}' is not in the predefined scorers list. "
+                    f"Expected one of: {sorted(predefined_names)}"
+                )
+
         @op(name=scorer.name, enable_code_capture=False)
         def score_method(self: Scorer, *, output: Any, inputs: Any) -> ScoreType:
             # TODO: can't use score here because it will cause version mismatch
@@ -406,6 +417,14 @@ class EvaluationLogger(BaseModel):
             "These attributes can be used to add additional metadata columns to the Evaluation.",
         ),
     ]
+    scorers: Annotated[
+        list[str] | None,
+        Field(
+            default=None,
+            description="(Optional): A metadata-only list of predefined scorers for the evaluation. "
+            "If specified, warnings will be issued when logging scores not in this list.",
+        ),
+    ]
 
     _eval_started: bool = PrivateAttr(False)
     _logged_summary: bool = PrivateAttr(False)
@@ -439,6 +458,7 @@ class EvaluationLogger(BaseModel):
         self._pseudo_evaluation = Evaluation(
             dataset=cast(Dataset, self.dataset),
             scorers=[],
+            metadata={"scorers": self.scorers, **self.eval_attributes},
         )
 
         # The following section is a "hacky" way to create Model and Evaluation
@@ -598,6 +618,7 @@ class EvaluationLogger(BaseModel):
             predict_and_score_call=predict_and_score_call,
             evaluate_call=self._evaluate_call,
             predict_call=predict_call,
+            predefined_scorers=self.scorers,
         )
         self._accumulated_predictions.append(pred)
         return pred
