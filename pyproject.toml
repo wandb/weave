@@ -103,7 +103,7 @@ docs = [
 video_support = ["moviepy<=1.0.3"]
 anthropic = ["anthropic>=0.18.0"]
 cerebras = ["cerebras-cloud-sdk"]
-cohere = ["cohere>=5.9.1,<5.9.3"]
+cohere = ["cohere>=5.13.5"]
 # Pin until https://github.com/crewAIInc/crewAI/pull/2553 is released
 crewai = [
   "crewai>=0.100.1,<=0.108.0",
