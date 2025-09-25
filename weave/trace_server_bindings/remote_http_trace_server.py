@@ -436,6 +436,23 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             "/obj/delete", req, tsi.ObjDeleteReq, tsi.ObjDeleteRes
         )
 
+    def evaluation_create(
+        self, req: Union[dict[str, Any], "EvaluationCreateReq"]
+    ) -> "EvaluationCreateRes":
+        """Create an evaluation object using the v2 endpoint."""
+        from weave.trace_server import trace_server_interface as tsi
+        
+        # Convert to proper request type if needed
+        if isinstance(req, dict):
+            req = {"project_id": req["project_id"],
+                   "object_id": req["object_id"],
+                   "val": req["val"],
+                   "builtin_object_class": "Evaluation"}
+        
+        return self._generic_request(
+            "/v2/evaluations/create", req, dict, dict
+        )
+
     def table_create(
         self, req: Union[tsi.TableCreateReq, dict[str, Any]]
     ) -> tsi.TableCreateRes:

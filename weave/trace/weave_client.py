@@ -1578,6 +1578,31 @@ class WeaveClient:
             # `to_json` is mostly fast, except for CustomWeaveTypes
             # which incur network costs to serialize the payload
             json_val = to_json(val, self._project_id(), self)
+            
+            # Check if this is an Evaluation object
+            is_evaluation = False
+            if hasattr(val, "__class__"):
+                class_name = val.__class__.__name__
+                if class_name == "Evaluation" or class_name == "EvaluationResults":
+                    is_evaluation = True
+            
+            # For Evaluation objects, use the v2 endpoint
+            if is_evaluation and hasattr(self.server, 'evaluation_create'):
+                try:
+                    req = {
+                        "project_id": self.entity + "/" + self.project,
+                        "object_id": name,
+                        "val": json_val,
+                        "builtin_object_class": "Evaluation"
+                    }
+                    res = self.server.evaluation_create(req)
+                    # Convert response to expected format
+                    return ObjCreateRes(digest=res.get("digest", res))
+                except (AttributeError, NotImplementedError):
+                    # Fallback to regular object creation if v2 endpoint not available
+                    pass
+            
+            # Regular object creation for non-Evaluation objects
             req = ObjCreateReq(
                 obj=ObjSchemaForInsert(
                     project_id=self.entity + "/" + self.project,

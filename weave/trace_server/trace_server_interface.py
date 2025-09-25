@@ -646,6 +646,20 @@ class ObjDeleteRes(BaseModel):
     num_deleted: int
 
 
+class EvaluationCreateReq(BaseModelStrict):
+    project_id: str
+    object_id: str
+    val: Any
+    builtin_object_class: str = "Evaluation"
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class EvaluationCreateRes(BaseModel):
+    digest: str
+    object_id: str
+    version_index: int
+
+
 class ObjQueryRes(BaseModel):
     objs: list[ObjSchema]
 
