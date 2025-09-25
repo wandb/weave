@@ -65,6 +65,8 @@ class Call:
     deleted_at: datetime.datetime | None = None
     thread_id: str | None = None
     turn_id: str | None = None
+    wb_run_id: str | None = None
+    wb_run_step: int | None = None
 
     # These are the live children during logging
     _children: list[Call] = dataclasses.field(default_factory=list)
@@ -271,6 +273,8 @@ class Call:
             deleted_at=self.deleted_at,
             thread_id=self.thread_id,
             turn_id=self.turn_id,
+            wb_run_id=self.wb_run_id,
+            wb_run_step=self.wb_run_step,
         )
 
 
@@ -298,6 +302,8 @@ class CallDict(TypedDict):
     deleted_at: datetime.datetime | None
     thread_id: str | None
     turn_id: str | None
+    wb_run_id: str | None
+    wb_run_step: int | None
 
 
 CallsIter = PaginatedIterator[CallSchema, WeaveObject]
@@ -414,6 +420,8 @@ def make_client_call(
         deleted_at=server_call.deleted_at,
         thread_id=server_call.thread_id,
         turn_id=server_call.turn_id,
+        wb_run_id=server_call.wb_run_id,
+        wb_run_step=server_call.wb_run_step,
     )
     if isinstance(call.attributes, AttributesDict):
         call.attributes.freeze()

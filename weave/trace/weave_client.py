@@ -739,6 +739,9 @@ class WeaveClient:
             # Inherit turn_id from context
             turn_id = current_turn_id
 
+        current_wb_run_id = safe_current_wb_run_id()
+        current_wb_run_step = safe_current_wb_run_step()
+
         call = Call(
             _op_name=op_name_future,
             project_id=self._project_id(),
@@ -750,6 +753,8 @@ class WeaveClient:
             attributes=attributes_dict,
             thread_id=thread_id,
             turn_id=turn_id,
+            wb_run_id=current_wb_run_id,
+            wb_run_step=current_wb_run_step,
         )
         # Disallow further modification of attributes after the call is created
         attributes_dict.freeze()
@@ -761,9 +766,6 @@ class WeaveClient:
 
         if parent is not None:
             parent._children.append(call)
-
-        current_wb_run_id = safe_current_wb_run_id()
-        current_wb_run_step = safe_current_wb_run_step()
         check_wandb_run_matches(current_wb_run_id, self.entity, self.project)
 
         started_at = datetime.datetime.now(tz=datetime.timezone.utc)
