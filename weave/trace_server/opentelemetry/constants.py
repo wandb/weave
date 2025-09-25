@@ -131,6 +131,8 @@ ATTRIBUTE_KEYS = {
 WB_KEYS = {
     # Custom display name for the call in the UI
     "display_name": ["wandb.display_name"],
+    # Custom user ID to override the one from API key
+    "wb_user_id": ["wandb.wb_user_id"],
     "thread_id": ["gcp.vertex.agent.session_id", "wandb.thread_id"],
     "is_turn": [
         "gcp.vertex.agent.session_id",

@@ -346,6 +346,11 @@ class Span:
         if display_name and len(display_name) >= MAX_DISPLAY_NAME_LENGTH:
             display_name = shorten_name(display_name, MAX_DISPLAY_NAME_LENGTH)
 
+        # Allow override of wb_user_id from attributes
+        override_wb_user_id = wandb_attributes.get("wb_user_id")
+        if override_wb_user_id:
+            wb_user_id = override_wb_user_id
+
         thread_id = wandb_attributes.get("thread_id") or None
         if thread_id is not None and (wandb_attributes.get("is_turn")):
             turn_id = self.span_id

@@ -94,3 +94,12 @@ def weave_wandb_api_key() -> str | None:
         return env_api_key
 
     return _wandb_api_key_via_netrc()
+
+
+def weave_user_id_override() -> str | None:
+    """Get the user ID override from environment variable.
+    
+    This allows using a service account API key while still identifying
+    individual users by setting WEAVE_USER_ID environment variable.
+    """
+    return os.environ.get("WEAVE_USER_ID")

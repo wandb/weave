@@ -22,7 +22,7 @@ from weave import version
 from weave.chat.chat import Chat
 from weave.chat.inference_models import InferenceModels
 from weave.telemetry import trace_sentry
-from weave.trace import settings
+from weave.trace import env, settings
 from weave.trace.call import (
     DEFAULT_CALLS_PAGE_SIZE,
     Call,
@@ -782,6 +782,9 @@ class WeaveClient:
             inputs_json = to_json(
                 maybe_redacted_inputs_with_refs, project_id, self, use_dictify=False
             )
+            # Check for user ID override from environment
+            wb_user_id_override = env.weave_user_id_override()
+            
             call_start_req = CallStartReq(
                 start=StartedCallSchemaForInsert(
                     project_id=project_id,
@@ -795,6 +798,7 @@ class WeaveClient:
                     attributes=attributes_dict.unwrap(),
                     wb_run_id=current_wb_run_id,
                     wb_run_step=current_wb_run_step,
+                    wb_user_id=wb_user_id_override,
                     thread_id=thread_id,
                     turn_id=turn_id,
                 )
