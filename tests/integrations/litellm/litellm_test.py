@@ -280,3 +280,147 @@ def test_model_predict(
     assert d["prompt_tokens_details"]["cached_tokens"] == 0
     assert d["completion_tokens"] == 10
     assert d["total_tokens"] == 38
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
+)
+def test_litellm_responses(
+    client: weave.trace.weave_client.WeaveClient, patch_litellm: None
+) -> None:
+    """Test litellm.responses method if available."""
+    # Check if responses method exists in litellm
+    if not hasattr(litellm, "responses"):
+        pytest.skip("litellm.responses method not available")
+
+    response = litellm.responses(
+        api_key=os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY"),
+        model="openai/gpt-4o-2024-08-06",
+        input="Write a one-sentence bedtime story about a unicorn.",
+        max_output_tokens=100,
+    )
+
+    assert response is not None
+    assert hasattr(response, "output")
+    assert len(response.output) > 0
+    assert hasattr(response.output[0], "content")
+
+    calls = list(client.get_calls())
+    assert len(calls) > 0
+    call = calls[0]
+    assert call.exception is None
+    assert call.ended_at is not None
+
+    # Check that the op name includes "responses"
+    assert "responses" in call.op_name
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
+)
+def test_litellm_responses_stream(
+    client: weave.trace.weave_client.WeaveClient, patch_litellm: None
+) -> None:
+    """Test litellm.responses method with streaming if available."""
+    # Check if responses method exists in litellm
+    if not hasattr(litellm, "responses"):
+        pytest.skip("litellm.responses method not available")
+
+    stream = litellm.responses(
+        api_key=os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY"),
+        model="openai/gpt-4o-2024-08-06",
+        input="Write a one-sentence bedtime story about a unicorn.",
+        max_output_tokens=100,
+        stream=True,
+    )
+
+    # Consume the stream
+    events = []
+    for event in stream:
+        events.append(event)
+
+    assert len(events) > 0
+
+    calls = list(client.get_calls())
+    assert len(calls) > 0
+    call = calls[0]
+    assert call.exception is None
+    assert call.ended_at is not None
+
+    # Check that the op name includes "responses"
+    assert "responses" in call.op_name
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
+)
+@pytest.mark.asyncio
+async def test_litellm_aresponses(
+    client: weave.trace.weave_client.WeaveClient, patch_litellm: None
+) -> None:
+    """Test litellm.aresponses async method if available."""
+    # Check if aresponses method exists in litellm
+    if not hasattr(litellm, "aresponses"):
+        pytest.skip("litellm.aresponses method not available")
+
+    response = await litellm.aresponses(
+        api_key=os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY"),
+        model="openai/gpt-4o-2024-08-06",
+        input="Write a one-sentence bedtime story about a unicorn.",
+        max_output_tokens=100,
+    )
+
+    assert response is not None
+    assert hasattr(response, "output")
+    assert len(response.output) > 0
+    assert hasattr(response.output[0], "content")
+
+    calls = list(client.get_calls())
+    assert len(calls) > 0
+    call = calls[0]
+    assert call.exception is None
+    assert call.ended_at is not None
+
+    # Check that the op name includes "aresponses"
+    assert "aresponses" in call.op_name
+
+
+@pytest.mark.skip_clickhouse_client
+@pytest.mark.vcr(
+    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
+)
+@pytest.mark.asyncio
+async def test_litellm_aresponses_stream(
+    client: weave.trace.weave_client.WeaveClient, patch_litellm: None
+) -> None:
+    """Test litellm.aresponses async method with streaming if available."""
+    # Check if aresponses method exists in litellm
+    if not hasattr(litellm, "aresponses"):
+        pytest.skip("litellm.aresponses method not available")
+
+    stream = await litellm.aresponses(
+        api_key=os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY"),
+        model="openai/gpt-4o-2024-08-06",
+        input="Write a one-sentence bedtime story about a unicorn.",
+        max_output_tokens=100,
+        stream=True,
+    )
+
+    # Consume the async stream
+    events = []
+    async for event in stream:
+        events.append(event)
+
+    assert len(events) > 0
+
+    calls = list(client.get_calls())
+    assert len(calls) > 0
+    call = calls[0]
+    assert call.exception is None
+    assert call.ended_at is not None
+
+    # Check that the op name includes "aresponses"
+    assert "aresponses" in call.op_name

@@ -122,6 +122,12 @@ def get_litellm_patcher(
     acompletion_settings = base.model_copy(
         update={"name": base.name or "litellm.acompletion"}
     )
+    responses_settings = base.model_copy(
+        update={"name": base.name or "litellm.responses"}
+    )
+    aresponses_settings = base.model_copy(
+        update={"name": base.name or "litellm.aresponses"}
+    )
 
     _litellm_patcher = MultiPatcher(
         [
@@ -134,6 +140,16 @@ def get_litellm_patcher(
                 lambda: importlib.import_module("litellm"),
                 "acompletion",
                 make_wrapper(acompletion_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("litellm"),
+                "responses",
+                make_wrapper(responses_settings),
+            ),
+            SymbolPatcher(
+                lambda: importlib.import_module("litellm"),
+                "aresponses",
+                make_wrapper(aresponses_settings),
             ),
         ]
     )
