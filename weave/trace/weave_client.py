@@ -94,6 +94,9 @@ from weave.trace_server.interface.feedback_types import (
     runnable_feedback_runnable_ref_selector,
 )
 from weave.trace_server.trace_server_interface import (
+    CallBatchEndMode,
+    CallBatchStartMode,
+    CallCreateBatchReq,
     CallEndReq,
     CallsDeleteReq,
     CallsFilter,
@@ -345,6 +348,9 @@ class WeaveClient:
         if hasattr(self.server, "get_feedback_processor"):
             self._server_feedback_processor = self.server.get_feedback_processor()
         self.send_file_cache = WeaveClientSendFileCache()
+
+        # Cache to store call starts so they can be sent with call ends
+        self._call_start_cache: dict[str, CallStartReq] = {}
 
     ################ High Level Convenience Methods ################
 
@@ -795,6 +801,7 @@ class WeaveClient:
                     attributes=attributes_dict.unwrap(),
                     wb_run_id=current_wb_run_id,
                     wb_run_step=current_wb_run_step,
+                    wb_user_id=None,  # Will be set by the server
                     thread_id=thread_id,
                     turn_id=turn_id,
                 )
@@ -807,6 +814,9 @@ class WeaveClient:
                     "Inputs may be dropped."
                 )
 
+            # Cache the start request for later use with call_end
+            self._call_start_cache[call_id] = call_start_req
+            # Also send immediately so users can see in progress calls
             self.server.call_start(call_start_req)
             return True
 
@@ -934,7 +944,7 @@ class WeaveClient:
         if op is not None and op._on_finish_handler:
             op._on_finish_handler(call, original_output, exception)
 
-        def send_end_call() -> None:
+        def send_complete_call() -> None:
             maybe_redacted_output_as_refs = output_as_refs
             if should_redact_pii():
                 from weave.utils.pii_redaction import redact_pii
@@ -960,9 +970,30 @@ class WeaveClient:
                     f"Trace output size ({bytes_size} bytes) exceeds the maximum allowed size of {MAX_TRACE_PAYLOAD_SIZE} bytes. "
                     "Output may be dropped."
                 )
-            self.server.call_end(call_end_req)
 
-        self.future_executor.defer(send_end_call)
+            # Get cached start request
+            call_id = call.id
+            if call_id is None:
+                # This shouldn't happen since we always generate call id...
+                self.server.call_end(call_end_req)
+                return
+
+            cached_start = self._call_start_cache.get(call_id)
+            if cached_start is not None:
+                # Send complete call (start + end)
+                batch_req = CallCreateBatchReq(
+                    batch=[
+                        CallBatchStartMode(req=cached_start),
+                        CallBatchEndMode(req=call_end_req),
+                    ]
+                )
+                self.server.call_start_batch(batch_req)
+                del self._call_start_cache[call_id]
+            else:
+                # Fallback: just send end (shouldn't happen normally)
+                self.server.call_end(call_end_req)
+
+        self.future_executor.defer(send_complete_call)
 
         # If a turn call is finishing, reset turn context for next sibling
         if call.turn_id == call.id and call.thread_id:

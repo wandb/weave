@@ -347,7 +347,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             and req.query is None
             and not req.include_total_storage_size
         ):
-            query = optimized_project_contains_call_query(req.project_id, pb)
+            optimal_table = self._get_optimal_calls_table_name()
+            query = optimized_project_contains_call_query(
+                req.project_id, pb, table_name=optimal_table
+            )
             raw_res = self._query(query, pb.get_params())
             rows = raw_res.result_rows
             count = rows[0][0]
@@ -356,7 +359,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 total_storage_size_bytes=None,
             )
 
-        query, columns = build_calls_query_stats_query(req, pb)
+        optimal_table = self._get_optimal_calls_table_name()
+        query, columns = build_calls_query_stats_query(
+            req, pb, table_name=optimal_table
+        )
 
         raw_res = self._query(query, pb.get_params())
 
@@ -370,6 +376,114 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
 
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
+        """Returns a stream of calls that match the given query using the optimized calls_complete table.
+
+        This implementation uses the calls_complete table which contains complete call data
+        in single rows, eliminating the need for CTEs and aggregation for better performance.
+        """
+        optimal_table = self._get_optimal_calls_table_name()
+        cq = CallsQuery(
+            project_id=req.project_id,
+            table_name=optimal_table,
+            include_costs=req.include_costs or False,
+            include_storage_size=req.include_storage_size or False,
+            include_total_storage_size=req.include_total_storage_size or False,
+        )
+        columns = ALL_CALL_SELECT_COLUMNS
+        if req.columns:
+            # TODO: add support for json extract fields
+            # Split out any nested column requests
+            columns = [col.split(".")[0] for col in req.columns]
+
+            # If we are returning a summary object, make sure that all fields
+            # required to compute the summary are in the columns
+            if "summary" in columns or req.include_costs:
+                columns += ["ended_at", "exception", "display_name"]
+
+            # Set columns to user-requested columns, w/ required columns
+            # These are all formatted by the CallsQuery, which prevents injection
+            # and other attack vectors.
+            columns = list(set(REQUIRED_CALL_COLUMNS + columns))
+
+        # sort the columns such that similar queries are grouped together
+        columns = sorted(columns)
+
+        # The order is actually important, it has something to do with how the cost_query wants to arrange things.
+        # specifically, the summary column should always be the last.
+        if req.include_storage_size:
+            columns.append("storage_size_bytes")
+
+        if req.include_total_storage_size:
+            columns.append("total_storage_size_bytes")
+
+        # We put summary_dump last so that when we compute the costs and summary its in the right place
+        if req.include_costs:
+            summary_columns = ["summary", "summary_dump"]
+            columns = [
+                *[col for col in columns if col not in summary_columns],
+                "summary_dump",
+            ]
+
+        if req.expand_columns is not None:
+            cq.set_expand_columns(req.expand_columns)
+        for col in columns:
+            cq.add_field(col)
+        if req.filter is not None:
+            cq.set_hardcoded_filter(HardCodedFilter(filter=req.filter))
+        if req.query is not None:
+            cq.add_condition(req.query.expr_)
+
+        # Sort with empty list results in no sorting
+        if req.sort_by is not None:
+            for sort_by in req.sort_by:
+                cq.add_order(sort_by.field, sort_by.direction)
+            # If user isn't already sorting by id, add id as secondary sort for consistency
+            if not any(sort_by.field == "id" for sort_by in req.sort_by):
+                cq.add_order("id", "asc")
+        else:
+            # Default sorting: started_at with id as secondary sort for consistency
+            cq.add_order("started_at", "asc")
+            cq.add_order("id", "asc")
+        if req.limit is not None:
+            cq.set_limit(req.limit)
+        if req.offset is not None:
+            cq.set_offset(req.offset)
+
+        pb = ParamBuilder()
+        raw_res = self._query_stream(cq.as_sql(pb), pb.get_params())
+
+        select_columns = [c.field for c in cq.select_fields]
+        expand_columns = req.expand_columns or []
+        include_feedback = req.include_feedback or False
+
+        def row_to_call_schema_dict(row: tuple[Any, ...]) -> dict[str, Any]:
+            return _ch_call_dict_to_call_schema_dict(dict(zip(select_columns, row)))
+
+        if not expand_columns and not include_feedback:
+            for row in raw_res:
+                yield tsi.CallSchema.model_validate(row_to_call_schema_dict(row))
+            return
+
+        ref_cache = LRUCache(max_size=1000)
+        batch_processor = DynamicBatchProcessor(
+            initial_size=ch_settings.INITIAL_CALLS_STREAM_BATCH_SIZE,
+            max_size=ch_settings.MAX_CALLS_STREAM_BATCH_SIZE,
+            growth_factor=10,
+        )
+
+        for batch in batch_processor.make_batches(raw_res):
+            call_dicts = [row_to_call_schema_dict(row) for row in batch]
+            if expand_columns and req.return_expanded_column_values:
+                self._expand_call_refs(
+                    req.project_id, call_dicts, expand_columns, ref_cache
+                )
+            if include_feedback:
+                self._add_feedback_to_calls(req.project_id, call_dicts)
+
+            for call in call_dicts:
+                yield tsi.CallSchema.model_validate(call)
+
+    def calls_query_stream1(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         """Returns a stream of calls that match the given query."""
         cq = CallsQuery(
             project_id=req.project_id,
@@ -482,6 +596,27 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         with self.with_new_client():
             feedback = self.feedback_query(feedback_query_req)
         hydrate_calls_with_feedback(calls, feedback)
+
+    def _get_optimal_calls_table_name(self) -> str:
+        """Determines the optimal table to use for calls queries.
+
+        This method can be extended in the future to add more sophisticated logic
+        based on system configuration, request characteristics, or performance metrics.
+
+        For now, it defaults to calls_complete which provides better performance
+        by eliminating the need for CTEs and aggregation.
+
+        Returns:
+            str: The table name to use ("calls_complete" or "calls_merged")
+        """
+        # Future enhancement ideas:
+        # - Check environment variables or feature flags
+        # - Analyze request complexity
+        # - Use performance metrics to choose dynamically
+        # - Fall back to calls_merged for certain edge cases
+
+        return "calls_complete"
+        # return "calls_merged"
 
     def _get_refs_to_resolve(
         self, calls: list[dict[str, Any]], expand_columns: list[str]
@@ -2482,7 +2617,17 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._flush_calls")
     def _flush_calls(self) -> None:
         try:
-            self._insert_call_batch(self._call_batch)
+            complete_calls, incomplete_calls = (
+                self._separate_complete_and_incomplete_calls(self._call_batch)
+            )
+
+            # Insert complete calls (start + end) into calls_complete table
+            if complete_calls:
+                self._insert_complete_calls_batch(complete_calls)
+
+            # Insert incomplete calls (just start or just end) into call_parts table
+            self._insert_call_batch(complete_calls + incomplete_calls)
+
         except InsertTooLarge:
             logger.info("Retrying with large objects stripped.")
             batch = self._strip_large_values(self._call_batch)
@@ -2491,6 +2636,104 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 self._insert_call_batch([row])
 
         self._call_batch = []
+
+    def _separate_complete_and_incomplete_calls(
+        self, batch: list[list[Any]]
+    ) -> tuple[list[list[Any]], list[list[Any]]]:
+        """Separate batch into complete calls (start+end) and incomplete calls.
+
+        Returns:
+            tuple: (complete_calls, incomplete_calls)
+        """
+        # Get column indices for key fields
+        id_idx = ALL_CALL_INSERT_COLUMNS.index("id")
+        started_at_idx = ALL_CALL_INSERT_COLUMNS.index("started_at")
+        ended_at_idx = ALL_CALL_INSERT_COLUMNS.index("ended_at")
+
+        # Group rows by call ID
+        calls_by_id: dict[str, dict[str, list[Any]]] = {}
+
+        for row in batch:
+            call_id = row[id_idx]
+            if call_id not in calls_by_id:
+                calls_by_id[call_id] = {"starts": [], "ends": []}
+
+            # Determine if this is a start or end based on which timestamp is filled
+            if row[started_at_idx] is not None:
+                calls_by_id[call_id]["starts"].append(row)
+            elif row[ended_at_idx] is not None:
+                calls_by_id[call_id]["ends"].append(row)
+
+        complete_calls = []
+        incomplete_calls = []
+
+        for call_id, call_data in calls_by_id.items():
+            starts = call_data["starts"]
+            ends = call_data["ends"]
+
+            # If we have both start and end for this call ID, it's complete
+            if len(starts) > 0 and len(ends) > 0:
+                # Merge start and end into a single complete call row
+                # Take the start row as base and fill in end-specific columns
+                start_row = starts[0]  # Should only be one start per call
+                end_row = ends[0]  # Should only be one end per call
+
+                complete_row = self._merge_start_and_end_rows(start_row, end_row)
+                complete_calls.append(complete_row)
+            else:
+                # Incomplete call - add all starts and ends as separate rows
+                incomplete_calls.extend(starts)
+                incomplete_calls.extend(ends)
+
+        return complete_calls, incomplete_calls
+
+    def _merge_start_and_end_rows(
+        self, start_row: list[Any], end_row: list[Any]
+    ) -> list[Any]:
+        """Merge a start row and end row into a single complete call row."""
+        # Start with the start row as the base
+        merged_row = list(start_row)
+
+        # Get column indices for end-specific fields
+        ended_at_idx = ALL_CALL_INSERT_COLUMNS.index("ended_at")
+        exception_idx = ALL_CALL_INSERT_COLUMNS.index("exception")
+        summary_dump_idx = ALL_CALL_INSERT_COLUMNS.index("summary_dump")
+        output_dump_idx = ALL_CALL_INSERT_COLUMNS.index("output_dump")
+        output_refs_idx = ALL_CALL_INSERT_COLUMNS.index("output_refs")
+
+        # Fill in the end-specific columns from the end row
+        merged_row[ended_at_idx] = end_row[ended_at_idx]
+        merged_row[exception_idx] = end_row[exception_idx]
+        merged_row[summary_dump_idx] = end_row[summary_dump_idx]
+        merged_row[output_dump_idx] = end_row[output_dump_idx]
+        merged_row[output_refs_idx] = end_row[output_refs_idx]
+
+        return merged_row
+
+    @ddtrace.tracer.wrap(
+        name="clickhouse_trace_server_batched._insert_complete_calls_batch"
+    )
+    def _insert_complete_calls_batch(self, batch: list[list[Any]]) -> None:
+        """Insert complete calls (start+end) into the calls_complete table."""
+        if root_span := ddtrace.tracer.current_span():
+            root_span.set_tags(
+                {
+                    "clickhouse_trace_server_batched._insert_complete_calls_batch.count": str(
+                        len(batch)
+                    )
+                }
+            )
+        if batch:
+            settings = {}
+            if self._use_async_insert:
+                settings["async_insert"] = 1
+                settings["wait_for_async_insert"] = 1
+            self._insert(
+                "calls_complete",
+                data=batch,
+                column_names=ALL_CALL_INSERT_COLUMNS,
+                settings=settings,
+            )
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._strip_large_values")
     def _strip_large_values(self, batch: list[list[Any]]) -> list[list[Any]]:
