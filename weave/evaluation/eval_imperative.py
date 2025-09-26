@@ -33,10 +33,11 @@ from weave.trace.api import attributes
 from weave.trace.call import Call
 from weave.trace.context import call_context
 from weave.trace.context.weave_client_context import require_weave_client
-from weave.trace.op import op
-from weave.trace.op_protocol import Op
+from weave.trace.op import Op, op
 from weave.trace.table import Table
 from weave.trace.util import Thread
+from weave.trace.view_utils import set_call_view
+from weave.type_wrappers.Content.content import Content
 
 T = TypeVar("T")
 ID = str
@@ -671,6 +672,63 @@ class EvaluationLogger(BaseModel):
                 # Even if summarize fails, try to finalize with the calculated summary
 
         self._finalize_evaluation(output=final_summary)
+
+    def set_view(
+        self,
+        name: str,
+        content: Content | str,
+        *,
+        extension: str | None = None,
+        mimetype: str | None = None,
+        metadata: dict[str, Any] | None = None,
+        encoding: str = "utf-8",
+    ) -> None:
+        """Attach a view to the evaluation's main call summary under `weave.views`.
+
+        Saves the provided content as an object in the project and writes its
+        reference URI under `summary.weave.views.<name>` for the evaluation's
+        `evaluate` call. String inputs are wrapped as text content using
+        `Content.from_text` with the provided extension or mimetype.
+
+        Args:
+            name: The view name to display, used as the key under `summary.weave.views`.
+            content: A `weave.Content` instance or string to serialize.
+            extension: Optional file extension for string content inputs.
+            mimetype: Optional MIME type for string content inputs.
+            metadata: Optional metadata attached to newly created `Content`.
+            encoding: Text encoding for string content inputs.
+
+        Returns:
+            None
+
+        Examples:
+            >>> import weave
+            >>> ev = weave.EvaluationLogger()
+            >>> ev.set_view("report", "# Report", extension="md")
+        """
+        if isinstance(content, str) and len(content) == 0:
+            raise ValueError("Content cannot be an empty string")
+
+        if not isinstance(name, str) or len(name) == 0:
+            raise ValueError("`name` must be a non-empty string")
+
+        if self._evaluate_call is None:
+            raise RuntimeError(
+                "Evaluation call not initialized; cannot add view before evaluation starts"
+            )
+
+        wc = require_weave_client()
+
+        set_call_view(
+            call=self._evaluate_call,
+            client=wc,
+            name=name,
+            content=content,
+            extension=extension,
+            mimetype=mimetype,
+            metadata=metadata,
+            encoding=encoding,
+        )
 
     def finish(self, exception: BaseException | None = None) -> None:
         """Clean up the evaluation resources explicitly without logging a summary.

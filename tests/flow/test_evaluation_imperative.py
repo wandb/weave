@@ -9,6 +9,7 @@ import weave
 from weave.evaluation.eval_imperative import EvaluationLogger, Model, Scorer
 from weave.integrations.integration_utilities import op_name_from_call
 from weave.trace.context import call_context
+from weave.trace.serialization.serialize import to_json
 from weave.trace_server.trace_server_interface import ObjectVersionFilter
 
 
@@ -701,3 +702,41 @@ def test_evaluation_logger_with_predefined_scorers(client, caplog):
     # verify we can get the eval object separately by ref and see metadata
     eval_object = ev._pseudo_evaluation.ref.get()
     assert eval_object.metadata["scorers"] == ["accuracy", "precision"]
+
+
+def test_evaluation_logger_set_view(client):
+    """Ensure set_view stores content metadata on evaluation summary."""
+    ev = weave.EvaluationLogger()
+    content = weave.Content.from_text("# hello", mimetype="text/markdown")
+    content2 = weave.Content.from_text("<h1>hello world</h1>", mimetype="text/html")
+
+    ev.set_view("report", content)
+    ev.set_view("report2", content2)
+    ev.finish()
+    client.flush()
+
+    evaluate_call = client.get_calls()[0]
+    assert evaluate_call.summary["weave"] is not None
+    assert "views" in evaluate_call.summary["weave"]
+    views = evaluate_call.summary["weave"]["views"]
+    assert len(views) == 2
+    assert views["report"] == to_json(content, client._project_id(), client)
+    assert views["report2"] == to_json(content2, client._project_id(), client)
+
+
+def test_evaluation_logger_set_view_string(client):
+    """Ensure string inputs are accepted for evaluation views."""
+    ev = weave.EvaluationLogger()
+    ev.set_view("view", "<h1>Eval</h1>", extension="html")
+    ev.finish()
+    client.flush()
+
+    evaluate_call = client.get_calls()[0]
+    assert evaluate_call.summary
+    assert evaluate_call.summary["weave"] is not None
+    views = evaluate_call.summary["weave"]["views"]
+    stored = dict(views["view"])
+
+    assert stored["_type"] == "CustomWeaveType"
+    assert stored["weave_type"]["type"] == "weave.type_wrappers.Content.content.Content"
+    assert stored["files"]["content"]
