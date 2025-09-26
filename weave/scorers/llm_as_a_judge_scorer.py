@@ -12,6 +12,7 @@ from weave.trace_server.interface.builtin_object_classes.llm_structured_model im
 class LLMAsAJudgeScorer(Scorer):
     model: LLMStructuredCompletionModel
     scoring_prompt: str
+    include_op_audio_output: bool = False
 
     @op
     def score(self, *, output: str, **kwargs: Any) -> Any:
