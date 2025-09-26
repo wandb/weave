@@ -59,7 +59,9 @@ def init(
     to the specified project.
 
     Args:
-        project_name: The name of the Weights & Biases project to log to.
+        project_name: The name of the Weights & Biases team and project to log to. If you don't
+            specify a team, your default entity is used.
+            To find or update your default entity, refer to [User Settings](https://docs.wandb.ai/guides/models/app/settings-page/user-settings/#default-team) in the W&B Models documentation.
         settings: Configuration for the Weave client generally.
         autopatch_settings: (Deprecated) Configuration for autopatch integrations. Use explicit patching instead.
         global_postprocess_inputs: A function that will be applied to all inputs of all ops.

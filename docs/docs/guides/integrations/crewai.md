@@ -1,5 +1,7 @@
 # CrewAI
 
+import DefaultEntityNote from '../../../src/components/DefaultEntityNote.mdx';
+
 <a target="_blank" href="https://github.com/wandb/examples/blob/master/weave/docs/quickstart_crewai.ipynb">
   <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
 </a>
@@ -13,13 +15,13 @@ The integration supports both Crews and Flows.
 
 ## Getting Started with Crew
 
-You need to install CrewAI ([more details](https://docs.crewai.com/installation)) and weave to run this example:
+You need to install CrewAI ([more details](https://docs.crewai.com/installation)) and Weave libraries to run this example:
 
 ```
 pip install crewai weave
 ```
 
-Now we will create a CrewAI Crew and trace the execution using Weave. To get started, simply call `weave.init()` at the beginning of your script. The argument in weave.init() is a project name where the traces will be logged.
+Create a CrewAI Crew and trace the execution using Weave. To get started, call `weave.init()` at the beginning of your script. The argument in `weave.init()` is a project name where the traces will be logged. <DefaultEntityNote />
 
 ```python
 import weave

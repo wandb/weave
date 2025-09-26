@@ -1,5 +1,7 @@
 # Verdict
 
+import DefaultEntityNote from '../../../src/components/DefaultEntityNote.mdx';
+
 <a target="_blank" href="https://github.com/wandb/examples/blob/master/weave/docs/quickstart_verdict.ipynb">
   <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
 </a>
@@ -12,7 +14,7 @@ Weave simplifies this process by automatically capturing traces for your [Verdic
 
 ## Getting Started
 
-To get started, simply call `weave.init(project=...)` at the beginning of your script. Use the `project` argument to log to a specific W&B Team name with `team-name/project-name` or do `project-name` to log to your default team/entity.
+To get started, call `weave.init(project=...)` at the beginning of your script. Use the `project` argument to log to a specific W&B Team name with `team-name/project-name`.
 
 ```python
 import weave
@@ -62,6 +64,8 @@ with weave.attributes({"evaluation_type": "sentiment", "batch_id": "batch_001"})
 
 print(output)
 ```
+
+<DefaultEntityNote />
 
 Weave automatically tracks the metadata against the trace of the Verdict pipeline call. You can view the metadata in the Weave web interface.
 
