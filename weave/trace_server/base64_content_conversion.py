@@ -31,6 +31,8 @@ MIN_BASE64_SIZE = 100  # 100 bytes
 
 MIN_TEXT_SIZE = 50 * 1024  # 50 KiB
 
+CONTENT_CLASS = "weave.type_wrappers.Content.content.Content"
+
 
 def is_data_uri(data_uri: str) -> bool:
     """Extract content type and decoded bytes from a data URI.
@@ -83,7 +85,7 @@ def store_content_object(
     # We exclude the load op because it isn't possible to get from the server side
     return {
         "_type": "CustomWeaveType",
-        "weave_type": {"type": "weave.type_wrappers.Content.content.Content"},
+        "weave_type": {"type": CONTENT_CLASS},
         "files": {"content": content_res.digest, "metadata.json": metadata_res.digest},
     }
 
