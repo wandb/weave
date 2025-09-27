@@ -59,6 +59,9 @@ class KafkaProducer(ConfluentKafkaProducer):
     ) -> None:
         """Produce a call_end message to Kafka with buffer size management.
 
+        Uses project_id as the message key to ensure all messages for a project
+        go to the same partition and are processed by a single consumer.
+
         Drops messages if buffer is full to prevent unbounded memory growth.
         Logs warnings at 50% capacity and errors when dropping messages.
         """
@@ -99,8 +102,14 @@ class KafkaProducer(ConfluentKafkaProducer):
                     }
                 )
 
+        # TODO: Use project_id as key to ensure all messages for a project
+        # go to the same partition for sequential processing by one worker
+        # This is NOT implemented currently due to performance concerns for
+        # online monitors, which will likely hotspot as individual projects
+        # would all be serviced by a single worker.
         self.produce(
             topic=CALL_ENDED_TOPIC,
+            # key=call_end.project_id.encode("utf-8"),
             value=call_end.model_dump_json(),
         )
 
@@ -129,6 +138,9 @@ class KafkaConsumer(ConfluentKafkaConsumer):
             "group.id": group_id,
             "auto.offset.reset": "earliest",
             "enable.auto.commit": False,
+            # Use cooperative-sticky assignment to minimize rebalances
+            # and keep partitions with the same consumer when possible
+            "partition.assignment.strategy": "cooperative-sticky",
             **_make_auth_config(),
             **additional_kafka_config,
         }

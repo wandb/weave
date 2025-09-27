@@ -98,6 +98,7 @@ ColumnType = typing.Literal[
     "string",
     "datetime",
     "json",  # Represented as string in ClickHouse
+    "array",
     "float",
 ]
 

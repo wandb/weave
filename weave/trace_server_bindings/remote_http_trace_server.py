@@ -694,6 +694,26 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     ) -> tsi.EvaluationStatusRes:
         raise NotImplementedError("evaluation_status is not implemented")
 
+    def alert_metrics_create(
+        self, req: tsi.AlertMetricsCreateReq
+    ) -> tsi.AlertMetricsCreateRes:
+        return self._generic_request(
+            "/alert/metrics/create",
+            req,
+            tsi.AlertMetricsCreateReq,
+            tsi.AlertMetricsCreateRes,
+        )
+
+    def alert_metrics_query_stream(
+        self, req: tsi.AlertMetricsQueryReq
+    ) -> Iterator[tsi.AlertMetricSchema]:
+        return self._generic_request(
+            "/alert/metrics/query",
+            req,
+            tsi.AlertMetricsQueryReq,
+            tsi.AlertMetricSchema,
+        )
+
 
 __docspec__ = [
     RemoteHTTPTraceServer,
