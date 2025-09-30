@@ -988,9 +988,15 @@ class FileCreateReq(BaseModelStrict):
     content: bytes
 
 
-class FileCreateRes(BaseModel):
+class FileCreateRes(BaseModelStrict):
     digest: str
 
+
+class FileCreateBatchReq(BaseModelStrict):
+    batch: list[FileCreateReq]
+
+class FileCreateBatchRes(BaseModelStrict):
+    res: list[FileCreateRes]
 
 class FileContentReadReq(BaseModelStrict):
     project_id: str
