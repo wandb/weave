@@ -408,6 +408,10 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
             lambda content: tsi.FileContentReadRes(content=content),
         )
 
+    def file_create_batched(self, req: tsi.FileCreateBatchReq) -> tsi.FileCreateBatchRes:
+        # NOTE: Could we cache the individual req <-> res pairs?
+        return self._next_trace_server.file_create_batched(req)
+
     def files_stats(self, req: tsi.FilesStatsReq) -> tsi.FilesStatsRes:
         return self._with_cache_pydantic(
             self._next_trace_server.files_stats,
