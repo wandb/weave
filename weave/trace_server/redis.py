@@ -48,7 +48,7 @@ class RedisClient:
         """
         return self._client.get(key)
 
-    def set(self, key: str, value: str, ex: Optional[int] = None) -> bool:
+    def set(self, key: str, value: str, ex: Optional[int] = None) -> Optional[bool]:
         """Set value in cache.
 
         Args:
@@ -57,6 +57,6 @@ class RedisClient:
             ex (Optional[int]): Expiration time in seconds.
 
         Returns:
-            bool: True if successful.
+            Optional[bool]: True if successful, None otherwise.
         """
         return self._client.set(key, value, ex=ex)
