@@ -29,6 +29,12 @@ CREATE TABLE calls_complete (
 
     INDEX idx_wb_run_id wb_run_id TYPE set(100) GRANULARITY 1,
 
+    -- for fast id lookups with unordered ids (OTEL)
+    PROJECTION projection_calls_by_id (
+        SELECT *
+        ORDER BY project_id, id, started_at
+    )
+
     PROJECTION projection_calls_by_op_name (
         SELECT *
         ORDER BY project_id, op_name, started_at

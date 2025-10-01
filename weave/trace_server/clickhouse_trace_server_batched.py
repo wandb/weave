@@ -5,6 +5,7 @@ import datetime
 import hashlib
 import json
 import logging
+import os
 import threading
 from collections import defaultdict
 from collections.abc import Iterator, Sequence
@@ -2614,10 +2615,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if self._flush_immediately:
             self._flush_calls()
 
+    def _do_read_before_write(self) -> bool:
+        return os.getenv("DO_READ_BEFORE_WRITE", "1") == "1"
+
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._flush_calls")
     def _flush_calls(self) -> None:
         try:
-            complete_calls, incomplete_calls = (
+            complete_calls, call_starts, call_ends = (
                 self._separate_complete_and_incomplete_calls(self._call_batch)
             )
 
@@ -2625,8 +2629,37 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             if complete_calls:
                 self._insert_complete_calls_batch(complete_calls)
 
-            # Insert incomplete calls (just start or just end) into call_parts table
-            self._insert_call_batch(complete_calls + incomplete_calls)
+            if call_ends and self._do_read_before_write():
+                # With retry, get call start data for incomplete calls
+                # TODO: can we have call batches from multiple different projects?
+                # TODO: how do we deal with call ends that don't have an associated start in the db?
+                # TODO: make this a helper
+                id_idx = ALL_CALL_INSERT_COLUMNS.index("id")
+                proj_id_idx = ALL_CALL_INSERT_COLUMNS.index("project_id")
+                call_end_ids = {row[id_idx] for row in call_ends}
+                db_call_starts = self.calls_query(
+                    tsi.CallsQueryReq(
+                        project_id=call_ends[0][proj_id_idx],
+                        filter=tsi.CallsFilter(call_ids=list(call_end_ids)),
+                    )
+                )
+                if len(db_call_starts.calls) != len(call_ends):
+                    db_call_start_ids = {row.id for row in db_call_starts.calls}
+                    missing_call_start_ids = call_end_ids - db_call_start_ids
+                    # if the client is waiting on this response, we can't just sit here
+                    # retrying, because the client will never be able to upload the call start
+                    # lets raise an error and see how rare this is
+                    raise ValueError(f"Missing call starts: {missing_call_start_ids}")
+
+                # now with the start data, combine and insert into complete calls
+                complete_calls = self._merge_start_and_end_rows(
+                    list(db_call_starts), list(call_ends)
+                )
+                self._insert_complete_calls_batch(complete_calls)
+            else:
+                # Always insert call starts and complete calls if not doing
+                # read before write for back compat
+                self._insert_call_batch(complete_calls + call_starts)
 
         except InsertTooLarge:
             logger.info("Retrying with large objects stripped.")
@@ -2639,11 +2672,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def _separate_complete_and_incomplete_calls(
         self, batch: list[list[Any]]
-    ) -> tuple[list[list[Any]], list[list[Any]]]:
+    ) -> tuple[list[list[Any]], list[list[Any]], list[list[Any]]]:  # TODO: type this
         """Separate batch into complete calls (start+end) and incomplete calls.
 
         Returns:
-            tuple: (complete_calls, incomplete_calls)
+            tuple: (complete_calls, call_starts, call_ends)
         """
         # Get column indices for key fields
         id_idx = ALL_CALL_INSERT_COLUMNS.index("id")
@@ -2665,7 +2698,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 calls_by_id[call_id]["ends"].append(row)
 
         complete_calls = []
-        incomplete_calls = []
+        call_starts = []
+        call_ends = []
 
         for call_data in calls_by_id.values():
             starts = call_data["starts"]
@@ -2681,11 +2715,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 complete_row = self._merge_start_and_end_rows(start_row, end_row)
                 complete_calls.append(complete_row)
             else:
-                # Incomplete call - add all starts and ends as separate rows
-                incomplete_calls.extend(starts)
-                incomplete_calls.extend(ends)
+                call_starts.extend(starts)
+                call_ends.extend(ends)
 
-        return complete_calls, incomplete_calls
+        return complete_calls, call_starts, call_ends
 
     def _merge_start_and_end_rows(
         self, start_row: list[Any], end_row: list[Any]
