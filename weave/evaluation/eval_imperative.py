@@ -33,10 +33,11 @@ from weave.trace.api import attributes
 from weave.trace.call import Call
 from weave.trace.context import call_context
 from weave.trace.context.weave_client_context import require_weave_client
-from weave.trace.op import op
-from weave.trace.op_protocol import Op
+from weave.trace.op import Op, op
 from weave.trace.table import Table
 from weave.trace.util import Thread
+from weave.trace.view_utils import set_call_view
+from weave.type_wrappers.Content.content import Content
 
 T = TypeVar("T")
 ID = str
@@ -238,6 +239,7 @@ class ScoreLogger(BaseModel):
     predict_and_score_call: Call
     evaluate_call: Call
     predict_call: Call
+    predefined_scorers: list[str] | None = None
 
     _captured_scores: dict[str, ScoreType] = PrivateAttr(default_factory=dict)
     _has_finished: bool = PrivateAttr(False)
@@ -325,6 +327,16 @@ class ScoreLogger(BaseModel):
         # this is safe; pydantic casting is done in validator above
         scorer = cast(Scorer, scorer)
 
+        # Check if scorer is in predefined list
+        if self.predefined_scorers:
+            predefined_names = self.predefined_scorers
+            scorer_name = cast(str, scorer.name)
+            if scorer_name not in predefined_names:
+                logger.warning(
+                    f"Scorer '{scorer_name}' is not in the predefined scorers list. "
+                    f"Expected one of: {sorted(predefined_names)}"
+                )
+
         @op(name=scorer.name, enable_code_capture=False)
         def score_method(self: Scorer, *, output: Any, inputs: Any) -> ScoreType:
             # TODO: can't use score here because it will cause version mismatch
@@ -406,6 +418,14 @@ class EvaluationLogger(BaseModel):
             "These attributes can be used to add additional metadata columns to the Evaluation.",
         ),
     ]
+    scorers: Annotated[
+        list[str] | None,
+        Field(
+            default=None,
+            description="(Optional): A metadata-only list of predefined scorers for the evaluation. "
+            "If specified, warnings will be issued when logging scores not in this list.",
+        ),
+    ]
 
     _eval_started: bool = PrivateAttr(False)
     _logged_summary: bool = PrivateAttr(False)
@@ -439,6 +459,7 @@ class EvaluationLogger(BaseModel):
         self._pseudo_evaluation = Evaluation(
             dataset=cast(Dataset, self.dataset),
             scorers=[],
+            metadata={"scorers": self.scorers, **self.eval_attributes},
         )
 
         # The following section is a "hacky" way to create Model and Evaluation
@@ -598,6 +619,7 @@ class EvaluationLogger(BaseModel):
             predict_and_score_call=predict_and_score_call,
             evaluate_call=self._evaluate_call,
             predict_call=predict_call,
+            predefined_scorers=self.scorers,
         )
         self._accumulated_predictions.append(pred)
         return pred
@@ -650,6 +672,63 @@ class EvaluationLogger(BaseModel):
                 # Even if summarize fails, try to finalize with the calculated summary
 
         self._finalize_evaluation(output=final_summary)
+
+    def set_view(
+        self,
+        name: str,
+        content: Content | str,
+        *,
+        extension: str | None = None,
+        mimetype: str | None = None,
+        metadata: dict[str, Any] | None = None,
+        encoding: str = "utf-8",
+    ) -> None:
+        """Attach a view to the evaluation's main call summary under `weave.views`.
+
+        Saves the provided content as an object in the project and writes its
+        reference URI under `summary.weave.views.<name>` for the evaluation's
+        `evaluate` call. String inputs are wrapped as text content using
+        `Content.from_text` with the provided extension or mimetype.
+
+        Args:
+            name: The view name to display, used as the key under `summary.weave.views`.
+            content: A `weave.Content` instance or string to serialize.
+            extension: Optional file extension for string content inputs.
+            mimetype: Optional MIME type for string content inputs.
+            metadata: Optional metadata attached to newly created `Content`.
+            encoding: Text encoding for string content inputs.
+
+        Returns:
+            None
+
+        Examples:
+            >>> import weave
+            >>> ev = weave.EvaluationLogger()
+            >>> ev.set_view("report", "# Report", extension="md")
+        """
+        if isinstance(content, str) and len(content) == 0:
+            raise ValueError("Content cannot be an empty string")
+
+        if not isinstance(name, str) or len(name) == 0:
+            raise ValueError("`name` must be a non-empty string")
+
+        if self._evaluate_call is None:
+            raise RuntimeError(
+                "Evaluation call not initialized; cannot add view before evaluation starts"
+            )
+
+        wc = require_weave_client()
+
+        set_call_view(
+            call=self._evaluate_call,
+            client=wc,
+            name=name,
+            content=content,
+            extension=extension,
+            mimetype=mimetype,
+            metadata=metadata,
+            encoding=encoding,
+        )
 
     def finish(self, exception: BaseException | None = None) -> None:
         """Clean up the evaluation resources explicitly without logging a summary.
