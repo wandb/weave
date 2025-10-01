@@ -39,6 +39,29 @@ def kafka_producer_max_buffer_size() -> Optional[int]:
         return None
 
 
+# Redis Settings
+
+
+def redis_host() -> str:
+    """The host of the redis server."""
+    return os.environ.get("REDIS_HOST", "localhost")
+
+
+def redis_port() -> int:
+    """The port of the redis server."""
+    return int(os.environ.get("REDIS_PORT", 6379))
+
+
+def redis_password() -> Optional[str]:
+    """The password for the redis server."""
+    return os.environ.get("REDIS_PASSWORD")
+
+
+def redis_db() -> int:
+    """The database number for the redis server."""
+    return int(os.environ.get("REDIS_DB", 0))
+
+
 # Scoring worker settings
 
 
