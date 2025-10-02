@@ -2262,6 +2262,29 @@ def optimized_project_contains_call_query(
     )
 
 
+def build_call_parts_query_by_ids(
+    project_id: str,
+    call_ids: list[str],
+    columns: list[str],
+    param_builder: ParamBuilder,
+) -> str:
+    """Build query to fetch call starts from call_parts table by IDs."""
+    columns_str = ", ".join(columns)
+    project_param = param_builder.add_param(project_id)
+    call_ids_param = param_builder.add_param(call_ids)
+
+    return safely_format_sql(
+        f"""
+        SELECT {columns_str}
+        FROM call_parts
+        WHERE project_id = {param_slot(project_param, "String")}
+          AND id IN {param_slot(call_ids_param, "Array(String)")}
+          AND started_at IS NOT NULL
+        """,
+        logger,
+    )
+
+
 def build_calls_query_stats_query(
     req: tsi.CallsQueryStatsReq,
     param_builder: ParamBuilder,
