@@ -47,7 +47,11 @@ class KafkaProducer(ConfluentKafkaProducer):
         config = {
             "bootstrap.servers": _make_broker_host(),
             "client.id": socket.gethostname(),
-            "message.timeout.ms": 500,
+            "retries": 1,
+            "retry.backoff.ms": 100,
+            # this is large to accommodate large call batches, with only 1
+            # retry to prevent continued failures when timeout is due to size
+            "request.timeout.ms": 5000,  # per attempt deadline
             **_make_auth_config(),
             **additional_kafka_config,
         }
