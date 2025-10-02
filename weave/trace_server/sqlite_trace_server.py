@@ -196,7 +196,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             # This does validation and conversion of the input data as well
             # as enforcing business rules and defaults
             cursor.execute(
-                """INSERT INTO calls (
+                """INSERT OR REPLACE INTO calls (
                     project_id,
                     id,
                     trace_id,
