@@ -781,7 +781,6 @@ class WeaveClient:
         current_call = call_context.get_current_call()
 
         def send_start_call() -> bool:
-            print(f">>>> send_start_call: {call_id}")
             maybe_redacted_inputs_with_refs = inputs_with_refs
             if should_redact_pii():
                 from weave.utils.pii_redaction import redact_pii

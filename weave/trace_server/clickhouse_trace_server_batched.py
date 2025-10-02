@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import threading
+import time
 from collections import defaultdict
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
@@ -33,7 +34,10 @@ from weave.trace_server.actions_worker.dispatcher import execute_batch
 from weave.trace_server.base64_content_conversion import (
     process_call_req_to_content,
 )
-from weave.trace_server.call_end_cache import CallEndCache, get_call_end_cache_from_env
+from weave.trace_server.call_part_cache import (
+    CallPartCache,
+    get_call_part_cache_from_env,
+)
 from weave.trace_server.calls_query_builder.calls_query_builder import (
     CallsQuery,
     HardCodedFilter,
@@ -182,7 +186,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._model_to_provider_info_map = read_model_to_provider_info_map()
         self._file_storage_client: Optional[FileStorageClient] = None
         self._kafka_producer: Optional[KafkaProducer] = None
-        self._call_end_cache_instance: Optional[CallEndCache] = None
         self._evaluate_model_dispatcher = evaluate_model_dispatcher
 
     @classmethod
@@ -216,11 +219,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return self._kafka_producer
 
     @property
-    def _call_end_cache(self) -> CallEndCache:
-        if self._call_end_cache_instance is not None:
-            return self._call_end_cache_instance
-        self._call_end_cache_instance = get_call_end_cache_from_env()
-        return self._call_end_cache_instance
+    def _call_part_cache(self) -> CallPartCache:
+        """Get the global shared call part cache.
+
+        Returns the module-level singleton cache that's shared across all
+        ClickHouseTraceServer instances and FastAPI worker threads.
+        """
+        # Always return the global singleton cache
+        return get_call_part_cache_from_env()
 
     def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
         if not isinstance(req.traces, ExportTraceServiceRequest):
@@ -2310,26 +2316,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call_batch")
     def _insert_call_batch(self, batch: list) -> None:
-        print(
-            ">>>> _insert_call_batch",
-            len(batch),
-            "starts:",
-            len(
-                [
-                    row
-                    for row in batch
-                    if row[ALL_CALL_INSERT_COLUMNS.index("started_at")] is not None
-                ]
-            ),
-            "ends:",
-            len(
-                [
-                    row
-                    for row in batch
-                    if row[ALL_CALL_INSERT_COLUMNS.index("ended_at")] is not None
-                ]
-            ),
-        )
         if root_span := ddtrace.tracer.current_span():
             root_span.set_tags(
                 {
@@ -2548,7 +2534,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def _do_cache_read_before_write(self) -> bool:
         """Hit cache (in mem for local, need redis for prod) before writing"""
-        return os.getenv("DO_CACHE_READ_BEFORE_WRITE", "0") == "1"
+        return os.getenv("DO_CACHE_READ_BEFORE_WRITE", "1") == "1"
 
     def _use_redis_cache(self) -> bool:
         return os.getenv("USE_REDIS_CACHE", "0") == "1"
@@ -2556,8 +2542,58 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def _get_cached_call_end_ids(self, project_id: str) -> set[str]:
         # either hit cache or do an actual read in call_parts
         if self._do_cache_read_before_write():
-            return self._call_end_cache.get_call_end_ids(project_id=project_id)
+            return self._call_part_cache.get_call_end_ids(project_id=project_id)
         return self._get_call_end_ids(project_id=project_id)
+
+    def _get_cached_call_start_ids(self, project_id: str) -> set[str]:
+        """Get cached call start IDs that have been logged but may not be in DB yet.
+
+        Args:
+            project_id (str): The project ID to fetch call start IDs for.
+
+        Returns:
+            set[str]: Set of call start IDs that have been logged.
+        """
+        if self._do_cache_read_before_write():
+            return self._call_part_cache.get_call_start_ids(project_id=project_id)
+        return set()
+
+    def _query_call_parts_by_ids(
+        self, project_id: str, call_ids: list[str]
+    ) -> list[list[Any]]:
+        """Query call_parts table directly for specific call IDs, returning raw rows.
+
+        This is used to find call starts that were recently inserted into call_parts
+        but haven't been merged into calls_complete yet.
+
+        Args:
+            project_id (str): The project ID.
+            call_ids (list[str]): List of call IDs to search for.
+
+        Returns:
+            list[list[Any]]: List of rows in ALL_CALL_INSERT_COLUMNS format.
+        """
+        if not call_ids:
+            return []
+
+        # Query call_parts directly (not calls_complete)
+        # Select columns in the same order as ALL_CALL_INSERT_COLUMNS
+        columns_str = ", ".join(ALL_CALL_INSERT_COLUMNS)
+        query = f"""
+        SELECT {columns_str}
+        FROM call_parts
+        WHERE project_id = {{project_id:String}}
+          AND id IN {{call_ids:Array(String)}}
+          AND started_at IS NOT NULL
+        """
+
+        result = self._query(
+            query,
+            parameters={"project_id": project_id, "call_ids": call_ids},
+        )
+
+        # Return rows directly - they're already in the right format
+        return [list(row) for row in result.result_rows]
 
     def _get_call_end_ids(self, project_id: str) -> set[str]:
         one_day_ago = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(
@@ -2647,6 +2683,16 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     )
                     # Insert starts that do not have ends
                     self._insert_call_batch(starts_to_insert)
+                    # Cache the call start IDs we just inserted
+                    if self._do_cache_read_before_write():
+                        inserted_start_ids = {row[id_idx] for row in starts_to_insert}
+                        self._call_part_cache.add_call_start_ids(
+                            project_id=project_id,
+                            call_start_ids=inserted_start_ids,
+                        )
+                        print(
+                            f">>>>>> Cached {len(inserted_start_ids)} new call start IDs"
+                        )
                     if not dangling_starts:
                         print("returning early, no dangling starts")
                         # HAPPY PATH, new clients don't have dangling call parts
@@ -2658,32 +2704,93 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 print("returning early, no dangling call ends")
                 return
 
-            # TODO: can we have call batches from multiple different projects?
             project_id = call_ends[0][proj_id_idx]
             call_end_ids = {row[id_idx] for row in call_ends}
-            db_call_starts = self.calls_query(
-                tsi.CallsQueryReq(
-                    project_id=project_id,
-                    filter=tsi.CallsFilter(call_ids=list(call_end_ids)),
-                )
+
+            print(f"Looking for call starts for {call_end_ids=} {project_id=}")
+
+            # Check cache for call starts that may have been logged but not yet in DB
+            cached_call_start_ids = self._get_cached_call_start_ids(
+                project_id=project_id
             )
+
             print(
-                f"found {len(db_call_starts.calls)} call starts for {len(call_ends)} call ends"
+                f"Found {cached_call_start_ids=} cached call start ids for {project_id=}"
             )
-            db_call_start_ids = {row.id for row in db_call_starts.calls}
-            if len(db_call_starts.calls) != len(call_ends):
+
+            # Retry logic: if we have cached call starts that aren't in DB yet, retry the query
+            # NOTE: We query call_parts table directly, not calls_complete, because call starts
+            # are inserted into call_parts and may not have been merged into calls_complete yet
+            max_retries = 3
+            retry_delay = 0.1  # Start with 100ms
+            db_call_start_rows = []
+
+            for attempt in range(max_retries + 1):
+                db_call_start_rows = self._query_call_parts_by_ids(
+                    project_id=project_id,
+                    call_ids=list(call_end_ids),
+                )
+
+                db_call_start_ids = {row[id_idx] for row in db_call_start_rows}
                 missing_call_start_ids = call_end_ids - db_call_start_ids
-                # if the client is waiting on this response, we can't just sit here
-                # retrying, because the client will never be able to upload the call start
-                # lets raise an error and see how rare this is
-                raise ValueError(f"Missing call starts: {missing_call_start_ids}")
+
+                print(f"Found {db_call_start_ids} in db, {missing_call_start_ids=}")
+
+                if not missing_call_start_ids:
+                    print("********** Found all call starts, we're good")
+                    # Found all call starts, we're good
+                    break
+
+                # Check if missing IDs are in cache - if so, they've been logged but not yet in DB
+                cached_missing_ids = missing_call_start_ids & cached_call_start_ids
+
+                print(
+                    f"Found {cached_missing_ids=} cached call start ids for {project_id=}"
+                )
+
+                if cached_missing_ids and attempt < max_retries:
+                    print(
+                        f">>>>>> Attempt {attempt + 1}/{max_retries + 1}: "
+                        f"Found {len(cached_missing_ids)} cached call starts not yet in DB, "
+                        f"waiting {retry_delay}s for buffer flush..."
+                    )
+                    time.sleep(retry_delay)
+                    retry_delay *= 2  # Exponential backoff
+                else:
+                    # Either no cached missing IDs, or exhausted retries
+                    break
+
+            print(
+                f"found {len(db_call_start_rows)} call starts for {len(call_ends)} call ends"
+            )
+
+            # Final check after retries
+            db_call_start_ids = {row[id_idx] for row in db_call_start_rows}
+            if len(db_call_start_rows) != len(call_ends):
+                missing_call_start_ids = call_end_ids - db_call_start_ids
+                cached_missing_ids = missing_call_start_ids & cached_call_start_ids
+
+                if cached_missing_ids:
+                    logger.warning(
+                        f"After {max_retries + 1} attempts, still missing {len(cached_missing_ids)} "
+                        f"call starts that are in cache: {cached_missing_ids}"
+                    )
+                    print(
+                        f">>>>>> WARNING: After retries, {len(cached_missing_ids)} cached call starts "
+                        f"still not in DB (buffer may be very delayed)"
+                    )
+
+                logger.warning(f"Missing call starts {missing_call_start_ids}")
+                print(f"Missing call starts {missing_call_start_ids}")
 
             # now with the start data, combine and insert into complete calls
-            merged_calls = self._merge_start_and_end_rows(
-                list(db_call_starts.calls), list(call_ends)
+            # Merge start rows from DB and end rows from batch into complete rows
+            merged_calls = self._merge_start_and_end_rows_direct(
+                start_rows=db_call_start_rows, end_rows=list(call_ends)
             )
-            print(f"inserting {len(merged_calls)} MANUALLY merged calls")
-            self._insert_complete_calls_batch(merged_calls)
+            if merged_calls:
+                print(f"inserting {len(merged_calls)} MANUALLY merged calls")
+                self._insert_complete_calls_batch(merged_calls)
 
             # now insert call_ends into call parts that didnt have a call start
             # and set the cache
@@ -2693,11 +2800,17 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             print(f"inserting {len(orphaned_call_ends)} orphaned call ends")
             self._insert_call_batch(orphaned_call_ends)
             if self._do_cache_read_before_write():
-                # We only ever need to set the cache if we are dealing with old clients.... right?
-                self._call_end_cache.set_call_end_ids(
-                    project_id=project_id,
-                    call_end_ids=call_end_ids,
-                )
+                # Cache orphaned call ends (old clients or out-of-order arrivals)
+                # These are call ends without matching call starts in the DB
+                orphaned_call_end_ids = {c[id_idx] for c in orphaned_call_ends}
+                if orphaned_call_end_ids:
+                    print(
+                        f">>>>>> Cached {len(orphaned_call_end_ids)} orphaned call end IDs"
+                    )
+                    self._call_part_cache.add_call_end_ids(
+                        project_id=project_id,
+                        call_end_ids=orphaned_call_end_ids,
+                    )
 
         except InsertTooLarge:
             logger.info("Retrying with large objects stripped.")
@@ -2750,7 +2863,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 start_row = starts[0]  # Should only be one start per call
                 end_row = ends[0]  # Should only be one end per call
 
-                complete_row = self._merge_start_and_end_rows(start_row, end_row)
+                complete_row = self._merge_single_start_and_end_row(start_row, end_row)
                 complete_calls.append(complete_row)
             else:
                 call_starts.extend(starts)
@@ -2761,10 +2874,18 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
         return complete_calls, call_starts, call_ends
 
-    def _merge_start_and_end_rows(
+    def _merge_single_start_and_end_row(
         self, start_row: list[Any], end_row: list[Any]
     ) -> list[Any]:
-        """Merge a start row and end row into a single complete call row."""
+        """Merge a single start row and end row into a complete call row.
+
+        Args:
+            start_row: Single row list representing a call start
+            end_row: Single row list representing a call end
+
+        Returns:
+            A single complete call row with both start and end data
+        """
         # Start with the start row as the base
         merged_row = list(start_row)
 
@@ -2783,6 +2904,82 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         merged_row[output_refs_idx] = end_row[output_refs_idx]
 
         return merged_row
+
+    def _merge_start_and_end_rows_direct(
+        self, start_rows: list[list[Any]], end_rows: list[list[Any]]
+    ) -> list[list[Any]]:
+        """Merge start rows and end rows (both raw rows) into complete call rows.
+
+        Args:
+            start_rows: List of start-only rows from call_parts table
+            end_rows: List of end-only rows from batch
+
+        Returns:
+            List of complete call rows with both start and end data
+        """
+        # Get column index for ID
+        id_idx = ALL_CALL_INSERT_COLUMNS.index("id")
+
+        # Build a lookup for end rows by ID
+        end_rows_by_id: dict[str, list[Any]] = {}
+        for end_row in end_rows:
+            call_id = end_row[id_idx]
+            end_rows_by_id[call_id] = end_row
+
+        # Merge each start row with its corresponding end row
+        merged_calls = []
+        for start_row in start_rows:
+            call_id = start_row[id_idx]
+            end_row = end_rows_by_id.get(call_id)
+            if end_row is None:
+                # This shouldn't happen if we validated correctly, but skip if no match
+                continue
+
+            # Reuse the single-row merge logic
+            merged_row = self._merge_single_start_and_end_row(start_row, end_row)
+            merged_calls.append(merged_row)
+
+        return merged_calls
+
+    def _merge_start_and_end_rows(
+        self, start_calls: list[tsi.CallSchema], end_rows: list[list[Any]]
+    ) -> list[list[Any]]:
+        """Merge start calls (CallSchema) and end rows into complete call rows.
+
+        Args:
+            start_calls: List of CallSchema objects from the database
+            end_rows: List of row lists (end-only rows from batch)
+
+        Returns:
+            List of complete call rows with both start and end data
+        """
+        # Get column index for ID
+        id_idx = ALL_CALL_INSERT_COLUMNS.index("id")
+
+        # Build a lookup for end rows by ID
+        end_rows_by_id: dict[str, list[Any]] = {}
+        for end_row in end_rows:
+            call_id = end_row[id_idx]
+            end_rows_by_id[call_id] = end_row
+
+        # Merge each start call with its corresponding end row
+        merged_calls = []
+        for start_call in start_calls:
+            end_row = end_rows_by_id.get(start_call.id)
+            if end_row is None:
+                # This shouldn't happen if we validated correctly, but skip if no match
+                continue
+
+            # Convert CallSchema to row format
+            start_row = []
+            for col in ALL_CALL_INSERT_COLUMNS:
+                start_row.append(getattr(start_call, col, None))
+
+            # Reuse the single-row merge logic
+            merged_row = self._merge_single_start_and_end_row(start_row, end_row)
+            merged_calls.append(merged_row)
+
+        return merged_calls
 
     @ddtrace.tracer.wrap(
         name="clickhouse_trace_server_batched._insert_complete_calls_batch"
