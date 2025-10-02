@@ -95,9 +95,6 @@ from weave.trace_server.interface.feedback_types import (
     runnable_feedback_runnable_ref_selector,
 )
 from weave.trace_server.trace_server_interface import (
-    CallBatchEndMode,
-    CallBatchStartMode,
-    CallCreateBatchReq,
     CallEndReq,
     CallsDeleteReq,
     CallsFilter,
@@ -140,6 +137,7 @@ from weave.trace_server_bindings.http_utils import (
     ROW_COUNT_CHUNKING_THRESHOLD,
     check_endpoint_exists,
 )
+from weave.trace_server_bindings.models import EndBatchItem, StartBatchItem
 from weave.utils.attributes_dict import AttributesDict
 from weave.utils.dict_utils import sum_dict_leaves, zip_dicts
 from weave.utils.exception import exception_to_json_str
@@ -783,6 +781,7 @@ class WeaveClient:
         current_call = call_context.get_current_call()
 
         def send_start_call() -> bool:
+            print(f">>>> send_start_call: {call_id}")
             maybe_redacted_inputs_with_refs = inputs_with_refs
             if should_redact_pii():
                 from weave.utils.pii_redaction import redact_pii
@@ -975,14 +974,13 @@ class WeaveClient:
 
             cached_start = self._call_start_cache.get(call.id)
             if cached_start is not None:
-                # Send complete call (start + end)
-                batch_req = CallCreateBatchReq(
-                    batch=[
-                        CallBatchStartMode(req=cached_start),
-                        CallBatchEndMode(req=call_end_req),
+                # Enqueue both items - they'll be processed in the same batch
+                self._server_call_processor.enqueue(
+                    [
+                        StartBatchItem(req=cached_start),
+                        EndBatchItem(req=call_end_req),
                     ]
                 )
-                self.server.call_start_batch(batch_req)
                 del self._call_start_cache[call.id]
             else:
                 # Fallback: just send end (shouldn't happen normally)

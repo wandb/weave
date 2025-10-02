@@ -33,6 +33,7 @@ from weave.trace_server.actions_worker.dispatcher import execute_batch
 from weave.trace_server.base64_content_conversion import (
     process_call_req_to_content,
 )
+from weave.trace_server.call_end_cache import CallEndCache, get_call_end_cache_from_env
 from weave.trace_server.calls_query_builder.calls_query_builder import (
     CallsQuery,
     HardCodedFilter,
@@ -181,6 +182,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._model_to_provider_info_map = read_model_to_provider_info_map()
         self._file_storage_client: Optional[FileStorageClient] = None
         self._kafka_producer: Optional[KafkaProducer] = None
+        self._call_end_cache_instance: Optional[CallEndCache] = None
         self._evaluate_model_dispatcher = evaluate_model_dispatcher
 
     @classmethod
@@ -212,6 +214,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             return self._kafka_producer
         self._kafka_producer = KafkaProducer.from_env()
         return self._kafka_producer
+
+    @property
+    def _call_end_cache(self) -> CallEndCache:
+        if self._call_end_cache_instance is not None:
+            return self._call_end_cache_instance
+        self._call_end_cache_instance = get_call_end_cache_from_env()
+        return self._call_end_cache_instance
 
     def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
         if not isinstance(req.traces, ExportTraceServiceRequest):
@@ -253,6 +262,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             self._flush_immediately = True
 
     def call_start_batch(self, req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
+        print(f">>>> call_start_batch: {len(req.batch)} calls")
         with self.call_batch():
             res = []
             for item in req.batch:
@@ -386,108 +396,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         cq = CallsQuery(
             project_id=req.project_id,
             table_name=optimal_table,
-            include_costs=req.include_costs or False,
-            include_storage_size=req.include_storage_size or False,
-            include_total_storage_size=req.include_total_storage_size or False,
-        )
-        columns = ALL_CALL_SELECT_COLUMNS
-        if req.columns:
-            # TODO: add support for json extract fields
-            # Split out any nested column requests
-            columns = [col.split(".")[0] for col in req.columns]
-
-            # If we are returning a summary object, make sure that all fields
-            # required to compute the summary are in the columns
-            if "summary" in columns or req.include_costs:
-                columns += ["ended_at", "exception", "display_name"]
-
-            # Set columns to user-requested columns, w/ required columns
-            # These are all formatted by the CallsQuery, which prevents injection
-            # and other attack vectors.
-            columns = list(set(REQUIRED_CALL_COLUMNS + columns))
-
-        # sort the columns such that similar queries are grouped together
-        columns = sorted(columns)
-
-        # The order is actually important, it has something to do with how the cost_query wants to arrange things.
-        # specifically, the summary column should always be the last.
-        if req.include_storage_size:
-            columns.append("storage_size_bytes")
-
-        if req.include_total_storage_size:
-            columns.append("total_storage_size_bytes")
-
-        # We put summary_dump last so that when we compute the costs and summary its in the right place
-        if req.include_costs:
-            summary_columns = ["summary", "summary_dump"]
-            columns = [
-                *[col for col in columns if col not in summary_columns],
-                "summary_dump",
-            ]
-
-        if req.expand_columns is not None:
-            cq.set_expand_columns(req.expand_columns)
-        for col in columns:
-            cq.add_field(col)
-        if req.filter is not None:
-            cq.set_hardcoded_filter(HardCodedFilter(filter=req.filter))
-        if req.query is not None:
-            cq.add_condition(req.query.expr_)
-
-        # Sort with empty list results in no sorting
-        if req.sort_by is not None:
-            for sort_by in req.sort_by:
-                cq.add_order(sort_by.field, sort_by.direction)
-            # If user isn't already sorting by id, add id as secondary sort for consistency
-            if not any(sort_by.field == "id" for sort_by in req.sort_by):
-                cq.add_order("id", "asc")
-        else:
-            # Default sorting: started_at with id as secondary sort for consistency
-            cq.add_order("started_at", "asc")
-            cq.add_order("id", "asc")
-        if req.limit is not None:
-            cq.set_limit(req.limit)
-        if req.offset is not None:
-            cq.set_offset(req.offset)
-
-        pb = ParamBuilder()
-        raw_res = self._query_stream(cq.as_sql(pb), pb.get_params())
-
-        select_columns = [c.field for c in cq.select_fields]
-        expand_columns = req.expand_columns or []
-        include_feedback = req.include_feedback or False
-
-        def row_to_call_schema_dict(row: tuple[Any, ...]) -> dict[str, Any]:
-            return _ch_call_dict_to_call_schema_dict(dict(zip(select_columns, row)))
-
-        if not expand_columns and not include_feedback:
-            for row in raw_res:
-                yield tsi.CallSchema.model_validate(row_to_call_schema_dict(row))
-            return
-
-        ref_cache = LRUCache(max_size=1000)
-        batch_processor = DynamicBatchProcessor(
-            initial_size=ch_settings.INITIAL_CALLS_STREAM_BATCH_SIZE,
-            max_size=ch_settings.MAX_CALLS_STREAM_BATCH_SIZE,
-            growth_factor=10,
-        )
-
-        for batch in batch_processor.make_batches(raw_res):
-            call_dicts = [row_to_call_schema_dict(row) for row in batch]
-            if expand_columns and req.return_expanded_column_values:
-                self._expand_call_refs(
-                    req.project_id, call_dicts, expand_columns, ref_cache
-                )
-            if include_feedback:
-                self._add_feedback_to_calls(req.project_id, call_dicts)
-
-            for call in call_dicts:
-                yield tsi.CallSchema.model_validate(call)
-
-    def calls_query_stream1(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
-        """Returns a stream of calls that match the given query."""
-        cq = CallsQuery(
-            project_id=req.project_id,
             include_costs=req.include_costs or False,
             include_storage_size=req.include_storage_size or False,
             include_total_storage_size=req.include_total_storage_size or False,
@@ -2402,6 +2310,26 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call_batch")
     def _insert_call_batch(self, batch: list) -> None:
+        print(
+            ">>>> _insert_call_batch",
+            len(batch),
+            "starts:",
+            len(
+                [
+                    row
+                    for row in batch
+                    if row[ALL_CALL_INSERT_COLUMNS.index("started_at")] is not None
+                ]
+            ),
+            "ends:",
+            len(
+                [
+                    row
+                    for row in batch
+                    if row[ALL_CALL_INSERT_COLUMNS.index("ended_at")] is not None
+                ]
+            ),
+        )
         if root_span := ddtrace.tracer.current_span():
             root_span.set_tags(
                 {
@@ -2618,48 +2546,158 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def _do_read_before_write(self) -> bool:
         return os.getenv("DO_READ_BEFORE_WRITE", "1") == "1"
 
+    def _do_cache_read_before_write(self) -> bool:
+        """Hit cache (in mem for local, need redis for prod) before writing"""
+        return os.getenv("DO_CACHE_READ_BEFORE_WRITE", "0") == "1"
+
+    def _use_redis_cache(self) -> bool:
+        return os.getenv("USE_REDIS_CACHE", "0") == "1"
+
+    def _get_cached_call_end_ids(self, project_id: str) -> set[str]:
+        # either hit cache or do an actual read in call_parts
+        if self._do_cache_read_before_write():
+            return self._call_end_cache.get_call_end_ids(project_id=project_id)
+        return self._get_call_end_ids(project_id=project_id)
+
+    def _get_call_end_ids(self, project_id: str) -> set[str]:
+        one_day_ago = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(
+            days=1
+        )
+        one_day_ago_ms = int(one_day_ago.timestamp() * 1000)
+        calls = self.calls_query(
+            tsi.CallsQueryReq(
+                project_id=project_id,
+                query={
+                    "$expr": {
+                        "$and": [
+                            {"$eq": [{"$getField": "started_at"}, {"$literal": None}]},
+                            {
+                                "$gt": [
+                                    {"$getField": "ended_at"},
+                                    {"$literal": one_day_ago_ms},
+                                ]
+                            },
+                        ]
+                    }
+                },
+            )
+        ).calls
+        return {call.id for call in calls}
+
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._flush_calls")
     def _flush_calls(self) -> None:
+        print(
+            f"flushing: {len(self._call_batch)=} {self._do_read_before_write()=} {self._do_cache_read_before_write()=}"
+        )
         try:
+            # OLD PATH
+            if not self._do_read_before_write():
+                print(f"returning early, inserting {len(self._call_batch)} calls")
+                self._insert_call_batch(self._call_batch)
+                return
+
             complete_calls, call_starts, call_ends = (
                 self._separate_complete_and_incomplete_calls(self._call_batch)
             )
-
             # Insert complete calls (start + end) into calls_complete table
             if complete_calls:
+                print(f"inserting {len(complete_calls)} completed calls")
+                # HAPPY PATH, insert completed calls, still need to handle started calls
                 self._insert_complete_calls_batch(complete_calls)
 
-            if call_ends and self._do_read_before_write():
-                # With retry, get call start data for incomplete calls
-                # TODO: can we have call batches from multiple different projects?
-                # TODO: how do we deal with call ends that don't have an associated start in the db?
-                # TODO: make this a helper
-                id_idx = ALL_CALL_INSERT_COLUMNS.index("id")
-                proj_id_idx = ALL_CALL_INSERT_COLUMNS.index("project_id")
-                call_end_ids = {row[id_idx] for row in call_ends}
-                db_call_starts = self.calls_query(
-                    tsi.CallsQueryReq(
-                        project_id=call_ends[0][proj_id_idx],
-                        filter=tsi.CallsFilter(call_ids=list(call_end_ids)),
+            if not call_starts and not call_ends:
+                # no in-progress calls or dangling call ends
+                print("returning early, no in-progress calls or dangling call ends")
+                return
+
+            # HANDLING FOR HANGING call parts
+            # 1. new clients with in-progress traces
+            # 2. old clients
+
+            id_idx = ALL_CALL_INSERT_COLUMNS.index("id")
+            proj_id_idx = ALL_CALL_INSERT_COLUMNS.index("project_id")
+            if call_starts:
+                project_id = call_starts[0][proj_id_idx]
+
+                # handle call starts, must be inserted in order to show in progress rows
+                # check if we have logged call_ends previously, if so, skip this step
+                call_end_ids = self._get_cached_call_end_ids(project_id=project_id)
+                print(
+                    f"found {len(call_end_ids)} CACHED call end ids for project {project_id}"
+                )
+                # unique ids in call_starts that dont have call end ids
+                call_start_ids_to_insert = {
+                    row[id_idx]
+                    for row in call_starts
+                    if row[id_idx] not in call_end_ids
+                }
+                # insert the call starts that dont have call end ids
+                starts_to_insert = [
+                    row
+                    for row in call_starts
+                    if row[id_idx] in call_start_ids_to_insert
+                ]
+                # call starts that have call end ids
+                dangling_starts = [
+                    row for row in call_starts if row[id_idx] in call_end_ids
+                ]
+                if starts_to_insert:
+                    print(
+                        f"inserting {len(starts_to_insert)} starts that do not have ends"
                     )
-                )
-                if len(db_call_starts.calls) != len(call_ends):
-                    db_call_start_ids = {row.id for row in db_call_starts.calls}
-                    missing_call_start_ids = call_end_ids - db_call_start_ids
-                    # if the client is waiting on this response, we can't just sit here
-                    # retrying, because the client will never be able to upload the call start
-                    # lets raise an error and see how rare this is
-                    raise ValueError(f"Missing call starts: {missing_call_start_ids}")
+                    # Insert starts that do not have ends
+                    self._insert_call_batch(starts_to_insert)
+                    if not dangling_starts:
+                        print("returning early, no dangling starts")
+                        # HAPPY PATH, new clients don't have dangling call parts
+                        return
 
-                # now with the start data, combine and insert into complete calls
-                complete_calls = self._merge_start_and_end_rows(
-                    list(db_call_starts), list(call_ends)
+            # HANDLING FOR OLD CLIENTS: call_starts WITH call_ends already in the DB!
+            if not call_ends:
+                # no dangling call ends
+                print("returning early, no dangling call ends")
+                return
+
+            # TODO: can we have call batches from multiple different projects?
+            project_id = call_ends[0][proj_id_idx]
+            call_end_ids = {row[id_idx] for row in call_ends}
+            db_call_starts = self.calls_query(
+                tsi.CallsQueryReq(
+                    project_id=project_id,
+                    filter=tsi.CallsFilter(call_ids=list(call_end_ids)),
                 )
-                self._insert_complete_calls_batch(complete_calls)
-            else:
-                # Always insert call starts and complete calls if not doing
-                # read before write for back compat
-                self._insert_call_batch(complete_calls + call_starts)
+            )
+            print(
+                f"found {len(db_call_starts.calls)} call starts for {len(call_ends)} call ends"
+            )
+            db_call_start_ids = {row.id for row in db_call_starts.calls}
+            if len(db_call_starts.calls) != len(call_ends):
+                missing_call_start_ids = call_end_ids - db_call_start_ids
+                # if the client is waiting on this response, we can't just sit here
+                # retrying, because the client will never be able to upload the call start
+                # lets raise an error and see how rare this is
+                raise ValueError(f"Missing call starts: {missing_call_start_ids}")
+
+            # now with the start data, combine and insert into complete calls
+            merged_calls = self._merge_start_and_end_rows(
+                list(db_call_starts.calls), list(call_ends)
+            )
+            print(f"inserting {len(merged_calls)} MANUALLY merged calls")
+            self._insert_complete_calls_batch(merged_calls)
+
+            # now insert call_ends into call parts that didnt have a call start
+            # and set the cache
+            orphaned_call_ends = [
+                row for row in call_ends if row[id_idx] not in db_call_start_ids
+            ]
+            print(f"inserting {len(orphaned_call_ends)} orphaned call ends")
+            self._insert_call_batch(orphaned_call_ends)
+            if self._do_cache_read_before_write():
+                # We only ever need to set the cache if we are dealing with old clients.... right?
+                self._call_end_cache.set_call_end_ids(
+                    project_id=project_id,
+                    call_end_ids=call_end_ids,
+                )
 
         except InsertTooLarge:
             logger.info("Retrying with large objects stripped.")
@@ -2718,6 +2756,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 call_starts.extend(starts)
                 call_ends.extend(ends)
 
+        print(
+            f"found {len(complete_calls)} complete calls, {len(call_starts)} call starts, {len(call_ends)} call ends"
+        )
         return complete_calls, call_starts, call_ends
 
     def _merge_start_and_end_rows(
@@ -2748,6 +2789,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     )
     def _insert_complete_calls_batch(self, batch: list[list[Any]]) -> None:
         """Insert complete calls (start+end) into the calls_complete table."""
+        print(">>>> _insert_complete_calls_batch", len(batch))
         if root_span := ddtrace.tracer.current_span():
             root_span.set_tags(
                 {

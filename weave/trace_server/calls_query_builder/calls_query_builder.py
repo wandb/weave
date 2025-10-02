@@ -1400,9 +1400,17 @@ class CallsQuery(BaseModel):
         Some fields may be NULL for in-progress calls (start events).
         """
         # Convert calls_complete field to equivalent call_parts field
-        if isinstance(field, CallsCompleteField):
-            # Simple field, just use the field name with the table alias
-            return f"{table_alias}.{field.field} AS {field.field}"
+        # Check specific types first before checking general CallsCompleteField
+        if isinstance(
+            field,
+            (
+                CompleteTableFieldWithTableOverrides,
+                CompleteTableAggregatedDataSizeField,
+            ),
+        ):
+            # These fields reference other tables via JOINs - for call_parts,
+            # we'll return NULL since these JOINs won't be available
+            return f"NULL AS {field.field}"
 
         elif isinstance(field, CallsCompleteDynamicField):
             # Dynamic field - use the same logic but without aggregation
@@ -1416,16 +1424,9 @@ class CallsQuery(BaseModel):
             else:
                 return f"{base_field} AS {field.field}"
 
-        elif isinstance(
-            field,
-            (
-                CompleteTableFieldWithTableOverrides,
-                CompleteTableAggregatedDataSizeField,
-            ),
-        ):
-            # These fields reference other tables via JOINs - for call_parts,
-            # we'll return NULL since these JOINs won't be available
-            return f"NULL AS {field.field}"
+        elif isinstance(field, CallsCompleteField):
+            # Simple field, just use the field name with the table alias
+            return f"{table_alias}.{field.field} AS {field.field}"
 
         else:
             # Fallback - treat as simple field
