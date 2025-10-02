@@ -57,9 +57,7 @@ _default_pattern = (
 )
 
 
-def generate_large_text(
-    tokens: int = 100_000, pattern: Optional[str] = _default_pattern
-) -> str:
+def generate_large_text(tokens: int = 100_000, pattern: Optional[str] = _default_pattern) -> str:
     words_per_pattern = len(pattern.split())
     tokens_per_pattern = words_per_pattern * 1.5
     multiplier = int(tokens / tokens_per_pattern)
@@ -69,9 +67,7 @@ def generate_large_text(
     return text
 
 
-def generate_context_and_output(
-    total_tokens: int = 100_000, context_ratio: float = 0.5
-) -> tuple[str, str]:
+def generate_context_and_output(total_tokens: int = 100_000, context_ratio: float = 0.5) -> tuple[str, str]:
     context_tokens = int(total_tokens * context_ratio)
     output_tokens = total_tokens - context_tokens
 
@@ -132,9 +128,7 @@ def test_download_model_custom_env_var():
 
 def test_download_model_from_huggingface_hub():
     """Test downloading a model from Hugging Face Hub."""
-    tiny_model_path = download_model_from_huggingface_hub(
-        TINY_HF_MODEL_PATHS["bias_scorer"]
-    )
+    tiny_model_path = download_model_from_huggingface_hub(TINY_HF_MODEL_PATHS["bias_scorer"])
     assert os.path.exists(tiny_model_path)
     assert os.path.isdir(tiny_model_path)
 
@@ -142,9 +136,7 @@ def test_download_model_from_huggingface_hub():
 def test_load_hf_model_weights_with_default():
     """Test load_local_model_weights function with HF Hub default model."""
     # Test with empty model_name_or_path and HF Hub default_model
-    result_path = load_local_model_weights(
-        default_model=TINY_HF_MODEL_PATHS["bias_scorer"]
-    )
+    result_path = load_local_model_weights(default_model=TINY_HF_MODEL_PATHS["bias_scorer"])
     assert os.path.exists(result_path)
     assert os.path.isdir(result_path)
 
@@ -152,8 +144,6 @@ def test_load_hf_model_weights_with_default():
 def test_load_hf_model_weights_with_wandb_artifact():
     """Test load_local_model_weights function with W&B artifact path (backward compatibility)."""
     # Test with W&B artifact path (should still work)
-    result_path = load_local_model_weights(
-        model_name_or_path=TINY_MODEL_PATHS["bias_scorer"]
-    )
+    result_path = load_local_model_weights(model_name_or_path=TINY_MODEL_PATHS["bias_scorer"])
     assert os.path.exists(result_path)
     assert os.path.isdir(result_path)

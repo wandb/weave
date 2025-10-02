@@ -27,12 +27,7 @@ def cohere_accumulator(acc: dict | None, value: Any) -> NonStreamedChatResponse:
         acc = {}
 
     # we wait for the last event
-    if (
-        hasattr(value, "event_type")
-        and value.event_type == "stream-end"
-        and value.is_finished
-        and value.response
-    ):
+    if hasattr(value, "event_type") and value.event_type == "stream-end" and value.is_finished and value.response:
         acc = value.response
     return acc
 
@@ -65,11 +60,7 @@ def cohere_accumulator_v2(acc: V2ChatResponse | None, value: Any) -> V2ChatRespo
     if value.type == "message-start":
         if hasattr(value, "id"):
             acc.id = value.id
-        if (
-            hasattr(value, "delta")
-            and hasattr(value.delta, "message")
-            and hasattr(value.delta.message, "role")
-        ):
+        if hasattr(value, "delta") and hasattr(value.delta, "message") and hasattr(value.delta.message, "role"):
             acc.message.role = value.delta.message.role
 
     elif value.type == "content-start":
@@ -212,27 +203,13 @@ def get_cohere_patcher(
     base = settings.op_settings
 
     chat_settings = base.model_copy(update={"name": base.name or "cohere.Client.chat"})
-    async_chat_settings = base.model_copy(
-        update={"name": base.name or "cohere.AsyncClient.chat"}
-    )
-    chat_stream_settings = base.model_copy(
-        update={"name": base.name or "cohere.Client.chat_stream"}
-    )
-    async_chat_stream_settings = base.model_copy(
-        update={"name": base.name or "cohere.AsyncClient.chat_stream"}
-    )
-    chat_v2_settings = base.model_copy(
-        update={"name": base.name or "cohere.ClientV2.chat"}
-    )
-    async_chat_v2_settings = base.model_copy(
-        update={"name": base.name or "cohere.AsyncClientV2.chat"}
-    )
-    chat_stream_v2_settings = base.model_copy(
-        update={"name": base.name or "cohere.ClientV2.chat_stream"}
-    )
-    async_chat_stream_v2_settings = base.model_copy(
-        update={"name": base.name or "cohere.AsyncClientV2.chat_stream"}
-    )
+    async_chat_settings = base.model_copy(update={"name": base.name or "cohere.AsyncClient.chat"})
+    chat_stream_settings = base.model_copy(update={"name": base.name or "cohere.Client.chat_stream"})
+    async_chat_stream_settings = base.model_copy(update={"name": base.name or "cohere.AsyncClient.chat_stream"})
+    chat_v2_settings = base.model_copy(update={"name": base.name or "cohere.ClientV2.chat"})
+    async_chat_v2_settings = base.model_copy(update={"name": base.name or "cohere.AsyncClientV2.chat"})
+    chat_stream_v2_settings = base.model_copy(update={"name": base.name or "cohere.ClientV2.chat_stream"})
+    async_chat_stream_v2_settings = base.model_copy(update={"name": base.name or "cohere.AsyncClientV2.chat_stream"})
 
     _cohere_patcher = MultiPatcher(
         [

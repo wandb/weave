@@ -47,19 +47,12 @@ def _process_image_data_item(
         if "url" in data_item and data_item["url"] and trace_server and project_id:
             url = data_item["url"]
             # Use Content.from_url() to handle download and content creation
-            content_obj = Content.from_url(
-                url, metadata={"source_index": index, "_original_schema": "url"}
-            )
+            content_obj = Content.from_url(url, metadata={"source_index": index, "_original_schema": "url"})
             content_dict = store_content_object(content_obj, project_id, trace_server)
             processed_item["url"] = content_dict
 
         # Handle base64-encoded images
-        elif (
-            "b64_json" in data_item
-            and data_item["b64_json"]
-            and trace_server
-            and project_id
-        ):
+        elif "b64_json" in data_item and data_item["b64_json"] and trace_server and project_id:
             b64_data = data_item["b64_json"]
 
             content_obj = Content.from_base64(
@@ -167,14 +160,9 @@ def lite_llm_image_generation(
         response_data["model"] = model_name
         if "usage" in response_data:
             usage = response_data["usage"]
-            response_data["usage"]["prompt_tokens"] = (
-                usage.get("prompt_tokens") or usage.get("input_tokens") or 0
-            )
+            response_data["usage"]["prompt_tokens"] = usage.get("prompt_tokens") or usage.get("input_tokens") or 0
             response_data["usage"]["completion_tokens"] = (
-                usage.get("completion_tokens")
-                or usage.get("output_tokens")
-                or usage.get("total_tokens")
-                or 0
+                usage.get("completion_tokens") or usage.get("output_tokens") or usage.get("total_tokens") or 0
             )
             response_data["usage"]["total_tokens"] = usage.get("total_tokens") or 0
 

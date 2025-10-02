@@ -33,9 +33,7 @@ def with_tracing_disabled():
 
 class DummySecretFetcher:
     def fetch(self, secret_name: str) -> dict:
-        return {
-            "secrets": {secret_name: os.environ.get(secret_name, "DUMMY_SECRET_VALUE")}
-        }
+        return {"secrets": {secret_name: os.environ.get(secret_name, "DUMMY_SECRET_VALUE")}}
 
 
 def create_provider_obj(
@@ -182,9 +180,7 @@ def setup_test_environment(mock_secret_fetcher=None):
     return mock_secret_fetcher, token
 
 
-def create_mock_obj_read(
-    provider_obj: tsi.ObjSchema, provider_model_obj: tsi.ObjSchema
-):
+def create_mock_obj_read(provider_obj: tsi.ObjSchema, provider_model_obj: tsi.ObjSchema):
     """Create a mock obj_read function for testing.
 
     Args:
@@ -227,20 +223,16 @@ def test_custom_provider_model_classes():
 
     # Verify Provider attributes
     assert provider.base_url == "https://api.example.com", (
-        f"Provider base_url mismatch. Expected 'https://api.example.com', "
-        f"got '{provider.base_url}'"
+        f"Provider base_url mismatch. Expected 'https://api.example.com', got '{provider.base_url}'"
     )
     assert provider.api_key_name == "EXAMPLE_API_KEY", (
-        f"Provider api_key_name mismatch. Expected 'EXAMPLE_API_KEY', "
-        f"got '{provider.api_key_name}'"
+        f"Provider api_key_name mismatch. Expected 'EXAMPLE_API_KEY', got '{provider.api_key_name}'"
     )
     assert provider.extra_headers == {"X-Custom-Header": "value"}, (
-        f"Provider extra_headers mismatch. Expected {{'X-Custom-Header': 'value'}}, "
-        f"got {provider.extra_headers}"
+        f"Provider extra_headers mismatch. Expected {{'X-Custom-Header': 'value'}}, got {provider.extra_headers}"
     )
     assert provider.return_type == ProviderReturnType.OPENAI, (
-        f"Provider return_type mismatch. Expected {ProviderReturnType.OPENAI}, "
-        f"got {provider.return_type}"
+        f"Provider return_type mismatch. Expected {ProviderReturnType.OPENAI}, got {provider.return_type}"
     )
 
     # Test ProviderModel class initialization and attribute access
@@ -251,12 +243,10 @@ def test_custom_provider_model_classes():
 
     # Verify ProviderModel attributes
     assert provider_model.provider == "provider_id", (
-        f"ProviderModel provider mismatch. Expected 'provider_id', "
-        f"got '{provider_model.provider}'"
+        f"ProviderModel provider mismatch. Expected 'provider_id', got '{provider_model.provider}'"
     )
     assert provider_model.max_tokens == 4096, (
-        f"ProviderModel max_tokens mismatch. Expected 4096, "
-        f"got {provider_model.max_tokens}"
+        f"ProviderModel max_tokens mismatch. Expected 4096, got {provider_model.max_tokens}"
     )
 
 
@@ -324,9 +314,7 @@ def test_custom_provider_completions_create(client):
             ) as mock_read:
                 mock_read.side_effect = mock_obj_read
                 with patch("litellm.completion") as mock_completion:
-                    mock_completion.return_value = ModelResponse.model_validate(
-                        mock_response
-                    )
+                    mock_completion.return_value = ModelResponse.model_validate(mock_response)
 
                     res = client.server.completions_create(
                         tsi.CompletionsCreateReq.model_validate(
@@ -338,48 +326,37 @@ def test_custom_provider_completions_create(client):
                     )
 
             # Verify the response matches our mock
-            assert res.response == mock_response, (
-                f"Response mismatch. Expected {mock_response}, got {res.response}"
-            )
+            assert res.response == mock_response, f"Response mismatch. Expected {mock_response}, got {res.response}"
 
             # Verify LiteLLM was called with correct parameters
             mock_completion.assert_called_once()
             call_args = mock_completion.call_args[1]
-            expected_litellm_model = (
-                f"openai/{model_id}"  # Implementation prefixes with "openai/"
-            )
+            expected_litellm_model = f"openai/{model_id}"  # Implementation prefixes with "openai/"
             assert call_args["model"] == expected_litellm_model, (
                 f"Model name mismatch. Expected '{expected_litellm_model}', got '{call_args['model']}'"
             )
             assert call_args["messages"] == inputs["messages"], (
-                f"Messages mismatch. Expected {inputs['messages']}, "
-                f"got {call_args['messages']}"
+                f"Messages mismatch. Expected {inputs['messages']}, got {call_args['messages']}"
             )
             assert call_args["api_key"] == "DUMMY_SECRET_VALUE", (
-                f"API key mismatch. Expected 'DUMMY_SECRET_VALUE', "
-                f"got '{call_args['api_key']}'"
+                f"API key mismatch. Expected 'DUMMY_SECRET_VALUE', got '{call_args['api_key']}'"
             )
             assert call_args["api_base"] == "https://api.example.com", (
-                f"API base URL mismatch. Expected 'https://api.example.com', "
-                f"got '{call_args['api_base']}'"
+                f"API base URL mismatch. Expected 'https://api.example.com', got '{call_args['api_base']}'"
             )
             assert call_args["extra_headers"] == {"X-Custom-Header": "value"}, (
-                f"Extra headers mismatch. Expected {{'X-Custom-Header': 'value'}}, "
-                f"got {call_args['extra_headers']}"
+                f"Extra headers mismatch. Expected {{'X-Custom-Header': 'value'}}, got {call_args['extra_headers']}"
             )
 
             # Verify the call was properly logged
             calls = list(client.get_calls())
             assert len(calls) == 1, f"Expected 1 logged call, got {len(calls)}"
             assert calls[0].output == res.response, (
-                f"Logged output mismatch. Expected {res.response}, "
-                f"got {calls[0].output}"
+                f"Logged output mismatch. Expected {res.response}, got {calls[0].output}"
             )
             # The usage key in the summary uses the provider/model format, not the custom format
             expected_usage_key = f"{provider_id}/{model_id}"
-            assert (
-                calls[0].summary["usage"][expected_usage_key] == res.response["usage"]
-            ), (
+            assert calls[0].summary["usage"][expected_usage_key] == res.response["usage"], (
                 f"Usage summary mismatch. Expected {res.response['usage']}, "
                 f"got {calls[0].summary['usage'][expected_usage_key]}"
             )
@@ -390,8 +367,7 @@ def test_custom_provider_completions_create(client):
                 f"Logged inputs mismatch. Expected {expected_logged_inputs}, got {calls[0].inputs}"
             )
             assert calls[0].op_name == "weave.completions_create", (
-                f"Operation name mismatch. Expected 'weave.completions_create', "
-                f"got {calls[0].op_name}"
+                f"Operation name mismatch. Expected 'weave.completions_create', got {calls[0].op_name}"
             )
         finally:
             _secret_fetcher_context.reset(token)
@@ -452,9 +428,7 @@ def test_custom_provider_ollama_model(client):
             ) as mock_read:
                 mock_read.side_effect = mock_obj_read
                 with patch("litellm.completion") as mock_completion:
-                    mock_completion.return_value = ModelResponse.model_validate(
-                        mock_response
-                    )
+                    mock_completion.return_value = ModelResponse.model_validate(mock_response)
                     res = client.server.completions_create(
                         tsi.CompletionsCreateReq.model_validate(
                             {
@@ -560,10 +534,7 @@ def test_error_handling_custom_provider(client):
 
             # Verify error is returned in the response
             assert "error" in res.response
-            assert (
-                "Failed to fetch provider model information: Test error fetching provider"
-                in res.response["error"]
-            )
+            assert "Failed to fetch provider model information: Test error fetching provider" in res.response["error"]
         finally:
             _secret_fetcher_context.reset(token)
 

@@ -108,9 +108,7 @@ class ServerVAD(BaseModel):
     silence_duration_ms: int | None = None
 
 
-TurnDetection = Annotated[
-    Union[NoTurnDetection, ServerVAD], Field(discriminator="type")
-]
+TurnDetection = Annotated[Union[NoTurnDetection, ServerVAD], Field(discriminator="type")]
 
 
 class FunctionToolChoice(BaseModel):
@@ -204,11 +202,7 @@ class OutputTextContentPart(BaseModel):
 
 
 SystemContentPart = InputTextContentPart
-UserContentPart = Union[
-    Annotated[
-        Union[InputTextContentPart, InputAudioContentPart], Field(discriminator="type")
-    ]
-]
+UserContentPart = Union[Annotated[Union[InputTextContentPart, InputAudioContentPart], Field(discriminator="type")]]
 AssistantContentPart = OutputTextContentPart
 
 ItemParamStatus = Literal["completed", "incomplete", "in_progress"]
@@ -456,9 +450,7 @@ class InputAudioBufferSpeechStartedMessage(ServerMessageBase):
     when speech stops.
     """
 
-    type: Literal["input_audio_buffer.speech_started"] = (
-        "input_audio_buffer.speech_started"
-    )
+    type: Literal["input_audio_buffer.speech_started"] = "input_audio_buffer.speech_started"
     audio_start_ms: int
     item_id: ItemID
 
@@ -470,9 +462,7 @@ class InputAudioBufferSpeechStoppedMessage(ServerMessageBase):
     when speech starts.
     """
 
-    type: Literal["input_audio_buffer.speech_stopped"] = (
-        "input_audio_buffer.speech_stopped"
-    )
+    type: Literal["input_audio_buffer.speech_stopped"] = "input_audio_buffer.speech_stopped"
     audio_end_ms: int
     item_id: ItemID
 
@@ -539,9 +529,7 @@ class ResponseFunctionCallOutputItem(ResponseItemBase):
 
 
 ResponseItem = Annotated[
-    Union[
-        ResponseMessageItem, ResponseFunctionCallItem, ResponseFunctionCallOutputItem
-    ],
+    Union[ResponseMessageItem, ResponseFunctionCallItem, ResponseFunctionCallOutputItem],
     Field(discriminator="type"),
 ]
 
@@ -591,9 +579,7 @@ class ItemInputAudioTranscriptionDeltaMessage(ServerMessageBase):
     delta: str
 
 
-ResponseStatus = Literal[
-    "in_progress", "completed", "cancelled", "incomplete", "failed"
-]
+ResponseStatus = Literal["in_progress", "completed", "cancelled", "incomplete", "failed"]
 
 
 class ResponseCancelledDetails(BaseModel):
@@ -747,9 +733,7 @@ class ResponseAudioDoneMessage(ServerMessageBase):
 
 
 class ResponseFunctionCallArgumentsDeltaMessage(ServerMessageBase):
-    type: Literal["response.function_call_arguments.delta"] = (
-        "response.function_call_arguments.delta"
-    )
+    type: Literal["response.function_call_arguments.delta"] = "response.function_call_arguments.delta"
     response_id: ResponseID
     item_id: ItemID
     output_index: int
@@ -758,9 +742,7 @@ class ResponseFunctionCallArgumentsDeltaMessage(ServerMessageBase):
 
 
 class ResponseFunctionCallArgumentsDoneMessage(ServerMessageBase):
-    type: Literal["response.function_call_arguments.done"] = (
-        "response.function_call_arguments.done"
-    )
+    type: Literal["response.function_call_arguments.done"] = "response.function_call_arguments.done"
     response_id: ResponseID
     item_id: ItemID
     output_index: int
@@ -895,9 +877,7 @@ def create_user_message_from_dict(data: dict) -> UserMessageType | None:
     try:
         return cls(**data)
     except ValidationError as e:
-        logger.debug(
-            f"Failed to construct message for type {event_type} with error - {e}"
-        )
+        logger.debug(f"Failed to construct message for type {event_type} with error - {e}")
 
     return None
 
@@ -915,9 +895,7 @@ def create_server_message_from_dict(data: dict) -> ServerMessageType | None:
     try:
         return cls(**data)
     except ValidationError as e:
-        logger.debug(
-            f"Failed to construct message for type {event_type} with error - {e}"
-        )
+        logger.debug(f"Failed to construct message for type {event_type} with error - {e}")
 
     return None
 

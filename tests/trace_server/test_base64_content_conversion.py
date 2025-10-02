@@ -60,10 +60,7 @@ class TestContentObjectStorage:
 
         # Verify structure
         assert result["_type"] == "CustomWeaveType"
-        assert (
-            result["weave_type"]["type"]
-            == "weave.type_wrappers.Content.content.Content"
-        )
+        assert result["weave_type"]["type"] == "weave.type_wrappers.Content.content.Content"
         assert "files" in result
         assert result["files"]["content"] == "content_digest"
         assert result["files"]["metadata.json"] == "metadata_digest"
@@ -114,9 +111,7 @@ class TestBase64Replacement:
             "nested": {"field3": f"data:image/png;base64,{b64_data}"},
         }
 
-        result = replace_base64_with_content_objects(
-            input_data, "test_project", trace_server
-        )
+        result = replace_base64_with_content_objects(input_data, "test_project", trace_server)
 
         # Check normal string is unchanged
         assert result["field1"] == "normal string"
@@ -154,9 +149,7 @@ class TestBase64Replacement:
             {"nested": f"data:text/plain;base64,{b64_data}"},
         ]
 
-        result = replace_base64_with_content_objects(
-            input_data, "test_project", trace_server
-        )
+        result = replace_base64_with_content_objects(input_data, "test_project", trace_server)
 
         # Check list structure is preserved
         assert len(result) == 3

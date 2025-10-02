@@ -74,9 +74,7 @@ async def run_client():
 
             # List resources
             resources = await session.list_resources()
-            print(
-                f"Available resources: {[resource.name for resource in resources.resources]}"
-            )
+            print(f"Available resources: {[resource.name for resource in resources.resources]}")
 
             # List prompts
             prompts = await session.list_prompts()
@@ -91,9 +89,7 @@ async def run_client():
             print(f"Resource: {resource}")
 
             # Generate a prompt
-            prompt = await session.get_prompt(
-                "review_code", arguments={"code": "print('Hello, world!')"}
-            )
+            prompt = await session.get_prompt("review_code", arguments={"code": "print('Hello, world!')"})
             print(f"Prompt: {prompt}")
 
 
@@ -124,32 +120,22 @@ def test_mcp_client(client: WeaveClient) -> None:
     ]
 
     for name in expected_call_names:
-        assert any(name in call_name for call_name in call_names), (
-            f"Expected call {name} not found in calls"
-        )
+        assert any(name in call_name for call_name in call_names), f"Expected call {name} not found in calls"
 
     # Assert data within the calls
-    call_tool_call = next(
-        call for call, _ in flattened_calls if "call_tool.add" in call.op_name
-    )
+    call_tool_call = next(call for call, _ in flattened_calls if "call_tool.add" in call.op_name)
 
     # outputs
     text_content = call_tool_call.output.content[0].text
     assert text_content == "3", "Expected add(1, 2) to return 3"
 
-    resource_call = next(
-        call for call, _ in flattened_calls if "read_resource" in call.op_name
-    )
+    resource_call = next(call for call, _ in flattened_calls if "read_resource" in call.op_name)
     text_content = resource_call.output.contents[0].text
     assert text_content == "Hello, cw!", "Expected greeting to be 'Hello, cw!'"
 
-    prompt_call = next(
-        call for call, _ in flattened_calls if "get_prompt.review_code" in call.op_name
-    )
+    prompt_call = next(call for call, _ in flattened_calls if "get_prompt.review_code" in call.op_name)
     prompt_text = prompt_call.output.messages[0].content.text
-    assert "Please review this code" in prompt_text, (
-        "Expected prompt to contain 'Please review this code'"
-    )
+    assert "Please review this code" in prompt_text, "Expected prompt to contain 'Please review this code'"
 
 
 @pytest.mark.skip_clickhouse_client
@@ -162,16 +148,11 @@ def test_mcp_server(client: WeaveClient) -> None:
 
     result = asyncio.run(fastmcp.call_tool("add", {"a": 1, "b": 2}))
     resource = asyncio.run(fastmcp.read_resource("greeting://cw"))
-    prompt = asyncio.run(
-        fastmcp.get_prompt("review_code", {"code": "print('Hello, world!')"})
-    )
+    prompt = asyncio.run(fastmcp.get_prompt("review_code", {"code": "print('Hello, world!')"}))
 
     assert result[0].text == str(3)
     assert resource[0].content == "Hello, cw!"
-    assert (
-        prompt.messages[0].content.text
-        == "Please review this code:\\n\\nprint('Hello, world!')"
-    )
+    assert prompt.messages[0].content.text == "Please review this code:\\n\\nprint('Hello, world!')"
 
     calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
     assert len(calls) == 3

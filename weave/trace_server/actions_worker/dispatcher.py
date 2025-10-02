@@ -60,9 +60,7 @@ def execute_batch(
     # 1. Lookup the action definition
     parsed_ref = parse_internal_uri(batch_req.action_ref)
     if parsed_ref.project_id != project_id:
-        raise TypeError(
-            f"Action ref {batch_req.action_ref} does not match project_id {project_id}"
-        )
+        raise TypeError(f"Action ref {batch_req.action_ref} does not match project_id {project_id}")
     if not isinstance(parsed_ref, InternalObjectRef):
         raise TypeError(f"Action ref {batch_req.action_ref} is not an object ref")
 
@@ -88,9 +86,7 @@ def execute_batch(
     # FUTURE: Some actions may be able to be batched together
     results = []
     for call in calls:
-        result = dispatch_action(
-            project_id, batch_req.action_ref, action_def, call, wb_user_id, trace_server
-        )
+        result = dispatch_action(project_id, batch_req.action_ref, action_def, call, wb_user_id, trace_server)
         results.append(result)
     return results
 
@@ -106,9 +102,7 @@ def dispatch_action(
     action_type = type(action_def.config)
     action_fn = dispatch_map[action_type]
     result = action_fn(project_id, action_def.config, target_call, trace_server)
-    feedback_res = publish_results_as_feedback(
-        target_call, action_ref, result, wb_user_id, trace_server
-    )
+    feedback_res = publish_results_as_feedback(target_call, action_ref, result, wb_user_id, trace_server)
     return ActionResult(result=result, feedback_res=feedback_res)
 
 

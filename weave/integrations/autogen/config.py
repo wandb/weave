@@ -61,9 +61,7 @@ def _get_module_patch_configs() -> list[BasePatchModuleConfig]:
     )
 
     # Task Runner Tool Class
-    task_runner_tool_config = BasePatchClassConfig(
-        class_name="TaskRunnerTool", method_names=["run"]
-    )
+    task_runner_tool_config = BasePatchClassConfig(class_name="TaskRunnerTool", method_names=["run"])
 
     task_runner_tool_module_config = BasePatchModuleConfig(
         module_path="autogen_agentchat.tools._task_runner_tool",
@@ -109,13 +107,9 @@ def _get_module_patch_configs() -> list[BasePatchModuleConfig]:
         classes=[agent_runtime_config],
     )
     # Base Tool Class
-    base_tool_config = BasePatchClassConfig(
-        class_name="BaseTool", method_names=["run", "run_json"]
-    )
+    base_tool_config = BasePatchClassConfig(class_name="BaseTool", method_names=["run", "run_json"])
 
-    base_tool_module_config = BasePatchModuleConfig(
-        module_path="autogen_core.tools._base", classes=[base_tool_config]
-    )
+    base_tool_module_config = BasePatchModuleConfig(module_path="autogen_core.tools._base", classes=[base_tool_config])
 
     # Chat Completion Client Class
     chat_completion_client_config = BasePatchClassConfig(

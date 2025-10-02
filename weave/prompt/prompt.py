@@ -32,9 +32,7 @@ def maybe_dedent(content: str, dedent: bool) -> str:
     return content
 
 
-def str_to_message(
-    content: str, role: Optional[str] = None, dedent: bool = False
-) -> Message:
+def str_to_message(content: str, role: Optional[str] = None, dedent: bool = False) -> Message:
     if role is not None:
         return {"role": role, "content": maybe_dedent(content, dedent)}
     for role in ROLE_COLORS:
@@ -68,9 +66,7 @@ def color_content(content: str, values: dict) -> str:
         if placeholder not in values:
             colored_values[placeholder] = "[red]{" + placeholder + "}[/]"
         else:
-            colored_values[placeholder] = (
-                "[orange3]{" + placeholder + ":" + str(values[placeholder]) + "}[/]"
-            )
+            colored_values[placeholder] = "[orange3]{" + placeholder + ":" + str(values[placeholder]) + "}[/]"
     return content.format(**colored_values)
 
 
@@ -219,9 +215,7 @@ class EasyPrompt(UserList, Prompt):
         for message in self.data:
             # TODO: Support placeholders in image messages?
             placeholders = extract_placeholders(message["content"])
-            all_placeholders.extend(
-                p for p in placeholders if p not in all_placeholders
-            )
+            all_placeholders.extend(p for p in placeholders if p not in all_placeholders)
         return all_placeholders
 
     @property
@@ -302,10 +296,7 @@ class EasyPrompt(UserList, Prompt):
             for placeholder in placeholders:
                 if placeholder in self._values:
                     values[placeholder] = self._values[placeholder]
-                elif (
-                    placeholder in self.requirements
-                    and "default" in self.requirements[placeholder]
-                ):
+                elif placeholder in self.requirements and "default" in self.requirements[placeholder]:
                     values[placeholder] = self.requirements[placeholder]["default"]
                 else:
                     values[placeholder] = "{" + placeholder + "}"
@@ -337,9 +328,7 @@ class EasyPrompt(UserList, Prompt):
         # in turn can't be copied
         c = copy.deepcopy(dict(self.config), memo)
         r = copy.deepcopy(dict(self.requirements), memo)
-        p = Prompt(
-            name=self.name, description=self.description, config=c, requirements=r
-        )
+        p = Prompt(name=self.name, description=self.description, config=c, requirements=r)
         p._values = dict(self._values)
         for value in self.data:
             p.data.append(dict(value))
@@ -447,9 +436,7 @@ class EasyPrompt(UserList, Prompt):
     @classmethod
     def load(cls, fp: IO) -> Self:
         if isinstance(fp, str):  # Common mistake
-            raise TypeError(
-                "Prompt.load() takes a file-like object, not a string. Did you mean Prompt.e()?"
-            )
+            raise TypeError("Prompt.load() takes a file-like object, not a string. Did you mean Prompt.e()?")
         data = json.load(fp)
         prompt = EasyPrompt(**data)
         return prompt

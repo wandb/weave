@@ -89,9 +89,7 @@ class HuggingFacePipelineScorer(weave.Scorer):
         [{'label': 'POSITIVE', 'score': 0.9998}]
     """
 
-    task: str = Field(
-        description="The task to use for the pipeline, for example 'text-classification'"
-    )
+    task: str = Field(description="The task to use for the pipeline, for example 'text-classification'")
     model_name_or_path: str = Field(default="", description="The path to the model")
     device: str = Field(
         default="cpu",
@@ -108,9 +106,7 @@ class HuggingFacePipelineScorer(weave.Scorer):
             self.load_pipeline()
 
     def load_pipeline(self) -> None:
-        raise NotImplementedError(
-            "Subclasses must implement the `load_pipeline` method."
-        )
+        raise NotImplementedError("Subclasses must implement the `load_pipeline` method.")
 
     @weave.op
     def score(self, *, output: Any, **kwargs: Any) -> Any:
@@ -144,17 +140,13 @@ class HuggingFaceScorer(weave.Scorer):
             logger.info("Using user-provided tokenizer.")
 
         assert self._model is not None, "Model must be loaded, implement `load_model`"
-        assert self._tokenizer is not None, (
-            "Tokenizer must be loaded, implement `load_tokenizer`"
-        )
+        assert self._tokenizer is not None, "Tokenizer must be loaded, implement `load_tokenizer`"
 
     def load_model(self) -> None:
         raise NotImplementedError("Subclasses must implement the `load_model` method.")
 
     def load_tokenizer(self) -> None:
-        raise NotImplementedError(
-            "Subclasses must implement the `load_tokenizer` method."
-        )
+        raise NotImplementedError("Subclasses must implement the `load_tokenizer` method.")
 
     @weave.op
     def score(self, *, output: Any, **kwargs: Any) -> Any:
@@ -194,13 +186,9 @@ class RollingWindowScorer(HuggingFaceScorer):
             A tensor of tokenized input IDs.
         """
         assert self._tokenizer is not None
-        return self._tokenizer(
-            prompt, return_tensors="pt", truncation=False
-        ).input_ids.to(self.device)
+        return self._tokenizer(prompt, return_tensors="pt", truncation=False).input_ids.to(self.device)
 
-    def _aggregate_predictions(
-        self, all_predictions: list[list[Union[int, float]]]
-    ) -> list[float]:
+    def _aggregate_predictions(self, all_predictions: list[list[Union[int, float]]]) -> list[float]:
         """Aggregate predictions using the specified class attribute method.
 
         Args:
@@ -222,9 +210,7 @@ class RollingWindowScorer(HuggingFaceScorer):
             elif self.aggregation_method == "mean":
                 aggregated.append(sum(category_scores) / len(category_scores))
             else:
-                raise ValueError(
-                    f"Unsupported aggregation method: {self.aggregation_method}"
-                )
+                raise ValueError(f"Unsupported aggregation method: {self.aggregation_method}")
 
         return aggregated
 

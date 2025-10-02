@@ -7,9 +7,7 @@ from weave import EasyPrompt
 
 def iter_equal(items1, items2):
     """`True` if iterators `items1` and `items2` contain equal items."""
-    return (items1 is items2) or all(
-        a == b for a, b in itertools.zip_longest(items1, items2, fillvalue=object())
-    )
+    return (items1 is items2) or all(a == b for a, b in itertools.zip_longest(items1, items2, fillvalue=object()))
 
 
 def test_prompt_message_constructor_str():
@@ -151,10 +149,7 @@ def test_prompt_parameter_validation_oneof() -> None:
     prompt.require("flavor", oneof=("vanilla", "strawberry", "chocolate"))
     with pytest.raises(ValueError) as e:
         prompt.bind(flavor="mint chip")
-    assert (
-        str(e.value)
-        == "flavor (mint chip) must be one of vanilla, strawberry, chocolate"
-    )
+    assert str(e.value) == "flavor (mint chip) must be one of vanilla, strawberry, chocolate"
 
 
 def test_prompt_bind_iteration() -> None:

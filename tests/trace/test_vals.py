@@ -90,7 +90,9 @@ def test_row_ref_inside_dict(client):
 
     # We want to spy on the table_query method to ensure it is only returning
     # the row that was requested.
-    original_function = weave.trace_server_bindings.caching_middleware_trace_server.CachingMiddlewareTraceServer.table_query
+    original_function = (
+        weave.trace_server_bindings.caching_middleware_trace_server.CachingMiddlewareTraceServer.table_query
+    )
     with patch(
         "weave.trace_server_bindings.caching_middleware_trace_server.CachingMiddlewareTraceServer.table_query",
         autospec=True,

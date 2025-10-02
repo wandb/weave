@@ -18,14 +18,10 @@ def check_server_up(host, port, num_retries=30) -> bool:
     base_url = f"http://{host}:{port}/"
     endpoint = "ping"
 
-    return _check_server_health(
-        base_url=base_url, endpoint=endpoint, num_retries=num_retries
-    )
+    return _check_server_health(base_url=base_url, endpoint=endpoint, num_retries=num_retries)
 
 
-def _check_server_health(
-    base_url: str, endpoint: str, num_retries: int = 1, sleep_time: int = 1
-) -> bool:
+def _check_server_health(base_url: str, endpoint: str, num_retries: int = 1, sleep_time: int = 1) -> bool:
     for _ in range(num_retries):
         try:
             response = requests.get(urllib.parse.urljoin(base_url, endpoint))
@@ -35,7 +31,5 @@ def _check_server_health(
         except requests.exceptions.ConnectionError:
             time.sleep(sleep_time)
 
-    print(
-        f"Server not healthy @ {urllib.parse.urljoin(base_url, endpoint)}: no response"
-    )
+    print(f"Server not healthy @ {urllib.parse.urljoin(base_url, endpoint)}: no response")
     return False

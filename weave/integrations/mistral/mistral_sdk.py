@@ -68,13 +68,9 @@ def mistral_accumulator(
         if target_choice is None:
             return acc
 
-        target_choice.finish_reason = (
-            delta_choice.finish_reason or target_choice.finish_reason
-        )
+        target_choice.finish_reason = delta_choice.finish_reason or target_choice.finish_reason
 
-        target_choice.message.role = (
-            delta_choice.delta.role or target_choice.message.role
-        )
+        target_choice.message.role = delta_choice.delta.role or target_choice.message.role
         target_choice.message.content += delta_choice.delta.content or ""
         if delta_choice.delta.tool_calls:
             # treat UNSET or None as empty
@@ -118,18 +114,10 @@ def get_mistral_patcher(
         return _mistral_patcher
 
     base = settings.op_settings
-    chat_complete_settings = base.model_copy(
-        update={"name": base.name or "mistralai.chat.complete"}
-    )
-    chat_stream_settings = base.model_copy(
-        update={"name": base.name or "mistralai.chat.stream"}
-    )
-    async_chat_complete_settings = base.model_copy(
-        update={"name": base.name or "mistralai.async_client.chat.complete"}
-    )
-    async_chat_stream_settings = base.model_copy(
-        update={"name": base.name or "mistralai.async_client.chat.stream"}
-    )
+    chat_complete_settings = base.model_copy(update={"name": base.name or "mistralai.chat.complete"})
+    chat_stream_settings = base.model_copy(update={"name": base.name or "mistralai.chat.stream"})
+    async_chat_complete_settings = base.model_copy(update={"name": base.name or "mistralai.async_client.chat.complete"})
+    async_chat_stream_settings = base.model_copy(update={"name": base.name or "mistralai.async_client.chat.stream"})
 
     _mistral_patcher = MultiPatcher(
         [

@@ -105,9 +105,7 @@ class Call:
     @property
     def feedback(self) -> RefFeedbackQuery:
         if not self.id:
-            raise ValueError(
-                "Can't get feedback for call without ID, was `weave.init` called?"
-            )
+            raise ValueError("Can't get feedback for call without ID, was `weave.init` called?")
 
         if self._feedback is None:
             try:
@@ -121,9 +119,7 @@ class Call:
     @property
     def ui_url(self) -> str:
         if not self.id:
-            raise ValueError(
-                "Can't get URL for call without ID, was `weave.init` called?"
-            )
+            raise ValueError("Can't get URL for call without ID, was `weave.init` called?")
 
         try:
             entity, project = self.project_id.split("/")
@@ -135,9 +131,7 @@ class Call:
     def ref(self) -> CallRef:
         entity, project = self.project_id.split("/")
         if not self.id:
-            raise ValueError(
-                "Can't get ref for call without ID, was `weave.init` called?"
-            )
+            raise ValueError("Can't get ref for call without ID, was `weave.init` called?")
 
         return CallRef(entity, project, self.id)
 
@@ -152,9 +146,7 @@ class Call:
             An iterator of calls.
         """
         if not self.id:
-            raise ValueError(
-                "Can't get children of call without ID, was `weave.init` called?"
-            )
+            raise ValueError("Can't get children of call without ID, was `weave.init` called?")
 
         client = weave_client_context.require_weave_client()
         return _make_calls_iterator(
@@ -276,9 +268,7 @@ class Call:
 
 class NoOpCall(Call):
     def __init__(self) -> None:
-        super().__init__(
-            _op_name="", trace_id="", project_id="", parent_id=None, inputs={}
-        )
+        super().__init__(_op_name="", trace_id="", project_id="", parent_id=None, inputs={})
 
 
 class CallDict(TypedDict):
@@ -391,9 +381,7 @@ def _make_calls_iterator(
     )
 
 
-def make_client_call(
-    entity: str, project: str, server_call: CallSchema, server: TraceServerInterface
-) -> WeaveObject:
+def make_client_call(entity: str, project: str, server_call: CallSchema, server: TraceServerInterface) -> WeaveObject:
     if (call_id := server_call.id) is None:
         raise ValueError("Call ID is None")
 

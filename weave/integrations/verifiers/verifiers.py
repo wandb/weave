@@ -71,17 +71,11 @@ def _verifiers_postprocess_outputs_no_logprobs(outputs: Any) -> Any:
     except Exception:
         outputs_copy = copy.deepcopy(outputs)
 
-    if (
-        isinstance(outputs_copy, BaseModel)
-        and hasattr(outputs_copy, "state")
-        and isinstance(outputs_copy.state, list)
-    ):
+    if isinstance(outputs_copy, BaseModel) and hasattr(outputs_copy, "state") and isinstance(outputs_copy.state, list):
         for state_item in outputs_copy.state:
             # ref: https://github.com/willccbb/verifiers/blob/37d7243703a38944be6e44fd4afe9b22c696b449/verifiers/types.py#L41
             if isinstance(state_item, dict) and "responses" in state_item:
-                state_item["responses"] = _remove_logprobs_from_responses(
-                    state_item.get("responses", [])
-                )
+                state_item["responses"] = _remove_logprobs_from_responses(state_item.get("responses", []))
 
     return outputs_copy
 
@@ -99,9 +93,7 @@ def _verifiers_postprocess_inputs_no_logprobs(inputs: dict[str, Any]) -> dict[st
         for state_item in processed_inputs["states"]:
             if isinstance(state_item, dict) and "responses" in state_item:
                 new_item = dict(state_item)
-                new_item["responses"] = _remove_logprobs_from_responses(
-                    state_item.get("responses", [])
-                )
+                new_item["responses"] = _remove_logprobs_from_responses(state_item.get("responses", []))
                 new_states.append(new_item)
             else:
                 new_states.append(state_item)
@@ -148,9 +140,7 @@ def _wrap_parser_init(settings: OpSettings) -> Callable[[Callable], Callable]:
             if callable(extract_fn):
                 op_kwargs = settings.model_dump()
                 if not op_kwargs.get("name"):
-                    op_kwargs["name"] = (
-                        f"verifiers.{self.__class__.__name__}.extract_fn"
-                    )
+                    op_kwargs["name"] = f"verifiers.{self.__class__.__name__}.extract_fn"
                 try:
                     self.extract_fn = weave.op(extract_fn, **op_kwargs)
                 except Exception:
@@ -173,9 +163,7 @@ def _wrap_method_returning_callable(
             if callable(returned):
                 op_kwargs = settings.model_dump()
                 if not op_kwargs.get("name"):
-                    op_kwargs["name"] = (
-                        f"verifiers.{self.__class__.__name__}.format_reward"
-                    )
+                    op_kwargs["name"] = f"verifiers.{self.__class__.__name__}.format_reward"
                 try:
                     return weave.op(returned, **op_kwargs)
                 except Exception:
@@ -205,9 +193,7 @@ def get_verifiers_patcher(
         update={"name": base.name or "verifiers.Environment.get_model_response"}
     )
     rollout_settings = base.model_copy(
-        update={
-            "name": base.name or "verifiers.envs.multiturn_env.MultiTurnEnv.rollout"
-        }
+        update={"name": base.name or "verifiers.envs.multiturn_env.MultiTurnEnv.rollout"}
     )
     evaluate_settings = base.model_copy(
         update={
@@ -234,9 +220,7 @@ def get_verifiers_patcher(
             "postprocess_output": _verifiers_postprocess_outputs_no_logprobs,
         }
     )
-    score_rollout_settings = base.model_copy(
-        update={"name": base.name or "verifiers.Rubric.score_rollout"}
-    )
+    score_rollout_settings = base.model_copy(update={"name": base.name or "verifiers.Rubric.score_rollout"})
 
     _verifiers_patcher = MultiPatcher(
         [
@@ -272,9 +256,7 @@ def get_verifiers_patcher(
                 lambda: importlib.import_module("verifiers.envs.env_group"),
                 "EnvGroup.rollout",
                 _verifiers_wrapper_async(
-                    settings=base.model_copy(
-                        update={"name": base.name or "verifiers.EnvGroup.rollout"}
-                    )
+                    settings=base.model_copy(update={"name": base.name or "verifiers.EnvGroup.rollout"})
                 ),
             ),
             # SingleTurnEnv
@@ -282,11 +264,7 @@ def get_verifiers_patcher(
                 lambda: importlib.import_module("verifiers.envs.singleturn_env"),
                 "SingleTurnEnv.env_response",
                 _verifiers_wrapper_async(
-                    settings=base.model_copy(
-                        update={
-                            "name": base.name or "verifiers.SingleTurnEnv.env_response"
-                        }
-                    )
+                    settings=base.model_copy(update={"name": base.name or "verifiers.SingleTurnEnv.env_response"})
                 ),
             ),
             # ToolEnv (tool-use)
@@ -294,27 +272,21 @@ def get_verifiers_patcher(
                 lambda: importlib.import_module("verifiers.envs.tool_env"),
                 "ToolEnv.is_completed",
                 _verifiers_wrapper_async(
-                    settings=base.model_copy(
-                        update={"name": base.name or "verifiers.ToolEnv.is_completed"}
-                    )
+                    settings=base.model_copy(update={"name": base.name or "verifiers.ToolEnv.is_completed"})
                 ),
             ),
             SymbolPatcher(
                 lambda: importlib.import_module("verifiers.envs.tool_env"),
                 "ToolEnv.env_response",
                 _verifiers_wrapper_async(
-                    settings=base.model_copy(
-                        update={"name": base.name or "verifiers.ToolEnv.env_response"}
-                    )
+                    settings=base.model_copy(update={"name": base.name or "verifiers.ToolEnv.env_response"})
                 ),
             ),
             SymbolPatcher(
                 lambda: importlib.import_module("verifiers.envs.tool_env"),
                 "ToolEnv.call_tool",
                 _verifiers_wrapper_async(
-                    settings=base.model_copy(
-                        update={"name": base.name or "verifiers.ToolEnv.call_tool"}
-                    )
+                    settings=base.model_copy(update={"name": base.name or "verifiers.ToolEnv.call_tool"})
                 ),
             ),
             # StatefulToolEnv
@@ -322,35 +294,21 @@ def get_verifiers_patcher(
                 lambda: importlib.import_module("verifiers.envs.stateful_tool_env"),
                 "StatefulToolEnv.update_tool_args",
                 _verifiers_wrapper(
-                    settings=base.model_copy(
-                        update={
-                            "name": base.name
-                            or "verifiers.StatefulToolEnv.update_tool_args"
-                        }
-                    )
+                    settings=base.model_copy(update={"name": base.name or "verifiers.StatefulToolEnv.update_tool_args"})
                 ),
             ),
             SymbolPatcher(
                 lambda: importlib.import_module("verifiers.envs.stateful_tool_env"),
                 "StatefulToolEnv.call_tool",
                 _verifiers_wrapper_async(
-                    settings=base.model_copy(
-                        update={
-                            "name": base.name or "verifiers.StatefulToolEnv.call_tool"
-                        }
-                    )
+                    settings=base.model_copy(update={"name": base.name or "verifiers.StatefulToolEnv.call_tool"})
                 ),
             ),
             SymbolPatcher(
                 lambda: importlib.import_module("verifiers.envs.stateful_tool_env"),
                 "StatefulToolEnv.env_response",
                 _verifiers_wrapper_async(
-                    settings=base.model_copy(
-                        update={
-                            "name": base.name
-                            or "verifiers.StatefulToolEnv.env_response"
-                        }
-                    )
+                    settings=base.model_copy(update={"name": base.name or "verifiers.StatefulToolEnv.env_response"})
                 ),
             ),
             # Rubric
@@ -369,27 +327,19 @@ def get_verifiers_patcher(
                 lambda: importlib.import_module("verifiers.parsers.parser"),
                 "Parser.__init__",
                 _wrap_parser_init(
-                    settings=base.model_copy(
-                        update={"name": base.name or "verifiers.Parser.extract_fn"}
-                    )
+                    settings=base.model_copy(update={"name": base.name or "verifiers.Parser.extract_fn"})
                 ),
             ),
             SymbolPatcher(
                 lambda: importlib.import_module("verifiers.parsers.parser"),
                 "Parser.parse",
-                _verifiers_wrapper(
-                    settings=base.model_copy(
-                        update={"name": base.name or "verifiers.Parser.parse"}
-                    )
-                ),
+                _verifiers_wrapper(settings=base.model_copy(update={"name": base.name or "verifiers.Parser.parse"})),
             ),
             SymbolPatcher(
                 lambda: importlib.import_module("verifiers.parsers.parser"),
                 "Parser.get_format_reward_func",
                 _wrap_method_returning_callable(
-                    settings=base.model_copy(
-                        update={"name": base.name or "verifiers.Parser.format_reward"}
-                    )
+                    settings=base.model_copy(update={"name": base.name or "verifiers.Parser.format_reward"})
                 ),
             ),
             # Parsers: ThinkParser
@@ -397,79 +347,55 @@ def get_verifiers_patcher(
                 lambda: importlib.import_module("verifiers.parsers.think_parser"),
                 "ThinkParser.parse",
                 _verifiers_wrapper(
-                    settings=base.model_copy(
-                        update={"name": base.name or "verifiers.ThinkParser.parse"}
-                    )
+                    settings=base.model_copy(update={"name": base.name or "verifiers.ThinkParser.parse"})
                 ),
             ),
             SymbolPatcher(
                 lambda: importlib.import_module("verifiers.parsers.think_parser"),
                 "ThinkParser.get_format_reward_func",
                 _wrap_method_returning_callable(
-                    settings=base.model_copy(
-                        update={
-                            "name": base.name or "verifiers.ThinkParser.format_reward"
-                        }
-                    )
+                    settings=base.model_copy(update={"name": base.name or "verifiers.ThinkParser.format_reward"})
                 ),
             ),
             # Parsers: XMLParser
             SymbolPatcher(
                 lambda: importlib.import_module("verifiers.parsers.xml_parser"),
                 "XMLParser.parse",
-                _verifiers_wrapper(
-                    settings=base.model_copy(
-                        update={"name": base.name or "verifiers.XMLParser.parse"}
-                    )
-                ),
+                _verifiers_wrapper(settings=base.model_copy(update={"name": base.name or "verifiers.XMLParser.parse"})),
             ),
             SymbolPatcher(
                 lambda: importlib.import_module("verifiers.parsers.xml_parser"),
                 "XMLParser.parse_answer",
                 _verifiers_wrapper(
-                    settings=base.model_copy(
-                        update={"name": base.name or "verifiers.XMLParser.parse_answer"}
-                    )
+                    settings=base.model_copy(update={"name": base.name or "verifiers.XMLParser.parse_answer"})
                 ),
             ),
             SymbolPatcher(
                 lambda: importlib.import_module("verifiers.parsers.xml_parser"),
                 "XMLParser.get_format_reward_func",
                 _wrap_method_returning_callable(
-                    settings=base.model_copy(
-                        update={
-                            "name": base.name or "verifiers.XMLParser.format_reward"
-                        }
-                    )
+                    settings=base.model_copy(update={"name": base.name or "verifiers.XMLParser.format_reward"})
                 ),
             ),
             SymbolPatcher(
                 lambda: importlib.import_module("verifiers.parsers.xml_parser"),
                 "XMLParser.get_fields",
                 _verifiers_wrapper(
-                    settings=base.model_copy(
-                        update={"name": base.name or "verifiers.XMLParser.get_fields"}
-                    )
+                    settings=base.model_copy(update={"name": base.name or "verifiers.XMLParser.get_fields"})
                 ),
             ),
             SymbolPatcher(
                 lambda: importlib.import_module("verifiers.parsers.xml_parser"),
                 "XMLParser.format",
                 _verifiers_wrapper(
-                    settings=base.model_copy(
-                        update={"name": base.name or "verifiers.XMLParser.format"}
-                    )
+                    settings=base.model_copy(update={"name": base.name or "verifiers.XMLParser.format"})
                 ),
             ),
             SymbolPatcher(
                 lambda: importlib.import_module("verifiers.parsers.xml_parser"),
                 "XMLParser.get_format_str",
                 _verifiers_wrapper(
-                    settings=base.model_copy(
-                        update={
-                            "name": base.name or "verifiers.XMLParser.get_format_str"
-                        }
-                    )
+                    settings=base.model_copy(update={"name": base.name or "verifiers.XMLParser.get_format_str"})
                 ),
             ),
         ]

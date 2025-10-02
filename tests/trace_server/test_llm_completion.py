@@ -93,9 +93,7 @@ class TestGetCustomProviderInfo(unittest.TestCase):
 
         # Mock secret fetcher for API key management
         self.mock_secret_fetcher = MagicMock()
-        self.mock_secret_fetcher.fetch.return_value = {
-            "secrets": {"TEST_API_KEY": "test-api-key-value"}
-        }
+        self.mock_secret_fetcher.fetch.return_value = {"secrets": {"TEST_API_KEY": "test-api-key-value"}}
 
         # Mock object read function for database interactions
         self.mock_obj_read_func = MagicMock()
@@ -131,24 +129,19 @@ class TestGetCustomProviderInfo(unittest.TestCase):
 
             # Verify the results
             assert provider_info.base_url == "https://api.example.com", (
-                f"Base URL mismatch. Expected 'https://api.example.com', "
-                f"got '{provider_info.base_url}'"
+                f"Base URL mismatch. Expected 'https://api.example.com', got '{provider_info.base_url}'"
             )
             assert provider_info.api_key == "test-api-key-value", (
-                f"API key mismatch. Expected 'test-api-key-value', "
-                f"got '{provider_info.api_key}'"
+                f"API key mismatch. Expected 'test-api-key-value', got '{provider_info.api_key}'"
             )
             assert provider_info.extra_headers == {"X-Header": "value"}, (
-                f"Extra headers mismatch. Expected {{'X-Header': 'value'}}, "
-                f"got {provider_info.extra_headers}"
+                f"Extra headers mismatch. Expected {{'X-Header': 'value'}}, got {provider_info.extra_headers}"
             )
             assert provider_info.return_type == "openai", (
-                f"Return type mismatch. Expected 'openai', "
-                f"got '{provider_info.return_type}'"
+                f"Return type mismatch. Expected 'openai', got '{provider_info.return_type}'"
             )
             assert provider_info.actual_model_name == "actual-model-name", (
-                f"Actual model name mismatch. Expected 'actual-model-name', "
-                f"got '{provider_info.actual_model_name}'"
+                f"Actual model name mismatch. Expected 'actual-model-name', got '{provider_info.actual_model_name}'"
             )
 
             # Verify the mock calls
@@ -344,9 +337,7 @@ class TestLLMCompletionStreaming(unittest.TestCase):
             },
         ]
 
-        with patch(
-            "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
-        ) as mock_litellm:
+        with patch("weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream") as mock_litellm:
             # Mock the litellm completion stream
             mock_stream = MagicMock()
             mock_stream.__iter__.return_value = mock_chunks
@@ -380,9 +371,7 @@ class TestLLMCompletionStreaming(unittest.TestCase):
 
         class StreamingException(Exception): ...
 
-        with patch(
-            "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
-        ) as mock_litellm:
+        with patch("weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream") as mock_litellm:
             # Mock litellm to raise an exception
             mock_litellm.side_effect = StreamingException("Test error")
 
@@ -436,12 +425,8 @@ class TestLLMCompletionStreaming(unittest.TestCase):
         ]
 
         with (
-            patch(
-                "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
-            ) as mock_litellm,
-            patch.object(
-                chts.ClickHouseTraceServer, "_insert_call"
-            ) as mock_insert_call,
+            patch("weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream") as mock_litellm,
+            patch.object(chts.ClickHouseTraceServer, "_insert_call") as mock_insert_call,
         ):
             # Mock the litellm completion stream
             mock_stream = MagicMock()
@@ -515,9 +500,7 @@ class TestLLMCompletionStreaming(unittest.TestCase):
         ]
 
         with (
-            patch(
-                "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
-            ) as mock_litellm,
+            patch("weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream") as mock_litellm,
             patch.object(chts.ClickHouseTraceServer, "obj_read") as mock_obj_read,
         ):
             # Mock the litellm completion stream
@@ -606,13 +589,9 @@ class TestLLMCompletionStreaming(unittest.TestCase):
 
     def test_missing_api_key(self):
         """Test handling of missing API key in streaming completion."""
-        with patch(
-            "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
-        ) as mock_litellm:
+        with patch("weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream") as mock_litellm:
             # Mock litellm to raise MissingLLMApiKeyError
-            mock_litellm.side_effect = MissingLLMApiKeyError(
-                "No API key found", api_key_name="TEST_API_KEY"
-            )
+            mock_litellm.side_effect = MissingLLMApiKeyError("No API key found", api_key_name="TEST_API_KEY")
 
             # Create test request
             req = tsi.CompletionsCreateReq(

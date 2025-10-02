@@ -165,15 +165,9 @@ def auto_summarize(data: list) -> Optional[dict[str, Any]]:
             return {"mean": sum(data) / len(data)}
     elif isinstance(val, dict):
         result = {}
-        all_keys = list(
-            dict.fromkeys([k for d in data if isinstance(d, dict) for k in d.keys()])
-        )
+        all_keys = list(dict.fromkeys([k for d in data if isinstance(d, dict) for k in d.keys()]))
         for k in all_keys:
-            if (
-                summary := auto_summarize(
-                    [x.get(k) for x in data if isinstance(x, dict)]
-                )
-            ) is not None:
+            if (summary := auto_summarize([x.get(k) for x in data if isinstance(x, dict)])) is not None:
                 if k in summary:
                     result.update(summary)
                 else:
@@ -205,9 +199,7 @@ def get_scorer_attributes(
             scorer_name = scorer.__class__.__name__
         try:
             if not is_op(scorer.score):
-                raise TypeError(
-                    f"Scorer {scorer_name} must implement `score` as a weave.op() decorated function."
-                )
+                raise TypeError(f"Scorer {scorer_name} must implement `score` as a weave.op() decorated function.")
             score_op = as_op(scorer.score)
             summarize_fn = scorer.summarize  # type: ignore
 
@@ -226,9 +218,7 @@ def get_scorer_attributes(
     if scorer_name:
         scorer_name = sanitize_object_name(scorer_name)
 
-    return ScorerAttributes(
-        scorer_name=scorer_name, score_op=score_op, summarize_fn=summarize_fn
-    )
+    return ScorerAttributes(scorer_name=scorer_name, score_op=score_op, summarize_fn=summarize_fn)
 
 
 def _has_oldstyle_scorers(scorers: list[Union[Op, Scorer]]) -> bool:
@@ -263,8 +253,7 @@ def prepare_scorer_op_args(
     score_arg_names = list(score_signature.parameters.keys())
 
     has_var_keyword_arg = any(
-        param.kind == inspect.Parameter.VAR_KEYWORD
-        for param in score_signature.parameters.values()
+        param.kind == inspect.Parameter.VAR_KEYWORD for param in score_signature.parameters.values()
     )
 
     # The keys of `score_args` must match the argument names of the scorer's `score` method.
@@ -348,11 +337,7 @@ def prepare_scorer_op_args(
                 raise ValueError(message)
     else:
         # Without column mapping, directly match scorer arguments to example keys
-        score_args = {
-            k: v
-            for k, v in example.items()
-            if k in score_arg_names or has_var_keyword_arg
-        }
+        score_args = {k: v for k, v in example.items() if k in score_arg_names or has_var_keyword_arg}
 
         if has_var_keyword_arg and "inputs" not in score_args:
             score_args["inputs"] = example
@@ -423,9 +408,7 @@ async def apply_scorer_async(
         score_signature = inspect.signature(score_op)
 
         required_arg_names = [
-            param.name
-            for param in score_signature.parameters.values()
-            if param.default == inspect.Parameter.empty
+            param.name for param in score_signature.parameters.values() if param.default == inspect.Parameter.empty
         ]
         score_output_name = "output" if "output" in score_args else "model_output"
         required_arg_names.remove(score_output_name)

@@ -58,9 +58,9 @@ from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker impo
     EvaluateModelDispatcher,
 )
 
-_conn_cursor: contextvars.ContextVar[
-    Optional[tuple[sqlite3.Connection, sqlite3.Cursor]]
-] = contextvars.ContextVar("conn_cursor", default=None)
+_conn_cursor: contextvars.ContextVar[Optional[tuple[sqlite3.Connection, sqlite3.Cursor]]] = contextvars.ContextVar(
+    "conn_cursor", default=None
+)
 
 
 def get_conn_cursor(db_path: str) -> tuple[sqlite3.Connection, sqlite3.Cursor]:
@@ -225,9 +225,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     req.start.started_at.isoformat(),
                     json.dumps(req.start.attributes),
                     json.dumps(req.start.inputs),
-                    json.dumps(
-                        extract_refs_from_values(list(req.start.inputs.values()))
-                    ),
+                    json.dumps(extract_refs_from_values(list(req.start.inputs.values()))),
                     req.start.wb_user_id,
                     req.start.wb_run_id,
                     req.start.wb_run_step,
@@ -260,9 +258,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     req.end.ended_at.isoformat(),
                     req.end.exception,
                     json.dumps(req.end.output),
-                    json.dumps(
-                        extract_refs_from_values(list(parsable_output.values()))
-                    ),
+                    json.dumps(extract_refs_from_values(list(parsable_output.values()))),
                     json.dumps(req.end.summary),
                     req.end.id,
                 ),
@@ -309,31 +305,23 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     conds.append("(" + " OR ".join(or_conditions) + ")")
 
             if filter.input_refs:
-                assert_parameter_length_less_than_max(
-                    "input_refs", len(filter.input_refs)
-                )
+                assert_parameter_length_less_than_max("input_refs", len(filter.input_refs))
                 or_conditions = []
                 for ref in filter.input_refs:
                     or_conditions.append(f"input_refs LIKE '%{ref}%'")
                 conds.append("(" + " OR ".join(or_conditions) + ")")
             if filter.output_refs:
-                assert_parameter_length_less_than_max(
-                    "output_refs", len(filter.output_refs)
-                )
+                assert_parameter_length_less_than_max("output_refs", len(filter.output_refs))
                 or_conditions = []
                 for ref in filter.output_refs:
                     or_conditions.append(f"output_refs LIKE '%{ref}%'")
                 conds.append("(" + " OR ".join(or_conditions) + ")")
             if filter.parent_ids:
-                assert_parameter_length_less_than_max(
-                    "parent_ids", len(filter.parent_ids)
-                )
+                assert_parameter_length_less_than_max("parent_ids", len(filter.parent_ids))
                 in_expr = ", ".join(f"'{x}'" for x in filter.parent_ids)
                 conds += [f"parent_id IN ({in_expr})"]
             if filter.trace_ids:
-                assert_parameter_length_less_than_max(
-                    "trace_ids", len(filter.trace_ids)
-                )
+                assert_parameter_length_less_than_max("trace_ids", len(filter.trace_ids))
                 in_expr = ", ".join(f"'{x}'" for x in filter.trace_ids)
                 conds += [f"trace_id IN ({in_expr})"]
             if filter.call_ids:
@@ -400,9 +388,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 if isinstance(operand, tsi_query.LiteralOperation):
                     return json.dumps(operand.literal_)
                 elif isinstance(operand, tsi_query.GetFieldOperator):
-                    field = _transform_external_calls_field_to_internal_calls_field(
-                        operand.get_field_, None
-                    )
+                    field = _transform_external_calls_field_to_internal_calls_field(operand.get_field_, None)
                     return field
                 elif isinstance(operand, tsi_query.ConvertOperation):
                     field = process_operand(operand.convert_.input)
@@ -453,9 +439,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
             select_columns = [x for x in simple_columns if x in select_columns]
             # add required columns, preserving requested column order
-            select_columns += [
-                rcol for rcol in required_columns if rcol not in select_columns
-            ]
+            select_columns += [rcol for rcol in required_columns if rcol not in select_columns]
 
         select_columns_names = [*select_columns]
 
@@ -600,9 +584,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     data = json.loads(call_dict[json_field])
                     # do ref expansion
                     if req.expand_columns:
-                        data = self._expand_refs(
-                            {json_field: data}, req.expand_columns
-                        )[json_field]
+                        data = self._expand_refs({json_field: data}, req.expand_columns)[json_field]
                     call_dict[json_field] = data
             # convert empty string display_names to None
             if "display_name" in call_dict:
@@ -613,9 +595,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 op_name=call_dict["op_name"],
                 started_at=datetime.datetime.fromisoformat(call_dict["started_at"]),
                 ended_at=(
-                    datetime.datetime.fromisoformat(call_dict["ended_at"])
-                    if call_dict.get("ended_at")
-                    else None
+                    datetime.datetime.fromisoformat(call_dict["ended_at"]) if call_dict.get("ended_at") else None
                 ),
                 exception=call_dict.get("exception"),
                 display_name=call_dict.get("display_name"),
@@ -625,9 +605,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 if mfield.is_required() and col not in call_dict:
                     if isinstance(mfield.annotation, str):
                         call_dict[col] = ""
-                    elif isinstance(
-                        mfield.annotation, (datetime.datetime, datetime.date)
-                    ):
+                    elif isinstance(mfield.annotation, (datetime.datetime, datetime.date)):
                         raise ValueError(f"Field '{col}' is required for selection")
                     else:
                         call_dict[col] = {}
@@ -640,9 +618,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
         return tsi.CallsQueryRes(calls=[tsi.CallSchema(**call) for call in calls])
 
-    def _expand_refs(
-        self, data: dict[str, Any], expand_columns: list[str]
-    ) -> dict[str, Any]:
+    def _expand_refs(self, data: dict[str, Any], expand_columns: list[str]) -> dict[str, Any]:
         """Recursively expand refs in the data. Only expand refs if requested in the
         expand_columns list. expand_columns must be sorted by depth, shallowest first.
         """
@@ -685,9 +661,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         return tsi.CallsQueryStatsRes(
             count=len(calls),
             total_storage_size_bytes=sum(
-                call.total_storage_size_bytes
-                for call in calls
-                if call.total_storage_size_bytes is not None
+                call.total_storage_size_bytes for call in calls if call.total_storage_size_bytes is not None
             ),
         )
 
@@ -757,9 +731,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
         conn, cursor = get_conn_cursor(self.db_path)
 
-        processed_result = process_incoming_object_val(
-            req.obj.val, req.obj.builtin_object_class
-        )
+        processed_result = process_incoming_object_val(req.obj.val, req.obj.builtin_object_class)
         processed_val = processed_result["val"]
         json_val = json.dumps(processed_val)
         digest = str_digest(json_val)
@@ -825,9 +797,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             conn.commit()
         return tsi.ObjCreateRes(digest=digest)
 
-    def _obj_exists(
-        self, cursor: sqlite3.Cursor, project_id: str, object_id: str, digest: str
-    ) -> bool:
+    def _obj_exists(self, cursor: sqlite3.Cursor, project_id: str, object_id: str, digest: str) -> bool:
         cursor.execute(
             "SELECT COUNT(*) FROM objects WHERE project_id = ? AND object_id = ? AND digest = ? AND deleted_at IS NULL",
             (project_id, object_id, digest),
@@ -837,9 +807,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             return False
         return return_row[0] > 0
 
-    def _mark_existing_objects_as_not_latest(
-        self, cursor: sqlite3.Cursor, project_id: str, object_id: str
-    ) -> None:
+    def _mark_existing_objects_as_not_latest(self, cursor: sqlite3.Cursor, project_id: str, object_id: str) -> None:
         """Mark all existing objects with such id as not latest.
         We are creating a new object with the same id, all existing ones are no longer latest.
         """
@@ -848,9 +816,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             (project_id, object_id),
         )
 
-    def _get_obj_version_index(
-        self, cursor: sqlite3.Cursor, project_id: str, object_id: str
-    ) -> int:
+    def _get_obj_version_index(self, cursor: sqlite3.Cursor, project_id: str, object_id: str) -> int:
         """Get the version index for a new object with such id."""
         cursor.execute(
             "SELECT COUNT(*) FROM objects WHERE project_id = ? AND object_id = ?",
@@ -943,9 +909,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         """
         parameters = [req.project_id, req.object_id]
         if req.digests:
-            digest_conditions = [
-                self._make_digest_condition(digest) for digest in req.digests
-            ]
+            digest_conditions = [self._make_digest_condition(digest) for digest in req.digests]
             digest_conditions_str = " OR ".join(digest_conditions)
             select_query += f"AND ({digest_conditions_str})"
 
@@ -954,9 +918,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         matching_objects = cursor.fetchall()
 
         if len(matching_objects) == 0:
-            raise NotFoundError(
-                f"Object {req.object_id} ({req.digests}) not found when deleting."
-            )
+            raise NotFoundError(f"Object {req.object_id} ({req.digests}) not found when deleting.")
         found_digests = {obj[0] for obj in matching_objects}
         if req.digests:
             given_digests = set(req.digests)
@@ -1011,9 +973,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
         return tsi.TableCreateRes(digest=digest, row_digests=row_digests)
 
-    def table_create_from_digests(
-        self, req: tsi.TableCreateFromDigestsReq
-    ) -> tsi.TableCreateFromDigestsRes:
+    def table_create_from_digests(self, req: tsi.TableCreateFromDigestsReq) -> tsi.TableCreateFromDigestsRes:
         """Create a table by specifying row digests, instead actual rows."""
         conn, cursor = get_conn_cursor(self.db_path)
 
@@ -1075,10 +1035,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 popped_digest = final_row_digests.pop(update.pop.index)
                 updated_digests.append(popped_digest)
             elif isinstance(update, tsi.TableInsertSpec):
-                if (
-                    update.insert.index > len(final_row_digests)
-                    or update.insert.index < 0
-                ):
+                if update.insert.index > len(final_row_digests) or update.insert.index < 0:
                     raise ValueError("Index out of range")
                 new_digest = add_new_row_needed_to_insert(update.insert.row)
                 final_row_digests.insert(update.insert.index, new_digest)
@@ -1111,11 +1068,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         parameters: list[str] = []
         if req.filter:
             if req.filter.row_digests:
-                conds.append(
-                    "tr.digest IN ({})".format(
-                        ",".join("?" * len(req.filter.row_digests))
-                    )
-                )
+                conds.append("tr.digest IN ({})".format(",".join("?" * len(req.filter.row_digests))))
                 parameters.extend(req.filter.row_digests)
             else:
                 conds.append("1 = 1")
@@ -1147,9 +1100,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     parts = field.split(".")
                     # Additional validation: ensure no empty path components
                     if any(not component.strip() for component in parts):
-                        raise InvalidRequest(
-                            f"Invalid sort field '{field}': field path components cannot be empty"
-                        )
+                        raise InvalidRequest(f"Invalid sort field '{field}': field path components cannot be empty")
                     field = f"json_extract(tr.val, '$.{'.'.join(parts)}')"
                 else:
                     field = f"json_extract(tr.val, '$.{field}')"
@@ -1205,9 +1156,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
     # This is a legacy endpoint, it should be removed once the client is mostly updated
     def table_query_stats(self, req: tsi.TableQueryStatsReq) -> tsi.TableQueryStatsRes:
-        batch_req = tsi.TableQueryStatsBatchReq(
-            project_id=req.project_id, digests=[req.digest]
-        )
+        batch_req = tsi.TableQueryStatsBatchReq(project_id=req.project_id, digests=[req.digest])
 
         res = self.table_query_stats_batch(batch_req)
 
@@ -1217,9 +1166,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         count = res.tables[0].count
         return tsi.TableQueryStatsRes(count=count)
 
-    def table_query_stats_batch(
-        self, req: tsi.TableQueryStatsBatchReq
-    ) -> tsi.TableQueryStatsBatchRes:
+    def table_query_stats_batch(self, req: tsi.TableQueryStatsBatchReq) -> tsi.TableQueryStatsBatchRes:
         parameters: list[Any] = [req.project_id] + list(req.digests or [])
 
         placeholders = ",".join(["?" for _ in (req.digests or [])])
@@ -1292,18 +1239,14 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     if isinstance(val, str) and val.startswith(weave_internal_prefix):
                         table_ref = ri.parse_internal_uri(val)
                         if not isinstance(table_ref, ri.InternalTableRef):
-                            raise ValueError(
-                                "invalid data layout encountered, expected TableRef when resolving id"
-                            )
+                            raise ValueError("invalid data layout encountered, expected TableRef when resolving id")
                         row = self._table_row_read(
                             project_id=table_ref.project_id,
                             row_digest=arg,
                         )
                         val = row.val
                     else:
-                        raise ValueError(
-                            "invalid data layout encountered, expected TableRef when resolving id"
-                        )
+                        raise ValueError("invalid data layout encountered, expected TableRef when resolving id")
                 else:
                     raise ValueError(f"Unknown ref type: {extra[extra_index]}")
             return val
@@ -1324,9 +1267,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
         return format_feedback_to_res(row)
 
-    def feedback_create_batch(
-        self, req: tsi.FeedbackCreateBatchReq
-    ) -> tsi.FeedbackCreateBatchRes:
+    def feedback_create_batch(self, req: tsi.FeedbackCreateBatchReq) -> tsi.FeedbackCreateBatchRes:
         """Create multiple feedback items in a batch efficiently."""
         rows_to_insert = []
         results = []
@@ -1346,9 +1287,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             with self.lock:
                 # Insert each row individually but in a single transaction
                 for row in rows_to_insert:
-                    prepared = TABLE_FEEDBACK.insert(row).prepare(
-                        database_type="sqlite"
-                    )
+                    prepared = TABLE_FEEDBACK.insert(row).prepare(database_type="sqlite")
                     cursor.executemany(prepared.sql, prepared.data)
                 conn.commit()
 
@@ -1406,12 +1345,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             payload=create_result.payload,
         )
 
-    def actions_execute_batch(
-        self, req: tsi.ActionsExecuteBatchReq
-    ) -> tsi.ActionsExecuteBatchRes:
-        raise NotImplementedError(
-            "actions_execute_batch is not implemented for SQLite trace server"
-        )
+    def actions_execute_batch(self, req: tsi.ActionsExecuteBatchReq) -> tsi.ActionsExecuteBatchRes:
+        raise NotImplementedError("actions_execute_batch is not implemented for SQLite trace server")
 
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         conn, cursor = get_conn_cursor(self.db_path)
@@ -1455,37 +1390,27 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         print("COST PURGE is not implemented for local sqlite", req)
         return tsi.CostPurgeRes()
 
-    def completions_create(
-        self, req: tsi.CompletionsCreateReq
-    ) -> tsi.CompletionsCreateRes:
+    def completions_create(self, req: tsi.CompletionsCreateReq) -> tsi.CompletionsCreateRes:
         # TODO: This is not implemented for the sqlite trace server
         # Currently, this will only be called from the weave file, so we return an empty dict for now
         return tsi.CompletionsCreateRes(response={})
 
-    def completions_create_stream(
-        self, req: tsi.CompletionsCreateReq
-    ) -> Iterator[dict[str, Any]]:
+    def completions_create_stream(self, req: tsi.CompletionsCreateReq) -> Iterator[dict[str, Any]]:
         # TODO: This is not implemented for the sqlite trace server
         # Fall back to non-streaming completion
         response = self.completions_create(req)
         yield {"response": response.response, "weave_call_id": response.weave_call_id}
 
-    def image_create(
-        self, req: tsi.ImageGenerationCreateReq
-    ) -> tsi.ImageGenerationCreateRes:
+    def image_create(self, req: tsi.ImageGenerationCreateReq) -> tsi.ImageGenerationCreateRes:
         # TODO: This is not implemented for the sqlite trace server
         # Currently, this will only be called from the weave file, so we return an empty dict for now
         return tsi.ImageGenerationCreateRes(response={})
 
     def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
         if not isinstance(req.traces, ExportTraceServiceRequest):
-            raise TypeError(
-                "Expected traces as ExportTraceServiceRequest, got {type(req.traces)}"
-            )
+            raise TypeError("Expected traces as ExportTraceServiceRequest, got {type(req.traces)}")
 
-        traces_data = [
-            ResourceSpans.from_proto(span) for span in req.traces.resource_spans
-        ]
+        traces_data = [ResourceSpans.from_proto(span) for span in req.traces.resource_spans]
 
         calls = []
         for resource_spans in traces_data:
@@ -1506,13 +1431,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         return tsi.OtelExportRes()
 
     def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes:
-        raise NotImplementedError(
-            "project_stats is not implemented for SQLite trace server"
-        )
+        raise NotImplementedError("project_stats is not implemented for SQLite trace server")
 
-    def threads_query_stream(
-        self, req: tsi.ThreadsQueryReq
-    ) -> Iterator[tsi.ThreadSchema]:
+    def threads_query_stream(self, req: tsi.ThreadsQueryReq) -> Iterator[tsi.ThreadSchema]:
         """Stream threads with aggregated statistics sorted by last activity."""
         conn, cursor = get_conn_cursor(self.db_path)
 
@@ -1556,12 +1477,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             if start_time_str and last_updated_str:
                 try:
                     # SQLite stores datetime as string, parse it
-                    start_time = datetime.datetime.fromisoformat(
-                        start_time_str.replace("Z", "+00:00")
-                    )
-                    last_updated = datetime.datetime.fromisoformat(
-                        last_updated_str.replace("Z", "+00:00")
-                    )
+                    start_time = datetime.datetime.fromisoformat(start_time_str.replace("Z", "+00:00"))
+                    last_updated = datetime.datetime.fromisoformat(last_updated_str.replace("Z", "+00:00"))
                 except (ValueError, AttributeError):
                     # Skip threads without valid timestamps
                     continue
@@ -1597,9 +1514,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         )
         return tsi.EvaluateModelRes(call_id=call_id)
 
-    def evaluation_status(
-        self, req: tsi.EvaluationStatusReq
-    ) -> tsi.EvaluationStatusRes:
+    def evaluation_status(self, req: tsi.EvaluationStatusReq) -> tsi.EvaluationStatusRes:
         return evaluation_status(self, req)
 
     def _table_row_read(self, project_id: str, row_digest: str) -> tsi.TableRowSchema:
@@ -1615,9 +1530,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         query_result = cursor.fetchone()
         if query_result is None:
             raise NotFoundError(f"Row {row_digest} not found")
-        return tsi.TableRowSchema(
-            digest=query_result[0], val=json.loads(query_result[1])
-        )
+        return tsi.TableRowSchema(digest=query_result[0], val=json.loads(query_result[1]))
 
     def _select_objs_query(
         self,
@@ -1702,9 +1615,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             )
         return result
 
-    def table_query_stream(
-        self, req: tsi.TableQueryReq
-    ) -> Iterator[tsi.TableRowSchema]:
+    def table_query_stream(self, req: tsi.TableQueryReq) -> Iterator[tsi.TableRowSchema]:
         results = self.table_query(req)
         yield from results.rows
 
@@ -1792,14 +1703,6 @@ def _transform_external_calls_field_to_internal_calls_field(
                 sql_type = "TEXT"
             else:
                 raise ValueError(f"Unknown cast: {cast}")
-        field = (
-            "CAST(json_extract("
-            + json.dumps(field)
-            + ", '"
-            + json_path
-            + "') AS "
-            + sql_type
-            + ")"
-        )
+        field = "CAST(json_extract(" + json.dumps(field) + ", '" + json_path + "') AS " + sql_type + ")"
 
     return field

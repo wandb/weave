@@ -85,9 +85,7 @@ def test_conversation_manager_worker_queue(monkeypatch):
     mgr = cm_mod.ConversationManager()
 
     # Use a server event that the registry listens for
-    msg = models.InputAudioBufferClearedMessage(
-        type="input_audio_buffer.cleared", event_id="event_1"
-    )
+    msg = models.InputAudioBufferClearedMessage(type="input_audio_buffer.cleared", event_id="event_1")
 
     async def run():
         await mgr.submit_event(msg)

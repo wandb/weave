@@ -61,9 +61,7 @@ def test_then_multiple_futures() -> None:
 
     future_data1: Future[list[int]] = executor.defer(fetch_data1)
     future_data2: Future[list[int]] = executor.defer(fetch_data2)
-    future_result: Future[int] = executor.then(
-        [future_data1, future_data2], process_multiple_data
-    )
+    future_result: Future[int] = executor.then([future_data1, future_data2], process_multiple_data)
     assert future_result.result() == 15
 
 
@@ -136,9 +134,7 @@ def test_max_workers() -> None:
         return delay
 
     start_time: float = time.time()
-    futures: list[Future[int]] = [
-        executor.defer(lambda: slow_task(1)) for _ in range(4)
-    ]
+    futures: list[Future[int]] = [executor.defer(lambda: slow_task(1)) for _ in range(4)]
     results: list[int] = [f.result() for f in futures]
     end_time: float = time.time()
 

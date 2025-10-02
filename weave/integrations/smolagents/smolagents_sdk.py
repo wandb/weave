@@ -37,9 +37,7 @@ def smolagents_wrapper(settings: OpSettings) -> Callable[[Callable], Callable]:
     return wrapper
 
 
-def get_symbol_patcher(
-    base_symbol: str, attribute_name: str, settings: OpSettings
-) -> SymbolPatcher | None:
+def get_symbol_patcher(base_symbol: str, attribute_name: str, settings: OpSettings) -> SymbolPatcher | None:
     try:
         module = importlib.import_module(base_symbol)
     except ImportError:
@@ -57,31 +55,19 @@ def get_symbol_patcher(
         return None
 
     display_name = base_symbol + "." + attribute_name
-    display_name = (
-        display_name.replace(".__call__", "")
-        if attribute_name.endswith(".__call__")
-        else display_name
-    )
+    display_name = display_name.replace(".__call__", "") if attribute_name.endswith(".__call__") else display_name
     return SymbolPatcher(
         lambda: module,
         attribute_name,
-        smolagents_wrapper(
-            settings.model_copy(update={"name": settings.name or display_name})
-        ),
+        smolagents_wrapper(settings.model_copy(update={"name": settings.name or display_name})),
     )
 
 
-def get_multi_step_agent_patchers(
-    agent_class_name: str, settings: OpSettings
-) -> list[SymbolPatcher | None]:
+def get_multi_step_agent_patchers(agent_class_name: str, settings: OpSettings) -> list[SymbolPatcher | None]:
     return [
         get_symbol_patcher("smolagents", f"{agent_class_name}.run", settings),
-        get_symbol_patcher(
-            "smolagents", f"{agent_class_name}.provide_final_answer", settings
-        ),
-        get_symbol_patcher(
-            "smolagents", f"{agent_class_name}.execute_tool_call", settings
-        ),
+        get_symbol_patcher("smolagents", f"{agent_class_name}.provide_final_answer", settings),
+        get_symbol_patcher("smolagents", f"{agent_class_name}.execute_tool_call", settings),
         get_symbol_patcher("smolagents", f"{agent_class_name}.__call__", settings),
         get_symbol_patcher("smolagents", f"{agent_class_name}.step", settings),
     ]

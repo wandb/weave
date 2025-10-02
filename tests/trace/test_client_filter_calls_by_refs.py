@@ -142,9 +142,7 @@ def test_filter_calls_by_ref_properties(client):
                             "$eq": [
                                 {
                                     "$convert": {
-                                        "input": {
-                                            "$getField": "inputs.worker_config.config.temperature"
-                                        },
+                                        "input": {"$getField": "inputs.worker_config.config.temperature"},
                                         "to": "double",
                                     }
                                 },
@@ -193,9 +191,7 @@ def test_filter_calls_by_ref_properties(client):
                     "$gt": [
                         {
                             "$convert": {
-                                "input": {
-                                    "$getField": "output.processed_worker.config.max_tokens"
-                                },
+                                "input": {"$getField": "output.processed_worker.config.max_tokens"},
                                 "to": "double",
                             }
                         },
@@ -221,9 +217,7 @@ def test_filter_calls_by_ref_properties(client):
                             "$eq": [
                                 {
                                     "$convert": {
-                                        "input": {
-                                            "$getField": "inputs.worker_config.id"
-                                        },
+                                        "input": {"$getField": "inputs.worker_config.id"},
                                         "to": "double",
                                     }
                                 },
@@ -242,9 +236,7 @@ def test_filter_calls_by_ref_properties(client):
             expand_columns=["inputs.worker_config", "output.processed_worker"],
         )
     )
-    assert (
-        len(calls) == 2
-    )  # Should get both calls (worker1 by id=1, worker2 by status=inactive)
+    assert len(calls) == 2  # Should get both calls (worker1 by id=1, worker2 by status=inactive)
 
     # Test filtering without expand_columns should not work for ref values
     calls = list(
@@ -273,9 +265,7 @@ def test_filter_calls_by_ref_properties(client):
             query={
                 "$expr": {
                     "$eq": [
-                        {
-                            "$getField": "inputs.worker_config.config.nested.nested key with spaces.one"
-                        },
+                        {"$getField": "inputs.worker_config.config.nested.nested key with spaces.one"},
                         {"$literal": "1"},
                     ]
                 }
@@ -305,18 +295,8 @@ def test_filter_calls_by_ref_properties(client):
             ],
         )
     )
-    assert (
-        calls[0].inputs["worker_config"]["config"]["nested"]["nested key with spaces"][
-            "one"
-        ]
-        == "1"
-    )
-    assert (
-        calls[1].inputs["worker_config"]["config"]["nested"]["nested key with spaces"][
-            "one"
-        ]
-        == "2"
-    )
+    assert calls[0].inputs["worker_config"]["config"]["nested"]["nested key with spaces"]["one"] == "1"
+    assert calls[1].inputs["worker_config"]["config"]["nested"]["nested key with spaces"]["one"] == "2"
 
     # desc
     calls = list(
@@ -334,18 +314,8 @@ def test_filter_calls_by_ref_properties(client):
             ],
         )
     )
-    assert (
-        calls[0].inputs["worker_config"]["config"]["nested"]["nested key with spaces"][
-            "one"
-        ]
-        == "2"
-    )
-    assert (
-        calls[1].inputs["worker_config"]["config"]["nested"]["nested key with spaces"][
-            "one"
-        ]
-        == "1"
-    )
+    assert calls[0].inputs["worker_config"]["config"]["nested"]["nested key with spaces"]["one"] == "2"
+    assert calls[1].inputs["worker_config"]["config"]["nested"]["nested key with spaces"]["one"] == "1"
 
 
 def test_filter_calls_by_ref_properties_with_table_rows_simple(client):

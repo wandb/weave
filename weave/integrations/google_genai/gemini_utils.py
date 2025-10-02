@@ -35,9 +35,7 @@ def google_genai_gemini_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, 
     return inputs
 
 
-def google_genai_gemini_on_finish(
-    call: Call, output: Any, exception: Optional[BaseException] = None
-) -> None:
+def google_genai_gemini_on_finish(call: Call, output: Any, exception: Optional[BaseException] = None) -> None:
     """On finish handler for the Google GenAI Gemini API integration that ensures the usage
     metadata is added to the summary of the trace.
     """
@@ -82,9 +80,7 @@ def google_genai_gemini_accumulator(
     if acc.usage_metadata.candidates_token_count is None:
         acc.usage_metadata.candidates_token_count = 0
     elif value.usage_metadata.candidates_token_count is not None:
-        acc.usage_metadata.candidates_token_count += (
-            value.usage_metadata.candidates_token_count
-        )
+        acc.usage_metadata.candidates_token_count += value.usage_metadata.candidates_token_count
 
     if acc.usage_metadata.total_token_count is None:
         acc.usage_metadata.total_token_count = 0
@@ -94,9 +90,7 @@ def google_genai_gemini_accumulator(
     if acc.usage_metadata.cached_content_token_count is None:
         acc.usage_metadata.cached_content_token_count = 0
     elif value.usage_metadata.cached_content_token_count is not None:
-        acc.usage_metadata.cached_content_token_count += (
-            value.usage_metadata.cached_content_token_count
-        )
+        acc.usage_metadata.cached_content_token_count += value.usage_metadata.cached_content_token_count
 
     return acc
 

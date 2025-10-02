@@ -51,10 +51,7 @@ def _make_sort_part(sort_by: Optional[list[tsi.SortBy]]) -> str:
 
     sort_clauses = []
     for sort in sort_by:
-        if (
-            sort.field in VALID_OBJECT_SORT_FIELDS
-            and sort.direction in VALID_SORT_DIRECTIONS
-        ):
+        if sort.field in VALID_OBJECT_SORT_FIELDS and sort.direction in VALID_SORT_DIRECTIONS:
             sort_clause = f"{sort.field} {sort.direction.upper()}"
             sort_clauses.append(sort_clause)
     return _make_optional_part("ORDER BY", ", ".join(sort_clauses))
@@ -67,9 +64,7 @@ def _make_conditions_part(conditions: Optional[list[str]]) -> str:
     return _make_optional_part("WHERE", conditions_str)
 
 
-def _make_object_id_conditions_part(
-    object_id_conditions: Optional[list[str]], add_where_clause: bool = False
-) -> str:
+def _make_object_id_conditions_part(object_id_conditions: Optional[list[str]], add_where_clause: bool = False) -> str:
     """Formats object_id_conditions into a query string. In this file is it only
     used after the WHERE project_id... clause, but passing add_where_clause=True
     adds a WHERE clause to the query string.
@@ -151,9 +146,7 @@ class ObjectMetadataQueryBuilder:
     def offset_part(self) -> str:
         return _make_offset_part(self._offset)
 
-    def _make_digest_condition(
-        self, digest: str, param_key: Optional[str] = None, index: Optional[int] = None
-    ) -> str:
+    def _make_digest_condition(self, digest: str, param_key: Optional[str] = None, index: Optional[int] = None) -> str:
         """If digest is "latest", return the condition for the latest version.
         Otherwise, return the condition for the version with the given digest.
         If digest is a version like "v123", return the condition for the version
@@ -172,17 +165,13 @@ class ObjectMetadataQueryBuilder:
             param_key = param_key or "version_digest"
             return self._make_version_digest_condition(digest, param_key, index)
 
-    def _make_version_digest_condition(
-        self, digest: str, param_key: str, index: Optional[int] = None
-    ) -> str:
+    def _make_version_digest_condition(self, digest: str, param_key: str, index: Optional[int] = None) -> str:
         if index is not None:
             param_key = f"{param_key}_{index}"
         self.parameters.update({param_key: digest})
         return f"digest = {{{param_key}: String}}"
 
-    def _make_version_index_condition(
-        self, version_index: int, param_key: str, index: Optional[int] = None
-    ) -> str:
+    def _make_version_index_condition(self, version_index: int, param_key: str, index: Optional[int] = None) -> str:
         if index is not None:
             param_key = f"{param_key}_{index}"
         self.parameters.update({param_key: version_index})
@@ -197,18 +186,14 @@ class ObjectMetadataQueryBuilder:
         digests_condition = combine_conditions(digest_conditions, "OR")
         self._conditions.append(digests_condition)
 
-    def add_object_ids_condition(
-        self, object_ids: list[str], param_key: Optional[str] = None
-    ) -> None:
+    def add_object_ids_condition(self, object_ids: list[str], param_key: Optional[str] = None) -> None:
         if len(object_ids) == 1:
             param_key = param_key or "object_id"
             self._object_id_conditions.append(f"object_id = {{{param_key}: String}}")
             self.parameters.update({param_key: object_ids[0]})
         else:
             param_key = param_key or "object_ids"
-            self._object_id_conditions.append(
-                f"object_id IN {{{param_key}: Array(String)}}"
-            )
+            self._object_id_conditions.append(f"object_id IN {{{param_key}: Array(String)}}")
             self.parameters.update({param_key: object_ids})
 
     def add_is_latest_condition(self) -> None:
@@ -221,15 +206,11 @@ class ObjectMetadataQueryBuilder:
             self._conditions.append("is_op = 0")
 
     def add_base_object_classes_condition(self, base_object_classes: list[str]) -> None:
-        self._conditions.append(
-            "base_object_class IN {base_object_classes: Array(String)}"
-        )
+        self._conditions.append("base_object_class IN {base_object_classes: Array(String)}")
         self.parameters.update({"base_object_classes": base_object_classes})
 
     def add_leaf_object_classes_condition(self, leaf_object_classes: list[str]) -> None:
-        self._conditions.append(
-            "leaf_object_class IN {leaf_object_classes: Array(String)}"
-        )
+        self._conditions.append("leaf_object_class IN {leaf_object_classes: Array(String)}")
         self.parameters.update({"leaf_object_classes": leaf_object_classes})
 
     def add_order(self, field: str, direction: str) -> None:

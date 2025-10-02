@@ -34,9 +34,7 @@ def _is_valid_realtime_url(url: Any) -> bool:
         return False
     s_lower = s.lower()
     print(url)
-    return s_lower.startswith("wss://api.openai.com") or s_lower.startswith(
-        "api.openai.com"
-    )
+    return s_lower.startswith("wss://api.openai.com") or s_lower.startswith("api.openai.com")
 
 
 def _extract_url_from_args_kwargs(
@@ -179,9 +177,7 @@ def get_openai_realtime_websocket_patcher(
                 make_new_value=make_new_async_value,
             ),
             SymbolPatcher(
-                get_base_symbol=lambda: importlib.import_module(
-                    "aiohttp"
-                ).ClientSession,
+                get_base_symbol=lambda: importlib.import_module("aiohttp").ClientSession,
                 attribute_name="ws_connect",
                 make_new_value=make_aiohttp_ws_connect,
             ),

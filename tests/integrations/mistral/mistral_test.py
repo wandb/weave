@@ -18,9 +18,7 @@ def patch_mistral() -> Generator[None, None, None]:
 
 
 @pytest.mark.skip_clickhouse_client
-@pytest.mark.vcr(
-    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
-)
+@pytest.mark.vcr(filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"])
 def test_mistral_quickstart(client: weave.trace.weave_client.WeaveClient) -> None:
     # This is taken directly from https://docs.mistral.ai/getting-started/quickstart/
 
@@ -82,9 +80,7 @@ Each of these cheeses has its unique characteristics, so the "best" one depends 
 
 
 @pytest.mark.skip_clickhouse_client
-@pytest.mark.vcr(
-    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
-)
+@pytest.mark.vcr(filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"])
 @pytest.mark.asyncio
 async def test_mistral_quickstart_async(
     client: weave.trace.weave_client.WeaveClient,
@@ -141,9 +137,7 @@ Each of these cheeses offers a unique taste and texture, so the "best" one is a 
 
 
 @pytest.mark.skip_clickhouse_client
-@pytest.mark.vcr(
-    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
-)
+@pytest.mark.vcr(filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"])
 def test_mistral_quickstart_with_stream(
     client: weave.trace.weave_client.WeaveClient,
 ) -> None:
@@ -201,9 +195,7 @@ Each of these cheeses offers a unique taste and texture, so the "best" one depen
 
 
 @pytest.mark.skip_clickhouse_client
-@pytest.mark.vcr(
-    filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"]
-)
+@pytest.mark.vcr(filter_headers=["authorization"], allowed_hosts=["api.wandb.ai", "localhost"])
 @pytest.mark.asyncio
 async def test_mistral_quickstart_with_stream_async(
     client: weave.trace.weave_client.WeaveClient,

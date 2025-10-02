@@ -184,9 +184,7 @@ def test_score_with_custom_summarize(client):
         ),
     ],
 )
-async def test_basic_evaluation_with_scorer_styles(
-    client, scorers, expected_output_key
-):
+async def test_basic_evaluation_with_scorer_styles(client, scorers, expected_output_key):
     # Define all possible scorers
     @weave.op
     def fn_scorer_with_old_style(col_a, col_b, model_output, target):

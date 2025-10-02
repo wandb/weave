@@ -7,9 +7,7 @@ from weave.trace.autopatch import OpSettings
 from weave.trace.op import _add_accumulator
 
 
-def instructor_partial_accumulator(
-    acc: Optional[BaseModel], value: BaseModel
-) -> BaseModel:
+def instructor_partial_accumulator(acc: Optional[BaseModel], value: BaseModel) -> BaseModel:
     if acc is None or acc != value:
         acc = value
     return acc

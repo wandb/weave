@@ -36,9 +36,7 @@ def test_query_to_filters_none():
 
 def test_query_to_filters_one_filter():
     query = tsi.Query(**{"$expr": {"$eq": [{"$getField": "rank"}, {"$literal": 1}]}})
-    assert query_to_filters(query) == [
-        Filter(field="rank", operator="(number): =", value=1)
-    ]
+    assert query_to_filters(query) == [Filter(field="rank", operator="(number): =", value=1)]
 
     query = tsi.Query(
         **{
@@ -50,20 +48,10 @@ def test_query_to_filters_one_filter():
             }
         }
     )
-    assert query_to_filters(query) == [
-        Filter(field="completion_token_cost", operator="(number): >", value=25)
-    ]
+    assert query_to_filters(query) == [Filter(field="completion_token_cost", operator="(number): >", value=25)]
 
-    query = tsi.Query(
-        **{
-            "$expr": {
-                "$eq": [{"$getField": "inputs.model"}, {"$literal": "gpt-4o-mini"}]
-            }
-        }
-    )
-    assert query_to_filters(query) == [
-        Filter(field="inputs.model", operator="(string): equals", value="gpt-4o-mini")
-    ]
+    query = tsi.Query(**{"$expr": {"$eq": [{"$getField": "inputs.model"}, {"$literal": "gpt-4o-mini"}]}})
+    assert query_to_filters(query) == [Filter(field="inputs.model", operator="(string): equals", value="gpt-4o-mini")]
 
 
 def test_query_to_filters_multiple_filters():
@@ -89,9 +77,7 @@ def test_query_to_filters_multiple_filters():
     )
     assert query_to_filters(query) == [
         Filter(field="inputs.model", operator="(string): equals", value="gpt-4o-mini"),
-        Filter(
-            field="output.object", operator="(string): equals", value="chat.completion"
-        ),
+        Filter(field="output.object", operator="(string): equals", value="chat.completion"),
     ]
 
 
@@ -110,12 +96,8 @@ def test_roundtrip_operators():
         Filter(field="test", operator="(any): isEmpty", value=None),
         Filter(field="test", operator="(any): isNotEmpty", value=None),
         # There is special handling for started_at because we convert it to a numeric filter
-        Filter(
-            field="started_at", operator="(date): after", value="2025-01-01T00:00:00"
-        ),
-        Filter(
-            field="started_at", operator="(date): before", value="2025-01-01T00:00:00"
-        ),
+        Filter(field="started_at", operator="(date): after", value="2025-01-01T00:00:00"),
+        Filter(field="started_at", operator="(date): before", value="2025-01-01T00:00:00"),
     ]
     for case in cases:
         filters = [case]
@@ -126,21 +108,13 @@ def test_roundtrip_operators():
 
 def test_filter_op_without_client():
     """If we haven't done an init, we don't know what entity/project a non-qualified op name is in."""
-    with pytest.raises(
-        ValueError, match="Must specify Op URI if entity/project is not known"
-    ):
-        weave.SavedView("traces", "My saved view").filter_op(
-            "Evaluation.predict_and_score"
-        )
+    with pytest.raises(ValueError, match="Must specify Op URI if entity/project is not known"):
+        weave.SavedView("traces", "My saved view").filter_op("Evaluation.predict_and_score")
 
 
 def test_filter_op_with_client(client):
-    view = weave.SavedView("traces", "My saved view").filter_op(
-        "Evaluation.predict_and_score"
-    )
-    assert view.base.definition.filter.op_names == [
-        "weave:///shawn/test-project/op/Evaluation.predict_and_score:*"
-    ]
+    view = weave.SavedView("traces", "My saved view").filter_op("Evaluation.predict_and_score")
+    assert view.base.definition.filter.op_names == ["weave:///shawn/test-project/op/Evaluation.predict_and_score:*"]
     view.filter_op(None)
     assert view.base.definition.filter is None
 

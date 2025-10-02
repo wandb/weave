@@ -29,9 +29,7 @@ def install_require_weave_client(monkeypatch, client: DummyWeaveClient):
     # Ensure the in-function import gets our stub
     mod = ModuleType("weave.trace.context.weave_client_context")
     mod.require_weave_client = lambda: client
-    monkeypatch.setitem(
-        __import__("sys").modules, "weave.trace.context.weave_client_context", mod
-    )
+    monkeypatch.setitem(__import__("sys").modules, "weave.trace.context.weave_client_context", mod)
 
 
 def make_session_text():
@@ -114,9 +112,7 @@ def test_fifo_completion_orders_responses_by_arrival(monkeypatch):
     exp = StateExporter()
     # Active session with text modality -> transcripts gating applies
     exp.handle_session_updated(
-        models.SessionUpdatedMessage(
-            type="session.updated", event_id="event_0", session=make_session_text()
-        )
+        models.SessionUpdatedMessage(type="session.updated", event_id="event_0", session=make_session_text())
     )
 
     # User items
@@ -124,17 +120,13 @@ def test_fifo_completion_orders_responses_by_arrival(monkeypatch):
         id="item_u1",
         object="realtime.item",
         role="user",
-        content=[
-            models.InputAudioContentPart(type="input_audio", audio="", transcript=None)
-        ],
+        content=[models.InputAudioContentPart(type="input_audio", audio="", transcript=None)],
     )
     user2 = models.ServerUserMessageItem(
         id="item_u2",
         object="realtime.item",
         role="user",
-        content=[
-            models.InputAudioContentPart(type="input_audio", audio="", transcript=None)
-        ],
+        content=[models.InputAudioContentPart(type="input_audio", audio="", transcript=None)],
     )
     exp.items[user1.id] = user1
     exp.items[user2.id] = user2
@@ -181,29 +173,17 @@ def test_fifo_completion_orders_responses_by_arrival(monkeypatch):
 
     # Signal created (sets pending_response, used for context)
     exp.handle_response_created(
-        models.ResponseCreatedMessage(
-            type="response.created", event_id="event_1", response=resp1
-        )
+        models.ResponseCreatedMessage(type="response.created", event_id="event_1", response=resp1)
     )
     # Done arrives for resp1 first, but transcript for user1 not ready yet
-    exp.handle_response_done(
-        models.ResponseDoneMessage(
-            type="response.done", event_id="event_2", response=resp1
-        )
-    )
+    exp.handle_response_done(models.ResponseDoneMessage(type="response.done", event_id="event_2", response=resp1))
 
     # Now second response created and done; user2 transcript is ready immediately
     exp.handle_response_created(
-        models.ResponseCreatedMessage(
-            type="response.created", event_id="event_3", response=resp2
-        )
+        models.ResponseCreatedMessage(type="response.created", event_id="event_3", response=resp2)
     )
     exp.transcript_completed.add(user2.id)
-    exp.handle_response_done(
-        models.ResponseDoneMessage(
-            type="response.done", event_id="event_4", response=resp2
-        )
-    )
+    exp.handle_response_done(models.ResponseDoneMessage(type="response.done", event_id="event_4", response=resp2))
 
     # Allow timers to run once
     time.sleep(0.12)
@@ -231,9 +211,7 @@ def test_transcripts_not_required_when_text_modality_absent(monkeypatch):
     install_require_weave_client(monkeypatch, client)
     import weave.integrations.openai_realtime.state_exporter as se
 
-    monkeypatch.setattr(
-        se.Content, "from_bytes", staticmethod(lambda b, extension: {"ok": True})
-    )
+    monkeypatch.setattr(se.Content, "from_bytes", staticmethod(lambda b, extension: {"ok": True}))
 
     exp = StateExporter()
     # Session without text modality -> no gating
@@ -253,9 +231,7 @@ def test_transcripts_not_required_when_text_modality_absent(monkeypatch):
         max_response_output_tokens=None,
     )
     exp.handle_session_updated(
-        models.SessionUpdatedMessage(
-            type="session.updated", event_id="event_0", session=session
-        )
+        models.SessionUpdatedMessage(type="session.updated", event_id="event_0", session=session)
     )
 
     out = models.ResponseMessageItem(
@@ -273,15 +249,9 @@ def test_transcripts_not_required_when_text_modality_absent(monkeypatch):
         conversation_id=None,
     )
     exp.handle_response_created(
-        models.ResponseCreatedMessage(
-            type="response.created", event_id="event_1", response=resp
-        )
+        models.ResponseCreatedMessage(type="response.created", event_id="event_1", response=resp)
     )
-    exp.handle_response_done(
-        models.ResponseDoneMessage(
-            type="response.done", event_id="event_2", response=resp
-        )
-    )
+    exp.handle_response_done(models.ResponseDoneMessage(type="response.done", event_id="event_2", response=resp))
 
     # Should finish quickly without waiting for any transcripts
     time.sleep(0.08)

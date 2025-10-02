@@ -14,7 +14,5 @@ class EvaluateModelTestDispatcher(EvaluateModelDispatcher):
         self.id_converter = id_converter
 
     def dispatch(self, args: EvaluateModelArgs) -> None:
-        externalized_args = universal_int_to_ext_ref_converter(
-            args, self.id_converter.int_to_ext_project_id
-        )
+        externalized_args = universal_int_to_ext_ref_converter(args, self.id_converter.int_to_ext_project_id)
         evaluate_model(externalized_args)

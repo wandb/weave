@@ -66,15 +66,9 @@ class ConversationManager:
 
         handlers: dict[str, Handler] = {
             # Session lifecycle
-            "session.created": adapt_handler(
-                models.SessionCreatedMessage, self.state.handle_session_created
-            ),
-            "session.update": adapt_handler(
-                models.SessionUpdateMessage, self.state.handle_session_update
-            ),
-            "session.updated": adapt_handler(
-                models.SessionUpdatedMessage, self.state.handle_session_updated
-            ),
+            "session.created": adapt_handler(models.SessionCreatedMessage, self.state.handle_session_created),
+            "session.update": adapt_handler(models.SessionUpdateMessage, self.state.handle_session_update),
+            "session.updated": adapt_handler(models.SessionUpdatedMessage, self.state.handle_session_updated),
             # Input audio buffer lifecycle
             "input_audio_buffer.append": adapt_handler(
                 models.InputAudioBufferAppendMessage,
@@ -97,23 +91,15 @@ class ConversationManager:
                 self.state.handle_speech_stopped,
             ),
             # Conversation item changes
-            "conversation.item.created": adapt_handler(
-                models.ItemCreatedMessage, self.state.handle_item_created
-            ),
-            "conversation.item.deleted": adapt_handler(
-                models.ItemDeletedMessage, self.state.handle_item_deleted
-            ),
+            "conversation.item.created": adapt_handler(models.ItemCreatedMessage, self.state.handle_item_created),
+            "conversation.item.deleted": adapt_handler(models.ItemDeletedMessage, self.state.handle_item_deleted),
             "conversation.item.input_audio_transcription.completed": adapt_handler(
                 models.ItemInputAudioTranscriptionCompletedMessage,
                 self.state.handle_item_input_audio_transcription_completed,
             ),
             # Response lifecycle and parts
-            "response.created": adapt_handler(
-                models.ResponseCreatedMessage, self.state.handle_response_created
-            ),
-            "response.done": adapt_handler(
-                models.ResponseDoneMessage, self.state.handle_response_done
-            ),
+            "response.created": adapt_handler(models.ResponseCreatedMessage, self.state.handle_response_created),
+            "response.done": adapt_handler(models.ResponseDoneMessage, self.state.handle_response_done),
             "response.audio.delta": adapt_handler(
                 models.ResponseAudioDeltaMessage, self.state.handle_response_audio_delta
             ),
@@ -138,9 +124,7 @@ class ConversationManager:
         if self._worker_thread is not None and self._worker_thread.is_alive():
             return
         self._stop_event.clear()
-        t = threading.Thread(
-            target=self._worker, name="ConversationManagerWorker", daemon=True
-        )
+        t = threading.Thread(target=self._worker, name="ConversationManagerWorker", daemon=True)
         t.start()
         self._worker_thread = t
 

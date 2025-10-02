@@ -32,9 +32,7 @@ class KafkaProducer(ConfluentKafkaProducer):
 
     def __init__(self, config: dict[str, Any]):
         super().__init__(config)
-        self.max_buffer_size = (
-            kafka_producer_max_buffer_size() or DEFAULT_MAX_BUFFER_SIZE
-        )
+        self.max_buffer_size = kafka_producer_max_buffer_size() or DEFAULT_MAX_BUFFER_SIZE
 
     @classmethod
     def from_env(
@@ -50,9 +48,7 @@ class KafkaProducer(ConfluentKafkaProducer):
         # with only 1 retry to prevent continued failures when timeout is due to size
         request_timeout_ms = 5000
         # worst case total request time hardcap
-        total_timeout_ms = (
-            request_timeout_ms * (num_retries + 1) + request_retry_backoff_ms
-        )
+        total_timeout_ms = request_timeout_ms * (num_retries + 1) + request_retry_backoff_ms
         config = {
             "bootstrap.servers": _make_broker_host(),
             "client.id": socket.gethostname(),
@@ -66,9 +62,7 @@ class KafkaProducer(ConfluentKafkaProducer):
 
         return cls(config)
 
-    def produce_call_end(
-        self, call_end: tsi.EndedCallSchemaForInsert, flush_immediately: bool = False
-    ) -> None:
+    def produce_call_end(self, call_end: tsi.EndedCallSchemaForInsert, flush_immediately: bool = False) -> None:
         """Produce a call_end message to Kafka with buffer size management.
 
         Drops messages if buffer is full to prevent unbounded memory growth.
@@ -129,9 +123,7 @@ class KafkaConsumer(ConfluentKafkaConsumer):
     """
 
     @classmethod
-    def from_env(
-        cls, group_id: str, additional_kafka_config: Optional[dict[str, Any]] = None
-    ) -> "KafkaConsumer":
+    def from_env(cls, group_id: str, additional_kafka_config: Optional[dict[str, Any]] = None) -> "KafkaConsumer":
         if additional_kafka_config is None:
             additional_kafka_config = {}
 

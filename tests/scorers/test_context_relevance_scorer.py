@@ -22,11 +22,9 @@ def weave_context_relevance_scorer():
 def test_context_relevance_scorer_basic(weave_context_relevance_scorer):
     """Test that a basic matching query/output does not get flagged."""
     query = "What is the moon made of?"
-    output = (
-        "The moon is a big rock made primarily of silicate minerals. It consists of an \
+    output = "The moon is a big rock made primarily of silicate minerals. It consists of an \
 iron-rich core, a rocky mantle, and a thin crust composed mainly of oxygen, silicon, magnesium, \
 iron, calcium, and aluminum."
-    )
     result = weave_context_relevance_scorer.score(
         query=query,
         output=output,
@@ -40,14 +38,9 @@ def test_long_context(weave_context_relevance_scorer):
     """Test the context relevance scorer with a long context."""
     query = "What is the capital of France?"
     # Generate a context about something completely unrelated
-    irrelevant_context = (
-        "The process of photosynthesis involves chlorophyll capturing light energy. "
-        * 1000
-    )
+    irrelevant_context = "The process of photosynthesis involves chlorophyll capturing light energy. " * 1000
     irrelevant_context += "Mitochondria are the powerhouses of the cell. " * 1000
-    irrelevant_context += (
-        "DNA replication occurs during the S phase of the cell cycle. " * 1000
-    )
+    irrelevant_context += "DNA replication occurs during the S phase of the cell cycle. " * 1000
 
     result = weave_context_relevance_scorer.score(
         query=query,

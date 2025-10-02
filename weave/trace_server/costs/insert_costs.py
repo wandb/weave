@@ -68,12 +68,8 @@ def insert_costs_into_db(client: Client, data: dict[str, list[CostDetails]]) -> 
             provider_id = cost.get("provider", "default")
             input_token_cost = cost.get("input", 0)
             output_token_cost = cost.get("output", 0)
-            date_str = cost.get(
-                "created_at", datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            )
-            created_at = datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S").replace(
-                tzinfo=timezone.utc
-            )
+            date_str = cost.get("created_at", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+            created_at = datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
             rows.append(
                 (
                     str(uuid.uuid4()),
@@ -111,9 +107,7 @@ def insert_costs_into_db(client: Client, data: dict[str, list[CostDetails]]) -> 
     )
 
 
-def filter_out_current_costs(
-    client: Client, new_costs: dict[str, list[CostDetails]]
-) -> dict[str, list[CostDetails]]:
+def filter_out_current_costs(client: Client, new_costs: dict[str, list[CostDetails]]) -> dict[str, list[CostDetails]]:
     current_costs = get_current_costs(client)
     for (
         llm_id,
@@ -184,9 +178,5 @@ def insert_costs(client: Client, target_db: str) -> None:
 
 # We only want to insert costs if the target db version is 5 or higher
 # because the costs table was added in migration 5
-def should_insert_costs(
-    db_curr_version: int, db_target_version: Optional[int] = None
-) -> bool:
-    return db_target_version is None or (
-        db_target_version >= 5 and db_curr_version < db_target_version
-    )
+def should_insert_costs(db_curr_version: int, db_target_version: Optional[int] = None) -> bool:
+    return db_target_version is None or (db_target_version >= 5 and db_curr_version < db_target_version)

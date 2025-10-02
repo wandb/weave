@@ -11,9 +11,7 @@ from weave.scorers.scorer_types import LLMScorer
 
 
 class EntityExtractionResponse(BaseModel):
-    entities: list[str] = Field(
-        description="A list of unique entities extracted from the text"
-    )
+    entities: list[str] = Field(description="A list of unique entities extracted from the text")
 
 
 class ContextEntityRecallScorer(LLMScorer):
@@ -64,9 +62,7 @@ class ContextEntityRecallScorer(LLMScorer):
             response_format=EntityExtractionResponse,
             model=self.model_id,
         )
-        response = EntityExtractionResponse.model_validate_json(
-            response.choices[0].message.content
-        )
+        response = EntityExtractionResponse.model_validate_json(response.choices[0].message.content)
         # Assume entities are returned as a comma-separated list
         entities = [e.strip() for e in response.entities]
         return entities
@@ -84,9 +80,7 @@ class ContextEntityRecallScorer(LLMScorer):
 
 
 class RelevancyResponse(BaseModel):
-    reasoning: str = Field(
-        description="Think step by step about whether the context is relevant to the question"
-    )
+    reasoning: str = Field(description="Think step by step about whether the context is relevant to the question")
     relevancy_score: int = Field(
         description="The relevancy score of the context to the question (0 for not relevant, 1 for relevant)"
     )
@@ -140,7 +134,5 @@ class ContextRelevancyScorer(LLMScorer):
             response_format=RelevancyResponse,
             model=self.model_id,
         )
-        response = RelevancyResponse.model_validate_json(
-            response.choices[0].message.content
-        )
+        response = RelevancyResponse.model_validate_json(response.choices[0].message.content)
         return response.model_dump()

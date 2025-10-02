@@ -16,9 +16,7 @@ class InvalidInternalRef(ValueError):
     pass
 
 
-def universal_ext_to_int_ref_converter(
-    obj: A, convert_ext_to_int_project_id: Callable[[str], str]
-) -> A:
+def universal_ext_to_int_ref_converter(obj: A, convert_ext_to_int_project_id: Callable[[str], str]) -> A:
     """Takes any object and recursively replaces all external references with
     internal references. The external references are expected to be in the
     format of `weave:///entity/project/...` and the internal references are
@@ -45,9 +43,7 @@ def universal_ext_to_int_ref_converter(
         entity, project, tail = parts
         project_key = f"{entity}/{project}"
         if project_key not in ext_to_int_project_cache:
-            ext_to_int_project_cache[project_key] = convert_ext_to_int_project_id(
-                project_key
-            )
+            ext_to_int_project_cache[project_key] = convert_ext_to_int_project_id(project_key)
         internal_project_id = ext_to_int_project_cache[project_key]
         return f"{ri.WEAVE_INTERNAL_SCHEME}:///{internal_project_id}/{tail}"
 
@@ -98,9 +94,7 @@ def universal_int_to_ext_ref_converter(
             raise InvalidInternalRef(f"Invalid URI: {ref_str}")
         project_id, tail = parts
         if project_id not in int_to_ext_project_cache:
-            int_to_ext_project_cache[project_id] = convert_int_to_ext_project_id(
-                project_id
-            )
+            int_to_ext_project_cache[project_id] = convert_int_to_ext_project_id(project_id)
         external_project_id = int_to_ext_project_cache[project_id]
         if not external_project_id:
             return f"{ri.WEAVE_PRIVATE_SCHEME}://///{tail}"

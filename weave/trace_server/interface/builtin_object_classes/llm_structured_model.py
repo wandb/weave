@@ -37,9 +37,7 @@ class Message(BaseModel):
     tool_call_id: Optional[str] = None
 
 
-def _substitute_template_variables(
-    messages: list[Message], template_vars: dict[str, Any]
-) -> list[Message]:
+def _substitute_template_variables(messages: list[Message], template_vars: dict[str, Any]) -> list[Message]:
     """Substitute template variables using Python's .format()."""
     substituted_messages = []
 
@@ -48,13 +46,9 @@ def _substitute_template_variables(
 
         if isinstance(message_dict.get("content"), str):
             try:
-                message_dict["content"] = message_dict["content"].format(
-                    **template_vars
-                )
+                message_dict["content"] = message_dict["content"].format(**template_vars)
             except KeyError as e:
-                raise ValueError(
-                    f"Template variable {e} not found in template_vars"
-                ) from e
+                raise ValueError(f"Template variable {e} not found in template_vars") from e
 
         substituted_messages.append(Message.model_validate(message_dict))
 
@@ -173,11 +167,7 @@ class LLMStructuredCompletionModel(Model):
         try:
             # The 'response' attribute of CompletionsCreateRes is a dict
             response_payload = api_response.response
-            response_format = (
-                req.inputs.response_format.get("type")
-                if req.inputs.response_format is not None
-                else None
-            )
+            response_format = req.inputs.response_format.get("type") if req.inputs.response_format is not None else None
             return parse_response(response_payload, response_format)
         except (
             KeyError,
@@ -199,9 +189,7 @@ class LLMStructuredCompletionModel(Model):
     ) -> CompletionsCreateReq:
         # Ensure user_input is properly converted to a list of Message objects
         # This is needed because the @op decorator might interfere with Pydantic validation
-        if not isinstance(user_input, list) or (
-            user_input and not isinstance(user_input[0], Message)
-        ):
+        if not isinstance(user_input, list) or (user_input and not isinstance(user_input[0], Message)):
             user_input = cast_to_message_list(user_input)
 
         # 1. Prepare messages with template variable substitution
@@ -210,9 +198,7 @@ class LLMStructuredCompletionModel(Model):
             template_msgs = self.default_params.messages_template
             # Apply template variable substitution if variables are provided
             if template_vars:
-                template_msgs = _substitute_template_variables(
-                    template_msgs, template_vars
-                )
+                template_msgs = _substitute_template_variables(template_msgs, template_vars)
 
         prepared_messages_dicts = _prepare_llm_messages(template_msgs, user_input)
 
@@ -295,9 +281,7 @@ def parse_params_to_litellm_params(
             if isinstance(value, str) and is_response_format(value):
                 litellm_response_format_value = {"type": value}
             elif (
-                isinstance(value, dict)
-                and "type" in value
-                and is_response_format(value["type"])
+                isinstance(value, dict) and "type" in value and is_response_format(value["type"])
             ):  # Pre-formed dict with valid type
                 litellm_response_format_value = value
 

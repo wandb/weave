@@ -53,33 +53,24 @@ def _get_valid_evaluation(client: WeaveClient, evaluation_ref: str) -> Evaluatio
     loaded_evaluation = client.get(Ref.parse_uri(evaluation_ref))
 
     if not isinstance(loaded_evaluation, Evaluation):
-        raise TypeError(
-            f"Invalid evaluation reference: expected Evaluation, "
-            f"got {type(loaded_evaluation).__name__}"
-        )
+        raise TypeError(f"Invalid evaluation reference: expected Evaluation, got {type(loaded_evaluation).__name__}")
 
     scorers = loaded_evaluation.scorers
     if scorers:
         for scorer in scorers:
             if not isinstance(scorer, LLMAsAJudgeScorer):
-                raise TypeError(
-                    f"Invalid scorer reference: expected LLMAsAJudgeScorer, "
-                    f"got {type(scorer).__name__}"
-                )
+                raise TypeError(f"Invalid scorer reference: expected LLMAsAJudgeScorer, got {type(scorer).__name__}")
 
     return loaded_evaluation
 
 
 @ddtrace.tracer.wrap(name="evaluate_model_worker.evaluate_model.get_valid_model")
-def _get_valid_model(
-    client: WeaveClient, model_ref: str
-) -> LLMStructuredCompletionModel:
+def _get_valid_model(client: WeaveClient, model_ref: str) -> LLMStructuredCompletionModel:
     loaded_model = client.get(Ref.parse_uri(model_ref))
 
     if not isinstance(loaded_model, LLMStructuredCompletionModel):
         raise TypeError(
-            f"Invalid model reference: expected LLMStructuredCompletionModel, "
-            f"got {type(loaded_model).__name__}"
+            f"Invalid model reference: expected LLMStructuredCompletionModel, got {type(loaded_model).__name__}"
         )
     return loaded_model
 
@@ -91,8 +82,4 @@ def _run_evaluation(
     evaluation_call_id: str,
 ) -> None:
     with weave.attributes(EVALUATE_MODEL_WORKER_MARKER):
-        return asyncio.run(
-            loaded_evaluation.evaluate(
-                loaded_model, __weave={"call_id": evaluation_call_id}
-            )
-        )
+        return asyncio.run(loaded_evaluation.evaluate(loaded_model, __weave={"call_id": evaluation_call_id}))

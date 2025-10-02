@@ -51,10 +51,7 @@ def to_json_serializable(value: Any) -> Any:
     elif isinstance(value, (bytes, bytearray)):
         return base64.b64encode(value).decode("ascii")
     elif hasattr(value, "__dataclass_fields__"):
-        return {
-            k: to_json_serializable(getattr(value, k))
-            for k in value.__dataclass_fields__
-        }
+        return {k: to_json_serializable(getattr(value, k)) for k in value.__dataclass_fields__}
     else:
         raise ValueError(f"Unsupported type for JSON serialization: {type(value)}")
 
@@ -154,9 +151,7 @@ def convert_numeric_keys_to_list(
     # Check if all keys are numeric strings and contiguous starting from 0
     try:
         keys = sorted(int(k) for k in obj.keys())
-        if keys == list(range(len(keys))) and all(
-            isinstance(k, str) and k.isdigit() for k in obj.keys()
-        ):
+        if keys == list(range(len(keys))) and all(isinstance(k, str) and k.isdigit() for k in obj.keys()):
             # Convert to list, preserving order
             return [obj[str(i)] for i in range(len(keys))]
     except (ValueError, TypeError):
@@ -198,9 +193,7 @@ def expand_attributes(kv: Iterable[tuple[str, Any]]) -> dict[str, Any]:
     return result_dict
 
 
-def flatten_attributes(
-    data: dict[str, Any], json_attributes: Optional[list[str]] = None
-) -> dict[str, Any]:
+def flatten_attributes(data: dict[str, Any], json_attributes: Optional[list[str]] = None) -> dict[str, Any]:
     """Flatten a nested Python dictionary into a flat dictionary with dot-separated keys.
 
     Args:
@@ -217,9 +210,7 @@ def flatten_attributes(
 
     def _flatten(obj: Union[dict[str, Any], list[Any]], prefix: str = "") -> None:
         # Check if the entire object should be stringified as JSON
-        should_stringify_entire_obj = any(
-            prefix.rstrip(".") == attr for attr in json_attributes
-        )
+        should_stringify_entire_obj = any(prefix.rstrip(".") == attr for attr in json_attributes)
 
         if should_stringify_entire_obj:
             result[prefix.rstrip(".")] = json.dumps(obj)
@@ -230,13 +221,9 @@ def flatten_attributes(
                 new_key = f"{prefix}{key}" if prefix else key
 
                 # Check if this exact key's value should be stringified as JSON
-                should_stringify_as_json = any(
-                    new_key == attr for attr in json_attributes
-                )
+                should_stringify_as_json = any(new_key == attr for attr in json_attributes)
 
-                if (
-                    isinstance(value, dict) or isinstance(value, list)
-                ) and not should_stringify_as_json:
+                if (isinstance(value, dict) or isinstance(value, list)) and not should_stringify_as_json:
                     # Recursively flatten nested dictionaries or lists
                     _flatten(value, f"{new_key}.")
                 else:
@@ -250,13 +237,9 @@ def flatten_attributes(
                 new_key = f"{prefix}{i}"
 
                 # Check if this exact key's value should be stringified as JSON
-                should_stringify_as_json = any(
-                    new_key == attr for attr in json_attributes
-                )
+                should_stringify_as_json = any(new_key == attr for attr in json_attributes)
 
-                if (
-                    isinstance(item, dict) or isinstance(item, list)
-                ) and not should_stringify_as_json:
+                if (isinstance(item, dict) or isinstance(item, list)) and not should_stringify_as_json:
                     # Recursively flatten nested dictionaries or lists
                     _flatten(item, f"{new_key}.")
                 else:
@@ -376,9 +359,7 @@ def capture_parts(s: str, delimiters: Optional[list[str]] = None) -> list[str]:
     return result
 
 
-def shorten_name(
-    name: str, max_len: int, abbrv: str = "...", use_delimiter_in_abbr: bool = True
-) -> str:
+def shorten_name(name: str, max_len: int, abbrv: str = "...", use_delimiter_in_abbr: bool = True) -> str:
     """Shorten a string to a maximum length by intelligently abbreviating at delimiters.
 
     This function shortens a string to fit within a specified maximum length.
@@ -440,9 +421,7 @@ def shorten_name(
         else:
             delimiter_with_abbrv = f"{next_delimiter}{abbrv}"
 
-        if len(shortened_name) + len(next_part) >= max_len - (
-            len(delimiter_with_abbrv)
-        ):
+        if len(shortened_name) + len(next_part) >= max_len - (len(delimiter_with_abbrv)):
             shortened_name += delimiter_with_abbrv
             break
         else:

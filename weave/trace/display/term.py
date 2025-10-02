@@ -18,9 +18,7 @@ class WeaveFormatter(logging.Formatter):
         # First let the parent class handle the formatting
         formatted_message = super().format(record)
         # Then add the weave prefix to each line
-        return "\n".join(
-            [f"{LOG_STRING}: {line}" for line in formatted_message.split("\n")]
-        )
+        return "\n".join([f"{LOG_STRING}: {line}" for line in formatted_message.split("\n")])
 
 
 def in_colab() -> bool:

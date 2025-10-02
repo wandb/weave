@@ -52,9 +52,7 @@ def test_ensure_project_exists_project_not_found_create_success(
 
     assert result == {"project_name": "new_project"}
     mock_api.project.assert_called_once_with("test_entity", "test_project")
-    mock_api.upsert_project.assert_called_once_with(
-        entity="test_entity", project="test_project"
-    )
+    mock_api.upsert_project.assert_called_once_with(entity="test_entity", project="test_project")
 
 
 def test_ensure_project_exists_project_not_found_create_fails(mock_api_with_no_project):

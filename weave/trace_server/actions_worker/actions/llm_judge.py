@@ -56,9 +56,7 @@ def do_llm_judge_action(
         )
     )
 
-    content = (
-        completion.response.get("choices", [{}])[0].get("message", {}).get("content")
-    )
+    content = completion.response.get("choices", [{}])[0].get("message", {}).get("content")
     if content is None:
         res = None
     else:

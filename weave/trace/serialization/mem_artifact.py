@@ -35,9 +35,7 @@ class MemTraceFilesArtifact:
 
     @overload
     @contextlib.contextmanager
-    def new_file(
-        self, path: str, binary: Literal[False] = False
-    ) -> Iterator[StringIO]: ...
+    def new_file(self, path: str, binary: Literal[False] = False) -> Iterator[StringIO]: ...
 
     @overload
     @contextlib.contextmanager
@@ -65,9 +63,7 @@ class MemTraceFilesArtifact:
             if binary:
                 val = self.path_contents[path]
                 if not isinstance(val, bytes):
-                    raise ValueError(
-                        f"Expected binary file, but got string for path {path}"
-                    )
+                    raise ValueError(f"Expected binary file, but got string for path {path}")
                 f = BytesIO(val)
             else:
                 val = self.path_contents[path]

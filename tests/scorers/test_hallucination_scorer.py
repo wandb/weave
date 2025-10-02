@@ -81,9 +81,7 @@ async def test_hallucination_scorer_eval(hallucination_scorer):
     )
     result = await evaluation.evaluate(model)
     assert result["HallucinationFreeScorer"]["has_hallucination"]["true_count"] == 2
-    assert (
-        result["HallucinationFreeScorer"]["has_hallucination"]["true_fraction"] == 1.0
-    )
+    assert result["HallucinationFreeScorer"]["has_hallucination"]["true_fraction"] == 1.0
 
 
 @pytest.mark.asyncio
@@ -112,6 +110,4 @@ async def test_hallucination_scorer_eval2(hallucination_scorer):
     )
     result = await evaluation.evaluate(model)
     assert result["HallucinationFreeScorer"]["has_hallucination"]["true_count"] == 2
-    assert (
-        result["HallucinationFreeScorer"]["has_hallucination"]["true_fraction"] == 1.0
-    )
+    assert result["HallucinationFreeScorer"]["has_hallucination"]["true_fraction"] == 1.0

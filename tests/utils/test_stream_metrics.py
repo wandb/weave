@@ -36,9 +36,7 @@ def test_ttft_basic_calculation():
     # First content chunk should calculate TTFT
     first_content_chunk = MockChunk(content="Hello")
     with patch("time.time", return_value=1001.5):
-        ttft = calculate_time_to_first_token(
-            accumulator, first_content_chunk, simple_content_detector
-        )
+        ttft = calculate_time_to_first_token(accumulator, first_content_chunk, simple_content_detector)
 
     assert ttft == 1.5
     assert extract_time_to_first_token(accumulator) == 1.5
@@ -54,12 +52,8 @@ def test_ttft_ignores_empty_chunks():
     empty_chunk2 = MockChunk(content="")
 
     with patch("time.time", return_value=1001.0):
-        ttft1 = calculate_time_to_first_token(
-            accumulator, empty_chunk1, simple_content_detector
-        )
-        ttft2 = calculate_time_to_first_token(
-            accumulator, empty_chunk2, simple_content_detector
-        )
+        ttft1 = calculate_time_to_first_token(accumulator, empty_chunk1, simple_content_detector)
+        ttft2 = calculate_time_to_first_token(accumulator, empty_chunk2, simple_content_detector)
 
     assert ttft1 is None
     assert ttft2 is None
@@ -68,9 +62,7 @@ def test_ttft_ignores_empty_chunks():
     # First content chunk should calculate TTFT
     first_content_chunk = MockChunk(content="Hello")
     with patch("time.time", return_value=1002.5):
-        ttft3 = calculate_time_to_first_token(
-            accumulator, first_content_chunk, simple_content_detector
-        )
+        ttft3 = calculate_time_to_first_token(accumulator, first_content_chunk, simple_content_detector)
 
     assert ttft3 == 2.5
     assert extract_time_to_first_token(accumulator) == 2.5
@@ -84,16 +76,12 @@ def test_ttft_calculated_only_once():
     # First content chunk - should calculate TTFT
     first_content_chunk = MockChunk(content="Hello")
     with patch("time.time", return_value=1001.5):
-        ttft1 = calculate_time_to_first_token(
-            accumulator, first_content_chunk, simple_content_detector
-        )
+        ttft1 = calculate_time_to_first_token(accumulator, first_content_chunk, simple_content_detector)
 
     # Second content chunk - should NOT recalculate TTFT
     second_content_chunk = MockChunk(content=" World")
     with patch("time.time", return_value=1002.0):
-        ttft2 = calculate_time_to_first_token(
-            accumulator, second_content_chunk, simple_content_detector
-        )
+        ttft2 = calculate_time_to_first_token(accumulator, second_content_chunk, simple_content_detector)
 
     assert ttft1 == 1.5
     assert ttft2 is None
@@ -134,9 +122,7 @@ def test_streaming_response():
 
     for chunk in _mock_streaming_response():
         # Calculate TTFT for this chunk
-        ttft = calculate_time_to_first_token(
-            accumulator, chunk, simple_content_detector
-        )
+        ttft = calculate_time_to_first_token(accumulator, chunk, simple_content_detector)
         ttft_results.append(ttft)
 
         # Simulate accumulator recreation (like in real streaming)
@@ -148,9 +134,7 @@ def test_streaming_response():
     # Verify results
     assert ttft_results[0] is None, "First chunk (metadata) should not calculate TTFT"
     assert ttft_results[1] is None, "Second chunk (metadata) should not calculate TTFT"
-    assert ttft_results[2] is not None, (
-        "Third chunk (first content) should calculate TTFT"
-    )
+    assert ttft_results[2] is not None, "Third chunk (first content) should calculate TTFT"
     assert ttft_results[3] is None, "Fourth chunk should not recalculate TTFT"
     assert ttft_results[4] is None, "Fifth chunk should not recalculate TTFT"
 

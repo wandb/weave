@@ -122,9 +122,7 @@ def undo_threadsafe_patch_to_pil_image() -> None:
     except ImportError:
         pass
     except Exception as e:
-        logger.info(
-            f"Failed to unpatch PIL.ImageFile.ImageFile: Unable to restore original methods - {e}"
-        )
+        logger.info(f"Failed to unpatch PIL.ImageFile.ImageFile: Unable to restore original methods - {e}")
     else:
         _patched = False
 

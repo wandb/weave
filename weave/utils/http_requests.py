@@ -75,9 +75,7 @@ def pprint_json(text: str) -> None:
 
 def pprint_prepared_request(prepared_request: PreparedRequest) -> None:
     """Pretty print a PreparedRequest."""
-    time_text = Text(
-        datetime.datetime.now().strftime("%H:%M:%S.%f"), style=STYLE_METADATA
-    )
+    time_text = Text(datetime.datetime.now().strftime("%H:%M:%S.%f"), style=STYLE_METADATA)
     thread_text = Text(str(threading.get_ident()), style=STYLE_METADATA)
     method_text = Text(f"{prepared_request.method}", style=STYLE_METHOD)
     url_text = Text(f"{prepared_request.url}", style=STYLE_URL)

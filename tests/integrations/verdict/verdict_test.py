@@ -50,9 +50,7 @@ def test_simple_verdict_pipeline(client: WeaveClient) -> None:
 
     # Verify the first call is our pipeline
     pipeline_call = calls[0]
-    assert (
-        "Pipeline" in pipeline_call.op_name or "TestPipeline" in pipeline_call.op_name
-    )
+    assert "Pipeline" in pipeline_call.op_name or "TestPipeline" in pipeline_call.op_name
 
     flattened = flatten_calls(calls)
     assert len(flattened) >= 1  # At least one call should be created
@@ -84,11 +82,7 @@ def test_verdict_layer_tracing(client: WeaveClient) -> None:
 
     # Create a pipeline with a layer containing multiple judges (ensemble)
     pipeline = Pipeline(name="LayerTestPipeline")
-    pipeline = (
-        pipeline
-        >> Layer([JudgeUnit().prompt("Rate this: {source.text}")], repeat=3)
-        >> MeanPoolUnit()
-    )
+    pipeline = pipeline >> Layer([JudgeUnit().prompt("Rate this: {source.text}")], repeat=3) >> MeanPoolUnit()
 
     # Create test data
     test_data = Schema.of(text="This is a test message for layer tracing")
@@ -184,9 +178,7 @@ def test_verdict_block_tracing(client: WeaveClient) -> None:
 
     # Create a complex block structure
     judge1 = JudgeUnit(name="FirstJudge").prompt("Rate this: {source.text}")
-    judge2 = JudgeUnit(name="SecondJudge").prompt(
-        "Verify: {previous.score}, Text: {source.text}"
-    )
+    judge2 = JudgeUnit(name="SecondJudge").prompt("Verify: {previous.score}, Text: {source.text}")
 
     block = Block() >> judge1 >> judge2
 
@@ -238,15 +230,11 @@ def test_verdict_dataset_execution_tracing(client: WeaveClient) -> None:
     pipeline = pipeline >> JudgeUnit().prompt("Rate this: {source.text}")
 
     # Create test dataset
-    test_dataset = Dataset.from_list(
-        [{"text": "First test message"}, {"text": "Second test message"}]
-    )
+    test_dataset = Dataset.from_list([{"text": "First test message"}, {"text": "Second test message"}])
     dataset_wrapper = DatasetWrapper(test_dataset)
 
     # Run the pipeline on dataset
-    response, leaf_prefixes = pipeline.run_from_dataset(
-        dataset_wrapper, max_workers=2, graceful=True
-    )
+    response, leaf_prefixes = pipeline.run_from_dataset(dataset_wrapper, max_workers=2, graceful=True)
 
     # Get calls from Weave client
     calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))

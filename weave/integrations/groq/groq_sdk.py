@@ -15,9 +15,7 @@ if TYPE_CHECKING:
 _groq_patcher: MultiPatcher | None = None
 
 
-def groq_accumulator(
-    acc: ChatCompletion | None, value: ChatCompletionChunk
-) -> ChatCompletion:
+def groq_accumulator(acc: ChatCompletion | None, value: ChatCompletionChunk) -> ChatCompletion:
     from groq.types.chat import ChatCompletion, ChatCompletionMessage
     from groq.types.chat.chat_completion import Choice
     from groq.types.chat.chat_completion_chunk import Choice as ChoiceChunk
@@ -71,14 +69,10 @@ def groq_accumulator(
 
     if value.choices:
         for idx, choice in enumerate(value.choices):
-            if isinstance(acc.choices[idx].message.content, str) and isinstance(
-                choice.delta.content, str
-            ):
+            if isinstance(acc.choices[idx].message.content, str) and isinstance(choice.delta.content, str):
                 acc.choices[idx].message.content += choice.delta.content
             if acc.choices[idx].message.function_call:
-                acc.choices[idx].message.function_call.append(
-                    choice.delta.function_call
-                )
+                acc.choices[idx].message.function_call.append(choice.delta.function_call)
             if acc.choices[idx].message.tool_call:
                 acc.choices[idx].message.tool_call.append(choice.delta.tool_call)
 
@@ -117,9 +111,7 @@ def get_groq_patcher(
 
     base = settings.op_settings
 
-    chat_completions_settings = base.model_copy(
-        update={"name": base.name or "groq.chat.completions.create"}
-    )
+    chat_completions_settings = base.model_copy(update={"name": base.name or "groq.chat.completions.create"})
     async_chat_completions_settings = base.model_copy(
         update={"name": base.name or "groq.async.chat.completions.create"}
     )

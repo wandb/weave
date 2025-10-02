@@ -109,9 +109,7 @@ def get_extension_from_mimetype(mimetype: str) -> str | None:
     mimetypes = _get_mimetypes_module()
     extension = mimetypes.guess_extension(mimetype)
     if not extension:
-        logger.warning(
-            f"Got mime-type {mimetype} but failed to resolve a valid extension"
-        )
+        logger.warning(f"Got mime-type {mimetype} but failed to resolve a valid extension")
     return extension
 
 
@@ -174,16 +172,10 @@ def get_mime_and_extension(
     if mimetype and extension:
         return mimetype, extension
 
-    elif (
-        mimetype
-        and not extension
-        and (guessed_ext := get_extension_from_mimetype(mimetype))
-    ):
+    elif mimetype and not extension and (guessed_ext := get_extension_from_mimetype(mimetype)):
         return mimetype, guessed_ext
 
-    elif (
-        extension and not mimetype and (guessed_type := guess_from_extension(extension))
-    ):
+    elif extension and not mimetype and (guessed_type := guess_from_extension(extension)):
         return guessed_type, extension
 
     if filename is not None:
@@ -198,11 +190,7 @@ def get_mime_and_extension(
     if mimetype and extension:
         return mimetype, extension
 
-    elif (
-        mimetype
-        and not extension
-        and (extension := get_extension_from_mimetype(mimetype))
-    ):
+    elif mimetype and not extension and (extension := get_extension_from_mimetype(mimetype)):
         return mimetype, extension
 
     if filename is not None:

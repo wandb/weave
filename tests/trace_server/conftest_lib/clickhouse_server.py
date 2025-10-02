@@ -12,9 +12,7 @@ from tests.trace_server.conftest_lib.container_management import check_server_up
 from weave.trace_server import environment as ts_env
 
 
-def ensure_clickhouse_db_container_running(
-    host: str, port: int
-) -> typing.Callable[[], None]:
+def ensure_clickhouse_db_container_running(host: str, port: int) -> typing.Callable[[], None]:
     """ClickHouse server fixture that automatically starts a server if one isn't already running.
 
     This fixture checks if a ClickHouse server is already running on the configured host/port.
@@ -30,12 +28,8 @@ def ensure_clickhouse_db_container_running(
         container_name = "weave-python-test-clickhouse-server"
 
         # First, ensure any existing container is stopped and removed
-        subprocess.run(
-            ["docker", "stop", container_name], capture_output=True, check=False
-        )
-        subprocess.run(
-            ["docker", "rm", container_name], capture_output=True, check=False
-        )
+        subprocess.run(["docker", "stop", container_name], capture_output=True, check=False)
+        subprocess.run(["docker", "rm", container_name], capture_output=True, check=False)
 
         # Start the ClickHouse container
         process = subprocess.Popen(
@@ -75,25 +69,17 @@ def ensure_clickhouse_db_container_running(
         server_up = check_server_up(host, port)
         if not server_up:
             # Clean up the container if server didn't start properly
-            subprocess.run(
-                ["docker", "stop", container_name], capture_output=True, check=False
-            )
-            pytest.fail(
-                f"ClickHouse server failed to start and become healthy on {host}:{port}"
-            )
+            subprocess.run(["docker", "stop", container_name], capture_output=True, check=False)
+            pytest.fail(f"ClickHouse server failed to start and become healthy on {host}:{port}")
 
     def cleanup():
         if started_container:
-            subprocess.run(
-                ["docker", "stop", started_container], capture_output=True, check=False
-            )
+            subprocess.run(["docker", "stop", started_container], capture_output=True, check=False)
 
     return cleanup
 
 
-def ensure_clickhouse_db_process_running(
-    host: str, port: int
-) -> typing.Callable[[], None]:
+def ensure_clickhouse_db_process_running(host: str, port: int) -> typing.Callable[[], None]:
     """ClickHouse server fixture that automatically starts a server process if one isn't already running.
 
     This fixture checks if a ClickHouse server is already running on the configured host/port.
@@ -109,9 +95,7 @@ def ensure_clickhouse_db_process_running(
         # Check if clickhouse-server is available
         clickhouse_binary = shutil.which("clickhouse-server")
         if not clickhouse_binary:
-            pytest.fail(
-                "ClickHouse server binary not found. Please install ClickHouse or use Docker version."
-            )
+            pytest.fail("ClickHouse server binary not found. Please install ClickHouse or use Docker version.")
 
         # Create temporary directory for ClickHouse data and config
         temp_dir = tempfile.mkdtemp(prefix="weave-clickhouse-test-")
@@ -126,9 +110,7 @@ def ensure_clickhouse_db_process_running(
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 cwd=temp_dir,
-                preexec_fn=os.setsid
-                if os.name != "nt"
-                else None,  # Create new process group on Unix
+                preexec_fn=os.setsid if os.name != "nt" else None,  # Create new process group on Unix
             )
             started_process = process
 
@@ -145,17 +127,13 @@ def ensure_clickhouse_db_process_running(
                     else:
                         process.terminate()
                     process.wait()
-                pytest.fail(
-                    f"ClickHouse server process failed to start and become healthy on {host}:{port}"
-                )
+                pytest.fail(f"ClickHouse server process failed to start and become healthy on {host}:{port}")
 
         except Exception as e:
             pytest.fail(f"Failed to start ClickHouse server process: {e!s}")
 
     def cleanup():
-        if (
-            started_process and started_process.poll() is None
-        ):  # Process is still running
+        if started_process and started_process.poll() is None:  # Process is still running
             try:
                 if os.name != "nt":
                     # On Unix, terminate the entire process group

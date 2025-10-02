@@ -42,10 +42,7 @@ def _print_wandb_version_check() -> None:
         return
 
     if _parse_version(REQUIRED_WANDB_VERSION) > _parse_version(wandb.__version__):
-        message = (
-            "wandb version >= 0.16.4 is required.  To upgrade, please run:\n"
-            " $ pip install wandb --upgrade"
-        )
+        message = "wandb version >= 0.16.4 is required.  To upgrade, please run:\n $ pip install wandb --upgrade"
         logger.info(message)
         return
 
@@ -81,9 +78,7 @@ def _print_version_check() -> None:
     _print_weave_version_check()
 
 
-def assert_min_weave_version(
-    min_required_version: str, trace_server_host: str = "https://trace.wandb.ai"
-) -> None:
+def assert_min_weave_version(min_required_version: str, trace_server_host: str = "https://trace.wandb.ai") -> None:
     import weave
 
     if _parse_version(min_required_version) > _parse_version(weave.__version__):
@@ -96,9 +91,7 @@ def assert_min_weave_version(
         raise ValueError(message)
 
 
-def print_init_message(
-    username: str | None, entity_name: str, project_name: str, read_only: bool
-) -> None:
+def print_init_message(username: str | None, entity_name: str, project_name: str, read_only: bool) -> None:
     try:
         _print_version_check()
     except Exception as e:
@@ -107,9 +100,7 @@ def print_init_message(
     message = ""
     if username is not None:
         message += f"Logged in as Weights & Biases user: {username}.\n"
-    message += (
-        f"View Weave data at {urls.project_weave_root_url(entity_name, project_name)}"
-    )
+    message += f"View Weave data at {urls.project_weave_root_url(entity_name, project_name)}"
     # Cosmetically, if we are in `read_only` mode, we are not logging data, so
     # we should not print the message about logging data.
     if not read_only:

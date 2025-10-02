@@ -13,9 +13,7 @@ from typing_extensions import TypedDict
 
 from weave.trace_server.interface.query import Query
 
-WB_USER_ID_DESCRIPTION = (
-    "Do not set directly. Server will automatically populate this field."
-)
+WB_USER_ID_DESCRIPTION = "Do not set directly. Server will automatically populate this field."
 
 
 class BaseModelStrict(BaseModel):
@@ -226,9 +224,7 @@ class ObjSchemaForInsert(BaseModel):
     val: Any
     builtin_object_class: Optional[str] = None
     # Keeping `set_base_object_class` here until it is successfully removed from UI client
-    set_base_object_class: Optional[str] = Field(
-        exclude=True, default=None, deprecated=True
-    )
+    set_base_object_class: Optional[str] = Field(exclude=True, default=None, deprecated=True)
 
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
@@ -359,9 +355,7 @@ class CompletionsCreateReq(BaseModelStrict):
     project_id: str
     inputs: CompletionsCreateRequestInputs
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
-    track_llm_call: Optional[bool] = Field(
-        True, description="Whether to track this LLM call in the trace server"
-    )
+    track_llm_call: Optional[bool] = Field(True, description="Whether to track this LLM call in the trace server")
 
 
 class CompletionsCreateRes(BaseModel):
@@ -423,23 +417,19 @@ class CallsQueryReq(BaseModelStrict):
     query: Optional[Query] = None
     include_costs: Optional[bool] = Field(
         default=False,
-        description="Beta, subject to change. If true, the response will"
-        " include any model costs for each call.",
+        description="Beta, subject to change. If true, the response will include any model costs for each call.",
     )
     include_feedback: Optional[bool] = Field(
         default=False,
-        description="Beta, subject to change. If true, the response will"
-        " include feedback for each call.",
+        description="Beta, subject to change. If true, the response will include feedback for each call.",
     )
     include_storage_size: Optional[bool] = Field(
         default=False,
-        description="Beta, subject to change. If true, the response will"
-        " include the storage size for a call.",
+        description="Beta, subject to change. If true, the response will include the storage size for a call.",
     )
     include_total_storage_size: Optional[bool] = Field(
         default=False,
-        description="Beta, subject to change. If true, the response will"
-        " include the total storage size for a trace.",
+        description="Beta, subject to change. If true, the response will include the total storage size for a trace.",
     )
 
     # TODO: type this with call schema columns, following the same rules as
@@ -599,19 +589,13 @@ class ObjectVersionFilter(BaseModelStrict):
 
 
 class ObjQueryReq(BaseModelStrict):
-    project_id: str = Field(
-        description="The ID of the project to query", examples=["user/project"]
-    )
+    project_id: str = Field(description="The ID of the project to query", examples=["user/project"])
     filter: Optional[ObjectVersionFilter] = Field(
         default=None,
         description="Filter criteria for the query. See `ObjectVersionFilter`",
-        examples=[
-            ObjectVersionFilter(object_ids=["my_favorite_model"], latest_only=True)
-        ],
+        examples=[ObjectVersionFilter(object_ids=["my_favorite_model"], latest_only=True)],
     )
-    limit: Optional[int] = Field(
-        default=None, description="Maximum number of results to return", examples=[100]
-    )
+    limit: Optional[int] = Field(default=None, description="Maximum number of results to return", examples=[100])
     offset: Optional[int] = Field(
         default=None,
         description="Number of results to skip before returning",
@@ -781,9 +765,7 @@ class TableCreateRes(BaseModel):
     # they are targeting an older server. We should remove
     # this default factory once we are sure that all servers
     # have been updated to support this field.
-    row_digests: list[str] = Field(
-        default_factory=list, description="The digests of the rows that were created"
-    )
+    row_digests: list[str] = Field(default_factory=list, description="The digests of the rows that were created")
 
 
 class TableRowFilter(BaseModelStrict):
@@ -800,9 +782,7 @@ class TableRowFilter(BaseModelStrict):
 
 
 class TableQueryReq(BaseModelStrict):
-    project_id: str = Field(
-        description="The ID of the project", examples=["my_entity/my_project"]
-    )
+    project_id: str = Field(description="The ID of the project", examples=["my_entity/my_project"])
     digest: str = Field(
         description="The digest of the table to query",
         examples=["aonareimsvtl13apimtalpa4435rpmgnaemrpgmarltarstaorsnte134avrims"],
@@ -819,9 +799,7 @@ class TableQueryReq(BaseModelStrict):
             }
         ],
     )
-    limit: Optional[int] = Field(
-        default=None, description="Maximum number of rows to return", examples=[100]
-    )
+    limit: Optional[int] = Field(default=None, description="Maximum number of rows to return", examples=[100])
     offset: Optional[int] = Field(
         default=None,
         description="Number of rows to skip before starting to return rows",
@@ -839,18 +817,14 @@ class TableQueryRes(BaseModel):
 
 
 class TableQueryStatsReq(BaseModelStrict):
-    project_id: str = Field(
-        description="The ID of the project", examples=["my_entity/my_project"]
-    )
+    project_id: str = Field(description="The ID of the project", examples=["my_entity/my_project"])
     digest: str = Field(
         description="The digest of the table to query",
     )
 
 
 class TableQueryStatsBatchReq(BaseModelStrict):
-    project_id: str = Field(
-        description="The ID of the project", examples=["my_entity/my_project"]
-    )
+    project_id: str = Field(description="The ID of the project", examples=["my_entity/my_project"])
 
     digests: Optional[list[str]] = Field(
         description="The digests of the tables to query",
@@ -907,18 +881,10 @@ class FeedbackCreateReq(BaseModelStrict):
     )
     # TODO: From Griffin: `it would be nice if we could type this to a kind of ref,
     # like objectRef, with a pydantic validator and then check its construction in the client.`
-    annotation_ref: Optional[str] = Field(
-        default=None, examples=["weave:///entity/project/object/name:digest"]
-    )
-    runnable_ref: Optional[str] = Field(
-        default=None, examples=["weave:///entity/project/op/name:digest"]
-    )
-    call_ref: Optional[str] = Field(
-        default=None, examples=["weave:///entity/project/call/call_id"]
-    )
-    trigger_ref: Optional[str] = Field(
-        default=None, examples=["weave:///entity/project/object/name:digest"]
-    )
+    annotation_ref: Optional[str] = Field(default=None, examples=["weave:///entity/project/object/name:digest"])
+    runnable_ref: Optional[str] = Field(default=None, examples=["weave:///entity/project/op/name:digest"])
+    call_ref: Optional[str] = Field(default=None, examples=["weave:///entity/project/call/call_id"])
+    trigger_ref: Optional[str] = Field(default=None, examples=["weave:///entity/project/object/name:digest"])
 
     # wb_user_id is automatically populated by the server
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
@@ -941,9 +907,7 @@ class Feedback(FeedbackCreateReq):
 
 class FeedbackQueryReq(BaseModelStrict):
     project_id: str = Field(examples=["entity/project"])
-    fields: Optional[list[str]] = Field(
-        default=None, examples=[["id", "feedback_type", "payload.note"]]
-    )
+    fields: Optional[list[str]] = Field(default=None, examples=[["id", "feedback_type", "payload.note"]])
     query: Optional[Query] = None
     # TODO: I think I would prefer to call this order_by to match SQL, but this is what calls API uses
     # TODO: Might be nice to have shortcut for single field and implied ASC direction
@@ -1016,9 +980,7 @@ class EnsureProjectExistsRes(BaseModel):
 class CostCreateInput(BaseModelStrict):
     prompt_token_cost: float
     completion_token_cost: float
-    prompt_token_cost_unit: Optional[str] = Field(
-        "USD", description="The unit of the cost for the prompt tokens"
-    )
+    prompt_token_cost_unit: Optional[str] = Field("USD", description="The unit of the cost for the prompt tokens")
     completion_token_cost_unit: Optional[str] = Field(
         "USD", description="The unit of the cost for the completion tokens"
     )
@@ -1076,9 +1038,7 @@ class CostQueryOutput(BaseModel):
     completion_token_cost: Optional[float] = Field(default=None, examples=[1.0])
     prompt_token_cost_unit: Optional[str] = Field(default=None, examples=["USD"])
     completion_token_cost_unit: Optional[str] = Field(default=None, examples=["USD"])
-    effective_date: Optional[datetime.datetime] = Field(
-        default=None, examples=["2024-01-01T00:00:00Z"]
-    )
+    effective_date: Optional[datetime.datetime] = Field(default=None, examples=["2024-01-01T00:00:00Z"])
     provider_id: Optional[str] = Field(default=None, examples=["openai"])
 
 
@@ -1127,18 +1087,10 @@ class ProjectStatsRes(BaseModel):
 class ThreadSchema(BaseModel):
     thread_id: str
     turn_count: int = Field(description="Number of turn calls in this thread")
-    start_time: datetime.datetime = Field(
-        description="Earliest start time of turn calls in this thread"
-    )
-    last_updated: datetime.datetime = Field(
-        description="Latest end time of turn calls in this thread"
-    )
-    first_turn_id: Optional[str] = Field(
-        description="Turn ID of the first turn in this thread (earliest start_time)"
-    )
-    last_turn_id: Optional[str] = Field(
-        description="Turn ID of the latest turn in this thread (latest end_time)"
-    )
+    start_time: datetime.datetime = Field(description="Earliest start time of turn calls in this thread")
+    last_updated: datetime.datetime = Field(description="Latest end time of turn calls in this thread")
+    first_turn_id: Optional[str] = Field(description="Turn ID of the first turn in this thread (earliest start_time)")
+    last_turn_id: Optional[str] = Field(description="Turn ID of the latest turn in this thread (latest end_time)")
     p50_turn_duration_ms: Optional[float] = Field(
         description="50th percentile (median) of turn durations in milliseconds within this thread"
     )
@@ -1173,16 +1125,12 @@ class ThreadsQueryReq(BaseModelStrict):
     nested implementation details.
     """
 
-    project_id: str = Field(
-        description="The ID of the project", examples=["my_entity/my_project"]
-    )
+    project_id: str = Field(description="The ID of the project", examples=["my_entity/my_project"])
     filter: Optional[ThreadsQueryFilter] = Field(
         default=None,
         description="Filter criteria for the threads query",
     )
-    limit: Optional[int] = Field(
-        default=None, description="Maximum number of threads to return"
-    )
+    limit: Optional[int] = Field(default=None, description="Maximum number of threads to return")
     offset: Optional[int] = Field(default=None, description="Number of threads to skip")
     sort_by: Optional[list[SortBy]] = Field(
         default=None,
@@ -1240,9 +1188,7 @@ class EvaluationStatusRes(BaseModel):
 
 
 class TraceServerInterface(Protocol):
-    def ensure_project_exists(
-        self, entity: str, project: str
-    ) -> EnsureProjectExistsRes:
+    def ensure_project_exists(self, entity: str, project: str) -> EnsureProjectExistsRes:
         return EnsureProjectExistsRes(project_name=project)
 
     # OTEL API
@@ -1277,17 +1223,13 @@ class TraceServerInterface(Protocol):
 
     # Table API
     def table_create(self, req: TableCreateReq) -> TableCreateRes: ...
-    def table_create_from_digests(
-        self, req: TableCreateFromDigestsReq
-    ) -> TableCreateFromDigestsRes: ...
+    def table_create_from_digests(self, req: TableCreateFromDigestsReq) -> TableCreateFromDigestsRes: ...
 
     def table_update(self, req: TableUpdateReq) -> TableUpdateRes: ...
     def table_query(self, req: TableQueryReq) -> TableQueryRes: ...
     def table_query_stream(self, req: TableQueryReq) -> Iterator[TableRowSchema]: ...
     def table_query_stats(self, req: TableQueryStatsReq) -> TableQueryStatsRes: ...
-    def table_query_stats_batch(
-        self, req: TableQueryStatsBatchReq
-    ) -> TableQueryStatsBatchRes: ...
+    def table_query_stats_batch(self, req: TableQueryStatsBatchReq) -> TableQueryStatsBatchRes: ...
 
     # Ref API
     def refs_read_batch(self, req: RefsReadBatchReq) -> RefsReadBatchRes: ...
@@ -1299,18 +1241,14 @@ class TraceServerInterface(Protocol):
 
     # Feedback API
     def feedback_create(self, req: FeedbackCreateReq) -> FeedbackCreateRes: ...
-    def feedback_create_batch(
-        self, req: FeedbackCreateBatchReq
-    ) -> FeedbackCreateBatchRes: ...
+    def feedback_create_batch(self, req: FeedbackCreateBatchReq) -> FeedbackCreateBatchRes: ...
 
     def feedback_query(self, req: FeedbackQueryReq) -> FeedbackQueryRes: ...
     def feedback_purge(self, req: FeedbackPurgeReq) -> FeedbackPurgeRes: ...
     def feedback_replace(self, req: FeedbackReplaceReq) -> FeedbackReplaceRes: ...
 
     # Action API
-    def actions_execute_batch(
-        self, req: ActionsExecuteBatchReq
-    ) -> ActionsExecuteBatchRes: ...
+    def actions_execute_batch(self, req: ActionsExecuteBatchReq) -> ActionsExecuteBatchRes: ...
 
     # Execute LLM API
     def completions_create(self, req: CompletionsCreateReq) -> CompletionsCreateRes: ...
@@ -1319,14 +1257,10 @@ class TraceServerInterface(Protocol):
     # Returns an iterator of JSON-serializable chunks that together form the streamed
     # response from the model provider. Each element must be a dictionary that can
     # be serialized with ``json.dumps``.
-    def completions_create_stream(
-        self, req: CompletionsCreateReq
-    ) -> Iterator[dict[str, Any]]: ...
+    def completions_create_stream(self, req: CompletionsCreateReq) -> Iterator[dict[str, Any]]: ...
 
     # Execute Image Generation API
-    def image_create(
-        self, req: ImageGenerationCreateReq
-    ) -> ImageGenerationCreateRes: ...
+    def image_create(self, req: ImageGenerationCreateReq) -> ImageGenerationCreateRes: ...
 
     # Project statistics API
     def project_stats(self, req: ProjectStatsReq) -> ProjectStatsRes: ...

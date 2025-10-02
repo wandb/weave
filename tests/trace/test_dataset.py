@@ -10,11 +10,7 @@ def test_basic_dataset_lifecycle(client):
         dataset = weave.Dataset(rows=[{"a": 5, "b": 6}, {"a": 7, "b": 10}])
         ref = weave.publish(dataset)
         dataset2 = weave.ref(ref.uri()).get()
-        assert (
-            list(dataset2.rows)
-            == list(dataset.rows)
-            == [{"a": 5, "b": 6}, {"a": 7, "b": 10}]
-        )
+        assert list(dataset2.rows) == list(dataset.rows) == [{"a": 5, "b": 6}, {"a": 7, "b": 10}]
 
 
 def test_dataset_iteration(client):
@@ -177,9 +173,7 @@ def test_dataset_select(client):
     ]
 
     # Select with an empty list - should raise ValueError
-    with pytest.raises(
-        ValueError, match="Cannot select rows with an empty set of indices."
-    ):
+    with pytest.raises(ValueError, match="Cannot select rows with an empty set of indices."):
         ds.select([])
 
     # Select with indices that are out of order
@@ -285,9 +279,7 @@ def test_hf_conversion(client):
     assert list(weave_dataset_from_dict.rows) == train_rows
 
     # Test error when 'train' split is missing
-    hf_dataset_dict_no_train = HFDatasetDict(
-        {"validation": HFDataset.from_list(test_rows)}
-    )
+    hf_dataset_dict_no_train = HFDatasetDict({"validation": HFDataset.from_list(test_rows)})
     with pytest.raises(ValueError, match="does not contain a 'train' split"):
         weave.Dataset.from_hf(hf_dataset_dict_no_train)
 
@@ -302,7 +294,5 @@ def test_hf_conversion(client):
 
     # Test from_hf with an empty HFDataset (should raise ValueError)
     empty_hf_dataset_input = HFDataset.from_list([])
-    with pytest.raises(
-        ValueError, match="Attempted to construct a Dataset with an empty list"
-    ):
+    with pytest.raises(ValueError, match="Attempted to construct a Dataset with an empty list"):
         weave.Dataset.from_hf(empty_hf_dataset_input)

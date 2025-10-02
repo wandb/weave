@@ -76,9 +76,7 @@ class DummyTestException(Exception):
     pass
 
 
-def get_info_loglines(
-    caplog, match_string: str | None = None, getattrs: list[str] | None = None
-):
+def get_info_loglines(caplog, match_string: str | None = None, getattrs: list[str] | None = None):
     """Get all log lines from caplog that match the given string.
 
     Match string is compared to the message, and getattrs is a list of attributes to get from the record.

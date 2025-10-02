@@ -37,9 +37,7 @@ async def test_simple_client_create(
 
     model_name = "gpt-4.1-nano-2025-04-14"
     openai_model_client = OpenAIChatCompletionClient(model=model_name)
-    _ = await openai_model_client.create(
-        [UserMessage(content="Hello, how are you?", source="user")]
-    )
+    _ = await openai_model_client.create([UserMessage(content="Hello, how are you?", source="user")])
     calls = list(client.get_calls())
     assert len(calls) == 2
     flattened = flatten_calls(calls)
@@ -75,13 +73,9 @@ async def test_simple_client_create_with_exception(
     from openai import AuthenticationError
 
     model_name = "gpt-4.1-nano-2025-04-14"
-    openai_model_client = OpenAIChatCompletionClient(
-        model=model_name, api_key="DUMMY_API_KEY"
-    )
+    openai_model_client = OpenAIChatCompletionClient(model=model_name, api_key="DUMMY_API_KEY")
     with pytest.raises(AuthenticationError):
-        _ = await openai_model_client.create(
-            [UserMessage(content="Hello, how are you?", source="user")]
-        )
+        _ = await openai_model_client.create([UserMessage(content="Hello, how are you?", source="user")])
         calls = list(client.get_calls())
         assert len(calls) == 3
         flattened = flatten_calls(calls)
@@ -118,9 +112,7 @@ async def test_simple_client_create_stream(
 
     model_name = "gpt-4.1-nano-2025-04-14"
     openai_model_client = OpenAIChatCompletionClient(model=model_name)
-    response = openai_model_client.create_stream(
-        [UserMessage(content="Hello, how are you?", source="user")]
-    )
+    response = openai_model_client.create_stream([UserMessage(content="Hello, how are you?", source="user")])
     async for _ in response:
         pass
 
@@ -165,12 +157,8 @@ async def test_simple_cached_client_create(
     cache_store = InMemoryStore[CHAT_CACHE_VALUE_TYPE]()
     cache_client = ChatCompletionCache(openai_model_client, cache_store)
 
-    await cache_client.create(
-        [UserMessage(content="Hello, how are you?", source="user")]
-    )
-    await cache_client.create(
-        [UserMessage(content="Hello, how are you?", source="user")]
-    )
+    await cache_client.create([UserMessage(content="Hello, how are you?", source="user")])
+    await cache_client.create([UserMessage(content="Hello, how are you?", source="user")])
     calls = list(client.get_calls())
     assert len(calls) == 9
     flattened = flatten_calls(calls)
@@ -222,13 +210,9 @@ async def test_simple_cached_client_create_stream(
     cache_store = InMemoryStore[CHAT_CACHE_VALUE_TYPE]()
     cache_client = ChatCompletionCache(openai_model_client, cache_store)
 
-    async for _ in cache_client.create_stream(
-        [UserMessage(content="Hello, how are you?", source="user")]
-    ):
+    async for _ in cache_client.create_stream([UserMessage(content="Hello, how are you?", source="user")]):
         pass
-    async for _ in cache_client.create_stream(
-        [UserMessage(content="Hello, how are you?", source="user")]
-    ):
+    async for _ in cache_client.create_stream([UserMessage(content="Hello, how are you?", source="user")]):
         pass
     calls = list(client.get_calls())
     assert len(calls) == 9
@@ -716,11 +700,7 @@ async def test_agent_with_memory(
             )
         )
 
-        await user_memory.add(
-            MemoryContent(
-                content="Meal recipe must be vegan", mime_type=MemoryMimeType.TEXT
-            )
-        )
+        await user_memory.add(MemoryContent(content="Meal recipe must be vegan", mime_type=MemoryMimeType.TEXT))
 
         async def get_weather(city: str, units: str = "imperial") -> str:
             if units == "imperial":
@@ -740,9 +720,7 @@ async def test_agent_with_memory(
             memory=[user_memory],
         )
 
-        async for _ in assistant_agent.run_stream(
-            task="What is the weather in New York?"
-        ):
+        async for _ in assistant_agent.run_stream(task="What is the weather in New York?"):
             pass
 
         await model_client.close()
@@ -856,9 +834,7 @@ async def test_workflows_singlethreaded_runtime(
         @message_handler
         async def handle_message(self, message: Message, ctx: MessageContext) -> None:
             if not self._run_until(message.content):
-                await self.publish_message(
-                    Message(content=message.content), DefaultTopicId()
-                )
+                await self.publish_message(Message(content=message.content), DefaultTopicId())
 
     # NOTE: this is a special case where you need to use the weave decorator
     # if you want the messages in the pubsub to be captured under a single trace

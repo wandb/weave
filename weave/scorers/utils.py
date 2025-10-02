@@ -82,9 +82,7 @@ def download_model_from_huggingface_hub(model_name: str) -> str:
     return snapshot_download(model_name, local_dir=str(local_dir))
 
 
-def _resolve_model_path(
-    model_name_or_path: str = "", default_model: Optional[str] = None
-) -> str:
+def _resolve_model_path(model_name_or_path: str = "", default_model: Optional[str] = None) -> str:
     """Dispatcher to resolve a model path from various sources.
 
     Resolution priority:
@@ -106,14 +104,10 @@ def _resolve_model_path(
             return model_name_or_path
         return str(download_model_from_wandb(model_name_or_path))
 
-    raise ValueError(
-        "No model_name_or_path or no default_model provided, please set one of the two."
-    )
+    raise ValueError("No model_name_or_path or no default_model provided, please set one of the two.")
 
 
-def load_local_model_weights(
-    model_name_or_path: str = "", default_model: Optional[str] = None
-) -> str:
+def load_local_model_weights(model_name_or_path: str = "", default_model: Optional[str] = None) -> str:
     """Resolves the path to a model, downloading it if necessary.
 
     Args:
@@ -125,6 +119,4 @@ def load_local_model_weights(
     Returns:
         str: The local path to the model weights.
     """
-    return _resolve_model_path(
-        model_name_or_path=model_name_or_path, default_model=default_model
-    )
+    return _resolve_model_path(model_name_or_path=model_name_or_path, default_model=default_model)

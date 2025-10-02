@@ -35,9 +35,7 @@ def user_model():
     return func
 
 
-def test_basic_evaluation(
-    client, user_dataset: list[ExampleRow], user_model: Callable[[int, int], int]
-):
+def test_basic_evaluation(client, user_dataset: list[ExampleRow], user_model: Callable[[int, int], int]):
     ev = EvaluationLogger()
 
     outputs = []
@@ -82,12 +80,8 @@ def test_basic_evaluation(
         predict_index = 1 + i * 4
 
         predict_and_score_call = calls[predict_index]
-        assert (
-            op_name_from_call(predict_and_score_call) == "Evaluation.predict_and_score"
-        )
-        assert (
-            predict_and_score_call.attributes["_weave_eval_meta"]["imperative"] is True
-        )
+        assert op_name_from_call(predict_and_score_call) == "Evaluation.predict_and_score"
+        assert predict_and_score_call.attributes["_weave_eval_meta"]["imperative"] is True
         assert predict_and_score_call.inputs["self"]._class_name == "Evaluation"
         assert predict_and_score_call.inputs["model"]._class_name == "Model"
         assert predict_and_score_call.inputs["example"] == inputs
@@ -175,17 +169,13 @@ def test_evaluation_with_custom_models_and_scorers(
     def make_assertions():
         client.flush()
 
-        models = client._objects(
-            filter=ObjectVersionFilter(base_object_classes=["Model"])
-        )
+        models = client._objects(filter=ObjectVersionFilter(base_object_classes=["Model"]))
         assert len(models) == 3
         assert models[0].object_id == "MyModel"
         assert models[1].object_id == "dict_model"
         assert models[2].object_id == "string_model"
 
-        scorers = client._objects(
-            filter=ObjectVersionFilter(base_object_classes=["Scorer"])
-        )
+        scorers = client._objects(filter=ObjectVersionFilter(base_object_classes=["Scorer"]))
         assert len(scorers) == 3
         assert scorers[0].object_id == "gt2_scorer"
         assert scorers[1].object_id == "gt4_scorer"
@@ -227,9 +217,7 @@ def test_evaluation_with_custom_models_and_scorers(
     assert models[3].object_id == "new_string_model"
 
     # No change to scorers
-    scorers = client._objects(
-        filter=ObjectVersionFilter(base_object_classes=["Scorer"])
-    )
+    scorers = client._objects(filter=ObjectVersionFilter(base_object_classes=["Scorer"]))
     assert len(scorers) == 3
 
     # Run a new evaluation using the same models, but different scorers
@@ -250,18 +238,14 @@ def test_evaluation_with_custom_models_and_scorers(
     models = client._objects(filter=ObjectVersionFilter(base_object_classes=["Model"]))
     assert len(models) == 4
 
-    scorers = client._objects(
-        filter=ObjectVersionFilter(base_object_classes=["Scorer"])
-    )
+    scorers = client._objects(filter=ObjectVersionFilter(base_object_classes=["Scorer"]))
     assert len(scorers) == 4
     assert scorers[3].object_id == "gt8_scorer"
 
     assert call_context.get_call_stack() == []
 
 
-def test_evaluation_version_reuse(
-    client, user_dataset: list[ExampleRow], user_model: Callable[[int, int], int]
-):
+def test_evaluation_version_reuse(client, user_dataset: list[ExampleRow], user_model: Callable[[int, int], int]):
     """Test that running the same evaluation twice results in only one version."""
     model = {"name": "test_model", "a": 1, "b": "two"}
     dataset_id = "test_dataset_unique_identifier"
@@ -285,16 +269,12 @@ def test_evaluation_version_reuse(
         client.flush()
 
     # Only 1 version of the dataset should exist (it's the same one)
-    evaluations = client._objects(
-        filter=ObjectVersionFilter(base_object_classes=["Dataset"])
-    )
+    evaluations = client._objects(filter=ObjectVersionFilter(base_object_classes=["Dataset"]))
     assert len(evaluations) == 1
 
     # Check that only one version of the evaluation exists (none of the methods
     # nor any of the attributes should have changed)
-    evaluations = client._objects(
-        filter=ObjectVersionFilter(base_object_classes=["Evaluation"])
-    )
+    evaluations = client._objects(filter=ObjectVersionFilter(base_object_classes=["Evaluation"]))
     assert len(evaluations) == 1
 
 
@@ -488,9 +468,7 @@ def test_evaluation_fail_with_exception(client):
     assert len(calls) == 1
     finish_call = calls[0]
     assert finish_call.output is None
-    assert finish_call.exception == json.dumps(
-        {"type": "ValueError", "message": "test"}
-    )
+    assert finish_call.exception == json.dumps({"type": "ValueError", "message": "test"})
 
 
 def test_evaluation_no_auto_summarize_with_custom_dict(client):
@@ -683,13 +661,8 @@ def test_evaluation_logger_with_predefined_scorers(client, caplog):
 
     # Verify warning was issued for unlisted scorer
     warning_messages = [r.message for r in caplog.records]
-    assert any(
-        "recall" in msg and "not in the predefined scorers list" in msg
-        for msg in warning_messages
-    )
-    assert any(
-        "Expected one of: ['accuracy', 'precision']" in msg for msg in warning_messages
-    )
+    assert any("recall" in msg and "not in the predefined scorers list" in msg for msg in warning_messages)
+    assert any("Expected one of: ['accuracy', 'precision']" in msg for msg in warning_messages)
 
     ev.finish()
     client.flush()

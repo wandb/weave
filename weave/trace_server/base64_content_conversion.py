@@ -63,21 +63,15 @@ def store_content_object(
         Dict representing the Content object in the proper format
     """
     content_data = content_obj.data
-    content_metadata = json.dumps(content_obj.model_dump(exclude={"data"})).encode(
-        "utf-8"
-    )
+    content_metadata = json.dumps(content_obj.model_dump(exclude={"data"})).encode("utf-8")
 
     # Create files in storage
     # 1. Store the actual content
-    content_req = FileCreateReq(
-        project_id=project_id, name="content", content=content_data
-    )
+    content_req = FileCreateReq(project_id=project_id, name="content", content=content_data)
     content_res = trace_server.file_create(content_req)
 
     # 2. Store the metadata
-    metadata_req = FileCreateReq(
-        project_id=project_id, name="metadata.json", content=content_metadata
-    )
+    metadata_req = FileCreateReq(project_id=project_id, name="metadata.json", content=content_metadata)
     metadata_res = trace_server.file_create(metadata_req)
 
     # We exclude the load op because it isn't possible to get from the server side
@@ -129,9 +123,7 @@ def replace_base64_with_content_objects(
                         trace_server,
                     )
                 except Exception as e:
-                    logger.warning(
-                        f"Failed to create and store content from data URI with error {e}"
-                    )
+                    logger.warning(f"Failed to create and store content from data URI with error {e}")
 
             return val
         return val
@@ -159,9 +151,7 @@ def process_call_req_to_content(
         Tuple of (processed_data, list_of_refs) with base64 content replaced by Content objects
     """
     if isinstance(req, CallStartReq):
-        req.start.inputs = replace_base64_with_content_objects(
-            req.start.inputs, req.start.project_id, trace_server
-        )
+        req.start.inputs = replace_base64_with_content_objects(req.start.inputs, req.start.project_id, trace_server)
     else:
         req.end.output = req.end.output = replace_base64_with_content_objects(
             req.end.output, req.end.project_id, trace_server

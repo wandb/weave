@@ -16,11 +16,7 @@ def weave_isinstance(obj: Any, cls: type[C] | tuple[type[C], ...]) -> TypeGuard[
     if isinstance(obj, cls):  # type: ignore
         return True
     if isinstance(obj, ObjectRecord):
-        return obj._class_name == cls.__name__ or any(
-            b == cls.__name__ for b in obj._bases
-        )
+        return obj._class_name == cls.__name__ or any(b == cls.__name__ for b in obj._bases)
     if isinstance(obj, WeaveObject):
-        return obj._class_name == cls.__name__ or any(
-            b == cls.__name__ for b in obj._bases
-        )
+        return obj._class_name == cls.__name__ or any(b == cls.__name__ for b in obj._bases)
     return False

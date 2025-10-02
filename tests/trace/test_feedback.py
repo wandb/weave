@@ -184,9 +184,7 @@ def test_annotation_feedback(client: WeaveClient) -> None:
         "creator": None,
         # Sad - seems like sqlite and clickhouse remote different types here
         "created_at": (
-            create_res.created_at.isoformat().replace("T", " ")
-            if client_is_sqlite(client)
-            else MatchAnyDatetime()
+            create_res.created_at.isoformat().replace("T", " ") if client_is_sqlite(client) else MatchAnyDatetime()
         ),
         "feedback_type": feedback_type,
         "payload": payload,
@@ -334,9 +332,7 @@ def test_runnable_feedback(client: WeaveClient) -> None:
         "creator": None,
         # Sad - seems like sqlite and clickhouse remote different types here
         "created_at": (
-            create_res.created_at.isoformat().replace("T", " ")
-            if client_is_sqlite(client)
-            else MatchAnyDatetime()
+            create_res.created_at.isoformat().replace("T", " ") if client_is_sqlite(client) else MatchAnyDatetime()
         ),
         "feedback_type": feedback_type,
         "payload": payload,
@@ -419,9 +415,7 @@ async def test_sort_by_feedback(client: WeaveClient) -> None:
         )
 
         found_ids = [c.id for c in calls]
-        assert found_ids == asc_ids, (
-            f"Sorting by {fields} ascending failed, expected {asc_ids}, got {found_ids}"
-        )
+        assert found_ids == asc_ids, f"Sorting by {fields} ascending failed, expected {asc_ids}, got {found_ids}"
 
         calls = client.server.calls_query_stream(
             tsi.CallsQueryReq(
@@ -487,9 +481,7 @@ async def test_filter_by_feedback(client: WeaveClient) -> None:
         )
 
         found_ids = [c.id for c in calls]
-        assert found_ids == eq_ids, (
-            f"Filtering by {field} == {value} failed, expected {eq_ids}, got {found_ids}"
-        )
+        assert found_ids == eq_ids, f"Filtering by {field} == {value} failed, expected {eq_ids}, got {found_ids}"
 
         calls = client.server.calls_query_stream(
             tsi.CallsQueryReq(
@@ -507,9 +499,7 @@ async def test_filter_by_feedback(client: WeaveClient) -> None:
         )
 
         found_ids = [c.id for c in calls]
-        assert found_ids == gt_ids, (
-            f"Filtering by {field} > {value} failed, expected {gt_ids}, got {found_ids}"
-        )
+        assert found_ids == gt_ids, f"Filtering by {field} > {value} failed, expected {gt_ids}, got {found_ids}"
 
 
 class MatchAnyDatetime:
@@ -533,9 +523,7 @@ async def test_filter_and_sort_by_feedback(client: WeaveClient) -> None:
             query={
                 "$expr": {
                     "$eq": [
-                        {
-                            "$getField": "feedback.[wandb.runnable.my_scorer].payload.output.match"
-                        },
+                        {"$getField": "feedback.[wandb.runnable.my_scorer].payload.output.match"},
                         {"$literal": "true"},
                     ]
                 }
@@ -592,9 +580,7 @@ def test_feedback_replace(client) -> None:
 
     # Verify the other feedback remains unchanged
     query_res = client.server.feedback_query(
-        FeedbackQueryReq(
-            project_id="test/project", fields=["id", "feedback_type", "payload"]
-        )
+        FeedbackQueryReq(project_id="test/project", fields=["id", "feedback_type", "payload"])
     )
 
     feedbacks = query_res.result
@@ -620,9 +606,7 @@ def test_feedback_replace(client) -> None:
 
     # Verify the latest feedback payload
     query_res = client.server.feedback_query(
-        FeedbackQueryReq(
-            project_id="test/project", fields=["id", "feedback_type", "payload"]
-        )
+        FeedbackQueryReq(project_id="test/project", fields=["id", "feedback_type", "payload"])
     )
     feedbacks = query_res.result
     assert len(feedbacks) == 2

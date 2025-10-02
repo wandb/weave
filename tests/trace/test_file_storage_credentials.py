@@ -122,9 +122,7 @@ def test_get_gcp_credentials():
     with mock.patch.dict(
         os.environ,
         {
-            "WF_FILE_STORAGE_GCP_CREDENTIALS_JSON_B64": base64.b64encode(
-                test_creds_json.encode()
-            ).decode(),
+            "WF_FILE_STORAGE_GCP_CREDENTIALS_JSON_B64": base64.b64encode(test_creds_json.encode()).decode(),
         },
     ):
         with mock.patch("google.oauth2.service_account.Credentials") as mock_creds:
@@ -135,9 +133,7 @@ def test_get_gcp_credentials():
     with mock.patch.dict(
         os.environ,
         {
-            "WF_FILE_STORAGE_GCP_CREDENTIALS_JSON_B64": base64.b64encode(
-                b"invalid-json"
-            ).decode(),
+            "WF_FILE_STORAGE_GCP_CREDENTIALS_JSON_B64": base64.b64encode(b"invalid-json").decode(),
         },
     ):
         with pytest.raises(ValueError, match="Invalid GCP credentials JSON"):

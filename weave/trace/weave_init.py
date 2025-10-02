@@ -46,16 +46,12 @@ def get_entity_project_from_project_name(project_name: str) -> tuple[str, str]:
             api = wandb.Api()
             entity_name = api.default_entity_name()
             if entity_name is None:
-                raise WeaveWandbAuthenticationException(
-                    'weave init requires wandb. Run "wandb login"'
-                )
+                raise WeaveWandbAuthenticationException('weave init requires wandb. Run "wandb login"')
         project_name = fields[0]
     elif len(fields) == 2:
         entity_name, project_name = fields
     else:
-        raise ValueError(
-            'project_name must be of the form "<project_name>" or "<entity_name>/<project_name>"'
-        )
+        raise ValueError('project_name must be of the form "<project_name>" or "<entity_name>/<project_name>"')
     if not entity_name:
         raise ValueError("entity_name must be non-empty")
     if not project_name:
@@ -80,9 +76,7 @@ def _weave_is_available(server: remote_http_trace_server.RemoteHTTPTraceServer) 
     except JSONDecodeError:
         return False
     except Exception:
-        logger.warning(
-            "Unexpected error when checking if Weave is available on the server.  Please contact support."
-        )
+        logger.warning("Unexpected error when checking if Weave is available on the server.  Please contact support.")
         return False
     return True
 
@@ -97,10 +91,7 @@ def init_weave(
     current_client = weave_client_context.get_weave_client()
     if current_client is not None:
         # TODO: Prob should move into settings
-        if (
-            current_client.project == project_name
-            and current_client.ensure_project_exists == ensure_project_exists
-        ):
+        if current_client.project == project_name and current_client.ensure_project_exists == ensure_project_exists:
             return current_client
         else:
             # Flush any pending calls before switching to a new project
@@ -134,16 +125,12 @@ def init_weave(
 
     remote_server = init_weave_get_server(api_key)
     if not _weave_is_available(remote_server):
-        raise RuntimeError(
-            "Weave is not available on the server.  Please contact support."
-        )
+        raise RuntimeError("Weave is not available on the server.  Please contact support.")
     server: TraceServerInterface = remote_server
     if use_server_cache():
         server = CachingMiddlewareTraceServer.from_env(server)
 
-    client = weave_client.WeaveClient(
-        entity_name, project_name, server, ensure_project_exists
-    )
+    client = weave_client.WeaveClient(entity_name, project_name, server, ensure_project_exists)
 
     # If the project name was formatted by init, update the project name
     project_name = client.project
@@ -167,9 +154,7 @@ def init_weave(
         track_pii_redaction_enabled(username or "unknown", entity_name, project_name)
 
     try:
-        min_required_version = (
-            remote_server.server_info().min_required_weave_python_version
-        )
+        min_required_version = remote_server.server_info().min_required_weave_python_version
     # TODO: Tighten this exception to only catch the specific exception
     # that is thrown by the server_info call.
     except Exception:
@@ -177,9 +162,7 @@ def init_weave(
         # In the future, we may want to throw here.
         min_required_version = "0.0.0"
     init_message.assert_min_weave_version(min_required_version)
-    init_message.print_init_message(
-        username, entity_name, project_name, read_only=not ensure_project_exists
-    )
+    init_message.print_init_message(username, entity_name, project_name, read_only=not ensure_project_exists)
 
     user_context = {"username": username} if username else None
     trace_sentry.global_trace_sentry.configure_scope(

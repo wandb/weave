@@ -38,12 +38,8 @@ def lint(session):
 
     if ruff_only:
         # Run only ruff checks on all files
-        session.run(
-            "pre-commit", "run", "--hook-stage=pre-push", "ruff-check", "--all-files"
-        )
-        session.run(
-            "pre-commit", "run", "--hook-stage=pre-push", "ruff-format", "--all-files"
-        )
+        session.run("pre-commit", "run", "--hook-stage=pre-push", "ruff-check", "--all-files")
+        session.run("pre-commit", "run", "--hook-stage=pre-push", "ruff-format", "--all-files")
     elif dry_run:
         session.run(
             "pre-commit",
@@ -220,11 +216,7 @@ def tests(session, shard):
         )
 
     # Check if posargs contains test files (ending with .py or containing :: for specific tests)
-    has_test_files = any(
-        arg.endswith(".py") or "::" in arg
-        for arg in session.posargs
-        if not arg.startswith("-")
-    )
+    has_test_files = any(arg.endswith(".py") or "::" in arg for arg in session.posargs if not arg.startswith("-"))
 
     # If specific test files are provided, don't add default test directories
     if has_test_files:

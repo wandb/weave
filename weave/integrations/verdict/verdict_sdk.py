@@ -98,12 +98,8 @@ def create_pipeline_init_wrapper(
     """Create a wrapper that injects the default tracer into Pipeline.__init__."""
 
     def wrapper(original_init: Callable) -> Callable:
-        def pipeline_init(
-            self: Any, name: str = "Pipeline", tracer_param: Optional[Any] = None
-        ) -> None:
-            return original_init(
-                self, name, tracer_param if tracer_param is not None else tracer
-            )
+        def pipeline_init(self: Any, name: str = "Pipeline", tracer_param: Optional[Any] = None) -> None:
+            return original_init(self, name, tracer_param if tracer_param is not None else tracer)
 
         return pipeline_init
 

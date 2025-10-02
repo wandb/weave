@@ -28,9 +28,7 @@ def test_truncate_op_name_too_short_for_hash() -> None:
     for tail_len in range(NON_HASH_LIMIT + 1):
         if tail_len <= chars_to_remove:
             with pytest.raises(ValueError):
-                name, trunc = _truncated_str(
-                    tail_len, MAX_OP_NAME_LENGTH + chars_to_remove
-                )
+                name, trunc = _truncated_str(tail_len, MAX_OP_NAME_LENGTH + chars_to_remove)
         else:
             name, trunc = _truncated_str(tail_len, MAX_OP_NAME_LENGTH + chars_to_remove)
             assert trunc == name[:MAX_OP_NAME_LENGTH]
@@ -46,9 +44,7 @@ def test_truncate_op_name_too_short_for_hash() -> None:
     for chars_to_remove in range(0, tail_len + 1):
         if tail_len <= chars_to_remove:
             with pytest.raises(ValueError):
-                name, trunc = _truncated_str(
-                    tail_len, MAX_OP_NAME_LENGTH + chars_to_remove
-                )
+                name, trunc = _truncated_str(tail_len, MAX_OP_NAME_LENGTH + chars_to_remove)
         else:
             name, trunc = _truncated_str(tail_len, MAX_OP_NAME_LENGTH + chars_to_remove)
             assert trunc == name[:MAX_OP_NAME_LENGTH]

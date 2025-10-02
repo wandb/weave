@@ -87,13 +87,9 @@ class ContextAwareThreadPoolExecutor(_ThreadPoolExecutor):
         # Convert lists to iterables for map()
         map_iterables = (contexts, first_iterable, *iterables[1:])
 
-        return super().map(
-            wrapped_fn, *map_iterables, timeout=timeout, chunksize=chunksize
-        )
+        return super().map(wrapped_fn, *map_iterables, timeout=timeout, chunksize=chunksize)
 
-    def _run_with_context(
-        self, fn: Callable, context: Context, *args: Any, **kwargs: Any
-    ) -> Any:
+    def _run_with_context(self, fn: Callable, context: Context, *args: Any, **kwargs: Any) -> Any:
         return context.run(fn, *args, **kwargs)
 
 

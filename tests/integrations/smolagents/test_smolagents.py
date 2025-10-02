@@ -51,9 +51,7 @@ def patch_smolagents() -> Generator[None, None, None]:
 def test_hf_api_model(client):
     from smolagents import HfApiModel
 
-    os.environ["HUGGINGFACE_API_KEY"] = os.environ.get(
-        "HUGGINGFACE_API_KEY", "DUMMY_API_KEY"
-    )
+    os.environ["HUGGINGFACE_API_KEY"] = os.environ.get("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
     engine = HfApiModel(
         model_id="Qwen/Qwen2.5-Coder-32B-Instruct",
         token=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY"),
@@ -72,10 +70,7 @@ def test_hf_api_model(client):
 
     call = calls[1]
     assert call.started_at < call.ended_at
-    assert (
-        op_name_from_ref(call.op_name)
-        == "huggingface_hub.InferenceClient.chat_completion"
-    )
+    assert op_name_from_ref(call.op_name) == "huggingface_hub.InferenceClient.chat_completion"
     assert "paris" in call.output.choices[0].message.content.lower()
 
 
@@ -122,9 +117,7 @@ def test_tool_calling_agent_search(client):
     from smolagents import GoogleSearchTool, OpenAIServerModel, ToolCallingAgent
 
     os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
-    os.environ["HUGGINGFACE_API_KEY"] = os.environ.get(
-        "HUGGINGFACE_API_KEY", "DUMMY_API_KEY"
-    )
+    os.environ["HUGGINGFACE_API_KEY"] = os.environ.get("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
     os.environ["SERPAPI_API_KEY"] = os.environ.get("SERPAPI_API_KEY", "DUMMY_API_KEY")
     model = OpenAIServerModel(model_id="gpt-4.1")
     agent = ToolCallingAgent(tools=[GoogleSearchTool()], model=model)
@@ -151,9 +144,7 @@ def test_tool_calling_agent_weather(client):
     from smolagents import OpenAIServerModel, ToolCallingAgent, tool
 
     os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
-    os.environ["HUGGINGFACE_API_KEY"] = os.environ.get(
-        "HUGGINGFACE_API_KEY", "DUMMY_API_KEY"
-    )
+    os.environ["HUGGINGFACE_API_KEY"] = os.environ.get("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
 
     model = OpenAIServerModel(model_id="gpt-4.1")
 
@@ -189,9 +180,7 @@ def test_code_agent_search(client):
     from smolagents import CodeAgent, GoogleSearchTool, OpenAIServerModel
 
     os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
-    os.environ["HUGGINGFACE_API_KEY"] = os.environ.get(
-        "HUGGINGFACE_API_KEY", "DUMMY_API_KEY"
-    )
+    os.environ["HUGGINGFACE_API_KEY"] = os.environ.get("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
     os.environ["SERPAPI_API_KEY"] = os.environ.get("SERPAPI_API_KEY", "DUMMY_API_KEY")
 
     model = OpenAIServerModel(model_id="gpt-4.1")
@@ -219,9 +208,7 @@ def test_code_agent_weather(client):
     from smolagents import CodeAgent, OpenAIServerModel, tool
 
     os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
-    os.environ["HUGGINGFACE_API_KEY"] = os.environ.get(
-        "HUGGINGFACE_API_KEY", "DUMMY_API_KEY"
-    )
+    os.environ["HUGGINGFACE_API_KEY"] = os.environ.get("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
     os.environ["SERPAPI_API_KEY"] = os.environ.get("SERPAPI_API_KEY", "DUMMY_API_KEY")
 
     model = OpenAIServerModel(model_id="gpt-4.1")
@@ -237,9 +224,7 @@ def test_code_agent_weather(client):
         return f"The weather in {location} is sunny with temperatures around 7°C."
 
     agent = CodeAgent(tools=[get_weather], model=model)
-    answer = agent.run(
-        "Use the provided tool to answer this question. What is the weather in Tokyo?"
-    )
+    answer = agent.run("Use the provided tool to answer this question. What is the weather in Tokyo?")
 
     assert answer == "The weather in Tokyo is sunny with temperatures around 7°C."
     calls = client.get_calls()

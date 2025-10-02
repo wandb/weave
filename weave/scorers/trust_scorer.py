@@ -196,14 +196,10 @@ class WeaveTrustScorerV1(weave.Scorer):
             # Add specific threshold parameters based on scorer type
             if scorer_cls == WeaveContextRelevanceScorerV1:
                 scorer_params["threshold"] = CONTEXT_RELEVANCE_SCORER_THRESHOLD
-                scorer_params["model_name_or_path"] = (
-                    self.context_relevance_model_name_or_path
-                )
+                scorer_params["model_name_or_path"] = self.context_relevance_model_name_or_path
             elif scorer_cls == WeaveHallucinationScorerV1:
                 scorer_params["threshold"] = HALLUCINATION_SCORER_THRESHOLD
-                scorer_params["model_name_or_path"] = (
-                    self.hallucination_model_name_or_path
-                )
+                scorer_params["model_name_or_path"] = self.hallucination_model_name_or_path
             elif scorer_cls == WeaveToxicityScorerV1:
                 scorer_params["total_threshold"] = TOXICITY_TOTAL_THRESHOLD
                 scorer_params["category_threshold"] = TOXICITY_CATEGORY_THRESHOLD
@@ -229,18 +225,11 @@ class WeaveTrustScorerV1(weave.Scorer):
         text = " ".join(text.split())
 
         # Ensure proper sentence spacing
-        text = (
-            text.replace(" .", ".")
-            .replace(" ,", ",")
-            .replace(" !", "!")
-            .replace(" ?", "?")
-        )
+        text = text.replace(" .", ".").replace(" ,", ",").replace(" !", "!").replace(" ?", "?")
 
         return text
 
-    def _filter_inputs_for_scorer(
-        self, scorer: weave.Scorer, inputs: dict[str, Any]
-    ) -> dict[str, Any]:
+    def _filter_inputs_for_scorer(self, scorer: weave.Scorer, inputs: dict[str, Any]) -> dict[str, Any]:
         """Filter inputs to match scorer's signature."""
         scorer_params = signature(scorer.score).parameters
         return {k: v for k, v in inputs.items() if k in scorer_params}
@@ -254,9 +243,7 @@ class WeaveTrustScorerV1(weave.Scorer):
         """Run all applicable scorers and return their raw results."""
         # Preprocess inputs
         processed_output = self._preprocess_text(output)
-        processed_context = (
-            self._preprocess_text(context) if isinstance(context, str) else context
-        )
+        processed_context = self._preprocess_text(context) if isinstance(context, str) else context
         processed_query = self._preprocess_text(query) if query else None
 
         inputs: dict[str, Any] = {"output": processed_output}
@@ -271,9 +258,7 @@ class WeaveTrustScorerV1(weave.Scorer):
             with ThreadPoolExecutor() as executor:
                 # Schedule each scorer's work concurrently.
                 future_to_scorer = {
-                    executor.submit(
-                        scorer.score, **self._filter_inputs_for_scorer(scorer, inputs)
-                    ): scorer_name
+                    executor.submit(scorer.score, **self._filter_inputs_for_scorer(scorer, inputs)): scorer_name
                     for scorer_name, scorer in self._loaded_scorers.items()
                 }
                 # Collect results as they complete.
@@ -282,20 +267,14 @@ class WeaveTrustScorerV1(weave.Scorer):
                     try:
                         results[scorer_name] = future.result()
                     except Exception as e:
-                        raise WeaveTrustScorerError(
-                            f"Error calling {scorer_name}: {e}", errors=e
-                        ) from e
+                        raise WeaveTrustScorerError(f"Error calling {scorer_name}: {e}", errors=e) from e
         else:
             # Run scorers sequentially
             for scorer_name, scorer in self._loaded_scorers.items():
                 try:
-                    results[scorer_name] = scorer.score(
-                        **self._filter_inputs_for_scorer(scorer, inputs)
-                    )
+                    results[scorer_name] = scorer.score(**self._filter_inputs_for_scorer(scorer, inputs))
                 except Exception as e:
-                    raise WeaveTrustScorerError(
-                        f"Error calling {scorer_name}: {e}", errors=e
-                    ) from e
+                    raise WeaveTrustScorerError(f"Error calling {scorer_name}: {e}", errors=e) from e
 
         return results
 

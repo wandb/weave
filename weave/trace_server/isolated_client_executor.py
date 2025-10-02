@@ -252,9 +252,7 @@ class IsolatedClientExecutor:
         )
         self._process.start()
 
-    async def _execute_with_timeout(
-        self, func: AnyCallable[T, R], request: T, timeout_seconds: float
-    ) -> R:
+    async def _execute_with_timeout(self, func: AnyCallable[T, R], request: T, timeout_seconds: float) -> R:
         """Execute a function with timeout handling.
 
         Args:
@@ -289,20 +287,14 @@ class IsolatedClientExecutor:
             # Check if process is still alive
             if not self.is_running:
                 exit_code = self._process.exitcode
-                raise IsolatedClientExecutorError(
-                    f"Worker process terminated unexpectedly with exit code: {exit_code}"
-                )
+                raise IsolatedClientExecutorError(f"Worker process terminated unexpectedly with exit code: {exit_code}")
 
             await asyncio.sleep(RESPONSE_POLL_INTERVAL_SECONDS)
 
         # Timeout occurred
-        raise IsolatedClientExecutorTimeoutError(
-            f"Function execution timed out after {timeout_seconds} seconds"
-        )
+        raise IsolatedClientExecutorTimeoutError(f"Function execution timed out after {timeout_seconds} seconds")
 
-    def _stop_process(
-        self, timeout_seconds: float = DEFAULT_SHUTDOWN_TIMEOUT_SECONDS
-    ) -> None:
+    def _stop_process(self, timeout_seconds: float = DEFAULT_SHUTDOWN_TIMEOUT_SECONDS) -> None:
         """Stop the worker process gracefully."""
         if self._process is None:
             return
@@ -388,9 +380,7 @@ def _client_context(client: WeaveClient) -> Generator[None]:
         IsolatedClientExecutorError: If a weave client already exists
     """
     if get_weave_client() is not None:
-        raise IsolatedClientExecutorError(
-            "Unsafe to run as user with existing weave client"
-        )
+        raise IsolatedClientExecutorError("Unsafe to run as user with existing weave client")
 
     set_weave_client_global(client)
     try:

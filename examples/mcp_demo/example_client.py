@@ -29,17 +29,11 @@ class MCPClient:
         """
         print(f"Connecting to server at: {server_script_path}")
 
-        server_params = StdioServerParameters(
-            command="python", args=[server_script_path], env=None
-        )
+        server_params = StdioServerParameters(command="python", args=[server_script_path], env=None)
 
-        stdio_transport = await self.exit_stack.enter_async_context(
-            stdio_client(server_params)
-        )
+        stdio_transport = await self.exit_stack.enter_async_context(stdio_client(server_params))
         self.stdio, self.write = stdio_transport
-        self.session = await self.exit_stack.enter_async_context(
-            ClientSession(self.stdio, self.write)
-        )
+        self.session = await self.exit_stack.enter_async_context(ClientSession(self.stdio, self.write))
 
         await self.session.initialize()
 
@@ -56,9 +50,7 @@ class MCPClient:
 
         # List available prompts
         prompts_response = await self.session.list_prompts()
-        print(
-            "Available prompts:", [prompt.name for prompt in prompts_response.prompts]
-        )
+        print("Available prompts:", [prompt.name for prompt in prompts_response.prompts])
 
         print("\nServer connection established!")
         return {
@@ -76,18 +68,12 @@ class MCPClient:
             arguments: Arguments to pass to the tool
         """
         if not self.session:
-            raise RuntimeError(
-                "Not connected to a server. Call connect_to_server first."
-            )
+            raise RuntimeError("Not connected to a server. Call connect_to_server first.")
 
         print(f"Calling tool: {tool_name} with arguments: {arguments}")
         result = await self.session.call_tool(tool_name, arguments)
         content = result.content
-        if (
-            isinstance(content, list)
-            and len(content) > 0
-            and isinstance(content[0], TextContent)
-        ):
+        if isinstance(content, list) and len(content) > 0 and isinstance(content[0], TextContent):
             return content[0].text
         return content
 
@@ -99,18 +85,14 @@ class MCPClient:
             uri: URI of the resource to read
         """
         if not self.session:
-            raise RuntimeError(
-                "Not connected to a server. Call connect_to_server first."
-            )
+            raise RuntimeError("Not connected to a server. Call connect_to_server first.")
 
         print(f"Reading resource: {uri}")
         result = await self.session.read_resource(AnyUrl(uri))
         return result
 
     @weave.op
-    async def get_prompt(
-        self, prompt_name: str, arguments: dict[str, str] | None = None
-    ):
+    async def get_prompt(self, prompt_name: str, arguments: dict[str, str] | None = None):
         """Get a prompt from the MCP server.
 
         Args:
@@ -118,9 +100,7 @@ class MCPClient:
             arguments: Arguments to pass to the prompt
         """
         if not self.session:
-            raise RuntimeError(
-                "Not connected to a server. Call connect_to_server first."
-            )
+            raise RuntimeError("Not connected to a server. Call connect_to_server first.")
 
         print(f"Getting prompt: {prompt_name} with arguments: {arguments}")
         result = await self.session.get_prompt(prompt_name, arguments)
@@ -130,9 +110,7 @@ class MCPClient:
     async def demo_all_tools(self):
         """Demonstrate all available tools."""
         if not self.session:
-            raise RuntimeError(
-                "Not connected to a server. Call connect_to_server first."
-            )
+            raise RuntimeError("Not connected to a server. Call connect_to_server first.")
 
         print("\n=== TOOL DEMO ===")
         tools_response = await self.session.list_tools()
@@ -150,17 +128,13 @@ class MCPClient:
                     results.append({"name": name, "result": result})
 
                 elif name == "calculate_bmi":
-                    result = await self.call_tool(
-                        "calculate_bmi", {"weight_kg": 70, "height_m": 1.75}
-                    )
+                    result = await self.call_tool("calculate_bmi", {"weight_kg": 70, "height_m": 1.75})
                     print(f"BMI for 70kg/1.75m: {result}")
                     results.append({"name": name, "result": result})
 
                 elif name == "fetch_weather":
                     try:
-                        result = await self.call_tool(
-                            "fetch_weather", {"city": "San Francisco"}
-                        )
+                        result = await self.call_tool("fetch_weather", {"city": "San Francisco"})
                         print(f"Weather for San Francisco: {result}")
                         results.append({"name": name, "result": result})
                     except Exception as e:
@@ -182,9 +156,7 @@ class MCPClient:
     async def demo_all_resources(self):
         """Demonstrate all available resources."""
         if not self.session:
-            raise RuntimeError(
-                "Not connected to a server. Call connect_to_server first."
-            )
+            raise RuntimeError("Not connected to a server. Call connect_to_server first.")
 
         print("\n=== RESOURCE DEMO ===")
         resources_response = await self.session.list_resources()
@@ -222,9 +194,7 @@ class MCPClient:
     async def demo_all_prompts(self):
         """Demonstrate all available prompts."""
         if not self.session:
-            raise RuntimeError(
-                "Not connected to a server. Call connect_to_server first."
-            )
+            raise RuntimeError("Not connected to a server. Call connect_to_server first.")
 
         print("\n=== PROMPT DEMO ===")
         prompts_response = await self.session.list_prompts()
@@ -236,16 +206,12 @@ class MCPClient:
                 print(f"\nDemonstrating prompt: {name}")
 
                 if name == "review_code":
-                    result = await self.get_prompt(
-                        "review_code", {"code": "def hello(): print('Hello World')"}
-                    )
+                    result = await self.get_prompt("review_code", {"code": "def hello(): print('Hello World')"})
                     print(f"Code review prompt: {result}")
                     results.append({"name": name, "result": result})
 
                 elif name == "debug_error":
-                    result = await self.get_prompt(
-                        "debug_error", {"error": "NameError: name 'x' is not defined"}
-                    )
+                    result = await self.get_prompt("debug_error", {"error": "NameError: name 'x' is not defined"})
                     print(f"Debug error prompt: {result}")
                     results.append({"name": name, "result": result})
 
@@ -259,9 +225,7 @@ class MCPClient:
     async def interactive_session(self):
         """Run an interactive session to use MCP tools and resources."""
         if not self.session:
-            raise RuntimeError(
-                "Not connected to a server. Call connect_to_server first."
-            )
+            raise RuntimeError("Not connected to a server. Call connect_to_server first.")
 
         print("\nMCP Interactive Session")
         print("Available commands:")
@@ -330,9 +294,7 @@ class MCPClient:
                     try:
                         weight = float(parts[1])
                         height = float(parts[2])
-                        result = await self.call_tool(
-                            "calculate_bmi", {"weight_kg": weight, "height_m": height}
-                        )
+                        result = await self.call_tool("calculate_bmi", {"weight_kg": weight, "height_m": height})
                         print(f"\nBMI for {weight}kg/{height}m: {result}")
                     except ValueError:
                         print("Error: Arguments must be numbers")

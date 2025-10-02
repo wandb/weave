@@ -6,9 +6,7 @@ from typing import Optional
 
 from playwright.async_api import async_playwright
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 
 async def generate_screenshot_from_browser(
@@ -51,9 +49,7 @@ async def generate_screenshot_from_browser(
         page = await context.new_page()
 
         if viewport_size:
-            await page.set_viewport_size(
-                {"width": viewport_size[0], "height": viewport_size[1]}
-            )
+            await page.set_viewport_size({"width": viewport_size[0], "height": viewport_size[1]})
 
         if local_storage:
             await context.add_init_script(

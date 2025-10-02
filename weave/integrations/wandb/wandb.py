@@ -22,8 +22,6 @@ def wandb_init_hook() -> None:
         return
 
     project_path = f"{run_path.entity}/{run_path.project}"
-    logger.info(
-        f"Active wandb run detected. Using project name from wandb: {project_path}"
-    )
+    logger.info(f"Active wandb run detected. Using project name from wandb: {project_path}")
 
     init(project_path)

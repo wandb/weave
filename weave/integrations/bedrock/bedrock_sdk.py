@@ -15,9 +15,7 @@ if TYPE_CHECKING:
     from botocore.client import BaseClient
 
 
-def bedrock_on_finish_converse(
-    call: Call, output: Any, exception: Optional[BaseException]
-) -> None:
+def bedrock_on_finish_converse(call: Call, output: Any, exception: Optional[BaseException]) -> None:
     model_name = str(call.inputs["modelId"])  # get the ref
     usage = {model_name: {"requests": 1}}
     summary_update = {"usage": usage}
@@ -32,9 +30,7 @@ def bedrock_on_finish_converse(
         call.summary.update(summary_update)
 
 
-def bedrock_on_finish_invoke(
-    call: Call, output: Any, exception: Optional[BaseException]
-) -> None:
+def bedrock_on_finish_invoke(call: Call, output: Any, exception: Optional[BaseException]) -> None:
     model_name = str(call.inputs["modelId"])
     usage = {model_name: {"requests": 1}}
     summary_update = {"usage": usage}
@@ -73,9 +69,7 @@ def extract_model_name_from_inference_profile_arn(profile_arn: str) -> str:
         profile_id = profile_arn.split("/")[-1]
         bedrock_client = boto3.client("bedrock", region_name=aws_region_name)
 
-        response = bedrock_client.get_inference_profile(
-            inferenceProfileIdentifier=profile_id
-        )
+        response = bedrock_client.get_inference_profile(inferenceProfileIdentifier=profile_id)
 
         # Get the first model ARN from the models array
         model_arn = response["models"][0]["modelArn"]
@@ -99,9 +93,7 @@ def postprocess_inputs_converse(inputs: dict[str, Any]) -> dict[str, Any]:
     """
     kwargs = inputs.get("kwargs", {})
     if "modelId" in kwargs and "arn" in kwargs["modelId"]:
-        kwargs["modelId"] = extract_model_name_from_inference_profile_arn(
-            kwargs["modelId"]
-        )
+        kwargs["modelId"] = extract_model_name_from_inference_profile_arn(kwargs["modelId"])
     return kwargs
 
 
@@ -233,9 +225,7 @@ def create_stream_wrapper(
                 """Delegate 'get' method to the response object."""
                 if key == "stream":
                     if hasattr(self._iterator_or_ctx_manager, "get"):
-                        self._iterator_or_ctx_manager = (
-                            self._iterator_or_ctx_manager.get("stream")
-                        )
+                        self._iterator_or_ctx_manager = self._iterator_or_ctx_manager.get("stream")
                     return self
 
             def __getitem__(self, key: str) -> Any:
@@ -254,9 +244,7 @@ def create_stream_wrapper(
 
 def _patch_converse_stream(bedrock_client: "BaseClient") -> None:
     """Patches the converse_stream method to handle streaming."""
-    op = create_stream_wrapper("BedrockRuntime.converse_stream")(
-        bedrock_client.converse_stream
-    )
+    op = create_stream_wrapper("BedrockRuntime.converse_stream")(bedrock_client.converse_stream)
     bedrock_client.converse_stream = op
 
 

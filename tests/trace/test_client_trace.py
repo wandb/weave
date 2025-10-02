@@ -106,9 +106,7 @@ def test_simple_op(client):
     assert len(calls) == 1
     fetched_call = calls[0]
     digest = "Zo4OshYu57R00QNlBBGjuiDGyewGYsJ1B69IKXSXYQY"
-    expected_name = (
-        f"{TRACE_REF_SCHEME}:///{client.entity}/{client.project}/op/my_op:{digest}"
-    )
+    expected_name = f"{TRACE_REF_SCHEME}:///{client.entity}/{client.project}/op/my_op:{digest}"
     assert fetched_call == weave.trace.call.Call(
         _op_name=expected_name,
         project_id=f"{client.entity}/{client.project}",
@@ -158,8 +156,7 @@ def test_trace_server_call_start_and_end(client):
         op_name="test_name",
         trace_id=trace_id,
         parent_id=parent_id,
-        started_at=datetime.datetime.now(tz=datetime.timezone.utc)
-        - datetime.timedelta(seconds=1),
+        started_at=datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(seconds=1),
         attributes={"a": 5},
         inputs={"b": 5},
     )
@@ -172,9 +169,7 @@ def test_trace_server_call_start_and_end(client):
         )
     )
 
-    exp_started_at = datetime.datetime.fromisoformat(
-        start.started_at.isoformat(timespec="milliseconds")
-    )
+    exp_started_at = datetime.datetime.fromisoformat(start.started_at.isoformat(timespec="milliseconds"))
 
     assert res.call.model_dump() == {
         "project_id": client._project_id(),
@@ -221,9 +216,7 @@ def test_trace_server_call_start_and_end(client):
         )
     )
 
-    exp_ended_at = datetime.datetime.fromisoformat(
-        end.ended_at.isoformat(timespec="milliseconds")
-    )
+    exp_ended_at = datetime.datetime.fromisoformat(end.ended_at.isoformat(timespec="milliseconds"))
 
     assert res.call.model_dump() == {
         "project_id": client._project_id(),
@@ -390,7 +383,9 @@ def test_trace_call_query_filter_op_version_refs(client):
     assert ref_str(call_summaries["adder"].op).startswith(
         f"{TRACE_REF_SCHEME}:///{client.entity}/{client.project}/op/adder:"
     )
-    wildcard_adder_ref_str = f"{TRACE_REF_SCHEME}:///{client.entity}/{client.project}/op/adder{WILDCARD_ARTIFACT_VERSION_AND_PATH}"
+    wildcard_adder_ref_str = (
+        f"{TRACE_REF_SCHEME}:///{client.entity}/{client.project}/op/adder{WILDCARD_ARTIFACT_VERSION_AND_PATH}"
+    )
 
     for i, (op_version_refs, exp_count) in enumerate(
         [
@@ -411,14 +406,12 @@ def test_trace_call_query_filter_op_version_refs(client):
                     ref_str(call_summaries["adder"].op),
                     ref_str(call_summaries["subtractor"].op),
                 ],
-                call_summaries["adder"].num_calls
-                + call_summaries["subtractor"].num_calls,
+                call_summaries["adder"].num_calls + call_summaries["subtractor"].num_calls,
             ),
             # Test the wildcard case
             (
                 [wildcard_adder_ref_str],
-                call_summaries["adder"].num_calls
-                + call_summaries["adder_v0"].num_calls,
+                call_summaries["adder"].num_calls + call_summaries["adder_v0"].num_calls,
             ),
             # Test the wildcard case and specific case
             (
@@ -448,9 +441,7 @@ def unique_vals(list_a: list[str]) -> list[str]:
     return list(set(list_a))
 
 
-def get_all_calls_asserting_finished(
-    client: ClientType, call_spec: OpCallSpec
-) -> tsi.CallsQueryRes:
+def get_all_calls_asserting_finished(client: ClientType, call_spec: OpCallSpec) -> tsi.CallsQueryRes:
     res = get_client_trace_server(client).calls_query(
         tsi.CallsQueryReq(
             project_id=get_client_project_id(client),
@@ -467,11 +458,7 @@ def test_trace_call_query_filter_input_object_version_refs(client):
     res = get_all_calls_asserting_finished(client, call_spec)
 
     input_object_version_refs = unique_vals(
-        [
-            ref
-            for call in res.calls
-            for ref in extract_weave_refs_from_value(call.inputs)
-        ]
+        [ref for call in res.calls for ref in extract_weave_refs_from_value(call.inputs)]
     )
     assert len(input_object_version_refs) > 3  # > 3
 
@@ -525,9 +512,7 @@ def test_trace_call_wb_run_step_query(client):
 
     step_counter = iter(range(100))
     with (
-        mock.patch.object(
-            weave_client, "safe_current_wb_run_id", return_value=full_wb_run_id
-        ),
+        mock.patch.object(weave_client, "safe_current_wb_run_id", return_value=full_wb_run_id),
         mock.patch.object(  # noqa: PT008
             weave_client, "safe_current_wb_run_step", lambda: next(step_counter)
         ),
@@ -535,31 +520,17 @@ def test_trace_call_wb_run_step_query(client):
         call_spec = simple_line_call_bootstrap()
 
     server = get_client_trace_server(client)
-    res = server.calls_query(
-        tsi.CallsQueryReq(project_id=get_client_project_id(client))
-    )
+    res = server.calls_query(tsi.CallsQueryReq(project_id=get_client_project_id(client)))
     steps = {c.wb_run_step for c in res.calls}
     assert steps == set(range(call_spec.total_calls))
 
-    query = tsi.Query(
-        **{"$expr": {"$eq": [{"$getField": "wb_run_step"}, {"$literal": 0}]}}
-    )
-    res = server.calls_query(
-        tsi.CallsQueryReq(project_id=get_client_project_id(client), query=query)
-    )
+    query = tsi.Query(**{"$expr": {"$eq": [{"$getField": "wb_run_step"}, {"$literal": 0}]}})
+    res = server.calls_query(tsi.CallsQueryReq(project_id=get_client_project_id(client), query=query))
     assert len(res.calls) == 1
 
     compare_step = call_spec.total_calls - 2
-    range_query = tsi.Query(
-        **{
-            "$expr": {
-                "$gte": [{"$getField": "wb_run_step"}, {"$literal": compare_step}]
-            }
-        }
-    )
-    res = server.calls_query(
-        tsi.CallsQueryReq(project_id=get_client_project_id(client), query=range_query)
-    )
+    range_query = tsi.Query(**{"$expr": {"$gte": [{"$getField": "wb_run_step"}, {"$literal": compare_step}]}})
+    res = server.calls_query(tsi.CallsQueryReq(project_id=get_client_project_id(client), query=range_query))
     assert len(res.calls) == 2
 
     res = server.calls_query(
@@ -579,11 +550,7 @@ def test_trace_call_query_filter_output_object_version_refs(client):
     res = get_all_calls_asserting_finished(client, call_spec)
 
     output_object_version_refs = unique_vals(
-        [
-            ref
-            for call in res.calls
-            for ref in extract_weave_refs_from_value(call.output)
-        ]
+        [ref for call in res.calls for ref in extract_weave_refs_from_value(call.output)]
     )
     assert len(output_object_version_refs) > 3
 
@@ -636,9 +603,7 @@ def test_trace_call_query_filter_parent_ids(client):
 
     res = get_all_calls_asserting_finished(client, call_spec)
 
-    parent_ids = unique_vals(
-        [call.parent_id for call in res.calls if call.parent_id is not None]
-    )
+    parent_ids = unique_vals([call.parent_id for call in res.calls if call.parent_id is not None])
     assert len(parent_ids) > 3
 
     for parent_id_list, exp_count in [
@@ -747,19 +712,13 @@ def test_trace_call_query_filter_wb_run_ids(client):
     full_wb_run_id_2 = f"{client.entity}/{client.project}/test-run-2"
     from weave.trace import weave_client
 
-    with mock.patch.object(
-        weave_client, "safe_current_wb_run_id", return_value=full_wb_run_id_1
-    ):
+    with mock.patch.object(weave_client, "safe_current_wb_run_id", return_value=full_wb_run_id_1):
         call_spec_1 = simple_line_call_bootstrap()
-    with mock.patch.object(
-        weave_client, "safe_current_wb_run_id", return_value=full_wb_run_id_2
-    ):
+    with mock.patch.object(weave_client, "safe_current_wb_run_id", return_value=full_wb_run_id_2):
         call_spec_2 = simple_line_call_bootstrap()
     call_spec_3 = simple_line_call_bootstrap()
 
-    total_calls = (
-        call_spec_1.total_calls + call_spec_2.total_calls + call_spec_3.total_calls
-    )
+    total_calls = call_spec_1.total_calls + call_spec_2.total_calls + call_spec_3.total_calls
 
     for wb_run_ids, exp_count in [
         (None, total_calls),
@@ -881,15 +840,11 @@ def test_trace_call_query_timings(client):
         else:  # call 99 gets 'even_later'
             return even_later
 
-    with mock.patch(
-        "weave.trace.weave_client.datetime.datetime"
-    ) as mock_datetime_class:
+    with mock.patch("weave.trace.weave_client.datetime.datetime") as mock_datetime_class:
         # Mock only the .now() method, keep everything else as-is
         mock_datetime_class.now = mock.Mock(side_effect=mock_now)
         # Preserve other datetime functionality
-        mock_datetime_class.side_effect = lambda *args, **kw: datetime.datetime(
-            *args, **kw
-        )
+        mock_datetime_class.side_effect = lambda *args, **kw: datetime.datetime(*args, **kw)
 
         for i in range(num_calls):
             call_index = i
@@ -1111,10 +1066,7 @@ def test_trace_call_filter(client):
         ),
         # not gt = lte
         (
-            6
-            + (
-                1 if is_sqlite else 0
-            ),  # SQLite casting transforms strings to 0, instead of NULL
+            6 + (1 if is_sqlite else 0),  # SQLite casting transforms strings to 0, instead of NULL
             {
                 "$not": [
                     {
@@ -1133,10 +1085,7 @@ def test_trace_call_filter(client):
         ),
         # not gte = lt
         (
-            5
-            + (
-                1 if is_sqlite else 0
-            ),  # SQLite casting transforms strings to 0, instead of NULL
+            5 + (1 if is_sqlite else 0),  # SQLite casting transforms strings to 0, instead of NULL
             {
                 "$not": [
                     {
@@ -1155,10 +1104,7 @@ def test_trace_call_filter(client):
         ),
         # like all
         (
-            13
-            + (
-                -2 if is_sqlite else 0
-            ),  # SQLite returns NULL for non-existent fields rather than ''.
+            13 + (-2 if is_sqlite else 0),  # SQLite returns NULL for non-existent fields rather than ''.
             {
                 "$contains": {
                     "input": {"$getField": "inputs.in_val.str"},
@@ -1206,9 +1152,7 @@ def test_trace_call_filter(client):
                                 "$gt": [
                                     {
                                         "$convert": {
-                                            "input": {
-                                                "$getField": "inputs.in_val.prim"
-                                            },
+                                            "input": {"$getField": "inputs.in_val.prim"},
                                             "to": "int",
                                         }
                                     },
@@ -1233,10 +1177,7 @@ def test_trace_call_filter(client):
         ),
         # or
         (
-            5
-            + (
-                1 if is_sqlite else 0
-            ),  # SQLite casting transforms strings to 0, instead of NULL
+            5 + (1 if is_sqlite else 0),  # SQLite casting transforms strings to 0, instead of NULL
             {
                 "$or": [
                     {
@@ -1245,9 +1186,7 @@ def test_trace_call_filter(client):
                                 "$gt": [
                                     {
                                         "$convert": {
-                                            "input": {
-                                                "$getField": "inputs.in_val.prim"
-                                            },
+                                            "input": {"$getField": "inputs.in_val.prim"},
                                             "to": "int",
                                         }
                                     },
@@ -1307,9 +1246,7 @@ def test_trace_call_filter(client):
                 "$gt": [
                     {
                         "$convert": {
-                            "input": {
-                                "$getField": "inputs.in_val.list.0"
-                            },  # changing this to a dot instead of [0]
+                            "input": {"$getField": "inputs.in_val.list.0"},  # changing this to a dot instead of [0]
                             "to": "int",
                         }
                     },
@@ -1380,9 +1317,7 @@ def test_trace_call_filter(client):
         )
 
         if len(inner_res.calls) != count:
-            failed_cases.append(
-                f"(ALL) Query {query} expected {count}, but found {len(inner_res.calls)}"
-            )
+            failed_cases.append(f"(ALL) Query {query} expected {count}, but found {len(inner_res.calls)}")
         inner_res = get_client_trace_server(client).calls_query_stats(
             tsi.CallsQueryStatsReq.model_validate(
                 {
@@ -1393,14 +1328,10 @@ def test_trace_call_filter(client):
         )
 
         if inner_res.count != count:
-            failed_cases.append(
-                f"(Stats) Query {query} expected {count}, but found {inner_res.count}"
-            )
+            failed_cases.append(f"(Stats) Query {query} expected {count}, but found {inner_res.count}")
 
     if failed_cases:
-        raise AssertionError(
-            f"Failed {len(failed_cases)} cases:\n" + "\n".join(failed_cases)
-        )
+        raise AssertionError(f"Failed {len(failed_cases)} cases:\n" + "\n".join(failed_cases))
 
 
 def test_ops_with_default_params(client):
@@ -1772,9 +1703,7 @@ def test_named_reuse(client):
     res = get_client_trace_server(client).objs_query(
         tsi.ObjQueryReq(
             project_id=get_client_project_id(client),
-            filter=tsi.ObjectVersionFilter(
-                is_op=False, latest_only=True, base_object_classes=["Dataset"]
-            ),
+            filter=tsi.ObjectVersionFilter(is_op=False, latest_only=True, base_object_classes=["Dataset"]),
         )
     )
 
@@ -2662,9 +2591,7 @@ def test_read_call_start_with_cost(client):
         pytest.fail(f"summary_dump was not None or dict: {type(summary)} {summary}")
 
     # --- 4. Cleanup ---
-    client.server.calls_delete(
-        tsi.CallsDeleteReq(project_id=project_id, call_ids=[call_id])
-    )
+    client.server.calls_delete(tsi.CallsDeleteReq(project_id=project_id, call_ids=[call_id]))
     client.purge_costs(price_id)
 
 
@@ -2819,9 +2746,7 @@ def test_sort_and_filter_through_refs(client):
             tsi.CallsQueryReq.model_validate(
                 {
                     "project_id": get_client_project_id(client),
-                    "sort_by": [
-                        tsi.SortBy(field="inputs.val.a.b.c.d", direction="asc")
-                    ],
+                    "sort_by": [tsi.SortBy(field="inputs.val.a.b.c.d", direction="asc")],
                     "query": {"$expr": query},
                 }
             )
@@ -3014,9 +2939,7 @@ def test_model_save(client):
     inner_res = get_client_trace_server(client).objs_query(
         tsi.ObjQueryReq(
             project_id=get_client_project_id(client),
-            filter=tsi.ObjectVersionFilter(
-                is_op=False, latest_only=True, base_object_classes=["Model"]
-            ),
+            filter=tsi.ObjectVersionFilter(is_op=False, latest_only=True, base_object_classes=["Model"]),
         )
     )
 
@@ -3125,9 +3048,7 @@ def test_calls_stream_column_expansion(client):
 # in clickhouse_trace_server_settings.py, this test verifies that the dynamic
 # increase works as expected
 @pytest.mark.parametrize("batch_size", [1, 5, 6])
-def test_calls_stream_column_expansion_dynamic_batch_size(
-    client, batch_size, monkeypatch
-):
+def test_calls_stream_column_expansion_dynamic_batch_size(client, batch_size, monkeypatch):
     monkeypatch.setattr(
         "weave.trace_server.clickhouse_trace_server_settings.INITIAL_CALLS_STREAM_BATCH_SIZE",
         1,
@@ -3249,10 +3170,7 @@ def test_objects_and_keys_with_special_characters(client):
     exp_name = sanitize_object_name(name_with_special_characters)
     assert exp_name == "n-a_m.e-100"
     exp_key = extra_value_quoter(name_with_special_characters)
-    assert (
-        exp_key
-        == "n-a_m.e%3A%20%2F%2B_%28%29%7B%7D%7C%22%27%3C%3E%21%40%24%5E%26%2A%23%3A%2C.%5B%5D-%3D%3B~%60100"
-    )
+    assert exp_key == "n-a_m.e%3A%20%2F%2B_%28%29%7B%7D%7C%22%27%3C%3E%21%40%24%5E%26%2A%23%3A%2C.%5B%5D-%3D%3B~%60100"
     exp_digest = "O66Mk7g91rlAUtcGYOFR1Y2Wk94YyPXJy2UEAzDQcYM"
 
     exp_obj_ref = f"{ref_base}/object/{exp_name}:{exp_digest}"
@@ -3441,7 +3359,9 @@ def test_large_keys_are_stripped_call(client, caplog, monkeypatch):
         # no need to strip in sqlite
         return
 
-    original_insert_call_batch = weave.trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer._insert_call_batch
+    original_insert_call_batch = (
+        weave.trace_server.clickhouse_trace_server_batched.ClickHouseTraceServer._insert_call_batch
+    )
     max_size = 10 * 1024
 
     # Patch _insert_call_batch to raise InsertTooLarge
@@ -3504,9 +3424,7 @@ def test_large_keys_are_stripped_call(client, caplog, monkeypatch):
     assert calls[0].output == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
     assert calls[0].inputs == json.loads(ENTITY_TOO_LARGE_PAYLOAD)
 
-    error_messages = [
-        record.message for record in caplog.records if record.levelname == "ERROR"
-    ]
+    error_messages = [record.message for record in caplog.records if record.levelname == "ERROR"]
     for error_message in error_messages:
         assert "Retrying with large objects stripped" in error_message
 
@@ -3867,21 +3785,12 @@ def test_calls_query_multiple_dupe_select_columns(client, capsys, caplog):
 
     # now make sure we don't make duplicate selects
     if client_is_sqlite(client):
-        select_queries = [
-            line
-            for line in capsys.readouterr().out.split("\n")
-            if line.startswith("QUERY SELECT")
-        ]
+        select_queries = [line for line in capsys.readouterr().out.split("\n") if line.startswith("QUERY SELECT")]
         for query in select_queries:
             assert query.count("output") == 1
     else:
-        select_query = get_info_loglines(caplog, "clickhouse_stream_query", ["query"])[
-            0
-        ]
-        assert (
-            select_query["query"].count("any(calls_merged.output_dump) AS output_dump")
-            == 1
-        )
+        select_query = get_info_loglines(caplog, "clickhouse_stream_query", ["query"])[0]
+        assert select_query["query"].count("any(calls_merged.output_dump) AS output_dump") == 1
 
 
 def test_calls_stream_heavy_condition_aggregation_parts(client):
@@ -3911,8 +3820,7 @@ def test_calls_stream_heavy_condition_aggregation_parts(client):
         op_name="test_name",
         trace_id=trace_id,
         parent_id=parent_id,
-        started_at=datetime.datetime.now(tz=datetime.timezone.utc)
-        - datetime.timedelta(seconds=1),
+        started_at=datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(seconds=1),
         attributes={"a": 5},
         inputs={"param": {"value1": "hello"}},
     )
@@ -3953,8 +3861,7 @@ def test_call_stream_query_heavy_query_batch(client):
             op_name="test_name",
             trace_id=trace_id,
             parent_id=parent_id,
-            started_at=datetime.datetime.now(tz=datetime.timezone.utc)
-            - datetime.timedelta(seconds=1),
+            started_at=datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(seconds=1),
             attributes={"a": 5, "empty": "", "null": None},
             inputs={"param": {"value1": "hello"}},
         )
@@ -3986,9 +3893,7 @@ def test_call_stream_query_heavy_query_batch(client):
             }
         },
     }
-    res = client.server.calls_query_stream(
-        tsi.CallsQueryReq.model_validate(output_query)
-    )
+    res = client.server.calls_query_stream(tsi.CallsQueryReq.model_validate(output_query))
     assert len(list(res)) == 10
     for call in res:
         assert call.attributes["a"] == 5
@@ -4017,9 +3922,7 @@ def test_call_stream_query_heavy_query_batch(client):
             }
         },
     }
-    res = client.server.calls_query_stream(
-        tsi.CallsQueryReq.model_validate(input_string_query)
-    )
+    res = client.server.calls_query_stream(tsi.CallsQueryReq.model_validate(input_string_query))
     assert len(list(res)) == 10
     for call in res:
         assert call.inputs["param"]["value1"] == "hello"
@@ -4029,9 +3932,7 @@ def test_call_stream_query_heavy_query_batch(client):
     # Now lets add a light filter, which
     # changes how we filter out calls. Make sure that still works
     input_string_query["filter"] = {"op_names": ["test_name"]}
-    res = client.server.calls_query_stream(
-        tsi.CallsQueryReq.model_validate(input_string_query)
-    )
+    res = client.server.calls_query_stream(tsi.CallsQueryReq.model_validate(input_string_query))
     assert len(list(res)) == 10
     for call in res:
         assert call.inputs["param"]["value1"] == "helslo"
@@ -4040,9 +3941,7 @@ def test_call_stream_query_heavy_query_batch(client):
     # now try to filter by the empty attribute string
     query = {
         "project_id": project_id,
-        "query": {
-            "$expr": {"$eq": [{"$getField": "attributes.empty"}, {"$literal": ""}]}
-        },
+        "query": {"$expr": {"$eq": [{"$getField": "attributes.empty"}, {"$literal": ""}]}},
     }
     res = client.server.calls_query_stream(tsi.CallsQueryReq.model_validate(query))
     assert len(list(res)) == 10
@@ -4080,9 +3979,7 @@ def test_calls_query_with_storage_size_clickhouse(client, clickhouse_client):
     # Query with storage size
     calls = list(
         client.server.calls_query_stream(
-            tsi.CallsQueryReq(
-                project_id=get_client_project_id(client), include_storage_size=True
-            )
+            tsi.CallsQueryReq(project_id=get_client_project_id(client), include_storage_size=True)
         )
     )
     assert len(calls) == 1
@@ -4140,13 +4037,9 @@ def test_calls_query_with_total_storage_size_clickhouse(client, clickhouse_clien
     # Verify the total storage size is present, despite that the race condition
     # that the calls_merged_stats table is not updated in time, and we are unable to
     # verify the value against an expected value.
-    assert (
-        parent_call.total_storage_size_bytes is not None
-    )  # Parent should have total size
+    assert parent_call.total_storage_size_bytes is not None  # Parent should have total size
     assert child_call.storage_size_bytes is None
-    assert (
-        child_call.total_storage_size_bytes is None
-    )  # Child should not have total size
+    assert child_call.total_storage_size_bytes is None  # Child should not have total size
 
 
 def test_calls_query_with_both_storage_sizes_clickhouse(client, clickhouse_client):
@@ -4772,9 +4665,7 @@ def test_thread_context_with_weave_api(client):
     with weave.thread("api_thread_1") as t:
         # Use ThreadContext object to access thread_id
         assert t.thread_id == "api_thread_1"
-        assert (
-            call_context.get_thread_id() == "api_thread_1"
-        )  # Verify internal consistency
+        assert call_context.get_thread_id() == "api_thread_1"  # Verify internal consistency
 
         # Test nested context with ThreadContext
         with weave.thread("api_thread_2") as inner_t:
@@ -4935,9 +4826,7 @@ def test_thread_id_query_filtering(client):
         )
 
         # Should find the call with filter_thread_1
-        thread1_calls = [
-            call for call in res1.calls if call.thread_id == "filter_thread_1"
-        ]
+        thread1_calls = [call for call in res1.calls if call.thread_id == "filter_thread_1"]
         assert len(thread1_calls) >= 1
 
         # Query all calls and verify thread_id values
@@ -4948,21 +4837,13 @@ def test_thread_id_query_filtering(client):
         )
 
         # Find our test calls by op_name pattern
-        our_test_calls = [
-            call for call in all_calls_res.calls if "query_test_op" in call.op_name
-        ]
+        our_test_calls = [call for call in all_calls_res.calls if "query_test_op" in call.op_name]
 
         # Verify we have calls with both thread_ids and None
         thread_ids_found = {call.thread_id for call in our_test_calls}
-        assert "filter_thread_1" in thread_ids_found, (
-            f"Should find filter_thread_1, got: {thread_ids_found}"
-        )
-        assert "filter_thread_2" in thread_ids_found, (
-            f"Should find filter_thread_2, got: {thread_ids_found}"
-        )
-        assert None in thread_ids_found, (
-            f"Should find None thread_id, got: {thread_ids_found}"
-        )
+        assert "filter_thread_1" in thread_ids_found, f"Should find filter_thread_1, got: {thread_ids_found}"
+        assert "filter_thread_2" in thread_ids_found, f"Should find filter_thread_2, got: {thread_ids_found}"
+        assert None in thread_ids_found, f"Should find None thread_id, got: {thread_ids_found}"
 
 
 def test_thread_context_error_handling(client):
@@ -5031,9 +4912,7 @@ def test_threads_query_endpoint(client):
 
     # Test that we start with no threads (if this is a fresh client)
     initial_threads = list(
-        client.server.threads_query_stream(
-            tsi.ThreadsQueryReq(project_id=get_client_project_id(client))
-        )
+        client.server.threads_query_stream(tsi.ThreadsQueryReq(project_id=get_client_project_id(client)))
     )
     initial_count = len(initial_threads)
 
@@ -5054,20 +4933,14 @@ def test_threads_query_endpoint(client):
 
     # Test basic threads query
     threads_res = list(
-        client.server.threads_query_stream(
-            tsi.ThreadsQueryReq(project_id=get_client_project_id(client))
-        )
+        client.server.threads_query_stream(tsi.ThreadsQueryReq(project_id=get_client_project_id(client)))
     )
 
     # Should have found our new threads
     assert len(threads_res) >= 3  # At least our 3 threads
 
     # Find our specific threads
-    our_threads = {
-        thread.thread_id: thread
-        for thread in threads_res
-        if thread.thread_id in thread_ids
-    }
+    our_threads = {thread.thread_id: thread for thread in threads_res if thread.thread_id in thread_ids}
     assert len(our_threads) == 3, f"Expected 3 threads, got {len(our_threads)}"
 
     # Test that each thread has the correct turn_count
@@ -5076,9 +4949,7 @@ def test_threads_query_endpoint(client):
     # 2) thread_test_op("single_call_i") turn
     for thread_id, thread in our_threads.items():
         assert thread.thread_id == thread_id
-        assert thread.turn_count >= 2, (
-            f"Thread {thread_id} should have at least 2 turns, got {thread.turn_count}"
-        )
+        assert thread.turn_count >= 2, f"Thread {thread_id} should have at least 2 turns, got {thread.turn_count}"
         assert thread.start_time is not None
         assert thread.last_updated is not None
         assert isinstance(thread.start_time, datetime.datetime)
@@ -5086,18 +4957,14 @@ def test_threads_query_endpoint(client):
 
     # Test limit parameter
     limited_res = list(
-        client.server.threads_query_stream(
-            tsi.ThreadsQueryReq(project_id=get_client_project_id(client), limit=2)
-        )
+        client.server.threads_query_stream(tsi.ThreadsQueryReq(project_id=get_client_project_id(client), limit=2))
     )
     assert len(limited_res) == 2
 
     # Test offset parameter
     offset_res = list(
         client.server.threads_query_stream(
-            tsi.ThreadsQueryReq(
-                project_id=get_client_project_id(client), limit=1, offset=1
-            )
+            tsi.ThreadsQueryReq(project_id=get_client_project_id(client), limit=1, offset=1)
         )
     )
     assert len(offset_res) == 1
@@ -5142,9 +5009,7 @@ def test_threads_query_endpoint(client):
 
     # Test datetime filtering
     # Get a timestamp from the middle of our test
-    middle_time = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(
-        seconds=5
-    )
+    middle_time = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(seconds=5)
 
     after_filter_res = list(
         client.server.threads_query_stream(
@@ -5159,9 +5024,7 @@ def test_threads_query_endpoint(client):
     assert any(tid in recent_thread_ids for tid in thread_ids)
 
     # Test filtering for very recent data (should include our threads)
-    very_recent_time = datetime.datetime.now(
-        datetime.timezone.utc
-    ) + datetime.timedelta(minutes=1)
+    very_recent_time = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=1)
     before_filter_res = list(
         client.server.threads_query_stream(
             tsi.ThreadsQueryReq(
@@ -5309,9 +5172,7 @@ def test_threads_query_aggregation_fields(client):
 
     # Query threads to get the aggregation data
     threads_res = list(
-        client.server.threads_query_stream(
-            tsi.ThreadsQueryReq(project_id=get_client_project_id(client))
-        )
+        client.server.threads_query_stream(tsi.ThreadsQueryReq(project_id=get_client_project_id(client)))
     )
 
     # Find our test thread
@@ -5345,9 +5206,7 @@ def test_threads_query_aggregation_fields(client):
     # We expect roughly: quick_op ~10ms, medium_op ~50ms, slow_op ~100ms
     assert 5 <= test_thread.p50_turn_duration_ms <= 200  # Reasonable range for P50
     assert 5 <= test_thread.p99_turn_duration_ms <= 200  # Reasonable range for P99
-    assert (
-        test_thread.p50_turn_duration_ms <= test_thread.p99_turn_duration_ms
-    )  # P99 >= P50
+    assert test_thread.p50_turn_duration_ms <= test_thread.p99_turn_duration_ms  # P99 >= P50
 
     # Verify first_turn_id and last_turn_id point to actual calls
     all_calls = client.get_calls()
@@ -5364,12 +5223,8 @@ def test_threads_query_aggregation_fields(client):
             if call.id == test_thread.last_turn_id:
                 latest_call = call
 
-    assert first_call is not None, (
-        f"Could not find first_turn_id {test_thread.first_turn_id}"
-    )
-    assert latest_call is not None, (
-        f"Could not find last_turn_id {test_thread.last_turn_id}"
-    )
+    assert first_call is not None, f"Could not find first_turn_id {test_thread.first_turn_id}"
+    assert latest_call is not None, f"Could not find last_turn_id {test_thread.last_turn_id}"
 
     # Test that first_turn_id has the earliest start_time
     earliest_start = min(call.started_at for call in thread_calls)
@@ -5380,9 +5235,7 @@ def test_threads_query_aggregation_fields(client):
     assert latest_call.ended_at == latest_end
 
     # Test that we have the expected number of turn calls (5 operations)
-    assert test_thread.turn_count == 5, (
-        f"Expected 5 turns, got {test_thread.turn_count}"
-    )
+    assert test_thread.turn_count == 5, f"Expected 5 turns, got {test_thread.turn_count}"
 
     # Test sorting by the new duration percentile fields
     # Test sorting by p50_turn_duration_ms
@@ -5798,11 +5651,7 @@ def test_calls_query_filter_contains_in_message_array(client):
     op1("extra")
     op1("extra2")
 
-    calls = list(
-        client.server.calls_query_stream(
-            tsi.CallsQueryReq(project_id=get_client_project_id(client))
-        )
-    )
+    calls = list(client.server.calls_query_stream(tsi.CallsQueryReq(project_id=get_client_project_id(client))))
     assert len(calls) == 3
 
     # Test $contains with substring search in the JSON-serialized output

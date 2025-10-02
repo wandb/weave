@@ -123,9 +123,7 @@ class TestUpdateCosts(unittest.TestCase):
     @patch("os.path.exists")
     @patch("weave.trace_server.costs.update_costs.fetch_new_costs")
     @patch("weave.trace_server.costs.update_costs.get_current_costs")
-    def test_main(
-        self, mock_get_current_costs, mock_fetch_new_costs, mock_exists, mock_file
-    ):
+    def test_main(self, mock_get_current_costs, mock_fetch_new_costs, mock_exists, mock_file):
         """Test main function with no cost changes."""
         mock_exists.return_value = True
         mock_get_current_costs.return_value = {
@@ -186,9 +184,7 @@ class TestUpdateCosts(unittest.TestCase):
     @patch("os.path.exists")
     @patch("weave.trace_server.costs.update_costs.fetch_new_costs")
     @patch("weave.trace_server.costs.update_costs.get_current_costs")
-    def test_main_cost_change(
-        self, mock_get_current_costs, mock_fetch_new_costs, mock_exists, mock_file
-    ):
+    def test_main_cost_change(self, mock_get_current_costs, mock_fetch_new_costs, mock_exists, mock_file):
         """Test main function when cost changes for a model."""
         mock_exists.return_value = True
         mock_get_current_costs.return_value = {
@@ -241,9 +237,7 @@ class TestUpdateCosts(unittest.TestCase):
     @patch("os.path.exists")
     @patch("weave.trace_server.costs.update_costs.fetch_new_costs")
     @patch("weave.trace_server.costs.update_costs.get_current_costs")
-    def test_main_historical_costs_limit(
-        self, mock_get_current_costs, mock_fetch_new_costs, mock_exists, mock_file
-    ):
+    def test_main_historical_costs_limit(self, mock_get_current_costs, mock_fetch_new_costs, mock_exists, mock_file):
         """Test main function when historical cost limit is reached."""
         mock_exists.return_value = True
         mock_get_current_costs.return_value = {

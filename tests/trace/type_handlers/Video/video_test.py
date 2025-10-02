@@ -70,9 +70,7 @@ def test_save_invalid_ext_clip(tmp_path: Path, test_video: VideoClip):
         write_video(fp, test_video)
 
 
-def test_video_with_no_ext_converted(
-    client: WeaveClient, tmp_path: Path, test_video: VideoClip
-):
+def test_video_with_no_ext_converted(client: WeaveClient, tmp_path: Path, test_video: VideoClip):
     video_path = str(tmp_path / "test.mp4")
     # Save an mp4 video
     write_video(video_path, test_video)
@@ -220,9 +218,7 @@ def test_video_as_call_io(client: WeaveClient, test_video: VideoClip) -> None:
     video_as_solo_output_call = video_as_solo_output.calls()[0]
     video_as_input_and_output_part_call = video_as_input_and_output_part.calls()[0]
 
-    compare_sizes(
-        video_as_solo_output_call.output.size, test_video.size, "solo_output_call"
-    )
+    compare_sizes(video_as_solo_output_call.output.size, test_video.size, "solo_output_call")
     compare_sizes(
         video_as_input_and_output_part_call.inputs["in_video"].size,
         test_video.size,
@@ -256,9 +252,7 @@ def test_video_as_call_io_refs(client: WeaveClient, test_video: VideoClip) -> No
     video_as_solo_output_call = video_as_solo_output.calls()[0]
     video_as_input_and_output_part_call = video_as_input_and_output_part.calls()[0]
 
-    compare_sizes(
-        video_as_solo_output_call.output.size, test_video.size, "solo_output_call"
-    )
+    compare_sizes(video_as_solo_output_call.output.size, test_video.size, "solo_output_call")
     compare_sizes(
         video_as_input_and_output_part_call.inputs["in_video"].size,
         test_video.size,
@@ -281,9 +275,7 @@ def test_video_as_file(client: WeaveClient, tmp_path: Path) -> None:
         # If no test video exists, create one
         clip = ColorClip(size=(64, 64), color=(128, 0, 128), duration=1)
         clip.fps = 24
-        clip.write_videofile(
-            str(fp), codec="libx264", audio=False, verbose=False, logger=None
-        )
+        clip.write_videofile(str(fp), codec="libx264", audio=False, verbose=False, logger=None)
 
     @weave.op
     def return_video_mp4(path: str):
@@ -345,26 +337,18 @@ def test_videos_in_load_of_dataset(client):
 
     dataset = ref.get()
     for i, (gotten_row, local_row) in enumerate(zip(dataset.rows, rows)):
-        assert isinstance(gotten_row["video"], VideoClip), (
-            f"Row {i} video is not a VideoClip"
-        )
+        assert isinstance(gotten_row["video"], VideoClip), f"Row {i} video is not a VideoClip"
 
         # Handle difference in size representation (list vs tuple)
         gotten_size = gotten_row["video"].size
         local_size = local_row["video"].size
 
         if isinstance(gotten_size, list) and isinstance(local_size, tuple):
-            assert tuple(gotten_size) == local_size, (
-                f"Row {i} size mismatch: {gotten_size} != {local_size}"
-            )
+            assert tuple(gotten_size) == local_size, f"Row {i} size mismatch: {gotten_size} != {local_size}"
         elif isinstance(gotten_size, tuple) and isinstance(local_size, list):
-            assert gotten_size == tuple(local_size), (
-                f"Row {i} size mismatch: {gotten_size} != {local_size}"
-            )
+            assert gotten_size == tuple(local_size), f"Row {i} size mismatch: {gotten_size} != {local_size}"
         else:
-            assert gotten_size == local_size, (
-                f"Row {i} size mismatch: {gotten_size} != {local_size}"
-            )
+            assert gotten_size == local_size, f"Row {i} size mismatch: {gotten_size} != {local_size}"
 
         # Duration may be rounded due to encoding limitations, especially with small durations
         # Allow some tolerance in comparison
@@ -386,9 +370,7 @@ def test_video_format_from_filename():
     assert get_format_from_filename("test.something.mp4") == VideoFormat.MP4
 
 
-def test_multiple_video_formats(
-    client: WeaveClient, tmp_path: Path, test_video: VideoClip
-):
+def test_multiple_video_formats(client: WeaveClient, tmp_path: Path, test_video: VideoClip):
     """Test that we can publish videos of different formats in the same session."""
     sample_mp4_path = str(tmp_path / "test.mp4")
     sample_gif_path = str(tmp_path / "test.gif")

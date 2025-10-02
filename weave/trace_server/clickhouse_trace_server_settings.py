@@ -31,9 +31,7 @@ DEFAULT_MAX_EXECUTION_TIME = 60 * 1  # 1 minute
 RETURN_TYPE_ALLOW_COMPLEX = "1"
 
 CLICKHOUSE_DEFAULT_QUERY_SETTINGS = {
-    "max_memory_usage": wf_env.wf_clickhouse_max_memory_usage()
-    or DEFAULT_MAX_MEMORY_USAGE,
-    "max_execution_time": wf_env.wf_clickhouse_max_execution_time()
-    or DEFAULT_MAX_EXECUTION_TIME,
+    "max_memory_usage": wf_env.wf_clickhouse_max_memory_usage() or DEFAULT_MAX_MEMORY_USAGE,
+    "max_execution_time": wf_env.wf_clickhouse_max_execution_time() or DEFAULT_MAX_EXECUTION_TIME,
     "function_json_value_return_type_allow_complex": RETURN_TYPE_ALLOW_COMPLEX,
 }

@@ -87,13 +87,9 @@ class PrintViewer:
         header_style: str | None = None,
         **kwargs: Any,
     ) -> TableProtocol:
-        return PrintTable(
-            title=title, show_header=show_header, header_style=header_style, **kwargs
-        )
+        return PrintTable(title=title, show_header=show_header, header_style=header_style, **kwargs)
 
-    def create_progress(
-        self, console: ConsoleProtocol | None = None, **kwargs: Any
-    ) -> ProgressProtocol:
+    def create_progress(self, console: ConsoleProtocol | None = None, **kwargs: Any) -> ProgressProtocol:
         return PrintProgress(console=console, file=self._file)
 
     def create_syntax(
@@ -105,9 +101,7 @@ class PrintViewer:
     ) -> SyntaxProtocol:
         return PrintSyntax(code, lexer, line_numbers=line_numbers)
 
-    def create_text(
-        self, text: str = "", style: str | Style | None = None
-    ) -> TextProtocol:
+    def create_text(self, text: str = "", style: str | Style | None = None) -> TextProtocol:
         return PrintText(text, style=style)
 
     def indent(self, content: str, amount: int) -> str:
@@ -220,9 +214,7 @@ class PrintProgress:
         self._tasks: dict[int, dict[str, Any]] = {}
         self._next_task_id = 0
 
-    def add_task(
-        self, description: str, total: float | None = None, **kwargs: Any
-    ) -> int:
+    def add_task(self, description: str, total: float | None = None, **kwargs: Any) -> int:
         task_id = self._next_task_id
         self._next_task_id += 1
         self._tasks[task_id] = {
@@ -264,20 +256,16 @@ class PrintProgress:
             return
 
         task = self._tasks[task_id]
-        percentage = (
-            (task["completed"] / task["total"] * 100) if task["total"] > 0 else 0
-        )
+        percentage = (task["completed"] / task["total"] * 100) if task["total"] > 0 else 0
         status = "✓" if final and percentage >= 100 else "→"
 
         if self.console:
             self.console.print(
-                f"{status} {task['description']}: {percentage:.1f}% "
-                f"({task['completed']}/{task['total']})"
+                f"{status} {task['description']}: {percentage:.1f}% ({task['completed']}/{task['total']})"
             )
         else:
             print(
-                f"{status} {task['description']}: {percentage:.1f}% "
-                f"({task['completed']}/{task['total']})",
+                f"{status} {task['description']}: {percentage:.1f}% ({task['completed']}/{task['total']})",
                 file=self._file,
             )
 
@@ -303,9 +291,7 @@ class PrintSyntax:
         if self.line_numbers:
             lines = self.code.split("\n")
             width = len(str(len(lines)))
-            numbered_lines = [
-                f"{i + 1:>{width}} | {line}" for i, line in enumerate(lines)
-            ]
+            numbered_lines = [f"{i + 1:>{width}} | {line}" for i, line in enumerate(lines)]
             return "\n".join(numbered_lines)
         return self.code
 

@@ -52,9 +52,7 @@ def test_clickhouse_storage_size_query_generation():
         # Verify that _query_stream was called once
         mock_query_stream.assert_called_once()
         call_args = mock_query_stream.call_args[0]
-        assert (
-            call_args[0] == mock_calls_query.as_sql()
-        )  # First argument should be the query
+        assert call_args[0] == mock_calls_query.as_sql()  # First argument should be the query
         # with mocks, we don't have any params generated
         assert call_args[1] == {}  # Second argument should be project_id
 
@@ -159,9 +157,7 @@ def test_completions_create_stream_custom_provider():
     ]
 
     with (
-        patch(
-            "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
-        ) as mock_litellm,
+        patch("weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream") as mock_litellm,
         patch.object(chts.ClickHouseTraceServer, "obj_read") as mock_obj_read,
     ):
         # Mock the litellm completion stream
@@ -220,9 +216,7 @@ def test_completions_create_stream_custom_provider():
 
         # Set up mock secret fetcher
         mock_secret_fetcher = MagicMock()
-        mock_secret_fetcher.fetch.return_value = {
-            "secrets": {"CUSTOM_API_KEY": "test-api-key-value"}
-        }
+        mock_secret_fetcher.fetch.return_value = {"secrets": {"CUSTOM_API_KEY": "test-api-key-value"}}
         token = _secret_fetcher_context.set(mock_secret_fetcher)
 
         try:
@@ -248,10 +242,7 @@ def test_completions_create_stream_custom_provider():
             # Verify litellm was called with correct parameters
             mock_litellm.assert_called_once()
             call_args = mock_litellm.call_args[1]
-            assert (
-                call_args.get("api_base")
-                or call_args.get("base_url") == "https://api.custom.com"
-            )
+            assert call_args.get("api_base") or call_args.get("base_url") == "https://api.custom.com"
             assert call_args["extra_headers"] == {"X-Custom": "value"}
         finally:
             _secret_fetcher_context.reset(token)
@@ -293,9 +284,7 @@ def test_completions_create_stream_custom_provider_with_tracking():
     ]
 
     with (
-        patch(
-            "weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream"
-        ) as mock_litellm,
+        patch("weave.trace_server.clickhouse_trace_server_batched.lite_llm_completion_stream") as mock_litellm,
         patch.object(chts.ClickHouseTraceServer, "obj_read") as mock_obj_read,
         patch.object(chts.ClickHouseTraceServer, "_insert_call") as mock_insert_call,
     ):
@@ -355,9 +344,7 @@ def test_completions_create_stream_custom_provider_with_tracking():
 
         # Set up mock secret fetcher
         mock_secret_fetcher = MagicMock()
-        mock_secret_fetcher.fetch.return_value = {
-            "secrets": {"CUSTOM_API_KEY": "test-api-key-value"}
-        }
+        mock_secret_fetcher.fetch.return_value = {"secrets": {"CUSTOM_API_KEY": "test-api-key-value"}}
         token = _secret_fetcher_context.set(mock_secret_fetcher)
 
         try:
@@ -394,10 +381,7 @@ def test_completions_create_stream_custom_provider_with_tracking():
             # Verify litellm was called with correct parameters
             mock_litellm.assert_called_once()
             call_args = mock_litellm.call_args[1]
-            assert (
-                call_args.get("api_base")
-                or call_args.get("base_url") == "https://api.custom.com"
-            )
+            assert call_args.get("api_base") or call_args.get("base_url") == "https://api.custom.com"
             assert call_args["extra_headers"] == {"X-Custom": "value"}
         finally:
             _secret_fetcher_context.reset(token)

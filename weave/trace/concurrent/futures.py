@@ -204,9 +204,7 @@ class FutureExecutor:
 
         return wrapped_f
 
-    def _safe_add_done_callback(
-        self, future: Future[T], callback: Callable[[Future[T]], None]
-    ) -> None:
+    def _safe_add_done_callback(self, future: Future[T], callback: Callable[[Future[T]], None]) -> None:
         """Add a done callback to a future."""
         future.add_done_callback(self._make_deadlock_safe(callback))
 
@@ -234,9 +232,7 @@ class FutureExecutor:
 
         return future
 
-    def _execute_directly(
-        self, f: Callable[..., T], *args: Any, **kwargs: Any
-    ) -> Future[T]:
+    def _execute_directly(self, f: Callable[..., T], *args: Any, **kwargs: Any) -> Future[T]:
         """Execute a function directly in the current thread."""
         fut: Future[T] = Future()
         try:

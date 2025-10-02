@@ -164,9 +164,7 @@ def _value_is_sentinel(param: inspect.Parameter) -> bool:
     return False
 
 
-def _apply_fn_defaults_to_inputs(
-    fn: Callable, inputs: Mapping[str, Any]
-) -> dict[str, Any]:
+def _apply_fn_defaults_to_inputs(fn: Callable, inputs: Mapping[str, Any]) -> dict[str, Any]:
     inputs = {**inputs}
     sig = inspect.signature(fn)
     for name, param in sig.parameters.items():
@@ -288,9 +286,7 @@ def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedI
     )
 
 
-def _create_call(
-    func: Op, *args: Any, __weave: WeaveKwargs | None = None, **kwargs: Any
-) -> Call:
+def _create_call(func: Op, *args: Any, __weave: WeaveKwargs | None = None, **kwargs: Any) -> Call:
     client = weave_client_context.require_weave_client()
 
     pargs = None
@@ -368,14 +364,8 @@ def is_placeholder_call(call: Call) -> TypeIs[NoOpCall]:
     return isinstance(call, NoOpCall)
 
 
-def _set_python_function_type_on_weave_dict(
-    __weave: WeaveKwargs, type_str: str
-) -> None:
-    weave_dict = (
-        __weave.setdefault("attributes", {})
-        .setdefault("weave", {})
-        .setdefault("python", {})
-    )
+def _set_python_function_type_on_weave_dict(__weave: WeaveKwargs, type_str: str) -> None:
+    weave_dict = __weave.setdefault("attributes", {}).setdefault("weave", {}).setdefault("python", {})
     weave_dict["type"] = type_str
 
 
@@ -607,11 +597,7 @@ async def _call_async_func(
         if handler := getattr(op, "_on_output_handler", None):
             return handler(output, finish, call.inputs)
 
-        if (
-            op._accumulator
-            and isinstance(output, AsyncIterator)
-            and not isinstance(output, (str, bytes))
-        ):
+        if op._accumulator and isinstance(output, AsyncIterator) and not isinstance(output, (str, bytes)):
             acc_logic: _Accumulator = _Accumulator(op._accumulator)
 
             def acc_on_yield(value: Any) -> None:
@@ -775,9 +761,7 @@ def _call_sync_gen(
                         if get_raise_on_captured_errors():
                             raise
                         # Otherwise, log the error and continue with the original generator
-                        log_once(
-                            logger.error, ON_OUTPUT_MSG.format(traceback.format_exc())
-                        )
+                        log_once(logger.error, ON_OUTPUT_MSG.format(traceback.format_exc()))
 
                 # If we get here, either there was no handler, it returned the original generator,
                 # or it raised an exception that we caught.  Proceed with our normal accumulation logic
@@ -985,9 +969,7 @@ async def _call_async_gen(
                         if get_raise_on_captured_errors():
                             raise
                         # Otherwise, log the error and continue with the original generator
-                        log_once(
-                            logger.error, ON_OUTPUT_MSG.format(traceback.format_exc())
-                        )
+                        log_once(logger.error, ON_OUTPUT_MSG.format(traceback.format_exc()))
 
                 # If we get here, either there was no handler, it returned the original generator,
                 # or it raised an exception that we caught.  Proceed with our normal accumulation logic
@@ -1214,17 +1196,13 @@ def op(
 
                 @wraps(func)
                 async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:  # pyright: ignore[reportRedeclaration]
-                    res, _ = await _call_async_func(
-                        cast(Op[P, R], wrapper), *args, __should_raise=True, **kwargs
-                    )
+                    res, _ = await _call_async_func(cast(Op[P, R], wrapper), *args, __should_raise=True, **kwargs)
                     return cast(R, res)
             elif is_sync_generator:
 
                 @wraps(func)
                 def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:  # pyright: ignore[reportRedeclaration]
-                    res, _ = _call_sync_gen(
-                        cast(Op[P, R], wrapper), *args, __should_raise=True, **kwargs
-                    )
+                    res, _ = _call_sync_gen(cast(Op[P, R], wrapper), *args, __should_raise=True, **kwargs)
                     return cast(R, res)
             elif is_async_generator:
 
@@ -1232,18 +1210,14 @@ def op(
                 async def wrapper(  # pyright: ignore[reportRedeclaration]
                     *args: P.args, **kwargs: P.kwargs
                 ) -> AsyncGenerator[R]:
-                    res, _ = await _call_async_gen(
-                        cast(Op[P, R], wrapper), *args, __should_raise=True, **kwargs
-                    )
+                    res, _ = await _call_async_gen(cast(Op[P, R], wrapper), *args, __should_raise=True, **kwargs)
                     async for item in res:
                         yield item
             else:
 
                 @wraps(func)
                 def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
-                    res, _ = _call_sync_func(
-                        cast(Op[P, R], wrapper), *args, __should_raise=True, **kwargs
-                    )
+                    res, _ = _call_sync_func(cast(Op[P, R], wrapper), *args, __should_raise=True, **kwargs)
                     return cast(R, res)
 
             # Tack these helpers on to our wrapper
@@ -1389,9 +1363,7 @@ _OnCloseType = Callable[[], None]
 ON_CLOSE_MSG = "Error closing iterator, call data may be incomplete:\n{}"
 ON_ERROR_MSG = "Error capturing error from iterator, call data may be incomplete:\n{}"
 ON_YIELD_MSG = "Error capturing value from iterator, call data may be incomplete:\n{}"
-ON_AYIELD_MSG = (
-    "Error capturing async value from iterator, call data may be incomplete:\n{}"
-)
+ON_AYIELD_MSG = "Error capturing async value from iterator, call data may be incomplete:\n{}"
 
 
 class _IteratorWrapper(Generic[V]):
@@ -1559,19 +1531,13 @@ class _IteratorWrapper(Generic[V]):
     ) -> None:
         if exc_type and isinstance(exc_value, Exception):
             self._call_on_error_once(exc_value)
-        if hasattr(
-            self._iterator_or_ctx_manager, "__exit__"
-        ):  # case where is a context mngr
+        if hasattr(self._iterator_or_ctx_manager, "__exit__"):  # case where is a context mngr
             self._iterator_or_ctx_manager.__exit__(exc_type, exc_value, traceback)
         self._call_on_close_once()
 
     async def __aenter__(self) -> _IteratorWrapper:
-        if hasattr(
-            self._iterator_or_ctx_manager, "__aenter__"
-        ):  # let's enter the context manager
-            self._iterator_or_ctx_manager = (
-                await self._iterator_or_ctx_manager.__aenter__()
-            )
+        if hasattr(self._iterator_or_ctx_manager, "__aenter__"):  # let's enter the context manager
+            self._iterator_or_ctx_manager = await self._iterator_or_ctx_manager.__aenter__()
         return self
 
     async def __aexit__(
@@ -1664,9 +1630,7 @@ def _add_accumulator(
     add_accumulator(fn, simple_list_accumulator) # returns the op with `list(range(9, -1, -1))` as output
     """
 
-    def on_output(
-        value: Iterator[V], on_finish: FinishCallbackType, inputs: dict
-    ) -> Iterator:
+    def on_output(value: Iterator[V], on_finish: FinishCallbackType, inputs: dict) -> Iterator:
         def wrapped_on_finish(value: Any, e: BaseException | None = None) -> None:
             if on_finish_post_processor is not None:
                 value = on_finish_post_processor(value)

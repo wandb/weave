@@ -131,9 +131,7 @@ def parse_content_annotation(
 
     # Try the class with type hint pattern first
     # Fall back to the original patterns
-    return try_parse_annotation_with_hint(
-        annotation_string
-    ) or try_parse_annotation_without_hint(annotation_string)
+    return try_parse_annotation_with_hint(annotation_string) or try_parse_annotation_without_hint(annotation_string)
 
 
 def parse_from_signature(sig: Signature) -> dict[str, ContentAnnotation]:
@@ -143,9 +141,7 @@ def parse_from_signature(sig: Signature) -> dict[str, ContentAnnotation]:
         if not param.annotation:
             continue
 
-        if parse_result := param.annotation and parse_content_annotation(
-            str(param.annotation)
-        ):
+        if parse_result := param.annotation and parse_content_annotation(str(param.annotation)):
             parsed_annotations[param_name] = parse_result
 
     return parsed_annotations

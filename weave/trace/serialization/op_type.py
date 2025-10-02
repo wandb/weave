@@ -139,9 +139,7 @@ class ExternalVariableFinder(ast.NodeVisitor):
         # TODO: we don't capture python version, but builtins can change from version to version!
         if isinstance(node.ctx, ast.Store):
             self.scope_stack[-1].add(node.id)
-        elif isinstance(node.ctx, ast.Load) and not any(
-            node.id in scope for scope in self.scope_stack
-        ):
+        elif isinstance(node.ctx, ast.Load) and not any(node.id in scope for scope in self.scope_stack):
             self.external_vars[node.id] = True
 
 
@@ -222,10 +220,7 @@ def reconstruct_signature(fn: Callable) -> str:
                 return annotation.__name__
             # Otherwise, check if the type is imported and use the alias if given
             for name, obj in module.__dict__.items():
-                if (
-                    isinstance(obj, py_types.ModuleType)
-                    and annotation.__module__ == obj.__name__
-                ):
+                if isinstance(obj, py_types.ModuleType) and annotation.__module__ == obj.__name__:
                     return f"{name}.{annotation.__name__}"
         return str(annotation)
 
@@ -257,9 +252,7 @@ def get_source_or_fallback(fn: Callable, *, warnings: list[str]) -> str:
         op = as_op(fn)
         fn = op.resolve_fn
 
-    if not settings.should_capture_code() or (
-        fn_is_op and not op._code_capture_enabled
-    ):
+    if not settings.should_capture_code() or (fn_is_op and not op._code_capture_enabled):
         # This digest is kept for op versioning purposes
         digest = str_digest(inspect.getsource(fn))
         return textwrap.dedent(
@@ -410,13 +403,9 @@ def _get_code_deps(
                     pass
 
                 if is_op(var_value):
-                    warnings.append(
-                        f"Cross-module op dependencies are not yet serializable {var_value}"
-                    )
+                    warnings.append(f"Cross-module op dependencies are not yet serializable {var_value}")
                 else:
-                    import_line = (
-                        f"from {var_value.__module__} import {var_value.__name__}"
-                    )
+                    import_line = f"from {var_value.__module__} import {var_value.__name__}"
                     if var_value.__name__ != var_name:
                         import_line += f" as {var_name}"
 
@@ -427,14 +416,8 @@ def _get_code_deps(
             # because NotRequired on 3.9 requires using typing_extensions and the implementation
             # doesn't have a __name__ attribute. We now check for _name as a fallback.
             # This came up in the context of persisting an inline custom object deserializer.
-            var_value_name = getattr(
-                var_value, "__name__", getattr(var_value, "_name", None)
-            )
-            if (
-                var_value_name
-                and hasattr(var_value, "__module__")
-                and var_value.__module__ != fn.__module__
-            ):
+            var_value_name = getattr(var_value, "__name__", getattr(var_value, "_name", None))
+            if var_value_name and hasattr(var_value, "__module__") and var_value.__module__ != fn.__module__:
                 import_line = f"from {var_value.__module__} import {var_value_name}"
                 if var_value_name != var_name:
                     import_line += f" as {var_name}"
@@ -463,12 +446,8 @@ def _get_code_deps(
                     else:
                         json_str = json.dumps(json_val, cls=RefJSONEncoder, indent=4)
                     code_paragraph = f"{var_name} = " + json_str + "\n"
-                    code_paragraph = code_paragraph.replace(
-                        f'"{RefJSONEncoder.SPECIAL_REF_TOKEN}', ""
-                    )
-                    code_paragraph = code_paragraph.replace(
-                        f'{RefJSONEncoder.SPECIAL_REF_TOKEN}"', ""
-                    )
+                    code_paragraph = code_paragraph.replace(f'"{RefJSONEncoder.SPECIAL_REF_TOKEN}', "")
+                    code_paragraph = code_paragraph.replace(f'{RefJSONEncoder.SPECIAL_REF_TOKEN}"', "")
                     code.append(code_paragraph)
     return {"import_code": import_code, "code": code, "warnings": warnings}
 
@@ -615,9 +594,7 @@ def load_instance(
     art_and_version_dir = module_path[: -(1 + len(file_name))]
     art_dir, version_subdir = art_and_version_dir.rsplit("/", 1)
     module_dir = art_dir
-    import_name = (
-        version_subdir + "." + ".".join(os.path.splitext(file_name)[0].split("/"))
-    )
+    import_name = version_subdir + "." + ".".join(os.path.splitext(file_name)[0].split("/"))
 
     sys.path.insert(0, os.path.abspath(module_dir))
     try:

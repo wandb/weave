@@ -87,9 +87,7 @@ if not import_failed:
         if as_input:
             run_dict["inputs"] = run.inputs.copy() if run.inputs is not None else None
         else:
-            run_dict["outputs"] = (
-                run.outputs.copy() if run.outputs is not None else None
-            )
+            run_dict["outputs"] = run.outputs.copy() if run.outputs is not None else None
 
         run_dict = {k: v for k, v in run_dict.items() if v}
         return run_dict
@@ -163,12 +161,8 @@ if not import_failed:
             `False` as the `parent_id`, telling the system: "trust me, this is a root".
             """
             parent_run: Optional[Call] = None
-            lc_parent_run_id = (
-                str(run.parent_run_id) if run.parent_run_id is not None else None
-            )
-            wv_parent_run = (
-                self._call_map.get(lc_parent_run_id) if lc_parent_run_id else None
-            )
+            lc_parent_run_id = str(run.parent_run_id) if run.parent_run_id is not None else None
+            wv_parent_run = self._call_map.get(lc_parent_run_id) if lc_parent_run_id else None
             use_stack = True
             if wv_parent_run is not None:
                 parent_run = wv_parent_run
@@ -249,9 +243,7 @@ if not import_failed:
             if self.wc is None:
                 return
             if call:
-                self.wc.finish_call(
-                    call, _run_to_dict(run), exception=Exception(run.error)
-                )
+                self.wc.finish_call(call, _run_to_dict(run), exception=Exception(run.error))
 
         def on_chat_model_start(
             self,
@@ -273,9 +265,7 @@ if not import_failed:
                 id=run_id,
                 parent_run_id=parent_run_id,
                 serialized=serialized,
-                inputs={
-                    "messages": [[dumpd(msg) for msg in batch] for batch in messages]
-                },
+                inputs={"messages": [[dumpd(msg) for msg in batch] for batch in messages]},
                 extra=kwargs,
                 events=[{"name": "start", "time": start_time}],
                 start_time=start_time,
@@ -368,9 +358,7 @@ else:
         pass
 
 
-weave_tracing_callback_var: ContextVar[Optional[WeaveTracer]] = ContextVar(
-    "tracing_weave_callback", default=None
-)
+weave_tracing_callback_var: ContextVar[Optional[WeaveTracer]] = ContextVar("tracing_weave_callback", default=None)
 
 
 @contextmanager
@@ -411,9 +399,7 @@ class LangchainPatcher(Patcher):
                 os.environ["WEAVE_TRACE_LANGCHAIN"] = "true"
             else:
                 os.environ["WEAVE_TRACE_LANGCHAIN"] = self.original_trace_state
-            register_configure_hook(
-                weave_tracing_callback_var, True, WeaveTracer, "WEAVE_TRACE_LANGCHAIN"
-            )
+            register_configure_hook(weave_tracing_callback_var, True, WeaveTracer, "WEAVE_TRACE_LANGCHAIN")
         except Exception:
             return False
         else:

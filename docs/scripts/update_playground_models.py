@@ -25,9 +25,7 @@ TS_FILE_PATH = os.path.join(
     "PlaygroundPage",
     "llmMaxTokens.ts",
 )
-MD_FILE_PATH = os.path.join(
-    PROJECT_ROOT, "docs", "docs", "guides", "tools", "playground.md"
-)
+MD_FILE_PATH = os.path.join(PROJECT_ROOT, "docs", "docs", "guides", "tools", "playground.md")
 
 # --- Configuration ---
 
@@ -66,9 +64,7 @@ MARKDOWN_END_MARKER = "\n<!-- LLM_LIST_END, DON'T EDIT THIS SECTION -->"
 
 def extract_llm_data(ts_content):
     """Extracts the LLM_MAX_TOKENS object definition using regex."""
-    match = re.search(
-        r"export const LLM_MAX_TOKENS = ({.*?});", ts_content, re.DOTALL | re.MULTILINE
-    )
+    match = re.search(r"export const LLM_MAX_TOKENS = ({.*?});", ts_content, re.DOTALL | re.MULTILINE)
     if not match:
         raise ValueError("Could not find LLM_MAX_TOKENS object in the TS file.")
 
@@ -114,9 +110,7 @@ def format_markdown(sorted_grouped_models):
     md_lines = []
     for provider_key in PROVIDER_ORDER:
         if provider_key in sorted_grouped_models:
-            display_name, doc_link = PROVIDER_DETAILS.get(
-                provider_key, (provider_key.capitalize(), None)
-            )
+            display_name, doc_link = PROVIDER_DETAILS.get(provider_key, (provider_key.capitalize(), None))
 
             if doc_link:
                 md_lines.append(f"### [{display_name}]({doc_link})")
@@ -177,15 +171,11 @@ def update_markdown_file(md_filepath, new_content):
     # --- DEBUGGING END ---
 
     if num_replacements == 0:
-        print(
-            f"Error: Could not find markers '{MARKDOWN_START_MARKER}' and '{MARKDOWN_END_MARKER}' in {md_filepath}"
-        )
+        print(f"Error: Could not find markers '{MARKDOWN_START_MARKER}' and '{MARKDOWN_END_MARKER}' in {md_filepath}")
         return
 
     if num_replacements > 1:
-        print(
-            f"Warning: Found multiple instances of the markers in {md_filepath}. Replacing only the first one."
-        )
+        print(f"Warning: Found multiple instances of the markers in {md_filepath}. Replacing only the first one.")
         # If subn replaced more than one, it might be an issue. Let's proceed but warn.
 
     try:

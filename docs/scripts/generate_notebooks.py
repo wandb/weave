@@ -36,9 +36,7 @@ def remove_outputs(notebook_path):
             cell.outputs = []
             cell.execution_count = None
 
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".ipynb", delete=False
-    ) as temp_file:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".ipynb", delete=False) as temp_file:
         nbformat.write(nb, temp_file)
         temp_path = temp_file.name
     return temp_path
@@ -98,9 +96,7 @@ def export_all_notebooks_in_primary_dir():
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Convert Python notebooks to Markdown docs."
-    )
+    parser = argparse.ArgumentParser(description="Convert Python notebooks to Markdown docs.")
     parser.add_argument(
         "notebook_path",
         nargs="?",

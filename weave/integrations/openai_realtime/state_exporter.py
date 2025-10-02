@@ -42,18 +42,14 @@ class SessionSpan(BaseModel):
         self.session = msg.session
         wc = require_weave_client()
         if not self.root_call:
-            self.root_call = wc.create_call(
-                "realtime.session", inputs=msg.session.model_dump()
-            )
+            self.root_call = wc.create_call("realtime.session", inputs=msg.session.model_dump())
 
     def on_updated(self, msg: models.SessionUpdatedMessage) -> None:
         self.session = msg.session
         wc = require_weave_client()
 
         if not self.root_call:
-            self.root_call = wc.create_call(
-                "realtime.session", inputs=msg.session.model_dump()
-            )
+            self.root_call = wc.create_call("realtime.session", inputs=msg.session.model_dump())
 
         # Return after confirming initialization if we can't properly complete
         if not self.last_update:
@@ -94,9 +90,7 @@ class SessionSpan(BaseModel):
 
 
 class ItemRegistry:
-    speech_markers: dict[models.ItemID, dict[str, int | None]] = Field(
-        default_factory=dict
-    )
+    speech_markers: dict[models.ItemID, dict[str, int | None]] = Field(default_factory=dict)
     input_audio_buffer: AudioBufferManager = Field(default_factory=AudioBufferManager)
 
     # ---- Convenience lookups ----
@@ -117,28 +111,18 @@ class StateExporter(BaseModel):
     model_config = {"arbitrary_types_allowed": True}
     session_span: SessionSpan | None = None
     # Map conversation -> response ids
-    conversation_responses: dict[models.ConversationID, list[models.ResponseID]] = (
-        Field(default_factory=dict)
-    )
+    conversation_responses: dict[models.ConversationID, list[models.ResponseID]] = Field(default_factory=dict)
     # Map conversation -> call
     conversation_calls: dict[models.ConversationID, Call] = Field(default_factory=dict)
     timeline: list[models.ItemID | models.ResponseID] = Field(default_factory=list)
     committed_item_ids: set[models.ItemID] = Field(default_factory=set)
 
     transcript_completed: set[models.ItemID] = Field(default_factory=set)
-    items: dict[models.ItemID, models.ServerItem | models.ResponseItem] = Field(
-        default_factory=dict
-    )
-    last_input_item_id: models.ItemID | None = (
-        None  # Last message item not generated as part ofa response
-    )
+    items: dict[models.ItemID, models.ServerItem | models.ResponseItem] = Field(default_factory=dict)
+    last_input_item_id: models.ItemID | None = None  # Last message item not generated as part ofa response
 
-    prev_by_item: dict[models.ItemID, models.ItemID | None] = Field(
-        default_factory=dict
-    )
-    next_by_item: dict[models.ItemID, models.ItemID | None] = Field(
-        default_factory=dict
-    )
+    prev_by_item: dict[models.ItemID, models.ItemID | None] = Field(default_factory=dict)
+    next_by_item: dict[models.ItemID, models.ItemID | None] = Field(default_factory=dict)
 
     input_buffer: AudioBufferManager = Field(default_factory=AudioBufferManager)
     output_buffer: AudioBufferManager = Field(default_factory=AudioBufferManager)
@@ -146,23 +130,17 @@ class StateExporter(BaseModel):
     user_messages: dict[models.ItemID, models.ClientUserMessageItem] = Field(
         default_factory=dict
     )  # For efficiency we don't convert back to base64
-    user_speech_markers: dict[models.ItemID, dict[str, int | None]] = Field(
-        default_factory=dict
-    )
+    user_speech_markers: dict[models.ItemID, dict[str, int | None]] = Field(default_factory=dict)
 
     response_audio: dict[models.ItemID, bytes] = Field(default_factory=dict)
     response_calls: dict[models.ResponseID, Call] = Field(default_factory=dict)
     responses: dict[models.ResponseID, models.Response] = Field(default_factory=dict)
     # Deprecated: per-response debounce timers caused out-of-order completions
-    debounce_timers: dict[models.ResponseID, threading.Timer] = Field(
-        default_factory=dict
-    )
+    debounce_timers: dict[models.ResponseID, threading.Timer] = Field(default_factory=dict)
 
     # FIFO completion control to ensure responses finish in submission order
     completion_queue: list[models.ResponseID] = Field(default_factory=list)
-    pending_completions: dict[models.ResponseID, dict[str, Any]] = Field(
-        default_factory=dict
-    )
+    pending_completions: dict[models.ResponseID, dict[str, Any]] = Field(default_factory=dict)
     fifo_timer: threading.Timer | None = None
     fifo_lock: threading.Lock = Field(default_factory=threading.Lock)
 
@@ -198,17 +176,11 @@ class StateExporter(BaseModel):
             self.session_span = SessionSpan.from_session(msg.session)
         self.session_span.on_updated(msg)
 
-    def handle_speech_stopped(
-        self, msg: models.InputAudioBufferSpeechStoppedMessage
-    ) -> None:
-        markers = self.user_speech_markers.setdefault(
-            msg.item_id, {"audio_start_ms": None, "audio_end_ms": None}
-        )
+    def handle_speech_stopped(self, msg: models.InputAudioBufferSpeechStoppedMessage) -> None:
+        markers = self.user_speech_markers.setdefault(msg.item_id, {"audio_start_ms": None, "audio_end_ms": None})
         markers["audio_end_ms"] = msg.audio_end_ms
 
-    def handle_speech_started(
-        self, msg: models.InputAudioBufferSpeechStartedMessage
-    ) -> None:
+    def handle_speech_started(self, msg: models.InputAudioBufferSpeechStartedMessage) -> None:
         self.user_speech_markers[msg.item_id] = {
             "audio_start_ms": msg.audio_start_ms,
             "audio_end_ms": None,
@@ -242,14 +214,10 @@ class StateExporter(BaseModel):
         except ValueError:
             pass
 
-    def handle_input_audio_cleared(
-        self, _: models.InputAudioBufferClearedMessage
-    ) -> None:
+    def handle_input_audio_cleared(self, _: models.InputAudioBufferClearedMessage) -> None:
         self.input_buffer.clear()
 
-    def handle_input_audio_committed(
-        self, msg: models.InputAudioBufferCommittedMessage
-    ) -> None:
+    def handle_input_audio_committed(self, msg: models.InputAudioBufferCommittedMessage) -> None:
         # Track commits against items for turn completeness checks
 
         self.committed_item_ids.add(msg.item_id)
@@ -260,14 +228,10 @@ class StateExporter(BaseModel):
     def handle_response_created(self, msg: models.ResponseCreatedMessage) -> None:
         self.pending_response = msg.response
 
-    def handle_input_audio_append(
-        self, msg: models.InputAudioBufferAppendMessage
-    ) -> None:
+    def handle_input_audio_append(self, msg: models.InputAudioBufferAppendMessage) -> None:
         self.input_buffer.extend_base64(msg.audio)
 
-    def handle_response_audio_delta(
-        self, msg: models.ResponseAudioDeltaMessage
-    ) -> None:
+    def handle_response_audio_delta(self, msg: models.ResponseAudioDeltaMessage) -> None:
         self.output_buffer.extend_base64(msg.delta)
 
     def handle_response_audio_done(self, msg: models.ResponseAudioDoneMessage) -> None:
@@ -284,14 +248,12 @@ class StateExporter(BaseModel):
                     audio = self.response_audio.get(output.id)
                     if not audio:
                         continue
-                    response_dict["output"][output_idx]["content"][content_idx][
-                        "audio"
-                    ] = Content.from_bytes(pcm_to_wav(audio), extension=".wav")
+                    response_dict["output"][output_idx]["content"][content_idx]["audio"] = Content.from_bytes(
+                        pcm_to_wav(audio), extension=".wav"
+                    )
         return response_dict
 
-    def _get_input_item_list(
-        self, output: list[models.ResponseItem]
-    ) -> list[models.ResponseItem | models.ServerItem]:
+    def _get_input_item_list(self, output: list[models.ResponseItem]) -> list[models.ResponseItem | models.ServerItem]:
         if len(output) > 1:
             logger.error("Inputs for multi-output responses are not yet supported")
             return []
@@ -352,9 +314,7 @@ class StateExporter(BaseModel):
             if not audio:
                 return msg_dict
             audio = pcm_to_wav(audio)
-            msg_dict["content"][content_idx]["audio"] = Content.from_bytes(
-                audio, extension=".wav"
-            )
+            msg_dict["content"][content_idx]["audio"] = Content.from_bytes(audio, extension=".wav")
 
         return msg_dict
 
@@ -416,17 +376,13 @@ class StateExporter(BaseModel):
         if conv_id and (conv_call := self.conversation_calls.get(conv_id)):
             response_parent = conv_call
         elif conv_id:
-            conv_call = client.create_call(
-                op="realtime.conversation", inputs={"id": conv_id}, parent=session_call
-            )
+            conv_call = client.create_call(op="realtime.conversation", inputs={"id": conv_id}, parent=session_call)
             self.conversation_calls[conv_id] = conv_call
             response_parent = conv_call
         else:
             response_parent = session_call
 
-        call = client.create_call(
-            "realtime.response", inputs=inputs, parent=response_parent
-        )
+        call = client.create_call("realtime.response", inputs=inputs, parent=response_parent)
 
         output_dict = msg.response.model_dump()
         for output_idx, output in enumerate(msg.response.output):
@@ -440,12 +396,8 @@ class StateExporter(BaseModel):
                         if not audio_bytes:
                             logger.error("failed to fetch audio bytes")
                             continue
-                        content_dict["audio"] = Content.from_bytes(
-                            pcm_to_wav(bytes(audio_bytes)), extension=".wav"
-                        )
-                    output_dict["output"][output_idx]["content"][content_idx] = (
-                        content_dict
-                    )
+                        content_dict["audio"] = Content.from_bytes(pcm_to_wav(bytes(audio_bytes)), extension=".wav")
+                    output_dict["output"][output_idx]["content"][content_idx] = content_dict
         client.finish_call(call, output=output_dict)
 
     def handle_response_done(self, msg: models.ResponseDoneMessage) -> None:
@@ -565,9 +517,7 @@ class StateExporter(BaseModel):
             # The loop continues only if the immediate next is also ready now.
             continue
 
-    def build_conversation_forward(
-        self, item_id: models.ItemID
-    ) -> list[models.ResponseItem | models.ServerItem]:
+    def build_conversation_forward(self, item_id: models.ItemID) -> list[models.ResponseItem | models.ServerItem]:
         item = self.items.get(item_id)
         if not item:
             return []
@@ -592,9 +542,7 @@ class StateExporter(BaseModel):
         wc = require_weave_client()
         if self.session_span and self.session_span.root_call:
             # Complete it with the final state of the session
-            wc.finish_call(
-                self.session_span.root_call, output=self.session_span.session
-            )
+            wc.finish_call(self.session_span.root_call, output=self.session_span.session)
 
         for call in self.conversation_calls.values():
             conv_id = call.inputs["id"]

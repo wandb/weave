@@ -93,9 +93,7 @@ async def async_foreach(
             # Always wait for the first task in the list to complete
             # This ensures we yield results in order
             try:
-                (done, pending) = await asyncio.wait(
-                    active_tasks, return_when=asyncio.FIRST_COMPLETED
-                )
+                (done, pending) = await asyncio.wait(active_tasks, return_when=asyncio.FIRST_COMPLETED)
                 active_tasks = list(pending)
                 for task in done:
                     (index, item, result) = task.result()
@@ -117,9 +115,7 @@ async def async_foreach(
         raise
 
 
-def _subproc(
-    queue: multiprocessing.Queue, func: Callable, *args: Any, **kwargs: Any
-) -> None:
+def _subproc(queue: multiprocessing.Queue, func: Callable, *args: Any, **kwargs: Any) -> None:
     result = func(*args, **kwargs)
     queue.put(result)
 
@@ -141,9 +137,7 @@ def _run_in_process(
     return process, queue
 
 
-async def run_in_process_with_timeout(
-    timeout: float, func: Callable, *args: Any, **kwargs: Any
-) -> Any:
+async def run_in_process_with_timeout(timeout: float, func: Callable, *args: Any, **kwargs: Any) -> Any:
     """Run a function in a separate process with a timeout. Terminate the process if it exceeds the timeout."""
     # Note, on osx, multiprocessing uses spawn by default. With span, subprocesses will re-import main,
     # and incur the cost of bootstrapping python and all imports, which for weave is currently about 1.5s.
@@ -164,9 +158,7 @@ async def run_in_process_with_timeout(
     if process.exitcode == 0:
         return queue.get()  # Retrieve result from the queue
     else:
-        raise ValueError(
-            "Unhandled exception in subprocess. Exitcode: " + str(process.exitcode)
-        )
+        raise ValueError("Unhandled exception in subprocess. Exitcode: " + str(process.exitcode))
 
 
 def warn_once(logger: logging.Logger, message: str) -> None:

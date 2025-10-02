@@ -247,9 +247,7 @@ class TestWeaveClientSendFileCache:
         assert key1 != key4
 
         # Same request should have the same key
-        assert key1 == cache._key(
-            FileCreateReq(project_id="test", name="file1", content=b"content1")
-        )
+        assert key1 == cache._key(FileCreateReq(project_id="test", name="file1", content=b"content1"))
 
     def test_put_get_basic(self):
         """Test basic put and get operations."""

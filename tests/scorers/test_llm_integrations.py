@@ -29,11 +29,7 @@ PROVIDERS = {
 
 
 @pytest.fixture(
-    params=[
-        (provider, model)
-        for provider, cfg in PROVIDERS.items()
-        for model in cfg["models"]
-    ],
+    params=[(provider, model) for provider, cfg in PROVIDERS.items() for model in cfg["models"]],
     ids=lambda p: f"{p[0]}:{p[1]}",
 )
 def summarization_scorer(request):

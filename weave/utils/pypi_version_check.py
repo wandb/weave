@@ -20,9 +20,7 @@ if TYPE_CHECKING:
     import packaging.version  # type: ignore[import-not-found]
 
 
-def check_available(
-    current_version: str, module_name: str
-) -> dict[str, str | None] | None:
+def check_available(current_version: str, module_name: str) -> dict[str, str | None] | None:
     """Check if there is a new version of the module available on PyPI.
 
     Args:
@@ -37,14 +35,11 @@ def check_available(
         return None
 
     latest_version, pip_prerelease, deleted, yanked, yanked_reason = package_info
-    upgrade_message = (
-        "{} version {} is available!  To upgrade, please run:\n"
-        " $ pip install {} --upgrade{}".format(
-            module_name,
-            latest_version,
-            module_name,
-            " --pre" if pip_prerelease else "",
-        )
+    upgrade_message = "{} version {} is available!  To upgrade, please run:\n $ pip install {} --upgrade{}".format(
+        module_name,
+        latest_version,
+        module_name,
+        " --pre" if pip_prerelease else "",
     )
     delete_message = None
     if deleted:
@@ -95,9 +90,7 @@ def _async_call(target: Callable, timeout: int | float | None = None) -> Callabl
             q.put(e)
 
     def wrapper(*args: Any, **kwargs: Any) -> tuple[Exception | None, threading.Thread]:
-        thread = threading.Thread(
-            target=wrapped_target, args=(q,) + args, kwargs=kwargs
-        )
+        thread = threading.Thread(target=wrapped_target, args=(q,) + args, kwargs=kwargs)
         thread.daemon = True
         thread.start()
         try:
@@ -112,9 +105,7 @@ def _async_call(target: Callable, timeout: int | float | None = None) -> Callabl
     return wrapper
 
 
-def _find_available(
-    current_version: str, module_name: str
-) -> tuple[str, bool, bool, bool, str | None] | None:
+def _find_available(current_version: str, module_name: str) -> tuple[str, bool, bool, bool, str | None] | None:
     pypi_url = f"https://pypi.org/pypi/{module_name}/json"
     yanked_dict = {}
     try:

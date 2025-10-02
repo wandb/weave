@@ -173,13 +173,9 @@ def test_init_weave_calls_patching(setup_env, monkeypatch):
 
     with (
         patch("weave.integrations.patch.implicit_patch", mock_implicit_patch),
-        patch(
-            "weave.integrations.patch.register_import_hook", mock_register_import_hook
-        ),
+        patch("weave.integrations.patch.register_import_hook", mock_register_import_hook),
         patch.object(weave_init, "init_weave_get_server") as mock_get_server,
-        patch(
-            "weave.wandb_interface.context.get_wandb_api_context"
-        ) as mock_get_context,
+        patch("weave.wandb_interface.context.get_wandb_api_context") as mock_get_context,
         patch.object(weave_init, "get_username") as mock_get_username,
         patch("weave.trace.init_message.print_init_message") as mock_print_message,
     ):
@@ -212,9 +208,7 @@ def test_implicit_patching_disabled_via_settings(setup_env, monkeypatch):
             "weave.integrations.patch.INTEGRATION_MODULE_MAPPING",
             {"openai": mock_patch_func},
         ),
-        patch(
-            "weave.trace.settings.should_implicitly_patch_integrations"
-        ) as mock_should_patch,
+        patch("weave.trace.settings.should_implicitly_patch_integrations") as mock_should_patch,
     ):
         mock_should_patch.return_value = False
 
@@ -249,9 +243,7 @@ def test_explicit_patch_still_works(setup_env, monkeypatch):
     """Test that explicit patching still works alongside implicit patching."""
     _inject_fake_module(monkeypatch, "openai")
 
-    with patch(
-        "weave.integrations.openai.openai_sdk.get_openai_patcher"
-    ) as mock_get_patcher:
+    with patch("weave.integrations.openai.openai_sdk.get_openai_patcher") as mock_get_patcher:
         mock_patcher = MagicMock()
         mock_patcher.attempt_patch.return_value = True
         mock_get_patcher.return_value = mock_patcher

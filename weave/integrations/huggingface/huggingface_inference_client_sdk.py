@@ -60,9 +60,7 @@ def huggingface_accumulator(
         acc.choices[idx].message.content += value_choice.delta.content or ""
 
     if acc.usage is None:
-        acc.usage = ChatCompletionOutputUsage(
-            completion_tokens=0, prompt_tokens=0, total_tokens=0
-        )
+        acc.usage = ChatCompletionOutputUsage(completion_tokens=0, prompt_tokens=0, total_tokens=0)
     # # For some reason, value.usage is always `None` when streaming.
     # # This might be a bug in `huggingface_hub.InferenceClient`
     # if value.usage is not None:
@@ -82,8 +80,7 @@ def huggingface_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Calla
         return _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: huggingface_accumulator,
-            should_accumulate=lambda inputs: isinstance(inputs, dict)
-            and bool(inputs.get("stream")),
+            should_accumulate=lambda inputs: isinstance(inputs, dict) and bool(inputs.get("stream")),
         )
 
     return wrapper
@@ -106,8 +103,7 @@ def huggingface_wrapper_async(settings: OpSettings) -> Callable[[Callable], Call
         return _add_accumulator(
             op,  # type: ignore
             make_accumulator=lambda inputs: huggingface_accumulator,
-            should_accumulate=lambda inputs: isinstance(inputs, dict)
-            and bool(inputs.get("stream")),
+            should_accumulate=lambda inputs: isinstance(inputs, dict) and bool(inputs.get("stream")),
         )
 
     return wrapper
@@ -141,9 +137,7 @@ def get_huggingface_patcher(
     )
 
     chat_completion_async_settings = base.model_copy(
-        update={
-            "name": base.name or "huggingface_hub.AsyncInferenceClient.chat_completion"
-        }
+        update={"name": base.name or "huggingface_hub.AsyncInferenceClient.chat_completion"}
     )
     patchers.append(
         SymbolPatcher(
@@ -154,10 +148,7 @@ def get_huggingface_patcher(
     )
 
     document_question_answering_settings = base.model_copy(
-        update={
-            "name": base.name
-            or "huggingface_hub.InferenceClient.document_question_answering"
-        }
+        update={"name": base.name or "huggingface_hub.InferenceClient.document_question_answering"}
     )
     patchers.append(
         SymbolPatcher(
@@ -168,10 +159,7 @@ def get_huggingface_patcher(
     )
 
     document_question_answering_async_settings = base.model_copy(
-        update={
-            "name": base.name
-            or "huggingface_hub.AsyncInferenceClient.document_question_answering"
-        }
+        update={"name": base.name or "huggingface_hub.AsyncInferenceClient.document_question_answering"}
     )
     patchers.append(
         SymbolPatcher(
@@ -181,10 +169,7 @@ def get_huggingface_patcher(
         )
     )
     visual_question_answering_settings = base.model_copy(
-        update={
-            "name": base.name
-            or "huggingface_hub.InferenceClient.visual_question_answering"
-        }
+        update={"name": base.name or "huggingface_hub.InferenceClient.visual_question_answering"}
     )
     patchers.append(
         SymbolPatcher(
@@ -194,10 +179,7 @@ def get_huggingface_patcher(
         )
     )
     visual_question_answering_async_settings = base.model_copy(
-        update={
-            "name": base.name
-            or "huggingface_hub.AsyncInferenceClient.visual_question_answering"
-        }
+        update={"name": base.name or "huggingface_hub.AsyncInferenceClient.visual_question_answering"}
     )
     patchers.append(
         SymbolPatcher(
@@ -206,9 +188,7 @@ def get_huggingface_patcher(
             huggingface_wrapper_sync(visual_question_answering_async_settings),
         )
     )
-    fill_mask_settings = base.model_copy(
-        update={"name": base.name or "huggingface_hub.InferenceClient.fill_mask"}
-    )
+    fill_mask_settings = base.model_copy(update={"name": base.name or "huggingface_hub.InferenceClient.fill_mask"})
     patchers.append(
         SymbolPatcher(
             lambda: importlib.import_module("huggingface_hub"),
@@ -229,9 +209,7 @@ def get_huggingface_patcher(
     )
 
     question_answering_settings = base.model_copy(
-        update={
-            "name": base.name or "huggingface_hub.InferenceClient.question_answering"
-        }
+        update={"name": base.name or "huggingface_hub.InferenceClient.question_answering"}
     )
     patchers.append(
         SymbolPatcher(
@@ -242,10 +220,7 @@ def get_huggingface_patcher(
     )
 
     question_answering_async_settings = base.model_copy(
-        update={
-            "name": base.name
-            or "huggingface_hub.AsyncInferenceClient.question_answering"
-        }
+        update={"name": base.name or "huggingface_hub.AsyncInferenceClient.question_answering"}
     )
     patchers.append(
         SymbolPatcher(
@@ -256,9 +231,7 @@ def get_huggingface_patcher(
     )
 
     sentence_similarity_settings = base.model_copy(
-        update={
-            "name": base.name or "huggingface_hub.InferenceClient.sentence_similarity"
-        }
+        update={"name": base.name or "huggingface_hub.InferenceClient.sentence_similarity"}
     )
     patchers.append(
         SymbolPatcher(
@@ -269,10 +242,7 @@ def get_huggingface_patcher(
     )
 
     sentence_similarity_async_settings = base.model_copy(
-        update={
-            "name": base.name
-            or "huggingface_hub.AsyncInferenceClient.sentence_similarity"
-        }
+        update={"name": base.name or "huggingface_hub.AsyncInferenceClient.sentence_similarity"}
     )
     patchers.append(
         SymbolPatcher(
@@ -294,9 +264,7 @@ def get_huggingface_patcher(
     )
 
     summarization_async_settings = base.model_copy(
-        update={
-            "name": base.name or "huggingface_hub.AsyncInferenceClient.summarization"
-        }
+        update={"name": base.name or "huggingface_hub.AsyncInferenceClient.summarization"}
     )
     patchers.append(
         SymbolPatcher(
@@ -307,10 +275,7 @@ def get_huggingface_patcher(
     )
 
     table_question_answering_settings = base.model_copy(
-        update={
-            "name": base.name
-            or "huggingface_hub.InferenceClient.table_question_answering"
-        }
+        update={"name": base.name or "huggingface_hub.InferenceClient.table_question_answering"}
     )
     patchers.append(
         SymbolPatcher(
@@ -321,10 +286,7 @@ def get_huggingface_patcher(
     )
 
     table_question_answering_async_settings = base.model_copy(
-        update={
-            "name": base.name
-            or "huggingface_hub.AsyncInferenceClient.table_question_answering"
-        }
+        update={"name": base.name or "huggingface_hub.AsyncInferenceClient.table_question_answering"}
     )
     patchers.append(
         SymbolPatcher(
@@ -335,9 +297,7 @@ def get_huggingface_patcher(
     )
 
     text_classification_settings = base.model_copy(
-        update={
-            "name": base.name or "huggingface_hub.InferenceClient.text_classification"
-        }
+        update={"name": base.name or "huggingface_hub.InferenceClient.text_classification"}
     )
     patchers.append(
         SymbolPatcher(
@@ -348,10 +308,7 @@ def get_huggingface_patcher(
     )
 
     text_classification_async_settings = base.model_copy(
-        update={
-            "name": base.name
-            or "huggingface_hub.AsyncInferenceClient.text_classification"
-        }
+        update={"name": base.name or "huggingface_hub.AsyncInferenceClient.text_classification"}
     )
     patchers.append(
         SymbolPatcher(
@@ -362,9 +319,7 @@ def get_huggingface_patcher(
     )
 
     token_classification_settings = base.model_copy(
-        update={
-            "name": base.name or "huggingface_hub.InferenceClient.token_classification"
-        }
+        update={"name": base.name or "huggingface_hub.InferenceClient.token_classification"}
     )
     patchers.append(
         SymbolPatcher(
@@ -375,10 +330,7 @@ def get_huggingface_patcher(
     )
 
     token_classification_async_settings = base.model_copy(
-        update={
-            "name": base.name
-            or "huggingface_hub.AsyncInferenceClient.token_classification"
-        }
+        update={"name": base.name or "huggingface_hub.AsyncInferenceClient.token_classification"}
     )
     patchers.append(
         SymbolPatcher(
@@ -388,9 +340,7 @@ def get_huggingface_patcher(
         )
     )
 
-    translation_settings = base.model_copy(
-        update={"name": base.name or "huggingface_hub.InferenceClient.translation"}
-    )
+    translation_settings = base.model_copy(update={"name": base.name or "huggingface_hub.InferenceClient.translation"})
     patchers.append(
         SymbolPatcher(
             lambda: importlib.import_module("huggingface_hub"),
@@ -411,10 +361,7 @@ def get_huggingface_patcher(
     )
 
     zero_shot_classification_settings = base.model_copy(
-        update={
-            "name": base.name
-            or "huggingface_hub.InferenceClient.zero_shot_classification"
-        }
+        update={"name": base.name or "huggingface_hub.InferenceClient.zero_shot_classification"}
     )
     patchers.append(
         SymbolPatcher(
@@ -425,10 +372,7 @@ def get_huggingface_patcher(
     )
 
     zero_shot_classification_async_settings = base.model_copy(
-        update={
-            "name": base.name
-            or "huggingface_hub.AsyncInferenceClient.zero_shot_classification"
-        }
+        update={"name": base.name or "huggingface_hub.AsyncInferenceClient.zero_shot_classification"}
     )
     patchers.append(
         SymbolPatcher(
@@ -450,9 +394,7 @@ def get_huggingface_patcher(
     )
 
     text_to_image_async_settings = base.model_copy(
-        update={
-            "name": base.name or "huggingface_hub.AsyncInferenceClient.text_to_image"
-        }
+        update={"name": base.name or "huggingface_hub.AsyncInferenceClient.text_to_image"}
     )
     patchers.append(
         SymbolPatcher(
@@ -474,9 +416,7 @@ def get_huggingface_patcher(
     )
 
     image_to_image_async_settings = base.model_copy(
-        update={
-            "name": base.name or "huggingface_hub.AsyncInferenceClient.image_to_image"
-        }
+        update={"name": base.name or "huggingface_hub.AsyncInferenceClient.image_to_image"}
     )
     patchers.append(
         SymbolPatcher(

@@ -51,22 +51,16 @@ class Model(Object):
         for name in INFER_METHOD_NAMES:
             if infer_method := getattr(self, name, None):
                 return infer_method
-        raise MissingInferenceMethodError(
-            f"Missing a method with name in ({INFER_METHOD_NAMES})"
-        )
+        raise MissingInferenceMethodError(f"Missing a method with name in ({INFER_METHOD_NAMES})")
 
 
 def get_infer_method(model: Model) -> Op:
     for name in INFER_METHOD_NAMES:
         if (infer_method := getattr(model, name, None)) is not None:
             if not is_op(infer_method):
-                raise ValueError(
-                    f"Model {model} must implement `{name}` as a weave.op() decorated function."
-                )
+                raise ValueError(f"Model {model} must implement `{name}` as a weave.op() decorated function.")
             return infer_method
-    raise MissingInferenceMethodError(
-        f"Missing a method with name in ({INFER_METHOD_NAMES})"
-    )
+    raise MissingInferenceMethodError(f"Missing a method with name in ({INFER_METHOD_NAMES})")
 
 
 # Using `dataclass` because pydantic does not like `Call` as a property
@@ -128,9 +122,7 @@ async def apply_model_async(
     predict_signature = inspect.signature(model_predict_op)
     model_predict_arg_names = list(predict_signature.parameters.keys())
 
-    model_predict_args = {
-        k: v for k, v in model_input.items() if k in model_predict_arg_names
-    }
+    model_predict_args = {k: v for k, v in model_input.items() if k in model_predict_arg_names}
     try:
         model_predict_op = as_op(model_predict_op)
         if model_self is not None:
@@ -139,18 +131,14 @@ async def apply_model_async(
                 "self": model_self,
             }
         model_start_time = time.time()
-        model_output, model_call = await async_call_op(
-            model_predict_op, **model_predict_args
-        )
+        model_output, model_call = await async_call_op(model_predict_op, **model_predict_args)
     except OpCallError as e:
         dataset_column_names = list(example.keys())
         dataset_column_names_str = ", ".join(dataset_column_names[:3])
         if len(dataset_column_names) > 3:
             dataset_column_names_str += ", ..."
         required_arg_names = [
-            param.name
-            for param in predict_signature.parameters.values()
-            if param.default == inspect.Parameter.empty
+            param.name for param in predict_signature.parameters.values() if param.default == inspect.Parameter.empty
         ]
 
         message = textwrap.dedent(

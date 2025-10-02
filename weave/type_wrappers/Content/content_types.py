@@ -4,9 +4,7 @@ from typing import Any, Literal, TypedDict, Union
 from pydantic import BaseModel, Field
 from typing_extensions import NotRequired
 
-DataUrlContentType = Literal[
-    "data_url", "data_url:base64", "data_url:encoding", "data_url:encoding:base64"
-]
+DataUrlContentType = Literal["data_url", "data_url:base64", "data_url:encoding", "data_url:encoding:base64"]
 
 ContentType = Literal["bytes", "text", "base64", "file", "url", DataUrlContentType]
 

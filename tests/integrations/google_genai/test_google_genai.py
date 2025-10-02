@@ -49,8 +49,7 @@ def test_content_generation_sync(client):
     assert call.output.usageMetadata.promptTokenCount > 0
     assert (
         call.output.usageMetadata.totalTokenCount
-        == call.output.usageMetadata.candidatesTokenCount
-        + call.output.usageMetadata.promptTokenCount
+        == call.output.usageMetadata.candidatesTokenCount + call.output.usageMetadata.promptTokenCount
     )
 
 
@@ -76,8 +75,7 @@ async def test_content_generation_async(client):
     assert call.output.usageMetadata.promptTokenCount > 0
     assert (
         call.output.usageMetadata.totalTokenCount
-        == call.output.usageMetadata.candidatesTokenCount
-        + call.output.usageMetadata.promptTokenCount
+        == call.output.usageMetadata.candidatesTokenCount + call.output.usageMetadata.promptTokenCount
     )
 
 
@@ -111,8 +109,7 @@ def test_content_generation_sync_stream(client):
     assert call.output.usageMetadata.promptTokenCount > 0
     assert (
         call.output.usageMetadata.totalTokenCount
-        == call.output.usageMetadata.candidatesTokenCount
-        + call.output.usageMetadata.promptTokenCount
+        == call.output.usageMetadata.candidatesTokenCount + call.output.usageMetadata.promptTokenCount
     )
 
 
@@ -146,8 +143,7 @@ async def test_content_generation_async_stream(client):
     assert call.output.usageMetadata.promptTokenCount > 0
     assert (
         call.output.usageMetadata.totalTokenCount
-        == call.output.usageMetadata.candidatesTokenCount
-        + call.output.usageMetadata.promptTokenCount
+        == call.output.usageMetadata.candidatesTokenCount + call.output.usageMetadata.promptTokenCount
     )
 
 
@@ -168,9 +164,7 @@ You are able to generate high-quality code in the Python programming language.""
             system_instruction=system_instruction,
             temperature=0.5,
         ),
-    ).send_message(
-        "Write a python function named `is_leap_year` that checks if a year is a leap year."
-    )
+    ).send_message("Write a python function named `is_leap_year` that checks if a year is a leap year.")
 
     assert "def is_leap_year" in response.text.lower()
 
@@ -183,8 +177,7 @@ You are able to generate high-quality code in the Python programming language.""
     assert call.output.usageMetadata.promptTokenCount > 0
     assert (
         call.output.usageMetadata.totalTokenCount
-        == call.output.usageMetadata.candidatesTokenCount
-        + call.output.usageMetadata.promptTokenCount
+        == call.output.usageMetadata.candidatesTokenCount + call.output.usageMetadata.promptTokenCount
     )
 
 
@@ -204,9 +197,7 @@ You are an expert software developer and a helpful coding assistant.
 You are able to generate high-quality code in the Python programming language.""",
             temperature=0.5,
         ),
-    ).send_message(
-        "Write a python function named `is_leap_year` that checks if a year is a leap year."
-    )
+    ).send_message("Write a python function named `is_leap_year` that checks if a year is a leap year.")
     assert "def is_leap_year" in response.text.lower()
     call = next(iter(client.get_calls()))
     assert call.started_at < call.ended_at
@@ -217,8 +208,7 @@ You are able to generate high-quality code in the Python programming language.""
     assert call.output.usageMetadata.promptTokenCount > 0
     assert (
         call.output.usageMetadata.totalTokenCount
-        == call.output.usageMetadata.candidatesTokenCount
-        + call.output.usageMetadata.promptTokenCount
+        == call.output.usageMetadata.candidatesTokenCount + call.output.usageMetadata.promptTokenCount
     )
 
 
@@ -261,19 +251,12 @@ def test_function_calling(client):
     trace_name = op_name_from_ref(call.op_name)
     assert trace_name == "google.genai.models.Models.generate_content"
     assert call.output is not None
-    assert (
-        call.output.candidates[0]
-        .content.parts[0]
-        .functionCall.args["destination"]
-        .lower()
-        == "paris"
-    )
+    assert call.output.candidates[0].content.parts[0].functionCall.args["destination"].lower() == "paris"
     assert call.output.usageMetadata.candidatesTokenCount > 0
     assert call.output.usageMetadata.promptTokenCount > 0
     assert (
         call.output.usageMetadata.totalTokenCount
-        == call.output.usageMetadata.candidatesTokenCount
-        + call.output.usageMetadata.promptTokenCount
+        == call.output.usageMetadata.candidatesTokenCount + call.output.usageMetadata.promptTokenCount
     )
 
 

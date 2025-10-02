@@ -3,9 +3,7 @@ import pytest
 from weave.integrations.integration_utilities import op_name_from_ref
 
 
-@pytest.mark.skip(
-    reason="This test depends on a non-deterministic external service provider"
-)
+@pytest.mark.skip(reason="This test depends on a non-deterministic external service provider")
 @pytest.mark.flaky(reruns=5, reruns_delay=2)
 @pytest.mark.skip_clickhouse_client
 def test_content_generation(client):
@@ -31,9 +29,7 @@ def test_content_generation(client):
     assert "gemini-1.5-flash" in output["model_version"]
 
 
-@pytest.mark.skip(
-    reason="This test depends on a non-deterministic external service provider"
-)
+@pytest.mark.skip(reason="This test depends on a non-deterministic external service provider")
 @pytest.mark.flaky(reruns=5, reruns_delay=2)
 @pytest.mark.skip_clickhouse_client
 def test_content_generation_stream(client):
@@ -59,9 +55,7 @@ def test_content_generation_stream(client):
     assert output["candidates"][0]["content"]["role"] == "model"
 
 
-@pytest.mark.skip(
-    reason="This test depends on a non-deterministic external service provider"
-)
+@pytest.mark.skip(reason="This test depends on a non-deterministic external service provider")
 @pytest.mark.flaky(reruns=5, reruns_delay=2)
 @pytest.mark.asyncio
 @pytest.mark.skip_clickhouse_client
@@ -88,9 +82,7 @@ async def test_content_generation_async(client):
     assert "gemini-1.5-flash" in output["model_version"]
 
 
-@pytest.mark.skip(
-    reason="This test depends on a non-deterministic external service provider"
-)
+@pytest.mark.skip(reason="This test depends on a non-deterministic external service provider")
 @pytest.mark.flaky(reruns=5, reruns_delay=2)
 @pytest.mark.asyncio
 @pytest.mark.skip_clickhouse_client
@@ -103,9 +95,7 @@ async def test_content_generation_async_stream(client):
 
     async def get_response():
         chunks = []
-        async for chunk in await model.generate_content_async(
-            "What is the capital of France?", stream=True
-        ):
+        async for chunk in await model.generate_content_async("What is the capital of France?", stream=True):
             if chunk.text:
                 chunks.append(chunk.text)
         return chunks
@@ -125,9 +115,7 @@ async def test_content_generation_async_stream(client):
     assert output["candidates"][0]["content"]["role"] == "model"
 
 
-@pytest.mark.skip(
-    reason="This test depends on a non-deterministic external service provider"
-)
+@pytest.mark.skip(reason="This test depends on a non-deterministic external service provider")
 @pytest.mark.flaky(reruns=5, reruns_delay=2)
 @pytest.mark.skip_clickhouse_client
 def test_chat_session(client):
@@ -154,9 +142,7 @@ def test_chat_session(client):
     assert "gemini-1.5-flash" in output["model_version"]
 
 
-@pytest.mark.skip(
-    reason="This test depends on a non-deterministic external service provider"
-)
+@pytest.mark.skip(reason="This test depends on a non-deterministic external service provider")
 @pytest.mark.flaky(reruns=5, reruns_delay=2)
 @pytest.mark.asyncio
 @pytest.mark.skip_clickhouse_client

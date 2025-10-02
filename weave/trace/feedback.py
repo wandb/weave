@@ -22,9 +22,7 @@ class Feedbacks(AbstractRichContainer[tsi.Feedback]):
 
     show_refs: bool
 
-    def __init__(
-        self, show_refs: bool, feedbacks: Iterable[tsi.Feedback] | None = None
-    ) -> None:
+    def __init__(self, show_refs: bool, feedbacks: Iterable[tsi.Feedback] | None = None) -> None:
         super().__init__("Feedback", feedbacks)
         self.show_refs = show_refs
 

@@ -86,9 +86,7 @@ class Status:
     @classmethod
     def from_proto(cls, proto_status: PbStatus) -> "Status":
         """Create a Status from a protobuf Status."""
-        return cls(
-            code=StatusCode.from_proto(proto_status.code), message=proto_status.message
-        )
+        return cls(code=StatusCode.from_proto(proto_status.code), message=proto_status.message)
 
     def as_weave_status(self) -> Optional[tsi.TraceStatus]:
         """Convert from protobuf enum value to StatusCode."""
@@ -211,9 +209,7 @@ class Span:
     @property
     def start_time(self) -> datetime.datetime:
         """Return the start time as a datetime object."""
-        return datetime.datetime.fromtimestamp(
-            self.start_time_unix_nano / 1_000_000_000
-        )
+        return datetime.datetime.fromtimestamp(self.start_time_unix_nano / 1_000_000_000)
 
     @property
     def end_time(self) -> datetime.datetime:
@@ -231,9 +227,7 @@ class Span:
         return self.duration_ns / 1_000_000
 
     @classmethod
-    def from_proto(
-        cls, proto_span: PbSpan, resource: Optional[Resource] = None
-    ) -> "Span":
+    def from_proto(cls, proto_span: PbSpan, resource: Optional[Resource] = None) -> "Span":
         """Create a Span from a protobuf Span."""
         parent_id = None
         if proto_span.parent_span_id:
@@ -391,9 +385,7 @@ class Span:
             thread_id=thread_id,
         )
 
-        exception_msg = (
-            self.status.message if self.status.code == StatusCode.ERROR else None
-        )
+        exception_msg = self.status.message if self.status.code == StatusCode.ERROR else None
 
         end_call = tsi.EndedCallSchemaForInsert(
             project_id=project_id,
@@ -418,9 +410,7 @@ class ScopeSpans:
         yield from self.spans
 
     @classmethod
-    def from_proto(
-        cls, proto_scope_spans: PbScopeSpans, resource: Optional[Resource] = None
-    ) -> "ScopeSpans":
+    def from_proto(cls, proto_scope_spans: PbScopeSpans, resource: Optional[Resource] = None) -> "ScopeSpans":
         """Create a ScopeSpans from a protobuf ScopeSpans."""
         return cls(
             scope=proto_scope_spans.scope,
@@ -446,10 +436,7 @@ class ResourceSpans:
         resource = Resource.from_proto(proto_resource_spans.resource)
         return cls(
             resource=resource,
-            scope_spans=[
-                ScopeSpans.from_proto(s, resource)
-                for s in proto_resource_spans.scope_spans
-            ],
+            scope_spans=[ScopeSpans.from_proto(s, resource) for s in proto_resource_spans.scope_spans],
             schema_url=proto_resource_spans.schema_url,
         )
 
@@ -466,8 +453,4 @@ class TracesData:
     @classmethod
     def from_proto(cls, proto_traces_data: PbTracesData) -> "TracesData":
         """Create a TracesData from a protobuf TracesData."""
-        return cls(
-            resource_spans=[
-                ResourceSpans.from_proto(rs) for rs in proto_traces_data.resource_spans
-            ]
-        )
+        return cls(resource_spans=[ResourceSpans.from_proto(rs) for rs in proto_traces_data.resource_spans])

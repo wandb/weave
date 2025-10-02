@@ -42,17 +42,11 @@ def _accumulator(acc: Any | None, value: Any) -> Any:
     Returns:
         The updated accumulated value.
     """
-    if (
-        hasattr(value, "type")
-        and getattr(value, "type", None) == "ModelClientStreamingChunkEvent"
-    ):
+    if hasattr(value, "type") and getattr(value, "type", None) == "ModelClientStreamingChunkEvent":
         if acc is None:
             return value
 
-        if (
-            hasattr(acc, "type")
-            and getattr(acc, "type", None) == "ModelClientStreamingChunkEvent"
-        ):
+        if hasattr(acc, "type") and getattr(acc, "type", None) == "ModelClientStreamingChunkEvent":
             combined_content = acc.content + value.content
             new_event = type(value)(
                 source=value.source,
@@ -220,9 +214,7 @@ def _create_wrapper_async_generator(
         @wraps(fn)
         async def _symbol_wrapper(*args: Any, **kwargs: Any) -> Any:
             try:
-                op = _setup_op_wrapper(
-                    fn, args, kwargs, op_kwargs, should_accumulate=True
-                )
+                op = _setup_op_wrapper(fn, args, kwargs, op_kwargs, should_accumulate=True)
                 agen = op(*args, **kwargs)
 
                 async for value in agen:
@@ -261,9 +253,7 @@ def _create_wrapper_async(
         @wraps(fn)
         async def _symbol_wrapper(*args: Any, **kwargs: Any) -> Any:
             try:
-                op = _setup_op_wrapper(
-                    fn, args, kwargs, op_kwargs, should_accumulate=False
-                )
+                op = _setup_op_wrapper(fn, args, kwargs, op_kwargs, should_accumulate=False)
                 return await op(*args, **kwargs)
             except Exception as e:
                 logger.exception(
@@ -298,9 +288,7 @@ def _create_wrapper_sync(
         @wraps(fn)
         def _symbol_wrapper(*args: Any, **kwargs: Any) -> Any:
             try:
-                op = _setup_op_wrapper(
-                    fn, args, kwargs, op_kwargs, should_accumulate=False
-                )
+                op = _setup_op_wrapper(fn, args, kwargs, op_kwargs, should_accumulate=False)
                 return op(*args, **kwargs)
             except Exception as e:
                 logger.exception(
@@ -362,14 +350,10 @@ def _get_symbol_patcher(
     try:
         module = importlib.import_module(module_path)
     except ModuleNotFoundError as e:
-        logger.warning(
-            f"Module {module_path} not found, skipping patching for {class_name}: {e}"
-        )
+        logger.warning(f"Module {module_path} not found, skipping patching for {class_name}: {e}")
         return None
     except ImportError as e:
-        logger.warning(
-            f"Could not import module {module_path}, skipping patching for {class_name}: {e}"
-        )
+        logger.warning(f"Could not import module {module_path}, skipping patching for {class_name}: {e}")
         return None
 
     if not hasattr(module, class_name):
@@ -384,9 +368,7 @@ def _get_symbol_patcher(
 
     display_name = f"{module_path}.{class_name}.{method_name}"
 
-    wrapper_factory = _create_symbol_wrapper(
-        settings.model_copy(update={"display_name": display_name})
-    )
+    wrapper_factory = _create_symbol_wrapper(settings.model_copy(update={"display_name": display_name}))
     return SymbolPatcher(lambda: module, f"{class_name}.{method_name}", wrapper_factory)
 
 
@@ -419,14 +401,10 @@ def _get_class_and_subclass_patchers(
     try:
         module = importlib.import_module(module_path)
     except ModuleNotFoundError as e:
-        logger.warning(
-            f"Module {module_path} not found, skipping patching for {class_name}: {e}"
-        )
+        logger.warning(f"Module {module_path} not found, skipping patching for {class_name}: {e}")
         return patchers  # Return empty list, skip patching for this module
     except ImportError as e:
-        logger.warning(
-            f"Could not import module {module_path}, skipping patching for {class_name}: {e}"
-        )
+        logger.warning(f"Could not import module {module_path}, skipping patching for {class_name}: {e}")
         return patchers
 
     try:
@@ -465,9 +443,7 @@ def _get_class_and_subclass_patchers(
                     if "." in qualname:
                         owner_name = qualname.split(".")[0]
                         # Allow patching inherited methods for base_class if explicitly requested
-                        if owner_name != cls_name and not (
-                            cls is base_class and should_patch_base_class
-                        ):
+                        if owner_name != cls_name and not (cls is base_class and should_patch_base_class):
                             continue
 
                 # Skip methods we've already patched
@@ -477,9 +453,7 @@ def _get_class_and_subclass_patchers(
 
                 patched_methods.add(method_key)
 
-                patcher = _get_symbol_patcher(
-                    cls_module_path, cls_name, method_name, settings
-                )
+                patcher = _get_symbol_patcher(cls_module_path, cls_name, method_name, settings)
                 if patcher is not None:
                     patchers.append(patcher)
 
@@ -513,9 +487,7 @@ def _preload_autogen_extensions() -> None:
 
         import autogen_ext
 
-        for _, name, _ in pkgutil.walk_packages(
-            autogen_ext.__path__, autogen_ext.__name__ + "."
-        ):
+        for _, name, _ in pkgutil.walk_packages(autogen_ext.__path__, autogen_ext.__name__ + "."):
             try:
                 importlib.import_module(name)
             except (ImportError, ModuleNotFoundError) as e:
@@ -569,9 +541,7 @@ def get_autogen_patcher(
         _preload_autogen_extensions()
 
         base_settings = settings.op_settings
-        op_patch_settings = base_settings.model_copy(
-            update={"name": base_settings.name or "autogen.component"}
-        )
+        op_patch_settings = base_settings.model_copy(update={"name": base_settings.name or "autogen.component"})
 
         patchers: list[SymbolPatcher | None] = []
         patch_configs = get_module_patch_configs()

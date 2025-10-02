@@ -64,9 +64,7 @@ def redact_pii_string(data: str) -> str:
     return redacted.text
 
 
-def track_pii_redaction_enabled(
-    username: str, entity_name: str, project_name: str
-) -> None:
+def track_pii_redaction_enabled(username: str, entity_name: str, project_name: str) -> None:
     trace_sentry.global_trace_sentry.track_event(
         "pii_redaction_enabled",
         {

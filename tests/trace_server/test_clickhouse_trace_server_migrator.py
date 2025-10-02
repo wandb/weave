@@ -9,12 +9,8 @@ from weave.trace_server.clickhouse_trace_server_migrator import MigrationError
 
 @pytest.fixture
 def mock_costs():
-    with patch(
-        "weave.trace_server.costs.insert_costs.should_insert_costs", return_value=False
-    ) as mock_should_insert:
-        with patch(
-            "weave.trace_server.costs.insert_costs.get_current_costs", return_value=[]
-        ) as mock_get_costs:
+    with patch("weave.trace_server.costs.insert_costs.should_insert_costs", return_value=False) as mock_should_insert:
+        with patch("weave.trace_server.costs.insert_costs.get_current_costs", return_value=[]) as mock_get_costs:
             yield
 
 
@@ -46,9 +42,7 @@ def test_apply_migrations_with_target_version(mock_costs, migrator, tmp_path):
     migration_dir = tmp_path / "migrations"
     migration_dir.mkdir()
     migration_file = migration_dir / "2.up.sql"
-    migration_file.write_text(
-        "CREATE TABLE test1 (id Int32);\nCREATE TABLE test2 (id Int32);"
-    )
+    migration_file.write_text("CREATE TABLE test1 (id Int32);\nCREATE TABLE test2 (id Int32);")
 
     # Mock the migration directory path
     with patch("os.path.dirname") as mock_dirname:
@@ -60,9 +54,7 @@ def test_apply_migrations_with_target_version(mock_costs, migrator, tmp_path):
     # Verify
     migrator._get_migration_status.assert_called_once_with("test_db")
     migrator._get_migrations.assert_called_once()
-    migrator._determine_migrations_to_apply.assert_called_once_with(
-        1, migrator._get_migrations.return_value, 2
-    )
+    migrator._determine_migrations_to_apply.assert_called_once_with(1, migrator._get_migrations.return_value, 2)
 
     # Verify migration execution
     assert migrator._update_migration_status.call_count == 2
@@ -73,9 +65,7 @@ def test_apply_migrations_with_target_version(mock_costs, migrator, tmp_path):
     # Verify the actual SQL commands were executed
     ch_client = migrator.ch_client
     assert ch_client.command.call_count == 2
-    ch_client.command.assert_has_calls(
-        [call("CREATE TABLE test1 (id Int32)"), call("CREATE TABLE test2 (id Int32)")]
-    )
+    ch_client.command.assert_has_calls([call("CREATE TABLE test1 (id Int32)"), call("CREATE TABLE test2 (id Int32)")])
 
 
 def test_execute_migration_command(mock_costs, migrator):

@@ -26,17 +26,13 @@ if not import_failed:
         def __init__(self) -> None:
             self._call_map: dict[str, Call] = {}
 
-        def on_module_start(
-            self, call_id: str, instance: Any, inputs: dict[str, Any]
-        ) -> None:
+        def on_module_start(self, call_id: str, instance: Any, inputs: dict[str, Any]) -> None:
             gc = weave_client_context.require_weave_client()
             if instance is not None:
                 inputs = {"self": dictify(instance), **inputs}
                 if hasattr(instance, "signature"):
                     if hasattr(instance.signature, "model_json_schema"):
-                        inputs["self"]["signature"] = (
-                            instance.signature.model_json_schema()
-                        )
+                        inputs["self"]["signature"] = instance.signature.model_json_schema()
                     else:
                         inputs["self"]["signature"] = instance.signature
 
@@ -109,9 +105,7 @@ if not import_failed:
                     exception,
                 )
 
-        def on_tool_start(
-            self, call_id: str, instance: Any, inputs: dict[str, Any]
-        ) -> None:
+        def on_tool_start(self, call_id: str, instance: Any, inputs: dict[str, Any]) -> None:
             gc = weave_client_context.require_weave_client()
             if instance is not None:
                 inputs = {"self": dictify(instance), **inputs}

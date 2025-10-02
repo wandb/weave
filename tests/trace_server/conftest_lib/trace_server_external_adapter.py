@@ -83,9 +83,7 @@ class DummyIdConverter(external_to_internal_trace_server_adapter.IdConverter):
         return self._user_map.int_to_ext(user_id, b64(user_id))
 
 
-class TestOnlyUserInjectingExternalTraceServer(
-    external_to_internal_trace_server_adapter.ExternalTraceServer
-):
+class TestOnlyUserInjectingExternalTraceServer(external_to_internal_trace_server_adapter.ExternalTraceServer):
     def __init__(
         self,
         internal_trace_server: tsi.TraceServerInterface,
@@ -111,9 +109,7 @@ class TestOnlyUserInjectingExternalTraceServer(
         req.wb_user_id = self._user_id
         return super().feedback_create(req)
 
-    def feedback_create_batch(
-        self, req: tsi.FeedbackCreateBatchReq
-    ) -> tsi.FeedbackCreateBatchRes:
+    def feedback_create_batch(self, req: tsi.FeedbackCreateBatchReq) -> tsi.FeedbackCreateBatchRes:
         for feedback_req in req.batch:
             feedback_req.wb_user_id = self._user_id
         return super().feedback_create_batch(req)
@@ -122,9 +118,7 @@ class TestOnlyUserInjectingExternalTraceServer(
         req.wb_user_id = self._user_id
         return super().cost_create(req)
 
-    def actions_execute_batch(
-        self, req: tsi.ActionsExecuteBatchReq
-    ) -> tsi.ActionsExecuteBatchRes:
+    def actions_execute_batch(self, req: tsi.ActionsExecuteBatchReq) -> tsi.ActionsExecuteBatchRes:
         req.wb_user_id = self._user_id
         return super().actions_execute_batch(req)
 
@@ -140,9 +134,7 @@ class TestOnlyUserInjectingExternalTraceServer(
 def externalize_trace_server(
     trace_server: tsi.TraceServerInterface,
     user_id: str = "test_user",
-    id_converter: Optional[
-        external_to_internal_trace_server_adapter.IdConverter
-    ] = None,
+    id_converter: Optional[external_to_internal_trace_server_adapter.IdConverter] = None,
 ) -> TestOnlyUserInjectingExternalTraceServer:
     return TestOnlyUserInjectingExternalTraceServer(
         trace_server,

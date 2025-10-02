@@ -64,9 +64,7 @@ class Content(BaseModel, Generic[T]):
     content_type: ContentType
     input_type: str
 
-    encoding: str = Field(
-        "utf-8", description="Encoding to use when decoding bytes to string"
-    )
+    encoding: str = Field("utf-8", description="Encoding to use when decoding bytes to string")
 
     metadata: Annotated[
         dict[str, Any] | None,
@@ -78,9 +76,7 @@ class Content(BaseModel, Generic[T]):
     path: str | None = None
     extension: str | None = None
 
-    _last_saved_path: Annotated[
-        str | None, Field(description="Last path the file was saved to")
-    ] = None
+    _last_saved_path: Annotated[str | None, Field(description="Last path the file was saved to")] = None
 
     # These fields are set by serialization layer when it picks up a pydantic class
     # We define them here so they can be set without doing `extra=allow`
@@ -136,9 +132,7 @@ class Content(BaseModel, Generic[T]):
                 return cls.model_construct(**obj)
 
         # Fall back to parent implementation for other cases
-        return super().model_validate(
-            obj, strict=strict, from_attributes=from_attributes, context=context
-        )
+        return super().model_validate(obj, strict=strict, from_attributes=from_attributes, context=context)
 
     @classmethod
     def model_validate_json(
@@ -173,12 +167,8 @@ class Content(BaseModel, Generic[T]):
 
         digest = hashlib.sha256(data).hexdigest()
         size = len(data)
-        mimetype, extension = get_mime_and_extension(
-            mimetype=mimetype, extension=extension, filename=None, buffer=data
-        )
-        filename = default_filename(
-            extension=extension, mimetype=mimetype, digest=digest
-        )
+        mimetype, extension = get_mime_and_extension(mimetype=mimetype, extension=extension, filename=None, buffer=data)
+        filename = default_filename(extension=extension, mimetype=mimetype, digest=digest)
 
         resolved_args: ResolvedContentArgs = {
             "id": uuid.uuid4().hex,
@@ -226,9 +216,7 @@ class Content(BaseModel, Generic[T]):
             default_extension=".txt",
         )
 
-        filename = default_filename(
-            extension=extension, mimetype=mimetype, digest=digest
-        )
+        filename = default_filename(extension=extension, mimetype=mimetype, digest=digest)
 
         resolved_args: ResolvedContentArgs = {
             "id": uuid.uuid4().hex,
@@ -275,12 +263,8 @@ class Content(BaseModel, Generic[T]):
 
         digest = hashlib.sha256(data).hexdigest()
         size = len(data)
-        mimetype, extension = get_mime_and_extension(
-            mimetype=mimetype, extension=extension, filename=None, buffer=data
-        )
-        filename = default_filename(
-            extension=extension, mimetype=mimetype, digest=digest
-        )
+        mimetype, extension = get_mime_and_extension(mimetype=mimetype, extension=extension, filename=None, buffer=data)
+        filename = default_filename(extension=extension, mimetype=mimetype, digest=digest)
 
         resolved_args: ResolvedContentArgs = {
             "id": uuid.uuid4().hex,
@@ -352,9 +336,7 @@ class Content(BaseModel, Generic[T]):
         return cls.model_construct(**resolved_args)
 
     @classmethod
-    def from_data_url(
-        cls: type[Self], url: str, /, metadata: dict[str, Any] | None = None
-    ) -> Self:
+    def from_data_url(cls: type[Self], url: str, /, metadata: dict[str, Any] | None = None) -> Self:
         """Initializes Content from a data URL."""
         parsed = try_parse_data_url(url)
         if not parsed:
@@ -368,12 +350,8 @@ class Content(BaseModel, Generic[T]):
         digest = hashlib.sha256(data).hexdigest()
         size = len(data)
 
-        mimetype, extension = get_mime_and_extension(
-            mimetype=mimetype, extension=None, filename=None, buffer=data
-        )
-        filename = default_filename(
-            extension=extension, mimetype=mimetype, digest=digest
-        )
+        mimetype, extension = get_mime_and_extension(mimetype=mimetype, extension=None, filename=None, buffer=data)
+        filename = default_filename(extension=extension, mimetype=mimetype, digest=digest)
 
         resolved_args: ResolvedContentArgs = {
             "id": uuid.uuid4().hex,
@@ -428,9 +406,7 @@ class Content(BaseModel, Generic[T]):
         cd = resp.headers.get("Content-Disposition", "")
         if "filename=" in cd:
             # naive extraction; handles filename="..." or filename=...
-            match = re.search(
-                r"filename\*=.*?''([^;\r\n]+)|filename=\"?([^;\r\n\"]+)\"?", cd
-            )
+            match = re.search(r"filename\*=.*?''([^;\r\n]+)|filename=\"?([^;\r\n\"]+)\"?", cd)
             if match:
                 filename_from_header = match.group(1) or match.group(2)
 
@@ -445,11 +421,7 @@ class Content(BaseModel, Generic[T]):
             buffer=data,
         )
 
-        filename = (
-            filename_hint
-            if filename_hint
-            else default_filename(extension, mimetype, digest)
-        )
+        filename = filename_hint if filename_hint else default_filename(extension, mimetype, digest)
 
         resolved_args: ResolvedContentArgs = {
             "id": uuid.uuid4().hex,
@@ -517,10 +489,7 @@ class Content(BaseModel, Generic[T]):
             A data URL string.
         """
         header = f"data:{self.mimetype}"
-        if (
-            self.mimetype.startswith("text/")
-            and self.content_type.find(":encoding") != -1
-        ):
+        if self.mimetype.startswith("text/") and self.content_type.find(":encoding") != -1:
             # Only add charset for text types
             header += f";charset={self.encoding}"
 

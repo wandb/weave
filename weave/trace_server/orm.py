@@ -86,9 +86,7 @@ class ParamBuilder:
 
 
 Value: TypeAlias = typing.Optional[
-    typing.Union[
-        str, float, datetime.datetime, list[str], list[float], dict[str, typing.Any]
-    ]
+    typing.Union[str, float, datetime.datetime, list[str], list[float], dict[str, typing.Any]]
 ]
 Row: TypeAlias = dict[str, Value]
 Rows: TypeAlias = list[Row]
@@ -249,9 +247,7 @@ class Select:
         self._offset = None
         self._group_by = None
 
-    def join(
-        self, table: Table, query: tsi.Query, join_type: typing.Optional[str] = None
-    ) -> "Select":
+    def join(self, table: Table, query: tsi.Query, join_type: typing.Optional[str] = None) -> "Select":
         self.joins.append(Join(table, query, join_type))
         for col in table.cols:
             self.all_columns.append(col.dbname())
@@ -350,9 +346,7 @@ class Select:
 
         conditions = []
         if self._project_id:
-            param_project_id = param_builder.add(
-                self._project_id, "project_id", "String"
-            )
+            param_project_id = param_builder.add(self._project_id, "project_id", "String")
             conditions = [f"project_id = {param_project_id}"]
         if self._query:
             query_conds, fields_used = _process_query_to_conditions(
@@ -459,10 +453,7 @@ class Insert:
         for row in self.rows:
             r: list[typing.Any] = []
             for field in given_column_names:
-                if (
-                    field in self.table.col_types
-                    and self.table.col_types[field] == "json"
-                ):
+                if field in self.table.col_types and self.table.col_types[field] == "json":
                     r.append(json.dumps(row[field]))
                 else:
                     r.append(row[field])
@@ -508,9 +499,7 @@ def python_value_to_ch_type(value: typing.Any) -> str:
         raise ValueError(f"Unknown value type: {value}")
 
 
-def clickhouse_cast(
-    inner_sql: str, cast: typing.Optional[tsi_query.CastTo] = None
-) -> str:
+def clickhouse_cast(inner_sql: str, cast: typing.Optional[tsi_query.CastTo] = None) -> str:
     """Helper function to cast a sql expression to a clickhouse type."""
     if cast is None:
         return inner_sql
@@ -671,17 +660,13 @@ def _process_query_to_conditions(
 
     def process_operand(operand: tsi_query.Operand) -> str:
         if isinstance(operand, tsi_query.LiteralOperation):
-            return pb.add(
-                operand.literal_, None, python_value_to_ch_type(operand.literal_)
-            )
+            return pb.add(operand.literal_, None, python_value_to_ch_type(operand.literal_))
         elif isinstance(operand, tsi_query.GetFieldOperator):
             (
                 field,
                 _,
                 fields_used,
-            ) = _transform_external_field_to_internal_field(
-                operand.get_field_, all_columns, json_columns, None, pb
-            )
+            ) = _transform_external_field_to_internal_field(operand.get_field_, all_columns, json_columns, None, pb)
             raw_fields_used.update(fields_used)
             return field
         elif isinstance(operand, tsi_query.ConvertOperation):

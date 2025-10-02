@@ -254,9 +254,7 @@ class ObjectRefCondition(BaseModel):
             'JSON_VALUE(any(calls_merged.inputs_dump), $.model) IN (SELECT ref FROM obj_filter_0)'
         """
         if self.unique_key not in field_to_object_join_alias_map:
-            raise ValueError(
-                f"Object ref condition key {self.unique_key} not found when generating sql."
-            )
+            raise ValueError(f"Object ref condition key {self.unique_key} not found when generating sql.")
 
         cte_alias = field_to_object_join_alias_map[self.unique_key]
 
@@ -268,9 +266,7 @@ class ObjectRefCondition(BaseModel):
         field_sql = f"{table_alias}.{root_field}"
         if use_agg_fn:
             field_sql = f"any({field_sql})"
-        json_extract_sql = json_dump_field_as_sql(
-            pb, table_alias, field_sql, key_parts, use_agg_fn=use_agg_fn
-        )
+        json_extract_sql = json_dump_field_as_sql(pb, table_alias, field_sql, key_parts, use_agg_fn=use_agg_fn)
 
         if is_order_join:
             # For joins, we need to handle both object refs and table row refs
@@ -328,9 +324,7 @@ class ObjectRefConditionHandler:
         self.pb = pb
         self.json_path_param = json_path_param
 
-    def _create_json_extract_expression(
-        self, conversion_type: Optional[tsi_query.CastTo] = None
-    ) -> str:
+    def _create_json_extract_expression(self, conversion_type: Optional[tsi_query.CastTo] = None) -> str:
         """Creates a JSON_VALUE expression with optional type conversion.
 
         Args:
@@ -345,9 +339,7 @@ class ObjectRefConditionHandler:
             >>> handler._create_json_extract_expression('double')
             'toFloat64(JSON_VALUE(val_dump, {param_slot}))'
         """
-        json_extract = (
-            f"JSON_VALUE(val_dump, {param_slot(self.json_path_param, 'String')})"
-        )
+        json_extract = f"JSON_VALUE(val_dump, {param_slot(self.json_path_param, 'String')})"
 
         if conversion_type:
             return clickhouse_cast(json_extract, conversion_type)
@@ -373,9 +365,7 @@ class ObjectRefConditionHandler:
         filter_type = python_value_to_ch_type(value)
         return filter_param, filter_type
 
-    def handle_comparison_operation(
-        self, condition: ObjectRefFilterCondition, operator: str
-    ) -> str:
+    def handle_comparison_operation(self, condition: ObjectRefFilterCondition, operator: str) -> str:
         """Handle simple binary operations (=, >, >=) for object references.
 
         Args:
@@ -482,15 +472,11 @@ class ObjectRefQueryProcessor:
                 query_for_condition, self.pb, self.table_alias, self.expand_columns
             )
             if len(object_ref_conditions) > 1:
-                raise ValueError(
-                    f"Leaf operand {operand} has multiple object ref conditions: {object_ref_conditions}"
-                )
+                raise ValueError(f"Leaf operand {operand} has multiple object ref conditions: {object_ref_conditions}")
 
             condition = object_ref_conditions[0]
             self.fields_used.add(condition.field_path)
-            return condition.as_sql_condition(
-                self.pb, self.table_alias, self.field_to_object_join_alias_map
-            )
+            return condition.as_sql_condition(self.pb, self.table_alias, self.field_to_object_join_alias_map)
         else:
             # Handle as normal condition
             from weave.trace_server.calls_query_builder.calls_query_builder import (
@@ -565,9 +551,7 @@ class ObjectRefFilterToCTEProcessor(QueryOptimizationProcessor):
 
         if field_operand is not None:
             field_path = field_operand.get_field_
-            if self._is_object_ref_field(field_path) and isinstance(
-                operands[1], tsi_query.LiteralOperation
-            ):
+            if self._is_object_ref_field(field_path) and isinstance(operands[1], tsi_query.LiteralOperation):
                 condition_kwargs = {**kwargs}
                 if conversion_type in get_args(tsi_query.CastTo):
                     condition_kwargs["conversion_type"] = conversion_type
@@ -859,9 +843,7 @@ def has_object_ref_field(field_path: str, expand_columns: list[str]) -> bool:
     return any(field_path.startswith(expand_col + ".") for expand_col in expand_columns)
 
 
-def is_object_ref_operand(
-    operand: "tsi_query.Operand", expand_columns: list[str]
-) -> bool:
+def is_object_ref_operand(operand: "tsi_query.Operand", expand_columns: list[str]) -> bool:
     """Check if an operand references object fields based on expand_columns.
 
     Args:
@@ -891,9 +873,7 @@ def is_object_ref_operand(
         elif isinstance(op, tsi_query.GteOperation):
             return any(check_operand_recursive(sub_op) for sub_op in op.gte_)
         elif isinstance(op, tsi_query.InOperation):
-            return check_operand_recursive(
-                op.in_[0]
-            )  # Only check the field being compared
+            return check_operand_recursive(op.in_[0])  # Only check the field being compared
         elif isinstance(op, tsi_query.ContainsOperation):
             return check_operand_recursive(op.contains_.input)
         elif isinstance(op, tsi_query.ConvertOperation):

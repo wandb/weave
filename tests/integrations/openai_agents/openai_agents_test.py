@@ -58,10 +58,7 @@ def test_openai_agents_quickstart(client: WeaveClient, setup_tests) -> None:
     assert val.role == "assistant"
     assert val.type == "message"
     assert val.status == "completed"
-    assert (
-        val.content[0].text
-        == "Code calls to itself,  \nInfinite loops in silence,  \nPatterns emerge clear."
-    )
+    assert val.content[0].text == "Code calls to itself,  \nInfinite loops in silence,  \nPatterns emerge clear."
 
 
 @pytest.mark.skip(
@@ -73,9 +70,7 @@ def test_openai_agents_quickstart(client: WeaveClient, setup_tests) -> None:
     allowed_hosts=["api.wandb.ai", "localhost"],
 )
 @pytest.mark.asyncio
-async def test_openai_agents_quickstart_homework(
-    client: WeaveClient, setup_tests
-) -> None:
+async def test_openai_agents_quickstart_homework(client: WeaveClient, setup_tests) -> None:
     class HomeworkOutput(BaseModel):
         is_homework: bool
         reasoning: str
@@ -115,9 +110,7 @@ async def test_openai_agents_quickstart_homework(
         ],
     )
 
-    result = await Runner.run(
-        triage_agent, "who was the first president of the united states?"
-    )
+    result = await Runner.run(triage_agent, "who was the first president of the united states?")
     with pytest.raises(agents.exceptions.InputGuardrailTripwireTriggered):
         result = await Runner.run(triage_agent, "what is life")
 
@@ -166,10 +159,7 @@ async def test_openai_agents_quickstart_homework(
     # ====================
     call4 = calls[4]
     assert call4.inputs["name"] == "Response"
-    assert (
-        call4.inputs["input"][0]["content"]
-        == "who was the first president of the united states?"
-    )
+    assert call4.inputs["input"][0]["content"] == "who was the first president of the united states?"
     assert call4.inputs["input"][0]["role"] == "user"
 
     val4 = call4.output["output"][0]
@@ -189,10 +179,7 @@ async def test_openai_agents_quickstart_homework(
     # ====================
     call6 = calls[6]
     assert call6.inputs["name"] == "Response"
-    assert (
-        call6.inputs["input"][0]["content"]
-        == "who was the first president of the united states?"
-    )
+    assert call6.inputs["input"][0]["content"] == "who was the first president of the united states?"
     assert call6.inputs["input"][0]["role"] == "user"
 
     val6 = call6.output["output"][0]
@@ -213,10 +200,7 @@ async def test_openai_agents_quickstart_homework(
     # ====================
     call8 = calls[8]
     assert call8.inputs["name"] == "Response"
-    assert (
-        call8.inputs["input"][0]["content"]
-        == "who was the first president of the united states?"
-    )
+    assert call8.inputs["input"][0]["content"] == "who was the first president of the united states?"
     assert call8.inputs["input"][0]["role"] == "user"
     assert call8.inputs["input"][1]["name"] == "transfer_to_history_tutor"
     assert call8.inputs["input"][1]["type"] == "function_call"

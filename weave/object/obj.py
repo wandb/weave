@@ -138,9 +138,7 @@ class Object(BaseModel):
 
     @model_validator(mode="wrap")
     @classmethod
-    def handle_relocatable_object(
-        cls, v: Any, handler: ValidatorFunctionWrapHandler, info: ValidationInfo
-    ) -> Any:
+    def handle_relocatable_object(cls, v: Any, handler: ValidatorFunctionWrapHandler, info: ValidationInfo) -> Any:
         """Handle validation of relocatable objects including ObjectRef and WeaveObject.
 
         This validator handles special cases where the input is an ObjectRef or

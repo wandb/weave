@@ -54,17 +54,15 @@ def require_base64(s: str) -> str:
         raise CHValidationError(f"Invalid base64 string: {s}.") from None
 
     if s_prime != s:
-        raise CHValidationError(
-            f"Invalid base64 string: {s}. Base64 did not round-trip"
-        )
+        raise CHValidationError(f"Invalid base64 string: {s}. Base64 did not round-trip")
 
     return s
 
 
 def require_internal_ref_uri(s: str, ref_class: Optional[type] = None) -> str:
-    if not s.startswith(
-        f"{refs_internal.WEAVE_INTERNAL_SCHEME}:///"
-    ) and not s.startswith(f"{refs_internal.ARTIFACT_REF_SCHEME}:///"):
+    if not s.startswith(f"{refs_internal.WEAVE_INTERNAL_SCHEME}:///") and not s.startswith(
+        f"{refs_internal.ARTIFACT_REF_SCHEME}:///"
+    ):
         raise CHValidationError(
             f"Invalid ref: {s}. Must start with {refs_internal.WEAVE_INTERNAL_SCHEME}:/// "
             f"or {refs_internal.ARTIFACT_REF_SCHEME}:///"

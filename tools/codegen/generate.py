@@ -137,9 +137,7 @@ def generate_code(
     ] = None,
     typescript_path: Annotated[
         str | None,
-        Option(
-            "--typescript-path", help="Path to the TypeScript code generation output"
-        ),
+        Option("--typescript-path", help="Path to the TypeScript code generation output"),
     ] = None,
 ) -> None:
     """Generate code from the OpenAPI spec using Stainless.
@@ -150,9 +148,7 @@ def generate_code(
     header("Generating code with Stainless")
 
     if not any([python_path, node_path, typescript_path]):
-        error(
-            "At least one of --python-path, --node-path, or --typescript-path must be provided"
-        )
+        error("At least one of --python-path, --node-path, or --typescript-path must be provided")
         sys.exit(1)
 
     required_env_vars = {
@@ -160,18 +156,12 @@ def generate_code(
         "GITHUB_TOKEN": "GitHub token",
     }
 
-    missing_vars = [
-        var_name for var_name in required_env_vars if not os.getenv(var_name)
-    ]
+    missing_vars = [var_name for var_name in required_env_vars if not os.getenv(var_name)]
 
     if missing_vars:
         error(
             "Missing required environment variables: "
-            + ", ".join(
-                f"{var} ({desc})"
-                for var, desc in required_env_vars.items()
-                if var in missing_vars
-            )
+            + ", ".join(f"{var} ({desc})" for var, desc in required_env_vars.items() if var in missing_vars)
         )
         sys.exit(1)
 
@@ -210,13 +200,9 @@ def generate_code(
 
 @app.command()
 def update_pyproject(
-    python_output: Annotated[
-        Path, typer.Argument(help="Path to Python output", exists=True)
-    ],
+    python_output: Annotated[Path, typer.Argument(help="Path to Python output", exists=True)],
     package_name: Annotated[str, typer.Argument(help="Name of the package")],
-    release: Annotated[
-        bool, Option("--release", help="Update to the latest version")
-    ] = False,
+    release: Annotated[bool, Option("--release", help="Update to the latest version")] = False,
 ) -> None:
     """Update the pyproject.toml file with the latest version of the generated code.
 
@@ -241,12 +227,8 @@ def update_pyproject(
 
 @app.command()
 def merge_generated_code(
-    python_output: Annotated[
-        Path, typer.Argument(help="Path to generated Python code (weave-stainless)")
-    ],
-    package_name: Annotated[
-        str, typer.Argument(help="Name of the package to update in pyproject.toml")
-    ],
+    python_output: Annotated[Path, typer.Argument(help="Path to generated Python code (weave-stainless)")],
+    package_name: Annotated[str, typer.Argument(help="Name of the package to update in pyproject.toml")],
 ) -> None:
     """Create a branch from main with the generated code and update pyproject.toml.
 
@@ -337,9 +319,7 @@ def merge_generated_code(
 
         if branch_exists:
             # Delete the existing branch first so we can recreate it from origin/main
-            info(
-                f"Deleting existing branch {mirror_branch} to recreate with new generated code..."
-            )
+            info(f"Deleting existing branch {mirror_branch} to recreate with new generated code...")
             subprocess.run(
                 ["git", "branch", "-D", mirror_branch],
                 cwd=python_output,
@@ -390,9 +370,7 @@ def merge_generated_code(
             )
 
             # Commit changes
-            commit_message = (
-                f"Update generated code from weave branch: {current_branch}"
-            )
+            commit_message = f"Update generated code from weave branch: {current_branch}"
             info(f"Committing: {commit_message}")
             subprocess.run(
                 ["git", "commit", "-m", commit_message],
@@ -438,18 +416,15 @@ def merge_generated_code(
 
 @app.command()
 def all(
-    config: Annotated[
-        str, Option("--config", help="Path to config file")
-    ] = CODEGEN_ROOT_RELPATH + "/generate_config.yaml",
+    config: Annotated[str, Option("--config", help="Path to config file")] = CODEGEN_ROOT_RELPATH
+    + "/generate_config.yaml",
     python_output: Annotated[
         str | None,
         Option("--python-output", help="Path for Python code generation output"),
     ] = None,
     package_name: Annotated[
         str | None,
-        Option(
-            "--package-name", help="Name of the package to update in pyproject.toml"
-        ),
+        Option("--package-name", help="Name of the package to update in pyproject.toml"),
     ] = None,
     openapi_output: Annotated[
         str | None,
@@ -461,9 +436,7 @@ def all(
     ] = None,
     typescript_output: Annotated[
         str | None,
-        Option(
-            "--typescript-output", help="Path for TypeScript code generation output"
-        ),
+        Option("--typescript-output", help="Path for TypeScript code generation output"),
     ] = None,
     release: Annotated[
         bool | None,
@@ -526,9 +499,7 @@ def all(
                 config_content = src.read()
 
             # Prompt for python_output
-            python_output_input = input(
-                "\nPlease enter the absolute path to your local Python repository: "
-            )
+            python_output_input = input("\nPlease enter the absolute path to your local Python repository: ")
             if not python_output_input:
                 error("Repository path cannot be empty")
                 sys.exit(1)
@@ -538,20 +509,14 @@ def all(
 
             # Ensure the path exists
             if not os.path.exists(python_output_input):
-                warning(
-                    f"Repository path '{python_output_input}' does not exist. Please make sure it's correct."
-                )
-                create_anyway = input(
-                    "Continue creating config anyway? (y/n): "
-                ).lower()
+                warning(f"Repository path '{python_output_input}' does not exist. Please make sure it's correct.")
+                create_anyway = input("Continue creating config anyway? (y/n): ").lower()
                 if create_anyway != "y":
                     error("Config creation aborted")
                     sys.exit(1)
 
             # Replace the template python_output with the provided value
-            config_content = config_content.replace(
-                "/path/to/your/local/python/repo", python_output_input
-            )
+            config_content = config_content.replace("/path/to/your/local/python/repo", python_output_input)
 
             # Write the updated content to the config file
             config_file_path = Path(config_path)
@@ -562,14 +527,10 @@ def all(
 
             # Reload the config file to get all values including package_name
             cfg = _load_config(config_file_path)
-            info(
-                f"Loaded config with package_name: {cfg.get('package_name', 'weave_server_sdk')}"
-            )
+            info(f"Loaded config with package_name: {cfg.get('package_name', 'weave_server_sdk')}")
         else:
             error(f"Template file not found: {template_path}")
-            error(
-                "python_output and package_name must be specified either in config file or as arguments"
-            )
+            error("python_output and package_name must be specified either in config file or as arguments")
             sys.exit(1)
 
     str_path = _ensure_absolute_path(cfg["python_output"])
@@ -694,9 +655,7 @@ def _kill_port(port: int) -> bool:
     return killed_any
 
 
-def _wait_for_server(
-    url: str, timeout: int = SERVER_TIMEOUT, interval: int = SERVER_CHECK_INTERVAL
-) -> bool:
+def _wait_for_server(url: str, timeout: int = SERVER_TIMEOUT, interval: int = SERVER_CHECK_INTERVAL) -> bool:
     """Wait for the server at the specified URL to become available.
 
     Polls the URL until a successful connection is made or the timeout is reached.
@@ -789,9 +748,7 @@ def _update_pyproject_toml(
             doc["project"]["optional-dependencies"]["stainless"] = tomlkit.array()
 
         # Ensure stainless is a tomlkit array for consistent formatting
-        if not isinstance(
-            doc["project"]["optional-dependencies"]["stainless"], tomlkit.items.Array
-        ):
+        if not isinstance(doc["project"]["optional-dependencies"]["stainless"], tomlkit.items.Array):
             stainless_deps = tomlkit.array()
             stainless_deps.extend(doc["project"]["optional-dependencies"]["stainless"])
             doc["project"]["optional-dependencies"]["stainless"] = stainless_deps
@@ -818,11 +775,7 @@ def _update_pyproject_toml(
     # Handle [tool.hatch.metadata] section
     if is_version:
         # For release, remove allow-direct-references if it exists
-        if (
-            "tool" in doc
-            and "hatch" in doc["tool"]
-            and "metadata" in doc["tool"]["hatch"]
-        ):
+        if "tool" in doc and "hatch" in doc["tool"] and "metadata" in doc["tool"]["hatch"]:
             if "allow-direct-references" in doc["tool"]["hatch"]["metadata"]:
                 del doc["tool"]["hatch"]["metadata"]["allow-direct-references"]
             # Clean up empty sections

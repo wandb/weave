@@ -32,9 +32,7 @@ try:
     from weave.scorers.trust_scorer import WeaveTrustScorerV1
     from weave.scorers.xml_scorer import ValidXMLScorer
 except ModuleNotFoundError as e:
-    raise ImportError(
-        "Scorer dependencies are missing.  Please install them with `pip install weave[scorers]`"
-    ) from e
+    raise ImportError("Scorer dependencies are missing.  Please install them with `pip install weave[scorers]`") from e
 
 __all__ = [
     "ContextEntityRecallScorer",

@@ -77,20 +77,14 @@ def test_completions_create(client):
 
     class DummySecretFetcher:
         def fetch(self, secret_name: str) -> dict:
-            return {
-                "secrets": {
-                    secret_name: os.environ.get(secret_name, "DUMMY_SECRET_VALUE")
-                }
-            }
+            return {"secrets": {secret_name: os.environ.get(secret_name, "DUMMY_SECRET_VALUE")}}
 
     # Have to do this since we run the tests in the same process as the server
     # and the inner litellm gets patched!
     with with_tracing_disabled():
         with secret_fetcher_context(DummySecretFetcher()):
             with patch("litellm.completion") as mock_completion:
-                mock_completion.return_value = ModelResponse.model_validate(
-                    mock_response
-                )
+                mock_completion.return_value = ModelResponse.model_validate(mock_response)
                 res = client.server.completions_create(
                     tsi.CompletionsCreateReq.model_validate(
                         {

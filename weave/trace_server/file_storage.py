@@ -124,9 +124,7 @@ class FileStorageReadError(Exception):
     pass
 
 
-def store_in_bucket(
-    client: FileStorageClient, path: str, data: bytes
-) -> FileStorageURI:
+def store_in_bucket(client: FileStorageClient, path: str, data: bytes) -> FileStorageURI:
     """Store a file in a storage bucket."""
     try:
         target_file_storage_uri = client.base_uri.with_path(path)
@@ -137,17 +135,13 @@ def store_in_bucket(
     return target_file_storage_uri
 
 
-def read_from_bucket(
-    client: FileStorageClient, file_storage_uri: FileStorageURI
-) -> bytes:
+def read_from_bucket(client: FileStorageClient, file_storage_uri: FileStorageURI) -> bytes:
     """Read a file from a storage bucket."""
     try:
         return client.read(file_storage_uri)
     except Exception as e:
         logger.exception("Failed to read file from %s", file_storage_uri)
-        raise FileStorageReadError(
-            f"Failed to read file from {file_storage_uri}: {e!s}"
-        ) from e
+        raise FileStorageReadError(f"Failed to read file from {file_storage_uri}: {e!s}") from e
 
 
 ### Everything below here is internal
@@ -207,13 +201,9 @@ def create_retry_decorator(operation_name: str) -> Callable[[Any], Any]:
             exception = retry_state.outcome.exception()
             if exception and _is_rate_limit_error(exception):
                 # Use random exponential backoff with jitter for rate limiting
-                return wait_random_exponential(
-                    multiplier=RETRY_MIN_WAIT, max=RETRY_MAX_WAIT
-                )(retry_state)
+                return wait_random_exponential(multiplier=RETRY_MIN_WAIT, max=RETRY_MAX_WAIT)(retry_state)
         # Use regular exponential backoff for other errors
-        return wait_exponential(multiplier=RETRY_MIN_WAIT, max=RETRY_MAX_WAIT)(
-            retry_state
-        )
+        return wait_exponential(multiplier=RETRY_MIN_WAIT, max=RETRY_MAX_WAIT)(retry_state)
 
     return retry(
         stop=stop_after_attempt(RETRY_MAX_ATTEMPTS),
@@ -238,9 +228,7 @@ class S3StorageClient(FileStorageClient):
         )
         credential_params = {}
         credential_params["aws_access_key_id"] = credentials.get("access_key_id")
-        credential_params["aws_secret_access_key"] = credentials.get(
-            "secret_access_key"
-        )
+        credential_params["aws_secret_access_key"] = credentials.get("secret_access_key")
         credential_params["aws_session_token"] = credentials.get("session_token")
         credential_params["region_name"] = credentials.get("region")
         # Store KMS key as an instance variable for use in operations
@@ -278,9 +266,7 @@ class S3StorageClient(FileStorageClient):
 class GCSStorageClient(FileStorageClient):
     """Google Cloud Storage implementation with retry logic and configurable timeouts."""
 
-    def __init__(
-        self, base_uri: FileStorageURI, credentials: Optional[GCPCredentials] = None
-    ):
+    def __init__(self, base_uri: FileStorageURI, credentials: Optional[GCPCredentials] = None):
         """Initialize GCS client with credentials and default timeout configuration."""
         assert isinstance(base_uri, GCSFileStorageURI)
         super().__init__(base_uri)
@@ -379,9 +365,7 @@ def maybe_get_storage_client_from_env() -> Optional[FileStorageClient]:
         logger.warning(f"Error parsing file storage URI: {e}")
         return None
     if parsed_uri.has_path():
-        logger.error(
-            f"Supplied file storage uri contains path components: {file_storage_uri}"
-        )
+        logger.error(f"Supplied file storage uri contains path components: {file_storage_uri}")
         return None
 
     if isinstance(parsed_uri, S3FileStorageURI):
@@ -391,6 +375,4 @@ def maybe_get_storage_client_from_env() -> Optional[FileStorageClient]:
     elif isinstance(parsed_uri, AzureFileStorageURI):
         return AzureStorageClient(parsed_uri, get_azure_credentials())
     else:
-        raise NotImplementedError(
-            f"Storage client for URI type {type(file_storage_uri)} not supported"
-        )
+        raise NotImplementedError(f"Storage client for URI type {type(file_storage_uri)} not supported")

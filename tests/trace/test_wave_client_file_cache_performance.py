@@ -59,9 +59,7 @@ def test_cache_memory_usage_with_file_contents():
     for i in range(50):
         size = random.choice(file_sizes)
         content = bytes([random.randint(0, 255) for _ in range(size)])
-        req = FileCreateReq(
-            project_id=f"test_project_{i % 5}", name=f"file_{i}.txt", content=content
-        )
+        req = FileCreateReq(project_id=f"test_project_{i % 5}", name=f"file_{i}.txt", content=content)
         res = FileCreateRes(digest=f"digest_{i}")
         cache.put(req, res)
 
@@ -106,9 +104,7 @@ def test_concurrent_access_with_high_load():
     # Print performance stats
     duration = end_time - start_time
     ops_per_second = (num_threads * operations_per_thread) / duration
-    print(
-        f"Completed {num_threads * operations_per_thread} operations in {duration:.2f} seconds"
-    )
+    print(f"Completed {num_threads * operations_per_thread} operations in {duration:.2f} seconds")
     print(f"Performance: {ops_per_second:.2f} operations/second")
 
     # Ensure the cache size hasn't exceeded max_size
@@ -156,9 +152,7 @@ def test_stress_test_cache():
     # Print performance stats
     duration = end_time - start_time
     ops_per_second = (num_threads * operations_per_thread) / duration
-    print(
-        f"Stress test completed {num_threads * operations_per_thread} operations in {duration:.2f} seconds"
-    )
+    print(f"Stress test completed {num_threads * operations_per_thread} operations in {duration:.2f} seconds")
     print(f"Performance: {ops_per_second:.2f} operations/second")
 
     # Ensure the cache size hasn't exceeded max_size

@@ -153,10 +153,7 @@ def test_llm_structured_completion_model_filtering(client: WeaveClient):
     )
 
     assert len(leaf_filter_res.objs) == 2
-    assert all(
-        obj.leaf_object_class == "LLMStructuredCompletionModel"
-        for obj in leaf_filter_res.objs
-    )
+    assert all(obj.leaf_object_class == "LLMStructuredCompletionModel" for obj in leaf_filter_res.objs)
     assert all(obj.base_object_class == "Model" for obj in leaf_filter_res.objs)
 
     # Test filtering by base_object_class
@@ -188,12 +185,8 @@ def test_llm_structured_completion_model_filtering(client: WeaveClient):
     assert len(combined_filter_res.objs) == 2
 
 
-@patch(
-    "weave.trace_server.interface.builtin_object_classes.llm_structured_model.get_weave_client"
-)
-def test_llm_structured_completion_model_predict_text_response(
-    mock_get_client, client: WeaveClient
-):
+@patch("weave.trace_server.interface.builtin_object_classes.llm_structured_model.get_weave_client")
+def test_llm_structured_completion_model_predict_text_response(mock_get_client, client: WeaveClient):
     """Test the predict function with mocked LLM API response for text format."""
     # Setup mock client
     mock_client = Mock()
@@ -242,12 +235,8 @@ def test_llm_structured_completion_model_predict_text_response(
     assert call_args.inputs.messages == [{"role": "user", "content": "Hello"}]
 
 
-@patch(
-    "weave.trace_server.interface.builtin_object_classes.llm_structured_model.get_weave_client"
-)
-def test_llm_structured_completion_model_predict_json_response(
-    mock_get_client, client: WeaveClient
-):
+@patch("weave.trace_server.interface.builtin_object_classes.llm_structured_model.get_weave_client")
+def test_llm_structured_completion_model_predict_json_response(mock_get_client, client: WeaveClient):
     """Test the predict function with mocked LLM API response for JSON format."""
     # Setup mock client
     mock_client = Mock()
@@ -257,11 +246,7 @@ def test_llm_structured_completion_model_predict_json_response(
     # Mock successful API response with JSON content
     json_content = {"result": "success", "data": {"message": "Hello World"}}
     mock_response = tsi.CompletionsCreateRes(
-        response={
-            "choices": [
-                {"message": {"role": "assistant", "content": json.dumps(json_content)}}
-            ]
-        }
+        response={"choices": [{"message": {"role": "assistant", "content": json.dumps(json_content)}}]}
     )
     mock_client.server.completions_create.return_value = mock_response
     mock_get_client.return_value = mock_client
@@ -283,12 +268,8 @@ def test_llm_structured_completion_model_predict_json_response(
     assert result["result"] == "success"
 
 
-@patch(
-    "weave.trace_server.interface.builtin_object_classes.llm_structured_model.get_weave_client"
-)
-def test_llm_structured_completion_model_predict_with_template(
-    mock_get_client, client: WeaveClient
-):
+@patch("weave.trace_server.interface.builtin_object_classes.llm_structured_model.get_weave_client")
+def test_llm_structured_completion_model_predict_with_template(mock_get_client, client: WeaveClient):
     """Test the predict function with message templates and template variables."""
     # Setup mock client
     mock_client = Mock()
@@ -315,9 +296,7 @@ def test_llm_structured_completion_model_predict_with_template(
         llm_model_id="claude-3",
         default_params=LLMStructuredCompletionModelDefaultParams(
             messages_template=[
-                Message(
-                    role="system", content="You are {assistant_name}, a helpful AI."
-                ),
+                Message(role="system", content="You are {assistant_name}, a helpful AI."),
                 Message(role="user", content="Hello, my name is {user_name}"),
             ],
             response_format="text",
@@ -344,12 +323,8 @@ def test_llm_structured_completion_model_predict_with_template(
     assert call_args.inputs.messages == expected_messages
 
 
-@patch(
-    "weave.trace_server.interface.builtin_object_classes.llm_structured_model.get_weave_client"
-)
-def test_llm_structured_completion_model_predict_with_config_override(
-    mock_get_client, client: WeaveClient
-):
+@patch("weave.trace_server.interface.builtin_object_classes.llm_structured_model.get_weave_client")
+def test_llm_structured_completion_model_predict_with_config_override(mock_get_client, client: WeaveClient):
     """Test the predict function with config parameter overriding defaults."""
     # Setup mock client
     mock_client = Mock()
@@ -398,12 +373,8 @@ def test_llm_structured_completion_model_predict_with_config_override(
     assert call_args.inputs.max_tokens == 200  # Overridden
 
 
-@patch(
-    "weave.trace_server.interface.builtin_object_classes.llm_structured_model.get_weave_client"
-)
-def test_llm_structured_completion_model_predict_error_handling(
-    mock_get_client, client: WeaveClient
-):
+@patch("weave.trace_server.interface.builtin_object_classes.llm_structured_model.get_weave_client")
+def test_llm_structured_completion_model_predict_error_handling(mock_get_client, client: WeaveClient):
     """Test the predict function error handling."""
     # Setup mock client
     mock_client = Mock()
@@ -411,17 +382,13 @@ def test_llm_structured_completion_model_predict_error_handling(
     mock_client.project = "test_project"
 
     # Test 1: API error response
-    mock_error_response = tsi.CompletionsCreateRes(
-        response={"error": "API rate limit exceeded"}
-    )
+    mock_error_response = tsi.CompletionsCreateRes(response={"error": "API rate limit exceeded"})
     mock_client.server.completions_create.return_value = mock_error_response
     mock_get_client.return_value = mock_client
 
     model = LLMStructuredCompletionModel(
         llm_model_id="gpt-4",
-        default_params=LLMStructuredCompletionModelDefaultParams(
-            response_format="text"
-        ),
+        default_params=LLMStructuredCompletionModelDefaultParams(response_format="text"),
     )
 
     with pytest.raises(RuntimeError, match="LLM API returned an error"):
@@ -438,9 +405,7 @@ def test_llm_structured_completion_model_predict_error_handling(
     mock_invalid_response = tsi.CompletionsCreateRes(response={"invalid": "response"})
     mock_client.server.completions_create.return_value = mock_invalid_response
 
-    with pytest.raises(
-        RuntimeError, match="Failed to extract message from LLM response"
-    ):
+    with pytest.raises(RuntimeError, match="Failed to extract message from LLM response"):
         model.predict(user_input="Test")
 
 

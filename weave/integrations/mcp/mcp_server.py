@@ -36,16 +36,12 @@ def decorator_wrapper(settings: OpSettings) -> Callable:
                 base_name = settings.name or ""
 
                 # Set the op name to mcp.server.fastmcp.FastMCP.tool.<TOOL_NAME>
-                op_name = (
-                    f"{base_name}.{weave_op_name}" if weave_op_name != "" else base_name
-                )
+                op_name = f"{base_name}.{weave_op_name}" if weave_op_name != "" else base_name
 
                 # Use just the function name as the display name
                 display_name = weave_op_name if weave_op_name != "" else base_name
 
-                settings_copy = settings.model_copy(
-                    update={"name": op_name, "call_display_name": display_name}
-                )
+                settings_copy = settings.model_copy(update={"name": op_name, "call_display_name": display_name})
 
                 weave_wrapped = weave.op(fn, **settings_copy.model_dump())
 

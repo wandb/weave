@@ -68,11 +68,7 @@ def is_file_save(value: Callable) -> TypeIs[FileSave]:
     name_annotation = params[2].annotation
     return (
         len(params) == 3
-        and (
-            name_annotation is str
-            or name_annotation == "str"
-            or name_annotation == inspect._empty
-        )
+        and (name_annotation is str or name_annotation == "str" or name_annotation == inspect._empty)
         and (
             signature.return_annotation is None
             or signature.return_annotation == "None"

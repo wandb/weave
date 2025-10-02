@@ -277,21 +277,15 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
         if not digest_is_cacheable(req.digest):
             return self._next_trace_server.obj_read(req)
-        return self._with_cache_pydantic(
-            self._next_trace_server.obj_read, req, tsi.ObjReadRes
-        )
+        return self._with_cache_pydantic(self._next_trace_server.obj_read, req, tsi.ObjReadRes)
 
     # Obj API
     def obj_create(self, req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
         # All obj_create requests are cacheable!
-        return self._with_cache_pydantic(
-            self._next_trace_server.obj_create, req, tsi.ObjCreateRes
-        )
+        return self._with_cache_pydantic(self._next_trace_server.obj_create, req, tsi.ObjCreateRes)
 
     def obj_delete(self, req: tsi.ObjDeleteReq) -> tsi.ObjDeleteRes:
-        cache_key_partial = (
-            f'{{"project_id": "{req.project_id}", "object_id": "{req.object_id}"'
-        )
+        cache_key_partial = f'{{"project_id": "{req.project_id}", "object_id": "{req.object_id}"'
         if req.digests:
             for digest in req.digests:
                 cache_key_partial_digest = f'{cache_key_partial}, "digest": "{digest}"'
@@ -309,13 +303,9 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
     def table_query(self, req: tsi.TableQueryReq) -> tsi.TableQueryRes:
         if not digest_is_cacheable(req.digest):
             return self._next_trace_server.table_query(req)
-        return self._with_cache_pydantic(
-            self._next_trace_server.table_query, req, tsi.TableQueryRes
-        )
+        return self._with_cache_pydantic(self._next_trace_server.table_query, req, tsi.TableQueryRes)
 
-    def table_query_stream(
-        self, req: tsi.TableQueryReq
-    ) -> Iterator[tsi.TableRowSchema]:
+    def table_query_stream(self, req: tsi.TableQueryReq) -> Iterator[tsi.TableRowSchema]:
         # I am not sure the best way to cache the iterator here. TODO
         return self._next_trace_server.table_query_stream(req)
 
@@ -323,13 +313,9 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
     def table_query_stats(self, req: tsi.TableQueryStatsReq) -> tsi.TableQueryStatsRes:
         if not digest_is_cacheable(req.digest):
             return self._next_trace_server.table_query_stats(req)
-        return self._with_cache_pydantic(
-            self._next_trace_server.table_query_stats, req, tsi.TableQueryStatsRes
-        )
+        return self._with_cache_pydantic(self._next_trace_server.table_query_stats, req, tsi.TableQueryStatsRes)
 
-    def table_query_stats_batch(
-        self, req: tsi.TableQueryStatsBatchReq
-    ) -> tsi.TableQueryStatsBatchRes:
+    def table_query_stats_batch(self, req: tsi.TableQueryStatsBatchReq) -> tsi.TableQueryStatsBatchRes:
         if any(not digest_is_cacheable(digest) for digest in req.digests or []):
             return self._next_trace_server.table_query_stats_batch(req)
         return self._with_cache_pydantic(
@@ -358,9 +344,7 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         needed_indices: list[int] = []
 
         for needed_ndx, ref in enumerate(req.refs):
-            existing_result = self._safe_cache_get(
-                self._make_cache_key("refs_read_batch", ref)
-            )
+            existing_result = self._safe_cache_get(self._make_cache_key("refs_read_batch", ref))
 
             if existing_result is not None:
                 final_results[needed_ndx] = existing_result
@@ -371,17 +355,13 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         if needed_refs:
             new_req = tsi.RefsReadBatchReq(refs=needed_refs)
             needed_results = self._next_trace_server.refs_read_batch(new_req)
-            for needed_ndx, needed_ref, needed_val in zip(
-                needed_indices, needed_refs, needed_results.vals
-            ):
+            for needed_ndx, needed_ref, needed_val in zip(needed_indices, needed_refs, needed_results.vals):
                 final_results[needed_ndx] = needed_val
 
                 # Only cache if the ref has a cacheable digest
                 try:
                     parsed_ref = Ref.parse_uri(needed_ref)
-                    if isinstance(parsed_ref, ObjectRef) and digest_is_cacheable(
-                        parsed_ref.digest
-                    ):
+                    if isinstance(parsed_ref, ObjectRef) and digest_is_cacheable(parsed_ref.digest):
                         self._safe_cache_set(
                             self._make_cache_key("refs_read_batch", needed_ref),
                             needed_val,
@@ -394,9 +374,7 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
     # File API
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         # All file_create requests are cacheable!
-        return self._with_cache_pydantic(
-            self._next_trace_server.file_create, req, tsi.FileCreateRes
-        )
+        return self._with_cache_pydantic(self._next_trace_server.file_create, req, tsi.FileCreateRes)
 
     def file_content_read(self, req: tsi.FileContentReadReq) -> tsi.FileContentReadRes:
         return self._with_cache(
@@ -417,9 +395,7 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
 
     # Remaining Un-cacheable Methods:
 
-    def ensure_project_exists(
-        self, entity: str, project: str
-    ) -> tsi.EnsureProjectExistsRes:
+    def ensure_project_exists(self, entity: str, project: str) -> tsi.EnsureProjectExistsRes:
         return self._next_trace_server.ensure_project_exists(entity, project)
 
     # Call API
@@ -478,9 +454,7 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
     def table_create(self, req: tsi.TableCreateReq) -> tsi.TableCreateRes:
         return self._next_trace_server.table_create(req)
 
-    def table_create_from_digests(
-        self, req: tsi.TableCreateFromDigestsReq
-    ) -> tsi.TableCreateFromDigestsRes:
+    def table_create_from_digests(self, req: tsi.TableCreateFromDigestsReq) -> tsi.TableCreateFromDigestsRes:
         return self._next_trace_server.table_create_from_digests(req)
 
     def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
@@ -489,9 +463,7 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
     def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
         return self._next_trace_server.feedback_create(req)
 
-    def feedback_create_batch(
-        self, req: tsi.FeedbackCreateBatchReq
-    ) -> tsi.FeedbackCreateBatchRes:
+    def feedback_create_batch(self, req: tsi.FeedbackCreateBatchReq) -> tsi.FeedbackCreateBatchRes:
         return self._next_trace_server.feedback_create_batch(req)
 
     def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
@@ -504,31 +476,23 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         return self._next_trace_server.feedback_replace(req)
 
     # Action API
-    def actions_execute_batch(
-        self, req: tsi.ActionsExecuteBatchReq
-    ) -> tsi.ActionsExecuteBatchRes:
+    def actions_execute_batch(self, req: tsi.ActionsExecuteBatchReq) -> tsi.ActionsExecuteBatchRes:
         return self._next_trace_server.actions_execute_batch(req)
 
     # Execute LLM API
-    def completions_create(
-        self, req: tsi.CompletionsCreateReq
-    ) -> tsi.CompletionsCreateRes:
+    def completions_create(self, req: tsi.CompletionsCreateReq) -> tsi.CompletionsCreateRes:
         return self._next_trace_server.completions_create(req)
 
     def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes:
         return self._next_trace_server.project_stats(req)
 
-    def threads_query_stream(
-        self, req: tsi.ThreadsQueryReq
-    ) -> Iterator[tsi.ThreadSchema]:
+    def threads_query_stream(self, req: tsi.ThreadsQueryReq) -> Iterator[tsi.ThreadSchema]:
         return self._next_trace_server.threads_query_stream(req)
 
     def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
         return self._next_trace_server.evaluate_model(req)
 
-    def evaluation_status(
-        self, req: tsi.EvaluationStatusReq
-    ) -> tsi.EvaluationStatusRes:
+    def evaluation_status(self, req: tsi.EvaluationStatusReq) -> tsi.EvaluationStatusRes:
         return self._next_trace_server.evaluation_status(req)
 
 
@@ -549,9 +513,7 @@ def pydantic_bytes_safe_dump(obj: BaseModel) -> str:
     return json.dumps(processed_dict, ensure_ascii=False)
 
 
-def create_memory_disk_cache(
-    cache_dir: str, size_limit: int = 1_000_000_000, memory_size: int = 1000
-) -> StackedCache:
+def create_memory_disk_cache(cache_dir: str, size_limit: int = 1_000_000_000, memory_size: int = 1000) -> StackedCache:
     """Factory function to create a memory+disk stacked cache.
 
     This is the equivalent of the old MemCacheWithDiskCacheBackend but more flexible.

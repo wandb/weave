@@ -440,9 +440,7 @@ def test_extract_usage_data_success(output, expected_usage):
         # Zero token counts - should not create usage data
         (
             {
-                "extra": {
-                    "metadata": {"ls_model_name": "gpt-4", "ls_model_type": "chat"}
-                },
+                "extra": {"metadata": {"ls_model_name": "gpt-4", "ls_model_type": "chat"}},
                 "outputs": {
                     "generations": [
                         [

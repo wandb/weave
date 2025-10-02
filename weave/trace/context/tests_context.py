@@ -2,8 +2,8 @@ import contextlib
 import contextvars
 from collections.abc import Generator
 
-test_only_raise_on_captured_errors: contextvars.ContextVar[bool] = (
-    contextvars.ContextVar("test_only_raise_on_captured_errors", default=False)
+test_only_raise_on_captured_errors: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "test_only_raise_on_captured_errors", default=False
 )
 
 

@@ -39,8 +39,7 @@ def generate_end(id: str | None = None) -> tsi.EndedCallSchemaForInsert:
     return tsi.EndedCallSchemaForInsert(
         project_id="test",
         id=id or generate_id(),
-        ended_at=datetime.datetime.now(tz=datetime.timezone.utc)
-        + datetime.timedelta(seconds=1),
+        ended_at=datetime.datetime.now(tz=datetime.timezone.utc) + datetime.timedelta(seconds=1),
         outputs={"c": 5},
         error=None,
         summary={"result": "Test summary"},
@@ -78,9 +77,7 @@ def server(request):
             stop=tenacity.stop_after_attempt(2),
             reraise=True,
         )
-        unwrapped_send_batch_to_server = MethodType(
-            server_._send_batch_to_server.__wrapped__, server_
-        )
+        unwrapped_send_batch_to_server = MethodType(server_._send_batch_to_server.__wrapped__, server_)
         server_._send_batch_to_server = fast_retry(unwrapped_send_batch_to_server)
 
     yield server_
@@ -228,9 +225,7 @@ def test_dynamic_batch_size_adjustment(server):
     data = Batch(batch=batch).model_dump_json()
     encoded_bytes = len(data.encode("utf-8"))
     estimated_bytes_per_item = encoded_bytes / len(batch)
-    expected_max_batch_size = max(
-        1, int(server.remote_request_bytes_limit // estimated_bytes_per_item)
-    )
+    expected_max_batch_size = max(1, int(server.remote_request_bytes_limit // estimated_bytes_per_item))
 
     assert new_max_batch_size == expected_max_batch_size
 
@@ -332,9 +327,7 @@ def test_post_timeout(mock_post, success_response, server, log_collector):
         stop=tenacity.stop_after_attempt(2),
         reraise=True,
     )
-    unwrapped_send_batch_to_server = MethodType(
-        new_server._send_batch_to_server.__wrapped__, new_server
-    )
+    unwrapped_send_batch_to_server = MethodType(new_server._send_batch_to_server.__wrapped__, new_server)
     new_server._send_batch_to_server = fast_retry(unwrapped_send_batch_to_server)
 
     # Should succeed with retry
@@ -377,9 +370,7 @@ def test_requeue_after_max_retries(server, caplog):
 
     # Mock enqueue to verify it gets called, and _send_batch_to_server to throw an exception
     server.call_processor.enqueue = MagicMock()
-    server._send_batch_to_server = MagicMock(
-        side_effect=requests.ConnectionError("Connection error")
-    )
+    server._send_batch_to_server = MagicMock(side_effect=requests.ConnectionError("Connection error"))
 
     # Create a batch
     start, end = generate_call_start_end_pair()

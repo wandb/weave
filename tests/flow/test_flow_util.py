@@ -15,9 +15,7 @@ async def test_async_foreach_basic():
         await asyncio.sleep(0.1)  # Simulate async work
         return x * 2
 
-    async for index, item, result in async_foreach(
-        input_data, process, max_concurrent_tasks=2
-    ):
+    async for index, item, result in async_foreach(input_data, process, max_concurrent_tasks=2):
         results.append((index, item, result))
 
     results.sort(key=lambda x: x[0])
@@ -43,9 +41,7 @@ async def test_async_foreach_concurrency():
         return x
 
     max_concurrent = 3
-    async for _ in async_foreach(
-        input_data, process, max_concurrent_tasks=max_concurrent
-    ):
+    async for _ in async_foreach(input_data, process, max_concurrent_tasks=max_concurrent):
         pass
 
     assert max_running == max_concurrent
@@ -116,9 +112,7 @@ async def test_async_foreach_cancellation():
 
     # Create a task we can cancel
     async def run_foreach():
-        async for index, item, result in async_foreach(
-            input_data, slow_process, max_concurrent_tasks=3
-        ):
+        async for index, item, result in async_foreach(input_data, slow_process, max_concurrent_tasks=3):
             results.append((index, item, result))
             if len(results) >= 2:  # Cancel after 2 results
                 raise asyncio.CancelledError()
@@ -147,12 +141,8 @@ async def test_async_foreach_execution_order():
         await asyncio.sleep(delay)  # Different delays to force out-of-order completion
         return value * 2
 
-    async for index, item, result in async_foreach(
-        input_data, process, max_concurrent_tasks=3
-    ):
-        results.append(
-            (index, item[0], result)
-        )  # Store (original_value, processed_result)
+    async for index, item, result in async_foreach(input_data, process, max_concurrent_tasks=3):
+        results.append((index, item[0], result))  # Store (original_value, processed_result)
 
     # Assert that results done sooner were indeed returned first
     assert results == [(1, 1, 2), (2, 2, 4), (0, 0, 0)]

@@ -73,9 +73,7 @@ def test_table_create(client):
             )
         )
     )
-    result = client.server.table_query(
-        TableQueryReq(project_id="test/test-project", digest=res.digest)
-    )
+    result = client.server.table_query(TableQueryReq(project_id="test/test-project", digest=res.digest))
     assert result.rows[0].val["val"] == 1
     assert result.rows[1].val["val"] == 2
     assert result.rows[2].val["val"] == 3
@@ -310,15 +308,11 @@ def test_filter_sort_by_query_validation(client):
     with pytest.raises(TypeError):
         client.get_calls(query=["not a query"])
 
-    with pytest.raises(
-        ValidationError, match="8 validation errors for WeaveClient.get_calls"
-    ):
+    with pytest.raises(ValidationError, match="8 validation errors for WeaveClient.get_calls"):
         client.get_calls(query={"$expr": {"$invalid_field": "invalid_value"}})
 
     # test valid
-    client.get_calls(
-        query={"$expr": {"$eq": [{"$getField": "op_name"}, {"$literal": "predict"}]}}
-    )
+    client.get_calls(query={"$expr": {"$eq": [{"$getField": "op_name"}, {"$literal": "predict"}]}})
 
 
 def test_call_create(client):
@@ -430,15 +424,9 @@ def test_get_calls_complete(client):
     obj = weave.Dataset(rows=[{"a": 1}, {"a": 2}, {"a": 3}])
     ref = client.save(obj, "my-dataset")
 
-    call0 = client.create_call(
-        "x", {"a": 5, "b": 10, "dataset": ref, "s": "str"}, display_name="call0"
-    )
-    call1 = client.create_call(
-        "x", {"a": 6, "b": 11, "dataset": ref, "s": "str"}, display_name="call1"
-    )
-    call2 = client.create_call(
-        "y", {"a": 5, "b": 10, "dataset": ref, "s": "str"}, display_name="call2"
-    )
+    call0 = client.create_call("x", {"a": 5, "b": 10, "dataset": ref, "s": "str"}, display_name="call0")
+    call1 = client.create_call("x", {"a": 6, "b": 11, "dataset": ref, "s": "str"}, display_name="call1")
+    call2 = client.create_call("y", {"a": 5, "b": 10, "dataset": ref, "s": "str"}, display_name="call2")
 
     query = tsi.Query(
         **{
@@ -842,9 +830,7 @@ def test_mutations(client):
             operation="setitem",
             args=("a", 12),
         ),
-        weave_client.MutationSetattr(
-            path=[], operation="setattr", args=("cows", "moo")
-        ),
+        weave_client.MutationSetattr(path=[], operation="setattr", args=("cows", "moo")),
     ]
     new_ref = dataset.save()
     new_ds = client.get(new_ref)
@@ -1118,10 +1104,7 @@ def test_evaluate(client):
 
     model_obj = child0.inputs["model"]
     assert is_op(model_obj)
-    assert (
-        weave_client.get_ref(model_obj).uri()
-        == weave_client.get_ref(model_predict).uri()
-    )
+    assert weave_client.get_ref(model_obj).uri() == weave_client.get_ref(model_predict).uri()
 
     example0_obj = child0.inputs["example"]
     assert example0_obj.ref.name == "Dataset"
@@ -1291,13 +1274,9 @@ def test_large_files(client):
 
 def test_server_file(client):
     f_bytes = b"0" * 10000005
-    res = client.server.file_create(
-        FileCreateReq(project_id="shawn/test-project", name="my-file", content=f_bytes)
-    )
+    res = client.server.file_create(FileCreateReq(project_id="shawn/test-project", name="my-file", content=f_bytes))
 
-    read_res = client.server.file_content_read(
-        FileContentReadReq(project_id="shawn/test-project", digest=res.digest)
-    )
+    read_res = client.server.file_content_read(FileContentReadReq(project_id="shawn/test-project", digest=res.digest))
     assert f_bytes == read_res.content
 
 
@@ -1369,13 +1348,7 @@ def test_summary_tokens(client):
 
     @weave.op
     def models(text):
-        return (
-            model_a(text)["result"]
-            + " "
-            + model_a(text)["result"]
-            + " "
-            + model_b(text)["result"]
-        )
+        return model_a(text)["result"] + " " + model_a(text)["result"] + " " + model_b(text)["result"]
 
     res = models("hello")
     assert res == "a: hello a: hello bbbb: hello"
@@ -1411,15 +1384,7 @@ def test_summary_descendents(client):
 
     @weave.op
     def models(text):
-        return (
-            model_a(text)
-            + " "
-            + model_a(text)
-            + " "
-            + model_b(text)
-            + " "
-            + model_error_catch(text)
-        )
+        return model_a(text) + " " + model_a(text) + " " + model_b(text) + " " + model_error_catch(text)
 
     res = models("hello")
     assert res == "a: hello a: hello bbbb: hello error: hello"
@@ -1466,9 +1431,7 @@ def test_table_partitioning(network_proxy_client, use_parallel_table_upload):
     client, remote_client, records = network_proxy_client
 
     # Set the parallel table upload setting for this test
-    test_settings = settings.UserSettings(
-        use_parallel_table_upload=use_parallel_table_upload
-    )
+    test_settings = settings.UserSettings(use_parallel_table_upload=use_parallel_table_upload)
     settings.parse_and_apply_settings(test_settings)
 
     num_rows = 16
@@ -1492,9 +1455,7 @@ def test_table_partitioning(network_proxy_client, use_parallel_table_upload):
         "KW40nfHplo7BDJux0kP8PeYQ95lnOEGaeYfgNtsQ1oE",
         "u10rDrPoYXl58eQStkQP4dPH6KfmE7I88f0FYI7L9fg",
     ]
-    remote_client.remote_request_bytes_limit = (
-        100 * 1024
-    )  # very large buffer to ensure a single request
+    remote_client.remote_request_bytes_limit = 100 * 1024  # very large buffer to ensure a single request
     res = remote_client.table_create(
         tsi.TableCreateReq(
             table=tsi.TableSchemaForInsert(
@@ -1507,9 +1468,7 @@ def test_table_partitioning(network_proxy_client, use_parallel_table_upload):
     assert res.row_digests == row_digests
     assert len(records) == 1
 
-    remote_client.remote_request_bytes_limit = (
-        4 * 1024
-    )  # Small enough to get multiple updates
+    remote_client.remote_request_bytes_limit = 4 * 1024  # Small enough to get multiple updates
 
     # Set the client to use the remote server so calls get recorded
     client = TestOnlyFlushingWeaveClient(
@@ -1528,22 +1487,16 @@ def test_table_partitioning(network_proxy_client, use_parallel_table_upload):
     if use_parallel_table_upload:
         # Verify that chunking happened by checking for table_create_from_digests call
         table_create_records = [r for r in records if r[0] == "table_create"]
-        table_create_from_digests_records = [
-            r for r in records if r[0] == "table_create_from_digests"
-        ]
+        table_create_from_digests_records = [r for r in records if r[0] == "table_create_from_digests"]
         obj_records = [r for r in records if r[0] in ["obj_create", "obj_read"]]
 
         # Expected: 2 table_create calls (first + second) + 1 table_create_from_digests (chunking merge)
-        assert len(table_create_records) == 2, (
-            f"Expected 2 table_create calls, got {len(table_create_records)}"
-        )
+        assert len(table_create_records) == 2, f"Expected 2 table_create calls, got {len(table_create_records)}"
         # 1 for testing if the endpoint exists, 1 for the actual request
         assert len(table_create_from_digests_records) == 2, (
             f"Expected 2 table_create_from_digests calls, got {len(table_create_from_digests_records)}"
         )
-        assert len(obj_records) == 2, (
-            f"Expected 2 obj_create/obj_read calls, got {len(obj_records)}"
-        )
+        assert len(obj_records) == 2, f"Expected 2 obj_create/obj_read calls, got {len(obj_records)}"
         assert len(records) == 6, f"Expected 6 total records, got {len(records)}"
 
 
@@ -1578,13 +1531,7 @@ def test_summary_tokens_cost(client):
 
     @weave.op
     def models(text):
-        return (
-            gpt4(text)["result"]
-            + " "
-            + gpt4(text)["result"]
-            + " "
-            + gpt4o(text)["result"]
-        )
+        return gpt4(text)["result"] + " " + gpt4(text)["result"] + " " + gpt4o(text)["result"]
 
     res = models("hello")
     assert res == "a: hello a: hello bbbb: hello"
@@ -1880,9 +1827,7 @@ async def test_op_calltime_display_name(client):
     assert call.display_name == "custom_display_name"
 
     evaluation = weave.Evaluation(dataset=[{"a": 1}], scorers=[])
-    res = await evaluation.evaluate(
-        my_op, __weave={"display_name": "custom_display_name"}
-    )
+    res = await evaluation.evaluate(my_op, __weave={"display_name": "custom_display_name"})
     calls = list(evaluation.evaluate.calls())
     assert len(calls) == 1
     call = calls[0]
@@ -2047,9 +1992,7 @@ def test_global_attributes_with_call_attributes(client_creator):
     def my_op(a: int) -> int:
         return a
 
-    with client_creator(
-        global_attributes={"global_attr": "global", "env": "test"}
-    ) as client:
+    with client_creator(global_attributes={"global_attr": "global", "env": "test"}) as client:
         with weave.attributes({"local_attr": "local", "env": "override"}):
             my_op(1)
 
@@ -2161,9 +2104,7 @@ def test_calls_query_filter_by_strings(client):
     client.flush()
 
     # Basic filter - should return all 5 calls
-    query = tsi.Query(
-        **{"$expr": {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]}}
-    )
+    query = tsi.Query(**{"$expr": {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]}})
     calls = list(client.get_calls(query=query))
     assert len(calls) == 5
 
@@ -2368,9 +2309,7 @@ def test_calls_query_filter_by_strings(client):
                                     {
                                         "$eq": [
                                             {"$getField": "inputs.active"},
-                                            {
-                                                "$literal": "False"
-                                            },  # should filter out beta
+                                            {"$literal": "False"},  # should filter out beta
                                         ]
                                     },
                                 ]
@@ -2429,9 +2368,7 @@ def test_calls_query_sort_by_status(client):
 
     # Create calls with different statuses
     success_call = client.create_call("x", {"a": 1, "b": 1, "test_id": test_id})
-    client.finish_call(
-        success_call, "success result"
-    )  # This will have status "success"
+    client.finish_call(success_call, "success result")  # This will have status "success"
 
     # Create a call with an error status
     error_call = client.create_call("x", {"a": 2, "b": 2, "test_id": test_id})
@@ -2439,17 +2376,13 @@ def test_calls_query_sort_by_status(client):
     client.finish_call(error_call, None, exception=e)  # This will have status "error"
 
     # Create a call with running status (no finish_call)
-    running_call = client.create_call(
-        "x", {"a": 3, "b": 3, "test_id": test_id}
-    )  # This will have status "running"
+    running_call = client.create_call("x", {"a": 3, "b": 3, "test_id": test_id})  # This will have status "running"
 
     # Flush to make sure all calls are committed
     client.flush()
 
     # Create a query to find just our test calls
-    query = tsi.Query(
-        **{"$expr": {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]}}
-    )
+    query = tsi.Query(**{"$expr": {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]}})
 
     # Ascending sort - running, error, success
     calls_asc = list(
@@ -2512,9 +2445,7 @@ def test_calls_query_sort_by_latency(client):
     client.flush()
 
     # Create a query to find just our test calls
-    query = tsi.Query(
-        **{"$expr": {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]}}
-    )
+    query = tsi.Query(**{"$expr": {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]}})
 
     # Ascending sort (fast to slow)
     calls_asc = list(
@@ -2558,17 +2489,13 @@ def test_calls_filter_by_status(client):
     e = ValueError("Test error")
     client.finish_call(error_call, None, exception=e)  # Status: error
 
-    running_call = client.create_call(
-        "x", {"a": 3, "b": 3, "test_id": test_id}
-    )  # Status: running
+    running_call = client.create_call("x", {"a": 3, "b": 3, "test_id": test_id})  # Status: running
 
     # Flush to make sure all calls are committed
     client.flush()
 
     # Get all calls to examine their structure
-    base_query = {
-        "$expr": {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]}
-    }
+    base_query = {"$expr": {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]}}
     all_calls = list(client.get_calls(query=tsi.Query(**base_query)))
     assert len(all_calls) == 3
 
@@ -2583,23 +2510,17 @@ def test_calls_filter_by_status(client):
 
     # Using the 'filter' parameter instead of complex query for status
     # This is a more reliable way to filter by status
-    success_calls = list(
-        client.get_calls(filter=tsi.CallsFilter(call_ids=[success_call.id]))
-    )
+    success_calls = list(client.get_calls(filter=tsi.CallsFilter(call_ids=[success_call.id])))
     assert len(success_calls) == 1
     assert success_calls[0].id == success_call.id
     assert success_calls[0].summary.get("weave", {}).get("status") == "success"
 
-    error_calls = list(
-        client.get_calls(filter=tsi.CallsFilter(call_ids=[error_call.id]))
-    )
+    error_calls = list(client.get_calls(filter=tsi.CallsFilter(call_ids=[error_call.id])))
     assert len(error_calls) == 1
     assert error_calls[0].id == error_call.id
     assert error_calls[0].summary.get("weave", {}).get("status") == "error"
 
-    running_calls = list(
-        client.get_calls(filter=tsi.CallsFilter(call_ids=[running_call.id]))
-    )
+    running_calls = list(client.get_calls(filter=tsi.CallsFilter(call_ids=[running_call.id])))
     assert len(running_calls) == 1
     assert running_calls[0].id == running_call.id
     assert running_calls[0].summary.get("weave", {}).get("status") == "running"
@@ -2630,18 +2551,14 @@ def test_calls_filter_by_latency(client):
     client.flush()
 
     # Get all test calls to determine actual latencies
-    base_query = {
-        "$expr": {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]}
-    }
+    base_query = {"$expr": {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]}}
     all_calls = list(client.get_calls(query=tsi.Query(**base_query)))
     assert len(all_calls) == 3
 
     # Print summary structure to debug
     for call in all_calls:
         print(f"Call {call.id} summary: {call.summary}")
-        print(
-            f"Call {call.id} latency: {call.summary.get('weave', {}).get('latency_ms')}"
-        )
+        print(f"Call {call.id} latency: {call.summary.get('weave', {}).get('latency_ms')}")
 
     # Verify asc order
     sorted_calls = client.get_calls(
@@ -2701,9 +2618,7 @@ def test_calls_query_sort_by_trace_name(client):
 
     # Call 1: with display_name - this should be prioritized for trace_name
     display_name_call = client.create_call("simple_op", {"test_id": test_id})
-    display_name_call.set_display_name(
-        "B_display_name"
-    )  # Using B_ prefix for testing alphabetical order
+    display_name_call.set_display_name("B_display_name")  # Using B_ prefix for testing alphabetical order
     client.finish_call(display_name_call, "result")
 
     # Call 2: with weave reference op_name - should extract name from reference
@@ -2719,9 +2634,7 @@ def test_calls_query_sort_by_trace_name(client):
     client.flush()
 
     # Create a query to find just our test calls
-    query = tsi.Query(
-        **{"$expr": {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]}}
-    )
+    query = tsi.Query(**{"$expr": {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]}})
 
     # Get all calls for our test
     all_calls = list(client.get_calls(query=query))
@@ -2757,21 +2670,15 @@ def test_calls_query_sort_by_trace_name(client):
 
     # Verify filtering capabilities for trace_name
     # Test filter by individual call IDs to ensure we can fetch specific calls
-    display_name_call_result = list(
-        client.get_calls(filter=tsi.CallsFilter(call_ids=[display_name_call.id]))
-    )
+    display_name_call_result = list(client.get_calls(filter=tsi.CallsFilter(call_ids=[display_name_call.id])))
     assert len(display_name_call_result) == 1
     assert display_name_call_result[0].id == display_name_call.id
 
-    ref_call_result = list(
-        client.get_calls(filter=tsi.CallsFilter(call_ids=[ref_call.id]))
-    )
+    ref_call_result = list(client.get_calls(filter=tsi.CallsFilter(call_ids=[ref_call.id])))
     assert len(ref_call_result) == 1
     assert ref_call_result[0].id == ref_call.id
 
-    plain_call_result = list(
-        client.get_calls(filter=tsi.CallsFilter(call_ids=[plain_call.id]))
-    )
+    plain_call_result = list(client.get_calls(filter=tsi.CallsFilter(call_ids=[plain_call.id])))
     assert len(plain_call_result) == 1
     assert plain_call_result[0].id == plain_call.id
 
@@ -2803,9 +2710,7 @@ def test_calls_query_sort_by_display_name_prioritized(client):
     client.flush()
 
     # Query calls and sort by trace_name (ascending)
-    query = tsi.Query(
-        **{"$expr": {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]}}
-    )
+    query = tsi.Query(**{"$expr": {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]}})
     calls = client.get_calls(
         query=query,
         sort_by=[tsi.SortBy(field="summary.weave.trace_name", direction="asc")],
@@ -2856,12 +2761,8 @@ def test_tracing_enabled_context(client):
     # Test create_call with tracing disabled
     with tracing_disabled():
         call = client.create_call(test_op, {})
-        assert isinstance(
-            call, weave.trace.call.NoOpCall
-        )  # Should be a NoOpCall instance
-        assert (
-            len(list(client.get_calls())) == 1
-        )  # Verify no additional calls were created
+        assert isinstance(call, weave.trace.call.NoOpCall)  # Should be a NoOpCall instance
+        assert len(list(client.get_calls())) == 1  # Verify no additional calls were created
 
     # Test finish_call with tracing disabled
     with tracing_disabled():
@@ -2875,17 +2776,13 @@ def test_calls_query_hardcoded_filter_length_validation(client):
 
     with pytest.raises(
         ValueError,
-        match=re.escape(
-            "Parameter: 'call_ids' request length is greater than max length (1000). Actual length: 1001"
-        ),
+        match=re.escape("Parameter: 'call_ids' request length is greater than max length (1000). Actual length: 1001"),
     ):
         calls = client.get_calls(filter={"call_ids": ["11111"] * 1001})[0]
 
     with pytest.raises(
         ValueError,
-        match=re.escape(
-            "Parameter: 'op_names' request length is greater than max length (1000). Actual length: 1001"
-        ),
+        match=re.escape("Parameter: 'op_names' request length is greater than max length (1000). Actual length: 1001"),
     ):
         calls = client.get_calls(filter={"op_names": ["11111"] * 1001})[0]
 
@@ -2915,9 +2812,7 @@ def test_calls_query_hardcoded_filter_length_validation(client):
 
     with pytest.raises(
         ValueError,
-        match=re.escape(
-            "Parameter: 'trace_ids' request length is greater than max length (1000). Actual length: 1001"
-        ),
+        match=re.escape("Parameter: 'trace_ids' request length is greater than max length (1000). Actual length: 1001"),
     ):
         calls = client.get_calls(filter={"trace_ids": ["11111"] * 1001})[0]
 
@@ -2960,9 +2855,7 @@ def test_calls_query_datetime_optimization_with_gt_operation(client):
     client.flush()
 
     # Get all calls to determine their actual timestamps
-    base_query = {
-        "$expr": {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]}
-    }
+    base_query = {"$expr": {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]}}
     all_calls = list(client.get_calls(query=tsi.Query(**base_query)))
     assert len(all_calls) == 4
 
@@ -3082,11 +2975,7 @@ def test_calls_query_datetime_optimization_with_gt_operation(client):
                 "$and": [
                     {"$eq": [{"$getField": "inputs.test_id"}, {"$literal": test_id}]},
                     {"$gt": [{"$getField": "ended_at"}, {"$literal": call2_ts}]},
-                    {
-                        "$not": [
-                            {"$gt": [{"$getField": "ended_at"}, {"$literal": call4_ts}]}
-                        ]
-                    },
+                    {"$not": [{"$gt": [{"$getField": "ended_at"}, {"$literal": call4_ts}]}]},
                 ]
             }
         }
@@ -3504,9 +3393,7 @@ def test_filter_calls_by_ref(client):
     assert calls[0].output["ref2"] == obj
 
     # filter by both input and output ref
-    calls = client.get_calls(
-        filter={"input_refs": [ref.uri()], "output_refs": [ref2.uri()]}
-    )
+    calls = client.get_calls(filter={"input_refs": [ref.uri()], "output_refs": [ref2.uri()]})
     assert len(calls) == 1
     assert calls[0].inputs["ref"] == obj
     assert calls[0].output["ref2"] == obj
@@ -3543,9 +3430,7 @@ def test_files_stats(client):
         pytest.skip("Not implemented in SQLite")
 
     f_bytes = b"0" * 10000005
-    client.server.file_create(
-        FileCreateReq(project_id="shawn/test-project", name="my-file", content=f_bytes)
-    )
+    client.server.file_create(FileCreateReq(project_id="shawn/test-project", name="my-file", content=f_bytes))
     read_res = client.server.files_stats(FilesStatsReq(project_id="shawn/test-project"))
 
     assert read_res.total_size_bytes == 10000005
@@ -3646,18 +3531,12 @@ def test_feedback_batching(network_proxy_client):
 
     # Query feedback to verify all items were created
     all_feedback = list(test_call.feedback)
-    created_feedback = [
-        f for f in all_feedback if f.feedback_type.startswith("test_feedback_")
-    ]
+    created_feedback = [f for f in all_feedback if f.feedback_type.startswith("test_feedback_")]
     assert len(created_feedback) == 10
 
     # Verify the feedback content
-    for i, feedback in enumerate(
-        sorted(created_feedback, key=lambda x: x.feedback_type)
-    ):
-        assert feedback.id in feedback_items, (
-            f"Feedback {i} not found in feedback_items"
-        )
+    for i, feedback in enumerate(sorted(created_feedback, key=lambda x: x.feedback_type)):
+        assert feedback.id in feedback_items, f"Feedback {i} not found in feedback_items"
         assert feedback.feedback_type == f"test_feedback_{i}"
         assert feedback.payload["score"] == i
         assert feedback.payload["note"] == f"Test feedback {i}"
@@ -3665,14 +3544,10 @@ def test_feedback_batching(network_proxy_client):
 
 @pytest.mark.disable_logging_error_check
 @pytest.mark.parametrize("use_parallel_table_upload", [False, True])
-def test_parallel_table_uploads_digest_consistency(
-    client, monkeypatch, use_parallel_table_upload
-):
+def test_parallel_table_uploads_digest_consistency(client, monkeypatch, use_parallel_table_upload):
     """Test parallel table uploads are consistent with one shot uploads."""
     # Set the parallel table upload setting for this test
-    test_settings = settings.UserSettings(
-        use_parallel_table_upload=use_parallel_table_upload
-    )
+    test_settings = settings.UserSettings(use_parallel_table_upload=use_parallel_table_upload)
     settings.parse_and_apply_settings(test_settings)
 
     # Set up the mock before creating the client
@@ -3688,9 +3563,7 @@ def test_parallel_table_uploads_digest_consistency(
             )
 
     # Apply the mock before creating the client
-    monkeypatch.setattr(
-        table_upload_chunking, "TableChunkManager", MockTableChunkManager
-    )
+    monkeypatch.setattr(table_upload_chunking, "TableChunkManager", MockTableChunkManager)
 
     # Create large rows that will trigger chunking behavior
     # Use 500KB per row with 3 rows = ~1.5MB total, much more efficient for testing
@@ -3712,9 +3585,7 @@ def test_parallel_table_uploads_digest_consistency(
     table1_ref = saved_table1.table_ref
 
     # Get the digest information from the saved table
-    table1_res = client.server.table_query(
-        tsi.TableQueryReq(project_id=client._project_id(), digest=table1_ref.digest)
-    )
+    table1_res = client.server.table_query(tsi.TableQueryReq(project_id=client._project_id(), digest=table1_ref.digest))
     digest1 = table1_ref.digest
     row_digests1 = [row.digest for row in table1_res.rows]
 
@@ -3733,9 +3604,7 @@ def test_parallel_table_uploads_digest_consistency(
     table2_ref = saved_table2.table_ref
 
     # Get the digest information from the saved table
-    table2_res = client.server.table_query(
-        tsi.TableQueryReq(project_id=client._project_id(), digest=table2_ref.digest)
-    )
+    table2_res = client.server.table_query(tsi.TableQueryReq(project_id=client._project_id(), digest=table2_ref.digest))
     digest2 = table2_ref.digest
     row_digests2 = [row.digest for row in table2_res.rows]
 
@@ -3757,9 +3626,7 @@ def test_parallel_table_uploads_digest_consistency(
     table3_ref = saved_table3.table_ref
 
     # Get the digest information from the saved table
-    table3_res = client.server.table_query(
-        tsi.TableQueryReq(project_id=client._project_id(), digest=table3_ref.digest)
-    )
+    table3_res = client.server.table_query(tsi.TableQueryReq(project_id=client._project_id(), digest=table3_ref.digest))
     digest3 = table3_ref.digest
     row_digests3 = [row.digest for row in table3_res.rows]
 
@@ -3771,9 +3638,7 @@ def test_parallel_table_uploads_digest_consistency(
     table4_ref = saved_table4.table_ref
 
     # Get the digest information from the saved table
-    table4_res = client.server.table_query(
-        tsi.TableQueryReq(project_id=client._project_id(), digest=table4_ref.digest)
-    )
+    table4_res = client.server.table_query(tsi.TableQueryReq(project_id=client._project_id(), digest=table4_ref.digest))
     digest4 = table4_ref.digest
     row_digests4 = [row.digest for row in table4_res.rows]
 
@@ -3783,34 +3648,22 @@ def test_parallel_table_uploads_digest_consistency(
     # - digest1 and digest2 should be different (different row order)
     # - digest3 and digest4 should be different (different row order)
 
-    assert digest1 == digest3, (
-        f"Digests should be same for same row order: {digest1} vs {digest3}"
-    )
-    assert digest2 == digest4, (
-        f"Digests should be same for same row order: {digest2} vs {digest4}"
-    )
-    assert digest1 != digest2, (
-        f"Digests should be different for different row order: {digest1} vs {digest2}"
-    )
-    assert digest3 != digest4, (
-        f"Digests should be different for different row order: {digest3} vs {digest4}"
-    )
+    assert digest1 == digest3, f"Digests should be same for same row order: {digest1} vs {digest3}"
+    assert digest2 == digest4, f"Digests should be same for same row order: {digest2} vs {digest4}"
+    assert digest1 != digest2, f"Digests should be different for different row order: {digest1} vs {digest2}"
+    assert digest3 != digest4, f"Digests should be different for different row order: {digest3} vs {digest4}"
 
     # Verify row digests are also consistent
     assert row_digests1 == row_digests3, "Row digests should be same for same row order"
     assert row_digests2 == row_digests4, "Row digests should be same for same row order"
-    assert row_digests1 != row_digests2, (
-        "Row digests should be different for different row order"
-    )
+    assert row_digests1 != row_digests2, "Row digests should be different for different row order"
 
     # Verify that chunking actually happened by checking the access log
     access_log = client.server.attribute_access_log
 
     # Look for chunking-related method calls
     table_create_calls = [call for call in access_log if "table_create" in call]
-    table_create_from_digests_calls = [
-        call for call in access_log if "table_create_from_digests" in call
-    ]
+    table_create_from_digests_calls = [call for call in access_log if "table_create_from_digests" in call]
     # Test with smaller chunk size to verify more aggressive chunking
     # Set a very small chunk size to force chunking even on smaller data
     test_chunk_size = 100 * 1024  # 100KB (much smaller than our 500KB rows)

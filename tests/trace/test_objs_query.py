@@ -39,15 +39,11 @@ def test_objs_query_filter_is_op(client: WeaveClient):
     generate_objects(client, 10, 10)
 
     res = client.server.objs_query(
-        tsi.ObjQueryReq(
-            project_id=client._project_id(), filter=tsi.ObjectVersionFilter(is_op=True)
-        )
+        tsi.ObjQueryReq(project_id=client._project_id(), filter=tsi.ObjectVersionFilter(is_op=True))
     )
     assert len(res.objs) == 0
     res = client.server.objs_query(
-        tsi.ObjQueryReq(
-            project_id=client._project_id(), filter=tsi.ObjectVersionFilter(is_op=False)
-        )
+        tsi.ObjQueryReq(project_id=client._project_id(), filter=tsi.ObjectVersionFilter(is_op=False))
     )
     assert len(res.objs) == 100
 
@@ -178,9 +174,7 @@ def test_objs_query_wb_user_id(client: WeaveClient):
     weave.publish({"i": 2}, name="obj_1")
     weave.publish({"i": 3}, name="obj_1")
 
-    correct_id = base64.b64encode(
-        bytes(client.server._next_trace_server._user_id, "utf-8")
-    ).decode("utf-8")
+    correct_id = base64.b64encode(bytes(client.server._next_trace_server._user_id, "utf-8")).decode("utf-8")
 
     res = client._objects()
     assert len(res) == 3

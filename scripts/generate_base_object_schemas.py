@@ -7,13 +7,7 @@ from weave.trace_server.interface.builtin_object_classes.builtin_object_registry
     BUILTIN_OBJECT_REGISTRY,
 )
 
-OUTPUT_DIR = (
-    Path(__file__).parent.parent
-    / "trace_server"
-    / "interface"
-    / "builtin_object_classes"
-    / "generated"
-)
+OUTPUT_DIR = Path(__file__).parent.parent / "trace_server" / "interface" / "builtin_object_classes" / "generated"
 OUTPUT_PATH = OUTPUT_DIR / "generated_builtin_object_class_schemas.json"
 
 

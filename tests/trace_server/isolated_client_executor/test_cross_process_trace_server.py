@@ -187,9 +187,7 @@ class TestCrossProcessTraceServerSender:
             )
 
             # Send streaming request and expect error
-            with pytest.raises(
-                CrossProcessTraceServerError, match="Mock streaming error"
-            ):
+            with pytest.raises(CrossProcessTraceServerError, match="Mock streaming error"):
                 list(sender.calls_query_stream(req))
 
         finally:
@@ -204,9 +202,7 @@ class TestCrossProcessTraceServerSender:
             def call_start(self, req):
                 # Simulate a stuck method that never returns
                 time.sleep(100)  # This will be interrupted by timeout
-                return tsi.CallStartRes(
-                    id="should_not_reach", trace_id="should_not_reach"
-                )
+                return tsi.CallStartRes(id="should_not_reach", trace_id="should_not_reach")
 
         stuck_server = StuckTraceServer()
         receiver = CrossProcessTraceServerReceiver(stuck_server)
@@ -348,17 +344,13 @@ class TestCrossProcessTraceServerIntegration:
 
             def call_start(self, req: tsi.CallStartReq) -> tsi.CallStartRes:
                 self.calls.append(("call_start", req))
-                return tsi.CallStartRes(
-                    id=f"call_{len(self.calls)}", trace_id="test_trace"
-                )
+                return tsi.CallStartRes(id=f"call_{len(self.calls)}", trace_id="test_trace")
 
             def call_end(self, req: tsi.CallEndReq) -> tsi.CallEndRes:
                 self.calls.append(("call_end", req))
                 return tsi.CallEndRes()
 
-            def calls_query_stream(
-                self, req: tsi.CallsQueryReq
-            ) -> Iterator[tsi.CallSchema]:
+            def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
                 self.calls.append(("calls_query_stream", req))
                 yield tsi.CallSchema(
                     project_id=req.project_id,

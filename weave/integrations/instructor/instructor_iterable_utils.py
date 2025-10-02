@@ -8,9 +8,7 @@ from weave.trace.autopatch import OpSettings
 from weave.trace.op import _add_accumulator
 
 
-def instructor_iterable_accumulator(
-    acc: Optional[list[BaseModel]], value: BaseModel
-) -> list[BaseModel]:
+def instructor_iterable_accumulator(acc: Optional[list[BaseModel]], value: BaseModel) -> list[BaseModel]:
     if acc is None:
         return [value]
     if acc[-1] != value:

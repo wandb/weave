@@ -68,9 +68,7 @@ def evaluate_router(
     best_provider = eval_stats["Best Average Provider"][0]
 
     def _get_model_results(provider_name: str) -> pd.DataFrame:
-        return eval_results[
-            [prompt_column, f"{provider_name}/score", f"{provider_name}/response"]
-        ].rename(
+        return eval_results[[prompt_column, f"{provider_name}/score", f"{provider_name}/response"]].rename(
             columns={
                 prompt_column: "prompt",
                 f"{provider_name}/score": "score",
@@ -86,9 +84,9 @@ def evaluate_router(
 
         @weave.op
         def predict(self, prompt: str) -> dict[str, Any]:
-            response, score = self.model_results[
-                self.model_results[prompt_column] == prompt
-            ][["response", "score"]].values[0]
+            response, score = self.model_results[self.model_results[prompt_column] == prompt][
+                ["response", "score"]
+            ].values[0]
             return {"response": response, "score": score}
 
     class BestRoutedModel(_DummyEvalModel):
@@ -103,25 +101,19 @@ def evaluate_router(
         def predict(self, prompt: str) -> dict[str, Any]:
             return super().predict(prompt)
 
-    best_provider_model = BestRoutedModel(
-        model_name=best_provider, model_results=model_results
-    )
+    best_provider_model = BestRoutedModel(model_name=best_provider, model_results=model_results)
     not_diamond_model = NotDiamondRoutedModel(model_results=not_diamond_results)
 
     return best_provider_model, not_diamond_model
 
 
-def _get_score_column(
-    model: str, scores: dict, score_col_name: Optional[str] = None
-) -> tuple[str, float]:
+def _get_score_column(model: str, scores: dict, score_col_name: Optional[str] = None) -> tuple[str, float]:
     """Extract a single score from the nested `scores` column.
     - raise for multiple scores
     - build score column name if not provided.
     """
     if len(scores) > 1:
-        raise ValueError(
-            f"Multiple eval scores for {model}. Please specify a single score column."
-        )
+        raise ValueError(f"Multiple eval scores for {model}. Please specify a single score column.")
 
     score_column, score_val = first(scores.items())
     not_diamond_score_column = f"{score_column}_score"
@@ -134,9 +126,7 @@ def _get_score_column(
     return not_diamond_score_column, score_val
 
 
-def _build_dataframe(
-    model: str, dataset: Union[EvaluationResults, weave.Dataset]
-) -> tuple[str, pd.DataFrame]:
+def _build_dataframe(model: str, dataset: Union[EvaluationResults, weave.Dataset]) -> tuple[str, pd.DataFrame]:
     df_rows = []
     score_col_name = None
     for row in dataset.rows:

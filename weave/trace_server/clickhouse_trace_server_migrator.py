@@ -36,14 +36,8 @@ class ClickHouseTraceServerMigrator:
         super().__init__()
         self.ch_client = ch_client
         self.replicated = False if replicated is None else replicated
-        self.replicated_path = (
-            DEFAULT_REPLICATED_PATH if replicated_path is None else replicated_path
-        )
-        self.replicated_cluster = (
-            DEFAULT_REPLICATED_CLUSTER
-            if replicated_cluster is None
-            else replicated_cluster
-        )
+        self.replicated_path = DEFAULT_REPLICATED_PATH if replicated_path is None else replicated_path
+        self.replicated_cluster = DEFAULT_REPLICATED_CLUSTER if replicated_cluster is None else replicated_cluster
         self._initialize_migration_db()
 
     def _is_safe_identifier(self, value: str) -> bool:
@@ -76,26 +70,18 @@ class ClickHouseTraceServerMigrator:
                 raise MigrationError(f"Invalid cluster name: {self.replicated_cluster}")
 
             replicated_path = self.replicated_path.replace("{db}", db_name)
-            if not all(
-                self._is_safe_identifier(part)
-                for part in replicated_path.split("/")
-                if part
-            ):
+            if not all(self._is_safe_identifier(part) for part in replicated_path.split("/") if part):
                 raise MigrationError(f"Invalid replicated path: {replicated_path}")
 
             replicated_cluster = f" ON CLUSTER {self.replicated_cluster}"
-            replicated_engine = (
-                f" ENGINE=Replicated('{replicated_path}', '{{shard}}', '{{replica}}')"
-            )
+            replicated_engine = f" ENGINE=Replicated('{replicated_path}', '{{shard}}', '{{replica}}')"
 
         create_db_sql = f"""
             CREATE DATABASE IF NOT EXISTS {db_name}{replicated_cluster}{replicated_engine}
         """
         return create_db_sql
 
-    def apply_migrations(
-        self, target_db: str, target_version: Optional[int] = None
-    ) -> None:
+    def apply_migrations(self, target_db: str, target_version: Optional[int] = None) -> None:
         status = self._get_migration_status(target_db)
         logger.info(f"""`{target_db}` migration status: {status}""")
         if status["partially_applied_version"]:
@@ -104,9 +90,7 @@ class ClickHouseTraceServerMigrator:
             )
             return
         migration_map = self._get_migrations()
-        migrations_to_apply = self._determine_migrations_to_apply(
-            status["curr_version"], migration_map, target_version
-        )
+        migrations_to_apply = self._determine_migrations_to_apply(status["curr_version"], migration_map, target_version)
         if len(migrations_to_apply) == 0:
             logger.info(f"No migrations to apply to `{target_db}`")
             if should_insert_costs(status["curr_version"], target_version):
@@ -179,15 +163,11 @@ class ClickHouseTraceServerMigrator:
 
             if is_up:
                 if migration_map[version]["up"] is not None:
-                    raise MigrationError(
-                        f"Duplicate migration file for version {version}"
-                    )
+                    raise MigrationError(f"Duplicate migration file for version {version}")
                 migration_map[version]["up"] = file
             else:
                 if migration_map[version]["down"] is not None:
-                    raise MigrationError(
-                        f"Duplicate migration file for version {version}"
-                    )
+                    raise MigrationError(f"Duplicate migration file for version {version}")
                 migration_map[version]["down"] = file
 
             if version > max_version:
@@ -207,9 +187,7 @@ class ClickHouseTraceServerMigrator:
             if migration_map[version]["up"] is None:
                 raise MigrationError(f"Missing up migration file for version {version}")
             if migration_map[version]["down"] is None:
-                raise MigrationError(
-                    f"Missing down migration file for version {version}"
-                )
+                raise MigrationError(f"Missing down migration file for version {version}")
 
         return migration_map
 
@@ -260,9 +238,7 @@ class ClickHouseTraceServerMigrator:
         self.ch_client.command(self._format_replicated_sql(command))
         self.ch_client.database = curr_db
 
-    def _update_migration_status(
-        self, target_db: str, target_version: int, is_start: bool = True
-    ) -> None:
+    def _update_migration_status(self, target_db: str, target_version: int, is_start: bool = True) -> None:
         """Update the migration status in db_management.migrations table."""
         if is_start:
             self.ch_client.command(
@@ -273,9 +249,7 @@ class ClickHouseTraceServerMigrator:
                 f"ALTER TABLE db_management.migrations UPDATE curr_version = {target_version}, partially_applied_version = NULL WHERE db_name = '{target_db}'"
             )
 
-    def _apply_migration(
-        self, target_db: str, target_version: int, migration_file: str
-    ) -> None:
+    def _apply_migration(self, target_db: str, target_version: int, migration_file: str) -> None:
         logger.info(f"Applying migration {migration_file} to `{target_db}`")
         migration_dir = os.path.join(os.path.dirname(__file__), "migrations")
         migration_file_path = os.path.join(migration_dir, migration_file)
