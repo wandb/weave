@@ -105,9 +105,7 @@ def wf_clickhouse_max_execution_time() -> Optional[int]:
     try:
         return int(time)
     except ValueError:
-        logger.exception(
-            f"WF_CLICKHOUSE_MAX_EXECUTION_TIME value '{time}' is not valid"
-        )
+        logger.exception(f"WF_CLICKHOUSE_MAX_EXECUTION_TIME value '{time}' is not valid")
         return None
 
 
@@ -205,14 +203,10 @@ def wf_file_storage_project_ramp_pct() -> Optional[int]:
     try:
         pct = int(pct_str)
     except ValueError as e:
-        raise ValueError(
-            f"WF_FILE_STORAGE_PROJECT_RAMP_PCT is not a valid integer: {pct_str}. Error: {e!s}"
-        ) from e
+        raise ValueError(f"WF_FILE_STORAGE_PROJECT_RAMP_PCT is not a valid integer: {pct_str}. Error: {e!s}") from e
 
     if pct < 0 or pct > 100:
-        raise ValueError(
-            f"WF_FILE_STORAGE_PROJECT_RAMP_PCT must be between 0 and 100, got {pct}"
-        )
+        raise ValueError(f"WF_FILE_STORAGE_PROJECT_RAMP_PCT must be between 0 and 100, got {pct}")
 
     return pct
 
@@ -222,6 +216,4 @@ def wf_file_storage_project_ramp_pct() -> Optional[int]:
 
 def inference_service_base_url() -> str:
     """The base URL for the inference service."""
-    return os.environ.get(
-        "INFERENCE_SERVICE_BASE_URL", "https://api.inference.wandb.ai/v1"
-    )
+    return os.environ.get("INFERENCE_SERVICE_BASE_URL", "https://api.inference.wandb.ai/v1")

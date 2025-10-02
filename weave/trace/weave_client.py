@@ -162,9 +162,7 @@ def print_call_link(call: Call) -> None:
         logger.info(f"{TRACE_CALL_EMOJI} {call.ui_url}")
 
 
-def _add_scored_by_to_calls_query(
-    scored_by: list[str] | str | None, query: Query | None
-) -> Query | None:
+def _add_scored_by_to_calls_query(scored_by: list[str] | str | None, query: Query | None) -> Query | None:
     # This logic might be pushed down to the server soon, but for now it lives here:
     if not scored_by:
         return query
@@ -182,17 +180,13 @@ def _add_scored_by_to_calls_query(
             exprs.append(
                 {
                     "$eq": (
-                        get_field_expr(
-                            runnable_feedback_runnable_ref_selector(scorer_name)
-                        ),
+                        get_field_expr(runnable_feedback_runnable_ref_selector(scorer_name)),
                         literal_expr(uri),
                     )
                 }
             )
         else:
-            exprs.append(
-                exists_expr(get_field_expr(runnable_feedback_output_selector(name)))
-            )
+            exprs.append(exists_expr(get_field_expr(runnable_feedback_output_selector(name))))
     return Query.model_validate({"$expr": {"$and": exprs}})
 
 
@@ -397,9 +391,7 @@ class WeaveClient:
                     except json.JSONDecodeError:
                         raise ValueError(e.response.content) from None
                 if e.response.status_code == 404:
-                    raise ValueError(
-                        f"Unable to find object for ref uri: {ref.uri()}"
-                    ) from e
+                    raise ValueError(f"Unable to find object for ref uri: {ref.uri()}") from e
             raise
 
         # At this point, `ref.digest` is one of three things:
@@ -416,14 +408,10 @@ class WeaveClient:
         # let the server resolve it.
         if ref.extra:
             try:
-                ref_read_res = self.server.refs_read_batch(
-                    RefsReadBatchReq(refs=[ref.uri()])
-                )
+                ref_read_res = self.server.refs_read_batch(RefsReadBatchReq(refs=[ref.uri()]))
             except HTTPError as e:
                 if e.response is not None and e.response.status_code == 404:
-                    raise ValueError(
-                        f"Unable to find object for ref uri: {ref.uri()}"
-                    ) from None
+                    raise ValueError(f"Unable to find object for ref uri: {ref.uri()}") from None
                 raise
             if not ref_read_res.vals:
                 raise ValueError(f"Unable to find object for ref uri: {ref.uri()}")
@@ -665,9 +653,7 @@ class WeaveClient:
         Returns:
             The created Call object.
         """
-        if is_tracing_setting_disabled() or (
-            is_op(op) and should_skip_tracing_for_op(cast(Op, op))
-        ):
+        if is_tracing_setting_disabled() or (is_op(op) and should_skip_tracing_for_op(cast(Op, op))):
             return placeholder_call()
 
         from weave.trace.api import _global_attributes, _global_postprocess_inputs
@@ -779,9 +765,7 @@ class WeaveClient:
 
                 maybe_redacted_inputs_with_refs = redact_pii(inputs_with_refs)
 
-            inputs_json = to_json(
-                maybe_redacted_inputs_with_refs, project_id, self, use_dictify=False
-            )
+            inputs_json = to_json(maybe_redacted_inputs_with_refs, project_id, self, use_dictify=False)
             call_start_req = CallStartReq(
                 start=StartedCallSchemaForInsert(
                     project_id=project_id,
@@ -869,9 +853,7 @@ class WeaveClient:
         # Summary handling
         computed_summary: dict[str, Any] = {}
         if call._children:
-            computed_summary = sum_dict_leaves(
-                [child.summary or {} for child in call._children]
-            )
+            computed_summary = sum_dict_leaves([child.summary or {} for child in call._children])
         elif (
             isinstance(original_output, dict)
             and RESERVED_SUMMARY_USAGE_KEY in original_output
@@ -882,9 +864,7 @@ class WeaveClient:
                 "requests": 1,
                 **original_output[RESERVED_SUMMARY_USAGE_KEY],
             }
-        elif hasattr(original_output, RESERVED_SUMMARY_USAGE_KEY) and hasattr(
-            original_output, "model"
-        ):
+        elif hasattr(original_output, RESERVED_SUMMARY_USAGE_KEY) and hasattr(original_output, "model"):
             # Handle the cases where we are emitting an object instead of a pre-serialized dict
             # In fact, this is going to become the more common case
             model = original_output.model
@@ -941,9 +921,7 @@ class WeaveClient:
 
                 maybe_redacted_output_as_refs = redact_pii(output_as_refs)
 
-            output_json = to_json(
-                maybe_redacted_output_as_refs, project_id, self, use_dictify=False
-            )
+            output_json = to_json(maybe_redacted_output_as_refs, project_id, self, use_dictify=False)
             call_end_req = CallEndReq(
                 end=EndedCallSchemaForInsert(
                     project_id=project_id,
@@ -1178,9 +1156,7 @@ class WeaveClient:
         offset: int = 0,
         limit: int = 100,
     ) -> FeedbackQuery:
-        return self.get_feedback(
-            query=query, reaction=reaction, offset=offset, limit=limit
-        )
+        return self.get_feedback(query=query, reaction=reaction, offset=offset, limit=limit)
 
     def add_cost(
         self,
@@ -1224,9 +1200,7 @@ class WeaveClient:
             completion_token_cost_unit=completion_token_cost_unit,
             provider_id=provider_id,
         )
-        return self.server.cost_create(
-            CostCreateReq(project_id=self._project_id(), costs={llm_id: cost})
-        )
+        return self.server.cost_create(CostCreateReq(project_id=self._project_id(), costs={llm_id: cost}))
 
     def purge_costs(self, ids: list[str] | str) -> None:
         """Purge costs from the current project.
@@ -1248,9 +1222,7 @@ class WeaveClient:
                 [{"$literal": id} for id in ids],
             ]
         }
-        self.server.cost_purge(
-            CostPurgeReq(project_id=self._project_id(), query=Query(**{"$expr": expr}))
-        )
+        self.server.cost_purge(CostPurgeReq(project_id=self._project_id(), query=Query(**{"$expr": expr})))
 
     def query_costs(
         self,
@@ -1345,9 +1317,7 @@ class WeaveClient:
             # If scorer_object_ref is provided, it is used as the runnable_ref_uri
             # Otherwise, we use the op_name from the score_call. This should happen
             # when there is a Scorer subclass that is the source of the score call.
-            scorer_object_ref_uri = (
-                scorer_object_ref.uri() if scorer_object_ref else None
-            )
+            scorer_object_ref_uri = scorer_object_ref.uri() if scorer_object_ref else None
             runnable_ref_uri = scorer_object_ref_uri or score_call.op_name
             score_results = score_call.output
 
@@ -1541,9 +1511,7 @@ class WeaveClient:
                 self._save_nested_objects(v)
 
     @trace_sentry.global_trace_sentry.watch()
-    def _save_object_basic(
-        self, val: Any, name: str | None = None, branch: str = "latest"
-    ) -> ObjectRef:
+    def _save_object_basic(self, val: Any, name: str | None = None, branch: str = "latest") -> ObjectRef:
         """Directly saves an object to the weave server and attach
         the ref to the object. This is the lowest level object saving logic.
         """
@@ -1588,9 +1556,7 @@ class WeaveClient:
             return self.server.obj_create(req)
 
         res_future: Future[ObjCreateRes] = self.future_executor.defer(send_obj_create)
-        digest_future: Future[str] = self.future_executor.then(
-            [res_future], lambda res: res[0].digest
-        )
+        digest_future: Future[str] = self.future_executor.then([res_future], lambda res: res[0].digest)
 
         ref: Ref
         if is_op(orig_val):
@@ -1620,9 +1586,7 @@ class WeaveClient:
 
     def _send_table_create(self, rows: list[Any]) -> TableCreateRes:
         json_rows = to_json(rows, self._project_id(), self)
-        req = TableCreateReq(
-            table=TableSchemaForInsert(project_id=self._project_id(), rows=json_rows)
-        )
+        req = TableCreateReq(table=TableSchemaForInsert(project_id=self._project_id(), rows=json_rows))
         return self.server.table_create(req)
 
     @trace_sentry.global_trace_sentry.watch()
@@ -1650,16 +1614,10 @@ class WeaveClient:
             # Legacy method for large tables and old servers
             res_future = self._create_table_with_incremental_updates(table)
 
-        digest_future: Future[str] = self.future_executor.then(
-            [res_future], lambda res: res[0].digest
-        )
-        row_digests_future: Future[list[str]] = self.future_executor.then(
-            [res_future], lambda res: res[0].row_digests
-        )
+        digest_future: Future[str] = self.future_executor.then([res_future], lambda res: res[0].digest)
+        row_digests_future: Future[list[str]] = self.future_executor.then([res_future], lambda res: res[0].row_digests)
 
-        table_ref = TableRef(
-            self.entity, self.project, digest_future, row_digests_future
-        )
+        table_ref = TableRef(self.entity, self.project, digest_future, row_digests_future)
 
         table.ref = table_ref
 
@@ -1670,9 +1628,7 @@ class WeaveClient:
 
     def _should_use_chunking(self, table: Table | WeaveTable) -> ChunkingConfig:
         """Determine if we should use chunking and parallel chunks for a table."""
-        remote_request_bytes_limit = getattr(
-            self.server, "remote_request_bytes_limit", REMOTE_REQUEST_BYTES_LIMIT
-        )
+        remote_request_bytes_limit = getattr(self.server, "remote_request_bytes_limit", REMOTE_REQUEST_BYTES_LIMIT)
 
         # Primary heuristic: row count
         use_chunking = len(table.rows) > ROW_COUNT_CHUNKING_THRESHOLD
@@ -1686,9 +1642,7 @@ class WeaveClient:
         # Determine parallel vs incremental chunking
         use_parallel_chunks = False
         if use_chunking and should_use_parallel_table_upload():
-            test_req = TableCreateFromDigestsReq(
-                project_id=self._project_id(), row_digests=[]
-            )
+            test_req = TableCreateFromDigestsReq(project_id=self._project_id(), row_digests=[])
 
             def test_func(req: TableCreateFromDigestsReq) -> Any:
                 server = self.server
@@ -1697,21 +1651,13 @@ class WeaveClient:
 
                 assert hasattr(server, "_generic_request_executor")
                 assert hasattr(server._generic_request_executor, "__wrapped__")
-                return server._generic_request_executor.__wrapped__(
-                    server, "/table/create_from_digests", req
-                )
+                return server._generic_request_executor.__wrapped__(server, "/table/create_from_digests", req)
 
-            use_parallel_chunks = check_endpoint_exists(
-                test_func, test_req, "table_create_from_digests"
-            )
+            use_parallel_chunks = check_endpoint_exists(test_func, test_req, "table_create_from_digests")
 
-        return ChunkingConfig(
-            use_chunking=use_chunking, use_parallel_chunks=use_parallel_chunks
-        )
+        return ChunkingConfig(use_chunking=use_chunking, use_parallel_chunks=use_parallel_chunks)
 
-    def _create_table_with_parallel_chunks(
-        self, table: Table | WeaveTable
-    ) -> Future[TableCreateRes]:
+    def _create_table_with_parallel_chunks(self, table: Table | WeaveTable) -> Future[TableCreateRes]:
         """Execute the actual parallel chunk upload."""
         # Create chunks from raw table data (not serialized yet)
         chunk_manager = TableChunkManager()
@@ -1720,9 +1666,7 @@ class WeaveClient:
         # Create chunks in parallel using future_executor - defer serialization
         chunk_futures = []
         for raw_chunk in raw_chunks:
-            chunk_future = self.future_executor.defer(
-                lambda chunk=raw_chunk: self._send_table_create(chunk)
-            )
+            chunk_future = self.future_executor.defer(lambda chunk=raw_chunk: self._send_table_create(chunk))
             chunk_futures.append(chunk_future)
 
         # Chain the operations using future_executor.then
@@ -1734,9 +1678,7 @@ class WeaveClient:
                 all_row_digests.extend(chunk_result.row_digests)
 
             # Create final table from digests
-            create_req = TableCreateFromDigestsReq(
-                project_id=self._project_id(), row_digests=all_row_digests
-            )
+            create_req = TableCreateFromDigestsReq(project_id=self._project_id(), row_digests=all_row_digests)
             create_res = self.server.table_create_from_digests(create_req)
 
             return TableCreateRes(
@@ -1747,9 +1689,7 @@ class WeaveClient:
         # Return a future that will complete when all chunks are done and combined
         return self.future_executor.then(chunk_futures, combine_chunks_and_create_table)
 
-    def _create_table_with_incremental_updates(
-        self, table: Table | WeaveTable
-    ) -> Future[TableCreateRes]:
+    def _create_table_with_incremental_updates(self, table: Table | WeaveTable) -> Future[TableCreateRes]:
         """Create table using incremental table_update pattern (fallback)."""
         # Create chunks from raw table data (not serialized yet)
         chunk_manager = TableChunkManager()
@@ -1846,9 +1786,7 @@ class WeaveClient:
         return response.objs
 
     @trace_sentry.global_trace_sentry.watch()
-    def _set_call_display_name(
-        self, call: Call, display_name: str | None = None
-    ) -> None:
+    def _set_call_display_name(self, call: Call, display_name: str | None = None) -> None:
         # Removing call display name, use "" for db representation
         if display_name is None:
             display_name = ""
@@ -1971,38 +1909,26 @@ class WeaveClient:
             current_job_counts = self._get_pending_jobs()
 
             # If new jobs were added, update the total
-            if (
-                current_job_counts["total_jobs"]
-                > prev_job_counts["total_jobs"] - total_completed
-            ):
-                new_jobs = current_job_counts["total_jobs"] - (
-                    prev_job_counts["total_jobs"] - total_completed
-                )
+            if current_job_counts["total_jobs"] > prev_job_counts["total_jobs"] - total_completed:
+                new_jobs = current_job_counts["total_jobs"] - (prev_job_counts["total_jobs"] - total_completed)
                 prev_job_counts["total_jobs"] += new_jobs
 
             # Calculate completed jobs since last update
-            main_completed = max(
-                0, prev_job_counts["main_jobs"] - current_job_counts["main_jobs"]
-            )
+            main_completed = max(0, prev_job_counts["main_jobs"] - current_job_counts["main_jobs"])
             fastlane_completed = max(
                 0,
                 prev_job_counts["fastlane_jobs"] - current_job_counts["fastlane_jobs"],
             )
             call_processor_completed = max(
                 0,
-                prev_job_counts["call_processor_jobs"]
-                - current_job_counts["call_processor_jobs"],
+                prev_job_counts["call_processor_jobs"] - current_job_counts["call_processor_jobs"],
             )
             feedback_processor_completed = max(
                 0,
-                prev_job_counts["feedback_processor_jobs"]
-                - current_job_counts["feedback_processor_jobs"],
+                prev_job_counts["feedback_processor_jobs"] - current_job_counts["feedback_processor_jobs"],
             )
             completed_this_iteration = (
-                main_completed
-                + fastlane_completed
-                + call_processor_completed
-                + feedback_processor_completed
+                main_completed + fastlane_completed + call_processor_completed + feedback_processor_completed
             )
 
             if completed_this_iteration > 0:
@@ -2078,19 +2004,14 @@ class WeaveClient:
             call_processor_jobs = self._server_call_processor.num_outstanding_jobs
         feedback_processor_jobs = 0
         if self._server_feedback_processor:
-            feedback_processor_jobs = (
-                self._server_feedback_processor.num_outstanding_jobs
-            )
+            feedback_processor_jobs = self._server_feedback_processor.num_outstanding_jobs
 
         return PendingJobCounts(
             main_jobs=main_jobs,
             fastlane_jobs=fastlane_jobs,
             call_processor_jobs=call_processor_jobs,
             feedback_processor_jobs=feedback_processor_jobs,
-            total_jobs=main_jobs
-            + fastlane_jobs
-            + call_processor_jobs
-            + feedback_processor_jobs,
+            total_jobs=main_jobs + fastlane_jobs + call_processor_jobs + feedback_processor_jobs,
         )
 
     def _has_pending_jobs(self) -> bool:
@@ -2174,9 +2095,7 @@ def safe_current_wb_run_step() -> int | None:
         return None
 
 
-def check_wandb_run_matches(
-    wandb_run_id: str | None, weave_entity: str, weave_project: str
-) -> None:
+def check_wandb_run_matches(wandb_run_id: str | None, weave_entity: str, weave_project: str) -> None:
     if wandb_run_id:
         # ex: "entity/project/run_id"
         wandb_entity, wandb_project, _ = wandb_run_id.split("/")

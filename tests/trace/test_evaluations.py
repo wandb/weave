@@ -46,9 +46,7 @@ def normalize_scorers_in_flattened(
         got_block = res[start_ndx : start_ndx + num_scorer_calls]
         sorted_got_block = sorted(
             got_block,
-            key=lambda x: scorer_order.index(
-                op_name_from_ref(op_name_from_ref(x[0].op_name))
-            ),
+            key=lambda x: scorer_order.index(op_name_from_ref(op_name_from_ref(x[0].op_name))),
         )
         res[start_ndx : start_ndx + num_scorer_calls] = sorted_got_block
     return res
@@ -122,9 +120,7 @@ async def test_basic_evaluation(client):
         ("Evaluation.summarize", 1),
     ]
 
-    exp_scorer_block_start_ndxs = [
-        i for i, (op_name, _) in enumerate(exp) if op_name == "match_score1"
-    ]
+    exp_scorer_block_start_ndxs = [i for i, (op_name, _) in enumerate(exp) if op_name == "match_score1"]
     flattened_calls = normalize_scorers_in_flattened(
         flattened_calls, exp_scorer_block_start_ndxs, ["match_score1", "match_score2"]
     )
@@ -133,14 +129,10 @@ async def test_basic_evaluation(client):
     assert got == exp
 
     def is_object_ref_with_name(val: Any, name: str):
-        return isinstance(val, str) and val.startswith(
-            f"weave:///shawn/test-project/object/{name}:"
-        )
+        return isinstance(val, str) and val.startswith(f"weave:///shawn/test-project/object/{name}:")
 
     def is_op_ref_with_name(val: Any, name: str):
-        return isinstance(val, str) and val.startswith(
-            f"weave:///shawn/test-project/op/{name}:"
-        )
+        return isinstance(val, str) and val.startswith(f"weave:///shawn/test-project/op/{name}:")
 
     ## Assertion Category 1: Here we make some application-specific assertions about the
     # structure of the calls, specifically for evaluation-specific UI elements
@@ -153,17 +145,10 @@ async def test_basic_evaluation(client):
     # The UI depends on "example", "model" and "self" being refs, so we make that
     # specific assertion here
     for i in [1, 5, 9]:  # The indexes of the predict_and_score calls
-        assert (
-            op_name_from_ref(flattened_calls[i][0].op_name)
-            == "Evaluation.predict_and_score"
-        )
-        assert is_object_ref_with_name(
-            flattened_calls[i][0].inputs["self"], "Evaluation"
-        )
+        assert op_name_from_ref(flattened_calls[i][0].op_name) == "Evaluation.predict_and_score"
+        assert is_object_ref_with_name(flattened_calls[i][0].inputs["self"], "Evaluation")
         assert is_object_ref_with_name(flattened_calls[i][0].inputs["model"], "MyModel")
-        assert is_object_ref_with_name(
-            flattened_calls[i][0].inputs["example"], "Dataset"
-        )
+        assert is_object_ref_with_name(flattened_calls[i][0].inputs["example"], "Dataset")
 
     objs = client.server.objs_query(
         tsi.ObjQueryReq(
@@ -177,9 +162,7 @@ async def test_basic_evaluation(client):
     assert is_op_ref_with_name(expected_predict_ref, "MyModel.predict")
 
     predict_and_score_calls = [
-        c
-        for (c, d) in flattened_calls
-        if op_name_from_ref(c.op_name) == "Evaluation.predict_and_score"
+        c for (c, d) in flattened_calls if op_name_from_ref(c.op_name) == "Evaluation.predict_and_score"
     ]
     assert len(predict_and_score_calls) == 3
 
@@ -303,9 +286,7 @@ class MyDictScorerWithCustomDictSummary(weave.Scorer):
     @weave.op
     def summarize(self, score_rows: list) -> Optional[dict]:
         float_avg = sum(row["d_float"] for row in score_rows) / len(score_rows)
-        bool_avg = sum(1 if row["d_bool"] else 0 for row in score_rows) / len(
-            score_rows
-        )
+        bool_avg = sum(1 if row["d_bool"] else 0 for row in score_rows) / len(score_rows)
         return {
             "float_avg": float_avg,
             "nested": {"bool_avg": bool_avg},
@@ -404,12 +385,8 @@ async def test_evaluation_data_topology(client):
         "MyDictScorerWithCustomBoolSummary.score",
         "MyDictScorerWithCustomDictSummary.score",
     ]
-    exp_scorer_block_start_ndxs = [
-        i for i, (op_name, _) in enumerate(exp) if op_name == "score_int"
-    ]
-    flattened = normalize_scorers_in_flattened(
-        flattened, exp_scorer_block_start_ndxs, scorer_order
-    )
+    exp_scorer_block_start_ndxs = [i for i, (op_name, _) in enumerate(exp) if op_name == "score_int"]
+    flattened = normalize_scorers_in_flattened(flattened, exp_scorer_block_start_ndxs, scorer_order)
 
     # First, let's assert the topology of the calls
 
@@ -484,9 +461,7 @@ async def test_evaluation_data_topology(client):
 
     # Prediction
     assert predict_call.output == output
-    assert with_empty_feedback(predict_call.summary) == with_empty_feedback(
-        predict_usage
-    )
+    assert with_empty_feedback(predict_call.summary) == with_empty_feedback(predict_usage)
 
     # Prediction Scores
     assert score_int_call.output == score_int_score
@@ -540,18 +515,9 @@ async def test_evaluation_data_topology(client):
         "usage": {
             "gpt-4o-2024-05-13": {
                 "requests": predict_usage["usage"]["gpt-4o-2024-05-13"]["requests"] * 2,
-                "completion_tokens": predict_usage["usage"]["gpt-4o-2024-05-13"][
-                    "completion_tokens"
-                ]
-                * 2,
-                "prompt_tokens": predict_usage["usage"]["gpt-4o-2024-05-13"][
-                    "prompt_tokens"
-                ]
-                * 2,
-                "total_tokens": predict_usage["usage"]["gpt-4o-2024-05-13"][
-                    "total_tokens"
-                ]
-                * 2,
+                "completion_tokens": predict_usage["usage"]["gpt-4o-2024-05-13"]["completion_tokens"] * 2,
+                "prompt_tokens": predict_usage["usage"]["gpt-4o-2024-05-13"]["prompt_tokens"] * 2,
+                "total_tokens": predict_usage["usage"]["gpt-4o-2024-05-13"]["total_tokens"] * 2,
             }
         },
         "status_counts": {
@@ -566,16 +532,9 @@ async def test_evaluation_data_topology(client):
     }
 
     # Summarizers
-    assert (
-        my_dict_scorer_with_custom_float_summary_call.output
-        == dict_scorer_float_summary
-    )
-    assert (
-        my_dict_scorer_with_custom_bool_summary_call.output == dict_scorer_bool_summary
-    )
-    assert (
-        my_dict_scorer_with_custom_dict_summary_call.output == dict_scorer_dict_summary
-    )
+    assert my_dict_scorer_with_custom_float_summary_call.output == dict_scorer_float_summary
+    assert my_dict_scorer_with_custom_bool_summary_call.output == dict_scorer_bool_summary
+    assert my_dict_scorer_with_custom_dict_summary_call.output == dict_scorer_dict_summary
 
     # Final Summary
     assert (
@@ -605,13 +564,9 @@ async def test_evaluation_data_topology(client):
     assert evaluate_call.summary == with_empty_feedback(predict_usage_summary)
 
     # Test new Feeedback as Scores
-    predict_calls_simple = [
-        c for c in flat_calls if op_name_from_ref(c.op_name) == "SimpleModel.predict"
-    ]
+    predict_calls_simple = [c for c in flat_calls if op_name_from_ref(c.op_name) == "SimpleModel.predict"]
     predict_calls_with_confidence = [
-        c
-        for c in flat_calls
-        if op_name_from_ref(c.op_name) == "SimpleModelWithConfidence.predict"
+        c for c in flat_calls if op_name_from_ref(c.op_name) == "SimpleModelWithConfidence.predict"
     ]
     assert len(predict_calls_simple) == len(predict_calls_with_confidence) == 2
     assert len(predict_calls_simple[0].summary["weave"]["feedback"]) == 7
@@ -752,9 +707,7 @@ async def test_eval_with_complex_types(client):
         a_string: str
 
     @weave.op
-    def model_func(
-        image: Image.Image, dc: MyDataclass, model: MyModel, obj: MyObj, text: str
-    ) -> str:
+    def model_func(image: Image.Image, dc: MyDataclass, model: MyModel, obj: MyObj, text: str) -> str:
         assert isinstance(image, Image.Image)
 
         # Note: when we start recursively saving dataset rows, this will
@@ -921,9 +874,7 @@ async def test_evaluation_with_wrong_column_map():
         dummy_scorer = DummyScorer(column_map={"jeez": "col1"})
         evaluation = Evaluation(dataset=dataset, scorers=[dummy_scorer])
         await evaluation.predict_and_score(model_function, dataset[0])
-        assert "is not found in the dataset columns and is not mapped" in str(
-            excinfo.value
-        )
+        assert "is not found in the dataset columns and is not mapped" in str(excinfo.value)
 
 
 # Define another dummy scorer
@@ -945,9 +896,7 @@ async def test_evaluation_with_multiple_column_maps():
     dummy_scorer = DummyScorer(column_map={"foo": "col1", "bar": "col2"})
 
     # Second scorer maps 'input1'->'col2', 'input2'->'col1'
-    another_dummy_scorer = AnotherDummyScorer(
-        column_map={"input1": "col2", "input2": "col1"}
-    )
+    another_dummy_scorer = AnotherDummyScorer(column_map={"input1": "col2", "input2": "col1"})
 
     @weave.op
     def model_function(col1, col2):
@@ -960,9 +909,7 @@ async def test_evaluation_with_multiple_column_maps():
         {"col1": "xyz", "col2": "zyx", "target": "zzzzzz"},
     ]
 
-    evaluation = Evaluation(
-        dataset=dataset, scorers=[dummy_scorer, another_dummy_scorer]
-    )
+    evaluation = Evaluation(dataset=dataset, scorers=[dummy_scorer, another_dummy_scorer])
 
     # Run the evaluation
     eval_out = await evaluation.evaluate(model_function)
@@ -973,9 +920,7 @@ async def test_evaluation_with_multiple_column_maps():
 
     # Assertions for the first scorer
     expected_results_dummy = {"true_count": 1, "true_fraction": 1.0 / 3}
-    assert eval_out["DummyScorer"]["match"] == expected_results_dummy, (
-        "All concatenations should match the target"
-    )
+    assert eval_out["DummyScorer"]["match"] == expected_results_dummy, "All concatenations should match the target"
 
     # Assertions for the second scorer
     # Since input1 == col2, and output is col1 + col2, we check if col2 == (col1 + col2)[::-1]
@@ -1076,19 +1021,13 @@ def test_scorers_with_output_and_model_output_raise_error():
 
     ds = [{"text": "hello"}]
 
-    with pytest.raises(
-        ValueError, match="cannot include both `output` and `model_output`"
-    ):
+    with pytest.raises(ValueError, match="cannot include both `output` and `model_output`"):
         scorer = MyScorer()
 
-    with pytest.raises(
-        ValueError, match="cannot include both `output` and `model_output`"
-    ):
+    with pytest.raises(ValueError, match="cannot include both `output` and `model_output`"):
         evaluation = weave.Evaluation(dataset=ds, scorers=[MyScorer()])
 
-    with pytest.raises(
-        ValueError, match="cannot include both `output` and `model_output`"
-    ):
+    with pytest.raises(ValueError, match="cannot include both `output` and `model_output`"):
         evaluation = weave.Evaluation(dataset=ds, scorers=[my_second_scorer])
 
 

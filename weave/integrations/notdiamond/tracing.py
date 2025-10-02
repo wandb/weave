@@ -57,12 +57,8 @@ def get_notdiamond_patcher(
 
     base = settings.op_settings
 
-    model_select_settings = base.model_copy(
-        update={"name": base.name or "NotDiamond.model_select"}
-    )
-    async_model_select_settings = base.model_copy(
-        update={"name": base.name or "NotDiamond.amodel_select"}
-    )
+    model_select_settings = base.model_copy(update={"name": base.name or "NotDiamond.model_select"})
+    async_model_select_settings = base.model_copy(update={"name": base.name or "NotDiamond.amodel_select"})
     patched_client_functions = [
         SymbolPatcher(
             lambda: importlib.import_module("notdiamond"),
@@ -76,12 +72,8 @@ def get_notdiamond_patcher(
         ),
     ]
 
-    llm_config_init_settings = base.model_copy(
-        update={"name": base.name or "NotDiamond.LLMConfig.__init__"}
-    )
-    llm_config_from_string_settings = base.model_copy(
-        update={"name": base.name or "NotDiamond.LLMConfig.from_string"}
-    )
+    llm_config_init_settings = base.model_copy(update={"name": base.name or "NotDiamond.LLMConfig.__init__"})
+    llm_config_from_string_settings = base.model_copy(update={"name": base.name or "NotDiamond.LLMConfig.from_string"})
     patched_llmconfig_functions = [
         SymbolPatcher(
             lambda: importlib.import_module("notdiamond"),
@@ -114,11 +106,7 @@ def get_notdiamond_patcher(
         ),
     ]
 
-    all_patched_functions = (
-        patched_client_functions
-        + patched_toolkit_functions
-        + patched_llmconfig_functions
-    )
+    all_patched_functions = patched_client_functions + patched_toolkit_functions + patched_llmconfig_functions
 
     _notdiamond_patcher = MultiPatcher(all_patched_functions)
 

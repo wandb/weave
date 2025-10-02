@@ -354,7 +354,7 @@ mark-parentheses = false
 fixture-parentheses = false
 
 [tool.ruff]
-line-length = 88
+line-length = 120
 show-fixes = true
 exclude = ["weave_query", "rules"]
 

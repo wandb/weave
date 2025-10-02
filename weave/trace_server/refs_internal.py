@@ -54,9 +54,7 @@ def validate_extra(extra: list[str]) -> None:
                 OBJECT_ATTR_EDGE_NAME,
                 TABLE_ROW_ID_EDGE_NAME,
             ):
-                raise InvalidInternalRef(
-                    f"Invalid extra edge name at index {i}: {extra}"
-                )
+                raise InvalidInternalRef(f"Invalid extra edge name at index {i}: {extra}")
         else:
             # Here we are in the edge value position
             # There is only a single rule here:
@@ -64,9 +62,7 @@ def validate_extra(extra: list[str]) -> None:
                 try:
                     int(e)
                 except ValueError:
-                    raise InvalidInternalRef(
-                        f"Invalid list edge value at index {i}: {extra}"
-                    ) from None
+                    raise InvalidInternalRef(f"Invalid list edge value at index {i}: {extra}") from None
             pass
 
 
@@ -158,9 +154,7 @@ class InternalArtifactRef:
         return u
 
 
-InternalRef = Union[
-    InternalObjectRef, InternalTableRef, InternalCallRef, InternalArtifactRef
-]
+InternalRef = Union[InternalObjectRef, InternalTableRef, InternalCallRef, InternalArtifactRef]
 
 
 def parse_internal_uri(
@@ -231,9 +225,7 @@ def _parse_remaining(remaining: list[str]) -> tuple[str, str, list[str]]:
 
 
 def string_will_be_interpreted_as_ref(s: str) -> bool:
-    return s.startswith(f"{WEAVE_INTERNAL_SCHEME}:///") or s.startswith(
-        f"{WEAVE_SCHEME}:///"
-    )
+    return s.startswith(f"{WEAVE_INTERNAL_SCHEME}:///") or s.startswith(f"{WEAVE_SCHEME}:///")
 
 
 def any_will_be_interpreted_as_ref_str(val: Any) -> bool:

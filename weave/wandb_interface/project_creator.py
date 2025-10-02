@@ -62,9 +62,7 @@ def _ensure_project_exists(entity_name: str, project_name: str) -> dict[str, str
 
     # Project creation failed
     if exception is None:
-        raise UnableToCreateProjectError(
-            f"Failed to create project {entity_name}/{project_name}"
-        )
+        raise UnableToCreateProjectError(f"Failed to create project {entity_name}/{project_name}")
 
     # Log and re-raise with clean exception types
     logger.error(f"Unable to access `{entity_name}/{project_name}`.")

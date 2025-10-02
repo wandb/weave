@@ -31,9 +31,7 @@ def test_disabled_setting(client):
     calls = list(client.get_calls())
     assert len(calls) == 10
 
-    assert disabled_time * 10 < enabled_time, (
-        "Disabled weave should be faster than enabled weave"
-    )
+    assert disabled_time * 10 < enabled_time, "Disabled weave should be faster than enabled weave"
 
 
 def test_disabled_env(client):
@@ -47,9 +45,7 @@ def test_disabled_env(client):
     calls = list(client.get_calls())
     assert len(calls) == 10
 
-    assert disabled_time * 10 < enabled_time, (
-        "Disabled weave should be faster than enabled weave"
-    )
+    assert disabled_time * 10 < enabled_time, "Disabled weave should be faster than enabled weave"
 
 
 def test_print_call_link_setting(client_creator):
@@ -285,9 +281,7 @@ def test_retry_max_interval_settings(client_creator, caplog, monkeypatch) -> Non
         call_args.append(max)
         return original_wait(initial=initial, max=max)
 
-    monkeypatch.setattr(
-        tenacity, "wait_exponential_jitter", mock_wait_exponential_jitter
-    )
+    monkeypatch.setattr(tenacity, "wait_exponential_jitter", mock_wait_exponential_jitter)
 
     @with_retry
     def func():
@@ -312,9 +306,7 @@ def test_retry_max_interval_env(caplog, monkeypatch) -> None:
         call_args.append(max)
         return original_wait(initial=initial, max=max)
 
-    monkeypatch.setattr(
-        tenacity, "wait_exponential_jitter", mock_wait_exponential_jitter
-    )
+    monkeypatch.setattr(tenacity, "wait_exponential_jitter", mock_wait_exponential_jitter)
 
     @with_retry
     def func():

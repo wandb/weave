@@ -69,9 +69,9 @@ class ServiceDependency:
 
     def __init__(
         self,
-        service_factory: Callable[
-            [AuthParams], weave.trace_server.trace_service.TraceService
-        ] = (noop_trace_server_factory),
+        service_factory: Callable[[AuthParams], weave.trace_server.trace_service.TraceService] = (
+            noop_trace_server_factory
+        ),
         auth_dependency: Callable[[], AuthParams] = lambda: AuthParams(),
     ):
         """Initialize with auth dependencies and server factory.
@@ -96,9 +96,7 @@ class ServiceDependency:
         return _get_server
 
 
-def generate_routes(
-    router: APIRouter, service_dependency: ServiceDependency
-) -> APIRouter:
+def generate_routes(router: APIRouter, service_dependency: ServiceDependency) -> APIRouter:
     """Generate a FastAPI app from a TraceServerInterface implementation using dependencies.
 
     Args:
@@ -208,9 +206,7 @@ def generate_routes(
         service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
         accept: Annotated[str, Header()] = "application/jsonl",
     ) -> StreamingResponse:
-        return StreamingResponse(
-            service.trace_server_interface.calls_query_stream(req), media_type=accept
-        )
+        return StreamingResponse(service.trace_server_interface.calls_query_stream(req), media_type=accept)
 
     @router.post("/calls/query", tags=[CALLS_TAG_NAME], include_in_schema=False)
     def calls_query(
@@ -290,9 +286,7 @@ def generate_routes(
         service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
         accept: Annotated[str, Header()] = "application/jsonl",
     ) -> StreamingResponse:
-        return StreamingResponse(
-            service.trace_server_interface.table_query_stream(req), media_type=accept
-        )
+        return StreamingResponse(service.trace_server_interface.table_query_stream(req), media_type=accept)
 
     @router.post("/table/query_stats", tags=[TABLES_TAG_NAME])
     def table_query_stats(
@@ -339,9 +333,7 @@ def generate_routes(
         service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
     ) -> StreamingResponse:
         res = service.trace_server_interface.file_content_read(req)
-        return StreamingResponse(
-            iter([res.content]), media_type="application/octet-stream"
-        )
+        return StreamingResponse(iter([res.content]), media_type="application/octet-stream")
 
     # @router.post("/op/create", tags=[OPS_TAG_NAME])
     # def op_create(
@@ -416,9 +408,7 @@ def generate_routes(
     ) -> tsi.FeedbackReplaceRes:
         return service.trace_server_interface.feedback_replace(req)
 
-    @router.post(
-        "/actions/execute_batch", tags=[ACTIONS_TAG_NAME], include_in_schema=False
-    )
+    @router.post("/actions/execute_batch", tags=[ACTIONS_TAG_NAME], include_in_schema=False)
     def actions_execute_batch(
         req: tsi.ActionsExecuteBatchReq,
         service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008

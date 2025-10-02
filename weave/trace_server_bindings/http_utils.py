@@ -25,9 +25,7 @@ T = TypeVar("T")
 BatchProcessor = AsyncBatchProcessor
 
 
-def log_dropped_call_batch(
-    batch: list[Union["StartBatchItem", "EndBatchItem"]], e: Exception
-) -> None:
+def log_dropped_call_batch(batch: list[Union["StartBatchItem", "EndBatchItem"]], e: Exception) -> None:
     """Log details about a dropped call batch for debugging purposes."""
     logger.error(f"Error sending batch of {len(batch)} call events to server")
     dropped_start_ids = []
@@ -52,9 +50,7 @@ def log_dropped_call_batch(
         logger.error(f"error: {e}")
 
 
-def log_dropped_feedback_batch(
-    batch: list[tsi.FeedbackCreateReq], e: Exception
-) -> None:
+def log_dropped_feedback_batch(batch: list[tsi.FeedbackCreateReq], e: Exception) -> None:
     """Log details about a dropped feedback batch for debugging purposes."""
     logger.error(f"Error sending batch of {len(batch)} feedback events to server")
     dropped_feedback_types = []
@@ -238,9 +234,7 @@ def handle_response_error(response: requests.Response, url: str) -> None:
     raise requests.HTTPError(message, response=response)
 
 
-def check_endpoint_exists(
-    func: Callable, test_req: Any, cache_key: Union[str, None] = None
-) -> bool:
+def check_endpoint_exists(func: Callable, test_req: Any, cache_key: Union[str, None] = None) -> bool:
     """Check if a function/endpoint exists and works by calling it with a test request.
 
     This allows bypassing retry logic by passing the unwrapped function directly,

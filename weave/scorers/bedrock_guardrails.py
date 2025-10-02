@@ -22,9 +22,7 @@ class BedrockGuardrailScorer(weave.Scorer):
     """
 
     guardrail_id: str = Field(description="The identifier of the guardrail to use.")
-    guardrail_version: str = Field(
-        default="DRAFT", description="The version of the guardrail to use."
-    )
+    guardrail_version: str = Field(default="DRAFT", description="The version of the guardrail to use.")
     source: Literal["INPUT", "OUTPUT"] = Field(
         default="OUTPUT",
         description="The source of the content to evaluate, either 'INPUT' or 'OUTPUT'.",
@@ -42,19 +40,14 @@ class BedrockGuardrailScorer(weave.Scorer):
         try:
             import boto3
 
-            self._bedrock_runtime = boto3.client(
-                "bedrock-runtime", **self.bedrock_runtime_kwargs
-            )
+            self._bedrock_runtime = boto3.client("bedrock-runtime", **self.bedrock_runtime_kwargs)
             patch_client(self._bedrock_runtime)
         except ImportError:
             raise ImportError(
-                "boto3 is not installed. Please install it with 'pip install boto3' "
-                "to use the BedrockGuardrailScorer."
+                "boto3 is not installed. Please install it with 'pip install boto3' to use the BedrockGuardrailScorer."
             ) from None
         except Exception as e:
-            raise RuntimeError(
-                f"Failed to initialize Bedrock runtime client: {e}"
-            ) from e
+            raise RuntimeError(f"Failed to initialize Bedrock runtime client: {e}") from e
 
     def format_content(self, output: str) -> dict[str, Any]:
         """Format the content for the guardrail API."""

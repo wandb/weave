@@ -62,17 +62,13 @@ def test_pythonic_creation(client: WeaveClient):
     assert top_obj_gotten.model_dump(by_alias=True) == top_obj.model_dump(by_alias=True)
 
     # Test inherited object (leaf class) with pythonic creation
-    inherited_obj = base_objects.TestOnlyInheritedBaseObject(
-        b=10, c=20, additional_field="pythonic_test"
-    )
+    inherited_obj = base_objects.TestOnlyInheritedBaseObject(b=10, c=20, additional_field="pythonic_test")
     inherited_ref = weave.publish(inherited_obj)
 
     inherited_obj_gotten = weave.ref(inherited_ref.uri()).get()
 
     assert isinstance(inherited_obj_gotten, base_objects.TestOnlyInheritedBaseObject)
-    assert inherited_obj_gotten.model_dump(by_alias=True) == inherited_obj.model_dump(
-        by_alias=True
-    )
+    assert inherited_obj_gotten.model_dump(by_alias=True) == inherited_obj.model_dump(by_alias=True)
 
     objs_res = client.server.objs_query(
         tsi.ObjQueryReq.model_validate(
@@ -88,9 +84,7 @@ def test_pythonic_creation(client: WeaveClient):
     assert (
         objs[0].val
         == {
-            **with_base_object_class_annotations(
-                top_obj.model_dump(by_alias=True), "TestOnlyExample", "BaseObject"
-            ),
+            **with_base_object_class_annotations(top_obj.model_dump(by_alias=True), "TestOnlyExample", "BaseObject"),
             "nested_base_model": with_base_object_class_annotations(
                 top_obj.nested_base_model.model_dump(by_alias=True),
                 "TestOnlyNestedBaseModel",
@@ -128,12 +122,8 @@ def test_pythonic_creation(client: WeaveClient):
     assert len(objs) == 2
 
     # Find the base and inherited objects
-    base_obj = next(
-        obj for obj in objs if obj.leaf_object_class == "TestOnlyNestedBaseObject"
-    )
-    inherited_obj_result = next(
-        obj for obj in objs if obj.leaf_object_class == "TestOnlyInheritedBaseObject"
-    )
+    base_obj = next(obj for obj in objs if obj.leaf_object_class == "TestOnlyNestedBaseObject")
+    inherited_obj_result = next(obj for obj in objs if obj.leaf_object_class == "TestOnlyInheritedBaseObject")
 
     # Verify base object
     assert (
@@ -229,9 +219,7 @@ def test_interface_creation(client):
 
     nested_obj_gotten = weave.ref(nested_obj_ref.uri()).get()
 
-    assert nested_obj_gotten.model_dump(by_alias=True) == nested_obj.model_dump(
-        by_alias=True
-    )
+    assert nested_obj_gotten.model_dump(by_alias=True) == nested_obj.model_dump(by_alias=True)
 
     objs_res = client.server.objs_query(
         tsi.ObjQueryReq.model_validate(
@@ -247,9 +235,7 @@ def test_interface_creation(client):
     assert (
         objs[0].val
         == {
-            **with_base_object_class_annotations(
-                top_obj.model_dump(by_alias=True), "TestOnlyExample", "BaseObject"
-            ),
+            **with_base_object_class_annotations(top_obj.model_dump(by_alias=True), "TestOnlyExample", "BaseObject"),
             "nested_base_model": with_base_object_class_annotations(
                 top_obj.nested_base_model.model_dump(by_alias=True),
                 "TestOnlyNestedBaseModel",
@@ -534,9 +520,7 @@ def test_leaf_object_class_filtering_with_builtin_objects(client: WeaveClient):
     )
 
     # Create inherited object to test hierarchy
-    inherited_obj = base_objects.TestOnlyInheritedBaseObject(
-        b=300, c=400, additional_field="test_inherited"
-    )
+    inherited_obj = base_objects.TestOnlyInheritedBaseObject(b=300, c=400, additional_field="test_inherited")
     inherited_obj_res = client.server.obj_create(
         tsi.ObjCreateReq.model_validate(
             {
@@ -579,14 +563,8 @@ def test_leaf_object_class_filtering_with_builtin_objects(client: WeaveClient):
     )
 
     assert len(nested_objs_res.objs) == 2  # Only the 2 base objects, not inherited
-    assert all(
-        obj.leaf_object_class == "TestOnlyNestedBaseObject"
-        for obj in nested_objs_res.objs
-    )
-    assert all(
-        obj.base_object_class == "TestOnlyNestedBaseObject"
-        for obj in nested_objs_res.objs
-    )
+    assert all(obj.leaf_object_class == "TestOnlyNestedBaseObject" for obj in nested_objs_res.objs)
+    assert all(obj.base_object_class == "TestOnlyNestedBaseObject" for obj in nested_objs_res.objs)
 
     nested_obj_ids = {obj.object_id for obj in nested_objs_res.objs}
     assert nested_obj_ids == {"nested_obj_1", "nested_obj_2"}
@@ -603,9 +581,7 @@ def test_leaf_object_class_filtering_with_builtin_objects(client: WeaveClient):
 
     assert len(inherited_objs_res.objs) == 1
     assert inherited_objs_res.objs[0].leaf_object_class == "TestOnlyInheritedBaseObject"
-    assert (
-        inherited_objs_res.objs[0].base_object_class == "TestOnlyNestedBaseObject"
-    )  # Different from leaf!
+    assert inherited_objs_res.objs[0].base_object_class == "TestOnlyNestedBaseObject"  # Different from leaf!
     assert inherited_objs_res.objs[0].object_id == "inherited_obj"
 
     # Test filtering by base_object_class - should return both base and inherited objects
@@ -764,9 +740,7 @@ def test_inherited_builtin_object_class_hierarchy(client: WeaveClient):
     )
 
     # Create inherited object
-    inherited_obj = base_objects.TestOnlyInheritedBaseObject(
-        b=200, c=300, additional_field="test_value"
-    )
+    inherited_obj = base_objects.TestOnlyInheritedBaseObject(b=200, c=300, additional_field="test_value")
     inherited_obj_res = client.server.obj_create(
         tsi.ObjCreateReq.model_validate(
             {
@@ -860,14 +834,8 @@ def test_inherited_builtin_object_class_hierarchy(client: WeaveClient):
     )
 
     assert len(inherited_leaf_filter_res.objs) == 1
-    assert (
-        inherited_leaf_filter_res.objs[0].leaf_object_class
-        == "TestOnlyInheritedBaseObject"
-    )
-    assert (
-        inherited_leaf_filter_res.objs[0].base_object_class
-        == "TestOnlyNestedBaseObject"
-    )
+    assert inherited_leaf_filter_res.objs[0].leaf_object_class == "TestOnlyInheritedBaseObject"
+    assert inherited_leaf_filter_res.objs[0].base_object_class == "TestOnlyNestedBaseObject"
     assert inherited_leaf_filter_res.objs[0].object_id == "inherited_obj"
 
     # Test combined filtering: base_object_class and leaf_object_class
@@ -885,9 +853,7 @@ def test_inherited_builtin_object_class_hierarchy(client: WeaveClient):
     )
 
     assert len(combined_filter_res.objs) == 1
-    assert (
-        combined_filter_res.objs[0].leaf_object_class == "TestOnlyInheritedBaseObject"
-    )
+    assert combined_filter_res.objs[0].leaf_object_class == "TestOnlyInheritedBaseObject"
     assert combined_filter_res.objs[0].base_object_class == "TestOnlyNestedBaseObject"
     assert combined_filter_res.objs[0].object_id == "inherited_obj"
 

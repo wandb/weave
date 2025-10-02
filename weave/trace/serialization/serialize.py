@@ -26,11 +26,7 @@ if TYPE_CHECKING:
 def is_pydantic_model_class(obj: Any) -> bool:
     """Determine if obj is a subclass of pydantic.BaseModel."""
     try:
-        return (
-            isinstance(obj, type)
-            and issubclass(obj, BaseModel)
-            and obj is not BaseModel
-        )
+        return isinstance(obj, type) and issubclass(obj, BaseModel) and obj is not BaseModel
     except TypeError:
         # Might be something like Iterable[CalendarEvent]
         return False
@@ -44,9 +40,7 @@ def _is_inline_custom_obj(encoded: dict) -> bool:
     return "val" in encoded
 
 
-def to_json(
-    obj: Any, project_id: str, client: WeaveClient, use_dictify: bool = False
-) -> Any:
+def to_json(obj: Any, project_id: str, client: WeaveClient, use_dictify: bool = False) -> Any:
     if isinstance(obj, TableRef):
         return obj.uri()
     elif isinstance(obj, ObjectRef):
@@ -69,10 +63,7 @@ def to_json(
             res[k] = to_json(v, project_id, client, use_dictify)
         return res
     elif isinstance_namedtuple(obj):
-        return {
-            k: to_json(v, project_id, client, use_dictify)
-            for k, v in obj._asdict().items()
-        }
+        return {k: to_json(v, project_id, client, use_dictify) for k, v in obj._asdict().items()}
     elif isinstance(obj, (list, tuple)):
         return [to_json(v, project_id, client, use_dictify) for v in obj]
     elif isinstance(obj, dict):
@@ -87,28 +78,18 @@ def to_json(
     from weave.flow.scorer import WeaveScorerResult
 
     if isinstance(obj, WeaveScorerResult):
-        return {
-            k: to_json(v, project_id, client, use_dictify)
-            for k, v in obj.model_dump().items()
-        }
+        return {k: to_json(v, project_id, client, use_dictify) for k, v in obj.model_dump().items()}
 
     # This still blocks potentially on large-file i/o.
     encoded = custom_objs.encode_custom_obj(obj)
     if encoded is None:
-        if (
-            use_dictify
-            and not isinstance(obj, ALWAYS_STRINGIFY)
-            and not has_custom_repr(obj)
-        ):
+        if use_dictify and not isinstance(obj, ALWAYS_STRINGIFY) and not has_custom_repr(obj):
             return dictify(obj)
 
         # TODO: I would prefer to only have this once in dictify? Maybe dictify and to_json need to be merged?
         # However, even if dictify is false, i still want to try to convert to dict
         elif as_dict := try_to_dict(obj):
-            return {
-                k: to_json(v, project_id, client, use_dictify)
-                for k, v in as_dict.items()
-            }
+            return {k: to_json(v, project_id, client, use_dictify) for k, v in as_dict.items()}
         return fallback_encode(obj)
     if _is_inline_custom_obj(encoded):
         return encoded
@@ -116,9 +97,7 @@ def to_json(
     return result
 
 
-def _build_result_from_encoded(
-    encoded: dict, project_id: str, client: WeaveClient
-) -> Any:
+def _build_result_from_encoded(encoded: dict, project_id: str, client: WeaveClient) -> Any:
     file_digests = {}
     for name, val in encoded["files"].items():
         # Instead of waiting for the file to be created, we
@@ -126,9 +105,7 @@ def _build_result_from_encoded(
         # to_json procedure is not blocked on network requests.
         # Technically it is possible that the file creation request
         # fails.
-        client._send_file_create(
-            FileCreateReq(project_id=project_id, name=name, content=val)
-        )
+        client._send_file_create(FileCreateReq(project_id=project_id, name=name, content=val))
         contents_as_bytes = val
         if isinstance(contents_as_bytes, str):
             contents_as_bytes = contents_as_bytes.encode("utf-8")
@@ -173,9 +150,7 @@ def has_custom_repr(obj: Any) -> bool:
     return obj.__class__.__repr__ is not object.__repr__
 
 
-def dictify(
-    obj: Any, maxdepth: int = 0, depth: int = 1, seen: set[int] | None = None
-) -> Any:
+def dictify(obj: Any, maxdepth: int = 0, depth: int = 1, seen: set[int] | None = None) -> Any:
     """Recursively compute a dictionary representation of an object."""
     if seen is None:
         seen = set()
@@ -278,19 +253,13 @@ def fallback_encode(obj: Any) -> Any:
 
 
 def isinstance_namedtuple(obj: Any) -> bool:
-    return (
-        isinstance(obj, tuple) and hasattr(obj, "_asdict") and hasattr(obj, "_fields")
-    )
+    return isinstance(obj, tuple) and hasattr(obj, "_asdict") and hasattr(obj, "_fields")
 
 
-def _load_custom_obj_files(
-    project_id: str, server: TraceServerInterface, file_digests: dict
-) -> dict[str, bytes]:
+def _load_custom_obj_files(project_id: str, server: TraceServerInterface, file_digests: dict) -> dict[str, bytes]:
     loaded_files: dict[str, bytes] = {}
     for name, digest in file_digests.items():
-        file_response = server.file_content_read(
-            FileContentReadReq(project_id=project_id, digest=digest)
-        )
+        file_response = server.file_content_read(FileContentReadReq(project_id=project_id, digest=digest))
         loaded_files[name] = file_response.content
     return loaded_files
 
@@ -302,16 +271,12 @@ def from_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
         if (val_type := obj.pop("_type", None)) is None:
             return {k: from_json(v, project_id, server) for k, v in obj.items()}
         elif val_type == "ObjectRecord":
-            return ObjectRecord(
-                {k: from_json(v, project_id, server) for k, v in obj.items()}
-            )
+            return ObjectRecord({k: from_json(v, project_id, server) for k, v in obj.items()})
         elif val_type == "CustomWeaveType":
             if _is_inline_custom_obj(obj):
                 return custom_objs.decode_custom_inline_obj(obj)
             files = _load_custom_obj_files(project_id, server, obj["files"])
-            return custom_objs.decode_custom_files_obj(
-                obj["weave_type"], files, obj.get("load_op")
-            )
+            return custom_objs.decode_custom_files_obj(obj["weave_type"], files, obj.get("load_op"))
         elif isinstance(val_type, str) and obj.get("_class_name") == val_type:
             from weave.trace_server.interface.builtin_object_classes.builtin_object_registry import (
                 BUILTIN_OBJECT_REGISTRY,
@@ -320,14 +285,10 @@ def from_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
             cls = BUILTIN_OBJECT_REGISTRY.get(val_type)
             if cls:
                 # Filter out metadata fields before validation
-                obj_data = {
-                    k: v for k, v in obj.items() if k in cls.model_fields.keys()
-                }
+                obj_data = {k: v for k, v in obj.items() if k in cls.model_fields.keys()}
                 return cls.model_validate(obj_data)
 
-        return ObjectRecord(
-            {k: from_json(v, project_id, server) for k, v in obj.items()}
-        )
+        return ObjectRecord({k: from_json(v, project_id, server) for k, v in obj.items()})
     elif isinstance(obj, str) and obj.startswith("weave://"):
         return Ref.parse_uri(obj)
 

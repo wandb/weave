@@ -171,9 +171,7 @@ class ThrowingServer(tsi.TraceServerInterface):
     def feedback_create(self, req: tsi.FeedbackCreateReq) -> tsi.FeedbackCreateRes:
         raise DummyTestException("FAILURE - feedback_create, req:", req)
 
-    def feedback_create_batch(
-        self, req: tsi.FeedbackCreateBatchReq
-    ) -> tsi.FeedbackCreateBatchRes:
+    def feedback_create_batch(self, req: tsi.FeedbackCreateBatchReq) -> tsi.FeedbackCreateBatchRes:
         raise DummyTestException("FAILURE - feedback_create_batch, req:", req)
 
     def feedback_query(self, req: tsi.FeedbackQueryReq) -> tsi.FeedbackQueryRes:
@@ -185,9 +183,7 @@ class ThrowingServer(tsi.TraceServerInterface):
     def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
         raise DummyTestException("FAILURE - evaluate_model, req:", req)
 
-    def evaluation_status(
-        self, req: tsi.EvaluationStatusReq
-    ) -> tsi.EvaluationStatusRes:
+    def evaluation_status(self, req: tsi.EvaluationStatusReq) -> tsi.EvaluationStatusRes:
         raise DummyTestException("FAILURE - evaluation_status, req:", req)
 
 
@@ -268,9 +264,7 @@ def logging_error_check(request, log_collector):
         return
     error_logs = log_collector.get_error_logs()
     if error_logs:
-        pytest.fail(
-            f"Expected no errors, but found {len(error_logs)} error(s): {error_logs}"
-        )
+        pytest.fail(f"Expected no errors, but found {len(error_logs)} error(s): {error_logs}")
 
 
 class TestOnlyFlushingWeaveClient(weave_client.WeaveClient):
@@ -373,9 +367,7 @@ def create_client(
     # Keeping off for now until it is the default behavior.
     # os.environ["WEAVE_USE_SERVER_CACHE"] = "true"
     caching_server = CachingMiddlewareTraceServer.from_env(server)
-    client = TestOnlyFlushingWeaveClient(
-        TEST_ENTITY, "test-project", make_server_recorder(caching_server)
-    )
+    client = TestOnlyFlushingWeaveClient(TEST_ENTITY, "test-project", make_server_recorder(caching_server))
     weave_client_context.set_weave_client_global(client)
     if global_attributes is not None:
         weave.trace.api._global_attributes = global_attributes
@@ -418,9 +410,7 @@ def client_creator(zero_stack, request, trace_server):
         finally:
             weave_client_context.set_weave_client_global(None)
             weave.trace.api._global_attributes = {}
-            weave.trace.settings.parse_and_apply_settings(
-                weave.trace.settings.UserSettings()
-            )
+            weave.trace.settings.parse_and_apply_settings(weave.trace.settings.UserSettings())
 
     return client
 
@@ -556,9 +546,7 @@ def network_proxy_client(client):
 @pytest.fixture(autouse=True)
 def caching_client_isolation(monkeypatch, tmp_path):
     """Isolate cache directories for each test to prevent cross-test contamination."""
-    test_specific_cache_dir = (
-        tmp_path / f"weave_cache_{get_test_name().replace('/', '_').replace('::', '_')}"
-    )
+    test_specific_cache_dir = tmp_path / f"weave_cache_{get_test_name().replace('/', '_').replace('::', '_')}"
     test_specific_cache_dir.mkdir(parents=True, exist_ok=True)
 
     monkeypatch.setenv("WEAVE_SERVER_CACHE_DIR", str(test_specific_cache_dir))
@@ -624,12 +612,8 @@ def mock_wandb_context():
     """Fixture that provides mocked weave wandb context operations."""
     with (
         patch("weave.wandb_interface.context.init") as mock_context_init,
-        patch(
-            "weave.wandb_interface.context.get_wandb_api_context"
-        ) as mock_get_context,
-        patch(
-            "weave.wandb_interface.context.set_wandb_api_context"
-        ) as mock_set_context,
+        patch("weave.wandb_interface.context.get_wandb_api_context") as mock_get_context,
+        patch("weave.wandb_interface.context.set_wandb_api_context") as mock_set_context,
     ):
         yield {
             "init": mock_context_init,

@@ -55,9 +55,7 @@ def make_openai_call() -> str:
     return response.choices[0].message.content or ""
 
 
-def time_function_calls(
-    func: Callable[[], Any], iterations: int, warmup: int = 3
-) -> list[float]:
+def time_function_calls(func: Callable[[], Any], iterations: int, warmup: int = 3) -> list[float]:
     """Time function calls and return list of execution times.
 
     Args:
@@ -102,9 +100,7 @@ def run_benchmark_with_weave(iterations: int, warmup: int = 3) -> dict[str, floa
     return utils.calculate_stats(times)
 
 
-def run_multiple_rounds(
-    iterations: int, rounds: int = 2, warmup: int = 3
-) -> tuple[dict[str, float], dict[str, float]]:
+def run_multiple_rounds(iterations: int, rounds: int = 2, warmup: int = 3) -> tuple[dict[str, float], dict[str, float]]:
     """Run multiple rounds of benchmarks with alternating order."""
     console.print(f"Running {rounds} rounds with alternating order...")
 
@@ -130,9 +126,7 @@ def run_multiple_rounds(
         without_weave_means.append(without_stats["mean"])
 
     # Return aggregated stats
-    return utils.calculate_stats(with_weave_means), utils.calculate_stats(
-        without_weave_means
-    )
+    return utils.calculate_stats(with_weave_means), utils.calculate_stats(without_weave_means)
 
 
 def write_results_to_csv(
@@ -158,12 +152,8 @@ def write_results_to_csv(
     ]:
         with_val = with_weave_stats[metric]
         without_val = without_weave_stats[metric]
-        overhead_pct = (
-            ((with_val - without_val) / without_val) * 100 if without_val > 0 else 0
-        )
-        rows.append(
-            [label, f"{with_val:.6f}", f"{without_val:.6f}", f"{overhead_pct:.2f}"]
-        )
+        overhead_pct = ((with_val - without_val) / without_val) * 100 if without_val > 0 else 0
+        rows.append([label, f"{with_val:.6f}", f"{without_val:.6f}", f"{overhead_pct:.2f}"])
 
     utils.write_csv_with_headers(filename, headers, rows)
 
@@ -194,9 +184,7 @@ def create_results_table(
     else:
         # Create from stats
         if with_weave_stats is None or without_weave_stats is None:
-            raise ValueError(
-                "with_weave_stats and without_weave_stats must be provided when csv_data is None"
-            )
+            raise ValueError("with_weave_stats and without_weave_stats must be provided when csv_data is None")
 
         for metric, label in [
             ("mean", "Mean"),
@@ -207,9 +195,7 @@ def create_results_table(
         ]:
             with_val = with_weave_stats[metric]
             without_val = without_weave_stats[metric]
-            overhead_pct = (
-                ((with_val - without_val) / without_val) * 100 if without_val > 0 else 0
-            )
+            overhead_pct = ((with_val - without_val) / without_val) * 100 if without_val > 0 else 0
 
             rows.append(
                 [
@@ -231,27 +217,21 @@ def create_results_table(
 
 def main() -> None:
     """Benchmark OpenAI calls with and without Weave logging."""
-    parser = argparse.ArgumentParser(
-        description="Benchmark Weave overhead on OpenAI calls"
-    )
+    parser = argparse.ArgumentParser(description="Benchmark Weave overhead on OpenAI calls")
     parser.add_argument(
         "--iterations",
         type=int,
         default=10,
         help="Number of API calls to make per round (default: 10)",
     )
-    parser.add_argument(
-        "--rounds", type=int, default=2, help="Number of rounds to run (default: 2)"
-    )
+    parser.add_argument("--rounds", type=int, default=2, help="Number of rounds to run (default: 2)")
     parser.add_argument(
         "--warmup",
         type=int,
         default=3,
         help="Number of warm-up calls before timing (default: 3)",
     )
-    parser.add_argument(
-        "--out_filetype", choices=["csv"], help="Output file type for results (csv)"
-    )
+    parser.add_argument("--out_filetype", choices=["csv"], help="Output file type for results (csv)")
     parser.add_argument(
         "--from_file",
         type=str,
@@ -286,9 +266,7 @@ def main() -> None:
     )
     console.print("Test order will alternate between rounds to eliminate bias.\n")
 
-    with_weave_stats, without_weave_stats = run_multiple_rounds(
-        args.iterations, args.rounds, args.warmup
-    )
+    with_weave_stats, without_weave_stats = run_multiple_rounds(args.iterations, args.rounds, args.warmup)
 
     if args.out_filetype == "csv":
         # Write to CSV and display from CSV
@@ -310,11 +288,7 @@ def main() -> None:
         console.print(table)
 
         mean_overhead = (
-            (
-                (with_weave_stats["mean"] - without_weave_stats["mean"])
-                / without_weave_stats["mean"]
-            )
-            * 100
+            ((with_weave_stats["mean"] - without_weave_stats["mean"]) / without_weave_stats["mean"]) * 100
             if without_weave_stats["mean"] > 0
             else 0
         )

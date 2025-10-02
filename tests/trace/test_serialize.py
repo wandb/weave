@@ -308,10 +308,7 @@ def test_to_json_function_with_memory_address_in_op(client) -> None:
 
 def test__replace_memory_address() -> None:
     # Test with memory addresses of different lengths
-    assert (
-        _replace_memory_address("<Function object at 0x1234>")
-        == "<Function object at 0x0000>"
-    )
+    assert _replace_memory_address("<Function object at 0x1234>") == "<Function object at 0x0000>"
     assert _replace_memory_address("<Class at 0xdeadbeef>") == "<Class at 0x00000000>"
 
     # Test with multiple memory addresses

@@ -187,13 +187,9 @@ class Progress:
     ):
         """Initialize the progress bar."""
         viewer = get_viewer()
-        self._progress: ProgressProtocol = viewer.create_progress(
-            console=console, **kwargs
-        )
+        self._progress: ProgressProtocol = viewer.create_progress(console=console, **kwargs)
 
-    def add_task(
-        self, description: str, total: float | None = None, **kwargs: Any
-    ) -> int:
+    def add_task(self, description: str, total: float | None = None, **kwargs: Any) -> int:
         """Add a task to the progress bar."""
         return self._progress.add_task(description, total=total, **kwargs)
 
@@ -206,9 +202,7 @@ class Progress:
         **kwargs: Any,
     ) -> None:
         """Update a task's progress."""
-        self._progress.update(
-            task_id, advance=advance, completed=completed, total=total, **kwargs
-        )
+        self._progress.update(task_id, advance=advance, completed=completed, total=total, **kwargs)
 
     def start(self) -> None:
         """Start the progress bar."""
@@ -240,9 +234,7 @@ class SyntaxHighlight:
     ):
         """Initialize syntax highlighting."""
         viewer = get_viewer()
-        self._syntax: SyntaxProtocol = viewer.create_syntax(
-            code, lexer, theme=theme, line_numbers=line_numbers
-        )
+        self._syntax: SyntaxProtocol = viewer.create_syntax(code, lexer, theme=theme, line_numbers=line_numbers)
 
     def to_string(self, console: Console | None = None) -> str:
         """Convert to string representation."""
@@ -263,11 +255,7 @@ class Text:
 
     def __repr__(self) -> str:
         """Get repr string."""
-        return (
-            repr(self._text_obj)
-            if hasattr(self._text_obj, "__repr__")
-            else str(self._text_obj)
-        )
+        return repr(self._text_obj) if hasattr(self._text_obj, "__repr__") else str(self._text_obj)
 
 
 class PaddingWrapper:

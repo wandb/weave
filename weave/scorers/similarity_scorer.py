@@ -31,14 +31,10 @@ class EmbeddingSimilarityScorer(LLMScorer):
         # Ensure the threshold is within the valid range for cosine similarity.
         assert -1 <= self.threshold <= 1, "`threshold` should be between -1 and 1"
 
-        model_embedding, target_embedding = await self._compute_embeddings(
-            output, target
-        )
+        model_embedding, target_embedding = await self._compute_embeddings(output, target)
         return self._cosine_similarity(model_embedding, target_embedding)
 
-    async def _compute_embeddings(
-        self, output: str, target: str
-    ) -> tuple[list[float], list[float]]:
+    async def _compute_embeddings(self, output: str, target: str) -> tuple[list[float], list[float]]:
         embeddings = await self._aembedding(self.model_id, [output, target])
         return embeddings.data[0]["embedding"], embeddings.data[1]["embedding"]
 

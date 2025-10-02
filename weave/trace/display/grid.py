@@ -185,9 +185,7 @@ class Row:
         if cycle:
             p.text("Row(...)")
         else:
-            items = [
-                f"{col.id}={display_value(self[col.id])}" for col in self.grid.columns
-            ]
+            items = [f"{col.id}={display_value(self[col.id])}" for col in self.grid.columns]
             p.text(f"Row({', '.join(items)})")
 
 
@@ -266,9 +264,7 @@ class Column:
         table = display.Table()
 
         # Add a single column with the column name
-        col_def = next(
-            (col for col in self.grid.columns if col.id == self.column_id), None
-        )
+        col_def = next((col for col in self.grid.columns if col.id == self.column_id), None)
         display_name = col_def.display_name if col_def else self.column_id
 
         # Set justification based on column type
@@ -352,9 +348,7 @@ class Grid:
                 elif col.type == "str" and not isinstance(value, str):
                     value = str(value)
             except (ValueError, TypeError):
-                raise ValueError(
-                    f"Cannot coerce value '{value}' to type '{col.type}' for column '{col.id}'"
-                ) from None
+                raise ValueError(f"Cannot coerce value '{value}' to type '{col.type}' for column '{col.id}'") from None
 
         self.rows[row_index][column_index] = value
         return self
@@ -367,17 +361,13 @@ class Grid:
         type: ColumnType | None = None,
     ) -> Grid:
         """Insert a new column at the specified index in the grid."""
-        self.columns.insert(
-            column_index, ColumnDefinition(id=name, label=label, type=type)
-        )
+        self.columns.insert(column_index, ColumnDefinition(id=name, label=label, type=type))
         self._column_id_to_index = {col.id: i for i, col in enumerate(self.columns)}
         for row_index in range(self.num_rows):
             self.rows[row_index].insert(column_index, None)
         return self
 
-    def add_column(
-        self, name: str, label: str | None = None, type: ColumnType | None = None
-    ) -> Grid:
+    def add_column(self, name: str, label: str | None = None, type: ColumnType | None = None) -> Grid:
         """Add a new column to the grid."""
         return self.insert_column(len(self.columns), name, label, type)
 
@@ -401,9 +391,7 @@ class Grid:
     def add_row(self, values: RowValues) -> Grid:
         """Add a new row of values to the grid."""
         if len(values) != len(self.columns):
-            raise ValueError(
-                f"Row length ({len(values)}) does not match number of columns ({len(self.columns)})"
-            )
+            raise ValueError(f"Row length ({len(values)}) does not match number of columns ({len(self.columns)})")
 
         # Check column types and coerce values if possible
         processed_values: RowValues = []
@@ -450,9 +438,7 @@ class Grid:
                 raise IndexError("Column index out of range")
             column_index = column
         else:
-            raise TypeError(
-                "Column must be specified by name (string) or index (integer)"
-            )
+            raise TypeError("Column must be specified by name (string) or index (integer)")
 
         # Extract values for the specified column from all rows
         return [row[column_index] for row in self.rows]
@@ -468,9 +454,7 @@ class Grid:
                 raise KeyError(f"Column '{key}' not found")
             column_id = key
         else:
-            raise TypeError(
-                "Key must be a string (column name) or integer (column index)"
-            )
+            raise TypeError("Key must be a string (column name) or integer (column index)")
         return Column(self, column_id)
 
     def __getitem__(self, key: str | int | slice) -> Column | Row | Grid:
@@ -491,9 +475,7 @@ class Grid:
             new_grid.rows = self.rows[start:stop:step]
             return new_grid
         else:
-            raise TypeError(
-                "Key must be a string (column name), integer (row index), or slice (row range)"
-            )
+            raise TypeError("Key must be a string (column name), integer (row index), or slice (row range)")
 
     @property
     def num_rows(self) -> int:
@@ -505,18 +487,14 @@ class Grid:
         """Return the number of columns in the grid."""
         return len(self.columns)
 
-    def to_rich_table(
-        self, row_start: int = 0, row_end: int | None = None
-    ) -> display.Table:
+    def to_rich_table(self, row_start: int = 0, row_end: int | None = None) -> display.Table:
         """Convert the grid spec (not calls) to a Table for pretty display."""
         table = display.Table()
 
         # Add columns to the table
         for col in self.columns:
             if col.type == "int":
-                table.add_column(
-                    col.display_name, justify="right", header_style="bold cyan"
-                )
+                table.add_column(col.display_name, justify="right", header_style="bold cyan")
             else:
                 table.add_column(col.display_name, header_style="bold cyan")
 
@@ -541,9 +519,7 @@ class Grid:
 
     def show(self, rows_per_page: int | None = None) -> None:
         if os.name == "nt":  # Windows
-            raise NotImplementedError(
-                "Interactive grid pagination is not yet supported on Windows."
-            )
+            raise NotImplementedError("Interactive grid pagination is not yet supported on Windows.")
 
         height = get_terminal_height()
         if self.num_rows < height:
@@ -556,17 +532,13 @@ class Grid:
             # Make rows_per_page a multiple of 5 with a minimum value of 5
             rows_per_page = max(5, (height // 5) * 5)
         page = 0
-        total_pages = (self.num_rows // rows_per_page) + (
-            1 if self.num_rows % rows_per_page else 0
-        )
+        total_pages = (self.num_rows // rows_per_page) + (1 if self.num_rows % rows_per_page else 0)
 
         console = display.Console()
         while True:
             console.clear()
             console.print(f"Page {page + 1}/{total_pages}", style="bold magenta")
-            paginated_table = self.to_rich_table(
-                page * rows_per_page, (page + 1) * rows_per_page
-            )
+            paginated_table = self.to_rich_table(page * rows_per_page, (page + 1) * rows_per_page)
             console.print(paginated_table.to_string(console))
             console.print(
                 "\nUse ← (left) / → (right) to navigate, 'q' to quit",

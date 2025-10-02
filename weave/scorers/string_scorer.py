@@ -15,9 +15,7 @@ class StringMatchScorer(weave.Scorer):
 
 
 class LevenshteinScorer(weave.Scorer):
-    distance: Callable[[str, str], int] = Field(
-        default=None, description="The Levenshtein distance function"
-    )
+    distance: Callable[[str, str], int] = Field(default=None, description="The Levenshtein distance function")
 
     @model_validator(mode="after")
     def check_levenshtein(self) -> "LevenshteinScorer":

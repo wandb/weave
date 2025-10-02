@@ -85,13 +85,13 @@ class AsyncBatchProcessor(Generic[T]):
                     # TODO: This is probably not what you want, but it will prevent OOM for now.
                     self._dropped_item_count += 1
                     item_id = id(item)
-                    error_message = f"Queue is full. Dropping item. Item ID: {item_id}. Max queue size: {self.queue.maxsize}"
+                    error_message = (
+                        f"Queue is full. Dropping item. Item ID: {item_id}. Max queue size: {self.queue.maxsize}"
+                    )
 
                     # Only log every 1000th dropped item
                     if self._dropped_item_count % 1000 == 0:
-                        logger.warning(
-                            f"{error_message}. Total dropped items: {self._dropped_item_count}"
-                        )
+                        logger.warning(f"{error_message}. Total dropped items: {self._dropped_item_count}")
                         if SENTRY_AVAILABLE:
                             sentry_sdk.capture_message(
                                 f"Queue full - dropped {self._dropped_item_count} items total",
@@ -141,9 +141,7 @@ class AsyncBatchProcessor(Generic[T]):
                 except Exception as e:
                     if get_raise_on_captured_errors():
                         raise
-                    logger.warning(
-                        f"Batch processing failed, processing items individually. Error: {e}"
-                    )
+                    logger.warning(f"Batch processing failed, processing items individually. Error: {e}")
                     # Process each item individually to identify unprocessable items, this can be
                     # costly for large batches!
                     self._process_batch_individually(current_batch)
@@ -166,10 +164,7 @@ class AsyncBatchProcessor(Generic[T]):
             error: The exception that occurred
         """
         item_id = id(item)
-        error_message = (
-            f"Unprocessable item detected, dropping item permanently. "
-            f"Item ID: {item_id}, Error: {error}"
-        )
+        error_message = f"Unprocessable item detected, dropping item permanently. Item ID: {item_id}, Error: {error}"
         logger.exception(error_message)
         if SENTRY_AVAILABLE:
             sentry_sdk.capture_message(error_message, level="error")

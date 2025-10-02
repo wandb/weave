@@ -80,9 +80,7 @@ def test_simple_chain_invoke(
 
     llm = ChatOpenAI(model_name="gpt-4o-mini", openai_api_key=api_key, temperature=0.0)
     prompt = PromptTemplate.from_template("1 + {number} = ")
-    long_str = (
-        "really_massive_name_that_is_longer_than_max_characters_which_would_be_crazy"
-    )
+    long_str = "really_massive_name_that_is_longer_than_max_characters_which_would_be_crazy"
     name = long_str + long_str
     prompt.name = name
 
@@ -118,9 +116,7 @@ def test_simple_chain_invoke_no_client(client) -> None:
 
     llm = ChatOpenAI(model_name="gpt-4o-mini", openai_api_key=api_key, temperature=0.0)
     prompt = PromptTemplate.from_template("1 + {number} = ")
-    long_str = (
-        "really_massive_name_that_is_longer_than_max_characters_which_would_be_crazy"
-    )
+    long_str = "really_massive_name_that_is_longer_than_max_characters_which_would_be_crazy"
     name = long_str + long_str
     prompt.name = name
 
@@ -428,9 +424,7 @@ def test_simple_rag_chain(client: WeaveClient, fix_chroma_ci: None) -> None:
 
     api_key = os.environ.get("OPENAI_API_KEY", "sk-1234567890abcdef1234567890abcdef")
 
-    vectorstore = Chroma.from_documents(
-        documents=splits, embedding=OpenAIEmbeddings(openai_api_key=api_key)
-    )
+    vectorstore = Chroma.from_documents(documents=splits, embedding=OpenAIEmbeddings(openai_api_key=api_key))
     retriever = vectorstore.as_retriever()
 
     prompt = ChatPromptTemplate.from_template(
@@ -448,10 +442,7 @@ def test_simple_rag_chain(client: WeaveClient, fix_chroma_ci: None) -> None:
 
     # Chain
     rag_chain = (
-        {"context": retriever | format_docs, "question": RunnablePassthrough()}
-        | prompt
-        | llm
-        | StrOutputParser()
+        {"context": retriever | format_docs, "question": RunnablePassthrough()} | prompt | llm | StrOutputParser()
     )
 
     rag_chain.invoke(
@@ -550,9 +541,7 @@ def test_agent_run_with_tools(
         {
             "input": lambda x: x["input"],
             "chat_history": lambda x: _format_chat_history(x["chat_history"]),
-            "agent_scratchpad": lambda x: format_to_openai_function_messages(
-                x["intermediate_steps"]
-            ),
+            "agent_scratchpad": lambda x: format_to_openai_function_messages(x["intermediate_steps"]),
         }
         | prompt
         | llm_with_tools
@@ -566,9 +555,7 @@ def test_agent_run_with_tools(
             extra={"widget": {"type": "chat", "input": "input", "output": "output"}},
         )
 
-    agent_executor = AgentExecutor(agent=agent, tools=tools).with_types(
-        input_type=AgentInput
-    )
+    agent_executor = AgentExecutor(agent=agent, tools=tools).with_types(input_type=AgentInput)
 
     _ = agent_executor.invoke(
         {"input": "What is 3 times 4 ?", "chat_history": []},
@@ -666,9 +653,7 @@ def test_agent_run_with_function_call(
         {
             "input": lambda x: x["input"],
             "chat_history": lambda x: _format_chat_history(x["chat_history"]),
-            "agent_scratchpad": lambda x: format_to_openai_function_messages(
-                x["intermediate_steps"]
-            ),
+            "agent_scratchpad": lambda x: format_to_openai_function_messages(x["intermediate_steps"]),
         }
         | prompt
         | llm_with_tools
@@ -682,9 +667,7 @@ def test_agent_run_with_function_call(
             extra={"widget": {"type": "chat", "input": "input", "output": "output"}},
         )
 
-    agent_executor = AgentExecutor(agent=agent, tools=tools).with_types(
-        input_type=AgentInput
-    )
+    agent_executor = AgentExecutor(agent=agent, tools=tools).with_types(input_type=AgentInput)
 
     _ = agent_executor.invoke(
         {"input": "What is 3 times 4 ?", "chat_history": []},
@@ -732,9 +715,7 @@ def test_langchain_google_vertexai_usage(client: WeaveClient) -> None:
     from google.auth.credentials import AnonymousCredentials
     from langchain_google_vertexai import ChatVertexAI
 
-    with patch(
-        "google.auth.default", return_value=(AnonymousCredentials(), "wandb-qa")
-    ):
+    with patch("google.auth.default", return_value=(AnonymousCredentials(), "wandb-qa")):
         llm = ChatVertexAI(
             model="gemini-2.5-pro-preview-05-06",
             temperature=0,

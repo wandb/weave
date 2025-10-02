@@ -133,8 +133,7 @@ CATEGORIES = [
         name="Python SDK",
         column_header="Py",
         emoji="🐍",
-        matcher=lambda path: path.startswith("weave/")
-        and not path.startswith("weave/trace_server/"),
+        matcher=lambda path: path.startswith("weave/") and not path.startswith("weave/trace_server/"),
     ),
 ]
 
@@ -153,9 +152,7 @@ class FileCategories:
     matches: dict[str, bool]
 
     @classmethod
-    def analyze(
-        cls, files: list[Any], categories: list[CategoryRule] = CATEGORIES
-    ) -> FileCategories:
+    def analyze(cls, files: list[Any], categories: list[CategoryRule] = CATEGORIES) -> FileCategories:
         """Analyze files against all category rules.
 
         Args:
@@ -170,9 +167,7 @@ class FileCategories:
 
         for category in categories:
             matches[category.name] = any(
-                category.matcher.match(path)
-                if isinstance(category.matcher, Pattern)
-                else category.matcher(path)
+                category.matcher.match(path) if isinstance(category.matcher, Pattern) else category.matcher(path)
                 for path in paths
             )
 
@@ -287,9 +282,7 @@ class GitHubDigest:
             reset_timestamp = rate_limit.core.reset.timestamp()
             sleep_time = reset_timestamp - time.time() + 1  # Add 1 second buffer
             if sleep_time > 0:
-                logger.warning(
-                    f"Rate limit reached. Waiting {sleep_time:.1f} seconds..."
-                )
+                logger.warning(f"Rate limit reached. Waiting {sleep_time:.1f} seconds...")
                 time.sleep(sleep_time)
                 self._rate_limit_remaining = None  # Force a recheck after waiting
 
@@ -370,9 +363,7 @@ class GitHubDigest:
             return title
         return title[: max_length - 3] + "..."
 
-    def _get_base_row_data(
-        self, item: Any, date_field: str, stats_source: Any = None
-    ) -> dict:
+    def _get_base_row_data(self, item: Any, date_field: str, stats_source: Any = None) -> dict:
         """Extract common row data from a GitHub item (commit or PR).
 
         Args:
@@ -394,9 +385,7 @@ class GitHubDigest:
 
         return {
             "date": date,
-            "line_diff": self.format_line_diff(
-                stats_obj.stats.additions, stats_obj.stats.deletions
-            ),
+            "line_diff": self.format_line_diff(stats_obj.stats.additions, stats_obj.stats.deletions),
             "files": str(stats_obj.stats.total),
             "url": stats_obj.html_url,
         }
@@ -514,9 +503,7 @@ class GitHubDigest:
 
         # Sort PRs by updated_at descending
         sorted_prs = sorted(prs, key=lambda x: x.updated_at, reverse=True)
-        results = self.process_items_parallel(
-            sorted_prs, self.process_pr, "Processing pull requests..."
-        )
+        results = self.process_items_parallel(sorted_prs, self.process_pr, "Processing pull requests...")
 
         ready_rows = []
         draft_rows = []
@@ -551,9 +538,7 @@ class GitHubDigest:
             rows=ready_rows,
         )
 
-        draft_section = Section(
-            title="Open Pull Requests - In Progress", headers=headers, rows=draft_rows
-        )
+        draft_section = Section(title="Open Pull Requests - In Progress", headers=headers, rows=draft_rows)
 
         return ready_section, draft_section
 
@@ -568,22 +553,14 @@ class GitHubDigest:
             commits = list(self.repo.get_commits(since=since_date, sha=self.branch))
 
             self._handle_rate_limit()
-            prs = [
-                pr
-                for pr in self.repo.get_pulls(state="open")
-                if pr.updated_at >= since_date
-            ]
+            prs = [pr for pr in self.repo.get_pulls(state="open") if pr.updated_at >= since_date]
 
         except RateLimitExceededException:
             logger.exception("Rate limit exceeded while fetching initial data")
             self._handle_rate_limit()
             # Retry once after waiting
             commits = list(self.repo.get_commits(since=since_date, sha=self.branch))
-            prs = [
-                pr
-                for pr in self.repo.get_pulls(state="open")
-                if pr.updated_at >= since_date
-            ]
+            prs = [pr for pr in self.repo.get_pulls(state="open") if pr.updated_at >= since_date]
         except GithubException as e:
             logger.exception("GitHub API error")
             raise
@@ -822,9 +799,7 @@ class SlackOutput:
 
         # Verify final size is within limits (including code block markers if table)
         if len(content) > self.MAX_CHARS_PER_BLOCK:
-            logger.warning(
-                f"Chunk exceeds character limit ({len(content)} > {self.MAX_CHARS_PER_BLOCK})"
-            )
+            logger.warning(f"Chunk exceeds character limit ({len(content)} > {self.MAX_CHARS_PER_BLOCK})")
 
         self.notifier.send_message(self.channel, content)
 
@@ -832,15 +807,9 @@ class SlackOutput:
 def main():
     """Main entry point for both CLI and Action modes."""
     parser = argparse.ArgumentParser(description="Generate GitHub activity digest")
-    parser.add_argument(
-        "--channel", default="weave-dev-digest", help="Slack channel name"
-    )
-    parser.add_argument(
-        "--repo", default="wandb/weave", help="Repository name (owner/repo)"
-    )
-    parser.add_argument(
-        "--days", type=int, default=7, help="Number of days to look back"
-    )
+    parser.add_argument("--channel", default="weave-dev-digest", help="Slack channel name")
+    parser.add_argument("--repo", default="wandb/weave", help="Repository name (owner/repo)")
+    parser.add_argument("--days", type=int, default=7, help="Number of days to look back")
     parser.add_argument("--branch", default="master", help="Branch to analyze")
     parser.add_argument(
         "--slack",

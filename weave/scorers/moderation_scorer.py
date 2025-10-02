@@ -43,11 +43,7 @@ class OpenAIModerationScorer(LLMScorer):
         response = response.results[0]
 
         passed = not response.flagged
-        categories = {
-            k: v
-            for k, v in response.categories
-            if v and ("/" not in k and "-" not in k)
-        }
+        categories = {k: v for k, v in response.categories if v and ("/" not in k and "-" not in k)}
         return {"passed": passed, "categories": categories}
 
 
@@ -118,9 +114,7 @@ class WeaveToxicityScorerV1(RollingWindowScorer):
     def load_model(self) -> None:
         from transformers import AutoModelForSequenceClassification
 
-        self._local_model_path = load_local_model_weights(
-            self.model_name_or_path, MODEL_PATHS["toxicity_scorer"]
-        )
+        self._local_model_path = load_local_model_weights(self.model_name_or_path, MODEL_PATHS["toxicity_scorer"])
         self._model = AutoModelForSequenceClassification.from_pretrained(
             self._local_model_path, trust_remote_code=True
         ).to(self.device)
@@ -155,9 +149,7 @@ class WeaveToxicityScorerV1(RollingWindowScorer):
     def score(self, *, output: str, **kwargs: Any) -> WeaveScorerResult:
         passed: bool = True
         predictions: list[float] = self._predict(output)
-        if (sum(predictions) >= self.total_threshold) or any(
-            o >= self.category_threshold for o in predictions
-        ):
+        if (sum(predictions) >= self.total_threshold) or any(o >= self.category_threshold for o in predictions):
             passed = False
 
         return WeaveScorerResult(
@@ -215,9 +207,7 @@ class WeaveBiasScorerV1(RollingWindowScorer):
     def load_model(self) -> None:
         from transformers import AutoModelForSequenceClassification
 
-        self._local_model_path = load_local_model_weights(
-            self.model_name_or_path, MODEL_PATHS["bias_scorer"]
-        )
+        self._local_model_path = load_local_model_weights(self.model_name_or_path, MODEL_PATHS["bias_scorer"])
         self._model = AutoModelForSequenceClassification.from_pretrained(
             self._local_model_path, trust_remote_code=True
         ).to(self.device)

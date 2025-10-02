@@ -71,9 +71,7 @@ def process_feedback_payload(
     if feedback_req.feedback_type == "wandb.reaction.1":
         em = feedback_req.payload["emoji"]
         if emoji.emoji_count(em) != 1:
-            raise InvalidRequest(
-                "Value of emoji key in payload must be exactly one emoji"
-            )
+            raise InvalidRequest("Value of emoji key in payload must be exactly one emoji")
         processed_payload["alias"] = emoji.demojize(em)
         detoned = detone_emojis(em)
         processed_payload["detoned"] = detoned
@@ -87,65 +85,45 @@ def process_feedback_payload(
     return processed_payload
 
 
-def validate_feedback_create_req(
-    req: tsi.FeedbackCreateReq, trace_server: tsi.TraceServerInterface
-) -> None:
+def validate_feedback_create_req(req: tsi.FeedbackCreateReq, trace_server: tsi.TraceServerInterface) -> None:
     payload_schema = FEEDBACK_PAYLOAD_SCHEMAS.get(req.feedback_type)
     if payload_schema:
         try:
             payload_schema(**req.payload)
         except ValidationError as e:
-            raise InvalidRequest(
-                f"Invalid payload for feedback_type {req.feedback_type}: {e}"
-            ) from e
+            raise InvalidRequest(f"Invalid payload for feedback_type {req.feedback_type}: {e}") from e
 
     # Validate the required fields for the feedback type.
     if feedback_type_is_annotation(req.feedback_type):
         if not req.feedback_type.startswith(ANNOTATION_FEEDBACK_TYPE_PREFIX + "."):
-            raise InvalidRequest(
-                f"Invalid annotation feedback type: {req.feedback_type}"
-            )
+            raise InvalidRequest(f"Invalid annotation feedback type: {req.feedback_type}")
         type_subname = req.feedback_type[len(ANNOTATION_FEEDBACK_TYPE_PREFIX) + 1 :]
         if not req.annotation_ref:
             raise InvalidRequest("annotation_ref is required for annotation feedback")
-        annotation_ref = ensure_ref_is_valid(
-            req.annotation_ref, (ri.InternalObjectRef,)
-        )
+        annotation_ref = ensure_ref_is_valid(req.annotation_ref, (ri.InternalObjectRef,))
         if annotation_ref.name != type_subname:
-            raise InvalidRequest(
-                f"annotation_ref must point to an object with name {type_subname}"
-            )
+            raise InvalidRequest(f"annotation_ref must point to an object with name {type_subname}")
         try:
             AnnotationPayloadSchema.model_validate(req.payload)
         except ValidationError as e:
-            raise InvalidRequest(
-                f"Invalid payload for feedback_type {req.feedback_type}: {e}"
-            ) from e
+            raise InvalidRequest(f"Invalid payload for feedback_type {req.feedback_type}: {e}") from e
     elif req.annotation_ref:
-        raise InvalidRequest(
-            "annotation_ref is not allowed for non-annotation feedback"
-        )
+        raise InvalidRequest("annotation_ref is not allowed for non-annotation feedback")
     elif feedback_type_is_runnable(req.feedback_type):
         if not req.feedback_type.startswith(RUNNABLE_FEEDBACK_TYPE_PREFIX + "."):
             raise InvalidRequest(f"Invalid runnable feedback type: {req.feedback_type}")
         type_subname = req.feedback_type[len(RUNNABLE_FEEDBACK_TYPE_PREFIX) + 1 :]
         if not req.runnable_ref:
             raise InvalidRequest("runnable_ref is required for runnable feedback")
-        runnable_ref = ensure_ref_is_valid(
-            req.runnable_ref, (ri.InternalOpRef, ri.InternalObjectRef)
-        )
+        runnable_ref = ensure_ref_is_valid(req.runnable_ref, (ri.InternalOpRef, ri.InternalObjectRef))
         if runnable_ref.name != type_subname:
-            raise InvalidRequest(
-                f"runnable_ref must point to an object with name {type_subname}"
-            )
+            raise InvalidRequest(f"runnable_ref must point to an object with name {type_subname}")
         if isinstance(runnable_ref, ri.InternalOpRef) and not req.call_ref:
             raise InvalidRequest("call_ref is required for runnable feedback on ops")
         try:
             RunnablePayloadSchema.model_validate(req.payload)
         except ValidationError as e:
-            raise InvalidRequest(
-                f"Invalid payload for feedback_type {req.feedback_type}: {e}"
-            ) from e
+            raise InvalidRequest(f"Invalid payload for feedback_type {req.feedback_type}: {e}") from e
     elif req.runnable_ref:
         raise InvalidRequest("runnable_ref is not allowed for non-runnable feedback")
     elif req.call_ref:
@@ -157,14 +135,10 @@ def validate_feedback_create_req(
     if req.annotation_ref:
         parsed = ensure_ref_is_valid(req.annotation_ref, (ri.InternalObjectRef,))
         if parsed.project_id != req.project_id:
-            raise InvalidRequest(
-                f"Annotation ref {req.annotation_ref} does not match project id {req.project_id}"
-            )
+            raise InvalidRequest(f"Annotation ref {req.annotation_ref} does not match project id {req.project_id}")
 
         # 2. Read the annotation spec
-        data = trace_server.refs_read_batch(
-            tsi.RefsReadBatchReq(refs=[req.annotation_ref])
-        )
+        data = trace_server.refs_read_batch(tsi.RefsReadBatchReq(refs=[req.annotation_ref]))
         if len(data.vals) == 0:
             raise InvalidRequest(f"Annotation ref {req.annotation_ref} not found")
 
@@ -182,9 +156,7 @@ def validate_feedback_create_req(
         ensure_ref_is_valid(req.trigger_ref, (ri.InternalObjectRef,))
 
 
-MESSAGE_INVALID_FEEDBACK_PURGE = (
-    "Can only purge feedback by specifying one or more feedback ids"
-)
+MESSAGE_INVALID_FEEDBACK_PURGE = "Can only purge feedback by specifying one or more feedback ids"
 
 
 def validate_feedback_purge_req(req: tsi.FeedbackPurgeReq) -> None:

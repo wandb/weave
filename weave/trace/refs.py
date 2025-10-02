@@ -49,19 +49,13 @@ class Ref:
             return TableRef(entity=entity, project=project, _digest=remaining[0])
         extra = tuple(urllib.parse.unquote(r) for r in remaining[1:])
         if kind == "call":
-            return CallRef(
-                entity=entity, project=project, id=remaining[0], _extra=extra
-            )
+            return CallRef(entity=entity, project=project, id=remaining[0], _extra=extra)
         elif kind == "object":
             name, version = parse_name_version(remaining[0])
-            return ObjectRef(
-                entity=entity, project=project, name=name, _digest=version, _extra=extra
-            )
+            return ObjectRef(entity=entity, project=project, name=name, _digest=version, _extra=extra)
         elif kind == "op":
             name, version = parse_name_version(remaining[0])
-            return OpRef(
-                entity=entity, project=project, name=name, _digest=version, _extra=extra
-            )
+            return OpRef(entity=entity, project=project, name=name, _digest=version, _extra=extra)
         else:
             raise ValueError(f"Unknown ref kind: {kind}")
 
@@ -109,9 +103,7 @@ class TableRef(Ref):
             self.__dict__["_row_digests"] = self._row_digests.result()
 
         if not isinstance(self._row_digests, list):
-            raise WeaveDigestError(
-                f"TableRef row_digests is not a list: {self._row_digests}"
-            )
+            raise WeaveDigestError(f"TableRef row_digests is not a list: {self._row_digests}")
 
         return self._row_digests
 
@@ -174,9 +166,7 @@ class ObjectRef(RefWithExtra):
     @property
     def extra(self) -> tuple[str, ...]:
         if any(isinstance(e, Future) for e in self._extra):
-            self.__dict__["_extra"] = tuple(
-                e if isinstance(e, str) else e.result() for e in self._extra
-            )
+            self.__dict__["_extra"] = tuple(e if isinstance(e, str) else e.result() for e in self._extra)
             refs_internal.validate_extra(list(self.extra))
 
         return cast(tuple[str, ...], self._extra)
@@ -228,9 +218,7 @@ class ObjectRef(RefWithExtra):
         # fetch the object. It is critical to reset the client after fetching the
         # object to avoid any side effects in user code.
 
-        client = init_weave(
-            f"{self.entity}/{self.project}", ensure_project_exists=False
-        )
+        client = init_weave(f"{self.entity}/{self.project}", ensure_project_exists=False)
         try:
             res = client.get(self, objectify=objectify)
         finally:
@@ -248,10 +236,7 @@ class ObjectRef(RefWithExtra):
             return False
         if len(self.extra) <= len(potential_ancestor.extra):
             return False
-        return all(
-            self.extra[i] == potential_ancestor.extra[i]
-            for i in range(len(potential_ancestor.extra))
-        )
+        return all(self.extra[i] == potential_ancestor.extra[i] for i in range(len(potential_ancestor.extra)))
 
     def delete(self) -> None:
         from weave.trace.context.weave_client_context import get_weave_client

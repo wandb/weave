@@ -45,9 +45,7 @@ def read_model_to_provider_info_map(
         with open(full_path) as f:
             return json.load(f)
     except Exception as e:
-        logger.exception(
-            f"Failed to read model to provider info file at: {full_path}", exc_info=e
-        )
+        logger.exception(f"Failed to read model to provider info file at: {full_path}", exc_info=e)
         return {}
 
 
@@ -124,9 +122,7 @@ def main(
         api_key_name = PROVIDER_TO_API_KEY_NAME_MAP.get(provider)
         if api_key_name is None:
             raise ValueError(f"No API key name found for provider: {provider}")
-        providers[model["idPlayground"]] = LLMModelProviderInfo(
-            litellm_provider=provider, api_key_name=api_key_name
-        )
+        providers[model["idPlayground"]] = LLMModelProviderInfo(litellm_provider=provider, api_key_name=api_key_name)
 
     # Next add in information from the LiteLLM model provider info file
     try:
@@ -145,16 +141,12 @@ def main(
         provider = val.get("litellm_provider")
         api_key_name = PROVIDER_TO_API_KEY_NAME_MAP.get(provider)
         if api_key_name:
-            providers[k] = LLMModelProviderInfo(
-                litellm_provider=provider, api_key_name=api_key_name
-            )
+            providers[k] = LLMModelProviderInfo(litellm_provider=provider, api_key_name=api_key_name)
     full_path_output = os.path.join(os.path.dirname(__file__), file_name)
     os.makedirs(os.path.dirname(full_path_output), exist_ok=True)
     with open(full_path_output, "w") as f:
         json.dump(providers, f, indent=2)
-    print(
-        f"Updated model to model provider info file at: {full_path_output}. {len(providers)} models updated."
-    )
+    print(f"Updated model to model provider info file at: {full_path_output}. {len(providers)} models updated.")
     return providers
 
 

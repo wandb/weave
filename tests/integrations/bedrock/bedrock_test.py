@@ -146,13 +146,7 @@ MOCK_APPLY_GUARDRAIL_RESPONSE = {
         }
     ],
     "assessments": [
-        {
-            "topicPolicy": {
-                "topics": [
-                    {"name": "Financial advice", "type": "FILTERED", "confidence": 0.95}
-                ]
-            }
-        }
+        {"topicPolicy": {"topics": [{"name": "Financial advice", "type": "FILTERED", "confidence": 0.95}]}}
     ],
     "usage": {"inputTokens": 25, "outputTokens": 45, "totalTokens": 70},
 }
@@ -177,15 +171,7 @@ MOCK_APPLY_GUARDRAIL_INTERVENTION_RESPONSE = {
             "text": "I cannot provide specific investment advice. Please consult with a qualified financial advisor for personalized retirement planning guidance."
         }
     ],
-    "assessments": [
-        {
-            "topicPolicy": {
-                "topics": [
-                    {"name": "Financial advice", "type": "BLOCKED", "confidence": 0.98}
-                ]
-            }
-        }
-    ],
+    "assessments": [{"topicPolicy": {"topics": [{"name": "Financial advice", "type": "BLOCKED", "confidence": 0.98}]}}],
     "usage": {"inputTokens": 25, "outputTokens": 30, "totalTokens": 55},
 }
 
@@ -212,9 +198,7 @@ def mock_invoke_make_api_call(self, operation_name: str, api_params: dict) -> di
     return orig(self, operation_name, api_params)
 
 
-def mock_apply_guardrail_make_api_call(
-    self, operation_name: str, api_params: dict
-) -> dict:
+def mock_apply_guardrail_make_api_call(self, operation_name: str, api_params: dict) -> dict:
     if operation_name == "ApplyGuardrail":
         # Check if we should return the intervention response based on the content
         content = api_params.get("content", [])
@@ -226,9 +210,7 @@ def mock_apply_guardrail_make_api_call(
     return orig(self, operation_name, api_params)
 
 
-def mock_invoke_exception_make_api_call(
-    self, operation_name: str, api_params: dict
-) -> dict:
+def mock_invoke_exception_make_api_call(self, operation_name: str, api_params: dict) -> dict:
     if operation_name == "InvokeModel":
         # Simulate a ValidationException for invalid model ID
         from botocore.exceptions import ClientError
@@ -248,15 +230,11 @@ def mock_invoke_exception_make_api_call(
 @pytest.mark.skip_clickhouse_client
 @mock_aws
 @pytest.mark.parametrize("model_identifier", [model_id, inference_profile_id])
-def test_bedrock_converse(
-    client: weave.trace.weave_client.WeaveClient, model_identifier: str
-) -> None:
+def test_bedrock_converse(client: weave.trace.weave_client.WeaveClient, model_identifier: str) -> None:
     bedrock_client = boto3.client("bedrock-runtime", region_name="us-east-1")
     patch_client(bedrock_client)
 
-    with patch(
-        "botocore.client.BaseClient._make_api_call", new=mock_converse_make_api_call
-    ):
+    with patch("botocore.client.BaseClient._make_api_call", new=mock_converse_make_api_call):
         response = bedrock_client.converse(
             modelId=model_identifier,
             system=[{"text": system_message}],
@@ -303,15 +281,11 @@ def test_bedrock_converse(
 @pytest.mark.skip_clickhouse_client
 @mock_aws
 @pytest.mark.parametrize("model_identifier", [model_id, inference_profile_id])
-def test_bedrock_converse_stream(
-    client: weave.trace.weave_client.WeaveClient, model_identifier: str
-) -> None:
+def test_bedrock_converse_stream(client: weave.trace.weave_client.WeaveClient, model_identifier: str) -> None:
     bedrock_client = boto3.client("bedrock-runtime", region_name="us-east-1")
     patch_client(bedrock_client)
 
-    with patch(
-        "botocore.client.BaseClient._make_api_call", new=mock_converse_make_api_call
-    ):
+    with patch("botocore.client.BaseClient._make_api_call", new=mock_converse_make_api_call):
         response = bedrock_client.converse_stream(
             modelId=model_identifier,
             system=[{"text": system_message}],
@@ -361,9 +335,7 @@ def test_bedrock_invoke(client: weave.trace.weave_client.WeaveClient) -> None:
     bedrock_client = boto3.client("bedrock-runtime", region_name="us-east-1")
     patch_client(bedrock_client)
 
-    with patch(
-        "botocore.client.BaseClient._make_api_call", new=mock_invoke_make_api_call
-    ):
+    with patch("botocore.client.BaseClient._make_api_call", new=mock_invoke_make_api_call):
         # Call the custom op that wraps the bedrock_client.invoke_model call
         body = json.dumps(
             {
@@ -386,9 +358,7 @@ def test_bedrock_invoke(client: weave.trace.weave_client.WeaveClient) -> None:
         assert "type" in response
         assert response["type"] == "message"
         assert "content" in response
-        assert response["content"][0]["text"].startswith(
-            "To list all text files in the current directory"
-        )
+        assert response["content"][0]["text"].startswith("To list all text files in the current directory")
 
     # Check that a trace was captured
     calls = list(client.get_calls())
@@ -424,9 +394,7 @@ def test_bedrock_apply_guardrail(client: weave.trace.weave_client.WeaveClient) -
         "botocore.client.BaseClient._make_api_call",
         new=mock_apply_guardrail_make_api_call,
     ):
-        result = scorer.score(
-            output="How should I think about retirement planning in general?"
-        )
+        result = scorer.score(output="How should I think about retirement planning in general?")
 
         # Verify the result
         assert result.passed is True
@@ -435,10 +403,7 @@ def test_bedrock_apply_guardrail(client: weave.trace.weave_client.WeaveClient) -
         assert "assessments" in result.metadata
 
         # Check that the modified output matches our mock
-        assert (
-            result.metadata["modified_output"]
-            == MOCK_APPLY_GUARDRAIL_RESPONSE["outputs"][0]["text"]
-        )
+        assert result.metadata["modified_output"] == MOCK_APPLY_GUARDRAIL_RESPONSE["outputs"][0]["text"]
 
         # Check usage data
         assert result.metadata["usage"]["inputTokens"] == 25
@@ -461,9 +426,7 @@ def test_bedrock_apply_guardrail(client: weave.trace.weave_client.WeaveClient) -
         "botocore.client.BaseClient._make_api_call",
         new=mock_apply_guardrail_make_api_call,
     ):
-        result = scorer.score(
-            output="Give me specific investment advice for my retirement to generate $5,000 monthly."
-        )
+        result = scorer.score(output="Give me specific investment advice for my retirement to generate $5,000 monthly.")
 
         # Verify the result shows intervention
         assert result.passed is False
@@ -472,10 +435,7 @@ def test_bedrock_apply_guardrail(client: weave.trace.weave_client.WeaveClient) -
         assert "assessments" in result.metadata
 
         # Check that the modified output matches our intervention mock
-        assert (
-            result.metadata["modified_output"]
-            == MOCK_APPLY_GUARDRAIL_INTERVENTION_RESPONSE["outputs"][0]["text"]
-        )
+        assert result.metadata["modified_output"] == MOCK_APPLY_GUARDRAIL_INTERVENTION_RESPONSE["outputs"][0]["text"]
 
         # Check usage data
         assert result.metadata["usage"]["inputTokens"] == 25

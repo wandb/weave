@@ -29,9 +29,7 @@ def test_max_batch_size():
 
 def test_min_batch_interval():
     processor_fn = MagicMock()
-    processor = AsyncBatchProcessor(
-        processor_fn, max_batch_size=100, min_batch_interval=1
-    )
+    processor = AsyncBatchProcessor(processor_fn, max_batch_size=100, min_batch_interval=1)
 
     # Queue up batches of 3 items within the min_batch_interval
     processor.enqueue([1, 2, 3])
@@ -47,9 +45,7 @@ def test_min_batch_interval():
 
 def test_wait_until_all_processed():
     processor_fn = MagicMock()
-    processor = AsyncBatchProcessor(
-        processor_fn, max_batch_size=100, min_batch_interval=0.01
-    )
+    processor = AsyncBatchProcessor(processor_fn, max_batch_size=100, min_batch_interval=0.01)
 
     processor.enqueue([1, 2, 3])
     processor.stop_accepting_new_work_and_flush_queue()
@@ -69,9 +65,7 @@ def test_wait_until_all_processed():
 def test_health_check_thread_is_created():
     """Test that health check thread is created and running."""
     processor_fn = MagicMock()
-    processor = AsyncBatchProcessor(
-        processor_fn, max_batch_size=100, min_batch_interval=0.1
-    )
+    processor = AsyncBatchProcessor(processor_fn, max_batch_size=100, min_batch_interval=0.1)
 
     # Health check thread should be alive
     assert processor.health_check_thread.is_alive()
@@ -93,36 +87,24 @@ def test_health_check_functionality_and_logging():
     """Test health check revival functionality, logging, and full queue behavior."""
     processor_fn = MagicMock()
 
-    with patch(
-        "weave.trace_server_bindings.async_batch_processor.logger"
-    ) as mock_logger:
+    with patch("weave.trace_server_bindings.async_batch_processor.logger") as mock_logger:
         # Create processor with small queue to test full queue behavior
-        processor = AsyncBatchProcessor(
-            processor_fn, max_batch_size=100, min_batch_interval=0.1, max_queue_size=1
-        )
+        processor = AsyncBatchProcessor(processor_fn, max_batch_size=100, min_batch_interval=0.1, max_queue_size=1)
 
         # Test 1: Test the _ensure_health_check_alive method directly
         original_health_thread = processor.health_check_thread
-        with patch.object(
-            processor.health_check_thread, "is_alive", return_value=False
-        ):
+        with patch.object(processor.health_check_thread, "is_alive", return_value=False):
             processor._ensure_health_check_alive()
 
             # Should have created a new health check thread
             assert processor.health_check_thread != original_health_thread
             assert processor.health_check_thread.is_alive()
-            mock_logger.warning.assert_called_with(
-                "Health check thread died, attempting to revive it"
-            )
-            mock_logger.info.assert_called_with(
-                "Health check thread successfully revived"
-            )
+            mock_logger.warning.assert_called_with("Health check thread died, attempting to revive it")
+            mock_logger.info.assert_called_with("Health check thread successfully revived")
 
         # Test 2: Health check revival on full queue
         mock_logger.reset_mock()
-        with patch.object(
-            processor.health_check_thread, "is_alive", return_value=False
-        ):
+        with patch.object(processor.health_check_thread, "is_alive", return_value=False):
             processor.enqueue([1])  # Fills the queue
             processor.enqueue([2])  # Should trigger Full exception
 
@@ -142,9 +124,7 @@ def test_processing_thread_exception_handling():
     def failing_processor_fn(batch):
         raise RuntimeError("Simulated processing error")
 
-    with patch(
-        "weave.trace_server_bindings.async_batch_processor.logger"
-    ) as mock_logger:
+    with patch("weave.trace_server_bindings.async_batch_processor.logger") as mock_logger:
         processor = AsyncBatchProcessor(
             failing_processor_fn,
             max_batch_size=100,
@@ -159,10 +139,7 @@ def test_processing_thread_exception_handling():
 
         # Stop and check logs
         processor.stop_accepting_new_work_and_flush_queue()
-        assert (
-            "Unprocessable item detected, dropping item permanently."
-            in mock_logger.exception.call_args[0][0]
-        )
+        assert "Unprocessable item detected, dropping item permanently." in mock_logger.exception.call_args[0][0]
 
         # make sure we can restart and everything is as expected
         processor.accept_new_work()
@@ -181,9 +158,7 @@ def test_realistic_health_check_revival_scenario():
         processed_items.extend(batch)
         time.sleep(0.05)  # Simulate some processing time
 
-    with patch(
-        "weave.trace_server_bindings.async_batch_processor.logger"
-    ) as mock_logger:
+    with patch("weave.trace_server_bindings.async_batch_processor.logger") as mock_logger:
         # Use shorter intervals for faster testing
         with patch(
             "weave.trace_server_bindings.async_batch_processor.HEALTH_CHECK_INTERVAL",
@@ -209,9 +184,7 @@ def test_realistic_health_check_revival_scenario():
             original_processing_thread = processor.processing_thread
 
             # Mock the processing thread to appear dead
-            with patch.object(
-                processor.processing_thread, "is_alive", return_value=False
-            ):
+            with patch.object(processor.processing_thread, "is_alive", return_value=False):
                 # Step 3: Immediately enqueue another item
                 processor.enqueue([6])
 
@@ -312,9 +285,7 @@ def test_poison_pill_detection_and_immediate_drop():
             # Should have at least 4 log entries (2 poison pills + 2 queue full items)
             assert len(log_content) >= 4
             # Check that queue full items were logged
-            queue_full_entries = [
-                line for line in log_content if "Queue is full" in line
-            ]
+            queue_full_entries = [line for line in log_content if "Queue is full" in line]
             assert len(queue_full_entries) >= 2
 
         # Test 5: Disk fallback disabled - no files should be written
@@ -363,9 +334,7 @@ def test_log_rotation_and_disk_fallback():
 
             # Test 1: Fill up the log file to trigger rotation
             # Add enough items to exceed the mocked 200 byte limit
-            large_items = [
-                f"large_item_{i}" * 10 for i in range(10)
-            ]  # Make items large
+            large_items = [f"large_item_{i}" * 10 for i in range(10)]  # Make items large
             for item in large_items:
                 processor._write_item_to_disk(item, "Test rotation trigger")
 
@@ -380,9 +349,7 @@ def test_log_rotation_and_disk_fallback():
 
             # Check max backup files limit (should only keep MAX_LOGFILES-1 backups)
             backup2_path = log_path.with_suffix(".2")
-            backup3_path = log_path.with_suffix(
-                ".3"
-            )  # Should not exist due to MAX_LOGFILES=2
+            backup3_path = log_path.with_suffix(".3")  # Should not exist due to MAX_LOGFILES=2
 
             assert log_path.exists(), "Main log file should exist"
             assert backup_path.exists(), "First backup should exist"
@@ -391,9 +358,7 @@ def test_log_rotation_and_disk_fallback():
             # Test 3: Error handling in disk operations
             with (
                 patch("builtins.open", side_effect=PermissionError("No write access")),
-                patch(
-                    "weave.trace_server_bindings.async_batch_processor.logger"
-                ) as mock_logger,
+                patch("weave.trace_server_bindings.async_batch_processor.logger") as mock_logger,
             ):
                 processor._write_item_to_disk("test_item", "Permission test")
 
@@ -406,24 +371,16 @@ def test_log_rotation_and_disk_fallback():
             # First ensure the log file exists and has enough content to trigger rotation
             # Add multiple large items to exceed the 200 byte limit
             for i in range(5):
-                processor._write_item_to_disk(
-                    f"large_setup_item_{i}" * 20, "Setup for rename failure test"
-                )
+                processor._write_item_to_disk(f"large_setup_item_{i}" * 20, "Setup for rename failure test")
 
             # Verify file exists and is large enough before testing rename failure
-            assert log_path.exists(), (
-                "Log file should exist before testing rename failure"
-            )
-            assert log_path.stat().st_size > 200, (
-                "Log file should be large enough to trigger rotation"
-            )
+            assert log_path.exists(), "Log file should exist before testing rename failure"
+            assert log_path.stat().st_size > 200, "Log file should be large enough to trigger rotation"
 
             # Mock pathlib.Path.rename at the class level to simulate a rename failure
             with (
                 patch("pathlib.Path.rename", side_effect=OSError("Rename failed")),
-                patch(
-                    "weave.trace_server_bindings.async_batch_processor.logger"
-                ) as mock_logger,
+                patch("weave.trace_server_bindings.async_batch_processor.logger") as mock_logger,
             ):
                 processor._rotate_log_file_if_needed()
 
@@ -441,13 +398,9 @@ def test_log_rotation_and_disk_fallback():
             )
 
             # Should create nested directories automatically
-            processor_nested._write_item_to_disk(
-                "test_nested", "Directory creation test"
-            )
+            processor_nested._write_item_to_disk("test_nested", "Directory creation test")
             assert nested_log_path.exists(), "Should create nested directories"
-            assert nested_log_path.parent.exists(), (
-                "Parent directories should be created"
-            )
+            assert nested_log_path.parent.exists(), "Parent directories should be created"
 
             processor.stop_accepting_new_work_and_flush_queue()
             processor_nested.stop_accepting_new_work_and_flush_queue()

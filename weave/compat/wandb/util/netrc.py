@@ -87,9 +87,7 @@ class Netrc:
                     "password": password or "",
                 }
         except netrc.NetrcParseError as e:
-            raise netrc.NetrcParseError(
-                f"Failed to parse netrc file: {self.path}"
-            ) from e
+            raise netrc.NetrcParseError(f"Failed to parse netrc file: {self.path}") from e
         else:
             return result
 
@@ -127,9 +125,7 @@ class Netrc:
         except OSError as e:
             raise PermissionError(f"Unable to write to netrc file: {self.path}") from e
 
-    def add_or_update_entry(
-        self, machine: str, login: str, password: str, account: str = ""
-    ) -> None:
+    def add_or_update_entry(self, machine: str, login: str, password: str, account: str = "") -> None:
         """Add or update an entry in the netrc file.
 
         Args:

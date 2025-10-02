@@ -227,9 +227,7 @@ def test_query_heavy_column_simple_filter_with_order_and_limit() -> None:
     )
 
 
-def test_query_heavy_column_simple_filter_with_order_and_limit_and_mixed_query_conditions() -> (
-    None
-):
+def test_query_heavy_column_simple_filter_with_order_and_limit_and_mixed_query_conditions() -> None:
     cq = CallsQuery(project_id="project")
     cq.add_field("id")
     cq.add_field("inputs")
@@ -259,9 +257,7 @@ def test_query_heavy_column_simple_filter_with_order_and_limit_and_mixed_query_c
                             {"$literal": "true"},
                         ]
                     },  # <-- heavy condition with boolean literal
-                    {
-                        "$eq": [{"$getField": "wb_user_id"}, {"$literal": "my_user_id"}]
-                    },  # <-- light condition
+                    {"$eq": [{"$getField": "wb_user_id"}, {"$literal": "my_user_id"}]},  # <-- light condition
                 ]
             }
         )
@@ -333,9 +329,7 @@ def assert_sql(cq: CallsQuery, exp_query, exp_params):
 
 
 def test_query_light_column_with_costs() -> None:
-    cq = CallsQuery(
-        project_id="UHJvamVjdEludGVybmFsSWQ6Mzk1NDg2Mjc=", include_costs=True
-    )
+    cq = CallsQuery(project_id="UHJvamVjdEludGVybmFsSWQ6Mzk1NDg2Mjc=", include_costs=True)
     cq.add_field("id")
     cq.add_field("started_at")
     cq.set_hardcoded_filter(
@@ -534,9 +528,7 @@ def test_query_with_simple_feedback_sort_with_op_name() -> None:
     cq = CallsQuery(project_id="project")
     cq.add_field("id")
     cq.set_hardcoded_filter(
-        HardCodedFilter(
-            filter={"op_names": ["weave-trace-internal:///project/op/my_op:1234567890"]}
-        )
+        HardCodedFilter(filter={"op_names": ["weave-trace-internal:///project/op/my_op:1234567890"]})
     )
     cq.add_order("feedback.[wandb.runnable.my_op].payload.output.expected", "desc")
     assert_sql(
@@ -632,12 +624,8 @@ def test_query_with_simple_feedback_filter() -> None:
         tsi_query.GtOperation.model_validate(
             {
                 "$gt": [
-                    {
-                        "$getField": "feedback.[wandb.runnable.my_op].payload.output.expected"
-                    },
-                    {
-                        "$getField": "feedback.[wandb.runnable.my_op].payload.output.found"
-                    },
+                    {"$getField": "feedback.[wandb.runnable.my_op].payload.output.expected"},
+                    {"$getField": "feedback.[wandb.runnable.my_op].payload.output.found"},
                 ]
             }
         )
@@ -686,9 +674,7 @@ def test_query_with_simple_feedback_sort_and_filter() -> None:
         tsi_query.EqOperation.model_validate(
             {
                 "$eq": [
-                    {
-                        "$getField": "feedback.[wandb.runnable.my_op].payload.output.expected"
-                    },
+                    {"$getField": "feedback.[wandb.runnable.my_op].payload.output.expected"},
                     {"$literal": "a"},
                 ]
             }
@@ -801,9 +787,7 @@ def test_calls_query_with_predicate_filters() -> None:
                             {"$literal": "hello"},
                         ]
                     },  # <-- heavy condition
-                    {
-                        "$eq": [{"$getField": "wb_user_id"}, {"$literal": "my_user_id"}]
-                    },  # <-- light condition
+                    {"$eq": [{"$getField": "wb_user_id"}, {"$literal": "my_user_id"}]},  # <-- light condition
                 ]
             }
         )
@@ -907,9 +891,7 @@ def test_query_with_summary_weave_status_sort_and_filter() -> None:
 
     # Add a condition to filter for only successful calls
     cq.add_condition(
-        tsi_query.EqOperation.model_validate(
-            {"$eq": [{"$getField": "summary.weave.status"}, {"$literal": "success"}]}
-        )
+        tsi_query.EqOperation.model_validate({"$eq": [{"$getField": "summary.weave.status"}, {"$literal": "success"}]})
     )
 
     # Sort by status descending
@@ -973,9 +955,7 @@ def test_calls_query_with_predicate_filters_multiple_heavy_conditions() -> None:
                             {"$literal": "success"},
                         ]
                     },  # <-- heavy condition on end-only field
-                    {
-                        "$eq": [{"$getField": "wb_user_id"}, {"$literal": "my_user_id"}]
-                    },  # <-- light condition
+                    {"$eq": [{"$getField": "wb_user_id"}, {"$literal": "my_user_id"}]},  # <-- light condition
                 ]
             }
         )
@@ -1461,9 +1441,7 @@ def test_calls_query_filter_by_empty_string() -> None:
     cq.add_field("id")
     cq.add_field("inputs")
     cq.add_condition(
-        tsi_query.EqOperation.model_validate(
-            {"$eq": [{"$getField": "inputs.param.val"}, {"$literal": ""}]}
-        )
+        tsi_query.EqOperation.model_validate({"$eq": [{"$getField": "inputs.param.val"}, {"$literal": ""}]})
     )
     # Empty string is not a valid value for LIKE optimization, this test ensures we do
     # not try to optimize
@@ -1538,9 +1516,7 @@ def test_query_with_summary_weave_latency_ms_filter() -> None:
 
     # Add a condition to filter for calls with latency greater than 1000ms (1s)
     cq.add_condition(
-        tsi_query.GtOperation.model_validate(
-            {"$gt": [{"$getField": "summary.weave.latency_ms"}, {"$literal": 1000}]}
-        )
+        tsi_query.GtOperation.model_validate({"$gt": [{"$getField": "summary.weave.latency_ms"}, {"$literal": 1000}]})
     )
 
     # Assert that the query includes a filter on the latency field
@@ -1714,9 +1690,7 @@ def test_total_storage_size():
 
 def test_aggregated_data_size_field():
     """Test the AggregatedDataSizeField class."""
-    field = AggregatedDataSizeField(
-        field="total_storage_size_bytes", join_table_name="rolled_up_cms"
-    )
+    field = AggregatedDataSizeField(field="total_storage_size_bytes", join_table_name="rolled_up_cms")
     pb = ParamBuilder()
 
     # Test SQL generation
@@ -1829,9 +1803,7 @@ def test_datetime_optimization_multiple_conditions() -> None:
                                     {
                                         "$gt": [
                                             {"$getField": "started_at"},
-                                            {
-                                                "$literal": 1709337600
-                                            },  # 2024-03-02 00:00:00 UTC
+                                            {"$literal": 1709337600},  # 2024-03-02 00:00:00 UTC
                                         ]
                                     }
                                 ]
@@ -1953,12 +1925,8 @@ def test_query_with_feedback_filter_and_datetime_and_string_filter() -> None:
                 "$and": [
                     {
                         "$gt": [
-                            {
-                                "$getField": "feedback.[wandb.runnable.my_op].payload.output.expected"
-                            },
-                            {
-                                "$getField": "feedback.[wandb.runnable.my_op].payload.output.found"
-                            },
+                            {"$getField": "feedback.[wandb.runnable.my_op].payload.output.expected"},
+                            {"$getField": "feedback.[wandb.runnable.my_op].payload.output.found"},
                         ]
                     },
                     {
@@ -2019,9 +1987,7 @@ def test_query_with_feedback_filter_and_datetime_and_string_filter() -> None:
 def test_trace_id_filter_in():
     cq = CallsQuery(project_id="project")
     cq.add_field("id")
-    cq.hardcoded_filter = HardCodedFilter(
-        filter={"trace_ids": ["111111111111", "222222222222"]}
-    )
+    cq.hardcoded_filter = HardCodedFilter(filter={"trace_ids": ["111111111111", "222222222222"]})
     assert_sql(
         cq,
         """
@@ -2126,9 +2092,7 @@ def test_trace_roots_only_filter_with_condition():
 def test_parent_id_filter():
     cq = CallsQuery(project_id="project")
     cq.add_field("id")
-    cq.hardcoded_filter = HardCodedFilter(
-        filter={"parent_ids": ["111111111111", "222222222222"]}
-    )
+    cq.hardcoded_filter = HardCodedFilter(filter={"parent_ids": ["111111111111", "222222222222"]})
     assert_sql(
         cq,
         """
@@ -2259,44 +2223,32 @@ def test_filter_length_validation():
     """Test that filter length validation works."""
     pb = ParamBuilder()
     cq = CallsQuery(project_id="test/project")
-    cq.hardcoded_filter = HardCodedFilter(
-        filter={"op_names": ["weave-trace-internal:///%"] * 1001}
-    )
+    cq.hardcoded_filter = HardCodedFilter(filter={"op_names": ["weave-trace-internal:///%"] * 1001})
     with pytest.raises(ValueError):
         cq.as_sql(pb)
 
     cq = CallsQuery(project_id="test/project")
-    cq.hardcoded_filter = HardCodedFilter(
-        filter={"input_refs": ["weave-trace-internal:///%"] * 1001}
-    )
+    cq.hardcoded_filter = HardCodedFilter(filter={"input_refs": ["weave-trace-internal:///%"] * 1001})
     with pytest.raises(ValueError):
         cq.as_sql(pb)
 
     cq = CallsQuery(project_id="test/project")
-    cq.hardcoded_filter = HardCodedFilter(
-        filter={"output_refs": ["weave-trace-internal:///%"] * 1001}
-    )
+    cq.hardcoded_filter = HardCodedFilter(filter={"output_refs": ["weave-trace-internal:///%"] * 1001})
     with pytest.raises(ValueError):
         cq.as_sql(pb)
 
     cq = CallsQuery(project_id="test/project")
-    cq.hardcoded_filter = HardCodedFilter(
-        filter={"parent_ids": ["weave-trace-internal:///%"] * 1001}
-    )
+    cq.hardcoded_filter = HardCodedFilter(filter={"parent_ids": ["weave-trace-internal:///%"] * 1001})
     with pytest.raises(ValueError):
         cq.as_sql(pb)
 
     cq = CallsQuery(project_id="test/project")
-    cq.hardcoded_filter = HardCodedFilter(
-        filter={"trace_ids": ["weave-trace-internal:///%"] * 1001}
-    )
+    cq.hardcoded_filter = HardCodedFilter(filter={"trace_ids": ["weave-trace-internal:///%"] * 1001})
     with pytest.raises(ValueError):
         cq.as_sql(pb)
 
     cq = CallsQuery(project_id="test/project")
-    cq.hardcoded_filter = HardCodedFilter(
-        filter={"call_ids": ["weave-trace-internal:///%"] * 1001}
-    )
+    cq.hardcoded_filter = HardCodedFilter(filter={"call_ids": ["weave-trace-internal:///%"] * 1001})
     with pytest.raises(ValueError):
         cq.as_sql(pb)
     cq = CallsQuery(project_id="test/project")
@@ -2396,9 +2348,7 @@ def test_thread_id_filter_in():
     """Test thread_id filter with multiple thread IDs."""
     cq = CallsQuery(project_id="project")
     cq.add_field("id")
-    cq.hardcoded_filter = HardCodedFilter(
-        filter={"thread_ids": ["thread_123", "thread_456"]}
-    )
+    cq.hardcoded_filter = HardCodedFilter(filter={"thread_ids": ["thread_123", "thread_456"]})
     assert_sql(
         cq,
         """

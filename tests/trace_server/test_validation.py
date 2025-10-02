@@ -46,32 +46,21 @@ def test_validate_purge_req_one():
     assert str(e.value) == validation.MESSAGE_INVALID_PURGE
 
     with pytest.raises(InvalidRequest) as e:
-        validation.validate_purge_req_one(
-            {"eq_": {"get_field_": "foo"}, "literal_": "bar"}
-        )
-    assert (
-        str(e.value)
-        == "Expected a dictionary with one key, got {'eq_': {'get_field_': 'foo'}, 'literal_': 'bar'}"
-    )
+        validation.validate_purge_req_one({"eq_": {"get_field_": "foo"}, "literal_": "bar"})
+    assert str(e.value) == "Expected a dictionary with one key, got {'eq_': {'get_field_': 'foo'}, 'literal_': 'bar'}"
 
-    validation.validate_purge_req_one(
-        {"eq_": ({"get_field_": "id"}, {"literal_": "bar"})}
-    )
+    validation.validate_purge_req_one({"eq_": ({"get_field_": "id"}, {"literal_": "bar"})})
 
     with pytest.raises(InvalidRequest) as e:
         validation.validate_purge_req_one({"in_": ()}, operator="in_")
     assert str(e.value) == validation.MESSAGE_INVALID_PURGE
 
     with pytest.raises(InvalidRequest) as e:
-        validation.validate_purge_req_one(
-            {"in_": tuple({"literal_": 12})}, operator="in_"
-        )
+        validation.validate_purge_req_one({"in_": tuple({"literal_": 12})}, operator="in_")
     assert str(e.value) == validation.MESSAGE_INVALID_PURGE
 
     with pytest.raises(InvalidRequest) as e:
-        validation.validate_purge_req_one(
-            {"in_": tuple({"literal_": "bar"})}, operator="in_"
-        )
+        validation.validate_purge_req_one({"in_": tuple({"literal_": "bar"})}, operator="in_")
     assert str(e.value) == validation.MESSAGE_INVALID_PURGE
 
     validation.validate_purge_req_one(
@@ -104,13 +93,8 @@ def test_validate_purge_req_multiple():
     assert str(e.value) == validation.MESSAGE_INVALID_PURGE
 
     with pytest.raises(InvalidRequest) as e:
-        validation.validate_purge_req_multiple(
-            [{"eq_": {"get_field_": "id"}, "literal_": "bar"}]
-        )
-    assert (
-        str(e.value)
-        == "Expected a dictionary with one key, got {'eq_': {'get_field_': 'id'}, 'literal_': 'bar'}"
-    )
+        validation.validate_purge_req_multiple([{"eq_": {"get_field_": "id"}, "literal_": "bar"}])
+    assert str(e.value) == "Expected a dictionary with one key, got {'eq_': {'get_field_': 'id'}, 'literal_': 'bar'}"
 
     validation.validate_purge_req_multiple(
         [

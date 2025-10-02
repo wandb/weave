@@ -42,9 +42,7 @@ def find_benchmarks(benchmarks_dir: Path) -> list[Path]:
         list[Path]: List of benchmark file paths.
     """
     if not benchmarks_dir.exists():
-        console.print(
-            f"[red]Error:[/red] Benchmarks directory not found: {benchmarks_dir}"
-        )
+        console.print(f"[red]Error:[/red] Benchmarks directory not found: {benchmarks_dir}")
         return []
 
     benchmarks = []
@@ -91,9 +89,7 @@ def display_benchmarks_table(benchmarks: list[Path]) -> None:
     Args:
         benchmarks (list[Path]): List of benchmark file paths.
     """
-    table = Table(
-        title="📊 Available Benchmarks", box=box.ROUNDED, title_style="bold magenta"
-    )
+    table = Table(title="📊 Available Benchmarks", box=box.ROUNDED, title_style="bold magenta")
 
     table.add_column("#", style="cyan", no_wrap=True, width=3)
     table.add_column("Benchmark", style="bright_blue", no_wrap=True)
@@ -109,9 +105,7 @@ def display_benchmarks_table(benchmarks: list[Path]) -> None:
     console.print()
 
 
-def execute_benchmark(
-    benchmark_path: Path, extra_args: list[str] | None = None
-) -> bool:
+def execute_benchmark(benchmark_path: Path, extra_args: list[str] | None = None) -> bool:
     """Execute the selected benchmark using uv run.
 
     Args:
@@ -121,9 +115,7 @@ def execute_benchmark(
     Returns:
         bool: True if benchmark completed successfully, False otherwise.
     """
-    console.print(
-        f"[green]🚀 Running benchmark:[/green] [bold]{benchmark_path.name}[/bold]"
-    )
+    console.print(f"[green]🚀 Running benchmark:[/green] [bold]{benchmark_path.name}[/bold]")
 
     # Build command with extra arguments
     cmd = ["uv", "run", str(benchmark_path)]
@@ -144,18 +136,12 @@ def execute_benchmark(
             console.print("[green]✅ Benchmark completed successfully![/green]")
             return True
         else:
-            console.print(
-                f"[red]❌ Benchmark failed with exit code {result.returncode}[/red]"
-            )
+            console.print(f"[red]❌ Benchmark failed with exit code {result.returncode}[/red]")
             return False
 
     except FileNotFoundError:
-        console.print(
-            "[red]❌ Error: 'uv' command not found. Please install uv first.[/red]"
-        )
-        console.print(
-            "Install with: [dim]curl -LsSf https://astral.sh/uv/install.sh | sh[/dim]"
-        )
+        console.print("[red]❌ Error: 'uv' command not found. Please install uv first.[/red]")
+        console.print("Install with: [dim]curl -LsSf https://astral.sh/uv/install.sh | sh[/dim]")
         return False
     except Exception as e:
         console.print(f"[red]❌ Error running benchmark:[/red] {e}")
@@ -170,9 +156,7 @@ def list_benchmarks() -> None:
     benchmarks = find_benchmarks(benchmarks_dir)
 
     if not benchmarks:
-        console.print(
-            "[red]No benchmark files found in the benchmarks/ directory.[/red]"
-        )
+        console.print("[red]No benchmark files found in the benchmarks/ directory.[/red]")
         console.print(f"[dim]Looked in: {benchmarks_dir}[/dim]")
         return
 
@@ -187,9 +171,7 @@ def run_benchmark(
     ] = None,
     interactive: Annotated[
         bool,
-        typer.Option(
-            "--interactive", "-i", help="Run in interactive mode to select benchmark"
-        ),
+        typer.Option("--interactive", "-i", help="Run in interactive mode to select benchmark"),
     ] = False,
     out_filetype: Annotated[
         str | None,
@@ -209,9 +191,7 @@ def run_benchmark(
     benchmarks = find_benchmarks(benchmarks_dir)
 
     if not benchmarks:
-        console.print(
-            "[red]No benchmark files found in the benchmarks/ directory.[/red]"
-        )
+        console.print("[red]No benchmark files found in the benchmarks/ directory.[/red]")
         console.print(f"[dim]Looked in: {benchmarks_dir}[/dim]")
         raise typer.Exit(1)
 
@@ -235,9 +215,7 @@ def run_benchmark(
     else:
         # Print header
         header_text = Text("🔬 Weave Benchmark Runner", style="bold bright_blue")
-        header_panel = Panel(
-            header_text, box=box.DOUBLE, padding=(1, 2), style="bright_blue"
-        )
+        header_panel = Panel(header_text, box=box.DOUBLE, padding=(1, 2), style="bright_blue")
         console.print(header_panel)
 
         # Display available benchmarks
@@ -261,13 +239,9 @@ def run_benchmark(
                         selected_benchmark = benchmarks[choice_num - 1]
                         break
                     else:
-                        console.print(
-                            f"[red]Please enter a number between 1 and {len(benchmarks)}[/red]"
-                        )
+                        console.print(f"[red]Please enter a number between 1 and {len(benchmarks)}[/red]")
                 except ValueError:
-                    console.print(
-                        "[red]Please enter a valid number or 'q' to quit[/red]"
-                    )
+                    console.print("[red]Please enter a valid number or 'q' to quit[/red]")
 
         except KeyboardInterrupt:
             console.print("\n[dim]👋 Goodbye![/dim]")
@@ -291,9 +265,7 @@ def run_benchmark(
 def run_all_benchmarks(
     continue_on_failure: Annotated[
         bool,
-        typer.Option(
-            "--continue", "-c", help="Continue running other benchmarks if one fails"
-        ),
+        typer.Option("--continue", "-c", help="Continue running other benchmarks if one fails"),
     ] = False,
     out_filetype: Annotated[
         str | None,
@@ -313,19 +285,13 @@ def run_all_benchmarks(
     benchmarks = find_benchmarks(benchmarks_dir)
 
     if not benchmarks:
-        console.print(
-            "[red]No benchmark files found in the benchmarks/ directory.[/red]"
-        )
+        console.print("[red]No benchmark files found in the benchmarks/ directory.[/red]")
         console.print(f"[dim]Looked in: {benchmarks_dir}[/dim]")
         raise typer.Exit(1)
 
     # Print header
-    header_text = Text(
-        f"🔬 Running All {len(benchmarks)} Benchmarks", style="bold bright_blue"
-    )
-    header_panel = Panel(
-        header_text, box=box.DOUBLE, padding=(1, 2), style="bright_blue"
-    )
+    header_text = Text(f"🔬 Running All {len(benchmarks)} Benchmarks", style="bold bright_blue")
+    header_panel = Panel(header_text, box=box.DOUBLE, padding=(1, 2), style="bright_blue")
     console.print(header_panel)
 
     # Build extra arguments for the benchmark script
@@ -342,12 +308,8 @@ def run_all_benchmarks(
         results.append((benchmark.stem, success))
 
         if not success and not continue_on_failure:
-            console.print(
-                f"\n[red]❌ Stopping execution due to failure in {benchmark.stem}[/red]"
-            )
-            console.print(
-                "[dim]Use --continue to run all benchmarks regardless of failures[/dim]"
-            )
+            console.print(f"\n[red]❌ Stopping execution due to failure in {benchmark.stem}[/red]")
+            console.print("[dim]Use --continue to run all benchmarks regardless of failures[/dim]")
             break
 
     # Show summary

@@ -33,9 +33,7 @@ def test_publish_and_load_evaluation(client):
     model = LLMStructuredCompletionModel(
         llm_model_id="gpt-4o-mini",
         default_params=LLMStructuredCompletionModelDefaultParams(
-            messages_template=[
-                {"role": "system", "content": "You are a helpful assistant."}
-            ],
+            messages_template=[{"role": "system", "content": "You are a helpful assistant."}],
             response_format="text",
         ),
     )

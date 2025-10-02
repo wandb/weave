@@ -72,22 +72,12 @@ class DSPyPatcher(MultiPatcher):
                 model_name = getattr(program, "__class__", type(program)).__name__
                 metric = metric if metric is not None else self.metric
                 devset = devset if devset is not None else self.devset
-                num_threads = (
-                    num_threads if num_threads is not None else self.num_threads
-                )
-                display_progress = (
-                    display_progress
-                    if display_progress is not None
-                    else self.display_progress
-                )
-                display_table = (
-                    display_table if display_table is not None else self.display_table
-                )
+                num_threads = num_threads if num_threads is not None else self.num_threads
+                display_progress = display_progress if display_progress is not None else self.display_progress
+                display_table = display_table if display_table is not None else self.display_table
 
                 if callback_metadata:
-                    logger.debug(
-                        f"Evaluate is called with callback metadata: {callback_metadata}"
-                    )
+                    logger.debug(f"Evaluate is called with callback metadata: {callback_metadata}")
 
                 failure_score = getattr(self, "failure_score", 0.0)
                 max_errors = getattr(self, "max_errors", dspy.settings.max_errors)
@@ -136,13 +126,9 @@ class DSPyPatcher(MultiPatcher):
 
                         # Increment assert and suggest failures to program's attributes
                         if hasattr(program, "_assert_failures"):
-                            program._assert_failures += dspy.settings.get(
-                                "assert_failures"
-                            )
+                            program._assert_failures += dspy.settings.get("assert_failures")
                         if hasattr(program, "_suggest_failures"):
-                            program._suggest_failures += dspy.settings.get(
-                                "suggest_failures"
-                            )
+                            program._suggest_failures += dspy.settings.get("suggest_failures")
 
                         # DSPy expects the inputs to be wrapped in an Example object
                         serialized_inputs = dictify(example.toDict())
@@ -154,20 +140,14 @@ class DSPyPatcher(MultiPatcher):
                             # Completions exposes the `items` method
                             serialized_pred = dictify(prediction.items())
 
-                        pl = ev.log_prediction(
-                            inputs=serialized_inputs, output=serialized_pred
-                        )
+                        pl = ev.log_prediction(inputs=serialized_inputs, output=serialized_pred)
                         pl.log_score(scorer=scorer_name, score=score)
                         pl.finish()
 
                         return prediction, score
 
                 # Determine scorer name once, outside threads
-                scorer_name = (
-                    metric.__name__
-                    if isinstance(metric, types.FunctionType)
-                    else metric.__class__.__name__
-                )
+                scorer_name = metric.__name__ if isinstance(metric, types.FunctionType) else metric.__class__.__name__
                 if scorer_name == "method":
                     scorer_name = "score"
 
@@ -175,10 +155,7 @@ class DSPyPatcher(MultiPatcher):
                 results = executor.execute(process_item, devset)
                 assert len(devset) == len(results)
 
-                results = [
-                    ((dspy.Prediction(), failure_score) if r is None else r)
-                    for r in results
-                ]
+                results = [((dspy.Prediction(), failure_score) if r is None else r) for r in results]
                 results = [
                     (example, prediction, score)
                     for example, (prediction, score) in zip(
@@ -189,9 +166,7 @@ class DSPyPatcher(MultiPatcher):
                 ]
                 ncorrect, ntotal = sum(score for *_, score in results), len(devset)
 
-                logger.info(
-                    f"Average Metric: {ncorrect} / {ntotal} ({round(100 * ncorrect / ntotal, 1)}%)"
-                )
+                logger.info(f"Average Metric: {ncorrect} / {ntotal} ({round(100 * ncorrect / ntotal, 1)}%)")
 
                 ev.log_summary({"Average Metric": ncorrect / ntotal})
 
@@ -243,9 +218,7 @@ def get_dspy_patcher(
             # Optimizers
             get_symbol_patcher("dspy", "BetterTogether.compile", base),
             get_symbol_patcher("dspy", "BootstrapFewShot.compile", base),
-            get_symbol_patcher(
-                "dspy", "BootstrapFewShotWithRandomSearch.compile", base
-            ),
+            get_symbol_patcher("dspy", "BootstrapFewShotWithRandomSearch.compile", base),
             get_symbol_patcher("dspy", "BootstrapFinetune.compile", base),
             get_symbol_patcher("dspy", "COPRO.compile", base),
             get_symbol_patcher("dspy", "Ensemble.compile", base),

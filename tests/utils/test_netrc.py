@@ -159,9 +159,7 @@ def test_netrc_add_or_update_entry_new_file(temp_netrc):
 def test_netrc_add_or_update_entry_existing_file(temp_netrc):
     """Test adding entry to an existing netrc file."""
     # Create initial file
-    initial_credentials = {
-        "example.com": {"login": "olduser", "account": "", "password": "oldpass"}
-    }
+    initial_credentials = {"example.com": {"login": "olduser", "account": "", "password": "oldpass"}}
     temp_netrc.write(initial_credentials)
 
     # Add new entry
@@ -176,9 +174,7 @@ def test_netrc_add_or_update_entry_existing_file(temp_netrc):
 def test_netrc_add_or_update_entry_update_existing(temp_netrc):
     """Test updating an existing entry."""
     # Create initial file
-    initial_credentials = {
-        "example.com": {"login": "olduser", "account": "", "password": "oldpass"}
-    }
+    initial_credentials = {"example.com": {"login": "olduser", "account": "", "password": "oldpass"}}
     temp_netrc.write(initial_credentials)
 
     # Update existing entry
@@ -213,9 +209,7 @@ def test_netrc_delete_entry_existing(temp_netrc):
 def test_netrc_delete_entry_nonexistent(temp_netrc):
     """Test deleting a non-existent entry."""
     # Create initial file
-    initial_credentials = {
-        "example.com": {"login": "user1", "account": "", "password": "pass1"}
-    }
+    initial_credentials = {"example.com": {"login": "user1", "account": "", "password": "pass1"}}
     temp_netrc.write(initial_credentials)
 
     # Try to delete non-existent entry
@@ -254,9 +248,7 @@ def test_netrc_get_credentials_existing(temp_netrc):
 
 def test_netrc_get_credentials_nonexistent(temp_netrc):
     """Test getting credentials for a non-existent machine."""
-    credentials = {
-        "example.com": {"login": "testuser", "account": "", "password": "testpass"}
-    }
+    credentials = {"example.com": {"login": "testuser", "account": "", "password": "testpass"}}
     temp_netrc.write(credentials)
 
     result = temp_netrc.get_credentials("nonexistent.com")
@@ -337,9 +329,7 @@ def test_check_netrc_access_read_only_file(tmp_path):
     assert permissions.write_access is False
 
 
-@pytest.mark.disable_logging_error_check(
-    reason="This test is expected to raise OSError"
-)
+@pytest.mark.disable_logging_error_check(reason="This test is expected to raise OSError")
 @patch("os.stat")
 def test_check_netrc_access_os_error(mock_stat, tmp_path):
     """Test checking access when os.stat raises an OSError."""

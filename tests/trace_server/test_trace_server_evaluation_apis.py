@@ -73,9 +73,7 @@ async def test_evaluation_status(client):
 
         generate_id_side_effect.calls = 0
 
-        with mock.patch(
-            "weave.trace.weave_client.generate_id", side_effect=generate_id_side_effect
-        ):
+        with mock.patch("weave.trace.weave_client.generate_id", side_effect=generate_id_side_effect):
             await eval.evaluate(model=model)
 
     assert get_status() == EvaluationStatusComplete(
@@ -126,9 +124,7 @@ def setup_test_objects(server: TraceServerInterface, entity: str, project: str):
 
     def create_dataset() -> str:
         """Create a test dataset and return its reference URI."""
-        dataset_table_val = [
-            {"user_input": "How are you?", "expected": "I'm doing well, thank you!"}
-        ]
+        dataset_table_val = [{"user_input": "How are you?", "expected": "I'm doing well, thank you!"}]
         dataset_table_res = server.table_create(
             TableCreateReq.model_validate(
                 {
@@ -293,11 +289,7 @@ def test_evaluate_model(client: WeaveClient, direct_script_execution):
             call_id=call_id,
         )
 
-    evaluate_model_fn = (
-        evaluate_model_wrapped
-        if direct_script_execution
-        else client.server.evaluate_model
-    )
+    evaluate_model_fn = evaluate_model_wrapped if direct_script_execution else client.server.evaluate_model
     model_ref_uri, evaluation_ref_uri = setup_test_objects(
         client.server,
         entity,
@@ -314,9 +306,7 @@ def test_evaluate_model(client: WeaveClient, direct_script_execution):
     )
     # Mock the LLM completions for all the calls during evaluation
     # This is a simplified mock - in reality the evaluation would make multiple calls
-    with with_simple_mock_litellm_completion(
-        json.dumps({"score": 9})
-    ):  # Mock score response
+    with with_simple_mock_litellm_completion(json.dumps({"score": 9})):  # Mock score response
         eval_res = evaluate_model_fn(req)
 
     # Query for calls
@@ -360,9 +350,7 @@ def test_evaluate_model(client: WeaveClient, direct_script_execution):
 
     assert len(eval_calls_res.calls) == 1
     eval_call = eval_calls_res.calls[0]
-    assert eval_call.op_name.startswith(
-        f"weave:///{project_id}/op/Evaluation.evaluate:"
-    )
+    assert eval_call.op_name.startswith(f"weave:///{project_id}/op/Evaluation.evaluate:")
     assert isinstance(eval_call.summary, dict)
     if is_sqlite:
         assert eval_call.summary["status_counts"] == {

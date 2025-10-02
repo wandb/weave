@@ -8,9 +8,7 @@ from weave.trace import util
 from weave.trace.display import display
 
 
-def dict_to_table(
-    d: dict[str, Any], *, filter_none_values: bool = False
-) -> display.Table:
+def dict_to_table(d: dict[str, Any], *, filter_none_values: bool = False) -> display.Table:
     """Create a two-column table from a dictionary."""
     table = display.Table(show_header=False)
     table.add_column("Key", justify="right", style="bold cyan")
@@ -29,9 +27,7 @@ def table_to_str(table: display.Table) -> str:
     return table.to_string(console)
 
 
-def model_to_table(
-    model: BaseModel, *, filter_none_values: bool = False
-) -> display.Table:
+def model_to_table(model: BaseModel, *, filter_none_values: bool = False) -> display.Table:
     """Create a two-column table from a Pydantic model."""
     return dict_to_table(model.model_dump(), filter_none_values=filter_none_values)
 

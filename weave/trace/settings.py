@@ -317,10 +317,7 @@ def parse_and_apply_settings(
     user_settings.apply()
 
 
-_context_vars = {
-    name: ContextVar(name, default=field.default)
-    for name, field in UserSettings.model_fields.items()
-}
+_context_vars = {name: ContextVar(name, default=field.default) for name, field in UserSettings.model_fields.items()}
 
 
 def _str2bool_truthy(v: str) -> bool:

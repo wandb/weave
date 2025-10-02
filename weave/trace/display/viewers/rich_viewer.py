@@ -31,9 +31,7 @@ class RichViewer:
 
         self._file = file
         self._emoji = emoji
-        self._console = RichConsole(
-            file=file, force_terminal=force_terminal, emoji=emoji, **kwargs
-        )
+        self._console = RichConsole(file=file, force_terminal=force_terminal, emoji=emoji, **kwargs)
 
     def print(
         self,
@@ -64,13 +62,9 @@ class RichViewer:
         header_style: str | None = None,
         **kwargs: Any,
     ) -> TableProtocol:
-        return RichTable(
-            title=title, show_header=show_header, header_style=header_style, **kwargs
-        )
+        return RichTable(title=title, show_header=show_header, header_style=header_style, **kwargs)
 
-    def create_progress(
-        self, console: ConsoleProtocol | None = None, **kwargs: Any
-    ) -> ProgressProtocol:
+    def create_progress(self, console: ConsoleProtocol | None = None, **kwargs: Any) -> ProgressProtocol:
         return RichProgress(console=self._console, **kwargs)
 
     def create_syntax(
@@ -82,9 +76,7 @@ class RichViewer:
     ) -> SyntaxProtocol:
         return RichSyntax(code, lexer, theme=theme, line_numbers=line_numbers)
 
-    def create_text(
-        self, text: str = "", style: str | Style | None = None
-    ) -> TextProtocol:
+    def create_text(self, text: str = "", style: str | Style | None = None) -> TextProtocol:
         return RichText(text, style=style)
 
     def indent(self, content: str, amount: int) -> str:
@@ -110,9 +102,7 @@ class RichTable:
     ):
         from rich.table import Table as RichTableBase
 
-        self._table = RichTableBase(
-            title=title, show_header=show_header, header_style=header_style, **kwargs
-        )
+        self._table = RichTableBase(title=title, show_header=show_header, header_style=header_style, **kwargs)
 
     def add_column(
         self,
@@ -140,11 +130,7 @@ class RichTable:
         self._table.add_row(*processed_values)
 
     def to_string(self, console: ConsoleProtocol | None = None) -> str:
-        if (
-            console
-            and hasattr(console, "_viewer")
-            and isinstance(console._viewer, RichViewer)
-        ):
+        if console and hasattr(console, "_viewer") and isinstance(console._viewer, RichViewer):
             with console._viewer._console.capture() as capture:
                 console._viewer._console.print(self._table)
             return capture.get().strip()
@@ -184,9 +170,7 @@ class RichProgress:
 
         self._progress = Progress(*columns, console=console, **kwargs)
 
-    def add_task(
-        self, description: str, total: float | None = None, **kwargs: Any
-    ) -> int:
+    def add_task(self, description: str, total: float | None = None, **kwargs: Any) -> int:
         return self._progress.add_task(description, total=total, **kwargs)
 
     def update(
@@ -197,9 +181,7 @@ class RichProgress:
         total: float | None = None,
         **kwargs: Any,
     ) -> None:
-        self._progress.update(
-            task_id, advance=advance, completed=completed, total=total, **kwargs
-        )
+        self._progress.update(task_id, advance=advance, completed=completed, total=total, **kwargs)
 
     def start(self) -> None:
         self._progress.start()
@@ -230,11 +212,7 @@ class RichSyntax:
         self._syntax = Syntax(code, lexer, theme=theme, line_numbers=line_numbers)
 
     def to_string(self, console: ConsoleProtocol | None = None) -> str:
-        if (
-            console
-            and hasattr(console, "_viewer")
-            and isinstance(console._viewer, RichViewer)
-        ):
+        if console and hasattr(console, "_viewer") and isinstance(console._viewer, RichViewer):
             with console._viewer._console.capture() as capture:
                 console._viewer._console.print(self._syntax)
             return capture.get().strip()

@@ -215,9 +215,7 @@ class HeavyFieldOptimizationProcessor(QueryOptimizationProcessor):
 
         Creates SQL condition using LIKE patterns for substrings in JSON fields.
         """
-        return _create_like_optimized_contains_condition(
-            operation, self.pb, self.table_alias
-        )
+        return _create_like_optimized_contains_condition(operation, self.pb, self.table_alias)
 
     def process_in(self, operation: tsi_query.InOperation) -> Optional[str]:
         """Process IN operation on heavy fields.
@@ -260,23 +258,17 @@ class SortableDatetimeOptimizationProcessor(QueryOptimizationProcessor):
 
         Creates SQL condition that filters started_at with the sortable_datetime column.
         """
-        return _create_datetime_optimization_sql(
-            operation, self.pb, self.table_alias, ">"
-        )
+        return _create_datetime_optimization_sql(operation, self.pb, self.table_alias, ">")
 
     def process_gte(self, operation: tsi_query.GteOperation) -> Optional[str]:
         """Process GTE operation on sortable_datetime fields using sortable_datetime optimization.
 
         Creates SQL condition that filters started_at with the sortable_datetime column.
         """
-        return _create_datetime_optimization_sql(
-            operation, self.pb, self.table_alias, ">="
-        )
+        return _create_datetime_optimization_sql(operation, self.pb, self.table_alias, ">=")
 
 
-def apply_processor(
-    processor: QueryOptimizationProcessor, operation: tsi_query.Operation
-) -> Optional[str]:
+def apply_processor(processor: QueryOptimizationProcessor, operation: tsi_query.Operation) -> Optional[str]:
     if isinstance(operation, tsi_query.AndOperation):
         return processor.process_and(operation)
     elif isinstance(operation, tsi_query.OrOperation):
@@ -332,15 +324,9 @@ def process_query_to_optimization_sql(
     heavy_field_result_sql = heavy_field_processor.finalize_sql(heavy_field_result)
 
     # Apply sortable_datetime optimization
-    sortable_datetime_processor = SortableDatetimeOptimizationProcessor(
-        param_builder, table_alias
-    )
-    sortable_datetime_result = apply_processor(
-        sortable_datetime_processor, and_operation
-    )
-    sortable_datetime_result_sql = sortable_datetime_processor.finalize_sql(
-        sortable_datetime_result
-    )
+    sortable_datetime_processor = SortableDatetimeOptimizationProcessor(param_builder, table_alias)
+    sortable_datetime_result = apply_processor(sortable_datetime_processor, and_operation)
+    sortable_datetime_result_sql = sortable_datetime_processor.finalize_sql(sortable_datetime_result)
 
     return OptimizationConditions(
         heavy_filter_opt_sql=heavy_field_result_sql,
@@ -390,18 +376,14 @@ def _create_like_condition(
 
 
 def _extract_field_and_literal(
-    operation: Union[
-        tsi_query.EqOperation, tsi_query.GtOperation, tsi_query.GteOperation
-    ],
+    operation: Union[tsi_query.EqOperation, tsi_query.GtOperation, tsi_query.GteOperation],
 ) -> tuple[Optional[tsi_query.GetFieldOperator], Optional[tsi_query.LiteralOperation]]:
     """Extract field and literal operands from a binary operation.
 
     Returns a tuple of (field_operand, literal_operand) or (None, None) if invalid.
     """
     ops = (
-        operation.eq_
-        if hasattr(operation, "eq_")
-        else (operation.gt_ if hasattr(operation, "gt_") else operation.gte_)
+        operation.eq_ if hasattr(operation, "eq_") else (operation.gt_ if hasattr(operation, "gt_") else operation.gte_)
     )
 
     if len(ops) != 2:
@@ -469,9 +451,9 @@ def _create_like_optimized_contains_condition(
     if not isinstance(operation.contains_.input, tsi_query.GetFieldOperator):
         return None
     # Return if substr isn't a string literal
-    if not isinstance(
-        operation.contains_.substr, tsi_query.LiteralOperation
-    ) or not isinstance(operation.contains_.substr.literal_, str):
+    if not isinstance(operation.contains_.substr, tsi_query.LiteralOperation) or not isinstance(
+        operation.contains_.substr.literal_, str
+    ):
         return None
 
     from weave.trace_server.calls_query_builder.calls_query_builder import (
@@ -490,9 +472,7 @@ def _create_like_optimized_contains_condition(
     case_insensitive = operation.contains_.case_insensitive or False
     like_pattern = f'%"%{substr_value}%"%'
 
-    like_condition = _create_like_condition(
-        field, like_pattern, pb, table_alias, case_insensitive
-    )
+    like_condition = _create_like_condition(field, like_pattern, pb, table_alias, case_insensitive)
     if _field_requires_null_check(field):
         return f"({like_condition} OR {table_alias}.{field} IS NULL)"
     return like_condition
@@ -508,11 +488,7 @@ def _create_like_optimized_in_condition(
     if not isinstance(operation.in_[0], tsi_query.GetFieldOperator):
         return None
     # Return if right-side isn't non-empty list
-    if (
-        len(operation.in_) != 2
-        or not isinstance(operation.in_[1], list)
-        or len(operation.in_[1]) == 0
-    ):
+    if len(operation.in_) != 2 or not isinstance(operation.in_[1], list) or len(operation.in_[1]) == 0:
         return None
 
     from weave.trace_server.calls_query_builder.calls_query_builder import (
@@ -549,9 +525,7 @@ def _create_like_optimized_in_condition(
 
 def _timestamp_to_datetime_str(timestamp: int) -> str:
     """Converts a timestamp to a datetime string."""
-    return datetime.datetime.fromtimestamp(
-        timestamp, tz=datetime.timezone.utc
-    ).strftime("%Y-%m-%d %H:%M:%S.%f")
+    return datetime.datetime.fromtimestamp(timestamp, tz=datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f")
 
 
 def _create_datetime_optimization_sql(
@@ -594,6 +568,4 @@ def _create_datetime_optimization_sql(
     datetime_str = _timestamp_to_datetime_str(timestamp)
 
     param_name = pb.add_param(datetime_str)
-    return (
-        f"{table_alias}.sortable_datetime {op_str} {param_slot(param_name, 'String')}"
-    )
+    return f"{table_alias}.sortable_datetime {op_str} {param_slot(param_name, 'String')}"

@@ -45,10 +45,7 @@ def test_human_feedback_basic(client):
     assert len(objects.objs) == 2
     assert objects.objs[0].val["name"] == "Numerical field #1"
     assert objects.objs[1].val["name"] == "Text field #1"
-    assert (
-        objects.objs[0].val["description"]
-        == "A numerical field with a range of -1 to 1"
-    )
+    assert objects.objs[0].val["description"] == "A numerical field with a range of -1 to 1"
     assert not objects.objs[1].val["description"]
     assert not objects.objs[0].val["op_scope"]
     assert objects.objs[1].val["op_scope"] == ["weave:///entity/project/op/name:digest"]
@@ -115,9 +112,7 @@ def test_field_schema_with_pydantic_model(client):
     )
 
     # Find our new spec
-    pydantic_spec = next(
-        obj for obj in objects.objs if obj.val["name"] == "Pydantic Model Feedback"
-    )
+    pydantic_spec = next(obj for obj in objects.objs if obj.val["name"] == "Pydantic Model Feedback")
 
     # Verify the schema was properly converted
     assert pydantic_spec.val["field_schema"]["type"] == "object"
@@ -190,9 +185,7 @@ def test_field_schema_with_pydantic_field(client):
         pattern="^[A-Za-z ]+$",
         description="Text feedback",
     )
-    enum_field = Field(
-        enum=["excellent", "good", "fair", "poor"], description="Category selection"
-    )
+    enum_field = Field(enum=["excellent", "good", "fair", "poor"], description="Category selection")
 
     # Test rating field
     col1 = AnnotationSpec(
@@ -288,9 +281,7 @@ def test_annotation_spec_validation():
     model_spec = AnnotationSpec(name="Complex Feedback", field_schema=FeedbackModel)
 
     # Valid cases
-    assert model_spec.value_is_valid(
-        {"rating": 4, "comment": "Good work!", "tags": ["positive", "helpful"]}
-    )
+    assert model_spec.value_is_valid({"rating": 4, "comment": "Good work!", "tags": ["positive", "helpful"]})
 
     # Invalid cases
     assert not model_spec.value_is_valid(
@@ -349,9 +340,7 @@ def test_annotation_spec_validation_with_complex_types():
         {
             "name": "John Doe",
             "age": 30,
-            "addresses": [
-                {"street": "123 Main St", "city": "Springfield", "zip_code": "12345"}
-            ],
+            "addresses": [{"street": "123 Main St", "city": "Springfield", "zip_code": "12345"}],
         }
     )
 
@@ -415,9 +404,7 @@ def test_annotation_spec_validate_return_value():
     model_spec = AnnotationSpec(name="Complex Feedback", field_schema=FeedbackModel)
 
     # Valid case should return True
-    assert model_spec.value_is_valid(
-        {"rating": 4, "comment": "Good work!", "tags": ["positive", "helpful"]}
-    )
+    assert model_spec.value_is_valid({"rating": 4, "comment": "Good work!", "tags": ["positive", "helpful"]})
 
     # Invalid cases should return False
     assert not model_spec.value_is_valid(
@@ -499,9 +486,7 @@ def test_annotation_feedback_sdk(client):
 
     # empty annotation_ref
     with pytest.raises(ValueError):
-        calls[0].feedback.add(
-            "wandb.annotation.number_rating", {"value": 3}, annotation_ref=""
-        )
+        calls[0].feedback.add("wandb.annotation.number_rating", {"value": 3}, annotation_ref="")
 
     # invalid annotation_ref
     with pytest.raises(ValueError):

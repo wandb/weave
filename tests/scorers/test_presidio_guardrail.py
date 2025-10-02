@@ -22,9 +22,7 @@ def test_presidio_email_detection(presidio_entity_recognition_guardrail):
 
     # Check that the detected entities include the expected email.
     detected_emails = result.metadata["detected_entities"].get("EMAIL_ADDRESS", [])
-    assert "thomas@gmail.com" in detected_emails, (
-        "Expected to detect 'thomas@gmail.com' as an EMAIL_ADDRESS."
-    )
+    assert "thomas@gmail.com" in detected_emails, "Expected to detect 'thomas@gmail.com' as an EMAIL_ADDRESS."
 
 
 # A custom recognizer to detect numbers by checking each token's `like_num` attribute.
@@ -35,9 +33,7 @@ class NumbersRecognizer(EntityRecognizer):
         """No loading is required."""
         pass
 
-    def analyze(
-        self, text: str, entities: list[str], nlp_artifacts: NlpArtifacts
-    ) -> list[RecognizerResult]:
+    def analyze(self, text: str, entities: list[str], nlp_artifacts: NlpArtifacts) -> list[RecognizerResult]:
         """Analyze the text to locate tokens which represent numbers."""
         results = []
         for token in nlp_artifacts.tokens:

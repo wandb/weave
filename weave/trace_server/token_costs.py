@@ -18,9 +18,7 @@ from weave.trace_server.validation import (
 )
 
 DUMMY_LLM_ID = "weave_dummy_llm_id"
-DUMMY_LLM_USAGE = (
-    '{"requests": 0, "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}'
-)
+DUMMY_LLM_USAGE = '{"requests": 0, "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}'
 ESCAPED_DUMMY_LLM_USAGE = DUMMY_LLM_USAGE.replace('"', '\\"')
 
 
@@ -55,9 +53,7 @@ LLM_TOKEN_PRICES_COLUMNS = [
 ]
 
 LLM_TOKEN_PRICES_TABLE_NAME = "llm_token_prices"
-LLM_TOKEN_PRICES_TABLE = Table(
-    name=LLM_TOKEN_PRICES_TABLE_NAME, cols=LLM_TOKEN_PRICES_COLUMNS
-)
+LLM_TOKEN_PRICES_TABLE = Table(name=LLM_TOKEN_PRICES_TABLE_NAME, cols=LLM_TOKEN_PRICES_COLUMNS)
 
 
 def get_calls_merged_columns() -> list[Column]:
@@ -160,9 +156,7 @@ def get_llm_usage(param_builder: ParamBuilder, table_alias: str) -> PreparedSele
         )
     )
 
-    prepared_query = select_query.prepare(
-        database_type="clickhouse", param_builder=param_builder
-    )
+    prepared_query = select_query.prepare(database_type="clickhouse", param_builder=param_builder)
     return prepared_query
 
 
@@ -196,9 +190,7 @@ def get_llm_usage(param_builder: ParamBuilder, table_alias: str) -> PreparedSele
 """
 
 
-def get_ranked_prices(
-    param_builder: ParamBuilder, llm_usage_table_alias: str, project_id: str
-) -> PreparedSelect:
+def get_ranked_prices(param_builder: ParamBuilder, llm_usage_table_alias: str, project_id: str) -> PreparedSelect:
     llm_usage_cols = [
         *LLM_USAGE_COLUMNS,
         Column(name="started_at", type="datetime"),
@@ -208,13 +200,9 @@ def get_ranked_prices(
         Column(name="rank", type="string"),
     ]
 
-    llm_usage_table = Table(
-        name=llm_usage_table_alias, cols=[*llm_usage_cols, *derived_llm_usage_cols]
-    )
+    llm_usage_table = Table(name=llm_usage_table_alias, cols=[*llm_usage_cols, *derived_llm_usage_cols])
 
-    ltp_fields = [
-        f"{LLM_TOKEN_PRICES_TABLE.name}.{col.name}" for col in LLM_TOKEN_PRICES_COLUMNS
-    ]
+    ltp_fields = [f"{LLM_TOKEN_PRICES_TABLE.name}.{col.name}" for col in LLM_TOKEN_PRICES_COLUMNS]
 
     # Clickhouse does not allow parameters in the row_number() over function
     # This is a temporary workaround, to check the validity of the project_id, to prevent SQL injection
@@ -253,34 +241,26 @@ def get_ranked_prices(
                             {
                                 "$eq": [
                                     {"$getField": f"{llm_usage_table_alias}.llm_id"},
-                                    {
-                                        "$getField": f"{LLM_TOKEN_PRICES_TABLE_NAME}.llm_id"
-                                    },
+                                    {"$getField": f"{LLM_TOKEN_PRICES_TABLE_NAME}.llm_id"},
                                 ]
                             },
                             {
                                 "$or": [
                                     {
                                         "$eq": [
-                                            {
-                                                "$getField": f"{LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id"
-                                            },
+                                            {"$getField": f"{LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id"},
                                             {"$literal": project_id},
                                         ]
                                     },
                                     {
                                         "$eq": [
-                                            {
-                                                "$getField": f"{LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id"
-                                            },
+                                            {"$getField": f"{LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id"},
                                             {"$literal": DEFAULT_PRICING_LEVEL_ID},
                                         ]
                                     },
                                     {
                                         "$eq": [
-                                            {
-                                                "$getField": f"{LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id"
-                                            },
+                                            {"$getField": f"{LLM_TOKEN_PRICES_TABLE_NAME}.pricing_level_id"},
                                             {"$literal": ""},
                                         ]
                                     },
@@ -294,9 +274,7 @@ def get_ranked_prices(
         )
     )
 
-    prepared_query = select_query.prepare(
-        database_type="clickhouse", param_builder=param_builder
-    )
+    prepared_query = select_query.prepare(database_type="clickhouse", param_builder=param_builder)
     return prepared_query
 
 
@@ -359,10 +337,7 @@ def final_call_select_with_cost(
 
     numeric_fields_str = " ".join(
         [
-            *[
-                f""" '"{field}":', toString({field}), ',', """
-                for field in cost_numeric_fields
-            ],
+            *[f""" '"{field}":', toString({field}), ',', """ for field in cost_numeric_fields],
             # These numeric fields are derived or mapped to another name
             """
             '"prompt_token_cost":', toString(prompt_token_cost), ',',
@@ -372,9 +347,7 @@ def final_call_select_with_cost(
         """,
         ]
     )
-    string_fields_str = """ '",', """.join(
-        [f""" '"{field}":"', toString({field}), """ for field in cost_string_fields]
-    )
+    string_fields_str = """ '",', """.join([f""" '"{field}":"', toString({field}), """ for field in cost_string_fields])
 
     cost_snippet = f"""
     ',"weave":{{',
@@ -427,16 +400,12 @@ def final_call_select_with_cost(
         ranked_price_table.select()
         .fields(final_select_fields)
         .raw_sql_fields([summary_dump_snippet])
-        .where(
-            tsi.Query(**{"$expr": {"$eq": [{"$getField": "rank"}, {"$literal": 1}]}})
-        )
+        .where(tsi.Query(**{"$expr": {"$eq": [{"$getField": "rank"}, {"$literal": 1}]}}))
         .group_by(final_select_fields)
         .order_by(order_fields)
     )
 
-    final_prepared_query = final_query.prepare(
-        database_type="clickhouse", param_builder=param_builder
-    )
+    final_prepared_query = final_query.prepare(database_type="clickhouse", param_builder=param_builder)
     return final_prepared_query
 
 
@@ -495,10 +464,7 @@ def is_project_id_sql_injection_safe(project_id: str) -> None:
         decoded_str = base64.b64decode(project_id).decode("utf-8")
 
         # Check if the decoded id matches the pattern "ProjectInternalId:" followed by a number
-        match = (
-            re.fullmatch(r"ProjectInternalId:\d+", decoded_str.strip())
-            or decoded_str == "shawn/test-project"
-        )
+        match = re.fullmatch(r"ProjectInternalId:\d+", decoded_str.strip()) or decoded_str == "shawn/test-project"
 
         if match:
             return

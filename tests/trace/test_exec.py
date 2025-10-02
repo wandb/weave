@@ -4,9 +4,7 @@ import textwrap
 import pytest
 
 
-@pytest.mark.skipif(
-    sys.version_info > (3, 9), reason="TODO: Different behavior on 3.10+"
-)
+@pytest.mark.skipif(sys.version_info > (3, 9), reason="TODO: Different behavior on 3.10+")
 @pytest.mark.parametrize(
     ("code", "expected_captured_code"),
     [
@@ -93,9 +91,7 @@ import pytest
         ),
     ],
 )
-def test_publish_works_for_code_with_no_source_file(
-    client, code, expected_captured_code
-):
+def test_publish_works_for_code_with_no_source_file(client, code, expected_captured_code):
     captured = {}
     exec(code, globals(), captured)
 

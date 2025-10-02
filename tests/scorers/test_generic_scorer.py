@@ -63,9 +63,7 @@ def test_skips_output_and_model_output_parameters():
     }
     model_output = "actual model output"
 
-    _, score_args = prepare_scorer_op_args(
-        scorer_with_output_params, example, model_output
-    )
+    _, score_args = prepare_scorer_op_args(scorer_with_output_params, example, model_output)
 
     # Should be mapped
     assert "input_text" in score_args
@@ -82,9 +80,7 @@ def test_all_skipped_parameters_together():
     """
 
     @weave.op
-    def comprehensive_scorer(
-        input_text: str, target: str, output: str, model_output: str, **kwargs
-    ):
+    def comprehensive_scorer(input_text: str, target: str, output: str, model_output: str, **kwargs):
         """A scorer with all the parameters that should be skipped."""
         return {"score": 0.5}
 

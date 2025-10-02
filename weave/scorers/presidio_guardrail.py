@@ -30,9 +30,7 @@ class PresidioScorer(weave.Scorer):
     Offline mode for presidio: https://github.com/microsoft/presidio/discussions/1435
     """
 
-    language: str = Field(
-        default="en", description="The language of the text to be analyzed."
-    )
+    language: str = Field(default="en", description="The language of the text to be analyzed.")
     custom_recognizers: list[Any] = Field(
         default_factory=list,
         description="A list of custom recognizers to add to the analyzer. Check Presidio's documentation for more information; https://microsoft.github.io/presidio/samples/python/customizing_presidio_analyzer/",
@@ -62,19 +60,12 @@ class PresidioScorer(weave.Scorer):
                 self._analyzer.registry.add_recognizer(recognizer)
 
         # Get available entities dynamically
-        available_entities = [
-            recognizer.supported_entities[0]
-            for recognizer in self._analyzer.registry.recognizers
-        ]
+        available_entities = [recognizer.supported_entities[0] for recognizer in self._analyzer.registry.recognizers]
 
         if self.selected_entities is not None:
             # Filter out invalid entities and warn user
-            invalid_entities = list(
-                set(self.selected_entities) - set(available_entities)
-            )
-            valid_entities = list(
-                set(self.selected_entities).intersection(available_entities)
-            )
+            invalid_entities = list(set(self.selected_entities) - set(available_entities))
+            valid_entities = list(set(self.selected_entities).intersection(available_entities))
 
             if invalid_entities:
                 logger.warning(
@@ -105,9 +96,7 @@ class PresidioScorer(weave.Scorer):
         if detected_entities:
             explanation_parts.append("Found the following entities in the text:")
             for entity_type, instances in detected_entities.items():
-                explanation_parts.append(
-                    f"- {entity_type}: {len(instances)} instance(s)"
-                )
+                explanation_parts.append(f"- {entity_type}: {len(instances)} instance(s)")
         else:
             explanation_parts.append("No entities detected in the text.")
 
@@ -127,30 +116,20 @@ class PresidioScorer(weave.Scorer):
     ) -> Optional[str]:
         anonymized_text = None
         if detected_entities and self._anonymizer is not None:
-            anonymized_result = self._anonymizer.anonymize(
-                text=output, analyzer_results=analyzer_results
-            )
+            anonymized_result = self._anonymizer.anonymize(text=output, analyzer_results=analyzer_results)
             anonymized_text = anonymized_result.text
         return anonymized_text
 
     @weave.op
-    def score(
-        self, *, output: str, entities: Optional[list[str]] = None, **kwargs: Any
-    ) -> WeaveScorerResult:
+    def score(self, *, output: str, entities: Optional[list[str]] = None, **kwargs: Any) -> WeaveScorerResult:
         if self._analyzer is None:
             raise ValueError("Analyzer is not initialized")
         if entities is None:
             entities = self.selected_entities
-        analyzer_results = self._analyzer.analyze(
-            text=str(output), entities=entities, language=self.language
-        )
-        detected_entities = self.group_analyzer_results_by_entity_type(
-            output, analyzer_results
-        )
+        analyzer_results = self._analyzer.analyze(text=str(output), entities=entities, language=self.language)
+        detected_entities = self.group_analyzer_results_by_entity_type(output, analyzer_results)
         reason = self.create_reason(detected_entities)
-        anonymized_text = self.anonymize_text(
-            output, analyzer_results, detected_entities
-        )
+        anonymized_text = self.anonymize_text(output, analyzer_results, detected_entities)
         return WeaveScorerResult(
             passed=not bool(detected_entities),
             metadata={

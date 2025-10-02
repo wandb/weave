@@ -20,21 +20,13 @@ if TYPE_CHECKING:
 MAX_STR_LEN = 1000
 
 
-def get_symbol_patcher(
-    base_symbol: str, attribute_name: str, settings: OpSettings
-) -> SymbolPatcher:
+def get_symbol_patcher(base_symbol: str, attribute_name: str, settings: OpSettings) -> SymbolPatcher:
     display_name = base_symbol + "." + attribute_name
-    display_name = (
-        display_name.replace(".__call__", "")
-        if attribute_name.endswith(".__call__")
-        else display_name
-    )
+    display_name = display_name.replace(".__call__", "") if attribute_name.endswith(".__call__") else display_name
     return SymbolPatcher(
         lambda: importlib.import_module(base_symbol),
         attribute_name,
-        dspy_wrapper(
-            settings.model_copy(update={"name": settings.name or display_name})
-        ),
+        dspy_wrapper(settings.model_copy(update={"name": settings.name or display_name})),
     )
 
 
@@ -55,13 +47,9 @@ def dspy_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
             dictified_inputs_self.pop("history", None)
 
         # Serialize the signature of the object if it is a Predict or Adapter
-        if isinstance(inputs["self"], (Predict, Adapter)) and hasattr(
-            inputs["self"], "signature"
-        ):
+        if isinstance(inputs["self"], (Predict, Adapter)) and hasattr(inputs["self"], "signature"):
             if isinstance(inputs["self"].signature, BaseModel):
-                dictified_inputs_self["signature"] = inputs[
-                    "self"
-                ].signature.model_json_schema()
+                dictified_inputs_self["signature"] = inputs["self"].signature.model_json_schema()
             else:
                 dictified_inputs_self["signature"] = inputs["self"].signature
 
@@ -69,9 +57,7 @@ def dspy_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
 
         # Recursively serialize the dspy objects in the devset
         if isinstance(inputs["self"], Evaluate):
-            dictified_inputs_self["devset"] = [
-                dictify(example) for example in inputs["self"].devset
-            ]
+            dictified_inputs_self["devset"] = [dictify(example) for example in inputs["self"].devset]
 
             # Convert the metric to a weave op if it is not already one
             if hasattr(inputs["self"], "metric"):
@@ -126,16 +112,10 @@ def dspy_wrapper(settings: OpSettings) -> Callable[[Callable], Callable]:
 
 def get_op_name_for_callback(instance: Any, inputs: dict[str, Any]) -> str:
     instance_class_name = instance.__class__.__name__
-    return (
-        f"dspy.{instance_class_name}"
-        if "dspy." in inputs["self"]["__class__"]["module"]
-        else instance_class_name
-    )
+    return f"dspy.{instance_class_name}" if "dspy." in inputs["self"]["__class__"]["module"] else instance_class_name
 
 
-def dictify(
-    obj: Any, maxdepth: int = 0, depth: int = 1, seen: set[int] | None = None
-) -> Any:
+def dictify(obj: Any, maxdepth: int = 0, depth: int = 1, seen: set[int] | None = None) -> Any:
     """Recursively compute a dictionary representation of an object."""
     if seen is None:
         seen = set()

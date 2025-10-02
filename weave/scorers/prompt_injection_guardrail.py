@@ -73,9 +73,7 @@ class PromptInjectionLLMGuardrail(LLMScorer):
             temperature=self.temperature,
             max_tokens=self.max_tokens,
         )
-        response = LLMGuardrailReasoning.model_validate_json(
-            response.choices[0].message.content
-        )
+        response = LLMGuardrailReasoning.model_validate_json(response.choices[0].message.content)
         return WeaveScorerResult(
             passed=not response.injection_prompt,
             metadata={"reason": response.explanation},

@@ -48,9 +48,7 @@ def require_weave_client() -> WeaveClient:
 
 
 @contextmanager
-def with_weave_client(
-    entity: str | None, project: str | None, required: bool = True
-) -> Generator[WeaveClient | None]:
+def with_weave_client(entity: str | None, project: str | None, required: bool = True) -> Generator[WeaveClient | None]:
     """Context manager that returns a WeaveClient for a given entity and project.
 
     Restores any active WeaveClient after the context manager exits.

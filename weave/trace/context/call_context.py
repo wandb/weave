@@ -24,14 +24,10 @@ logger = logging.getLogger(__name__)
 _tracing_enabled = contextvars.ContextVar("tracing_enabled", default=True)
 
 # Thread ID context variable for tracking execution threads
-_thread_id: contextvars.ContextVar[str | None] = contextvars.ContextVar(
-    "thread_id", default=None
-)
+_thread_id: contextvars.ContextVar[str | None] = contextvars.ContextVar("thread_id", default=None)
 
 # Turn ID context variable for tracking turns within threads
-_turn_id: contextvars.ContextVar[str | None] = contextvars.ContextVar(
-    "turn_id", default=None
-)
+_turn_id: contextvars.ContextVar[str | None] = contextvars.ContextVar("turn_id", default=None)
 
 
 def push_call(call: Call) -> None:
@@ -43,9 +39,7 @@ def push_call(call: Call) -> None:
 def pop_call(call_id: str | None) -> None:
     new_stack = copy.copy(_call_stack.get())
     if len(new_stack) == 0:
-        logger.debug(
-            f"weave pop_call error: Found empty callstack when popping call_id: {call_id}."
-        )
+        logger.debug(f"weave pop_call error: Found empty callstack when popping call_id: {call_id}.")
         # raise ValueError("Call stack is empty")
         return
     if call_id:
@@ -63,9 +57,7 @@ def pop_call(call_id: str | None) -> None:
                 new_stack = new_stack[:target_index]
                 break
         else:
-            logger.debug(
-                f"weave pop_call error: Call with id {call_id} not found in stack."
-            )
+            logger.debug(f"weave pop_call error: Call with id {call_id} not found in stack.")
             # raise ValueError(f"Call with id {call_id} not found in stack")
             return
     else:
@@ -116,9 +108,7 @@ def require_current_call() -> Call:
             invoked outside an Op.
     """
     if (call := get_current_call()) is None:
-        raise NoCurrentCallError(
-            "Have you initialized weave and are you calling this from inside an op?"
-        )
+        raise NoCurrentCallError("Have you initialized weave and are you calling this from inside an op?")
     return call
 
 

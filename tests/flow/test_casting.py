@@ -53,9 +53,7 @@ def valid_scorer(client, request):
         return ref
 
 
-@pytest.mark.parametrize(
-    "valid_dataset", ["dataset", "list", "ref", "remote dataset"], indirect=True
-)
+@pytest.mark.parametrize("valid_dataset", ["dataset", "list", "ref", "remote dataset"], indirect=True)
 def test_cast_to_dataset(valid_dataset):
     res = cast_to_dataset(valid_dataset)
 

@@ -123,9 +123,7 @@ class MockServer(TraceServerInterface):
 
 
 def get_cache_sizes(cache_dir: str) -> dict[str, int]:
-    return {
-        f: os.path.getsize(os.path.join(cache_dir, f)) for f in os.listdir(cache_dir)
-    }
+    return {f: os.path.getsize(os.path.join(cache_dir, f)) for f in os.listdir(cache_dir)}
 
 
 def test_server_cache_size_limit(client):
@@ -145,9 +143,7 @@ def test_server_cache_size_limit(client):
         assert sizes["cache.db"] <= 50000
 
         for i in range(count):
-            caching_server.obj_read(
-                ObjReadReq(project_id="test", object_id="test", digest=f"test_{i}")
-            )
+            caching_server.obj_read(ObjReadReq(project_id="test", object_id="test", digest=f"test_{i}"))
 
             # Internally, the cache estimates it's own size
             # Access the disk cache layer (second layer in the stack)
@@ -174,9 +170,7 @@ def test_server_cache_size_limit(client):
             assert sizes["cache.db-wal"] == 0
             assert sizes["cache.db"] <= limit * 1.1
         else:
-            raise ValueError(
-                f"Unexpected number of files in cache directory: {len(sizes)}"
-            )
+            raise ValueError(f"Unexpected number of files in cache directory: {len(sizes)}")
 
 
 def test_server_cache_latency(client):
@@ -188,9 +182,7 @@ def test_server_cache_latency(client):
     def get_latency_for_server(server: TraceServerInterface, count: int):
         start = time.time()
         for i in range(count):
-            server.obj_read(
-                ObjReadReq(project_id="test", object_id="test", digest=f"test_{i}")
-            )
+            server.obj_read(ObjReadReq(project_id="test", object_id="test", digest=f"test_{i}"))
         end = time.time()
         return (end - start) / count
 

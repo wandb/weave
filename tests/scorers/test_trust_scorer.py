@@ -35,9 +35,7 @@ def trust_scorer():
 
 
 def test_simple_score(trust_scorer):
-    result = trust_scorer.score(
-        output="dummy output", context="dummy context", query="dummy query"
-    )
+    result = trust_scorer.score(output="dummy output", context="dummy context", query="dummy query")
     assert not result.passed
 
 
@@ -78,9 +76,7 @@ def test_score_all_with_dummy_scorers(trust_scorer):
         "AlwaysFail": AlwaysFailScore(),
     }
 
-    results = trust_scorer._score_all(
-        output="dummy output", context="dummy context", query="dummy query"
-    )
+    results = trust_scorer._score_all(output="dummy output", context="dummy context", query="dummy query")
     assert "AlwaysPass" in results
     assert "AlwaysFail" in results
     assert results["AlwaysPass"].passed
@@ -92,16 +88,12 @@ def test_score_with_logic(trust_scorer):
     class DummyCriticalScore(weave.Scorer):
         @weave.op
         def score(self, **kwargs):
-            return WeaveScorerResult(
-                passed=False, metadata={"score": 0.8, "score_2": 0.8}
-            )
+            return WeaveScorerResult(passed=False, metadata={"score": 0.8, "score_2": 0.8})
 
     class DummyAdvisoryScore(weave.Scorer):
         @weave.op
         def score(self, **kwargs):
-            return WeaveScorerResult(
-                passed=False, metadata={"score": 0.4, "score_2": 0.4}
-            )
+            return WeaveScorerResult(passed=False, metadata={"score": 0.4, "score_2": 0.4})
 
     # Override the loaded scorers and classification sets.
     trust_scorer._loaded_scorers = {
@@ -111,9 +103,7 @@ def test_score_with_logic(trust_scorer):
     trust_scorer._critical_scorers = {DummyCriticalScore}
     trust_scorer._advisory_scorers = {DummyAdvisoryScore}
 
-    result = trust_scorer._score_with_logic(
-        query="dummy query", context="dummy context", output="dummy output"
-    )
+    result = trust_scorer._score_with_logic(query="dummy query", context="dummy context", output="dummy output")
     # Since a critical scorer failed, overall trust should be low.
     assert result.metadata["trust_level"] == "low_critical-issues-found"
     assert not result.passed
@@ -153,18 +143,10 @@ def test_trust_scorer_parallelism(trust_scorer):
     raw_outputs = eval_result["WeaveTrustScorerV1"]["metadata"]["raw_outputs"]
 
     # Verify specific mean scores
-    assert raw_outputs["WeaveHallucinationScorerV1"]["metadata"]["score"][
-        "mean"
-    ] == pytest.approx(0.0932, rel=1e-3)
-    assert raw_outputs["WeaveCoherenceScorerV1"]["metadata"]["score"][
-        "mean"
-    ] == pytest.approx(0.8197, rel=1e-3)
-    assert raw_outputs["WeaveFluencyScorerV1"]["metadata"]["score"][
-        "mean"
-    ] == pytest.approx(0.5185, rel=1e-3)
-    assert raw_outputs["WeaveContextRelevanceScorerV1"]["metadata"]["score"][
-        "mean"
-    ] == pytest.approx(0.6296, rel=1e-3)
+    assert raw_outputs["WeaveHallucinationScorerV1"]["metadata"]["score"]["mean"] == pytest.approx(0.0932, rel=1e-3)
+    assert raw_outputs["WeaveCoherenceScorerV1"]["metadata"]["score"]["mean"] == pytest.approx(0.8197, rel=1e-3)
+    assert raw_outputs["WeaveFluencyScorerV1"]["metadata"]["score"]["mean"] == pytest.approx(0.5185, rel=1e-3)
+    assert raw_outputs["WeaveContextRelevanceScorerV1"]["metadata"]["score"]["mean"] == pytest.approx(0.6296, rel=1e-3)
 
     # Verify toxicity categories
     toxicity_results = raw_outputs["WeaveToxicityScorerV1"]["metadata"]

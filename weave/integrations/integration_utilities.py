@@ -49,13 +49,7 @@ def _uniquely_truncate_str(s: str, max_len: int, max_hash_len: int = 4) -> str:
     start_len = max_len_to_keep // 2
     end_len = max_len_to_keep - start_len
 
-    return (
-        _truncate_string(s, start_len)
-        + "_"
-        + _hash_str(s, hash_len)
-        + "_"
-        + _truncate_string(s, end_len, True)
-    )
+    return _truncate_string(s, start_len) + "_" + _hash_str(s, hash_len) + "_" + _truncate_string(s, end_len, True)
 
 
 def _truncate_string(s: str, max_len: int, from_start: bool = False) -> str:
@@ -108,9 +102,5 @@ def _make_string_of_length(n: int) -> str:
 
 
 def _truncated_str(tail_len: int, total_len: int) -> tuple:
-    name = (
-        _make_string_of_length(total_len - tail_len - 1)
-        + "."
-        + _make_string_of_length(tail_len)
-    )
+    name = _make_string_of_length(total_len - tail_len - 1) + "." + _make_string_of_length(tail_len)
     return name, truncate_op_name(name)

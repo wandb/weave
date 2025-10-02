@@ -49,15 +49,9 @@ def flow_decorator_wrapper(op_settings: OpSettings) -> Callable:
                 weave_op_name = getattr(fn, "__name__", "unknown_function")
 
                 base_name = op_settings.name or ""
-                display_name = (
-                    f"{base_name}.{weave_op_name}"
-                    if weave_op_name != "unknown_function"
-                    else base_name
-                )
+                display_name = f"{base_name}.{weave_op_name}" if weave_op_name != "unknown_function" else base_name
 
-                op_settings_copy = op_settings.model_copy(
-                    update={"call_display_name": display_name}
-                )
+                op_settings_copy = op_settings.model_copy(update={"call_display_name": display_name})
 
                 # Apply weave.op to the function
                 weave_wrapped = weave.op(fn, **op_settings_copy.model_dump())
@@ -109,8 +103,7 @@ def get_crewai_patcher(
     agent_execute_task_settings = base.model_copy(
         update={
             "name": base.name or "crewai.Agent.execute_task",
-            "call_display_name": base.call_display_name
-            or default_call_display_name_execute_task,
+            "call_display_name": base.call_display_name or default_call_display_name_execute_task,
             "postprocess_inputs": crewai_postprocess_inputs,
         }
     )
@@ -119,8 +112,7 @@ def get_crewai_patcher(
     task_execute_sync_settings = base.model_copy(
         update={
             "name": base.name or "crewai.Task.execute_sync",
-            "call_display_name": base.call_display_name
-            or default_call_display_name_execute_sync,
+            "call_display_name": base.call_display_name or default_call_display_name_execute_sync,
             "postprocess_inputs": crewai_postprocess_inputs,
         }
     )
@@ -184,8 +176,7 @@ def get_crewai_patcher(
                         tools_settings[tool] = base.model_copy(
                             update={
                                 "name": base.name or f"crewai_tools.{tool}._run",
-                                "call_display_name": base.call_display_name
-                                or f"{tool}._run",
+                                "call_display_name": base.call_display_name or f"{tool}._run",
                             }
                         )
                     else:

@@ -61,9 +61,7 @@ class ExceptionCase:
     ],
     ids=str,
 )
-def test_get_entity_project_from_project_name_success(
-    case: SuccessCase, mock_wandb_api
-):
+def test_get_entity_project_from_project_name_success(case: SuccessCase, mock_wandb_api):
     """Test successful project name parsing scenarios."""
     # Configure mock if needed
     if case.mock_default_entity is not None:
@@ -78,9 +76,7 @@ def test_get_entity_project_from_project_name_success(
         mock_wandb_api.default_entity_name.assert_called_once()
 
 
-def test_get_entity_project_from_project_name_with_wandb_entity_env(
-    mock_wandb_api, monkeypatch
-):
+def test_get_entity_project_from_project_name_with_wandb_entity_env(mock_wandb_api, monkeypatch):
     """Test that WANDB_ENTITY environment variable is respected."""
     # Set WANDB_ENTITY environment variable
     monkeypatch.setenv("WANDB_ENTITY", "env_entity")
@@ -94,9 +90,7 @@ def test_get_entity_project_from_project_name_with_wandb_entity_env(
     mock_wandb_api.default_entity_name.assert_not_called()
 
     # Test that explicit entity in project name overrides env var
-    entity, project = get_entity_project_from_project_name(
-        "explicit_entity/test_project"
-    )
+    entity, project = get_entity_project_from_project_name("explicit_entity/test_project")
     assert entity == "explicit_entity"
     assert project == "test_project"
 

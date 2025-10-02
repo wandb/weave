@@ -53,9 +53,7 @@ def anthropic_accumulator(
         acc.usage.input_tokens += value.message.usage.input_tokens
 
     # Accumulate the content if it's a ContentBlockDeltaEvent
-    if isinstance(
-        value, (RawContentBlockDeltaEvent, BetaRawContentBlockDeltaEvent)
-    ) and hasattr(value.delta, "text"):
+    if isinstance(value, (RawContentBlockDeltaEvent, BetaRawContentBlockDeltaEvent)) and hasattr(value.delta, "text"):
         if acc.content and isinstance(acc.content[-1], TextBlock):
             acc.content[-1].text += value.delta.text
         else:
@@ -202,30 +200,16 @@ def get_anthropic_patcher(
 
     base = settings.op_settings
 
-    messages_create_settings = base.model_copy(
-        update={"name": base.name or "anthropic.Messages.create"}
-    )
-    async_messages_create_settings = base.model_copy(
-        update={"name": base.name or "anthropic.AsyncMessages.create"}
-    )
-    stream_settings = base.model_copy(
-        update={"name": base.name or "anthropic.Messages.stream"}
-    )
-    async_stream_settings = base.model_copy(
-        update={"name": base.name or "anthropic.AsyncMessages.stream"}
-    )
-    beta_messages_create_settings = base.model_copy(
-        update={"name": base.name or "anthropic.beta.Messages.create"}
-    )
+    messages_create_settings = base.model_copy(update={"name": base.name or "anthropic.Messages.create"})
+    async_messages_create_settings = base.model_copy(update={"name": base.name or "anthropic.AsyncMessages.create"})
+    stream_settings = base.model_copy(update={"name": base.name or "anthropic.Messages.stream"})
+    async_stream_settings = base.model_copy(update={"name": base.name or "anthropic.AsyncMessages.stream"})
+    beta_messages_create_settings = base.model_copy(update={"name": base.name or "anthropic.beta.Messages.create"})
     beta_async_messages_create_settings = base.model_copy(
         update={"name": base.name or "anthropic.beta.AsyncMessages.create"}
     )
-    beta_stream_settings = base.model_copy(
-        update={"name": base.name or "anthropic.beta.Messages.stream"}
-    )
-    beta_async_stream_settings = base.model_copy(
-        update={"name": base.name or "anthropic.beta.AsyncMessages.stream"}
-    )
+    beta_stream_settings = base.model_copy(update={"name": base.name or "anthropic.beta.Messages.stream"})
+    beta_async_stream_settings = base.model_copy(update={"name": base.name or "anthropic.beta.AsyncMessages.stream"})
 
     _anthropic_patcher = MultiPatcher(
         [

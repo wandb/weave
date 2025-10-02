@@ -51,9 +51,7 @@ def get_cerebras_patcher(
 
     base = settings.op_settings
 
-    create_settings = base.model_copy(
-        update={"name": base.name or "cerebras.chat.completions.create"}
-    )
+    create_settings = base.model_copy(update={"name": base.name or "cerebras.chat.completions.create"})
 
     _cerebras_patcher = MultiPatcher(
         [

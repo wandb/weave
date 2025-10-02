@@ -91,11 +91,7 @@ def _find_full_model_name(output: Any, partial_model_name: str) -> str:
     for value in flattened.values():
         # we use startswith here to avoid prefix matches like "models/gemini-1.5-pro"
         # and return if we find a better (longer) match
-        if (
-            isinstance(value, str)
-            and value.startswith(partial_model_name)
-            and len(value) > len(best_match)
-        ):
+        if isinstance(value, str) and value.startswith(partial_model_name) and len(value) > len(best_match):
             best_match = value
 
     return best_match
@@ -122,15 +118,9 @@ def _extract_usage_data(call: Call, output: Any) -> None:
     for generation_batch in generations:
         for generation in generation_batch:
             if model_type == "chat":
-                usage_metadata = (
-                    generation.get("message", {})
-                    .get("kwargs", {})
-                    .get("usage_metadata", {})
-                )
+                usage_metadata = generation.get("message", {}).get("kwargs", {}).get("usage_metadata", {})
             elif model_type == "llm":
-                usage_metadata = generation.get("generation_info", {}).get(
-                    "usage_metadata", {}
-                )
+                usage_metadata = generation.get("generation_info", {}).get("usage_metadata", {})
             # or other non-chat models we don't know how to extract usage metadata from
             else:
                 usage_metadata = {}
@@ -140,9 +130,7 @@ def _extract_usage_data(call: Call, output: Any) -> None:
 
             if token_usage.prompt_tokens > 0 or token_usage.completion_tokens > 0:
                 usage_dict[model_name]["prompt_tokens"] += token_usage.prompt_tokens
-                usage_dict[model_name]["completion_tokens"] += (
-                    token_usage.completion_tokens
-                )
+                usage_dict[model_name]["completion_tokens"] += token_usage.completion_tokens
                 usage_dict[model_name]["total_tokens"] += token_usage.total_tokens
 
     if usage_dict:

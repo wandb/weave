@@ -56,9 +56,7 @@ def apply_threadsafe_patch_to_moviepy_video() -> None:
         try:
             _apply_threadsafe_patch()
         except Exception as e:
-            logger.info(
-                f"Failed to patch moviepy.editor.VideoFileClip: Unexpected error - {e}"
-            )
+            logger.info(f"Failed to patch moviepy.editor.VideoFileClip: Unexpected error - {e}")
         else:
             _patched = True
     else:
@@ -129,9 +127,7 @@ def undo_threadsafe_patch_to_moviepy_video() -> None:
     except ImportError:
         pass
     except Exception as e:
-        logger.info(
-            f"Failed to unpatch moviepy.editor.VideoFileClip: Unable to restore original methods - {e}"
-        )
+        logger.info(f"Failed to unpatch moviepy.editor.VideoFileClip: Unable to restore original methods - {e}")
     else:
         _patched = False
 
@@ -180,9 +176,7 @@ class MoviePyPatchHook(MetaPathFinder):
             # Import will succeed now since we're in the import process
             _apply_threadsafe_patch()
         except Exception as e:
-            logger.info(
-                f"Failed to patch moviepy.editor.VideoFileClip during import: {e}"
-            )
+            logger.info(f"Failed to patch moviepy.editor.VideoFileClip during import: {e}")
         else:
             _patched = True
         # Always return None to let the normal import mechanism handle it

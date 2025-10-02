@@ -74,9 +74,7 @@ atexit.register(_cleanup_all_evaluations)
 current_output: ContextVar[Any] = ContextVar("current_output", default=None)
 current_score: ContextVar[ScoreType | None] = ContextVar("current_score", default=None)
 current_summary: ContextVar[dict | None] = ContextVar("current_summary", default=None)
-current_predict_call: ContextVar[Call | None] = ContextVar(
-    "current_predict_call", default=None
-)
+current_predict_call: ContextVar[Call | None] = ContextVar("current_predict_call", default=None)
 
 IMPERATIVE_EVAL_MARKER = {"_weave_eval_meta": {"imperative": True}}
 IMPERATIVE_SCORE_MARKER = {"_weave_eval_meta": {"imperative": True, "score": True}}
@@ -201,9 +199,7 @@ def _validate_class_name(name: str, base_class_name: str = "Class") -> str:
 
     # Check if name is not a Python keyword
     if keyword.iskeyword(name):
-        raise ValueError(
-            f"`{base_class_name}` name '{name}' cannot be a Python keyword"
-        )
+        raise ValueError(f"`{base_class_name}` name '{name}' cannot be a Python keyword")
 
     return name
 
@@ -218,9 +214,7 @@ class ScorerCache:
         self._cached_scorers_lock = Lock()
         self._max_size = max_size
 
-    def get_scorer(
-        self, scorer_id: str, default_factory: Callable[[], Scorer]
-    ) -> Scorer:
+    def get_scorer(self, scorer_id: str, default_factory: Callable[[], Scorer]) -> Scorer:
         with self._cached_scorers_lock:
             if scorer_id not in self._cached_scorers:
                 if len(self._cached_scorers) >= self._max_size:
@@ -286,9 +280,7 @@ class ScoreLogger(BaseModel):
                     new_loop = asyncio.new_event_loop()
                     asyncio.set_event_loop(new_loop)
                     try:
-                        result = new_loop.run_until_complete(
-                            self.alog_score(scorer, score)
-                        )
+                        result = new_loop.run_until_complete(self.alog_score(scorer, score))
                     finally:
                         new_loop.close()
                 except Exception as e:
@@ -318,9 +310,7 @@ class ScoreLogger(BaseModel):
     ) -> None:
         if not isinstance(scorer, Scorer):
             scorer_id = json.dumps(scorer)
-            scorer = global_scorer_cache.get_scorer(
-                scorer_id, lambda: _cast_to_cls(Scorer)(scorer)
-            )
+            scorer = global_scorer_cache.get_scorer(scorer_id, lambda: _cast_to_cls(Scorer)(scorer))
         if self._has_finished:
             raise ValueError("Cannot log score after finish has been called")
 
@@ -346,9 +336,7 @@ class ScoreLogger(BaseModel):
         scorer.__dict__["score"] = MethodType(score_method, scorer)
 
         # attach the score feedback to the predict call
-        with call_context.set_call_stack(
-            [self.evaluate_call, self.predict_and_score_call]
-        ):
+        with call_context.set_call_stack([self.evaluate_call, self.predict_and_score_call]):
             with _set_current_score(score):
                 with attributes(IMPERATIVE_SCORE_MARKER):
                     await self.predict_call.apply_scorer(scorer)
@@ -382,8 +370,7 @@ class EvaluationLogger(BaseModel):
         str | None,
         Field(
             default=None,
-            description="(Optional): A name for the evaluation call."
-            "If not provided, a default name will be generated.",
+            description="(Optional): A name for the evaluation call.If not provided, a default name will be generated.",
         ),
     ]
     model: Annotated[
@@ -514,9 +501,7 @@ class EvaluationLogger(BaseModel):
         self._pseudo_evaluation.__dict__.update(
             {
                 "evaluate": MethodType(evaluate, self._pseudo_evaluation),
-                "predict_and_score": MethodType(
-                    predict_and_score, self._pseudo_evaluation
-                ),
+                "predict_and_score": MethodType(predict_and_score, self._pseudo_evaluation),
                 "summarize": MethodType(summarize, self._pseudo_evaluation),
             }
         )
@@ -549,9 +534,7 @@ class EvaluationLogger(BaseModel):
                 # This is best effort.  If we fail, just swallow the error.
                 pass
 
-    def _finalize_evaluation(
-        self, output: Any = None, exception: BaseException | None = None
-    ) -> None:
+    def _finalize_evaluation(self, output: Any = None, exception: BaseException | None = None) -> None:
         """Handles the final steps of the evaluation: cleaning up predictions and finishing the main call."""
         if self._is_finalized:
             return
@@ -559,9 +542,7 @@ class EvaluationLogger(BaseModel):
         self._cleanup_predictions()
 
         if self._evaluate_call is None:
-            raise RuntimeError(
-                "Evaluation call should exist for finalization, something went wrong!"
-            )
+            raise RuntimeError("Evaluation call should exist for finalization, something went wrong!")
 
         # Finish the evaluation call
         wc = require_weave_client()
@@ -570,9 +551,7 @@ class EvaluationLogger(BaseModel):
             wc.finish_call(self._evaluate_call, output=output, exception=exception)
         except Exception:
             # Log error but continue cleanup
-            logger.error(
-                "Failed to finish evaluation call during finalization.", exc_info=True
-            )
+            logger.error("Failed to finish evaluation call during finalization.", exc_info=True)
 
         self._is_finalized = True
 
@@ -595,13 +574,11 @@ class EvaluationLogger(BaseModel):
                 # Make the prediction call
                 with _set_current_output(output):
                     with attributes(IMPERATIVE_EVAL_MARKER):
-                        _, predict_and_score_call = (
-                            self._pseudo_evaluation.predict_and_score.call(
-                                self._pseudo_evaluation,
-                                self.model,
-                                inputs,
-                                __require_explicit_finish=True,
-                            )
+                        _, predict_and_score_call = self._pseudo_evaluation.predict_and_score.call(
+                            self._pseudo_evaluation,
+                            self.model,
+                            inputs,
+                            __require_explicit_finish=True,
                         )
         finally:
             # Restore the original predict method
@@ -643,9 +620,7 @@ class EvaluationLogger(BaseModel):
 
         # Calculate summary
         if auto_summarize:
-            data_to_summarize = [
-                pred._captured_scores for pred in self._accumulated_predictions
-            ]
+            data_to_summarize = [pred._captured_scores for pred in self._accumulated_predictions]
             summary_data = auto_summarize_fn(data_to_summarize)
         else:
             summary_data = summary
@@ -657,9 +632,7 @@ class EvaluationLogger(BaseModel):
             final_summary = {**final_summary, "output": summary}
 
         # Call the summarize op
-        assert self._evaluate_call is not None, (
-            "Evaluation call should exist for summary"
-        )
+        assert self._evaluate_call is not None, "Evaluation call should exist for summary"
 
         # Use set_call_stack to temporarily set the evaluation as the parent
         with call_context.set_call_stack([self._evaluate_call]):
@@ -713,9 +686,7 @@ class EvaluationLogger(BaseModel):
             raise ValueError("`name` must be a non-empty string")
 
         if self._evaluate_call is None:
-            raise RuntimeError(
-                "Evaluation call not initialized; cannot add view before evaluation starts"
-            )
+            raise RuntimeError("Evaluation call not initialized; cannot add view before evaluation starts")
 
         wc = require_weave_client()
 

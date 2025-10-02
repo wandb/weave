@@ -192,9 +192,7 @@ def test_dspy_predict_module(client: WeaveClient) -> None:
 def test_dspy_cot(client: WeaveClient) -> None:
     dspy.configure(lm=dspy.LM("openai/gpt-4o-mini", cache=False))
     math = dspy.ChainOfThought("question -> answer: float")
-    response = math(
-        question="Two dice are tossed. What is the probability that the sum equals two?"
-    )
+    response = math(question="Two dice are tossed. What is the probability that the sum equals two?")
     assert response.answer > 0.027
 
     calls = list(client.get_calls())
@@ -257,9 +255,7 @@ def test_dspy_custom_module(client: WeaveClient) -> None:
         confidence: float = dspy.OutputField()
 
     classify = dspy.Predict(Classify)
-    response = classify(
-        sentence="This book was super fun to read, though not the last chapter."
-    )
+    response = classify(sentence="This book was super fun to read, though not the last chapter.")
     assert response.sentiment == "positive"
     assert response.confidence > 0.5
 
@@ -391,10 +387,7 @@ def test_dspy_optimizer_labeled_fewshot(client: WeaveClient) -> None:
     assert op_name_from_ref(call.op_name) == "dspy.LabeledFewShot.compile"
     output = call.output
     assert len(output["predict"]["demos"]) > 0
-    assert (
-        output["predict"]["signature"]["instructions"]
-        == optimized_module.predict.signature.instructions
-    )
+    assert output["predict"]["signature"]["instructions"] == optimized_module.predict.signature.instructions
 
 
 @pytest.mark.skip_clickhouse_client
@@ -426,10 +419,7 @@ def test_dspy_optimizer_bootstrap_fewshot(client: WeaveClient) -> None:
     assert op_name_from_ref(call.op_name) == "dspy.BootstrapFewShot.compile"
     output = call.output
     assert len(output["predict"]["demos"]) > 0
-    assert (
-        output["predict"]["signature"]["instructions"]
-        == optimized_module.predict.signature.instructions
-    )
+    assert output["predict"]["signature"]["instructions"] == optimized_module.predict.signature.instructions
 
 
 @pytest.mark.skip_clickhouse_client
@@ -454,9 +444,7 @@ def test_dspy_optimizer_bootstrap_fewshot_with_random_search(
         stop_at_score=100,
         num_threads=1,
     )
-    optimized_module = optimizer.compile(
-        module, trainset=SAMPLE_EVAL_DATASET, valset=SAMPLE_EVAL_DATASET
-    )
+    optimized_module = optimizer.compile(module, trainset=SAMPLE_EVAL_DATASET, valset=SAMPLE_EVAL_DATASET)
     assert (
         optimized_module.predict.signature.instructions
         == "Given the fields `question`, produce the fields `answer`, `explanation`."
@@ -467,12 +455,6 @@ def test_dspy_optimizer_bootstrap_fewshot_with_random_search(
 
     call = calls[0]
     assert call.started_at < call.ended_at
-    assert (
-        op_name_from_ref(call.op_name)
-        == "dspy.BootstrapFewShotWithRandomSearch.compile"
-    )
+    assert op_name_from_ref(call.op_name) == "dspy.BootstrapFewShotWithRandomSearch.compile"
     output = call.output
-    assert (
-        output["predict"]["signature"]["instructions"]
-        == optimized_module.predict.signature.instructions
-    )
+    assert output["predict"]["signature"]["instructions"] == optimized_module.predict.signature.instructions

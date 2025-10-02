@@ -75,19 +75,13 @@ def get_ch_trace_server(
         ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer(
             host=host,
             port=port,
-            evaluate_model_dispatcher=EvaluateModelTestDispatcher(
-                id_converter=id_converter
-            ),
+            evaluate_model_dispatcher=EvaluateModelTestDispatcher(id_converter=id_converter),
         )
         ch_server.ch_client.command("DROP DATABASE IF EXISTS db_management")
-        ch_server.ch_client.command(
-            f"DROP DATABASE IF EXISTS {ts_env.wf_clickhouse_database()}"
-        )
+        ch_server.ch_client.command(f"DROP DATABASE IF EXISTS {ts_env.wf_clickhouse_database()}")
         ch_server._run_migrations()
 
-        return externalize_trace_server(
-            ch_server, TEST_ENTITY, id_converter=id_converter
-        )
+        return externalize_trace_server(ch_server, TEST_ENTITY, id_converter=id_converter)
 
     return ch_trace_server_inner
 
@@ -98,15 +92,11 @@ def get_sqlite_trace_server() -> Callable[[], TestOnlyUserInjectingExternalTrace
         id_converter = DummyIdConverter()
         sqlite_server = SqliteTraceServer(
             "file::memory:?cache=shared",
-            evaluate_model_dispatcher=EvaluateModelTestDispatcher(
-                id_converter=id_converter
-            ),
+            evaluate_model_dispatcher=EvaluateModelTestDispatcher(id_converter=id_converter),
         )
         sqlite_server.drop_tables()
         sqlite_server.setup_tables()
-        return externalize_trace_server(
-            sqlite_server, TEST_ENTITY, id_converter=id_converter
-        )
+        return externalize_trace_server(sqlite_server, TEST_ENTITY, id_converter=id_converter)
 
     return sqlite_trace_server_inner
 

@@ -278,9 +278,7 @@ def generate_module_doc_string(module, src_root_path):
         # Very special / hacky handling of pydantic models
         # since the lazydocs library doesn't handle them well.
         if isinstance(obj, type) and issubclass(obj, pydantic.BaseModel):
-            markdown_paragraphs.append(
-                fix_pydantic_model(generator.class2md(obj), obj, module_name)
-            )
+            markdown_paragraphs.append(fix_pydantic_model(generator.class2md(obj), obj, module_name))
         elif callable(obj) and not isinstance(obj, type):
             markdown_paragraphs.append(generator.func2md(obj))
         elif isinstance(obj, type):
@@ -301,9 +299,7 @@ def generate_module_doc_string(module, src_root_path):
 
             process_item(obj)
 
-    overview = remove_empty_overview_sections(
-        sanitize_markdown(generator.overview2md())
-    )
+    overview = remove_empty_overview_sections(sanitize_markdown(generator.overview2md()))
     overview = make_links_relative(overview)
     sections = [sanitize_markdown(par) for par in markdown_paragraphs]
     final = "\n\n".join(

@@ -197,9 +197,7 @@ class _WandbLogin:
             except Exception as e:
                 logger.warning(f"Failed to save API key: {e}")
 
-    def _prompt_api_key(
-        self, referrer: str | None = None
-    ) -> tuple[str | None, ApiKeyStatus]:
+    def _prompt_api_key(self, referrer: str | None = None) -> tuple[str | None, ApiKeyStatus]:
         """Prompts user for API key.
 
         Args:
@@ -236,9 +234,7 @@ class _WandbLogin:
 
         return api_key, ApiKeyStatus.VALID
 
-    def prompt_api_key(
-        self, referrer: str | None = None
-    ) -> tuple[str | None, ApiKeyStatus]:
+    def prompt_api_key(self, referrer: str | None = None) -> tuple[str | None, ApiKeyStatus]:
         """Updates the global API key by prompting the user.
 
         Args:
@@ -252,9 +248,7 @@ class _WandbLogin:
         """
         key, status = self._prompt_api_key(referrer)
         if status == ApiKeyStatus.NOTTY:
-            raise ValueError(
-                "api_key not configured (no-tty). call wandb.login(key=[your_api_key])"
-            )
+            raise ValueError("api_key not configured (no-tty). call wandb.login(key=[your_api_key])")
 
         return key, status
 
@@ -362,9 +356,7 @@ def _validate_api_key(api_key: str) -> None:
         key = api_key
 
     if len(key) != 40:
-        raise ValueError(
-            f"API key must be 40 characters long, yours was {len(key)}"
-        ) from None
+        raise ValueError(f"API key must be 40 characters long, yours was {len(key)}") from None
 
 
 def _get_default_host() -> str:
@@ -421,9 +413,7 @@ def _get_host_from_settings() -> str | None:
         settings = configparser.ConfigParser()
         settings.read(str(settings_path))
 
-        if settings.has_section("default") and settings.has_option(
-            "default", "base_url"
-        ):
+        if settings.has_section("default") and settings.has_option("default", "base_url"):
             base_url = settings.get("default", "base_url")
             # Parse out just the hostname from the URL
             if base_url.startswith(("http://", "https://")):

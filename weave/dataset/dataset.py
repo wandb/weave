@@ -75,8 +75,7 @@ class Dataset(Object):
             from datasets import DatasetDict as HFDatasetDict
         except ImportError:
             raise ImportError(
-                "huggingface datasets is required to use this method. "
-                "Install with `pip install datasets`"
+                "huggingface datasets is required to use this method. Install with `pip install datasets`"
             ) from None
 
         if isinstance(hf_dataset, HFDatasetDict):
@@ -95,10 +94,7 @@ class Dataset(Object):
         elif isinstance(hf_dataset, HFDataset):
             target_hf_dataset = hf_dataset
         else:
-            raise TypeError(
-                "Expected a datasets.Dataset or datasets.DatasetDict object, "
-                f"got {type(hf_dataset)}"
-            )
+            raise TypeError(f"Expected a datasets.Dataset or datasets.DatasetDict object, got {type(hf_dataset)}")
 
         # Convert HF Dataset to list of dicts
         rows = target_hf_dataset.to_list()
@@ -117,8 +113,7 @@ class Dataset(Object):
             from datasets import Dataset as HFDataset
         except ImportError:
             raise ImportError(
-                "huggingface datasets is required to use this method. "
-                "Install with `pip install datasets`"
+                "huggingface datasets is required to use this method. Install with `pip install datasets`"
             ) from None
         # Convert list of dicts to HF Dataset format (dict of lists)
         if not self.rows:
@@ -157,16 +152,11 @@ class Dataset(Object):
         if self.rows.table_ref.entity != client.entity:
             raise ValueError(
                 "This dataset is not saved to the same entity as the current weave client. "
-                "Client is in entity: "
-                + client.entity
-                + " but dataset is in entity: "
-                + self.rows.table_ref.entity
+                "Client is in entity: " + client.entity + " but dataset is in entity: " + self.rows.table_ref.entity
             )
 
         new_table = client._append_to_table(self.rows.table_ref.digest, list(rows))
-        new_dataset = Dataset(
-            name=self.name, description=self.description, rows=new_table
-        )
+        new_dataset = Dataset(name=self.name, description=self.description, rows=new_table)
         weave.publish(new_dataset, name=self.name)
         return new_dataset
 
@@ -190,9 +180,7 @@ class Dataset(Object):
                     + short_str(row)
                 )
             if len(row) == 0:
-                raise ValueError(
-                    "Attempted to construct a Dataset row with an empty dict."
-                )
+                raise ValueError("Attempted to construct a Dataset row with an empty dict.")
         return rows
 
     def __iter__(self) -> Iterator[dict]:

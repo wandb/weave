@@ -63,9 +63,7 @@ async def fetch_weather(city: str) -> str:
         get_stations = response.json()
 
     stations = get_stations["features"]
-    stationid_names = {
-        station["properties"]["name"]: station["id"] for station in stations
-    }
+    stationid_names = {station["properties"]["name"]: station["id"] for station in stations}
 
     openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
     response = openai_client.beta.chat.completions.parse(

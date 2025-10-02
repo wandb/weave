@@ -114,8 +114,7 @@ def crew_kickoff_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
                     results["self"] = {
                         k2: v2
                         for k2, v2 in crew_dict.items()
-                        if v2 is not None
-                        and not (isinstance(v2, list) and len(v2) == 0)
+                        if v2 is not None and not (isinstance(v2, list) and len(v2) == 0)
                     }
                 else:
                     results["self"] = crew_dict

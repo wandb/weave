@@ -42,9 +42,7 @@ class File:
             raise FileNotFoundError(f"{self.path} does not exist")
         if not self.path.is_file():
             raise FileNotFoundError(f"{self.path} is not a file")
-        self.mimetype = (
-            mimetype if mimetype else mimetypes.guess_type(str(self.path))[0]
-        )
+        self.mimetype = mimetype if mimetype else mimetypes.guess_type(str(self.path))[0]
         self.size = self.path.stat().st_size
 
     @property

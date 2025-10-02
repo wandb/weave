@@ -91,9 +91,7 @@ def test_action_lifecycle_llm_judge_primitive(client: WeaveClient):
 
     with secret_fetcher_context(DummySecretFetcher()):
         with patch("litellm.completion") as mock_completion:
-            mock_completion.return_value = ModelResponse.model_validate(
-                primitive_mock_response
-            )
+            mock_completion.return_value = ModelResponse.model_validate(primitive_mock_response)
             client.server.actions_execute_batch(
                 ActionsExecuteBatchReq.model_validate(
                     {
@@ -182,9 +180,7 @@ def test_action_lifecycle_llm_judge_structured(client: WeaveClient):
 
     with secret_fetcher_context(DummySecretFetcher()):
         with patch("litellm.completion") as mock_completion:
-            mock_completion.return_value = ModelResponse.model_validate(
-                structured_mock_response
-            )
+            mock_completion.return_value = ModelResponse.model_validate(structured_mock_response)
             client.server.actions_execute_batch(
                 ActionsExecuteBatchReq.model_validate(
                     {

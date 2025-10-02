@@ -41,12 +41,8 @@ def postprocess_output_to_openai_format(output: Any) -> dict:
     if isinstance(output, ChatResult):  # its ChatResult
         message = output.llm_output
         enhanced_usage = message.get("token_usage", {})
-        enhanced_usage["output_tokens"] = message.get("token_usage").get(
-            "completion_tokens", 0
-        )
-        enhanced_usage["input_tokens"] = message.get("token_usage").get(
-            "prompt_tokens", 0
-        )
+        enhanced_usage["output_tokens"] = message.get("token_usage").get("completion_tokens", 0)
+        enhanced_usage["input_tokens"] = message.get("token_usage").get("prompt_tokens", 0)
 
         returnable = {
             "choices": [
@@ -74,12 +70,8 @@ def postprocess_output_to_openai_format(output: Any) -> dict:
         orig_message = output.message
         openai_message = convert_to_openai_messages(output.message)
         enhanced_usage = getattr(orig_message, "usage_metadata", {})
-        enhanced_usage["completion_tokens"] = orig_message.usage_metadata.get(
-            "output_tokens", 0
-        )
-        enhanced_usage["prompt_tokens"] = orig_message.usage_metadata.get(
-            "input_tokens", 0
-        )
+        enhanced_usage["completion_tokens"] = orig_message.usage_metadata.get("output_tokens", 0)
+        enhanced_usage["prompt_tokens"] = orig_message.usage_metadata.get("input_tokens", 0)
 
         returnable = {
             "choices": [
@@ -91,14 +83,10 @@ def postprocess_output_to_openai_format(output: Any) -> dict:
                         "tool_calls": openai_message.get("tool_calls", []),
                     },
                     "logprobs": None,
-                    "finish_reason": getattr(orig_message, "response_metadata", {}).get(
-                        "finish_reason", None
-                    ),
+                    "finish_reason": getattr(orig_message, "response_metadata", {}).get("finish_reason", None),
                 }
             ],
-            "model": getattr(orig_message, "response_metadata", {}).get(
-                "model_name", None
-            ),
+            "model": getattr(orig_message, "response_metadata", {}).get("model_name", None),
             "tool_calls": openai_message.get("tool_calls", []),
             "usage": enhanced_usage,
         }
@@ -110,9 +98,7 @@ def postprocess_output_to_openai_format(output: Any) -> dict:
     return output
 
 
-def postprocess_inputs_to_openai_format(
-    func: Op, args: tuple, kwargs: dict
-) -> ProcessedInputs:
+def postprocess_inputs_to_openai_format(func: Op, args: tuple, kwargs: dict) -> ProcessedInputs:
     """Need to process the input reported to weave to send it on openai format so that Weave front end renders
     chat view. This only affects what is sent to weave.
     """
@@ -138,9 +124,7 @@ def postprocess_inputs_to_openai_format(
         "stream": stream,
     }
 
-    weave_report.update(
-        chat_nvidia_obj.model_dump(exclude_unset=True, exclude_none=True)
-    )
+    weave_report.update(chat_nvidia_obj.model_dump(exclude_unset=True, exclude_none=True))
 
     return ProcessedInputs(
         original_args=original_args,

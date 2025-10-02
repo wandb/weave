@@ -26,13 +26,7 @@ MOCK_APPLY_GUARDRAIL_RESPONSE = {
         }
     ],
     "assessments": [
-        {
-            "topicPolicy": {
-                "topics": [
-                    {"name": "Financial advice", "type": "FILTERED", "confidence": 0.95}
-                ]
-            }
-        }
+        {"topicPolicy": {"topics": [{"name": "Financial advice", "type": "FILTERED", "confidence": 0.95}]}}
     ],
     "usage": {"inputTokens": 25, "outputTokens": 45, "totalTokens": 70},
 }
@@ -56,15 +50,7 @@ MOCK_APPLY_GUARDRAIL_INTERVENTION_RESPONSE = {
             "text": "I cannot provide specific investment advice. Please consult with a qualified financial advisor for personalized retirement planning guidance."
         }
     ],
-    "assessments": [
-        {
-            "topicPolicy": {
-                "topics": [
-                    {"name": "Financial advice", "type": "BLOCKED", "confidence": 0.98}
-                ]
-            }
-        }
-    ],
+    "assessments": [{"topicPolicy": {"topics": [{"name": "Financial advice", "type": "BLOCKED", "confidence": 0.98}]}}],
     "usage": {"inputTokens": 25, "outputTokens": 30, "totalTokens": 55},
 }
 
@@ -125,30 +111,19 @@ class TestBedrockGuardrailScorer:
         # Configure the mock to return the ALLOW response
         mock_bedrock_client.apply_guardrail.return_value = MOCK_APPLY_GUARDRAIL_RESPONSE
 
-        result = scorer.score(
-            output="How should I think about retirement planning in general?"
-        )
+        result = scorer.score(output="How should I think about retirement planning in general?")
 
         # Verify the result
         assert result.passed is True
-        assert (
-            result.metadata["modified_output"]
-            == MOCK_APPLY_GUARDRAIL_RESPONSE["outputs"][0]["text"]
-        )
+        assert result.metadata["modified_output"] == MOCK_APPLY_GUARDRAIL_RESPONSE["outputs"][0]["text"]
         assert result.metadata["usage"]["inputTokens"] == 25
         assert result.metadata["usage"]["outputTokens"] == 45
         assert result.metadata["usage"]["totalTokens"] == 70
 
         # Verify the assessments
         assert "topicPolicy" in result.metadata["assessments"]
-        assert (
-            result.metadata["assessments"]["topicPolicy"]["topics"][0]["name"]
-            == "Financial advice"
-        )
-        assert (
-            result.metadata["assessments"]["topicPolicy"]["topics"][0]["type"]
-            == "FILTERED"
-        )
+        assert result.metadata["assessments"]["topicPolicy"]["topics"][0]["name"] == "Financial advice"
+        assert result.metadata["assessments"]["topicPolicy"]["topics"][0]["type"] == "FILTERED"
 
         # Verify the client was called with the correct parameters
         mock_bedrock_client.apply_guardrail.assert_called_once()
@@ -157,42 +132,26 @@ class TestBedrockGuardrailScorer:
         assert call_args["guardrailVersion"] == "DRAFT"
         assert call_args["source"] == "OUTPUT"
         assert len(call_args["content"]) == 1
-        assert (
-            call_args["content"][0]["text"]["text"]
-            == "How should I think about retirement planning in general?"
-        )
+        assert call_args["content"][0]["text"]["text"] == "How should I think about retirement planning in general?"
 
     def bedrock_guardrail_test_score_intervene(self, scorer, mock_bedrock_client):
         """Test scoring content that triggers guardrail intervention."""
         # Configure the mock to return the INTERVENE response
-        mock_bedrock_client.apply_guardrail.return_value = (
-            MOCK_APPLY_GUARDRAIL_INTERVENTION_RESPONSE
-        )
+        mock_bedrock_client.apply_guardrail.return_value = MOCK_APPLY_GUARDRAIL_INTERVENTION_RESPONSE
 
-        result = scorer.score(
-            output="Give me specific investment advice for my retirement to generate $5,000 monthly."
-        )
+        result = scorer.score(output="Give me specific investment advice for my retirement to generate $5,000 monthly.")
 
         # Verify the result
         assert result.passed is False
-        assert (
-            result.metadata["modified_output"]
-            == MOCK_APPLY_GUARDRAIL_INTERVENTION_RESPONSE["outputs"][0]["text"]
-        )
+        assert result.metadata["modified_output"] == MOCK_APPLY_GUARDRAIL_INTERVENTION_RESPONSE["outputs"][0]["text"]
         assert result.metadata["usage"]["inputTokens"] == 25
         assert result.metadata["usage"]["outputTokens"] == 30
         assert result.metadata["usage"]["totalTokens"] == 55
 
         # Verify the assessments
         assert "topicPolicy" in result.metadata["assessments"]
-        assert (
-            result.metadata["assessments"]["topicPolicy"]["topics"][0]["name"]
-            == "Financial advice"
-        )
-        assert (
-            result.metadata["assessments"]["topicPolicy"]["topics"][0]["type"]
-            == "BLOCKED"
-        )
+        assert result.metadata["assessments"]["topicPolicy"]["topics"][0]["name"] == "Financial advice"
+        assert result.metadata["assessments"]["topicPolicy"]["topics"][0]["type"] == "BLOCKED"
 
         # Verify the client was called with the correct parameters
         mock_bedrock_client.apply_guardrail.assert_called_once()
@@ -207,9 +166,7 @@ class TestBedrockGuardrailScorer:
         # Verify the result
         assert result.passed is False
         assert "reason" in result.metadata
-        assert (
-            "Error applying Bedrock guardrail: Test error" in result.metadata["reason"]
-        )
+        assert "Error applying Bedrock guardrail: Test error" in result.metadata["reason"]
         assert "error" in result.metadata
         assert "Test error" in result.metadata["error"]
 

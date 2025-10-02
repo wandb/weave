@@ -96,9 +96,7 @@ def create_test_client_factory_and_cleanup(
     sender_trace_server = receiver.get_sender_trace_server()
 
     # Create a completely self-contained factory function
-    factory_config = WeaveClientFactoryConfig(
-        entity=entity, project=project, server=sender_trace_server
-    )
+    factory_config = WeaveClientFactoryConfig(entity=entity, project=project, server=sender_trace_server)
 
     # Create a cleanup function that handles the receiver
     def cleanup():
@@ -129,9 +127,7 @@ async def runner_with_cleanup(
     Yields:
         IsolatedClientExecutor: Configured runner instance
     """
-    factory_config, cleanup = create_test_client_factory_and_cleanup(
-        trace_server, entity=entity, project=project
-    )
+    factory_config, cleanup = create_test_client_factory_and_cleanup(trace_server, entity=entity, project=project)
     runner = IsolatedClientExecutor(
         client_factory=weave_client_factory,
         client_factory_config=factory_config,
@@ -164,9 +160,7 @@ async def test_hello_world(client):
     factory_config, cleanup = create_test_client_factory_and_cleanup(
         client.server, entity=client.entity, project=inner_project
     )
-    runner = IsolatedClientExecutor(
-        client_factory=weave_client_factory, client_factory_config=factory_config
-    )
+    runner = IsolatedClientExecutor(client_factory=weave_client_factory, client_factory_config=factory_config)
 
     assert get_ref(get_keys) is None
     res, err = await runner.execute(do_task, {"a": {"b": "c"}})
@@ -177,9 +171,7 @@ async def test_hello_world(client):
     runner.stop()
     cleanup()
 
-    objs = client.server.objs_query(
-        ObjQueryReq(project_id=client.entity + "/" + inner_project)
-    ).objs
+    objs = client.server.objs_query(ObjQueryReq(project_id=client.entity + "/" + inner_project)).objs
     assert len(objs) == exp_obj_count
 
     # now the performing the task in the main process
@@ -189,9 +181,7 @@ async def test_hello_world(client):
     assert err is None
     assert res == ["a"]
 
-    objs = client.server.objs_query(
-        ObjQueryReq(project_id=client.entity + "/" + client.project)
-    ).objs
+    objs = client.server.objs_query(ObjQueryReq(project_id=client.entity + "/" + client.project)).objs
     assert len(objs) == exp_obj_count
 
 
@@ -238,9 +228,7 @@ async def timeout_function(req: TestRequest) -> TestResponse:
 async def test_process_timeout(client):
     """Test handling of process timeout."""
     # Create runner with very short timeout
-    async with runner_with_cleanup(
-        client.server, entity=client.entity, timeout_seconds=0.5
-    ) as runner:
+    async with runner_with_cleanup(client.server, entity=client.entity, timeout_seconds=0.5) as runner:
         req = TestRequest(value="timeout_test", sleep_time=2.0)
         result, error = await runner.execute(timeout_function, req)
         assert error is not None
@@ -280,19 +268,13 @@ async def check_isolation_function(req: TestRequest) -> TestResponse:
 
     # Check entity matches if expected
     if req.expected_entity and actual_entity != req.expected_entity:
-        return TestResponse(
-            result=f"Entity mismatch: expected {req.expected_entity}, got {actual_entity}"
-        )
+        return TestResponse(result=f"Entity mismatch: expected {req.expected_entity}, got {actual_entity}")
 
     # Check project matches if expected
     if req.expected_project and actual_project != req.expected_project:
-        return TestResponse(
-            result=f"Project mismatch: expected {req.expected_project}, got {actual_project}"
-        )
+        return TestResponse(result=f"Project mismatch: expected {req.expected_project}, got {actual_project}")
 
-    return TestResponse(
-        result=f"Isolation verified for {actual_entity}/{actual_project}"
-    )
+    return TestResponse(result=f"Isolation verified for {actual_entity}/{actual_project}")
 
 
 @pytest.mark.asyncio
@@ -300,24 +282,16 @@ async def test_project_isolation(client):
     """Test that different projects are properly isolated."""
     # Use two separate context managers for different projects
     async with (
-        runner_with_cleanup(
-            client.server, entity=client.entity, project="project1"
-        ) as runner1,
-        runner_with_cleanup(
-            client.server, entity=client.entity, project="project2"
-        ) as runner2,
+        runner_with_cleanup(client.server, entity=client.entity, project="project1") as runner1,
+        runner_with_cleanup(client.server, entity=client.entity, project="project2") as runner2,
     ):
         # Each runner should see its own project context
-        req1 = TestRequest(
-            value="test", expected_project="project1", expected_entity=client.entity
-        )
+        req1 = TestRequest(value="test", expected_project="project1", expected_entity=client.entity)
         result1, error = await runner1.execute(check_isolation_function, req1)
         assert error is None
         assert "Isolation verified" in result1.result
 
-        req2 = TestRequest(
-            value="test", expected_project="project2", expected_entity=client.entity
-        )
+        req2 = TestRequest(value="test", expected_project="project2", expected_entity=client.entity)
         result2, error = await runner2.execute(check_isolation_function, req2)
         assert error is None
         assert "Isolation verified" in result2.result
@@ -452,9 +426,7 @@ async def test_correct_isolation(client):
 
     We also assert that calls are successfully logged to the trace server.
     """
-    async with runner_with_cleanup(
-        client.server, entity=client.entity, project=client.project
-    ) as runner:
+    async with runner_with_cleanup(client.server, entity=client.entity, project=client.project) as runner:
         req = SimpleRequest(value="test")
         result, error = await runner.execute(log_to_weave, req)
         assert error is None
@@ -471,9 +443,7 @@ async def test_correct_isolation(client):
 
     assert get_ref(log_to_weave_op) is None
 
-    async with runner_with_cleanup(
-        client.server, entity=client.entity, project=client.project
-    ) as runner:
+    async with runner_with_cleanup(client.server, entity=client.entity, project=client.project) as runner:
         req = SimpleRequest(value="test")
         result, error = await runner.execute(log_to_weave, req)
         assert error is None
@@ -499,9 +469,7 @@ async def check_client_isolation_function(req: SimpleRequest) -> SimpleResponse:
 
     # The child should have a different client instance
     # even though it may have the same entity/project
-    return SimpleResponse(
-        result=f"Client entity: {child_client.entity}, Client id: {id(child_client)}"
-    )
+    return SimpleResponse(result=f"Client entity: {child_client.entity}, Client id: {id(child_client)}")
 
 
 @pytest.mark.asyncio
@@ -512,9 +480,7 @@ async def test_global_client_isolation(client):
     assert parent_client is not None
     assert parent_client.entity == client.entity
 
-    async with runner_with_cleanup(
-        client.server, entity="different_entity", project="different_project"
-    ) as runner:
+    async with runner_with_cleanup(client.server, entity="different_entity", project="different_project") as runner:
         req = SimpleRequest(value="test")
         result, error = await runner.execute(check_client_isolation_function, req)
         assert error is None

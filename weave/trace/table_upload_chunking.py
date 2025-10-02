@@ -53,10 +53,7 @@ class TableChunkManager:
         for row in rows:
             row_bytes = self.calculate_row_bytes(row)
 
-            if (
-                current_chunk_bytes + row_bytes > self.target_chunk_bytes
-                and current_chunk
-            ):
+            if current_chunk_bytes + row_bytes > self.target_chunk_bytes and current_chunk:
                 chunks.append(current_chunk)
                 current_chunk = [row]
                 current_chunk_bytes = row_bytes

@@ -318,10 +318,7 @@ class WeaveImportHook(MetaPathFinder):
 
         # If this is one of our supported integrations and not yet patched,
         # we'll patch it after it's imported
-        if (
-            root_module in INTEGRATION_MODULE_MAPPING
-            and root_module not in _PATCHED_INTEGRATIONS
-        ):
+        if root_module in INTEGRATION_MODULE_MAPPING and root_module not in _PATCHED_INTEGRATIONS:
             # We don't actually find the spec - let the normal import system do that
             # But we'll use a Loader wrapper to patch after import
             spec = None
@@ -391,10 +388,7 @@ class PatchingLoader:
 
 def _patch_if_needed(module_name: str) -> None:
     """Apply patching for a module if it hasn't been patched yet."""
-    if (
-        module_name not in _PATCHED_INTEGRATIONS
-        and module_name in INTEGRATION_MODULE_MAPPING
-    ):
+    if module_name not in _PATCHED_INTEGRATIONS and module_name in INTEGRATION_MODULE_MAPPING:
         patch_func = INTEGRATION_MODULE_MAPPING[module_name]
         try:
             patch_func()

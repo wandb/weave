@@ -85,9 +85,7 @@ class WeaveMediaConnection:
 
         # Wrap user-provided handlers with tracing and session management
         self.wrapped_on_open = self._wrap_handler("on_open", on_open)
-        self.wrapped_on_message = self._wrap_handler_with_session(
-            "on_message", on_message
-        )
+        self.wrapped_on_message = self._wrap_handler_with_session("on_message", on_message)
         self.wrapped_on_error = self._wrap_handler("on_error", on_error)
         self.wrapped_on_close = self._wrap_handler("on_close", on_close)
 
@@ -111,14 +109,10 @@ class WeaveMediaConnection:
             pass
 
     def _wrap_sender(self, sender: Any) -> Any:
-        def wrapper(
-            data: Any, opcode: int = 1
-        ) -> Any:  # opcode is websocket.ABNF.OPCODE_TEXT
+        def wrapper(data: Any, opcode: int = 1) -> Any:  # opcode is websocket.ABNF.OPCODE_TEXT
             # Process outgoing events with session manager
             parsed_data = _try_json_load(data)
-            if isinstance(parsed_data, dict) and (
-                typed_message := create_user_message_from_dict(parsed_data)
-            ):
+            if isinstance(parsed_data, dict) and (typed_message := create_user_message_from_dict(parsed_data)):
                 self.conversation_manager.process_event(typed_message)
             return sender(data, opcode)
 
@@ -154,18 +148,14 @@ class WeaveMediaConnection:
             if len(args) > 1:  # Message is the second argument
                 data = args[1]
                 parsed_data = _try_json_load(data)
-                if isinstance(parsed_data, dict) and (
-                    typed_message := create_server_message_from_dict(parsed_data)
-                ):
+                if isinstance(parsed_data, dict) and (typed_message := create_server_message_from_dict(parsed_data)):
                     self.conversation_manager.process_event(typed_message)
             # Call the original handler
             return handler(*args, **kwargs)
 
         return wrapper
 
-    def send(
-        self, data: Any, opcode: int = 1
-    ) -> Any:  # opcode is websocket.ABNF.OPCODE_TEXT
+    def send(self, data: Any, opcode: int = 1) -> Any:  # opcode is websocket.ABNF.OPCODE_TEXT
         self.ws.send(data, opcode)
 
     def run_forever(self, **kwargs: Any) -> Any:
@@ -198,9 +188,7 @@ class WeaveMediaConnection:
                 except Exception:
                     logger.exception("Error in realtime on_exit handler")
 
-            t = threading.Thread(
-                target=_target, name="WeaveRealtimeOnExit", daemon=True
-            )
+            t = threading.Thread(target=_target, name="WeaveRealtimeOnExit", daemon=True)
             t.start()
             # If timeout is None, treat as immediate return
             if isinstance(timeout, (int, float)) and timeout is not None:
@@ -234,9 +222,7 @@ class WeaveAsyncWebsocketConnection:
         data = args[0] if args else None
         parsed_data = _try_json_load(data)
         # Forward outgoing user messages to conversation manager
-        if isinstance(parsed_data, dict) and (
-            typed_message := create_user_message_from_dict(parsed_data)
-        ):
+        if isinstance(parsed_data, dict) and (typed_message := create_user_message_from_dict(parsed_data)):
             self.conversation_manager.process_event(typed_message)
         return await self.original_connection.send(*args, **kwargs)
 
@@ -244,9 +230,7 @@ class WeaveAsyncWebsocketConnection:
         data = await self.original_connection.recv(*args, **kwargs)
         parsed_data = _try_json_load(data)
         # Forward incoming server messages to conversation manager
-        if isinstance(parsed_data, dict) and (
-            typed_message := create_server_message_from_dict(parsed_data)
-        ):
+        if isinstance(parsed_data, dict) and (typed_message := create_server_message_from_dict(parsed_data)):
             self.conversation_manager.process_event(typed_message)
         return data
 
@@ -295,9 +279,7 @@ class WeaveAsyncWebsocketConnection:
                 except Exception:
                     logger.exception("Error in realtime on_exit handler")
 
-            t = threading.Thread(
-                target=_target, name="WeaveRealtimeOnExit", daemon=True
-            )
+            t = threading.Thread(target=_target, name="WeaveRealtimeOnExit", daemon=True)
             t.start()
             if isinstance(timeout, (int, float)) and timeout is not None:
                 t.join(timeout=float(timeout))
@@ -326,40 +308,30 @@ class WeaveAiohttpWebsocketConnection:
     async def send_str(self, data: str, *args: Any, **kwargs: Any) -> None:
         parsed_data = _try_json_load(data)
         # Forward outgoing user messages to conversation manager
-        if isinstance(parsed_data, dict) and (
-            typed_message := create_user_message_from_dict(parsed_data)
-        ):
+        if isinstance(parsed_data, dict) and (typed_message := create_user_message_from_dict(parsed_data)):
             self.conversation_manager.process_event(typed_message)
         return await self.original_ws.send_str(data, *args, **kwargs)
 
     async def send_bytes(self, data: bytes, *args: Any, **kwargs: Any) -> None:
         parsed_data = _try_json_load(data)
         # Forward outgoing user messages to conversation manager
-        if isinstance(parsed_data, dict) and (
-            typed_message := create_user_message_from_dict(parsed_data)
-        ):
+        if isinstance(parsed_data, dict) and (typed_message := create_user_message_from_dict(parsed_data)):
             self.conversation_manager.process_event(typed_message)
         return await self.original_ws.send_bytes(data, *args, **kwargs)
 
     async def send_json(self, data: Any, *args: Any, **kwargs: Any) -> None:
         # Forward outgoing user messages to conversation manager
-        if isinstance(data, dict) and (
-            typed_message := create_user_message_from_dict(data)
-        ):
+        if isinstance(data, dict) and (typed_message := create_user_message_from_dict(data)):
             self.conversation_manager.process_event(typed_message)
         return await self.original_ws.send_json(data, *args, **kwargs)
 
     async def receive(self, *args: Any, **kwargs: Any) -> Any:
         msg = await self.original_ws.receive(*args, **kwargs)
-        if not (
-            msg.type in (WSMsgType.TEXT, WSMsgType.BINARY) if WSMsgType else (1, 2)
-        ):
+        if not (msg.type in (WSMsgType.TEXT, WSMsgType.BINARY) if WSMsgType else (1, 2)):
             return msg
         # Forward outgoing user messages to conversation manager
         parsed_data = _try_json_load(msg.data)
-        if isinstance(parsed_data, dict) and (
-            typed_message := create_server_message_from_dict(parsed_data)
-        ):
+        if isinstance(parsed_data, dict) and (typed_message := create_server_message_from_dict(parsed_data)):
             self.conversation_manager.process_event(typed_message)
         return msg
 
@@ -402,9 +374,7 @@ class WeaveAiohttpWebsocketConnection:
                 except Exception:
                     logger.exception("Error in realtime on_exit handler")
 
-            t = threading.Thread(
-                target=_target, name="WeaveRealtimeOnExit", daemon=True
-            )
+            t = threading.Thread(target=_target, name="WeaveRealtimeOnExit", daemon=True)
             t.start()
             if isinstance(timeout, (int, float)) and timeout is not None:
                 t.join(timeout=float(timeout))

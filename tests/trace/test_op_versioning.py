@@ -23,9 +23,7 @@ def get_saved_code(client, ref):
     )
     files = resp.obj.val["files"]
     file_read_resp = client.server.file_content_read(
-        FileContentReadReq(
-            project_id=ref.entity + "/" + ref.project, digest=files["obj.py"]
-        )
+        FileContentReadReq(project_id=ref.entity + "/" + ref.project, digest=files["obj.py"])
     )
     return file_read_resp.content.decode()
 

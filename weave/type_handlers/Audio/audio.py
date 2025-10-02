@@ -17,9 +17,7 @@ METADATA_FILE_NAME = "_metadata.json"
 AUDIO_FILE_PREFIX = "audio."
 
 SUPPORTED_FORMATS_TYPE = Literal["mp3", "wav"]
-SUPPORTED_FORMATS = cast(
-    list[SUPPORTED_FORMATS_TYPE], sorted(get_args(SUPPORTED_FORMATS_TYPE))
-)
+SUPPORTED_FORMATS = cast(list[SUPPORTED_FORMATS_TYPE], sorted(get_args(SUPPORTED_FORMATS_TYPE)))
 T = TypeVar("T", bound=SUPPORTED_FORMATS_TYPE)
 
 
@@ -162,9 +160,7 @@ class Audio(Generic[T]):
 
         format_str = get_format_from_filename(str(path))
         if format_str not in list(map(str, SUPPORTED_FORMATS)):
-            raise ValueError(
-                f"Invalid file path {path}, file must end in one of: mp3 or wav"
-            )
+            raise ValueError(f"Invalid file path {path}, file must end in one of: mp3 or wav")
 
         data = open(path, "rb").read()
         return cls(data=data, format=cast(SUPPORTED_FORMATS_TYPE, format_str))
@@ -207,9 +203,7 @@ def export_wave_read(obj: wave.Wave_read, fp: str, name: str) -> None:
     obj.setpos(original_frame_position)
 
 
-def save(
-    obj: wave.Wave_read | Audio, artifact: MemTraceFilesArtifact, name: str
-) -> None:
+def save(obj: wave.Wave_read | Audio, artifact: MemTraceFilesArtifact, name: str) -> None:
     """Save an audio object to a trace files artifact.
 
     Args:
@@ -253,9 +247,7 @@ def load(artifact: MemTraceFilesArtifact, name: str) -> wave.Wave_read | Audio:
     for filename in artifact.path_contents:
         path = artifact.path(filename)
         if filename.startswith(AUDIO_FILE_PREFIX):
-            if (
-                pytype is None and filename.endswith(".wav")
-            ) or pytype == "wave.Wave_read":
+            if (pytype is None and filename.endswith(".wav")) or pytype == "wave.Wave_read":
                 return wave.open(path, "rb")
             return Audio.from_path(path=path)
 

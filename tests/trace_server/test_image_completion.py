@@ -27,12 +27,8 @@ class TestProcessImageDataItem:
         """Test successful processing of URL-based image data."""
         # Mock Content.from_url to return a mock content object
         with (
-            patch(
-                "weave.trace_server.image_completion.Content.from_url"
-            ) as mock_from_url,
-            patch(
-                "weave.trace_server.image_completion.store_content_object"
-            ) as mock_store,
+            patch("weave.trace_server.image_completion.Content.from_url") as mock_from_url,
+            patch("weave.trace_server.image_completion.store_content_object") as mock_store,
         ):
             mock_content = Mock()
             mock_from_url.return_value = mock_content
@@ -42,9 +38,7 @@ class TestProcessImageDataItem:
             trace_server = Mock()
             project_id = "test-project"
 
-            result = _process_image_data_item(
-                data_item, 0, trace_server, project_id, "user123"
-            )
+            result = _process_image_data_item(data_item, 0, trace_server, project_id, "user123")
 
             # Verify Content.from_url was called with correct parameters
             mock_from_url.assert_called_once_with(
@@ -66,12 +60,8 @@ class TestProcessImageDataItem:
         b64_data = base64.b64encode(test_image_data).decode("ascii")
 
         with (
-            patch(
-                "weave.trace_server.image_completion.Content.from_base64"
-            ) as mock_from_base64,
-            patch(
-                "weave.trace_server.image_completion.store_content_object"
-            ) as mock_store,
+            patch("weave.trace_server.image_completion.Content.from_base64") as mock_from_base64,
+            patch("weave.trace_server.image_completion.store_content_object") as mock_store,
         ):
             mock_content = Mock()
             mock_from_base64.return_value = mock_content
@@ -81,9 +71,7 @@ class TestProcessImageDataItem:
             trace_server = Mock()
             project_id = "test-project"
 
-            result = _process_image_data_item(
-                data_item, 1, trace_server, project_id, "user123"
-            )
+            result = _process_image_data_item(data_item, 1, trace_server, project_id, "user123")
 
             # Verify Content.from_base64 was called with correct parameters
             mock_from_base64.assert_called_once_with(
@@ -122,18 +110,14 @@ class TestProcessImageDataItem:
 
     def test_process_url_error(self):
         """Test handling of errors when fetching URL-based images."""
-        with patch(
-            "weave.trace_server.image_completion.Content.from_url"
-        ) as mock_from_url:
+        with patch("weave.trace_server.image_completion.Content.from_url") as mock_from_url:
             mock_from_url.side_effect = Exception("Connection failed")
 
             data_item = {"url": "https://example.com/image.png"}
             trace_server = Mock()
             project_id = "test-project"
 
-            result = _process_image_data_item(
-                data_item, 0, trace_server, project_id, "user123"
-            )
+            result = _process_image_data_item(data_item, 0, trace_server, project_id, "user123")
 
             # Should contain error information
             assert "error" in result
@@ -143,18 +127,14 @@ class TestProcessImageDataItem:
 
     def test_process_base64_decode_error(self):
         """Test handling of base64 decoding errors."""
-        with patch(
-            "weave.trace_server.image_completion.Content.from_base64"
-        ) as mock_from_base64:
+        with patch("weave.trace_server.image_completion.Content.from_base64") as mock_from_base64:
             mock_from_base64.side_effect = ValueError("Invalid base64 data")
 
             data_item = {"b64_json": "invalid_base64_data!@#"}
             trace_server = Mock()
             project_id = "test-project"
 
-            result = _process_image_data_item(
-                data_item, 0, trace_server, project_id, "user123"
-            )
+            result = _process_image_data_item(data_item, 0, trace_server, project_id, "user123")
 
             # Should contain error information
             assert "error" in result
@@ -164,18 +144,14 @@ class TestProcessImageDataItem:
 
     def test_process_unexpected_error(self):
         """Test handling of unexpected errors during processing."""
-        with patch(
-            "weave.trace_server.image_completion.Content.from_url"
-        ) as mock_from_url:
+        with patch("weave.trace_server.image_completion.Content.from_url") as mock_from_url:
             mock_from_url.side_effect = RuntimeError("Unexpected error")
 
             data_item = {"url": "https://example.com/image.png"}
             trace_server = Mock()
             project_id = "test-project"
 
-            result = _process_image_data_item(
-                data_item, 0, trace_server, project_id, "user123"
-            )
+            result = _process_image_data_item(data_item, 0, trace_server, project_id, "user123")
 
             # Should contain generic error message
             assert "error" in result
@@ -198,9 +174,7 @@ class TestLiteLLMImageGeneration:
 
         with (
             patch("litellm.image_generation") as mock_image_gen,
-            patch(
-                "weave.trace_server.image_completion._process_image_data_item"
-            ) as mock_process,
+            patch("weave.trace_server.image_completion._process_image_data_item") as mock_process,
         ):
             mock_image_gen.return_value = mock_response
             mock_process.side_effect = [
@@ -276,9 +250,7 @@ class TestLiteLLMImageGeneration:
     def test_gpt_image_1_generation(self):
         """Test image generation with gpt-image-1 model (no response_format parameter)."""
         mock_response = Mock()
-        mock_response.model_dump.return_value = {
-            "data": [{"url": "https://example.com/generated.png"}]
-        }
+        mock_response.model_dump.return_value = {"data": [{"url": "https://example.com/generated.png"}]}
 
         with patch("litellm.image_generation") as mock_image_gen:
             mock_image_gen.return_value = mock_response
@@ -328,9 +300,7 @@ class TestRequestResponseTypes:
         """Test creating ImageGenerationCreateReq with valid inputs."""
         req = tsi.ImageGenerationCreateReq(
             project_id="test-project",
-            inputs=tsi.ImageGenerationRequestInputs(
-                model="dall-e-3", prompt="A beautiful sunset", n=1
-            ),
+            inputs=tsi.ImageGenerationRequestInputs(model="dall-e-3", prompt="A beautiful sunset", n=1),
             track_llm_call=True,
         )
 
@@ -348,9 +318,7 @@ class TestRequestResponseTypes:
             "usage": {"prompt_tokens": 10, "total_tokens": 10},
         }
 
-        res = tsi.ImageGenerationCreateRes(
-            response=response_data, weave_call_id="call_123"
-        )
+        res = tsi.ImageGenerationCreateRes(response=response_data, weave_call_id="call_123")
 
         assert res.response == response_data
         assert res.weave_call_id == "call_123"

@@ -33,9 +33,7 @@ IGNORE_ARGS = ("self", "endpoint", "track_llm_call")
 def postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
     """Update arguments for closer alignment with OpenAI API."""
     kwargs = inputs.get("kwargs", {})
-    return {
-        k: v for k, v in kwargs.items() if k not in IGNORE_ARGS and v is not NOT_GIVEN
-    }
+    return {k: v for k, v in kwargs.items() if k not in IGNORE_ARGS and v is not NOT_GIVEN}
 
 
 class Completions:
@@ -155,11 +153,7 @@ class Completions:
             "temperature": temperature,
             "top_p": top_p,
         }
-        return (
-            self._create_op(**kwargs)
-            if track_llm_call
-            else self._create_non_op(**kwargs)
-        )
+        return self._create_op(**kwargs) if track_llm_call else self._create_non_op(**kwargs)
 
     @op(name=COMPLETIONS_CREATE_OP_NAME, postprocess_inputs=postprocess_inputs)
     def _create_op(self, **kwargs: Any) -> ChatCompletion | ChatCompletionChunkStream:

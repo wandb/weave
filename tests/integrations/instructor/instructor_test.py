@@ -80,9 +80,7 @@ def test_instructor_openai(
     assert call.started_at < call.ended_at
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
     output = call.output
-    output_arguments = json.loads(
-        output["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"]
-    )
+    output_arguments = json.loads(output["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"])
     assert "person_name" in output_arguments
     assert "age" in output_arguments
     assert "John" in output_arguments["person_name"]
@@ -119,9 +117,7 @@ def test_instructor_openai_with_completion(
     assert call.started_at < call.ended_at
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
     output = call.output
-    output_arguments = json.loads(
-        output["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"]
-    )
+    output_arguments = json.loads(output["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"])
     assert "person_name" in output_arguments
     assert "age" in output_arguments
     assert "John" in output_arguments["person_name"]
@@ -167,9 +163,7 @@ def test_instructor_openai_async(
     assert call.started_at < call.ended_at
     assert op_name_from_ref(call.op_name) == "openai.chat.completions.create"
     output = call.output
-    output_arguments = json.loads(
-        output["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"]
-    )
+    output_arguments = json.loads(output["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"])
     assert "person_name" in output_arguments
     assert "age" in output_arguments
     assert "John" in output_arguments["person_name"]
@@ -188,9 +182,7 @@ def test_instructor_iterable(
     from openai import OpenAI
 
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
-    lm_client = instructor.from_openai(
-        OpenAI(api_key=api_key), mode=instructor.function_calls.Mode.JSON
-    )
+    lm_client = instructor.from_openai(OpenAI(api_key=api_key), mode=instructor.function_calls.Mode.JSON)
     lm_client.chat.completions.create(
         model="gpt-3.5-turbo-1106",
         temperature=0.1,
@@ -246,9 +238,7 @@ def test_instructor_iterable_sync_stream(
     from openai import OpenAI
 
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
-    lm_client = instructor.from_openai(
-        OpenAI(api_key=api_key), mode=instructor.Mode.TOOLS
-    )
+    lm_client = instructor.from_openai(OpenAI(api_key=api_key), mode=instructor.Mode.TOOLS)
     users = lm_client.chat.completions.create(
         model="gpt-4",
         stream=True,
@@ -295,9 +285,7 @@ def test_instructor_iterable_async_stream(
     from openai import AsyncOpenAI
 
     api_key = os.environ.get("OPENAI_API_KEY", "DUMMY_API_KEY")
-    lm_client = instructor.from_openai(
-        AsyncOpenAI(api_key=api_key), mode=instructor.Mode.TOOLS
-    )
+    lm_client = instructor.from_openai(AsyncOpenAI(api_key=api_key), mode=instructor.Mode.TOOLS)
 
     async def print_iterable_results() -> list[Person]:
         model = await lm_client.chat.completions.create(

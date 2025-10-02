@@ -81,9 +81,7 @@ class Api:
         """
     )
 
-    def artifact_manifest_url(
-        self, entity_name: str, project_name: str, name: str
-    ) -> Optional[str]:
+    def artifact_manifest_url(self, entity_name: str, project_name: str, name: str) -> Optional[str]:
         try:
             result = self.query(
                 self.ARTIFACT_MANIFEST_QUERY,
@@ -299,9 +297,7 @@ class ApiAsync:
         """
     )
 
-    async def artifact_manifest_url(
-        self, entity_name: str, project_name: str, name: str
-    ) -> Optional[str]:
+    async def artifact_manifest_url(self, entity_name: str, project_name: str, name: str) -> Optional[str]:
         try:
             result = await self.query(
                 self.ARTIFACT_MANIFEST_QUERY,
@@ -344,9 +340,7 @@ class ApiAsync:
 
     async def artifact_manifest_url_from_id(self, art_id: str) -> Optional[str]:
         try:
-            result = await self.query(
-                self.ARTIFACT_MANIFEST_FROM_ID_QUERY, artifactID=art_id
-            )
+            result = await self.query(self.ARTIFACT_MANIFEST_FROM_ID_QUERY, artifactID=art_id)
         except gql.transport.exceptions.TransportQueryError as e:
             return None
         artifact = result["artifact"]
@@ -393,12 +387,7 @@ class ApiAsync:
 
     async def can_access_entity(self, entity: str, api_key: Optional[str]) -> bool:
         try:
-            result = await self.query(
-                self.ENTITY_ACCESS_QUERY, entityName=entity, api_key=api_key
-            )
+            result = await self.query(self.ENTITY_ACCESS_QUERY, entityName=entity, api_key=api_key)
         except gql.transport.exceptions.TransportQueryError as e:
             return False
-        return (
-            result.get("viewer")
-            and result.get("entity", {}).get("readOnly", True) == False
-        )
+        return result.get("viewer") and result.get("entity", {}).get("readOnly", True) == False

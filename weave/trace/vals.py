@@ -69,9 +69,7 @@ Mutation = Union[MutationSetattr, MutationSetitem, MutationAppend]
 MutationOperation = Union[Literal["setitem"], Literal["setattr"], Literal["append"]]
 
 
-def make_mutation(
-    path: tuple[str, ...], operation: MutationOperation, args: tuple[Any, ...]
-) -> Mutation:
+def make_mutation(path: tuple[str, ...], operation: MutationOperation, args: tuple[Any, ...]) -> Mutation:
     if operation == "setitem":
         if len(args) != 2 or not isinstance(args[0], str):
             raise ValueError("setitem mutation requires 2 args")
@@ -120,15 +118,11 @@ class Traceable:
         self.ref = None
         if (
             # Written this way to satisfy mypy
-            self.parent is not self
-            and self.parent is not None
-            and hasattr(self.parent, "_mark_dirty")
+            self.parent is not self and self.parent is not None and hasattr(self.parent, "_mark_dirty")
         ):
             self.parent._mark_dirty()
 
-    def add_mutation(
-        self, path: tuple[str, ...], operation: MutationOperation, *args: Any
-    ) -> None:
+    def add_mutation(self, path: tuple[str, ...], operation: MutationOperation, *args: Any) -> None:
         if self.mutations is None:
             self.mutations = []
         self.mutations.append(make_mutation(path, operation, args))
@@ -355,9 +349,7 @@ class WeaveTable(Traceable):
         will cause table operations to behave unexpectedly.
         """
         if self._rows is not None:
-            raise ValueError(
-                "Cannot set prefetched rows on WeaveTable when rows are already loaded"
-            )
+            raise ValueError("Cannot set prefetched rows on WeaveTable when rows are already loaded")
         self._prefetched_rows = prefetched_rows
 
     def __len__(self) -> int:
@@ -395,9 +387,7 @@ class WeaveTable(Traceable):
             raise ValueError("Cannot fetch remote length of table without table ref")
 
         response = self.server.table_query_stats(
-            TableQueryStatsReq(
-                project_id=self.table_ref.project_id, digest=self.table_ref.digest
-            )
+            TableQueryStatsReq(project_id=self.table_ref.project_id, digest=self.table_ref.digest)
         )
         return response.count
 
@@ -428,9 +418,7 @@ class WeaveTable(Traceable):
         ):
             if get_raise_on_captured_errors():
                 raise
-            logger.error(
-                "Expected all row digests and prefetched rows to be set, falling back to remote iteration"
-            )
+            logger.error("Expected all row digests and prefetched rows to be set, falling back to remote iteration")
             yield from self._remote_iter()
             return
 
@@ -449,9 +437,7 @@ class WeaveTable(Traceable):
                 return
 
         for i, _ in enumerate(self._prefetched_rows):
-            next_id_future = wc.future_executor.defer(
-                lambda closure=i: cached_table_ref.row_digests[closure]
-            )
+            next_id_future = wc.future_executor.defer(lambda closure=i: cached_table_ref.row_digests[closure])
             new_ref = self.ref.with_item(next_id_future)
             val = self._prefetched_rows[i]
             res = from_json(val, self.table_ref.project_id, self.server)
@@ -509,11 +495,7 @@ class WeaveTable(Traceable):
                 # return digests, this branch can be removed because anytime we have prefetched
                 # rows we should also have the digests - and we should be in the
                 #  _local_iter_with_remote_fallback case.
-                val = (
-                    item.val
-                    if self._prefetched_rows is None
-                    else self._prefetched_rows[page_index * page_size + i]
-                )
+                val = item.val if self._prefetched_rows is None else self._prefetched_rows[page_index * page_size + i]
 
                 def process_row(val: Any, new_ref: RefWithExtra) -> Any:
                     if not self.table_ref:
@@ -526,9 +508,7 @@ class WeaveTable(Traceable):
                         self.root,
                     )
 
-                future = wc.future_executor.defer(
-                    lambda v=val, r=new_ref: process_row(v, r)
-                )
+                future = wc.future_executor.defer(lambda v=val, r=new_ref: process_row(v, r))
                 futures.append(future)
 
             # Yield results as they complete
@@ -785,9 +765,7 @@ def make_trace_obj(
         if not isinstance(val_ref, TableRef):
             val_table_ref = getattr(val, "table_ref", None)
             if not isinstance(val_table_ref, TableRef):
-                raise InternalError(
-                    "Expected Table.ref or Table.table_ref to be TableRef"
-                )
+                raise InternalError("Expected Table.ref or Table.table_ref to be TableRef")
             val_ref = val_table_ref
         rows = val.rows
         val = WeaveTable(
@@ -851,9 +829,7 @@ def make_trace_obj(
 
     if not isinstance(val, Traceable):
         if isinstance(val, ObjectRecord):
-            return WeaveObject(
-                val, ref=new_ref, server=server, root=root, parent=parent
-            )
+            return WeaveObject(val, ref=new_ref, server=server, root=root, parent=parent)
         elif isinstance(val, list):
             return WeaveList(val, ref=new_ref, server=server, root=root, parent=parent)
         elif isinstance(val, dict):

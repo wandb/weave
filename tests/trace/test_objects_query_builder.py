@@ -47,20 +47,14 @@ def test_make_conditions_part():
     assert _make_conditions_part(None) == ""
     assert _make_conditions_part([]) == ""
     assert _make_conditions_part(["condition1"]) == "WHERE condition1"
-    assert (
-        _make_conditions_part(["condition1", "condition2"])
-        == "WHERE ((condition1) AND (condition2))"
-    )
+    assert _make_conditions_part(["condition1", "condition2"]) == "WHERE ((condition1) AND (condition2))"
 
 
 def test_make_object_id_conditions_part():
     assert _make_object_id_conditions_part(None) == ""
     assert _make_object_id_conditions_part([]) == ""
     assert _make_object_id_conditions_part(["id = 1"]) == " AND id = 1"
-    assert (
-        _make_object_id_conditions_part(["id = 1", "id = 2"])
-        == " AND ((id = 1) AND (id = 2))"
-    )
+    assert _make_object_id_conditions_part(["id = 1", "id = 2"]) == " AND ((id = 1) AND (id = 2))"
 
 
 def test_object_query_builder_basic():
@@ -94,9 +88,7 @@ def test_object_query_builder_add_object_ids_condition():
     # Test multiple object IDs
     builder = ObjectMetadataQueryBuilder(project_id="test_project")
     builder.add_object_ids_condition(["obj1", "obj2"])
-    assert (
-        "object_id IN {object_ids: Array(String)}" in builder.object_id_conditions_part
-    )
+    assert "object_id IN {object_ids: Array(String)}" in builder.object_id_conditions_part
     assert builder.parameters["object_ids"] == ["obj1", "obj2"]
 
 
@@ -295,9 +287,7 @@ def test_make_objects_val_query_and_parameters():
     object_ids = ["object_1"]
     digests = ["digestttttttttttttttt", "digestttttttttttttttt2"]
 
-    query, parameters = make_objects_val_query_and_parameters(
-        project_id, object_ids, digests
-    )
+    query, parameters = make_objects_val_query_and_parameters(project_id, object_ids, digests)
 
     expected_query = """
         SELECT object_id, digest, argMax(val_dump, created_at)

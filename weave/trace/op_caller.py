@@ -31,9 +31,7 @@ def async_call(func: Union[Callable, Op], *args: Any, **kwargs: Any) -> Coroutin
     return asyncio.to_thread(func, *args, **kwargs)
 
 
-def async_call_op(
-    func: Op, *args: Any, **kwargs: Any
-) -> Coroutine[Any, Any, tuple[Any, "Call"]]:
+def async_call_op(func: Op, *args: Any, **kwargs: Any) -> Coroutine[Any, Any, tuple[Any, "Call"]]:
     """Similar to async_call but specifically for Ops, handling the Weave tracing
     functionality. For sync Ops, runs them in a thread.
 
@@ -49,6 +47,4 @@ def async_call_op(
     if is_async:
         return func.call(*args, __should_raise=True, **kwargs)
     else:
-        return asyncio.to_thread(
-            lambda: func.call(*args, __should_raise=True, **kwargs)
-        )
+        return asyncio.to_thread(lambda: func.call(*args, __should_raise=True, **kwargs))

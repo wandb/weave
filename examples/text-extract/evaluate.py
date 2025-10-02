@@ -19,9 +19,7 @@ class TextExtractModel(weave.Model):
 
         response = await client.chat.completions.create(
             model=self.model_name,
-            messages=[
-                {"role": "user", "content": self.prompt_template.format(doc=doc)}
-            ],
+            messages=[{"role": "user", "content": self.prompt_template.format(doc=doc)}],
         )
         result = response.choices[0].message.content
         if result is None:

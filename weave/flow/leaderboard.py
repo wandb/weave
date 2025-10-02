@@ -22,9 +22,7 @@ class LeaderboardModelResult(BaseModel):
     column_scores: list[ModelScoresForColumn]
 
 
-def get_leaderboard_results(
-    spec: leaderboard.Leaderboard, client: WeaveClient
-) -> list[LeaderboardModelResult]:
+def get_leaderboard_results(spec: leaderboard.Leaderboard, client: WeaveClient) -> list[LeaderboardModelResult]:
     entity, project = client._project_id().split("/")
     calls = client.get_calls(
         filter=CallsFilter(
@@ -77,9 +75,7 @@ def get_leaderboard_results(
                 else:
                     break
             res_map[model_ref_uri].column_scores[col_idx].scores.append(
-                LeaderboardModelEvaluationResult(
-                    evaluate_call_ref=call_ref_uri, value=val
-                )
+                LeaderboardModelEvaluationResult(evaluate_call_ref=call_ref_uri, value=val)
             )
     return list(res_map.values())
 

@@ -91,13 +91,9 @@ class OpenAIStream:
                         tool_call["type"] = tool_call_delta.type
                     if tool_call_delta.function is not None:
                         if tool_call_delta.function.name is not None:
-                            tool_call["function"]["name"] = (
-                                tool_call_delta.function.name
-                            )
+                            tool_call["function"]["name"] = tool_call_delta.function.name
                         if tool_call_delta.function.arguments is not None:
-                            tool_call["function"]["arguments"] += (
-                                tool_call_delta.function.arguments
-                            )
+                            tool_call["function"]["arguments"] += tool_call_delta.function.arguments
 
     def final_response(self) -> "ChatCompletion":
         from openai.types.chat import ChatCompletion

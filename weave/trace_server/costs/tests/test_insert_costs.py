@@ -37,17 +37,13 @@ class TestInsertCosts(unittest.TestCase):
                 "llm_model_1",
                 0.01,
                 0.02,
-                datetime.strptime("2023-10-01 12:00:00", "%Y-%m-%d %H:%M:%S").replace(
-                    tzinfo=timezone.utc
-                ),
+                datetime.strptime("2023-10-01 12:00:00", "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc),
             ),
             (
                 "llm_model_3",
                 0.02,
                 0.03,
-                datetime.strptime("2023-10-02 13:30:00", "%Y-%m-%d %H:%M:%S").replace(
-                    tzinfo=timezone.utc
-                ),
+                datetime.strptime("2023-10-02 13:30:00", "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc),
             ),
         ]
         self.mock_uuid = str(uuid.uuid4())
@@ -76,9 +72,7 @@ class TestInsertCosts(unittest.TestCase):
         mock_get_current_costs.return_value = self.sample_current_costs
 
         # Call the function
-        filtered_costs = insert_costs.filter_out_current_costs(
-            self.client, self.sample_costs_json
-        )
+        filtered_costs = insert_costs.filter_out_current_costs(self.client, self.sample_costs_json)
 
         # Expected result after filtering out 'llm_model_1' which already exists
         expected_filtered_costs = {"llm_model_2": self.sample_costs_json["llm_model_2"]}
@@ -104,12 +98,8 @@ class TestInsertCosts(unittest.TestCase):
         # Prepare expected rows
         expected_rows = []
         for cost in data_to_insert["llm_model_2"]:
-            date_str = cost.get(
-                "created_at", self.mock_now.strftime("%Y-%m-%d %H:%M:%S")
-            )
-            created_at = datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S").replace(
-                tzinfo=timezone.utc
-            )
+            date_str = cost.get("created_at", self.mock_now.strftime("%Y-%m-%d %H:%M:%S"))
+            created_at = datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
             expected_rows.append(
                 (
                     self.mock_uuid,
@@ -151,14 +141,10 @@ class TestInsertCosts(unittest.TestCase):
     @patch("weave.trace_server.costs.insert_costs.insert_costs_into_db")
     @patch("weave.trace_server.costs.insert_costs.filter_out_current_costs")
     @patch("weave.trace_server.costs.insert_costs.load_costs_from_json")
-    def test_insert_costs(
-        self, mock_load_json, mock_filter_costs, mock_insert_db, mock_logger
-    ):
+    def test_insert_costs(self, mock_load_json, mock_filter_costs, mock_insert_db, mock_logger):
         # Mock the methods
         mock_load_json.return_value = self.sample_costs_json
-        mock_filter_costs.return_value = {
-            "llm_model_2": self.sample_costs_json["llm_model_2"]
-        }
+        mock_filter_costs.return_value = {"llm_model_2": self.sample_costs_json["llm_model_2"]}
 
         # Call the function
         insert_costs.insert_costs(self.client, self.target_db)
@@ -166,13 +152,9 @@ class TestInsertCosts(unittest.TestCase):
         # Assertions
         mock_load_json.assert_called_once()
         mock_filter_costs.assert_called_once_with(self.client, self.sample_costs_json)
-        mock_insert_db.assert_called_once_with(
-            self.client, mock_filter_costs.return_value
-        )
+        mock_insert_db.assert_called_once_with(self.client, mock_filter_costs.return_value)
         mock_logger.info.assert_any_call("Loaded %d costs from json", 2)
-        mock_logger.info.assert_any_call(
-            "There are %d costs to insert, after filtering out existing costs", 1
-        )
+        mock_logger.info.assert_any_call("There are %d costs to insert, after filtering out existing costs", 1)
         mock_logger.info.assert_any_call("Inserted %d costs", 1)
 
     @patch("weave.trace_server.costs.insert_costs.logger")
@@ -187,16 +169,12 @@ class TestInsertCosts(unittest.TestCase):
 
         # Assertions
         mock_load_json.assert_called_once()
-        mock_logger.error.assert_called_once_with(
-            "Failed to load costs from json, %s", e
-        )
+        mock_logger.error.assert_called_once_with("Failed to load costs from json, %s", e)
 
     @patch("weave.trace_server.costs.insert_costs.logger")
     @patch("weave.trace_server.costs.insert_costs.filter_out_current_costs")
     @patch("weave.trace_server.costs.insert_costs.load_costs_from_json")
-    def test_insert_costs_filter_exception(
-        self, mock_load_json, mock_filter_costs, mock_logger
-    ):
+    def test_insert_costs_filter_exception(self, mock_load_json, mock_filter_costs, mock_logger):
         # Mock the methods
         mock_load_json.return_value = self.sample_costs_json
         e = Exception("Filter error")
@@ -208,17 +186,13 @@ class TestInsertCosts(unittest.TestCase):
         # Assertions
         mock_load_json.assert_called_once()
         mock_filter_costs.assert_called_once_with(self.client, self.sample_costs_json)
-        mock_logger.error.assert_called_once_with(
-            "Failed to filter out current costs, %s", e
-        )
+        mock_logger.error.assert_called_once_with("Failed to filter out current costs, %s", e)
 
     @patch("weave.trace_server.costs.insert_costs.logger")
     @patch("weave.trace_server.costs.insert_costs.insert_costs_into_db")
     @patch("weave.trace_server.costs.insert_costs.filter_out_current_costs")
     @patch("weave.trace_server.costs.insert_costs.load_costs_from_json")
-    def test_insert_costs_insert_exception(
-        self, mock_load_json, mock_filter_costs, mock_insert_db, mock_logger
-    ):
+    def test_insert_costs_insert_exception(self, mock_load_json, mock_filter_costs, mock_insert_db, mock_logger):
         # Mock the methods
         mock_load_json.return_value = self.sample_costs_json
         mock_filter_costs.return_value = self.sample_costs_json
@@ -232,17 +206,13 @@ class TestInsertCosts(unittest.TestCase):
         mock_load_json.assert_called_once()
         mock_filter_costs.assert_called_once_with(self.client, self.sample_costs_json)
         mock_insert_db.assert_called_once_with(self.client, self.sample_costs_json)
-        mock_logger.error.assert_called_once_with(
-            "Failed to insert costs into db, %s", e
-        )
+        mock_logger.error.assert_called_once_with("Failed to insert costs into db, %s", e)
 
     @patch("weave.trace_server.costs.insert_costs.logger")
     @patch("weave.trace_server.costs.insert_costs.insert_costs_into_db")
     @patch("weave.trace_server.costs.insert_costs.filter_out_current_costs")
     @patch("weave.trace_server.costs.insert_costs.load_costs_from_json")
-    def test_insert_costs_no_new_costs(
-        self, mock_load_json, mock_filter_costs, mock_insert_db, mock_logger
-    ):
+    def test_insert_costs_no_new_costs(self, mock_load_json, mock_filter_costs, mock_insert_db, mock_logger):
         # Mock the methods
         mock_load_json.return_value = self.sample_costs_json
         mock_filter_costs.return_value = {}
@@ -255,9 +225,7 @@ class TestInsertCosts(unittest.TestCase):
         mock_filter_costs.assert_called_once_with(self.client, self.sample_costs_json)
         mock_insert_db.assert_not_called()
         mock_logger.info.assert_any_call("Loaded %d costs from json", 2)
-        mock_logger.info.assert_any_call(
-            "There are %d costs to insert, after filtering out existing costs", 0
-        )
+        mock_logger.info.assert_any_call("There are %d costs to insert, after filtering out existing costs", 0)
 
 
 if __name__ == "__main__":

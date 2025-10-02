@@ -25,8 +25,7 @@ def generate_start(id) -> tsi.StartedCallSchemaForInsert:
         op_name="test_name",
         trace_id="test_trace_id",
         parent_id="test_parent_id",
-        started_at=datetime.datetime.now(tz=datetime.timezone.utc)
-        - datetime.timedelta(seconds=1),
+        started_at=datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(seconds=1),
         attributes={"a": 5},
         inputs={"b": 5},
     )
@@ -44,9 +43,7 @@ def test_ok(mock_post, trace_server):
     """Test successful call_start request."""
     call_id = generate_id()
     mock_post.return_value = requests.Response()
-    mock_post.return_value.json = lambda: dict(
-        tsi.CallStartRes(id=call_id, trace_id="test_trace_id")
-    )
+    mock_post.return_value.json = lambda: dict(tsi.CallStartRes(id=call_id, trace_id="test_trace_id"))
     mock_post.return_value.status_code = 200
     start = generate_start(call_id)
     trace_server.call_start(tsi.CallStartReq(start=start))

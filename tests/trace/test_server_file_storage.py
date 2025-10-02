@@ -47,9 +47,7 @@ def run_storage_test(client: WeaveClient):
         assert res.digest != ""
 
         # Get the file
-        file = client.server.file_content_read(
-            FileContentReadReq(project_id=client._project_id(), digest=res.digest)
-        )
+        file = client.server.file_content_read(FileContentReadReq(project_id=client._project_id(), digest=res.digest))
         assert file.content == TEST_CONTENT
         return res
 
@@ -161,9 +159,7 @@ class TestGCSStorage:
     @pytest.fixture
     def mock_gcp_credentials(self):
         """Mock GCP credentials to prevent authentication."""
-        with mock.patch(
-            "google.oauth2.service_account.Credentials.from_service_account_info"
-        ) as mock_creds:
+        with mock.patch("google.oauth2.service_account.Credentials.from_service_account_info") as mock_creds:
             mock_creds.return_value = AnonymousCredentials()
             yield
 
@@ -194,9 +190,7 @@ class TestGCSStorage:
         mock_blob.upload_from_string.side_effect = mock_upload_from_string
         mock_blob.download_as_bytes.side_effect = mock_download_as_bytes
 
-        with mock.patch(
-            "google.cloud.storage.Client", return_value=mock_storage_client
-        ):
+        with mock.patch("google.cloud.storage.Client", return_value=mock_storage_client):
             yield mock_storage_client
 
     @pytest.fixture
@@ -288,9 +282,7 @@ class TestAzureStorage:
         container_client = azure_blob.get_container_client(TEST_BUCKET)
         # Hard-coding project for ease. If we change how CI generates projects, this is ok to change
         project = "c2hhd24vdGVzdC1wcm9qZWN0"
-        blob_client = container_client.get_blob_client(
-            f"weave/projects/{project}/files/{res.digest}"
-        )
+        blob_client = container_client.get_blob_client(f"weave/projects/{project}/files/{res.digest}")
         assert blob_client.download_blob().readall() == TEST_CONTENT
 
 
@@ -303,16 +295,12 @@ def test_support_for_variable_length_chunks(client: WeaveClient):
 
     def create_and_read_file(content: bytes):
         res = client.server.file_create(
-            FileCreateReq(
-                project_id=client._project_id(), name="test.txt", content=content
-            )
+            FileCreateReq(project_id=client._project_id(), name="test.txt", content=content)
         )
         assert res.digest is not None
         assert res.digest != ""
 
-        file = client.server.file_content_read(
-            FileContentReadReq(project_id=client._project_id(), digest=res.digest)
-        )
+        file = client.server.file_content_read(FileContentReadReq(project_id=client._project_id(), digest=res.digest))
         assert file.content == content
 
         return res.digest
@@ -332,9 +320,7 @@ def test_support_for_variable_length_chunks(client: WeaveClient):
         base_chunk_size,
         base_chunk_size // 2,
     ]:
-        with mock.patch.object(
-            clickhouse_trace_server_settings, "FILE_CHUNK_SIZE", size
-        ):
+        with mock.patch.object(clickhouse_trace_server_settings, "FILE_CHUNK_SIZE", size):
             digest = create_and_read_file(large_file)
             assert digest == large_digest
 
@@ -386,9 +372,7 @@ def test_file_storage_retry_limit(client: WeaveClient):
 
         with (
             mock.patch("google.cloud.storage.Client", return_value=mock_storage_client),
-            mock.patch(
-                "google.oauth2.service_account.Credentials.from_service_account_info"
-            ),
+            mock.patch("google.oauth2.service_account.Credentials.from_service_account_info"),
         ):
             # GCS should fail after 3 attempts, then fall back to database storage
             result = client.server.file_create(

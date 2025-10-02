@@ -71,12 +71,8 @@ class WeaveContextRelevanceScorerV1(HuggingFaceScorer):
     def load_model(self) -> None:
         from transformers import AutoModelForTokenClassification
 
-        self._local_model_path = load_local_model_weights(
-            self.model_name_or_path, MODEL_PATHS["relevance_scorer"]
-        )
-        self._model = AutoModelForTokenClassification.from_pretrained(
-            self._local_model_path
-        ).to(self.device)
+        self._local_model_path = load_local_model_weights(self.model_name_or_path, MODEL_PATHS["relevance_scorer"])
+        self._model = AutoModelForTokenClassification.from_pretrained(self._local_model_path).to(self.device)
         self._model.eval()
 
     def load_tokenizer(self) -> None:
@@ -87,9 +83,7 @@ class WeaveContextRelevanceScorerV1(HuggingFaceScorer):
             model_max_length=self.model_max_length,
         )
 
-    def _score_document(
-        self, query: str, document: str, threshold: float
-    ) -> tuple[list[dict[str, Any]], int, int]:
+    def _score_document(self, query: str, document: str, threshold: float) -> tuple[list[dict[str, Any]], int, int]:
         """Score a single document."""
         import torch
 
@@ -109,12 +103,7 @@ class WeaveContextRelevanceScorerV1(HuggingFaceScorer):
         model_inputs = {k: v.to(self.device) for k, v in model_inputs.items()}
 
         special_tokens_mask = model_inputs.pop("special_tokens_mask")
-        combined_mask = (
-            ~((model_inputs["input_ids"] == 2).bool() | special_tokens_mask.bool())
-            .cpu()
-            .numpy()
-            .flatten()
-        )
+        combined_mask = ~((model_inputs["input_ids"] == 2).bool() | special_tokens_mask.bool()).cpu().numpy().flatten()
         # we should mask the query up to the sep token,
         # on the combined mask we have to search for the first False
         # TODO: Check that this is not wrong
@@ -128,9 +117,7 @@ class WeaveContextRelevanceScorerV1(HuggingFaceScorer):
             logits = results.logits[0].detach()
             probabilities = torch.nn.functional.softmax(logits, dim=-1).detach()
 
-        pred_mask = (
-            (probabilities[:, 1] > threshold).cpu().numpy().astype(int).flatten()
-        )
+        pred_mask = (probabilities[:, 1] > threshold).cpu().numpy().astype(int).flatten()
         label_mask = pred_mask & combined_mask
 
         positive_probs = probabilities[:, 1].cpu().numpy()
@@ -163,9 +150,7 @@ class WeaveContextRelevanceScorerV1(HuggingFaceScorer):
         if isinstance(output, str):
             output = [output]
         for doc in output:
-            spans, relevant_tokens, total_tokens = self._score_document(
-                query, doc, self.threshold
-            )
+            spans, relevant_tokens, total_tokens = self._score_document(query, doc, self.threshold)
 
             all_spans.extend(spans)
 

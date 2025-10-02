@@ -8,11 +8,7 @@ from weave.trace_server.refs_internal import InvalidInternalRef
 
 def test_save_object(client):
     create_res = client.server.obj_create(
-        tsi.ObjCreateReq(
-            obj=tsi.ObjSchemaForInsert(
-                project_id="shawn/proj", object_id="my-obj", val={"a": 1}
-            )
-        )
+        tsi.ObjCreateReq(obj=tsi.ObjSchemaForInsert(project_id="shawn/proj", object_id="my-obj", val={"a": 1}))
     )
     read_res = client.server.obj_read(
         tsi.ObjReadReq(
@@ -54,9 +50,7 @@ def test_robust_to_url_sensitive_chars(client):
     # Object ID that contains reserved characters should be rejected.
 
     read_res = client.server.refs_read_batch(
-        tsi.RefsReadBatchReq(
-            refs=[f"weave:///{project_id}/object/{object_id}:{create_res.digest}"]
-        )
+        tsi.RefsReadBatchReq(refs=[f"weave:///{project_id}/object/{object_id}:{create_res.digest}"])
     )
 
     assert read_res.vals[0] == bad_val
@@ -64,20 +58,14 @@ def test_robust_to_url_sensitive_chars(client):
     # Key that contains reserved characters should be rejected.
     with pytest.raises(InvalidInternalRef):
         read_res = client.server.refs_read_batch(
-            tsi.RefsReadBatchReq(
-                refs=[
-                    f"weave:///{project_id}/object/{object_id}:{create_res.digest}/key/{bad_key}"
-                ]
-            )
+            tsi.RefsReadBatchReq(refs=[f"weave:///{project_id}/object/{object_id}:{create_res.digest}/key/{bad_key}"])
         )
 
     encoded_bad_key = urllib.parse.quote_plus(bad_key)
     assert encoded_bad_key == "mali%3Acious%2Fke%25y"
     read_res = client.server.refs_read_batch(
         tsi.RefsReadBatchReq(
-            refs=[
-                f"weave:///{project_id}/object/{object_id}:{create_res.digest}/key/{encoded_bad_key}"
-            ]
+            refs=[f"weave:///{project_id}/object/{object_id}:{create_res.digest}/key/{encoded_bad_key}"]
         )
     )
     assert read_res.vals[0] == bad_val[bad_key]

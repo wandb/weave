@@ -58,9 +58,7 @@ class AnnotationSpec(base_object_def.BaseObject):
             if len(field_schema) != 2:
                 raise ValueError("Expected a tuple of length 2")
             annotation, field = field_schema
-            if (
-                not isinstance(annotation, type)
-            ) or annotation not in SUPPORTED_PRIMITIVES:
+            if (not isinstance(annotation, type)) or annotation not in SUPPORTED_PRIMITIVES:
                 raise TypeError("Expected annotation to be a primitive type")
             if not isinstance(field, FieldInfo):
                 raise TypeError("Expected field to be a Pydantic Field")
@@ -74,9 +72,7 @@ class AnnotationSpec(base_object_def.BaseObject):
 
             schema = TempModel.model_json_schema()["properties"]["field"]
 
-            if (
-                "title" in schema and schema["title"] == "Field"
-            ):  # default title for Field
+            if "title" in schema and schema["title"] == "Field":  # default title for Field
                 schema.pop("title")
 
             data["field_schema"] = schema

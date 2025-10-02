@@ -50,11 +50,7 @@ def _convert_instance_to_dict(obj: Any) -> Any:
     if isinstance(obj, BaseModel):  # Handle pydantic models
         return obj.model_dump(exclude_none=True)
     elif hasattr(obj, "__dict__"):  # Handle regular class instances
-        return {
-            k: v
-            for k, v in vars(obj).items()
-            if not k.startswith("__") and not callable(v)
-        }
+        return {k: v for k, v in vars(obj).items() if not k.startswith("__") and not callable(v)}
     return obj
 
 
@@ -82,15 +78,12 @@ def _process_inputs(raw_inputs: dict[str, Any]) -> dict[str, Any]:
             ):
                 # Convert list of instances to dict with class names as keys
                 processed[k] = {
-                    f"{_get_class_name(item)}_{i}": _convert_instance_to_dict(item)
-                    for i, item in enumerate(v)
+                    f"{_get_class_name(item)}_{i}": _convert_instance_to_dict(item) for i, item in enumerate(v)
                 }
                 continue
 
         # Handle single instances
-        if hasattr(v, "__class__") and not isinstance(
-            v, (str, int, float, bool, dict, list, tuple)
-        ):
+        if hasattr(v, "__class__") and not isinstance(v, (str, int, float, bool, dict, list, tuple)):
             processed[k] = _convert_instance_to_dict(v)
             continue
 
@@ -232,9 +225,7 @@ if not _import_failed:
                 if self._is_streaming:
                     _accumulators[id_] = [call, False, {}, None, None]
             except Exception as e:
-                log_once(
-                    logger.error, f"Error creating call for {op_name} (ID: {id_}): {e}"
-                )
+                log_once(logger.error, f"Error creating call for {op_name} (ID: {id_}): {e}")
 
         def _prepare_to_exit_or_drop(
             self,
@@ -264,11 +255,7 @@ if not _import_failed:
                 exception_to_log = err
 
                 # WorkflowDone is not an error, it's the normal way workflows signal completion
-                if (
-                    err is not None
-                    and not _import_failed
-                    and isinstance(err, WorkflowDone)
-                ):
+                if err is not None and not _import_failed and isinstance(err, WorkflowDone):
                     exception_to_log = None
 
                 if result is not None and isinstance(result, StopEvent):
@@ -277,9 +264,7 @@ if not _import_failed:
                 if result is not None:
                     try:
                         if isinstance(result, BaseModel):
-                            outputs = _process_inputs(
-                                result.model_dump(exclude_none=True)
-                            )
+                            outputs = _process_inputs(result.model_dump(exclude_none=True))
                         else:
                             outputs = _process_inputs({"result": result})
                     except Exception:
@@ -361,24 +346,16 @@ if not _import_failed:
                     # Parent: span call or global root
                     parent_call_for_event = _weave_calls_map.get(event.span_id)
                     # Create a new call for the start event
-                    call = gc.create_call(
-                        op_name, raw_event_payload, parent_call_for_event
-                    )
+                    call = gc.create_call(op_name, raw_event_payload, parent_call_for_event)
                     _weave_calls_map[event_pairing_key] = call
 
                     # For streaming LLMCompletion and LLMChat events, pre-create the InProgress call
                     # so that OpenAI autopatch inherits it as parent
-                    if (
-                        base_event_name in ["LLMCompletion", "LLMChat"]
-                    ) and event.span_id in _accumulators:
-                        progress_op_name = (
-                            f"llama_index.event.{base_event_name}InProgress"
-                        )
+                    if (base_event_name in ["LLMCompletion", "LLMChat"]) and event.span_id in _accumulators:
+                        progress_op_name = f"llama_index.event.{base_event_name}InProgress"
                         progress_event_key = (event.span_id, progress_op_name)
                         # Create InProgress call as child of LLM start event
-                        progress_call = gc.create_call(
-                            progress_op_name, raw_event_payload, call
-                        )
+                        progress_call = gc.create_call(progress_op_name, raw_event_payload, call)
                         _weave_calls_map[progress_event_key] = progress_call
                         # Update accumulator to point to the pre-created progress call
                         acc_entry = _accumulators[event.span_id]
@@ -414,10 +391,7 @@ if not _import_failed:
                             deferred_result = acc_entry[3]
                             deferred_err = acc_entry[4]
 
-                        if (
-                            progress_call is not None
-                            and last_progress_payload is not None
-                        ):
+                        if progress_call is not None and last_progress_payload is not None:
                             gc.finish_call(progress_call, last_progress_payload)
                     if event_pairing_key in _weave_calls_map:
                         # Found matching start event, finish its call with end event data
@@ -425,46 +399,32 @@ if not _import_failed:
                         gc.finish_call(call_to_finish, raw_event_payload)
                     else:
                         # No matching start event found, create a standalone call
-                        call = gc.create_call(
-                            op_name, raw_event_payload, parent_call_for_event
-                        )
+                        call = gc.create_call(op_name, raw_event_payload, parent_call_for_event)
                         gc.finish_call(call, raw_event_payload)
 
                     # Only finish spans that were deferred due to streaming (indicated by deferred_result or deferred_err being set)
-                    if event.span_id in _weave_calls_map and (
-                        deferred_result is not None or deferred_err is not None
-                    ):
+                    if event.span_id in _weave_calls_map and (deferred_result is not None or deferred_err is not None):
                         span_call = _weave_calls_map.pop(event.span_id)
 
                         outputs = None
                         if deferred_result is not None:
                             try:
                                 if isinstance(deferred_result, BaseModel):
-                                    outputs = _process_inputs(
-                                        deferred_result.model_dump(exclude_none=True)
-                                    )
+                                    outputs = _process_inputs(deferred_result.model_dump(exclude_none=True))
                                 else:
-                                    outputs = _process_inputs(
-                                        {"result": deferred_result}
-                                    )
+                                    outputs = _process_inputs({"result": deferred_result})
                             except Exception:
-                                outputs = _process_inputs(
-                                    {"result": str(deferred_result)}
-                                )
+                                outputs = _process_inputs({"result": str(deferred_result)})
 
                         gc.finish_call(span_call, outputs, exception=deferred_err)
                 else:
                     # Parent: span call or global root
                     parent_call_for_event = _weave_calls_map.get(event.span_id)
                     # Handle non-start/end events as instantaneous events
-                    call = gc.create_call(
-                        op_name, raw_event_payload, parent_call_for_event
-                    )
+                    call = gc.create_call(op_name, raw_event_payload, parent_call_for_event)
                     gc.finish_call(call, raw_event_payload)
             except Exception as e:
-                print(
-                    f"Weave(EventHandler): Error processing event {op_name} (Key: {event_pairing_key}): {e}"
-                )
+                print(f"Weave(EventHandler): Error processing event {op_name} (Key: {event_pairing_key}): {e}")
 
 else:
 
@@ -512,11 +472,7 @@ class LLamaIndexPatcher(Patcher):  # pyright: ignore[reportRedeclaration]
 
     def undo_patch(self) -> bool:
         """Reverts LlamaIndex instrumentation to its original state."""
-        if (
-            not self.dispatcher
-            or self._original_event_handlers is None
-            or self._original_span_handlers is None
-        ):
+        if not self.dispatcher or self._original_event_handlers is None or self._original_span_handlers is None:
             return False
 
         try:

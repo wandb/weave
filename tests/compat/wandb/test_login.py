@@ -267,9 +267,7 @@ def test_wandb_login_try_save_api_key(mock_netrc, mock_default_host):
     wlogin = _WandbLogin()
     wlogin.try_save_api_key("test_key")
 
-    mock_netrc.add_or_update_entry.assert_called_once_with(
-        "api.wandb.ai", "user", "test_key"
-    )
+    mock_netrc.add_or_update_entry.assert_called_once_with("api.wandb.ai", "user", "test_key")
 
 
 def test_login_internal_with_preconfigured_key(mock_netrc, mock_default_host):
@@ -286,9 +284,7 @@ def test_login_internal_with_provided_key(mock_netrc, mock_default_host):
     result = _login(key="a" * 40)
 
     assert result is True
-    mock_netrc.add_or_update_entry.assert_called_once_with(
-        "api.wandb.ai", "user", "a" * 40
-    )
+    mock_netrc.add_or_update_entry.assert_called_once_with("api.wandb.ai", "user", "a" * 40)
 
 
 def test_login_internal_with_prompting(mock_netrc, mock_default_host, mock_app_url):
@@ -300,9 +296,7 @@ def test_login_internal_with_prompting(mock_netrc, mock_default_host, mock_app_u
         result = _login()
 
         assert result is True
-        mock_netrc.add_or_update_entry.assert_called_once_with(
-            "api.wandb.ai", "user", valid_key
-        )
+        mock_netrc.add_or_update_entry.assert_called_once_with("api.wandb.ai", "user", valid_key)
 
 
 def test_login_internal_prompt_failure(mock_netrc, mock_default_host, mock_app_url):
@@ -362,9 +356,7 @@ def test_full_login_flow_with_netrc(api_key, mock_netrc, mock_default_host):
 
 
 @pytest.mark.parametrize("api_key", all_valid_keys, indirect=True)
-def test_full_login_flow_without_netrc(
-    api_key, mock_netrc, mock_default_host, mock_app_url
-):
+def test_full_login_flow_without_netrc(api_key, mock_netrc, mock_default_host, mock_app_url):
     """Test complete login flow with user prompting."""
     mock_netrc.get_credentials.return_value = None
 
@@ -410,15 +402,11 @@ def test_auth_from_env_environment():
 
 def test_project_create_if_not_exists(mock_wandb_api):
     mock_wandb_api.project.return_value = None
-    mock_wandb_api.upsert_project.return_value = {
-        "upsertModel": {"model": {"name": "test_project"}}
-    }
+    mock_wandb_api.upsert_project.return_value = {"upsertModel": {"model": {"name": "test_project"}}}
     res = _ensure_project_exists("test_entity", "test_project")
     assert res == {"project_name": "test_project"}
     mock_wandb_api.project.assert_called_once_with("test_entity", "test_project")
-    mock_wandb_api.upsert_project.assert_called_once_with(
-        entity="test_entity", project="test_project"
-    )
+    mock_wandb_api.upsert_project.assert_called_once_with(entity="test_entity", project="test_project")
 
 
 def test_no_project_create_if_exists(mock_wandb_api):

@@ -178,9 +178,7 @@ def openai_accumulator(
         ChoiceDeltaToolCallFunction,
     )
 
-    def _process_chunk(
-        chunk: ChatCompletionChunk, acc_choices: list[dict] | None = None
-    ) -> list[dict]:
+    def _process_chunk(chunk: ChatCompletionChunk, acc_choices: list[dict] | None = None) -> list[dict]:
         """Once the first_chunk is set (acc), take the next chunk and append the message content
         to the message content of acc or first_chunk.
         """
@@ -231,17 +229,13 @@ def openai_accumulator(
                         name=chunk_choice.delta.function_call.name,
                     )
                 else:
-                    choice["delta"]["function_call"]["arguments"] += (
-                        chunk_choice.delta.function_call.arguments
-                    )
+                    choice["delta"]["function_call"]["arguments"] += chunk_choice.delta.function_call.arguments
 
             # tool calls
             if chunk_choice.delta.tool_calls:
                 if choice["delta"]["tool_calls"] is None:
                     choice["delta"]["tool_calls"] = []
-                    tool_call_delta = chunk_choice.delta.tool_calls[
-                        0
-                    ]  # when streaming, we get one
+                    tool_call_delta = chunk_choice.delta.tool_calls[0]  # when streaming, we get one
                     choice["delta"]["tool_calls"].append(  # type: ignore
                         ChoiceDeltaToolCall(
                             id=tool_call_delta.id,
@@ -272,13 +266,9 @@ def openai_accumulator(
                         tool_call["type"] = tool_call_delta.type
                     if tool_call_delta.function is not None:
                         if tool_call_delta.function.name is not None:
-                            tool_call["function"]["name"] = (
-                                tool_call_delta.function.name
-                            )
+                            tool_call["function"]["name"] = tool_call_delta.function.name
                         if tool_call_delta.function.arguments is not None:
-                            tool_call["function"]["arguments"] += (
-                                tool_call_delta.function.arguments
-                            )
+                            tool_call["function"]["arguments"] += tool_call_delta.function.arguments
 
         return acc_choices
 
@@ -302,9 +292,7 @@ def openai_accumulator(
         else:
             raise ValueError("Initial event must contain choices")
 
-    output_choices = _process_chunk(
-        value, [choice.model_dump() for choice in acc.choices]
-    )
+    output_choices = _process_chunk(value, [choice.model_dump() for choice in acc.choices])
 
     # Calculate time to first token if this is the first chunk with content
     calculate_time_to_first_token(acc, value, _openai_chunk_has_content)
@@ -340,8 +328,7 @@ def should_use_accumulator(inputs: dict) -> bool:
         # This is very critical. When `"X-Stainless-Raw-Response` is true, the response
         # is an APIResponse object. This is very hard to mock/patch for the streaming use
         # case, so we don't even try.
-        and not inputs.get("extra_headers", {}).get("X-Stainless-Raw-Response")
-        == "true"
+        and not inputs.get("extra_headers", {}).get("X-Stainless-Raw-Response") == "true"
     )
 
 
@@ -363,9 +350,7 @@ def completion_instance_check(obj: Any) -> bool:
     )
 
 
-def openai_on_input_handler(
-    func: Op, args: tuple, kwargs: dict
-) -> ProcessedInputs | None:
+def openai_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedInputs | None:
     original_args = args
     original_kwargs = kwargs
 
@@ -695,9 +680,7 @@ def create_wrapper_responses_sync(
         op._set_on_input_handler(openai_on_input_handler)
         return _add_accumulator(
             op,  # type: ignore
-            make_accumulator=lambda inputs: lambda acc, value: responses_accumulator(
-                acc, value
-            ),
+            make_accumulator=lambda inputs: lambda acc, value: responses_accumulator(acc, value),
             should_accumulate=should_use_responses_accumulator,
             on_finish_post_processor=lambda value: value,
         )
@@ -719,9 +702,7 @@ def create_wrapper_responses_async(
         op._set_on_input_handler(openai_on_input_handler)
         return _add_accumulator(
             op,  # type: ignore
-            make_accumulator=lambda inputs: lambda acc, value: responses_accumulator(
-                acc, value
-            ),
+            make_accumulator=lambda inputs: lambda acc, value: responses_accumulator(acc, value),
             should_accumulate=should_use_responses_accumulator,
             on_finish_post_processor=lambda value: value,
         )
@@ -754,36 +735,16 @@ def get_openai_patcher(
             "name": base.name or "openai.chat.completions.create",
         }
     )
-    completions_parse_settings = base.model_copy(
-        update={"name": base.name or "openai.chat.completions.parse"}
-    )
-    async_completions_parse_settings = base.model_copy(
-        update={"name": base.name or "openai.chat.completions.parse"}
-    )
-    moderation_create_settings = base.model_copy(
-        update={"name": base.name or "openai.moderations.create"}
-    )
-    async_moderation_create_settings = base.model_copy(
-        update={"name": base.name or "openai.moderations.create"}
-    )
-    embeddings_create_settings = base.model_copy(
-        update={"name": base.name or "openai.embeddings.create"}
-    )
-    async_embeddings_create_settings = base.model_copy(
-        update={"name": base.name or "openai.embeddings.create"}
-    )
-    responses_create_settings = base.model_copy(
-        update={"name": base.name or "openai.responses.create"}
-    )
-    async_responses_create_settings = base.model_copy(
-        update={"name": base.name or "openai.responses.create"}
-    )
-    responses_parse_settings = base.model_copy(
-        update={"name": base.name or "openai.responses.parse"}
-    )
-    async_responses_parse_settings = base.model_copy(
-        update={"name": base.name or "openai.responses.parse"}
-    )
+    completions_parse_settings = base.model_copy(update={"name": base.name or "openai.chat.completions.parse"})
+    async_completions_parse_settings = base.model_copy(update={"name": base.name or "openai.chat.completions.parse"})
+    moderation_create_settings = base.model_copy(update={"name": base.name or "openai.moderations.create"})
+    async_moderation_create_settings = base.model_copy(update={"name": base.name or "openai.moderations.create"})
+    embeddings_create_settings = base.model_copy(update={"name": base.name or "openai.embeddings.create"})
+    async_embeddings_create_settings = base.model_copy(update={"name": base.name or "openai.embeddings.create"})
+    responses_create_settings = base.model_copy(update={"name": base.name or "openai.responses.create"})
+    async_responses_create_settings = base.model_copy(update={"name": base.name or "openai.responses.create"})
+    responses_parse_settings = base.model_copy(update={"name": base.name or "openai.responses.parse"})
+    async_responses_parse_settings = base.model_copy(update={"name": base.name or "openai.responses.parse"})
 
     _openai_patcher = MultiPatcher(
         [
@@ -809,16 +770,12 @@ def get_openai_patcher(
             ),
             # Beta methods were removed in 1.92.0
             SymbolPatcher(
-                lambda: importlib.import_module(
-                    "openai.resources.beta.chat.completions"
-                ),
+                lambda: importlib.import_module("openai.resources.beta.chat.completions"),
                 "Completions.parse",
                 create_wrapper_sync(settings=completions_parse_settings),
             ),
             SymbolPatcher(
-                lambda: importlib.import_module(
-                    "openai.resources.beta.chat.completions"
-                ),
+                lambda: importlib.import_module("openai.resources.beta.chat.completions"),
                 "AsyncCompletions.parse",
                 create_wrapper_async(settings=async_completions_parse_settings),
             ),
@@ -850,9 +807,7 @@ def get_openai_patcher(
             SymbolPatcher(
                 lambda: importlib.import_module("openai.resources.responses"),
                 "AsyncResponses.create",
-                create_wrapper_responses_async(
-                    settings=async_responses_create_settings
-                ),
+                create_wrapper_responses_async(settings=async_responses_create_settings),
             ),
             SymbolPatcher(
                 lambda: importlib.import_module("openai.resources.responses"),

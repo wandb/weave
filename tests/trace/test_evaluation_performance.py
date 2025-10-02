@@ -150,17 +150,13 @@ async def test_evaluation_performance(client: WeaveClient):
     calls = client.get_calls()
     objects = client._objects()
 
-    assert (
-        len(list(calls)) == 14
-    )  # eval, summary, 4 predict_and_score, 4 predicts, 4 scores
+    assert len(list(calls)) == 14  # eval, summary, 4 predict_and_score, 4 predicts, 4 scores
     assert len(list(objects)) == 3  # model, dataset, evaluation
 
 
 @pytest.mark.asyncio
 @pytest.mark.disable_logging_error_check
-async def test_evaluation_resilience(
-    client_with_throwing_server: WeaveClient, log_collector
-):
+async def test_evaluation_resilience(client_with_throwing_server: WeaveClient, log_collector):
     client_with_throwing_server.project = "test_evaluation_resilience"
     evaluation, predict = build_evaluation()
 

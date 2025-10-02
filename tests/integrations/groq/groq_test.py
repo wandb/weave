@@ -47,10 +47,7 @@ def test_groq_quickstart(
         seed=42,
     )
 
-    assert (
-        chat_completion.choices[0].message.content
-        == "The capital of India is New Delhi."
-    )
+    assert chat_completion.choices[0].message.content == "The capital of India is New Delhi."
     calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
     flattened_calls = flatten_calls(calls)
     assert len(flattened_calls) == 1
@@ -404,17 +401,13 @@ def test_groq_tool_call(
             available_functions = {
                 "get_game_score": get_game_score,
             }  # only one function in this example, but you can have multiple
-            messages.append(
-                response_message
-            )  # extend conversation with assistant's reply
+            messages.append(response_message)  # extend conversation with assistant's reply
             # Step 4: send the info for each function call and function response to the model
             for tool_call in tool_calls:
                 function_name = tool_call.function.name
                 function_to_call = available_functions[function_name]
                 function_args = json.loads(tool_call.function.arguments)
-                function_response = function_to_call(
-                    team_name=function_args.get("team_name")
-                )
+                function_response = function_to_call(team_name=function_args.get("team_name"))
                 messages.append(
                     {
                         "tool_call_id": tool_call.id,
@@ -464,10 +457,7 @@ def test_groq_tool_call(
     assert output_1.choices[0].index == 0
     assert output_1.choices[0].message.role == "assistant"
     assert len(output_1.choices[0].message.tool_calls) == 1
-    assert (
-        output_1.choices[0].message.tool_calls[0].function.arguments
-        == '{"team_name":"Golden State Warriors"}'
-    )
+    assert output_1.choices[0].message.tool_calls[0].function.arguments == '{"team_name":"Golden State Warriors"}'
     assert output_1.choices[0].message.tool_calls[0].type == "function"
 
     call_2, _ = flattened_calls[2]

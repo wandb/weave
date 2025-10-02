@@ -117,9 +117,7 @@ def test_weaveflow_unknown_type_op_param_closure():
 
 
 def test_subobj_ref_passing(client):
-    dataset = client.save(
-        weave.Dataset(rows=[{"x": 1, "y": 3}, {"x": 2, "y": 16}]), "my-dataset"
-    )
+    dataset = client.save(weave.Dataset(rows=[{"x": 1, "y": 3}, {"x": 2, "y": 16}]), "my-dataset")
 
     @weave.op
     def get_item(row):
@@ -161,9 +159,7 @@ def test_agent_has_tools(client):
 
 
 def test_construct_eval_with_dataset_get(client):
-    dataset = client.save(
-        weave.Dataset(rows=[{"x": 1, "y": 3}, {"x": 2, "y": 16}]), "my-dataset"
-    )
+    dataset = client.save(weave.Dataset(rows=[{"x": 1, "y": 3}, {"x": 2, "y": 16}]), "my-dataset")
     ref = dataset.ref
     assert ref is not None
     dataset2 = weave.ref(ref.uri()).get()

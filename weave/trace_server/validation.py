@@ -140,9 +140,7 @@ def validate_purge_req_one(
 
 
 # validate a purge query with multiple eq conditions
-def validate_purge_req_multiple(
-    value: Any, invalid_message: str = MESSAGE_INVALID_PURGE
-) -> None:
+def validate_purge_req_multiple(value: Any, invalid_message: str = MESSAGE_INVALID_PURGE) -> None:
     if not isinstance(value, list):
         raise InvalidRequest(invalid_message)
     for item in value:

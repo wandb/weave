@@ -142,9 +142,7 @@ class DiskCache:
             cache_dir: Directory path for disk cache storage
             size_limit: Maximum size in bytes for disk cache (default 1GB)
         """
-        self._cache: diskcache.Cache[str, str | bytes] = diskcache.Cache(
-            cache_dir, size_limit=size_limit
-        )
+        self._cache: diskcache.Cache[str, str | bytes] = diskcache.Cache(cache_dir, size_limit=size_limit)
 
     def get(self, key: str) -> str | bytes | None:
         """Get a value by key. Returns None on error."""

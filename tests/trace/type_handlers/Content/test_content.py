@@ -62,12 +62,8 @@ MEDIA_TEST_PARAMS = [
 
 
 class TestWeaveContent:
-    @pytest.mark.parametrize(
-        ("fixture_name", "extension", "mimetype"), MEDIA_TEST_PARAMS
-    )
-    def test_content_from_path(
-        self, fixture_name: str, extension: str, mimetype: str, request
-    ):
+    @pytest.mark.parametrize(("fixture_name", "extension", "mimetype"), MEDIA_TEST_PARAMS)
+    def test_content_from_path(self, fixture_name: str, extension: str, mimetype: str, request):
         """Test creating Content from file path."""
         file_path = request.getfixturevalue(fixture_name)
 
@@ -83,12 +79,8 @@ class TestWeaveContent:
         assert content.input_type == "str"
         assert content.content_type == "file"
 
-    @pytest.mark.parametrize(
-        ("fixture_name", "extension", "mimetype"), MEDIA_TEST_PARAMS
-    )
-    def test_content_from_bytes(
-        self, fixture_name: str, extension: str, mimetype: str, request
-    ):
+    @pytest.mark.parametrize(("fixture_name", "extension", "mimetype"), MEDIA_TEST_PARAMS)
+    def test_content_from_bytes(self, fixture_name: str, extension: str, mimetype: str, request):
         """Test creating Content from bytes."""
         file_path = request.getfixturevalue(fixture_name)
         file_bytes = file_path.read_bytes()
@@ -107,12 +99,8 @@ class TestWeaveContent:
         content2 = Content.from_bytes(file_bytes, mimetype=mimetype)
         assert content2.mimetype == mimetype
 
-    @pytest.mark.parametrize(
-        ("fixture_name", "extension", "mimetype"), MEDIA_TEST_PARAMS
-    )
-    def test_content_from_base64(
-        self, fixture_name: str, extension: str, mimetype: str, request
-    ):
+    @pytest.mark.parametrize(("fixture_name", "extension", "mimetype"), MEDIA_TEST_PARAMS)
+    def test_content_from_base64(self, fixture_name: str, extension: str, mimetype: str, request):
         """Test creating Content from base64 encoded string."""
         file_path = request.getfixturevalue(fixture_name)
         file_bytes = file_path.read_bytes()
@@ -130,12 +118,8 @@ class TestWeaveContent:
         assert content.input_type == "str"
         assert content.content_type == "base64"
 
-    @pytest.mark.parametrize(
-        ("fixture_name", "extension", "mimetype"), MEDIA_TEST_PARAMS
-    )
-    def test_content_from_pathlib(
-        self, fixture_name: str, extension: str, mimetype: str, request
-    ):
+    @pytest.mark.parametrize(("fixture_name", "extension", "mimetype"), MEDIA_TEST_PARAMS)
+    def test_content_from_pathlib(self, fixture_name: str, extension: str, mimetype: str, request):
         """Test creating Content from pathlib.Path object."""
         file_path = request.getfixturevalue(fixture_name)
 
@@ -168,12 +152,8 @@ class TestWeaveContent:
             expected_path = Path(tmpdir) / image_file.name
             assert expected_path.exists()
 
-    @pytest.mark.parametrize(
-        ("fixture_name", "extension", "mimetype"), MEDIA_TEST_PARAMS
-    )
-    def test_content_in_ops(
-        self, fixture_name: str, extension: str, mimetype: str, request
-    ):
+    @pytest.mark.parametrize(("fixture_name", "extension", "mimetype"), MEDIA_TEST_PARAMS)
+    def test_content_in_ops(self, fixture_name: str, extension: str, mimetype: str, request):
         """Test Content as input/output of weave ops."""
         file_path = request.getfixturevalue(fixture_name)
 
@@ -233,16 +213,12 @@ class TestWeaveContent:
         assert content_bytes.as_string() == text_data
 
         # Test 3: UTF-16 encoded content
-        content_utf16 = Content.from_bytes(
-            text_data.encode("utf-16"), extension="txt", encoding="utf-16"
-        )
+        content_utf16 = Content.from_bytes(text_data.encode("utf-16"), extension="txt", encoding="utf-16")
         assert content_utf16.as_string() == text_data
 
         # Test 4: Latin-1 encoded content
         latin_text = "Café, naïve, résumé"
-        content_latin1 = Content.from_bytes(
-            latin_text.encode("latin-1"), extension="txt", encoding="latin-1"
-        )
+        content_latin1 = Content.from_bytes(latin_text.encode("latin-1"), extension="txt", encoding="latin-1")
         assert content_latin1.as_string() == latin_text
 
         # Test 5: Base64 encoded content
@@ -291,25 +267,19 @@ class TestWeaveContent:
         assert content_multiline.as_string() == multiline
 
         # Test 13: UTF-32 encoded content
-        content_utf32 = Content.from_bytes(
-            text_data.encode("utf-32"), extension="txt", encoding="utf-32"
-        )
+        content_utf32 = Content.from_bytes(text_data.encode("utf-32"), extension="txt", encoding="utf-32")
         assert content_utf32.as_string() == text_data
 
         # Test 14: Windows-1252 encoded content
         win_text = "Windows specific: ''"
-        content_win1252 = Content.from_bytes(
-            win_text.encode("windows-1252"), extension="txt", encoding="windows-1252"
-        )
+        content_win1252 = Content.from_bytes(win_text.encode("windows-1252"), extension="txt", encoding="windows-1252")
         assert content_win1252.as_string() == win_text
 
         # Test 15: Very long string
         long_text = "A" * 10000 + "\n" + "B" * 10000
         content_long = Content.from_text(long_text)
         assert content_long.as_string() == long_text
-        assert (
-            len(content_long.as_string()) == 20001
-        )  # 10000 A's + 1 newline + 10000 B's
+        assert len(content_long.as_string()) == 20001  # 10000 A's + 1 newline + 10000 B's
 
     def test_content_metadata(self, image_file):
         """Test Content extra metadata property."""
@@ -386,9 +356,7 @@ class TestWeaveContent:
         assert retrieved.mimetype == content.mimetype
         assert retrieved.size == content.size
 
-    def test_content_in_dataset(
-        self, image_file, audio_file, video_file, pdf_file, client: WeaveClient
-    ):
+    def test_content_in_dataset(self, image_file, audio_file, video_file, pdf_file, client: WeaveClient):
         """Test Content objects as dataset values."""
         rows = []
         original_files = {}

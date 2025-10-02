@@ -64,9 +64,7 @@ def process_incoming_object_val(
     if not isinstance(val, dict):
         if req_builtin_object_class is not None:
             raise ValueError("object_class cannot be provided for non-dict objects")
-        return ProcessIncomingObjectResult(
-            val=val, base_object_class=None, leaf_object_class=None
-        )
+        return ProcessIncomingObjectResult(val=val, base_object_class=None, leaf_object_class=None)
 
     # Next we extract the object classes from the object. the `_bases` and `_class_name` keys are
     # special weave-added keys that tell us the class hierarchy of the object.
@@ -101,17 +99,13 @@ def process_incoming_object_val(
     # and set the correct bases information. This is an important case: the user is asking us to ensure that they payload is valid and
     # stored correctly. We need to validate the payload and write the correct bases information.
     if req_builtin_object_class is not None:
-        if builtin_object_class := BUILTIN_OBJECT_REGISTRY.get(
-            req_builtin_object_class
-        ):
+        if builtin_object_class := BUILTIN_OBJECT_REGISTRY.get(req_builtin_object_class):
             # TODO: in the next iteration of this code path, this is where we need to actually publish the object
             # using the weave publish API instead of just dumping it.
             dict_val = dump_object(builtin_object_class.model_validate(val))
             new_val_object_classes = get_object_classes(dict_val)
             if not new_val_object_classes:
-                raise ValueError(
-                    f"Unexpected error: could not get object classes for {dict_val}"
-                )
+                raise ValueError(f"Unexpected error: could not get object classes for {dict_val}")
             if new_val_object_classes["object_class"] != req_builtin_object_class:
                 raise ValueError(
                     f"Unexpected error: base object class does not match requested object class: {new_val_object_classes['object_class']} != {req_builtin_object_class}"
@@ -125,9 +119,7 @@ def process_incoming_object_val(
             raise ValueError(f"Unknown object class: {req_builtin_object_class}")
 
     # Finally, if there is no requested object class, just return the object as is.
-    return ProcessIncomingObjectResult(
-        val=val, base_object_class=None, leaf_object_class=None
-    )
+    return ProcessIncomingObjectResult(val=val, base_object_class=None, leaf_object_class=None)
 
 
 # Server-side version of `pydantic_object_record`

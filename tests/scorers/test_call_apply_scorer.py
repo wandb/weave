@@ -23,9 +23,7 @@ def do_assertions_for_scorer_op(
     feedbacks = list(call.feedback)
     assert len(feedbacks) == 1
     target_feedback = feedbacks[0]
-    scorer_name = (
-        score_fn.name if isinstance(score_fn, Op) else score_fn.__class__.__name__
-    )
+    scorer_name = score_fn.name if isinstance(score_fn, Op) else score_fn.__class__.__name__
     assert target_feedback.feedback_type == "wandb.runnable." + scorer_name
     assert target_feedback.runnable_ref == score_fn.ref.uri()
     assert (
@@ -72,9 +70,7 @@ async def test_scorer_op_with_context(client: WeaveClient):
         return output - correct_answer
 
     _, call = predict.call(1)
-    apply_score_res = await call.apply_scorer(
-        score_fn, additional_scorer_kwargs={"correct_answer": 2}
-    )
+    apply_score_res = await call.apply_scorer(score_fn, additional_scorer_kwargs={"correct_answer": 2})
     do_assertions_for_scorer_op(apply_score_res, call, score_fn, client)
 
     @weave.op
@@ -155,9 +151,7 @@ async def test_scorer_obj_with_context(client: WeaveClient):
     scorer = MyScorer(offset=0)
 
     _, call = predict.call(1)
-    apply_score_res = await call.apply_scorer(
-        scorer, additional_scorer_kwargs={"correct_answer": 2}
-    )
+    apply_score_res = await call.apply_scorer(scorer, additional_scorer_kwargs={"correct_answer": 2})
     do_assertions_for_scorer_op(apply_score_res, call, scorer, client)
 
     class MyScorerWithIncorrectArgs(weave.Scorer):
@@ -185,9 +179,7 @@ async def test_scorer_obj_with_context(client: WeaveClient):
     )
 
     _, call = predict.call(1)
-    apply_score_res = await call.apply_scorer(
-        scorer, additional_scorer_kwargs={"correct_answer": 2}
-    )
+    apply_score_res = await call.apply_scorer(scorer, additional_scorer_kwargs={"correct_answer": 2})
     do_assertions_for_scorer_op(apply_score_res, call, scorer, client)
 
 
@@ -207,9 +199,7 @@ async def test_async_scorer_obj(client: WeaveClient):
     scorer = MyScorer(offset=0)
 
     _, call = predict.call(1)
-    apply_score_res = await call.apply_scorer(
-        scorer, additional_scorer_kwargs={"correct_answer": 2}
-    )
+    apply_score_res = await call.apply_scorer(scorer, additional_scorer_kwargs={"correct_answer": 2})
     do_assertions_for_scorer_op(apply_score_res, call, scorer, client)
 
 
@@ -224,16 +214,12 @@ async def test_scorer_with_weave_scorer_result_output(client: WeaveClient):
 
         @weave.op
         def score(self, x, output, correct_answer):
-            return WeaveScorerResult(
-                passed=False, metadata={"score": 0.8, "score_2": 0.8}
-            )
+            return WeaveScorerResult(passed=False, metadata={"score": 0.8, "score_2": 0.8})
 
     scorer = MyScorer(offset=0)
 
     _, call = predict.call(1)
-    apply_score_res = await call.apply_scorer(
-        scorer, additional_scorer_kwargs={"correct_answer": 2}
-    )
+    apply_score_res = await call.apply_scorer(scorer, additional_scorer_kwargs={"correct_answer": 2})
 
     assert apply_score_res.score_call.id is not None
 

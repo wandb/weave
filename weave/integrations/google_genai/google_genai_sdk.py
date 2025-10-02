@@ -17,11 +17,7 @@ def get_google_genai_symbol_patcher(
     base_symbol: str, attribute_name: str, wrapper: Callable, settings: OpSettings
 ) -> SymbolPatcher:
     display_name = base_symbol + "." + attribute_name
-    display_name = (
-        display_name.replace(".__call__", "")
-        if attribute_name.endswith(".__call__")
-        else display_name
-    )
+    display_name = display_name.replace(".__call__", "") if attribute_name.endswith(".__call__") else display_name
     return SymbolPatcher(
         lambda: importlib.import_module(base_symbol),
         attribute_name,

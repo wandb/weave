@@ -104,21 +104,13 @@ class S3FileStorageURI(FileStorageURI):
     @classmethod
     def _from_parse_result(cls, parsed_uri: ParseResult) -> "S3FileStorageURI":
         if parsed_uri.scheme != cls.scheme:
-            raise URIParseError(
-                f"Incorrect scheme for S3 file storage URI: {parsed_uri.geturl()}"
-            )
+            raise URIParseError(f"Incorrect scheme for S3 file storage URI: {parsed_uri.geturl()}")
         if parsed_uri.params != "":
-            raise URIParseError(
-                f"Invalid params for S3 file storage URI: {parsed_uri.geturl()}"
-            )
+            raise URIParseError(f"Invalid params for S3 file storage URI: {parsed_uri.geturl()}")
         if parsed_uri.query != "":
-            raise URIParseError(
-                f"Invalid query for S3 file storage URI: {parsed_uri.geturl()}"
-            )
+            raise URIParseError(f"Invalid query for S3 file storage URI: {parsed_uri.geturl()}")
         if parsed_uri.fragment != "":
-            raise URIParseError(
-                f"Invalid fragment for S3 file storage URI: {parsed_uri.geturl()}"
-            )
+            raise URIParseError(f"Invalid fragment for S3 file storage URI: {parsed_uri.geturl()}")
         return cls(parsed_uri.netloc, parsed_uri.path)
 
     def _to_parse_result(self) -> ParseResult:
@@ -156,21 +148,13 @@ class GCSFileStorageURI(FileStorageURI):
     @classmethod
     def _from_parse_result(cls, parsed_uri: ParseResult) -> "GCSFileStorageURI":
         if parsed_uri.scheme != cls.scheme:
-            raise URIParseError(
-                f"Incorrect scheme for GCS file storage URI: {parsed_uri.geturl()}"
-            )
+            raise URIParseError(f"Incorrect scheme for GCS file storage URI: {parsed_uri.geturl()}")
         if parsed_uri.params != "":
-            raise URIParseError(
-                f"Invalid params for GCS file storage URI: {parsed_uri.geturl()}"
-            )
+            raise URIParseError(f"Invalid params for GCS file storage URI: {parsed_uri.geturl()}")
         if parsed_uri.query != "":
-            raise URIParseError(
-                f"Invalid query for GCS file storage URI: {parsed_uri.geturl()}"
-            )
+            raise URIParseError(f"Invalid query for GCS file storage URI: {parsed_uri.geturl()}")
         if parsed_uri.fragment != "":
-            raise URIParseError(
-                f"Invalid fragment for GCS file storage URI: {parsed_uri.geturl()}"
-            )
+            raise URIParseError(f"Invalid fragment for GCS file storage URI: {parsed_uri.geturl()}")
         return cls(parsed_uri.netloc, parsed_uri.path)
 
     def _to_parse_result(self) -> ParseResult:
@@ -210,21 +194,13 @@ class AzureFileStorageURI(FileStorageURI):
     @classmethod
     def _from_parse_result(cls, parsed_uri: ParseResult) -> "AzureFileStorageURI":
         if parsed_uri.scheme != cls.scheme:
-            raise URIParseError(
-                f"Incorrect scheme for Azure file storage URI: {parsed_uri.geturl()}"
-            )
+            raise URIParseError(f"Incorrect scheme for Azure file storage URI: {parsed_uri.geturl()}")
         if parsed_uri.params != "":
-            raise URIParseError(
-                f"Invalid params for Azure file storage URI: {parsed_uri.geturl()}"
-            )
+            raise URIParseError(f"Invalid params for Azure file storage URI: {parsed_uri.geturl()}")
         if parsed_uri.query != "":
-            raise URIParseError(
-                f"Invalid query for Azure file storage URI: {parsed_uri.geturl()}"
-            )
+            raise URIParseError(f"Invalid query for Azure file storage URI: {parsed_uri.geturl()}")
         if parsed_uri.fragment != "":
-            raise URIParseError(
-                f"Invalid fragment for Azure file storage URI: {parsed_uri.geturl()}"
-            )
+            raise URIParseError(f"Invalid fragment for Azure file storage URI: {parsed_uri.geturl()}")
 
         # Split the path into container and path
         path = parsed_uri.path.strip("/")

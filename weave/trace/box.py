@@ -33,20 +33,14 @@ class BoxedDatetime(datetime.datetime):
     ref: Ref | None = None
 
     def __eq__(self, other: Any) -> bool:
-        return (
-            isinstance(other, datetime.datetime)
-            and self.timestamp() == other.timestamp()
-        )
+        return isinstance(other, datetime.datetime) and self.timestamp() == other.timestamp()
 
 
 class BoxedTimedelta(datetime.timedelta):
     ref: Ref | None = None
 
     def __eq__(self, other: Any) -> bool:
-        return (
-            isinstance(other, datetime.timedelta)
-            and self.total_seconds() == other.total_seconds()
-        )
+        return isinstance(other, datetime.timedelta) and self.total_seconds() == other.total_seconds()
 
 
 def box(

@@ -291,9 +291,7 @@ def test_viewer_registry():
         def clear(self):
             pass
 
-        def create_table(
-            self, title=None, show_header=True, header_style=None, **kwargs
-        ):
+        def create_table(self, title=None, show_header=True, header_style=None, **kwargs):
             return MagicMock()
 
         def create_progress(self, console=None, **kwargs):
@@ -386,9 +384,7 @@ def test_fallback_behavior_simulation():
     """
     from weave.trace.display.display import _get_auto_viewer
 
-    with patch(
-        "weave.trace.display.viewers.rich_viewer.RichViewer", side_effect=ImportError
-    ):
+    with patch("weave.trace.display.viewers.rich_viewer.RichViewer", side_effect=ImportError):
         # Should fall back to print viewer
         viewer = _get_auto_viewer()
         assert viewer is not None

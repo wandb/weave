@@ -89,9 +89,7 @@ def get_flow_with_router_or():
             # In a real app, this might come from an API
             self.state.ticket_id = "TKT-12345"
             self.state.customer_name = "Alex Johnson"
-            self.state.issue_description = (
-                "Unable to access premium features after payment"
-            )
+            self.state.issue_description = "Unable to access premium features after payment"
             return "Ticket received"
 
         @listen(receive_ticket)
@@ -166,10 +164,7 @@ def test_crewai_simple_crew(client: WeaveClient) -> None:
     assert inputs["self"]["memory"] == False
 
     outputs = call_0.output
-    assert (
-        "The market landscape for AI-powered healthcare solutions is rapidly evolving, "
-        in outputs.raw
-    )
+    assert "The market landscape for AI-powered healthcare solutions is rapidly evolving, " in outputs.raw
     assert outputs._class_name == "CrewOutput"
 
     summary = call_0.summary
@@ -184,8 +179,7 @@ def test_crewai_simple_crew(client: WeaveClient) -> None:
     inputs = call_1.inputs
     assert inputs["self"]["type"] == "Task"
     assert (
-        inputs["self"]["description"]
-        == "'Research the current market landscape for AI-powered healthcare solutions'"
+        inputs["self"]["description"] == "'Research the current market landscape for AI-powered healthcare solutions'"
     )
     assert (
         inputs["self"]["expected_output"]
@@ -194,10 +188,7 @@ def test_crewai_simple_crew(client: WeaveClient) -> None:
     assert inputs["agent"]["type"] == "Agent"
 
     outputs = call_1.output
-    assert (
-        "The market landscape for AI-powered healthcare solutions is rapidly evolving, "
-        in outputs.raw
-    )
+    assert "The market landscape for AI-powered healthcare solutions is rapidly evolving, " in outputs.raw
     assert outputs._class_name == "TaskOutput"
 
     call_2, _ = flattened_calls[2]
@@ -207,14 +198,8 @@ def test_crewai_simple_crew(client: WeaveClient) -> None:
     inputs = call_2.inputs
     assert inputs["self"]["type"] == "Agent"
     assert inputs["self"]["role"] == "'Market Research Specialist'"
-    assert (
-        inputs["self"]["goal"]
-        == "'Find comprehensive market data on emerging technologies'"
-    )
-    assert (
-        inputs["self"]["backstory"]
-        == "'You are an expert at discovering market trends and gathering data.'"
-    )
+    assert inputs["self"]["goal"] == "'Find comprehensive market data on emerging technologies'"
+    assert inputs["self"]["backstory"] == "'You are an expert at discovering market trends and gathering data.'"
     assert inputs["self"]["max_iter"] == "25"
     assert inputs["task"]["type"] == "Task"
     assert inputs["context"] == ""
@@ -257,10 +242,7 @@ def test_crewai_simple_crew(client: WeaveClient) -> None:
     assert call_5.inputs["messages"][0]["role"] == "system"
     assert call_5.inputs["messages"][1]["role"] == "user"
 
-    assert (
-        "I now can give a great answer  \nFinal Answer:"
-        in call_5.output["choices"][0]["message"]["content"]
-    )
+    assert "I now can give a great answer  \nFinal Answer:" in call_5.output["choices"][0]["message"]["content"]
 
 
 @pytest.mark.skip_clickhouse_client
@@ -348,9 +330,7 @@ async def test_crewai_simple_crew_kickoff_async(client: WeaveClient) -> None:
 async def test_crewai_simple_crew_kickoff_for_each_async(client: WeaveClient) -> None:
     crew = get_crew()
 
-    result = await crew.kickoff_for_each_async(
-        inputs=[{"input1": "input1"}, {"input2": "input2"}]
-    )
+    result = await crew.kickoff_for_each_async(inputs=[{"input1": "input1"}, {"input2": "input2"}])
 
     await asyncio.sleep(1)
 

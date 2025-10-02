@@ -74,9 +74,7 @@ class TableProtocol(Protocol):
 class ProgressProtocol(Protocol):
     """Protocol for progress bar objects."""
 
-    def add_task(
-        self, description: str, total: Optional[float] = None, **kwargs: Any
-    ) -> int:
+    def add_task(self, description: str, total: Optional[float] = None, **kwargs: Any) -> int:
         """Add a task to the progress bar."""
         ...
 
@@ -145,9 +143,7 @@ class ViewerProtocol(Protocol):
         """Create a table object."""
         ...
 
-    def create_progress(
-        self, console: Optional["ConsoleProtocol"] = None, **kwargs: Any
-    ) -> ProgressProtocol:
+    def create_progress(self, console: Optional["ConsoleProtocol"] = None, **kwargs: Any) -> ProgressProtocol:
         """Create a progress bar object."""
         ...
 
@@ -161,9 +157,7 @@ class ViewerProtocol(Protocol):
         """Create a syntax highlighting object."""
         ...
 
-    def create_text(
-        self, text: str = "", style: Optional[Union[str, Style]] = None
-    ) -> TextProtocol:
+    def create_text(self, text: str = "", style: Optional[Union[str, Style]] = None) -> TextProtocol:
         """Create a styled text object."""
         ...
 

@@ -22,10 +22,7 @@ def generate_table_data(client: WeaveClient, n_rows: int, n_cols: int):
                 "prop_a": f"value_{chr(97 + (i % 26))}",  # Use letters a-z cyclically
                 "prop_b": f"value_{random.randint(0, 100)}",  # Random integer
             },
-            **{
-                f"col_{j}": f"value_{random.randint(0, 100)}_{chr(97 + (i % 26))}"
-                for j in range(n_cols)
-            },
+            **{f"col_{j}": f"value_{random.randint(0, 100)}_{chr(97 + (i % 26))}" for j in range(n_cols)},
         }
         for i in ids
     ]
@@ -135,9 +132,7 @@ def test_table_query_limit(client: WeaveClient):
     digest, row_digests, data = generate_table_data(client, 10, 5)
 
     limit = 5
-    res = client.server.table_query(
-        tsi.TableQueryReq(project_id=client._project_id(), digest=digest, limit=limit)
-    )
+    res = client.server.table_query(tsi.TableQueryReq(project_id=client._project_id(), digest=digest, limit=limit))
 
     result_vals = [r.val for r in res.rows]
     result_digests = [r.digest for r in res.rows]
@@ -153,9 +148,7 @@ def test_table_query_offset(client: WeaveClient):
     digest, row_digests, data = generate_table_data(client, 10, 5)
 
     offset = 3
-    res = client.server.table_query(
-        tsi.TableQueryReq(project_id=client._project_id(), digest=digest, offset=offset)
-    )
+    res = client.server.table_query(tsi.TableQueryReq(project_id=client._project_id(), digest=digest, offset=offset))
 
     result_vals = [r.val for r in res.rows]
     result_digests = [r.digest for r in res.rows]
@@ -306,9 +299,7 @@ def test_table_query_stats_missing(client: WeaveClient):
     assert len(stats_res.tables) == 0
 
 
-def generate_duplication_simple_table_data(
-    client: WeaveClient, n_rows: int, copy_count: int
-):
+def generate_duplication_simple_table_data(client: WeaveClient, n_rows: int, copy_count: int):
     # Create a list of IDs and shuffle them to ensure random order
     data = [{"val": i} for i in range(n_rows) for _ in range(copy_count)]
 

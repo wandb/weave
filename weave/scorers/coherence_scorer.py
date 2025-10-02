@@ -31,16 +31,12 @@ class WeaveCoherenceScorerV1(HuggingFacePipelineScorer):
     """
 
     task: str = "sentiment-analysis"
-    model_max_length: int = Field(
-        default=1024, description="The maximum length of the model output."
-    )
+    model_max_length: int = Field(default=1024, description="The maximum length of the model output.")
 
     def load_pipeline(self) -> None:
         from transformers import pipeline
 
-        self._local_model_path = load_local_model_weights(
-            self.model_name_or_path, MODEL_PATHS["coherence_scorer"]
-        )
+        self._local_model_path = load_local_model_weights(self.model_name_or_path, MODEL_PATHS["coherence_scorer"])
         self._pipeline = pipeline(
             task=self.task,
             model=self._local_model_path,

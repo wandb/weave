@@ -32,9 +32,7 @@ def apply_postprocessing():
 def test_global_postprocessing(client, apply_postprocessing) -> None:
     @weave.op
     def func(api_key: str, secret_key: str, name: str, age: int) -> str:
-        return (
-            f"Hello, {name}! You are {age} years old.  Also your api_key is {api_key}."
-        )
+        return f"Hello, {name}! You are {age} years old.  Also your api_key is {api_key}."
 
     func(api_key="123", secret_key="456", name="John", age=30)
 

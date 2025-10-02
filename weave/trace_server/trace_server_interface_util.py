@@ -22,10 +22,7 @@ def str_digest(json_val: str) -> str:
 
 
 def _order_dict(dictionary: dict) -> dict:
-    return {
-        k: _order_dict(v) if isinstance(v, dict) else v
-        for k, v in sorted(dictionary.items())
-    }
+    return {k: _order_dict(v) if isinstance(v, dict) else v for k, v in sorted(dictionary.items())}
 
 
 valid_internal_schemes = [
@@ -46,9 +43,7 @@ def extract_refs_from_values(
         elif isinstance(val, list):
             for v in val:
                 _visit(v)
-        elif isinstance(val, str) and any(
-            val.startswith(scheme + ":///") for scheme in valid_internal_schemes
-        ):
+        elif isinstance(val, str) and any(val.startswith(scheme + ":///") for scheme in valid_internal_schemes):
             try:
                 parsed = refs_internal.parse_internal_uri(val)
                 if parsed.uri() == val:

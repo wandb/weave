@@ -35,9 +35,7 @@ async def test_score_with_chat_history(weave_coherence_scorer):
         {"role": "assistant", "content": "Hi"},
     ]
     # Call score using the new argument names.
-    result = weave_coherence_scorer.score(
-        query=query, output=output, chat_history=chat_history
-    )
+    result = weave_coherence_scorer.score(query=query, output=output, chat_history=chat_history)
     assert result.metadata is not None
     assert result.metadata["coherence_label"] == "Perfectly Coherent"
 

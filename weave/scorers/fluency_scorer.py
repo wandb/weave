@@ -44,9 +44,7 @@ class WeaveFluencyScorerV1(HuggingFacePipelineScorer):
         """Loads the _pipeline attribute using HF utilities."""
         from transformers import pipeline
 
-        self._local_model_path = load_local_model_weights(
-            self.model_name_or_path, MODEL_PATHS["fluency_scorer"]
-        )
+        self._local_model_path = load_local_model_weights(self.model_name_or_path, MODEL_PATHS["fluency_scorer"])
         self._pipeline = pipeline(
             self.task,
             model=self._local_model_path,
@@ -59,9 +57,7 @@ class WeaveFluencyScorerV1(HuggingFacePipelineScorer):
     def score(self, *, output: str, **kwargs: Any) -> WeaveScorerResult:
         assert self._pipeline is not None
         pipeline_output = self._pipeline(output)[0]
-        fluency_score = next(
-            pred["score"] for pred in pipeline_output if pred["label"] == "fluent"
-        )
+        fluency_score = next(pred["score"] for pred in pipeline_output if pred["label"] == "fluent")
         passed = fluency_score >= self.threshold
         return WeaveScorerResult(
             passed=passed,

@@ -49,16 +49,12 @@ def _run_timing_script(
             f.write(script_content)
 
         # Run in a fresh Python process
-        result = subprocess.run(
-            [sys.executable, temp_file], capture_output=True, text=True, timeout=30
-        )
+        result = subprocess.run([sys.executable, temp_file], capture_output=True, text=True, timeout=30)
 
         if result.returncode == 0:
             return parser_func(result.stdout.strip())
         else:
-            console.print(
-                f"[red]{test_name.title()} test failed: {result.stderr}[/red]"
-            )
+            console.print(f"[red]{test_name.title()} test failed: {result.stderr}[/red]")
             return parser_func("")  # Let parser_func handle the error case
     finally:
         # Clean up temp file
@@ -153,9 +149,7 @@ def run_benchmark_iterations(iterations: int) -> dict[str, list[float]]:
         init_times.append(init_time)
         total_times.append(total_time)
 
-        console.print(
-            f" - Import: {import_time:.3f}s, Init: {init_time:.3f}s, Total: {total_time:.3f}s"
-        )
+        console.print(f" - Import: {import_time:.3f}s, Init: {init_time:.3f}s, Total: {total_time:.3f}s")
 
     return {"import": import_times, "init": init_times, "total": total_times}
 
@@ -168,10 +162,7 @@ def write_results_to_csv(results: dict[str, list[float]], filename: str) -> None
         filename: Output CSV filename.
     """
     # Calculate stats for each timing type
-    stats = {
-        timing_type: utils.calculate_stats(times)
-        for timing_type, times in results.items()
-    }
+    stats = {timing_type: utils.calculate_stats(times) for timing_type, times in results.items()}
 
     # Prepare CSV data
     headers = ["Timing_Type", "Metric", "Value_Seconds"]
@@ -226,15 +217,9 @@ def display_summary(stats: dict[str, dict[str, float]]) -> None:
         stats: Dictionary with timing statistics.
     """
     console.print("\n[bold]Summary:[/bold]")
-    console.print(
-        f"  • Import time: [yellow]{utils.format_seconds(stats['import']['mean'])}[/yellow]"
-    )
-    console.print(
-        f"  • Init time: [yellow]{utils.format_seconds(stats['init']['mean'])}[/yellow]"
-    )
-    console.print(
-        f"  • Total time: [yellow]{utils.format_seconds(stats['total']['mean'])}[/yellow]"
-    )
+    console.print(f"  • Import time: [yellow]{utils.format_seconds(stats['import']['mean'])}[/yellow]")
+    console.print(f"  • Init time: [yellow]{utils.format_seconds(stats['init']['mean'])}[/yellow]")
+    console.print(f"  • Total time: [yellow]{utils.format_seconds(stats['total']['mean'])}[/yellow]")
 
 
 def get_stats_from_csv(csv_data: list[dict[str, str]]) -> dict[str, dict[str, float]]:
@@ -294,10 +279,7 @@ def main() -> None:
         console.print(f"Running {args.iterations} iterations...\n")
 
         results = run_benchmark_iterations(args.iterations)
-        stats = {
-            timing_type: utils.calculate_stats(times)
-            for timing_type, times in results.items()
-        }
+        stats = {timing_type: utils.calculate_stats(times) for timing_type, times in results.items()}
 
         if args.out_filetype == "csv":
             # Write results to CSV in the same directory as the script

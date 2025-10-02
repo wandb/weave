@@ -96,9 +96,7 @@ def test_openai_on_input_handler_with_easy_prompt():
     mock_op.name = "test_op"
 
     # Create a real EasyPrompt instance
-    easy_prompt = weave.EasyPrompt(
-        messages=[{"role": "user", "content": "Hello"}], model="gpt-4"
-    )
+    easy_prompt = weave.EasyPrompt(messages=[{"role": "user", "content": "Hello"}], model="gpt-4")
 
     args = (completion, easy_prompt)
     kwargs = {"temperature": 0.5}

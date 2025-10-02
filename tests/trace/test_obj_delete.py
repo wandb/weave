@@ -114,9 +114,7 @@ def test_delete_object_max_limit(client: WeaveClient):
     for i in range(max_objs + 1):
         digests.append(f"test_{i}")
 
-    with pytest.raises(
-        ValueError, match=f"Please delete {max_objs} or fewer objects at a time"
-    ):
+    with pytest.raises(ValueError, match=f"Please delete {max_objs} or fewer objects at a time"):
         _obj_delete(client, "obj_1", digests)
 
 
@@ -323,9 +321,7 @@ def test_delete_object_versions_api(client: WeaveClient):
     assert len(objs) == 4
 
     # Delete multiple specific versions
-    num_deleted = client.delete_object_versions(
-        "obj_multi_delete", [v0.digest, v2.digest]
-    )
+    num_deleted = client.delete_object_versions("obj_multi_delete", [v0.digest, v2.digest])
     assert num_deleted == 2
 
     objs = _objs_query(client, "obj_multi_delete")

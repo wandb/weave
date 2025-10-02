@@ -174,9 +174,7 @@ class Evaluation(Object):
 
     @op
     async def predict_and_score(self, model: Union[Op, Model], example: dict) -> dict:
-        apply_model_result = await apply_model_async(
-            model, example, self.preprocess_model_input
-        )
+        apply_model_result = await apply_model_async(model, example, self.preprocess_model_input)
 
         if isinstance(apply_model_result, ApplyModelError):
             return {
@@ -192,9 +190,7 @@ class Evaluation(Object):
         scores = {}
         if scorers := self.scorers:
             # Run all scorer calls in parallel
-            scorer_tasks = [
-                model_call.apply_scorer(scorer, example) for scorer in scorers
-            ]
+            scorer_tasks = [model_call.apply_scorer(scorer, example) for scorer in scorers]
             apply_scorer_results = await asyncio.gather(*scorer_tasks)
 
             # Process results and build scores dict
@@ -255,9 +251,7 @@ class Evaluation(Object):
         num_rows = len(rows) * self.trials
 
         trial_rows = chain.from_iterable(repeat(rows, self.trials))
-        async for index, _example, eval_row in util.async_foreach(
-            trial_rows, eval_example, get_weave_parallelism()
-        ):
+        async for index, _example, eval_row in util.async_foreach(trial_rows, eval_example, get_weave_parallelism()):
             n_complete += 1
             logger.info(f"Evaluated {n_complete} of {num_rows} examples")
             if eval_row is None:
@@ -345,17 +339,11 @@ class Evaluation(Object):
         d = {}
         client = require_weave_client()
         for evaluate_call in self.get_evaluate_calls():
-            descendents = list(
-                client.get_calls(filter={"trace_ids": [evaluate_call.trace_id]})
-            )
+            descendents = list(client.get_calls(filter={"trace_ids": [evaluate_call.trace_id]}))
             summary_call = list(descendents)[-1]
-            scorer_names = {
-                k for k in summary_call.output if k not in ["output", "model_latency"]
-            }
+            scorer_names = {k for k in summary_call.output if k not in ["output", "model_latency"]}
             score_calls = [
-                call
-                for call in descendents
-                if call.summary.get("weave", {}).get("trace_name") in scorer_names
+                call for call in descendents if call.summary.get("weave", {}).get("trace_name") in scorer_names
             ]
             d[evaluate_call.trace_id] = score_calls
 
@@ -425,9 +413,7 @@ def evaluate(
     scorers: Optional[list[Union[Callable, Scorer]]] = None,
     preprocess_model_input: Optional[PreprocessModelInput] = None,
 ) -> dict:
-    eval = Evaluation(
-        dataset=dataset, scorers=scorers, preprocess_model_input=preprocess_model_input
-    )
+    eval = Evaluation(dataset=dataset, scorers=scorers, preprocess_model_input=preprocess_model_input)
     return asyncio.run(eval.evaluate(model))
 
 

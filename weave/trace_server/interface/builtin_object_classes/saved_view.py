@@ -26,9 +26,7 @@ class ChartConfig(BaseModel):
         default=None,
     )
     bin_count: Optional[int] = Field(default=None)
-    aggregation: Optional[Literal["average", "sum", "min", "max", "p95", "p99"]] = (
-        Field(default=None)
-    )
+    aggregation: Optional[Literal["average", "sum", "min", "max", "p95", "p99"]] = Field(default=None)
     group_keys: Optional[list[str]] = Field(default=None)
     custom_name: Optional[str] = Field(default=None)
 

@@ -88,9 +88,7 @@ class ProjectNotFound(Error):
     pass
 
 
-def _format_error_to_json_with_extra(
-    exc: Exception, extra_fields: Optional[dict[str, Any]] = None
-) -> dict[str, Any]:
+def _format_error_to_json_with_extra(exc: Exception, extra_fields: Optional[dict[str, Any]] = None) -> dict[str, Any]:
     """Helper to format exception as JSON or fallback to reason, always adding extra fields."""
     exc_str = str(exc)
     result = {}
@@ -137,14 +135,10 @@ class ErrorRegistry:
         self,
         exception_class: type,
         status_code: int,
-        formatter: Callable[
-            [Exception], dict[str, Any]
-        ] = _format_error_to_json_with_extra,
+        formatter: Callable[[Exception], dict[str, Any]] = _format_error_to_json_with_extra,
     ) -> None:
         """Register an exception with its handling definition."""
-        self._definitions[exception_class] = ErrorDefinition(
-            exception_class, status_code, formatter
-        )
+        self._definitions[exception_class] = ErrorDefinition(exception_class, status_code, formatter)
 
     def get_definition(self, exception_class: type) -> Optional[ErrorDefinition]:
         """Get error definition for an exception class."""
@@ -161,13 +155,9 @@ class ErrorRegistry:
 
         if definition:
             error_content = definition.formatter(exc)
-            return ErrorWithStatus(
-                status_code=definition.status_code, message=error_content
-            )
+            return ErrorWithStatus(status_code=definition.status_code, message=error_content)
 
-        return ErrorWithStatus(
-            status_code=500, message={"reason": "Internal server error"}
-        )
+        return ErrorWithStatus(status_code=500, message={"reason": "Internal server error"})
 
     def _setup_common_errors(self) -> None:
         """Register common/standard library errors that don't depend on domain-specific modules."""
@@ -192,9 +182,7 @@ class ErrorRegistry:
         # Requests specific errors
         import requests
 
-        self.register(
-            requests.exceptions.ReadTimeout, 504, lambda exc: {"reason": "Read timeout"}
-        )
+        self.register(requests.exceptions.ReadTimeout, 504, lambda exc: {"reason": "Read timeout"})
         self.register(
             requests.exceptions.ConnectTimeout,
             504,
@@ -209,12 +197,8 @@ class ErrorRegistry:
             OperationalError as CHOperationalError,
         )
 
-        self.register(
-            CHDatabaseError, 502, lambda exc: {"reason": "Temporary backend error"}
-        )
-        self.register(
-            CHOperationalError, 502, lambda exc: {"reason": "Temporary backend error"}
-        )
+        self.register(CHDatabaseError, 502, lambda exc: {"reason": "Temporary backend error"})
+        self.register(CHOperationalError, 502, lambda exc: {"reason": "Temporary backend error"})
 
         # GraphQL transport errors
         from gql.transport.exceptions import TransportQueryError
@@ -257,14 +241,11 @@ def handle_clickhouse_query_error(e: Exception) -> None:
     error_str = str(e)
 
     limit_scope_message = (
-        "Please limit the scope of the query by including a date range and/or additional filter"
-        " criteria. "
+        "Please limit the scope of the query by including a date range and/or additional filter criteria. "
     )
 
     if "MEMORY_LIMIT_EXCEEDED" in error_str:
-        raise QueryMemoryLimitExceededError(
-            "Query memory limit exceeded. " + limit_scope_message
-        ) from e
+        raise QueryMemoryLimitExceededError("Query memory limit exceeded. " + limit_scope_message) from e
     if "NO_COMMON_TYPE" in error_str:
         raise QueryNoCommonTypeError(
             "No common type between data types in query. "
@@ -273,9 +254,7 @@ def handle_clickhouse_query_error(e: Exception) -> None:
             "Correct: {$expr: {$eq: [{$convert: {input: {$getField: 'inputs.integer_value'}, to: 'double'}}, {$literal: 1}]}}"
         ) from e
     if "TIMEOUT_EXCEEDED" in error_str:
-        raise QueryTimeoutExceededError(
-            "Query timeout exceeded. " + limit_scope_message
-        ) from e
+        raise QueryTimeoutExceededError("Query timeout exceeded. " + limit_scope_message) from e
 
     # Re-raise the original exception if no known pattern matches
     raise

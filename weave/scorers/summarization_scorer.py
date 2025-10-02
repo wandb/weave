@@ -49,9 +49,7 @@ Evaluate the quality of the following <summary> given the <input>:
 
 
 class EntityExtractionResponse(BaseModel):
-    entities: list[str] = Field(
-        description="A list of unique entities extracted from the text."
-    )
+    entities: list[str] = Field(description="A list of unique entities extracted from the text.")
 
 
 summarization_quality_options = Literal["poor", "ok", "excellent"]
@@ -103,9 +101,7 @@ class SummarizationScorer(LLMScorer):
 
     extraction_system_prompt: str = DEFAULT_EXTRACTION_SYSTEM_PROMPT
     extraction_prompt: str = DEFAULT_EXTRACTION_USER_PROMPT
-    summarization_evaluation_system_prompt: str = (
-        DEFAULT_SUMMARIZATION_EVALUATION_SYSTEM_PROMPT
-    )
+    summarization_evaluation_system_prompt: str = DEFAULT_SUMMARIZATION_EVALUATION_SYSTEM_PROMPT
     summarization_evaluation_prompt: str = DEFAULT_SUMMARIZATION_EVALUATION_USER_PROMPT
     entity_density_threshold: float = 0.08
     model_id: str = OPENAI_DEFAULT_MODEL
@@ -131,16 +127,12 @@ class SummarizationScorer(LLMScorer):
             temperature=self.temperature,
             max_tokens=self.max_tokens,
         )
-        response = EntityExtractionResponse.model_validate_json(
-            response.choices[0].message.content
-        )
+        response = EntityExtractionResponse.model_validate_json(response.choices[0].message.content)
         entities = [e.strip().lower() for e in response.entities]
         return entities
 
     @weave.op
-    async def _evaluate_summary(
-        self, input: str, summary: str
-    ) -> SummarizationEvaluationResponse:
+    async def _evaluate_summary(self, input: str, summary: str) -> SummarizationEvaluationResponse:
         """Evaluate the quality of a summary using an LLM."""
         response = await self._acompletion(
             messages=[
@@ -150,9 +142,7 @@ class SummarizationScorer(LLMScorer):
                 },
                 {
                     "role": "user",
-                    "content": self.summarization_evaluation_prompt.format(
-                        input=input, summary=summary
-                    ),
+                    "content": self.summarization_evaluation_prompt.format(input=input, summary=summary),
                 },
             ],
             response_format=SummarizationEvaluationResponse,
@@ -160,9 +150,7 @@ class SummarizationScorer(LLMScorer):
             temperature=self.temperature,
             max_tokens=self.max_tokens,
         )
-        return SummarizationEvaluationResponse.model_validate_json(
-            response.choices[0].message.content
-        )
+        return SummarizationEvaluationResponse.model_validate_json(response.choices[0].message.content)
 
     def _simple_word_tokenize(self, text: str) -> list[str]:
         """Simple word tokenization: splits text into words."""

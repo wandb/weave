@@ -123,9 +123,7 @@ def main() -> None:
         launch_date = model.get("launchDate")
         if launch_date:
             try:
-                launch_datetime = datetime.fromisoformat(
-                    launch_date.replace("Z", "+00:00")
-                )
+                launch_datetime = datetime.fromisoformat(launch_date.replace("Z", "+00:00"))
                 # Calculate if more than one month old
                 if (current_date - launch_datetime).days <= 30:
                     model["isNew"] = True

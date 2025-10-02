@@ -60,9 +60,7 @@ def create_test_span():
     span.trace_id = uuid.uuid4().bytes
     span.span_id = uuid.uuid4().bytes[:8]
     span.start_time_unix_nano = int(datetime.now().timestamp() * 1_000_000_000)
-    span.end_time_unix_nano = (
-        span.start_time_unix_nano + 1_000_000_000
-    )  # 1 second later
+    span.end_time_unix_nano = span.start_time_unix_nano + 1_000_000_000  # 1 second later
     span.kind = 1
 
     # Add some attributes
@@ -183,11 +181,7 @@ def test_otel_export_clickhouse(client: weave_client.WeaveClient):
             assert get_attribute(call.attributes, key) == array_values
 
     # Verify call deletion using client provided ID works
-    client.server.calls_delete(
-        tsi.CallsDeleteReq(
-            project_id=project_id, call_ids=[decoded_span], wb_user_id=None
-        )
-    )
+    client.server.calls_delete(tsi.CallsDeleteReq(project_id=project_id, call_ids=[decoded_span], wb_user_id=None))
 
     res = client.server.calls_query(
         tsi.CallsQueryReq(
@@ -243,9 +237,7 @@ def test_otel_export_with_turn_and_thread(client: weave_client.WeaveClient):
     assert call.thread_id == test_thread_id
 
     # Clean up
-    client.server.calls_delete(
-        tsi.CallsDeleteReq(project_id=project_id, call_ids=[call.id], wb_user_id=None)
-    )
+    client.server.calls_delete(tsi.CallsDeleteReq(project_id=project_id, call_ids=[call.id], wb_user_id=None))
 
 
 def test_otel_export_with_turn_no_thread(client: weave_client.WeaveClient):
@@ -286,9 +278,7 @@ def test_otel_export_with_turn_no_thread(client: weave_client.WeaveClient):
     assert call.thread_id is None
 
     # Clean up
-    client.server.calls_delete(
-        tsi.CallsDeleteReq(project_id=project_id, call_ids=[call.id], wb_user_id=None)
-    )
+    client.server.calls_delete(tsi.CallsDeleteReq(project_id=project_id, call_ids=[call.id], wb_user_id=None))
 
 
 class TestPythonSpans:
@@ -309,10 +299,7 @@ class TestPythonSpans:
         # Verify attributes were correctly converted
         assert get_attribute(py_span.attributes, "test.attribute") == "test_value"
         assert get_attribute(py_span.attributes, "test.number") == 42
-        assert (
-            get_attribute(py_span.attributes, "test.nested.value")
-            == "nested_test_value"
-        )
+        assert get_attribute(py_span.attributes, "test.nested.value") == "nested_test_value"
         array_value = get_attribute(py_span.attributes, "test.array")
         assert isinstance(array_value, list)
         assert len(array_value) == 2
@@ -330,9 +317,7 @@ class TestPythonSpans:
         assert isinstance(start_call, tsi.StartedCallSchemaForInsert)
         assert start_call.project_id == "test_project"
         assert start_call.id == py_span.span_id
-        assert (
-            start_call.op_name == py_span.name
-        )  # This should be using the shortened name if necessary
+        assert start_call.op_name == py_span.name  # This should be using the shortened name if necessary
         assert start_call.trace_id == py_span.trace_id
         assert start_call.started_at == py_span.start_time
 
@@ -370,13 +355,8 @@ class TestPythonSpans:
         # Verify otel_span is included in attributes
         assert "otel_span" in start_call.attributes
         assert start_call.attributes["otel_span"]["name"] == py_span.name
-        assert (
-            start_call.attributes["otel_span"]["context"]["trace_id"]
-            == py_span.trace_id
-        )
-        assert (
-            start_call.attributes["otel_span"]["context"]["span_id"] == py_span.span_id
-        )
+        assert start_call.attributes["otel_span"]["context"]["trace_id"] == py_span.trace_id
+        assert start_call.attributes["otel_span"]["context"]["span_id"] == py_span.span_id
 
         # Verify end call
         assert isinstance(end_call, tsi.EndedCallSchemaForInsert)
@@ -460,9 +440,7 @@ class TestPythonSpans:
     def test_traces_data_from_proto(self):
         """Test converting protobuf TracesData to Python TracesData."""
         export_req = create_test_export_request()
-        traces_data = PyTracesData.from_proto(
-            TracesData(resource_spans=export_req.traces.resource_spans)
-        )
+        traces_data = PyTracesData.from_proto(TracesData(resource_spans=export_req.traces.resource_spans))
 
         assert len(traces_data.resource_spans) == 1
         resource_spans = traces_data.resource_spans[0]
@@ -555,10 +533,7 @@ class TestAttributes:
         assert to_json_serializable(Decimal("10.5")) == 10.5
 
         # Test high precision decimal
-        assert (
-            to_json_serializable(Decimal("3.14159265358979323846"))
-            == 3.14159265358979323846
-        )
+        assert to_json_serializable(Decimal("3.14159265358979323846")) == 3.14159265358979323846
 
         # Test zero
         assert to_json_serializable(Decimal("0")) == 0.0
@@ -732,9 +707,7 @@ class TestSemanticConventionParsing:
                 OISpanAttr.LLM_PROVIDER: "test-provider",
                 OISpanAttr.LLM_MODEL_NAME: "test-model",
                 OISpanAttr.OPENINFERENCE_SPAN_KIND: "llm",
-                OISpanAttr.LLM_INVOCATION_PARAMETERS: json.dumps(
-                    {"temperature": 0.7, "max_tokens": 100}
-                ),
+                OISpanAttr.LLM_INVOCATION_PARAMETERS: json.dumps({"temperature": 0.7, "max_tokens": 100}),
             }
         )
 
@@ -972,11 +945,7 @@ class TestSemanticConventionParsing:
 
         # Test get_weave_inputs
         inputs = get_weave_inputs([], attributes)
-        assert inputs == {
-            "gen_ai.prompt": [
-                {"role": "user", "content": "Tell me about quantum computing"}
-            ]
-        }
+        assert inputs == {"gen_ai.prompt": [{"role": "user", "content": "Tell me about quantum computing"}]}
 
         # Test with multiple prompts
         prompts_multiple = {
@@ -1241,9 +1210,7 @@ class TestSpanOverrides:
 
         # End time should be 60 seconds after start time
         delta = overrides["end_time"] - overrides["start_time"]
-        assert (
-            abs(delta.total_seconds() - 60) < 1
-        )  # Allow small difference due to float precision
+        assert abs(delta.total_seconds() - 60) < 1  # Allow small difference due to float precision
 
     def test_get_span_overrides_with_missing_attributes(self):
         """Test get_span_overrides when no override attributes are present."""

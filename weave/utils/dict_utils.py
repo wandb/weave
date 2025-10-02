@@ -12,9 +12,7 @@ from typing import Any, Optional, TypeVar, Union
 T = TypeVar("T")
 
 
-def safe_get(
-    obj: Optional[dict], path: list[str], default: Optional[T] = None
-) -> Union[Any, Optional[T]]:
+def safe_get(obj: Optional[dict], path: list[str], default: Optional[T] = None) -> Union[Any, Optional[T]]:
     """Safely get a value from a nested dictionary using a list of keys.
 
     This function traverses a nested dictionary structure using a list of keys,
@@ -133,9 +131,7 @@ def zip_dicts(base_dict: dict[str, Any], new_dict: dict[str, Any]) -> dict[str, 
     return final_dict
 
 
-def flatten_attributes(
-    data: dict[str, Any], json_attributes: Optional[list[str]] = None
-) -> dict[str, Any]:
+def flatten_attributes(data: dict[str, Any], json_attributes: Optional[list[str]] = None) -> dict[str, Any]:
     """Flatten a nested Python dictionary into a flat dictionary with dot-separated keys.
 
     Args:
@@ -152,9 +148,7 @@ def flatten_attributes(
 
     def _flatten(obj: Union[dict[str, Any], list[Any]], prefix: str = "") -> None:
         # Check if the entire object should be stringified as JSON
-        should_stringify_entire_obj = any(
-            prefix.rstrip(".") == attr for attr in json_attributes
-        )
+        should_stringify_entire_obj = any(prefix.rstrip(".") == attr for attr in json_attributes)
 
         if should_stringify_entire_obj:
             result[prefix.rstrip(".")] = json.dumps(obj)
@@ -165,13 +159,9 @@ def flatten_attributes(
                 new_key = f"{prefix}{key}" if prefix else key
 
                 # Check if this exact key's value should be stringified as JSON
-                should_stringify_as_json = any(
-                    new_key == attr for attr in json_attributes
-                )
+                should_stringify_as_json = any(new_key == attr for attr in json_attributes)
 
-                if (
-                    isinstance(value, dict) or isinstance(value, list)
-                ) and not should_stringify_as_json:
+                if (isinstance(value, dict) or isinstance(value, list)) and not should_stringify_as_json:
                     # Recursively flatten nested dictionaries or lists
                     _flatten(value, f"{new_key}.")
                 else:
@@ -185,13 +175,9 @@ def flatten_attributes(
                 new_key = f"{prefix}{i}"
 
                 # Check if this exact key's value should be stringified as JSON
-                should_stringify_as_json = any(
-                    new_key == attr for attr in json_attributes
-                )
+                should_stringify_as_json = any(new_key == attr for attr in json_attributes)
 
-                if (
-                    isinstance(item, dict) or isinstance(item, list)
-                ) and not should_stringify_as_json:
+                if (isinstance(item, dict) or isinstance(item, list)) and not should_stringify_as_json:
                     # Recursively flatten nested dictionaries or lists
                     _flatten(item, f"{new_key}.")
                 else:

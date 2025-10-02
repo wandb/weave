@@ -86,9 +86,7 @@ Analyze the following <input_data> and <output> and determine if the <output> co
 
 
 class HallucinationReasoning(BaseModel):
-    hallucination_type: str = Field(
-        description="A short name for the type of hallucination."
-    )
+    hallucination_type: str = Field(description="A short name for the type of hallucination.")
     observation: str = Field(
         description="An observation from the <input_data> and <output> that supports the hallucination."
     )
@@ -154,9 +152,7 @@ class HallucinationFreeScorer(LLMScorer):
                 {"role": "system", "content": self.system_prompt},
                 {
                     "role": "user",
-                    "content": self.user_prompt.format(
-                        input_data=context, output=output
-                    ),
+                    "content": self.user_prompt.format(input_data=context, output=output),
                 },
             ],
             model=self.model_id,
@@ -164,9 +160,7 @@ class HallucinationFreeScorer(LLMScorer):
             temperature=self.temperature,
             max_tokens=self.max_tokens,
         )
-        response = HallucinationResponse.model_validate_json(
-            response.choices[0].message.content
-        )
+        response = HallucinationResponse.model_validate_json(response.choices[0].message.content)
         return response.model_dump()
 
 
@@ -223,9 +217,7 @@ class WeaveHallucinationScorerV1(HuggingFacePipelineScorer):
     def load_pipeline(self) -> None:
         from transformers import pipeline
 
-        self._local_model_path = load_local_model_weights(
-            self.model_name_or_path, MODEL_PATHS["hallucination_scorer"]
-        )
+        self._local_model_path = load_local_model_weights(self.model_name_or_path, MODEL_PATHS["hallucination_scorer"])
 
         self._pipeline = pipeline(
             task=self.task,
@@ -234,12 +226,8 @@ class WeaveHallucinationScorerV1(HuggingFacePipelineScorer):
             trust_remote_code=True,
         )
 
-    def _predict(
-        self, query: str, context: Union[str, list[str]], output: str
-    ) -> float:
-        assert self._pipeline is not None, (
-            "Pipeline not loaded, check your `model_name_or_path`"
-        )
+    def _predict(self, query: str, context: Union[str, list[str]], output: str) -> float:
+        assert self._pipeline is not None, "Pipeline not loaded, check your `model_name_or_path`"
         tokenizer = self._pipeline.tokenizer
         context_str = "\n\n".join(context) if isinstance(context, list) else context
         inps = query + "\n\n" + context_str

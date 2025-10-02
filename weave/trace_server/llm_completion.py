@@ -64,9 +64,7 @@ def lite_llm_completion(
             error_message = error_message.replace("litellm.", "")
             return tsi.CompletionsCreateRes(response={"error": error_message})
     elif provider == "custom" and not base_url:
-        raise InvalidRequest(
-            "Invalid provider configuration: must provide base_url if provider is 'custom'"
-        )
+        raise InvalidRequest("Invalid provider configuration: must provide base_url if provider is 'custom'")
     elif base_url and provider != "custom":
         raise InvalidRequest(
             f"Invalid provider configuration: provider '{provider}' must be 'custom' if base_url is provided"
@@ -94,25 +92,13 @@ def get_bedrock_credentials(
 ) -> tuple[str, str, str]:
     secret_fetcher = _secret_fetcher_context.get()
     if not secret_fetcher:
-        raise InvalidRequest(
-            f"No secret fetcher found, cannot fetch API key for model {model_name}"
-        )
+        raise InvalidRequest(f"No secret fetcher found, cannot fetch API key for model {model_name}")
 
-    aws_access_key_id = (
-        secret_fetcher.fetch("AWS_ACCESS_KEY_ID")
-        .get("secrets", {})
-        .get("AWS_ACCESS_KEY_ID")
-    )
+    aws_access_key_id = secret_fetcher.fetch("AWS_ACCESS_KEY_ID").get("secrets", {}).get("AWS_ACCESS_KEY_ID")
     aws_secret_access_key = (
-        secret_fetcher.fetch("AWS_SECRET_ACCESS_KEY")
-        .get("secrets", {})
-        .get("AWS_SECRET_ACCESS_KEY")
+        secret_fetcher.fetch("AWS_SECRET_ACCESS_KEY").get("secrets", {}).get("AWS_SECRET_ACCESS_KEY")
     )
-    aws_region_name = (
-        secret_fetcher.fetch("AWS_REGION_NAME")
-        .get("secrets", {})
-        .get("AWS_REGION_NAME")
-    )
+    aws_region_name = secret_fetcher.fetch("AWS_REGION_NAME").get("secrets", {}).get("AWS_REGION_NAME")
     if not aws_region_name:
         raise MissingLLMApiKeyError(
             f"No AWS region name found for model {model_name}",
@@ -135,24 +121,16 @@ def get_bedrock_credentials(
 def get_azure_credentials(model_name: str) -> tuple[str, str]:
     secret_fetcher = _secret_fetcher_context.get()
     if not secret_fetcher:
-        raise InvalidRequest(
-            f"No secret fetcher found, cannot fetch API key for model {model_name}"
-        )
+        raise InvalidRequest(f"No secret fetcher found, cannot fetch API key for model {model_name}")
 
-    azure_api_base = (
-        secret_fetcher.fetch("AZURE_API_BASE").get("secrets", {}).get("AZURE_API_BASE")
-    )
+    azure_api_base = secret_fetcher.fetch("AZURE_API_BASE").get("secrets", {}).get("AZURE_API_BASE")
     if not azure_api_base:
         raise MissingLLMApiKeyError(
             f"No Azure API base found for model {model_name}",
             api_key_name="AZURE_API_BASE",
         )
 
-    azure_api_version = (
-        secret_fetcher.fetch("AZURE_API_VERSION")
-        .get("secrets", {})
-        .get("AZURE_API_VERSION")
-    )
+    azure_api_version = secret_fetcher.fetch("AZURE_API_VERSION").get("secrets", {}).get("AZURE_API_VERSION")
     if not azure_api_version:
         raise MissingLLMApiKeyError(
             f"No Azure API version found for model {model_name}",
@@ -174,9 +152,7 @@ def _setup_provider_credentials_and_model(
     azure_api_base, azure_api_version = None, None
 
     if provider == "bedrock" or provider == "bedrock_converse":
-        aws_access_key_id, aws_secret_access_key, aws_region_name = (
-            get_bedrock_credentials(inputs.model)
-        )
+        aws_access_key_id, aws_secret_access_key, aws_region_name = get_bedrock_credentials(inputs.model)
         # Nova models need the region in the model name
         if any(x in inputs.model for x in NOVA_MODELS) and aws_region_name:
             aws_inference_region = aws_region_name.split("-")[0]
@@ -230,9 +206,7 @@ def get_custom_provider_info(
     """
     secret_fetcher = _secret_fetcher_context.get()
     if not secret_fetcher:
-        raise InvalidRequest(
-            f"No secret fetcher found, cannot fetch API key for model {model_name}"
-        )
+        raise InvalidRequest(f"No secret fetcher found, cannot fetch API key for model {model_name}")
 
     # Fetch the ProviderModel object
     try:
@@ -244,17 +218,10 @@ def get_custom_provider_info(
         )
         provider_model_obj_res = obj_read_func(provider_model_obj_req)
 
-        if (
-            provider_model_obj_res.obj is None
-            or provider_model_obj_res.obj.base_object_class != "ProviderModel"
-        ):
-            raise InvalidRequest(
-                f"Could not find ProviderModel with object_id {model_name}"
-            )
+        if provider_model_obj_res.obj is None or provider_model_obj_res.obj.base_object_class != "ProviderModel":
+            raise InvalidRequest(f"Could not find ProviderModel with object_id {model_name}")
 
-        provider_model_obj = ProviderModel.model_validate(
-            provider_model_obj_res.obj.val
-        )
+        provider_model_obj = ProviderModel.model_validate(provider_model_obj_res.obj.val)
         actual_model_name = provider_model_obj.name
 
         provider_obj_req = tsi.ObjReadReq(
@@ -265,20 +232,13 @@ def get_custom_provider_info(
         )
         provider_obj_res = obj_read_func(provider_obj_req)
 
-        if (
-            provider_obj_res.obj is None
-            or provider_obj_res.obj.base_object_class != "Provider"
-        ):
-            raise InvalidRequest(
-                f"Could not find Provider for model object_id {provider_name}"
-            )
+        if provider_obj_res.obj is None or provider_obj_res.obj.base_object_class != "Provider":
+            raise InvalidRequest(f"Could not find Provider for model object_id {provider_name}")
 
         provider_obj = Provider.model_validate(provider_obj_res.obj.val)
 
     except Exception as e:
-        raise InvalidRequest(
-            f"Failed to fetch provider model information: {e!s}"
-        ) from e
+        raise InvalidRequest(f"Failed to fetch provider model information: {e!s}") from e
 
     secret_name = provider_obj.api_key_name
 

@@ -75,16 +75,10 @@ def make_standard_table_query(
     digest_name = pb.add_param(digest)
 
     sql_safe_sort_clause = sql_safe_sort_clause or ""
-    sql_safe_filter_clause = (
-        f"AND {' AND '.join(sql_safe_conditions)}" if sql_safe_conditions else ""
-    )
+    sql_safe_filter_clause = f"AND {' AND '.join(sql_safe_conditions)}" if sql_safe_conditions else ""
 
-    sql_safe_limit = (
-        f"LIMIT {{{pb.add_param(limit)}: Int64}}" if limit is not None else ""
-    )
-    sql_safe_offset = (
-        f"OFFSET {{{pb.add_param(offset)}: Int64}}" if offset is not None else ""
-    )
+    sql_safe_limit = f"LIMIT {{{pb.add_param(limit)}: Int64}}" if limit is not None else ""
+    sql_safe_offset = f"OFFSET {{{pb.add_param(offset)}: Int64}}" if offset is not None else ""
 
     query = f"""
     SELECT tr.digest, tr.val_dump, tr.original_index FROM

@@ -50,9 +50,7 @@ class ThreadSafeLazyList(Sequence[T]):
 
     _single_use_iterator: Iterator[T]
 
-    def __init__(
-        self, single_use_iterator: Iterator[T], known_length: int | None = None
-    ) -> None:
+    def __init__(self, single_use_iterator: Iterator[T], known_length: int | None = None) -> None:
         self._lock = Lock()
         self._single_use_iterator = single_use_iterator
         self._list: list[T] = []

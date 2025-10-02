@@ -56,20 +56,10 @@ def test_cohere(
     assert output.is_search_required == response.is_search_required
     assert output.search_queries == response.search_queries
     assert output.search_results == response.search_results
-    assert (
-        output.meta.billed_units.input_tokens == response.meta.billed_units.input_tokens
-    )
-    assert (
-        output.meta.billed_units.output_tokens
-        == response.meta.billed_units.output_tokens
-    )
-    assert (
-        output.meta.billed_units.search_units == response.meta.billed_units.search_units
-    )
-    assert (
-        output.meta.billed_units.classifications
-        == response.meta.billed_units.classifications
-    )
+    assert output.meta.billed_units.input_tokens == response.meta.billed_units.input_tokens
+    assert output.meta.billed_units.output_tokens == response.meta.billed_units.output_tokens
+    assert output.meta.billed_units.search_units == response.meta.billed_units.search_units
+    assert output.meta.billed_units.classifications == response.meta.billed_units.classifications
     assert output.meta.tokens.input_tokens == response.meta.tokens.input_tokens
     assert output.meta.tokens.output_tokens == response.meta.tokens.output_tokens
 
@@ -115,20 +105,10 @@ def test_cohere_stream(
     assert output.is_search_required == response.is_search_required
     assert output.search_queries == response.search_queries
     assert output.search_results == response.search_results
-    assert (
-        output.meta.billed_units.input_tokens == response.meta.billed_units.input_tokens
-    )
-    assert (
-        output.meta.billed_units.output_tokens
-        == response.meta.billed_units.output_tokens
-    )
-    assert (
-        output.meta.billed_units.search_units == response.meta.billed_units.search_units
-    )
-    assert (
-        output.meta.billed_units.classifications
-        == response.meta.billed_units.classifications
-    )
+    assert output.meta.billed_units.input_tokens == response.meta.billed_units.input_tokens
+    assert output.meta.billed_units.output_tokens == response.meta.billed_units.output_tokens
+    assert output.meta.billed_units.search_units == response.meta.billed_units.search_units
+    assert output.meta.billed_units.classifications == response.meta.billed_units.classifications
     assert output.meta.tokens.input_tokens == response.meta.tokens.input_tokens
     assert output.meta.tokens.output_tokens == response.meta.tokens.output_tokens
 
@@ -170,20 +150,10 @@ async def test_cohere_async(
     assert output.is_search_required == response.is_search_required
     assert output.search_queries == response.search_queries
     assert output.search_results == response.search_results
-    assert (
-        output.meta.billed_units.input_tokens == response.meta.billed_units.input_tokens
-    )
-    assert (
-        output.meta.billed_units.output_tokens
-        == response.meta.billed_units.output_tokens
-    )
-    assert (
-        output.meta.billed_units.search_units == response.meta.billed_units.search_units
-    )
-    assert (
-        output.meta.billed_units.classifications
-        == response.meta.billed_units.classifications
-    )
+    assert output.meta.billed_units.input_tokens == response.meta.billed_units.input_tokens
+    assert output.meta.billed_units.output_tokens == response.meta.billed_units.output_tokens
+    assert output.meta.billed_units.search_units == response.meta.billed_units.search_units
+    assert output.meta.billed_units.classifications == response.meta.billed_units.classifications
     assert output.meta.tokens.input_tokens == response.meta.tokens.input_tokens
     assert output.meta.tokens.output_tokens == response.meta.tokens.output_tokens
 
@@ -229,20 +199,10 @@ async def test_cohere_async_stream(
     assert output.is_search_required == response.is_search_required
     assert output.search_queries == response.search_queries
     assert output.search_results == response.search_results
-    assert (
-        output.meta.billed_units.input_tokens == response.meta.billed_units.input_tokens
-    )
-    assert (
-        output.meta.billed_units.output_tokens
-        == response.meta.billed_units.output_tokens
-    )
-    assert (
-        output.meta.billed_units.search_units == response.meta.billed_units.search_units
-    )
-    assert (
-        output.meta.billed_units.classifications
-        == response.meta.billed_units.classifications
-    )
+    assert output.meta.billed_units.input_tokens == response.meta.billed_units.input_tokens
+    assert output.meta.billed_units.output_tokens == response.meta.billed_units.output_tokens
+    assert output.meta.billed_units.search_units == response.meta.billed_units.search_units
+    assert output.meta.billed_units.classifications == response.meta.billed_units.classifications
     assert output.meta.tokens.input_tokens == response.meta.tokens.input_tokens
     assert output.meta.tokens.output_tokens == response.meta.tokens.output_tokens
 
@@ -282,14 +242,8 @@ def test_cohere_v2(
     assert output.message.tool_plan == response.message.tool_plan
     assert output.message.citations == response.message.citations
 
-    assert (
-        output.usage.billed_units.input_tokens
-        == response.usage.billed_units.input_tokens
-    )
-    assert (
-        output.usage.billed_units.output_tokens
-        == response.usage.billed_units.output_tokens
-    )
+    assert output.usage.billed_units.input_tokens == response.usage.billed_units.input_tokens
+    assert output.usage.billed_units.output_tokens == response.usage.billed_units.output_tokens
     assert output.usage.tokens.input_tokens == response.usage.tokens.input_tokens
     assert output.usage.tokens.output_tokens == response.usage.tokens.output_tokens
 
@@ -330,14 +284,8 @@ async def test_cohere_async_v2(
     assert output.message.tool_plan == response.message.tool_plan
     assert output.message.citations == response.message.citations
 
-    assert (
-        output.usage.billed_units.input_tokens
-        == response.usage.billed_units.input_tokens
-    )
-    assert (
-        output.usage.billed_units.output_tokens
-        == response.usage.billed_units.output_tokens
-    )
+    assert output.usage.billed_units.input_tokens == response.usage.billed_units.input_tokens
+    assert output.usage.billed_units.output_tokens == response.usage.billed_units.output_tokens
     assert output.usage.tokens.input_tokens == response.usage.tokens.input_tokens
     assert output.usage.tokens.output_tokens == response.usage.tokens.output_tokens
 

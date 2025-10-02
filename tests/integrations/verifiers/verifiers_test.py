@@ -63,9 +63,7 @@ def test_verifiers_environment_evaluate_with_mock_env(client: WeaveClient) -> No
             self.rubric.add_reward_func(self.parser.get_format_reward_func())
 
             # Add a reward that explicitly calls parser.parse (also wrapped)
-            def _parse_reward(
-                completion: list[vf.ChatMessage], *, parser: vf.Parser, **_: Any
-            ) -> float:
+            def _parse_reward(completion: list[vf.ChatMessage], *, parser: vf.Parser, **_: Any) -> float:
                 """Invoke parser.parse on assistant messages and return 1.0.
 
                 Args:

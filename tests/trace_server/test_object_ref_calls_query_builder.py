@@ -197,9 +197,7 @@ def test_multiple_object_ref_filters() -> None:
                                 "$gt": [
                                     {
                                         "$convert": {
-                                            "input": {
-                                                "$getField": "inputs.model.temperature"
-                                            },
+                                            "input": {"$getField": "inputs.model.temperature"},
                                             "to": "double",
                                         }
                                     },

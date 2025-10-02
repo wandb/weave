@@ -41,9 +41,7 @@ def mcp_client_wrapper(settings: OpSettings) -> Callable:
                     new_op_name = f"{base_name}.{tool_name}"
 
                     # Use just the tool name as the display name
-                    new_settings = settings.model_copy(
-                        update={"name": new_op_name, "call_display_name": tool_name}
-                    )
+                    new_settings = settings.model_copy(update={"name": new_op_name, "call_display_name": tool_name})
 
                     # Create a new op with the updated settings
                     new_op_kwargs = new_settings.model_dump()
@@ -70,13 +68,9 @@ def mcp_client_wrapper(settings: OpSettings) -> Callable:
                     display_uri = f"{uri.scheme}://{uri.host}"
 
                 if display_uri:
-                    base_name = (
-                        op_name or "mcp.client.session.ClientSession.read_resource"
-                    )
+                    base_name = op_name or "mcp.client.session.ClientSession.read_resource"
                     new_op_name = f"{base_name}.{display_uri}"
-                    new_settings = settings.model_copy(
-                        update={"name": new_op_name, "call_display_name": display_uri}
-                    )
+                    new_settings = settings.model_copy(update={"name": new_op_name, "call_display_name": display_uri})
                     new_op_kwargs = new_settings.model_dump()
                     op = weave.op(fn, **new_op_kwargs)
                     return op(*args, **kwargs)
@@ -98,9 +92,7 @@ def mcp_client_wrapper(settings: OpSettings) -> Callable:
                 if prompt_name:
                     base_name = op_name or "mcp.client.session.ClientSession.get_prompt"
                     new_op_name = f"{base_name}.{prompt_name}"
-                    new_settings = settings.model_copy(
-                        update={"name": new_op_name, "call_display_name": prompt_name}
-                    )
+                    new_settings = settings.model_copy(update={"name": new_op_name, "call_display_name": prompt_name})
                     new_op_kwargs = new_settings.model_dump()
                     op = weave.op(fn, **new_op_kwargs)
                     return op(*args, **kwargs)
@@ -150,16 +142,14 @@ def get_mcp_client_patcher(
     read_resource_settings = base.model_copy(
         update={
             "name": base.name or "mcp.client.session.ClientSession.read_resource",
-            "call_display_name": base.call_display_name
-            or "ClientSession.read_resource",
+            "call_display_name": base.call_display_name or "ClientSession.read_resource",
         }
     )
 
     list_resources_settings = base.model_copy(
         update={
             "name": base.name or "mcp.client.session.ClientSession.list_resources",
-            "call_display_name": base.call_display_name
-            or "ClientSession.list_resources",
+            "call_display_name": base.call_display_name or "ClientSession.list_resources",
         }
     )
 

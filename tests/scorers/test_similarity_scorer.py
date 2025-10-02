@@ -16,11 +16,7 @@ def mock_aembedding(monkeypatch):
         class Response(weave.Model):
             data: list[dict]
 
-        return Response(
-            data=[
-                {"embedding": [random.random() for _ in range(1024)]} for _ in range(2)
-            ]
-        )
+        return Response(data=[{"embedding": [random.random() for _ in range(1024)]} for _ in range(2)])
 
     monkeypatch.setattr(
         "weave.scorers.similarity_scorer.EmbeddingSimilarityScorer._aembedding",

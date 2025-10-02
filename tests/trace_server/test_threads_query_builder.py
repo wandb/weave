@@ -24,9 +24,7 @@ def assert_clickhouse_sql(expected_query: str, expected_params: dict, **kwargs):
     assert expected_formatted == found_formatted, (
         f"Query mismatch:\nExpected:\n{expected_formatted}\n\nFound:\n{found_formatted}"
     )
-    assert expected_params == params, (
-        f"Params mismatch:\nExpected: {expected_params}\nFound: {params}"
-    )
+    assert expected_params == params, f"Params mismatch:\nExpected: {expected_params}\nFound: {params}"
 
 
 def assert_sqlite_sql(expected_query: str, expected_params: list, **kwargs):
@@ -39,9 +37,7 @@ def assert_sqlite_sql(expected_query: str, expected_params: list, **kwargs):
     assert expected_formatted == found_formatted, (
         f"Query mismatch:\nExpected:\n{expected_formatted}\n\nFound:\n{found_formatted}"
     )
-    assert expected_params == params, (
-        f"Params mismatch:\nExpected: {expected_params}\nFound: {params}"
-    )
+    assert expected_params == params, f"Params mismatch:\nExpected: {expected_params}\nFound: {params}"
 
 
 # Basic Functionality Tests
@@ -626,12 +622,8 @@ def test_validate_and_map_sort_field():
     assert _validate_and_map_sort_field("turn_count") == "turn_count"
     assert _validate_and_map_sort_field("start_time") == "start_time"
     assert _validate_and_map_sort_field("last_updated") == "last_updated"
-    assert (
-        _validate_and_map_sort_field("p50_turn_duration_ms") == "p50_turn_duration_ms"
-    )
-    assert (
-        _validate_and_map_sort_field("p99_turn_duration_ms") == "p99_turn_duration_ms"
-    )
+    assert _validate_and_map_sort_field("p50_turn_duration_ms") == "p50_turn_duration_ms"
+    assert _validate_and_map_sort_field("p99_turn_duration_ms") == "p99_turn_duration_ms"
 
     # Test invalid fields - call IDs should not be sortable since they're just identifiers
     with pytest.raises(ValueError) as exc_info:
@@ -687,10 +679,7 @@ def test_turn_filtering_explanation():
 
     # Check that thread filtering is also present (non-null, non-empty)
     # For ClickHouse, filtering is now in the HAVING clause using aggregated_thread_id
-    assert (
-        "aggregated_thread_id IS NOT NULL AND aggregated_thread_id != ''"
-        in clickhouse_query
-    )
+    assert "aggregated_thread_id IS NOT NULL AND aggregated_thread_id != ''" in clickhouse_query
     assert "thread_id IS NOT NULL" in sqlite_query
     assert "thread_id != ''" in sqlite_query
 
@@ -979,9 +968,7 @@ def test_thread_id_filter_no_match():
     """Test that thread_id filter doesn't break query even if no threads match."""
     # This test verifies that the SQL generation doesn't break with thread_id filter
     pb = ParamBuilder("pb")
-    query = make_threads_query(
-        project_id="test_project", pb=pb, thread_ids=["nonexistent_thread"]
-    )
+    query = make_threads_query(project_id="test_project", pb=pb, thread_ids=["nonexistent_thread"])
 
     # Should contain the thread filter
     assert "thread_id IN ({pb_1: String})" in query
@@ -997,12 +984,8 @@ def test_thread_id_filter_consistency():
     pb = ParamBuilder("pb")
 
     # Generate both queries with same parameters
-    clickhouse_query = make_threads_query(
-        project_id="test_project", pb=pb, thread_ids=["consistency_test"]
-    )
-    sqlite_query, sqlite_params = make_threads_query_sqlite(
-        project_id="test_project", thread_ids=["consistency_test"]
-    )
+    clickhouse_query = make_threads_query(project_id="test_project", pb=pb, thread_ids=["consistency_test"])
+    sqlite_query, sqlite_params = make_threads_query_sqlite(project_id="test_project", thread_ids=["consistency_test"])
 
     # Both should filter by thread_ids
     assert "thread_id IN ({pb_1: String})" in clickhouse_query  # ClickHouse style

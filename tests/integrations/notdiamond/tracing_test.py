@@ -34,9 +34,7 @@ def test_notdiamond_quickstart(
         LLMConfig.from_string("openai/gpt-4o-mini"),
         LLMConfig.from_string("openai/gpt-4o"),
     ]
-    _, results = nd_client.model_select(
-        model=llm_configs, messages=[{"role": "user", "content": "Hello, world!"}]
-    )
+    _, results = nd_client.model_select(model=llm_configs, messages=[{"role": "user", "content": "Hello, world!"}])
     calls = list(client.get_calls(filter=tsi.CallsFilter(trace_roots_only=True)))
     flattened_calls = flattened_calls_to_names(flatten_calls(calls))
     assert len([call for call in flattened_calls if "model_select" in call[0]]) == 1

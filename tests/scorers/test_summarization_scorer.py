@@ -18,10 +18,7 @@ def summarization_scorer(monkeypatch):
         if response_format == EntityExtractionResponse:
             content = '{"entities": ["entity1", "entity2"]}'
         elif response_format == SummarizationEvaluationResponse:
-            content = (
-                '{"think_step_by_step": "This is some reasoning.", '
-                '"summarization_evaluation": "excellent"}'
-            )
+            content = '{"think_step_by_step": "This is some reasoning.", "summarization_evaluation": "excellent"}'
 
         class Message(BaseModel):
             content: str
@@ -50,9 +47,7 @@ def summarization_scorer(monkeypatch):
 async def test_summarization_scorer_evaluate_summary(summarization_scorer):
     input_text = "This is the original text."
     summary_text = "This is the summary."
-    result = await summarization_scorer._evaluate_summary(
-        input=input_text, summary=summary_text
-    )
+    result = await summarization_scorer._evaluate_summary(input=input_text, summary=summary_text)
     assert isinstance(result, SummarizationEvaluationResponse)
     assert result.summarization_evaluation == "excellent"
     assert result.think_step_by_step == "This is some reasoning."

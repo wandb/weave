@@ -54,15 +54,11 @@ def litellm_accumulator(
         acc.choices[delta_choice.index].message.role = (
             delta_choice.delta.role or acc.choices[delta_choice.index].message.role
         )
-        acc.choices[delta_choice.index].message.content += (
-            delta_choice.delta.content or ""
-        )
+        acc.choices[delta_choice.index].message.content += delta_choice.delta.content or ""
         if delta_choice.delta.tool_calls:
             if acc.choices[delta_choice.index].message.tool_calls is None:
                 acc.choices[delta_choice.index].message.tool_calls = []
-            acc.choices[
-                delta_choice.index
-            ].message.tool_calls += delta_choice.delta.tool_calls
+            acc.choices[delta_choice.index].message.tool_calls += delta_choice.delta.tool_calls
         acc.choices[delta_choice.index].finish_reason = (
             delta_choice.finish_reason or acc.choices[delta_choice.index].finish_reason
         )
@@ -116,12 +112,8 @@ def get_litellm_patcher(
 
     base = settings.op_settings
 
-    completion_settings = base.model_copy(
-        update={"name": base.name or "litellm.completion"}
-    )
-    acompletion_settings = base.model_copy(
-        update={"name": base.name or "litellm.acompletion"}
-    )
+    completion_settings = base.model_copy(update={"name": base.name or "litellm.completion"})
+    acompletion_settings = base.model_copy(update={"name": base.name or "litellm.acompletion"})
 
     _litellm_patcher = MultiPatcher(
         [

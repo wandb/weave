@@ -90,9 +90,7 @@ def test_train_router(
 
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(filter_headers=["authorization"])
-def test_evaluate_router(
-    client: WeaveClient, model_datasets: dict[str, weave.Table], preference_id: str
-):
+def test_evaluate_router(client: WeaveClient, model_datasets: dict[str, weave.Table], preference_id: str):
     api_key = os.getenv("NOTDIAMOND_API_KEY", "DUMMY_API_KEY")
     best_routed_model, nd_model = evaluate_router(
         model_datasets=model_datasets,
@@ -103,7 +101,5 @@ def test_evaluate_router(
     )
 
     assert len(list(client.get_calls())) > 0
-    nd_calls = [
-        call for call in client.get_calls() if "evaluate_router" in call.op_name
-    ]
+    nd_calls = [call for call in client.get_calls() if "evaluate_router" in call.op_name]
     assert len(nd_calls) == 1

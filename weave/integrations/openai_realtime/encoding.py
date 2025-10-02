@@ -2,9 +2,7 @@ import io
 import wave
 
 
-def pcm_to_wav(
-    pcm_data: bytes, sample_rate: int = 24000, channels: int = 1, sample_width: int = 2
-) -> bytes:
+def pcm_to_wav(pcm_data: bytes, sample_rate: int = 24000, channels: int = 1, sample_width: int = 2) -> bytes:
     """Convert raw PCM audio data to WAV format.
 
     Args:

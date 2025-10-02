@@ -100,9 +100,7 @@ def test_llamaindex_llm_complete_sync(client: WeaveClient) -> None:
     assert call_2.parent_id == call_1.id
     assert call_2.inputs["model"] == "gpt-4o-mini"
     assert call_2.inputs["temperature"] == 0.1
-    assert call_2.inputs["messages"] == [
-        {"role": "user", "content": "William Shakespeare is "}
-    ]
+    assert call_2.inputs["messages"] == [{"role": "user", "content": "William Shakespeare is "}]
     assert call_2.inputs["stream"] == False
     assert "id" in call_2.output
     assert "choices" in call_2.output
@@ -165,9 +163,7 @@ async def test_llamaindex_llm_complete_async(client: WeaveClient) -> None:
     assert call_2.parent_id == call_1.id
     assert call_2.inputs["model"] == "gpt-4o-mini"
     assert call_2.inputs["temperature"] == 0.1
-    assert call_2.inputs["messages"] == [
-        {"role": "user", "content": "William Shakespeare is "}
-    ]
+    assert call_2.inputs["messages"] == [{"role": "user", "content": "William Shakespeare is "}]
     assert call_2.inputs["stream"] == False
     assert "id" in call_2.output
     assert "choices" in call_2.output
@@ -245,9 +241,7 @@ def test_llamaindex_llm_stream_complete_sync(client: WeaveClient) -> None:
     assert call_3.inputs["model"] == "gpt-4o-mini"
     assert call_3.inputs["temperature"] == 0.1
     assert call_3.inputs["stream"] == True
-    assert call_3.inputs["messages"] == [
-        {"role": "user", "content": "William Shakespeare is "}
-    ]
+    assert call_3.inputs["messages"] == [{"role": "user", "content": "William Shakespeare is "}]
     assert "id" in call_3.output
     assert "choices" in call_3.output
     assert len(call_3.output["choices"]) == 1
@@ -315,9 +309,7 @@ async def test_llamaindex_llm_stream_complete_async(client: WeaveClient) -> None
     assert call_2.output["response"]["text"] == all_content
 
     call_3, _ = flattened_calls[3]
-    assert call_3.inputs["messages"] == [
-        {"role": "user", "content": "William Shakespeare is "}
-    ]
+    assert call_3.inputs["messages"] == [{"role": "user", "content": "William Shakespeare is "}]
     assert call_3.inputs["model"] == "gpt-4o-mini"
     assert call_3.inputs["stream"] == True
     assert call_3.inputs["temperature"] == 0.1
@@ -365,39 +357,24 @@ def test_llamaindex_llm_chat_sync(client: WeaveClient) -> None:
     assert call_0.inputs["model"] == "gpt-4o-mini"
     assert call_0.inputs["temperature"] == 0.1
     assert call_0.inputs["_self"]["ChatMessage_0"]["role"] == "system"
-    assert (
-        call_0.inputs["_self"]["ChatMessage_0"]["blocks"][0]["text"]
-        == "You are a helpful assistant."
-    )
+    assert call_0.inputs["_self"]["ChatMessage_0"]["blocks"][0]["text"] == "You are a helpful assistant."
     assert call_0.inputs["_self"]["ChatMessage_1"]["role"] == "user"
-    assert (
-        call_0.inputs["_self"]["ChatMessage_1"]["blocks"][0]["text"]
-        == "Tell me a joke."
-    )
+    assert call_0.inputs["_self"]["ChatMessage_1"]["blocks"][0]["text"] == "Tell me a joke."
     assert call_0.output["message"]["role"] == "assistant"
-    assert (
-        "Why did the scarecrow win an award?"
-        in call_0.output["message"]["blocks"][0]["text"]
-    )
+    assert "Why did the scarecrow win an award?" in call_0.output["message"]["blocks"][0]["text"]
     assert call_0.output["raw"]["usage"]["prompt_tokens"] == 22
     assert call_0.output["raw"]["usage"]["completion_tokens"] == 17
     assert call_0.output["raw"]["usage"]["total_tokens"] == 39
 
     call_1, _ = flattened_calls[1]
     assert call_1.inputs["messages"][0]["role"] == "system"
-    assert (
-        call_1.inputs["messages"][0]["blocks"][0]["text"]
-        == "You are a helpful assistant."
-    )
+    assert call_1.inputs["messages"][0]["blocks"][0]["text"] == "You are a helpful assistant."
     assert call_1.inputs["messages"][1]["role"] == "user"
     assert call_1.inputs["messages"][1]["blocks"][0]["text"] == "Tell me a joke."
     assert call_1.inputs["model_dict"]["model"] == "gpt-4o-mini"
     assert call_1.inputs["model_dict"]["temperature"] == 0.1
     assert call_1.output["response"]["message"]["role"] == "assistant"
-    assert (
-        "Why did the scarecrow win an award?"
-        in call_1.output["response"]["message"]["blocks"][0]["text"]
-    )
+    assert "Why did the scarecrow win an award?" in call_1.output["response"]["message"]["blocks"][0]["text"]
 
     call_2, _ = flattened_calls[2]
     assert call_2.inputs["messages"] == [
@@ -408,10 +385,7 @@ def test_llamaindex_llm_chat_sync(client: WeaveClient) -> None:
     assert call_2.inputs["temperature"] == 0.1
     assert call_2.inputs["stream"] == False
     assert call_2.output["choices"][0]["message"]["role"] == "assistant"
-    assert (
-        "Why did the scarecrow win an award?"
-        in call_2.output["choices"][0]["message"]["content"]
-    )
+    assert "Why did the scarecrow win an award?" in call_2.output["choices"][0]["message"]["content"]
     assert call_2.output["usage"]["prompt_tokens"] == 22
     assert call_2.output["usage"]["completion_tokens"] == 17
     assert call_2.output["usage"]["total_tokens"] == 39
@@ -450,37 +424,22 @@ async def test_llamaindex_llm_chat_async(client: WeaveClient) -> None:
     assert call_0.inputs["model"] == "gpt-4o-mini"
     assert call_0.inputs["temperature"] == 0.1
     assert call_0.inputs["_self"]["ChatMessage_0"]["role"] == "system"
-    assert (
-        call_0.inputs["_self"]["ChatMessage_0"]["blocks"][0]["text"]
-        == "You are a helpful assistant."
-    )
+    assert call_0.inputs["_self"]["ChatMessage_0"]["blocks"][0]["text"] == "You are a helpful assistant."
     assert call_0.inputs["_self"]["ChatMessage_1"]["role"] == "user"
-    assert (
-        call_0.inputs["_self"]["ChatMessage_1"]["blocks"][0]["text"]
-        == "Tell me a joke."
-    )
+    assert call_0.inputs["_self"]["ChatMessage_1"]["blocks"][0]["text"] == "Tell me a joke."
     assert call_0.output["message"]["role"] == "assistant"
-    assert (
-        "Why did the scarecrow win an award?"
-        in call_0.output["message"]["blocks"][0]["text"]
-    )
+    assert "Why did the scarecrow win an award?" in call_0.output["message"]["blocks"][0]["text"]
 
     call_1, _ = flattened_calls[1]
     assert call_1.started_at < call_1.ended_at
     assert call_1.inputs["messages"][0]["role"] == "system"
-    assert (
-        call_1.inputs["messages"][0]["blocks"][0]["text"]
-        == "You are a helpful assistant."
-    )
+    assert call_1.inputs["messages"][0]["blocks"][0]["text"] == "You are a helpful assistant."
     assert call_1.inputs["messages"][1]["role"] == "user"
     assert call_1.inputs["messages"][1]["blocks"][0]["text"] == "Tell me a joke."
     assert call_1.inputs["model_dict"]["model"] == "gpt-4o-mini"
     assert call_1.inputs["model_dict"]["temperature"] == 0.1
     assert call_1.output["response"]["message"]["role"] == "assistant"
-    assert (
-        "Why did the scarecrow win an award?"
-        in call_1.output["response"]["message"]["blocks"][0]["text"]
-    )
+    assert "Why did the scarecrow win an award?" in call_1.output["response"]["message"]["blocks"][0]["text"]
 
     call_2, _ = flattened_calls[2]
     assert call_2.started_at < call_2.ended_at
@@ -492,10 +451,7 @@ async def test_llamaindex_llm_chat_async(client: WeaveClient) -> None:
     assert call_2.inputs["temperature"] == 0.1
     assert call_2.inputs["stream"] == False
     assert call_2.output["choices"][0]["message"]["role"] == "assistant"
-    assert (
-        "Why did the scarecrow win an award?"
-        in call_2.output["choices"][0]["message"]["content"]
-    )
+    assert "Why did the scarecrow win an award?" in call_2.output["choices"][0]["message"]["content"]
     assert call_2.output["usage"]["prompt_tokens"] == 22
     assert call_2.output["usage"]["completion_tokens"] == 17
     assert call_2.output["usage"]["total_tokens"] == 39
@@ -541,15 +497,9 @@ def test_llamaindex_llm_stream_chat_sync(client: WeaveClient) -> None:
     assert call_0.inputs["temperature"] == 0.1
     assert call_0.inputs["api_key"] == "REDACTED"
     assert call_0.inputs["_self"]["ChatMessage_0"]["role"] == "system"
-    assert (
-        call_0.inputs["_self"]["ChatMessage_0"]["blocks"][0]["text"]
-        == "You are a helpful assistant."
-    )
+    assert call_0.inputs["_self"]["ChatMessage_0"]["blocks"][0]["text"] == "You are a helpful assistant."
     assert call_0.inputs["_self"]["ChatMessage_1"]["role"] == "user"
-    assert (
-        call_0.inputs["_self"]["ChatMessage_1"]["blocks"][0]["text"]
-        == "Tell me a joke."
-    )
+    assert call_0.inputs["_self"]["ChatMessage_1"]["blocks"][0]["text"] == "Tell me a joke."
     assert call_0.summary["usage"]["gpt-4o-mini-2024-07-18"]["prompt_tokens"] == 22
     assert call_0.summary["usage"]["gpt-4o-mini-2024-07-18"]["completion_tokens"] == 17
     assert call_0.summary["usage"]["gpt-4o-mini-2024-07-18"]["total_tokens"] == 39
@@ -558,19 +508,13 @@ def test_llamaindex_llm_stream_chat_sync(client: WeaveClient) -> None:
     call_1, _ = flattened_calls[1]
     assert op_name_from_ref(call_1.op_name) == "llama_index.event.LLMChat"
     assert call_1.inputs["messages"][0]["role"] == "system"
-    assert (
-        call_1.inputs["messages"][0]["blocks"][0]["text"]
-        == "You are a helpful assistant."
-    )
+    assert call_1.inputs["messages"][0]["blocks"][0]["text"] == "You are a helpful assistant."
     assert call_1.inputs["messages"][1]["role"] == "user"
     assert call_1.inputs["messages"][1]["blocks"][0]["text"] == "Tell me a joke."
     assert call_1.inputs["model_dict"]["model"] == "gpt-4o-mini"
     assert call_1.inputs["model_dict"]["temperature"] == 0.1
     assert call_1.output["response"]["message"]["role"] == "assistant"
-    assert (
-        "Why did the scarecrow win an award?"
-        in call_1.output["response"]["message"]["blocks"][0]["text"]
-    )
+    assert "Why did the scarecrow win an award?" in call_1.output["response"]["message"]["blocks"][0]["text"]
     assert call_1.summary["usage"]["gpt-4o-mini-2024-07-18"]["prompt_tokens"] == 22
     assert call_1.summary["usage"]["gpt-4o-mini-2024-07-18"]["completion_tokens"] == 17
     assert call_1.summary["usage"]["gpt-4o-mini-2024-07-18"]["total_tokens"] == 39
@@ -582,10 +526,7 @@ def test_llamaindex_llm_stream_chat_sync(client: WeaveClient) -> None:
     assert call_2.inputs["messages"][1]["role"] == "user"
     assert call_2.inputs["model_dict"]["model"] == "gpt-4o-mini"
     assert call_2.output["response"]["message"]["role"] == "assistant"
-    assert (
-        "Why did the scarecrow win an award?"
-        in call_2.output["response"]["message"]["blocks"][0]["text"]
-    )
+    assert "Why did the scarecrow win an award?" in call_2.output["response"]["message"]["blocks"][0]["text"]
     assert call_2.summary["usage"]["gpt-4o-mini-2024-07-18"]["prompt_tokens"] == 22
     assert call_2.summary["usage"]["gpt-4o-mini-2024-07-18"]["completion_tokens"] == 17
     assert call_2.summary["usage"]["gpt-4o-mini-2024-07-18"]["total_tokens"] == 39
@@ -601,10 +542,7 @@ def test_llamaindex_llm_stream_chat_sync(client: WeaveClient) -> None:
     assert call_3.inputs["messages"][1]["role"] == "user"
     assert call_3.inputs["messages"][1]["content"] == "Tell me a joke."
     assert call_3.output["choices"][0]["message"]["role"] == "assistant"
-    assert (
-        "Why did the scarecrow win an award?"
-        in call_3.output["choices"][0]["message"]["content"]
-    )
+    assert "Why did the scarecrow win an award?" in call_3.output["choices"][0]["message"]["content"]
     assert call_3.output["usage"]["prompt_tokens"] == 22
     assert call_3.output["usage"]["completion_tokens"] == 17
     assert call_3.output["usage"]["total_tokens"] == 39
@@ -650,15 +588,9 @@ async def test_llamaindex_llm_stream_chat_async(client: WeaveClient) -> None:
     assert call_0.inputs["temperature"] == 0.1
     assert call_0.inputs["api_key"] == "REDACTED"
     assert call_0.inputs["_self"]["ChatMessage_0"]["role"] == "system"
-    assert (
-        call_0.inputs["_self"]["ChatMessage_0"]["blocks"][0]["text"]
-        == "You are a helpful assistant."
-    )
+    assert call_0.inputs["_self"]["ChatMessage_0"]["blocks"][0]["text"] == "You are a helpful assistant."
     assert call_0.inputs["_self"]["ChatMessage_1"]["role"] == "user"
-    assert (
-        call_0.inputs["_self"]["ChatMessage_1"]["blocks"][0]["text"]
-        == "Tell me a joke."
-    )
+    assert call_0.inputs["_self"]["ChatMessage_1"]["blocks"][0]["text"] == "Tell me a joke."
     assert "<async_generator object" in call_0.output["result"]
     assert call_0.summary["usage"]["gpt-4o-mini-2024-07-18"]["prompt_tokens"] == 22
     assert call_0.summary["usage"]["gpt-4o-mini-2024-07-18"]["completion_tokens"] == 17
@@ -667,18 +599,12 @@ async def test_llamaindex_llm_stream_chat_async(client: WeaveClient) -> None:
     call_1, _ = flattened_calls[1]
     assert op_name_from_ref(call_1.op_name) == "llama_index.event.LLMChat"
     assert call_1.inputs["messages"][0]["role"] == "system"
-    assert (
-        call_1.inputs["messages"][0]["blocks"][0]["text"]
-        == "You are a helpful assistant."
-    )
+    assert call_1.inputs["messages"][0]["blocks"][0]["text"] == "You are a helpful assistant."
     assert call_1.inputs["messages"][1]["role"] == "user"
     assert call_1.inputs["messages"][1]["blocks"][0]["text"] == "Tell me a joke."
     assert call_1.inputs["model_dict"]["model"] == "gpt-4o-mini"
     assert call_1.output["response"]["message"]["role"] == "assistant"
-    assert (
-        "Why did the scarecrow win an award?"
-        in call_1.output["response"]["message"]["blocks"][0]["text"]
-    )
+    assert "Why did the scarecrow win an award?" in call_1.output["response"]["message"]["blocks"][0]["text"]
     assert call_1.summary["usage"]["gpt-4o-mini-2024-07-18"]["prompt_tokens"] == 22
     assert call_1.summary["usage"]["gpt-4o-mini-2024-07-18"]["completion_tokens"] == 17
     assert call_1.summary["usage"]["gpt-4o-mini-2024-07-18"]["total_tokens"] == 39
@@ -686,18 +612,12 @@ async def test_llamaindex_llm_stream_chat_async(client: WeaveClient) -> None:
     call_2, _ = flattened_calls[2]
     assert op_name_from_ref(call_2.op_name) == "llama_index.event.LLMChatInProgress"
     assert call_2.inputs["messages"][0]["role"] == "system"
-    assert (
-        call_2.inputs["messages"][0]["blocks"][0]["text"]
-        == "You are a helpful assistant."
-    )
+    assert call_2.inputs["messages"][0]["blocks"][0]["text"] == "You are a helpful assistant."
     assert call_2.inputs["messages"][1]["role"] == "user"
     assert call_2.inputs["messages"][1]["blocks"][0]["text"] == "Tell me a joke."
     assert call_2.inputs["model_dict"]["model"] == "gpt-4o-mini"
     assert call_2.output["response"]["message"]["role"] == "assistant"
-    assert (
-        "Why did the scarecrow win an award?"
-        in call_2.output["response"]["message"]["blocks"][0]["text"]
-    )
+    assert "Why did the scarecrow win an award?" in call_2.output["response"]["message"]["blocks"][0]["text"]
     assert call_2.summary["usage"]["gpt-4o-mini-2024-07-18"]["prompt_tokens"] == 22
     assert call_2.summary["usage"]["gpt-4o-mini-2024-07-18"]["completion_tokens"] == 17
     assert call_2.summary["usage"]["gpt-4o-mini-2024-07-18"]["total_tokens"] == 39
@@ -712,10 +632,7 @@ async def test_llamaindex_llm_stream_chat_async(client: WeaveClient) -> None:
     assert call_3.inputs["messages"][1]["role"] == "user"
     assert call_3.inputs["messages"][1]["content"] == "Tell me a joke."
     assert call_3.output["choices"][0]["message"]["role"] == "assistant"
-    assert (
-        "Why did the scarecrow win an award?"
-        in call_3.output["choices"][0]["message"]["content"]
-    )
+    assert "Why did the scarecrow win an award?" in call_3.output["choices"][0]["message"]["content"]
     assert call_3.output["usage"]["prompt_tokens"] == 22
     assert call_3.output["usage"]["completion_tokens"] == 17
     assert call_3.output["usage"]["total_tokens"] == 39
@@ -771,9 +688,7 @@ def test_llamaindex_tool_calling_sync(client: WeaveClient) -> None:
 
     # Check that we have OpenAI completion calls
     openai_calls = [
-        call
-        for call, _ in flattened_calls
-        if "openai.chat.completions.create" in op_name_from_ref(call.op_name)
+        call for call, _ in flattened_calls if "openai.chat.completions.create" in op_name_from_ref(call.op_name)
     ]
     assert len(openai_calls) >= 1, "Should have at least one OpenAI completion call"
 
@@ -852,9 +767,7 @@ async def test_llamaindex_quick_start(client: WeaveClient) -> None:
     nodes = parser.get_nodes_from_documents(documents)
 
     if os.path.exists("integrations/llamaindex/vector_index/"):
-        storage_context = StorageContext.from_defaults(
-            persist_dir="integrations/llamaindex/vector_index/"
-        )
+        storage_context = StorageContext.from_defaults(persist_dir="integrations/llamaindex/vector_index/")
         index = load_index_from_storage(storage_context)
     else:
         os.makedirs("integrations/llamaindex/vector_index/", exist_ok=True)

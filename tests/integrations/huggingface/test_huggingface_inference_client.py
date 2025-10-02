@@ -15,9 +15,7 @@ from weave.integrations.integration_utilities import op_name_from_ref
 def test_huggingface_chat_completion(client):
     from huggingface_hub import InferenceClient
 
-    huggingface_client = InferenceClient(
-        api_key=os.environ.get("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
-    )
+    huggingface_client = InferenceClient(api_key=os.environ.get("HUGGINGFACE_API_KEY", "DUMMY_API_KEY"))
 
     huggingface_client.chat_completion(
         model="meta-llama/Meta-Llama-3-8B-Instruct",
@@ -31,10 +29,7 @@ def test_huggingface_chat_completion(client):
 
     call = calls[0]
     assert call.started_at < call.ended_at
-    assert (
-        op_name_from_ref(call.op_name)
-        == "huggingface_hub.InferenceClient.chat_completion"
-    )
+    assert op_name_from_ref(call.op_name) == "huggingface_hub.InferenceClient.chat_completion"
     output = call.output
     assert output.choices[0].finish_reason == "stop"
     assert output.choices[0].index == 0
@@ -53,9 +48,7 @@ def test_huggingface_chat_completion(client):
 def test_huggingface_chat_completion_stream(client):
     from huggingface_hub import InferenceClient
 
-    huggingface_client = InferenceClient(
-        api_key=os.environ.get("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
-    )
+    huggingface_client = InferenceClient(api_key=os.environ.get("HUGGINGFACE_API_KEY", "DUMMY_API_KEY"))
     result = huggingface_client.chat_completion(
         model="meta-llama/Meta-Llama-3-8B-Instruct",
         messages=[{"role": "user", "content": "What is the capital of France?"}],
@@ -72,10 +65,7 @@ def test_huggingface_chat_completion_stream(client):
 
     call = calls[0]
     assert call.started_at < call.ended_at
-    assert (
-        op_name_from_ref(call.op_name)
-        == "huggingface_hub.InferenceClient.chat_completion"
-    )
+    assert op_name_from_ref(call.op_name) == "huggingface_hub.InferenceClient.chat_completion"
     output = call.output
     assert output.choices[0].index == 0
     assert "paris" in output.choices[0].message.content.lower()
@@ -92,9 +82,7 @@ def test_huggingface_chat_completion_stream(client):
 def test_huggingface_chat_completion_async(client):
     from huggingface_hub import AsyncInferenceClient
 
-    huggingface_client = AsyncInferenceClient(
-        api_key=os.environ.get("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
-    )
+    huggingface_client = AsyncInferenceClient(api_key=os.environ.get("HUGGINGFACE_API_KEY", "DUMMY_API_KEY"))
     asyncio.run(
         huggingface_client.chat_completion(
             model="meta-llama/Meta-Llama-3-8B-Instruct",
@@ -109,10 +97,7 @@ def test_huggingface_chat_completion_async(client):
 
     call = calls[0]
     assert call.started_at < call.ended_at
-    assert (
-        op_name_from_ref(call.op_name)
-        == "huggingface_hub.AsyncInferenceClient.chat_completion"
-    )
+    assert op_name_from_ref(call.op_name) == "huggingface_hub.AsyncInferenceClient.chat_completion"
     output = call.output
     assert output.choices[0].finish_reason == "stop"
     assert output.choices[0].index == 0
@@ -131,10 +116,10 @@ def test_huggingface_chat_completion_async(client):
 def test_huggingface_document_question_answering(client):
     from huggingface_hub import InferenceClient
 
-    image_url = "https://huggingface.co/spaces/impira/docquery/resolve/2359223c1837a7587402bda0f2643382a6eefeab/invoice.png"
-    InferenceClient(
-        api_key=os.environ.get("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
-    ).document_question_answering(
+    image_url = (
+        "https://huggingface.co/spaces/impira/docquery/resolve/2359223c1837a7587402bda0f2643382a6eefeab/invoice.png"
+    )
+    InferenceClient(api_key=os.environ.get("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")).document_question_answering(
         image=image_url,
         model="impira/layoutlm-document-qa",
         question="What is the invoice number?",
@@ -145,10 +130,7 @@ def test_huggingface_document_question_answering(client):
 
     call = calls[0]
     assert call.started_at < call.ended_at
-    assert (
-        op_name_from_ref(call.op_name)
-        == "huggingface_hub.InferenceClient.document_question_answering"
-    )
+    assert op_name_from_ref(call.op_name) == "huggingface_hub.InferenceClient.document_question_answering"
     output = call.output
     assert output[0].answer == "us-001"
 
@@ -162,7 +144,9 @@ def test_huggingface_document_question_answering(client):
 def test_huggingface_document_question_answering_async(client):
     from huggingface_hub import AsyncInferenceClient
 
-    image_url = "https://huggingface.co/spaces/impira/docquery/resolve/2359223c1837a7587402bda0f2643382a6eefeab/invoice.png"
+    image_url = (
+        "https://huggingface.co/spaces/impira/docquery/resolve/2359223c1837a7587402bda0f2643382a6eefeab/invoice.png"
+    )
     asyncio.run(
         AsyncInferenceClient(
             api_key=os.environ.get("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
@@ -178,10 +162,7 @@ def test_huggingface_document_question_answering_async(client):
 
     call = calls[0]
     assert call.started_at < call.ended_at
-    assert (
-        op_name_from_ref(call.op_name)
-        == "huggingface_hub.AsyncInferenceClient.document_question_answering"
-    )
+    assert op_name_from_ref(call.op_name) == "huggingface_hub.AsyncInferenceClient.document_question_answering"
     output = call.output
     assert output[0].answer == "us-001"
 
@@ -195,9 +176,7 @@ def test_huggingface_document_question_answering_async(client):
 def test_huggingface_fill_mask(client):
     from huggingface_hub import InferenceClient
 
-    InferenceClient(
-        api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
-    ).fill_mask("The goal of life is <mask>.")
+    InferenceClient(api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")).fill_mask("The goal of life is <mask>.")
 
     calls = list(client.get_calls())
     assert len(calls) == 1
@@ -220,9 +199,9 @@ def test_huggingface_fill_mask_async(client):
     from huggingface_hub import AsyncInferenceClient
 
     asyncio.run(
-        AsyncInferenceClient(
-            api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
-        ).fill_mask("The goal of life is <mask>.")
+        AsyncInferenceClient(api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")).fill_mask(
+            "The goal of life is <mask>."
+        )
     )
 
     calls = list(client.get_calls())
@@ -230,10 +209,7 @@ def test_huggingface_fill_mask_async(client):
 
     call = calls[0]
     assert call.started_at < call.ended_at
-    assert (
-        op_name_from_ref(call.op_name)
-        == "huggingface_hub.AsyncInferenceClient.fill_mask"
-    )
+    assert op_name_from_ref(call.op_name) == "huggingface_hub.AsyncInferenceClient.fill_mask"
     output = call.output
     assert output[0].token_str in output[0].sequence
     assert output[0].score > 0
@@ -248,9 +224,7 @@ def test_huggingface_fill_mask_async(client):
 def test_huggingface_question_answering(client):
     from huggingface_hub import InferenceClient
 
-    InferenceClient(
-        api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
-    ).question_answering(
+    InferenceClient(api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")).question_answering(
         question="What's my name?", context="My name is Clara and I live in Berkeley."
     )
 
@@ -259,10 +233,7 @@ def test_huggingface_question_answering(client):
 
     call = calls[0]
     assert call.started_at < call.ended_at
-    assert (
-        op_name_from_ref(call.op_name)
-        == "huggingface_hub.InferenceClient.question_answering"
-    )
+    assert op_name_from_ref(call.op_name) == "huggingface_hub.InferenceClient.question_answering"
     output = call.output
     assert output.answer == "Clara"
 
@@ -277,9 +248,7 @@ def test_huggingface_question_answering_async(client):
     from huggingface_hub import AsyncInferenceClient
 
     asyncio.run(
-        AsyncInferenceClient(
-            api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
-        ).question_answering(
+        AsyncInferenceClient(api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")).question_answering(
             question="What's my name?",
             context="My name is Clara and I live in Berkeley.",
         )
@@ -290,10 +259,7 @@ def test_huggingface_question_answering_async(client):
 
     call = calls[0]
     assert call.started_at < call.ended_at
-    assert (
-        op_name_from_ref(call.op_name)
-        == "huggingface_hub.AsyncInferenceClient.question_answering"
-    )
+    assert op_name_from_ref(call.op_name) == "huggingface_hub.AsyncInferenceClient.question_answering"
     output = call.output
     assert output.answer == "Clara"
 
@@ -312,19 +278,16 @@ def test_huggingface_table_question_answering(client):
         "Repository": ["Transformers", "Datasets", "Tokenizers"],
         "Stars": ["36542", "4512", "3934"],
     }
-    InferenceClient(
-        api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
-    ).table_question_answering(table, query, model="google/tapas-base-finetuned-wtq")
+    InferenceClient(api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")).table_question_answering(
+        table, query, model="google/tapas-base-finetuned-wtq"
+    )
 
     calls = list(client.get_calls())
     assert len(calls) == 1
 
     call = calls[0]
     assert call.started_at < call.ended_at
-    assert (
-        op_name_from_ref(call.op_name)
-        == "huggingface_hub.InferenceClient.table_question_answering"
-    )
+    assert op_name_from_ref(call.op_name) == "huggingface_hub.InferenceClient.table_question_answering"
     output = call.output
     assert output.answer == "AVERAGE > 36542"
 
@@ -344,9 +307,7 @@ def test_huggingface_table_question_answering_async(client):
         "Stars": ["36542", "4512", "3934"],
     }
     asyncio.run(
-        AsyncInferenceClient(
-            api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
-        ).table_question_answering(
+        AsyncInferenceClient(api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")).table_question_answering(
             table, query, model="google/tapas-base-finetuned-wtq"
         )
     )
@@ -356,10 +317,7 @@ def test_huggingface_table_question_answering_async(client):
 
     call = calls[0]
     assert call.started_at < call.ended_at
-    assert (
-        op_name_from_ref(call.op_name)
-        == "huggingface_hub.AsyncInferenceClient.table_question_answering"
-    )
+    assert op_name_from_ref(call.op_name) == "huggingface_hub.AsyncInferenceClient.table_question_answering"
     output = call.output
     assert output.answer == "AVERAGE > 36542"
 
@@ -373,19 +331,14 @@ def test_huggingface_table_question_answering_async(client):
 def test_huggingface_text_classification(client):
     from huggingface_hub import InferenceClient
 
-    InferenceClient(
-        api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
-    ).text_classification("I like you")
+    InferenceClient(api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")).text_classification("I like you")
 
     calls = list(client.get_calls())
     assert len(calls) == 1
 
     call = calls[0]
     assert call.started_at < call.ended_at
-    assert (
-        op_name_from_ref(call.op_name)
-        == "huggingface_hub.InferenceClient.text_classification"
-    )
+    assert op_name_from_ref(call.op_name) == "huggingface_hub.InferenceClient.text_classification"
     output = call.output
     assert output[0].label == "POSITIVE"
     assert output[0].score > 0
@@ -401,9 +354,9 @@ def test_huggingface_text_classification_async(client):
     from huggingface_hub import AsyncInferenceClient
 
     asyncio.run(
-        AsyncInferenceClient(
-            api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
-        ).text_classification("I like you")
+        AsyncInferenceClient(api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")).text_classification(
+            "I like you"
+        )
     )
 
     calls = list(client.get_calls())
@@ -411,10 +364,7 @@ def test_huggingface_text_classification_async(client):
 
     call = calls[0]
     assert call.started_at < call.ended_at
-    assert (
-        op_name_from_ref(call.op_name)
-        == "huggingface_hub.AsyncInferenceClient.text_classification"
-    )
+    assert op_name_from_ref(call.op_name) == "huggingface_hub.AsyncInferenceClient.text_classification"
     output = call.output
     assert output[0].label == "POSITIVE"
     assert output[0].score > 0
@@ -429,9 +379,7 @@ def test_huggingface_text_classification_async(client):
 def test_huggingface_token_classification(client):
     from huggingface_hub import InferenceClient
 
-    InferenceClient(
-        api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
-    ).token_classification(
+    InferenceClient(api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")).token_classification(
         "My name is Sarah Jessica Parker but you can call me Jessica"
     )
 
@@ -440,10 +388,7 @@ def test_huggingface_token_classification(client):
 
     call = calls[0]
     assert call.started_at < call.ended_at
-    assert (
-        op_name_from_ref(call.op_name)
-        == "huggingface_hub.InferenceClient.token_classification"
-    )
+    assert op_name_from_ref(call.op_name) == "huggingface_hub.InferenceClient.token_classification"
     output = call.output
     assert output[0].word == "Sarah Jessica Parker"
     assert output[0].score > 0
@@ -459,9 +404,7 @@ def test_huggingface_token_classification_async(client):
     from huggingface_hub import AsyncInferenceClient
 
     asyncio.run(
-        AsyncInferenceClient(
-            api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
-        ).token_classification(
+        AsyncInferenceClient(api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")).token_classification(
             "My name is Sarah Jessica Parker but you can call me Jessica"
         )
     )
@@ -471,10 +414,7 @@ def test_huggingface_token_classification_async(client):
 
     call = calls[0]
     assert call.started_at < call.ended_at
-    assert (
-        op_name_from_ref(call.op_name)
-        == "huggingface_hub.AsyncInferenceClient.token_classification"
-    )
+    assert op_name_from_ref(call.op_name) == "huggingface_hub.AsyncInferenceClient.token_classification"
     output = call.output
     assert output[0].word == "Sarah Jessica Parker"
     assert output[0].score > 0
@@ -489,9 +429,7 @@ def test_huggingface_token_classification_async(client):
 def test_huggingface_translation(client):
     from huggingface_hub import InferenceClient
 
-    InferenceClient(
-        api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
-    ).translation(
+    InferenceClient(api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")).translation(
         "My name is Wolfgang and I live in Berlin", model="Helsinki-NLP/opus-mt-en-fr"
     )
 
@@ -500,9 +438,7 @@ def test_huggingface_translation(client):
 
     call = calls[0]
     assert call.started_at < call.ended_at
-    assert (
-        op_name_from_ref(call.op_name) == "huggingface_hub.InferenceClient.translation"
-    )
+    assert op_name_from_ref(call.op_name) == "huggingface_hub.InferenceClient.translation"
     output = call.output
     assert "Wolfgang" in output.translation_text
 
@@ -517,9 +453,7 @@ def test_huggingface_translation_async(client):
     from huggingface_hub import AsyncInferenceClient
 
     asyncio.run(
-        AsyncInferenceClient(
-            api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
-        ).translation(
+        AsyncInferenceClient(api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")).translation(
             "My name is Wolfgang and I live in Berlin",
             model="Helsinki-NLP/opus-mt-en-fr",
         )
@@ -530,10 +464,7 @@ def test_huggingface_translation_async(client):
 
     call = calls[0]
     assert call.started_at < call.ended_at
-    assert (
-        op_name_from_ref(call.op_name)
-        == "huggingface_hub.AsyncInferenceClient.translation"
-    )
+    assert op_name_from_ref(call.op_name) == "huggingface_hub.AsyncInferenceClient.translation"
     output = call.output
     assert "Wolfgang" in output.translation_text
 
@@ -547,9 +478,7 @@ def test_huggingface_translation_async(client):
 def test_huggingface_text_to_image(client):
     from huggingface_hub import InferenceClient
 
-    InferenceClient(
-        api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
-    ).text_to_image(
+    InferenceClient(api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")).text_to_image(
         prompt="A cute puppy",
         model="black-forest-labs/FLUX.1-schnell",
         num_inference_steps=4,
@@ -560,10 +489,7 @@ def test_huggingface_text_to_image(client):
 
     call = calls[0]
     assert call.started_at < call.ended_at
-    assert (
-        op_name_from_ref(call.op_name)
-        == "huggingface_hub.InferenceClient.text_to_image"
-    )
+    assert op_name_from_ref(call.op_name) == "huggingface_hub.InferenceClient.text_to_image"
     output = call.output
     assert output is not None
 
@@ -578,9 +504,7 @@ def test_huggingface_text_to_image_async(client):
     from huggingface_hub import AsyncInferenceClient
 
     asyncio.run(
-        AsyncInferenceClient(
-            api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")
-        ).text_to_image(
+        AsyncInferenceClient(api_key=os.getenv("HUGGINGFACE_API_KEY", "DUMMY_API_KEY")).text_to_image(
             prompt="A cute puppy",
             model="black-forest-labs/FLUX.1-schnell",
             num_inference_steps=4,
@@ -592,9 +516,6 @@ def test_huggingface_text_to_image_async(client):
 
     call = calls[0]
     assert call.started_at < call.ended_at
-    assert (
-        op_name_from_ref(call.op_name)
-        == "huggingface_hub.AsyncInferenceClient.text_to_image"
-    )
+    assert op_name_from_ref(call.op_name) == "huggingface_hub.AsyncInferenceClient.text_to_image"
     output = call.output
     assert output is not None

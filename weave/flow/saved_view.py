@@ -214,14 +214,8 @@ def filter_to_clause(item: Filter) -> dict[str, Any]:
             ],
         }
     elif item.operator == "(string): in":
-        values = (
-            item.value
-            if isinstance(item.value, list)
-            else [s.strip() for s in item.value.split(",")]
-        )
-        clauses = [
-            {"$eq": [{"$getField": item.field}, {"$literal": v}]} for v in values
-        ]
+        values = item.value if isinstance(item.value, list) else [s.strip() for s in item.value.split(",")]
+        clauses = [{"$eq": [{"$getField": item.field}, {"$literal": v}]} for v in values]
         return {"$or": clauses}
     elif item.operator == "(number): =":
         value = float(item.value)
@@ -297,9 +291,7 @@ def operand_to_filter_eq(operand: tsi_query.EqOperation) -> Filter:
         "int",
     ):
         first = first.convert_.input
-    if isinstance(first, tsi_query.GetFieldOperator) and isinstance(
-        second, tsi_query.LiteralOperation
-    ):
+    if isinstance(first, tsi_query.GetFieldOperator) and isinstance(second, tsi_query.LiteralOperation):
         value = second.literal_
         if isinstance(value, str):
             if value == "":
@@ -321,9 +313,7 @@ def operand_to_filter_contains(operand: tsi_query.ContainsOperation) -> Filter:
     substr = operand.contains_.substr
     case_insensitive = operand.contains_.case_insensitive
     # TODO: Handle case_insensitive correctly
-    if isinstance(input, tsi_query.GetFieldOperator) and isinstance(
-        substr, tsi_query.LiteralOperation
-    ):
+    if isinstance(input, tsi_query.GetFieldOperator) and isinstance(substr, tsi_query.LiteralOperation):
         value = substr.literal_
         if isinstance(value, str):
             operator = "(string): contains"
@@ -342,9 +332,7 @@ def operand_to_filter_gt(operand: tsi_query.GtOperation) -> Filter:
         "int",
     ):
         first = first.convert_.input
-    if isinstance(first, tsi_query.GetFieldOperator) and isinstance(
-        second, tsi_query.LiteralOperation
-    ):
+    if isinstance(first, tsi_query.GetFieldOperator) and isinstance(second, tsi_query.LiteralOperation):
         value = second.literal_
         if isinstance(value, (int, float)):
             operator = "(number): >"
@@ -366,9 +354,7 @@ def operand_to_filter_gte(operand: tsi_query.GteOperation) -> Filter:
         "int",
     ):
         first = first.convert_.input
-    if isinstance(first, tsi_query.GetFieldOperator) and isinstance(
-        second, tsi_query.LiteralOperation
-    ):
+    if isinstance(first, tsi_query.GetFieldOperator) and isinstance(second, tsi_query.LiteralOperation):
         value = second.literal_
         if isinstance(value, (int, float)):
             operator = "(number): >="
@@ -519,9 +505,7 @@ class SavedView:
         self.base.label = label
         return self
 
-    def add_filter(
-        self, field: str, operator: str, value: Any | None = None
-    ) -> SavedView:
+    def add_filter(self, field: str, operator: str, value: Any | None = None) -> SavedView:
         if field in COLUMN_ALIASES:
             field = COLUMN_ALIASES[field]
         if ObjectPath.parse_str(field).elements[0] not in KNOWN_COLUMNS:
@@ -582,9 +566,7 @@ class SavedView:
             op_uri = op_name
             if not op_uri.startswith("weave:///"):
                 if not self.entity:
-                    raise ValueError(
-                        "Must specify Op URI if entity/project is not known"
-                    )
+                    raise ValueError("Must specify Op URI if entity/project is not known")
                 op_uri = f"weave:///{self.entity}/{self.project}/op/{op_name}"
                 if ":" not in op_name:
                     op_uri += ":*"
@@ -633,9 +615,7 @@ class SavedView:
             self.add_column(column)
         return self
 
-    def insert_column(
-        self, idx: int, path: str | ObjectPath, label: str | None = None
-    ) -> SavedView:
+    def insert_column(self, idx: int, path: str | ObjectPath, label: str | None = None) -> SavedView:
         if isinstance(path, str):
             if path in COLUMN_ALIASES:
                 if label is None:
@@ -689,9 +669,7 @@ class SavedView:
             self.base.definition.columns.pop(path)
             return self
         self.base.definition.columns = [
-            col
-            for col in self.base.definition.columns
-            if not col.path or col.path != path.elements
+            col for col in self.base.definition.columns if not col.path or col.path != path.elements
         ]
         if not self.base.definition.columns:
             self.base.definition.columns = None
@@ -779,9 +757,7 @@ class SavedView:
         if self.base.definition.filter is not None:
             table.add_row(
                 "Call Filter",
-                pydantic_util.model_to_table(
-                    self.base.definition.filter, filter_none_values=True
-                ),
+                pydantic_util.model_to_table(self.base.definition.filter, filter_none_values=True),
             )
         if self.base.definition.query is not None:
             try:
@@ -792,9 +768,7 @@ class SavedView:
                     filters_table.add_column("Operator")
                     filters_table.add_column("Value")
                     for filter in filters:
-                        filters_table.add_row(
-                            filter.field, filter.operator, str(filter.value)
-                        )
+                        filters_table.add_row(filter.field, filter.operator, str(filter.value))
                     table.add_row("Filters", filters_table)
             except QueryTranslationException:
                 table.add_row("Query", str(self.base.definition.query))
@@ -832,13 +806,7 @@ class SavedView:
         """Publish the saved view to the server."""
         name = self.base.name
         if name is None:
-            formatted_now = (
-                datetime.now()
-                .isoformat()
-                .replace("T", "_")
-                .replace(":", "-")
-                .replace(".", "-")[:-1]
-            )
+            formatted_now = datetime.now().isoformat().replace("T", "_").replace(":", "-").replace(".", "-")[:-1]
             name = f"{self.view_type}_{formatted_now}"
         self.ref = weave_publish(self.base, name)
         return self
@@ -854,9 +822,7 @@ class SavedView:
         """Get calls matching this saved view's filters and settings."""
         entity = self.ref.entity if self.ref else None
         project = self.ref.project if self.ref else None
-        with weave_client_context.with_weave_client(
-            entity=entity, project=project
-        ) as client:
+        with weave_client_context.with_weave_client(entity=entity, project=project) as client:
             assert client is not None  # with_weave_client would have raised
             # This method is also used internally, we allow forcing all columns.
             table_columns = None if all_columns else self.get_table_columns()
@@ -917,8 +883,7 @@ class SavedView:
             return [
                 {
                     "path": ObjectPath(col.path),
-                    "label": col.label
-                    or (ObjectPath(col.path).to_str() if col.path else ""),
+                    "label": col.label or (ObjectPath(col.path).to_str() if col.path else ""),
                 }
                 for col in self.base.definition.columns
             ]
@@ -933,11 +898,7 @@ class SavedView:
         ]
         # Add any columns that are visible that are not in the above list
         for key, value in visibility.items():
-            if (
-                value
-                and key not in default_column_paths
-                and ObjectPath.parse_str(key).elements[0] in KNOWN_COLUMNS
-            ):
+            if value and key not in default_column_paths and ObjectPath.parse_str(key).elements[0] in KNOWN_COLUMNS:
                 default_column_paths.append(key)
         pin: Pin = self.base.definition.pin or DEFAULT_PIN
         for pin_right in pin["right"]:

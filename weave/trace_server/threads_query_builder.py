@@ -64,17 +64,13 @@ def make_threads_query(
         # Convert to datetime string format expected by ClickHouse
         datetime_str = sortable_datetime_after.strftime("%Y-%m-%d %H:%M:%S.%f")
         sortable_datetime_param = pb.add_param(datetime_str)
-        sortable_datetime_filter_clauses.append(
-            f"AND sortable_datetime > {{{sortable_datetime_param}: String}}"
-        )
+        sortable_datetime_filter_clauses.append(f"AND sortable_datetime > {{{sortable_datetime_param}: String}}")
 
     if sortable_datetime_before is not None:
         # Convert to datetime string format expected by ClickHouse
         datetime_str = sortable_datetime_before.strftime("%Y-%m-%d %H:%M:%S.%f")
         sortable_datetime_param = pb.add_param(datetime_str)
-        sortable_datetime_filter_clauses.append(
-            f"AND sortable_datetime < {{{sortable_datetime_param}: String}}"
-        )
+        sortable_datetime_filter_clauses.append(f"AND sortable_datetime < {{{sortable_datetime_param}: String}}")
 
     sortable_datetime_filter_clause = " ".join(sortable_datetime_filter_clauses)
 
@@ -98,19 +94,13 @@ def make_threads_query(
         thread_ids_in_clause = f"({', '.join(thread_id_params)})"
 
         # WHERE: Include NULL (incomplete rows) OR matching thread_ids (optimization)
-        where_thread_filter_clause = (
-            f"AND (thread_id IS NULL OR thread_id IN {thread_ids_in_clause})"
-        )
+        where_thread_filter_clause = f"AND (thread_id IS NULL OR thread_id IN {thread_ids_in_clause})"
 
         # HAVING: Filter final aggregated thread_id to specified thread_ids only
-        having_thread_filter_clause = (
-            f"AND aggregated_thread_id IN {thread_ids_in_clause}"
-        )
+        having_thread_filter_clause = f"AND aggregated_thread_id IN {thread_ids_in_clause}"
     else:
         # Filter out NULL and empty thread_ids when no specific thread_ids are requested
-        having_thread_filter_clause = (
-            "AND aggregated_thread_id IS NOT NULL AND aggregated_thread_id != ''"
-        )
+        having_thread_filter_clause = "AND aggregated_thread_id IS NOT NULL AND aggregated_thread_id != ''"
 
     # Two-level aggregation to handle ClickHouse materialized view partial merges
     #
@@ -331,8 +321,6 @@ def _validate_and_map_sort_field(field: str) -> str:
     }
 
     if field not in valid_fields:
-        raise ValueError(
-            f"Unsupported sort field: {field}. Supported fields: {list(valid_fields.keys())}"
-        )
+        raise ValueError(f"Unsupported sort field: {field}. Supported fields: {list(valid_fields.keys())}")
 
     return valid_fields[field]

@@ -10,9 +10,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-def evaluation_status(
-    server: tsi.TraceServerInterface, req: tsi.EvaluationStatusReq
-) -> tsi.EvaluationStatusRes:
+def evaluation_status(server: tsi.TraceServerInterface, req: tsi.EvaluationStatusReq) -> tsi.EvaluationStatusRes:
     eval_call = server.call_read(
         tsi.CallReadReq(
             project_id=req.project_id,
@@ -30,9 +28,7 @@ def evaluation_status(
         return tsi.EvaluationStatusRes(status=tsi.EvaluationStatusFailed())
 
     if eval_call.call.ended_at is not None:
-        return tsi.EvaluationStatusRes(
-            status=tsi.EvaluationStatusComplete(output=eval_call.call.output)
-        )
+        return tsi.EvaluationStatusRes(status=tsi.EvaluationStatusComplete(output=eval_call.call.output))
 
     # determine completed rows (children complete)
     children_stats = server.calls_query_stats(
@@ -108,12 +104,8 @@ def evaluation_status(
     try:
         total_rows = max(get_total_rows(), completed_rows)
     except Exception as e:
-        logger.exception(
-            "Error getting total rows for evaluation", extra={"error": str(e)}
-        )
+        logger.exception("Error getting total rows for evaluation", extra={"error": str(e)})
 
     return tsi.EvaluationStatusRes(
-        status=tsi.EvaluationStatusRunning(
-            completed_rows=completed_rows, total_rows=total_rows
-        )
+        status=tsi.EvaluationStatusRunning(completed_rows=completed_rows, total_rows=total_rows)
     )

@@ -49,9 +49,7 @@ def make_feedback_query_req(
     return feedback_query_req
 
 
-def hydrate_calls_with_feedback(
-    calls: list[dict[str, Any]], feedback: tsi.FeedbackQueryRes
-) -> None:
+def hydrate_calls_with_feedback(calls: list[dict[str, Any]], feedback: tsi.FeedbackQueryRes) -> None:
     """Hydrate calls with feedback inplace."""
     feedback_map = defaultdict(list)
     # map feedback to calls
@@ -97,9 +95,7 @@ def make_derived_summary_fields(
         days = (ended_at - started_at).days
         seconds = (ended_at - started_at).seconds
         milliseconds = (ended_at - started_at).microseconds // 1000
-        weave_summary["latency_ms"] = (
-            days * 24 * 60 * 60 + seconds
-        ) * 1000 + milliseconds
+        weave_summary["latency_ms"] = (days * 24 * 60 * 60 + seconds) * 1000 + milliseconds
 
     if display_name:
         weave_summary["display_name"] = display_name
@@ -216,9 +212,7 @@ def digest_is_version_like(digest: str) -> tuple[bool, int]:
 MAX_FILTER_LENGTH = 1000
 
 
-def assert_parameter_length_less_than_max(
-    param_name: str, arr_len: int, max_length: int = MAX_FILTER_LENGTH
-) -> None:
+def assert_parameter_length_less_than_max(param_name: str, arr_len: int, max_length: int = MAX_FILTER_LENGTH) -> None:
     if arr_len > max_length:
         raise ValueError(
             f"Parameter: '{param_name}' request length is greater than max length ({max_length}). Actual length: {arr_len}"
