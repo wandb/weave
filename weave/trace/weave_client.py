@@ -16,6 +16,7 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Any, Callable, TypedDict, cast
 
 import pydantic
+from cachetools import TTLCache
 from requests import HTTPError
 
 from weave import version
@@ -136,6 +137,7 @@ from weave.trace_server_bindings.http_utils import (
     ROW_COUNT_CHUNKING_THRESHOLD,
     check_endpoint_exists,
 )
+from weave.trace_server_bindings.models import EndBatchItem, StartBatchItem
 from weave.utils.attributes_dict import AttributesDict
 from weave.utils.dict_utils import sum_dict_leaves, zip_dicts
 from weave.utils.exception import exception_to_json_str
@@ -345,6 +347,12 @@ class WeaveClient:
         if hasattr(self.server, "get_feedback_processor"):
             self._server_feedback_processor = self.server.get_feedback_processor()
         self.send_file_cache = WeaveClientSendFileCache()
+
+        # Cache to store call starts so they can be sent with call ends
+        self._call_start_cache: TTLCache[str, CallStartReq] = TTLCache(
+            maxsize=10_000,
+            ttl=60 * 60,  # 60 minute TTL
+        )
 
     ################ High Level Convenience Methods ################
 
@@ -807,6 +815,7 @@ class WeaveClient:
                     "Inputs may be dropped."
                 )
 
+            self._call_start_cache[call_id] = call_start_req
             self.server.call_start(call_start_req)
             return True
 
@@ -934,7 +943,7 @@ class WeaveClient:
         if op is not None and op._on_finish_handler:
             op._on_finish_handler(call, original_output, exception)
 
-        def send_end_call() -> None:
+        def send_complete_call() -> None:
             maybe_redacted_output_as_refs = output_as_refs
             if should_redact_pii():
                 from weave.utils.pii_redaction import redact_pii
@@ -944,6 +953,7 @@ class WeaveClient:
             output_json = to_json(
                 maybe_redacted_output_as_refs, project_id, self, use_dictify=False
             )
+            assert call.id is not None
             call_end_req = CallEndReq(
                 end=EndedCallSchemaForInsert(
                     project_id=project_id,
@@ -960,9 +970,27 @@ class WeaveClient:
                     f"Trace output size ({bytes_size} bytes) exceeds the maximum allowed size of {MAX_TRACE_PAYLOAD_SIZE} bytes. "
                     "Output may be dropped."
                 )
-            self.server.call_end(call_end_req)
 
-        self.future_executor.defer(send_end_call)
+            cached_start = self._call_start_cache.get(call.id)
+            if cached_start is not None:
+                if self._server_call_processor is not None:
+                    # Enqueue both items atomically - they'll be processed in the same batch
+                    self._server_call_processor.enqueue(
+                        [
+                            StartBatchItem(req=cached_start),
+                            EndBatchItem(req=call_end_req),
+                        ]
+                    )
+                else:
+                    # Fallback for non-batching servers: send separately
+                    self.server.call_start(cached_start)
+                    self.server.call_end(call_end_req)
+                del self._call_start_cache[call.id]
+            else:
+                # Fallback: just send end (shouldn't happen normally)
+                self.server.call_end(call_end_req)
+
+        self.future_executor.defer(send_complete_call)
 
         # If a turn call is finishing, reset turn context for next sibling
         if call.turn_id == call.id and call.thread_id:
