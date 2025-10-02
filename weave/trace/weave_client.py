@@ -974,13 +974,18 @@ class WeaveClient:
 
             cached_start = self._call_start_cache.get(call.id)
             if cached_start is not None:
-                # Enqueue both items - they'll be processed in the same batch
-                self._server_call_processor.enqueue(
-                    [
-                        StartBatchItem(req=cached_start),
-                        EndBatchItem(req=call_end_req),
-                    ]
-                )
+                if self._server_call_processor is not None:
+                    # Enqueue both items atomically - they'll be processed in the same batch
+                    self._server_call_processor.enqueue(
+                        [
+                            StartBatchItem(req=cached_start),
+                            EndBatchItem(req=call_end_req),
+                        ]
+                    )
+                else:
+                    # Fallback for non-batching servers: send separately
+                    self.server.call_start(cached_start)
+                    self.server.call_end(call_end_req)
                 del self._call_start_cache[call.id]
             else:
                 # Fallback: just send end (shouldn't happen normally)
