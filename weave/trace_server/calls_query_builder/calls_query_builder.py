@@ -1372,7 +1372,7 @@ class CallsQuery(BaseModel):
               {parts_op_name_sql}
               {parts_trace_id_sql}
               {parts_conditions_sql}
-            ORDER BY (project_id, started_at)
+            {order_by_sql}
             {limit_sql}
         )
         SELECT *
