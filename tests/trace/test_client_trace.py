@@ -197,6 +197,7 @@ def test_trace_server_call_start_and_end(client):
         "wb_user_id": MaybeStringMatcher(client.entity),
         "wb_run_id": None,
         "wb_run_step": None,
+        "wb_run_step_end": None,
         "deleted_at": None,
         "display_name": None,
         "storage_size_bytes": None,
@@ -248,6 +249,7 @@ def test_trace_server_call_start_and_end(client):
         "wb_user_id": MaybeStringMatcher(client.entity),
         "wb_run_id": None,
         "wb_run_step": None,
+        "wb_run_step_end": None,
         "deleted_at": None,
         "display_name": None,
         "storage_size_bytes": None,
@@ -571,6 +573,63 @@ def test_trace_call_wb_run_step_query(client):
     exp_steps = list(range(call_spec.total_calls))[::-1]
     found_steps = [c.wb_run_step for c in res.calls]
     assert found_steps == exp_steps
+
+
+def test_trace_call_wb_run_step_end(client):
+    """Test that wb_run_step_end is captured at call end time."""
+    full_wb_run_id = f"{client.entity}/{client.project}/test-run"
+    from weave.trace import weave_client
+
+    # Start at step 100, increment by 10 each time
+    # This simulates the run step advancing during op execution
+    step_start = 100
+    step_increment = 10
+    step_counter = iter(range(step_start, step_start + 1000, step_increment))
+
+    with (
+        mock.patch.object(
+            weave_client, "safe_current_wb_run_id", return_value=full_wb_run_id
+        ),
+        mock.patch.object(  # noqa: PT008
+            weave_client, "safe_current_wb_run_step", lambda: next(step_counter)
+        ),
+    ):
+        call_spec = simple_line_call_bootstrap()
+
+    server = get_client_trace_server(client)
+    res = server.calls_query(
+        tsi.CallsQueryReq(project_id=get_client_project_id(client))
+    )
+
+    # Check that wb_run_step_end is captured for all calls
+    assert all(c.wb_run_step_end is not None for c in res.calls)
+
+    # wb_run_step_end should be equal to or greater than wb_run_step
+    # (in this test they happen to be equal since the mock returns sequential values)
+    for call in res.calls:
+        assert call.wb_run_step_end >= call.wb_run_step
+
+    # Test querying by wb_run_step_end
+    target_step_end = step_start + step_increment
+    query = tsi.Query(
+        **{"$expr": {"$eq": [{"$getField": "wb_run_step_end"}, {"$literal": target_step_end}]}}
+    )
+    res = server.calls_query(
+        tsi.CallsQueryReq(project_id=get_client_project_id(client), query=query)
+    )
+    assert len(res.calls) == 1
+    assert res.calls[0].wb_run_step_end == target_step_end
+
+    # Test sorting by wb_run_step_end
+    res = server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=get_client_project_id(client),
+            sort_by=[tsi.SortBy(field="wb_run_step_end", direction="asc")],
+        )
+    )
+    step_ends = [c.wb_run_step_end for c in res.calls]
+    # Check that the results are sorted in ascending order
+    assert step_ends == sorted(step_ends)
 
 
 def test_trace_call_query_filter_output_object_version_refs(client):

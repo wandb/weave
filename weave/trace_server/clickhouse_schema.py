@@ -48,11 +48,13 @@ class CallEndCHInsertable(BaseModel):
     output_dump: str
     input_refs: list[str] = Field(default_factory=list)  # sadly, this is required
     output_refs: list[str]
+    wb_run_step_end: Optional[int] = None
 
     _project_id_v = field_validator("project_id")(validation.project_id_validator)
     _id_v = field_validator("id")(validation.call_id_validator)
     _input_refs_v = field_validator("input_refs")(validation.refs_list_validator)
     _output_refs_v = field_validator("output_refs")(validation.refs_list_validator)
+    _wb_run_step_end_v = field_validator("wb_run_step_end")(validation.wb_run_step_validator)
 
 
 class CallDeleteCHInsertable(BaseModel):
@@ -126,6 +128,7 @@ class SelectableCHCallSchema(BaseModel):
     wb_user_id: Optional[str] = None
     wb_run_id: Optional[str] = None
     wb_run_step: Optional[int] = None
+    wb_run_step_end: Optional[int] = None
 
     deleted_at: Optional[datetime.datetime] = None
 
