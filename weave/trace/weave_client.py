@@ -31,6 +31,7 @@ from weave.trace.call import (
     elide_display_name,
     make_client_call,
 )
+from weave.trace.callsite import get_callsite_info
 from weave.trace.casting import CallsFilterLike, QueryLike, SortByLike
 from weave.trace.concurrent.futures import FutureExecutor
 from weave.trace.constants import TRACE_CALL_EMOJI
@@ -84,7 +85,6 @@ from weave.trace.settings import (
     should_redact_pii,
     should_use_parallel_table_upload,
 )
-from weave.trace.callsite import get_callsite_info
 from weave.trace.table import Table
 from weave.trace.table_upload_chunking import ChunkingConfig, TableChunkManager
 from weave.trace.util import deprecated

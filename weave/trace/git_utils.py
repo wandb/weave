@@ -1,10 +1,9 @@
 """Utilities for capturing git repository state."""
 
+from __future__ import annotations
+
 import subprocess
 from typing import TypedDict
-
-# Cache git state per process since it's expensive to compute
-_git_state_cache: GitState | None = None
 
 
 class GitState(TypedDict, total=False):
@@ -13,6 +12,10 @@ class GitState(TypedDict, total=False):
     branch: str | None
     commit_sha: str | None
     dirty: bool
+
+
+# Cache git state per process since it's expensive to compute
+_git_state_cache: GitState | None = None
 
 
 def get_git_state(use_cache: bool = True) -> GitState:
