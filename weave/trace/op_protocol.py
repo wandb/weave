@@ -99,6 +99,9 @@ class ProcessedInputs:
     # What should get sent to the Weave server
     inputs: dict[str, Any]
 
+    # Metadata about bound methods
+    bound_method_metadata: dict[str, Any] | None = None
+
 
 OnInputHandlerType = Callable[["Op", tuple, dict], Optional[ProcessedInputs]]
 FinishCallbackType = Callable[[Any, Optional[BaseException]], None]

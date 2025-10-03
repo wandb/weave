@@ -234,6 +234,48 @@ def _is_unbound_method(func: Callable) -> bool:
 class OpCallError(Exception): ...
 
 
+def _extract_bound_method_metadata(func: Op, args: tuple) -> dict[str, Any] | None:
+    """Extract metadata about bound methods.
+
+    When a method is bound to an instance (e.g., obj.method()), this function
+    extracts information about the bound instance:
+    - instance_id: memory id of the bound instance
+    - instance_ref: weave ref of the bound instance (if available)
+    - instance_class: class name of the bound instance
+
+    Args:
+        func: The Op being called
+        args: The original args tuple passed to the function
+
+    Returns:
+        A dict with bound method metadata, or None if not a bound method
+    """
+    # Check if the resolve_fn (the actual wrapped function) is a bound method
+    # using inspect.ismethod which properly detects bound methods
+    if not inspect.ismethod(func.resolve_fn):
+        return None
+
+    # For bound methods, __self__ contains the bound instance
+    bound_instance = func.resolve_fn.__self__
+
+    metadata: dict[str, Any] = {
+        'instance_id': id(bound_instance),
+        'instance_class': type(bound_instance).__qualname__,
+    }
+
+    # Try to get weave ref if the instance has one
+    try:
+        from weave.trace.ref_util import get_ref
+        ref = get_ref(bound_instance)
+        if ref is not None:
+            metadata['instance_ref'] = ref.uri()
+    except Exception:
+        # If we can't get a ref, that's okay
+        pass
+
+    return metadata
+
+
 def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedInputs:
     # Lazy load so Content modele isn't resolved until necessary
     from weave.trace.annotation_parser import (
@@ -250,6 +292,10 @@ def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedI
         raise OpCallError(f"Error calling {func.name}: {e}") from e
 
     inputs_with_defaults = _apply_fn_defaults_to_inputs(func, inputs)
+
+    # Detect and track bound method metadata
+    # Pass the original args tuple to properly detect bound methods via inspect
+    bound_method_metadata = _extract_bound_method_metadata(func, args)
 
     # Annotated input type flow
     # If user defines postprocess_inputs manually, trust it instead of running this
@@ -285,6 +331,7 @@ def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedI
         args=args,
         kwargs=kwargs,
         inputs=to_weave_inputs,
+        bound_method_metadata=bound_method_metadata,
     )
 
 
@@ -318,6 +365,14 @@ def _create_call(
 
     if call_attrs is not None:
         attributes = {**attributes, **call_attrs}
+
+    # Add bound method metadata to attributes if present
+    if pargs.bound_method_metadata is not None:
+        if 'weave' not in attributes:
+            attributes['weave'] = {}
+        if 'python' not in attributes['weave']:
+            attributes['weave']['python'] = {}
+        attributes['weave']['python']['bound_method'] = pargs.bound_method_metadata
 
     return client.create_call(
         func,
