@@ -370,8 +370,14 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     cond = f"(NOT ({operand_part}))"
                 elif isinstance(operation, tsi_query.EqOperation):
                     lhs_part = process_operand(operation.eq_[0])
-                    rhs_part = process_operand(operation.eq_[1])
-                    cond = f"({lhs_part} = {rhs_part})"
+                    if (
+                        isinstance(operation.eq_[1], tsi_query.LiteralOperation)
+                        and operation.eq_[1].literal_ is None
+                    ):
+                        cond = f"({lhs_part} IS NULL)"
+                    else:
+                        rhs_part = process_operand(operation.eq_[1])
+                        cond = f"({lhs_part} = {rhs_part})"
                 elif isinstance(operation, tsi_query.GtOperation):
                     lhs_part = process_operand(operation.gt_[0])
                     rhs_part = process_operand(operation.gt_[1])
