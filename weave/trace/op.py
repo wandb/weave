@@ -259,16 +259,17 @@ def _extract_bound_method_metadata(func: Op, args: tuple) -> dict[str, Any] | No
     bound_instance = func.resolve_fn.__self__
 
     metadata: dict[str, Any] = {
-        'instance_id': id(bound_instance),
-        'instance_class': type(bound_instance).__qualname__,
+        "instance_id": id(bound_instance),
+        "instance_class": type(bound_instance).__qualname__,
     }
 
     # Try to get weave ref if the instance has one
     try:
         from weave.trace.ref_util import get_ref
+
         ref = get_ref(bound_instance)
         if ref is not None:
-            metadata['instance_ref'] = ref.uri()
+            metadata["instance_ref"] = ref.uri()
     except Exception:
         # If we can't get a ref, that's okay
         pass
@@ -368,11 +369,11 @@ def _create_call(
 
     # Add bound method metadata to attributes if present
     if pargs.bound_method_metadata is not None:
-        if 'weave' not in attributes:
-            attributes['weave'] = {}
-        if 'python' not in attributes['weave']:
-            attributes['weave']['python'] = {}
-        attributes['weave']['python']['bound_method'] = pargs.bound_method_metadata
+        if "weave" not in attributes:
+            attributes["weave"] = {}
+        if "python" not in attributes["weave"]:
+            attributes["weave"]["python"] = {}
+        attributes["weave"]["python"]["bound_method"] = pargs.bound_method_metadata
 
     return client.create_call(
         func,
