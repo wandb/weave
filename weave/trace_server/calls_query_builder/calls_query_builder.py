@@ -1689,7 +1689,6 @@ def optimized_wb_run_id_not_null_query(
             WHERE calls_merged.project_id = {param_slot(project_id_param, "String")}
                 AND calls_merged.wb_run_id IS NOT NULL
                 AND calls_merged.deleted_at IS NULL
-                AND calls_merged.started_at IS NOT NULL
             LIMIT 1
         )
     """
@@ -1710,9 +1709,7 @@ def try_optimized_stats_query(
         and req.query is None
         and not req.include_total_storage_size
     ):
-        return optimized_project_contains_call_query(
-            req.project_id, param_builder, table_name="calls_complete"
-        )
+        return optimized_project_contains_call_query(req.project_id, param_builder)
 
     # Pattern 2: Query with wb_run_id check (limit=1, query present, minimal filter)
     # Covers common case: checking for runs with wb_run_id not null
