@@ -3941,7 +3941,14 @@ def test_calls_query_with_wb_run_id_not_null(client, monkeypatch):
     test_op(5)
     client.flush()
 
-    # Query for calls with wb_run_id not null using limit=1 to trigger optimization
+    # first query all root calls
+    calls = client.server.calls_query(
+        tsi.CallsQueryReq(project_id=client._project_id())
+    ).calls
+    assert len(calls) == 1
+    assert calls[0].wb_run_id == mock_run_id
+
+    # Now query for calls with wb_run_id not null using limit=1 to trigger optimization
     query = tsi.Query(
         **{
             "$expr": {
@@ -3949,7 +3956,11 @@ def test_calls_query_with_wb_run_id_not_null(client, monkeypatch):
             }
         }
     )
-    calls = list(client.get_calls(query=query, limit=1))
+    calls = list(
+        client.server.calls_query(
+            tsi.CallsQueryReq(project_id=client._project_id(), query=query, limit=1)
+        ).calls
+    )
 
     assert len(calls) == 1
     assert calls[0].wb_run_id == mock_run_id
