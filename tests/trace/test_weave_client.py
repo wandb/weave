@@ -3930,7 +3930,7 @@ def test_calls_query_with_wb_run_id_not_null(client, monkeypatch):
     # Mock wandb to simulate a run
     import weave.trace.weave_client as wc
 
-    mock_run_id = "entity/project/test_run_123"
+    mock_run_id = f"{client._project_id()}/test_run_123"
     monkeypatch.setattr(wc, "safe_current_wb_run_id", lambda: mock_run_id)
 
     @weave.op
