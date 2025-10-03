@@ -1,5 +1,11 @@
 # Agent instructions for `weave` repository
 
+## Overview
+
+Weave is a toolkit for developing Generative AI applications by Weights & Biases. The codebase focuses on two main areas:
+- **Weave Tracing**: Located in `weave/trace` and `weave/trace_server` - Core tracing functionality for LLM applications
+- **Weave Evaluations**: Located in `weave/flow` - Evaluation framework for AI applications
+
 ## Core Rules
 
 - When you learn something new about the codebase or introduce a new concept, update this file (`AGENTS.md`) to reflect the new knowledge. This is YOUR FILE! It should grow and evolve with you.
@@ -26,20 +32,44 @@ _Important:_ For OpenAI Codex agents (most likely you!), your environment does n
   - `weave/trace_server` - Backend server implementation
 - `docs/` - Documentation website
 
+### Core Components Detail
+
+**weave/trace/** - Main tracing functionality
+- `api.py`: Top-level API (init, op decorator, etc.)
+- `weave_client.py`: Primary client for trace operations
+- `op.py`: Operation decorator and management
+- `refs.py`: Reference system for objects
+- `settings.py`: Configuration management
+
+**weave/trace_server/** - Server-side trace handling  
+- `trace_server_interface.py`: Main server interface
+- `clickhouse_trace_server_batched.py`: ClickHouse backend
+- `sqlite_trace_server.py`: SQLite backend for local dev
+- `interface/`: Server interface definitions and builtin objects
+
+**weave/flow/** - Evaluation and model framework
+- `model.py`: Model wrapper classes
+- `scorer.py`: Evaluation scoring framework
+- `leaderboard.py`: Leaderboard functionality
+- `monitor.py`: Monitoring capabilities
+
+**weave/integrations/** - Third-party integrations
+- Auto-patching system for popular ML libraries (OpenAI, Anthropic, etc.)
+- Each integration lives in its own subdirectory
+
 ### Legacy Code
 
 - `weave_query/` - Legacy codebase (DO NOT EDIT)
   - Marked for future refactoring
   - Avoid making changes to this directory
 
-## Python Testing Guidelines
+## Development Commands
 
-### Test Framework
+### Testing
 
-- Testing is managed by `nox` with multiple shards for different Python versions
-- Each shard represents specific package configurations
+**Framework**: Testing is managed by `nox` with multiple shards for different Python versions. Each shard represents specific package configurations.
 
-### Key Test Shards
+#### Key Test Shards
 
 Focus on these primary test shards:
 
@@ -47,18 +77,86 @@ Focus on these primary test shards:
 - `tests-3.12(shard='flow')` - Higher level work"flow" objects
 - `tests-3.12(shard='trace_server')` - Server implementation
 - `tests-3.12(shard='trace_server_bindings')` - Server bindings
+- `tests-3.12(shard='anthropic')` - Anthropic integration tests
+- `tests-3.12(shard='openai')` - OpenAI integration tests
 
-### Running Tests
+#### Running Tests
 
 **IMPORTANT**: Any test depending on the `client` fixture runs against either SQLite backend or Clickhouse. By default it will run against SQLite for performance. However, it is critical to test both. Use the pytest custom flag `--trace-server=clickhouse` with `--clickhouse-process=true` to run tests against the clickhouse implementation.
 
-1. Run all tests in a specific shard: `nox --no-install -e "tests-3.12(shard='trace')"`
-2. Run a specific test by appending `-- [test]` like so: `nox --no-install -e "tests-3.12(shard='trace')" -- trace/test_client_trace.py::test_simple_op`
-3. Run linting: `nox --no-install -e lint` (Note: This will modify files)
+```bash
+# Run tests using nox (recommended)
+nox -s tests  # Run all tests
+
+# Run specific test shards
+nox -s "tests-3.12(shard='trace')"         # Trace tests
+nox -s "tests-3.12(shard='flow')"          # Flow/evaluation tests  
+nox -s "tests-3.12(shard='trace_server')"  # Trace server tests
+
+# For Codex/OpenAI agents (no internet access)
+nox --no-install -e "tests-3.12(shard='trace')"
+nox --no-install -e "tests-3.12(shard='trace')" -- trace/test_client_trace.py::test_simple_op
+
+# Run custom tests
+nox -e "tests-3.12(shard='custom')" -- tests/trace/test_weave_client.py
+
+# Run single test file directly
+pytest tests/trace/test_weave_client.py
+```
 
 _Important:_ Since you don't have internet access, you must run `nox` with `--no-install`. We have pre-installed the requirements on the above shards.
 
-Therefore, a basic text command would look like: `nox --no-install -e "tests-3.12(shard='trace')" -- trace/test_client_trace.py::test_simple_op --trace-server=clickhouse --clickhouse-process=true`
+Therefore, a basic test command would look like: `nox --no-install -e "tests-3.12(shard='trace')" -- trace/test_client_trace.py::test_simple_op --trace-server=clickhouse --clickhouse-process=true`
+
+### Build and Release
+
+```bash
+# Build the package
+make build          # Uses uv build
+uv build           # Alternative direct build
+
+# Documentation
+make docs          # Generate documentation
+cd docs && make generate_all
+
+# Prepare release
+make prepare-release  # Builds docs and package
+```
+
+### Linting and Code Quality
+
+```bash
+# Run linting (uses pre-commit hooks)
+nox -s lint                    # Lint changed files
+nox -s lint -- --all-files     # Lint all files
+nox -s lint -- --ruff-only     # Run only ruff checks
+
+# For Codex/OpenAI agents (no internet access)
+nox --no-install -e lint       # Lint files (Note: This will modify files)
+```
+
+## Key Architecture Patterns
+
+### Operation Tracking
+Functions decorated with `@weave.op()` are automatically traced with inputs/outputs
+
+### Reference System
+Objects are stored with refs (e.g., `weave:///entity/project/object:version`) for versioning and retrieval
+
+### Client Architecture
+`weave_client.py` handles all server communication, with different backends (ClickHouse for production, SQLite for local)
+
+### Integration Pattern
+Integrations use monkey-patching via `weave/integrations/patcher.py` to automatically trace ML library calls
+
+## Technical Requirements
+
+- Python 3.9+ required
+- Uses `uv` for fast dependency management and builds  
+- Heavy use of Pydantic v2 for data validation
+- ClickHouse for production trace storage, SQLite for local development
+- All traced functions should use the `@weave.op()` decorator
+- The codebase includes legacy "Weave engine" code that's being phased out - focus on `weave/trace` and `weave/flow`
 
 ## Typescript Testing Guidelines
 
