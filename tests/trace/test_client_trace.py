@@ -612,7 +612,11 @@ def test_trace_call_wb_run_step_end(client):
     # Test querying by wb_run_step_end
     target_step_end = step_start + step_increment
     query = tsi.Query(
-        **{"$expr": {"$eq": [{"$getField": "wb_run_step_end"}, {"$literal": target_step_end}]}}
+        **{
+            "$expr": {
+                "$eq": [{"$getField": "wb_run_step_end"}, {"$literal": target_step_end}]
+            }
+        }
     )
     res = server.calls_query(
         tsi.CallsQueryReq(project_id=get_client_project_id(client), query=query)

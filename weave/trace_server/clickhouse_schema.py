@@ -54,7 +54,9 @@ class CallEndCHInsertable(BaseModel):
     _id_v = field_validator("id")(validation.call_id_validator)
     _input_refs_v = field_validator("input_refs")(validation.refs_list_validator)
     _output_refs_v = field_validator("output_refs")(validation.refs_list_validator)
-    _wb_run_step_end_v = field_validator("wb_run_step_end")(validation.wb_run_step_validator)
+    _wb_run_step_end_v = field_validator("wb_run_step_end")(
+        validation.wb_run_step_validator
+    )
 
 
 class CallDeleteCHInsertable(BaseModel):
