@@ -22,6 +22,9 @@ COMPLETIONS_TAG_NAME = "Completions"
 ACTIONS_TAG_NAME = "Actions"
 OTEL_TAG_NAME = "OpenTelemetry"
 THREADS_TAG_NAME = "Threads"
+EVALUATION_TAG_NAME = "Evaluation"
+DATASET_TAG_NAME = "Datasets"
+SCORER_TAG_NAME = "Scorers"
 
 
 class AuthParams(NamedTuple):
@@ -343,12 +346,12 @@ def generate_routes(
             iter([res.content]), media_type="application/octet-stream"
         )
 
-    # @router.post("/op/create", tags=[OPS_TAG_NAME])
-    # def op_create(
-    #     req: tsi.OpCreateReq,
-    #     server: tsi.TraceServerInterface = Depends(get_server),
-    # ) -> tsi.OpCreateRes:
-    #     return server.op_create(req)
+    @router.post("/op/create", tags=[OPS_TAG_NAME])
+    def op_create(
+        req: tsi.OpCreateReq,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.OpCreateRes:
+        return service.trace_server_interface.op_create(req)
 
     # @router.post("/op/read", tags=[OPS_TAG_NAME])
     # def op_read(
@@ -363,6 +366,55 @@ def generate_routes(
     #     server: tsi.TraceServerInterface = Depends(get_server),
     # ) -> tsi.OpQueryRes:
     #     return server.ops_query(req)
+
+    @router.get("/op/get", tags=[OPS_TAG_NAME])
+    def op_get(
+        project_id: str,
+        object_id: str,
+        digest: str,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.OpGetRes:
+        """Get an op object."""
+        req = tsi.OpGetReq(project_id=project_id, object_id=object_id, digest=digest)
+        return service.trace_server_interface.op_get(req)
+
+    @router.get(
+        "/op/list",
+        tags=[OPS_TAG_NAME],
+        response_class=StreamingResponse,
+        responses={
+            200: {
+                "description": "Stream of data in JSONL format",
+                "content": {
+                    "application/jsonl": {
+                        "schema": {
+                            "type": "array",
+                            "items": {"$ref": "#/components/schemas/Schema"},
+                        }
+                    }
+                },
+            }
+        },
+    )
+    def op_list(
+        project_id: str,
+        limit: int | None = None,
+        offset: int | None = None,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> StreamingResponse:
+        """List op objects."""
+        req = tsi.OpListReq(project_id=project_id, limit=limit, offset=offset)
+        return StreamingResponse(
+            service.trace_server_interface.op_list(req), media_type="application/jsonl"
+        )
+
+    @router.post("/op/delete", tags=[OPS_TAG_NAME])
+    def op_delete(
+        req: tsi.OpDeleteReq,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.OpDeleteRes:
+        """Delete an op object."""
+        return service.trace_server_interface.op_delete(req)
 
     @router.post("/cost/create", tags=[COST_TAG_NAME])
     def cost_create(
@@ -493,5 +545,231 @@ def generate_routes(
             service.trace_server_interface.threads_query_stream(req),
             media_type="application/jsonl",
         )
+
+    @router.post("/evaluate_model", tags=[EVALUATION_TAG_NAME])
+    def evaluate_model(
+        req: tsi.EvaluateModelReq,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.EvaluateModelRes:
+        return service.trace_server_interface.evaluate_model(req)
+
+    @router.post("/evaluation_status", tags=[EVALUATION_TAG_NAME])
+    def evaluation_status(
+        req: tsi.EvaluationStatusReq,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.EvaluationStatusRes:
+        return service.trace_server_interface.evaluation_status(req)
+
+    @router.post("/evaluation/create", tags=[EVALUATION_TAG_NAME])
+    def evaluation_create(
+        req: tsi.EvaluationCreateReq,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.EvaluationCreateRes:
+        """Create an evaluation object."""
+        return service.trace_server_interface.evaluation_create(req)
+
+    @router.post("/evaluation/log_start", tags=[EVALUATION_TAG_NAME])
+    def evaluation_log_start(
+        req: tsi.EvaluationLogStartReq,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.EvaluationLogStartRes:
+        """Start an evaluation run."""
+        return service.trace_server_interface.evaluation_log_start(req)
+
+    @router.post("/evaluation/log_prediction", tags=[EVALUATION_TAG_NAME])
+    def evaluation_log_prediction(
+        req: tsi.EvaluationLogPredictionReq,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.EvaluationLogPredictionRes:
+        """Log a prediction for an evaluation run."""
+        return service.trace_server_interface.evaluation_log_prediction(req)
+
+    @router.post("/evaluation/log_score", tags=[EVALUATION_TAG_NAME])
+    def evaluation_log_score(
+        req: tsi.EvaluationLogScoreReq,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.EvaluationLogScoreRes:
+        """Log a score for an evaluation run."""
+        return service.trace_server_interface.evaluation_log_score(req)
+
+    @router.post("/evaluation/log_finish", tags=[EVALUATION_TAG_NAME])
+    def evaluation_log_finish(
+        req: tsi.EvaluationLogFinishReq,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.EvaluationLogFinishRes:
+        """Finish an evaluation run."""
+        return service.trace_server_interface.evaluation_log_finish(req)
+
+    @router.get("/evaluation/get", tags=[EVALUATION_TAG_NAME])
+    def evaluation_get(
+        project_id: str,
+        object_id: str,
+        digest: str,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.EvaluationGetRes:
+        """Get an evaluation object."""
+        req = tsi.EvaluationGetReq(
+            project_id=project_id, object_id=object_id, digest=digest
+        )
+        return service.trace_server_interface.evaluation_get(req)
+
+    @router.get(
+        "/evaluation/list",
+        tags=[EVALUATION_TAG_NAME],
+        response_class=StreamingResponse,
+        responses={
+            200: {
+                "description": "Stream of data in JSONL format",
+                "content": {
+                    "application/jsonl": {
+                        "schema": {
+                            "type": "array",
+                            "items": {"$ref": "#/components/schemas/Schema"},
+                        }
+                    }
+                },
+            }
+        },
+    )
+    def evaluation_list(
+        project_id: str,
+        limit: int | None = None,
+        offset: int | None = None,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> StreamingResponse:
+        """List evaluation objects."""
+        req = tsi.EvaluationListReq(project_id=project_id, limit=limit, offset=offset)
+        return StreamingResponse(
+            service.trace_server_interface.evaluation_list(req),
+            media_type="application/jsonl",
+        )
+
+    @router.post("/evaluation/delete", tags=[EVALUATION_TAG_NAME])
+    def evaluation_delete(
+        req: tsi.EvaluationDeleteReq,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.EvaluationDeleteRes:
+        """Delete an evaluation object."""
+        return service.trace_server_interface.evaluation_delete(req)
+
+    @router.post("/dataset/create", tags=[DATASET_TAG_NAME])
+    def dataset_create(
+        req: tsi.DatasetCreateReq,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.DatasetCreateRes:
+        """Create a dataset object."""
+        return service.trace_server_interface.dataset_create(req)
+
+    @router.get("/dataset/get", tags=[DATASET_TAG_NAME])
+    def dataset_get(
+        project_id: str,
+        object_id: str,
+        digest: str,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.DatasetGetRes:
+        """Get a dataset object."""
+        req = tsi.DatasetGetReq(
+            project_id=project_id, object_id=object_id, digest=digest
+        )
+        return service.trace_server_interface.dataset_get(req)
+
+    @router.get(
+        "/dataset/list",
+        tags=[DATASET_TAG_NAME],
+        response_class=StreamingResponse,
+        responses={
+            200: {
+                "description": "Stream of data in JSONL format",
+                "content": {
+                    "application/jsonl": {
+                        "schema": {
+                            "type": "array",
+                            "items": {"$ref": "#/components/schemas/Schema"},
+                        }
+                    }
+                },
+            }
+        },
+    )
+    def dataset_list(
+        project_id: str,
+        limit: int | None = None,
+        offset: int | None = None,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> StreamingResponse:
+        """List dataset objects."""
+        req = tsi.DatasetListReq(project_id=project_id, limit=limit, offset=offset)
+        return StreamingResponse(
+            service.trace_server_interface.dataset_list(req),
+            media_type="application/jsonl",
+        )
+
+    @router.post("/dataset/delete", tags=[DATASET_TAG_NAME])
+    def dataset_delete(
+        req: tsi.DatasetDeleteReq,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.DatasetDeleteRes:
+        """Delete a dataset object."""
+        return service.trace_server_interface.dataset_delete(req)
+
+    @router.post("/scorer/create", tags=[SCORER_TAG_NAME])
+    def scorer_create(
+        req: tsi.ScorerCreateReq,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.ScorerCreateRes:
+        """Create a scorer object."""
+        return service.trace_server_interface.scorer_create(req)
+
+    @router.get("/scorer/get", tags=[SCORER_TAG_NAME])
+    def scorer_get(
+        project_id: str,
+        object_id: str,
+        digest: str,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.ScorerGetRes:
+        """Get a scorer object."""
+        req = tsi.ScorerGetReq(
+            project_id=project_id, object_id=object_id, digest=digest
+        )
+        return service.trace_server_interface.scorer_get(req)
+
+    @router.get(
+        "/scorer/list",
+        tags=[SCORER_TAG_NAME],
+        response_class=StreamingResponse,
+        responses={
+            200: {
+                "description": "Stream of data in JSONL format",
+                "content": {
+                    "application/jsonl": {
+                        "schema": {
+                            "type": "array",
+                            "items": {"$ref": "#/components/schemas/Schema"},
+                        }
+                    }
+                },
+            }
+        },
+    )
+    def scorer_list(
+        project_id: str,
+        limit: int | None = None,
+        offset: int | None = None,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> StreamingResponse:
+        """List scorer objects."""
+        req = tsi.ScorerListReq(project_id=project_id, limit=limit, offset=offset)
+        return StreamingResponse(
+            service.trace_server_interface.scorer_list(req),
+            media_type="application/jsonl",
+        )
+
+    @router.post("/scorer/delete", tags=[SCORER_TAG_NAME])
+    def scorer_delete(
+        req: tsi.ScorerDeleteReq,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.ScorerDeleteRes:
+        """Delete a scorer object."""
+        return service.trace_server_interface.scorer_delete(req)
 
     return router

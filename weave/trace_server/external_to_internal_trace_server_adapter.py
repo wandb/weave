@@ -218,7 +218,7 @@ class ExternalTraceServer(tsi.TraceServerInterface):
         return self._ref_apply(self._internal_trace_server.call_update, req)
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
-        req.op_obj.project_id = self._idc.ext_to_int_project_id(req.op_obj.project_id)
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(self._internal_trace_server.op_create, req)
 
     def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
