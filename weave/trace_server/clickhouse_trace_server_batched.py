@@ -38,9 +38,8 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     OrderField,
     QueryBuilderDynamicField,
     QueryBuilderField,
-    build_calls_query_stats_query,
+    build_calls_stats_query,
     combine_conditions,
-    try_optimized_stats_query,
 )
 from weave.trace_server.clickhouse_schema import (
     ALL_CALL_INSERT_COLUMNS,
@@ -338,18 +337,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         aggregate statistics that are not directly queryable from the calls themselves.
         """
         pb = ParamBuilder()
-
-        # Try optimized special case queries first
-        if opt_query := try_optimized_stats_query(req, pb):
-            raw_res = self._query(opt_query, pb.get_params())
-            count = raw_res.result_rows[0][0] if raw_res.result_rows else 0
-            return tsi.CallsQueryStatsRes(
-                count=count,
-                total_storage_size_bytes=None,
-            )
-
-        # Fall back to general query
-        query, columns = build_calls_query_stats_query(req, pb)
+        query, columns = build_calls_stats_query(req, pb)
         raw_res = self._query(query, pb.get_params())
 
         res_dict = (

@@ -1621,33 +1621,31 @@ def process_calls_filter_to_conditions(
 ######### STATS QUERY HANDLING ##########
 
 
-def optimized_project_contains_call_query(
-    project_id: str,
-    param_builder: ParamBuilder,
-) -> str:
-    """Returns a query that checks if the project contains any calls."""
-    return safely_format_sql(
-        f"""SELECT
-    toUInt8(count()) AS has_any
-    FROM
-    (
-        SELECT 1
-        FROM calls_merged
-        WHERE project_id = {param_slot(param_builder.add_param(project_id), "String")}
-        LIMIT 1
-    )
-    """,
-        logger,
-    )
-
-
-def build_calls_query_stats_query(
+def build_calls_stats_query(
     req: tsi.CallsQueryStatsReq,
     param_builder: ParamBuilder,
 ) -> tuple[str, KeysView[str]]:
+    """Build a stats query for calls, automatically using optimized queries when possible.
+
+    This function handles both optimized special-case queries and the general case.
+    Returns a tuple of (query_sql, column_names).
+
+    Args:
+        req: The stats query request
+        param_builder: Parameter builder for query parameterization
+
+    Returns:
+        Tuple of (SQL query string, column names in the result)
+    """
+    # Try optimized special case queries first
+    if opt_query := _try_optimized_stats_query(req, param_builder):
+        # Optimized queries return just count, no other columns
+        return (opt_query, {"count": "count()"}.keys())
+
+    # Fall back to general query builder
     cq = CallsQuery(
         project_id=req.project_id,
-        include_total_storage_size=req.include_total_storage_size,
+        include_total_storage_size=req.include_total_storage_size or False,
     )
 
     cq.add_field("id")
@@ -1673,7 +1671,57 @@ def build_calls_query_stats_query(
     return (calls_query_sql, aggregated_columns.keys())
 
 
-def optimized_wb_run_id_not_null_query(
+def _try_optimized_stats_query(
+    req: tsi.CallsQueryStatsReq, param_builder: ParamBuilder
+) -> Optional[str]:
+    """Try to match request to an optimized special-case query.
+
+    Returns optimized query string if a pattern matches, None otherwise.
+    Add new patterns here for common hot-path queries.
+    """
+    # Pattern 1: Simple existence check (limit=1, no filters)
+    if (
+        req.limit == 1
+        and req.filter is None
+        and req.query is None
+        and not req.include_total_storage_size
+    ):
+        return _optimized_project_contains_call_query(req.project_id, param_builder)
+
+    # Pattern 2: Query with wb_run_id check (limit=1, query present, minimal filter)
+    # Covers common case: checking for runs with wb_run_id not null
+    if (
+        req.limit == 1
+        and req.query is not None
+        and not req.include_total_storage_size
+        and _is_minimal_filter(req.filter)
+    ):
+        return _optimized_wb_run_id_not_null_query(req.project_id, param_builder)
+
+    return None
+
+
+def _optimized_project_contains_call_query(
+    project_id: str,
+    param_builder: ParamBuilder,
+) -> str:
+    """Returns a query that checks if the project contains any calls."""
+    return safely_format_sql(
+        f"""SELECT
+    toUInt8(count()) AS has_any
+    FROM
+    (
+        SELECT 1
+        FROM calls_merged
+        WHERE project_id = {param_slot(param_builder.add_param(project_id), "String")}
+        LIMIT 1
+    )
+    """,
+        logger,
+    )
+
+
+def _optimized_wb_run_id_not_null_query(
     project_id: str,
     param_builder: ParamBuilder,
 ) -> str:
@@ -1692,36 +1740,6 @@ def optimized_wb_run_id_not_null_query(
             LIMIT 1
         )
     """
-
-
-def try_optimized_stats_query(
-    req: tsi.CallsQueryStatsReq, param_builder: ParamBuilder
-) -> Optional[str]:
-    """Try to match request to an optimized special-case query.
-
-    Returns optimized query string if a pattern matches, None otherwise.
-    Add new patterns here for common hot-path queries.
-    """
-    # Pattern 1: Simple existence check (limit=1, no filters)
-    if (
-        req.limit == 1
-        and req.filter is None
-        and req.query is None
-        and not req.include_total_storage_size
-    ):
-        return optimized_project_contains_call_query(req.project_id, param_builder)
-
-    # Pattern 2: Query with wb_run_id check (limit=1, query present, minimal filter)
-    # Covers common case: checking for runs with wb_run_id not null
-    if (
-        req.limit == 1
-        and req.query is not None
-        and not req.include_total_storage_size
-        and _is_minimal_filter(req.filter)
-    ):
-        return optimized_wb_run_id_not_null_query(req.project_id, param_builder)
-
-    return None
 
 
 def _is_minimal_filter(filter: Optional[tsi.CallsFilter]) -> bool:
