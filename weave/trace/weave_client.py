@@ -36,6 +36,7 @@ from weave.trace.concurrent.futures import FutureExecutor
 from weave.trace.constants import TRACE_CALL_EMOJI
 from weave.trace.context import call_context
 from weave.trace.feedback import FeedbackQuery
+from weave.trace.git_utils import get_git_state
 from weave.trace.init_message import WANDB_AVAILABLE
 from weave.trace.interface_query_builder import (
     exists_expr,
@@ -75,12 +76,15 @@ from weave.trace.serialization.serialize import (
 from weave.trace.serialization.serializer import get_serializer_for_obj
 from weave.trace.settings import (
     client_parallelism,
+    should_capture_callsite,
     should_capture_client_info,
+    should_capture_git_state,
     should_capture_system_info,
     should_print_call_link,
     should_redact_pii,
     should_use_parallel_table_upload,
 )
+from weave.trace.callsite import get_callsite_info
 from weave.trace.table import Table
 from weave.trace.table_upload_chunking import ChunkingConfig, TableChunkManager
 from weave.trace.util import deprecated
@@ -718,6 +722,14 @@ class WeaveClient:
             attributes_dict._set_weave_item("os_name", platform.system())
             attributes_dict._set_weave_item("os_version", platform.version())
             attributes_dict._set_weave_item("os_release", platform.release())
+        if should_capture_git_state():
+            git_state = get_git_state()
+            if git_state:
+                attributes_dict._set_weave_item("git", git_state)
+        if should_capture_callsite():
+            callsite_info = get_callsite_info()
+            if callsite_info:
+                attributes_dict._set_weave_item("callsite", callsite_info)
 
         op_name_future = self.future_executor.defer(lambda: op_def_ref.uri())
 
