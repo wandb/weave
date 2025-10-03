@@ -1637,10 +1637,11 @@ def build_calls_stats_query(
     Returns:
         Tuple of (SQL query string, column names in the result)
     """
+    aggregated_columns = {"count": "count()"}
+
     # Try optimized special case queries first
     if opt_query := _try_optimized_stats_query(req, param_builder):
-        # Optimized queries return just count, no other columns
-        return (opt_query, {"count": "count()"}.keys())
+        return (opt_query, aggregated_columns.keys())
 
     # Fall back to general query builder
     cq = CallsQuery(
@@ -1658,7 +1659,6 @@ def build_calls_stats_query(
     if req.expand_columns is not None:
         cq.set_expand_columns(req.expand_columns)
 
-    aggregated_columns = {"count": "count()"}
     if req.include_total_storage_size:
         aggregated_columns["total_storage_size_bytes"] = (
             "sum(coalesce(total_storage_size_bytes, 0))"
