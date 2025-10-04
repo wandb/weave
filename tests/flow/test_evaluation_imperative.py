@@ -6,7 +6,9 @@ from typing import Callable, TypedDict
 import pytest
 
 import weave
-from weave.evaluation.eval_imperative import EvaluationLogger, Model, Scorer
+from weave.evaluation.eval_imperative import EvaluationLogger
+from weave.flow.model import Model
+from weave.flow.scorer import Scorer
 from weave.integrations.integration_utilities import op_name_from_call
 from weave.trace.context import call_context
 from weave.trace.serialization.serialize import to_json
@@ -16,6 +18,23 @@ from weave.trace_server.trace_server_interface import ObjectVersionFilter
 class ExampleRow(TypedDict):
     a: int
     b: int
+
+
+@pytest.fixture(params=["v1"])  # v2 temporarily disabled
+def eval_version(request, monkeypatch):
+    """Parametrized fixture that forces either v1 or v2 evaluation logger.
+
+    This allows tests to run against both implementations to ensure API compatibility.
+    """
+    version = request.param
+
+    # Use WEAVE_USE_V2_EVAL_API environment variable to control version
+    if version == "v1":
+        monkeypatch.setenv("WEAVE_USE_V2_EVAL_API", "false")
+    elif version == "v2":
+        monkeypatch.setenv("WEAVE_USE_V2_EVAL_API", "true")
+
+    return version
 
 
 @pytest.fixture
@@ -36,7 +55,10 @@ def user_model():
 
 
 def test_basic_evaluation(
-    client, user_dataset: list[ExampleRow], user_model: Callable[[int, int], int]
+    client,
+    user_dataset: list[ExampleRow],
+    user_model: Callable[[int, int], int],
+    eval_version: str,
 ):
     ev = EvaluationLogger()
 

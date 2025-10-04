@@ -187,6 +187,15 @@ class UserSettings(BaseModel):
     Can be overridden with the environment variable `WEAVE_USE_PARALLEL_TABLE_UPLOAD`
     """
 
+    use_v2_eval_api: bool = False
+    """
+    Toggles the use of V2 evaluation API.
+
+    If True, uses the V2 (TraceServer-based) evaluation logging implementation.
+    If False, uses the V1 implementation.
+    Can be overridden with the environment variable `WEAVE_USE_V2_EVAL_API`
+    """
+
     model_config = ConfigDict(extra="forbid")
     _is_first_apply: bool = PrivateAttr(True)
 
@@ -302,6 +311,11 @@ def should_use_parallel_table_upload() -> bool:
 def should_implicitly_patch_integrations() -> bool:
     """Returns whether implicit patching of integrations is enabled."""
     return _should("implicitly_patch_integrations")
+
+
+def should_use_v2_eval_api() -> bool:
+    """Returns whether the V2 evaluation API should be used."""
+    return _should("use_v2_eval_api")
 
 
 def parse_and_apply_settings(
