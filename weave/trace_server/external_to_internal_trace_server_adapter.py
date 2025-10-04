@@ -460,3 +460,20 @@ class ExternalTraceServer(tsi.TraceServerInterface):
     ) -> tsi.EvaluationStatusRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(self._internal_trace_server.evaluation_status, req)
+
+    def alert_metrics_create(
+        self, req: tsi.AlertMetricsCreateReq
+    ) -> tsi.AlertMetricsCreateRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        for metric in req.metrics:
+            if metric.wb_user_id is not None:
+                metric.wb_user_id = self._idc.ext_to_int_user_id(metric.wb_user_id)
+        return self._ref_apply(self._internal_trace_server.alert_metrics_create, req)
+
+    def alert_metrics_query_stream(
+        self, req: tsi.AlertMetricsQueryReq
+    ) -> Iterator[tsi.AlertMetricSchema]:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(
+            self._internal_trace_server.alert_metrics_query_stream, req
+        )
