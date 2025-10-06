@@ -13,8 +13,7 @@ class Dictifiable(Protocol):
 
 
 def try_to_dict(obj: Any) -> dict[str, Any] | None:
-    """
-    Attempt to convert an object to a dictionary using the Dictifiable protocol.
+    """Attempt to convert an object to a dictionary using the Dictifiable protocol.
 
     Args:
         obj: Object to attempt to convert to dictionary

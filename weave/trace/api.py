@@ -20,15 +20,17 @@ from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.context.call_context import get_current_call, require_current_call
 from weave.trace.display.term import configure_logger
 from weave.trace.op import PostprocessInputsFunc, PostprocessOutputFunc, as_op, op
-from weave.trace.refs import ObjectRef, parse_uri
+from weave.trace.refs import ObjectRef, Ref
 from weave.trace.settings import (
     UserSettings,
     parse_and_apply_settings,
     should_disable_weave,
 )
 from weave.trace.table import Table
+from weave.trace.view_utils import set_call_view
 from weave.trace_server.ids import generate_id
 from weave.trace_server.interface.builtin_object_classes import leaderboard
+from weave.type_wrappers.Content.content import Content
 
 logger = logging.getLogger(__name__)
 
@@ -58,9 +60,11 @@ def init(
     to the specified project.
 
     Args:
-        project_name: The name of the Weights & Biases project to log to.
+        project_name: The name of the Weights & Biases team and project to log to. If you don't
+            specify a team, your default entity is used.
+            To find or update your default entity, refer to [User Settings](https://docs.wandb.ai/guides/models/app/settings-page/user-settings/#default-team) in the W&B Models documentation.
         settings: Configuration for the Weave client generally.
-        autopatch_settings: Configuration for autopatch integrations, e.g. openai
+        autopatch_settings: (Deprecated) Configuration for autopatch integrations. Use explicit patching instead.
         global_postprocess_inputs: A function that will be applied to all inputs of all ops.
         global_postprocess_output: A function that will be applied to all outputs of all ops.
         global_attributes: A dictionary of attributes that will be applied to all traces.
@@ -73,6 +77,9 @@ def init(
     Returns:
         A Weave client.
     """
+    if not project_name or not project_name.strip():
+        raise ValueError("project_name must be non-empty")
+
     configure_logger()
 
     if sys.version_info < (3, 10):
@@ -80,6 +87,19 @@ def init(
             "Python 3.9 will reach end of life in October 2025, after which weave will drop support for it.  Please upgrade to Python 3.10 or later!",
             DeprecationWarning,
             stacklevel=2,
+        )
+
+    # Check if deprecated autopatch_settings is used
+    if autopatch_settings is not None:
+        logger.warning(
+            "The 'autopatch_settings' parameter is deprecated and will be removed in a future version. "
+            "Please use explicit patching instead. For example:\n"
+            "----------------------------------------\n"
+            "    import weave\n"
+            f"    weave.init('{project_name}')\n"
+            "    weave.integrations.patch_openai()\n"
+            "----------------------------------------\n"
+            "See https://docs.wandb.ai/guides/integrations for more information.",
         )
 
     parse_and_apply_settings(settings)
@@ -93,14 +113,11 @@ def init(
     _global_attributes = global_attributes or {}
 
     if should_disable_weave():
-        return weave_init.init_weave_disabled().client
+        return weave_init.init_weave_disabled()
 
-    initialized_client = weave_init.init_weave(
+    return weave_init.init_weave(
         project_name,
-        autopatch_settings=autopatch_settings,
     )
-
-    return initialized_client.client
 
 
 def get_client() -> weave_client.WeaveClient | None:
@@ -108,19 +125,17 @@ def get_client() -> weave_client.WeaveClient | None:
 
 
 def publish(obj: Any, name: str | None = None) -> ObjectRef:
-    """Save and version a python object.
+    """Save and version a Python object.
 
-    If an object with name already exists, and the content hash of obj does
-    not match the latest version of that object, a new version will be created.
-
-    TODO: Need to document how name works with this change.
+    Weave creates a new version of the object if the object's name already exists and its content hash does
+    not match the latest version of that object.
 
     Args:
         obj: The object to save and version.
         name: The name to save the object under.
 
     Returns:
-        A weave Ref to the saved object.
+        A Weave Ref to the saved object.
     """
     client = weave_client_context.require_weave_client()
 
@@ -162,16 +177,14 @@ def publish(obj: Any, name: str | None = None) -> ObjectRef:
 
 
 def ref(location: str) -> ObjectRef:
-    """Construct a Ref to a Weave object.
-
-    TODO: what happens if obj does not exist
+    """Creates a Ref to an existing Weave object. This does not directly retrieve
+    the object but allows you to pass it to other Weave API functions.
 
     Args:
-        location: A fully-qualified weave ref URI, or if weave.init() has been called, "name:version" or just "name" ("latest" will be used for version in this case).
-
+        location: A Weave Ref URI, or if `weave.init()` has been called, `name:version` or `name`. If no version is provided, `latest` is used.
 
     Returns:
-        A weave Ref to the object.
+        A Weave Ref to the object.
     """
     if "://" not in location:
         client = weave_client_context.get_weave_client()
@@ -186,10 +199,10 @@ def ref(location: str) -> ObjectRef:
             name, version = location.split(":")
         location = str(client._ref_uri(name, version, "obj"))
 
-    uri = parse_uri(location)
-    if not isinstance(uri, ObjectRef):
+    ref = Ref.parse_uri(location)
+    if not isinstance(ref, ObjectRef):
         raise TypeError("Expected an object ref")
-    return uri
+    return ref
 
 
 def get(uri: str | ObjectRef) -> Any:
@@ -205,7 +218,6 @@ def get(uri: str | ObjectRef) -> Any:
         The object.
 
     Example:
-
     ```python
     weave.init("weave_get_example")
     dataset = weave.Dataset(rows=[{"a": 1, "b": 2}])
@@ -221,11 +233,9 @@ def get(uri: str | ObjectRef) -> Any:
 
 @contextlib.contextmanager
 def attributes(attributes: dict[str, Any]) -> Iterator:
-    """
-    Context manager for setting attributes on a call.
+    """Context manager for setting attributes on a call.
 
     Example:
-
     ```python
     with weave.attributes({'env': 'production'}):
         print(my_function.call("World"))
@@ -239,6 +249,59 @@ def attributes(attributes: dict[str, Any]) -> Iterator:
         yield
     finally:
         call_context.call_attributes.reset(token)
+
+
+def set_view(
+    name: str,
+    content: Content | str,
+    *,
+    extension: str | None = None,
+    mimetype: str | None = None,
+    metadata: dict[str, Any] | None = None,
+    encoding: str = "utf-8",
+) -> None:
+    """Attach a custom view to the current call summary at `_weave.views.<name>`.
+
+    Args:
+        name: The view name (key under `summary._weave.views`).
+        content: A `weave.Content` instance or raw string. Strings are wrapped via
+            `Content.from_text` using the supplied extension or mimetype.
+        extension: Optional file extension to use when `content` is a string.
+        mimetype: Optional MIME type to use when `content` is a string.
+        metadata: Optional metadata to attach when creating `Content` from text.
+        encoding: Text encoding to apply when creating `Content` from text.
+
+    Returns:
+        None
+
+    Examples:
+        >>> import weave
+        >>> weave.init("proj")
+        >>> @weave.op
+        ... def foo():
+        ...     weave.set_view("readme", "# Hello", extension="md")
+        ...     return 1
+        >>> foo()
+    """
+    if isinstance(content, str) and len(content) == 0:
+        raise ValueError("Content cannot be an empty string")
+
+    if not isinstance(name, str) or len(name) == 0:
+        raise ValueError("`name` must be a non-empty string")
+
+    call = require_current_call()
+    client = weave_client_context.require_weave_client()
+
+    set_call_view(
+        call=call,
+        client=client,
+        name=name,
+        content=content,
+        extension=extension,
+        mimetype=mimetype,
+        metadata=metadata,
+        encoding=encoding,
+    )
 
 
 class ThreadContext:
@@ -273,11 +336,9 @@ class ThreadContext:
 
 @contextlib.contextmanager
 def thread(thread_id: str | None | object = _AUTO_GENERATE) -> Iterator[ThreadContext]:
-    """
-    Context manager for setting thread_id on calls within the context.
+    """Context manager for setting thread_id on calls within the context.
 
     Examples:
-
     ```python
     # Auto-generate thread_id
     with weave.thread() as t:
@@ -350,10 +411,10 @@ __all__ = [
     "get_current_call",
     "init",
     "op",
-    "parse_uri",
     "publish",
     "ref",
     "require_current_call",
+    "set_view",
     "thread",
     "weave_client_context",
 ]

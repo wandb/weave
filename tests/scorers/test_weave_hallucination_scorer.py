@@ -36,8 +36,7 @@ def test_weave_hallucination_scorer_large_input(weave_hallucination_scorer):
 
 
 def test_weave_hallucination_scorer_threshold(weave_hallucination_scorer):
-    """
-    Confirms that the threshold logic works properly.
+    """Confirms that the threshold logic works properly.
     This example text is contrived to produce a hallucination.
     """
     query = "What is John's favorite food?"

@@ -1,5 +1,7 @@
 # Hugging Face Hub
 
+import DefaultEntityNote from '../../../src/components/DefaultEntityNote.mdx';
+
 :::important
 All code samples shown on this page are in Python.
 :::
@@ -20,7 +22,7 @@ Do you want to experiment with Hugging Face Hub and Weave without any of the set
 
 The `huggingface_hub` Python library provides a unified interface to run inference across multiple services for models hosted on the Hub. You can invoke these models using the [`InferenceClient`](https://huggingface.co/docs/huggingface_hub/en/package_reference/inference_client).
 
-Weave will automatically capture traces for [`InferenceClient`](https://huggingface.co/docs/huggingface_hub/en/package_reference/inference_client). To start tracking, calling `weave.init()` and use the library as normal.
+Weave will automatically capture traces for [`InferenceClient`](https://huggingface.co/docs/huggingface_hub/en/package_reference/inference_client). To start tracking, call `weave.init()` and use the library as normal.
 
 ## Prerequisites
 
@@ -76,6 +78,8 @@ response = huggingface_client.chat_completion(
     seed=42,
 )
 ```
+
+<DefaultEntityNote />
 
 After the code shown above runs, Weave tracks and logs all LLM calls made with the Hugging Face Inference Client. You can view these traces in the Weave web interface.
 
@@ -163,7 +167,7 @@ Weave also captures and visualizes function execution, helping you to understand
 
 Managing LLM experiments can be challenging when multiple components are involved. The Weave [`Model`](../core-types/models.md) class helps capture and organize experimental details, such as system prompts and model configurations, allowing you to easily compare different iterations.
 
-In addition to versioning code and capturing inputs/outputs, a `Model` stores structured parameters that control application behavior. This makes it easier to track which configurations produced the best results. You can also integrate a Weave `Model` with Weave [Serve](../tools/serve.md) and [Evaluations](../evaluation/scorers.md) for further insights.
+In addition to versioning code and capturing inputs/outputs, a `Model` stores structured parameters that control application behavior. This makes it easier to track which configurations produced the best results. You can also integrate a Weave `Model` with [Evaluations](../evaluation/scorers.md) for further insights.
 
 The example below demonstrates defines a `CityVisitRecommender` model for travel recommendations. Each modification to its parameters generates a new version, making experimentation easy.
 

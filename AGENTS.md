@@ -99,6 +99,21 @@ TODO: need to fill this out
 - Include meaningful error messages
 - Add error handling tests
 
+### Integration Testing
+
+- Since autopatching was removed from `weave.init()`, integration tests must explicitly patch their integrations
+- Add a fixture with `autouse=True` at the top of each integration test file to enable patching
+- Example pattern:
+  ```python
+  @pytest.fixture(autouse=True)
+  def patch_integration() -> Generator[None, None, None]:
+      patcher = get_integration_patcher()
+      patcher.attempt_patch()
+      yield
+      patcher.undo_patch()
+  ```
+- Some integrations (like instructor) may need to patch multiple libraries
+
 ### Documentation
 
 - Make sure to add end-user documentation inside the `docs` dir when creating new features.
@@ -107,6 +122,59 @@ TODO: need to fill this out
 - Update this file when introducing new patterns or concepts
 
 ---
+
+## Integration Patching
+
+### Automatic Implicit Patching
+
+Weave provides automatic implicit patching for all supported integrations using an import hook mechanism:
+
+- **Automatic Patching**: Libraries are automatically patched regardless of when they are imported
+- **Import Hook**: An import hook intercepts library imports and applies patches automatically
+- **Explicit Patching**: Optional manual patching is still available for fine-grained control
+
+Example:
+
+```python
+# Automatic patching - works regardless of import order!
+
+# Option 1: Import before weave.init()
+import openai
+import weave
+weave.init('my-project')  # OpenAI is automatically patched!
+
+# Option 2: Import after weave.init()
+import weave
+weave.init('my-project')
+import anthropic  # Automatically patched via import hook!
+
+# Option 3: Explicit patching (optional)
+import weave
+weave.init('my-project')
+weave.patch_openai()  # Manually patch if needed
+```
+
+### Available Patch Functions
+
+All integrations have corresponding patch functions for explicit control: `patch_openai()`, `patch_anthropic()`, `patch_mistral()`, etc.
+
+### Technical Implementation
+
+The import hook uses Python's `sys.meta_path` to intercept imports and automatically apply patches when supported libraries are imported. This ensures seamless integration tracking without requiring users to manage import order or make explicit patch calls.
+
+### Disabling Implicit Patching
+
+If you prefer explicit control over which integrations are patched, you can disable implicit patching:
+
+```python
+# Via settings parameter
+weave.init('my-project', settings={'implicitly_patch_integrations': False})
+
+# Via environment variable
+export WEAVE_IMPLICITLY_PATCH_INTEGRATIONS=false
+```
+
+When disabled, you must explicitly call patch functions like `weave.patch_openai()` to enable tracing for integrations.
 
 # Requests to Humans
 

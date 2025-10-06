@@ -144,17 +144,20 @@ def get_llm_usage(param_builder: ParamBuilder, table_alias: str) -> PreparedSele
     completion_tokens = """if(JSONHas(kv.2, 'completion_tokens'), JSONExtractInt(kv.2, 'completion_tokens'), JSONExtractInt(kv.2, 'output_tokens')) AS completion_tokens"""
     total_tokens = "JSONExtractInt(kv.2, 'total_tokens') AS total_tokens"
 
-    select_query = all_calls_table.select().fields(
-        [
-            "*",
-            usage_raw,
-            kv,
-            llm_id,
-            requests,
-            prompt_tokens,
-            completion_tokens,
-            total_tokens,
-        ]
+    select_query = (
+        all_calls_table.select()
+        .fields(["*"])
+        .raw_sql_fields(
+            [
+                usage_raw,
+                kv,
+                llm_id,
+                requests,
+                prompt_tokens,
+                completion_tokens,
+                total_tokens,
+            ]
+        )
     )
 
     prepared_query = select_query.prepare(
@@ -239,7 +242,8 @@ def get_ranked_prices(
 
     select_query = (
         llm_usage_table.select()
-        .fields(["*", *ltp_fields, row_number_clause])
+        .fields(["*", *ltp_fields])
+        .raw_sql_fields([row_number_clause])
         .join(
             LLM_TOKEN_PRICES_TABLE,
             tsi.Query(
@@ -421,7 +425,8 @@ def final_call_select_with_cost(
 
     final_query = (
         ranked_price_table.select()
-        .fields([*final_select_fields, summary_dump_snippet])
+        .fields(final_select_fields)
+        .raw_sql_fields([summary_dump_snippet])
         .where(
             tsi.Query(**{"$expr": {"$eq": [{"$getField": "rank"}, {"$literal": 1}]}})
         )
@@ -446,8 +451,7 @@ def cost_query(
     select_fields: list[str],
     order_fields: list[tsi.SortBy],
 ) -> str:
-    """
-    This function takes something like the following:
+    """This function takes something like the following:
     1 call row
         [ id, summary_dump: {usage: { llm_1, llm_2}} ]
     splits it based on usage and extracts fields
@@ -459,7 +463,7 @@ def cost_query(
         [ id, summary_dump: {usage: { llm_1, llm_2}}, usage_raw, llm_id: llm_1, requests, prompt_tokens, completion_tokens, total_tokens,
             pricing_level, pricing_level_id, provider_id, effective_date, prompt_token_cost, completion_token_cost, prompt_token_cost_unit, completion_token_cost_unit, created_by, created_at, rank: 1 ]
         [ id, summary_dump: {usage: { llm_1, llm_2}}, usage_raw, llm_id: llm_1, requests, prompt_tokens, completion_tokens, total_tokens,
-            pricing_level, pricing_level_id, provider_id, effective_date, prompt_token_cost, completion_token_cost, prompt_token_cost_unit, completion_token_cost_unit, created_by, created_at, rank: 2 ]
+            pricing_level, pricing_level_id, provider_id, effective_date, prompt_token_cost, completion_token_cost, prompt_token_cost_unit, completion_token_cost_unit, created_by, created_at, rank: 2 ].
 
         [ id, summary_dump: {usage: { llm_1, llm_2}}, usage_raw, llm_id: llm_2, requests, prompt_tokens, completion_tokens, total_tokens,
             pricing_level, pricing_level_id, provider_id, effective_date, prompt_token_cost, completion_token_cost, prompt_token_cost_unit, completion_token_cost_unit, created_by, created_at, rank: 1 ]

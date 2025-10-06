@@ -44,7 +44,7 @@ async def test_score_with_chat_history(weave_coherence_scorer):
 
 @pytest.mark.asyncio
 async def test_incoherent_response(weave_coherence_scorer):
-    """Test  with incoherent response"""
+    """Test  with incoherent response."""
     query = "This is a test prompt."
     output = "The grass moon ducks by they"
     # Call score with the context parameter.

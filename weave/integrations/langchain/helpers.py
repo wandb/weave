@@ -1,5 +1,4 @@
-"""
-Helper Functions
+"""Helper Functions.
 
 Extracts usage metadata from responses. Handles different provider formats
 by flattening nested structures and searching for usage-related fields.
@@ -14,7 +13,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any
 
-from weave.trace.weave_client import Call
+from weave.trace.call import Call
 from weave.utils.dict_utils import convert_defaultdict_to_dict, flatten_attributes
 
 
@@ -26,8 +25,7 @@ class TokenUsage:
 
 
 def _normalize_usage_metadata(usage_metadata: dict) -> TokenUsage:
-    """
-    Normalize usage metadata from different provider formats to standard format.
+    """Normalize usage metadata from different provider formats to standard format.
 
     Args:
         usage_metadata: Raw usage metadata dictionary from provider
@@ -70,8 +68,7 @@ def _normalize_usage_metadata(usage_metadata: dict) -> TokenUsage:
 
 
 def _find_full_model_name(output: Any, partial_model_name: str) -> str:
-    """
-    Find the full model name by searching flattened output for longer model names.
+    """Find the full model name by searching flattened output for longer model names.
 
     Args:
         output: The LangChain output dictionary

@@ -1,5 +1,4 @@
-"""
-GitHub Activity Digest Generator
+"""GitHub Activity Digest Generator.
 
 This module generates comprehensive activity digests for GitHub repositories, with optional Slack integration.
 It tracks commits, pull requests, and categorizes changes across different areas of the codebase.

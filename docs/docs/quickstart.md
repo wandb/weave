@@ -4,9 +4,7 @@ import TabItem from '@theme/TabItem';
 # Track LLM inputs & outputs
 
 :::tip
-For a limited time, the new W&B Inference service is included in your free tier. W&B Inference provides access to leading open-source foundation models via API and the Weave [Playground](./guides/tools/playground.md). 
-- [Developer documentation](https://docs.wandb.ai/guides/inference/)
-- [Product page](https://wandb.ai/site/inference) 
+Try our [W&B Inference quickstart](/quickstart-inference) to get started without external API keys.
 :::
 
 <!-- TODO: Update wandb.me/weave-quickstart to match this new link -->
@@ -40,14 +38,15 @@ Then, create a Weights & Biases (W&B) account at https://wandb.ai and copy your 
 
 To get started with tracking your first project with Weave:
 
-- Import the `weave` library
-- Call `weave.init('project-name')` to start tracking
-  - You will be prompted to log in with your API key if you are not yet logged in on your machine.
-  - To log to a specific W&B Team name, replace `project-name` with `team-name/project-name`
-  - **NOTE:** In automated environments, you can define the environment variable `WANDB_API_KEY` with your API key to login without prompting.
-- Add the `@weave.op()` decorator to the python functions you want to track
+1. Import the `weave` library
+1. Call `weave.init('project-name')` to start tracking
+    - You will be prompted to log in with your API key if you are not yet logged in on your machine.
+    - To log to a specific W&B Team name, replace `project-name` with `team-name/project-name`. If you don't specify a W&B team, your default entity is used. To find or update your default entity, refer to [User Settings](https://docs.wandb.ai/guides/models/app/settings-page/user-settings/#default-team) in the W&B Models documentation.
+    
+    **NOTE:** In automated environments, you can define the environment variable `WANDB_API_KEY` with your API key to login without prompting.
+1. Add the `@weave.op()` decorator to the python functions you want to track
 
-_In this example, we're using openai so you will need to add an OpenAI [API key](https://platform.openai.com/docs/quickstart/step-2-setup-your-api-key)._
+In this example, we're using openai so you will need to add an OpenAI [API key](https://platform.openai.com/docs/quickstart/step-2-setup-your-api-key).
 
 <Tabs groupId="programming-language" queryString>
   <TabItem value="python" label="Python" default>
@@ -145,6 +144,11 @@ Calls made to OpenAI, Anthropic and [many more LLM libraries](./guides/integrati
 
 ![Weave Trace Outputs 1](../static/img/tutorial_trace_1.png)
 
-## What's next?
+## Next steps
 
-- Follow the [Tracking flows and app metadata](/tutorial-tracing_2) to start tracking and the data flowing through your app.
+Now that you've seen Weave in action, try the W&B Inference service for easier experimentation. [Get Started with W&B Inference](/quickstart-inference) - no need to manage multiple API keys, and free credits are included.
+
+Continue learning:
+- [Track flows and app metadata](/tutorial-tracing_2) - Dive deeper into tracing complex applications
+- [Build evaluations](/tutorial-eval) - Learn systematic model evaluation  
+- [Explore integrations](./guides/integrations/index.md) - Connect more LLM providers and frameworks

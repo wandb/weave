@@ -1,5 +1,6 @@
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
+import DefaultEntityNote from '../../../src/components/DefaultEntityNote.mdx';
 
 # OpenAI
 
@@ -19,15 +20,42 @@ It’s important to store traces of LLM applications in a central database, both
   <TabItem value="python" label="Python" default>
     Weave can automatically capture traces for the [openai python library](https://platform.openai.com/docs/libraries/python-library).
 
-    Start capturing by calling `weave.init(<project-name>)` with a project name your choice.
+    Start capturing by calling `weave.init(<project-name>)` with a project name of your choice. OpenAI will be automatically patched regardless of when you import it.
+    
+    <DefaultEntityNote />
+
+    **Automatic Patching**
+    Weave automatically patches OpenAI whether imported before or after `weave.init()`:
 
     ```python
     from openai import OpenAI
     import weave
+
+    # highlight-next-line
+    weave.init('emoji-bot')  # OpenAI is automatically patched!
+
     client = OpenAI()
+    response = client.chat.completions.create(
+      model="gpt-4",
+      messages=[
+        {"role": "user", "content": "Make me a emoji"}
+      ]
+    )
+    ```
+
+    **Explicit Patching (Optional)**
+    You can still explicitly patch if you want fine-grained control:
+
+    ```python
+    import weave
+
     # highlight-next-line
     weave.init('emoji-bot')
+    # highlight-next-line
+    weave.integrations.patch_openai()  # Enable OpenAI tracing
 
+    from openai import OpenAI
+    client = OpenAI()
     response = client.chat.completions.create(
       model="gpt-4",
       messages=[
@@ -50,7 +78,7 @@ It’s important to store traces of LLM applications in a central database, both
   <TabItem value="typescript" label="TypeScript">
     Weave can automatically capture traces for the [openai typescript library](https://platform.openai.com/docs/libraries/node-js-library).
 
-    Start capturing by calling `await weave.init(<project-name>)` with a project name your choice.
+    Start capturing by calling `await weave.init(<project-name>)` with a project name of your choice. <DefaultEntityNote /> This example specifies the `emoji-bot` project.
 
     :::important What changed?
     As of [PR #4554](https://github.com/wandb/weave/pull/4554), supported libraries such as OpenAI are automatically patched when Weave is loaded. You no longer need to manually wrap them, as was the case previously:

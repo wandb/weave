@@ -11,9 +11,26 @@ from weave.integrations.integration_utilities import (
     flatten_calls,
     op_name_from_ref,
 )
+from weave.integrations.langchain.langchain import langchain_patcher
+from weave.integrations.openai.openai_sdk import get_openai_patcher
+from weave.trace.call import Call
 from weave.trace.context import call_context
-from weave.trace.weave_client import Call, WeaveClient
+from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
+
+
+@pytest.fixture(autouse=True)
+def patch_langchain() -> Generator[None, None, None]:
+    """Patch LangChain and OpenAI for all tests in this file."""
+    openai_patcher = get_openai_patcher()
+
+    langchain_patcher.attempt_patch()
+    openai_patcher.attempt_patch()
+
+    yield
+
+    langchain_patcher.undo_patch()
+    openai_patcher.undo_patch()
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -479,12 +496,12 @@ def test_agent_run_with_tools(
     from langchain.agents import AgentExecutor
     from langchain.agents.format_scratchpad import format_to_openai_function_messages
     from langchain.agents.output_parsers import OpenAIFunctionsAgentOutputParser
-    from langchain.pydantic_v1 import BaseModel, Field
     from langchain.tools import StructuredTool
     from langchain_core.messages import AIMessage, HumanMessage
     from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
     from langchain_core.utils.function_calling import convert_to_openai_tool
     from langchain_openai import ChatOpenAI
+    from pydantic import BaseModel, Field
 
     class CalculatorInput(BaseModel):
         a: int = Field(description="first number")
@@ -595,12 +612,12 @@ def test_agent_run_with_function_call(
     from langchain.agents import AgentExecutor
     from langchain.agents.format_scratchpad import format_to_openai_function_messages
     from langchain.agents.output_parsers import OpenAIFunctionsAgentOutputParser
-    from langchain.pydantic_v1 import BaseModel, Field
     from langchain.tools import StructuredTool
     from langchain_core.messages import AIMessage, HumanMessage
     from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
     from langchain_core.utils.function_calling import convert_to_openai_function
     from langchain_openai import ChatOpenAI
+    from pydantic import BaseModel, Field
 
     class CalculatorInput(BaseModel):
         a: int = Field(description="first number")

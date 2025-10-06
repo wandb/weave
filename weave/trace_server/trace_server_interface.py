@@ -369,6 +369,27 @@ class CompletionsCreateRes(BaseModel):
     weave_call_id: Optional[str] = None
 
 
+class ImageGenerationRequestInputs(BaseModel):
+    model: str
+    prompt: str
+    n: Optional[int] = None
+
+
+class ImageGenerationCreateReq(BaseModel):
+    project_id: str
+    inputs: ImageGenerationRequestInputs
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    track_llm_call: Optional[bool] = Field(
+        True,
+        description="Whether to track this image generation call in the trace server",
+    )
+
+
+class ImageGenerationCreateRes(BaseModel):
+    response: dict[str, Any]
+    weave_call_id: Optional[str] = None
+
+
 class CallsFilter(BaseModelStrict):
     op_names: Optional[list[str]] = None
     input_refs: Optional[list[str]] = None
@@ -631,6 +652,15 @@ class ObjQueryRes(BaseModel):
 
 class TableCreateReq(BaseModelStrict):
     table: TableSchemaForInsert
+
+
+class TableCreateFromDigestsReq(BaseModelStrict):
+    project_id: str
+    row_digests: list[str]
+
+
+class TableCreateFromDigestsRes(BaseModel):
+    digest: str
 
 
 """
@@ -1136,8 +1166,7 @@ class ThreadsQueryFilter(BaseModelStrict):
 
 
 class ThreadsQueryReq(BaseModelStrict):
-    """
-    Query threads with aggregated statistics based on turn calls only.
+    """Query threads with aggregated statistics based on turn calls only.
 
     Turn calls are the immediate children of thread contexts (where call.id == turn_id).
     This provides meaningful conversation-level statistics rather than including all
@@ -1248,6 +1277,10 @@ class TraceServerInterface(Protocol):
 
     # Table API
     def table_create(self, req: TableCreateReq) -> TableCreateRes: ...
+    def table_create_from_digests(
+        self, req: TableCreateFromDigestsReq
+    ) -> TableCreateFromDigestsRes: ...
+
     def table_update(self, req: TableUpdateReq) -> TableUpdateRes: ...
     def table_query(self, req: TableQueryReq) -> TableQueryRes: ...
     def table_query_stream(self, req: TableQueryReq) -> Iterator[TableRowSchema]: ...
@@ -1289,6 +1322,11 @@ class TraceServerInterface(Protocol):
     def completions_create_stream(
         self, req: CompletionsCreateReq
     ) -> Iterator[dict[str, Any]]: ...
+
+    # Execute Image Generation API
+    def image_create(
+        self, req: ImageGenerationCreateReq
+    ) -> ImageGenerationCreateRes: ...
 
     # Project statistics API
     def project_stats(self, req: ProjectStatsReq) -> ProjectStatsRes: ...

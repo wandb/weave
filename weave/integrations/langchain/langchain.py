@@ -1,5 +1,4 @@
-"""
-Technical Note:
+"""Technical Note:
 This LangChain integration patching differs from other integrations in how tracing is enabled:
 
 1. Environment Variable:
@@ -43,9 +42,9 @@ from weave.integrations.integration_utilities import (
 )
 from weave.integrations.langchain.helpers import _extract_usage_data
 from weave.integrations.patcher import Patcher
+from weave.trace.call import Call
 from weave.trace.context import call_context
 from weave.trace.context import weave_client_context as weave_client_context
-from weave.trace.weave_client import Call
 
 import_failed = False
 

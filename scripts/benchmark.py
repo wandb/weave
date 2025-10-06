@@ -1,8 +1,3 @@
-"""Weave Benchmark Runner
-
-A typer app for selecting and running benchmarks from the benchmarks/ directory.
-"""
-
 #!/usr/bin/env -S uv run --script
 # /// script
 # dependencies = [
@@ -10,6 +5,11 @@ A typer app for selecting and running benchmarks from the benchmarks/ directory.
 #     "typer==0.16.0",
 # ]
 # ///
+"""Weave Benchmark Runner.
+
+A typer app for selecting and running benchmarks from the benchmarks/ directory.
+"""
+
 from __future__ import annotations
 
 import subprocess
@@ -33,8 +33,7 @@ console = Console()
 
 
 def find_benchmarks(benchmarks_dir: Path) -> list[Path]:
-    """
-    Find all Python benchmark files in the benchmarks directory.
+    """Find all Python benchmark files in the benchmarks directory.
 
     Args:
         benchmarks_dir (Path): Path to the benchmarks directory.
@@ -57,8 +56,7 @@ def find_benchmarks(benchmarks_dir: Path) -> list[Path]:
 
 
 def get_benchmark_description(benchmark_path: Path) -> str:
-    """
-    Extract a description from the benchmark file's header docstring.
+    """Extract a description from the benchmark file's header docstring.
 
     Args:
         benchmark_path (Path): Path to the benchmark file.
@@ -88,8 +86,7 @@ def get_benchmark_description(benchmark_path: Path) -> str:
 
 
 def display_benchmarks_table(benchmarks: list[Path]) -> None:
-    """
-    Display available benchmarks in a rich table.
+    """Display available benchmarks in a rich table.
 
     Args:
         benchmarks (list[Path]): List of benchmark file paths.
@@ -115,8 +112,7 @@ def display_benchmarks_table(benchmarks: list[Path]) -> None:
 def execute_benchmark(
     benchmark_path: Path, extra_args: list[str] | None = None
 ) -> bool:
-    """
-    Execute the selected benchmark using uv run.
+    """Execute the selected benchmark using uv run.
 
     Args:
         benchmark_path (Path): Path to the benchmark file to run.
@@ -375,8 +371,7 @@ def run_all_benchmarks(
 
 @app.callback(invoke_without_command=True)
 def main(ctx: typer.Context) -> None:
-    """
-    🔬 Weave Benchmark Runner
+    """🔬 Weave Benchmark Runner.
 
     A rich CLI app for selecting and running benchmarks from the benchmarks/ directory.
     """

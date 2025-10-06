@@ -8,6 +8,15 @@ W&B Weave supports ingestion of OpenTelemetry compatible trace data through a de
 **Path**: `/otel/v1/traces`
 **Method**: POST
 **Content-Type**: `application/x-protobuf`
+**Base URL**: The base URL for the OTEL trace endpoint depends on your W&B deployment type:
+
+- SaaS (Multi-tenant):  
+  `https://traces.wandb.ai/<path>`
+
+- Dedicated instances:  
+  `https://<your-subdomain>.wandb.io/<path>`
+
+Replace `<your-subdomain>` with your organization's unique W&B domain, e.g., `acme.wandb.io`.
 
 ## Authentication
 Standard W&B authentication is used. You must have write permissions to the project where you're sending trace data.
@@ -20,7 +29,7 @@ Standard W&B authentication is used. You must have write permissions to the proj
 
 You must modify the following fields before you can run the code samples below:
 1. `WANDB_API_KEY`: You can get this from [https://wandb.ai/authorize](https://wandb.ai/authorize).
-2. Entity: You can only log traces to the project under an entity that you have access to. You can find your entity name by visiting your W&N dashboard at [https://wandb.ai/home], and checking the **Teams** field in the left sidebar.
+2. Entity: You can only log traces to the project under an entity that you have access to. You can find your entity name by visiting your W&B dashboard at [https://wandb.ai/home], and checking the **Teams** field in the left sidebar.
 3. Project Name: Choose a fun name!
 4. `OPENAI_API_KEY`: You can obtain this from the [OpenAI dashboard](https://platform.openai.com/api-keys).
 

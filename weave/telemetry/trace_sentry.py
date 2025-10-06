@@ -1,5 +1,4 @@
-"""
-This module provides a simple interface to the Sentry SDK.
+"""This module provides a simple interface to the Sentry SDK.
 It is a thin wrapper around the Sentry SDK that provides a few
 convenience methods for logging exceptions and marking sessions.
 Furthermore, it ensures that the Sentry SDK is properly set up
@@ -10,9 +9,6 @@ This file is a trimmed down version of the original WandB Sentry module.
 
 from __future__ import annotations
 
-__all__ = ("Sentry",)
-
-
 import atexit
 import functools
 import os
@@ -20,12 +16,19 @@ import site
 import sys
 from typing import TYPE_CHECKING, Any, Callable, Literal
 
+try:
+    import sentry_sdk  # type: ignore
+    import sentry_sdk.utils  # type: ignore
+
+    SENTRY_AVAILABLE = True
+except ImportError:
+    SENTRY_AVAILABLE = False
+    sentry_sdk = None  # type: ignore
+
 if TYPE_CHECKING:
     from sentry_sdk._types import Event, ExcInfo
+    from sentry_sdk.hub import Hub
 
-
-import sentry_sdk  # type: ignore
-import sentry_sdk.utils  # type: ignore
 
 SENTRY_DEFAULT_DSN = "https://99697cf8ca5158250d3dd6cb23cca9b0@o151352.ingest.us.sentry.io/4507019311251456"
 
@@ -58,9 +61,10 @@ class Sentry:
 
         self.dsn = SENTRY_DEFAULT_DSN
 
-        self.hub: sentry_sdk.hub.Hub | None = None
+        self.hub: Hub | None = None
 
-        self._disabled = False
+        # Disable if sentry is not available
+        self._disabled = not SENTRY_AVAILABLE
 
         # ensure we always end the Sentry session
         atexit.register(self.end_session)
@@ -137,8 +141,10 @@ class Sentry:
     @_safe_noop
     def start_session(self) -> None:
         """Start a new session."""
-        assert self.hub is not None
         # get the current client and scope
+        if not SENTRY_AVAILABLE or self.hub is None:
+            return
+
         _, scope = self.hub._stack[-1]
         session = scope._session
 
@@ -149,8 +155,10 @@ class Sentry:
     @_safe_noop
     def end_session(self) -> None:
         """End the current session."""
-        assert self.hub is not None
         # get the current client and scope
+        if not SENTRY_AVAILABLE or self.hub is None:
+            return
+
         client, scope = self.hub._stack[-1]
         session = scope._session
 
@@ -161,7 +169,9 @@ class Sentry:
     @_safe_noop
     def mark_session(self, status: SessionStatus | None = None) -> None:
         """Mark the current session with a status."""
-        assert self.hub is not None
+        if not SENTRY_AVAILABLE or self.hub is None:
+            return
+
         _, scope = self.hub._stack[-1]
         session = scope._session
 
@@ -180,7 +190,8 @@ class Sentry:
         all events sent from this thread. It also tries to start a session
         if one doesn't already exist for this thread.
         """
-        assert self.hub is not None
+        if not SENTRY_AVAILABLE or self.hub is None:
+            return
 
         with self.hub.configure_scope() as scope:
             if tags is not None:
@@ -218,7 +229,8 @@ class Sentry:
         username: str | None = None,
     ) -> None:
         """Track an event to Sentry."""
-        assert self.hub is not None
+        if not SENTRY_AVAILABLE or self.hub is None:
+            return
 
         event_data: Event = {
             "message": event_name,
@@ -248,3 +260,5 @@ def _is_local_dev_install(module: Any) -> bool:
 global_trace_sentry = Sentry()
 global_trace_sentry.setup()
 global_trace_sentry.configure_scope()
+
+__all__ = ("SENTRY_AVAILABLE", "Sentry", "sentry_sdk")

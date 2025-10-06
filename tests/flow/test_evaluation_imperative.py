@@ -9,6 +9,7 @@ import weave
 from weave.evaluation.eval_imperative import EvaluationLogger, Model, Scorer
 from weave.integrations.integration_utilities import op_name_from_call
 from weave.trace.context import call_context
+from weave.trace.serialization.serialize import to_json
 from weave.trace_server.trace_server_interface import ObjectVersionFilter
 
 
@@ -605,3 +606,137 @@ def test_evaluation_logger_with_custom_attributes(client):
 
     calls = client.get_calls()
     assert calls[0].attributes["custom_attribute"] == "value"
+
+
+def test_evaluation_logger_uses_passed_output_not_model_predict(client):
+    """Test that EvaluationLogger uses the passed output instead of calling model.predict.
+
+    This test validates the fix for the issue where log_prediction was calling
+    model.predict(inputs) internally instead of using the passed outputs.
+    """
+
+    class TestModel(weave.Model):
+        @weave.op
+        def predict(self, text: str) -> str:
+            # This should NOT be called during log_prediction
+            return "MODEL_PREDICTED_OUTPUT"
+
+    model = TestModel()
+    ev = EvaluationLogger(model=model)
+
+    # Pass a different output than what the model would predict
+    custom_output = "USER_PROVIDED_OUTPUT"
+    pred = ev.log_prediction(inputs={"text": "test input"}, output=custom_output)
+    pred.finish()
+    ev.finish()
+
+    client.flush()
+    calls = client.get_calls()
+
+    # Find the Model.predict call
+    predict_call = None
+    for call in calls:
+        if op_name_from_call(call) == "Model.predict":
+            predict_call = call
+            break
+
+    assert predict_call is not None
+    # The output should be the user-provided one, not the model's prediction
+    assert predict_call.output == custom_output
+    assert predict_call.output != "MODEL_PREDICTED_OUTPUT"
+
+
+@pytest.mark.parametrize("model_name", ["for", "42", "a-b-c", "!"])
+def test_evaluation_invalid_model_name_fixable(model_name):
+    # Should not raise
+    weave.EvaluationLogger(model=model_name)
+
+
+@pytest.mark.parametrize("model_name", [""])
+def test_evaluation_invalid_model_name_not_fixable(model_name):
+    with pytest.raises(ValueError):
+        weave.EvaluationLogger(model=model_name)
+
+
+def test_evaluation_logger_with_predefined_scorers(client, caplog):
+    """Test that EvaluationLogger can track predefined scorers and warn when using unlisted ones."""
+    import logging
+
+    # Create evaluation with predefined scorer names
+    ev = EvaluationLogger(
+        model="test_model",
+        dataset=[{"input": 1}],
+        scorers=["accuracy", "precision"],  # List of allowed scorer names
+    )
+
+    with caplog.at_level(logging.WARNING):
+        pred = ev.log_prediction({"input": 1}, 1)
+
+        # These should not warn (in the predefined list)
+        pred.log_score("accuracy", 0.9)
+        pred.log_score("precision", 0.85)
+
+        # This should warn (not in the predefined list)
+        pred.log_score("recall", 0.8)
+
+        pred.finish()
+
+    # Verify warning was issued for unlisted scorer
+    warning_messages = [r.message for r in caplog.records]
+    assert any(
+        "recall" in msg and "not in the predefined scorers list" in msg
+        for msg in warning_messages
+    )
+    assert any(
+        "Expected one of: ['accuracy', 'precision']" in msg for msg in warning_messages
+    )
+
+    ev.finish()
+    client.flush()
+
+    # Verify scorers are stored in evaluation attributes
+    calls = client.get_calls()
+    eval_call = next(c for c in calls if op_name_from_call(c) == "Evaluation.evaluate")
+    assert eval_call.inputs["self"].metadata["scorers"] == ["accuracy", "precision"]
+
+    # verify we can get the eval object separately by ref and see metadata
+    eval_object = ev._pseudo_evaluation.ref.get()
+    assert eval_object.metadata["scorers"] == ["accuracy", "precision"]
+
+
+def test_evaluation_logger_set_view(client):
+    """Ensure set_view stores content metadata on evaluation summary."""
+    ev = weave.EvaluationLogger()
+    content = weave.Content.from_text("# hello", mimetype="text/markdown")
+    content2 = weave.Content.from_text("<h1>hello world</h1>", mimetype="text/html")
+
+    ev.set_view("report", content)
+    ev.set_view("report2", content2)
+    ev.finish()
+    client.flush()
+
+    evaluate_call = client.get_calls()[0]
+    assert evaluate_call.summary["weave"] is not None
+    assert "views" in evaluate_call.summary["weave"]
+    views = evaluate_call.summary["weave"]["views"]
+    assert len(views) == 2
+    assert views["report"] == to_json(content, client._project_id(), client)
+    assert views["report2"] == to_json(content2, client._project_id(), client)
+
+
+def test_evaluation_logger_set_view_string(client):
+    """Ensure string inputs are accepted for evaluation views."""
+    ev = weave.EvaluationLogger()
+    ev.set_view("view", "<h1>Eval</h1>", extension="html")
+    ev.finish()
+    client.flush()
+
+    evaluate_call = client.get_calls()[0]
+    assert evaluate_call.summary
+    assert evaluate_call.summary["weave"] is not None
+    views = evaluate_call.summary["weave"]["views"]
+    stored = dict(views["view"])
+
+    assert stored["_type"] == "CustomWeaveType"
+    assert stored["weave_type"]["type"] == "weave.type_wrappers.Content.content.Content"
+    assert stored["files"]["content"]

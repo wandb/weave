@@ -16,7 +16,8 @@ import weave
 from tests.trace.util import DummyTestException
 from tests.trace_server.conftest import *
 from tests.trace_server.conftest import TEST_ENTITY, get_trace_server_flag
-from weave.trace import autopatch, weave_client, weave_init
+from weave.trace import weave_client, weave_init
+from weave.trace.context import weave_client_context
 from weave.trace.context.call_context import set_call_stack
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings import remote_http_trace_server
@@ -30,8 +31,7 @@ os.environ["WANDB_ERROR_REPORTING"] = "false"
 
 @pytest.fixture(autouse=True)
 def patch_kafka_producer():
-    """
-    Patch the Kafka producer. Without this, attempt to connect to the brokers will fail.
+    """Patch the Kafka producer. Without this, attempt to connect to the brokers will fail.
     This is ok but this introduces a `message.timeout.ms` (500ms) delay in each test.
 
     If a test needs to test the Kafka producer, they should orride this patch explicitly.
@@ -45,8 +45,7 @@ def patch_kafka_producer():
 
 @pytest.fixture(autouse=True)
 def disable_datadog():
-    """
-    Disables Datadog logging and tracing for tests.
+    """Disables Datadog logging and tracing for tests.
 
     This prevents Datadog from polluting test logs with messages like
     'failed to send, dropping 1 traces to intake at...'
@@ -275,8 +274,7 @@ def logging_error_check(request, log_collector):
 
 
 class TestOnlyFlushingWeaveClient(weave_client.WeaveClient):
-    """
-    A WeaveClient that automatically flushes after every method call.
+    """A WeaveClient that automatically flushes after every method call.
 
     This subclass overrides the behavior of the standard WeaveClient to ensure
     that all write operations are immediately flushed to the underlying storage
@@ -360,9 +358,8 @@ def make_server_recorder(server: tsi.TraceServerInterface):  # type: ignore
 def create_client(
     request,
     trace_server,
-    autopatch_settings: typing.Optional[autopatch.AutopatchSettings] = None,
     global_attributes: typing.Optional[dict[str, typing.Any]] = None,
-) -> weave_init.InitializedClient:
+) -> weave_client.WeaveClient:
     trace_server_flag = get_trace_server_flag(request)
     if trace_server_flag == "prod":
         # Note: this is only for local dev testing and should be removed
@@ -379,12 +376,11 @@ def create_client(
     client = TestOnlyFlushingWeaveClient(
         TEST_ENTITY, "test-project", make_server_recorder(caching_server)
     )
-    inited_client = weave_init.InitializedClient(client)
-    autopatch.autopatch(autopatch_settings)
+    weave_client_context.set_weave_client_global(client)
     if global_attributes is not None:
         weave.trace.api._global_attributes = global_attributes
 
-    return inited_client
+    return client
 
 
 @pytest.fixture
@@ -396,35 +392,31 @@ def zero_stack():
 @pytest.fixture
 def client(zero_stack, request, trace_server):
     """This is the standard fixture used everywhere in tests to test end to end
-    client functionality"""
-    inited_client = create_client(request, trace_server)
+    client functionality.
+    """
+    client = create_client(request, trace_server)
     try:
-        yield inited_client.client
+        yield client
     finally:
-        inited_client.reset()
-        autopatch.reset_autopatch()
+        weave_client_context.set_weave_client_global(None)
 
 
 @pytest.fixture
 def client_creator(zero_stack, request, trace_server):
-    """This fixture is useful for delaying the creation of the client (ex. when you want to set settings first)"""
+    """This fixture is useful for delaying the creation of the client (ex. when you want to set settings first)."""
 
     @contextlib.contextmanager
     def client(
-        autopatch_settings: typing.Optional[autopatch.AutopatchSettings] = None,
         global_attributes: typing.Optional[dict[str, typing.Any]] = None,
         settings: typing.Optional[weave.trace.settings.UserSettings] = None,
     ):
         if settings is not None:
             weave.trace.settings.parse_and_apply_settings(settings)
-        inited_client = create_client(
-            request, trace_server, autopatch_settings, global_attributes
-        )
+        client = create_client(request, trace_server, global_attributes)
         try:
-            yield inited_client.client
+            yield client
         finally:
-            inited_client.reset()
-            autopatch.reset_autopatch()
+            weave_client_context.set_weave_client_global(None)
             weave.trace.api._global_attributes = {}
             weave.trace.settings.parse_and_apply_settings(
                 weave.trace.settings.UserSettings()
@@ -435,8 +427,7 @@ def client_creator(zero_stack, request, trace_server):
 
 @pytest.fixture
 def network_proxy_client(client):
-    """
-    This fixture is used to test the `RemoteHTTPTraceServer` class. There is
+    """This fixture is used to test the `RemoteHTTPTraceServer` class. There is
     almost no logic in this class, other than a little batching, so we typically
     skip it for simplicity. However, we can use this fixture to test such logic.
     It initializes a mini FastAPI app that proxies requests from the
@@ -480,6 +471,18 @@ def network_proxy_client(client):
         )
         return client.server.table_create(req)
 
+    @app.post("/table/create_from_digests")
+    def table_create_from_digests(
+        req: tsi.TableCreateFromDigestsReq,
+    ) -> tsi.TableCreateFromDigestsRes:
+        records.append(
+            (
+                "table_create_from_digests",
+                req,
+            )
+        )
+        return client.server.table_create_from_digests(req)
+
     @app.post("/table/update")
     def table_update(req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
         records.append(
@@ -512,14 +515,34 @@ def network_proxy_client(client):
         )
         return client.server.feedback_create_batch(req)
 
+    @app.post("/obj/create")
+    def obj_create(req: tsi.ObjCreateReq) -> tsi.ObjCreateRes:
+        records.append(
+            (
+                "obj_create",
+                req,
+            )
+        )
+        return client.server.obj_create(req)
+
+    @app.post("/obj/read")
+    def obj_read(req: tsi.ObjReadReq) -> tsi.ObjReadRes:
+        records.append(
+            (
+                "obj_read",
+                req,
+            )
+        )
+        return client.server.obj_read(req)
+
     with TestClient(app) as c:
 
         def post(url, data=None, json=None, **kwargs):
             kwargs.pop("stream", None)
             return c.post(url, data=data, json=json, **kwargs)
 
-        orig_post = weave.trace_server.requests.post
-        weave.trace_server.requests.post = post
+        orig_post = weave.utils.http_requests.post
+        weave.utils.http_requests.post = post
 
         remote_client = remote_http_trace_server.RemoteHTTPTraceServer(
             trace_server_url="",
@@ -527,7 +550,7 @@ def network_proxy_client(client):
         )
         yield (client, remote_client, records)
 
-        weave.trace_server.requests.post = orig_post
+        weave.utils.http_requests.post = orig_post
 
 
 @pytest.fixture(autouse=True)

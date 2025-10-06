@@ -16,6 +16,7 @@ from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import (
+    InvalidRequest,
     NotFoundError,
     ObjectDeletedError,
 )
@@ -642,8 +643,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
     def _expand_refs(
         self, data: dict[str, Any], expand_columns: list[str]
     ) -> dict[str, Any]:
-        """
-        Recursively expand refs in the data. Only expand refs if requested in the
+        """Recursively expand refs in the data. Only expand refs if requested in the
         expand_columns list. expand_columns must be sorted by depth, shallowest first.
         """
         cols = sorted(expand_columns, key=lambda x: x.count("."))
@@ -1011,6 +1011,27 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
         return tsi.TableCreateRes(digest=digest, row_digests=row_digests)
 
+    def table_create_from_digests(
+        self, req: tsi.TableCreateFromDigestsReq
+    ) -> tsi.TableCreateFromDigestsRes:
+        """Create a table by specifying row digests, instead actual rows."""
+        conn, cursor = get_conn_cursor(self.db_path)
+
+        # Calculate table digest from row digests
+        table_hasher = hashlib.sha256()
+        for row_digest in req.row_digests:
+            table_hasher.update(row_digest.encode())
+        digest = table_hasher.hexdigest()
+
+        with self.lock:
+            cursor.execute(
+                "INSERT OR IGNORE INTO tables (project_id, digest, row_digests) VALUES (?, ?, ?)",
+                (req.project_id, digest, json.dumps(req.row_digests)),
+            )
+            conn.commit()
+
+        return tsi.TableCreateFromDigestsRes(digest=digest)
+
     def table_update(self, req: tsi.TableUpdateReq) -> tsi.TableUpdateRes:
         conn, cursor = get_conn_cursor(self.db_path)
         # conds = ["project_id = {project_id: String}"]
@@ -1110,9 +1131,25 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             for sort in req.sort_by:
                 field = sort.field
                 direction = sort.direction.upper()
+
+                # Validate sort field to prevent empty JSON paths
+                if not field or not field.strip():
+                    raise InvalidRequest("Sort field cannot be empty")
+
+                # Check for invalid dot patterns that would create malformed JSON paths
+                if field.startswith(".") or field.endswith(".") or ".." in field:
+                    raise InvalidRequest(
+                        f"Invalid sort field '{field}': field names cannot start/end with dots or contain consecutive dots"
+                    )
+
                 if "." in field:
                     # Handle nested fields
                     parts = field.split(".")
+                    # Additional validation: ensure no empty path components
+                    if any(not component.strip() for component in parts):
+                        raise InvalidRequest(
+                            f"Invalid sort field '{field}': field path components cannot be empty"
+                        )
                     field = f"json_extract(tr.val, '$.{'.'.join(parts)}')"
                 else:
                     field = f"json_extract(tr.val, '$.{field}')"
@@ -1432,6 +1469,13 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         # Fall back to non-streaming completion
         response = self.completions_create(req)
         yield {"response": response.response, "weave_call_id": response.weave_call_id}
+
+    def image_create(
+        self, req: tsi.ImageGenerationCreateReq
+    ) -> tsi.ImageGenerationCreateRes:
+        # TODO: This is not implemented for the sqlite trace server
+        # Currently, this will only be called from the weave file, so we return an empty dict for now
+        return tsi.ImageGenerationCreateRes(response={})
 
     def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
         if not isinstance(req.traces, ExportTraceServiceRequest):
