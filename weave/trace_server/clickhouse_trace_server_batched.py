@@ -227,16 +227,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 for proto_span in proto_scope_spans.spans:
                     try:
                         span = Span.from_proto(proto_span, resource)
-                        start_call, end_call = span.to_call(req.project_id)
-                        calls.extend(
-                            [
-                                {
-                                    "mode": "start",
-                                    "req": tsi.CallStartReq(start=start_call),
-                                },
-                                {"mode": "end", "req": tsi.CallEndReq(end=end_call)},
-                            ]
-                        )
                     except AttributePathConflictError as e:
                         # Record and skip malformed spans so we can partially accept the batch
                         rejected_spans += 1
@@ -253,6 +243,18 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                             f"name='{name}' trace_id='{trace_id}' span_id='{span_id}'"
                         )
                         error_messages.append(f"Rejected span ({span_ident}): {e!s}")
+                        continue
+
+                    start_call, end_call = span.to_call(req.project_id)
+                    calls.extend(
+                        [
+                            {
+                                "mode": "start",
+                                "req": tsi.CallStartReq(start=start_call),
+                            },
+                            {"mode": "end", "req": tsi.CallEndReq(end=end_call)},
+                        ]
+                    )
         # TODO: Actually populate the error fields if call_start_batch fails
         self.call_start_batch(tsi.CallCreateBatchReq(batch=calls))
         if rejected_spans > 0:
