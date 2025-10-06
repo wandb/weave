@@ -41,7 +41,7 @@ from weave.trace.vals import MissingSelfInstanceError
 from weave.trace.weave_client import sanitize_object_name
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_trace_server_settings import ENTITY_TOO_LARGE_PAYLOAD
-from weave.trace_server.errors import InsertTooLarge, InvalidFieldError
+from weave.trace_server.errors import InsertTooLarge, InvalidFieldError, InvalidRequest
 from weave.trace_server.ids import generate_id
 from weave.trace_server.refs_internal import extra_value_quoter
 from weave.trace_server.token_costs import COST_OBJECT_NAME
@@ -1645,6 +1645,52 @@ def test_dataset_row_ref(client):
     assert inner.ref.uri() == exp_ref
     gotten = weave.ref(exp_ref).get()
     assert gotten == 5
+
+
+def test_table_query_empty_sort_field_validation(client):
+    """Test that empty or invalid sort fields in table queries are properly validated."""
+    # Create a dataset with table data
+    d = weave.Dataset(name="test_dataset", rows=[{"a": 5, "b": 6}, {"a": 7, "b": 10}])
+    weave.publish(d)
+
+    # Query the object to get its val
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=get_client_project_id(client),
+            filter={"object_ids": ["test_dataset"]},
+        )
+    )
+    assert len(res.objs) == 1
+    queried_obj = res.objs[0]
+
+    # Get table reference from the dataset
+    table_ref = TableRef.parse_uri(queried_obj.val["rows"])
+
+    # Test various invalid sort field scenarios that should trigger validation errors
+    invalid_sort_fields = [
+        "",  # Empty field
+        ".",  # Just a dot
+        "..",  # Multiple dots
+        "...",  # More dots
+        "a.",  # Field ending with dot
+        ".a",  # Field starting with dot
+        "a..b",  # Double dots in middle
+    ]
+
+    for invalid_field in invalid_sort_fields:
+        with pytest.raises((ValueError, InvalidRequest)) as exc_info:
+            # This should fail with a validation error, not a ClickHouse jsonpath error
+            list(
+                client.server.table_query_stream(
+                    tsi.TableQueryReq(
+                        project_id=get_client_project_id(client),
+                        digest=table_ref.digest,
+                        sort_by=[tsi.SortBy(field=invalid_field, direction="asc")],
+                    )
+                )
+            )
+        # The error should be a validation error, not a ClickHouse error
+        assert "jsonpath" not in str(exc_info.value).lower()
 
 
 def test_tuple_support(client):

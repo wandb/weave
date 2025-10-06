@@ -16,6 +16,7 @@ from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import (
+    InvalidRequest,
     NotFoundError,
     ObjectDeletedError,
 )
@@ -1131,9 +1132,25 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             for sort in req.sort_by:
                 field = sort.field
                 direction = sort.direction.upper()
+
+                # Validate sort field to prevent empty JSON paths
+                if not field or not field.strip():
+                    raise InvalidRequest("Sort field cannot be empty")
+
+                # Check for invalid dot patterns that would create malformed JSON paths
+                if field.startswith(".") or field.endswith(".") or ".." in field:
+                    raise InvalidRequest(
+                        f"Invalid sort field '{field}': field names cannot start/end with dots or contain consecutive dots"
+                    )
+
                 if "." in field:
                     # Handle nested fields
                     parts = field.split(".")
+                    # Additional validation: ensure no empty path components
+                    if any(not component.strip() for component in parts):
+                        raise InvalidRequest(
+                            f"Invalid sort field '{field}': field path components cannot be empty"
+                        )
                     field = f"json_extract(tr.val, '$.{'.'.join(parts)}')"
                 else:
                     field = f"json_extract(tr.val, '$.{field}')"

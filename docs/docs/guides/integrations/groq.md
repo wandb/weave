@@ -1,5 +1,7 @@
 # Groq
 
+import DefaultEntityNote from '../../../src/components/DefaultEntityNote.mdx';
+
 <a target="_blank" href="https://colab.research.google.com/github/wandb/examples/blob/master/weave/docs/quickstart_groq.ipynb">
   <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
 </a>
@@ -14,7 +16,7 @@ Do you want to experiment with Groq models on Weave without any set up? Try the 
 
 It’s important to store traces of language model applications in a central location, both during development and in production. These traces can be useful for debugging, and as a dataset that will help you improve your application.
 
-Weave will automatically capture traces for [Groq](https://groq.com/). To start tracking, calling `weave.init(project_name="<YOUR-WANDB-PROJECT-NAME>")` and use the library as normal.
+Weave will automatically capture traces for [Groq](https://groq.com/). To start tracking, call `weave.init(project_name="<YOUR-WANDB-PROJECT-NAME>")` and use the library as normal. <DefaultEntityNote />.
 
 ```python
 import os

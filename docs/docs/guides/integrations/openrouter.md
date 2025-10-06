@@ -1,10 +1,12 @@
-# Open Router
+# OpenRouter
+
+import DefaultEntityNote from '../../../src/components/DefaultEntityNote.mdx';
 
 Openrouter.ai is a unified interface for many LLMs, supporting both foundational models like OpenAI GPT-4, Anthropic Claude, Google Gemini but also open source models like LLama-3, Mixtral and [many more](https://openrouter.ai/models), some models are even offered for free. 
 
-Open Router offers a Rest API and an OpenAI SDK compatibility ([docs](https://docs.together.ai/docs/openai-api-compatibility)) which Weave automatically detects and integrates with (see Open Router [quick start](https://openrouter.ai/docs/quick-start) for more details).
+OpenRouter offers a Rest API and an OpenAI SDK compatibility ([docs](https://docs.together.ai/docs/openai-api-compatibility)) which Weave automatically detects and integrates with (see OpenRouter [quick start](https://openrouter.ai/docs/quick-start) for more details).
 
-To get switch your OpenAI SDK code to Open Router, simply switch out the API key to your [Open Router API](https://openrouter.ai/docs/api-keys) key, `base_url` to `https://openrouter.ai/api/v1`, and model to one of their many [chat models](https://openrouter.ai/docs/models).
+To switch your OpenAI SDK code to OpenRouter, switch out the API key to your [OpenRouter API](https://openrouter.ai/docs/api-keys) key, `base_url` to `https://openrouter.ai/api/v1`, and model to one of their many [chat models](https://openrouter.ai/docs/models). When you call `weave.init()`, provide a project name for your traces. <DefaultEntityNote variant="inline" />
 
 ```python
 import os
@@ -12,7 +14,7 @@ import openai
 import weave
 
 # highlight-next-line
-weave.init('together-weave')
+weave.init('openrouter-weave')
 
 system_content = "You are a travel agent. Be descriptive and helpful."
 user_content = "Tell me about San Francisco"
