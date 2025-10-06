@@ -588,6 +588,27 @@ class HardCodedFilter(BaseModel):
 class CallsQuery(BaseModel):
     """Critical to be injection safe!"""
 
+    # Configuration for in-progress call inclusion
+    # Only include in-progress calls when filters are limited to these fields
+    ALLOWED_QUERY_FIELDS_FOR_IN_PROGRESS: set[str] = {
+        "started_at",
+        "op_name",
+        "id",
+        "trace_id",
+        "parent_id",
+        "wb_run_ids",
+    }
+
+    # Hardcoded filter fields that are allowed when including in-progress calls
+    ALLOWED_HARDCODED_FILTERS_FOR_IN_PROGRESS: set[str] = {
+        "op_names",
+        "trace_ids",
+        "call_ids",
+        "parent_ids",
+        "wb_run_ids",
+        "trace_roots_only",
+    }
+
     project_id: str
     table_name: str = (
         "calls_merged"  # Default to calls_merged for backwards compatibility
@@ -668,8 +689,12 @@ class CallsQuery(BaseModel):
         )
 
     def is_using_complete_table(self) -> bool:
-        """Returns True if using the calls_complete table."""
-        return self.table_name == "calls_complete"
+        """Returns True if using a non-aggregated table (calls_complete or call_starts).
+
+        Both calls_complete and call_starts are non-aggregated tables that don't
+        require GROUP BY, unlike calls_merged which aggregates call_parts.
+        """
+        return self.table_name in ("calls_complete", "call_starts")
 
     def set_include_costs(self, include_costs: bool) -> "CallsQuery":
         self.include_costs = include_costs
@@ -1164,10 +1189,15 @@ class CallsQuery(BaseModel):
         """Determine if we should query both calls_complete and call_parts tables.
 
         Use mixed approach when:
-        1. There's a LIMIT clause
-        2. We're not sorting by fields only available in completed calls (output, summary)
-        3. Query doesn't reference fields only on completed calls
+        1. We're querying calls_complete (not call_starts)
+        2. There's a LIMIT clause
+        3. We're not sorting by fields only available in completed calls (output, summary)
+        4. Query doesn't reference fields only on completed calls
         """
+        # Mixed approach only applies to calls_complete table
+        if self.table_name != "calls_complete":
+            return False
+
         # Must have a limit to use mixed approach
         if self.limit is None:
             return False
@@ -1198,6 +1228,108 @@ class CallsQuery(BaseModel):
                 if field.field in completed_only_fields:
                     return False
 
+        return True
+
+    def _should_include_in_progress_cte(self) -> bool:
+        """Determine if we should include the in_progress_only CTE.
+
+        Only include in-progress calls when:
+        1. Sorting by started_at DESC (or default sort)
+        2. Filter conditions only include allowed fields (see ALLOWED_QUERY_FIELDS_FOR_IN_PROGRESS)
+        3. Hardcoded filters only include allowed filters (see ALLOWED_HARDCODED_FILTERS_FOR_IN_PROGRESS)
+
+        If there are any other filter conditions, we should only query calls_complete
+        and not include in-progress calls.
+
+        Returns:
+            bool: True if we should include the in_progress_only CTE, False otherwise.
+
+        Examples:
+            >>> # Should include: sorting by started_at DESC with op_name filter
+            >>> query = CallsQuery(project_id="p", limit=10)
+            >>> query.add_order("started_at", "DESC")
+            >>> query.hardcoded_filter = HardCodedFilter(filter=CallsFilter(op_names=["op1"]))
+            >>> query._should_include_in_progress_cte()
+            True
+
+            >>> # Should NOT include: has filters on other fields like inputs
+            >>> query = CallsQuery(project_id="p", limit=10)
+            >>> query.query_conditions = [Condition(operand={"$eq": [{"$getField": "inputs.x"}, {"$literal": 5}]})]
+            >>> query._should_include_in_progress_cte()
+            False
+        """
+        # Check if sorting is by started_at DESC
+        is_started_at_desc_sort = False
+
+        if len(self.order_fields) == 0:
+            # Default sort is started_at DESC
+            is_started_at_desc_sort = True
+        elif (
+            len(self.order_fields) == 2
+            and self.order_fields[0].field.field == "started_at"
+            and self.order_fields[0].direction == "DESC"
+            and self.order_fields[1].field.field == "id"
+            and self.order_fields[1].direction == "ASC"
+        ):
+            is_started_at_desc_sort = True
+
+        if not is_started_at_desc_sort:
+            sort_fields = [f"{f.field.field} {f.direction}" for f in self.order_fields]
+            logger.info(
+                f"Excluding in-progress calls: sorting not by started_at DESC (sort: {sort_fields})"
+            )
+            return False
+
+        # Check query_conditions - ensure they only reference allowed fields
+        for condition in self.query_conditions:
+            consumed_fields = condition._get_consumed_fields()
+            for field in consumed_fields:
+                field_name = field.field
+
+                if field_name not in self.ALLOWED_QUERY_FIELDS_FOR_IN_PROGRESS:
+                    logger.info(
+                        f"Excluding in-progress calls: query condition references disallowed field '{field_name}' "
+                        f"(allowed: {self.ALLOWED_QUERY_FIELDS_FOR_IN_PROGRESS})"
+                    )
+                    return False
+
+        # Check hardcoded_filter - ensure only allowed filters are present
+        if self.hardcoded_filter is not None:
+            filter_obj = self.hardcoded_filter.filter
+
+            # Map CallsFilter fields to their names for checking
+            filter_fields_present = {
+                "input_refs": filter_obj.input_refs,
+                "output_refs": filter_obj.output_refs,
+                "parent_ids": filter_obj.parent_ids,
+                "trace_ids": filter_obj.trace_ids,
+                "call_ids": filter_obj.call_ids,
+                "thread_ids": filter_obj.thread_ids,
+                "turn_ids": filter_obj.turn_ids,
+                "trace_roots_only": filter_obj.trace_roots_only is not None,
+                "wb_user_ids": filter_obj.wb_user_ids,
+                "wb_run_ids": filter_obj.wb_run_ids,
+                "op_names": filter_obj.op_names,
+            }
+
+            # Check for disallowed filters
+            disallowed_filter_info = []
+            for filter_name, filter_value in filter_fields_present.items():
+                if (
+                    filter_value
+                    and filter_name
+                    not in self.ALLOWED_HARDCODED_FILTERS_FOR_IN_PROGRESS
+                ):
+                    disallowed_filter_info.append(filter_name)
+
+            if disallowed_filter_info:
+                logger.info(
+                    f"Excluding in-progress calls: hardcoded filter uses disallowed fields: {disallowed_filter_info} "
+                    f"(allowed: {self.ALLOWED_HARDCODED_FILTERS_FOR_IN_PROGRESS})"
+                )
+                return False
+
+        logger.info("Including in-progress calls: all filter conditions are compatible")
         return True
 
     def _as_sql_mixed_table_format(
@@ -1255,6 +1387,11 @@ class CallsQuery(BaseModel):
             parts_alias,
         )
         parts_trace_id_sql = process_trace_id_filter_to_sql(
+            self.hardcoded_filter,
+            pb,
+            parts_alias,
+        )
+        parts_trace_roots_only_sql = process_trace_roots_only_filter_to_sql(
             self.hardcoded_filter,
             pb,
             parts_alias,
@@ -1349,8 +1486,50 @@ class CallsQuery(BaseModel):
                     parts_where_conditions, "AND"
                 )
 
-        raw_sql = f"""
-        WITH completed AS (
+        # Determine if we should include in-progress calls
+        include_in_progress = self._should_include_in_progress_cte()
+
+        if include_in_progress:
+            # Include both completed and in-progress calls
+            raw_sql = f"""
+            WITH completed AS (
+                SELECT {complete_fields_sql}
+                FROM calls_complete AS {complete_alias}
+                WHERE {complete_alias}.project_id = {param_slot(project_param, "String")}
+                  AND {complete_alias}.deleted_at IS NULL
+                  {complete_op_name_sql}
+                  {complete_trace_id_sql}
+                  {complete_conditions_sql}
+                {order_by_sql}
+                {limit_sql}
+            ),
+            in_progress_only AS (
+                SELECT {parts_fields_sql}
+                FROM call_starts AS {parts_alias}
+                WHERE {parts_alias}.project_id = {param_slot(project_param, "String")}
+                  AND {parts_alias}.started_at > {param_slot(twenty_four_hours_ago_param, "Float64")}
+                  AND {parts_alias}.id NOT IN (SELECT id FROM completed)
+                  AND {parts_alias}.deleted_at IS NULL
+                  {parts_op_name_sql}
+                  {parts_trace_id_sql}
+                  {parts_trace_roots_only_sql}
+                  {parts_conditions_sql}
+                {order_by_sql}
+                {limit_sql}
+            )
+            SELECT *
+            FROM (
+                SELECT * FROM completed
+                UNION ALL
+                SELECT * FROM in_progress_only
+            )
+            {order_by_sql}
+            {limit_sql}
+            {offset_sql}
+            """
+        else:
+            # Only query completed calls, skip in-progress calls
+            raw_sql = f"""
             SELECT {complete_fields_sql}
             FROM calls_complete AS {complete_alias}
             WHERE {complete_alias}.project_id = {param_slot(project_param, "String")}
@@ -1358,33 +1537,10 @@ class CallsQuery(BaseModel):
               {complete_op_name_sql}
               {complete_trace_id_sql}
               {complete_conditions_sql}
-            {order_by_sql}
+            ORDER BY started_at DESC
             {limit_sql}
-        ),
-        in_progress_only AS (
-            SELECT {parts_fields_sql}
-            FROM call_parts AS {parts_alias}
-            WHERE {parts_alias}.project_id = {param_slot(project_param, "String")}
-              AND {parts_alias}.started_at > {param_slot(twenty_four_hours_ago_param, "Float64")}
-              AND {parts_alias}.id NOT IN (SELECT id FROM completed)
-              AND {parts_alias}.deleted_at IS NULL
-              AND {parts_alias}.ended_at IS NULL
-              {parts_op_name_sql}
-              {parts_trace_id_sql}
-              {parts_conditions_sql}
-            {order_by_sql}
-            {limit_sql}
-        )
-        SELECT *
-        FROM (
-            SELECT * FROM completed
-            UNION ALL
-            SELECT * FROM in_progress_only
-        )
-        {order_by_sql}
-        {limit_sql}
-        {offset_sql}
-        """
+            {offset_sql}
+            """
 
         return safely_format_sql(raw_sql, logger)
 
@@ -1399,6 +1555,16 @@ class CallsQuery(BaseModel):
         call_parts has the same structure as calls_merged but without aggregation.
         Some fields may be NULL for in-progress calls (start events).
         """
+        # Fields that don't exist in call_starts table (only in calls_complete)
+        # Map field name to its default value for in-progress calls
+        CALL_STARTS_MISSING_FIELDS = {
+            "ended_at": "NULL",
+            "output_dump": "NULL",
+            "summary_dump": "NULL",
+            "exception": "NULL",
+            "output_refs": "CAST([] AS Array(String))",  # Array fields need empty array, not NULL
+        }
+
         # Convert calls_complete field to equivalent call_parts field
         # Check specific types first before checking general CallsCompleteField
         if isinstance(
@@ -1413,6 +1579,10 @@ class CallsQuery(BaseModel):
             return f"NULL AS {field.field}"
 
         elif isinstance(field, CallsCompleteDynamicField):
+            # Check if this field is missing from call_starts table
+            if field.field in CALL_STARTS_MISSING_FIELDS:
+                return f"{CALL_STARTS_MISSING_FIELDS[field.field]} AS {field.field}"
+
             # Dynamic field - use the same logic but without aggregation
             base_field = f"{table_alias}.{field.field}"
             if field.extra_path:
@@ -1425,10 +1595,18 @@ class CallsQuery(BaseModel):
                 return f"{base_field} AS {field.field}"
 
         elif isinstance(field, CallsCompleteField):
+            # Check if this field is missing from call_starts table
+            if field.field in CALL_STARTS_MISSING_FIELDS:
+                return f"{CALL_STARTS_MISSING_FIELDS[field.field]} AS {field.field}"
+
             # Simple field, just use the field name with the table alias
             return f"{table_alias}.{field.field} AS {field.field}"
 
         else:
+            # Check if this field is missing from call_starts table
+            if hasattr(field, "field") and field.field in CALL_STARTS_MISSING_FIELDS:
+                return f"{CALL_STARTS_MISSING_FIELDS[field.field]} AS {field.field}"
+
             # Fallback - treat as simple field
             return f"{table_alias}.{field.field} AS {field.field}"
 
@@ -1574,7 +1752,7 @@ class CallsQuery(BaseModel):
 
         raw_sql = f"""
         SELECT {select_fields_sql}
-        FROM {self.table_name}
+        FROM {self.table_name} AS {table_alias}
         {storage_size_sql}
         {total_storage_size_sql}
         {where_clause}
@@ -1662,7 +1840,7 @@ DISALLOWED_FILTERING_FIELDS = {"storage_size_bytes", "total_storage_size_bytes"}
 def get_field_by_name(name: str, table_name: str = "calls_merged") -> CallsMergedField:
     """Get field definition for the specified table name."""
     # Choose the appropriate field dictionary based on table name
-    if table_name == "calls_complete":
+    if table_name == "calls_complete" or table_name == "call_starts":
         allowed_fields = ALLOWED_CALLS_COMPLETE_FIELDS
     else:
         allowed_fields = ALLOWED_CALL_FIELDS
@@ -2285,11 +2463,141 @@ def build_call_parts_query_by_ids(
     )
 
 
+def _query_uses_completed_only_fields(
+    req: tsi.CallsQueryStatsReq,
+) -> bool:
+    """Check if the query uses fields that only exist in calls_complete.
+
+    Fields that don't exist in call_starts table:
+    - ended_at
+    - output_dump
+    - output_refs
+    - summary_dump
+    - exception
+
+    Args:
+        req (tsi.CallsQueryStatsReq): The stats query request.
+
+    Returns:
+        bool: True if the query uses completed-only fields, False otherwise.
+
+    Examples:
+        >>> # Query with output_refs filter uses completed-only field
+        >>> req = CallsQueryStatsReq(
+        ...     project_id="p",
+        ...     filter=CallsFilter(output_refs=["ref1"])
+        ... )
+        >>> _query_uses_completed_only_fields(req)
+        True
+
+        >>> # Query with only op_names filter doesn't use completed-only fields
+        >>> req = CallsQueryStatsReq(
+        ...     project_id="p",
+        ...     filter=CallsFilter(op_names=["op1"])
+        ... )
+        >>> _query_uses_completed_only_fields(req)
+        False
+    """
+    # Fields that don't exist in call_starts (need to check both raw and _dump versions)
+    completed_only_fields = {
+        "output_dump",
+        "output_refs",
+        "summary_dump",
+        "ended_at",
+        "exception",
+    }
+
+    # Also check the base field names without _dump suffix (used in queries like "output.lower")
+    completed_only_base_fields = {
+        "output",
+        "summary",
+    }
+
+    # Check hardcoded filter for completed-only fields
+    if req.filter is not None and req.filter.output_refs:
+        return True
+
+    # Check query expression for completed-only fields
+    if req.query is not None:
+
+        def check_operand(operand: "tsi_query.Operand") -> bool:
+            """Recursively check if operand references completed-only fields."""
+            if isinstance(operand, tsi_query.GetFieldOperator):
+                # Check if the field name references any completed-only field
+                field_name = operand.get_field_
+
+                # Check against _dump field names
+                for completed_field in completed_only_fields:
+                    if field_name == completed_field or field_name.startswith(
+                        f"{completed_field}."
+                    ):
+                        return True
+
+                # Check against base field names (e.g., "output" or "output.something")
+                for completed_base_field in completed_only_base_fields:
+                    if field_name == completed_base_field or field_name.startswith(
+                        f"{completed_base_field}."
+                    ):
+                        return True
+            elif isinstance(operand, tsi_query.AndOperation):
+                return any(check_operand(op) for op in operand.and_)
+            elif isinstance(operand, tsi_query.OrOperation):
+                return any(check_operand(op) for op in operand.or_)
+            elif isinstance(operand, tsi_query.NotOperation):
+                return check_operand(operand.not_[0])
+            elif isinstance(operand, tsi_query.EqOperation):
+                return check_operand(operand.eq_[0]) or check_operand(operand.eq_[1])
+            elif isinstance(operand, tsi_query.GtOperation):
+                return check_operand(operand.gt_[0]) or check_operand(operand.gt_[1])
+            elif isinstance(operand, tsi_query.GteOperation):
+                return check_operand(operand.gte_[0]) or check_operand(operand.gte_[1])
+            elif isinstance(operand, tsi_query.InOperation):
+                if check_operand(operand.in_[0]):
+                    return True
+                return any(check_operand(op) for op in operand.in_[1])
+            elif isinstance(operand, tsi_query.ContainsOperation):
+                return check_operand(operand.contains_.input) or check_operand(
+                    operand.contains_.substr
+                )
+            elif isinstance(operand, tsi_query.ConvertOperation):
+                return check_operand(operand.convert_.input)
+
+            return False
+
+        if check_operand(req.query.expr_):
+            return True
+
+    return False
+
+
 def build_calls_query_stats_query(
     req: tsi.CallsQueryStatsReq,
     param_builder: ParamBuilder,
     table_name: str = "calls_complete",
 ) -> tuple[str, KeysView[str]]:
+    """Build a stats query that counts calls from both calls_complete and call_starts.
+
+    If the query doesn't use completed-only fields (output, summary, exception, ended_at),
+    we count from both tables. Otherwise, we only count from calls_complete.
+
+    Args:
+        req (tsi.CallsQueryStatsReq): The stats query request.
+        param_builder (ParamBuilder): Parameter builder for SQL placeholders.
+        table_name (str): Base table name (default: "calls_complete").
+
+    Returns:
+        tuple[str, KeysView[str]]: SQL query and aggregated column names.
+
+    Examples:
+        >>> # Query without completed-only fields counts both tables
+        >>> req = CallsQueryStatsReq(
+        ...     project_id="p",
+        ...     filter=CallsFilter(op_names=["op1"])
+        ... )
+        >>> sql, cols = build_calls_query_stats_query(req, ParamBuilder())
+        >>> "call_starts" in sql
+        True
+    """
     cq = CallsQuery(
         project_id=req.project_id,
         table_name=table_name,
@@ -2314,6 +2622,52 @@ def build_calls_query_stats_query(
         cq.add_field("total_storage_size_bytes")
 
     inner_query = cq.as_sql(param_builder)
-    calls_query_sql = f"SELECT {', '.join(aggregated_columns[k] for k in aggregated_columns)} FROM ({inner_query})"
+
+    # Check if we should also count in-progress calls from call_starts
+    should_include_in_progress = not _query_uses_completed_only_fields(req)
+
+    if should_include_in_progress:
+        # Build a query for call_starts table with the same filters
+        cq_starts = CallsQuery(
+            project_id=req.project_id,
+            table_name="call_starts",
+            include_total_storage_size=False,  # call_starts doesn't have storage size
+        )
+
+        cq_starts.add_field("id")
+        if req.filter is not None:
+            cq_starts.set_hardcoded_filter(HardCodedFilter(filter=req.filter))
+        if req.query is not None:
+            cq_starts.add_condition(req.query.expr_)
+        if req.limit is not None:
+            cq_starts.set_limit(req.limit)
+        if req.expand_columns is not None:
+            cq_starts.set_expand_columns(req.expand_columns)
+
+        starts_query = cq_starts.as_sql(param_builder)
+
+        # Use CTE to combine counts from both tables
+        if req.include_total_storage_size:
+            # When including storage size, only completed calls have storage size
+            calls_query_sql = f"""
+            WITH
+                completed_stats AS ({inner_query}),
+                in_progress_stats AS ({starts_query})
+            SELECT
+                (SELECT count() FROM completed_stats) + (SELECT count() FROM in_progress_stats) AS count,
+                (SELECT sum(coalesce(total_storage_size_bytes, 0)) FROM completed_stats) AS total_storage_size_bytes
+            """
+        else:
+            # Just count from both tables
+            calls_query_sql = f"""
+            WITH
+                completed_stats AS ({inner_query}),
+                in_progress_stats AS ({starts_query})
+            SELECT
+                (SELECT count() FROM completed_stats) + (SELECT count() FROM in_progress_stats) AS count
+            """
+    else:
+        # Only query calls_complete if the query uses completed-only fields
+        calls_query_sql = f"SELECT {', '.join(aggregated_columns[k] for k in aggregated_columns)} FROM ({inner_query})"
 
     return (calls_query_sql, aggregated_columns.keys())

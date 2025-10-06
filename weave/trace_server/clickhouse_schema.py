@@ -186,6 +186,31 @@ ALL_CALL_INSERT_COLUMNS = sorted(
     | CallUpdateCHInsertable.model_fields.keys()
 )
 
+# Columns for call_starts table - explicitly list what's actually in the table schema
+# Based on migration 019_calls_complete.up.sql, call_starts table has these columns:
+# id, project_id, created_at, trace_id, op_name, started_at, deleted_at, parent_id,
+# display_name, attributes_dump, inputs_dump, input_refs, wb_user_id, wb_run_id,
+# wb_run_step, thread_id, turn_id
+# It does NOT have: ended_at, output_dump, summary_dump, exception, output_refs
+CALL_STARTS_INSERT_COLUMNS = [
+    "attributes_dump",
+    "deleted_at",
+    "display_name",
+    "id",
+    "input_refs",
+    "inputs_dump",
+    "op_name",
+    "parent_id",
+    "project_id",
+    "started_at",
+    "thread_id",
+    "trace_id",
+    "turn_id",
+    "wb_run_id",
+    "wb_run_step",
+    "wb_user_id",
+]
+
 ALL_CALL_SELECT_COLUMNS = list(SelectableCHCallSchema.model_fields.keys())
 ALL_CALL_JSON_COLUMNS = ("inputs", "output", "attributes", "summary")
 REQUIRED_CALL_COLUMNS = ["id", "project_id", "trace_id", "op_name", "started_at"]

@@ -28,21 +28,57 @@ CREATE TABLE calls_complete (
     turn_id         Nullable(String) DEFAULT NULL,
 
     INDEX idx_wb_run_id wb_run_id TYPE set(100) GRANULARITY 1,
+    INDEX idx_ended_at ended_at TYPE minmax GRANULARITY 1,
 
     -- for fast id lookups with unordered ids (OTEL)
     PROJECTION projection_calls_by_id (
         SELECT *
         ORDER BY project_id, id, started_at
-    )
-
-    PROJECTION projection_calls_by_op_name (
-        SELECT *
-        ORDER BY project_id, op_name, started_at
     ),
 
-    PROJECTION projection_calls_by_trace_id (
+
+    -- PROJECTION projection_calls_by_op_name (
+    --     SELECT *
+    --     ORDER BY project_id, op_name, started_at
+    -- ),
+
+    -- PROJECTION projection_calls_by_trace_id (
+    --     SELECT *
+    --     ORDER BY project_id, trace_id, started_at
+    -- )
+) ENGINE = MergeTree
+ORDER BY (project_id, started_at, trace_id, op_name, id);
+
+CREATE TABLE call_starts (
+    id              String,
+    project_id      String,
+    created_at      DateTime64(3) DEFAULT now64(3),
+
+    trace_id        String,
+    op_name         String,
+    started_at      DateTime64(6),
+
+    deleted_at      Nullable(DateTime64(3)) DEFAULT NULL,
+    parent_id       Nullable(String),
+    display_name    Nullable(String) DEFAULT NULL,
+    
+    attributes_dump Nullable(String),
+    inputs_dump     Nullable(String),
+    input_refs      Array(String),
+
+    wb_user_id      Nullable(String),
+    wb_run_id       Nullable(String),
+    wb_run_step     Nullable(UInt64) DEFAULT NULL,
+
+    thread_id       Nullable(String) DEFAULT NULL,
+    turn_id         Nullable(String) DEFAULT NULL,
+
+    INDEX idx_wb_run_id wb_run_id TYPE set(100) GRANULARITY 1,
+
+    -- for fast id lookups with unordered ids (OTEL)
+    PROJECTION projection_calls_by_id (
         SELECT *
-        ORDER BY project_id, trace_id, started_at
+        ORDER BY project_id, id, started_at DESC
     )
 ) ENGINE = MergeTree
-ORDER BY (project_id, started_at, id);
+ORDER BY (project_id, started_at, trace_id, op_name, id);

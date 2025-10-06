@@ -9,6 +9,7 @@ from weave.trace_server import environment as wf_env
 # File and batch processing settings
 FILE_CHUNK_SIZE = 100000
 MAX_DELETE_CALLS_COUNT = 1000
+MAX_DELETE_RECURSION_DEPTH = 10
 INITIAL_CALLS_STREAM_BATCH_SIZE = 50
 MAX_CALLS_STREAM_BATCH_SIZE = 500
 

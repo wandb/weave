@@ -348,10 +348,11 @@ class WeaveClient:
             self._server_feedback_processor = self.server.get_feedback_processor()
         self.send_file_cache = WeaveClientSendFileCache()
 
-        # Cache to store call starts so they can be sent with call ends
-        self._call_start_cache: TTLCache[str, CallStartReq] = TTLCache(
+        # Track futures for call start requests - used to ensure call ends
+        # are sent after call starts are built, and to send them together
+        self._call_start_futures: TTLCache[str, Future[CallStartReq]] = TTLCache(
             maxsize=10_000,
-            ttl=60 * 60,  # 60 minute TTL
+            ttl=60 * 60 * 24,  # 24 hour TTL
         )
 
     ################ High Level Convenience Methods ################
@@ -780,7 +781,7 @@ class WeaveClient:
         should_print_call_link_ = should_print_call_link()
         current_call = call_context.get_current_call()
 
-        def send_start_call() -> bool:
+        def build_and_send_start_call() -> CallStartReq:
             maybe_redacted_inputs_with_refs = inputs_with_refs
             if should_redact_pii():
                 from weave.utils.pii_redaction import redact_pii
@@ -815,20 +816,25 @@ class WeaveClient:
                     "Inputs may be dropped."
                 )
 
-            self._call_start_cache[call_id] = call_start_req
+            # Send the call start immediately (for long-running calls)
             self.server.call_start(call_start_req)
-            return True
+            # Return the request so finish_call can use it
+            return call_start_req
+
+        # Defer building and sending the call start to avoid blocking user code
+        start_future = self.future_executor.defer(build_and_send_start_call)
+        # Track this future so finish_call can wait for it
+        self._call_start_futures[call_id] = start_future
 
         def on_complete(f: Future) -> None:
             try:
-                root_call_did_not_error = f.result() and not current_call
-                if root_call_did_not_error and should_print_call_link_:
+                f.result()  # Get the CallStartReq result
+                if not current_call and should_print_call_link_:
                     print_call_link(call)
             except Exception:
                 pass
 
-        fut = self.future_executor.defer(send_start_call)
-        fut.add_done_callback(on_complete)
+        start_future.add_done_callback(on_complete)
 
         if use_stack:
             call_context.push_call(call)
@@ -943,7 +949,7 @@ class WeaveClient:
         if op is not None and op._on_finish_handler:
             op._on_finish_handler(call, original_output, exception)
 
-        def send_complete_call() -> None:
+        def send_complete_call(start_results: list[CallStartReq]) -> None:
             maybe_redacted_output_as_refs = output_as_refs
             if should_redact_pii():
                 from weave.utils.pii_redaction import redact_pii
@@ -971,26 +977,57 @@ class WeaveClient:
                     "Output may be dropped."
                 )
 
-            cached_start = self._call_start_cache.get(call.id)
-            if cached_start is not None:
-                if self._server_call_processor is not None:
-                    # Enqueue both items atomically - they'll be processed in the same batch
-                    self._server_call_processor.enqueue(
-                        [
-                            StartBatchItem(req=cached_start),
-                            EndBatchItem(req=call_end_req),
-                        ]
-                    )
-                else:
-                    # Fallback for non-batching servers: send separately
-                    self.server.call_start(cached_start)
-                    self.server.call_end(call_end_req)
-                del self._call_start_cache[call.id]
+            # Get the call start request from the future result
+            call_start_req = start_results[0]
+            if self._server_call_processor is not None:
+                # Enqueue both items atomically - they'll be processed in the same batch
+                self._server_call_processor.enqueue(
+                    [
+                        StartBatchItem(req=call_start_req),
+                        EndBatchItem(req=call_end_req),
+                    ]
+                )
             else:
-                # Fallback: just send end (shouldn't happen normally)
+                # Fallback for non-batching servers: send separately
+                self.server.call_start(call_start_req)
                 self.server.call_end(call_end_req)
 
-        self.future_executor.defer(send_complete_call)
+            # Clean up the future tracking
+            self._call_start_futures.pop(call.id, None)
+
+        # Check if there's a pending start future for this call
+        start_future = self._call_start_futures.get(call.id)
+        if start_future is not None:
+            # Wait for the start to be built before sending the end
+            # This ensures ordering: start is always ready before end is sent
+            self.future_executor.then([start_future], send_complete_call)
+        else:
+            # No start future found - this shouldn't happen in normal operation
+            # but handle it gracefully by just sending the end
+            def send_end_only() -> None:
+                maybe_redacted_output_as_refs = output_as_refs
+                if should_redact_pii():
+                    from weave.utils.pii_redaction import redact_pii
+
+                    maybe_redacted_output_as_refs = redact_pii(output_as_refs)
+
+                output_json = to_json(
+                    maybe_redacted_output_as_refs, project_id, self, use_dictify=False
+                )
+                assert call.id is not None
+                call_end_req = CallEndReq(
+                    end=EndedCallSchemaForInsert(
+                        project_id=project_id,
+                        id=call.id,
+                        ended_at=ended_at,
+                        output=output_json,
+                        summary=merged_summary,
+                        exception=exception_str,
+                    )
+                )
+                self.server.call_end(call_end_req)
+
+            self.future_executor.defer(send_end_only)
 
         # If a turn call is finishing, reset turn context for next sibling
         if call.turn_id == call.id and call.thread_id:
