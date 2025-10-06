@@ -2790,6 +2790,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if complete_calls:
             print(f"inserting {len(complete_calls)} completed calls")
             self._insert_complete_calls_batch(complete_calls)
+            # TODO: remove me, still need to insert into call parts for back compat
+            self._insert_call_batch(complete_calls)
 
         if not call_starts and not call_ends:
             print("returning early, no in-progress calls or dangling call ends")
@@ -2843,6 +2845,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if merged_calls:
             print(f"inserting {len(merged_calls)} MANUALLY merged calls")
             self._insert_complete_calls_batch(merged_calls)
+            # TODO: remove me, still need to insert into call parts for back compat
+            self._insert_call_batch(merged_calls)
 
         orphaned_ends = [r for r in call_ends if r[id_idx] not in found_start_ids]
         print(f"inserting {len(orphaned_ends)} orphaned call ends")
@@ -2948,7 +2952,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             filtered_batch = []
             # Get indices of columns we want to keep
             indices_to_keep = [
-                ALL_CALL_INSERT_COLUMNS.index(col) for col in CALL_STARTS_INSERT_COLUMNS
+                ALL_CALL_INSERT_COLUMNS.inadex(col)
+                for col in CALL_STARTS_INSERT_COLUMNS
             ]
             for row in batch:
                 filtered_row = [row[i] for i in indices_to_keep]
@@ -3116,7 +3121,6 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: dict) -> dict:
         "exception": ch_call_dict.get("exception"),
         "wb_run_id": ch_call_dict.get("wb_run_id"),
         "wb_run_step": ch_call_dict.get("wb_run_step"),
-        "wb_run_step_end": ch_call_dict.get("wb_run_step_end"),
         "wb_user_id": ch_call_dict.get("wb_user_id"),
         "display_name": display_name,
         "storage_size_bytes": ch_call_dict.get("storage_size_bytes"),
@@ -3205,7 +3209,6 @@ def _end_call_for_insert_to_ch_insertable_end_call(
         summary_dump=_dict_value_to_dump(dict(end_call.summary)),
         output_dump=_any_value_to_dump(output),
         output_refs=output_refs,
-        wb_run_step_end=end_call.wb_run_step_end,
     )
 
 
