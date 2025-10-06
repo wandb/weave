@@ -309,6 +309,8 @@ def simple_line_call_bootstrap() -> OpCallSpec:
                 part_sequence.append(("end", name))
                 return res
 
+            wrapped.__name__ = fn.__name__
+
             return wrapped
 
         return wrapper
@@ -323,7 +325,7 @@ def simple_line_call_bootstrap() -> OpCallSpec:
 
     adder_v0 = adder
 
-    @weave.op  # type: ignore
+    @weave.op
     @track_sequence("adder")
     def adder(a: Number, b) -> Number:
         return Number(value=a.value + b)
