@@ -118,6 +118,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 wb_user_id TEXT,
                 wb_run_id TEXT,
                 wb_run_step INTEGER,
+                wb_run_step_end INTEGER,
                 deleted_at TEXT,
                 display_name TEXT
             )
@@ -254,7 +255,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     exception = ?,
                     output = ?,
                     output_refs = ?,
-                    summary = ?
+                    summary = ?,
+                    wb_run_step_end = ?
                 WHERE id = ?""",
                 (
                     req.end.ended_at.isoformat(),
@@ -264,6 +266,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                         extract_refs_from_values(list(parsable_output.values()))
                     ),
                     json.dumps(req.end.summary),
+                    req.end.wb_run_step_end,
                     req.end.id,
                 ),
             )
