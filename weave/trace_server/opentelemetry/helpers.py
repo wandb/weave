@@ -123,7 +123,7 @@ def _get_value_from_nested_dict(d: dict[str, Any], key: str) -> Any:
     return current
 
 
-class AttributePathConflictError(ValueError):
+class AttributePathConflictError(TypeError):
     def __init__(
         self,
         *,
@@ -147,16 +147,19 @@ class AttributePathConflictError(ValueError):
         self.existing_type = existing_type
 
 
-def _set_value_in_nested_dict(d: dict[str, Any], key: str, value: Any) -> None:
-    """Set a value in a nested dictionary using a dot-separated key.
+def _validate_structure(d: dict[str, Any], key: str, value: Any) -> None:
+    """Ensure setting `value` at dot-path `key` won't corrupt structure.
 
-    Raises AttributePathConflictError when a parent path already holds a non-dict value
-    and a nested subkey is being set or when attempting to overwrite an existing mapping
-    with a primitive while subkeys exist.
+    Validation rules:
+    - Disallow placing a primitive at a path that already contains a mapping
+      (dict or list).
+    - Disallow descending into a non-dict value for any parent segment.
+    - Disallow overwriting an existing mapping at the leaf with a primitive
+      when subkeys already exist for that path.
     """
+    # Simple key (no nesting): prevent clobbering an existing mapping with a primitive
     if "." not in key:
-        # If there is already a mapping at this key, assigning a primitive would drop subkeys
-        existing = d.get(key, None)
+        existing = d.get(key)
         if isinstance(existing, (dict, list)) and not isinstance(value, (dict, list)):
             raise AttributePathConflictError(
                 parent_key=key,
@@ -170,42 +173,65 @@ def _set_value_in_nested_dict(d: dict[str, Any], key: str, value: Any) -> None:
                     f"(3) represent it as a field, e.g. '{key}.value'."
                 ),
             )
-        d[key] = value
         return
 
+    # Nested key: validate traversal and leaf overwrite rules
     parts = key.split(".")
-    current = d
-    # Walk down to the parent map, creating dicts as needed, but fail if we need
-    # to descend into a non-dict value.
+    current: Any = d
     for i, part in enumerate(parts[:-1]):
+        # Build the dotted path for the current parent segment.
+        # Example: key='a.b.c'
+        #  - i=0 -> parts[:1] = ['a']   -> parent_path='a'
+        #  - i=1 -> parts[:2] = ['a','b'] -> parent_path='a.b'
+        # This is used to reference the parent key in conflict messages when
+        # we detect that we must descend into a non-dict (primitive) value.
         parent_path = ".".join(parts[: i + 1])
-        if part not in current:
-            current[part] = {}
-        elif not isinstance(current[part], dict):
+        if part in current and not isinstance(current[part], dict):
             # We must descend, but parent is a primitive -> conflict
             raise AttributePathConflictError(
                 parent_key=parent_path,
                 attempted_subkey=parts[i + 1],
                 existing_type=type(current[part]),
             )
-        current = current[part]
+        # Safe to continue (either missing or a dict); creation happens in setter
+        if part in current:
+            current = current[part]
+        else:
+            current = {}  # placeholder to advance logic without mutating
 
-    last = parts[-1]
-    existing_leaf = current.get(last, None)
-    if isinstance(existing_leaf, (dict, list)) and not isinstance(value, (dict, list)):
-        # Overwriting an existing mapping (created by prior subkeys) with a primitive -> conflict
-        raise AttributePathConflictError(
-            parent_key=".".join(parts),
-            attempted_subkey="<root>",
-            existing_type=type(existing_leaf),
-            message=(
-                f"Invalid attribute structure: received both nested subkeys for '{'.'.join(parts)}' "
-                "and a non-object value for the same key. Do not send both '"
-                f"{'.'.join(parts)}' and '{'.'.join(parts)}.*'. Either keep only nested keys or "
-                f"use a different key for the primitive (e.g. '{'.'.join(parts)}_value')."
-            ),
-        )
-    current[last] = value
+    # Leaf rule: prevent overwriting an existing mapping with a primitive
+    parent = _get_value_from_nested_dict(d, ".".join(parts[:-1])) or {}
+    if isinstance(parent, dict):
+        last = parts[-1]
+        existing_leaf = parent.get(last)
+        if isinstance(existing_leaf, (dict, list)) and not isinstance(
+            value, (dict, list)
+        ):
+            raise AttributePathConflictError(
+                parent_key=".".join(parts),
+                attempted_subkey="<root>",
+                existing_type=type(existing_leaf),
+                message=(
+                    f"Invalid attribute structure: received both nested subkeys for '{'.'.join(parts)}' "
+                    "and a non-object value for the same key. Do not send both '"
+                    f"{'.'.join(parts)}' and '{'.'.join(parts)}.*'. Either keep only nested keys or "
+                    f"use a different key for the primitive (e.g. '{'.'.join(parts)}_value')."
+                ),
+            )
+
+
+def _set_value_in_nested_dict(d: dict[str, Any], key: str, value: Any) -> None:
+    """Set a value in a nested dictionary using a dot-separated key."""
+    _validate_structure(d, key, value)
+    if "." not in key:
+        d[key] = value
+        return
+
+    parts = key.split(".")
+    current = d
+    for part in parts[:-1]:
+        current = current.setdefault(part, {})
+    current[parts[-1]] = value
 
 
 def convert_numeric_keys_to_list(

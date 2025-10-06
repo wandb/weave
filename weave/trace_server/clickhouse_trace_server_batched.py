@@ -258,13 +258,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # TODO: Actually populate the error fields if call_start_batch fails
         self.call_start_batch(tsi.CallCreateBatchReq(batch=calls))
         if rejected_spans > 0:
+            # Join the first 20 errors and return them delimited by ';'
+            joined_errors = "; ".join(error_messages[:20]) + (
+                "; ..." if len(error_messages) > 20 else ""
+            )
             return tsi.OtelExportRes(
                 partial_success=tsi.ExportTracePartialSuccess(
                     rejected_spans=rejected_spans,
-                    error_message=(
-                        "; ".join(error_messages[:20])
-                        + ("; ..." if len(error_messages) > 20 else "")
-                    ),
+                    error_message=joined_errors,
                 )
             )
         return tsi.OtelExportRes()
