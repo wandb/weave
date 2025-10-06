@@ -295,33 +295,53 @@ class OpCallSpec(BaseModel):
     total_calls: int
     root_calls: int
     run_calls: int
+    part_sequence: list[tuple[str, str]]
 
 
 def simple_line_call_bootstrap() -> OpCallSpec:
+    part_sequence = []
+
+    def track_sequence(name: str):
+        def wrapper(fn):
+            def wrapped(*args, **kwargs):
+                part_sequence.append(("start", name))
+                res = fn(*args, **kwargs)
+                part_sequence.append(("end", name))
+                return res
+
+            return wrapped
+
+        return wrapper
+
     class Number(weave.Object):
         value: int
 
     @weave.op
+    @track_sequence("adder")
     def adder(a: Number) -> Number:
-        return Number(value=a.value + a.value)
+        res = Number(value=a.value + a.value)
 
     adder_v0 = adder
 
     @weave.op  # type: ignore
+    @track_sequence("adder")
     def adder(a: Number, b) -> Number:
         return Number(value=a.value + b)
 
     @weave.op
+    @track_sequence("subtractor")
     def subtractor(a: Number, b) -> Number:
         return Number(value=a.value - b)
 
     @weave.op
+    @track_sequence("multiplier")
     def multiplier(
         a: Number, b
     ) -> int:  # intentionally deviant in returning plain int - so that we have a different type
         return a.value * b
 
     @weave.op
+    @track_sequence("liner")
     def liner(m: Number, b, x) -> Number:
         return adder(Number(value=multiplier(m, x)), b)
 
@@ -375,6 +395,7 @@ def simple_line_call_bootstrap() -> OpCallSpec:
         total_calls=total_calls,
         root_calls=root_calls,
         run_calls=run_calls,
+        part_sequence=part_sequence,
     )
 
 
@@ -540,8 +561,21 @@ def test_trace_call_wb_run_step_query(client):
     res = server.calls_query(
         tsi.CallsQueryReq(project_id=get_client_project_id(client))
     )
-    steps = {c.wb_run_step for c in res.calls}
-    assert steps == set(range(call_spec.total_calls))
+    exp_start_steps = []
+    exp_end_steps = []
+    counter = 0
+    for part in call_spec.part_sequence:
+        if part[0] == "start":
+            exp_start_steps.append(counter)
+        else:
+            exp_end_steps.append(counter)
+        counter += 1
+    exp_start_steps_set = set(exp_start_steps)
+    found_start_steps_set = {c.wb_run_step for c in res.calls}
+    assert found_start_steps_set == exp_start_steps_set
+    exp_end_steps_set = set(exp_end_steps)
+    found_end_steps_set = {c.wb_run_step_end for c in res.calls}
+    assert found_end_steps_set == exp_end_steps_set
 
     query = tsi.Query(
         **{"$expr": {"$eq": [{"$getField": "wb_run_step"}, {"$literal": 0}]}}
@@ -551,7 +585,8 @@ def test_trace_call_wb_run_step_query(client):
     )
     assert len(res.calls) == 1
 
-    compare_step = call_spec.total_calls - 2
+    count = 2
+    compare_step = exp_start_steps[-count]
     range_query = tsi.Query(
         **{
             "$expr": {
@@ -562,7 +597,21 @@ def test_trace_call_wb_run_step_query(client):
     res = server.calls_query(
         tsi.CallsQueryReq(project_id=get_client_project_id(client), query=range_query)
     )
-    assert len(res.calls) == 2
+    assert len(res.calls) == count
+
+    count = 4
+    compare_step = exp_end_steps[-count]
+    range_query = tsi.Query(
+        **{
+            "$expr": {
+                "$gte": [{"$getField": "wb_run_step_end"}, {"$literal": compare_step}]
+            }
+        }
+    )
+    res = server.calls_query(
+        tsi.CallsQueryReq(project_id=get_client_project_id(client), query=range_query)
+    )
+    assert len(res.calls) == count
 
     res = server.calls_query(
         tsi.CallsQueryReq(
@@ -570,70 +619,19 @@ def test_trace_call_wb_run_step_query(client):
             sort_by=[tsi.SortBy(field="wb_run_step", direction="desc")],
         )
     )
-    exp_steps = list(range(call_spec.total_calls))[::-1]
+    exp_steps = sorted(exp_start_steps, reverse=True)
     found_steps = [c.wb_run_step for c in res.calls]
     assert found_steps == exp_steps
 
-
-def test_trace_call_wb_run_step_end(client):
-    """Test that wb_run_step_end is captured at call end time."""
-    full_wb_run_id = f"{client.entity}/{client.project}/test-run"
-    from weave.trace import weave_client
-
-    # Start at step 100, increment by 10 each time
-    # This simulates the run step advancing during op execution
-    step_start = 100
-    step_increment = 10
-    step_counter = iter(range(step_start, step_start + 1000, step_increment))
-
-    with (
-        mock.patch.object(
-            weave_client, "safe_current_wb_run_id", return_value=full_wb_run_id
-        ),
-        mock.patch.object(  # noqa: PT008
-            weave_client, "safe_current_wb_run_step", lambda: next(step_counter)
-        ),
-    ):
-        call_spec = simple_line_call_bootstrap()
-
-    server = get_client_trace_server(client)
-    res = server.calls_query(
-        tsi.CallsQueryReq(project_id=get_client_project_id(client))
-    )
-
-    # Check that wb_run_step_end is captured for all calls
-    assert all(c.wb_run_step_end is not None for c in res.calls)
-
-    # wb_run_step_end should be equal to or greater than wb_run_step
-    # (in this test they happen to be equal since the mock returns sequential values)
-    for call in res.calls:
-        assert call.wb_run_step_end >= call.wb_run_step
-
-    # Test querying by wb_run_step_end
-    target_step_end = step_start + step_increment
-    query = tsi.Query(
-        **{
-            "$expr": {
-                "$eq": [{"$getField": "wb_run_step_end"}, {"$literal": target_step_end}]
-            }
-        }
-    )
-    res = server.calls_query(
-        tsi.CallsQueryReq(project_id=get_client_project_id(client), query=query)
-    )
-    assert len(res.calls) == 1
-    assert res.calls[0].wb_run_step_end == target_step_end
-
-    # Test sorting by wb_run_step_end
     res = server.calls_query(
         tsi.CallsQueryReq(
             project_id=get_client_project_id(client),
-            sort_by=[tsi.SortBy(field="wb_run_step_end", direction="asc")],
+            sort_by=[tsi.SortBy(field="wb_run_step_end", direction="desc")],
         )
     )
-    step_ends = [c.wb_run_step_end for c in res.calls]
-    # Check that the results are sorted in ascending order
-    assert step_ends == sorted(step_ends)
+    exp_steps = sorted(exp_end_steps, reverse=True)
+    found_steps = [c.wb_run_step_end for c in res.calls]
+    assert found_steps == exp_steps
 
 
 def test_trace_call_query_filter_output_object_version_refs(client):
