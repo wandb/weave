@@ -58,7 +58,7 @@ def bedrock_on_finish_invoke(
 def bedrock_agent_on_finish_invoke_agent(
     call: Call,
     output: Any,
-    exception: Optional[BaseException],  # noqa: ARG001
+    exception: Optional[BaseException],
 ) -> None:
     # Extract foundation model name from stored info, fallback to agent ID
     model_name = "unknown"
@@ -143,7 +143,7 @@ def postprocess_inputs_apply_guardrail(inputs: dict[str, Any]) -> dict[str, Any]
 
 
 def postprocess_inputs_invoke_agent(inputs: dict[str, Any]) -> dict[str, Any]:
-    """unpack kwargs to render them in the UI."""
+    """Unpack kwargs to render them in the UI."""
     return inputs.get("kwargs", {})
 
 
@@ -260,7 +260,7 @@ def postprocess_output_invoke_agent(
         except Exception as e:
             # If we can't iterate, just note that it's an EventStream
             outputs_copy["completion"] = {
-                "_stream_error": f"Could not process EventStream: {str(e)}"
+                "_stream_error": f"Could not process EventStream: {e!s}"
             }
             return outputs_copy
 
