@@ -234,47 +234,64 @@ def _is_unbound_method(func: Callable) -> bool:
 class OpCallError(Exception): ...
 
 
+class BoundOpWrapper:
+    """A wrapper that holds bound method information for an Op.
+
+    This is returned by OpDescriptor.__get__ when a method is accessed on an instance.
+    It stores the binding context (instance, ref) and delegates all calls to the original op.
+    """
+
+    def __init__(self, op: Op, instance: Any):
+        self._op = op
+        self._bound_instance = instance
+
+        # Cache the instance ref at binding time
+        try:
+            from weave.trace.ref_util import get_ref
+            ref = get_ref(instance)
+            self._bound_instance_ref = ref.uri() if ref else None
+        except Exception as e:
+            logger.debug(f"Failed to get ref for bound instance: {e}")
+            self._bound_instance_ref = None
+
+    def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        """Delegate to the original op with the bound instance prepended."""
+        return self._op(self._bound_instance, *args, **kwargs)
+
+    def __getattr__(self, name: str) -> Any:
+        """Forward all other attribute access to the original op."""
+        return getattr(self._op, name)
+
+    @property
+    def bound_instance(self) -> Any:
+        return self._bound_instance
+
+    @property
+    def bound_instance_ref(self) -> str | None:
+        return self._bound_instance_ref
+
+
 def _extract_bound_method_metadata(func: Op, args: tuple) -> dict[str, Any] | None:
     """Extract metadata about bound methods.
 
-    When a method is bound to an instance (e.g., obj.method()), this function
-    extracts information about the bound instance:
-    - instance_id: memory id of the bound instance
-    - instance_ref: weave ref of the bound instance (if available)
-    - instance_class: class name of the bound instance
+    Checks if the op is a BoundOpWrapper and extracts the binding metadata.
 
     Args:
-        func: The Op being called
+        func: The Op being called (may be a BoundOpWrapper)
         args: The original args tuple passed to the function
 
     Returns:
         A dict with bound method metadata, or None if not a bound method
     """
-    # Check if the resolve_fn (the actual wrapped function) is a bound method
-    # using inspect.ismethod which properly detects bound methods
-    if not inspect.ismethod(func.resolve_fn):
+    if not isinstance(func, BoundOpWrapper):
         return None
 
-    # For bound methods, __self__ contains the bound instance
-    bound_instance = func.resolve_fn.__self__
-
-    metadata: dict[str, Any] = {
-        "instance_id": id(bound_instance),
-        "instance_class": type(bound_instance).__qualname__,
+    instance = func.bound_instance
+    return {
+        "instance_id": id(instance),
+        "instance_class": type(instance).__qualname__,
+        "instance_ref": func.bound_instance_ref,
     }
-
-    # Try to get weave ref if the instance has one
-    try:
-        from weave.trace.ref_util import get_ref
-
-        ref = get_ref(bound_instance)
-        if ref is not None:
-            metadata["instance_ref"] = ref.uri()
-    except Exception:
-        # If we can't get a ref, that's okay
-        pass
-
-    return metadata
 
 
 def _default_on_input_handler(func: Op, args: tuple, kwargs: dict) -> ProcessedInputs:
@@ -1353,6 +1370,17 @@ def op(
             wrapper._is_async = is_async  # type: ignore
             wrapper._is_generator = is_sync_generator  # type: ignore
             wrapper._is_async_generator = is_async_generator  # type: ignore
+
+            # Implement descriptor protocol for bound method detection
+            def __get__(self: Any, obj: Any, objtype: Any = None) -> Any:
+                """Descriptor protocol: return BoundOpWrapper when accessed on instance."""
+                if obj is None:
+                    # Accessed on class, not instance
+                    return self
+                # Return a clean BoundOpWrapper that tracks the instance
+                return BoundOpWrapper(self, obj)
+
+            wrapper.__get__ = __get__.__get__(wrapper, type(wrapper))  # type: ignore
 
             return cast(Op[P, R], wrapper)
 
