@@ -197,7 +197,6 @@ def test_trace_server_call_start_and_end(client):
         "wb_user_id": MaybeStringMatcher(client.entity),
         "wb_run_id": None,
         "wb_run_step": None,
-        "wb_run_step_end": None,
         "deleted_at": None,
         "display_name": None,
         "storage_size_bytes": None,
@@ -249,7 +248,6 @@ def test_trace_server_call_start_and_end(client):
         "wb_user_id": MaybeStringMatcher(client.entity),
         "wb_run_id": None,
         "wb_run_step": None,
-        "wb_run_step_end": None,
         "deleted_at": None,
         "display_name": None,
         "storage_size_bytes": None,
@@ -295,55 +293,33 @@ class OpCallSpec(BaseModel):
     total_calls: int
     root_calls: int
     run_calls: int
-    part_sequence: list[tuple[str, str]]
 
 
 def simple_line_call_bootstrap() -> OpCallSpec:
-    part_sequence = []
-
-    def track_sequence(name: str):
-        def wrapper(fn):
-            def wrapped(*args, **kwargs):
-                part_sequence.append(("start", name))
-                res = fn(*args, **kwargs)
-                part_sequence.append(("end", name))
-                return res
-
-            wrapped.__name__ = fn.__name__
-
-            return wrapped
-
-        return wrapper
-
     class Number(weave.Object):
         value: int
 
     @weave.op
-    @track_sequence("adder")
     def adder(a: Number) -> Number:
-        res = Number(value=a.value + a.value)
+        return Number(value=a.value + a.value)
 
     adder_v0 = adder
 
-    @weave.op
-    @track_sequence("adder")
+    @weave.op  # type: ignore
     def adder(a: Number, b) -> Number:
         return Number(value=a.value + b)
 
     @weave.op
-    @track_sequence("subtractor")
     def subtractor(a: Number, b) -> Number:
         return Number(value=a.value - b)
 
     @weave.op
-    @track_sequence("multiplier")
     def multiplier(
         a: Number, b
     ) -> int:  # intentionally deviant in returning plain int - so that we have a different type
         return a.value * b
 
     @weave.op
-    @track_sequence("liner")
     def liner(m: Number, b, x) -> Number:
         return adder(Number(value=multiplier(m, x)), b)
 
@@ -397,7 +373,6 @@ def simple_line_call_bootstrap() -> OpCallSpec:
         total_calls=total_calls,
         root_calls=root_calls,
         run_calls=run_calls,
-        part_sequence=part_sequence,
     )
 
 
@@ -563,21 +538,8 @@ def test_trace_call_wb_run_step_query(client):
     res = server.calls_query(
         tsi.CallsQueryReq(project_id=get_client_project_id(client))
     )
-    exp_start_steps = []
-    exp_end_steps = []
-    counter = 0
-    for part in call_spec.part_sequence:
-        if part[0] == "start":
-            exp_start_steps.append(counter)
-        else:
-            exp_end_steps.append(counter)
-        counter += 1
-    exp_start_steps_set = set(exp_start_steps)
-    found_start_steps_set = {c.wb_run_step for c in res.calls}
-    assert found_start_steps_set == exp_start_steps_set
-    exp_end_steps_set = set(exp_end_steps)
-    found_end_steps_set = {c.wb_run_step_end for c in res.calls}
-    assert found_end_steps_set == exp_end_steps_set
+    steps = {c.wb_run_step for c in res.calls}
+    assert steps == set(range(call_spec.total_calls))
 
     query = tsi.Query(
         **{"$expr": {"$eq": [{"$getField": "wb_run_step"}, {"$literal": 0}]}}
@@ -587,8 +549,7 @@ def test_trace_call_wb_run_step_query(client):
     )
     assert len(res.calls) == 1
 
-    count = 2
-    compare_step = exp_start_steps[-count]
+    compare_step = call_spec.total_calls - 2
     range_query = tsi.Query(
         **{
             "$expr": {
@@ -599,21 +560,7 @@ def test_trace_call_wb_run_step_query(client):
     res = server.calls_query(
         tsi.CallsQueryReq(project_id=get_client_project_id(client), query=range_query)
     )
-    assert len(res.calls) == count
-
-    count = 4
-    compare_step = exp_end_steps[-count]
-    range_query = tsi.Query(
-        **{
-            "$expr": {
-                "$gte": [{"$getField": "wb_run_step_end"}, {"$literal": compare_step}]
-            }
-        }
-    )
-    res = server.calls_query(
-        tsi.CallsQueryReq(project_id=get_client_project_id(client), query=range_query)
-    )
-    assert len(res.calls) == count
+    assert len(res.calls) == 2
 
     res = server.calls_query(
         tsi.CallsQueryReq(
@@ -621,18 +568,8 @@ def test_trace_call_wb_run_step_query(client):
             sort_by=[tsi.SortBy(field="wb_run_step", direction="desc")],
         )
     )
-    exp_steps = sorted(exp_start_steps, reverse=True)
+    exp_steps = list(range(call_spec.total_calls))[::-1]
     found_steps = [c.wb_run_step for c in res.calls]
-    assert found_steps == exp_steps
-
-    res = server.calls_query(
-        tsi.CallsQueryReq(
-            project_id=get_client_project_id(client),
-            sort_by=[tsi.SortBy(field="wb_run_step_end", direction="desc")],
-        )
-    )
-    exp_steps = sorted(exp_end_steps, reverse=True)
-    found_steps = [c.wb_run_step_end for c in res.calls]
     assert found_steps == exp_steps
 
 
