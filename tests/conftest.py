@@ -636,3 +636,31 @@ def mock_wandb_context():
             "get": mock_get_context,
             "set": mock_set_context,
         }
+
+
+@pytest.fixture(autouse=True, scope="session")
+def patch_vcr_bytesio():
+    """Patch VCR's VCRHTTPResponse.read() to handle keyword arguments.
+
+    VCR's stubs pass keyword arguments to BytesIO.read(), but BytesIO.read()
+    only accepts positional arguments. This causes issues with Python 3.13
+    when libraries like clickhouse-connect call response.read(size, decode_content=False).
+
+    This patch strips keyword arguments before passing to BytesIO.read().
+    """
+    try:
+        from vcr.stubs import VCRHTTPResponse
+
+        original_read = VCRHTTPResponse.read
+
+        def patched_read(self, *args, **kwargs):
+            # BytesIO.read() only accepts positional arguments, so we strip kwargs
+            # The main kwarg that causes issues is 'decode_content' from urllib3
+            return self._content.read(*args)
+
+        VCRHTTPResponse.read = patched_read
+        yield
+        VCRHTTPResponse.read = original_read
+    except ImportError:
+        # VCR not installed, skip patching
+        yield
