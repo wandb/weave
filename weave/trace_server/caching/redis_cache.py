@@ -36,15 +36,16 @@ class RedisCache:
         self._password = password
         self._kwargs = kwargs
 
-    async def _ensure_connection(self) -> aioredis.Redis:
-        """Ensure Redis connection is established."""
-        if self._redis is None:
-            self._redis = await aioredis.from_url(
-                f"redis://{self._host}:{self._port}/{self._db}",
-                password=self._password,
-                decode_responses=True,
-                **self._kwargs,
-            )
+    async def _get_client(self) -> aioredis.Redis:
+        """Get Redis client, creating one if needed."""
+        if self._redis is not None:
+            return self._redis
+        self._redis = await aioredis.from_url(
+            f"redis://{self._host}:{self._port}/{self._db}",
+            password=self._password,
+            decode_responses=True,
+            **self._kwargs,
+        )
         return self._redis
 
     async def get(self, key: str) -> Optional[str]:
@@ -62,7 +63,7 @@ class RedisCache:
             >>> await cache.get("key")
             'value'
         """
-        redis = await self._ensure_connection()
+        redis = await self._get_client()
         value = await redis.get(key)
         return value
 
@@ -78,7 +79,7 @@ class RedisCache:
             >>> cache = RedisCache()
             >>> await cache.set("key", "value", ttl=60)
         """
-        redis = await self._ensure_connection()
+        redis = await self._get_client()
         if ttl is not None:
             await redis.setex(key, ttl, value)
         else:
@@ -97,7 +98,7 @@ class RedisCache:
             >>> await cache.get("key")
             None
         """
-        redis = await self._ensure_connection()
+        redis = await self._get_client()
         await redis.delete(key)
 
     async def clear(self) -> None:
@@ -113,7 +114,7 @@ class RedisCache:
             >>> await cache.get("key1")
             None
         """
-        redis = await self._ensure_connection()
+        redis = await self._get_client()
         await redis.flushdb()
 
     async def close(self) -> None:
