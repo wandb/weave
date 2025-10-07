@@ -1,19 +1,19 @@
 """Protocol for cache service implementations."""
 
-from typing import Protocol
+from typing import Optional, Protocol
 
 
 class CacheProtocol(Protocol):
     """Protocol defining the interface for cache implementations."""
 
-    async def get(self, key: str) -> str | None:
+    async def get(self, key: str) -> Optional[str]:
         """Get a value from the cache.
 
         Args:
             key (str): The cache key to retrieve.
 
         Returns:
-            str | None: The cached value if it exists and hasn't expired, None otherwise.
+            Optional[str]: The cached value if it exists and hasn't expired, None otherwise.
 
         Examples:
             >>> cache = MemoryCache()
@@ -23,13 +23,13 @@ class CacheProtocol(Protocol):
         """
         ...
 
-    async def set(self, key: str, value: str, ttl: int | None = None) -> None:
+    async def set(self, key: str, value: str, ttl: Optional[int] = None) -> None:
         """Set a value in the cache.
 
         Args:
             key (str): The cache key to set.
             value (str): The value to cache.
-            ttl (int | None): Time-to-live in seconds. If None, the value never expires.
+            ttl (Optional[int]): Time-to-live in seconds. If None, the value never expires.
 
         Examples:
             >>> cache = MemoryCache()

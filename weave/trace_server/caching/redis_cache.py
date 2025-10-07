@@ -1,5 +1,7 @@
 """Redis cache implementation."""
 
+from typing import Optional
+
 import redis.asyncio as aioredis
 
 
@@ -15,7 +17,7 @@ class RedisCache:
         host: str = "localhost",
         port: int = 6379,
         db: int = 0,
-        password: str | None = None,
+        password: Optional[str] = None,
         **kwargs: str,
     ) -> None:
         """Initialize the Redis cache.
@@ -24,10 +26,10 @@ class RedisCache:
             host (str): Redis host address.
             port (int): Redis port number.
             db (int): Redis database number.
-            password (str | None): Redis password for authentication.
+            password (Optional[str]): Redis password for authentication.
             **kwargs: Additional arguments to pass to Redis client.
         """
-        self._redis: aioredis.Redis | None = None
+        self._redis: Optional[aioredis.Redis] = None
         self._host = host
         self._port = port
         self._db = db
@@ -45,14 +47,14 @@ class RedisCache:
             )
         return self._redis
 
-    async def get(self, key: str) -> str | None:
+    async def get(self, key: str) -> Optional[str]:
         """Get a value from the cache.
 
         Args:
             key (str): The cache key to retrieve.
 
         Returns:
-            str | None: The cached value if it exists and hasn't expired, None otherwise.
+            Optional[str]: The cached value if it exists and hasn't expired, None otherwise.
 
         Examples:
             >>> cache = RedisCache()
@@ -64,13 +66,13 @@ class RedisCache:
         value = await redis.get(key)
         return value
 
-    async def set(self, key: str, value: str, ttl: int | None = None) -> None:
+    async def set(self, key: str, value: str, ttl: Optional[int] = None) -> None:
         """Set a value in the cache.
 
         Args:
             key (str): The cache key to set.
             value (str): The value to cache.
-            ttl (int | None): Time-to-live in seconds. If None, the value never expires.
+            ttl (Optional[int]): Time-to-live in seconds. If None, the value never expires.
 
         Examples:
             >>> cache = RedisCache()

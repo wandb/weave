@@ -2,6 +2,7 @@
 
 import asyncio
 import time
+from typing import Optional
 
 
 class MemoryCache:
@@ -13,17 +14,17 @@ class MemoryCache:
 
     def __init__(self) -> None:
         """Initialize the in-memory cache."""
-        self._cache: dict[str, tuple[str, float | None]] = {}
+        self._cache: dict[str, tuple[str, Optional[float]]] = {}
         self._lock = asyncio.Lock()
 
-    async def get(self, key: str) -> str | None:
+    async def get(self, key: str) -> Optional[str]:
         """Get a value from the cache.
 
         Args:
             key (str): The cache key to retrieve.
 
         Returns:
-            str | None: The cached value if it exists and hasn't expired, None otherwise.
+            Optional[str]: The cached value if it exists and hasn't expired, None otherwise.
 
         Examples:
             >>> cache = MemoryCache()
@@ -44,13 +45,13 @@ class MemoryCache:
 
             return value
 
-    async def set(self, key: str, value: str, ttl: int | None = None) -> None:
+    async def set(self, key: str, value: str, ttl: Optional[int] = None) -> None:
         """Set a value in the cache.
 
         Args:
             key (str): The cache key to set.
             value (str): The value to cache.
-            ttl (int | None): Time-to-live in seconds. If None, the value never expires.
+            ttl (Optional[int]): Time-to-live in seconds. If None, the value never expires.
 
         Examples:
             >>> cache = MemoryCache()
