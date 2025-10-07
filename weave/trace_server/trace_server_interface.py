@@ -3,12 +3,7 @@ from collections.abc import Iterator
 from enum import Enum
 from typing import Any, Literal, Optional, Protocol, Union
 
-from pydantic import (
-    BaseModel,
-    ConfigDict,
-    Field,
-    field_serializer,
-)
+from pydantic import BaseModel, ConfigDict, Field, field_serializer
 from typing_extensions import TypedDict
 
 from weave.trace_server.interface.query import Query
@@ -518,12 +513,36 @@ class CallUpdateRes(BaseModel):
     pass
 
 
-class OpCreateReq(BaseModelStrict):
-    op_obj: ObjSchemaForInsert
+class OpCreateReq(BaseModel):
+    """Request model for creating an Op object."""
+
+    project_id: str = Field(
+        ..., description="The project where this object will be saved"
+    )
+    name: str = Field(
+        ...,
+        description="The (qualified) name of this object.  Objects with the same name will be versioned together.",
+    )
+    description: Optional[str] = Field(
+        None,
+        description="A description of this object",
+    )
+
+    source_code: str = Field(
+        ..., description="Complete source code for the op including imports"
+    )
 
 
 class OpCreateRes(BaseModel):
-    digest: str
+    """Response model for creating an Op object."""
+
+    digest: str = Field(..., description="The digest of the created object")
+    object_id: str = Field(..., description="The ID of the created object")
+    version_index: int = Field(
+        ..., description="The version index of the created object"
+    )
+
+    op_ref: str = Field(..., description="Full reference to the created op")
 
 
 class OpReadReq(BaseModelStrict):
@@ -1243,6 +1262,338 @@ class EvaluationStatusRes(BaseModel):
     ]
 
 
+class DatasetCreateReq(BaseModel):
+    project_id: str = Field(
+        ..., description="The project where this dataset will be saved"
+    )
+    name: str = Field(
+        ...,
+        description="The name of this dataset.  Datasets with the same name will be versioned together.",
+    )
+    description: Optional[str] = Field(
+        None,
+        description="A description of this dataset",
+    )
+    rows: list[dict[str, Any]] = Field(..., description="Dataset rows")
+
+
+class DatasetCreateRes(BaseModel):
+    digest: str = Field(..., description="The digest of the created dataset")
+    object_id: str = Field(..., description="The ID of the created dataset")
+    version_index: int = Field(
+        ..., description="The version index of the created dataset"
+    )
+
+    dataset_ref: str = Field(..., description="Full reference to the created dataset")
+
+
+class ScorerCreateReq(BaseModel):
+    project_id: str = Field(
+        ..., description="The project where this scorer will be saved"
+    )
+    name: str = Field(
+        ...,
+        description="The name of this scorer.  Scorers with the same name will be versioned together.",
+    )
+    description: Optional[str] = Field(
+        None,
+        description="A description of this scorer",
+    )
+    op_source_code: str = Field(
+        ..., description="Complete source code for the scorer op including imports"
+    )
+
+
+class ScorerCreateRes(BaseModel):
+    digest: str = Field(..., description="The digest of the created scorer")
+    object_id: str = Field(..., description="The ID of the created scorer")
+    version_index: int = Field(
+        ..., description="The version index of the created scorer"
+    )
+    scorer_ref: str = Field(..., description="Full reference to the created scorer")
+
+
+class EvaluationCreateReq(BaseModel):
+    project_id: str = Field(
+        ..., description="The project where this evaluation will be saved"
+    )
+    name: str = Field(
+        ...,
+        description="The name of this evaluation.  Evaluations with the same name will be versioned together.",
+    )
+    description: Optional[str] = Field(
+        None,
+        description="A description of this evaluation",
+    )
+
+    dataset_ref: str = Field(..., description="Reference to the dataset (weave:// URI)")
+    scorer_refs: Optional[list[str]] = Field(
+        None, description="List of scorer references (weave:// URIs)"
+    )
+
+    trials: int = Field(default=1, description="Number of trials to run")
+    evaluation_name: Optional[str] = Field(
+        None, description="Name for the evaluation run"
+    )
+    eval_attributes: Optional[dict[str, Any]] = Field(
+        None, description="Optional attributes for the evaluation"
+    )
+
+
+class EvaluationCreateRes(BaseModel):
+    digest: str = Field(..., description="The digest of the created evaluation")
+    object_id: str = Field(..., description="The ID of the created evaluation")
+    version_index: int = Field(
+        ..., description="The version index of the created evaluation"
+    )
+    evaluation_ref: str = Field(
+        ..., description="Full reference to the created evaluation"
+    )
+
+
+class EvaluationLogStartReq(BaseModel):
+    project_id: str = Field(..., description="Project ID (e.g., 'entity/project')")
+    evaluation_ref: str = Field(
+        ..., description="Reference to the evaluation object (weave:// URI)"
+    )
+    model_ref: Optional[str] = Field(
+        None, description="Reference to the model object (weave:// URI)"
+    )
+
+
+class EvaluationLogStartRes(BaseModel):
+    evaluate_call_id: str = Field(..., description="ID of the started evaluation call")
+
+
+class EvaluationLogPredictionReq(BaseModel):
+    project_id: str = Field(..., description="Project ID (e.g., 'entity/project')")
+    evaluate_call_id: str = Field(..., description="ID of the parent evaluation call")
+    model_ref: Optional[str] = Field(
+        None, description="Reference to the model object (weave:// URI)"
+    )
+    inputs: dict[str, Any] = Field(..., description="Inputs to the model")
+    output: Any = Field(None, description="Output from the model prediction")
+
+
+class EvaluationLogPredictionRes(BaseModel):
+    predict_call_id: str = Field(..., description="ID of the prediction call")
+
+
+class EvaluationLogScoreReq(BaseModel):
+    project_id: str = Field(..., description="Project ID (e.g., 'entity/project')")
+    predict_call_id: str = Field(..., description="ID of the parent prediction call")
+    scorer_ref: Optional[str] = Field(
+        None, description="Reference to the scorer object (weave:// URI)"
+    )
+    score: Union[dict[str, Any], int, float] = Field(
+        ..., description="The score value (can be a dict, int, or float)"
+    )
+
+
+class EvaluationLogScoreRes(BaseModel):
+    call_id: str = Field(..., description="ID of the score call")
+
+
+class EvaluationLogFinishReq(BaseModel):
+    project_id: str = Field(..., description="Project ID (e.g., 'entity/project')")
+    evaluate_call_id: str = Field(
+        ..., description="ID of the evaluation call to finish"
+    )
+    summary: dict[str, Any] = Field(
+        default_factory=dict, description="Summary data for the evaluation"
+    )
+
+
+class EvaluationLogFinishRes(BaseModel):
+    success: bool = Field(
+        ..., description="Whether the evaluation was successfully finished"
+    )
+
+
+class DatasetGetReq(BaseModel):
+    project_id: str = Field(..., description="Project ID (e.g., 'entity/project')")
+    object_id: str = Field(..., description="The dataset object ID")
+    digest: str = Field(..., description="The digest of the dataset object")
+
+
+class DatasetItemMetadata(BaseModel):
+    object_id: str = Field(..., description="The dataset object ID")
+    digest: str = Field(..., description="The digest of the dataset object")
+    version_index: int = Field(..., description="The version index of the object")
+    created_at: datetime.datetime = Field(
+        ..., description="When the object was created"
+    )
+    name: str = Field(..., description="The name of the dataset")
+    description: Optional[str] = Field(None, description="Description of the dataset")
+
+
+class DatasetGetRes(DatasetItemMetadata):
+    rows: list[dict[str, Any]] = Field(..., description="The dataset rows data")
+
+
+class DatasetListReq(BaseModel):
+    project_id: str = Field(..., description="Project ID (e.g., 'entity/project')")
+    limit: Optional[int] = Field(
+        default=None, description="Maximum number of datasets to return"
+    )
+    offset: Optional[int] = Field(
+        default=None, description="Number of datasets to skip"
+    )
+
+
+class DatasetDeleteReq(BaseModelStrict):
+    project_id: str = Field(..., description="Project ID (e.g., 'entity/project')")
+    object_id: str = Field(..., description="The dataset object ID")
+    digests: Optional[list[str]] = Field(
+        default=None,
+        description="List of digests to delete. If not provided, all digests for the dataset will be deleted.",
+    )
+
+
+class DatasetDeleteRes(BaseModel):
+    num_deleted: int = Field(..., description="Number of dataset versions deleted")
+
+
+class ScorerGetReq(BaseModel):
+    project_id: str = Field(..., description="Project ID (e.g., 'entity/project')")
+    object_id: str = Field(..., description="The scorer object ID")
+    digest: str = Field(..., description="The digest of the scorer object")
+
+
+class ScorerItemMetadata(BaseModel):
+    object_id: str = Field(..., description="The scorer object ID")
+    digest: str = Field(..., description="The digest of the scorer object")
+    version_index: int = Field(..., description="The version index of the object")
+    created_at: datetime.datetime = Field(
+        ..., description="When the object was created"
+    )
+    name: str = Field(..., description="The name of the scorer")
+    description: Optional[str] = Field(None, description="Description of the scorer")
+
+
+class ScorerGetRes(ScorerItemMetadata):
+    score_op_ref: str = Field(..., description="The scorer op reference")
+
+
+class ScorerListReq(BaseModel):
+    project_id: str = Field(..., description="Project ID (e.g., 'entity/project')")
+    limit: Optional[int] = Field(
+        default=None, description="Maximum number of scorers to return"
+    )
+    offset: Optional[int] = Field(default=None, description="Number of scorers to skip")
+
+
+class ScorerDeleteReq(BaseModelStrict):
+    project_id: str = Field(..., description="Project ID (e.g., 'entity/project')")
+    object_id: str = Field(..., description="The scorer object ID")
+    digests: Optional[list[str]] = Field(
+        default=None,
+        description="List of digests to delete. If not provided, all digests for the scorer will be deleted.",
+    )
+
+
+class ScorerDeleteRes(BaseModel):
+    num_deleted: int = Field(..., description="Number of scorer versions deleted")
+
+
+class EvaluationGetReq(BaseModel):
+    project_id: str = Field(..., description="Project ID (e.g., 'entity/project')")
+    object_id: str = Field(..., description="The evaluation object ID")
+    digest: str = Field(..., description="The digest of the evaluation object")
+
+
+class EvaluationItemMetadata(BaseModel):
+    object_id: str = Field(..., description="The evaluation object ID")
+    digest: str = Field(..., description="The digest of the evaluation object")
+    version_index: int = Field(..., description="The version index of the object")
+    created_at: datetime.datetime = Field(
+        ..., description="When the object was created"
+    )
+    name: str = Field(..., description="The name of the evaluation")
+    description: Optional[str] = Field(
+        None, description="Description of the evaluation"
+    )
+
+
+class EvaluationGetRes(EvaluationItemMetadata):
+    dataset_ref: str = Field(..., description="Dataset reference")
+    scorer_refs: list[str] = Field(..., description="List of scorer references")
+    trials: int = Field(..., description="Number of trials")
+    evaluation_name: Optional[str] = Field(
+        None, description="Name for the evaluation run"
+    )
+    evaluate_op_ref: str = Field(..., description="Evaluate op reference")
+    predict_and_score_op_ref: str = Field(
+        ..., description="Predict and score op reference"
+    )
+    summarize_op_ref: str = Field(..., description="Summarize op reference")
+
+
+class EvaluationListReq(BaseModel):
+    project_id: str = Field(..., description="Project ID (e.g., 'entity/project')")
+    limit: Optional[int] = Field(
+        default=None, description="Maximum number of evaluations to return"
+    )
+    offset: Optional[int] = Field(
+        default=None, description="Number of evaluations to skip"
+    )
+
+
+class EvaluationDeleteReq(BaseModelStrict):
+    project_id: str = Field(..., description="Project ID (e.g., 'entity/project')")
+    object_id: str = Field(..., description="The evaluation object ID")
+    digests: Optional[list[str]] = Field(
+        default=None,
+        description="List of digests to delete. If not provided, all digests for the evaluation will be deleted.",
+    )
+
+
+class EvaluationDeleteRes(BaseModel):
+    num_deleted: int = Field(..., description="Number of evaluation versions deleted")
+
+
+class OpGetReq(BaseModel):
+    project_id: str = Field(..., description="Project ID (e.g., 'entity/project')")
+    object_id: str = Field(..., description="The op object ID")
+    digest: str = Field(..., description="The digest of the op object")
+
+
+class OpItemMetadata(BaseModel):
+    object_id: str = Field(..., description="The op object ID")
+    digest: str = Field(..., description="The digest of the op object")
+    version_index: int = Field(..., description="The version index of the object")
+    created_at: datetime.datetime = Field(
+        ..., description="When the object was created"
+    )
+    name: str = Field(..., description="The name of the op")
+    description: Optional[str] = Field(None, description="Description of the op")
+
+
+class OpGetRes(OpItemMetadata):
+    code: str = Field(..., description="The op code")
+
+
+class OpListReq(BaseModel):
+    project_id: str = Field(..., description="Project ID (e.g., 'entity/project')")
+    limit: Optional[int] = Field(
+        default=None, description="Maximum number of ops to return"
+    )
+    offset: Optional[int] = Field(default=None, description="Number of ops to skip")
+
+
+class OpDeleteReq(BaseModelStrict):
+    project_id: str = Field(..., description="Project ID (e.g., 'entity/project')")
+    object_id: str = Field(..., description="The op object ID")
+    digests: Optional[list[str]] = Field(
+        default=None,
+        description="List of digests to delete. If not provided, all digests for the op will be deleted.",
+    )
+
+
+class OpDeleteRes(BaseModel):
+    num_deleted: int = Field(..., description="Number of op versions deleted")
+
+
 class TraceServerInterface(Protocol):
     def ensure_project_exists(
         self, entity: str, project: str
@@ -1267,6 +1618,9 @@ class TraceServerInterface(Protocol):
     def op_create(self, req: OpCreateReq) -> OpCreateRes: ...
     def op_read(self, req: OpReadReq) -> OpReadRes: ...
     def ops_query(self, req: OpQueryReq) -> OpQueryRes: ...
+    def op_get(self, req: OpGetReq) -> OpGetRes: ...
+    def op_list(self, req: OpListReq) -> Iterator[OpItemMetadata]: ...
+    def op_delete(self, req: OpDeleteReq) -> OpDeleteRes: ...
 
     # Cost API
     def cost_create(self, req: CostCreateReq) -> CostCreateRes: ...
@@ -1341,3 +1695,37 @@ class TraceServerInterface(Protocol):
     # Evaluation API
     def evaluate_model(self, req: EvaluateModelReq) -> EvaluateModelRes: ...
     def evaluation_status(self, req: EvaluationStatusReq) -> EvaluationStatusRes: ...
+
+    # Evaluation v2 API
+    def evaluation_create(self, req: EvaluationCreateReq) -> EvaluationCreateRes: ...
+    def evaluation_get(self, req: EvaluationGetReq) -> EvaluationGetRes: ...
+    def evaluation_list(
+        self, req: EvaluationListReq
+    ) -> Iterator[EvaluationItemMetadata]: ...
+    def evaluation_delete(self, req: EvaluationDeleteReq) -> EvaluationDeleteRes: ...
+
+    # Evaluation Logging API
+    def evaluation_log_start(
+        self, req: EvaluationLogStartReq
+    ) -> EvaluationLogStartRes: ...
+    def evaluation_log_prediction(
+        self, req: EvaluationLogPredictionReq
+    ) -> EvaluationLogPredictionRes: ...
+    def evaluation_log_score(
+        self, req: EvaluationLogScoreReq
+    ) -> EvaluationLogScoreRes: ...
+    def evaluation_log_finish(
+        self, req: EvaluationLogFinishReq
+    ) -> EvaluationLogFinishRes: ...
+
+    # Dataset API
+    def dataset_create(self, req: DatasetCreateReq) -> DatasetCreateRes: ...
+    def dataset_get(self, req: DatasetGetReq) -> DatasetGetRes: ...
+    def dataset_list(self, req: DatasetListReq) -> Iterator[DatasetItemMetadata]: ...
+    def dataset_delete(self, req: DatasetDeleteReq) -> DatasetDeleteRes: ...
+
+    # Scorer API
+    def scorer_create(self, req: ScorerCreateReq) -> ScorerCreateRes: ...
+    def scorer_get(self, req: ScorerGetReq) -> ScorerGetRes: ...
+    def scorer_list(self, req: ScorerListReq) -> Iterator[ScorerItemMetadata]: ...
+    def scorer_delete(self, req: ScorerDeleteReq) -> ScorerDeleteRes: ...
