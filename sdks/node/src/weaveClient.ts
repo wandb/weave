@@ -644,9 +644,9 @@ export class WeaveClient {
   ) {
     let inputs: Record<string, any> = {};
 
-    // Add 'self' first if thisArg is a WeaveObject
-    if (thisArg instanceof WeaveObject) {
-      inputs['self'] = thisArg;
+    // Add 'this' first if thisArg is a WeaveObject
+    if (thisArg instanceof WeaveObject && !('this' in inputs)) {
+      inputs['this'] = thisArg;
     }
     if (parameterNames === 'useParam0Object') {
       inputs = {...inputs, ...params[0]};
@@ -706,7 +706,8 @@ export class WeaveClient {
     currentCall: CallStackEntry,
     parentCall: CallStackEntry | undefined,
     startTime: Date,
-    displayName?: string
+    displayName?: string,
+    customAttributes?: Record<string, any>
   ) {
     const inputs = await this.paramsToCallInputs(
       params,
@@ -717,6 +718,16 @@ export class WeaveClient {
       this.saveOp(opRef);
       opRef = await opRef.__savedRef;
     }
+
+    // Merge custom attributes with default weave attributes
+    const attributes = {
+      weave: {
+        client_version: packageVersion,
+        source: 'js-sdk',
+      },
+      ...customAttributes,
+    };
+
     const startReq = {
       project_id: this.projectId,
       id: currentCall.callId,
@@ -725,12 +736,7 @@ export class WeaveClient {
       parent_id: parentCall?.callId,
       started_at: startTime.toISOString(),
       display_name: displayName,
-      attributes: {
-        weave: {
-          client_version: packageVersion,
-          source: 'js-sdk',
-        },
-      },
+      attributes,
       inputs,
     };
     internalCall.updateWithCallSchemaData(startReq);
@@ -820,6 +826,54 @@ export class WeaveClient {
       call_id: callId,
       display_name: displayName,
     });
+  }
+
+  /**
+   * Add feedback (e.g., scorer output) to a call.
+   * Used in imperative evaluation to attach scorer results to predict calls.
+   *
+   * @param predictCallId - ID of the predict call to attach feedback to
+   * @param scorerCallId - ID of the scorer call that generated the feedback
+   * @param runnableRefUri - URI of the scorer (Op or Object ref)
+   * @param scorerOutput - Output of the scorer
+   */
+  public async addFeedback(
+    predictCallId: string,
+    scorerCallId: string,
+    runnableRefUri: string,
+    scorerOutput: any
+  ): Promise<string> {
+    // Parse entity and project from projectId (format: "entity/project")
+    const [entity, project] = this.projectId.split('/');
+
+    // Build call URIs in weave:/// format
+    const predictCallUri = `weave:///${entity}/${project}/call/${predictCallId}`;
+    const scorerCallUri = `weave:///${entity}/${project}/call/${scorerCallId}`;
+
+    // Extract scorer name from runnable ref URI
+    // Format: weave:///{entity}/{project}/op/{op_name}:{digest} or object/{name}:{digest}
+    const scorerName =
+      runnableRefUri.split('/').pop()?.split(':')[0] || 'unknown';
+
+    // Serialize the scorer output
+    this.saveWeaveValues(scorerOutput);
+    const serializedOutput = await this.serializedVal(scorerOutput);
+
+    const payload = {
+      output: serializedOutput,
+    };
+
+    const response =
+      await this.traceServerApi.feedback.feedbackCreateFeedbackCreatePost({
+        project_id: this.projectId,
+        weave_ref: predictCallUri,
+        feedback_type: `wandb.runnable.${scorerName}`,
+        payload,
+        runnable_ref: runnableRefUri,
+        call_ref: scorerCallUri,
+      });
+
+    return response.data.id;
   }
 }
 

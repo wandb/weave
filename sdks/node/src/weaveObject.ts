@@ -50,10 +50,6 @@ export class WeaveObject {
 
   constructor(protected _baseParameters: WeaveObjectParameters) {}
 
-  className() {
-    return Object.getPrototypeOf(this).constructor.name;
-  }
-
   saveAttrs() {
     const attrs: {[key: string]: any} = {
       name: this._baseParameters?.name,
