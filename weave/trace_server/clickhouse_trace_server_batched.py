@@ -6,7 +6,6 @@ import hashlib
 import json
 import logging
 import threading
-import time
 from collections import defaultdict
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
@@ -22,6 +21,13 @@ from clickhouse_connect.driver.query import QueryResult
 from clickhouse_connect.driver.summary import QuerySummary
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
     ExportTraceServiceRequest,
+)
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    retry_if_result,
+    stop_after_attempt,
+    wait_exponential,
 )
 
 from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
@@ -149,77 +155,6 @@ from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker impo
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-
-
-def retry_with_exponential_backoff(
-    func: Callable[[], Any],
-    *,
-    max_retries: int = 10,
-    initial_delay: float = 0.05,
-    max_delay: float = 1.0,
-    should_retry_exception: Optional[Callable[[Exception], bool]] = None,
-    should_retry_result: Optional[Callable[[Any], bool]] = None,
-) -> Any:
-    """Execute a function with exponential backoff retry logic.
-
-    This handles race conditions (e.g., ClickHouse eventual consistency) by retrying
-    operations with exponentially increasing delays between attempts.
-
-    Args:
-        func: The function to execute (should take no arguments)
-        max_retries: Maximum number of retry attempts (default 10)
-        initial_delay: Initial delay in seconds (default 0.05, i.e., 50ms)
-        max_delay: Maximum delay between retries in seconds (default 1.0)
-        should_retry_exception: Optional function that takes an exception and returns
-            True if the operation should be retried. If None, all exceptions cause retry.
-            The exception is re-raised on the final attempt.
-        should_retry_result: Optional function that takes the result and returns True
-            if the operation should be retried based on the result. If None, any
-            non-exception result is considered successful.
-
-    Returns:
-        The result of the successful function execution
-
-    Raises:
-        The last exception encountered if all retries are exhausted
-    """
-    retry_delay = initial_delay
-    last_exception = None
-
-    for attempt in range(max_retries):
-        try:
-            result = func()
-
-            # Check if we should retry based on the result
-            if should_retry_result and should_retry_result(result):
-                if attempt < max_retries - 1:
-                    time.sleep(retry_delay)
-                    retry_delay = min(retry_delay * 2, max_delay)
-                    continue
-                # On final attempt, return the result anyway
-                return result
-        except Exception as e:
-            last_exception = e
-
-            # Check if we should retry this exception
-            if should_retry_exception and not should_retry_exception(e):
-                # Don't retry this exception type
-                raise
-
-            if attempt < max_retries - 1:
-                # Not the final attempt, sleep and continue
-                time.sleep(retry_delay)
-                retry_delay = min(retry_delay * 2, max_delay)
-            else:
-                # Final attempt, re-raise the exception
-                raise
-        else:
-            return result
-
-    # This should never be reached, but just in case
-    if last_exception:
-        raise last_exception
-    raise RuntimeError("Retry logic failed unexpectedly")
 
 
 # Create a shared connection pool manager for all ClickHouse connections
@@ -817,6 +752,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         """
 
         # Query the op object with op filtering, with retry logic
+        @retry(
+            stop=stop_after_attempt(10),
+            wait=wait_exponential(multiplier=1, min=0.05, max=1.0),
+            retry=retry_if_result(lambda result: len(result) == 0),
+            reraise=True,
+        )
         def query_op() -> list[SelectableCHObjSchema]:
             object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
             object_query_builder.add_is_op_condition(True)
@@ -825,12 +766,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             object_query_builder.set_include_deleted(include_deleted=True)
             return self._select_objs_query(object_query_builder)
 
-        objs = retry_with_exponential_backoff(
-            query_op,
-            max_retries=10,
-            initial_delay=0.05,
-            should_retry_result=lambda result: len(result) == 0,
-        )
+        objs = query_op()
 
         if len(objs) == 0:
             raise NotFoundError(f"Op {req.object_id}:{req.digest} not found")
@@ -1027,12 +963,17 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         Raises:
             NotFoundError: If the object is not found after all retries
         """
-        return retry_with_exponential_backoff(
-            lambda: self.obj_read(req),
-            max_retries=max_retries,
-            initial_delay=initial_delay,
-            should_retry_exception=lambda e: isinstance(e, NotFoundError),
+
+        @retry(
+            stop=stop_after_attempt(max_retries),
+            wait=wait_exponential(multiplier=1, min=initial_delay, max=1.0),
+            retry=retry_if_exception_type(NotFoundError),
+            reraise=True,
         )
+        def _read() -> tsi.ObjReadRes:
+            return self.obj_read(req)
+
+        return _read()
 
     def obj_read(self, req: tsi.ObjReadReq) -> tsi.ObjReadRes:
         object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
@@ -3247,6 +3188,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
 
         # Retry the val_dump query to handle race conditions where values may not be immediately available
+        expected_count = len(metadata_result)
+
+        @retry(
+            stop=stop_after_attempt(10),
+            wait=wait_exponential(multiplier=1, min=0.05, max=1.0),
+            retry=retry_if_result(lambda result: len(result) < expected_count),
+            reraise=True,
+        )
         def query_values() -> dict[tuple[str, str], Any]:
             query_result = self._query_stream(value_query, value_parameters)
             # Map (object_id, digest) to val_dump
@@ -3256,13 +3205,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 values[object_id, digest] = val_dump
             return values
 
-        expected_count = len(metadata_result)
-        object_values = retry_with_exponential_backoff(
-            query_values,
-            max_retries=10,
-            initial_delay=0.05,
-            should_retry_result=lambda result: len(result) < expected_count,
-        )
+        object_values = query_values()
 
         # update the val_dump for each object
         for obj in metadata_result:
