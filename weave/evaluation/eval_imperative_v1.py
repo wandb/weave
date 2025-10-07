@@ -1,0 +1,771 @@
+from __future__ import annotations
+
+import asyncio
+import atexit
+import datetime
+import json
+import keyword
+import logging
+import re
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
+from threading import Lock
+from types import MethodType
+from typing import Annotated, Any, TypeVar, Union, cast
+
+from pydantic import (
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    PrivateAttr,
+)
+
+from weave.dataset.dataset import Dataset
+from weave.evaluation.eval import Evaluation, default_evaluation_display_name
+from weave.flow.model import MissingInferenceMethodError, Model
+from weave.flow.scorer import Scorer
+from weave.flow.scorer import auto_summarize as auto_summarize_fn
+from weave.flow.util import make_memorable_name
+from weave.object.obj import Object
+from weave.trace.api import attributes
+from weave.trace.call import Call
+from weave.trace.context import call_context
+from weave.trace.context.weave_client_context import require_weave_client
+from weave.trace.op import Op, op
+from weave.trace.table import Table
+from weave.trace.util import Thread
+from weave.trace.view_utils import set_call_view
+from weave.type_wrappers.Content.content import Content
+
+T = TypeVar("T")
+ID = str
+ScoreType = Union[float, bool, dict]
+
+logger = logging.getLogger(__name__)
+
+# Class names should start with a letter or underscore and contain only alphanumeric characters and underscores
+VALID_CLASS_NAME_REGEX = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
+
+# Registry to track active EvaluationLogger instances
+_active_evaluation_loggers: list[EvaluationLogger] = []
+
+
+# Register cleanup handler for program exit
+def _cleanup_all_evaluations() -> None:
+    for eval_logger in _active_evaluation_loggers:
+        _cleanup_evaluation(eval_logger)
+
+
+def _cleanup_evaluation(eval_logger: EvaluationLogger) -> None:
+    try:
+        if not eval_logger._is_finalized:
+            eval_logger.finish()
+    except Exception:
+        logger.error("Error during cleanup of EvaluationLogger", exc_info=True)
+
+
+atexit.register(_cleanup_all_evaluations)
+
+# Context variable to store the current output safely between threads.  This also
+# ensures that only 1 version of the predict method is saved because the code
+# contents are always the same.
+current_output: ContextVar[Any] = ContextVar("current_output", default=None)
+current_score: ContextVar[ScoreType | None] = ContextVar("current_score", default=None)
+current_summary: ContextVar[dict | None] = ContextVar("current_summary", default=None)
+current_predict_call: ContextVar[Call | None] = ContextVar(
+    "current_predict_call", default=None
+)
+
+IMPERATIVE_EVAL_MARKER = {"_weave_eval_meta": {"imperative": True}}
+IMPERATIVE_SCORE_MARKER = {"_weave_eval_meta": {"imperative": True, "score": True}}
+
+
+@contextmanager
+def _set_current_output(output: Any) -> Iterator[None]:
+    """Set the current output in a thread-safe way using context variables."""
+    token = current_output.set(output)
+    try:
+        yield
+    finally:
+        current_output.reset(token)
+
+
+@contextmanager
+def _set_current_score(score: ScoreType) -> Iterator[None]:
+    token = current_score.set(score)
+    try:
+        yield
+    finally:
+        current_score.reset(token)
+
+
+@contextmanager
+def _set_current_summary(summary: dict) -> Iterator[None]:
+    token = current_summary.set(summary)
+    try:
+        yield
+    finally:
+        current_summary.reset(token)
+
+
+def _sanitize_class_name(name: str) -> str:
+    """Return a valid Python class name based on a string."""
+    # Remove characters that are not alphanumeric or underscore
+    class_name = re.sub(r"\W", "", name)
+    if class_name == "":
+        return "GeneratedClass"
+
+    # Ensure it starts with a letter or underscore (prepend "C" if not)
+    first_char = class_name[0]
+    if not first_char.isalpha() and first_char != "_":
+        class_name = "C" + class_name
+
+    # Avoid Python keywords
+    if keyword.iskeyword(class_name):
+        class_name += "Class"
+
+    return class_name
+
+
+def _cast_to_cls(type_: type[T]) -> Callable[[str | dict | T], T]:
+    def _convert_to_cls_inner(value: str | dict | T) -> T:
+        if isinstance(value, str):
+            # Dynamically create the class if the user only provides a name
+            cls_name = _sanitize_class_name(value)
+
+            # Sanitization should have ensured a valid class name, but double check for safety
+            cls_name = _validate_class_name(cls_name, type_.__name__)
+
+            pydantic_config_dict = {
+                "__annotations__": {"name": str},
+                "name": cls_name,
+            }
+
+            cls = type(cls_name, (type_,), pydantic_config_dict)
+            return cast(T, cls())
+
+        elif isinstance(value, dict):
+            attributes = value
+
+            if "name" not in attributes:
+                raise ValueError("Your dict must contain a `name` key.")
+
+            pydantic_config_dict = {
+                "__annotations__": dict.fromkeys(attributes, Any),
+                **attributes,
+            }
+            cls = type(attributes["name"], (type_,), pydantic_config_dict)
+            return cast(T, cls())
+
+        elif isinstance(value, type_):
+            instance = value
+            if isinstance(instance, Object) and not instance.name:
+                instance.name = instance.__class__.__name__
+            return instance
+
+        raise TypeError("Unsupported type for casting")
+
+    return _convert_to_cls_inner
+
+
+def _cast_to_imperative_dataset(value: Dataset | list[dict] | str) -> Dataset:
+    if isinstance(value, str):
+        return Dataset(name=value, rows=Table([{"dataset_id": value}]))
+    elif isinstance(value, list):
+        return Dataset(rows=Table(value))
+    elif isinstance(value, Dataset):
+        return value
+    else:
+        raise TypeError("Unsupported type for casting")
+
+
+def _default_dataset_name() -> str:
+    date = datetime.datetime.now().strftime("%Y-%m-%d")
+    unique_name = make_memorable_name()
+    return f"{date}-{unique_name}-dataset"
+
+
+def _validate_class_name(name: str, base_class_name: str = "Class") -> str:
+    """Validate the class name to be a valid Python class name."""
+    # Check if name is not empty
+    if not name:
+        raise ValueError(f"{base_class_name} name cannot be empty")
+
+    if not VALID_CLASS_NAME_REGEX.match(name):
+        raise ValueError(
+            f"Invalid `{base_class_name}` name: '{name}'. `{base_class_name}` names must start with a letter or underscore "
+            "and contain only alphanumeric characters and underscores."
+        )
+
+    # Check if name is not a Python keyword
+    if keyword.iskeyword(name):
+        raise ValueError(
+            f"`{base_class_name}` name '{name}' cannot be a Python keyword"
+        )
+
+    return name
+
+
+class ScorerCache:
+    _cached_scorers: dict[str, Scorer]
+    _cached_scorers_lock: Any
+    _max_size: int
+
+    def __init__(self, max_size: int = 1000) -> None:
+        self._cached_scorers = {}
+        self._cached_scorers_lock = Lock()
+        self._max_size = max_size
+
+    def get_scorer(
+        self, scorer_id: str, default_factory: Callable[[], Scorer]
+    ) -> Scorer:
+        with self._cached_scorers_lock:
+            if scorer_id not in self._cached_scorers:
+                if len(self._cached_scorers) >= self._max_size:
+                    self._cached_scorers.popitem()
+                self._cached_scorers[scorer_id] = default_factory()
+        return self._cached_scorers[scorer_id]
+
+
+global_scorer_cache = ScorerCache()
+
+
+class ScoreLogger(BaseModel):
+    """This class provides an imperative interface for logging scores."""
+
+    # model_id: ID
+    predict_and_score_call: Call
+    evaluate_call: Call
+    predict_call: Call
+    predefined_scorers: list[str] | None = None
+
+    _captured_scores: dict[str, ScoreType] = PrivateAttr(default_factory=dict)
+    _has_finished: bool = PrivateAttr(False)
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    def finish(self) -> None:
+        if self._has_finished:
+            logger.warning("(NO-OP): Already called finish, returning.")
+            return
+
+        scores = self._captured_scores
+
+        wc = require_weave_client()
+        wc.finish_call(
+            self.predict_and_score_call,
+            output={
+                "output": self.predict_call.output,
+                "scores": scores,
+                "model_latency": None,
+            },
+        )
+
+        self._has_finished = True
+
+    def log_score(self, scorer: Scorer | dict | str, score: ScoreType) -> None:
+        """Log a score synchronously."""
+        # When in an active asyncio test environment (like pytest.mark.asyncio),
+        # we need special handling to avoid "already running" errors
+        try:
+            loop = asyncio.get_running_loop()
+            if asyncio.current_task() is None:
+                # We're not in an async context, but a loop exists
+                return loop.run_until_complete(self.alog_score(scorer, score))
+
+            # We're in an async context, we need to handle this differently
+            result = None
+            exception = None
+
+            def run_in_new_loop() -> None:
+                nonlocal result, exception
+                try:
+                    # Create a new event loop for this thread
+                    new_loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(new_loop)
+                    try:
+                        result = new_loop.run_until_complete(
+                            self.alog_score(scorer, score)
+                        )
+                    finally:
+                        new_loop.close()
+                except Exception as e:
+                    exception = e
+
+            thread = Thread(target=run_in_new_loop)
+            thread.start()
+            thread.join()
+
+            if exception:
+                raise exception
+        except RuntimeError:
+            # No event loop exists, create one with asyncio.run
+            return asyncio.run(self.alog_score(scorer, score))
+
+    async def alog_score(
+        self,
+        scorer: Annotated[
+            Scorer | dict | str,
+            Field(
+                description="A metadata-only scorer used for comparisons."
+                "Alternatively, you can pass a dict of attributes or just a string"
+                "representing the ID of your scorer."
+            ),
+        ],
+        score: ScoreType,
+    ) -> None:
+        if not isinstance(scorer, Scorer):
+            scorer_id = json.dumps(scorer)
+            scorer = global_scorer_cache.get_scorer(
+                scorer_id, lambda: _cast_to_cls(Scorer)(scorer)
+            )
+        if self._has_finished:
+            raise ValueError("Cannot log score after finish has been called")
+
+        # this is safe; pydantic casting is done in validator above
+        scorer = cast(Scorer, scorer)
+
+        # Check if scorer is in predefined list
+        if self.predefined_scorers:
+            predefined_names = self.predefined_scorers
+            scorer_name = cast(str, scorer.name)
+            if scorer_name not in predefined_names:
+                logger.warning(
+                    f"Scorer '{scorer_name}' is not in the predefined scorers list. "
+                    f"Expected one of: {sorted(predefined_names)}"
+                )
+
+        @op(name=scorer.name, enable_code_capture=False)
+        def score_method(self: Scorer, *, output: Any, inputs: Any) -> ScoreType:
+            # TODO: can't use score here because it will cause version mismatch
+            # return score
+            return cast(ScoreType, current_score.get())
+
+        scorer.__dict__["score"] = MethodType(score_method, scorer)
+
+        # attach the score feedback to the predict call
+        with call_context.set_call_stack(
+            [self.evaluate_call, self.predict_and_score_call]
+        ):
+            with _set_current_score(score):
+                with attributes(IMPERATIVE_SCORE_MARKER):
+                    await self.predict_call.apply_scorer(scorer)
+
+        # this is always true because of how the scorer is created in the validator
+        scorer_name = cast(str, scorer.name)
+        self._captured_scores[scorer_name] = score
+
+
+class EvaluationLogger(BaseModel):
+    """This class provides an imperative interface for logging evaluations.
+
+    An evaluation is started automatically when the first prediction is logged
+    using the `log_prediction` method, and finished when the `log_summary` method
+    is called.
+
+    Each time you log a prediction, you will get back a `ScoreLogger` object.
+    You can use this object to log scores and metadata for that specific
+    prediction. For more information, see the `ScoreLogger` class.
+
+    Example:
+        ```python
+        ev = EvaluationLogger()
+        pred = ev.log_prediction(inputs, output)
+        pred.log_score(scorer_name, score)
+        ev.log_summary(summary)
+        ```
+    """
+
+    name: Annotated[
+        str | None,
+        Field(
+            default=None,
+            description="(Optional): A name for the evaluation call."
+            "If not provided, a default name will be generated.",
+        ),
+    ]
+    model: Annotated[
+        Model | dict | str,
+        BeforeValidator(_cast_to_cls(Model)),
+        Field(
+            default_factory=Model,
+            description="(Optional): A metadata-only Model used for comparisons."
+            "Alternatively, you can pass a dict of attributes or just a string"
+            "representing the ID of your model.",
+        ),
+    ]
+    dataset: Annotated[
+        Dataset | list[dict] | str,
+        BeforeValidator(_cast_to_imperative_dataset),
+        Field(
+            default_factory=lambda: Dataset(
+                rows=Table([{"dataset_id": _default_dataset_name()}]),
+            ),
+            description="(Optional): A metadata-only Dataset used for comparisons."
+            "If you already know your rows ahead of time, you can pass either"
+            "a Dataset or list[dict]."
+            "If you don't, you can just pass any string as a unique identifier",
+        ),
+    ]
+
+    eval_attributes: Annotated[
+        dict[str, Any],
+        Field(
+            default_factory=dict,
+            description="(Optional): A dictionary of attributes to add to the evaluation call."
+            "These attributes can be used to add additional metadata columns to the Evaluation.",
+        ),
+    ]
+    scorers: Annotated[
+        list[str] | None,
+        Field(
+            default=None,
+            description="(Optional): A metadata-only list of predefined scorers for the evaluation. "
+            "If specified, warnings will be issued when logging scores not in this list.",
+        ),
+    ]
+
+    _eval_started: bool = PrivateAttr(False)
+    _logged_summary: bool = PrivateAttr(False)
+    _is_finalized: bool = PrivateAttr(False)
+    _evaluate_call: Call | None = PrivateAttr(None)
+    _pseudo_evaluation: Evaluation = PrivateAttr()
+
+    @property
+    def ui_url(self) -> str | None:
+        # In normal usage, _evaluate_call will never be None because it's set
+        # at init time.
+        if self._evaluate_call is None:
+            return None
+        return self._evaluate_call.ui_url
+
+    @property
+    def attributes(self) -> dict[str, Any]:
+        return self.eval_attributes | IMPERATIVE_EVAL_MARKER
+
+    # This private attr is used to keep track of predictions so we can finish
+    # them if the user forgot to.
+    _accumulated_predictions: list[ScoreLogger] = PrivateAttr(default_factory=list)
+
+    def model_post_init(self, __context: Any) -> None:
+        """Initialize the pseudo evaluation with the dataset from the model."""
+        # Register this instance in the global registry for atexit cleanup
+        _active_evaluation_loggers.append(self)
+
+        # At this point dataset has already been processed by the validator
+        # and converted to a Dataset object
+        self._pseudo_evaluation = Evaluation(
+            dataset=cast(Dataset, self.dataset),
+            scorers=[],
+            metadata={"scorers": self.scorers, **self.eval_attributes},
+        )
+
+        # The following section is a "hacky" way to create Model and Evaluation
+        # objects that "look right" to our object saving system.
+
+        # --- Setup the model object ---
+        # Store the original predict method if it exists
+        self._original_predict_method = None
+        try:
+            assert isinstance(self.model, Model)
+            self._original_predict_method = self.model.get_infer_method()
+        except MissingInferenceMethodError:
+
+            @op(name="Model.predict", enable_code_capture=False)
+            def predict(self: Model, inputs: dict) -> Any:
+                # Get the output from the context variable
+                return current_output.get()
+
+            self.model.__dict__["predict"] = MethodType(predict, self.model)
+
+        # Always create a context-aware predict method for use during log_prediction
+        @op(name="Model.predict", enable_code_capture=False)  # type: ignore[no-redef]
+        def predict(self: Model, inputs: dict) -> Any:
+            # Get the output from the context variable
+            return current_output.get()
+
+        self._context_predict_method = MethodType(predict, self.model)
+
+        # --- Setup the evaluation object ---
+        @op(name="Evaluation.evaluate", enable_code_capture=False)
+        def evaluate(self: Evaluation, model: Model) -> None: ...
+
+        @op(name="Evaluation.predict_and_score", enable_code_capture=False)
+        def predict_and_score(self: Evaluation, model: Model, example: dict) -> dict:
+            predict_method = cast(Op, model.get_infer_method())
+            with attributes(IMPERATIVE_EVAL_MARKER):
+                output, predict_call = predict_method.call(model, example)
+                current_predict_call.set(predict_call)
+
+            # This data is just a placeholder to give a sense of the data shape.
+            # The actual output is explicitly replaced in ScoreLogger.finish.
+            return {
+                "output": output,
+                "scores": {},
+                "model_latency": None,
+            }
+
+        @op(name="Evaluation.summarize", enable_code_capture=False)
+        def summarize(self: Evaluation) -> dict:
+            return cast(dict, current_summary.get())
+
+        self._pseudo_evaluation.__dict__.update(
+            {
+                "evaluate": MethodType(evaluate, self._pseudo_evaluation),
+                "predict_and_score": MethodType(
+                    predict_and_score, self._pseudo_evaluation
+                ),
+                "summarize": MethodType(summarize, self._pseudo_evaluation),
+            }
+        )
+
+        # Create the evaluation call
+        wc = require_weave_client()
+        self._evaluate_call = wc.create_call(
+            display_name=self.name or default_evaluation_display_name,
+            op=self._pseudo_evaluation.evaluate,
+            inputs={
+                "self": self._pseudo_evaluation,
+                "model": self.model,
+            },
+            attributes=self.attributes,
+            use_stack=False,  # Don't push to global stack to prevent nesting
+        )
+        if self._evaluate_call is None:
+            raise RuntimeError("Evaluation call does not exist, something went wrong!")
+
+    def _cleanup_predictions(self) -> None:
+        if self._is_finalized:
+            return
+
+        for pred in self._accumulated_predictions:
+            if pred._has_finished:
+                continue
+            try:
+                pred.finish()
+            except Exception:
+                # This is best effort.  If we fail, just swallow the error.
+                pass
+
+    def _finalize_evaluation(
+        self, output: Any = None, exception: BaseException | None = None
+    ) -> None:
+        """Handles the final steps of the evaluation: cleaning up predictions and finishing the main call."""
+        if self._is_finalized:
+            return
+
+        self._cleanup_predictions()
+
+        if self._evaluate_call is None:
+            raise RuntimeError(
+                "Evaluation call should exist for finalization, something went wrong!"
+            )
+
+        # Finish the evaluation call
+        wc = require_weave_client()
+        # Ensure the call is finished even if there was an error during summarize or elsewhere
+        try:
+            wc.finish_call(self._evaluate_call, output=output, exception=exception)
+        except Exception:
+            # Log error but continue cleanup
+            logger.error(
+                "Failed to finish evaluation call during finalization.", exc_info=True
+            )
+
+        self._is_finalized = True
+
+    def log_prediction(self, inputs: dict, output: Any) -> ScoreLogger:
+        """Log a prediction to the Evaluation, and return a reference.
+
+        The reference can be used to log scores which are attached to the specific
+        prediction instance.
+        """
+        # Use set_call_stack to temporarily set the evaluation as the parent
+        assert self._evaluate_call is not None
+
+        # Temporarily swap the predict method to use our context-aware version
+        # This ensures we use the passed output instead of calling the model
+        original_method = self.model.__dict__.get("predict")
+        self.model.__dict__["predict"] = self._context_predict_method
+
+        try:
+            with call_context.set_call_stack([self._evaluate_call]):
+                # Make the prediction call
+                with _set_current_output(output):
+                    with attributes(IMPERATIVE_EVAL_MARKER):
+                        _, predict_and_score_call = (
+                            self._pseudo_evaluation.predict_and_score.call(
+                                self._pseudo_evaluation,
+                                self.model,
+                                inputs,
+                                __require_explicit_finish=True,
+                            )
+                        )
+        finally:
+            # Restore the original predict method
+            if original_method is not None:
+                self.model.__dict__["predict"] = original_method
+            else:
+                self.model.__dict__.pop("predict", None)
+
+        # Get the predict_call from the context variable
+        predict_call = current_predict_call.get()
+        if predict_call is None:
+            raise ValueError("predict_call should not be None")
+
+        pred = ScoreLogger(
+            predict_and_score_call=predict_and_score_call,
+            evaluate_call=self._evaluate_call,
+            predict_call=predict_call,
+            predefined_scorers=self.scorers,
+        )
+        self._accumulated_predictions.append(pred)
+        return pred
+
+    def log_summary(
+        self,
+        summary: dict | None = None,
+        auto_summarize: bool = True,
+    ) -> None:
+        """Log a summary dict to the Evaluation.
+
+        This will calculate the summary, call the summarize op, and then finalize
+        the evaluation, meaning no more predictions or scores can be logged.
+        """
+        if self._is_finalized:
+            logger.warning("(NO-OP): Evaluation already finalized, cannot log summary.")
+            return
+
+        if summary is None:
+            summary = {}
+
+        # Calculate summary
+        if auto_summarize:
+            data_to_summarize = [
+                pred._captured_scores for pred in self._accumulated_predictions
+            ]
+            summary_data = auto_summarize_fn(data_to_summarize)
+        else:
+            summary_data = summary
+
+        final_summary = {}
+        if summary_data:
+            final_summary = summary_data
+        if summary is not None:
+            final_summary = {**final_summary, "output": summary}
+
+        # Call the summarize op
+        assert self._evaluate_call is not None, (
+            "Evaluation call should exist for summary"
+        )
+
+        # Use set_call_stack to temporarily set the evaluation as the parent
+        with call_context.set_call_stack([self._evaluate_call]):
+            try:
+                with _set_current_summary(final_summary):
+                    with attributes(IMPERATIVE_EVAL_MARKER):
+                        self._pseudo_evaluation.summarize()
+            except Exception:
+                logger.error("Error during execution of summarize op.", exc_info=True)
+                # Even if summarize fails, try to finalize with the calculated summary
+
+        self._finalize_evaluation(output=final_summary)
+
+    def set_view(
+        self,
+        name: str,
+        content: Content | str,
+        *,
+        extension: str | None = None,
+        mimetype: str | None = None,
+        metadata: dict[str, Any] | None = None,
+        encoding: str = "utf-8",
+    ) -> None:
+        """Attach a view to the evaluation's main call summary under `weave.views`.
+
+        Saves the provided content as an object in the project and writes its
+        reference URI under `summary.weave.views.<name>` for the evaluation's
+        `evaluate` call. String inputs are wrapped as text content using
+        `Content.from_text` with the provided extension or mimetype.
+
+        Args:
+            name: The view name to display, used as the key under `summary.weave.views`.
+            content: A `weave.Content` instance or string to serialize.
+            extension: Optional file extension for string content inputs.
+            mimetype: Optional MIME type for string content inputs.
+            metadata: Optional metadata attached to newly created `Content`.
+            encoding: Text encoding for string content inputs.
+
+        Returns:
+            None
+
+        Examples:
+            >>> import weave
+            >>> ev = weave.EvaluationLogger()
+            >>> ev.set_view("report", "# Report", extension="md")
+        """
+        if isinstance(content, str) and len(content) == 0:
+            raise ValueError("Content cannot be an empty string")
+
+        if not isinstance(name, str) or len(name) == 0:
+            raise ValueError("`name` must be a non-empty string")
+
+        if self._evaluate_call is None:
+            raise RuntimeError(
+                "Evaluation call not initialized; cannot add view before evaluation starts"
+            )
+
+        wc = require_weave_client()
+
+        set_call_view(
+            call=self._evaluate_call,
+            client=wc,
+            name=name,
+            content=content,
+            extension=extension,
+            mimetype=mimetype,
+            metadata=metadata,
+            encoding=encoding,
+        )
+
+    def finish(self, exception: BaseException | None = None) -> None:
+        """Clean up the evaluation resources explicitly without logging a summary.
+
+        Ensures all prediction calls and the main evaluation call are finalized.
+        This is automatically called if the logger is used as a context manager.
+        """
+        if self._is_finalized:
+            return
+
+        # Finalize with None output, indicating closure without summary
+        self._finalize_evaluation(output=None, exception=exception)
+
+        # Remove from global registry since we've manually finalized
+        if self in _active_evaluation_loggers:
+            _active_evaluation_loggers.remove(self)
+
+    def fail(self, exception: BaseException) -> None:
+        """Convenience method to fail the evaluation with an exception."""
+        self.finish(exception=exception)
+
+    def __del__(self) -> None:
+        """Ensure cleanup happens during garbage collection."""
+        _cleanup_evaluation(self)
+
+
+class ImperativeEvaluationLogger(EvaluationLogger):
+    """Legacy class name for EvaluationLogger.
+
+    This class is maintained for backward compatibility.
+    Please use EvaluationLogger instead.
+    """
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        logger.warning(
+            "ImperativeEvaluationLogger was renamed to EvaluationLogger in 0.51.44"
+            "Please use EvaluationLogger instead.  ImperativeEvaluationLogger will"
+            "be removed in a future version."
+        )
+        super().__init__(*args, **kwargs)
