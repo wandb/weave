@@ -5,7 +5,9 @@ import datetime
 import hashlib
 import json
 import logging
+import os
 import threading
+import time
 from collections import defaultdict
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
@@ -32,12 +34,17 @@ from weave.trace_server.actions_worker.dispatcher import execute_batch
 from weave.trace_server.base64_content_conversion import (
     process_call_req_to_content,
 )
+from weave.trace_server.call_part_cache import (
+    CallPartCache,
+    get_call_part_cache_from_env,
+)
 from weave.trace_server.calls_query_builder.calls_query_builder import (
     CallsQuery,
     HardCodedFilter,
     OrderField,
     QueryBuilderDynamicField,
     QueryBuilderField,
+    build_call_parts_query_by_ids,
     build_calls_query_stats_query,
     combine_conditions,
     optimized_project_contains_call_query,
@@ -46,6 +53,7 @@ from weave.trace_server.clickhouse_schema import (
     ALL_CALL_INSERT_COLUMNS,
     ALL_CALL_JSON_COLUMNS,
     ALL_CALL_SELECT_COLUMNS,
+    CALL_STARTS_INSERT_COLUMNS,
     REQUIRED_CALL_COLUMNS,
     CallCHInsertable,
     CallDeleteCHInsertable,
@@ -212,6 +220,16 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._kafka_producer = KafkaProducer.from_env()
         return self._kafka_producer
 
+    @property
+    def _call_part_cache(self) -> CallPartCache:
+        """Get the global shared call part cache.
+
+        Returns the module-level singleton cache that's shared across all
+        ClickHouseTraceServer instances and FastAPI worker threads.
+        """
+        # Always return the global singleton cache
+        return get_call_part_cache_from_env()
+
     def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
         if not isinstance(req.traces, ExportTraceServiceRequest):
             raise TypeError(
@@ -252,6 +270,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             self._flush_immediately = True
 
     def call_start_batch(self, req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
+        print(f">>>> call_start_batch: {len(req.batch)} calls")
         with self.call_batch():
             res = []
             for item in req.batch:
@@ -347,7 +366,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             and req.query is None
             and not req.include_total_storage_size
         ):
-            query = optimized_project_contains_call_query(req.project_id, pb)
+            optimal_table = self._get_optimal_calls_table_name()
+            query = optimized_project_contains_call_query(
+                req.project_id, pb, table_name=optimal_table
+            )
             raw_res = self._query(query, pb.get_params())
             rows = raw_res.result_rows
             count = rows[0][0]
@@ -356,7 +378,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 total_storage_size_bytes=None,
             )
 
-        query, columns = build_calls_query_stats_query(req, pb)
+        optimal_table = self._get_optimal_calls_table_name()
+        query, columns = build_calls_query_stats_query(
+            req, pb, table_name=optimal_table
+        )
 
         raw_res = self._query(query, pb.get_params())
 
@@ -370,9 +395,15 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
 
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
-        """Returns a stream of calls that match the given query."""
+        """Returns a stream of calls that match the given query using the optimized calls_complete table.
+
+        This implementation uses the calls_complete table which contains complete call data
+        in single rows, eliminating the need for CTEs and aggregation for better performance.
+        """
+        optimal_table = self._get_optimal_calls_table_name()
         cq = CallsQuery(
             project_id=req.project_id,
+            table_name=optimal_table,
             include_costs=req.include_costs or False,
             include_storage_size=req.include_storage_size or False,
             include_total_storage_size=req.include_total_storage_size or False,
@@ -483,6 +514,27 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             feedback = self.feedback_query(feedback_query_req)
         hydrate_calls_with_feedback(calls, feedback)
 
+    def _get_optimal_calls_table_name(self) -> str:
+        """Determines the optimal table to use for calls queries.
+
+        This method can be extended in the future to add more sophisticated logic
+        based on system configuration, request characteristics, or performance metrics.
+
+        For now, it defaults to calls_complete which provides better performance
+        by eliminating the need for CTEs and aggregation.
+
+        Returns:
+            str: The table name to use ("calls_complete" or "calls_merged")
+        """
+        # Future enhancement ideas:
+        # - Check environment variables or feature flags
+        # - Analyze request complexity
+        # - Use performance metrics to choose dynamically
+        # - Fall back to calls_merged for certain edge cases
+
+        return "calls_complete"
+        # return "calls_merged"
+
     def _get_refs_to_resolve(
         self, calls: list[dict[str, Any]], expand_columns: list[str]
     ) -> dict[tuple[int, str], ri.InternalObjectRef]:
@@ -556,7 +608,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                         set_nested_key(calls[i], col, val)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.calls_delete")
-    def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
+    def calls_delete_old(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
         assert_non_null_wb_user_id(req)
         if len(req.call_ids) > ch_settings.MAX_DELETE_CALLS_COUNT:
             raise RequestTooLarge(
@@ -619,6 +671,86 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         return tsi.CallsDeleteRes()
 
+    def _make_delete_query_with_cte(self, table_name: str) -> str:
+        """Generate a query with an explicit recursive CTE to find and delete all descendants.
+
+        The CTE includes depth tracking to prevent deleting calls deeper than
+        MAX_DELETE_RECURSION_DEPTH levels for safety.
+
+        Args:
+            table_name (str): The table name to query (e.g., 'calls_complete' or 'call_starts').
+
+        Returns:
+            str: A complete ALTER TABLE query with a recursive CTE.
+        """
+        return f"""
+            WITH RECURSIVE all_descendants AS (
+                SELECT
+                    id,
+                    0 AS depth
+                FROM {table_name}
+                WHERE project_id = {{project_id:String}}
+                    AND id IN {{call_ids:Array(String)}}
+                    AND deleted_at IS NULL
+                UNION ALL
+                SELECT
+                    c.id,
+                    ad.depth + 1 AS depth
+                FROM {table_name} c
+                INNER JOIN all_descendants ad ON c.parent_id = ad.id
+                WHERE c.deleted_at IS NULL
+                    AND ad.depth < {ch_settings.MAX_DELETE_RECURSION_DEPTH}
+            )
+            ALTER TABLE {table_name}
+            UPDATE
+                deleted_at = CAST({{deleted_at:DateTime64(3)}}, 'Nullable(DateTime64(3))'),
+                wb_user_id = CAST({{wb_user_id:String}}, 'Nullable(String)')
+            WHERE project_id = {{project_id:String}}
+                AND id IN (SELECT id FROM all_descendants)
+        """
+
+    def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
+        assert_non_null_wb_user_id(req)
+        if len(req.call_ids) > ch_settings.MAX_DELETE_CALLS_COUNT:
+            raise RequestTooLarge(
+                f"Cannot delete more than {ch_settings.MAX_DELETE_CALLS_COUNT} calls at once"
+            )
+
+        if root_span := ddtrace.tracer.current_span():
+            root_span.set_tags(
+                {
+                    "clickhouse_trace_server_batched.calls_delete.count": str(
+                        len(req.call_ids)
+                    )
+                }
+            )
+
+        deleted_at = datetime.datetime.now()
+
+        # Delete from calls_complete using recursive CTE to find all descendants
+        self.ch_client.query(
+            self._make_delete_query_with_cte("calls_complete"),
+            parameters={
+                "project_id": req.project_id,
+                "call_ids": req.call_ids,
+                "deleted_at": deleted_at,
+                "wb_user_id": req.wb_user_id,
+            },
+        )
+
+        # Delete from call_starts using recursive CTE to find all descendants
+        self.ch_client.query(
+            self._make_delete_query_with_cte("call_starts"),
+            parameters={
+                "project_id": req.project_id,
+                "call_ids": req.call_ids,
+                "deleted_at": deleted_at,
+                "wb_user_id": req.wb_user_id,
+            },
+        )
+
+        return tsi.CallsDeleteRes()
+
     def _ensure_valid_update_field(self, req: tsi.CallUpdateReq) -> None:
         valid_update_fields = ["display_name"]
         for field in valid_update_fields:
@@ -629,7 +761,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             f"One of [{', '.join(valid_update_fields)}] is required for call update"
         )
 
-    def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
+    def call_update_old(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
         assert_non_null_wb_user_id(req)
         self._ensure_valid_update_field(req)
         renamed_insertable = CallUpdateCHInsertable(
@@ -640,6 +772,28 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
         self._insert_call(renamed_insertable)
 
+        return tsi.CallUpdateRes()
+
+    def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
+        assert_non_null_wb_user_id(req)
+        self._ensure_valid_update_field(req)
+        if not req.display_name:
+            raise ValueError("No display name to update")
+
+        alter_sql = """
+            ALTER TABLE calls_complete
+            UPDATE display_name = CAST({display_name:String}, 'Nullable(String)')
+            WHERE project_id = {project_id:String}
+                AND id = {call_id:String}
+        """
+        self.ch_client.query(
+            alter_sql,
+            parameters={
+                "project_id": req.project_id,
+                "call_id": req.call_id,
+                "display_name": req.display_name,
+            },
+        )
         return tsi.CallUpdateRes()
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
@@ -2479,10 +2633,233 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if self._flush_immediately:
             self._flush_calls()
 
+    def _do_read_before_write(self) -> bool:
+        return os.getenv("DO_READ_BEFORE_WRITE", "1") == "1"
+
+    def _do_cache_read_before_write(self) -> bool:
+        """Hit cache (in mem for local, need redis for prod) before writing"""
+        return os.getenv("DO_CACHE_READ_BEFORE_WRITE", "1") == "1"
+
+    def _use_redis_cache(self) -> bool:
+        return os.getenv("USE_REDIS_CACHE", "0") == "1"
+
+    def _get_cached_call_end_ids(self, project_id: str) -> set[str]:
+        # either hit cache or do an actual read in call_parts
+        if self._do_cache_read_before_write():
+            return self._call_part_cache.get_call_end_ids(project_id=project_id)
+        return self._get_call_end_ids(project_id=project_id)
+
+    def _get_cached_call_start_ids(self, project_id: str) -> set[str]:
+        """Get cached call start IDs that have been logged but may not be in DB yet.
+
+        Args:
+            project_id (str): The project ID to fetch call start IDs for.
+
+        Returns:
+            set[str]: Set of call start IDs that have been logged.
+        """
+        if self._do_cache_read_before_write():
+            return self._call_part_cache.get_call_start_ids(project_id=project_id)
+        return set()
+
+    def _query_call_parts_by_ids(
+        self, project_id: str, call_ids: list[str]
+    ) -> list[list[Any]]:
+        """Query call_parts for call starts by IDs."""
+        if not call_ids:
+            return []
+
+        pb = ParamBuilder()
+        query = build_call_parts_query_by_ids(
+            project_id, call_ids, ALL_CALL_INSERT_COLUMNS, pb
+        )
+        result = self._query(query, pb.get_params())
+        return [list(row) for row in result.result_rows]
+
+    def _get_call_end_ids(self, project_id: str) -> set[str]:
+        one_day_ago = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(
+            days=1
+        )
+        one_day_ago_ms = int(one_day_ago.timestamp() * 1000)
+        calls = self.calls_query(
+            tsi.CallsQueryReq(
+                project_id=project_id,
+                query={
+                    "$expr": {
+                        "$and": [
+                            {"$eq": [{"$getField": "started_at"}, {"$literal": None}]},
+                            {
+                                "$gt": [
+                                    {"$getField": "ended_at"},
+                                    {"$literal": one_day_ago_ms},
+                                ]
+                            },
+                        ]
+                    }
+                },
+            )
+        ).calls
+        return {call.id for call in calls}
+
+    def _get_col_indices(self) -> tuple[int, int, int, int]:
+        """Get commonly used column indices."""
+        return (
+            ALL_CALL_INSERT_COLUMNS.index("id"),
+            ALL_CALL_INSERT_COLUMNS.index("project_id"),
+            ALL_CALL_INSERT_COLUMNS.index("started_at"),
+            ALL_CALL_INSERT_COLUMNS.index("ended_at"),
+        )
+
+    def _merge_row(self, start_row: list[Any], end_row: list[Any]) -> list[Any]:
+        """Merge start and end rows into complete call."""
+        merged = list(start_row)
+        ended_at_idx = ALL_CALL_INSERT_COLUMNS.index("ended_at")
+        exception_idx = ALL_CALL_INSERT_COLUMNS.index("exception")
+        summary_idx = ALL_CALL_INSERT_COLUMNS.index("summary_dump")
+        output_idx = ALL_CALL_INSERT_COLUMNS.index("output_dump")
+        refs_idx = ALL_CALL_INSERT_COLUMNS.index("output_refs")
+
+        merged[ended_at_idx] = end_row[ended_at_idx]
+        merged[exception_idx] = end_row[exception_idx]
+        merged[summary_idx] = end_row[summary_idx]
+        merged[output_idx] = end_row[output_idx]
+        merged[refs_idx] = end_row[refs_idx]
+        return merged
+
+    def _find_starts_for_ends(
+        self, project_id: str, call_end_ids: set[str], id_idx: int
+    ) -> list[list[Any]]:
+        """Find call starts for orphaned ends with retry logic."""
+        cached_start_ids = self._get_cached_call_start_ids(project_id)
+        print(f"Found {len(cached_start_ids)} cached call start ids for {project_id=}")
+
+        max_retries = 3
+        retry_delay = 0.1
+
+        for attempt in range(max_retries + 1):
+            start_rows = self._query_call_parts_by_ids(project_id, list(call_end_ids))
+            found_ids = {row[id_idx] for row in start_rows}
+            missing_ids = call_end_ids - found_ids
+
+            print(f"Found {len(found_ids)} in db, missing={len(missing_ids)}")
+
+            if not missing_ids:
+                print("********** Found all call starts")
+                break
+
+            cached_missing = missing_ids & cached_start_ids
+            if cached_missing and attempt < max_retries:
+                print(
+                    f">>>>>> Retry {attempt + 1}/{max_retries + 1}: "
+                    f"{len(cached_missing)} cached starts not in DB, waiting {retry_delay}s"
+                )
+                time.sleep(retry_delay)
+                retry_delay *= 2
+            else:
+                break
+
+        found_ids = {row[id_idx] for row in start_rows}
+        if len(start_rows) != len(call_end_ids):
+            missing_ids = call_end_ids - found_ids
+            cached_missing = missing_ids & cached_start_ids
+            if cached_missing:
+                logger.warning(
+                    f"After retries, still missing {len(cached_missing)} cached starts: {cached_missing}"
+                )
+            logger.warning(f"Missing call starts {missing_ids}")
+            print(f"Missing call starts {missing_ids}")
+
+        return start_rows
+
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._flush_calls_complete")
+    def _flush_calls_complete(self) -> None:
+        print(
+            f"flushing: {len(self._call_batch)=} {self._do_read_before_write()=} {self._do_cache_read_before_write()=}"
+        )
+        if not self._do_read_before_write():
+            print(
+                f"Not reading before write, returning early, inserting {len(self._call_batch)} calls"
+            )
+            self._insert_call_batch(self._call_batch)
+            return
+
+        complete_calls, call_starts, call_ends = (
+            self._separate_complete_and_incomplete_calls(self._call_batch)
+        )
+
+        if complete_calls:
+            print(f"inserting {len(complete_calls)} completed calls")
+            self._insert_complete_calls_batch(complete_calls)
+            # TODO: remove me, still need to insert into call parts for back compat
+            self._insert_call_batch(complete_calls)
+
+        if not call_starts and not call_ends:
+            print("returning early, no in-progress calls or dangling call ends")
+            return
+
+        id_idx, proj_id_idx, _, _ = self._get_col_indices()
+
+        if call_starts:
+            project_id = call_starts[0][proj_id_idx]
+            call_end_ids = self._get_cached_call_end_ids(project_id)
+            print(
+                f"found {len(call_end_ids)} CACHED call end ids for project {project_id}"
+            )
+
+            starts_to_insert = [r for r in call_starts if r[id_idx] not in call_end_ids]
+            # These are valid starts representing in progress calls
+            if starts_to_insert:
+                print(f"inserting {len(starts_to_insert)} starts that do not have ends")
+                # TODO: slated for removal, how can we get rid of this?
+                # Insert into call_parts for back compat
+                self._insert_call_batch(starts_to_insert)
+                # Insert into fast call start table
+                self._insert_call_starts_batch(starts_to_insert)
+                if self._do_cache_read_before_write():
+                    inserted_ids = {r[id_idx] for r in starts_to_insert}
+                    self._call_part_cache.add_call_start_ids(project_id, inserted_ids)
+                    print(f">>>>>> Cached {len(inserted_ids)} new call start IDs")
+                if not [r for r in call_starts if r[id_idx] in call_end_ids]:
+                    print("returning early, no dangling starts")
+                    return
+
+        if not call_ends:
+            print("returning early, no dangling call ends")
+            return
+
+        project_id = call_ends[0][proj_id_idx]
+        call_end_ids = {r[id_idx] for r in call_ends}
+        print(
+            f"Looking for call starts for {len(call_end_ids)} call ends in {project_id=}"
+        )
+
+        start_rows = self._find_starts_for_ends(project_id, call_end_ids, id_idx)
+        found_start_ids = {r[id_idx] for r in start_rows}
+
+        merged_calls = [
+            self._merge_row(start, end)
+            for start, end in zip(
+                start_rows, [r for r in call_ends if r[id_idx] in found_start_ids]
+            )
+        ]
+        if merged_calls:
+            print(f"inserting {len(merged_calls)} MANUALLY merged calls")
+            self._insert_complete_calls_batch(merged_calls)
+            # TODO: remove me, still need to insert into call parts for back compat
+            self._insert_call_batch(merged_calls)
+
+        orphaned_ends = [r for r in call_ends if r[id_idx] not in found_start_ids]
+        print(f"inserting {len(orphaned_ends)} orphaned call ends")
+        self._insert_call_batch(orphaned_ends)
+        if self._do_cache_read_before_write() and orphaned_ends:
+            orphaned_ids = {r[id_idx] for r in orphaned_ends}
+            print(f">>>>>> Cached {len(orphaned_ids)} orphaned call end IDs")
+            self._call_part_cache.add_call_end_ids(project_id, orphaned_ids)
+
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._flush_calls")
     def _flush_calls(self) -> None:
         try:
-            self._insert_call_batch(self._call_batch)
+            self._flush_calls_complete()
         except InsertTooLarge:
             logger.info("Retrying with large objects stripped.")
             batch = self._strip_large_values(self._call_batch)
@@ -2491,6 +2868,102 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 self._insert_call_batch([row])
 
         self._call_batch = []
+
+    def _separate_complete_and_incomplete_calls(
+        self, batch: list[list[Any]]
+    ) -> tuple[list[list[Any]], list[list[Any]], list[list[Any]]]:
+        """Separate batch into complete calls (start+end) and incomplete calls."""
+        id_idx, _, started_at_idx, ended_at_idx = self._get_col_indices()
+
+        calls_by_id: dict[str, dict[str, list[Any]]] = {}
+        for row in batch:
+            call_id = row[id_idx]
+            if call_id not in calls_by_id:
+                calls_by_id[call_id] = {"starts": [], "ends": []}
+            if row[started_at_idx] is not None:
+                calls_by_id[call_id]["starts"].append(row)
+            elif row[ended_at_idx] is not None:
+                calls_by_id[call_id]["ends"].append(row)
+
+        complete_calls = []
+        call_starts = []
+        call_ends = []
+
+        for call_data in calls_by_id.values():
+            starts, ends = call_data["starts"], call_data["ends"]
+            if starts and ends:
+                complete_calls.append(self._merge_row(starts[0], ends[0]))
+            else:
+                call_starts.extend(starts)
+                call_ends.extend(ends)
+
+        print(
+            f"found {len(complete_calls)} complete calls, {len(call_starts)} call starts, {len(call_ends)} call ends"
+        )
+        return complete_calls, call_starts, call_ends
+
+    @ddtrace.tracer.wrap(
+        name="clickhouse_trace_server_batched._insert_complete_calls_batch"
+    )
+    def _insert_complete_calls_batch(self, batch: list[list[Any]]) -> None:
+        """Insert complete calls (start+end) into the calls_complete table."""
+        print(">>>> _insert_complete_calls_batch", len(batch))
+        if root_span := ddtrace.tracer.current_span():
+            root_span.set_tags(
+                {
+                    "clickhouse_trace_server_batched._insert_complete_calls_batch.count": str(
+                        len(batch)
+                    )
+                }
+            )
+        if batch:
+            settings = {}
+            if self._use_async_insert:
+                settings["async_insert"] = 1
+                settings["wait_for_async_insert"] = 1
+            self._insert(
+                "calls_complete",
+                data=batch,
+                column_names=ALL_CALL_INSERT_COLUMNS,
+                settings=settings,
+            )
+
+    @ddtrace.tracer.wrap(
+        name="clickhouse_trace_server_batched._insert_call_starts_batch"
+    )
+    def _insert_call_starts_batch(self, batch: list[list[Any]]) -> None:
+        """Insert call starts into the call_starts table.
+
+        Filters the batch to only include columns that exist in call_starts table.
+        The input batch has ALL_CALL_INSERT_COLUMNS, but call_starts doesn't have
+        ended_at, exception, summary_dump, or output_dump.
+        """
+        print(f">>>> _insert_call_starts_batch: {len(batch)}")
+        if root_span := ddtrace.tracer.current_span():
+            root_span.set_tags(
+                {
+                    "clickhouse_trace_server_batched._insert_call_starts_batch.count": str(
+                        len(batch)
+                    )
+                }
+            )
+        if batch:
+            # Filter batch to only include columns that exist in call_starts
+            filtered_batch = []
+            # Get indices of columns we want to keep
+            indices_to_keep = [
+                ALL_CALL_INSERT_COLUMNS.inadex(col)
+                for col in CALL_STARTS_INSERT_COLUMNS
+            ]
+            for row in batch:
+                filtered_row = [row[i] for i in indices_to_keep]
+                filtered_batch.append(filtered_row)
+
+            self._insert(
+                "call_starts",
+                data=filtered_batch,
+                column_names=CALL_STARTS_INSERT_COLUMNS,
+            )
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._strip_large_values")
     def _strip_large_values(self, batch: list[list[Any]]) -> list[list[Any]]:
@@ -2648,7 +3121,6 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: dict) -> dict:
         "exception": ch_call_dict.get("exception"),
         "wb_run_id": ch_call_dict.get("wb_run_id"),
         "wb_run_step": ch_call_dict.get("wb_run_step"),
-        "wb_run_step_end": ch_call_dict.get("wb_run_step_end"),
         "wb_user_id": ch_call_dict.get("wb_user_id"),
         "display_name": display_name,
         "storage_size_bytes": ch_call_dict.get("storage_size_bytes"),
@@ -2737,7 +3209,6 @@ def _end_call_for_insert_to_ch_insertable_end_call(
         summary_dump=_dict_value_to_dump(dict(end_call.summary)),
         output_dump=_any_value_to_dump(output),
         output_refs=output_refs,
-        wb_run_step_end=end_call.wb_run_step_end,
     )
 
 
