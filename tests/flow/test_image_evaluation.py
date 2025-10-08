@@ -4,7 +4,6 @@ import PIL
 import pytest
 
 import weave
-import weave.type_handlers
 from weave.trace.weave_client import WeaveClient
 
 
