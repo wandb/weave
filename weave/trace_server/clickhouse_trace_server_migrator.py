@@ -115,10 +115,16 @@ class ClickHouseTraceServerMigrator:
         logger.info(f"Migrations to apply: {migrations_to_apply}")
         if status["curr_version"] == 0:
             self.ch_client.command(self._create_db_sql(target_db))
+
+        newly_applied_versions = []
         for target_version, migration_file in migrations_to_apply:
             self._apply_migration(target_db, target_version, migration_file)
+            newly_applied_versions.append(target_version)
+
         if should_insert_costs(status["curr_version"], target_version):
             insert_costs(self.ch_client, target_db)
+
+        self._register_backfills(target_db, newly_applied_versions)
 
     def _initialize_migration_db(self) -> None:
         self.ch_client.command(self._create_db_sql("db_management"))
@@ -295,3 +301,23 @@ class ClickHouseTraceServerMigrator:
         self._update_migration_status(target_db, target_version, is_start=False)
 
         logger.info(f"Migration {migration_file} applied to `{target_db}`")
+
+    def _register_backfills(
+        self, target_db: str, migration_versions: list[int]
+    ) -> None:
+        """Register any pending backfills for newly applied migrations."""
+        if not migration_versions:
+            return
+
+        try:
+            from weave.trace_server.backfills import ClickHouseBackfillManager
+
+            backfill_manager = ClickHouseBackfillManager(
+                self.ch_client,
+                replicated=self.replicated,
+                replicated_path=self.replicated_path,
+                replicated_cluster=self.replicated_cluster,
+            )
+            backfill_manager.register_pending_backfills(target_db, migration_versions)
+        except Exception as e:
+            logger.warning(f"Failed to register backfills: {e}")

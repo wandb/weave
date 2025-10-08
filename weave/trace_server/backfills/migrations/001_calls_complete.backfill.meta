@@ -1,0 +1,27 @@
+{
+  "_comment": "This metadata file configures how the backfill framework executes the corresponding .sql file. The framework uses these settings to manage batch processing, checkpointing, retries, and error recovery. All migration-specific logic lives in the SQL file - this just tells the framework HOW to run it.",
+  
+  "migration_version": 1,
+  "description": "Backfill calls_complete from calls_merged with completed calls only",
+  
+  "batch_size": 100000,
+  "_batch_size_comment": "Initial number of rows per batch. Framework will automatically halve this on OOM errors.",
+  
+  "checkpoint_columns": ["sortable_datetime", "project_id", "id"],
+  "_checkpoint_columns_comment": "Columns used to track progress. Framework generates WHERE clauses like: WHERE (col1 > checkpoint_col1) OR (col1 = checkpoint_col1 AND col2 > checkpoint_col2)",
+  
+  "target_table": "calls_complete",
+  "_target_table_comment": "Table being populated. Used by framework to query for last inserted checkpoint position.",
+  
+  "timeout_seconds": 3600,
+  "_timeout_seconds_comment": "Maximum execution time per batch in seconds.",
+  
+  "run_on_startup": false,
+  "_run_on_startup_comment": "If true, backfill runs automatically when registered. If false, must be run manually.",
+  
+  "max_retries": 3,
+  "_max_retries_comment": "Number of retries per batch before marking as failed.",
+  
+  "custom_fields": [],
+  "_custom_fields_comment": "Custom fields to calculate once at backfill start and store in checkpoint. Available as {field_name} in SQL template."
+}
