@@ -2628,6 +2628,7 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: dict) -> dict:
         "exception": ch_call_dict.get("exception"),
         "wb_run_id": ch_call_dict.get("wb_run_id"),
         "wb_run_step": ch_call_dict.get("wb_run_step"),
+        "wb_run_step_end": ch_call_dict.get("wb_run_step_end"),
         "wb_user_id": ch_call_dict.get("wb_user_id"),
         "display_name": display_name,
         "storage_size_bytes": ch_call_dict.get("storage_size_bytes"),
@@ -2716,6 +2717,7 @@ def _end_call_for_insert_to_ch_insertable_end_call(
         summary_dump=_dict_value_to_dump(dict(end_call.summary)),
         output_dump=_any_value_to_dump(output),
         output_refs=output_refs,
+        wb_run_step_end=end_call.wb_run_step_end,
     )
 
 
