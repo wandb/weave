@@ -838,7 +838,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             object_query_builder.add_order("object_id", "asc")
             object_query_builder.add_order("version_index", "desc")
 
-            obj_res = self._select_objs_query(object_query_builder, metadata_only=True)
+            objs = self._select_objs_query(object_query_builder, metadata_only=True)
         else:
             # Use objs_query for simpler cases without custom sorting
             obj_query_req = tsi.ObjQueryReq(
@@ -847,9 +847,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 metadata_only=True,
             )
             obj_res = self.objs_query(obj_query_req)
+            objs = obj_res.objs
 
             # Yield back a descriptive metadata object for each op
-        for obj in obj_res.objs:
+        for obj in objs:
             yield tsi.OpItemMetadata(
                 object_id=obj.object_id,
                 digest=obj.digest,
