@@ -1410,7 +1410,7 @@ class EvaluationRunFinishRes(BaseModel):
     )
 
 
-class DatasetGetReq(BaseModel):
+class DatasetReadReq(BaseModel):
     project_id: str = Field(..., description="Project ID (e.g., 'entity/project')")
     object_id: str = Field(..., description="The dataset object ID")
     digest: str = Field(..., description="The digest of the dataset object")
@@ -1427,7 +1427,7 @@ class DatasetItemMetadata(BaseModel):
     description: Optional[str] = Field(None, description="Description of the dataset")
 
 
-class DatasetGetRes(DatasetItemMetadata):
+class DatasetReadRes(DatasetItemMetadata):
     rows: list[dict[str, Any]] = Field(..., description="The dataset rows data")
 
 
@@ -1454,7 +1454,7 @@ class DatasetDeleteRes(BaseModel):
     num_deleted: int = Field(..., description="Number of dataset versions deleted")
 
 
-class ScorerGetReq(BaseModel):
+class ScorerReadReq(BaseModel):
     project_id: str = Field(..., description="Project ID (e.g., 'entity/project')")
     object_id: str = Field(..., description="The scorer object ID")
     digest: str = Field(..., description="The digest of the scorer object")
@@ -1471,7 +1471,7 @@ class ScorerItemMetadata(BaseModel):
     description: Optional[str] = Field(None, description="Description of the scorer")
 
 
-class ScorerGetRes(ScorerItemMetadata):
+class ScorerReadRes(ScorerItemMetadata):
     score_op_ref: str = Field(..., description="The scorer op reference")
 
 
@@ -1496,7 +1496,7 @@ class ScorerDeleteRes(BaseModel):
     num_deleted: int = Field(..., description="Number of scorer versions deleted")
 
 
-class EvaluationGetReq(BaseModel):
+class EvaluationReadReq(BaseModel):
     project_id: str = Field(..., description="Project ID (e.g., 'entity/project')")
     object_id: str = Field(..., description="The evaluation object ID")
     digest: str = Field(..., description="The digest of the evaluation object")
@@ -1515,7 +1515,7 @@ class EvaluationItemMetadata(BaseModel):
     )
 
 
-class EvaluationGetRes(EvaluationItemMetadata):
+class EvaluationReadRes(EvaluationItemMetadata):
     dataset_ref: str = Field(..., description="Dataset reference")
     scorer_refs: list[str] = Field(..., description="List of scorer references")
     trials: int = Field(..., description="Number of trials")
@@ -1552,7 +1552,7 @@ class EvaluationDeleteRes(BaseModel):
     num_deleted: int = Field(..., description="Number of evaluation versions deleted")
 
 
-class OpGetReq(BaseModel):
+class OpReadV2Req(BaseModel):
     project_id: str = Field(..., description="Project ID (e.g., 'entity/project')")
     object_id: str = Field(..., description="The op object ID")
     digest: str = Field(..., description="The digest of the op object")
@@ -1569,7 +1569,7 @@ class OpItemMetadata(BaseModel):
     description: Optional[str] = Field(None, description="Description of the op")
 
 
-class OpGetRes(OpItemMetadata):
+class OpReadV2Res(OpItemMetadata):
     code: str = Field(..., description="The op code")
 
 
@@ -1618,7 +1618,7 @@ class TraceServerInterface(Protocol):
     def op_create(self, req: OpCreateReq) -> OpCreateRes: ...
     def op_read(self, req: OpReadReq) -> OpReadRes: ...
     def ops_query(self, req: OpQueryReq) -> OpQueryRes: ...
-    def op_get(self, req: OpGetReq) -> OpGetRes: ...
+    def op_read_v2(self, req: OpReadV2Req) -> OpReadV2Res: ...
     def op_list(self, req: OpListReq) -> Iterator[OpItemMetadata]: ...
     def op_delete(self, req: OpDeleteReq) -> OpDeleteRes: ...
 
@@ -1698,7 +1698,7 @@ class TraceServerInterface(Protocol):
 
     # Evaluation v2 API
     def evaluation_create(self, req: EvaluationCreateReq) -> EvaluationCreateRes: ...
-    def evaluation_get(self, req: EvaluationGetReq) -> EvaluationGetRes: ...
+    def evaluation_read(self, req: EvaluationReadReq) -> EvaluationReadRes: ...
     def evaluation_list(
         self, req: EvaluationListReq
     ) -> Iterator[EvaluationItemMetadata]: ...
@@ -1720,12 +1720,12 @@ class TraceServerInterface(Protocol):
 
     # Dataset API
     def dataset_create(self, req: DatasetCreateReq) -> DatasetCreateRes: ...
-    def dataset_get(self, req: DatasetGetReq) -> DatasetGetRes: ...
+    def dataset_read(self, req: DatasetReadReq) -> DatasetReadRes: ...
     def dataset_list(self, req: DatasetListReq) -> Iterator[DatasetItemMetadata]: ...
     def dataset_delete(self, req: DatasetDeleteReq) -> DatasetDeleteRes: ...
 
     # Scorer API
     def scorer_create(self, req: ScorerCreateReq) -> ScorerCreateRes: ...
-    def scorer_get(self, req: ScorerGetReq) -> ScorerGetRes: ...
+    def scorer_read(self, req: ScorerReadReq) -> ScorerReadRes: ...
     def scorer_list(self, req: ScorerListReq) -> Iterator[ScorerItemMetadata]: ...
     def scorer_delete(self, req: ScorerDeleteReq) -> ScorerDeleteRes: ...

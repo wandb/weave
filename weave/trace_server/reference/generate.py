@@ -373,10 +373,10 @@ def generate_routes(
         object_id: str,
         digest: str,
         service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
-    ) -> tsi.OpGetRes:
+    ) -> tsi.OpReadV2Res:
         """Get an op object."""
-        req = tsi.OpGetReq(project_id=project_id, object_id=object_id, digest=digest)
-        return service.trace_server_interface.op_get(req)
+        req = tsi.OpReadV2Req(project_id=project_id, object_id=object_id, digest=digest)
+        return service.trace_server_interface.op_read_v2(req)
 
     @router.get(
         "/op/list",
@@ -606,12 +606,12 @@ def generate_routes(
         object_id: str,
         digest: str,
         service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
-    ) -> tsi.EvaluationGetRes:
+    ) -> tsi.EvaluationReadRes:
         """Get an evaluation object."""
-        req = tsi.EvaluationGetReq(
+        req = tsi.EvaluationReadReq(
             project_id=project_id, object_id=object_id, digest=digest
         )
-        return service.trace_server_interface.evaluation_get(req)
+        return service.trace_server_interface.evaluation_read(req)
 
     @router.get(
         "/evaluation/list",
@@ -666,12 +666,12 @@ def generate_routes(
         object_id: str,
         digest: str,
         service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
-    ) -> tsi.DatasetGetRes:
+    ) -> tsi.DatasetReadRes:
         """Get a dataset object."""
-        req = tsi.DatasetGetReq(
+        req = tsi.DatasetReadReq(
             project_id=project_id, object_id=object_id, digest=digest
         )
-        return service.trace_server_interface.dataset_get(req)
+        return service.trace_server_interface.dataset_read(req)
 
     @router.get(
         "/dataset/list",
@@ -726,12 +726,12 @@ def generate_routes(
         object_id: str,
         digest: str,
         service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
-    ) -> tsi.ScorerGetRes:
+    ) -> tsi.ScorerReadRes:
         """Get a scorer object."""
-        req = tsi.ScorerGetReq(
+        req = tsi.ScorerReadReq(
             project_id=project_id, object_id=object_id, digest=digest
         )
-        return service.trace_server_interface.scorer_get(req)
+        return service.trace_server_interface.scorer_read(req)
 
     @router.get(
         "/scorer/list",

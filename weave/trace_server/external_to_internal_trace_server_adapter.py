@@ -461,10 +461,10 @@ class ExternalTraceServer(tsi.TraceServerInterface):
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(self._internal_trace_server.evaluation_status, req)
 
-    def op_get(self, req: tsi.OpGetReq) -> tsi.OpGetRes:
+    def op_get(self, req: tsi.OpReadV2Req) -> tsi.OpReadV2Res:
         original_project_id = req.project_id
         req.project_id = self._idc.ext_to_int_project_id(original_project_id)
-        res = self._ref_apply(self._internal_trace_server.op_get, req)
+        res = self._ref_apply(self._internal_trace_server.op_read_v2, req)
         # Note: OpGetRes fields don't include project_id, so no need to convert back
         return res
 
@@ -482,9 +482,9 @@ class ExternalTraceServer(tsi.TraceServerInterface):
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(self._internal_trace_server.evaluation_create, req)
 
-    def evaluation_get(self, req: tsi.EvaluationGetReq) -> tsi.EvaluationGetRes:
+    def evaluation_get(self, req: tsi.EvaluationReadReq) -> tsi.EvaluationReadRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(self._internal_trace_server.evaluation_get, req)
+        return self._ref_apply(self._internal_trace_server.evaluation_read, req)
 
     def evaluation_list(
         self, req: tsi.EvaluationListReq
@@ -530,9 +530,9 @@ class ExternalTraceServer(tsi.TraceServerInterface):
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(self._internal_trace_server.dataset_create, req)
 
-    def dataset_get(self, req: tsi.DatasetGetReq) -> tsi.DatasetGetRes:
+    def dataset_get(self, req: tsi.DatasetReadReq) -> tsi.DatasetReadRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(self._internal_trace_server.dataset_get, req)
+        return self._ref_apply(self._internal_trace_server.dataset_read, req)
 
     def dataset_list(
         self, req: tsi.DatasetListReq
@@ -548,9 +548,9 @@ class ExternalTraceServer(tsi.TraceServerInterface):
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(self._internal_trace_server.scorer_create, req)
 
-    def scorer_get(self, req: tsi.ScorerGetReq) -> tsi.ScorerGetRes:
+    def scorer_get(self, req: tsi.ScorerReadReq) -> tsi.ScorerReadRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(self._internal_trace_server.scorer_get, req)
+        return self._ref_apply(self._internal_trace_server.scorer_read, req)
 
     def scorer_list(self, req: tsi.ScorerListReq) -> Iterator[tsi.ScorerItemMetadata]:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)

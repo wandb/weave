@@ -411,8 +411,8 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     def ops_query(self, req: Union[tsi.OpQueryReq, dict[str, Any]]) -> tsi.OpQueryRes:
         return self._generic_request("/ops/query", req, tsi.OpQueryReq, tsi.OpQueryRes)
 
-    def op_get(self, req: Union[tsi.OpGetReq, dict[str, Any]]) -> tsi.OpGetRes:
-        return self._generic_request("/op/get", req, tsi.OpGetReq, tsi.OpGetRes)
+    def op_get(self, req: Union[tsi.OpReadV2Req, dict[str, Any]]) -> tsi.OpReadV2Res:
+        return self._generic_request("/op/get", req, tsi.OpReadV2Req, tsi.OpReadV2Res)
 
     def op_list(
         self, req: Union[tsi.OpListReq, dict[str, Any]]
@@ -716,10 +716,10 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         )
 
     def evaluation_get(
-        self, req: Union[tsi.EvaluationGetReq, dict[str, Any]]
-    ) -> tsi.EvaluationGetRes:
+        self, req: Union[tsi.EvaluationReadReq, dict[str, Any]]
+    ) -> tsi.EvaluationReadRes:
         return self._generic_request(
-            "/evaluation/get", req, tsi.EvaluationGetReq, tsi.EvaluationGetRes
+            "/evaluation/get", req, tsi.EvaluationReadReq, tsi.EvaluationReadRes
         )
 
     def evaluation_list(
@@ -784,10 +784,10 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         )
 
     def dataset_get(
-        self, req: Union[tsi.DatasetGetReq, dict[str, Any]]
-    ) -> tsi.DatasetGetRes:
+        self, req: Union[tsi.DatasetReadReq, dict[str, Any]]
+    ) -> tsi.DatasetReadRes:
         return self._generic_request(
-            "/dataset/get", req, tsi.DatasetGetReq, tsi.DatasetGetRes
+            "/dataset/get", req, tsi.DatasetReadReq, tsi.DatasetReadRes
         )
 
     def dataset_list(
@@ -812,10 +812,10 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         )
 
     def scorer_get(
-        self, req: Union[tsi.ScorerGetReq, dict[str, Any]]
-    ) -> tsi.ScorerGetRes:
+        self, req: Union[tsi.ScorerReadReq, dict[str, Any]]
+    ) -> tsi.ScorerReadRes:
         return self._generic_request(
-            "/scorer/get", req, tsi.ScorerGetReq, tsi.ScorerGetRes
+            "/scorer/get", req, tsi.ScorerReadReq, tsi.ScorerReadRes
         )
 
     def scorer_list(

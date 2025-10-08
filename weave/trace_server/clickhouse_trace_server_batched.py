@@ -742,7 +742,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         objs = [_ch_obj_to_obj_schema(call) for call in ch_objs]
         return tsi.OpQueryRes(op_objs=objs)
 
-    def op_get(self, req: tsi.OpGetReq) -> tsi.OpGetRes:
+    def op_get(self, req: tsi.OpReadV2Req) -> tsi.OpReadV2Res:
         """Get a specific op object by delegating to obj_read with op filtering and retry logic.
 
         Extracts the source code from the file storage referenced in the op object.
@@ -808,7 +808,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             except Exception:
                 pass  # If file reading fails, return empty code
 
-        return tsi.OpGetRes(
+        return tsi.OpReadV2Res(
             object_id=obj.object_id,
             digest=obj.digest,
             version_index=obj.version_index,
@@ -1167,7 +1167,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             evaluation_ref=evaluation_ref,
         )
 
-    def evaluation_get(self, req: tsi.EvaluationGetReq) -> tsi.EvaluationGetRes:
+    def evaluation_get(self, req: tsi.EvaluationReadReq) -> tsi.EvaluationReadRes:
         """Get an evaluation object by delegating to obj_read with retry logic."""
         obj_req = tsi.ObjReadReq(
             project_id=req.project_id,
@@ -1182,7 +1182,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         description = val.get("description")
 
         # Create the response with all required fields
-        return tsi.EvaluationGetRes(
+        return tsi.EvaluationReadRes(
             object_id=result.obj.object_id,
             digest=result.obj.digest,
             version_index=result.obj.version_index,
@@ -1455,7 +1455,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             dataset_ref=dataset_ref,
         )
 
-    def dataset_get(self, req: tsi.DatasetGetReq) -> tsi.DatasetGetRes:
+    def dataset_get(self, req: tsi.DatasetReadReq) -> tsi.DatasetReadRes:
         """Get a dataset object by delegating to obj_read with retry logic."""
         obj_req = tsi.ObjReadReq(
             project_id=req.project_id,
@@ -1483,7 +1483,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 rows = [row.val for row in table_query_res.rows]
 
         # Create the response with all required fields
-        return tsi.DatasetGetRes(
+        return tsi.DatasetReadRes(
             object_id=result.obj.object_id,
             digest=result.obj.digest,
             version_index=result.obj.version_index,
@@ -1595,7 +1595,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             scorer_ref=scorer_ref,
         )
 
-    def scorer_get(self, req: tsi.ScorerGetReq) -> tsi.ScorerGetRes:
+    def scorer_get(self, req: tsi.ScorerReadReq) -> tsi.ScorerReadRes:
         """Get a scorer object by delegating to obj_read with retry logic."""
         obj_req = tsi.ObjReadReq(
             project_id=req.project_id,
@@ -1610,7 +1610,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         description = val.get("description")
 
         # Create the response with all required fields
-        return tsi.ScorerGetRes(
+        return tsi.ScorerReadRes(
             object_id=result.obj.object_id,
             digest=result.obj.digest,
             version_index=result.obj.version_index,

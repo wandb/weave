@@ -811,7 +811,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
     def ops_query(self, req: tsi.OpQueryReq) -> tsi.OpQueryRes:
         raise NotImplementedError()
 
-    def op_get(self, req: tsi.OpGetReq) -> tsi.OpGetRes:
+    def op_get(self, req: tsi.OpReadV2Req) -> tsi.OpReadV2Res:
         """Get a specific op object by delegating to obj_read with op filtering.
 
         Extracts the source code from the file storage referenced in the op object.
@@ -847,7 +847,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                     # If file reading fails, return empty code
                     code = ""
 
-        return tsi.OpGetRes(
+        return tsi.OpReadV2Res(
             object_id=result.obj.object_id,
             digest=result.obj.digest,
             version_index=result.obj.version_index,
@@ -1822,7 +1822,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             evaluation_ref=evaluation_ref,
         )
 
-    def evaluation_get(self, req: tsi.EvaluationGetReq) -> tsi.EvaluationGetRes:
+    def evaluation_get(self, req: tsi.EvaluationReadReq) -> tsi.EvaluationReadRes:
         """Get evaluation objects by delegating to obj_read."""
         obj_req = tsi.ObjReadReq(
             project_id=req.project_id,
@@ -1837,7 +1837,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         description = val.get("description")
 
         # Create the response with all required fields
-        return tsi.EvaluationGetRes(
+        return tsi.EvaluationReadRes(
             object_id=result.obj.object_id,
             digest=result.obj.digest,
             version_index=result.obj.version_index,
@@ -1984,7 +1984,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             dataset_ref=dataset_ref,
         )
 
-    def dataset_get(self, req: tsi.DatasetGetReq) -> tsi.DatasetGetRes:
+    def dataset_read(self, req: tsi.DatasetReadReq) -> tsi.DatasetReadRes:
         """Get dataset objects by delegating to obj_read."""
         obj_req = tsi.ObjReadReq(
             project_id=req.project_id,
@@ -1999,7 +1999,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         description = val.get("description")
 
         # Create the response with all required fields
-        return tsi.DatasetGetRes(
+        return tsi.DatasetReadRes(
             object_id=result.obj.object_id,
             digest=result.obj.digest,
             version_index=result.obj.version_index,
@@ -2108,7 +2108,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             scorer_ref=scorer_ref,
         )
 
-    def scorer_get(self, req: tsi.ScorerGetReq) -> tsi.ScorerGetRes:
+    def scorer_get(self, req: tsi.ScorerReadReq) -> tsi.ScorerReadRes:
         """Get scorer objects by delegating to obj_read."""
         obj_req = tsi.ObjReadReq(
             project_id=req.project_id,
@@ -2123,7 +2123,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         description = val.get("description")
 
         # Create the response with all required fields
-        return tsi.ScorerGetRes(
+        return tsi.ScorerReadRes(
             object_id=result.obj.object_id,
             digest=result.obj.digest,
             version_index=result.obj.version_index,
