@@ -742,7 +742,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         objs = [_ch_obj_to_obj_schema(call) for call in ch_objs]
         return tsi.OpQueryRes(op_objs=objs)
 
-    def op_get(self, req: tsi.OpReadV2Req) -> tsi.OpReadV2Res:
+    def op_read_v2(self, req: tsi.OpReadV2Req) -> tsi.OpReadV2Res:
         """Get a specific op object by delegating to obj_read with op filtering and retry logic.
 
         Extracts the source code from the file storage referenced in the op object.
@@ -1167,7 +1167,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             evaluation_ref=evaluation_ref,
         )
 
-    def evaluation_get(self, req: tsi.EvaluationReadReq) -> tsi.EvaluationReadRes:
+    def evaluation_read(self, req: tsi.EvaluationReadReq) -> tsi.EvaluationReadRes:
         """Get an evaluation object by delegating to obj_read with retry logic."""
         obj_req = tsi.ObjReadReq(
             project_id=req.project_id,
@@ -1243,7 +1243,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         result = self.obj_delete(obj_delete_req)
         return tsi.EvaluationDeleteRes(num_deleted=result.num_deleted)
 
-    def evaluation_log_start(
+    def evaluation_run_start(
         self, req: tsi.EvaluationRunStartReq
     ) -> tsi.EvaluationRunStartRes:
         """Start an evaluation run - create a trace for evaluation."""
@@ -1279,7 +1279,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         return tsi.EvaluationRunStartRes(evaluate_call_id=call_start_res.id)
 
-    def evaluation_log_prediction(
+    def evaluation_run_log_prediction(
         self, req: tsi.EvaluationRunLogPredictionReq
     ) -> tsi.EvaluationRunLogPredictionRes:
         """Log a prediction for an evaluation run."""
@@ -1324,7 +1324,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         return tsi.EvaluationRunLogPredictionRes(predict_call_id=call_start_res.id)
 
-    def evaluation_log_score(
+    def evaluation_run_log_score(
         self, req: tsi.EvaluationRunLogScoreReq
     ) -> tsi.EvaluationRunLogScoreRes:
         """Log a score for an evaluation run."""
@@ -1371,7 +1371,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         return tsi.EvaluationRunLogScoreRes(call_id=call_start_res.id)
 
-    def evaluation_log_finish(
+    def evaluation_run_finish(
         self, req: tsi.EvaluationRunFinishReq
     ) -> tsi.EvaluationRunFinishRes:
         """Finish an evaluation run."""
@@ -1455,7 +1455,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             dataset_ref=dataset_ref,
         )
 
-    def dataset_get(self, req: tsi.DatasetReadReq) -> tsi.DatasetReadRes:
+    def dataset_read(self, req: tsi.DatasetReadReq) -> tsi.DatasetReadRes:
         """Get a dataset object by delegating to obj_read with retry logic."""
         obj_req = tsi.ObjReadReq(
             project_id=req.project_id,
@@ -1595,7 +1595,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             scorer_ref=scorer_ref,
         )
 
-    def scorer_get(self, req: tsi.ScorerReadReq) -> tsi.ScorerReadRes:
+    def scorer_read(self, req: tsi.ScorerReadReq) -> tsi.ScorerReadRes:
         """Get a scorer object by delegating to obj_read with retry logic."""
         obj_req = tsi.ObjReadReq(
             project_id=req.project_id,

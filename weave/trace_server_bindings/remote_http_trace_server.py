@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, Field
 from pydantic.json_schema import SkipJsonSchema
+
 from weave.trace.env import weave_trace_server_url
 from weave.trace.settings import max_calls_queue_size, should_enable_disk_fallback
 from weave.trace_server import trace_server_interface as tsi
@@ -411,8 +412,12 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     def ops_query(self, req: Union[tsi.OpQueryReq, dict[str, Any]]) -> tsi.OpQueryRes:
         return self._generic_request("/ops/query", req, tsi.OpQueryReq, tsi.OpQueryRes)
 
-    def op_get(self, req: Union[tsi.OpReadV2Req, dict[str, Any]]) -> tsi.OpReadV2Res:
-        return self._generic_request("/op/get", req, tsi.OpReadV2Req, tsi.OpReadV2Res)
+    def op_read_v2(
+        self, req: Union[tsi.OpReadV2Req, dict[str, Any]]
+    ) -> tsi.OpReadV2Res:
+        return self._generic_request(
+            "/op/read_v2", req, tsi.OpReadV2Req, tsi.OpReadV2Res
+        )
 
     def op_list(
         self, req: Union[tsi.OpListReq, dict[str, Any]]
@@ -715,11 +720,11 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             "/evaluation/create", req, tsi.EvaluationCreateReq, tsi.EvaluationCreateRes
         )
 
-    def evaluation_get(
+    def evaluation_read(
         self, req: Union[tsi.EvaluationReadReq, dict[str, Any]]
     ) -> tsi.EvaluationReadRes:
         return self._generic_request(
-            "/evaluation/get", req, tsi.EvaluationReadReq, tsi.EvaluationReadRes
+            "/evaluation/read", req, tsi.EvaluationReadReq, tsi.EvaluationReadRes
         )
 
     def evaluation_list(
@@ -736,41 +741,41 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             "/evaluation/delete", req, tsi.EvaluationDeleteReq, tsi.EvaluationDeleteRes
         )
 
-    def evaluation_log_start(
+    def evaluation_run_start(
         self, req: Union[tsi.EvaluationRunStartReq, dict[str, Any]]
     ) -> tsi.EvaluationRunStartRes:
         return self._generic_request(
-            "/evaluation/log_start",
+            "/evaluation/run/start",
             req,
             tsi.EvaluationRunStartReq,
             tsi.EvaluationRunStartRes,
         )
 
-    def evaluation_log_prediction(
+    def evaluation_run_log_prediction(
         self, req: Union[tsi.EvaluationRunLogPredictionReq, dict[str, Any]]
     ) -> tsi.EvaluationRunLogPredictionRes:
         return self._generic_request(
-            "/evaluation/log_prediction",
+            "/evaluation/run/log_prediction",
             req,
             tsi.EvaluationRunLogPredictionReq,
             tsi.EvaluationRunLogPredictionRes,
         )
 
-    def evaluation_log_score(
+    def evaluation_run_log_score(
         self, req: Union[tsi.EvaluationRunLogScoreReq, dict[str, Any]]
     ) -> tsi.EvaluationRunLogScoreRes:
         return self._generic_request(
-            "/evaluation/log_score",
+            "/evaluation/run/log_score",
             req,
             tsi.EvaluationRunLogScoreReq,
             tsi.EvaluationRunLogScoreRes,
         )
 
-    def evaluation_log_finish(
+    def evaluation_run_finish(
         self, req: Union[tsi.EvaluationRunFinishReq, dict[str, Any]]
     ) -> tsi.EvaluationRunFinishRes:
         return self._generic_request(
-            "/evaluation/log_finish",
+            "/evaluation/run/finish",
             req,
             tsi.EvaluationRunFinishReq,
             tsi.EvaluationRunFinishRes,
@@ -783,11 +788,11 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             "/dataset/create", req, tsi.DatasetCreateReq, tsi.DatasetCreateRes
         )
 
-    def dataset_get(
+    def dataset_read(
         self, req: Union[tsi.DatasetReadReq, dict[str, Any]]
     ) -> tsi.DatasetReadRes:
         return self._generic_request(
-            "/dataset/get", req, tsi.DatasetReadReq, tsi.DatasetReadRes
+            "/dataset/read", req, tsi.DatasetReadReq, tsi.DatasetReadRes
         )
 
     def dataset_list(
@@ -811,11 +816,11 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             "/scorer/create", req, tsi.ScorerCreateReq, tsi.ScorerCreateRes
         )
 
-    def scorer_get(
+    def scorer_read(
         self, req: Union[tsi.ScorerReadReq, dict[str, Any]]
     ) -> tsi.ScorerReadRes:
         return self._generic_request(
-            "/scorer/get", req, tsi.ScorerReadReq, tsi.ScorerReadRes
+            "/scorer/read", req, tsi.ScorerReadReq, tsi.ScorerReadRes
         )
 
     def scorer_list(
