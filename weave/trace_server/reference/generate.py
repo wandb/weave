@@ -22,9 +22,11 @@ COMPLETIONS_TAG_NAME = "Completions"
 ACTIONS_TAG_NAME = "Actions"
 OTEL_TAG_NAME = "OpenTelemetry"
 THREADS_TAG_NAME = "Threads"
-EVALUATION_TAG_NAME = "Evaluation"
+EVALUATION_V2_TAG_NAME = "Evaluation v2"
 DATASET_TAG_NAME = "Datasets"
 SCORER_TAG_NAME = "Scorers"
+EVALUATION_LOGGING_TAG_NAME = "Evaluation Logging"
+OP_V2_TAG_NAME = "Ops v2"
 
 
 class AuthParams(NamedTuple):
@@ -546,21 +548,21 @@ def generate_routes(
             media_type="application/jsonl",
         )
 
-    @router.post("/evaluate_model", tags=[EVALUATION_TAG_NAME])
+    @router.post("/evaluate_model", tags=[EVALUATION_V2_TAG_NAME])
     def evaluate_model(
         req: tsi.EvaluateModelReq,
         service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
     ) -> tsi.EvaluateModelRes:
         return service.trace_server_interface.evaluate_model(req)
 
-    @router.post("/evaluation_status", tags=[EVALUATION_TAG_NAME])
+    @router.post("/evaluation_status", tags=[EVALUATION_V2_TAG_NAME])
     def evaluation_status(
         req: tsi.EvaluationStatusReq,
         service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
     ) -> tsi.EvaluationStatusRes:
         return service.trace_server_interface.evaluation_status(req)
 
-    @router.post("/evaluation/create", tags=[EVALUATION_TAG_NAME])
+    @router.post("/evaluation/create", tags=[EVALUATION_V2_TAG_NAME])
     def evaluation_create(
         req: tsi.EvaluationCreateReq,
         service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
@@ -568,7 +570,7 @@ def generate_routes(
         """Create an evaluation object."""
         return service.trace_server_interface.evaluation_create(req)
 
-    @router.post("/evaluation/log_start", tags=[EVALUATION_TAG_NAME])
+    @router.post("/evaluation/log_start", tags=[EVALUATION_LOGGING_TAG_NAME])
     def evaluation_log_start(
         req: tsi.EvaluationRunStartReq,
         service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
@@ -576,7 +578,7 @@ def generate_routes(
         """Start an evaluation run."""
         return service.trace_server_interface.evaluation_run_start(req)
 
-    @router.post("/evaluation/log_prediction", tags=[EVALUATION_TAG_NAME])
+    @router.post("/evaluation/log_prediction", tags=[EVALUATION_LOGGING_TAG_NAME])
     def evaluation_log_prediction(
         req: tsi.EvaluationRunLogPredictionReq,
         service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
@@ -584,7 +586,7 @@ def generate_routes(
         """Log a prediction for an evaluation run."""
         return service.trace_server_interface.evaluation_run_log_prediction(req)
 
-    @router.post("/evaluation/log_score", tags=[EVALUATION_TAG_NAME])
+    @router.post("/evaluation/log_score", tags=[EVALUATION_LOGGING_TAG_NAME])
     def evaluation_log_score(
         req: tsi.EvaluationRunLogScoreReq,
         service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
@@ -592,7 +594,7 @@ def generate_routes(
         """Log a score for an evaluation run."""
         return service.trace_server_interface.evaluation_run_log_score(req)
 
-    @router.post("/evaluation/log_finish", tags=[EVALUATION_TAG_NAME])
+    @router.post("/evaluation/log_finish", tags=[EVALUATION_LOGGING_TAG_NAME])
     def evaluation_log_finish(
         req: tsi.EvaluationRunFinishReq,
         service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
