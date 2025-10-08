@@ -461,7 +461,7 @@ class ExternalTraceServer(tsi.TraceServerInterface):
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(self._internal_trace_server.evaluation_status, req)
 
-    def op_get(self, req: tsi.OpReadV2Req) -> tsi.OpReadV2Res:
+    def op_read_v2(self, req: tsi.OpReadV2Req) -> tsi.OpReadV2Res:
         original_project_id = req.project_id
         req.project_id = self._idc.ext_to_int_project_id(original_project_id)
         return self._ref_apply(self._internal_trace_server.op_read_v2, req)
@@ -480,7 +480,7 @@ class ExternalTraceServer(tsi.TraceServerInterface):
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(self._internal_trace_server.evaluation_create, req)
 
-    def evaluation_get(self, req: tsi.EvaluationReadReq) -> tsi.EvaluationReadRes:
+    def evaluation_read(self, req: tsi.EvaluationReadReq) -> tsi.EvaluationReadRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(self._internal_trace_server.evaluation_read, req)
 
@@ -552,7 +552,7 @@ class ExternalTraceServer(tsi.TraceServerInterface):
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(self._internal_trace_server.dataset_create, req)
 
-    def dataset_get(self, req: tsi.DatasetReadReq) -> tsi.DatasetReadRes:
+    def dataset_read(self, req: tsi.DatasetReadReq) -> tsi.DatasetReadRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(self._internal_trace_server.dataset_read, req)
 
@@ -570,7 +570,7 @@ class ExternalTraceServer(tsi.TraceServerInterface):
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(self._internal_trace_server.scorer_create, req)
 
-    def scorer_get(self, req: tsi.ScorerReadReq) -> tsi.ScorerReadRes:
+    def scorer_read(self, req: tsi.ScorerReadReq) -> tsi.ScorerReadRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(self._internal_trace_server.scorer_read, req)
 
