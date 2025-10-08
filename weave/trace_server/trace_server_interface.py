@@ -445,6 +445,11 @@ class CallsQueryReq(BaseModelStrict):
         description="Beta, subject to change. If true, the response will"
         " include the total storage size for a trace.",
     )
+    include_running: Optional[bool] = Field(
+        default=False,
+        description="If true, the response will include running calls from call_starts table. "
+        "If false, only completed calls from calls_complete table will be returned.",
+    )
 
     # TODO: type this with call schema columns, following the same rules as
     # SortBy and thus GetFieldOperator.get_field_ (without direction)
@@ -487,6 +492,11 @@ class CallsQueryStatsReq(BaseModelStrict):
     query: Optional[Query] = None
     limit: Optional[int] = None
     include_total_storage_size: Optional[bool] = False
+    include_running: Optional[bool] = Field(
+        default=False,
+        description="If true, the response will include running calls from call_starts table. "
+        "If false, only completed calls from calls_complete table will be returned.",
+    )
     # List of columns that include refs to objects or table rows that require
     # expansion during filtering or ordering. Required when filtering
     # on reffed fields.

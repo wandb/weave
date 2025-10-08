@@ -3,4 +3,4 @@ from weave.trace_server.backfills.clickhouse_backfill_manager import (
     ClickHouseBackfillManager,
 )
 
-__all__ = ["ClickHouseBackfillManager", "BackfillError"]
+__all__ = ["BackfillError", "ClickHouseBackfillManager"]

@@ -623,6 +623,7 @@ class CallsQuery(BaseModel):
     include_costs: bool = False
     include_storage_size: bool = False
     include_total_storage_size: bool = False
+    include_running: bool = False
 
     def add_field(self, field: str) -> "CallsQuery":
         name = get_field_by_name(field, self.table_name)
@@ -702,6 +703,10 @@ class CallsQuery(BaseModel):
 
     def set_expand_columns(self, expand_columns: list[str]) -> "CallsQuery":
         self.expand_columns = expand_columns
+        return self
+
+    def set_include_running(self, include_running: bool) -> "CallsQuery":
+        self.include_running = include_running
         return self
 
     def as_sql(self, pb: ParamBuilder, table_alias: Optional[str] = None) -> str:
@@ -1190,12 +1195,17 @@ class CallsQuery(BaseModel):
 
         Use mixed approach when:
         1. We're querying calls_complete (not call_starts)
-        2. There's a LIMIT clause
-        3. We're not sorting by fields only available in completed calls (output, summary)
-        4. Query doesn't reference fields only on completed calls
+        2. include_running is True
+        3. There's a LIMIT clause
+        4. We're not sorting by fields only available in completed calls (output, summary)
+        5. Query doesn't reference fields only on completed calls
         """
         # Mixed approach only applies to calls_complete table
         if self.table_name != "calls_complete":
+            return False
+
+        # Must have include_running enabled to use mixed approach
+        if not self.include_running:
             return False
 
         # Must have a limit to use mixed approach
@@ -1496,7 +1506,6 @@ class CallsQuery(BaseModel):
                 SELECT {complete_fields_sql}
                 FROM calls_complete AS {complete_alias}
                 WHERE {complete_alias}.project_id = {param_slot(project_param, "String")}
-                  AND {complete_alias}.deleted_at IS NULL
                   {complete_op_name_sql}
                   {complete_trace_id_sql}
                   {complete_conditions_sql}
@@ -1509,7 +1518,6 @@ class CallsQuery(BaseModel):
                 WHERE {parts_alias}.project_id = {param_slot(project_param, "String")}
                   AND {parts_alias}.started_at > {param_slot(twenty_four_hours_ago_param, "Float64")}
                   AND {parts_alias}.id NOT IN (SELECT id FROM completed)
-                  AND {parts_alias}.deleted_at IS NULL
                   {parts_op_name_sql}
                   {parts_trace_id_sql}
                   {parts_trace_roots_only_sql}
@@ -1533,7 +1541,6 @@ class CallsQuery(BaseModel):
             SELECT {complete_fields_sql}
             FROM calls_complete AS {complete_alias}
             WHERE {complete_alias}.project_id = {param_slot(project_param, "String")}
-              AND {complete_alias}.deleted_at IS NULL
               {complete_op_name_sql}
               {complete_trace_id_sql}
               {complete_conditions_sql}
@@ -1557,7 +1564,7 @@ class CallsQuery(BaseModel):
         """
         # Fields that don't exist in call_starts table (only in calls_complete)
         # Map field name to its default value for in-progress calls
-        CALL_STARTS_MISSING_FIELDS = {
+        call_starts_missing_fields = {
             "ended_at": "NULL",
             "output_dump": "NULL",
             "summary_dump": "NULL",
@@ -1580,8 +1587,8 @@ class CallsQuery(BaseModel):
 
         elif isinstance(field, CallsCompleteDynamicField):
             # Check if this field is missing from call_starts table
-            if field.field in CALL_STARTS_MISSING_FIELDS:
-                return f"{CALL_STARTS_MISSING_FIELDS[field.field]} AS {field.field}"
+            if field.field in call_starts_missing_fields:
+                return f"{call_starts_missing_fields[field.field]} AS {field.field}"
 
             # Dynamic field - use the same logic but without aggregation
             base_field = f"{table_alias}.{field.field}"
@@ -1596,16 +1603,16 @@ class CallsQuery(BaseModel):
 
         elif isinstance(field, CallsCompleteField):
             # Check if this field is missing from call_starts table
-            if field.field in CALL_STARTS_MISSING_FIELDS:
-                return f"{CALL_STARTS_MISSING_FIELDS[field.field]} AS {field.field}"
+            if field.field in call_starts_missing_fields:
+                return f"{call_starts_missing_fields[field.field]} AS {field.field}"
 
             # Simple field, just use the field name with the table alias
             return f"{table_alias}.{field.field} AS {field.field}"
 
         else:
             # Check if this field is missing from call_starts table
-            if hasattr(field, "field") and field.field in CALL_STARTS_MISSING_FIELDS:
-                return f"{CALL_STARTS_MISSING_FIELDS[field.field]} AS {field.field}"
+            if hasattr(field, "field") and field.field in call_starts_missing_fields:
+                return f"{call_starts_missing_fields[field.field]} AS {field.field}"
 
             # Fallback - treat as simple field
             return f"{table_alias}.{field.field} AS {field.field}"
@@ -1660,7 +1667,10 @@ class CallsQuery(BaseModel):
     ) -> str:
         """Generate SQL for single calls_complete table query."""
         # Add default conditions for complete table - add directly without aggregation
-        deleted_at_condition = f"{table_alias}.deleted_at IS NULL"
+        select_fields = self.select_fields
+        select_fields = [
+            field for field in select_fields if field.field != "deleted_at"
+        ]
         select_fields_sql = ", ".join(
             field.as_select_sql(pb, table_alias) for field in self.select_fields
         )
@@ -1693,7 +1703,6 @@ class CallsQuery(BaseModel):
         project_param = pb.add_param(self.project_id)
         base_conditions = [
             f"{table_alias}.project_id = {param_slot(project_param, 'String')}",
-            deleted_at_condition,  # Add the non-aggregated deleted_at condition
         ]
 
         if where_conditions_sql:
@@ -1788,7 +1797,7 @@ ALLOWED_CALLS_COMPLETE_FIELDS: dict[str, CallsMergedField] = {
     "wb_user_id": CallsCompleteField(field="wb_user_id"),
     "wb_run_id": CallsCompleteField(field="wb_run_id"),
     "wb_run_step": CallsCompleteField(field="wb_run_step"),
-    "deleted_at": CallsCompleteField(field="deleted_at"),
+    "wb_run_step_end": CallsCompleteField(field="wb_run_step_end"),
     "display_name": CallsCompleteField(field="display_name"),
     "storage_size_bytes": CompleteTableFieldWithTableOverrides(
         field="storage_size_bytes",
@@ -2425,6 +2434,7 @@ def optimized_project_contains_call_query(
     table_name: str = "calls_complete",
 ) -> str:
     """Returns a query that checks if the project contains any calls."""
+    deleted_at_sql = "AND deleted_at IS NULL" if table_name == "calls_merged" else ""
     return safely_format_sql(
         f"""SELECT
     toUInt8(count()) AS has_any
@@ -2433,7 +2443,7 @@ def optimized_project_contains_call_query(
         SELECT 1
         FROM {table_name}
         WHERE project_id = {param_slot(param_builder.add_param(project_id), "String")}
-        AND deleted_at IS NULL
+        {deleted_at_sql}
         LIMIT 1
     )
     """,
@@ -2455,10 +2465,9 @@ def build_call_parts_query_by_ids(
     return safely_format_sql(
         f"""
         SELECT {columns_str}
-        FROM call_parts
+        FROM call_starts
         WHERE project_id = {param_slot(project_param, "String")}
           AND id IN {param_slot(call_ids_param, "Array(String)")}
-          AND started_at IS NOT NULL
         """,
         logger,
     )
@@ -2625,7 +2634,9 @@ def build_calls_query_stats_query(
     inner_query = cq.as_sql(param_builder)
 
     # Check if we should also count in-progress calls from call_starts
-    should_include_in_progress = not _query_uses_completed_only_fields(req)
+    should_include_in_progress = (
+        req.include_running and not _query_uses_completed_only_fields(req)
+    )
 
     if should_include_in_progress:
         # Build a query for call_starts table with the same filters

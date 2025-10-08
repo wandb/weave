@@ -1,3 +1,4 @@
+import dataclasses
 import datetime
 from typing import Optional, Union
 
@@ -191,6 +192,10 @@ ALL_CALL_INSERT_COLUMNS = sorted(
     | CallUpdateCHInsertable.model_fields.keys()
 )
 
+CALLS_COMPLETE_INSERT_COLUMNS = sorted(
+    CallStartCHInsertable.model_fields.keys() | CallEndCHInsertable.model_fields.keys()
+)
+
 # Columns for call_starts table - explicitly list what's actually in the table schema
 # Based on migration 019_calls_complete.up.sql, call_starts table has these columns:
 # id, project_id, created_at, trace_id, op_name, started_at, deleted_at, parent_id,
@@ -199,7 +204,6 @@ ALL_CALL_INSERT_COLUMNS = sorted(
 # It does NOT have: ended_at, output_dump, summary_dump, exception, output_refs
 CALL_STARTS_INSERT_COLUMNS = [
     "attributes_dump",
-    "deleted_at",
     "display_name",
     "id",
     "input_refs",
@@ -224,6 +228,66 @@ REQUIRED_CALL_COLUMNS = ["id", "project_id", "trace_id", "op_name", "started_at"
 CALL_SELECT_RAW_COLUMNS = ["id", "project_id"]  # no aggregation
 CALL_SELECT_ARRAYS_COLUMNS = ["input_refs", "output_refs"]  # array_concat_agg
 CALL_SELECT_ARGMAX_COLUMNS = ["display_name"]  # argMaxMerge
+
+
+@dataclasses.dataclass
+class CallRowIndices:
+    """Column indices for call data rows."""
+
+    id: int
+    project_id: int
+    started_at: int
+    ended_at: int
+    attributes_dump: int
+    inputs_dump: int
+    output_dump: int
+    summary_dump: int
+    exception: int
+    output_refs: int
+    wb_run_step_end: int
+
+
+@dataclasses.dataclass
+class CallStartRowIndices:
+    """Column indices for call start data rows."""
+
+    id: int
+    project_id: int
+    started_at: int
+    attributes_dump: int
+    inputs_dump: int
+    output_refs: int
+
+
+def get_call_row_indices() -> CallRowIndices:
+    """Get column indices for ALL_CALL_INSERT_COLUMNS."""
+    return CallRowIndices(
+        id=ALL_CALL_INSERT_COLUMNS.index("id"),
+        project_id=ALL_CALL_INSERT_COLUMNS.index("project_id"),
+        started_at=ALL_CALL_INSERT_COLUMNS.index("started_at"),
+        ended_at=ALL_CALL_INSERT_COLUMNS.index("ended_at"),
+        attributes_dump=ALL_CALL_INSERT_COLUMNS.index("attributes_dump"),
+        inputs_dump=ALL_CALL_INSERT_COLUMNS.index("inputs_dump"),
+        output_dump=ALL_CALL_INSERT_COLUMNS.index("output_dump"),
+        summary_dump=ALL_CALL_INSERT_COLUMNS.index("summary_dump"),
+        exception=ALL_CALL_INSERT_COLUMNS.index("exception"),
+        output_refs=ALL_CALL_INSERT_COLUMNS.index("output_refs"),
+        wb_run_step_end=ALL_CALL_INSERT_COLUMNS.index("wb_run_step_end"),
+    )
+
+
+def get_call_start_row_indices() -> CallStartRowIndices:
+    """Get column indices for CALL_STARTS_INSERT_COLUMNS."""
+    return CallStartRowIndices(
+        id=CALL_STARTS_INSERT_COLUMNS.index("id"),
+        project_id=CALL_STARTS_INSERT_COLUMNS.index("project_id"),
+        started_at=CALL_STARTS_INSERT_COLUMNS.index("started_at"),
+        attributes_dump=CALL_STARTS_INSERT_COLUMNS.index("attributes_dump"),
+        inputs_dump=CALL_STARTS_INSERT_COLUMNS.index("inputs_dump"),
+        output_refs=CALL_STARTS_INSERT_COLUMNS.index("output_refs"),
+    )
+
+
 # all others use `any`
 
 ALL_OBJ_SELECT_COLUMNS = list(SelectableCHObjSchema.model_fields.keys())

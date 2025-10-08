@@ -1,5 +1,4 @@
-"""
-Entry point for running backfill CLI as a module.
+"""Entry point for running backfill CLI as a module.
 
 Usage:
     python -m weave.trace_server.backfills <command> [options]
