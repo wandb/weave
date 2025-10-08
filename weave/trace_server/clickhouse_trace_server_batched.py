@@ -745,6 +745,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 object_query_builder.add_base_object_classes_condition(
                     req.filter.base_object_classes
                 )
+            if req.filter.exclude_base_object_classes:
+                object_query_builder.add_exclude_base_object_classes_condition(
+                    req.filter.exclude_base_object_classes
+                )
             if req.filter.leaf_object_classes:
                 object_query_builder.add_leaf_object_classes_condition(
                     req.filter.leaf_object_classes

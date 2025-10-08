@@ -226,6 +226,12 @@ class ObjectMetadataQueryBuilder:
         )
         self.parameters.update({"base_object_classes": base_object_classes})
 
+    def add_exclude_base_object_classes_condition(self, exclude_base_object_classes: list[str]) -> None:
+        self._conditions.append(
+            "base_object_class NOT IN {exclude_base_object_classes: Array(String)}"
+        )
+        self.parameters.update({"exclude_base_object_classes": exclude_base_object_classes})
+
     def add_leaf_object_classes_condition(self, leaf_object_classes: list[str]) -> None:
         self._conditions.append(
             "leaf_object_class IN {leaf_object_classes: Array(String)}"

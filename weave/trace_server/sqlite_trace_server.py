@@ -913,6 +913,10 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 placeholders = ",".join(["?" for _ in req.filter.base_object_classes])
                 conds.append(f"base_object_class IN ({placeholders})")
                 parameters["base_object_classes"] = req.filter.base_object_classes
+            if req.filter.exclude_base_object_classes:
+                placeholders = ",".join(["?" for _ in req.filter.exclude_base_object_classes])
+                conds.append(f"base_object_class NOT IN ({placeholders})")
+                parameters["exclude_base_object_classes"] = req.filter.exclude_base_object_classes
             if req.filter.leaf_object_classes:
                 placeholders = ",".join(["?" for _ in req.filter.leaf_object_classes])
                 conds.append(f"leaf_object_class IN ({placeholders})")
