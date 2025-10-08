@@ -388,6 +388,7 @@ class WeaveClient:
                     digest=ref.digest,
                 )
             )
+            print(read_res)
         except HTTPError as e:
             if e.response is not None:
                 if e.response.content:
