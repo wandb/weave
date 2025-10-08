@@ -283,6 +283,18 @@ class PredictAndScoreCallMetadata {
   }
 }
 
+/**
+ * Incremental aggregates for summary calculation.
+ * Instead of storing all predictions, we maintain running aggregates
+ * to compute mean/true_fraction incrementally in O(1) memory.
+ */
+interface ScoreAggregate {
+  count: number;
+  sum?: number; // For numeric scores
+  trueCount?: number; // For boolean scores
+  type: 'number' | 'boolean' | 'mixed';
+}
+
 // ============================================================================
 // ScoreLogger
 // ============================================================================
@@ -300,9 +312,14 @@ class PredictAndScoreCallMetadata {
 export class ScoreLogger {
   private predMeta: PredictAndScoreCallMetadata;
   private _scoringProcesses: Array<Promise<void>> = [];
+  private evalLogger: EvaluationLogger;
 
-  constructor(predMeta: PredictAndScoreCallMetadata) {
+  constructor(
+    predMeta: PredictAndScoreCallMetadata,
+    evalLogger: EvaluationLogger
+  ) {
     this.predMeta = predMeta;
+    this.evalLogger = evalLogger;
   }
 
   /**
@@ -388,7 +405,7 @@ export class ScoreLogger {
   /**
    * Finish the scoring process for the prediction.
    * Finalizes the predict_and_score call with accumulated scores.
-   * Note: The predict call is finished by EvaluationLogger, not here.
+   * Updates incremental aggregates and frees memory.
    */
   async finish(): Promise<void> {
     if (this.predMeta.isFinished) {
@@ -416,6 +433,12 @@ export class ScoreLogger {
     );
 
     this.predMeta.isFinished = true;
+
+    // Update incremental aggregates for summary calculation
+    this.evalLogger.updateScoreAggregates(this.predMeta.scores);
+
+    // Remove from unfinished set to free memory
+    this.evalLogger.markPredictionFinished(this.predMeta);
   }
 }
 
@@ -467,7 +490,13 @@ export class EvaluationLogger {
   private evaluateCall?: InternalCall;
   private evaluateEntry?: CallStackEntry;
   private evaluateStartPromise?: Promise<any>;
-  private predictions: PredictAndScoreCallMetadata[] = [];
+
+  // Incremental summary aggregates (O(K) memory where K = # scorers)
+  private scoreAggregates: Map<string, ScoreAggregate> = new Map();
+
+  // Track unfinished predictions for warning (lightweight - only references)
+  private unfinishedPredictions: Set<PredictAndScoreCallMetadata> = new Set();
+
   private isFinalized: boolean = false;
 
   constructor(options: EvaluationLoggerOptions) {
@@ -564,7 +593,8 @@ export class EvaluationLogger {
           predictAndScoreStartPromise: Promise.resolve(),
           predictCallId: '',
           output,
-        })
+        }),
+        this
       );
     }
 
@@ -626,8 +656,10 @@ export class EvaluationLogger {
       output,
     });
 
-    this.predictions.push(predMeta);
-    return new ScoreLogger(predMeta);
+    // Track as unfinished for warning purposes
+    this.unfinishedPredictions.add(predMeta);
+
+    return new ScoreLogger(predMeta, this);
   }
 
   /**
@@ -647,7 +679,7 @@ export class EvaluationLogger {
     }
 
     // Warn if there are unfinished predictions
-    const unfinishedCount = this.predictions.filter(p => !p.isFinished).length;
+    const unfinishedCount = this.unfinishedPredictions.size;
     if (unfinishedCount > 0) {
       console.warn(
         `logSummary() called with ${unfinishedCount} unfinished prediction(s). ` +
@@ -698,42 +730,74 @@ export class EvaluationLogger {
   }
 
   /**
-   * Generate auto-summary from logged predictions.
+   * Update incremental aggregates when a prediction is finished.
+   * Called by ScoreLogger.finish() to maintain O(1) memory usage.
+   * @internal
+   */
+  updateScoreAggregates(scores: Record<string, any>): void {
+    for (const [scoreName, score] of Object.entries(scores)) {
+      if (score == null) continue;
+
+      let agg = this.scoreAggregates.get(scoreName);
+
+      if (!agg) {
+        // Initialize aggregate based on first value type
+        const type =
+          typeof score === 'number'
+            ? 'number'
+            : typeof score === 'boolean'
+              ? 'boolean'
+              : 'mixed';
+        agg = {count: 0, type};
+        if (type === 'number') agg.sum = 0;
+        if (type === 'boolean') agg.trueCount = 0;
+        this.scoreAggregates.set(scoreName, agg);
+      }
+
+      // Update aggregate
+      agg.count++;
+      if (agg.type === 'number' && typeof score === 'number') {
+        agg.sum! += score;
+      } else if (agg.type === 'boolean' && typeof score === 'boolean') {
+        if (score) agg.trueCount!++;
+      } else if (typeof score !== agg.type) {
+        // Mixed types - can't aggregate
+        agg.type = 'mixed';
+      }
+    }
+  }
+
+  /**
+   * Mark a prediction as finished.
+   * Removes from unfinished set to free memory.
+   * @internal
+   */
+  markPredictionFinished(predMeta: PredictAndScoreCallMetadata): void {
+    this.unfinishedPredictions.delete(predMeta);
+  }
+
+  /**
+   * Generate auto-summary from incremental aggregates.
    * Calculates mean for numeric scores, true_fraction for boolean scores.
+   * Runs in O(K) time where K = number of unique scorers.
    */
   private generateAutoSummary(): Record<string, any> {
     const summary: Record<string, any> = {};
 
-    // Collect all score names
-    const scoreNames = new Set<string>();
-    for (const pred of this.predictions) {
-      for (const scoreName of Object.keys(pred.scores)) {
-        scoreNames.add(scoreName);
-      }
-    }
+    for (const [scoreName, agg] of this.scoreAggregates) {
+      if (agg.count === 0) continue;
 
-    // Calculate summary for each score
-    for (const scoreName of scoreNames) {
-      const values = this.predictions
-        .map(pred => pred.scores[scoreName])
-        .filter(v => v != null);
-
-      if (values.length === 0) {
-        continue;
-      }
-
-      if (values.every(v => typeof v === 'boolean')) {
-        const trueCount = values.filter(v => v).length;
+      if (agg.type === 'number') {
         summary[scoreName] = {
-          true_count: trueCount,
-          true_fraction: trueCount / values.length,
+          mean: agg.sum! / agg.count,
         };
-      } else if (values.every(v => typeof v === 'number')) {
-        const sum = values.reduce((acc, v) => acc + v, 0);
+      } else if (agg.type === 'boolean') {
         summary[scoreName] = {
-          mean: sum / values.length,
+          true_count: agg.trueCount!,
+          true_fraction: agg.trueCount! / agg.count,
         };
       }
+      // Skip 'mixed' type - can't compute meaningful aggregate
     }
 
     return summary;
