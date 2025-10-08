@@ -3159,34 +3159,16 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             digests=list({row.digest for row in metadata_result}),
         )
 
-        # Retry the val_dump query to handle race conditions where values may not be immediately available
-        expected_count = len(metadata_result)
-
-        @retry(
-            stop=stop_after_attempt(10),
-            wait=wait_exponential(multiplier=1, min=0.05, max=1.0),
-            retry=retry_if_result(lambda result: len(result) < expected_count),
-            reraise=True,
-        )
-        def query_values() -> dict[tuple[str, str], Any]:
-            query_result = self._query_stream(value_query, value_parameters)
-            # Map (object_id, digest) to val_dump
-            values = {}
-            for row in query_result:
-                (object_id, digest, val_dump) = row
-                values[object_id, digest] = val_dump
-            return values
-
-        object_values = query_values()
+        query_result = self._query_stream(value_query, value_parameters)
+        # Map (object_id, digest) to val_dump
+        object_values: dict[tuple[str, str], Any] = {}
+        for row in query_result:
+            (object_id, digest, val_dump) = row
+            object_values[object_id, digest] = val_dump
 
         # update the val_dump for each object
         for obj in metadata_result:
-            key = (obj.object_id, obj.digest)
-            if key not in object_values:
-                raise NotFoundError(
-                    f"Object {obj.object_id}:{obj.digest} val_dump not found in value query"
-                )
-            obj.val_dump = object_values[key]
+            obj.val_dump = object_values.get((obj.object_id, obj.digest), "{}")
         return metadata_result
 
     def _run_migrations(self) -> None:

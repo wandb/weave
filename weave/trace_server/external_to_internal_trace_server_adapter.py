@@ -464,9 +464,7 @@ class ExternalTraceServer(tsi.TraceServerInterface):
     def op_get(self, req: tsi.OpReadV2Req) -> tsi.OpReadV2Res:
         original_project_id = req.project_id
         req.project_id = self._idc.ext_to_int_project_id(original_project_id)
-        res = self._ref_apply(self._internal_trace_server.op_read_v2, req)
-        # Note: OpGetRes fields don't include project_id, so no need to convert back
-        return res
+        return self._ref_apply(self._internal_trace_server.op_read_v2, req)
 
     def op_list(self, req: tsi.OpListReq) -> Iterator[tsi.OpItemMetadata]:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
