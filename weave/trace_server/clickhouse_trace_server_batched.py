@@ -521,8 +521,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # - Use performance metrics to choose dynamically
         # - Fall back to calls_merged for certain edge cases
 
-        # return "calls_complete"
-        return "calls_merged"
+        return "calls_complete"
+        # return "calls_merged"
 
     def _get_refs_to_resolve(
         self, calls: list[dict[str, Any]], expand_columns: list[str]
@@ -2662,7 +2662,21 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 },
             )
         ).calls
+        print(f"[_get_call_end_ids] one_day_ago_ms: {one_day_ago_ms}, calls: {[call.id for call in calls]}")
         return {call.id for call in calls}
+
+    def _ensure_proper_defaults(self, merged_row: list[Any]) -> None:
+        """Ensure proper default values for fields that can't be None."""
+        # Array fields should be empty arrays, not None
+        if "input_refs" in ALL_CALL_INSERT_COLUMNS:
+            input_refs_idx = ALL_CALL_INSERT_COLUMNS.index("input_refs")
+            if merged_row[input_refs_idx] is None:
+                merged_row[input_refs_idx] = []
+
+        if "output_refs" in ALL_CALL_INSERT_COLUMNS:
+            output_refs_idx = ALL_CALL_INSERT_COLUMNS.index("output_refs")
+            if merged_row[output_refs_idx] is None:
+                merged_row[output_refs_idx] = []
 
     def _merge_call_start_and_end(
         self, start_row: list[Any], end_row: list[Any]
@@ -2678,7 +2692,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             Merged row with ALL_CALL_INSERT_COLUMNS structure
         """
         call_indices = get_call_row_indices()
-        start_indices = get_call_start_row_indices()
 
         # Create a merged row with the full ALL_CALL_INSERT_COLUMNS structure
         merged = [None] * len(ALL_CALL_INSERT_COLUMNS)
@@ -2686,14 +2699,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # Determine if start_row has CALL_STARTS_INSERT_COLUMNS or ALL_CALL_INSERT_COLUMNS structure
         if len(start_row) == len(CALL_STARTS_INSERT_COLUMNS):
             # start_row has CALL_STARTS_INSERT_COLUMNS structure
-            merged[call_indices.id] = start_row[start_indices.id]
-            merged[call_indices.project_id] = start_row[start_indices.project_id]
-            merged[call_indices.started_at] = start_row[start_indices.started_at]
-            merged[call_indices.attributes_dump] = start_row[
-                start_indices.attributes_dump
-            ]
-            merged[call_indices.inputs_dump] = start_row[start_indices.inputs_dump]
-            merged[call_indices.output_refs] = start_row[start_indices.output_refs]
+            # Copy all fields that exist in both start_row and merged row
+            for i, col_name in enumerate(CALL_STARTS_INSERT_COLUMNS):
+                if col_name in ALL_CALL_INSERT_COLUMNS:
+                    col_index = ALL_CALL_INSERT_COLUMNS.index(col_name)
+                    merged[col_index] = start_row[i]
+
+            # Handle output_refs specially since it's not in CALL_STARTS_INSERT_COLUMNS
+            merged[call_indices.output_refs] = []
         else:
             # start_row has ALL_CALL_INSERT_COLUMNS structure (same as end_row)
             merged = start_row.copy()
@@ -2704,6 +2717,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         merged[call_indices.summary_dump] = end_row[call_indices.summary_dump]
         merged[call_indices.output_dump] = end_row[call_indices.output_dump]
         merged[call_indices.wb_run_step_end] = end_row[call_indices.wb_run_step_end]
+
+        # Ensure proper default values for fields that can't be None
+        self._ensure_proper_defaults(merged)
 
         return merged
 
@@ -2793,10 +2809,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             self._flush_calls_complete()
         except InsertTooLarge:
             logger.info("Retrying with large objects stripped.")
-            batch = self._strip_large_values(self._call_batch)
-            # Insert rows one at a time after stripping large values
-            for row in batch:
-                self._insert_call_batch([row])
+            self._call_batch = self._strip_large_values(self._call_batch)
+            self._flush_calls_complete()
 
         self._call_batch = []
 

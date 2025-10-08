@@ -153,9 +153,9 @@ class ExternalTraceServer(tsi.TraceServerInterface):
             if call.project_id != req.project_id:
                 raise ValueError("Internal Error - Project Mismatch")
             call.project_id = original_project_id
-            if call.wb_run_id is not None:
+            if call.wb_run_id:
                 call.wb_run_id = self._idc.int_to_ext_run_id(call.wb_run_id)
-            if call.wb_user_id is not None:
+            if call.wb_user_id:
                 call.wb_user_id = self._idc.int_to_ext_user_id(call.wb_user_id)
         return res
 
@@ -182,9 +182,9 @@ class ExternalTraceServer(tsi.TraceServerInterface):
             if call.project_id != req.project_id:
                 raise ValueError("Internal Error - Project Mismatch")
             call.project_id = original_project_id
-            if call.wb_run_id is not None:
+            if call.wb_run_id:
                 call.wb_run_id = self._idc.int_to_ext_run_id(call.wb_run_id)
-            if call.wb_user_id is not None:
+            if call.wb_user_id:
                 call.wb_user_id = self._idc.int_to_ext_user_id(call.wb_user_id)
             yield call
 

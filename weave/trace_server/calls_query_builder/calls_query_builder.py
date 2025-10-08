@@ -1347,11 +1347,11 @@ class CallsQuery(BaseModel):
         pb: ParamBuilder,
         table_alias: str,
     ) -> str:
-        """Generate SQL that queries both calls_complete and call_parts tables.
+        """Generate SQL that queries both calls_complete and call_starts tables.
 
         This approach:
         1. Queries calls_complete for finished calls
-        2. Queries call_parts for in-progress calls (start events only)
+        2. Queries call_starts for in-progress calls (start events only)
         3. Unions the results and sorts by started_at
         4. Applies artificial 24-hour filter to prevent long-running calls
         """
@@ -1371,12 +1371,12 @@ class CallsQuery(BaseModel):
             for field in self.select_fields
         )
 
-        # Build SELECT fields for call_parts table (use calls_merged field definitions)
-        parts_alias = "cp"
-        # For call_parts, we need to use the calls_merged field definitions since call_parts
-        # has the same structure as calls_merged (before aggregation)
+        # Build SELECT fields for call_starts table (use calls_complete field definitions)
+        parts_alias = "cs"
+        # For call_starts, we need to use the calls_complete field definitions since call_starts
+        # has the same structure as calls_complete (but without ended_at, output_dump, etc.)
         parts_fields_sql = ", ".join(
-            self._get_call_parts_field_sql(field, pb, parts_alias)
+            self._get_call_starts_field_sql(field, pb, parts_alias)
             for field in self.select_fields
         )
 
@@ -1391,17 +1391,22 @@ class CallsQuery(BaseModel):
             pb,
             complete_alias,
         )
-        parts_op_name_sql = process_op_name_filter_to_sql(
+        complete_trace_roots_only_sql = process_trace_roots_only_filter_to_sql(
+            self.hardcoded_filter,
+            pb,
+            complete_alias,
+        )
+        starts_op_name_sql = process_op_name_filter_to_sql(
             self.hardcoded_filter,
             pb,
             parts_alias,
         )
-        parts_trace_id_sql = process_trace_id_filter_to_sql(
+        starts_trace_id_sql = process_trace_id_filter_to_sql(
             self.hardcoded_filter,
             pb,
             parts_alias,
         )
-        parts_trace_roots_only_sql = process_trace_roots_only_filter_to_sql(
+        starts_trace_roots_only_sql = process_trace_roots_only_filter_to_sql(
             self.hardcoded_filter,
             pb,
             parts_alias,
@@ -1463,15 +1468,15 @@ class CallsQuery(BaseModel):
                     complete_where_conditions, "AND"
                 )
 
-        # Build conditions for call_parts table
-        parts_conditions_sql = ""
+        # Build conditions for call_starts table
+        starts_conditions_sql = ""
         if len(self.query_conditions) > 0 or self.hardcoded_filter is not None:
-            parts_where_conditions = []
+            starts_where_conditions = []
 
-            # Process query conditions for call_parts table
+            # Process query conditions for call_starts table
             if len(self.query_conditions) > 0:
                 for query_condition in self.query_conditions:
-                    # For call_parts, use calls_merged table name since it has same structure
+                    # For call_starts, use call_starts table name since it has different structure
                     conditions = process_query_to_conditions(
                         tsi_query.Query.model_validate(
                             {"$expr": {"$and": [query_condition.operand]}}
@@ -1479,21 +1484,21 @@ class CallsQuery(BaseModel):
                         pb,
                         parts_alias,
                         use_agg_fn=False,
-                        table_name="calls_merged",  # call_parts has same structure as calls_merged
+                        table_name="call_starts",  # call_starts has different structure than calls_complete
                     )
-                    parts_where_conditions.extend(conditions.conditions)
+                    starts_where_conditions.extend(conditions.conditions)
 
-            # Process hardcoded filter for call_parts table
+            # Process hardcoded filter for call_starts table
             if self.hardcoded_filter is not None:
                 hardcoded_sql = self.hardcoded_filter.as_sql(
-                    pb, parts_alias, "calls_merged"
+                    pb, parts_alias, "call_starts"
                 )
                 if hardcoded_sql.strip():  # Only add if not empty/whitespace
-                    parts_where_conditions.append(hardcoded_sql)
+                    starts_where_conditions.append(hardcoded_sql)
 
-            if parts_where_conditions:
-                parts_conditions_sql = "AND " + combine_conditions(
-                    parts_where_conditions, "AND"
+            if starts_where_conditions:
+                starts_conditions_sql = "AND " + combine_conditions(
+                    starts_where_conditions, "AND"
                 )
 
         # Determine if we should include in-progress calls
@@ -1508,6 +1513,7 @@ class CallsQuery(BaseModel):
                 WHERE {complete_alias}.project_id = {param_slot(project_param, "String")}
                   {complete_op_name_sql}
                   {complete_trace_id_sql}
+                  {complete_trace_roots_only_sql}
                   {complete_conditions_sql}
                 {order_by_sql}
                 {limit_sql}
@@ -1518,10 +1524,10 @@ class CallsQuery(BaseModel):
                 WHERE {parts_alias}.project_id = {param_slot(project_param, "String")}
                   AND {parts_alias}.started_at > {param_slot(twenty_four_hours_ago_param, "Float64")}
                   AND {parts_alias}.id NOT IN (SELECT id FROM completed)
-                  {parts_op_name_sql}
-                  {parts_trace_id_sql}
-                  {parts_trace_roots_only_sql}
-                  {parts_conditions_sql}
+                  {starts_op_name_sql}
+                  {starts_trace_id_sql}
+                  {starts_trace_roots_only_sql}
+                  {starts_conditions_sql}
                 {order_by_sql}
                 {limit_sql}
             )
@@ -1551,15 +1557,15 @@ class CallsQuery(BaseModel):
 
         return safely_format_sql(raw_sql, logger)
 
-    def _get_call_parts_field_sql(
+    def _get_call_starts_field_sql(
         self,
         field: CallsMergedField,
         pb: ParamBuilder,
         table_alias: str,
     ) -> str:
-        """Generate SQL for a field when querying the call_parts table.
+        """Generate SQL for a field when querying the call_starts table.
 
-        call_parts has the same structure as calls_merged but without aggregation.
+        call_starts has the same structure as calls_complete but without ended_at, output_dump, etc.
         Some fields may be NULL for in-progress calls (start events).
         """
         # Fields that don't exist in call_starts table (only in calls_complete)
@@ -1572,7 +1578,7 @@ class CallsQuery(BaseModel):
             "output_refs": "CAST([] AS Array(String))",  # Array fields need empty array, not NULL
         }
 
-        # Convert calls_complete field to equivalent call_parts field
+        # Convert calls_complete field to equivalent call_starts field
         # Check specific types first before checking general CallsCompleteField
         if isinstance(
             field,
@@ -1581,7 +1587,7 @@ class CallsQuery(BaseModel):
                 CompleteTableAggregatedDataSizeField,
             ),
         ):
-            # These fields reference other tables via JOINs - for call_parts,
+            # These fields reference other tables via JOINs - for call_starts,
             # we'll return NULL since these JOINs won't be available
             return f"NULL AS {field.field}"
 
@@ -1677,6 +1683,23 @@ class CallsQuery(BaseModel):
 
         where_conditions_sql: list[str] = []
 
+        # Process manual filters for op_name and trace_id (same as in mixed table logic)
+        op_name_sql = process_op_name_filter_to_sql(
+            self.hardcoded_filter,
+            pb,
+            table_alias,
+        )
+        trace_id_sql = process_trace_id_filter_to_sql(
+            self.hardcoded_filter,
+            pb,
+            table_alias,
+        )
+        trace_roots_only_sql = process_trace_roots_only_filter_to_sql(
+            self.hardcoded_filter,
+            pb,
+            table_alias,
+        )
+
         # Process query conditions - create a custom process for complete table
         if len(self.query_conditions) > 0:
             for query_condition in self.query_conditions:
@@ -1704,6 +1727,26 @@ class CallsQuery(BaseModel):
         base_conditions = [
             f"{table_alias}.project_id = {param_slot(project_param, 'String')}",
         ]
+
+        # Add op_name, trace_id, and trace_roots_only filters
+        if op_name_sql.strip():
+            # Strip leading " AND " since we'll add it when combining conditions
+            op_name_condition = op_name_sql.strip()
+            if op_name_condition.startswith("AND "):
+                op_name_condition = op_name_condition[4:]
+            base_conditions.append(op_name_condition)
+        if trace_id_sql.strip():
+            # Strip leading " AND " since we'll add it when combining conditions
+            trace_id_condition = trace_id_sql.strip()
+            if trace_id_condition.startswith("AND "):
+                trace_id_condition = trace_id_condition[4:]
+            base_conditions.append(trace_id_condition)
+        if trace_roots_only_sql.strip():
+            # Strip leading " AND " since we'll add it when combining conditions
+            trace_roots_condition = trace_roots_only_sql.strip()
+            if trace_roots_condition.startswith("AND "):
+                trace_roots_condition = trace_roots_condition[4:]
+            base_conditions.append(trace_roots_condition)
 
         if where_conditions_sql:
             base_conditions.extend(where_conditions_sql)
@@ -2102,10 +2145,13 @@ def process_op_name_filter_to_sql(
     wildcarded_names: list[str] = []
 
     op_field = get_field_by_name("op_name")
-    if not isinstance(op_field, CallsMergedAggField):
-        raise TypeError("op_name is not an aggregate field")
-
-    op_field_sql = op_field.as_sql(param_builder, table_alias, use_agg_fn=False)
+    # Handle both CallsMergedAggField and CallsCompleteField
+    if isinstance(op_field, CallsMergedAggField):
+        op_field_sql = op_field.as_sql(param_builder, table_alias, use_agg_fn=False)
+    elif isinstance(op_field, CallsCompleteField):
+        op_field_sql = op_field.as_sql(param_builder, table_alias)
+    else:
+        raise TypeError(f"op_name field type {type(op_field)} not supported")
     for name in op_names:
         if name.endswith(WILDCARD_ARTIFACT_VERSION_AND_PATH):
             wildcarded_names.append(name)
@@ -2146,11 +2192,15 @@ def process_trace_id_filter_to_sql(
     assert_parameter_length_less_than_max("trace_ids", len(trace_ids))
 
     trace_id_field = get_field_by_name("trace_id")
-    if not isinstance(trace_id_field, CallsMergedAggField):
-        raise TypeError("trace_id is not an aggregate field")
-    trace_id_field_sql = trace_id_field.as_sql(
-        param_builder, table_alias, use_agg_fn=False
-    )
+    # Handle both CallsMergedAggField and CallsCompleteField
+    if isinstance(trace_id_field, CallsMergedAggField):
+        trace_id_field_sql = trace_id_field.as_sql(
+            param_builder, table_alias, use_agg_fn=False
+        )
+    elif isinstance(trace_id_field, CallsCompleteField):
+        trace_id_field_sql = trace_id_field.as_sql(param_builder, table_alias)
+    else:
+        raise TypeError(f"trace_id field type {type(trace_id_field)} not supported")
 
     # If there's only one trace_id, use an equality condition for performance
     if len(trace_ids) == 1:
@@ -2181,11 +2231,15 @@ def process_thread_id_filter_to_sql(
     assert_parameter_length_less_than_max("thread_ids", len(thread_ids))
 
     thread_id_field = get_field_by_name("thread_id")
-    if not isinstance(thread_id_field, CallsMergedAggField):
-        raise TypeError("thread_id is not an aggregate field")
-    thread_id_field_sql = thread_id_field.as_sql(
-        param_builder, table_alias, use_agg_fn=False
-    )
+    # Handle both CallsMergedAggField and CallsCompleteField
+    if isinstance(thread_id_field, CallsMergedAggField):
+        thread_id_field_sql = thread_id_field.as_sql(
+            param_builder, table_alias, use_agg_fn=False
+        )
+    elif isinstance(thread_id_field, CallsCompleteField):
+        thread_id_field_sql = thread_id_field.as_sql(param_builder, table_alias)
+    else:
+        raise TypeError(f"thread_id field type {type(thread_id_field)} not supported")
 
     # If there's only one thread_id, use an equality condition for performance
     if len(thread_ids) == 1:

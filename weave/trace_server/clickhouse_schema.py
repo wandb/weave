@@ -284,7 +284,7 @@ def get_call_start_row_indices() -> CallStartRowIndices:
         started_at=CALL_STARTS_INSERT_COLUMNS.index("started_at"),
         attributes_dump=CALL_STARTS_INSERT_COLUMNS.index("attributes_dump"),
         inputs_dump=CALL_STARTS_INSERT_COLUMNS.index("inputs_dump"),
-        output_refs=CALL_STARTS_INSERT_COLUMNS.index("output_refs"),
+        output_refs=-1,  # Call starts don't have output_refs, use -1 as sentinel value
     )
 
 
