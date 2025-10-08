@@ -1351,7 +1351,7 @@ class EvaluationCreateRes(BaseModel):
     )
 
 
-class EvaluationLogStartReq(BaseModel):
+class EvaluationRunStartReq(BaseModel):
     project_id: str = Field(..., description="Project ID (e.g., 'entity/project')")
     evaluation_ref: str = Field(
         ..., description="Reference to the evaluation object (weave:// URI)"
@@ -1361,11 +1361,11 @@ class EvaluationLogStartReq(BaseModel):
     )
 
 
-class EvaluationLogStartRes(BaseModel):
+class EvaluationRunStartRes(BaseModel):
     evaluate_call_id: str = Field(..., description="ID of the started evaluation call")
 
 
-class EvaluationLogPredictionReq(BaseModel):
+class EvaluationRunLogPredictionReq(BaseModel):
     project_id: str = Field(..., description="Project ID (e.g., 'entity/project')")
     evaluate_call_id: str = Field(..., description="ID of the parent evaluation call")
     model_ref: Optional[str] = Field(
@@ -1375,11 +1375,11 @@ class EvaluationLogPredictionReq(BaseModel):
     output: Any = Field(None, description="Output from the model prediction")
 
 
-class EvaluationLogPredictionRes(BaseModel):
+class EvaluationRunLogPredictionRes(BaseModel):
     predict_call_id: str = Field(..., description="ID of the prediction call")
 
 
-class EvaluationLogScoreReq(BaseModel):
+class EvaluationRunLogScoreReq(BaseModel):
     project_id: str = Field(..., description="Project ID (e.g., 'entity/project')")
     predict_call_id: str = Field(..., description="ID of the parent prediction call")
     scorer_ref: Optional[str] = Field(
@@ -1390,11 +1390,11 @@ class EvaluationLogScoreReq(BaseModel):
     )
 
 
-class EvaluationLogScoreRes(BaseModel):
+class EvaluationRunLogScoreRes(BaseModel):
     call_id: str = Field(..., description="ID of the score call")
 
 
-class EvaluationLogFinishReq(BaseModel):
+class EvaluationRunFinishReq(BaseModel):
     project_id: str = Field(..., description="Project ID (e.g., 'entity/project')")
     evaluate_call_id: str = Field(
         ..., description="ID of the evaluation call to finish"
@@ -1404,7 +1404,7 @@ class EvaluationLogFinishReq(BaseModel):
     )
 
 
-class EvaluationLogFinishRes(BaseModel):
+class EvaluationRunFinishRes(BaseModel):
     success: bool = Field(
         ..., description="Whether the evaluation was successfully finished"
     )
@@ -1705,18 +1705,18 @@ class TraceServerInterface(Protocol):
     def evaluation_delete(self, req: EvaluationDeleteReq) -> EvaluationDeleteRes: ...
 
     # Evaluation Logging API
-    def evaluation_log_start(
-        self, req: EvaluationLogStartReq
-    ) -> EvaluationLogStartRes: ...
-    def evaluation_log_prediction(
-        self, req: EvaluationLogPredictionReq
-    ) -> EvaluationLogPredictionRes: ...
-    def evaluation_log_score(
-        self, req: EvaluationLogScoreReq
-    ) -> EvaluationLogScoreRes: ...
-    def evaluation_log_finish(
-        self, req: EvaluationLogFinishReq
-    ) -> EvaluationLogFinishRes: ...
+    def evaluation_run_start(
+        self, req: EvaluationRunStartReq
+    ) -> EvaluationRunStartRes: ...
+    def evaluation_run_log_prediction(
+        self, req: EvaluationRunLogPredictionReq
+    ) -> EvaluationRunLogPredictionRes: ...
+    def evaluation_run_log_score(
+        self, req: EvaluationRunLogScoreReq
+    ) -> EvaluationRunLogScoreRes: ...
+    def evaluation_run_finish(
+        self, req: EvaluationRunFinishReq
+    ) -> EvaluationRunFinishRes: ...
 
     # Dataset API
     def dataset_create(self, req: DatasetCreateReq) -> DatasetCreateRes: ...

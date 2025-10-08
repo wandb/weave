@@ -1898,31 +1898,31 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         return tsi.EvaluationDeleteRes(num_deleted=result.num_deleted)
 
     def evaluation_log_start(
-        self, req: tsi.EvaluationLogStartReq
-    ) -> tsi.EvaluationLogStartRes:
+        self, req: tsi.EvaluationRunStartReq
+    ) -> tsi.EvaluationRunStartRes:
         """Start an evaluation run - create a trace for evaluation."""
         call_id = generate_id()
-        return tsi.EvaluationLogStartRes(evaluate_call_id=call_id)
+        return tsi.EvaluationRunStartRes(evaluate_call_id=call_id)
 
     def evaluation_log_prediction(
-        self, req: tsi.EvaluationLogPredictionReq
-    ) -> tsi.EvaluationLogPredictionRes:
+        self, req: tsi.EvaluationRunLogPredictionReq
+    ) -> tsi.EvaluationRunLogPredictionRes:
         """Log a prediction for an evaluation run."""
         call_id = generate_id()
-        return tsi.EvaluationLogPredictionRes(predict_call_id=call_id)
+        return tsi.EvaluationRunLogPredictionRes(predict_call_id=call_id)
 
     def evaluation_log_score(
-        self, req: tsi.EvaluationLogScoreReq
-    ) -> tsi.EvaluationLogScoreRes:
+        self, req: tsi.EvaluationRunLogScoreReq
+    ) -> tsi.EvaluationRunLogScoreRes:
         """Log a score for an evaluation run."""
         call_id = generate_id()
-        return tsi.EvaluationLogScoreRes(call_id=call_id)
+        return tsi.EvaluationRunLogScoreRes(call_id=call_id)
 
     def evaluation_log_finish(
-        self, req: tsi.EvaluationLogFinishReq
-    ) -> tsi.EvaluationLogFinishRes:
+        self, req: tsi.EvaluationRunFinishReq
+    ) -> tsi.EvaluationRunFinishRes:
         """Finish an evaluation run."""
-        return tsi.EvaluationLogFinishRes()
+        return tsi.EvaluationRunFinishRes()
 
     def dataset_create(self, req: tsi.DatasetCreateReq) -> tsi.DatasetCreateRes:
         """Create a dataset object by first creating a table for rows, then creating the dataset object.

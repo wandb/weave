@@ -7,7 +7,6 @@ from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, Field
 from pydantic.json_schema import SkipJsonSchema
-
 from weave.trace.env import weave_trace_server_url
 from weave.trace.settings import max_calls_queue_size, should_enable_disk_fallback
 from weave.trace_server import trace_server_interface as tsi
@@ -738,43 +737,43 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         )
 
     def evaluation_log_start(
-        self, req: Union[tsi.EvaluationLogStartReq, dict[str, Any]]
-    ) -> tsi.EvaluationLogStartRes:
+        self, req: Union[tsi.EvaluationRunStartReq, dict[str, Any]]
+    ) -> tsi.EvaluationRunStartRes:
         return self._generic_request(
             "/evaluation/log_start",
             req,
-            tsi.EvaluationLogStartReq,
-            tsi.EvaluationLogStartRes,
+            tsi.EvaluationRunStartReq,
+            tsi.EvaluationRunStartRes,
         )
 
     def evaluation_log_prediction(
-        self, req: Union[tsi.EvaluationLogPredictionReq, dict[str, Any]]
-    ) -> tsi.EvaluationLogPredictionRes:
+        self, req: Union[tsi.EvaluationRunLogPredictionReq, dict[str, Any]]
+    ) -> tsi.EvaluationRunLogPredictionRes:
         return self._generic_request(
             "/evaluation/log_prediction",
             req,
-            tsi.EvaluationLogPredictionReq,
-            tsi.EvaluationLogPredictionRes,
+            tsi.EvaluationRunLogPredictionReq,
+            tsi.EvaluationRunLogPredictionRes,
         )
 
     def evaluation_log_score(
-        self, req: Union[tsi.EvaluationLogScoreReq, dict[str, Any]]
-    ) -> tsi.EvaluationLogScoreRes:
+        self, req: Union[tsi.EvaluationRunLogScoreReq, dict[str, Any]]
+    ) -> tsi.EvaluationRunLogScoreRes:
         return self._generic_request(
             "/evaluation/log_score",
             req,
-            tsi.EvaluationLogScoreReq,
-            tsi.EvaluationLogScoreRes,
+            tsi.EvaluationRunLogScoreReq,
+            tsi.EvaluationRunLogScoreRes,
         )
 
     def evaluation_log_finish(
-        self, req: Union[tsi.EvaluationLogFinishReq, dict[str, Any]]
-    ) -> tsi.EvaluationLogFinishRes:
+        self, req: Union[tsi.EvaluationRunFinishReq, dict[str, Any]]
+    ) -> tsi.EvaluationRunFinishRes:
         return self._generic_request(
             "/evaluation/log_finish",
             req,
-            tsi.EvaluationLogFinishReq,
-            tsi.EvaluationLogFinishRes,
+            tsi.EvaluationRunFinishReq,
+            tsi.EvaluationRunFinishRes,
         )
 
     def dataset_create(

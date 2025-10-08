@@ -499,30 +499,32 @@ class ExternalTraceServer(tsi.TraceServerInterface):
         return self._ref_apply(self._internal_trace_server.evaluation_delete, req)
 
     def evaluation_log_start(
-        self, req: tsi.EvaluationLogStartReq
-    ) -> tsi.EvaluationLogStartRes:
+        self, req: tsi.EvaluationRunStartReq
+    ) -> tsi.EvaluationRunStartRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(self._internal_trace_server.evaluation_log_start, req)
+        return self._ref_apply(self._internal_trace_server.evaluation_run_start, req)
 
     def evaluation_log_prediction(
-        self, req: tsi.EvaluationLogPredictionReq
-    ) -> tsi.EvaluationLogPredictionRes:
+        self, req: tsi.EvaluationRunLogPredictionReq
+    ) -> tsi.EvaluationRunLogPredictionRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(
-            self._internal_trace_server.evaluation_log_prediction, req
+            self._internal_trace_server.evaluation_run_log_prediction, req
         )
 
     def evaluation_log_score(
-        self, req: tsi.EvaluationLogScoreReq
-    ) -> tsi.EvaluationLogScoreRes:
+        self, req: tsi.EvaluationRunLogScoreReq
+    ) -> tsi.EvaluationRunLogScoreRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(self._internal_trace_server.evaluation_log_score, req)
+        return self._ref_apply(
+            self._internal_trace_server.evaluation_run_log_score, req
+        )
 
     def evaluation_log_finish(
-        self, req: tsi.EvaluationLogFinishReq
-    ) -> tsi.EvaluationLogFinishRes:
+        self, req: tsi.EvaluationRunFinishReq
+    ) -> tsi.EvaluationRunFinishRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(self._internal_trace_server.evaluation_log_finish, req)
+        return self._ref_apply(self._internal_trace_server.evaluation_run_finish, req)
 
     def dataset_create(self, req: tsi.DatasetCreateReq) -> tsi.DatasetCreateRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)

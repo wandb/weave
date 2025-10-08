@@ -570,35 +570,35 @@ def generate_routes(
 
     @router.post("/evaluation/log_start", tags=[EVALUATION_TAG_NAME])
     def evaluation_log_start(
-        req: tsi.EvaluationLogStartReq,
+        req: tsi.EvaluationRunStartReq,
         service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
-    ) -> tsi.EvaluationLogStartRes:
+    ) -> tsi.EvaluationRunStartRes:
         """Start an evaluation run."""
-        return service.trace_server_interface.evaluation_log_start(req)
+        return service.trace_server_interface.evaluation_run_start(req)
 
     @router.post("/evaluation/log_prediction", tags=[EVALUATION_TAG_NAME])
     def evaluation_log_prediction(
-        req: tsi.EvaluationLogPredictionReq,
+        req: tsi.EvaluationRunLogPredictionReq,
         service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
-    ) -> tsi.EvaluationLogPredictionRes:
+    ) -> tsi.EvaluationRunLogPredictionRes:
         """Log a prediction for an evaluation run."""
-        return service.trace_server_interface.evaluation_log_prediction(req)
+        return service.trace_server_interface.evaluation_run_log_prediction(req)
 
     @router.post("/evaluation/log_score", tags=[EVALUATION_TAG_NAME])
     def evaluation_log_score(
-        req: tsi.EvaluationLogScoreReq,
+        req: tsi.EvaluationRunLogScoreReq,
         service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
-    ) -> tsi.EvaluationLogScoreRes:
+    ) -> tsi.EvaluationRunLogScoreRes:
         """Log a score for an evaluation run."""
-        return service.trace_server_interface.evaluation_log_score(req)
+        return service.trace_server_interface.evaluation_run_log_score(req)
 
     @router.post("/evaluation/log_finish", tags=[EVALUATION_TAG_NAME])
     def evaluation_log_finish(
-        req: tsi.EvaluationLogFinishReq,
+        req: tsi.EvaluationRunFinishReq,
         service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
-    ) -> tsi.EvaluationLogFinishRes:
+    ) -> tsi.EvaluationRunFinishRes:
         """Finish an evaluation run."""
-        return service.trace_server_interface.evaluation_log_finish(req)
+        return service.trace_server_interface.evaluation_run_finish(req)
 
     @router.get("/evaluation/get", tags=[EVALUATION_TAG_NAME])
     def evaluation_get(

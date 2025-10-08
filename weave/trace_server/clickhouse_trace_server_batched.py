@@ -1244,8 +1244,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.EvaluationDeleteRes(num_deleted=result.num_deleted)
 
     def evaluation_log_start(
-        self, req: tsi.EvaluationLogStartReq
-    ) -> tsi.EvaluationLogStartRes:
+        self, req: tsi.EvaluationRunStartReq
+    ) -> tsi.EvaluationRunStartRes:
         """Start an evaluation run - create a trace for evaluation."""
         call_id = generate_id()
         trace_id = generate_id()
@@ -1277,11 +1277,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # Flush calls immediately to ensure they're available for subsequent operations
         self._flush_calls()
 
-        return tsi.EvaluationLogStartRes(evaluate_call_id=call_start_res.id)
+        return tsi.EvaluationRunStartRes(evaluate_call_id=call_start_res.id)
 
     def evaluation_log_prediction(
-        self, req: tsi.EvaluationLogPredictionReq
-    ) -> tsi.EvaluationLogPredictionRes:
+        self, req: tsi.EvaluationRunLogPredictionReq
+    ) -> tsi.EvaluationRunLogPredictionRes:
         """Log a prediction for an evaluation run."""
         call_id = generate_id()
 
@@ -1322,11 +1322,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # Flush calls immediately to ensure they're available for subsequent operations
         self._flush_calls()
 
-        return tsi.EvaluationLogPredictionRes(predict_call_id=call_start_res.id)
+        return tsi.EvaluationRunLogPredictionRes(predict_call_id=call_start_res.id)
 
     def evaluation_log_score(
-        self, req: tsi.EvaluationLogScoreReq
-    ) -> tsi.EvaluationLogScoreRes:
+        self, req: tsi.EvaluationRunLogScoreReq
+    ) -> tsi.EvaluationRunLogScoreRes:
         """Log a score for an evaluation run."""
         call_id = generate_id()
 
@@ -1369,11 +1369,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # Flush calls immediately to ensure they're available for subsequent operations
         self._flush_calls()
 
-        return tsi.EvaluationLogScoreRes(call_id=call_start_res.id)
+        return tsi.EvaluationRunLogScoreRes(call_id=call_start_res.id)
 
     def evaluation_log_finish(
-        self, req: tsi.EvaluationLogFinishReq
-    ) -> tsi.EvaluationLogFinishRes:
+        self, req: tsi.EvaluationRunFinishReq
+    ) -> tsi.EvaluationRunFinishRes:
         """Finish an evaluation run."""
         # End the evaluation call with summary
         call_end_req = tsi.CallEndReq(
@@ -1392,7 +1392,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # Flush calls immediately to ensure they're persisted
         self._flush_calls()
 
-        return tsi.EvaluationLogFinishRes(success=True)
+        return tsi.EvaluationRunFinishRes(success=True)
 
     # Dataset API
     def dataset_create(self, req: tsi.DatasetCreateReq) -> tsi.DatasetCreateRes:
