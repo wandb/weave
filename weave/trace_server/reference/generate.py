@@ -367,8 +367,8 @@ def generate_routes(
     # ) -> tsi.OpQueryRes:
     #     return server.ops_query(req)
 
-    @router.get("/op/get", tags=[OPS_TAG_NAME])
-    def op_get(
+    @router.get("/op/read", tags=[OPS_TAG_NAME])
+    def op_read_v2(
         project_id: str,
         object_id: str,
         digest: str,
@@ -600,8 +600,8 @@ def generate_routes(
         """Finish an evaluation run."""
         return service.trace_server_interface.evaluation_run_finish(req)
 
-    @router.get("/evaluation/get", tags=[EVALUATION_TAG_NAME])
-    def evaluation_get(
+    @router.get("/evaluation/read", tags=[EVALUATION_TAG_NAME])
+    def evaluation_read(
         project_id: str,
         object_id: str,
         digest: str,
@@ -660,8 +660,8 @@ def generate_routes(
         """Create a dataset object."""
         return service.trace_server_interface.dataset_create(req)
 
-    @router.get("/dataset/get", tags=[DATASET_TAG_NAME])
-    def dataset_get(
+    @router.get("/dataset/read", tags=[DATASET_TAG_NAME])
+    def dataset_read(
         project_id: str,
         object_id: str,
         digest: str,
@@ -720,8 +720,8 @@ def generate_routes(
         """Create a scorer object."""
         return service.trace_server_interface.scorer_create(req)
 
-    @router.get("/scorer/get", tags=[SCORER_TAG_NAME])
-    def scorer_get(
+    @router.get("/scorer/read", tags=[SCORER_TAG_NAME])
+    def scorer_read(
         project_id: str,
         object_id: str,
         digest: str,
