@@ -25,7 +25,7 @@ THREADS_TAG_NAME = "Threads"
 EVALUATION_TAG_NAME = "Evaluation"
 DATASET_TAG_NAME = "Datasets"
 SCORER_TAG_NAME = "Scorers"
-EVALUATION_LOGGING_TAG_NAME = "Evaluation Logging"
+EVALUATION_RUN_TAG_NAME = "Evaluation Runs"
 OPS_V2_TAG_NAME = "Ops v2"
 
 
@@ -570,32 +570,32 @@ def generate_routes(
         """Create an evaluation object."""
         return service.trace_server_interface.evaluation_create(req)
 
-    @router.post("/evaluation/log_start", tags=[EVALUATION_LOGGING_TAG_NAME])
-    def evaluation_log_start(
+    @router.post("/evaluation/run/start", tags=[EVALUATION_RUN_TAG_NAME])
+    def evaluation_run_start(
         req: tsi.EvaluationRunStartReq,
         service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
     ) -> tsi.EvaluationRunStartRes:
         """Start an evaluation run."""
         return service.trace_server_interface.evaluation_run_start(req)
 
-    @router.post("/evaluation/log_prediction", tags=[EVALUATION_LOGGING_TAG_NAME])
-    def evaluation_log_prediction(
+    @router.post("/evaluation/run/log_prediction", tags=[EVALUATION_RUN_TAG_NAME])
+    def evaluation_run_log_prediction(
         req: tsi.EvaluationRunLogPredictionReq,
         service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
     ) -> tsi.EvaluationRunLogPredictionRes:
         """Log a prediction for an evaluation run."""
         return service.trace_server_interface.evaluation_run_log_prediction(req)
 
-    @router.post("/evaluation/log_score", tags=[EVALUATION_LOGGING_TAG_NAME])
-    def evaluation_log_score(
+    @router.post("/evaluation/run/log_score", tags=[EVALUATION_RUN_TAG_NAME])
+    def evaluation_run_log_score(
         req: tsi.EvaluationRunLogScoreReq,
         service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
     ) -> tsi.EvaluationRunLogScoreRes:
         """Log a score for an evaluation run."""
         return service.trace_server_interface.evaluation_run_log_score(req)
 
-    @router.post("/evaluation/log_finish", tags=[EVALUATION_LOGGING_TAG_NAME])
-    def evaluation_log_finish(
+    @router.post("/evaluation/run/finish", tags=[EVALUATION_RUN_TAG_NAME])
+    def evaluation_run_finish(
         req: tsi.EvaluationRunFinishReq,
         service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
     ) -> tsi.EvaluationRunFinishRes:
