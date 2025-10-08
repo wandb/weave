@@ -3158,7 +3158,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             object_ids=list({row.object_id for row in metadata_result}),
             digests=list({row.digest for row in metadata_result}),
         )
-
         query_result = self._query_stream(value_query, value_parameters)
         # Map (object_id, digest) to val_dump
         object_values: dict[tuple[str, str], Any] = {}
