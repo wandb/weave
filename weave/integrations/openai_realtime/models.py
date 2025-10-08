@@ -16,7 +16,7 @@ Note that this file defines types for the OpenAI beta API and does not support t
 
 Modifications for ease of development were made to:
     1. Specify when IDs are definitely present or not instead of making them optional
-    2. Seperating what was originally the same class when it has or lacks fields depending on the source (client or server)
+    2. Separating what was originally the same class when it has or lacks fields depending on the source (client or server)
 
 
 Ideally we would move to the types in the openai sdk
