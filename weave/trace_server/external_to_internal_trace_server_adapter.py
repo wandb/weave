@@ -502,6 +502,12 @@ class ExternalTraceServer(tsi.TraceServerInterface):
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(self._internal_trace_server.evaluation_run_start, req)
 
+    def evaluation_run_start(
+        self, req: tsi.EvaluationRunStartReq
+    ) -> tsi.EvaluationRunStartRes:
+        """Alias for evaluation_log_start to match endpoint naming."""
+        return self.evaluation_log_start(req)
+
     def evaluation_log_prediction(
         self, req: tsi.EvaluationRunLogPredictionReq
     ) -> tsi.EvaluationRunLogPredictionRes:
@@ -509,6 +515,12 @@ class ExternalTraceServer(tsi.TraceServerInterface):
         return self._ref_apply(
             self._internal_trace_server.evaluation_run_log_prediction, req
         )
+
+    def evaluation_run_log_prediction(
+        self, req: tsi.EvaluationRunLogPredictionReq
+    ) -> tsi.EvaluationRunLogPredictionRes:
+        """Alias for evaluation_log_prediction to match endpoint naming."""
+        return self.evaluation_log_prediction(req)
 
     def evaluation_log_score(
         self, req: tsi.EvaluationRunLogScoreReq
@@ -518,11 +530,23 @@ class ExternalTraceServer(tsi.TraceServerInterface):
             self._internal_trace_server.evaluation_run_log_score, req
         )
 
+    def evaluation_run_log_score(
+        self, req: tsi.EvaluationRunLogScoreReq
+    ) -> tsi.EvaluationRunLogScoreRes:
+        """Alias for evaluation_log_score to match endpoint naming."""
+        return self.evaluation_log_score(req)
+
     def evaluation_log_finish(
         self, req: tsi.EvaluationRunFinishReq
     ) -> tsi.EvaluationRunFinishRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(self._internal_trace_server.evaluation_run_finish, req)
+
+    def evaluation_run_finish(
+        self, req: tsi.EvaluationRunFinishReq
+    ) -> tsi.EvaluationRunFinishRes:
+        """Alias for evaluation_log_finish to match endpoint naming."""
+        return self.evaluation_log_finish(req)
 
     def dataset_create(self, req: tsi.DatasetCreateReq) -> tsi.DatasetCreateRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
