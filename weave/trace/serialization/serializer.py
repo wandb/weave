@@ -100,7 +100,9 @@ def register_serializer(
     instance_check: Callable[[Any], bool] | None = None,
     publish_load_op: bool = True,
 ) -> None:
-    SERIALIZERS.append(Serializer(target_class, save, load, instance_check, publish_load_op))
+    SERIALIZERS.append(
+        Serializer(target_class, save, load, instance_check, publish_load_op)
+    )
 
 
 def get_serializer_by_id(id: str) -> Serializer | None:
