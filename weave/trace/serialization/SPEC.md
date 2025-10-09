@@ -96,6 +96,14 @@ class Serializer:
     save: Callable  # Normalized save function
     load: Callable  # Normalized load function
     instance_check: Callable[[Any], bool] | None = None
+
+    def id(self) -> str:
+        """Return the unique ID for this serializer (module.ClassName)."""
+        serializer_id = self.target_class.__module__ + "." + self.target_class.__name__
+        # Special case for weave.Op
+        if serializer_id.startswith("weave.") and serializer_id.endswith(".Op"):
+            return "Op"
+        return serializer_id
 ```
 
 **Key Design Decision**: Store normalized callables, not WeaveSerializer classes or separate field variants.
@@ -103,6 +111,7 @@ class Serializer:
 - ✅ Simple: Just two functions, always populated
 - ✅ Fast: No helper methods, no conditionals at usage sites
 - ✅ Clear: `serializer.save()` and `serializer.load()` work everywhere
+- ✅ ID method: Provides unique identifier for database storage
 
 ### 3. Registration Function
 
@@ -132,6 +141,28 @@ else:
     save_func = save
     load_func = load
 ```
+
+### 4. Lookup Functions
+
+```python
+def get_serializer_by_id(id: str) -> Serializer | None:
+    """Find a serializer by its type ID (module.ClassName)."""
+    for serializer in SERIALIZERS:
+        if serializer.id() == id:
+            return serializer
+    return None
+
+def get_serializer_for_obj(obj: Any) -> Serializer | None:
+    """Find a serializer for an object instance."""
+    for serializer in SERIALIZERS:
+        if serializer.instance_check and serializer.instance_check(obj):
+            return serializer
+        elif isinstance(obj, serializer.target_class):
+            return serializer
+    return None
+```
+
+**Note**: `instance_check` is used for special cases where `isinstance()` checks fail (e.g., Protocol types in Python 3.12+).
 
 ## Implementation Patterns
 
@@ -202,6 +233,31 @@ register_serializer(faiss.Index, save_faiss_index, load_faiss_index)
 ```
 
 ## Serialization Flow
+
+### Signature Inspection Helpers
+
+To support legacy serializers alongside the new API, we use signature inspection:
+
+```python
+def is_inline_save(value: Callable) -> bool:
+    """Check if save function has 1 parameter (legacy inline)."""
+    return len(inspect.signature(value).parameters) == 1
+
+def is_file_save(value: Callable) -> bool:
+    """Check if save function has 3 parameters AND returns None (legacy file-only)."""
+    sig = inspect.signature(value)
+    params = list(sig.parameters.values())
+    if len(params) != 3:
+        return False
+    # Check return annotation is None
+    return (sig.return_annotation is None or
+            sig.return_annotation == "None" or
+            sig.return_annotation == inspect._empty)
+```
+
+**Key Insight**: New WeaveSerializer has signature `(obj, artifact, name) -> Any | None`, which returns False for `is_file_save()` because the return annotation is not strictly `None`. This allows us to distinguish:
+- Legacy file-only: `(obj, artifact, name) -> None`
+- New API: `(obj, artifact, name) -> Any | None`
 
 ### Encoding (save)
 
