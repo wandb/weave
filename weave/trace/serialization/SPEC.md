@@ -166,26 +166,9 @@ def get_serializer_for_obj(obj: Any) -> Serializer | None:
 
 ## Implementation Patterns
 
-### Pattern 1: Files-Only (Image)
+### Pattern 1: Hybrid Files + Metadata (Markdown - New API)
 
-```python
-class ImageSerializer(WeaveSerializer):
-    @staticmethod
-    def save(obj: Image.Image, artifact, name: str) -> None:
-        with artifact.new_file("image.png", binary=True) as f:
-            obj.save(f, format="PNG")
-        return None  # No metadata
-
-    @staticmethod
-    def load(artifact, name: str, metadata: Any) -> Image.Image:
-        filename = next(iter(artifact.path_contents))
-        return Image.open(artifact.path(filename))
-
-# Registration
-register_serializer(Image.Image, ImageSerializer)
-```
-
-### Pattern 2: Hybrid (Markdown)
+Markdown demonstrates the new WeaveSerializer API with hybrid pattern:
 
 ```python
 class MarkdownSerializer(WeaveSerializer):
@@ -218,18 +201,34 @@ class MarkdownSerializer(WeaveSerializer):
 register_serializer(Markdown, MarkdownSerializer)
 ```
 
-### Pattern 3: Legacy Functions (Still Supported)
+### Pattern 2: Legacy File-Based Functions (Image - Current Implementation)
+
+Most existing serializers still use the legacy function-based API:
 
 ```python
-def save_faiss_index(obj: faiss.Index, artifact, name: str) -> None:
-    with artifact.writeable_file_path(f"{name}.faissindex") as path:
-        faiss.write_index(obj, path)
+def save(obj: Image.Image, artifact, name: str) -> None:
+    with artifact.new_file("image.png", binary=True) as f:
+        obj.save(f, format="PNG")
 
-def load_faiss_index(artifact, name: str) -> faiss.Index:
-    return faiss.read_index(artifact.path(f"{name}.faissindex"))
+def load(artifact, name: str) -> Image.Image:
+    filename = next(iter(artifact.path_contents))
+    return Image.open(artifact.path(filename))
 
 # Registration
-register_serializer(faiss.Index, save_faiss_index, load_faiss_index)
+register_serializer(Image.Image, save, load)
+```
+
+### Pattern 3: Legacy Inline Functions (Also Supported)
+
+```python
+def save_datetime(obj: datetime) -> dict:
+    return {"iso": obj.isoformat()}
+
+def load_datetime(data: dict) -> datetime:
+    return datetime.fromisoformat(data["iso"])
+
+# Registration
+register_serializer(datetime, save_datetime, load_datetime)
 ```
 
 ## Serialization Flow
