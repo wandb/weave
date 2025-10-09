@@ -106,7 +106,8 @@ from weave.trace_server.objects_query_builder import (
     format_metadata_objects_from_query_result,
     make_objects_val_query_and_parameters,
 )
-from weave.trace_server.opentelemetry.python_spans import ResourceSpans
+from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
+from weave.trace_server.opentelemetry.python_spans import Resource, Span
 from weave.trace_server.orm import ParamBuilder, Row
 from weave.trace_server.project_query_builder import make_project_stats_query
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
@@ -216,15 +217,34 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             raise TypeError(
                 "Expected traces as ExportTraceServiceRequest, got {type(req.traces)}"
             )
-        traces_data = [
-            ResourceSpans.from_proto(span) for span in req.traces.resource_spans
-        ]
+        calls: list[dict[str, object]] = []
+        rejected_spans = 0
+        error_messages: list[str] = []
+        for proto_resource_spans in req.traces.resource_spans:
+            resource = Resource.from_proto(proto_resource_spans.resource)
+            for proto_scope_spans in proto_resource_spans.scope_spans:
+                for proto_span in proto_scope_spans.spans:
+                    try:
+                        span = Span.from_proto(proto_span, resource)
+                    except AttributePathConflictError as e:
+                        # Record and skip malformed spans so we can partially accept the batch
+                        rejected_spans += 1
+                        # Use data available on the proto span for context
+                        try:
+                            trace_id = proto_span.trace_id.hex()
+                            span_id = proto_span.span_id.hex()
+                            name = getattr(proto_span, "name", "")
+                        except Exception:
+                            trace_id = ""
+                            span_id = ""
+                            name = ""
+                        span_ident = (
+                            f"name='{name}' trace_id='{trace_id}' span_id='{span_id}'"
+                        )
+                        error_messages.append(f"Rejected span ({span_ident}): {e!s}")
+                        continue
 
-        calls = []
-        for resource_spans in traces_data:
-            for scope_spans in resource_spans.scope_spans:
-                for span in scope_spans.spans:
-                    start_call, end_call = span.to_call(req.project_id, req.wb_user_id)
+                    start_call, end_call = span.to_call(req.project_id)
                     calls.extend(
                         [
                             {
@@ -236,6 +256,17 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     )
         # TODO: Actually populate the error fields if call_start_batch fails
         self.call_start_batch(tsi.CallCreateBatchReq(batch=calls))
+        if rejected_spans > 0:
+            # Join the first 20 errors and return them delimited by ';'
+            joined_errors = "; ".join(error_messages[:20]) + (
+                "; ..." if len(error_messages) > 20 else ""
+            )
+            return tsi.OtelExportRes(
+                partial_success=tsi.ExportTracePartialSuccess(
+                    rejected_spans=rejected_spans,
+                    error_message=joined_errors,
+                )
+            )
         return tsi.OtelExportRes()
 
     @contextmanager
