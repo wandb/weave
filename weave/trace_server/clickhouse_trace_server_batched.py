@@ -2966,13 +2966,6 @@ def _create_tracked_stream_wrapper(
     """Create a wrapper that tracks streaming completion and emits call records."""
 
     def _stream_wrapper() -> Iterator[dict[str, Any]]:
-        # Import helper functions locally to avoid circular imports
-        from weave.trace_server.clickhouse_trace_server_batched import (
-            _end_call_for_insert_to_ch_insertable_end_call,
-            _process_tool_call_delta,
-            _update_metadata_from_chunk,
-        )
-
         # (1) send meta chunk first so clients can associate stream
         yield {"_meta": {"weave_call_id": start_call.id}}
 

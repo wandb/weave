@@ -16,9 +16,6 @@ from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 
 NOVA_MODELS = ("nova-pro-v1", "nova-lite-v1", "nova-micro-v1")
 
-# Import helper functions needed by the stream wrapper
-# These create a circular import, so we'll import them locally in the functions that need them
-
 
 def lite_llm_completion(
     api_key: str | None,
