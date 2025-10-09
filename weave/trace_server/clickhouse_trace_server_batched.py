@@ -92,6 +92,7 @@ from weave.trace_server.ids import generate_id
 from weave.trace_server.image_completion import lite_llm_image_generation
 from weave.trace_server.kafka import KafkaProducer
 from weave.trace_server.llm_completion import (
+    _create_tracked_stream_wrapper,
     get_custom_provider_info,
     lite_llm_completion,
     lite_llm_completion_stream,
@@ -2018,6 +2019,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         Mirrors ``completions_create`` but with streaming enabled.  If
         ``track_llm_call`` is True we emit a call_start record immediately and
         a call_end record once the stream finishes (successfully or not).
+
+        When req.inputs.n > 1, properly separates and tracks all choices
+        within a single call's output rather than creating separate calls.
         """
         # --- Shared setup logic (copy of completions_create up to litellm call)
         model_info = self._model_to_provider_info_map.get(req.inputs.model)
@@ -2907,176 +2911,6 @@ def _process_tool_call_delta(
                 existing_tool_call["function"]["arguments"] += function_data[
                     "arguments"
                 ]
-
-
-def _clean_tool_calls(tool_calls: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Clean up tool_calls - remove incomplete ones and ensure proper format."""
-    cleaned_tool_calls = [
-        {
-            "function": {
-                "arguments": tool_call["function"]["arguments"],
-                "name": tool_call["function"]["name"],
-            },
-            "id": tool_call["id"],
-            "type": "function",
-        }
-        for tool_call in tool_calls
-        if tool_call.get("id") is not None
-        and tool_call.get("function", {}).get("name") is not None
-    ]
-    return cleaned_tool_calls
-
-
-def _build_aggregated_output(
-    aggregated_metadata: dict[str, Any],
-    assistant_acc: list[str],
-    tool_calls: list[dict[str, Any]],
-    chunk: dict[str, Any],
-    reasoning_content: list[str],
-) -> dict[str, Any]:
-    """Build the aggregated output from accumulated data."""
-    current_finish_reason = chunk.get("choices", [{}])[0].get("finish_reason")
-    cleaned_tool_calls = _clean_tool_calls(tool_calls)
-
-    return {
-        "id": aggregated_metadata.get("id", ""),
-        "created": aggregated_metadata.get("created", 0),
-        "model": aggregated_metadata.get("model", ""),
-        "object": "chat.completion",
-        "system_fingerprint": aggregated_metadata.get("system_fingerprint", ""),
-        "choices": [
-            {
-                "finish_reason": current_finish_reason,
-                "index": 0,
-                "message": {
-                    "content": (
-                        "".join(assistant_acc)
-                        if assistant_acc
-                        else (None if cleaned_tool_calls else "")
-                    ),
-                    "role": "assistant",
-                    "tool_calls": (cleaned_tool_calls if cleaned_tool_calls else None),
-                    "function_call": None,
-                    "reasoning_content": (
-                        "".join(reasoning_content) if reasoning_content else None
-                    ),
-                },
-            }
-        ],
-        "usage": aggregated_metadata.get("usage", {}),
-        "service_tier": aggregated_metadata.get("service_tier", "default"),
-    }
-
-
-def _create_tracked_stream_wrapper(
-    insert_call: Callable[[CallEndCHInsertable], None],
-    chunk_iter: Iterator[dict[str, Any]],
-    start_call: CallStartCHInsertable,
-    model_name: str,
-    project_id: str,
-) -> Iterator[dict[str, Any]]:
-    """Create a wrapper that tracks streaming completion and emits call records."""
-
-    def _stream_wrapper() -> Iterator[dict[str, Any]]:
-        # (1) send meta chunk first so clients can associate stream
-        yield {"_meta": {"weave_call_id": start_call.id}}
-
-        # Initialize accumulation variables
-        aggregated_output: Optional[dict[str, Any]] = None
-        assistant_acc: list[str] = []
-        tool_calls: list[dict[str, Any]] = []
-        aggregated_metadata: dict[str, Any] = {}
-        reasoning_content: list[str] = []
-
-        try:
-            for chunk in chunk_iter:
-                yield chunk  # Yield to client immediately
-
-                if not isinstance(chunk, dict):
-                    continue
-
-                # Accumulate metadata from chunks
-                _update_metadata_from_chunk(chunk, aggregated_metadata)
-
-                # Process assistant content and tool calls
-                choices = chunk.get("choices")
-                if choices:
-                    delta = choices[0].get("delta")
-                    if delta and isinstance(delta, dict):
-                        # Accumulate assistant content
-                        content_piece = delta.get("content")
-                        if content_piece:
-                            assistant_acc.append(content_piece)
-
-                        # Handle tool calls
-                        tool_call_delta = delta.get("tool_calls")
-                        if tool_call_delta:
-                            _process_tool_call_delta(tool_call_delta, tool_calls)
-
-                        # Handle reasoning content
-                        reasoning_content_delta = delta.get("reasoning_content")
-                        if reasoning_content_delta:
-                            reasoning_content.append(reasoning_content_delta)
-
-                # Build aggregated output
-                aggregated_output = _build_aggregated_output(
-                    aggregated_metadata,
-                    assistant_acc,
-                    tool_calls,
-                    chunk,
-                    reasoning_content,
-                )
-
-        finally:
-            # Handle fallback case for aggregated output
-            if aggregated_output is None and (
-                assistant_acc or tool_calls or reasoning_content
-            ):
-                cleaned_tool_calls = _clean_tool_calls(tool_calls)
-                aggregated_output = {
-                    "choices": [
-                        {
-                            "message": {
-                                "role": "assistant",
-                                "content": (
-                                    "".join(assistant_acc)
-                                    if assistant_acc
-                                    else (None if cleaned_tool_calls else "")
-                                ),
-                                "tool_calls": (
-                                    cleaned_tool_calls if cleaned_tool_calls else None
-                                ),
-                                "reasoning_content": (
-                                    "".join(reasoning_content)
-                                    if reasoning_content
-                                    else None
-                                ),
-                            }
-                        }
-                    ]
-                }
-
-            # Prepare summary and end call
-            summary: dict[str, Any] = {}
-            if aggregated_output is not None and model_name is not None:
-                aggregated_output["model"] = model_name
-
-                if "usage" in aggregated_output:
-                    summary["usage"] = {model_name: aggregated_output["usage"]}
-
-            end = tsi.EndedCallSchemaForInsert(
-                project_id=project_id,
-                id=start_call.id,
-                ended_at=datetime.datetime.now(),
-                output=aggregated_output,
-                summary=summary,
-            )
-            end_call = _end_call_for_insert_to_ch_insertable_end_call(
-                end, None
-            )  # No trace_server in stream wrapper
-            insert_call(end_call)
-
-    return _stream_wrapper()
 
 
 def _setup_completion_model_info(
