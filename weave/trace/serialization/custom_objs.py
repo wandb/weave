@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 from collections.abc import Mapping
 from typing import Any, Callable
 
@@ -10,6 +11,7 @@ from weave.trace.refs import ObjectRef, OpRef
 from weave.trace.serialization import (
     op_type,  # noqa: F401, Must import this to register op save/load
 )
+from weave.trace.serialization.base_serializer import WeaveSerializer
 from weave.trace.serialization.mem_artifact import MemTraceFilesArtifact
 from weave.trace.serialization.serializer import (
     get_serializer_by_id,
@@ -70,8 +72,24 @@ def encode_custom_obj(obj: Any) -> dict | None:
         "load_op": load_op_uri,
     }
 
-    # If the save method just takes one argument, it is an inline serializer
-    if is_inline_save(serializer.save):
+    # Handle new WeaveSerializer API
+    if isinstance(serializer.save, WeaveSerializer):
+        art = MemTraceFilesArtifact()
+        metadata = serializer.save.save(obj, art, "obj")
+
+        # Store files if any were written
+        if art.path_contents:
+            encoded_path_contents = {
+                k: (v.encode("utf-8") if isinstance(v, str) else v)  # type: ignore
+                for k, v in art.path_contents.items()
+            }
+            encoded["files"] = encoded_path_contents
+
+        # Store metadata if any was returned
+        if metadata is not None:
+            encoded["val"] = metadata
+    # Handle legacy function-based API
+    elif is_inline_save(serializer.save):
         encoded["val"] = serializer.save(obj)
     elif is_file_save(serializer.save):
         art = MemTraceFilesArtifact()
@@ -83,7 +101,7 @@ def encode_custom_obj(obj: Any) -> dict | None:
         encoded["files"] = encoded_path_contents
     else:
         raise ValueError(
-            f"Serializer save function could not be identified as inline or file-based: {type(serializer.save)}"
+            f"Serializer save function could not be identified: {type(serializer.save)}"
         )
     return encoded
 
@@ -93,6 +111,13 @@ def decode_custom_inline_obj(obj: dict) -> Any:
     if type_ in KNOWN_TYPES:
         serializer = get_serializer_by_id(type_)
         if serializer is not None:
+            # Handle new WeaveSerializer API - serializer.load is now a standalone function
+            if isinstance(serializer.save, WeaveSerializer):
+                art = MemTraceFilesArtifact()
+                metadata = obj.get("val")
+                load_fn = serializer.load
+                return load_fn(art, "obj", metadata)
+            # Handle legacy function-based API
             if is_op(serializer.load):
                 # We would expect this to be already set to False, but
                 # just in case.
@@ -118,11 +143,29 @@ def decode_custom_inline_obj(obj: dict) -> Any:
 def _decode_custom_files_obj(
     encoded_path_contents: Mapping[str, str | bytes],
     load_instance_op: Callable[..., Any],
+    metadata: Any | None = None,
 ) -> Any:
-    # Disables tracing so that calls to loading data itself don't get traced
-    load_instance_op._tracing_enabled = False  # type: ignore
     art = MemTraceFilesArtifact(encoded_path_contents, metadata={})
-    res = load_instance_op(art, "obj")
+
+    # Use inspection to determine the signature of the load function
+    # WeaveSerializer.load has signature (artifact, name, metadata)
+    # Legacy file-based has signature (artifact, name)
+    sig = inspect.signature(load_instance_op)
+    param_count = len(sig.parameters)
+
+    if param_count == 3:
+        # New API: load function takes (artifact, name, metadata)
+        res = load_instance_op(art, "obj", metadata)
+    elif param_count == 2:
+        # Legacy API: load function takes (artifact, name)
+        load_instance_op._tracing_enabled = False  # type: ignore
+        res = load_instance_op(art, "obj")
+    else:
+        raise ValueError(
+            f"Unexpected load function signature with {param_count} parameters. "
+            f"Expected 2 (artifact, name) or 3 (artifact, name, metadata)"
+        )
+
     res.art = art
     return res
 
@@ -131,6 +174,7 @@ def decode_custom_files_obj(
     weave_type: dict,
     encoded_path_contents: Mapping[str, str | bytes],
     load_instance_op_uri: str | None = None,
+    metadata: Any | None = None,
 ) -> Any:
     type_ = weave_type["type"]
     found_serializer = False
@@ -143,11 +187,14 @@ def decode_custom_files_obj(
             load_instance_op = serializer.load
 
             try:
-                return _decode_custom_files_obj(encoded_path_contents, load_instance_op)
+                return _decode_custom_files_obj(
+                    encoded_path_contents, load_instance_op, metadata
+                )
             except Exception as e:
                 pass
 
-    # Otherwise, fall back to load_instance_op
+    # Otherwise, fall back to load_instance_op from the saved op URI
+    # This handles cases where the serializer isn't registered or is from a prior version
     if not found_serializer:
         if load_instance_op_uri is None:
             raise ValueError(f"No serializer found for `{type_}`")
@@ -161,7 +208,7 @@ def decode_custom_files_obj(
             )
 
     try:
-        return _decode_custom_files_obj(encoded_path_contents, load_instance_op)
+        return _decode_custom_files_obj(encoded_path_contents, load_instance_op, metadata)
     except Exception as e:
         raise DecodeCustomObjectError(
             f"Failed to decode object of type `{type_}`. See logs above for more information."
