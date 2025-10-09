@@ -11,12 +11,10 @@ from weave.trace.refs import ObjectRef, OpRef
 from weave.trace.serialization import (
     op_type,  # noqa: F401, Must import this to register op save/load
 )
-from weave.trace.serialization.base_serializer import WeaveSerializer
 from weave.trace.serialization.mem_artifact import MemTraceFilesArtifact
 from weave.trace.serialization.serializer import (
     get_serializer_by_id,
     get_serializer_for_obj,
-    is_file_save,
     is_inline_save,
 )
 
@@ -78,29 +76,19 @@ def encode_custom_obj(obj: Any) -> dict | None:
     # Legacy file save: (obj, artifact, name) -> None
     if is_inline_save(serializer.save):
         encoded["val"] = serializer.save(obj)
-    elif is_file_save(serializer.save):
-        # Legacy file-only save
-        art = MemTraceFilesArtifact()
-        serializer.save(obj, art, "obj")
-        encoded_path_contents = {
-            k: (v.encode("utf-8") if isinstance(v, str) else v)  # type: ignore
-            for k, v in art.path_contents.items()
-        }
-        encoded["files"] = encoded_path_contents
     else:
-        # New WeaveSerializer API (or 3-param function returning metadata)
+        # File-based save (legacy or new API)
         art = MemTraceFilesArtifact()
         metadata = serializer.save(obj, art, "obj")
 
         # Store files if any were written
         if art.path_contents:
-            encoded_path_contents = {
+            encoded["files"] = {
                 k: (v.encode("utf-8") if isinstance(v, str) else v)  # type: ignore
                 for k, v in art.path_contents.items()
             }
-            encoded["files"] = encoded_path_contents
 
-        # Store metadata if any was returned
+        # Store metadata if any was returned (new API only)
         if metadata is not None:
             encoded["val"] = metadata
 

@@ -69,36 +69,12 @@ InlineSave = Callable[[Any], Any]
 if TYPE_CHECKING:
     from weave.trace.serialization.mem_artifact import MemTraceFilesArtifact
 
-# Type for legacy file save functions
-FileSave = Callable[[Any, "MemTraceFilesArtifact", str], None]
-
 
 def is_inline_save(value: Callable) -> TypeIs[InlineSave]:
     """Check if a value is an inline save function (legacy API only)."""
     signature = inspect.signature(value)
     param_count = len(signature.parameters)
     return param_count == 1
-
-
-def is_file_save(value: Callable) -> TypeIs[FileSave]:
-    """Check if a value is a file-based save function (legacy API only)."""
-    signature = inspect.signature(value)
-    params = list(signature.parameters.values())
-    if len(params) != 3:
-        return False
-    name_annotation = params[2].annotation
-    return (
-        (
-            name_annotation is str
-            or name_annotation == "str"
-            or name_annotation == inspect._empty
-        )
-        and (
-            signature.return_annotation is None
-            or signature.return_annotation == "None"
-            or signature.return_annotation == inspect._empty
-        )
-    )
 
 
 @dataclass

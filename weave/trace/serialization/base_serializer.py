@@ -8,12 +8,10 @@ with an explicit serializer base class that supports both files and metadata.
 from __future__ import annotations
 
 from abc import ABC
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from weave.trace.serialization.mem_artifact import MemTraceFilesArtifact
-
-T = TypeVar("T")
 
 
 class WeaveSerializer(ABC):
