@@ -110,7 +110,7 @@ def _build_result_from_encoded(
     encoded: dict, project_id: str, client: WeaveClient
 ) -> Any:
     file_digests = {}
-    for name, val in encoded["files"].items():
+    for name, val in encoded.get("files", {}).items():
         # Instead of waiting for the file to be created, we
         # calculate the digest directly. This makes sure that the
         # to_json procedure is not blocked on network requests.

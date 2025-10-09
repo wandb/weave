@@ -78,6 +78,7 @@ class Serializer:
     # Added to provide a function to check if an object is an instance of the
     # target class because protocol isinstance checks can fail in python3.12+
     instance_check: Callable[[Any], bool] | None = None
+    publish_load_op: bool = True
 
     def id(self) -> str:
         serializer_id = self.target_class.__module__ + "." + self.target_class.__name__
@@ -97,8 +98,9 @@ def register_serializer(
     save: SerializeSaveCallable,
     load: SerializeLoadCallable,
     instance_check: Callable[[Any], bool] | None = None,
+    publish_load_op: bool = True,
 ) -> None:
-    SERIALIZERS.append(Serializer(target_class, save, load, instance_check))
+    SERIALIZERS.append(Serializer(target_class, save, load, instance_check, publish_load_op))
 
 
 def get_serializer_by_id(id: str) -> Serializer | None:
