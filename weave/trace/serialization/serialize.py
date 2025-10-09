@@ -298,12 +298,13 @@ def from_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
             )
         elif val_type == "CustomWeaveType":
             files = _load_custom_obj_files(project_id, server, obj["files"])
-            return custom_objs.decode_custom_files_obj(
-                obj["weave_type"],
-                files,
-                obj.get("val"),
-                obj.get("load_op"),
-            )
+            encoded = {
+                "weave_type": obj["weave_type"],
+                "files": files,
+                "val": obj.get("val"),
+                "load_op": obj.get("load_op"),
+            }
+            return custom_objs.decode_custom_obj(encoded)
         elif isinstance(val_type, str) and obj.get("_class_name") == val_type:
             from weave.trace_server.interface.builtin_object_classes.builtin_object_registry import (
                 BUILTIN_OBJECT_REGISTRY,

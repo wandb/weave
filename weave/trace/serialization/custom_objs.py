@@ -18,6 +18,10 @@ from weave.trace.serialization.serializer import (
     is_probably_legacy_file_load,
     is_probably_legacy_inline_load,
 )
+from weave.trace_server.trace_server_interface import (
+    FileContentReadReq,
+    TraceServerInterface,
+)
 
 
 class DecodeCustomObjectError(Exception):
@@ -77,17 +81,39 @@ def encode_custom_obj(obj: Any) -> dict | None:
 
     art = MemTraceFilesArtifact()
     val = serializer.save(obj, art, "obj")
-    encoded_path_contents = {
-        k: (v.encode("utf-8") if isinstance(v, str) else v)  # type: ignore
-        for k, v in art.path_contents.items()
-    }
-    encoded["files"] = encoded_path_contents
+    if art.path_contents:
+        encoded_path_contents = {
+            k: (v.encode("utf-8") if isinstance(v, str) else v)  # type: ignore
+            for k, v in art.path_contents.items()
+        }
+        encoded["files"] = encoded_path_contents
     encoded["val"] = val
 
     return encoded
 
 
-def _decode_custom_files_obj(
+def decode_custom_obj(encoded: dict) -> Any:
+    return _decode_custom_obj(
+        encoded["weave_type"],
+        encoded.get("files", {}),
+        encoded.get("val"),
+        encoded.get("load_op"),
+    )
+
+
+def _load_custom_obj_files(
+    project_id: str, server: TraceServerInterface, file_digests: dict
+) -> dict[str, bytes]:
+    loaded_files: dict[str, bytes] = {}
+    for name, digest in file_digests.items():
+        file_response = server.file_content_read(
+            FileContentReadReq(project_id=project_id, digest=digest)
+        )
+        loaded_files[name] = file_response.content
+    return loaded_files
+
+
+def _load_custom_obj(
     encoded_path_contents: Mapping[str, str | bytes],
     val: Any | None,
     load_instance_op: AllLoadCallables,
@@ -102,11 +128,11 @@ def _decode_custom_files_obj(
     else:
         # Modern, current path
         res = load_instance_op(art, "obj", val)
-    res.art = art
+    # res.art = art
     return res
 
 
-def decode_custom_files_obj(
+def _decode_custom_obj(
     weave_type: dict,
     encoded_path_contents: Mapping[str, str | bytes],
     val: Any | None,
@@ -123,9 +149,7 @@ def decode_custom_files_obj(
             load_instance_op = serializer.load
 
             try:
-                return _decode_custom_files_obj(
-                    encoded_path_contents, val, load_instance_op
-                )
+                return _load_custom_obj(encoded_path_contents, val, load_instance_op)
             except Exception as e:
                 pass
 
@@ -143,7 +167,7 @@ def decode_custom_files_obj(
             )
 
     try:
-        return _decode_custom_files_obj(encoded_path_contents, val, load_instance_op)
+        return _load_custom_obj(encoded_path_contents, val, load_instance_op)
     except Exception as e:
         raise DecodeCustomObjectError(
             f"Failed to decode object of type `{type_}`. See logs above for more information."
