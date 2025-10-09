@@ -190,18 +190,16 @@ import TabItem from '@theme/TabItem';
     )
     ```
 
-    Note: You can use `column_map` to map the `target` column to a different name.
-
     **Parameters:**
 
     - `threshold` (float): The minimum cosine similarity score (between -1 and 1) needed to consider the two texts similar (defaults to `0.5`).
 
     **Column Mapping:**
 
-    You can the `column_map` attribute to tell the scorer which dataset columns to use. The available keys for `column_map` are:
+    You can use the `column_map` attribute to tell the scorer which dataset columns to use. The available keys for `column_map` are:
     - `output` (required): Model prediction
     - `target` (required): Reference answer to compare with
-    - `kwargs` (optional): Additional input context such as a question or prompt
+    - `kwargs` (optional): Additional input context for logging purposes, such as the original prompt or question sent to the model.
     
     An example of using `column_map`:
 
@@ -209,7 +207,7 @@ import TabItem from '@theme/TabItem';
     similarity_scorer.column_map = {
         "output": "model_output",  # The model's generated text
         "target": "answer",        # The expected or reference response
-        "kwargs": "question"        # Optional: additional context (e.g. the original prompt)
+        "kwargs": "question"       # Optional: 
     }
     ```
 
