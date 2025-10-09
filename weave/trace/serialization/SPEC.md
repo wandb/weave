@@ -234,22 +234,32 @@ register_serializer(faiss.Index, save_faiss_index, load_faiss_index)
 
 ## Serialization Flow
 
-### Signature Inspection Helper
+### Dispatch Logic (Maximally Simple)
 
-To support legacy inline serializers, we use simple signature inspection:
+No helper functions needed - just count parameters:
 
 ```python
-def is_inline_save(value: Callable) -> bool:
-    """Check if save function has 1 parameter (legacy inline)."""
-    return len(inspect.signature(value).parameters) == 1
+sig = inspect.signature(serializer.save)
+param_count = len(sig.parameters)
+
+if param_count == 1:
+    # Legacy inline: (obj) -> metadata
+    encoded["val"] = serializer.save(obj)
+else:
+    # File-based (legacy or new): (obj, artifact, name) -> metadata | None
+    artifact = MemTraceFilesArtifact()
+    metadata = serializer.save(obj, artifact, "obj")
+
+    if artifact.path_contents:
+        encoded["files"] = artifact.path_contents
+
+    if metadata is not None:
+        encoded["val"] = metadata
 ```
 
-**Key Insight**: We only need one check! Everything that's not inline is file-based:
-- Legacy inline: `(obj) -> metadata` - 1 parameter
-- Legacy file: `(obj, artifact, name) -> None` - 3 parameters, returns None
-- New API: `(obj, artifact, name) -> metadata | None` - 3 parameters, may return metadata
-
-Both legacy file and new API use the same code path. Legacy returns None for metadata, new API may return metadata - both handled naturally.
+**Key Insight**:
+- 1 param → legacy inline
+- 3 params → file-based (legacy returns None, new API may return metadata)
 
 ### Encoding (save)
 
@@ -258,21 +268,7 @@ Both legacy file and new API use the same code path. Legacy returns None for met
 2. encode_custom_obj(obj) is called
 3. Find serializer: get_serializer_for_obj(obj)
 4. Save load function as op (for cross-runtime deserialization)
-5. Dispatch based on signature:
-
-   if is_inline_save(serializer.save):      # 1 param: (obj) -> metadata
-       encoded["val"] = serializer.save(obj)
-
-   else:                                     # 3 params: file-based (legacy or new)
-       artifact = MemTraceFilesArtifact()
-       metadata = serializer.save(obj, artifact, "obj")
-
-       if artifact.path_contents:
-           encoded["files"] = artifact.path_contents
-
-       if metadata is not None:             # New API only
-           encoded["val"] = metadata
-
+5. Count parameters and dispatch (see above)
 6. Store in database with type ID and load_op reference
 ```
 
