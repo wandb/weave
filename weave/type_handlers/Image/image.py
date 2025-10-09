@@ -98,4 +98,4 @@ class ImageSerializer(WeaveSerializer):
 
 def register() -> None:
     if dependencies_met:
-        serializer.register_serializer(Image.Image, ImageSerializer())
+        serializer.register_weave_serializer(Image.Image, ImageSerializer)
