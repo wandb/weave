@@ -234,30 +234,22 @@ register_serializer(faiss.Index, save_faiss_index, load_faiss_index)
 
 ## Serialization Flow
 
-### Signature Inspection Helpers
+### Signature Inspection Helper
 
-To support legacy serializers alongside the new API, we use signature inspection:
+To support legacy inline serializers, we use simple signature inspection:
 
 ```python
 def is_inline_save(value: Callable) -> bool:
     """Check if save function has 1 parameter (legacy inline)."""
     return len(inspect.signature(value).parameters) == 1
-
-def is_file_save(value: Callable) -> bool:
-    """Check if save function has 3 parameters AND returns None (legacy file-only)."""
-    sig = inspect.signature(value)
-    params = list(sig.parameters.values())
-    if len(params) != 3:
-        return False
-    # Check return annotation is None
-    return (sig.return_annotation is None or
-            sig.return_annotation == "None" or
-            sig.return_annotation == inspect._empty)
 ```
 
-**Key Insight**: New WeaveSerializer has signature `(obj, artifact, name) -> Any | None`, which returns False for `is_file_save()` because the return annotation is not strictly `None`. This allows us to distinguish:
-- Legacy file-only: `(obj, artifact, name) -> None`
-- New API: `(obj, artifact, name) -> Any | None`
+**Key Insight**: We only need one check! Everything that's not inline is file-based:
+- Legacy inline: `(obj) -> metadata` - 1 parameter
+- Legacy file: `(obj, artifact, name) -> None` - 3 parameters, returns None
+- New API: `(obj, artifact, name) -> metadata | None` - 3 parameters, may return metadata
+
+Both legacy file and new API use the same code path. Legacy returns None for metadata, new API may return metadata - both handled naturally.
 
 ### Encoding (save)
 
@@ -266,22 +258,19 @@ def is_file_save(value: Callable) -> bool:
 2. encode_custom_obj(obj) is called
 3. Find serializer: get_serializer_for_obj(obj)
 4. Save load function as op (for cross-runtime deserialization)
-5. Dispatch based on signature inspection:
+5. Dispatch based on signature:
 
-   if is_inline_save(serializer.save):      # 1 param: (obj)
+   if is_inline_save(serializer.save):      # 1 param: (obj) -> metadata
        encoded["val"] = serializer.save(obj)
 
-   elif is_file_save(serializer.save):      # 3 params: (obj, artifact, name) -> None
-       artifact = MemTraceFilesArtifact()
-       serializer.save(obj, artifact, "obj")
-       encoded["files"] = artifact.path_contents
-
-   else:                                     # 3 params: (obj, artifact, name) -> metadata
+   else:                                     # 3 params: file-based (legacy or new)
        artifact = MemTraceFilesArtifact()
        metadata = serializer.save(obj, artifact, "obj")
+
        if artifact.path_contents:
            encoded["files"] = artifact.path_contents
-       if metadata is not None:
+
+       if metadata is not None:             # New API only
            encoded["val"] = metadata
 
 6. Store in database with type ID and load_op reference
