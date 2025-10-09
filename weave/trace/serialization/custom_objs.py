@@ -145,7 +145,9 @@ def decode_custom_files_obj(
             load_instance_op = serializer.load
 
             try:
-                return _decode_custom_files_obj(encoded_path_contents, val, load_instance_op)
+                return _decode_custom_files_obj(
+                    encoded_path_contents, val, load_instance_op
+                )
             except Exception as e:
                 pass
 

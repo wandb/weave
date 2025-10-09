@@ -37,7 +37,7 @@ from __future__ import annotations
 
 import inspect
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Callable, Union
+from typing import TYPE_CHECKING, Any, Callable
 
 from typing_extensions import TypeIs
 
@@ -51,35 +51,6 @@ if TYPE_CHECKING:
 
 Save = Callable[[Any, "MemTraceFilesArtifact", str], Any]
 Load = Callable[["MemTraceFilesArtifact", str, Any], Any]
-
-
-def is_inline_save(value: Callable) -> TypeIs[InlineSave]:
-    """Check if a function is an inline save function."""
-    signature = inspect.signature(value)
-    param_count = len(signature.parameters)
-    return param_count == 1
-
-
-def is_file_save(value: Callable) -> TypeIs[FileSave]:
-    """Check if a function is a file-based save function."""
-    signature = inspect.signature(value)
-    params = list(signature.parameters.values())
-    # Check parameter count and return type without relying on annotations
-    # that would cause circular import
-    name_annotation = params[2].annotation
-    return (
-        len(params) == 3
-        and (
-            name_annotation is str
-            or name_annotation == "str"
-            or name_annotation == inspect._empty
-        )
-        and (
-            signature.return_annotation is None
-            or signature.return_annotation == "None"
-            or signature.return_annotation == inspect._empty
-        )
-    )
 
 
 @dataclass
