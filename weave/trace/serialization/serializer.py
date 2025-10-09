@@ -35,11 +35,8 @@ registered.
 
 from __future__ import annotations
 
-import inspect
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Callable
-
-from typing_extensions import TypeIs
 
 # Not locking down the return type for inline encoding but
 # it would be expected to be something like a str or dict.
