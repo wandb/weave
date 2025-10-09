@@ -15,6 +15,7 @@ from weave.trace.serialization.mem_artifact import MemTraceFilesArtifact
 from weave.trace.serialization.serializer import (
     get_serializer_by_id,
     get_serializer_for_obj,
+    is_inline_save,
 )
 
 
@@ -69,15 +70,12 @@ def encode_custom_obj(obj: Any) -> dict | None:
         "load_op": load_op_uri,
     }
 
-    # Dispatch based on parameter count
-    sig = inspect.signature(serializer.save)
-    param_count = len(sig.parameters)
-
-    if param_count == 1:
-        # Legacy inline: (obj) -> metadata
+    # Dispatch based on signature
+    if is_inline_save(serializer.save):
+        # Inline: (obj) -> metadata
         encoded["val"] = serializer.save(obj)
     else:
-        # File-based (legacy or new): (obj, artifact, name) -> metadata | None
+        # File-based: (obj, artifact, name) -> metadata | None
         art = MemTraceFilesArtifact()
         metadata = serializer.save(obj, art, "obj")
 

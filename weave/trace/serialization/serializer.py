@@ -30,6 +30,17 @@ import inspect
 from dataclasses import dataclass
 from typing import Any, Callable
 
+
+def is_inline_save(func: Callable) -> bool:
+    """Check if save function is inline (1 param)."""
+    return len(inspect.signature(func).parameters) == 1
+
+
+def is_file_save(func: Callable) -> bool:
+    """Check if save function is file-based (3 params)."""
+    return len(inspect.signature(func).parameters) == 3
+
+
 @dataclass
 class Serializer:
     """Internal representation of a registered serializer."""
