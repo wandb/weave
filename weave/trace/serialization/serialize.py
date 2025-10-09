@@ -36,8 +36,6 @@ def is_pydantic_model_class(obj: Any) -> bool:
         return False
 
 
-
-
 def to_json(
     obj: Any, project_id: str, client: WeaveClient, use_dictify: bool = False
 ) -> Any:
