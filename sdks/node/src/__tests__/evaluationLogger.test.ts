@@ -37,8 +37,8 @@ describe('EvaluationLogger - Basic Functionality', () => {
       'output'
     );
 
-    await scoreLogger.logScore('accuracy', 0.95);
-    await scoreLogger.logScore('f1', 0.88);
+    scoreLogger.logScore('accuracy', 0.95);
+    scoreLogger.logScore('f1', 0.88);
     await scoreLogger.finish();
     await evalLogger.logSummary();
 
@@ -86,7 +86,7 @@ describe('EvaluationLogger - Call Hierarchy', () => {
       {input: 'test'},
       'output'
     );
-    await scoreLogger.logScore('accuracy', 0.95);
+    scoreLogger.logScore('accuracy', 0.95);
     await scoreLogger.finish();
     await evalLogger.logSummary();
 
@@ -147,7 +147,7 @@ describe('EvaluationLogger - Attribute Markers', () => {
       {input: 'test'},
       'output'
     );
-    await scoreLogger.logScore('accuracy', 0.95);
+    scoreLogger.logScore('accuracy', 0.95);
     await scoreLogger.finish();
     await evalLogger.logSummary();
 
@@ -176,7 +176,7 @@ describe('EvaluationLogger - Summary Generation', () => {
         {input: `test${i}`},
         `output${i}`
       );
-      await scoreLogger.logScore('accuracy', 0.9 + i * 0.05);
+      scoreLogger.logScore('accuracy', 0.9 + i * 0.05);
       await scoreLogger.finish();
     }
 
@@ -193,15 +193,15 @@ describe('EvaluationLogger - Summary Generation', () => {
     const evalLogger = new EvaluationLogger({name: 'test-eval'});
 
     const scoreLogger1 = await evalLogger.logPrediction({input: '1'}, 'out1');
-    await scoreLogger1.logScore('passed', true);
+    scoreLogger1.logScore('passed', true);
     await scoreLogger1.finish();
 
     const scoreLogger2 = await evalLogger.logPrediction({input: '2'}, 'out2');
-    await scoreLogger2.logScore('passed', false);
+    scoreLogger2.logScore('passed', false);
     await scoreLogger2.finish();
 
     const scoreLogger3 = await evalLogger.logPrediction({input: '3'}, 'out3');
-    await scoreLogger3.logScore('passed', true);
+    scoreLogger3.logScore('passed', true);
     await scoreLogger3.finish();
 
     await evalLogger.logSummary();
@@ -221,7 +221,7 @@ describe('EvaluationLogger - Summary Generation', () => {
       {input: 'test'},
       'output'
     );
-    await scoreLogger.logScore('accuracy', 0.95);
+    scoreLogger.logScore('accuracy', 0.95);
     await scoreLogger.finish();
 
     await evalLogger.logSummary({
@@ -287,7 +287,7 @@ describe('EvaluationLogger - Edge Cases', () => {
         {input: `test${i}`},
         `output${i}`
       );
-      await scoreLogger.logScore('accuracy', 0.9);
+      scoreLogger.logScore('accuracy', 0.9);
       await scoreLogger.finish();
     }
 

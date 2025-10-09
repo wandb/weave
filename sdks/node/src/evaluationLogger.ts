@@ -19,7 +19,7 @@
 import {WeaveObject, WeaveObjectParameters} from './weaveObject';
 import {Dataset} from './dataset';
 import {op} from './op';
-import {getGlobalClient} from './clientApi';
+import {requireGlobalClient} from './clientApi';
 import {InternalCall} from './call';
 import {CallStackEntry} from './weaveClient';
 import {uuidv7} from 'uuidv7';
@@ -78,8 +78,6 @@ async function createAndFinishCall(
     displayName,
     attributes
   );
-
-  await startPromise;
 
   const endTime = new Date();
   await client.finishCall(
@@ -206,9 +204,7 @@ class Scorer extends WeaveObject {
 
 const evaluationEvaluate = op(
   async function evaluate(evaluation: any, model: any): Promise<any> {
-    // Note: This Op is never executed in imperative eval.
-    // Its source code is captured and displayed in the UI.
-    throw new Error('Use EvaluationLogger instead of calling directly');
+    // internal function
   },
   {name: 'Evaluation.evaluate'}
 );
@@ -218,15 +214,15 @@ const evaluationPredictAndScore = op(
     evaluation: any,
     model: any,
     example: Record<string, any>
-  ): Promise<{output: any; scores: Record<string, any>}> {
-    throw new Error('Use EvaluationLogger.logPrediction() instead');
+  ): Promise<any> {
+    // internal function
   },
   {name: 'Evaluation.predict_and_score'}
 );
 
 const evaluationSummarize = op(
-  async function summarize(evaluation: any): Promise<Record<string, any>> {
-    throw new Error('Use EvaluationLogger.logSummary() instead');
+  async function summarize(evaluation: any): Promise<any> {
+    // internal function
   },
   {name: 'Evaluation.summarize'}
 );
@@ -236,7 +232,7 @@ const modelPredict = op(
     model: any,
     inputs: Record<string, any>
   ): Promise<any> {
-    throw new Error('Use EvaluationLogger.logPrediction() instead');
+    // internal function
   },
   {name: 'Model.predict'}
 );
@@ -244,7 +240,7 @@ const modelPredict = op(
 const scorerScoreFactory = (scorerName: string) =>
   op(
     async function score(scorer: any, output: any, target?: any): Promise<any> {
-      throw new Error('Use ScoreLogger.logScore() instead');
+      // internal function
     },
     {name: `${scorerName}.score`}
   );
@@ -303,6 +299,7 @@ class PredictAndScoreCallMetadata {
  */
 export class ScoreLogger {
   private predMeta: PredictAndScoreCallMetadata;
+  private _scoringProcesses: Array<Promise<void>> = [];
 
   constructor(predMeta: PredictAndScoreCallMetadata) {
     this.predMeta = predMeta;
@@ -316,79 +313,80 @@ export class ScoreLogger {
    * @param score - The score value
    */
   async logScore(scorerName: string, score: any): Promise<void> {
-    if (this.predMeta.isFinished) {
-      throw new Error('Cannot log score after prediction is finished');
-    }
-
-    const client = getGlobalClient();
-    if (!client) {
-      console.warn('Weave not initialized, skipping score logging');
-      return;
-    }
-
-    // Dynamically create a Scorer class with the scorer name
-    // Override the class name so constructor.name === scorerName for proper serialization
-    class DynamicScorer extends Scorer {
-      constructor(parameters: ScorerParameters) {
-        super({
-          ...parameters,
-          name: scorerName,
-          scorerName: scorerName,
-        });
+    // Collect this logScore call in a promise so that we can await it later in finish()
+    const asyncProcess = (async () => {
+      if (this.predMeta.isFinished) {
+        throw new Error('Cannot log score after prediction is finished');
       }
-    }
 
-    // // Override the constructor name to be the scorer name
-    Object.defineProperty(DynamicScorer, 'name', {
-      value: scorerName,
-      writable: false,
-      configurable: true,
-    });
+      const client = requireGlobalClient();
 
-    // Create an instance of the dynamic scorer class
-    const scorer = new DynamicScorer({});
+      // Dynamically create a Scorer class with the scorer name
+      // Override the class name so constructor.name === scorerName for proper serialization
+      class DynamicScorer extends Scorer {
+        constructor(parameters: ScorerParameters) {
+          super({
+            ...parameters,
+            name: scorerName,
+            scorerName: scorerName,
+          });
+        }
+      }
 
-    // Save the scorer to get its URI for feedback attachment
-    const scorerRef = await client.publish(scorer);
-    const scorerRefUri = scorerRef.uri();
+      // Override the constructor name to be the scorer name
+      Object.defineProperty(DynamicScorer, 'name', {
+        value: scorerName,
+        writable: false,
+        configurable: true,
+      });
 
-    // Create and finish scorer call (already have the score)
-    const scorerCall = new InternalCall();
-    const scorerEntry: CallStackEntry = {
-      callId: uuidv7(),
-      traceId: this.predMeta.predictAndScoreEntry.traceId,
-      childSummary: {},
-    };
+      // Create an instance of the dynamic scorer class
+      const scorer = new DynamicScorer({});
 
-    await createAndFinishCall(
-      client,
-      scorerCall,
-      scorerScoreFactory(scorerName),
-      [{this: scorer, output: this.predMeta.output}],
-      'useParam0Object',
-      scorer,
-      scorerEntry,
-      this.predMeta.predictAndScoreEntry,
-      new Date(),
-      score,
-      `${scorerName}.score`,
-      IMPERATIVE_SCORE_MARKER
-    );
+      // Save the scorer to get its URI for feedback attachment
+      const scorerRef = await client.publish(scorer);
+      const scorerRefUri = scorerRef.uri();
 
-    // Attach the score as feedback to the predict call
-    await client.addFeedback(
-      this.predMeta.predictCallId,
-      scorerEntry.callId,
-      scorerRefUri,
-      score
-    );
+      // Create and finish scorer call (already have the score)
+      const scorerCall = new InternalCall();
+      const scorerEntry: CallStackEntry = {
+        callId: uuidv7(),
+        traceId: this.predMeta.predictAndScoreEntry.traceId,
+        childSummary: {},
+      };
 
-    // Store score in metadata
-    this.predMeta.scores[scorerName] = score;
+      await createAndFinishCall(
+        client,
+        scorerCall,
+        scorerScoreFactory(scorerName),
+        [{self: scorer, output: this.predMeta.output}],
+        'useParam0Object',
+        scorer,
+        scorerEntry,
+        this.predMeta.predictAndScoreEntry,
+        new Date(),
+        score,
+        `${scorerName}.score`,
+        IMPERATIVE_SCORE_MARKER
+      );
+
+      // Attach the score as feedback to the predict call
+      await client.addScore(
+        this.predMeta.predictCallId,
+        scorerEntry.callId,
+        scorerRefUri,
+        score
+      );
+
+      // Store score in metadata
+      this.predMeta.scores[scorerName] = score;
+    })();
+    this._scoringProcesses.push(asyncProcess);
+    await asyncProcess;
   }
 
   /**
-   * Finish this prediction.
+   * Finish the scoring process for the prediction.
    * Finalizes the predict_and_score call with accumulated scores.
    * Note: The predict call is finished by EvaluationLogger, not here.
    */
@@ -397,11 +395,9 @@ export class ScoreLogger {
       return; // Already finished
     }
 
-    const client = getGlobalClient();
-    if (!client) {
-      console.warn('Weave not initialized, skipping prediction finish');
-      return;
-    }
+    const client = requireGlobalClient();
+
+    await Promise.all(this._scoringProcesses);
 
     const endTime = new Date();
 
@@ -516,11 +512,7 @@ export class EvaluationLogger {
    * Start the evaluate call (root of the call hierarchy).
    */
   private async startEvaluate(): Promise<void> {
-    const client = getGlobalClient();
-    if (!client) {
-      console.warn('Weave not initialized, skipping evaluate call creation');
-      return;
-    }
+    const client = requireGlobalClient();
 
     // Create evaluate call
     const evaluateCall = new InternalCall();
@@ -534,7 +526,7 @@ export class EvaluationLogger {
     const evaluateStartPromise = client.createCall(
       evaluateCall,
       evaluationEvaluate,
-      [{this: this.evaluation, model: this.model}],
+      [{self: this.evaluation, model: this.model}],
       'useParam0Object',
       undefined,
       evaluateEntry,
@@ -560,7 +552,7 @@ export class EvaluationLogger {
     output: any
   ): Promise<ScoreLogger> {
     await this.initPromise;
-    const client = getGlobalClient();
+    const client = requireGlobalClient();
     if (!client || !this.evaluateEntry) {
       console.warn('Weave not initialized or evaluate not started');
       // Return a no-op ScoreLogger
@@ -588,7 +580,7 @@ export class EvaluationLogger {
     const predictAndScoreStartPromise = client.createCall(
       predictAndScoreCall,
       evaluationPredictAndScore,
-      [{this: this.evaluation, model: this.model, example: inputs}],
+      [{self: this.evaluation, model: this.model, example: inputs}],
       'useParam0Object',
       undefined,
       predictAndScoreEntry,
@@ -644,7 +636,7 @@ export class EvaluationLogger {
    */
   async logSummary(summary?: Record<string, any>): Promise<void> {
     await this.initPromise;
-    const client = getGlobalClient();
+    const client = requireGlobalClient();
     if (!client || !this.evaluateEntry) {
       console.warn('Weave not initialized or evaluate not started');
       return;
@@ -680,7 +672,7 @@ export class EvaluationLogger {
       client,
       summarizeCall,
       evaluationSummarize,
-      [{this: this.evaluation}],
+      [{self: this.evaluation}],
       'useParam0Object',
       undefined,
       summarizeEntry,
