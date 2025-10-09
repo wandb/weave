@@ -23,7 +23,7 @@ class ImageSerializer(WeaveSerializer):
         return Image.open(artifact.path("image.png"))
 
 
-serializer.register_weave_serializer(Image.Image, ImageSerializer)
+serializer.register_serializer(Image.Image, ImageSerializer)
 ```
 
 ## Legacy Function-Based API (Still Supported)
@@ -41,7 +41,7 @@ def load_instance(artifact, name: str) -> faiss.Index:
     return faiss.read_index(artifact.path(f"{name}.faissindex"))
 
 
-serializer.register_serializer_functions(faiss.Index, save_instance, load_instance)
+serializer.register_serializer(faiss.Index, save_instance, load_instance)
 ```
 
 After registering a serializer, if the user tries to save an object
@@ -105,17 +105,13 @@ def is_file_save(value: Callable) -> TypeIs[FileSave]:
 class Serializer:
     """Internal representation of a registered serializer.
 
-    This can represent either:
-    - A WeaveSerializer class (new API)
-    - A pair of save/load functions (legacy API)
+    Stores normalized save/load callables regardless of whether they came from
+    a WeaveSerializer class or legacy functions. This keeps usage simple - just
+    call serializer.save() or serializer.load().
     """
     target_class: type
-
-    # For new API: this is the WeaveSerializer class itself
-    # For legacy API: this is the save function
-    weave_serializer: Type[WeaveSerializer] | None = None
-    legacy_save: Callable | None = None
-    legacy_load: Callable | None = None
+    save: Callable
+    load: Callable
 
     # Added to provide a function to check if an object is an instance of the
     # target class because protocol isinstance checks can fail in python3.12+
@@ -130,106 +126,57 @@ class Serializer:
             return "Op"
         return serializer_id
 
-    def is_weave_serializer(self) -> bool:
-        """Check if this is a WeaveSerializer (new API) vs legacy functions."""
-        return self.weave_serializer is not None
-
-    def get_save_func(self) -> Callable:
-        """Get the save function/method for this serializer."""
-        if self.weave_serializer:
-            return self.weave_serializer.save
-        return self.legacy_save  # type: ignore
-
-    def get_load_func(self) -> Callable:
-        """Get the load function/method for this serializer."""
-        if self.weave_serializer:
-            return self.weave_serializer.load
-        return self.legacy_load  # type: ignore
-
 
 SERIALIZERS: list[Serializer] = []
 
 
-def register_weave_serializer(
-    target_class: type,
-    serializer_class: Type[WeaveSerializer],
-    instance_check: Callable[[Any], bool] | None = None,
-) -> None:
-    """Register a WeaveSerializer for a type (new API).
-
-    Args:
-        target_class: The Python class to register the serializer for
-        serializer_class: The WeaveSerializer class (not an instance!)
-        instance_check: Optional function to check if an object is an instance of target_class
-
-    Example:
-        register_weave_serializer(Image.Image, ImageSerializer)
-    """
-    SERIALIZERS.append(
-        Serializer(
-            target_class=target_class,
-            weave_serializer=serializer_class,
-            instance_check=instance_check,
-        )
-    )
-
-
-def register_serializer_functions(
-    target_class: type,
-    save: Callable,
-    load: Callable,
-    instance_check: Callable[[Any], bool] | None = None,
-) -> None:
-    """Register save/load functions for a type (legacy API).
-
-    Args:
-        target_class: The Python class to register the serializer for
-        save: The save function
-        load: The load function
-        instance_check: Optional function to check if an object is an instance of target_class
-
-    Example:
-        register_serializer_functions(faiss.Index, save_instance, load_instance)
-    """
-    SERIALIZERS.append(
-        Serializer(
-            target_class=target_class,
-            legacy_save=save,
-            legacy_load=load,
-            instance_check=instance_check,
-        )
-    )
-
-
-# Legacy API for backward compatibility
 def register_serializer(
     target_class: type,
     save: Callable | Type[WeaveSerializer],
     load: Callable | None = None,
     instance_check: Callable[[Any], bool] | None = None,
 ) -> None:
-    """Register a serializer for a type (legacy overloaded API).
+    """Register a serializer for a type.
 
-    This function is maintained for backward compatibility but the specific
-    functions register_weave_serializer() and register_serializer_functions()
-    are preferred for clarity.
+    Accepts either:
+    1. A WeaveSerializer class (new API) - pass the class itself, not an instance
+    2. Separate save/load functions (legacy API) - provide both functions
 
     Args:
         target_class: The Python class to register the serializer for
         save: Either a WeaveSerializer class OR a save function
-        load: A load function (required if save is a function, must be None if save is WeaveSerializer)
+        load: A load function (required if save is a function, omit if save is WeaveSerializer)
         instance_check: Optional function to check if an object is an instance of target_class
+
+    Examples:
+        # New API: WeaveSerializer class
+        register_serializer(Image.Image, ImageSerializer)
+
+        # Legacy API: separate functions
+        register_serializer(faiss.Index, save_fn, load_fn)
     """
-    # Try to determine if save is a WeaveSerializer class
+    # Normalize to save/load callables at registration time
     if isinstance(save, type) and issubclass(save, WeaveSerializer):
-        register_weave_serializer(target_class, save, instance_check)
+        # New API: extract static methods from the class
+        save_func = save.save
+        load_func = save.load
     else:
-        # Legacy function-based API
+        # Legacy API: use provided functions
         if load is None:
             raise ValueError(
-                "When using function-based serialization, both save and load must be provided"
+                "When registering function-based serializers, both save and load must be provided"
             )
-        register_serializer_functions(target_class, save, load, instance_check)
+        save_func = save
+        load_func = load
+
+    SERIALIZERS.append(
+        Serializer(
+            target_class=target_class,
+            save=save_func,
+            load=load_func,
+            instance_check=instance_check,
+        )
+    )
 
 
 def get_serializer_by_id(id: str) -> Serializer | None:

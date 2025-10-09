@@ -70,4 +70,4 @@ class MarkdownSerializer(WeaveSerializer):
 
 
 def register() -> None:
-    serializer.register_weave_serializer(Markdown, MarkdownSerializer)
+    serializer.register_serializer(Markdown, MarkdownSerializer)

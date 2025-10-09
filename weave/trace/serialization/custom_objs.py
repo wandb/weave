@@ -46,27 +46,24 @@ def encode_custom_obj(obj: Any) -> dict | None:
         # will not be recoverable with client.get
         return None
 
-    # Get the load function - works for both WeaveSerializer and legacy
-    load_func = serializer.get_load_func()
-
-    # Save the load_instance function as an op, and store a reference
+    # Save the load function as an op, and store a reference
     # to that op in the saved value record. We don't do this if what
     # we're saving is actually an op, since that would be self-referential
     # (the op loading code is always present, we don't need to save/load it).
     load_op_uri = None
     if serializer.id() != "Op":
-        # Ensure load_instance is an op
-        if not isinstance(load_func, Op):
-            load_func = op(load_func)
+        # Ensure load is an op
+        if not isinstance(serializer.load, Op):
+            serializer.load = op(serializer.load)
             # We don't want to actually trace the load_instance op,
             # just save it.
-            load_func._tracing_enabled = False  # type: ignore
+            serializer.load._tracing_enabled = False  # type: ignore
         # Save the load_instance_op
         wc = require_weave_client()
 
         # TODO(PR): this can fail right? Or does it return None?
         # Calculating this URL is blocking, but we only have to pay it once per custom type
-        load_instance_op_ref = wc._save_op(load_func, "load_" + serializer.id())  # type: ignore
+        load_instance_op_ref = wc._save_op(serializer.load, "load_" + serializer.id())  # type: ignore
         load_op_uri = load_instance_op_ref.uri()
 
     encoded = {
@@ -75,13 +72,25 @@ def encode_custom_obj(obj: Any) -> dict | None:
         "load_op": load_op_uri,
     }
 
-    # Get the save function
-    save_func = serializer.get_save_func()
-
-    # Handle new WeaveSerializer API
-    if serializer.is_weave_serializer():
+    # Use inspection to determine save function signature
+    # WeaveSerializer.save: (obj, artifact, name) -> metadata | None
+    # Legacy inline save: (obj) -> metadata
+    # Legacy file save: (obj, artifact, name) -> None
+    if is_inline_save(serializer.save):
+        encoded["val"] = serializer.save(obj)
+    elif is_file_save(serializer.save):
+        # Legacy file-only save
         art = MemTraceFilesArtifact()
-        metadata = save_func(obj, art, "obj")
+        serializer.save(obj, art, "obj")
+        encoded_path_contents = {
+            k: (v.encode("utf-8") if isinstance(v, str) else v)  # type: ignore
+            for k, v in art.path_contents.items()
+        }
+        encoded["files"] = encoded_path_contents
+    else:
+        # New WeaveSerializer API (or 3-param function returning metadata)
+        art = MemTraceFilesArtifact()
+        metadata = serializer.save(obj, art, "obj")
 
         # Store files if any were written
         if art.path_contents:
@@ -94,21 +103,7 @@ def encode_custom_obj(obj: Any) -> dict | None:
         # Store metadata if any was returned
         if metadata is not None:
             encoded["val"] = metadata
-    # Handle legacy function-based API
-    elif is_inline_save(save_func):
-        encoded["val"] = save_func(obj)
-    elif is_file_save(save_func):
-        art = MemTraceFilesArtifact()
-        save_func(obj, art, "obj")
-        encoded_path_contents = {
-            k: (v.encode("utf-8") if isinstance(v, str) else v)  # type: ignore
-            for k, v in art.path_contents.items()
-        }
-        encoded["files"] = encoded_path_contents
-    else:
-        raise ValueError(
-            f"Serializer save function could not be identified: {type(save_func)}"
-        )
+
     return encoded
 
 
@@ -117,18 +112,24 @@ def decode_custom_inline_obj(obj: dict) -> Any:
     if type_ in KNOWN_TYPES:
         serializer = get_serializer_by_id(type_)
         if serializer is not None:
-            # Handle new WeaveSerializer API - serializer.load is now a standalone function
-            if isinstance(serializer.save, WeaveSerializer):
+            # Use inspection to determine load signature
+            # New API: load(artifact, name, metadata) - 3 params
+            # Legacy inline: load(val) - 1 param
+            sig = inspect.signature(serializer.load)
+            param_count = len(sig.parameters)
+
+            if param_count == 3:
+                # New WeaveSerializer API
                 art = MemTraceFilesArtifact()
                 metadata = obj.get("val")
-                load_fn = serializer.load
-                return load_fn(art, "obj", metadata)
-            # Handle legacy function-based API
-            if is_op(serializer.load):
-                # We would expect this to be already set to False, but
-                # just in case.
-                serializer.load._tracing_enabled = False  # type: ignore
-            return serializer.load(obj["val"])
+                return serializer.load(art, "obj", metadata)
+            else:
+                # Legacy inline API
+                if is_op(serializer.load):
+                    # We would expect this to be already set to False, but
+                    # just in case.
+                    serializer.load._tracing_enabled = False  # type: ignore
+                return serializer.load(obj["val"])
 
     load_op_uri = obj.get("load_op")
     if load_op_uri is None:
