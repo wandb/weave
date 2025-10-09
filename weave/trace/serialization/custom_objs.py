@@ -1,21 +1,22 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, Callable
+from typing import Any
 
 from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.op import is_op, op
 from weave.trace.op_protocol import Op
 from weave.trace.refs import ObjectRef, OpRef
 from weave.trace.serialization import (
+    AllLoadCallables,
     op_type,  # noqa: F401, Must import this to register op save/load
 )
 from weave.trace.serialization.mem_artifact import MemTraceFilesArtifact
 from weave.trace.serialization.serializer import (
     get_serializer_by_id,
     get_serializer_for_obj,
-    is_file_save,
-    is_inline_save,
+    is_probably_legacy_file_load,
+    is_probably_legacy_inline_load,
 )
 
 
@@ -70,21 +71,15 @@ def encode_custom_obj(obj: Any) -> dict | None:
         "load_op": load_op_uri,
     }
 
-    # If the save method just takes one argument, it is an inline serializer
-    if is_inline_save(serializer.save):
-        encoded["val"] = serializer.save(obj)
-    elif is_file_save(serializer.save):
-        art = MemTraceFilesArtifact()
-        serializer.save(obj, art, "obj")
-        encoded_path_contents = {
-            k: (v.encode("utf-8") if isinstance(v, str) else v)  # type: ignore
-            for k, v in art.path_contents.items()
-        }
-        encoded["files"] = encoded_path_contents
-    else:
-        raise ValueError(
-            f"Serializer save function could not be identified as inline or file-based: {type(serializer.save)}"
-        )
+    art = MemTraceFilesArtifact()
+    val = serializer.save(obj, art, "obj")
+    encoded_path_contents = {
+        k: (v.encode("utf-8") if isinstance(v, str) else v)  # type: ignore
+        for k, v in art.path_contents.items()
+    }
+    encoded["files"] = encoded_path_contents
+    encoded["val"] = val
+
     return encoded
 
 
@@ -118,12 +113,18 @@ def decode_custom_inline_obj(obj: dict) -> Any:
 def _decode_custom_files_obj(
     encoded_path_contents: Mapping[str, str | bytes],
     val: Any | None,
-    load_instance_op: Callable[..., Any],
+    load_instance_op: AllLoadCallables,
 ) -> Any:
     # Disables tracing so that calls to loading data itself don't get traced
     load_instance_op._tracing_enabled = False  # type: ignore
     art = MemTraceFilesArtifact(encoded_path_contents, metadata={})
-    res = load_instance_op(art, "obj", val)
+    if is_probably_legacy_file_load(load_instance_op):
+        res = load_instance_op(art, "obj")
+    elif is_probably_legacy_inline_load(load_instance_op):
+        res = load_instance_op(val)
+    else:
+        # Modern, current path
+        res = load_instance_op(art, "obj", val)
     res.art = art
     return res
 

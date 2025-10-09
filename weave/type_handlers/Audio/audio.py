@@ -232,7 +232,9 @@ def save(
         obj.export(fp)
 
 
-def load(artifact: MemTraceFilesArtifact, name: str, val: Any) -> wave.Wave_read | Audio:
+def load(
+    artifact: MemTraceFilesArtifact, name: str, val: Any
+) -> wave.Wave_read | Audio:
     """Load an audio object from a trace files artifact.
 
     Args:

@@ -1,6 +1,8 @@
 import datetime
+from typing import Any
 
 from weave.trace.serialization import serializer
+from weave.trace.serialization.mem_artifact import MemTraceFilesArtifact
 
 
 def save(obj: datetime.datetime, artifact: MemTraceFilesArtifact, name: str) -> str:

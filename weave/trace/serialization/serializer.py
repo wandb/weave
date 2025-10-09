@@ -35,26 +35,45 @@ registered.
 
 from __future__ import annotations
 
+import inspect
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Callable
 
-# Not locking down the return type for inline encoding but
-# it would be expected to be something like a str or dict.
-InlineSave = Callable[[Any], Any]
+from typing_extensions import TypeIs
+
 # This is avoiding a circular import.
 if TYPE_CHECKING:
     from weave.trace.serialization.mem_artifact import MemTraceFilesArtifact
 
 
-Save = Callable[[Any, "MemTraceFilesArtifact", str], Any]
-Load = Callable[["MemTraceFilesArtifact", str, Any], Any]
+SerializeSaveCallable = Callable[[Any, "MemTraceFilesArtifact", str], Any]
+SerializeLoadCallable = Callable[["MemTraceFilesArtifact", str, Any], Any]
+
+LegacyInlineLoad = Callable[[Any], Any]
+LegacyFileLoad = Callable[["MemTraceFilesArtifact", str], Any]
+
+AllLoadCallables = Union[SerializeLoadCallable, LegacyInlineLoad, LegacyFileLoad]
+
+
+def is_probably_legacy_inline_load(fn: Callable) -> TypeIs[LegacyInlineLoad]:
+    """Check if a function is an inline save function."""
+    signature = inspect.signature(fn)
+    param_count = len(signature.parameters)
+    return param_count == 1
+
+
+def is_probably_legacy_file_load(fn: Callable) -> TypeIs[LegacyFileLoad]:
+    """Check if a function is a file load function."""
+    signature = inspect.signature(fn)
+    param_count = len(signature.parameters)
+    return param_count == 2
 
 
 @dataclass
 class Serializer:
     target_class: type
-    save: Save
-    load: Load
+    save: SerializeSaveCallable
+    load: SerializeLoadCallable
 
     # Added to provide a function to check if an object is an instance of the
     # target class because protocol isinstance checks can fail in python3.12+
@@ -75,8 +94,8 @@ SERIALIZERS = []
 
 def register_serializer(
     target_class: type,
-    save: Save,
-    load: Load,
+    save: SerializeSaveCallable,
+    load: SerializeLoadCallable,
     instance_check: Callable[[Any], bool] | None = None,
 ) -> None:
     SERIALIZERS.append(Serializer(target_class, save, load, instance_check))
