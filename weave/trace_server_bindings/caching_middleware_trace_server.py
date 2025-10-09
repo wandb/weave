@@ -531,6 +531,31 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
     ) -> tsi.EvaluationStatusRes:
         return self._next_trace_server.evaluation_status(req)
 
+    # === V2 APIs ===
+
+    def op_create_v2(self, req: tsi.OpCreateV2Req) -> tsi.OpCreateV2Res:
+        return self._next_trace_server.op_create_v2(req)
+
+    def op_read_v2(self, req: tsi.OpReadV2Req) -> tsi.OpReadV2Res:
+        if not digest_is_cacheable(req.digest):
+            return self._next_trace_server.op_read_v2(req)
+        return self._with_cache_pydantic(
+            self._next_trace_server.op_read_v2, req, tsi.OpReadV2Res
+        )
+
+    def op_read_eager_v2(self, req: tsi.OpReadV2Req) -> tsi.OpReadEagerV2Res:
+        if not digest_is_cacheable(req.digest):
+            return self._next_trace_server.op_read_eager_v2(req)
+        return self._with_cache_pydantic(
+            self._next_trace_server.op_read_eager_v2, req, tsi.OpReadEagerV2Res
+        )
+
+    def op_list_v2(self, req: tsi.OpListV2Req) -> Iterator[tsi.OpReadV2Res]:
+        return self._next_trace_server.op_list_v2(req)
+
+    def op_delete_v2(self, req: tsi.OpDeleteV2Req) -> tsi.OpDeleteV2Res:
+        return self._next_trace_server.op_delete_v2(req)
+
 
 def pydantic_bytes_safe_dump(obj: BaseModel) -> str:
     raw_dict = obj.model_dump()
