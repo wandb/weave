@@ -38,9 +38,8 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     OrderField,
     QueryBuilderDynamicField,
     QueryBuilderField,
-    build_calls_query_stats_query,
+    build_calls_stats_query,
     combine_conditions,
-    optimized_project_contains_call_query,
 )
 from weave.trace_server.clickhouse_schema import (
     ALL_CALL_INSERT_COLUMNS,
@@ -108,7 +107,8 @@ from weave.trace_server.objects_query_builder import (
     format_metadata_objects_from_query_result,
     make_objects_val_query_and_parameters,
 )
-from weave.trace_server.opentelemetry.python_spans import ResourceSpans
+from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
+from weave.trace_server.opentelemetry.python_spans import Resource, Span
 from weave.trace_server.orm import ParamBuilder, Row
 from weave.trace_server.project_query_builder import make_project_stats_query
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
@@ -218,15 +218,34 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             raise TypeError(
                 "Expected traces as ExportTraceServiceRequest, got {type(req.traces)}"
             )
-        traces_data = [
-            ResourceSpans.from_proto(span) for span in req.traces.resource_spans
-        ]
+        calls: list[dict[str, object]] = []
+        rejected_spans = 0
+        error_messages: list[str] = []
+        for proto_resource_spans in req.traces.resource_spans:
+            resource = Resource.from_proto(proto_resource_spans.resource)
+            for proto_scope_spans in proto_resource_spans.scope_spans:
+                for proto_span in proto_scope_spans.spans:
+                    try:
+                        span = Span.from_proto(proto_span, resource)
+                    except AttributePathConflictError as e:
+                        # Record and skip malformed spans so we can partially accept the batch
+                        rejected_spans += 1
+                        # Use data available on the proto span for context
+                        try:
+                            trace_id = proto_span.trace_id.hex()
+                            span_id = proto_span.span_id.hex()
+                            name = getattr(proto_span, "name", "")
+                        except Exception:
+                            trace_id = ""
+                            span_id = ""
+                            name = ""
+                        span_ident = (
+                            f"name='{name}' trace_id='{trace_id}' span_id='{span_id}'"
+                        )
+                        error_messages.append(f"Rejected span ({span_ident}): {e!s}")
+                        continue
 
-        calls = []
-        for resource_spans in traces_data:
-            for scope_spans in resource_spans.scope_spans:
-                for span in scope_spans.spans:
-                    start_call, end_call = span.to_call(req.project_id, req.wb_user_id)
+                    start_call, end_call = span.to_call(req.project_id)
                     calls.extend(
                         [
                             {
@@ -238,6 +257,17 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     )
         # TODO: Actually populate the error fields if call_start_batch fails
         self.call_start_batch(tsi.CallCreateBatchReq(batch=calls))
+        if rejected_spans > 0:
+            # Join the first 20 errors and return them delimited by ';'
+            joined_errors = "; ".join(error_messages[:20]) + (
+                "; ..." if len(error_messages) > 20 else ""
+            )
+            return tsi.OtelExportRes(
+                partial_success=tsi.ExportTracePartialSuccess(
+                    rejected_spans=rejected_spans,
+                    error_message=joined_errors,
+                )
+            )
         return tsi.OtelExportRes()
 
     @contextmanager
@@ -339,26 +369,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         aggregate statistics that are not directly queryable from the calls themselves.
         """
         pb = ParamBuilder()
-
-        # Special case when limit=1 and there is no filter or query,
-        # construct highly optimized query that returns early
-        if (
-            req.limit == 1
-            and req.filter is None
-            and req.query is None
-            and not req.include_total_storage_size
-        ):
-            query = optimized_project_contains_call_query(req.project_id, pb)
-            raw_res = self._query(query, pb.get_params())
-            rows = raw_res.result_rows
-            count = rows[0][0]
-            return tsi.CallsQueryStatsRes(
-                count=count,
-                total_storage_size_bytes=None,
-            )
-
-        query, columns = build_calls_query_stats_query(req, pb)
-
+        query, columns = build_calls_stats_query(req, pb)
         raw_res = self._query(query, pb.get_params())
 
         res_dict = (
@@ -745,6 +756,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             if req.filter.base_object_classes:
                 object_query_builder.add_base_object_classes_condition(
                     req.filter.base_object_classes
+                )
+            if req.filter.exclude_base_object_classes:
+                object_query_builder.add_exclude_base_object_classes_condition(
+                    req.filter.exclude_base_object_classes
                 )
             if req.filter.leaf_object_classes:
                 object_query_builder.add_leaf_object_classes_condition(
@@ -2652,6 +2667,7 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: dict) -> dict:
         "exception": ch_call_dict.get("exception"),
         "wb_run_id": ch_call_dict.get("wb_run_id"),
         "wb_run_step": ch_call_dict.get("wb_run_step"),
+        "wb_run_step_end": ch_call_dict.get("wb_run_step_end"),
         "wb_user_id": ch_call_dict.get("wb_user_id"),
         "display_name": display_name,
         "storage_size_bytes": ch_call_dict.get("storage_size_bytes"),
@@ -2740,6 +2756,7 @@ def _end_call_for_insert_to_ch_insertable_end_call(
         summary_dump=_dict_value_to_dump(dict(end_call.summary)),
         output_dump=_any_value_to_dump(output),
         output_refs=output_refs,
+        wb_run_step_end=end_call.wb_run_step_end,
     )
 
 
