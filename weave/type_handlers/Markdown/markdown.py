@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Optional
 
 from weave.trace.serialization import serializer
 
@@ -22,7 +22,7 @@ except ImportError:
 
 def save(
     obj: Markdown, artifact: "MemTraceFilesArtifact", name: str
-) -> dict[str, Any] | None:
+) -> Optional[dict[str, Any]]:
     """Save markdown content as file, return metadata."""
     with artifact.new_file("content.md", binary=False) as f:
         f.write(obj.markup)
