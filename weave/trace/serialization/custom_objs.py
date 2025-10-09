@@ -8,7 +8,6 @@ from weave.trace.op import is_op, op
 from weave.trace.op_protocol import Op
 from weave.trace.refs import ObjectRef, OpRef
 from weave.trace.serialization import (
-    AllLoadCallables,
     op_type,  # noqa: F401, Must import this to register op save/load
 )
 from weave.trace.serialization.mem_artifact import MemTraceFilesArtifact
@@ -17,6 +16,7 @@ from weave.trace.serialization.serializer import (
     get_serializer_for_obj,
     is_probably_legacy_file_load,
     is_probably_legacy_inline_load,
+    AllLoadCallables
 )
 
 
@@ -82,32 +82,6 @@ def encode_custom_obj(obj: Any) -> dict | None:
 
     return encoded
 
-
-def decode_custom_inline_obj(obj: dict) -> Any:
-    type_ = obj["weave_type"]["type"]
-    if type_ in KNOWN_TYPES:
-        serializer = get_serializer_by_id(type_)
-        if serializer is not None:
-            if is_op(serializer.load):
-                # We would expect this to be already set to False, but
-                # just in case.
-                serializer.load._tracing_enabled = False  # type: ignore
-            return serializer.load(obj["val"])
-
-    load_op_uri = obj.get("load_op")
-    if load_op_uri is None:
-        raise ValueError(f"No serializer found for `{type_}`")
-
-    op_ref = OpRef.parse_uri(load_op_uri)
-    wc = require_weave_client()
-    load_instance_op = wc.get(op_ref)
-    if load_instance_op is None:
-        raise ValueError(
-            f"Failed to load op needed to decode object of type `{type_}`. See logs above for more information."
-        )
-
-    load_instance_op._tracing_enabled = False  # type: ignore
-    return load_instance_op(obj.get("val"))
 
 
 def _decode_custom_files_obj(
