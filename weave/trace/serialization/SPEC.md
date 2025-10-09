@@ -1,68 +1,35 @@
-# Weave Serialization Layer
+# Weave Serialization
 
 ## Problem
 
-Markdown serializer stored content inline as JSON, causing bloat for large markdown. Needed hybrid pattern: files + metadata.
+Markdown stored content inline as JSON, bloating payloads for large markdown.
 
 ## Solution
 
-New optional `WeaveSerializer` base class for types needing files + metadata. Legacy function-based serializers unchanged.
+Added 3rd parameter to `load(artifact, name, metadata)` for hybrid pattern. Markdown now stores `.md` file + returns metadata dict.
 
-## New API (Optional)
-
-```python
-from weave.trace.serialization.base_serializer import WeaveSerializer
-
-class MarkdownSerializer(WeaveSerializer):
-    @staticmethod
-    def save(obj: Markdown, artifact, name: str) -> dict | None:
-        # Save content as file
-        with artifact.new_file("content.md", binary=False) as f:
-            f.write(obj.markup)
-
-        # Return metadata
-        return {"code_theme": obj.code_theme} if obj.code_theme else None
-
-    @staticmethod
-    def load(artifact, name: str, metadata: dict | None) -> Markdown:
-        with artifact.open("content.md", binary=False) as f:
-            markup = f.read()
-
-        code_theme = metadata.get("code_theme") if metadata else None
-        return Markdown(markup, code_theme=code_theme)
-
-# Register
-serializer.register_serializer(Markdown, MarkdownSerializer)
-```
-
-## Legacy API (Still Works)
+## Markdown Example
 
 ```python
-# File-based (Image, Audio, Video, etc.)
-def save(obj: Image.Image, artifact, name: str) -> None:
-    with artifact.new_file("image.png", binary=True) as f:
-        obj.save(f, format="PNG")
+def save(obj: Markdown, artifact, name: str) -> dict | None:
+    with artifact.new_file("content.md", binary=False) as f:
+        f.write(obj.markup)
+    return {"code_theme": obj.code_theme} if obj.code_theme else None
 
-def load(artifact, name: str) -> Image.Image:
-    return Image.open(artifact.path("image.png"))
+def load(artifact, name: str, metadata) -> Markdown:
+    with artifact.open("content.md", binary=False) as f:
+        markup = f.read()
+    code_theme = metadata.get("code_theme") if metadata else None
+    return Markdown(markup, code_theme=code_theme)
 
-serializer.register_serializer(Image.Image, save, load)
-
-# Inline (DateTime, etc.)
-def save_dt(obj: datetime) -> dict:
-    return {"iso": obj.isoformat()}
-
-def load_dt(data: dict) -> datetime:
-    return datetime.fromisoformat(data["iso"])
-
-serializer.register_serializer(datetime, save_dt, load_dt)
+serializer.register_serializer(Markdown, save, load)
 ```
 
 ## Dispatch Logic
 
 Count parameters:
-- 1 param → legacy inline
-- 3 params → file-based (legacy or new)
+- 1 param → inline
+- 3 params → file-based (with or without metadata return)
 
 ```python
 sig = inspect.signature(serializer.save)
@@ -77,14 +44,4 @@ else:
         encoded["val"] = metadata
 ```
 
-## Migration Status
-
-- **Markdown**: Migrated to new API (stores `.md` file + metadata)
-- **Everything else**: Legacy API (unchanged)
-
-## Key Points
-
-1. **Additive**: New API available, old API untouched
-2. **Simple**: Just count parameters, no helper functions
-3. **Static methods**: Load serialized as op for cross-runtime deserialization
-4. **Single registration**: `register_serializer()` handles both APIs
+Legacy loads check param count (2 vs 3) to know whether to pass metadata.
