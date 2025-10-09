@@ -60,21 +60,7 @@ import inspect
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Callable, Type
 
-from typing_extensions import TypeIs
-
 from weave.trace.serialization.base_serializer import WeaveSerializer
-
-# Type for legacy inline save functions
-InlineSave = Callable[[Any], Any]
-if TYPE_CHECKING:
-    from weave.trace.serialization.mem_artifact import MemTraceFilesArtifact
-
-
-def is_inline_save(value: Callable) -> TypeIs[InlineSave]:
-    """Check if a value is an inline save function (legacy API only)."""
-    signature = inspect.signature(value)
-    param_count = len(signature.parameters)
-    return param_count == 1
 
 
 @dataclass
