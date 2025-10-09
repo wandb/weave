@@ -28,7 +28,7 @@ def test_decode_custom_files_obj_known_type(client):
 
     # Even though something is wrong with the deserializer op, we can still decode
     decoded = decode_custom_files_obj(
-        encoded["weave_type"], encoded["files"], "weave:///totally/invalid/uri"
+        encoded["weave_type"], encoded["files"], None, "weave:///totally/invalid/uri"
     )
 
     assert isinstance(decoded, Image.Image)
