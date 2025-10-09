@@ -3,7 +3,7 @@ import datetime
 from weave.trace.serialization import serializer
 
 
-def save(obj: datetime.datetime) -> str:
+def save(obj: datetime.datetime, artifact: MemTraceFilesArtifact, name: str) -> str:
     """Serialize a datetime object to ISO format with timezone information.
     If the datetime object is naive (has no timezone), it will be assumed to be UTC.
 
@@ -14,9 +14,9 @@ def save(obj: datetime.datetime) -> str:
     return obj.isoformat()
 
 
-def load(encoded: str) -> datetime.datetime:
+def load(artifact: MemTraceFilesArtifact, name: str, val: Any) -> datetime.datetime:
     """Deserialize an ISO format string back to a datetime object with timezone."""
-    return datetime.datetime.fromisoformat(encoded)
+    return datetime.datetime.fromisoformat(val)
 
 
 def register() -> None:

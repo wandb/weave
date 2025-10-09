@@ -56,7 +56,7 @@ def save(obj: Image.Image, artifact: MemTraceFilesArtifact, name: str) -> None:
         obj.save(f, format=ext_to_pil_format[ext])  # type: ignore
 
 
-def load(artifact: MemTraceFilesArtifact, name: str) -> Image.Image:
+def load(artifact: MemTraceFilesArtifact, name: str, val: Any) -> Image.Image:
     # Today, we assume there can only be 1 image in the artifact.
     filename = first(artifact.path_contents)
     if not filename.startswith("image."):

@@ -33,14 +33,14 @@ def save(
     return None
 
 
-def load(artifact: "MemTraceFilesArtifact", name: str, metadata: Any) -> Markdown:
+def load(artifact: "MemTraceFilesArtifact", name: str, val: Any) -> Markdown:
     """Load markdown from file and metadata."""
     with artifact.open("content.md", binary=False) as f:
         markup = f.read()
 
     kwargs = {}
-    if metadata and isinstance(metadata, dict) and "code_theme" in metadata:
-        kwargs["code_theme"] = metadata["code_theme"]
+    if val and isinstance(val, dict) and "code_theme" in val:
+        kwargs["code_theme"] = val["code_theme"]
 
     return Markdown(markup=markup, **kwargs)
 
