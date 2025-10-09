@@ -91,7 +91,9 @@ from weave.trace_server.ids import generate_id
 from weave.trace_server.image_completion import lite_llm_image_generation
 from weave.trace_server.kafka import KafkaProducer
 from weave.trace_server.llm_completion import (
-    _create_tracked_stream_wrapper,
+    _build_choices_array,
+    _build_completion_response,
+    _create_completion_choice,
     get_custom_provider_info,
     lite_llm_completion,
     lite_llm_completion_stream,
@@ -2928,6 +2930,151 @@ def _process_tool_call_delta(
                 existing_tool_call["function"]["arguments"] += function_data[
                     "arguments"
                 ]
+
+
+def _build_aggregated_output(
+    aggregated_metadata: dict[str, Any],
+    assistant_acc: list[str],
+    tool_calls: list[dict[str, Any]],
+    chunk: dict[str, Any],
+    reasoning_content: list[str],
+    choice_index: int = 0,
+) -> dict[str, Any]:
+    """Build the aggregated output from accumulated data."""
+    current_finish_reason = chunk.get("choices", [{}])[0].get("finish_reason")
+
+    # Use the typed approach for consistency
+    choice = _create_completion_choice(
+        choice_index=choice_index,
+        content_parts=assistant_acc,
+        tool_calls=tool_calls,
+        reasoning_parts=reasoning_content,
+        finish_reason=current_finish_reason,
+    )
+
+    choices_array = [dataclasses.asdict(choice)]
+    return _build_completion_response(aggregated_metadata, choices_array)
+
+
+def _create_tracked_stream_wrapper(
+    insert_call: Callable[[CallEndCHInsertable], None],
+    chunk_iter: Iterator[dict[str, Any]],
+    start_call: CallStartCHInsertable,
+    model_name: str,
+    project_id: str,
+) -> Iterator[dict[str, Any]]:
+    """Create a wrapper that tracks streaming completion and emits call records."""
+
+    def _stream_wrapper() -> Iterator[dict[str, Any]]:
+        # Import helper functions locally to avoid circular imports
+        from weave.trace_server.clickhouse_trace_server_batched import (
+            _end_call_for_insert_to_ch_insertable_end_call,
+            _process_tool_call_delta,
+            _update_metadata_from_chunk,
+        )
+
+        # (1) send meta chunk first so clients can associate stream
+        yield {"_meta": {"weave_call_id": start_call.id}}
+
+        # Initialize accumulation variables for all choices
+        aggregated_output: dict[str, Any] | None = None
+        choice_contents: dict[int, list[str]] = {}  # Track content by choice index
+        choice_tool_calls: dict[
+            int, list[dict[str, Any]]
+        ] = {}  # Track tool calls by choice index
+        choice_reasoning_content: dict[
+            int, list[str]
+        ] = {}  # Track reasoning by choice index
+        choice_finish_reasons: dict[
+            int, str | None
+        ] = {}  # Track finish reasons by choice index
+        aggregated_metadata: dict[str, Any] = {}
+
+        try:
+            for chunk in chunk_iter:
+                yield chunk  # Yield to client immediately
+
+                if not isinstance(chunk, dict):
+                    continue
+
+                # Accumulate metadata from chunks
+                _update_metadata_from_chunk(chunk, aggregated_metadata)
+
+                # Process all choices in the chunk
+                choices = chunk.get("choices")
+                if choices:
+                    for choice in choices:
+                        choice_index = choice.get("index", 0)
+
+                        # Initialize choice accumulators if not present
+                        if choice_index not in choice_contents:
+                            choice_contents[choice_index] = []
+                            choice_tool_calls[choice_index] = []
+                            choice_reasoning_content[choice_index] = []
+                            choice_finish_reasons[choice_index] = None
+
+                        # Update finish reason
+                        if "finish_reason" in choice:
+                            choice_finish_reasons[choice_index] = choice[
+                                "finish_reason"
+                            ]
+
+                        delta = choice.get("delta")
+                        if delta and isinstance(delta, dict):
+                            # Accumulate assistant content for this choice
+                            content_piece = delta.get("content")
+                            if content_piece:
+                                choice_contents[choice_index].append(content_piece)
+
+                            # Handle tool calls for this choice
+                            tool_call_delta = delta.get("tool_calls")
+                            if tool_call_delta:
+                                _process_tool_call_delta(
+                                    tool_call_delta, choice_tool_calls[choice_index]
+                                )
+
+                            # Handle reasoning content for this choice
+                            reasoning_content_delta = delta.get("reasoning_content")
+                            if reasoning_content_delta:
+                                choice_reasoning_content[choice_index].append(
+                                    reasoning_content_delta
+                                )
+
+        finally:
+            # Build final aggregated output with all choices
+            if choice_contents or choice_tool_calls or choice_reasoning_content:
+                choices_array = _build_choices_array(
+                    choice_contents,
+                    choice_tool_calls,
+                    choice_reasoning_content,
+                    choice_finish_reasons,
+                )
+                aggregated_output = _build_completion_response(
+                    aggregated_metadata,
+                    choices_array,
+                )
+
+            # Prepare summary and end call
+            summary: dict[str, Any] = {}
+            if aggregated_output is not None and model_name is not None:
+                aggregated_output["model"] = model_name
+
+                if "usage" in aggregated_output:
+                    summary["usage"] = {model_name: aggregated_output["usage"]}
+
+            end = tsi.EndedCallSchemaForInsert(
+                project_id=project_id,
+                id=start_call.id,
+                ended_at=datetime.datetime.now(),
+                output=aggregated_output,
+                summary=summary,
+            )
+            end_call = _end_call_for_insert_to_ch_insertable_end_call(
+                end, None
+            )  # No trace_server in stream wrapper
+            insert_call(end_call)
+
+    return _stream_wrapper()
 
 
 def _setup_completion_model_info(

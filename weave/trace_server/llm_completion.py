@@ -1,9 +1,5 @@
-from __future__ import annotations
-
-import dataclasses
-import datetime
 from collections.abc import Iterator
-from typing import TYPE_CHECKING, Any, Callable
+from typing import Any, Callable
 
 from pydantic import BaseModel
 
@@ -17,13 +13,6 @@ from weave.trace_server.interface.builtin_object_classes.provider import (
     ProviderModel,
 )
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
-
-# Import types only for type checking to avoid circular imports
-if TYPE_CHECKING:
-    from weave.trace_server.clickhouse_schema import (
-        CallEndCHInsertable,
-        CallStartCHInsertable,
-    )
 
 NOVA_MODELS = ("nova-pro-v1", "nova-lite-v1", "nova-micro-v1")
 
@@ -400,38 +389,35 @@ def lite_llm_completion_stream(
     return _generate_chunks()
 
 
-@dataclasses.dataclass
-class ChoiceMessage:
+class ChoiceMessage(BaseModel):
     """Typed representation of a choice message."""
 
-    content: str | None
+    content: str | None = None
     role: str
-    tool_calls: list[dict[str, Any]] | None
-    function_call: dict[str, Any] | None
-    reasoning_content: str | None
+    tool_calls: list[dict[str, Any]] | None = None
+    function_call: dict[str, Any] | None = None
+    reasoning_content: str | None = None
 
 
-@dataclasses.dataclass
-class CompletionChoice:
+class CompletionChoice(BaseModel):
     """Typed representation of a completion choice."""
 
-    finish_reason: str | None
+    finish_reason: str | None = None
     index: int
     message: ChoiceMessage
 
 
-@dataclasses.dataclass
-class CompletionResponse:
+class CompletionResponse(BaseModel):
     """Typed representation of a completion response."""
 
     id: str
     created: int
     model: str
     object: str
-    system_fingerprint: str
+    system_fingerprint: str | None = None
     choices: list[dict[str, Any]]
     usage: dict[str, Any]
-    service_tier: str
+    service_tier: str | None = None
 
 
 def _build_choice_content(content_parts: list[str]) -> str | None:
@@ -503,7 +489,7 @@ def _build_choices_array(
             reasoning_parts=choice_reasoning_content.get(choice_index, []),
             finish_reason=choice_finish_reasons.get(choice_index),
         )
-        choices.append(dataclasses.asdict(choice))
+        choices.append(choice.model_dump())
 
     return choices
 
@@ -514,16 +500,16 @@ def _build_completion_response(
 ) -> dict[str, Any]:
     """Build a complete completion response."""
     response = CompletionResponse(
-        id=aggregated_metadata.get("id", ""),
-        created=aggregated_metadata.get("created", 0),
-        model=aggregated_metadata.get("model", ""),
+        id=aggregated_metadata.get("id") or "",
+        created=aggregated_metadata.get("created") or 0,
+        model=aggregated_metadata.get("model") or "",
         object="chat.completion",
-        system_fingerprint=aggregated_metadata.get("system_fingerprint", ""),
+        system_fingerprint=aggregated_metadata.get("system_fingerprint"),
         choices=choices_array,
-        usage=aggregated_metadata.get("usage", {}),
-        service_tier=aggregated_metadata.get("service_tier", "default"),
+        usage=aggregated_metadata.get("usage") or {},
+        service_tier=aggregated_metadata.get("service_tier"),
     )
-    return dataclasses.asdict(response)
+    return response.model_dump()
 
 
 def _clean_tool_calls(tool_calls: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -542,148 +528,3 @@ def _clean_tool_calls(tool_calls: list[dict[str, Any]]) -> list[dict[str, Any]]:
         and tool_call.get("function", {}).get("name") is not None
     ]
     return cleaned_tool_calls
-
-
-def _build_aggregated_output(
-    aggregated_metadata: dict[str, Any],
-    assistant_acc: list[str],
-    tool_calls: list[dict[str, Any]],
-    chunk: dict[str, Any],
-    reasoning_content: list[str],
-    choice_index: int = 0,
-) -> dict[str, Any]:
-    """Build the aggregated output from accumulated data."""
-    current_finish_reason = chunk.get("choices", [{}])[0].get("finish_reason")
-
-    # Use the typed approach for consistency
-    choice = _create_completion_choice(
-        choice_index=choice_index,
-        content_parts=assistant_acc,
-        tool_calls=tool_calls,
-        reasoning_parts=reasoning_content,
-        finish_reason=current_finish_reason,
-    )
-
-    choices_array = [dataclasses.asdict(choice)]
-    return _build_completion_response(aggregated_metadata, choices_array)
-
-
-def _create_tracked_stream_wrapper(
-    insert_call: Callable[[CallEndCHInsertable], None],
-    chunk_iter: Iterator[dict[str, Any]],
-    start_call: CallStartCHInsertable,
-    model_name: str,
-    project_id: str,
-) -> Iterator[dict[str, Any]]:
-    """Create a wrapper that tracks streaming completion and emits call records."""
-
-    def _stream_wrapper() -> Iterator[dict[str, Any]]:
-        # Import helper functions locally to avoid circular imports
-        from weave.trace_server.clickhouse_trace_server_batched import (
-            _end_call_for_insert_to_ch_insertable_end_call,
-            _process_tool_call_delta,
-            _update_metadata_from_chunk,
-        )
-
-        # (1) send meta chunk first so clients can associate stream
-        yield {"_meta": {"weave_call_id": start_call.id}}
-
-        # Initialize accumulation variables for all choices
-        aggregated_output: dict[str, Any] | None = None
-        choice_contents: dict[int, list[str]] = {}  # Track content by choice index
-        choice_tool_calls: dict[
-            int, list[dict[str, Any]]
-        ] = {}  # Track tool calls by choice index
-        choice_reasoning_content: dict[
-            int, list[str]
-        ] = {}  # Track reasoning by choice index
-        choice_finish_reasons: dict[
-            int, str | None
-        ] = {}  # Track finish reasons by choice index
-        aggregated_metadata: dict[str, Any] = {}
-
-        try:
-            for chunk in chunk_iter:
-                yield chunk  # Yield to client immediately
-
-                if not isinstance(chunk, dict):
-                    continue
-
-                # Accumulate metadata from chunks
-                _update_metadata_from_chunk(chunk, aggregated_metadata)
-
-                # Process all choices in the chunk
-                choices = chunk.get("choices")
-                if choices:
-                    for choice in choices:
-                        choice_index = choice.get("index", 0)
-
-                        # Initialize choice accumulators if not present
-                        if choice_index not in choice_contents:
-                            choice_contents[choice_index] = []
-                            choice_tool_calls[choice_index] = []
-                            choice_reasoning_content[choice_index] = []
-                            choice_finish_reasons[choice_index] = None
-
-                        # Update finish reason
-                        if "finish_reason" in choice:
-                            choice_finish_reasons[choice_index] = choice[
-                                "finish_reason"
-                            ]
-
-                        delta = choice.get("delta")
-                        if delta and isinstance(delta, dict):
-                            # Accumulate assistant content for this choice
-                            content_piece = delta.get("content")
-                            if content_piece:
-                                choice_contents[choice_index].append(content_piece)
-
-                            # Handle tool calls for this choice
-                            tool_call_delta = delta.get("tool_calls")
-                            if tool_call_delta:
-                                _process_tool_call_delta(
-                                    tool_call_delta, choice_tool_calls[choice_index]
-                                )
-
-                            # Handle reasoning content for this choice
-                            reasoning_content_delta = delta.get("reasoning_content")
-                            if reasoning_content_delta:
-                                choice_reasoning_content[choice_index].append(
-                                    reasoning_content_delta
-                                )
-
-        finally:
-            # Build final aggregated output with all choices
-            if choice_contents or choice_tool_calls or choice_reasoning_content:
-                choices_array = _build_choices_array(
-                    choice_contents,
-                    choice_tool_calls,
-                    choice_reasoning_content,
-                    choice_finish_reasons,
-                )
-                aggregated_output = _build_completion_response(
-                    aggregated_metadata,
-                    choices_array,
-                )
-
-            # Prepare summary and end call
-            summary: dict[str, Any] = {}
-            if aggregated_output is not None and model_name is not None:
-                aggregated_output["model"] = model_name
-
-                if "usage" in aggregated_output:
-                    summary["usage"] = {model_name: aggregated_output["usage"]}
-
-            end = tsi.EndedCallSchemaForInsert(
-                project_id=project_id,
-                id=start_call.id,
-                ended_at=datetime.datetime.now(),
-                output=aggregated_output,
-                summary=summary,
-            )
-            end_call = _end_call_for_insert_to_ch_insertable_end_call(
-                end, None
-            )  # No trace_server in stream wrapper
-            insert_call(end_call)
-
-    return _stream_wrapper()
