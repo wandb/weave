@@ -1,5 +1,4 @@
 DROP TABLE IF EXISTS calls_complete;
-<<<<<<< HEAD
 DROP TABLE IF EXISTS call_starts;
 ALTER TABLE calls_merged_view MODIFY QUERY
     SELECT project_id,
@@ -28,6 +27,3 @@ ALTER TABLE calls_merged_view MODIFY QUERY
     FROM call_parts
     GROUP BY project_id,
         id;
-=======
-DROP TABLE IF EXISTS call_starts;
->>>>>>> griffin/new-schema-playing

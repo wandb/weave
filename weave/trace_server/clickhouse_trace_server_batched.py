@@ -60,7 +60,6 @@ from weave.trace_server.clickhouse_schema import (
     ObjDeleteCHInsertable,
     ObjRefListType,
     SelectableCHObjSchema,
-    get_call_row_indices,
     get_call_start_row_indices,
 )
 from weave.trace_server.constants import (
@@ -107,6 +106,7 @@ from weave.trace_server.model_providers.model_providers import (
     LLMModelProviderInfo,
     read_model_to_provider_info_map,
 )
+from weave.trace_server.models.call_row import CallRow
 from weave.trace_server.object_class_util import process_incoming_object_val
 from weave.trace_server.objects_query_builder import (
     ObjectMetadataQueryBuilder,
@@ -181,7 +181,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._password = password
         self._database = database
         self._flush_immediately = True
-        self._call_batch: list[list[Any]] = []
+        self._call_batch: list[CallRow] = []
         self._use_async_insert = use_async_insert
         self._model_to_provider_info_map = read_model_to_provider_info_map()
         self._file_storage_client: Optional[FileStorageClient] = None
@@ -2619,12 +2619,18 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             raise
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call")
-    def _insert_call(self, ch_call: CallCHInsertable) -> None:
-        parameters = ch_call.model_dump()
-        row = []
-        for key in ALL_CALL_INSERT_COLUMNS:
-            row.append(parameters.get(key, None))
-        self._call_batch.append(row)
+    def _insert_call(self, ch_call: Union[CallCHInsertable, CallRow]) -> None:
+        if isinstance(ch_call, CallRow):
+            # Already a CallRow, add directly to batch
+            self._call_batch.append(ch_call)
+        else:
+            # Convert CallCHInsertable to CallRow
+            parameters = ch_call.model_dump()
+            call_row = CallRow.from_clickhouse_row([
+                parameters.get(key, None) for key in ALL_CALL_INSERT_COLUMNS
+            ])
+            self._call_batch.append(call_row)
+
         if self._flush_immediately:
             self._flush_calls()
 
@@ -2668,7 +2674,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 },
             )
         ).calls
-        print(f"[_get_call_end_ids] one_day_ago_ms: {one_day_ago_ms}, calls: {[call.id for call in calls]}")
+        print(
+            f"[_get_call_end_ids] one_day_ago_ms: {one_day_ago_ms}, calls: {[call.id for call in calls]}"
+        )
         return {call.id for call in calls}
 
     def _ensure_proper_defaults(self, merged_row: list[Any]) -> None:
@@ -2684,66 +2692,25 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             if merged_row[output_refs_idx] is None:
                 merged_row[output_refs_idx] = []
 
-    def _merge_call_start_and_end(
-        self, start_row: list[Any], end_row: list[Any]
-    ) -> list[Any]:
-        """Merge start and end rows into complete call.
-
-        Args:
-            start_row: Row from call_starts table (CALL_STARTS_INSERT_COLUMNS structure)
-                      OR from batch processing (ALL_CALL_INSERT_COLUMNS structure)
-            end_row: Row from batch processing (ALL_CALL_INSERT_COLUMNS structure)
-
-        Returns:
-            Merged row with ALL_CALL_INSERT_COLUMNS structure
-        """
-        call_indices = get_call_row_indices()
-
-        # Create a merged row with the full ALL_CALL_INSERT_COLUMNS structure
-        merged = [None] * len(ALL_CALL_INSERT_COLUMNS)
-
-        # Determine if start_row has CALL_STARTS_INSERT_COLUMNS or ALL_CALL_INSERT_COLUMNS structure
-        if len(start_row) == len(CALL_STARTS_INSERT_COLUMNS):
-            # start_row has CALL_STARTS_INSERT_COLUMNS structure
-            # Copy all fields that exist in both start_row and merged row
-            for i, col_name in enumerate(CALL_STARTS_INSERT_COLUMNS):
-                if col_name in ALL_CALL_INSERT_COLUMNS:
-                    col_index = ALL_CALL_INSERT_COLUMNS.index(col_name)
-                    merged[col_index] = start_row[i]
-
-            # Handle output_refs specially since it's not in CALL_STARTS_INSERT_COLUMNS
-            merged[call_indices.output_refs] = []
-        else:
-            # start_row has ALL_CALL_INSERT_COLUMNS structure (same as end_row)
-            merged = start_row.copy()
-
-        # Copy end row data for columns that don't exist in start row
-        merged[call_indices.ended_at] = end_row[call_indices.ended_at]
-        merged[call_indices.exception] = end_row[call_indices.exception]
-        merged[call_indices.summary_dump] = end_row[call_indices.summary_dump]
-        merged[call_indices.output_dump] = end_row[call_indices.output_dump]
-        merged[call_indices.wb_run_step_end] = end_row[call_indices.wb_run_step_end]
-
-        # Ensure proper default values for fields that can't be None
-        self._ensure_proper_defaults(merged)
-
-        return merged
-
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._flush_calls_complete")
     def _flush_calls_complete(self) -> None:
         print(f"flushing: {len(self._call_batch)=} {self._do_read_before_write()=}")
+
+        # Work with CallRow objects throughout the flow
         complete_calls, call_starts, call_ends = (
             self._separate_complete_and_incomplete_calls(self._call_batch)
         )
 
         if complete_calls:
             print(f"inserting {len(complete_calls)} completed calls")
-            self._insert_complete_calls_batch(complete_calls)
+            # Convert CallRow objects to ClickHouse rows for insertion
+            complete_calls_rows = [call_row.to_clickhouse_row() for call_row in complete_calls]
+            self._insert_complete_calls_batch(complete_calls_rows)
             # delete any in progress calls
             self._call_starts_delete(
                 tsi.CallsDeleteReq(
-                    project_id=complete_calls[0][call_indices.project_id],
-                    call_ids=[call[call_indices.id] for call in complete_calls],
+                    project_id=complete_calls[0].project_id,
+                    call_ids=[call_row.id for call_row in complete_calls],
                 )
             )
 
@@ -2751,14 +2718,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             print("returning early, no in-progress calls or dangling call ends")
             return
 
-        call_indices = get_call_row_indices()
-
         if call_starts:
-            project_id = call_starts[0][call_indices.project_id]
+            project_id = call_starts[0].project_id
 
             # Check SDK version for first call start to determine if we should skip read-before-write
             first_start_attributes = (
-                call_starts[0][call_indices.attributes_dump] or "{}"
+                call_starts[0].attributes_dump or "{}"
             )
             sdk_version = _extract_sdk_version_from_attributes(first_start_attributes)
             skip_read_before_write = _is_sdk_version_gte(sdk_version, "0.52.9")
@@ -2775,21 +2740,23 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 # SDK < 0.52.9: check call_parts table for existing call_ends
                 call_end_ids = self._get_call_end_ids(project_id)
                 starts_to_insert = [
-                    r for r in call_starts if r[call_indices.id] not in call_end_ids
+                    call_row for call_row in call_starts if call_row.id not in call_end_ids
                 ]
                 print(
                     f"SDK {sdk_version} < 0.52.9: inserting {len(starts_to_insert)} call starts (filtered by existing call_ends)"
                 )
 
             if starts_to_insert:
-                self._insert_call_starts_batch(starts_to_insert)
+                # Convert CallRow objects to ClickHouse rows for insertion
+                starts_to_insert_rows = [call_row.to_clickhouse_row() for call_row in starts_to_insert]
+                self._insert_call_starts_batch(starts_to_insert_rows)
 
         if not call_ends:
             print("returning, no dangling call ends")
             return
 
-        project_id = call_ends[0][call_indices.project_id]
-        call_end_ids = {r[call_indices.id] for r in call_ends}
+        project_id = call_ends[0].project_id
+        call_end_ids = {call_row.id for call_row in call_ends}
         print(
             f"Looking for call starts for {len(call_end_ids)} call ends in {project_id=}"
         )
@@ -2799,28 +2766,32 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         start_indices = get_call_start_row_indices()
         found_start_ids = {r[start_indices.id] for r in start_rows}
 
-        merged_calls = [
-            self._merge_call_start_and_end(start, end)
-            for start, end in zip(
-                start_rows,
-                [r for r in call_ends if r[call_indices.id] in found_start_ids],
-            )
-        ]
+        merged_calls = []
+        for start_row, end_call_row in zip(start_rows, call_ends):
+            # Convert start_row to CallRow for merging
+            start_call_row = CallRow.from_clickhouse_row(start_row)
+            merged_call_row = CallRow.merge_start_and_end(start_call_row, end_call_row)
+            merged_calls.append(merged_call_row)
+
         if merged_calls:
             print(f"inserting {len(merged_calls)} MANUALLY merged calls")
-            self._insert_complete_calls_batch(merged_calls)
+            # Convert CallRow objects to ClickHouse rows for insertion
+            merged_calls_rows = [call_row.to_clickhouse_row() for call_row in merged_calls]
+            self._insert_complete_calls_batch(merged_calls_rows)
             self._call_starts_delete(
                 tsi.CallsDeleteReq(
-                    project_id=merged_calls[0][call_indices.project_id],
-                    call_ids=[call[call_indices.id] for call in merged_calls],
+                    project_id=merged_calls[0].project_id,
+                    call_ids=[call_row.id for call_row in merged_calls],
                 )
             )
 
         orphaned_ends = [
-            r for r in call_ends if r[call_indices.id] not in found_start_ids
+            call_row for call_row in call_ends if call_row.id not in found_start_ids
         ]
         print(f"inserting {len(orphaned_ends)} orphaned call ends")
-        self._insert_call_batch(orphaned_ends)
+        # Convert CallRow objects to ClickHouse rows for insertion
+        orphaned_ends_rows = [call_row.to_clickhouse_row() for call_row in orphaned_ends]
+        self._insert_call_batch(orphaned_ends_rows)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._flush_calls")
     def _flush_calls(self) -> None:
@@ -2834,20 +2805,18 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._call_batch = []
 
     def _separate_complete_and_incomplete_calls(
-        self, batch: list[list[Any]]
-    ) -> tuple[list[list[Any]], list[list[Any]], list[list[Any]]]:
+        self, batch: list[CallRow]
+    ) -> tuple[list[CallRow], list[CallRow], list[CallRow]]:
         """Separate batch into complete calls (start+end) and incomplete calls."""
-        call_indices = get_call_row_indices()
-
-        calls_by_id: dict[str, dict[str, list[Any]]] = {}
-        for row in batch:
-            call_id = row[call_indices.id]
+        calls_by_id: dict[str, dict[str, list[CallRow]]] = {}
+        for call_row in batch:
+            call_id = call_row.id
             if call_id not in calls_by_id:
                 calls_by_id[call_id] = {"starts": [], "ends": []}
-            if row[call_indices.started_at] is not None:
-                calls_by_id[call_id]["starts"].append(row)
-            elif row[call_indices.ended_at] is not None:
-                calls_by_id[call_id]["ends"].append(row)
+            if call_row.started_at is not None:
+                calls_by_id[call_id]["starts"].append(call_row)
+            elif call_row.ended_at is not None:
+                calls_by_id[call_id]["ends"].append(call_row)
 
         complete_calls = []
         call_starts = []
@@ -2857,7 +2826,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             starts, ends = call_data["starts"], call_data["ends"]
             if starts and ends:
                 complete_calls.append(
-                    self._merge_call_start_and_end(starts[0], ends[0])
+                    CallRow.merge_start_and_end(starts[0], ends[0])
                 )
             else:
                 call_starts.extend(starts)
@@ -2929,7 +2898,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         )
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._strip_large_values")
-    def _strip_large_values(self, batch: list[list[Any]]) -> list[list[Any]]:
+    def _strip_large_values(self, batch: list[CallRow]) -> list[CallRow]:
         """Iterate through the batch and replace large JSON values with placeholders.
 
         Only considers JSON dump columns and ensures their combined size stays under
@@ -2946,7 +2915,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             ch_settings.ENTITY_TOO_LARGE_PAYLOAD
         )
 
-        for item in batch:
+        for call_row in batch:
+            # Convert to ClickHouse row for processing
+            item = call_row.to_clickhouse_row()
+
             # Calculate only JSON dump bytes
             json_idx_size_pairs = [
                 (i, _num_bytes(item[i])) for i in json_column_indices
@@ -2972,7 +2944,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 total_json_bytes -= size - entity_too_large_payload_byte_size
                 stripped_count += 1
 
-            final_batch.append(stripped_item)
+            # Convert back to CallRow
+            stripped_call_row = CallRow.from_clickhouse_row(stripped_item)
+            final_batch.append(stripped_call_row)
 
         ddtrace.tracer.current_span().set_tags(
             {
