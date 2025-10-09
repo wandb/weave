@@ -740,6 +740,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         return tsi.CallsDeleteRes()
 
+    def _call_starts_delete(self, req: tsi.CallsDeleteReq) -> None:
+        self.ch_client.query(
+            self._make_delete_query_with_cte("call_starts"),
+            parameters=req.model_dump(),
+        )
+
     def _ensure_valid_update_field(self, req: tsi.CallUpdateReq) -> None:
         valid_update_fields = ["display_name"]
         for field in valid_update_fields:
@@ -2733,6 +2739,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if complete_calls:
             print(f"inserting {len(complete_calls)} completed calls")
             self._insert_complete_calls_batch(complete_calls)
+            # delete any in progress calls
+            self._call_starts_delete(
+                tsi.CallsDeleteReq(
+                    project_id=complete_calls[0][call_indices.project_id],
+                    call_ids=[call[call_indices.id] for call in complete_calls],
+                )
+            )
 
         if not call_starts and not call_ends:
             print("returning early, no in-progress calls or dangling call ends")
@@ -2796,6 +2809,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if merged_calls:
             print(f"inserting {len(merged_calls)} MANUALLY merged calls")
             self._insert_complete_calls_batch(merged_calls)
+            self._call_starts_delete(
+                tsi.CallsDeleteReq(
+                    project_id=merged_calls[0][call_indices.project_id],
+                    call_ids=[call[call_indices.id] for call in merged_calls],
+                )
+            )
 
         orphaned_ends = [
             r for r in call_ends if r[call_indices.id] not in found_start_ids
