@@ -1086,13 +1086,13 @@ To use the code sample:
 By default, Weave automatically patches and tracks calls to common LLM libraries like `openai`, `anthropic`, `cohere`, and `mistral`.
 
 :::warning[Deprecation Notice]
-The `autopatch_settings` argument is deprecated. Use `implicitly_patch_integrations=False` to disable implicit patching, or call specific patch functions like `patch_openai(settings={...})` to configure settings per integration.
+The `autopatch_settings` argument is deprecated. Use `settings={"implicitly_patch_integrations": False}` to disable implicit patching, or call specific patch functions like `weave.integrations.patch_openai(settings={...})` to configure settings per integration.
 :::
 
 ### Disable all autopatching
 
 ```python showLineNumbers
-weave.init(..., implicitly_patch_integrations=False)
+weave.init(..., settings={"implicitly_patch_integrations": False})
 ```
 
 ### Disable a specific integration
@@ -1101,7 +1101,7 @@ weave.init(..., implicitly_patch_integrations=False)
 import weave
 import weave.integrations
 
-weave.init(..., implicitly_patch_integrations=False)
+weave.init(..., settings={"implicitly_patch_integrations": False})
 
 # Then manually patch only the integrations you want
 weave.integrations.patch_anthropic()
