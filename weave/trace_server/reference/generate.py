@@ -841,13 +841,17 @@ def generate_routes(
         tags=[V2_EVALUATION_RUNS_TAG_NAME],
     )
     def evaluation_run_start(
-        req: tsi.EvaluationRunStartReq,
         entity: str,
         project: str,
+        body: tsi.EvaluationRunStartBody,
         service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
     ) -> tsi.EvaluationRunStartRes:
         """Start a new evaluation run."""
-        req.project_id = f"{entity}/{project}"
+        req = tsi.EvaluationRunStartReq(
+            project_id=f"{entity}/{project}",
+            evaluation_ref=body.evaluation_ref,
+            model_ref=body.model_ref,
+        )
         return service.trace_server_interface.evaluation_run_start(req)
 
     @router.post(
@@ -855,13 +859,19 @@ def generate_routes(
         tags=[V2_EVALUATION_RUNS_TAG_NAME],
     )
     def evaluation_run_log_prediction(
-        req: tsi.EvaluationRunLogPredictionReq,
         entity: str,
         project: str,
+        body: tsi.EvaluationRunLogPredictionBody,
         service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
     ) -> tsi.EvaluationRunLogPredictionRes:
         """Log a prediction within an evaluation run."""
-        req.project_id = f"{entity}/{project}"
+        req = tsi.EvaluationRunLogPredictionReq(
+            project_id=f"{entity}/{project}",
+            evaluation_run_id=body.evaluation_run_id,
+            model_ref=body.model_ref,
+            inputs=body.inputs,
+            output=body.output,
+        )
         return service.trace_server_interface.evaluation_run_log_prediction(req)
 
     @router.post(
@@ -869,13 +879,18 @@ def generate_routes(
         tags=[V2_EVALUATION_RUNS_TAG_NAME],
     )
     def evaluation_run_log_score(
-        req: tsi.EvaluationRunLogScoreReq,
         entity: str,
         project: str,
+        body: tsi.EvaluationRunLogScoreBody,
         service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
     ) -> tsi.EvaluationRunLogScoreRes:
         """Log a score for a prediction."""
-        req.project_id = f"{entity}/{project}"
+        req = tsi.EvaluationRunLogScoreReq(
+            project_id=f"{entity}/{project}",
+            predict_call_id=body.predict_call_id,
+            scorer_ref=body.scorer_ref,
+            score=body.score,
+        )
         return service.trace_server_interface.evaluation_run_log_score(req)
 
     @router.post(
@@ -883,13 +898,17 @@ def generate_routes(
         tags=[V2_EVALUATION_RUNS_TAG_NAME],
     )
     def evaluation_run_finish(
-        req: tsi.EvaluationRunFinishReq,
         entity: str,
         project: str,
+        body: tsi.EvaluationRunFinishBody,
         service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
     ) -> tsi.EvaluationRunFinishRes:
         """Finish an evaluation run."""
-        req.project_id = f"{entity}/{project}"
+        req = tsi.EvaluationRunFinishReq(
+            project_id=f"{entity}/{project}",
+            evaluation_run_id=body.evaluation_run_id,
+            summary=body.summary,
+        )
         return service.trace_server_interface.evaluation_run_finish(req)
 
     @router.get(

@@ -1618,8 +1618,7 @@ class EvaluationDeleteV2Res(BaseModel):
     num_deleted: int = Field(..., description="Number of evaluation versions deleted")
 
 
-class EvaluationRunStartReq(BaseModel):
-    project_id: str = Field(..., description="Project ID (e.g., 'entity/project')")
+class EvaluationRunStartBody(BaseModel):
     evaluation_ref: str = Field(
         ..., description="Reference to the evaluation object (weave:// URI)"
     )
@@ -1628,14 +1627,15 @@ class EvaluationRunStartReq(BaseModel):
     )
 
 
+class EvaluationRunStartReq(EvaluationRunStartBody):
+    project_id: str = Field(..., description="Project ID (e.g., 'entity/project')")
+
+
 class EvaluationRunStartRes(BaseModel):
     evaluation_run_id: str = Field(..., description="ID of the started evaluation run")
 
 
-class EvaluationRunLogPredictionReq(BaseModel):
-    project_id: str = Field(
-        ..., description="The `entity/project` where this evaluation is saved"
-    )
+class EvaluationRunLogPredictionBody(BaseModel):
     evaluation_run_id: str = Field(..., description="ID of the parent evaluation run")
     model_ref: Optional[str] = Field(
         None, description="Reference to the model object (weave:// URI)"
@@ -1644,14 +1644,17 @@ class EvaluationRunLogPredictionReq(BaseModel):
     output: Any = Field(None, description="Output from the model prediction")
 
 
+class EvaluationRunLogPredictionReq(EvaluationRunLogPredictionBody):
+    project_id: str = Field(
+        ..., description="The `entity/project` where this evaluation is saved"
+    )
+
+
 class EvaluationRunLogPredictionRes(BaseModel):
     predict_call_id: str = Field(..., description="ID of the prediction call")
 
 
-class EvaluationRunLogScoreReq(BaseModel):
-    project_id: str = Field(
-        ..., description="The `entity/project` where this evaluation is saved"
-    )
+class EvaluationRunLogScoreBody(BaseModel):
     predict_call_id: str = Field(..., description="ID of the parent prediction call")
     scorer_ref: Optional[str] = Field(
         None, description="Reference to the scorer object (weave:// URI)"
@@ -1661,19 +1664,28 @@ class EvaluationRunLogScoreReq(BaseModel):
     )
 
 
+class EvaluationRunLogScoreReq(EvaluationRunLogScoreBody):
+    project_id: str = Field(
+        ..., description="The `entity/project` where this evaluation is saved"
+    )
+
+
 class EvaluationRunLogScoreRes(BaseModel):
     call_id: str = Field(..., description="ID of the score call")
 
 
-class EvaluationRunFinishReq(BaseModel):
-    project_id: str = Field(
-        ..., description="The `entity/project` where this evaluation is saved"
-    )
+class EvaluationRunFinishBody(BaseModel):
     evaluation_run_id: str = Field(
         ..., description="ID of the evaluation run to finish"
     )
     summary: dict[str, Any] = Field(
         default_factory=dict, description="Summary data for the evaluation"
+    )
+
+
+class EvaluationRunFinishReq(EvaluationRunFinishBody):
+    project_id: str = Field(
+        ..., description="The `entity/project` where this evaluation is saved"
     )
 
 
