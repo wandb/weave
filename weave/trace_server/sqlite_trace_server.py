@@ -2269,9 +2269,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         result = self.obj_delete(obj_delete_req)
         return tsi.EvaluationDeleteV2Res(num_deleted=result.num_deleted)
 
-    def evaluation_run_start(
-        self, req: tsi.EvaluationRunStartReq
-    ) -> tsi.EvaluationRunStartRes:
+    def evaluation_run_start_v2(
+        self, req: tsi.EvaluationRunStartV2Req
+    ) -> tsi.EvaluationRunStartV2Res:
         """Start an evaluation run by creating a call."""
         import datetime
 
@@ -2287,11 +2287,11 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             )
         )
         call_res = self.call_start(call_start_req)
-        return tsi.EvaluationRunStartRes(evaluation_run_id=call_res.id)
+        return tsi.EvaluationRunStartV2Res(evaluation_run_id=call_res.id)
 
-    def evaluation_run_log_prediction(
-        self, req: tsi.EvaluationRunLogPredictionReq
-    ) -> tsi.EvaluationRunLogPredictionRes:
+    def evaluation_run_log_prediction_v2(
+        self, req: tsi.EvaluationRunLogPredictionV2Req
+    ) -> tsi.EvaluationRunLogPredictionV2Res:
         """Log a prediction within an evaluation run by creating a child call."""
         import datetime
 
@@ -2320,11 +2320,11 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         )
         self.call_end(call_end_req)
 
-        return tsi.EvaluationRunLogPredictionRes(predict_call_id=call_start_res.id)
+        return tsi.EvaluationRunLogPredictionV2Res(predict_call_id=call_start_res.id)
 
-    def evaluation_run_log_score(
-        self, req: tsi.EvaluationRunLogScoreReq
-    ) -> tsi.EvaluationRunLogScoreRes:
+    def evaluation_run_log_score_v2(
+        self, req: tsi.EvaluationRunLogScoreV2Req
+    ) -> tsi.EvaluationRunLogScoreV2Res:
         """Log a score for a prediction by creating a child call."""
         import datetime
 
@@ -2352,11 +2352,11 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         )
         self.call_end(call_end_req)
 
-        return tsi.EvaluationRunLogScoreRes(call_id=call_start_res.id)
+        return tsi.EvaluationRunLogScoreV2Res(call_id=call_start_res.id)
 
-    def evaluation_run_finish(
-        self, req: tsi.EvaluationRunFinishReq
-    ) -> tsi.EvaluationRunFinishRes:
+    def evaluation_run_finish_v2(
+        self, req: tsi.EvaluationRunFinishV2Req
+    ) -> tsi.EvaluationRunFinishV2Res:
         """Finish an evaluation run by ending the call."""
         import datetime
 
@@ -2370,11 +2370,11 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         )
         self.call_end(call_end_req)
 
-        return tsi.EvaluationRunFinishRes(success=True)
+        return tsi.EvaluationRunFinishV2Res(success=True)
 
-    def evaluation_run_read(
-        self, req: tsi.EvaluationRunReadReq
-    ) -> tsi.EvaluationRunReadRes:
+    def evaluation_run_read_v2(
+        self, req: tsi.EvaluationRunReadV2Req
+    ) -> tsi.EvaluationRunReadV2Res:
         """Read a single evaluation run by its evaluation_run_id."""
         # Query the call
         call_res = self.call_read(
@@ -2385,7 +2385,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         )
 
         if not call_res.call:
-            return tsi.EvaluationRunReadRes(
+            return tsi.EvaluationRunReadV2Res(
                 evaluation_run_id=req.evaluation_run_id,
                 evaluation_ref=None,
                 model_ref=None,
@@ -2402,7 +2402,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             evaluation_ref = call.attributes.get("evaluation_ref")
             model_ref = call.attributes.get("model_ref")
 
-        return tsi.EvaluationRunReadRes(
+        return tsi.EvaluationRunReadV2Res(
             evaluation_run_id=call.id,
             evaluation_ref=evaluation_ref,
             model_ref=model_ref,
@@ -2410,9 +2410,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             summary=call.output if isinstance(call.output, dict) else None,
         )
 
-    def evaluation_run_list(
-        self, req: tsi.EvaluationRunListReq
-    ) -> Iterator[tsi.EvaluationRunReadRes]:
+    def evaluation_run_list_v2(
+        self, req: tsi.EvaluationRunListV2Req
+    ) -> Iterator[tsi.EvaluationRunReadV2Res]:
         """List evaluation runs by querying calls with evaluation run attributes."""
         # Build the calls filter
         calls_filter = tsi.CallsFilter()
@@ -2454,7 +2454,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             )
             model_ref = call.attributes.get("model_ref") if call.attributes else None
 
-            yield tsi.EvaluationRunReadRes(
+            yield tsi.EvaluationRunReadV2Res(
                 evaluation_run_id=call.id,
                 evaluation_ref=evaluation_ref,
                 model_ref=model_ref,
@@ -2462,9 +2462,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 summary=call.output if isinstance(call.output, dict) else None,
             )
 
-    def evaluation_run_delete(
-        self, req: tsi.EvaluationRunDeleteReq
-    ) -> tsi.EvaluationRunDeleteRes:
+    def evaluation_run_delete_v2(
+        self, req: tsi.EvaluationRunDeleteV2Req
+    ) -> tsi.EvaluationRunDeleteV2Res:
         """Delete evaluation runs by deleting their associated calls."""
         # Use calls_delete to delete the evaluation run calls
         calls_delete_req = tsi.CallsDeleteReq(
@@ -2474,7 +2474,7 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         )
         self.calls_delete(calls_delete_req)
 
-        return tsi.EvaluationRunDeleteRes(num_deleted=len(req.evaluation_run_ids))
+        return tsi.EvaluationRunDeleteV2Res(num_deleted=len(req.evaluation_run_ids))
 
     def _table_row_read(self, project_id: str, row_digest: str) -> tsi.TableRowSchema:
         conn, cursor = get_conn_cursor(self.db_path)

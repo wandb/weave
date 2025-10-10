@@ -554,50 +554,54 @@ class ExternalTraceServer(tsi.TraceServerInterface):
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(self._internal_trace_server.evaluation_delete_v2, req)
 
-    def evaluation_run_start(
-        self, req: tsi.EvaluationRunStartReq
-    ) -> tsi.EvaluationRunStartRes:
+    def evaluation_run_start_v2(
+        self, req: tsi.EvaluationRunStartV2Req
+    ) -> tsi.EvaluationRunStartV2Res:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(self._internal_trace_server.evaluation_run_start, req)
+        return self._ref_apply(self._internal_trace_server.evaluation_run_start_v2, req)
 
-    def evaluation_run_log_prediction(
-        self, req: tsi.EvaluationRunLogPredictionReq
-    ) -> tsi.EvaluationRunLogPredictionRes:
-        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(
-            self._internal_trace_server.evaluation_run_log_prediction, req
-        )
-
-    def evaluation_run_log_score(
-        self, req: tsi.EvaluationRunLogScoreReq
-    ) -> tsi.EvaluationRunLogScoreRes:
+    def evaluation_run_log_prediction_v2(
+        self, req: tsi.EvaluationRunLogPredictionV2Req
+    ) -> tsi.EvaluationRunLogPredictionV2Res:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(
-            self._internal_trace_server.evaluation_run_log_score, req
+            self._internal_trace_server.evaluation_run_log_prediction_v2, req
         )
 
-    def evaluation_run_finish(
-        self, req: tsi.EvaluationRunFinishReq
-    ) -> tsi.EvaluationRunFinishRes:
+    def evaluation_run_log_score_v2(
+        self, req: tsi.EvaluationRunLogScoreV2Req
+    ) -> tsi.EvaluationRunLogScoreV2Res:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(self._internal_trace_server.evaluation_run_finish, req)
+        return self._ref_apply(
+            self._internal_trace_server.evaluation_run_log_score_v2, req
+        )
 
-    def evaluation_run_read(
-        self, req: tsi.EvaluationRunReadReq
-    ) -> tsi.EvaluationRunReadRes:
+    def evaluation_run_finish_v2(
+        self, req: tsi.EvaluationRunFinishV2Req
+    ) -> tsi.EvaluationRunFinishV2Res:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(self._internal_trace_server.evaluation_run_read, req)
+        return self._ref_apply(
+            self._internal_trace_server.evaluation_run_finish_v2, req
+        )
 
-    def evaluation_run_list(
-        self, req: tsi.EvaluationRunListReq
-    ) -> Iterator[tsi.EvaluationRunReadRes]:
+    def evaluation_run_read_v2(
+        self, req: tsi.EvaluationRunReadV2Req
+    ) -> tsi.EvaluationRunReadV2Res:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.evaluation_run_read_v2, req)
+
+    def evaluation_run_list_v2(
+        self, req: tsi.EvaluationRunListV2Req
+    ) -> Iterator[tsi.EvaluationRunReadV2Res]:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._stream_ref_apply(
-            self._internal_trace_server.evaluation_run_list, req
+            self._internal_trace_server.evaluation_run_list_v2, req
         )
 
-    def evaluation_run_delete(
-        self, req: tsi.EvaluationRunDeleteReq
-    ) -> tsi.EvaluationRunDeleteRes:
+    def evaluation_run_delete_v2(
+        self, req: tsi.EvaluationRunDeleteV2Req
+    ) -> tsi.EvaluationRunDeleteV2Res:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
-        return self._ref_apply(self._internal_trace_server.evaluation_run_delete, req)
+        return self._ref_apply(
+            self._internal_trace_server.evaluation_run_delete_v2, req
+        )
