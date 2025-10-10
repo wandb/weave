@@ -1017,6 +1017,101 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         r = self._delete_request_executor(url, params)
         return tsi.EvaluationDeleteV2Res.model_validate(r.json())
 
+    def evaluation_run_start_v2(
+        self, req: Union[tsi.EvaluationRunStartV2Req, dict[str, Any]]
+    ) -> tsi.EvaluationRunStartV2Res:
+        if isinstance(req, dict):
+            req = tsi.EvaluationRunStartV2Req.model_validate(req)
+        req = cast(tsi.EvaluationRunStartV2Req, req)
+        entity, project = req.project_id.split("/", 1)
+        url = f"/v2/{entity}/{project}/evaluation_runs/start"
+        r = self._post_request_executor(url, req.model_dump(mode="json"))
+        return tsi.EvaluationRunStartV2Res.model_validate(r.json())
+
+    def evaluation_run_log_prediction_v2(
+        self, req: Union[tsi.EvaluationRunLogPredictionV2Req, dict[str, Any]]
+    ) -> tsi.EvaluationRunLogPredictionV2Res:
+        if isinstance(req, dict):
+            req = tsi.EvaluationRunLogPredictionV2Req.model_validate(req)
+        req = cast(tsi.EvaluationRunLogPredictionV2Req, req)
+        entity, project = req.project_id.split("/", 1)
+        url = f"/v2/{entity}/{project}/evaluation_runs/log_prediction"
+        r = self._post_request_executor(url, req.model_dump(mode="json"))
+        return tsi.EvaluationRunLogPredictionV2Res.model_validate(r.json())
+
+    def evaluation_run_log_score_v2(
+        self, req: Union[tsi.EvaluationRunLogScoreV2Req, dict[str, Any]]
+    ) -> tsi.EvaluationRunLogScoreV2Res:
+        if isinstance(req, dict):
+            req = tsi.EvaluationRunLogScoreV2Req.model_validate(req)
+        req = cast(tsi.EvaluationRunLogScoreV2Req, req)
+        entity, project = req.project_id.split("/", 1)
+        url = f"/v2/{entity}/{project}/evaluation_runs/log_score"
+        r = self._post_request_executor(url, req.model_dump(mode="json"))
+        return tsi.EvaluationRunLogScoreV2Res.model_validate(r.json())
+
+    def evaluation_run_finish_v2(
+        self, req: Union[tsi.EvaluationRunFinishV2Req, dict[str, Any]]
+    ) -> tsi.EvaluationRunFinishV2Res:
+        if isinstance(req, dict):
+            req = tsi.EvaluationRunFinishV2Req.model_validate(req)
+        req = cast(tsi.EvaluationRunFinishV2Req, req)
+        entity, project = req.project_id.split("/", 1)
+        url = f"/v2/{entity}/{project}/evaluation_runs/finish"
+        r = self._post_request_executor(url, req.model_dump(mode="json"))
+        return tsi.EvaluationRunFinishV2Res.model_validate(r.json())
+
+    def evaluation_run_read_v2(
+        self, req: Union[tsi.EvaluationRunReadV2Req, dict[str, Any]]
+    ) -> tsi.EvaluationRunReadV2Res:
+        if isinstance(req, dict):
+            req = tsi.EvaluationRunReadV2Req.model_validate(req)
+        req = cast(tsi.EvaluationRunReadV2Req, req)
+        entity, project = req.project_id.split("/", 1)
+        url = f"/v2/{entity}/{project}/evaluation_runs/{req.evaluation_run_id}"
+        r = self._get_request_executor(url)
+        return tsi.EvaluationRunReadV2Res.model_validate(r.json())
+
+    def evaluation_run_list_v2(
+        self, req: Union[tsi.EvaluationRunListV2Req, dict[str, Any]]
+    ) -> Iterator[tsi.EvaluationRunReadV2Res]:
+        if isinstance(req, dict):
+            req = tsi.EvaluationRunListV2Req.model_validate(req)
+        req = cast(tsi.EvaluationRunListV2Req, req)
+        entity, project = req.project_id.split("/", 1)
+        url = f"/v2/{entity}/{project}/evaluation_runs"
+        # Build query params
+        params: dict[str, Any] = {}
+        if req.limit is not None:
+            params["limit"] = req.limit
+        if req.offset is not None:
+            params["offset"] = req.offset
+        if req.filter:
+            if req.filter.evaluation_refs:
+                params["evaluation_refs"] = ",".join(req.filter.evaluation_refs)
+            if req.filter.model_refs:
+                params["model_refs"] = ",".join(req.filter.model_refs)
+            if req.filter.evaluation_run_ids:
+                params["evaluation_run_ids"] = ",".join(req.filter.evaluation_run_ids)
+        r = self._get_request_executor(url, params, stream=True)
+        for line in r.iter_lines():
+            if line:
+                yield tsi.EvaluationRunReadV2Res.model_validate_json(line)
+
+    def evaluation_run_delete_v2(
+        self, req: Union[tsi.EvaluationRunDeleteV2Req, dict[str, Any]]
+    ) -> tsi.EvaluationRunDeleteV2Res:
+        if isinstance(req, dict):
+            req = tsi.EvaluationRunDeleteV2Req.model_validate(req)
+        req = cast(tsi.EvaluationRunDeleteV2Req, req)
+        entity, project = req.project_id.split("/", 1)
+        url = f"/v2/{entity}/{project}/evaluation_runs"
+        # Build query params
+        params = {}
+        params["evaluation_run_ids"] = ",".join(req.evaluation_run_ids)
+        r = self._delete_request_executor(url, params)
+        return tsi.EvaluationRunDeleteV2Res.model_validate(r.json())
+
 
 __docspec__ = [
     RemoteHTTPTraceServer,

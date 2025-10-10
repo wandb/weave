@@ -1618,6 +1618,162 @@ class EvaluationDeleteV2Res(BaseModel):
     num_deleted: int = Field(..., description="Number of evaluation versions deleted")
 
 
+class EvaluationRunStartV2Body(BaseModel):
+    evaluation_ref: str = Field(
+        ..., description="Reference to the evaluation object (weave:// URI)"
+    )
+    model_ref: Optional[str] = Field(
+        None, description="Reference to the model object (weave:// URI)"
+    )
+
+
+class EvaluationRunStartV2Req(EvaluationRunStartV2Body):
+    project_id: str = Field(..., description="Project ID (e.g., 'entity/project')")
+
+
+class EvaluationRunStartV2Res(BaseModel):
+    evaluation_run_id: str = Field(..., description="ID of the started evaluation run")
+
+
+class EvaluationRunLogPredictionV2Body(BaseModel):
+    evaluation_run_id: str = Field(..., description="ID of the parent evaluation run")
+    model_ref: Optional[str] = Field(
+        None, description="Reference to the model object (weave:// URI)"
+    )
+    inputs: dict[str, Any] = Field(..., description="Inputs to the model")
+    output: Any = Field(None, description="Output from the model prediction")
+
+
+class EvaluationRunLogPredictionV2Req(EvaluationRunLogPredictionV2Body):
+    project_id: str = Field(
+        ..., description="The `entity/project` where this evaluation is saved"
+    )
+
+
+class EvaluationRunLogPredictionV2Res(BaseModel):
+    predict_call_id: str = Field(..., description="ID of the prediction call")
+
+
+class EvaluationRunLogScoreV2Body(BaseModel):
+    predict_call_id: str = Field(..., description="ID of the parent prediction call")
+    scorer_ref: Optional[str] = Field(
+        None, description="Reference to the scorer object (weave:// URI)"
+    )
+    score: Union[dict[str, Any], int, float] = Field(
+        ..., description="The score value (can be a dict, int, or float)"
+    )
+
+
+class EvaluationRunLogScoreV2Req(EvaluationRunLogScoreV2Body):
+    project_id: str = Field(
+        ..., description="The `entity/project` where this evaluation is saved"
+    )
+
+
+class EvaluationRunLogScoreV2Res(BaseModel):
+    call_id: str = Field(..., description="ID of the score call")
+
+
+class EvaluationRunFinishV2Body(BaseModel):
+    evaluation_run_id: str = Field(
+        ..., description="ID of the evaluation run to finish"
+    )
+    summary: dict[str, Any] = Field(
+        default_factory=dict, description="Summary data for the evaluation"
+    )
+
+
+class EvaluationRunFinishV2Req(EvaluationRunFinishV2Body):
+    project_id: str = Field(
+        ..., description="The `entity/project` where this evaluation is saved"
+    )
+
+
+class EvaluationRunFinishV2Res(BaseModel):
+    success: bool = Field(
+        ..., description="Whether the evaluation was successfully finished"
+    )
+
+
+class EvaluationRunReadV2Req(BaseModel):
+    project_id: str = Field(
+        ..., description="The `entity/project` where this evaluation run exists"
+    )
+    evaluation_run_id: str = Field(..., description="ID of the evaluation run")
+
+
+class EvaluationRunReadV2Res(BaseModel):
+    evaluation_run_id: str = Field(..., description="ID of the evaluation run")
+    evaluation_ref: Optional[str] = Field(
+        None, description="Reference to the evaluation object (weave:// URI)"
+    )
+    model_ref: Optional[str] = Field(
+        None, description="Reference to the model object (weave:// URI)"
+    )
+    created_at: Optional[datetime.datetime] = Field(
+        None, description="When the evaluation run was created"
+    )
+    summary: Optional[dict[str, Any]] = Field(
+        None, description="Summary data for the evaluation run"
+    )
+
+
+class EvaluationRunFilterV2(BaseModelStrict):
+    evaluation_refs: Optional[list[str]] = Field(
+        default=None,
+        description="Filter by evaluation references (weave:// URIs)",
+        examples=[["weave:///entity/project/object/Evaluation:abc123"]],
+    )
+    model_refs: Optional[list[str]] = Field(
+        default=None,
+        description="Filter by model references (weave:// URIs)",
+        examples=[["weave:///entity/project/object/Model:xyz789"]],
+    )
+    evaluation_run_ids: Optional[list[str]] = Field(
+        default=None,
+        description="Filter by specific evaluation run IDs",
+        examples=[["call_123", "call_456"]],
+    )
+
+
+class EvaluationRunListV2Req(BaseModel):
+    project_id: str = Field(
+        ..., description="The `entity/project` where these evaluation runs exist"
+    )
+    filter: Optional[EvaluationRunFilterV2] = Field(
+        default=None,
+        description="Filter criteria for evaluation runs",
+    )
+    limit: Optional[int] = Field(
+        default=None, description="Maximum number of evaluation runs to return"
+    )
+    offset: Optional[int] = Field(
+        default=None, description="Number of evaluation runs to skip"
+    )
+    sort_by: Optional[list[SortBy]] = Field(
+        default=None,
+        description="Sorting criteria for evaluation runs",
+        examples=[[SortBy(field="created_at", direction="desc")]],
+    )
+
+
+class EvaluationRunDeleteV2Req(BaseModelStrict):
+    project_id: str = Field(
+        ..., description="The `entity/project` where this evaluation run exists"
+    )
+    evaluation_run_ids: list[str] = Field(
+        ...,
+        description="List of evaluation run IDs to delete",
+        examples=[["call_123", "call_456"]],
+    )
+    # wb_user_id is automatically populated by the server
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class EvaluationRunDeleteV2Res(BaseModel):
+    num_deleted: int = Field(..., description="Number of evaluation runs deleted")
+
+
 class TraceServerInterface(Protocol):
     def ensure_project_exists(
         self, entity: str, project: str
@@ -1752,3 +1908,26 @@ class TraceServerInterface(Protocol):
     def evaluation_delete_v2(
         self, req: EvaluationDeleteV2Req
     ) -> EvaluationDeleteV2Res: ...
+
+    # Evaluation Runs
+    def evaluation_run_start_v2(
+        self, req: EvaluationRunStartV2Req
+    ) -> EvaluationRunStartV2Res: ...
+    def evaluation_run_log_prediction_v2(
+        self, req: EvaluationRunLogPredictionV2Req
+    ) -> EvaluationRunLogPredictionV2Res: ...
+    def evaluation_run_log_score_v2(
+        self, req: EvaluationRunLogScoreV2Req
+    ) -> EvaluationRunLogScoreV2Res: ...
+    def evaluation_run_finish_v2(
+        self, req: EvaluationRunFinishV2Req
+    ) -> EvaluationRunFinishV2Res: ...
+    def evaluation_run_read_v2(
+        self, req: EvaluationRunReadV2Req
+    ) -> EvaluationRunReadV2Res: ...
+    def evaluation_run_list_v2(
+        self, req: EvaluationRunListV2Req
+    ) -> Iterator[EvaluationRunReadV2Res]: ...
+    def evaluation_run_delete_v2(
+        self, req: EvaluationRunDeleteV2Req
+    ) -> EvaluationRunDeleteV2Res: ...
