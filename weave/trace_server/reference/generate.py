@@ -22,6 +22,7 @@ COMPLETIONS_TAG_NAME = "Completions"
 ACTIONS_TAG_NAME = "Actions"
 OTEL_TAG_NAME = "OpenTelemetry"
 THREADS_TAG_NAME = "Threads"
+V2_OPS_TAG_NAME = "V2 -- Ops"
 
 
 class AuthParams(NamedTuple):
@@ -493,5 +494,103 @@ def generate_routes(
             service.trace_server_interface.threads_query_stream(req),
             media_type="application/jsonl",
         )
+
+    @router.post(
+        "/v2/{entity}/{project}/ops",
+        tags=[V2_OPS_TAG_NAME],
+    )
+    def op_create_v2(
+        entity: str,
+        project: str,
+        body: tsi.OpCreateV2Body,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.OpCreateV2Res:
+        """Create an op object."""
+        project_id = f"{entity}/{project}"
+        req = tsi.OpCreateV2Req(project_id=project_id, **body.model_dump())
+        return service.trace_server_interface.op_create_v2(req)
+
+    @router.get(
+        "/v2/{entity}/{project}/ops/{object_id}/{digest}",
+        tags=[V2_OPS_TAG_NAME],
+    )
+    def op_read_v2(
+        entity: str,
+        project: str,
+        object_id: str,
+        digest: str,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.OpReadV2Res:
+        """Get an op object."""
+        project_id = f"{entity}/{project}"
+        req = tsi.OpReadV2Req(project_id=project_id, object_id=object_id, digest=digest)
+        return service.trace_server_interface.op_read_v2(req)
+
+    @router.get(
+        "/v2/{entity}/{project}/ops/{object_id}/{digest}/eager",
+        tags=[V2_OPS_TAG_NAME],
+    )
+    def op_read_eager_v2(
+        entity: str,
+        project: str,
+        object_id: str,
+        digest: str,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.OpReadEagerV2Res:
+        """Get an op object with resolved code (eager loading)."""
+        project_id = f"{entity}/{project}"
+        req = tsi.OpReadV2Req(project_id=project_id, object_id=object_id, digest=digest)
+        return service.trace_server_interface.op_read_eager_v2(req)
+
+    @router.get(
+        "/v2/{entity}/{project}/ops",
+        tags=[V2_OPS_TAG_NAME],
+        response_class=StreamingResponse,
+        responses={
+            200: {
+                "description": "Stream of data in JSONL format",
+                "content": {
+                    "application/jsonl": {
+                        "schema": {
+                            "type": "array",
+                            "items": {"$ref": "#/components/schemas/Schema"},
+                        }
+                    }
+                },
+            }
+        },
+    )
+    def op_list_v2(
+        entity: str,
+        project: str,
+        limit: int | None = None,
+        offset: int | None = None,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> StreamingResponse:
+        """List op objects."""
+        project_id = f"{entity}/{project}"
+        req = tsi.OpListV2Req(project_id=project_id, limit=limit, offset=offset)
+        return StreamingResponse(
+            service.trace_server_interface.op_list_v2(req),
+            media_type="application/jsonl",
+        )
+
+    @router.delete(
+        "/v2/{entity}/{project}/ops/{object_id}",
+        tags=[V2_OPS_TAG_NAME],
+    )
+    def op_delete_v2(
+        entity: str,
+        project: str,
+        object_id: str,
+        digests: list[str] | None = None,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.OpDeleteV2Res:
+        """Delete an op object. If digests are provided, only those versions are deleted. Otherwise, all versions are deleted."""
+        project_id = f"{entity}/{project}"
+        req = tsi.OpDeleteV2Req(
+            project_id=project_id, object_id=object_id, digests=digests
+        )
+        return service.trace_server_interface.op_delete_v2(req)
 
     return router
