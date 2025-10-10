@@ -1086,27 +1086,25 @@ To use the code sample:
 By default, Weave automatically patches and tracks calls to common LLM libraries like `openai`, `anthropic`, `cohere`, and `mistral`.
 
 :::warning[Deprecation Notice]
-The `autopatch_settings` argument is deprecated. Use `settings={"implicitly_patch_integrations": False}` to disable implicit patching, or call specific patch functions like `weave.integrations.patch_openai(settings={...})` to configure settings per integration.
+The `autopatch_settings` argument is deprecated. Use `implicitly_patch_integrations=False` to disable implicit patching, or call specific patch functions like `patch_openai(settings={...})` to configure settings per integration.
 :::
 
 ### Disable all autopatching
 
 ```python showLineNumbers
-weave.init(..., settings={"implicitly_patch_integrations": False})
+weave.init(..., implicitly_patch_integrations=False)
 ```
 
 ### Disable a specific integration
 
 ```python showLineNumbers
 import weave
-import weave.integrations
 
-weave.init(..., settings={"implicitly_patch_integrations": False})
+weave.init(..., implicitly_patch_integrations=False)
 
 # Then manually patch only the integrations you want
 weave.integrations.patch_anthropic()
 weave.integrations.patch_cohere()
-# Don't call patch_openai() to keep OpenAI disabled
 ```
 
 ### Post-process inputs and outputs
@@ -1122,7 +1120,11 @@ def redact_inputs(inputs: dict) -> dict:
     return inputs
 
 weave.init(...)
-weave.integrations.patch_openai(settings={"op_settings": {"postprocess_inputs": redact_inputs}})
+weave.integrations.patch_openai(
+    settings={
+        "op_settings": {"postprocess_inputs": redact_inputs}
+    }
+)
 ```
 
 For more details, see [How to use Weave with PII data](../../reference/gen_notebooks/pii.md).
