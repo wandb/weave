@@ -96,7 +96,6 @@ class RunNotFound(Exception):
     pass
 
 
-
 def _format_error_to_json_with_extra(
     exc: Exception, extra_fields: Optional[dict[str, Any]] = None
 ) -> dict[str, Any]:
