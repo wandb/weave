@@ -26,6 +26,7 @@ V2_OPS_TAG_NAME = "V2 -- Ops"
 V2_DATASETS_TAG_NAME = "V2 -- Datasets"
 V2_SCORERS_TAG_NAME = "V2 -- Scorers"
 V2_EVALUATIONS_TAG_NAME = "V2 -- Evaluations"
+V2_EVALUATION_RUNS_TAG_NAME = "V2 -- Evaluation Runs"
 
 
 class AuthParams(NamedTuple):
@@ -834,5 +835,93 @@ def generate_routes(
     ) -> tsi.EvaluationDeleteV2Res:
         """Delete an evaluation object."""
         return service.trace_server_interface.evaluation_delete_v2(req)
+
+    @router.get(
+        "/v2/{entity}/{project}/evaluation_runs/{evaluate_call_id}",
+        tags=[V2_EVALUATION_RUNS_TAG_NAME],
+    )
+    def evaluation_run_read(
+        entity: str,
+        project: str,
+        evaluate_call_id: str,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.EvaluationRunReadRes:
+        """Get an evaluation run by its evaluate call ID."""
+        project_id = f"{entity}/{project}"
+        req = tsi.EvaluationRunReadReq(
+            project_id=project_id, evaluate_call_id=evaluate_call_id
+        )
+        return service.trace_server_interface.evaluation_run_read(req)
+
+    @router.get(
+        "/v2/{entity}/{project}/evaluation_runs",
+        tags=[V2_EVALUATION_RUNS_TAG_NAME],
+        response_class=StreamingResponse,
+        responses={
+            200: {
+                "description": "Stream of data in JSONL format",
+                "content": {
+                    "application/jsonl": {
+                        "schema": {
+                            "type": "array",
+                            "items": {"$ref": "#/components/schemas/Schema"},
+                        }
+                    }
+                },
+            }
+        },
+    )
+    def evaluation_run_list(
+        entity: str,
+        project: str,
+        limit: int | None = None,
+        offset: int | None = None,
+        evaluation_refs: str | None = None,
+        model_refs: str | None = None,
+        evaluate_call_ids: str | None = None,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> StreamingResponse:
+        """List evaluation runs."""
+        project_id = f"{entity}/{project}"
+        # Build filter from query params
+        filter_obj = None
+        if evaluation_refs or model_refs or evaluate_call_ids:
+            filter_obj = tsi.EvaluationRunFilter(
+                evaluation_refs=evaluation_refs.split(",") if evaluation_refs else None,
+                model_refs=model_refs.split(",") if model_refs else None,
+                evaluate_call_ids=evaluate_call_ids.split(",")
+                if evaluate_call_ids
+                else None,
+            )
+        req = tsi.EvaluationRunListReq(
+            project_id=project_id,
+            filter=filter_obj,
+            limit=limit,
+            offset=offset,
+        )
+        return StreamingResponse(
+            service.trace_server_interface.evaluation_run_list(req),
+            media_type="application/jsonl",
+        )
+
+    @router.delete(
+        "/v2/{entity}/{project}/evaluation_runs",
+        tags=[V2_EVALUATION_RUNS_TAG_NAME],
+    )
+    def evaluation_run_delete(
+        entity: str,
+        project: str,
+        evaluate_call_ids: str,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.EvaluationRunDeleteRes:
+        """Delete evaluation runs."""
+        project_id = f"{entity}/{project}"
+        call_ids = evaluate_call_ids.split(",")
+        req = tsi.EvaluationRunDeleteReq(
+            project_id=project_id,
+            evaluate_call_ids=call_ids,
+            wb_user_id=None,
+        )
+        return service.trace_server_interface.evaluation_run_delete(req)
 
     return router

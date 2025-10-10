@@ -2269,6 +2269,133 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         result = self.obj_delete(obj_delete_req)
         return tsi.EvaluationDeleteV2Res(num_deleted=result.num_deleted)
 
+    def evaluation_run_read(
+        self, req: tsi.EvaluationRunReadReq
+    ) -> tsi.EvaluationRunReadRes:
+        """Read a single evaluation run by its evaluate_call_id."""
+        # Query the call
+        call_res = self.call_read(
+            tsi.CallReadReq(
+                project_id=req.project_id,
+                id=req.evaluate_call_id,
+            )
+        )
+
+        if not call_res.call:
+            return tsi.EvaluationRunReadRes(
+                evaluate_call_id=req.evaluate_call_id,
+                evaluation_ref=None,
+                model_ref=None,
+                started_at=None,
+                ended_at=None,
+                status=None,
+                summary=None,
+            )
+
+        call = call_res.call
+
+        # Extract evaluation_ref and model_ref from attributes
+        evaluation_ref = None
+        model_ref = None
+        if call.attributes:
+            evaluation_ref = call.attributes.get("evaluation_ref")
+            model_ref = call.attributes.get("model_ref")
+
+        # Determine status based on call state
+        status = "running"
+        if call.ended_at:
+            if call.exception:
+                status = "failed"
+            else:
+                status = "complete"
+
+        return tsi.EvaluationRunReadRes(
+            evaluate_call_id=call.id,
+            evaluation_ref=evaluation_ref,
+            model_ref=model_ref,
+            started_at=call.started_at,
+            ended_at=call.ended_at,
+            status=status,
+            summary=call.output if isinstance(call.output, dict) else None,
+        )
+
+    def evaluation_run_list(
+        self, req: tsi.EvaluationRunListReq
+    ) -> Iterator[tsi.EvaluationRunReadRes]:
+        """List evaluation runs by querying calls with evaluation run attributes."""
+        # Build the calls filter
+        calls_filter = tsi.CallsFilter()
+
+        if req.filter:
+            if req.filter.evaluate_call_ids:
+                calls_filter.call_ids = req.filter.evaluate_call_ids
+
+        # Query calls
+        calls_query_req = tsi.CallsQueryReq(
+            project_id=req.project_id,
+            filter=calls_filter,
+            limit=req.limit,
+            offset=req.offset,
+            sort_by=req.sort_by,
+        )
+
+        calls = self.calls_query_stream(calls_query_req)
+
+        for call in calls:
+            # Filter by evaluation_ref and model_ref if specified
+            if req.filter:
+                evaluation_ref = (
+                    call.attributes.get("evaluation_ref") if call.attributes else None
+                )
+                model_ref = (
+                    call.attributes.get("model_ref") if call.attributes else None
+                )
+
+                if (
+                    req.filter.evaluation_refs
+                    and evaluation_ref not in req.filter.evaluation_refs
+                ):
+                    continue
+                if req.filter.model_refs and model_ref not in req.filter.model_refs:
+                    continue
+
+            # Determine status
+            status = "running"
+            if call.ended_at:
+                if call.exception:
+                    status = "failed"
+                else:
+                    status = "complete"
+
+            evaluation_ref = (
+                call.attributes.get("evaluation_ref") if call.attributes else None
+            )
+            model_ref = call.attributes.get("model_ref") if call.attributes else None
+
+            yield tsi.EvaluationRunReadRes(
+                evaluate_call_id=call.id,
+                evaluation_ref=evaluation_ref,
+                model_ref=model_ref,
+                started_at=call.started_at,
+                ended_at=call.ended_at,
+                status=status,
+                summary=call.output if isinstance(call.output, dict) else None,
+            )
+
+    def evaluation_run_delete(
+        self, req: tsi.EvaluationRunDeleteReq
+    ) -> tsi.EvaluationRunDeleteRes:
+        """Delete evaluation runs by deleting their associated calls."""
+        # Use calls_delete to delete the evaluation run calls
+        calls_delete_req = tsi.CallsDeleteReq(
+            project_id=req.project_id,
+            call_ids=req.evaluate_call_ids,
+            wb_user_id=req.wb_user_id,
+        )
+        self.calls_delete(calls_delete_req)
+
+        return tsi.EvaluationRunDeleteRes(num_deleted=len(req.evaluate_call_ids))
+
     def _table_row_read(self, project_id: str, row_digest: str) -> tsi.TableRowSchema:
         conn, cursor = get_conn_cursor(self.db_path)
         # Now get the rows

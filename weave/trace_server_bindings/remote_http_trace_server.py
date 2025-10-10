@@ -7,7 +7,6 @@ from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, Field
 from pydantic.json_schema import SkipJsonSchema
-
 from weave.trace.env import weave_trace_server_url
 from weave.trace.settings import max_calls_queue_size, should_enable_disk_fallback
 from weave.trace_server import trace_server_interface as tsi
@@ -1016,6 +1015,57 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             params["digests"] = req.digests
         r = self._delete_request_executor(url, params)
         return tsi.EvaluationDeleteV2Res.model_validate(r.json())
+
+    def evaluation_run_read(
+        self, req: Union[tsi.EvaluationRunReadReq, dict[str, Any]]
+    ) -> tsi.EvaluationRunReadRes:
+        if isinstance(req, dict):
+            req = tsi.EvaluationRunReadReq.model_validate(req)
+        req = cast(tsi.EvaluationRunReadReq, req)
+        entity, project = req.project_id.split("/", 1)
+        url = f"/v2/{entity}/{project}/evaluation_runs/{req.evaluate_call_id}"
+        r = self._get_request_executor(url)
+        return tsi.EvaluationRunReadRes.model_validate(r.json())
+
+    def evaluation_run_list(
+        self, req: Union[tsi.EvaluationRunListReq, dict[str, Any]]
+    ) -> Iterator[tsi.EvaluationRunReadRes]:
+        if isinstance(req, dict):
+            req = tsi.EvaluationRunListReq.model_validate(req)
+        req = cast(tsi.EvaluationRunListReq, req)
+        entity, project = req.project_id.split("/", 1)
+        url = f"/v2/{entity}/{project}/evaluation_runs"
+        # Build query params
+        params = {}
+        if req.limit is not None:
+            params["limit"] = req.limit
+        if req.offset is not None:
+            params["offset"] = req.offset
+        if req.filter:
+            if req.filter.evaluation_refs:
+                params["evaluation_refs"] = ",".join(req.filter.evaluation_refs)
+            if req.filter.model_refs:
+                params["model_refs"] = ",".join(req.filter.model_refs)
+            if req.filter.evaluate_call_ids:
+                params["evaluate_call_ids"] = ",".join(req.filter.evaluate_call_ids)
+        r = self._get_request_executor(url, params, stream=True)
+        for line in r.iter_lines():
+            if line:
+                yield tsi.EvaluationRunReadRes.model_validate_json(line)
+
+    def evaluation_run_delete(
+        self, req: Union[tsi.EvaluationRunDeleteReq, dict[str, Any]]
+    ) -> tsi.EvaluationRunDeleteRes:
+        if isinstance(req, dict):
+            req = tsi.EvaluationRunDeleteReq.model_validate(req)
+        req = cast(tsi.EvaluationRunDeleteReq, req)
+        entity, project = req.project_id.split("/", 1)
+        url = f"/v2/{entity}/{project}/evaluation_runs"
+        # Build query params
+        params = {}
+        params["evaluate_call_ids"] = ",".join(req.evaluate_call_ids)
+        r = self._delete_request_executor(url, params)
+        return tsi.EvaluationRunDeleteRes.model_validate(r.json())
 
 
 __docspec__ = [

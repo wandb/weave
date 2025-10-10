@@ -10,7 +10,6 @@ from typing import Any, Callable, TypedDict, TypeVar
 
 from pydantic import BaseModel
 from typing_extensions import Self
-
 from weave import version
 from weave.trace.refs import ObjectRef, Ref
 from weave.trace.settings import (
@@ -607,6 +606,21 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         self, req: tsi.EvaluationDeleteV2Req
     ) -> tsi.EvaluationDeleteV2Res:
         return self._next_trace_server.evaluation_delete_v2(req)
+
+    def evaluation_run_read(
+        self, req: tsi.EvaluationRunReadReq
+    ) -> tsi.EvaluationRunReadRes:
+        return self._next_trace_server.evaluation_run_read(req)
+
+    def evaluation_run_list(
+        self, req: tsi.EvaluationRunListReq
+    ) -> Iterator[tsi.EvaluationRunReadRes]:
+        return self._next_trace_server.evaluation_run_list(req)
+
+    def evaluation_run_delete(
+        self, req: tsi.EvaluationRunDeleteReq
+    ) -> tsi.EvaluationRunDeleteRes:
+        return self._next_trace_server.evaluation_run_delete(req)
 
 
 def pydantic_bytes_safe_dump(obj: BaseModel) -> str:
