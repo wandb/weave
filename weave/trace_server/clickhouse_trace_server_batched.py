@@ -176,6 +176,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._database = database
         self._flush_immediately = True
         self._call_batch: list[list[Any]] = []
+        self._file_batch: list[tuple[tsi.FileCreateReq, str, bool]] = []
+        self._file_batch_seen: set[tuple[str, str]] = set()
         self._use_async_insert = use_async_insert
         self._model_to_provider_info_map = read_model_to_provider_info_map()
         self._file_storage_client: Optional[FileStorageClient] = None
@@ -275,9 +277,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._flush_immediately = False
         try:
             yield
+            # Flush batched files before call inserts to ensure file digests exist
+            self._flush_batched_files()
             self._flush_calls()
             self.kafka_producer.flush()
         finally:
+            self._file_batch = []
+            self._file_batch_seen = set()
             self._call_batch = []
             self._flush_immediately = True
 
@@ -1534,11 +1540,61 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         return [r.val for r in extra_results]
 
+    def _flush_batched_files(self) -> None:
+        """Flush all accumulated file writes to storage.
+
+        Groups files by storage type and writes them in batch.
+        """
+        if not self._file_batch:
+            return
+
+        total_bytes = 0
+        client = self.file_storage_client
+
+        # Group files by storage type for efficient processing
+        bucket_files: list[tuple[tsi.FileCreateReq, str]] = []
+        clickhouse_files: list[tuple[tsi.FileCreateReq, str]] = []
+
+        for req, digest, use_file_storage in self._file_batch:
+            total_bytes += len(req.content)
+            if client is not None and use_file_storage:
+                bucket_files.append((req, digest))
+            else:
+                clickhouse_files.append((req, digest))
+
+        # Write to bucket storage with fallback to ClickHouse
+        for req, digest in bucket_files:
+            try:
+                self._file_create_bucket(req, digest, client)
+            except FileStorageWriteError:
+                self._file_create_clickhouse(req, digest)
+
+        # Write to ClickHouse
+        for req, digest in clickhouse_files:
+            self._file_create_clickhouse(req, digest)
+
+        # Tag aggregated metrics
+        set_root_span_dd_tags(
+            {
+                "batched_files_count": len(self._file_batch),
+                "batched_files_bytes": total_bytes,
+            }
+        )
+
     def file_create(self, req: tsi.FileCreateReq) -> tsi.FileCreateRes:
         digest = bytes_digest(req.content)
         use_file_storage = self._should_use_file_storage_for_writes(req.project_id)
-        client = self.file_storage_client
 
+        # If batching is enabled, accumulate the file and return digest immediately
+        if not self._flush_immediately:
+            batch_key = (req.project_id, digest)
+            if batch_key not in self._file_batch_seen:
+                self._file_batch_seen.add(batch_key)
+                self._file_batch.append((req, digest, use_file_storage))
+            return tsi.FileCreateRes(digest=digest)
+
+        # Otherwise, write immediately (non-batch path)
+        client = self.file_storage_client
         if client is not None and use_file_storage:
             try:
                 self._file_create_bucket(req, digest, client)
