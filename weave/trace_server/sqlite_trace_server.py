@@ -2292,35 +2292,64 @@ class SqliteTraceServer(tsi.TraceServerInterface):
     def evaluation_run_log_prediction_v2(
         self, req: tsi.EvaluationRunLogPredictionV2Req
     ) -> tsi.EvaluationRunLogPredictionV2Res:
-        """Log a prediction within an evaluation run by creating a child call."""
+        """Log a prediction within an evaluation run by creating predict_and_score and predict calls.
+
+        Note: The predict_and_score call is left open so scores can be logged as children.
+        It will be closed in evaluation_run_finish_v2.
+        """
         import datetime
 
-        call_start_req = tsi.CallStartReq(
+        # Create the predict_and_score call (leave it open for scores)
+        predict_and_score_start_req = tsi.CallStartReq(
             start=tsi.StartedCallSchemaForInsert(
                 project_id=req.project_id,
                 parent_id=req.evaluation_run_id,
-                op_name="weave:///predict",
+                op_name="Evaluation.predict_and_score",
                 started_at=datetime.datetime.now(datetime.timezone.utc),
-                attributes={
-                    "model_ref": req.model_ref,
+                inputs={
+                    "self": None,  # req.evaluation_ref,
+                    "model": req.model_ref,
+                    "example": req.inputs,
                 },
-                inputs=req.inputs,
+                attributes={},
             )
         )
-        call_start_res = self.call_start(call_start_req)
+        predict_and_score_res = self.call_start(predict_and_score_start_req)
 
-        # Immediately end the call with the output
-        call_end_req = tsi.CallEndReq(
+        # Create the predict call as a child of predict_and_score
+        predict_start_req = tsi.CallStartReq(
+            start=tsi.StartedCallSchemaForInsert(
+                project_id=req.project_id,
+                parent_id=predict_and_score_res.id,
+                op_name="Model.predict",
+                started_at=datetime.datetime.now(datetime.timezone.utc),
+                inputs={
+                    "self": req.model_ref,
+                    "inputs": req.inputs,
+                },
+                attributes={},
+            )
+        )
+        predict_res = self.call_start(predict_start_req)
+
+        # End the predict call with the output
+        predict_end_req = tsi.CallEndReq(
             end=tsi.EndedCallSchemaForInsert(
                 project_id=req.project_id,
-                id=call_start_res.id,
+                id=predict_res.id,
                 ended_at=datetime.datetime.now(datetime.timezone.utc),
                 output=req.output,
             )
         )
-        self.call_end(call_end_req)
+        self.call_end(predict_end_req)
 
-        return tsi.EvaluationRunLogPredictionV2Res(predict_call_id=call_start_res.id)
+        # Note: We don't end predict_and_score here because scores still need to be logged
+        # It will be closed in evaluation_run_finish_v2
+
+        # Return the predict_and_score call ID so scores can be attached to it
+        return tsi.EvaluationRunLogPredictionV2Res(
+            predict_call_id=predict_and_score_res.id
+        )
 
     def evaluation_run_log_score_v2(
         self, req: tsi.EvaluationRunLogScoreV2Req
@@ -2357,18 +2386,76 @@ class SqliteTraceServer(tsi.TraceServerInterface):
     def evaluation_run_finish_v2(
         self, req: tsi.EvaluationRunFinishV2Req
     ) -> tsi.EvaluationRunFinishV2Res:
-        """Finish an evaluation run by ending the call."""
+        """Finish an evaluation run by closing all predict_and_score calls and the evaluation call."""
         import datetime
 
-        call_end_req = tsi.CallEndReq(
+        # First, find all predict_and_score calls that are children of this evaluation run
+        calls_query_req = tsi.CallsQueryReq(
+            project_id=req.project_id,
+            filter=tsi.CallsFilter(
+                parent_ids=[req.evaluation_run_id],
+                op_names=["Evaluation.predict_and_score"],
+            ),
+        )
+        predict_and_score_calls = self.calls_query(calls_query_req).calls
+
+        # Close any predict_and_score calls that are still open
+        now = datetime.datetime.now(datetime.timezone.utc)
+        for call in predict_and_score_calls:
+            if call.ended_at is None:
+                # Gather all scores from children of this predict_and_score call
+                scores_query_req = tsi.CallsQueryReq(
+                    project_id=req.project_id,
+                    filter=tsi.CallsFilter(
+                        parent_ids=[call.id],
+                        op_names=["weave:///score"],
+                    ),
+                )
+                score_calls = self.calls_query(scores_query_req).calls
+
+                # Build scores dict from score calls
+                scores = {}
+                for score_call in score_calls:
+                    # Extract scorer name from attributes or use a default
+                    scorer_ref = (
+                        score_call.attributes.get("scorer_ref")
+                        if score_call.attributes
+                        else None
+                    )
+                    scorer_name = (
+                        scorer_ref if scorer_ref else f"scorer_{score_call.id}"
+                    )
+                    scores[scorer_name] = score_call.output
+
+                # End the predict_and_score call with all scores
+                call_end_req = tsi.CallEndReq(
+                    end=tsi.EndedCallSchemaForInsert(
+                        project_id=req.project_id,
+                        id=call.id,
+                        ended_at=now,
+                        output={
+                            "output": call.output.get("output")
+                            if call.output
+                            else None,
+                            "scores": scores,
+                            "model_latency": call.output.get("model_latency")
+                            if call.output
+                            else None,
+                        },
+                    )
+                )
+                self.call_end(call_end_req)
+
+        # Finally, close the evaluation run itself
+        eval_end_req = tsi.CallEndReq(
             end=tsi.EndedCallSchemaForInsert(
                 project_id=req.project_id,
                 id=req.evaluation_run_id,
-                ended_at=datetime.datetime.now(datetime.timezone.utc),
+                ended_at=now,
                 output=req.summary,
             )
         )
-        self.call_end(call_end_req)
+        self.call_end(eval_end_req)
 
         return tsi.EvaluationRunFinishV2Res(success=True)
 
