@@ -1964,26 +1964,127 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         result = self.obj_delete(obj_delete_req)
         return tsi.EvaluationDeleteV2Res(num_deleted=result.num_deleted)
 
+    def evaluation_run_start(
+        self, req: tsi.EvaluationRunStartReq
+    ) -> tsi.EvaluationRunStartRes:
+        """Start an evaluation run by creating a call."""
+        import datetime
+
+        call_start_req = tsi.CallStartReq(
+            start=tsi.StartedCallSchemaForInsert(
+                project_id=req.project_id,
+                op_name="weave:///evaluate",
+                started_at=datetime.datetime.now(datetime.timezone.utc),
+                attributes={
+                    "evaluation_ref": req.evaluation_ref,
+                    "model_ref": req.model_ref,
+                },
+            )
+        )
+        call_res = self.call_start(call_start_req)
+        return tsi.EvaluationRunStartRes(evaluation_run_id=call_res.id)
+
+    def evaluation_run_log_prediction(
+        self, req: tsi.EvaluationRunLogPredictionReq
+    ) -> tsi.EvaluationRunLogPredictionRes:
+        """Log a prediction within an evaluation run by creating a child call."""
+        import datetime
+
+        call_start_req = tsi.CallStartReq(
+            start=tsi.StartedCallSchemaForInsert(
+                project_id=req.project_id,
+                parent_id=req.evaluation_run_id,
+                op_name="weave:///predict",
+                started_at=datetime.datetime.now(datetime.timezone.utc),
+                attributes={
+                    "model_ref": req.model_ref,
+                },
+                inputs=req.inputs,
+            )
+        )
+        call_start_res = self.call_start(call_start_req)
+
+        # Immediately end the call with the output
+        call_end_req = tsi.CallEndReq(
+            end=tsi.EndedCallSchemaForInsert(
+                project_id=req.project_id,
+                id=call_start_res.id,
+                ended_at=datetime.datetime.now(datetime.timezone.utc),
+                output=req.output,
+            )
+        )
+        self.call_end(call_end_req)
+
+        return tsi.EvaluationRunLogPredictionRes(predict_call_id=call_start_res.id)
+
+    def evaluation_run_log_score(
+        self, req: tsi.EvaluationRunLogScoreReq
+    ) -> tsi.EvaluationRunLogScoreRes:
+        """Log a score for a prediction by creating a child call."""
+        import datetime
+
+        call_start_req = tsi.CallStartReq(
+            start=tsi.StartedCallSchemaForInsert(
+                project_id=req.project_id,
+                parent_id=req.predict_call_id,
+                op_name="weave:///score",
+                started_at=datetime.datetime.now(datetime.timezone.utc),
+                attributes={
+                    "scorer_ref": req.scorer_ref,
+                },
+            )
+        )
+        call_start_res = self.call_start(call_start_req)
+
+        # Immediately end the call with the score as output
+        call_end_req = tsi.CallEndReq(
+            end=tsi.EndedCallSchemaForInsert(
+                project_id=req.project_id,
+                id=call_start_res.id,
+                ended_at=datetime.datetime.now(datetime.timezone.utc),
+                output=req.score,
+            )
+        )
+        self.call_end(call_end_req)
+
+        return tsi.EvaluationRunLogScoreRes(call_id=call_start_res.id)
+
+    def evaluation_run_finish(
+        self, req: tsi.EvaluationRunFinishReq
+    ) -> tsi.EvaluationRunFinishRes:
+        """Finish an evaluation run by ending the call."""
+        import datetime
+
+        call_end_req = tsi.CallEndReq(
+            end=tsi.EndedCallSchemaForInsert(
+                project_id=req.project_id,
+                id=req.evaluation_run_id,
+                ended_at=datetime.datetime.now(datetime.timezone.utc),
+                output=req.summary,
+            )
+        )
+        self.call_end(call_end_req)
+
+        return tsi.EvaluationRunFinishRes(success=True)
+
     def evaluation_run_read(
         self, req: tsi.EvaluationRunReadReq
     ) -> tsi.EvaluationRunReadRes:
-        """Read a single evaluation run by its evaluate_call_id."""
+        """Read a single evaluation run by its evaluation_run_id."""
         # Query the call
         call_res = self.call_read(
             tsi.CallReadReq(
                 project_id=req.project_id,
-                id=req.evaluate_call_id,
+                id=req.evaluation_run_id,
             )
         )
 
         if not call_res.call:
             return tsi.EvaluationRunReadRes(
-                evaluate_call_id=req.evaluate_call_id,
+                evaluation_run_id=req.evaluation_run_id,
                 evaluation_ref=None,
                 model_ref=None,
-                started_at=None,
-                ended_at=None,
-                status=None,
+                created_at=None,
                 summary=None,
             )
 
@@ -1996,21 +2097,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             evaluation_ref = call.attributes.get("evaluation_ref")
             model_ref = call.attributes.get("model_ref")
 
-        # Determine status based on call state
-        status = "running"
-        if call.ended_at:
-            if call.exception:
-                status = "failed"
-            else:
-                status = "complete"
-
         return tsi.EvaluationRunReadRes(
-            evaluate_call_id=call.id,
+            evaluation_run_id=call.id,
             evaluation_ref=evaluation_ref,
             model_ref=model_ref,
-            started_at=call.started_at,
-            ended_at=call.ended_at,
-            status=status,
+            created_at=call.started_at,
             summary=call.output if isinstance(call.output, dict) else None,
         )
 
@@ -2022,8 +2113,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         calls_filter = tsi.CallsFilter()
 
         if req.filter:
-            if req.filter.evaluate_call_ids:
-                calls_filter.call_ids = req.filter.evaluate_call_ids
+            if req.filter.evaluation_run_ids:
+                calls_filter.call_ids = req.filter.evaluation_run_ids
 
         # Query calls - evaluation runs are calls with specific op_names
         # We'll look for calls with "evaluate" in the op_name or with evaluation_ref attribute
@@ -2055,26 +2146,16 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 if req.filter.model_refs and model_ref not in req.filter.model_refs:
                     continue
 
-            # Determine status
-            status = "running"
-            if call.ended_at:
-                if call.exception:
-                    status = "failed"
-                else:
-                    status = "complete"
-
             evaluation_ref = (
                 call.attributes.get("evaluation_ref") if call.attributes else None
             )
             model_ref = call.attributes.get("model_ref") if call.attributes else None
 
             yield tsi.EvaluationRunReadRes(
-                evaluate_call_id=call.id,
+                evaluation_run_id=call.id,
                 evaluation_ref=evaluation_ref,
                 model_ref=model_ref,
-                started_at=call.started_at,
-                ended_at=call.ended_at,
-                status=status,
+                created_at=call.started_at,
                 summary=call.output if isinstance(call.output, dict) else None,
             )
 
@@ -2085,12 +2166,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # Use calls_delete to delete the evaluation run calls
         calls_delete_req = tsi.CallsDeleteReq(
             project_id=req.project_id,
-            call_ids=req.evaluate_call_ids,
+            call_ids=req.evaluation_run_ids,
             wb_user_id=req.wb_user_id,
         )
         self.calls_delete(calls_delete_req)
 
-        return tsi.EvaluationRunDeleteRes(num_deleted=len(req.evaluate_call_ids))
+        return tsi.EvaluationRunDeleteRes(num_deleted=len(req.evaluation_run_ids))
 
     def _obj_read_with_retry(
         self, req: tsi.ObjReadReq, max_retries: int = 10, initial_delay: float = 0.05

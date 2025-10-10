@@ -1629,14 +1629,14 @@ class EvaluationRunStartReq(BaseModel):
 
 
 class EvaluationRunStartRes(BaseModel):
-    evaluate_call_id: str = Field(..., description="ID of the started evaluation call")
+    evaluation_run_id: str = Field(..., description="ID of the started evaluation run")
 
 
 class EvaluationRunLogPredictionReq(BaseModel):
     project_id: str = Field(
         ..., description="The `entity/project` where this evaluation is saved"
     )
-    evaluate_call_id: str = Field(..., description="ID of the parent evaluation call")
+    evaluation_run_id: str = Field(..., description="ID of the parent evaluation run")
     model_ref: Optional[str] = Field(
         None, description="Reference to the model object (weave:// URI)"
     )
@@ -1669,8 +1669,8 @@ class EvaluationRunFinishReq(BaseModel):
     project_id: str = Field(
         ..., description="The `entity/project` where this evaluation is saved"
     )
-    evaluate_call_id: str = Field(
-        ..., description="ID of the evaluation call to finish"
+    evaluation_run_id: str = Field(
+        ..., description="ID of the evaluation run to finish"
     )
     summary: dict[str, Any] = Field(
         default_factory=dict, description="Summary data for the evaluation"
@@ -1687,27 +1687,19 @@ class EvaluationRunReadReq(BaseModel):
     project_id: str = Field(
         ..., description="The `entity/project` where this evaluation run exists"
     )
-    evaluate_call_id: str = Field(
-        ..., description="ID of the evaluation run (evaluate call ID)"
-    )
+    evaluation_run_id: str = Field(..., description="ID of the evaluation run")
 
 
 class EvaluationRunReadRes(BaseModel):
-    evaluate_call_id: str = Field(..., description="ID of the evaluation run")
+    evaluation_run_id: str = Field(..., description="ID of the evaluation run")
     evaluation_ref: Optional[str] = Field(
         None, description="Reference to the evaluation object (weave:// URI)"
     )
     model_ref: Optional[str] = Field(
         None, description="Reference to the model object (weave:// URI)"
     )
-    started_at: Optional[datetime.datetime] = Field(
-        None, description="When the evaluation run started"
-    )
-    ended_at: Optional[datetime.datetime] = Field(
-        None, description="When the evaluation run ended"
-    )
-    status: Optional[str] = Field(
-        None, description="Status of the evaluation run (running, complete, failed)"
+    created_at: Optional[datetime.datetime] = Field(
+        None, description="When the evaluation run was created"
     )
     summary: Optional[dict[str, Any]] = Field(
         None, description="Summary data for the evaluation run"
@@ -1725,7 +1717,7 @@ class EvaluationRunFilter(BaseModelStrict):
         description="Filter by model references (weave:// URIs)",
         examples=[["weave:///entity/project/object/Model:xyz789"]],
     )
-    evaluate_call_ids: Optional[list[str]] = Field(
+    evaluation_run_ids: Optional[list[str]] = Field(
         default=None,
         description="Filter by specific evaluation run IDs",
         examples=[["call_123", "call_456"]],
@@ -1749,7 +1741,7 @@ class EvaluationRunListReq(BaseModel):
     sort_by: Optional[list[SortBy]] = Field(
         default=None,
         description="Sorting criteria for evaluation runs",
-        examples=[[SortBy(field="started_at", direction="desc")]],
+        examples=[[SortBy(field="created_at", direction="desc")]],
     )
 
 
@@ -1757,9 +1749,9 @@ class EvaluationRunDeleteReq(BaseModelStrict):
     project_id: str = Field(
         ..., description="The `entity/project` where this evaluation run exists"
     )
-    evaluate_call_ids: list[str] = Field(
+    evaluation_run_ids: list[str] = Field(
         ...,
-        description="List of evaluation run IDs (evaluate call IDs) to delete",
+        description="List of evaluation run IDs to delete",
         examples=[["call_123", "call_456"]],
     )
     # wb_user_id is automatically populated by the server
