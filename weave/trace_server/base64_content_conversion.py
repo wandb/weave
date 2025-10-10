@@ -23,13 +23,8 @@ logger = logging.getLogger(__name__)
 # Format: data:[content-type];base64,[base64_data]
 DATA_URI_PATTERN = re.compile(r"^data:([^;]+);base64,([A-Za-z0-9+/=]+)$", re.IGNORECASE)
 
-# Maximum size for base64 content to be processed (to avoid memory issues)
-MAX_BASE64_SIZE = 100 * 1024 * 1024  # 100 MiB
-
-# Minimum size for standalone base64 (to avoid false positives)
-MIN_BASE64_SIZE = 100  # 100 bytes
-
-MIN_TEXT_SIZE = 50 * 1024  # 50 KiB
+# Minimum size to create a file (to avoid making more data than what the original is)
+AUTO_CONVERSION_MIN_SIZE = 1024  # 1 KiB
 
 
 def is_data_uri(data_uri: str) -> bool:
@@ -118,7 +113,7 @@ def replace_base64_with_content_objects(
             return result
         elif isinstance(val, list):
             return [_visit(v) for v in val]
-        elif isinstance(val, str):
+        elif isinstance(val, str) and len(val) > AUTO_CONVERSION_MIN_SIZE:
             # Check for data URI pattern first
             if is_data_uri(val):
                 try:
