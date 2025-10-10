@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 DATA_URI_PATTERN = re.compile(r"^data:([^;]+);base64,([A-Za-z0-9+/=]+)$", re.IGNORECASE)
 
 # Minimum size to create a file (to avoid making more data than what the original is)
-AUTO_CONVERSION_MIN_SIZE = 1024 # 1 KiB
+AUTO_CONVERSION_MIN_SIZE = 1024  # 1 KiB
 
 
 def is_data_uri(data_uri: str) -> bool:
