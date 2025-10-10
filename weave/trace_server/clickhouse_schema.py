@@ -206,3 +206,18 @@ ALL_OBJ_INSERT_COLUMNS = list(ObjCHInsertable.model_fields.keys())
 
 # Let's just make everything required for now ... can optimize when we implement column selection
 REQUIRED_OBJ_SELECT_COLUMNS = list(set(ALL_OBJ_SELECT_COLUMNS))
+
+
+# Files
+class FileChunkCreateCHInsertable(BaseModel):
+    project_id: str
+    digest: str
+    chunk_index: int
+    n_chunks: int
+    name: str
+    val_bytes: bytes
+    bytes_stored: int
+    file_storage_uri: Optional[str]
+
+
+ALL_FILE_CHUNK_INSERT_COLUMNS = list(FileChunkCreateCHInsertable.model_fields.keys())
