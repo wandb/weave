@@ -199,15 +199,13 @@ import TabItem from '@theme/TabItem';
     You can use the `column_map` attribute to tell the scorer which dataset columns to use. The available keys for `column_map` are:
     - `output` (required): Model prediction
     - `target` (required): Reference answer to compare with
-    - `kwargs` (optional): Additional input context for logging purposes, such as the original prompt or question sent to the model.
     
     An example of using `column_map`:
 
     ```python
     similarity_scorer.column_map = {
         "output": "model_output",  # The model's generated text
-        "target": "answer",        # The expected or reference response
-        "kwargs": "question"       # Optional: Additional context (e.g. the original prompt)
+        "target": "answer"        # The expected or reference response
     }
     ```
 
