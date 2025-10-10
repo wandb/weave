@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, Field
 from pydantic.json_schema import SkipJsonSchema
+
 from weave.trace.env import weave_trace_server_url
 from weave.trace.settings import max_calls_queue_size, should_enable_disk_fallback
 from weave.trace_server import trace_server_interface as tsi
@@ -1080,7 +1081,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         entity, project = req.project_id.split("/", 1)
         url = f"/v2/{entity}/{project}/evaluation_runs"
         # Build query params
-        params = {}
+        params: dict[str, Any] = {}
         if req.limit is not None:
             params["limit"] = req.limit
         if req.offset is not None:

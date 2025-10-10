@@ -10,6 +10,7 @@ from typing import Any, Callable, TypedDict, TypeVar
 
 from pydantic import BaseModel
 from typing_extensions import Self
+
 from weave import version
 from weave.trace.refs import ObjectRef, Ref
 from weave.trace.settings import (

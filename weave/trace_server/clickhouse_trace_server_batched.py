@@ -1968,8 +1968,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self, req: tsi.EvaluationRunStartReq
     ) -> tsi.EvaluationRunStartRes:
         """Start an evaluation run by creating a call."""
-        import datetime
-
         call_start_req = tsi.CallStartReq(
             start=tsi.StartedCallSchemaForInsert(
                 project_id=req.project_id,
@@ -1988,8 +1986,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self, req: tsi.EvaluationRunLogPredictionReq
     ) -> tsi.EvaluationRunLogPredictionRes:
         """Log a prediction within an evaluation run by creating a child call."""
-        import datetime
-
         call_start_req = tsi.CallStartReq(
             start=tsi.StartedCallSchemaForInsert(
                 project_id=req.project_id,
@@ -2021,8 +2017,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self, req: tsi.EvaluationRunLogScoreReq
     ) -> tsi.EvaluationRunLogScoreRes:
         """Log a score for a prediction by creating a child call."""
-        import datetime
-
         call_start_req = tsi.CallStartReq(
             start=tsi.StartedCallSchemaForInsert(
                 project_id=req.project_id,
@@ -2053,8 +2047,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self, req: tsi.EvaluationRunFinishReq
     ) -> tsi.EvaluationRunFinishRes:
         """Finish an evaluation run by ending the call."""
-        import datetime
-
         call_end_req = tsi.CallEndReq(
             end=tsi.EndedCallSchemaForInsert(
                 project_id=req.project_id,
@@ -2112,9 +2104,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # Build the calls filter
         calls_filter = tsi.CallsFilter()
 
-        if req.filter:
-            if req.filter.evaluation_run_ids:
-                calls_filter.call_ids = req.filter.evaluation_run_ids
+        if req.filter and req.filter.evaluation_run_ids:
+            calls_filter.call_ids = req.filter.evaluation_run_ids
 
         # Query calls - evaluation runs are calls with specific op_names
         # We'll look for calls with "evaluate" in the op_name or with evaluation_ref attribute

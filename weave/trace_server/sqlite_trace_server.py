@@ -2417,9 +2417,8 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         # Build the calls filter
         calls_filter = tsi.CallsFilter()
 
-        if req.filter:
-            if req.filter.evaluation_run_ids:
-                calls_filter.call_ids = req.filter.evaluation_run_ids
+        if req.filter and req.filter.evaluation_run_ids:
+            calls_filter.call_ids = req.filter.evaluation_run_ids
 
         # Query calls
         calls_query_req = tsi.CallsQueryReq(
