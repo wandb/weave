@@ -2972,15 +2972,15 @@ def _create_tracked_stream_wrapper(
         # Initialize accumulation variables for all choices
         aggregated_output: Optional[dict[str, Any]] = None
         choice_contents: dict[int, list[str]] = {}  # Track content by choice index
-        choice_tool_calls: dict[int, list[dict[str, Any]]] = (
-            {}
-        )  # Track tool calls by choice index
-        choice_reasoning_content: dict[int, list[str]] = (
-            {}
-        )  # Track reasoning by choice index
-        choice_finish_reasons: dict[int, Optional[str]] = (
-            {}
-        )  # Track finish reasons by choice index
+        choice_tool_calls: dict[
+            int, list[dict[str, Any]]
+        ] = {}  # Track tool calls by choice index
+        choice_reasoning_content: dict[
+            int, list[str]
+        ] = {}  # Track reasoning by choice index
+        choice_finish_reasons: dict[
+            int, Optional[str]
+        ] = {}  # Track finish reasons by choice index
         aggregated_metadata: dict[str, Any] = {}
 
         try:
