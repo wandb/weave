@@ -1,5 +1,7 @@
 # LlamaIndex
 
+import DefaultEntityNote from '../../../src/components/DefaultEntityNote.mdx';
+
 Weave integrates with [LlamaIndex](https://docs.llamaindex.ai/en/stable/), a powerful framework for building LLM-driven applications like RAG systems, chatbots, and agents.
 
 Using [LlamaIndex’s instrumentation system](https://docs.llamaindex.ai/en/stable/module_guides/observability/instrumentation/), the Weave integration automatically captures:
@@ -34,6 +36,8 @@ llm = OpenAI(model="gpt-4o-mini")
 response = llm.complete("William Shakespeare is ")
 print(response)
 ```
+
+<DefaultEntityNote />
 
 ![LlamaIndex Demo](imgs/llamaindex/simple_trace.png)
 

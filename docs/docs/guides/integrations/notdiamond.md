@@ -1,5 +1,7 @@
 # Not Diamond ¬◇
 
+import DefaultEntityNote from '../../../src/components/DefaultEntityNote.mdx';
+
 When building complex LLM workflows users may need to prompt different models according to accuracy,
 cost, or call latency. Users can use [Not Diamond][nd] to route prompts in these workflows to the
 right model for their needs, helping maximize accuracy while saving on model costs.
@@ -41,6 +43,8 @@ session_id, provider = client.chat.completions.model_select(
 print("LLM called: ", provider.provider)  # openai, anthropic, etc
 print("Provider model: ", provider.model) # gpt-4o, claude-3-5-sonnet-20240620, etc
 ```
+
+<DefaultEntityNote />
 
 ## Custom routing
 

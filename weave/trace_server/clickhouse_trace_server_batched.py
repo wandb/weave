@@ -9,6 +9,7 @@ import threading
 from collections import defaultdict
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
+from re import sub
 from typing import Any, Callable, Optional, Union, cast
 from zoneinfo import ZoneInfo
 
@@ -37,9 +38,8 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     OrderField,
     QueryBuilderDynamicField,
     QueryBuilderField,
-    build_calls_query_stats_query,
+    build_calls_stats_query,
     combine_conditions,
-    optimized_project_contains_call_query,
 )
 from weave.trace_server.clickhouse_schema import (
     ALL_CALL_INSERT_COLUMNS,
@@ -56,7 +56,10 @@ from weave.trace_server.clickhouse_schema import (
     ObjRefListType,
     SelectableCHObjSchema,
 )
-from weave.trace_server.constants import COMPLETIONS_CREATE_OP_NAME
+from weave.trace_server.constants import (
+    COMPLETIONS_CREATE_OP_NAME,
+    IMAGE_GENERATION_CREATE_OP_NAME,
+)
 from weave.trace_server.errors import (
     InsertTooLarge,
     InvalidRequest,
@@ -85,6 +88,7 @@ from weave.trace_server.file_storage import (
 )
 from weave.trace_server.file_storage_uris import FileStorageURI
 from weave.trace_server.ids import generate_id
+from weave.trace_server.image_completion import lite_llm_image_generation
 from weave.trace_server.kafka import KafkaProducer
 from weave.trace_server.llm_completion import (
     get_custom_provider_info,
@@ -102,7 +106,8 @@ from weave.trace_server.objects_query_builder import (
     format_metadata_objects_from_query_result,
     make_objects_val_query_and_parameters,
 )
-from weave.trace_server.opentelemetry.python_spans import ResourceSpans
+from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
+from weave.trace_server.opentelemetry.python_spans import Resource, Span
 from weave.trace_server.orm import ParamBuilder, Row
 from weave.trace_server.project_query_builder import make_project_stats_query
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
@@ -212,14 +217,33 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             raise TypeError(
                 "Expected traces as ExportTraceServiceRequest, got {type(req.traces)}"
             )
-        traces_data = [
-            ResourceSpans.from_proto(span) for span in req.traces.resource_spans
-        ]
+        calls: list[dict[str, object]] = []
+        rejected_spans = 0
+        error_messages: list[str] = []
+        for proto_resource_spans in req.traces.resource_spans:
+            resource = Resource.from_proto(proto_resource_spans.resource)
+            for proto_scope_spans in proto_resource_spans.scope_spans:
+                for proto_span in proto_scope_spans.spans:
+                    try:
+                        span = Span.from_proto(proto_span, resource)
+                    except AttributePathConflictError as e:
+                        # Record and skip malformed spans so we can partially accept the batch
+                        rejected_spans += 1
+                        # Use data available on the proto span for context
+                        try:
+                            trace_id = proto_span.trace_id.hex()
+                            span_id = proto_span.span_id.hex()
+                            name = getattr(proto_span, "name", "")
+                        except Exception:
+                            trace_id = ""
+                            span_id = ""
+                            name = ""
+                        span_ident = (
+                            f"name='{name}' trace_id='{trace_id}' span_id='{span_id}'"
+                        )
+                        error_messages.append(f"Rejected span ({span_ident}): {e!s}")
+                        continue
 
-        calls = []
-        for resource_spans in traces_data:
-            for scope_spans in resource_spans.scope_spans:
-                for span in scope_spans.spans:
                     start_call, end_call = span.to_call(req.project_id)
                     calls.extend(
                         [
@@ -232,6 +256,17 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     )
         # TODO: Actually populate the error fields if call_start_batch fails
         self.call_start_batch(tsi.CallCreateBatchReq(batch=calls))
+        if rejected_spans > 0:
+            # Join the first 20 errors and return them delimited by ';'
+            joined_errors = "; ".join(error_messages[:20]) + (
+                "; ..." if len(error_messages) > 20 else ""
+            )
+            return tsi.OtelExportRes(
+                partial_success=tsi.ExportTracePartialSuccess(
+                    rejected_spans=rejected_spans,
+                    error_message=joined_errors,
+                )
+            )
         return tsi.OtelExportRes()
 
     @contextmanager
@@ -333,26 +368,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         aggregate statistics that are not directly queryable from the calls themselves.
         """
         pb = ParamBuilder()
-
-        # Special case when limit=1 and there is no filter or query,
-        # construct highly optimized query that returns early
-        if (
-            req.limit == 1
-            and req.filter is None
-            and req.query is None
-            and not req.include_total_storage_size
-        ):
-            query = optimized_project_contains_call_query(req.project_id, pb)
-            raw_res = self._query(query, pb.get_params())
-            rows = raw_res.result_rows
-            count = rows[0][0]
-            return tsi.CallsQueryStatsRes(
-                count=count,
-                total_storage_size_bytes=None,
-            )
-
-        query, columns = build_calls_query_stats_query(req, pb)
-
+        query, columns = build_calls_stats_query(req, pb)
         raw_res = self._query(query, pb.get_params())
 
         res_dict = (
@@ -740,6 +756,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 object_query_builder.add_base_object_classes_condition(
                     req.filter.base_object_classes
                 )
+            if req.filter.exclude_base_object_classes:
+                object_query_builder.add_exclude_base_object_classes_condition(
+                    req.filter.exclude_base_object_classes
+                )
             if req.filter.leaf_object_classes:
                 object_query_builder.add_leaf_object_classes_condition(
                     req.filter.leaf_object_classes
@@ -985,8 +1005,29 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         sort_fields = []
         if req.sort_by:
             for sort in req.sort_by:
+                # Validate sort field to prevent empty JSON paths
+                if not sort.field or not sort.field.strip():
+                    raise InvalidRequest("Sort field cannot be empty")
+
+                # Check for invalid dot patterns that would create malformed JSON paths
+                if (
+                    sort.field.startswith(".")
+                    or sort.field.endswith(".")
+                    or ".." in sort.field
+                ):
+                    raise InvalidRequest(
+                        f"Invalid sort field '{sort.field}': field names cannot start/end with dots or contain consecutive dots"
+                    )
+
                 # TODO: better splitting of escaped dots (.) in field names
                 extra_path = sort.field.split(".")
+
+                # Additional validation: ensure no empty path components
+                if any(not component.strip() for component in extra_path):
+                    raise InvalidRequest(
+                        f"Invalid sort field '{sort.field}': field path components cannot be empty"
+                    )
+
                 field = OrderField(
                     field=QueryBuilderDynamicField(
                         field=VAL_DUMP_COLUMN_NAME, extra_path=extra_path
@@ -1996,9 +2037,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # --- Shared setup logic (copy of completions_create up to litellm call)
         model_info = self._model_to_provider_info_map.get(req.inputs.model)
         try:
-            model_name, api_key, provider, base_url, extra_headers, return_type = (
-                _setup_completion_model_info(model_info, req, self.obj_read)
-            )
+            (
+                model_name,
+                api_key,
+                provider,
+                base_url,
+                extra_headers,
+                return_type,
+            ) = _setup_completion_model_info(model_info, req, self.obj_read)
         except Exception as e:
             # Yield error as single chunk then stop.
             def _single_error_iter(e: Exception) -> Iterator[dict[str, str]]:
@@ -2009,12 +2055,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # Track start call if requested
         start_call: Optional[CallStartCHInsertable] = None
         if req.track_llm_call:
+            inputs = req.inputs.model_dump(exclude_none=True)
+            inputs["model"] = model_name
             start = tsi.StartedCallSchemaForInsert(
                 project_id=req.project_id,
                 wb_user_id=req.wb_user_id,
                 op_name=COMPLETIONS_CREATE_OP_NAME,
                 started_at=datetime.datetime.now(),
-                inputs={**req.inputs.model_dump(exclude_none=True)},
+                inputs={**inputs},
                 attributes={},
             )
             start_call = _start_call_for_insert_to_ch_insertable_start_call(start, self)
@@ -2037,7 +2085,128 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         # Otherwise, wrap the iterator with tracking
         return _create_tracked_stream_wrapper(
-            self._insert_call, chunk_iter, start_call, model_name, req.project_id
+            self._insert_call,
+            chunk_iter,
+            start_call,
+            model_name,
+            req.project_id,
+        )
+
+    def image_create(
+        self, req: tsi.ImageGenerationCreateReq
+    ) -> tsi.ImageGenerationCreateRes:
+        """Create images using LLM image generation.
+
+        Args:
+            req (tsi.ImageGenerationCreateReq): The image generation request.
+
+        Returns:
+            tsi.ImageGenerationCreateRes: The image generation response.
+        """
+        # Validate input parameters
+        if req.inputs.model is None:
+            return tsi.ImageGenerationCreateRes(
+                response={"error": "No model specified in request"}
+            )
+
+        if req.inputs.prompt is None:
+            return tsi.ImageGenerationCreateRes(
+                response={"error": "No prompt specified in request"}
+            )
+
+        # Get API key from secret fetcher
+        secret_fetcher = _secret_fetcher_context.get()
+        if secret_fetcher is None:
+            logger.error("No secret fetcher available for image generation request")
+            return tsi.ImageGenerationCreateRes(
+                response={
+                    "error": "Unable to access required credentials for image generation"
+                }
+            )
+
+        api_key = (
+            secret_fetcher.fetch("OPENAI_API_KEY")
+            .get("secrets", {})
+            .get("OPENAI_API_KEY")
+        )
+
+        if api_key is None:
+            return tsi.ImageGenerationCreateRes(
+                response={"error": "No OpenAI API key found"}
+            )
+
+        # Now that we have the API key, we can make the API call
+        start_time = datetime.datetime.now()
+
+        try:
+            res = lite_llm_image_generation(
+                api_key=api_key,
+                inputs=req.inputs.model_dump(exclude_none=True),
+                trace_server=self,
+                project_id=req.project_id,
+                wb_user_id=req.wb_user_id,
+            )
+            if "error" in res.response:
+                return tsi.ImageGenerationCreateRes(
+                    response={"error": res.response["error"]}
+                )
+        except Exception as e:
+            return tsi.ImageGenerationCreateRes(
+                response={"error": f"Image generation failed: {e!s}"}
+            )
+
+        end_time = datetime.datetime.now()
+
+        # Return response directly if not tracking calls
+        if req.track_llm_call is False:
+            return res
+
+        # Capture all input fields for call tracking
+        input_data = req.inputs.model_dump(exclude_none=False)
+
+        start = tsi.StartedCallSchemaForInsert(
+            project_id=req.project_id,
+            wb_user_id=req.wb_user_id,
+            op_name=IMAGE_GENERATION_CREATE_OP_NAME,
+            started_at=start_time,
+            inputs=input_data,
+            attributes={},
+        )
+        start_call = _start_call_for_insert_to_ch_insertable_start_call(start)
+
+        end = tsi.EndedCallSchemaForInsert(
+            project_id=req.project_id,
+            id=start_call.id,
+            ended_at=end_time,
+            output=res.response,
+            summary={},
+        )
+
+        if "usage" in res.response:
+            end.summary["usage"] = {req.inputs.model: res.response["usage"]}
+
+        if "error" in res.response:
+            end.exception = res.response["error"]
+
+        end_call = _end_call_for_insert_to_ch_insertable_end_call(end)
+        calls: list[Union[CallStartCHInsertable, CallEndCHInsertable]] = [
+            start_call,
+            end_call,
+        ]
+        batch_data = []
+        for call in calls:
+            call_dict = call.model_dump()
+            values = [call_dict.get(col) for col in ALL_CALL_INSERT_COLUMNS]
+            batch_data.append(values)
+
+        try:
+            self._insert_call_batch(batch_data)
+        except Exception as e:
+            # Log error but don't fail the response
+            print(f"Error inserting call batch for image generation: {e}", flush=True)
+
+        return tsi.ImageGenerationCreateRes(
+            response=res.response, weave_call_id=start_call.id
         )
 
     def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
@@ -2494,6 +2663,7 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: dict) -> dict:
         "exception": ch_call_dict.get("exception"),
         "wb_run_id": ch_call_dict.get("wb_run_id"),
         "wb_run_step": ch_call_dict.get("wb_run_step"),
+        "wb_run_step_end": ch_call_dict.get("wb_run_step_end"),
         "wb_user_id": ch_call_dict.get("wb_user_id"),
         "display_name": display_name,
         "storage_size_bytes": ch_call_dict.get("storage_size_bytes"),
@@ -2582,6 +2752,7 @@ def _end_call_for_insert_to_ch_insertable_end_call(
         summary_dump=_dict_value_to_dump(dict(end_call.summary)),
         output_dump=_any_value_to_dump(output),
         output_refs=output_refs,
+        wb_run_step_end=end_call.wb_run_step_end,
     )
 
 
@@ -2904,8 +3075,11 @@ def _create_tracked_stream_wrapper(
 
             # Prepare summary and end call
             summary: dict[str, Any] = {}
-            if aggregated_output and "usage" in aggregated_output:
-                summary["usage"] = {model_name: aggregated_output["usage"]}
+            if aggregated_output is not None and model_name is not None:
+                aggregated_output["model"] = model_name
+
+                if "usage" in aggregated_output:
+                    summary["usage"] = {model_name: aggregated_output["usage"]}
 
             end = tsi.EndedCallSchemaForInsert(
                 project_id=project_id,
@@ -2933,11 +3107,14 @@ def _setup_completion_model_info(
     Note: api_key can be None for bedrock providers since they use AWS credentials instead.
     """
     model_name = req.inputs.model
-    api_key = None
-    provider = None
+    api_key: Optional[str] = None
+    provider: str = "openai"  # Default provider
     base_url: Optional[str] = None
     extra_headers: dict[str, str] = {}
     return_type: Optional[str] = None
+
+    # Check for explicit custom provider prefix
+    is_explicit_custom = model_name.startswith("custom::")
 
     is_coreweave = (
         model_info and model_info.get("litellm_provider") == "coreweave"
@@ -2954,6 +3131,59 @@ def _setup_completion_model_info(
             extra_headers = req.inputs.extra_headers
             req.inputs.extra_headers = None
         return_type = "openai"
+    elif is_explicit_custom:
+        # Custom provider path - model_name format: custom::<provider>::<model>
+        # Parse provider and model names, create sanitized object_id for lookup
+        name_part = model_name.replace("custom::", "")
+
+        if "::" in name_part:
+            # Format: custom::<provider>::<model>
+            provider_name, model_name_part = name_part.split("::", 1)
+
+            # Create sanitized object_id to match what was created during provider setup
+
+            sanitized_provider = _sanitize_name_for_object_id(provider_name)
+            sanitized_model = _sanitize_name_for_object_id(model_name_part)
+            sanitized_object_id = f"{sanitized_provider}-{sanitized_model}"
+        else:
+            # Fallback: assume it's already in object_id format
+            # Extract names from object_id (this is a fallback case)
+            parts = name_part.split("-", 1) if "-" in name_part else [name_part, ""]
+            provider_name = parts[0]  # May be sanitized
+            model_name_part = parts[1] if len(parts) > 1 else ""
+            sanitized_provider = provider_name  # Already sanitized
+            sanitized_object_id = name_part
+
+        custom_provider_info = get_custom_provider_info(
+            project_id=req.project_id,
+            provider_name=sanitized_provider,
+            model_name=sanitized_object_id,
+            obj_read_func=obj_read,
+        )
+
+        base_url = custom_provider_info.base_url
+        final_model_name = custom_provider_info.actual_model_name
+        provider_model_name = (
+            f"{provider_name}/{final_model_name}"
+            if "::" in name_part
+            else final_model_name
+        )
+
+        # prefix the model name with "ollama/" if it is an ollama model else with openai/
+        req.inputs.model = (
+            "ollama/" + final_model_name
+            if "ollama" in provider_name.lower()
+            else "openai/" + final_model_name
+        )
+
+        return (
+            provider_model_name,
+            custom_provider_info.api_key,
+            "custom",  # return "custom" as provider
+            base_url,
+            custom_provider_info.extra_headers,
+            custom_provider_info.return_type,
+        )
     elif model_info:
         secret_name = model_info.get("api_key_name")
         if not secret_name:
@@ -2973,25 +3203,16 @@ def _setup_completion_model_info(
                 f"No API key {secret_name} found for model {model_name}",
                 api_key_name=secret_name,
             )
-    else:
-        # Custom provider path
-        custom_provider_info = get_custom_provider_info(
-            project_id=req.project_id,
-            model_name=model_name,
-            obj_read_func=obj_read,
-        )
 
-        base_url = custom_provider_info.base_url
-        api_key = custom_provider_info.api_key
-        extra_headers = custom_provider_info.extra_headers
-        return_type = custom_provider_info.return_type
-        actual_model_name = custom_provider_info.actual_model_name
+    return (
+        model_name,
+        api_key,
+        provider,
+        base_url,
+        extra_headers,
+        return_type,
+    )
 
-        provider = "custom"
-        req.inputs.model = (
-            "ollama/" + actual_model_name
-            if "ollama" in model_name
-            else actual_model_name
-        )
 
-    return model_name, api_key, provider, base_url, extra_headers, return_type
+def _sanitize_name_for_object_id(name: str) -> str:
+    return sub(r"[^a-zA-Z0-9_-]", "_", name)

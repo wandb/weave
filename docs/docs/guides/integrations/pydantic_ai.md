@@ -27,7 +27,7 @@ It is recommended that you store sensitive environment variables like your API k
 
 ### Required configuration
 
-- **Endpoint:** `https://trace.wandb.ai/otel/v1/traces`
+- **Endpoint:** `https://trace.wandb.ai/otel/v1/traces`. If you are using a dedicated Weave instance, the URL follows this pattern instead: `{YOUR_WEAVE_HOST}/traces/otel/v1/traces`
 - **Headers:**
   - `Authorization`: Basic auth using your W&B API key
   - `project_id`: Your W&B entity/project name (e.g., `myteam/myproject`)

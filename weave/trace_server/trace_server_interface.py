@@ -133,6 +133,7 @@ class CallSchema(BaseModel):
     wb_user_id: Optional[str] = None
     wb_run_id: Optional[str] = None
     wb_run_step: Optional[int] = None
+    wb_run_step_end: Optional[int] = None
 
     deleted_at: Optional[datetime.datetime] = None
 
@@ -197,6 +198,9 @@ class EndedCallSchemaForInsert(BaseModel):
 
     # Summary: a summary of the call
     summary: SummaryInsertMap
+
+    # WB Metadata
+    wb_run_step_end: Optional[int] = None
 
     @field_serializer("summary")
     def serialize_typed_dicts(self, v: dict[str, Any]) -> dict[str, Any]:
@@ -365,6 +369,27 @@ class CompletionsCreateReq(BaseModelStrict):
 
 
 class CompletionsCreateRes(BaseModel):
+    response: dict[str, Any]
+    weave_call_id: Optional[str] = None
+
+
+class ImageGenerationRequestInputs(BaseModel):
+    model: str
+    prompt: str
+    n: Optional[int] = None
+
+
+class ImageGenerationCreateReq(BaseModel):
+    project_id: str
+    inputs: ImageGenerationRequestInputs
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    track_llm_call: Optional[bool] = Field(
+        True,
+        description="Whether to track this image generation call in the trace server",
+    )
+
+
+class ImageGenerationCreateRes(BaseModel):
     response: dict[str, Any]
     weave_call_id: Optional[str] = None
 
@@ -553,6 +578,11 @@ class ObjectVersionFilter(BaseModelStrict):
     base_object_classes: Optional[list[str]] = Field(
         default=None,
         description="Filter objects by their base classes",
+        examples=[["Model"], ["Dataset"]],
+    )
+    exclude_base_object_classes: Optional[list[str]] = Field(
+        default=None,
+        description="Exclude objects by their base classes",
         examples=[["Model"], ["Dataset"]],
     )
     leaf_object_classes: Optional[list[str]] = Field(
@@ -1301,6 +1331,11 @@ class TraceServerInterface(Protocol):
     def completions_create_stream(
         self, req: CompletionsCreateReq
     ) -> Iterator[dict[str, Any]]: ...
+
+    # Execute Image Generation API
+    def image_create(
+        self, req: ImageGenerationCreateReq
+    ) -> ImageGenerationCreateRes: ...
 
     # Project statistics API
     def project_stats(self, req: ProjectStatsReq) -> ProjectStatsRes: ...
