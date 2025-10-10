@@ -23,6 +23,7 @@ ACTIONS_TAG_NAME = "Actions"
 OTEL_TAG_NAME = "OpenTelemetry"
 THREADS_TAG_NAME = "Threads"
 V2_OPS_TAG_NAME = "V2 -- Ops"
+V2_DATASETS_TAG_NAME = "V2 -- Datasets"
 
 
 class AuthParams(NamedTuple):
@@ -592,5 +593,95 @@ def generate_routes(
             project_id=project_id, object_id=object_id, digests=digests
         )
         return service.trace_server_interface.op_delete_v2(req)
+
+    @router.post("/v2/{entity}/{project}/datasets", tags=[V2_DATASETS_TAG_NAME])
+    def dataset_create_v2(
+        entity: str,
+        project: str,
+        body: tsi.DatasetCreateV2Body,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.DatasetCreateV2Res:
+        """Create a dataset object."""
+        project_id = f"{entity}/{project}"
+        req = tsi.DatasetCreateV2Req(project_id=project_id, **body.model_dump())
+        return service.trace_server_interface.dataset_create_v2(req)
+
+    @router.get("/v2/dataset/read", tags=[V2_DATASETS_TAG_NAME])
+    def dataset_read_v2(
+        entity: str,
+        project: str,
+        object_id: str,
+        digest: str,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.DatasetReadV2Res:
+        """Get a dataset object."""
+        project_id = f"{entity}/{project}"
+        req = tsi.DatasetReadV2Req(
+            project_id=project_id, object_id=object_id, digest=digest
+        )
+        return service.trace_server_interface.dataset_read_v2(req)
+
+    @router.get("/v2/dataset/read-eager", tags=[V2_DATASETS_TAG_NAME])
+    def dataset_read_eager_v2(
+        entity: str,
+        project: str,
+        object_id: str,
+        digest: str,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.DatasetReadEagerV2Res:
+        """Get a dataset object with resolved rows (eager loading)."""
+        project_id = f"{entity}/{project}"
+        req = tsi.DatasetReadV2Req(
+            project_id=project_id, object_id=object_id, digest=digest
+        )
+        return service.trace_server_interface.dataset_read_eager_v2(req)
+
+    @router.get(
+        "/v2/{entity}/{project}/datasets",
+        tags=[V2_DATASETS_TAG_NAME],
+        response_class=StreamingResponse,
+        responses={
+            200: {
+                "description": "Stream of data in JSONL format",
+                "content": {
+                    "application/jsonl": {
+                        "schema": {
+                            "type": "array",
+                            "items": {"$ref": "#/components/schemas/Schema"},
+                        }
+                    }
+                },
+            }
+        },
+    )
+    def dataset_list_v2(
+        entity: str,
+        project: str,
+        limit: int | None = None,
+        offset: int | None = None,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> StreamingResponse:
+        """List dataset objects."""
+        project_id = f"{entity}/{project}"
+        req = tsi.DatasetListV2Req(project_id=project_id, limit=limit, offset=offset)
+        return StreamingResponse(
+            service.trace_server_interface.dataset_list_v2(req),
+            media_type="application/jsonl",
+        )
+
+    @router.post("/v2/dataset/delete", tags=[V2_DATASETS_TAG_NAME])
+    def dataset_delete_v2(
+        entity: str,
+        project: str,
+        object_id: str,
+        digests: list[str] | None = None,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.DatasetDeleteV2Res:
+        """Delete a dataset object."""
+        project_id = f"{entity}/{project}"
+        req = tsi.DatasetDeleteV2Req(
+            project_id=project_id, object_id=object_id, digests=digests
+        )
+        return service.trace_server_interface.dataset_delete_v2(req)
 
     return router

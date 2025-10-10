@@ -4,6 +4,7 @@ import contextvars
 import datetime
 import hashlib
 import json
+import logging
 import sqlite3
 import threading
 from collections.abc import Iterator
@@ -58,6 +59,8 @@ from weave.trace_server.workers.evaluate_model_worker.evaluate_model_worker impo
     EvaluateModelArgs,
     EvaluateModelDispatcher,
 )
+
+logger = logging.getLogger(__name__)
 
 _conn_cursor: contextvars.ContextVar[
     Optional[tuple[sqlite3.Connection, sqlite3.Cursor]]
@@ -1787,6 +1790,187 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         )
         result = self.obj_delete(obj_delete_req)
         return tsi.OpDeleteV2Res(num_deleted=result.num_deleted)
+
+    def dataset_create_v2(self, req: tsi.DatasetCreateV2Req) -> tsi.DatasetCreateV2Res:
+        """Create a dataset object by first creating a table for rows, then creating the dataset object.
+
+        The dataset object references the table containing the actual row data.
+        """
+        # Generate a safe ID for the dataset
+        safe_name = object_creation_utils.make_safe_name(req.name)
+        dataset_id = f"dataset_{safe_name}"
+
+        # 1. Create a table and get its ref
+        table_req = tsi.TableCreateReq(
+            table=tsi.TableSchemaForInsert(
+                project_id=req.project_id,
+                rows=req.rows,
+            )
+        )
+        table_res = self.table_create(table_req)
+
+        # Construct table ref using shared utility
+        entity, project = req.project_id.split("/")
+        table_ref = object_creation_utils.build_table_ref(
+            entity, project, table_res.digest
+        )
+
+        # 2: Create the dataset object using shared utility for val
+        dataset_val = object_creation_utils.build_dataset_val(
+            name=req.name,
+            description=req.description,
+            table_ref=table_ref,
+        )
+
+        obj_req = tsi.ObjCreateReq(
+            obj=tsi.ObjSchemaForInsert(
+                project_id=req.project_id,
+                object_id=dataset_id,
+                val=dataset_val,
+                wb_user_id=None,
+            )
+        )
+        obj_result = self.obj_create(obj_req)
+
+        # Query back to get version_index
+        obj_read_req = tsi.ObjReadReq(
+            project_id=req.project_id,
+            object_id=dataset_id,
+            digest=obj_result.digest,
+        )
+        obj_read_res = self.obj_read(obj_read_req)
+
+        return tsi.DatasetCreateV2Res(
+            digest=obj_result.digest,
+            object_id=dataset_id,
+            version_index=obj_read_res.obj.version_index,
+        )
+
+    def dataset_read_v2(self, req: tsi.DatasetReadV2Req) -> tsi.DatasetReadV2Res:
+        """Get dataset objects by delegating to obj_read."""
+        obj_req = tsi.ObjReadReq(
+            project_id=req.project_id,
+            object_id=req.object_id,
+            digest=req.digest,
+        )
+        result = self.obj_read(obj_req)
+        val = result.obj.val
+
+        # Extract name, description, and rows ref from val data
+        name = val.get("name", result.obj.object_id)
+        description = val.get("description")
+        rows_ref = val.get("rows", "")
+
+        # Create the response with all required fields
+        return tsi.DatasetReadV2Res(
+            object_id=result.obj.object_id,
+            digest=result.obj.digest,
+            version_index=result.obj.version_index,
+            created_at=result.obj.created_at,
+            name=name,
+            description=description,
+            rows=rows_ref,
+        )
+
+    def dataset_read_eager_v2(
+        self, req: tsi.DatasetReadV2Req
+    ) -> tsi.DatasetReadEagerV2Res:
+        """Get a specific dataset object with resolved rows.
+
+        This is similar to dataset_read_v2 but makes the additional API call to
+        resolve the rows reference and return the actual dataset rows.
+        """
+        obj_req = tsi.ObjReadReq(
+            project_id=req.project_id,
+            object_id=req.object_id,
+            digest=req.digest,
+        )
+        result = self.obj_read(obj_req)
+        val = result.obj.val
+
+        # Extract name, description, and rows ref from val data
+        name = val.get("name", result.obj.object_id)
+        description = val.get("description")
+        rows_ref = val.get("rows", "")
+
+        # Resolve the rows reference to get actual rows
+        rows: list[dict[str, Any]] = []
+        if rows_ref:
+            try:
+                # Parse the rows reference (should be a table reference)
+                parsed_ref = ri.parse_internal_uri(rows_ref)
+                if isinstance(parsed_ref, ri.InternalTableRef):
+                    # Query the table to get all rows
+                    table_query_req = tsi.TableQueryReq(
+                        project_id=parsed_ref.project_id,
+                        digest=parsed_ref.digest,
+                    )
+                    table_result = self.table_query(table_query_req)
+                    rows = [row.val for row in table_result.rows]
+            except Exception:
+                # If we can't resolve the rows, leave the list empty
+                pass
+
+        return tsi.DatasetReadEagerV2Res(
+            object_id=result.obj.object_id,
+            digest=result.obj.digest,
+            version_index=result.obj.version_index,
+            created_at=result.obj.created_at,
+            name=name,
+            description=description,
+            rows=rows,
+        )
+
+    def dataset_list_v2(
+        self, req: tsi.DatasetListV2Req
+    ) -> Iterator[tsi.DatasetReadV2Res]:
+        """List dataset objects by delegating to objs_query with Dataset filtering."""
+        obj_query_req = tsi.ObjQueryReq(
+            project_id=req.project_id,
+            filter=tsi.ObjectVersionFilter(base_object_classes=["Dataset"]),
+            limit=req.limit,
+            offset=req.offset,
+        )
+        result = self.objs_query(obj_query_req)
+
+        for obj in result.objs:
+            if not hasattr(obj, "val") or not obj.val:
+                logger.warning(
+                    f"Skipping dataset object {obj.object_id} with digest {obj.digest}: missing or empty val"
+                )
+                continue
+
+            val = obj.val
+            if not isinstance(val, dict):
+                logger.warning(
+                    f"Skipping dataset object {obj.object_id} with digest {obj.digest}: val is not a dict"
+                )
+                continue
+
+            # Extract name, description, and rows ref from val data
+            name = val.get("name")
+            description = val.get("description")
+            rows_ref = val.get("rows", "")
+
+            yield tsi.DatasetReadV2Res(
+                object_id=obj.object_id,
+                digest=obj.digest,
+                version_index=obj.version_index,
+                created_at=obj.created_at,
+                name=name,
+                description=description,
+                rows=rows_ref,
+            )
+
+    def dataset_delete_v2(self, req: tsi.DatasetDeleteV2Req) -> tsi.DatasetDeleteV2Res:
+        """Delete dataset objects by delegating to obj_delete."""
+        obj_delete_req = tsi.ObjDeleteReq(
+            project_id=req.project_id,
+            object_id=req.object_id,
+            digests=req.digests,
+        )
+        result = self.obj_delete(obj_delete_req)
+        return tsi.DatasetDeleteV2Res(num_deleted=result.num_deleted)
 
     def _table_row_read(self, project_id: str, row_digest: str) -> tsi.TableRowSchema:
         conn, cursor = get_conn_cursor(self.db_path)

@@ -100,7 +100,7 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         """Cleanup method called when object is destroyed."""
         try:
             self._cache.close()
-        except Exception as e:
+        except Exception:
             logger.exception("Error closing cache")
 
     def get_call_processor(self) -> AsyncBatchProcessor | None:
@@ -209,7 +209,7 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         """
         try:
             cache_key = self._make_cache_key(namespace, make_cache_key(req))
-        except Exception as e:
+        except Exception:
             logger.exception("Error creating cache key")
             return func(req)
 
@@ -218,7 +218,7 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         if cached_json_value is not None:
             try:
                 return deserialize(cached_json_value)
-            except Exception as e:
+            except Exception:
                 logger.exception("Error deserializing cached value")
                 # Remove corrupted cache entry
                 self._safe_cache_delete(cache_key)
@@ -230,7 +230,7 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
         try:
             json_value_to_cache = serialize(res)
             self._safe_cache_set(cache_key, json_value_to_cache)
-        except Exception as e:
+        except Exception:
             logger.exception("Error serializing value for cache")
 
         return res
@@ -386,7 +386,7 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
                             self._make_cache_key("refs_read_batch", needed_ref),
                             needed_val,
                         )
-                except Exception as e:
+                except Exception:
                     logger.exception("Error parsing ref for caching")
 
         return tsi.RefsReadBatchRes(vals=final_results)
@@ -555,6 +555,24 @@ class CachingMiddlewareTraceServer(tsi.TraceServerInterface):
 
     def op_delete_v2(self, req: tsi.OpDeleteV2Req) -> tsi.OpDeleteV2Res:
         return self._next_trace_server.op_delete_v2(req)
+
+    def dataset_create_v2(self, req: tsi.DatasetCreateV2Req) -> tsi.DatasetCreateV2Res:
+        return self._next_trace_server.dataset_create_v2(req)
+
+    def dataset_read_v2(self, req: tsi.DatasetReadV2Req) -> tsi.DatasetReadV2Res:
+        if not digest_is_cacheable(req.digest):
+            return self._next_trace_server.dataset_read_v2(req)
+        return self._with_cache_pydantic(
+            self._next_trace_server.dataset_read_v2, req, tsi.DatasetReadV2Res
+        )
+
+    def dataset_list_v2(
+        self, req: tsi.DatasetListV2Req
+    ) -> Iterator[tsi.DatasetReadV2Res]:
+        return self._next_trace_server.dataset_list_v2(req)
+
+    def dataset_delete_v2(self, req: tsi.DatasetDeleteV2Req) -> tsi.DatasetDeleteV2Res:
+        return self._next_trace_server.dataset_delete_v2(req)
 
 
 def pydantic_bytes_safe_dump(obj: BaseModel) -> str:
