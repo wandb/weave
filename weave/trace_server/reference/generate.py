@@ -836,20 +836,76 @@ def generate_routes(
         """Delete an evaluation object."""
         return service.trace_server_interface.evaluation_delete_v2(req)
 
+    @router.post(
+        "/v2/{entity}/{project}/evaluation_runs/start",
+        tags=[V2_EVALUATION_RUNS_TAG_NAME],
+    )
+    def evaluation_run_start(
+        req: tsi.EvaluationRunStartReq,
+        entity: str,
+        project: str,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.EvaluationRunStartRes:
+        """Start a new evaluation run."""
+        req.project_id = f"{entity}/{project}"
+        return service.trace_server_interface.evaluation_run_start(req)
+
+    @router.post(
+        "/v2/{entity}/{project}/evaluation_runs/log_prediction",
+        tags=[V2_EVALUATION_RUNS_TAG_NAME],
+    )
+    def evaluation_run_log_prediction(
+        req: tsi.EvaluationRunLogPredictionReq,
+        entity: str,
+        project: str,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.EvaluationRunLogPredictionRes:
+        """Log a prediction within an evaluation run."""
+        req.project_id = f"{entity}/{project}"
+        return service.trace_server_interface.evaluation_run_log_prediction(req)
+
+    @router.post(
+        "/v2/{entity}/{project}/evaluation_runs/log_score",
+        tags=[V2_EVALUATION_RUNS_TAG_NAME],
+    )
+    def evaluation_run_log_score(
+        req: tsi.EvaluationRunLogScoreReq,
+        entity: str,
+        project: str,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.EvaluationRunLogScoreRes:
+        """Log a score for a prediction."""
+        req.project_id = f"{entity}/{project}"
+        return service.trace_server_interface.evaluation_run_log_score(req)
+
+    @router.post(
+        "/v2/{entity}/{project}/evaluation_runs/finish",
+        tags=[V2_EVALUATION_RUNS_TAG_NAME],
+    )
+    def evaluation_run_finish(
+        req: tsi.EvaluationRunFinishReq,
+        entity: str,
+        project: str,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.EvaluationRunFinishRes:
+        """Finish an evaluation run."""
+        req.project_id = f"{entity}/{project}"
+        return service.trace_server_interface.evaluation_run_finish(req)
+
     @router.get(
-        "/v2/{entity}/{project}/evaluation_runs/{evaluate_call_id}",
+        "/v2/{entity}/{project}/evaluation_runs/{evaluation_run_id}",
         tags=[V2_EVALUATION_RUNS_TAG_NAME],
     )
     def evaluation_run_read(
         entity: str,
         project: str,
-        evaluate_call_id: str,
+        evaluation_run_id: str,
         service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
     ) -> tsi.EvaluationRunReadRes:
-        """Get an evaluation run by its evaluate call ID."""
+        """Get an evaluation run by its ID."""
         project_id = f"{entity}/{project}"
         req = tsi.EvaluationRunReadReq(
-            project_id=project_id, evaluate_call_id=evaluate_call_id
+            project_id=project_id, evaluation_run_id=evaluation_run_id
         )
         return service.trace_server_interface.evaluation_run_read(req)
 
@@ -878,19 +934,19 @@ def generate_routes(
         offset: int | None = None,
         evaluation_refs: str | None = None,
         model_refs: str | None = None,
-        evaluate_call_ids: str | None = None,
+        evaluation_run_ids: str | None = None,
         service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
     ) -> StreamingResponse:
         """List evaluation runs."""
         project_id = f"{entity}/{project}"
         # Build filter from query params
         filter_obj = None
-        if evaluation_refs or model_refs or evaluate_call_ids:
+        if evaluation_refs or model_refs or evaluation_run_ids:
             filter_obj = tsi.EvaluationRunFilter(
                 evaluation_refs=evaluation_refs.split(",") if evaluation_refs else None,
                 model_refs=model_refs.split(",") if model_refs else None,
-                evaluate_call_ids=evaluate_call_ids.split(",")
-                if evaluate_call_ids
+                evaluation_run_ids=evaluation_run_ids.split(",")
+                if evaluation_run_ids
                 else None,
             )
         req = tsi.EvaluationRunListReq(
@@ -911,15 +967,15 @@ def generate_routes(
     def evaluation_run_delete(
         entity: str,
         project: str,
-        evaluate_call_ids: str,
+        evaluation_run_ids: str,
         service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
     ) -> tsi.EvaluationRunDeleteRes:
         """Delete evaluation runs."""
         project_id = f"{entity}/{project}"
-        call_ids = evaluate_call_ids.split(",")
+        call_ids = evaluation_run_ids.split(",")
         req = tsi.EvaluationRunDeleteReq(
             project_id=project_id,
-            evaluate_call_ids=call_ids,
+            evaluation_run_ids=call_ids,
             wb_user_id=None,
         )
         return service.trace_server_interface.evaluation_run_delete(req)
