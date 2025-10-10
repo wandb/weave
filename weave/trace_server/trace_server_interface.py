@@ -1509,6 +1509,115 @@ class ScorerDeleteV2Res(BaseModel):
     num_deleted: int = Field(..., description="Number of scorer versions deleted")
 
 
+class EvaluationCreateV2Body(BaseModel):
+    name: str = Field(
+        ...,
+        description="The name of this evaluation.  Evaluations with the same name will be versioned together.",
+    )
+    description: Optional[str] = Field(
+        None,
+        description="A description of this evaluation",
+    )
+
+    dataset_ref: str = Field(..., description="Reference to the dataset (weave:// URI)")
+    scorer_refs: Optional[list[str]] = Field(
+        None, description="List of scorer references (weave:// URIs)"
+    )
+
+    trials: int = Field(default=1, description="Number of trials to run")
+    evaluation_name: Optional[str] = Field(
+        None, description="Name for the evaluation run"
+    )
+    eval_attributes: Optional[dict[str, Any]] = Field(
+        None, description="Optional attributes for the evaluation"
+    )
+
+
+class EvaluationCreateV2Req(EvaluationCreateV2Body):
+    project_id: str = Field(
+        ..., description="The `entity/project` where this evaluation will be saved"
+    )
+
+
+class EvaluationCreateV2Res(BaseModel):
+    digest: str = Field(..., description="The digest of the created evaluation")
+    object_id: str = Field(..., description="The ID of the created evaluation")
+    version_index: int = Field(
+        ..., description="The version index of the created evaluation"
+    )
+    evaluation_ref: str = Field(
+        ..., description="Full reference to the created evaluation"
+    )
+
+
+class EvaluationReadV2Req(BaseModel):
+    project_id: str = Field(
+        ..., description="The `entity/project` where this evaluation is saved"
+    )
+    object_id: str = Field(..., description="The evaluation ID")
+    digest: str = Field(..., description="The digest of the evaluation")
+
+
+class EvaluationItemMetadataV2(BaseModel):
+    object_id: str = Field(..., description="The evaluation ID")
+    digest: str = Field(..., description="The digest of the evaluation")
+    version_index: int = Field(..., description="The version index of the evaluation")
+    created_at: datetime.datetime = Field(
+        ..., description="When the evaluation was created"
+    )
+    name: str = Field(..., description="The name of the evaluation")
+    description: Optional[str] = Field(
+        None, description="A description of the evaluation"
+    )
+
+
+class EvaluationReadV2Res(EvaluationItemMetadataV2):
+    dataset_ref: str = Field(..., description="Dataset reference (weave:// URI)")
+    scorer_refs: list[str] = Field(
+        ..., description="List of scorer references (weave:// URIs)"
+    )
+    trials: int = Field(..., description="Number of trials")
+    evaluation_name: Optional[str] = Field(
+        None, description="Name for the evaluation run"
+    )
+    evaluate_op_ref: str = Field(
+        ..., description="Evaluate op reference (weave:// URI)"
+    )
+    predict_and_score_op_ref: str = Field(
+        ..., description="Predict and score op reference (weave:// URI)"
+    )
+    summarize_op_ref: str = Field(
+        ..., description="Summarize op reference (weave:// URI)"
+    )
+
+
+class EvaluationListV2Req(BaseModel):
+    project_id: str = Field(
+        ..., description="The `entity/project` where these evaluations are saved"
+    )
+    limit: Optional[int] = Field(
+        default=None, description="Maximum number of evaluations to return"
+    )
+    offset: Optional[int] = Field(
+        default=None, description="Number of evaluations to skip"
+    )
+
+
+class EvaluationDeleteV2Req(BaseModel):
+    project_id: str = Field(
+        ..., description="The `entity/project` where this evaluation is saved"
+    )
+    object_id: str = Field(..., description="The evaluation ID")
+    digests: Optional[list[str]] = Field(
+        default=None,
+        description="List of digests to delete. If not provided, all digests for the evaluation will be deleted.",
+    )
+
+
+class EvaluationDeleteV2Res(BaseModel):
+    num_deleted: int = Field(..., description="Number of evaluation versions deleted")
+
+
 class TraceServerInterface(Protocol):
     def ensure_project_exists(
         self, entity: str, project: str
@@ -1631,3 +1740,15 @@ class TraceServerInterface(Protocol):
         self, req: ScorerListV2Req
     ) -> Iterator[ScorerItemMetadataV2]: ...
     def scorer_delete_v2(self, req: ScorerDeleteV2Req) -> ScorerDeleteV2Res: ...
+
+    # Evaluations
+    def evaluation_create_v2(
+        self, req: EvaluationCreateV2Req
+    ) -> EvaluationCreateV2Res: ...
+    def evaluation_read_v2(self, req: EvaluationReadV2Req) -> EvaluationReadV2Res: ...
+    def evaluation_list_v2(
+        self, req: EvaluationListV2Req
+    ) -> Iterator[EvaluationItemMetadataV2]: ...
+    def evaluation_delete_v2(
+        self, req: EvaluationDeleteV2Req
+    ) -> EvaluationDeleteV2Res: ...
