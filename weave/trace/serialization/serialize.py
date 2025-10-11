@@ -36,14 +36,6 @@ def is_pydantic_model_class(obj: Any) -> bool:
         return False
 
 
-def _is_inline_custom_obj(encoded: dict) -> bool:
-    """Custom object values may be inline or backed by a file.
-
-    This separate function for readability checks which we are dealing with.
-    """
-    return "val" in encoded
-
-
 def to_json(
     obj: Any, project_id: str, client: WeaveClient, use_dictify: bool = False
 ) -> Any:
@@ -110,8 +102,6 @@ def to_json(
                 for k, v in as_dict.items()
             }
         return fallback_encode(obj)
-    if _is_inline_custom_obj(encoded):
-        return encoded
     result = _build_result_from_encoded(encoded, project_id, client)
     return result
 
@@ -120,7 +110,7 @@ def _build_result_from_encoded(
     encoded: dict, project_id: str, client: WeaveClient
 ) -> Any:
     file_digests = {}
-    for name, val in encoded["files"].items():
+    for name, val in encoded.get("files", {}).items():
         # Instead of waiting for the file to be created, we
         # calculate the digest directly. This makes sure that the
         # to_json procedure is not blocked on network requests.
@@ -138,6 +128,7 @@ def _build_result_from_encoded(
         "_type": encoded["_type"],
         "weave_type": encoded["weave_type"],
         "files": file_digests,
+        "val": encoded.get("val"),
     }
     load_op_uri = encoded.get("load_op")
     if load_op_uri:
@@ -306,12 +297,14 @@ def from_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
                 {k: from_json(v, project_id, server) for k, v in obj.items()}
             )
         elif val_type == "CustomWeaveType":
-            if _is_inline_custom_obj(obj):
-                return custom_objs.decode_custom_inline_obj(obj)
             files = _load_custom_obj_files(project_id, server, obj["files"])
-            return custom_objs.decode_custom_files_obj(
-                obj["weave_type"], files, obj.get("load_op")
-            )
+            encoded = {
+                "weave_type": obj["weave_type"],
+                "files": files,
+                "val": obj.get("val"),
+                "load_op": obj.get("load_op"),
+            }
+            return custom_objs.decode_custom_obj(encoded)
         elif isinstance(val_type, str) and obj.get("_class_name") == val_type:
             from weave.trace_server.interface.builtin_object_classes.builtin_object_registry import (
                 BUILTIN_OBJECT_REGISTRY,

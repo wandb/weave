@@ -603,6 +603,7 @@ def save_instance(obj: Op, artifact: MemTraceFilesArtifact, name: str) -> None:
 def load_instance(
     artifact: MemTraceFilesArtifact,
     name: str,
+    val: Any,
 ) -> Op | None:
     file_name = f"{name}.py"
     module_path = artifact.path(file_name)

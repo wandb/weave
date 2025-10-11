@@ -1,8 +1,9 @@
-from typing import Any, TypedDict
-
-from typing_extensions import NotRequired
+from typing import TYPE_CHECKING, Any, Optional
 
 from weave.trace.serialization import serializer
+
+if TYPE_CHECKING:
+    from weave.trace.serialization.mem_artifact import MemTraceFilesArtifact
 
 # Try to import rich Markdown, but make it optional
 try:
@@ -19,23 +20,29 @@ except ImportError:
             self.code_theme = code_theme
 
 
-# TODO: Serialize "justify" and "hyperlinks" attributes?
-class SerializedMarkdown(TypedDict):
-    markup: str
-    code_theme: NotRequired[str]
+def save(
+    obj: Markdown, artifact: "MemTraceFilesArtifact", name: str
+) -> Optional[dict[str, Any]]:
+    """Save markdown content as file, return metadata."""
+    with artifact.new_file("content.md", binary=False) as f:
+        f.write(obj.markup)
 
-
-def save(obj: Markdown) -> SerializedMarkdown:
-    d: SerializedMarkdown = {
-        "markup": obj.markup,
-    }
+    # Return metadata if present
     if obj.code_theme:
-        d["code_theme"] = obj.code_theme
-    return d
+        return {"code_theme": obj.code_theme}
+    return None
 
 
-def load(encoded: SerializedMarkdown) -> Markdown:
-    return Markdown(**encoded)
+def load(artifact: "MemTraceFilesArtifact", name: str, val: Any) -> Markdown:
+    """Load markdown from file and metadata."""
+    with artifact.open("content.md", binary=False) as f:
+        markup = f.read()
+
+    kwargs = {}
+    if val and isinstance(val, dict) and "code_theme" in val:
+        kwargs["code_theme"] = val["code_theme"]
+
+    return Markdown(markup=markup, **kwargs)
 
 
 def register() -> None:

@@ -1,21 +1,26 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, Callable
+from typing import Any
 
 from weave.trace.context.weave_client_context import require_weave_client
-from weave.trace.op import is_op, op
+from weave.trace.op import op
 from weave.trace.op_protocol import Op
-from weave.trace.refs import ObjectRef, OpRef
+from weave.trace.refs import ObjectRef
 from weave.trace.serialization import (
     op_type,  # noqa: F401, Must import this to register op save/load
 )
 from weave.trace.serialization.mem_artifact import MemTraceFilesArtifact
 from weave.trace.serialization.serializer import (
+    AllLoadCallables,
     get_serializer_by_id,
     get_serializer_for_obj,
-    is_file_save,
-    is_inline_save,
+    is_probably_legacy_file_load,
+    is_probably_legacy_inline_load,
+)
+from weave.trace_server.trace_server_interface import (
+    FileContentReadReq,
+    TraceServerInterface,
 )
 
 
@@ -56,13 +61,17 @@ def encode_custom_obj(obj: Any) -> dict | None:
             # We don't want to actually trace the load_instance op,
             # just save it.
             serializer.load._tracing_enabled = False  # type: ignore
-        # Save the load_instance_op
-        wc = require_weave_client()
 
-        # TODO(PR): this can fail right? Or does it return None?
-        # Calculating this URL is blocking, but we only have to pay it once per custom type
-        load_instance_op_ref = wc._save_op(serializer.load, "load_" + serializer.id())  # type: ignore
-        load_op_uri = load_instance_op_ref.uri()
+        if serializer.publish_load_op:
+            # Save the load_instance_op
+            wc = require_weave_client()
+
+            # TODO(PR): this can fail right? Or does it return None?
+            # Calculating this URL is blocking, but we only have to pay it once per custom type
+            load_instance_op_ref = wc._save_op(
+                serializer.load, "load_" + serializer.id()
+            )  # type: ignore
+            load_op_uri = load_instance_op_ref.uri()
 
     encoded = {
         "_type": "CustomWeaveType",
@@ -70,66 +79,63 @@ def encode_custom_obj(obj: Any) -> dict | None:
         "load_op": load_op_uri,
     }
 
-    # If the save method just takes one argument, it is an inline serializer
-    if is_inline_save(serializer.save):
-        encoded["val"] = serializer.save(obj)
-    elif is_file_save(serializer.save):
-        art = MemTraceFilesArtifact()
-        serializer.save(obj, art, "obj")
+    art = MemTraceFilesArtifact()
+    val = serializer.save(obj, art, "obj")
+    if art.path_contents:
         encoded_path_contents = {
             k: (v.encode("utf-8") if isinstance(v, str) else v)  # type: ignore
             for k, v in art.path_contents.items()
         }
         encoded["files"] = encoded_path_contents
-    else:
-        raise ValueError(
-            f"Serializer save function could not be identified as inline or file-based: {type(serializer.save)}"
-        )
+    encoded["val"] = val
+
     return encoded
 
 
-def decode_custom_inline_obj(obj: dict) -> Any:
-    type_ = obj["weave_type"]["type"]
-    if type_ in KNOWN_TYPES:
-        serializer = get_serializer_by_id(type_)
-        if serializer is not None:
-            if is_op(serializer.load):
-                # We would expect this to be already set to False, but
-                # just in case.
-                serializer.load._tracing_enabled = False  # type: ignore
-            return serializer.load(obj["val"])
+def decode_custom_obj(encoded: dict) -> Any:
+    return _decode_custom_obj(
+        encoded["weave_type"],
+        encoded.get("files", {}),
+        encoded.get("val"),
+        encoded.get("load_op"),
+    )
 
-    load_op_uri = obj.get("load_op")
-    if load_op_uri is None:
-        raise ValueError(f"No serializer found for `{type_}`")
 
-    op_ref = OpRef.parse_uri(load_op_uri)
-    wc = require_weave_client()
-    load_instance_op = wc.get(op_ref)
-    if load_instance_op is None:
-        raise ValueError(
-            f"Failed to load op needed to decode object of type `{type_}`. See logs above for more information."
+def _load_custom_obj_files(
+    project_id: str, server: TraceServerInterface, file_digests: dict
+) -> dict[str, bytes]:
+    loaded_files: dict[str, bytes] = {}
+    for name, digest in file_digests.items():
+        file_response = server.file_content_read(
+            FileContentReadReq(project_id=project_id, digest=digest)
         )
+        loaded_files[name] = file_response.content
+    return loaded_files
 
-    load_instance_op._tracing_enabled = False  # type: ignore
-    return load_instance_op(obj.get("val"))
 
-
-def _decode_custom_files_obj(
+def _load_custom_obj(
     encoded_path_contents: Mapping[str, str | bytes],
-    load_instance_op: Callable[..., Any],
+    val: Any | None,
+    load_instance_op: AllLoadCallables,
 ) -> Any:
     # Disables tracing so that calls to loading data itself don't get traced
     load_instance_op._tracing_enabled = False  # type: ignore
     art = MemTraceFilesArtifact(encoded_path_contents, metadata={})
-    res = load_instance_op(art, "obj")
-    res.art = art
+    if is_probably_legacy_file_load(load_instance_op):
+        res = load_instance_op(art, "obj")
+    elif is_probably_legacy_inline_load(load_instance_op):
+        res = load_instance_op(val)
+    else:
+        # Modern, current path
+        res = load_instance_op(art, "obj", val)
+    # res.art = art
     return res
 
 
-def decode_custom_files_obj(
+def _decode_custom_obj(
     weave_type: dict,
     encoded_path_contents: Mapping[str, str | bytes],
+    val: Any | None,
     load_instance_op_uri: str | None = None,
 ) -> Any:
     type_ = weave_type["type"]
@@ -143,7 +149,7 @@ def decode_custom_files_obj(
             load_instance_op = serializer.load
 
             try:
-                return _decode_custom_files_obj(encoded_path_contents, load_instance_op)
+                return _load_custom_obj(encoded_path_contents, val, load_instance_op)
             except Exception as e:
                 pass
 
@@ -161,7 +167,7 @@ def decode_custom_files_obj(
             )
 
     try:
-        return _decode_custom_files_obj(encoded_path_contents, load_instance_op)
+        return _load_custom_obj(encoded_path_contents, val, load_instance_op)
     except Exception as e:
         raise DecodeCustomObjectError(
             f"Failed to decode object of type `{type_}`. See logs above for more information."

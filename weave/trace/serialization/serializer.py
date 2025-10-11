@@ -41,55 +41,44 @@ from typing import TYPE_CHECKING, Any, Callable, Union
 
 from typing_extensions import TypeIs
 
-# Not locking down the return type for inline encoding but
-# it would be expected to be something like a str or dict.
-InlineSave = Callable[[Any], Any]
 # This is avoiding a circular import.
 if TYPE_CHECKING:
     from weave.trace.serialization.mem_artifact import MemTraceFilesArtifact
 
-FileSave = Callable[[Any, "MemTraceFilesArtifact", str], None]
-Save = Union[InlineSave, FileSave]
+
+SerializeSaveCallable = Callable[[Any, "MemTraceFilesArtifact", str], Any]
+SerializeLoadCallable = Callable[["MemTraceFilesArtifact", str, Any], Any]
+
+LegacyInlineLoad = Callable[[Any], Any]
+LegacyFileLoad = Callable[["MemTraceFilesArtifact", str], Any]
+
+AllLoadCallables = Union[SerializeLoadCallable, LegacyInlineLoad, LegacyFileLoad]
 
 
-def is_inline_save(value: Callable) -> TypeIs[InlineSave]:
+def is_probably_legacy_inline_load(fn: Callable) -> TypeIs[LegacyInlineLoad]:
     """Check if a function is an inline save function."""
-    signature = inspect.signature(value)
+    signature = inspect.signature(fn)
     param_count = len(signature.parameters)
     return param_count == 1
 
 
-def is_file_save(value: Callable) -> TypeIs[FileSave]:
-    """Check if a function is a file-based save function."""
-    signature = inspect.signature(value)
-    params = list(signature.parameters.values())
-    # Check parameter count and return type without relying on annotations
-    # that would cause circular import
-    name_annotation = params[2].annotation
-    return (
-        len(params) == 3
-        and (
-            name_annotation is str
-            or name_annotation == "str"
-            or name_annotation == inspect._empty
-        )
-        and (
-            signature.return_annotation is None
-            or signature.return_annotation == "None"
-            or signature.return_annotation == inspect._empty
-        )
-    )
+def is_probably_legacy_file_load(fn: Callable) -> TypeIs[LegacyFileLoad]:
+    """Check if a function is a file load function."""
+    signature = inspect.signature(fn)
+    param_count = len(signature.parameters)
+    return param_count == 2
 
 
 @dataclass
 class Serializer:
     target_class: type
-    save: Save
-    load: Callable
+    save: SerializeSaveCallable
+    load: SerializeLoadCallable
 
     # Added to provide a function to check if an object is an instance of the
     # target class because protocol isinstance checks can fail in python3.12+
     instance_check: Callable[[Any], bool] | None = None
+    publish_load_op: bool = True
 
     def id(self) -> str:
         serializer_id = self.target_class.__module__ + "." + self.target_class.__name__
@@ -106,11 +95,14 @@ SERIALIZERS = []
 
 def register_serializer(
     target_class: type,
-    save: Callable,
-    load: Callable,
+    save: SerializeSaveCallable,
+    load: SerializeLoadCallable,
     instance_check: Callable[[Any], bool] | None = None,
+    publish_load_op: bool = True,
 ) -> None:
-    SERIALIZERS.append(Serializer(target_class, save, load, instance_check))
+    SERIALIZERS.append(
+        Serializer(target_class, save, load, instance_check, publish_load_op)
+    )
 
 
 def get_serializer_by_id(id: str) -> Serializer | None:
