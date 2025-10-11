@@ -133,7 +133,6 @@ class CallSchema(BaseModel):
     wb_user_id: Optional[str] = None
     wb_run_id: Optional[str] = None
     wb_run_step: Optional[int] = None
-    wb_run_step_end: Optional[int] = None
 
     deleted_at: Optional[datetime.datetime] = None
 
@@ -198,9 +197,6 @@ class EndedCallSchemaForInsert(BaseModel):
 
     # Summary: a summary of the call
     summary: SummaryInsertMap
-
-    # WB Metadata
-    wb_run_step_end: Optional[int] = None
 
     @field_serializer("summary")
     def serialize_typed_dicts(self, v: dict[str, Any]) -> dict[str, Any]:
