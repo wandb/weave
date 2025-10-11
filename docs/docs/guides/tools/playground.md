@@ -6,7 +6,7 @@ For a limited time, the new W&B Inference service is included in your free tier.
 - [Product page](https://wandb.ai/site/inference) 
 :::
 
-Evaluating LLM prompts and responses is challenging. The W&B Weave Playground is designed to simplify the process of iterating on LLM prompts and responses, making it easier to experiment with different models and prompts. With features like prompt editing, message retrying, and model comparison, Playground helps you to quickly test and improve your LLM applications. Playground currently supports models from OpenAI, Anthropic, Google, Groq, Amazon Bedrock, and Microsoft Azure, as well as [custom providers](#add-a-custom-provider).
+Evaluating LLM prompts and responses is challenging. The W&B Weave Playground is designed to simplify the process of iterating on LLM prompts and responses, making it easier to experiment with different models and prompts. With features like prompt editing, message retrying, and model comparison, Playground helps you to quickly test and improve your LLM applications. Playground currently supports models from OpenAI (including DALL-E and GPT Image models), Anthropic, Google, Groq, Amazon Bedrock, and Microsoft Azure, as well as [custom providers](#add-a-custom-provider).
 
 - **Quick access:** Open the Playground from the W&B sidebar for a fresh session or from the Call page to test an existing project.
 - **Message controls:** Edit, retry, or delete messages directly within the chat.
@@ -66,9 +66,9 @@ There are two ways to access the Playground:
 
 ![Screenshot of Open in Playground button](imgs/open_chat_in_playground.png)
 
-## Select an LLM
+## Select an AI model provider
 
-You can switch the LLM using the dropdown menu in the top left. The available models from various providers are listed below:
+You can switch the model using the dropdown menu in the top left. The available models from various providers are listed below:
 
 - [Amazon Bedrock](#amazon-bedrock)
 - [Anthropic](#anthropic)
@@ -175,6 +175,8 @@ You can switch the LLM using the dropdown menu in the top left. The available mo
 
 ### [OpenAI](../integrations/openai.md)
 
+- dall-e-2
+- dall-e-3
 - gpt-4.1-mini-2025-04-14
 - gpt-4.1-mini
 - gpt-4.1-2025-04-14
@@ -185,6 +187,7 @@ You can switch the LLM using the dropdown menu in the top left. The available mo
 - o4-mini
 - gpt-4.5-preview-2025-02-27
 - gpt-4.5-preview
+- gpt-image-1
 - o3-2025-04-16
 - o3
 - o3-mini-2025-01-31
