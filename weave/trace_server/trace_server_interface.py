@@ -1248,6 +1248,43 @@ class EvaluationStatusRes(BaseModel):
     ]
 
 
+class AlertMetricInsertItem(BaseModel):
+    alert_ids: list[str]
+    metric_key: str
+    metric_value: float
+    metric_type: str = "float"
+    call_id: str
+    created_at: datetime.datetime
+    wb_user_id: str = Field(description=WB_USER_ID_DESCRIPTION)
+
+
+class AlertMetricSchema(AlertMetricInsertItem):
+    id: str
+    project_id: str
+
+
+class AlertMetricsCreateReq(BaseModelStrict):
+    """Request to create multiple alert metrics in batch."""
+
+    project_id: str
+    metrics: list[AlertMetricInsertItem]
+
+
+class AlertMetricsCreateRes(BaseModel):
+    """Response containing IDs of created metrics."""
+
+    ids: list[str]
+
+
+class AlertMetricsQueryReq(BaseModelStrict):
+    project_id: str
+    metric_keys: Optional[list[str]] = None
+    alert_ids: Optional[list[str]] = None
+    end_time: Optional[datetime.datetime] = None
+    limit: Optional[int] = None
+    offset: Optional[int] = None
+
+
 class TraceServerInterface(Protocol):
     def ensure_project_exists(
         self, entity: str, project: str
@@ -1346,3 +1383,12 @@ class TraceServerInterface(Protocol):
     # Evaluation API
     def evaluate_model(self, req: EvaluateModelReq) -> EvaluateModelRes: ...
     def evaluation_status(self, req: EvaluationStatusReq) -> EvaluationStatusRes: ...
+
+    # Alert API
+    def alert_metrics_create(
+        self, req: AlertMetricsCreateReq
+    ) -> AlertMetricsCreateRes: ...
+
+    def alert_metrics_query_stream(
+        self, req: AlertMetricsQueryReq
+    ) -> Iterator[AlertMetricSchema]: ...
