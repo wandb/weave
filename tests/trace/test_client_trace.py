@@ -4593,7 +4593,7 @@ def test_calls_query_stats_with_limit(client):
     assert calls_stats(filter={"trace_ids": [trace_id]}).count == 2
 
     with pytest.raises(ValueError):
-        calls_stats(limit=-1)
+        calls_stats(limit=0)
 
     # Test that the query works with include_total_storage_size
     result = calls_stats(limit=1, include_total_storage_size=True)
