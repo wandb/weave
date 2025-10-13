@@ -177,6 +177,9 @@ class ExternalTraceServer(tsi.TraceServerInterface):
                 ]
             # TODO: How do we correctly process user_id for the query filters?
 
+        # Convert all refs in the request from external to internal format
+        req = universal_ext_to_int_ref_converter(req, self._idc.ext_to_int_project_id)
+
         res = self._internal_trace_server.calls_query_stream(req)
         for call in res:
             if call.project_id != req.project_id:
