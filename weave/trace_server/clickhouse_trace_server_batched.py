@@ -279,12 +279,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         try:
             yield
             self._flush_immediately = True
+            self._flush_file_chunks()
             self._flush_calls()
             self.kafka_producer.flush()
-            self._flush_file_chunks()
         finally:
-            self._call_batch = []
             self._file_batch = []
+            self._call_batch = []
             self._flush_immediately = True
 
     def call_start_batch(self, req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
