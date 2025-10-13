@@ -45,12 +45,14 @@ from weave.trace_server.clickhouse_schema import (
     ALL_CALL_INSERT_COLUMNS,
     ALL_CALL_JSON_COLUMNS,
     ALL_CALL_SELECT_COLUMNS,
+    ALL_FILE_CHUNK_INSERT_COLUMNS,
     REQUIRED_CALL_COLUMNS,
     CallCHInsertable,
     CallDeleteCHInsertable,
     CallEndCHInsertable,
     CallStartCHInsertable,
     CallUpdateCHInsertable,
+    FileChunkCreateCHInsertable,
     ObjCHInsertable,
     ObjDeleteCHInsertable,
     ObjRefListType,
@@ -176,6 +178,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._database = database
         self._flush_immediately = True
         self._call_batch: list[list[Any]] = []
+        self._file_batch: list[FileChunkCreateCHInsertable] = []
         self._use_async_insert = use_async_insert
         self._model_to_provider_info_map = read_model_to_provider_info_map()
         self._file_storage_client: Optional[FileStorageClient] = None
@@ -275,9 +278,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._flush_immediately = False
         try:
             yield
+            self._flush_immediately = True
+            self._flush_file_chunks()
             self._flush_calls()
             self.kafka_producer.flush()
         finally:
+            self._file_batch = []
             self._call_batch = []
             self._flush_immediately = True
 
@@ -1556,31 +1562,20 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             req.content[i : i + ch_settings.FILE_CHUNK_SIZE]
             for i in range(0, len(req.content), ch_settings.FILE_CHUNK_SIZE)
         ]
-        self._insert(
-            "files",
-            data=[
-                (
-                    req.project_id,
-                    digest,
-                    i,
-                    len(chunks),
-                    req.name,
-                    chunk,
-                    len(chunk),
-                    None,
+        self._insert_file_chunks(
+            [
+                FileChunkCreateCHInsertable(
+                    project_id=req.project_id,
+                    digest=digest,
+                    chunk_index=i,
+                    n_chunks=len(chunks),
+                    name=req.name,
+                    val_bytes=chunk,
+                    bytes_stored=len(chunk),
+                    file_storage_uri=None,
                 )
                 for i, chunk in enumerate(chunks)
-            ],
-            column_names=[
-                "project_id",
-                "digest",
-                "chunk_index",
-                "n_chunks",
-                "name",
-                "val_bytes",
-                "bytes_stored",
-                "file_storage_uri",
-            ],
+            ]
         )
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._file_create_bucket")
@@ -1591,31 +1586,50 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         target_file_storage_uri = store_in_bucket(
             client, key_for_project_digest(req.project_id, digest), req.content
         )
-        self._insert(
-            "files",
-            data=[
-                (
-                    req.project_id,
-                    digest,
-                    0,
-                    1,
-                    req.name,
-                    b"",
-                    len(req.content),
-                    target_file_storage_uri.to_uri_str(),
+        self._insert_file_chunks(
+            [
+                FileChunkCreateCHInsertable(
+                    project_id=req.project_id,
+                    digest=digest,
+                    chunk_index=0,
+                    n_chunks=1,
+                    name=req.name,
+                    val_bytes=b"",
+                    bytes_stored=len(req.content),
+                    file_storage_uri=target_file_storage_uri.to_uri_str(),
                 )
-            ],
-            column_names=[
-                "project_id",
-                "digest",
-                "chunk_index",
-                "n_chunks",
-                "name",
-                "val_bytes",
-                "bytes_stored",
-                "file_storage_uri",
-            ],
+            ]
         )
+
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._flush_file_chunks")
+    def _flush_file_chunks(self) -> None:
+        if not self._flush_immediately:
+            raise ValueError("File chunks must be flushed immediately")
+        self._insert_file_chunks(self._file_batch)
+        self._file_batch = []
+
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_file_chunks")
+    def _insert_file_chunks(
+        self, file_chunks: list[FileChunkCreateCHInsertable]
+    ) -> None:
+        if not self._flush_immediately:
+            self._file_batch.extend(file_chunks)
+            return
+
+        data = []
+        for chunk in file_chunks:
+            chunk_dump = chunk.model_dump()
+            row = []
+            for col in ALL_FILE_CHUNK_INSERT_COLUMNS:
+                row.append(chunk_dump.get(col, None))
+            data.append(row)
+
+        if data:
+            self._insert(
+                "files",
+                data=data,
+                column_names=ALL_FILE_CHUNK_INSERT_COLUMNS,
+            )
 
     def _should_use_file_storage_for_writes(self, project_id: str) -> bool:
         """Determine if we should use file storage for a project."""
