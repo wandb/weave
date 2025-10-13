@@ -16,18 +16,21 @@ try:
     from wandb.errors import AuthenticationError, CommError
     from wandb.sdk.internal.internal_api import logger as wandb_logger
     from wandb.util import app_url
-    
+
+    # Import settings module to check silent mode
+    from weave.trace.settings import should_be_silent
+
     # Wrap wandb's termlog functions to respect WEAVE_SILENT
     def termlog(*args, **kwargs):
-        if os.getenv("WEAVE_SILENT", "").lower() not in ("yes", "true", "1", "on"):
+        if not should_be_silent():
             _wandb_termlog(*args, **kwargs)
-    
+
     def termwarn(*args, **kwargs):
-        if os.getenv("WEAVE_SILENT", "").lower() not in ("yes", "true", "1", "on"):
+        if not should_be_silent():
             _wandb_termwarn(*args, **kwargs)
-    
+
     def termerror(*args, **kwargs):
-        if os.getenv("WEAVE_SILENT", "").lower() not in ("yes", "true", "1", "on"):
+        if not should_be_silent():
             _wandb_termerror(*args, **kwargs)
             
 except (ImportError, ModuleNotFoundError):

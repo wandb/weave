@@ -61,10 +61,13 @@ def _log(
     repeat: bool = True,
     prefix: bool = True,
 ) -> None:
+    # Import here to avoid circular import
+    from weave.trace.settings import should_be_silent
+
     # Check if silent mode is enabled
-    if os.getenv("WEAVE_SILENT", "").lower() in ("yes", "true", "1", "on"):
+    if should_be_silent():
         return
-    
+
     if string:
         if prefix:
             line = "\n".join([f"{LOG_STRING}: {s}" for s in string.split("\n")])

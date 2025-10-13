@@ -4,6 +4,7 @@ import datetime
 import io
 import logging
 import re
+import sys
 import time
 from collections.abc import Callable
 from contextlib import contextmanager
@@ -110,9 +111,10 @@ def get_info_loglines(
 def capture_output(callbacks: list[Callable[[], None]]):
     captured_logs = io.StringIO()
 
-    # Store original stdout and logging handlers
+    # Store original stdout, stderr and logging handlers
+    old_stderr = sys.stderr
     old_handlers = logging.getLogger().handlers[:]
-    
+
     # Also capture from the weave logger hierarchy
     weave_logger = logging.getLogger("weave")
     old_weave_handlers = weave_logger.handlers[:]
@@ -125,10 +127,11 @@ def capture_output(callbacks: list[Callable[[], None]]):
     log_handler = logging.StreamHandler(captured_logs)
     log_handler.setFormatter(logging.Formatter("%(message)s"))
 
-    # Replace stdout and logging handlers
+    # Replace stderr, stdout and logging handlers
+    sys.stderr = captured_logs
     root_logger = logging.getLogger()
     root_logger.handlers = [log_handler]
-    
+
     # Also set handlers for weave loggers
     weave_logger.handlers = [log_handler]
     weave_logger.propagate = False  # Don't propagate to avoid double capture
@@ -142,6 +145,7 @@ def capture_output(callbacks: list[Callable[[], None]]):
     finally:
         for callback in callbacks:
             callback()
+        sys.stderr = old_stderr
         root_logger.handlers = old_handlers
         weave_logger.handlers = old_weave_handlers
         weave_logger.propagate = old_weave_propagate
