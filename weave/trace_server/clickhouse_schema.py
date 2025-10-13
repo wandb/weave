@@ -221,5 +221,5 @@ class FileChunkCreateCHInsertable(BaseModel):
 
 
 ALL_FILE_CHUNK_INSERT_COLUMNS = sorted(
-    list(FileChunkCreateCHInsertable.model_fields.keys())
+    FileChunkCreateCHInsertable.model_fields.keys()
 )
