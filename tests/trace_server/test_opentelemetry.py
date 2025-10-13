@@ -20,6 +20,7 @@ from opentelemetry.proto.trace.v1.trace_pb2 import (
     Span,
     TracesData,
 )
+from opentelemetry.semconv_ai import SpanAttributes as OTSpanAttr
 
 from weave.trace import weave_client
 from weave.trace_server import trace_server_interface as tsi
@@ -33,6 +34,7 @@ from weave.trace_server.opentelemetry.attributes import (
     get_weave_usage,
 )
 from weave.trace_server.opentelemetry.helpers import (
+    AttributePathConflictError,
     capture_parts,
     convert_numeric_keys_to_list,
     expand_attributes,
@@ -63,7 +65,7 @@ def create_test_span():
     span.end_time_unix_nano = (
         span.start_time_unix_nano + 1_000_000_000
     )  # 1 second later
-    span.kind = 1
+    span.kind = 1  # type: ignore
 
     # Add some attributes
     kv1 = KeyValue()
@@ -95,7 +97,7 @@ def create_test_span():
     span.attributes.append(kv4)
 
     # Set status
-    span.status.code = StatusCode.OK.value
+    span.status.code = StatusCode.OK.value  # type: ignore
     span.status.message = "Success"
 
     return span
@@ -713,6 +715,37 @@ class TestAttributes:
 
         assert result == expected
 
+    def test_expand_attributes_conflict_parent_then_child(self):
+        """Setting a parent primitive then a nested subkey should raise a clear error."""
+        flat_attrs = [
+            ("gen_ai.prompt", True),
+            ("gen_ai.prompt.content", "Hello"),
+        ]
+
+        try:
+            expand_attributes(flat_attrs)
+            raise AssertionError("Expected AttributePathConflictError")
+        except AttributePathConflictError as e:
+            msg = str(e)
+            assert "gen_ai.prompt" in msg
+            assert "content" in msg
+            assert "Do not" in msg or "Invalid attribute structure" in msg
+
+    def test_expand_attributes_conflict_child_then_parent(self):
+        """Setting nested subkeys then a parent primitive should raise a clear error."""
+        flat_attrs = [
+            ("gen_ai.prompt.content", "Hello"),
+            ("gen_ai.prompt", True),
+        ]
+
+        try:
+            expand_attributes(flat_attrs)
+            raise AssertionError("Expected AttributePathConflictError")
+        except AttributePathConflictError as e:
+            msg = str(e)
+            assert "gen_ai.prompt" in msg
+            assert "Do not" in msg or "Invalid attribute structure" in msg
+
 
 def create_attributes(d: dict[str, Any]):
     return expand_attributes(d.items())
@@ -978,24 +1011,6 @@ class TestSemanticConventionParsing:
             ]
         }
 
-        # Test with multiple prompts
-        prompts_multiple = {
-            "0": {"role": "system", "content": "You are an expert in quantum physics"},
-            "1": {"role": "user", "content": "Tell me about quantum computing"},
-        }
-        attributes = create_attributes(
-            {
-                OTSpanAttr.LLM_PROMPTS: prompts_multiple,
-            }
-        )
-        inputs = get_weave_inputs([], attributes)
-        assert inputs == {
-            "gen_ai.prompt": [
-                {"role": "system", "content": "You are an expert in quantum physics"},
-                {"role": "user", "content": "Tell me about quantum computing"},
-            ]
-        }
-
     def test_opentelemetry_outputs_extraction(self):
         """Test extracting outputs from OpenTelemetry attributes."""
         from opentelemetry.semconv_ai import SpanAttributes as OTSpanAttr
@@ -1187,8 +1202,6 @@ class TestSpanOverrides:
 
     def test_get_span_overrides(self):
         """Test extracting span overrides from attributes."""
-        from datetime import datetime
-
         # Create attribute dictionary with timestamp overrides in ISO format
         iso_start = "2023-01-01T10:00:00"
         iso_end = "2023-01-01T10:01:30"
@@ -1258,3 +1271,75 @@ class TestSpanOverrides:
         # Test extracting the overrides
         overrides = get_span_overrides(attributes)
         assert overrides == {}
+
+
+def test_otel_export_partial_success_on_attribute_conflict(
+    client: weave_client.WeaveClient,
+):
+    """A batch with one good span and one conflicting span returns partial success.
+
+    The good span is ingested; the conflicting span is rejected with a helpful message.
+    """
+    export_req = create_test_export_request()
+    project_id = client._project_id()
+    export_req.project_id = project_id
+
+    # Good span (already present at index 0)
+    good_span = export_req.traces.resource_spans[0].scope_spans[0].spans[0]
+    good_span_id = hexlify(good_span.span_id).decode("ascii")
+
+    # Add a conflicting span to the same batch
+    bad_span = create_test_span()
+    # Clear attributes and set conflicting keys: parent primitive + nested subkey
+    del bad_span.attributes[:]
+    kv_parent = KeyValue()
+    kv_parent.key = "gen_ai.prompt"
+    kv_parent.value.bool_value = True
+    bad_span.attributes.append(kv_parent)
+
+    kv_child = KeyValue()
+    kv_child.key = "gen_ai.prompt.content"
+    kv_child.value.string_value = "Hello"
+    bad_span.attributes.append(kv_child)
+
+    export_req.traces.resource_spans[0].scope_spans[0].spans.append(bad_span)
+    bad_span_id = hexlify(bad_span.span_id).decode("ascii")
+
+    # Export
+    res = client.server.otel_export(export_req)
+    assert isinstance(res, tsi.OtelExportRes)
+    assert res.partial_success is not None
+    assert res.partial_success.rejected_spans == 1
+    # Error message should mention the conflicting key and guidance
+    assert "gen_ai.prompt" in res.partial_success.error_message
+
+    # Only the good span should be ingested
+    calls = client.server.calls_query(tsi.CallsQueryReq(project_id=project_id)).calls
+    ingested_ids = {c.id for c in calls}
+    assert good_span_id in ingested_ids
+    assert bad_span_id not in ingested_ids
+
+    # Cleanup the good call
+    client.server.calls_delete(
+        tsi.CallsDeleteReq(
+            project_id=project_id, call_ids=[good_span_id], wb_user_id=None
+        )
+    )
+
+    # Test with multiple prompts
+    prompts_multiple = {
+        "0": {"role": "system", "content": "You are an expert in quantum physics"},
+        "1": {"role": "user", "content": "Tell me about quantum computing"},
+    }
+    attributes = create_attributes(
+        {
+            OTSpanAttr.LLM_PROMPTS: prompts_multiple,
+        }
+    )
+    inputs = get_weave_inputs([], attributes)
+    assert inputs == {
+        "gen_ai.prompt": [
+            {"role": "system", "content": "You are an expert in quantum physics"},
+            {"role": "user", "content": "Tell me about quantum computing"},
+        ]
+    }
