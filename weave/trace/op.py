@@ -110,6 +110,7 @@ class Sentinel:
 
 _sentinels_to_check = [
     Sentinel(package="openai", path="openai._types", name="NOT_GIVEN"),
+    Sentinel(package="openai", path="openai._types", name="omit"),
     Sentinel(package="cohere", path="cohere.base_client", name="COHERE_NOT_GIVEN"),
     Sentinel(package="anthropic", path="anthropic._types", name="NOT_GIVEN"),
     Sentinel(package="cerebras", path="cerebras.cloud.sdk._types", name="NOT_GIVEN"),
