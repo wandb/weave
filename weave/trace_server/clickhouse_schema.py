@@ -220,4 +220,4 @@ class FileChunkCreateCHInsertable(BaseModel):
     file_storage_uri: Optional[str]
 
 
-ALL_FILE_CHUNK_INSERT_COLUMNS = list(FileChunkCreateCHInsertable.model_fields.keys())
+ALL_FILE_CHUNK_INSERT_COLUMNS = sorted(list(FileChunkCreateCHInsertable.model_fields.keys()))
