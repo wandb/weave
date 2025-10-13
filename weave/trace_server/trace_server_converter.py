@@ -135,7 +135,7 @@ def _map_values(obj: E, func: Callable[[E], E]) -> E:
         # not valid for the `model_validate` step.
         orig = obj.model_dump(by_alias=True)
         new = _map_values(orig, func)
-        return obj.model_construct(**new)
+        return obj.model_validate(new)
     if isinstance(obj, dict):
         return cast(E, {k: _map_values(v, func) for k, v in obj.items()})
     if isinstance(obj, list):
