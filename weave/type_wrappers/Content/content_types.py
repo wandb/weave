@@ -30,6 +30,7 @@ class ResolvedContentArgsWithoutData(TypedDict):
     path: NotRequired[str]
     extension: NotRequired[str]
 
+
 class ResolvedContentArgs(ResolvedContentArgsWithoutData):
     # Required Fields
     data: bytes
