@@ -2,6 +2,7 @@
 
 import dataclasses
 import datetime
+import gc
 import hashlib
 import json
 import logging
@@ -454,13 +455,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         select_columns = [c.field for c in cq.select_fields]
         expand_columns = req.expand_columns or []
         include_feedback = req.include_feedback or False
+        do_expand = expand_columns and req.return_expanded_column_values
 
         def row_to_call_schema_dict(row: tuple[Any, ...]) -> dict[str, Any]:
             return _ch_call_dict_to_call_schema_dict(dict(zip(select_columns, row)))
 
-        if not expand_columns and not include_feedback:
+        if not do_expand and not include_feedback:
             for row in raw_res:
-                yield tsi.CallSchema.model_validate(row_to_call_schema_dict(row))
+                yield tsi.CallSchema.model_construct(**row_to_call_schema_dict(row))
             return
 
         ref_cache = LRUCache(max_size=1000)
@@ -470,17 +472,24 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             growth_factor=10,
         )
 
-        for batch in batch_processor.make_batches(raw_res):
-            call_dicts = [row_to_call_schema_dict(row) for row in batch]
-            if expand_columns and req.return_expanded_column_values:
-                self._expand_call_refs(
-                    req.project_id, call_dicts, expand_columns, ref_cache
-                )
-            if include_feedback:
-                self._add_feedback_to_calls(req.project_id, call_dicts)
+        try:
+            for batch in batch_processor.make_batches(raw_res):
+                call_dicts = [row_to_call_schema_dict(row) for row in batch]
+                if do_expand:
+                    self._expand_call_refs(
+                        req.project_id, call_dicts, expand_columns, ref_cache
+                    )
+                if include_feedback:
+                    self._add_feedback_to_calls(req.project_id, call_dicts)
 
-            for call in call_dicts:
-                yield tsi.CallSchema.model_validate(call)
+                for call in call_dicts:
+                    yield tsi.CallSchema.model_construct(**call)
+                    call.clear()
+        finally:
+            if ref_cache:
+                ref_cache.clear()
+            # Force GC of large objects
+            gc.collect()
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._add_feedback_to_calls")
     def _add_feedback_to_calls(

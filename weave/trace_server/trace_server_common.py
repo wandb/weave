@@ -193,6 +193,7 @@ class DynamicBatchProcessor:
 
         if batch:
             yield batch
+            batch = []  # explicit gc optim
 
     def _compute_batch_size(self) -> int:
         return min(self.max_size, self.batch_size * self.growth_factor)

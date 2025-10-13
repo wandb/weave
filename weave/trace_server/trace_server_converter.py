@@ -1,4 +1,4 @@
-from typing import Callable, Optional, TypeVar, cast
+from typing import Any, Callable, Optional, TypeVar, cast
 
 from pydantic import BaseModel
 
@@ -135,7 +135,7 @@ def _map_values(obj: E, func: Callable[[E], E]) -> E:
         # not valid for the `model_validate` step.
         orig = obj.model_dump(by_alias=True)
         new = _map_values(orig, func)
-        return obj.model_validate(new)
+        return obj.model_construct(**new)
     if isinstance(obj, dict):
         return cast(E, {k: _map_values(v, func) for k, v in obj.items()})
     if isinstance(obj, list):
@@ -145,3 +145,96 @@ def _map_values(obj: E, func: Callable[[E], E]) -> E:
     if isinstance(obj, set):
         return cast(E, {_map_values(v, func) for v in obj})
     return func(obj)
+
+
+def _map_values_in_place(obj: Any, func: Callable[[str], str]) -> None:
+    """Recursively applies func to all string values in obj, mutating in place.
+
+    This avoids creating new objects, significantly reducing memory allocation.
+    Only use this when you're certain the object won't be shared/reused elsewhere.
+
+    Args:
+        obj: The object to mutate. Modified in place.
+        func: Function to apply to leaf string values.
+    """
+    if isinstance(obj, BaseModel):
+        # Mutate Pydantic model's __dict__ directly
+        for key, value in obj.__dict__.items():
+            if isinstance(value, str):
+                new_value = func(value)
+                if new_value is not value:
+                    object.__setattr__(obj, key, new_value)
+            elif isinstance(value, (dict, list, BaseModel)):
+                _map_values_in_place(value, func)
+    elif isinstance(obj, dict):
+        # Mutate dict in place
+        for key, value in list(
+            obj.items()
+        ):  # list() to avoid mutation during iteration
+            if isinstance(value, str):
+                new_value = func(value)
+                if new_value is not value:
+                    obj[key] = new_value
+            elif isinstance(value, (dict, list, BaseModel)):
+                _map_values_in_place(value, func)
+    elif isinstance(obj, list):
+        # Mutate list in place
+        for i in range(len(obj)):
+            value = obj[i]
+            if isinstance(value, str):
+                new_value = func(value)
+                if new_value is not value:
+                    obj[i] = new_value
+            elif isinstance(value, (dict, list, BaseModel)):
+                _map_values_in_place(value, func)
+    # Note: tuples and sets are immutable, can't mutate in place
+
+
+def universal_int_to_ext_ref_converter_in_place(
+    obj: Any,
+    convert_int_to_ext_project_id: Callable[[str], Optional[str]],
+) -> None:
+    """In-place version of universal_int_to_ext_ref_converter.
+
+    Mutates the object directly instead of creating a new one. This significantly
+    reduces memory allocation and improves performance for large objects.
+
+    Only use this when you're certain the object won't be shared/reused elsewhere,
+    typically when streaming responses where each object is yielded once.
+
+    Args:
+        obj: The object to mutate. Modified in place.
+        convert_int_to_ext_project_id: A function that takes an internal
+            project ID and returns the external project ID.
+    """
+    int_to_ext_project_cache: dict[str, Optional[str]] = {}
+
+    def replace_ref(ref_str: str) -> str:
+        if not ref_str.startswith(weave_internal_prefix):
+            # Not an internal ref, return as-is
+            return ref_str
+        rest = ref_str[len(weave_internal_prefix) :]
+        parts = rest.split("/", 1)
+        if len(parts) != 2:
+            raise InvalidInternalRef(f"Invalid URI: {ref_str}")
+        project_id, tail = parts
+        if project_id not in int_to_ext_project_cache:
+            int_to_ext_project_cache[project_id] = convert_int_to_ext_project_id(
+                project_id
+            )
+        external_project_id = int_to_ext_project_cache[project_id]
+        if not external_project_id:
+            return f"{ri.WEAVE_PRIVATE_SCHEME}://///{tail}"
+        return f"{ri.WEAVE_SCHEME}:///{external_project_id}/{tail}"
+
+    def mapper(obj_val: str) -> str:
+        if obj_val.startswith(weave_internal_prefix):
+            return replace_ref(obj_val)
+        elif obj_val.startswith(weave_prefix):
+            # It is important to raise here as this would be the result of
+            # incorrectly storing an external ref at the database layer,
+            # rather than an internal ref.
+            raise InvalidInternalRef("Encountered unexpected ref format.")
+        return obj_val
+
+    _map_values_in_place(obj, mapper)

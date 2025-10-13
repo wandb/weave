@@ -7,6 +7,7 @@ from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.trace_server_converter import (
     universal_ext_to_int_ref_converter,
     universal_int_to_ext_ref_converter,
+    universal_int_to_ext_ref_converter_in_place,
 )
 
 
@@ -175,9 +176,8 @@ class ExternalTraceServer(tsi.TraceServerInterface):
                     for user_id in req.filter.wb_user_ids
                 ]
             # TODO: How do we correctly process user_id for the query filters?
-        res = self._stream_ref_apply(
-            self._internal_trace_server.calls_query_stream, req
-        )
+
+        res = self._internal_trace_server.calls_query_stream(req)
         for call in res:
             if call.project_id != req.project_id:
                 raise ValueError("Internal Error - Project Mismatch")
@@ -186,6 +186,10 @@ class ExternalTraceServer(tsi.TraceServerInterface):
                 call.wb_run_id = self._idc.int_to_ext_run_id(call.wb_run_id)
             if call.wb_user_id is not None:
                 call.wb_user_id = self._idc.int_to_ext_user_id(call.wb_user_id)
+
+            universal_int_to_ext_ref_converter_in_place(
+                call, self._idc.int_to_ext_project_id
+            )
             yield call
 
     def calls_delete(self, req: tsi.CallsDeleteReq) -> tsi.CallsDeleteRes:
