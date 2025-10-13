@@ -105,7 +105,7 @@ def test_clickhouse_batching():
         # Execute the batch
         trace_server.call_start_batch(batch_req)
 
-        # THE KEY ASSERTION: 
+        # THE KEY ASSERTION:
         # Verify that there are exactly 2 inserts:
         # 1 call that is the batch of call inserts
         # 1 call that is the batch of file inserts
