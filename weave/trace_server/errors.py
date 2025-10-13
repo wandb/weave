@@ -41,6 +41,12 @@ class QueryIllegalTypeofArgumentError(Error):
     pass
 
 
+class BadQueryParameterError(Error):
+    """Raised when a query parameter is invalid."""
+
+    pass
+
+
 class QueryTimeoutExceededError(Error):
     """Raised when a query timeout is exceeded."""
 
@@ -196,6 +202,7 @@ class ErrorRegistry:
         # 403
         self.register(InvalidFieldError, 403)
         self.register(QueryIllegalTypeofArgumentError, 403)
+        self.register(BadQueryParameterError, 403)
 
         # 404
         self.register(NotFoundError, 404)
@@ -293,6 +300,10 @@ def handle_clickhouse_query_error(e: Exception) -> None:
         raise QueryMemoryLimitExceededError(
             "Query memory limit exceeded. " + limit_scope_message
         ) from e
+    if "TIMEOUT_EXCEEDED" in error_str:
+        raise QueryTimeoutExceededError(
+            "Query timeout exceeded. " + limit_scope_message
+        ) from e
     if "NO_COMMON_TYPE" in error_str:
         raise QueryNoCommonTypeError(
             "No common type between data types in query. "
@@ -307,9 +318,12 @@ def handle_clickhouse_query_error(e: Exception) -> None:
             "Example: filtering calls by inputs.integer_value = 1 without using $convert -> "
             "Correct: {$expr: {$eq: [{$convert: {input: {$getField: 'inputs.integer_value'}, to: 'double'}}, {$literal: 1}]}}"
         ) from e
-    if "TIMEOUT_EXCEEDED" in error_str:
-        raise QueryTimeoutExceededError(
-            "Query timeout exceeded. " + limit_scope_message
+    if "BAD_QUERY_PARAMETER" in error_str:
+        raise BadQueryParameterError(
+            "Bad query parameter. "
+            "Example: A query like inputs.integer_value = -10000000000, when the parameter "
+            "expects a UInt64, will fail: Value -10000000000 cannot be parsed as UInt64. "
+            "To resolve, ensure all query parameters are of the correct type and within valid ranges."
         ) from e
 
     # Re-raise the original exception if no known pattern matches
