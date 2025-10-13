@@ -105,11 +105,13 @@ def test_clickhouse_batching():
         # Execute the batch
         trace_server.call_start_batch(batch_req)
 
-        # THE KEY ASSERTION: Verify that 3 calls resulted in exactly 1 ClickHouse insert
-        # This confirms the batching behavior is working correctly
+        # THE KEY ASSERTION: 
+        # Verify that there are exactly 2 inserts:
+        # 1 call that is the batch of call inserts
+        # 1 call that is the batch of file inserts
         insert_call_count = mock_ch_client.insert.call_count
         assert insert_call_count == 2, (
-            f"Expected exactly 2 ClickHouse insert call for 3 batched calls (and 3 base64 content objects), "
+            f"Expected exactly 2 ClickHouse insert call for 3 batched calls (and 3 base64 content objects, which are stored in files), "
             f"but got {insert_call_count} insert calls"
         )
         assert mock_ch_client.insert.call_args_list[0][0][0] == "call_parts", (
