@@ -88,6 +88,14 @@ class ProjectNotFound(Error):
     pass
 
 
+class InvalidIdFormat(Exception):
+    pass
+
+
+class RunNotFound(Exception):
+    pass
+
+
 def _format_error_to_json_with_extra(
     exc: Exception, extra_fields: Optional[dict[str, Any]] = None
 ) -> dict[str, Any]:
@@ -176,9 +184,11 @@ class ErrorRegistry:
         self.register(InvalidExternalRef, 400)
         self.register(QueryNoCommonTypeError, 400)
         self.register(MissingLLMApiKeyError, 400, _format_missing_llm_api_key)
+        self.register(InvalidIdFormat, 400)
         self.register(InvalidFieldError, 403)
         self.register(NotFoundError, 404)
         self.register(ProjectNotFound, 404)
+        self.register(RunNotFound, 404)
         self.register(ObjectDeletedError, 404, _format_object_deleted_error)
         self.register(InsertTooLarge, 413)
         self.register(RequestTooLarge, 413, lambda exc: {"reason": "Request too large"})
