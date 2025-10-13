@@ -111,6 +111,7 @@ class Sentinel:
 _sentinels_to_check = [
     Sentinel(package="openai", path="openai._types", name="NOT_GIVEN"),
     Sentinel(package="openai", path="openai._types", name="omit"),
+    Sentinel(package="openai", path="openai._types", name="Omit"),  # Class, not instance
     Sentinel(package="cohere", path="cohere.base_client", name="COHERE_NOT_GIVEN"),
     Sentinel(package="anthropic", path="anthropic._types", name="NOT_GIVEN"),
     Sentinel(package="cerebras", path="cerebras.cloud.sdk._types", name="NOT_GIVEN"),
@@ -155,8 +156,13 @@ def _value_is_sentinel(param: inspect.Parameter) -> bool:
 
     # Check cached sentinels first
     for sentinel in _SENTINEL_CACHE.values():
-        if sentinel is not None and param.default is sentinel:
-            return True
+        if sentinel is not None:
+            # Check for identity (singleton instances)
+            if param.default is sentinel:
+                return True
+            # Check for isinstance (e.g., openai.Omit class instances)
+            if isinstance(sentinel, type) and isinstance(param.default, sentinel):
+                return True
 
     for sentinel in _sentinels_to_check:
         if _check_param_is_sentinel(param, sentinel):
