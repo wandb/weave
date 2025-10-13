@@ -763,7 +763,7 @@ def test_feedback_query_contains_numeric_literal(client) -> None:
         project_id=project_id,
         weave_ref=call_ref_uri,
         feedback_type="custom.annotation",
-        payload={"dataset_id": 94},
+        payload={"dataset_id": 94, "dataset_id_str": "94"},
     )
     client.server.feedback_create(feedback_req)
 
@@ -792,3 +792,21 @@ def test_feedback_query_contains_numeric_literal(client) -> None:
                     ),
                 )
             )
+
+    res = client.server.feedback_query(
+        FeedbackQueryReq(
+            project_id=project_id,
+            query=Query(
+                **{
+                    "$expr": {
+                        "$contains": {
+                            "input": {"$getField": "payload.dataset_id_str"},
+                            "substr": {"$literal": "9"},  # Numeric literal, not string
+                        }
+                    }
+                }
+            ),
+        )
+    )
+    assert len(res.result) == 1
+    assert res.result[0]["payload"]["dataset_id_str"] == "94"
