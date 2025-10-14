@@ -221,7 +221,7 @@ def test_serialization_compatability(client, case):
         found_refs = set()
         found_files = set()
 
-        def ref_visitor(path: list[str | int], obj: Any):
+        def ref_visitor(path: list[Union[str, int]], obj: Any):
             if isinstance(obj, str):
                 try:
                     ref = ObjectRef.parse_uri(obj)
@@ -229,7 +229,7 @@ def test_serialization_compatability(client, case):
                 except ValueError:
                     pass
 
-        def file_visitor(path: list[str | int], obj: Any):
+        def file_visitor(path: list[Union[str, int]], obj: Any):
             if isinstance(obj, dict) and "files" in obj:
                 files = obj["files"]
                 if isinstance(files, dict):
@@ -451,7 +451,7 @@ def json_visitor(
     def _json_visitor(
         obj: Any,
         visitor: Callable[[list[Union[str, int]], Any], None],
-        path: list[str | int],
+        path: list[Union[str, int]],
     ):
         visitor(path, obj)
 
