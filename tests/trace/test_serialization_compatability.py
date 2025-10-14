@@ -1,7 +1,8 @@
 from dataclasses import dataclass
 from typing import Any, Callable, Optional, TypedDict
-
+from datetime import datetime, timezone
 import pytest
+import json
 
 import weave
 from weave.trace.refs import ObjectRef
@@ -12,6 +13,9 @@ from weave.trace_server.trace_server_interface import (
     ObjCreateReq,
     ObjReadReq,
 )
+
+def default_equality_check(a, b):
+    return a == b
 
 
 class ExpFileSpec(TypedDict):
@@ -75,7 +79,57 @@ independent of the actual code that is used to serialize the data.
 
 @pytest.mark.parametrize(
     "case",
-    [
+    [   
+        # Primitives
+        SerializationTestCase(
+            runtime_object_factory=lambda: {
+                "int": 1,
+                "float": 1.0,
+                "str": "hello",
+                "bool": True,
+                "none": None,
+                "list": [1, 2, 3],
+            },
+            inline_call_param=True,
+            is_legacy=False,
+            exp_json={
+                "int": 1,
+                "float": 1.0,
+                "str": "hello",
+                "bool": True,
+                "none": None,
+                "list": [1, 2, 3],
+            },
+            exp_objects=[],
+            exp_files=[],
+        ),
+
+        # Datetime
+        SerializationTestCase(
+            runtime_object_factory=lambda: datetime(2025, 1, 1, 0, 0, 0, tzinfo=timezone.utc),
+            inline_call_param=True,
+            is_legacy=False,
+            exp_json={'_type': 'CustomWeaveType', 'load_op': 'weave:///shawn/test-project/op/load_datetime.datetime:vBlX1uTKCGWJCbt7bmYHsvnse0lidjCeSGVQjE44Evc', 'val': '2025-01-01T00:00:00+00:00', 'weave_type': {'type': 'datetime.datetime'}},
+            exp_objects=[{
+  "object_id": "load_datetime.datetime",
+  "digest": "vBlX1uTKCGWJCbt7bmYHsvnse0lidjCeSGVQjE44Evc",
+  "exp_val": {
+    "_type": "CustomWeaveType",
+    "weave_type": {
+      "type": "Op"
+    },
+    "files": {
+      "obj.py": "ncV0DfMpJ6gN2ls9iSpQwSiYplvhm8CO2ZDNqjPbdBg"
+    }
+  }
+}],
+            exp_files=[{
+                    "digest": "ncV0DfMpJ6gN2ls9iSpQwSiYplvhm8CO2ZDNqjPbdBg",
+                    "exp_content": b'import weave\nimport datetime\n\n@weave.op()\ndef load(encoded: str) -> datetime.datetime:\n    """Deserialize an ISO format string back to a datetime object with timezone."""\n    return datetime.datetime.fromisoformat(encoded)\n',
+                }],
+        ),
+
+        # Markdown:
         SerializationTestCase(
             runtime_object_factory=lambda: weave.Markdown("# Hello, world!"),
             inline_call_param=True,
@@ -113,6 +167,8 @@ independent of the actual code that is used to serialize the data.
 def test_serialization_compatability(client, case):
     project_id = client._project_id()
 
+    equality_check = case.equality_check or default_equality_check
+
     def verify_test_case():
         # Verify that all refs in json and objects are in objects.
         # verify that all files in json and objects are in files.
@@ -133,9 +189,13 @@ def test_serialization_compatability(client, case):
                 if isinstance(files, dict):
                     for file_digest in files.values():
                         found_files.add(file_digest)
-
-        json_visitor(case.exp_json, ref_visitor)
-        json_visitor(case.exp_json, file_visitor)
+        payload = [
+            case.exp_json,
+            case.exp_objects,
+            case.exp_files,
+        ]
+        json_visitor(payload, ref_visitor)
+        json_visitor(payload, file_visitor)
 
         for found_ref in found_refs:
             ref = ObjectRef.parse_uri(found_ref)
@@ -150,8 +210,22 @@ def test_serialization_compatability(client, case):
                 if obj["object_id"] == name and obj["digest"] == digest:
                     break
             else:
+                possible_obj = client.server.obj_read(
+                    ObjReadReq(
+                        project_id=project_id,
+                        object_id=name,
+                        digest=digest,
+                    )
+                )
+                possible_val = possible_obj.obj.val
+                exp_obj_dict = {
+                    "object_id": name,
+                    "digest": digest,
+                    "exp_val": possible_val,
+                }
+                print(f"Possible object:\n<exp_object>{json.dumps(exp_obj_dict, indent=2)}</exp_object>")
                 raise ValueError(
-                    f"Ref {found_ref} was not found in the expected objects, please add it to the expected objects."
+                    f"Ref {found_ref} was not found in the expected objects, please add it to the expected objects"
                 )
 
         for found_file in found_files:
@@ -159,8 +233,21 @@ def test_serialization_compatability(client, case):
                 if exp_file["digest"] == found_file:
                     break
             else:
+                possible_file = client.server.file_content_read(
+                    FileContentReadReq(
+                        project_id=project_id,
+                        digest=found_file,
+                    )
+                )
+                possible_content = possible_file.content
+                print(f"""Possible file:
+                {{
+                    "digest": "{found_file}",
+                    "exp_content": {possible_content},
+                }}
+                """)
                 raise ValueError(
-                    f"File {found_file} was not found in the expected files, please add it to the expected files."
+                    f"File {found_file} was not found in the expected files, please add it to the expected files"
                 )
 
     def seed_legacy_data():
@@ -210,7 +297,7 @@ def test_serialization_compatability(client, case):
             published_obj = weave.publish(case.exp_json)
         digest = published_obj.digest
         gotten_obj = weave.ref(published_obj.uri()).get()
-        assert case.equality_check(gotten_obj, runtime_object)
+        assert equality_check(gotten_obj, runtime_object)
 
         # Verify the correct JSON is stored in the database.
         res = client.server.obj_read(
@@ -271,7 +358,7 @@ def test_serialization_compatability(client, case):
         call_id = calls_0.id
         gotten_obj = calls_0.inputs["val"]
 
-        assert case.equality_check(gotten_obj, runtime_object)
+        assert equality_check(gotten_obj, runtime_object)
 
         # Verify the correct JSON is stored in the database
         res = client.server.call_read(
@@ -298,13 +385,17 @@ def test_serialization_compatability(client, case):
 
         assert val == case.exp_json
 
-    verify_test_case()
 
     if case.is_legacy:
         seed_legacy_data()
 
     test_publish_flow()
     test_input_flow()
+
+    # We put this last so that helper functions can report more useful error messages
+    # based on true data in the database.
+    verify_test_case()
+
 
 
 def json_visitor(
@@ -316,13 +407,13 @@ def json_visitor(
         visitor: Callable[[list[str | int], Any], None],
         path: list[str | int],
     ):
+        visitor(path, obj)
+
         if isinstance(obj, dict):
             for k, v in obj.items():
                 _json_visitor(v, visitor, path + [k])
         elif isinstance(obj, list):
             for ndx, v in enumerate(obj):
                 _json_visitor(v, visitor, path + [ndx])
-        else:
-            visitor(path, obj)
 
     _json_visitor(obj, visitor, [])
