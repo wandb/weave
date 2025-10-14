@@ -1,8 +1,9 @@
-from dataclasses import dataclass
-from typing import Any, Callable, Optional, TypedDict
-from datetime import datetime, timezone
-import pytest
 import json
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from typing import Any, Callable, Optional, TypedDict
+
+import pytest
 
 import weave
 from weave.trace.refs import ObjectRef
@@ -13,6 +14,7 @@ from weave.trace_server.trace_server_interface import (
     ObjCreateReq,
     ObjReadReq,
 )
+
 
 def default_equality_check(a, b):
     return a == b
@@ -79,7 +81,7 @@ independent of the actual code that is used to serialize the data.
 
 @pytest.mark.parametrize(
     "case",
-    [   
+    [
         # Primitives
         SerializationTestCase(
             runtime_object_factory=lambda: {
@@ -103,32 +105,39 @@ independent of the actual code that is used to serialize the data.
             exp_objects=[],
             exp_files=[],
         ),
-
         # Datetime
         SerializationTestCase(
-            runtime_object_factory=lambda: datetime(2025, 1, 1, 0, 0, 0, tzinfo=timezone.utc),
+            runtime_object_factory=lambda: datetime(
+                2025, 1, 1, 0, 0, 0, tzinfo=timezone.utc
+            ),
             inline_call_param=True,
             is_legacy=False,
-            exp_json={'_type': 'CustomWeaveType', 'load_op': 'weave:///shawn/test-project/op/load_datetime.datetime:vBlX1uTKCGWJCbt7bmYHsvnse0lidjCeSGVQjE44Evc', 'val': '2025-01-01T00:00:00+00:00', 'weave_type': {'type': 'datetime.datetime'}},
-            exp_objects=[{
-  "object_id": "load_datetime.datetime",
-  "digest": "vBlX1uTKCGWJCbt7bmYHsvnse0lidjCeSGVQjE44Evc",
-  "exp_val": {
-    "_type": "CustomWeaveType",
-    "weave_type": {
-      "type": "Op"
-    },
-    "files": {
-      "obj.py": "ncV0DfMpJ6gN2ls9iSpQwSiYplvhm8CO2ZDNqjPbdBg"
-    }
-  }
-}],
-            exp_files=[{
+            exp_json={
+                "_type": "CustomWeaveType",
+                "load_op": "weave:///shawn/test-project/op/load_datetime.datetime:vBlX1uTKCGWJCbt7bmYHsvnse0lidjCeSGVQjE44Evc",
+                "val": "2025-01-01T00:00:00+00:00",
+                "weave_type": {"type": "datetime.datetime"},
+            },
+            exp_objects=[
+                {
+                    "object_id": "load_datetime.datetime",
+                    "digest": "vBlX1uTKCGWJCbt7bmYHsvnse0lidjCeSGVQjE44Evc",
+                    "exp_val": {
+                        "_type": "CustomWeaveType",
+                        "weave_type": {"type": "Op"},
+                        "files": {
+                            "obj.py": "ncV0DfMpJ6gN2ls9iSpQwSiYplvhm8CO2ZDNqjPbdBg"
+                        },
+                    },
+                }
+            ],
+            exp_files=[
+                {
                     "digest": "ncV0DfMpJ6gN2ls9iSpQwSiYplvhm8CO2ZDNqjPbdBg",
                     "exp_content": b'import weave\nimport datetime\n\n@weave.op()\ndef load(encoded: str) -> datetime.datetime:\n    """Deserialize an ISO format string back to a datetime object with timezone."""\n    return datetime.datetime.fromisoformat(encoded)\n',
-                }],
+                }
+            ],
         ),
-
         # Markdown:
         SerializationTestCase(
             runtime_object_factory=lambda: weave.Markdown("# Hello, world!"),
@@ -189,6 +198,7 @@ def test_serialization_compatability(client, case):
                 if isinstance(files, dict):
                     for file_digest in files.values():
                         found_files.add(file_digest)
+
         payload = [
             case.exp_json,
             case.exp_objects,
@@ -223,7 +233,9 @@ def test_serialization_compatability(client, case):
                     "digest": digest,
                     "exp_val": possible_val,
                 }
-                print(f"Possible object:\n<exp_object>{json.dumps(exp_obj_dict, indent=2)}</exp_object>")
+                print(
+                    f"Possible object:\n<exp_object>{json.dumps(exp_obj_dict, indent=2)}</exp_object>"
+                )
                 raise ValueError(
                     f"Ref {found_ref} was not found in the expected objects, please add it to the expected objects"
                 )
@@ -385,7 +397,6 @@ def test_serialization_compatability(client, case):
 
         assert val == case.exp_json
 
-
     if case.is_legacy:
         seed_legacy_data()
 
@@ -395,7 +406,6 @@ def test_serialization_compatability(client, case):
     # We put this last so that helper functions can report more useful error messages
     # based on true data in the database.
     verify_test_case()
-
 
 
 def json_visitor(
