@@ -122,7 +122,7 @@ class SerializationTestCase:
 
 
 audio_file_path = os.path.join(
-    os.path.dirname(__file__), "type_handlers", "Audio", "examples", "audio.wav"
+    os.path.dirname(__file__), "..", "type_handlers", "Audio", "examples", "audio.wav"
 )
 AUDIO_BYTES = open(audio_file_path, "rb").read()
 
@@ -321,7 +321,7 @@ independent of the actual code that is used to serialize the data.
     ],
     ids=lambda case: case.id,
 )
-def test_serialization_compatability(client, case):
+def test_serialization_correctness(client, case):
     if sys.version_info.major <= 3 and sys.version_info.minor <= 9:
         pytest.skip(
             "Skipping test for Python 3.9 and below due to inconsistent op code"
