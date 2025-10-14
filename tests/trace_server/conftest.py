@@ -24,7 +24,7 @@ def pytest_addoption(parser):
         parser.addoption(
             "--trace-server",
             action="store",
-            default="sqlite",
+            default="clickhouse",
             help="Specify the client object to use: sqlite or clickhouse",
         )
         parser.addoption(

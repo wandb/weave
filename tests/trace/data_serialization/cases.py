@@ -7,6 +7,57 @@ from spec import SerializationTestCase
 
 import weave
 
+"""
+# Data Type Directory (Test Checklist)
+
+## Primitives:
+[x] int
+[x] float
+[x] str
+[x] bool
+[x] None
+
+## Primitive Containers:
+[x] list
+[x] dict
+[] tuple
+[] set
+
+## Media Types:
+[X] Audio
+[] Content
+[x] Datetime
+[] File
+[x] Image
+[x] Markdown
+[] Video
+
+## Container Types:
+[] Dataclass
+[] Pydantic BaseModel
+
+## Weave Core Types:
+[] Op
+[] Object
+
+## Weave Library Objects:
+[] Model
+[] Scorer
+[] Evaluation
+[] Dataset
+[] Prompt
+
+### Weave Library Specialized Objects:
+[] LLMStructuredCompletionModel
+[] LLMAsAJudgeScorer
+
+## Weave Config Objects:
+[] AnnotationSpec
+[] Leaderboard
+[] SavedView
+[] Monitor
+"""
+
 audio_file_path = os.path.join(
     os.path.dirname(__file__), "..", "type_handlers", "Audio", "examples", "audio.wav"
 )
