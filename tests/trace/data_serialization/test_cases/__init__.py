@@ -23,7 +23,7 @@ from tests.trace.data_serialization.test_cases.primitive_cases import primitive_
 [] File
 [x] Image
 [x] Markdown
-[] Video
+[X] Video
 
 ## Container Types:
 [] Dataclass
