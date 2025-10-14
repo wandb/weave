@@ -150,9 +150,10 @@ def _decode_custom_obj(
             try:
                 res = _load_custom_obj(encoded_path_contents, val, load_instance_op)
                 found_serializer = True
-                return res
             except Exception as e:
                 pass
+            else:
+                return res
 
     # Otherwise, fall back to load_instance_op
     if not found_serializer:
