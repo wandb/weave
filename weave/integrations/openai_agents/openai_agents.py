@@ -12,7 +12,6 @@ from agents.tracing import (
     AgentSpanData,
     CustomSpanData,
     FunctionSpanData,
-    GeneratingSpanData,
     GuardrailSpanData,
     HandoffSpanData,
     ResponseSpanData,
@@ -39,8 +38,6 @@ def _call_name(span: Span) -> str:
     """Determine the name for a given OpenAI Agent span."""
     if name := getattr(span.span_data, "name", None):
         return name
-    elif isinstance(span.span_data, GeneratingSpanData):
-        return "Generation"
     elif isinstance(span.span_data, ResponseSpanData):
         return "Response"
     elif isinstance(span.span_data, HandoffSpanData):
@@ -206,23 +203,6 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
             error=None,
         )
 
-    def _generation_log_data(self, span: Span[GeneratingSpanData]) -> WeaveDataDict:
-        """Extract log data from a generation span."""
-        return WeaveDataDict(
-            inputs={"input": span.span_data.input},
-            outputs={"output": span.span_data.output},
-            metadata={
-                "model": span.span_data.model,
-                "model_config": span.span_data.model_config,
-            },
-            metrics={
-                "tokens": span.span_data.usage.get("total_tokens"),
-                "prompt_tokens": span.span_data.usage.get("prompt_tokens"),
-                "completion_tokens": span.span_data.usage.get("completion_tokens"),
-            },
-            error=None,
-        )
-
     def _custom_log_data(self, span: Span[CustomSpanData]) -> WeaveDataDict:
         """Extract log data from a custom span."""
         # Prepare fields
@@ -272,8 +252,6 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
             return self._handoff_log_data(span)
         elif isinstance(span.span_data, GuardrailSpanData):
             return self._guardrail_log_data(span)
-        elif isinstance(span.span_data, GeneratingSpanData):
-            return self._generation_log_data(span)
         elif isinstance(span.span_data, CustomSpanData):
             return self._custom_log_data(span)
         else:
