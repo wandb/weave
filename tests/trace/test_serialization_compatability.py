@@ -1,7 +1,7 @@
 import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Callable, Optional, TypedDict
+from typing import Any, Callable, Optional, TypedDict, Union
 
 import pytest
 
@@ -410,11 +410,11 @@ def test_serialization_compatability(client, case):
 
 def json_visitor(
     obj: Any,
-    visitor: Callable[[list[str | int], Any], None],
+    visitor: Callable[[list[Union[str, int]], Any], None],
 ):
     def _json_visitor(
         obj: Any,
-        visitor: Callable[[list[str | int], Any], None],
+        visitor: Callable[[list[Union[str, int]], Any], None],
         path: list[str | int],
     ):
         visitor(path, obj)
