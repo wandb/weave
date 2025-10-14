@@ -174,39 +174,38 @@ independent of the actual code that is used to serialize the data.
         ),
         # Image
         SerializationTestCase(
-            runtime_object_factory=lambda: Image.new('RGB', (10, 10), 'red'),
+            runtime_object_factory=lambda: Image.new("RGB", (10, 10), "red"),
             inline_call_param=True,
             is_legacy=False,
             exp_json={
-  "_type": "CustomWeaveType",
-  "weave_type": {
-    "type": "PIL.Image.Image"
-  },
-  "files": {
-    "image.png": "eIObd4Xf1Od75ekC8UuDfJMb7nk0VSF5WPzyohXn5eQ"
-  },
-  "load_op": "weave:///shawn/test-project/op/load_PIL.Image.Image:XTwpuNcfNiGtjAaWpDPfMSflzS7JYxJNd6FYk1TAfeA"
-},
-            exp_objects=[{
-  "object_id": "load_PIL.Image.Image",
-  "digest": "XTwpuNcfNiGtjAaWpDPfMSflzS7JYxJNd6FYk1TAfeA",
-  "exp_val": {
-    "_type": "CustomWeaveType",
-    "weave_type": {
-      "type": "Op"
-    },
-    "files": {
-      "obj.py": "ReUEgimaLvoco8RMDnTr4tTo26SXYwVz61tJHoDJ1CI"
-    }
-  }
-}],
-            exp_files=[{
+                "_type": "CustomWeaveType",
+                "weave_type": {"type": "PIL.Image.Image"},
+                "files": {"image.png": "eIObd4Xf1Od75ekC8UuDfJMb7nk0VSF5WPzyohXn5eQ"},
+                "load_op": "weave:///shawn/test-project/op/load_PIL.Image.Image:XTwpuNcfNiGtjAaWpDPfMSflzS7JYxJNd6FYk1TAfeA",
+            },
+            exp_objects=[
+                {
+                    "object_id": "load_PIL.Image.Image",
+                    "digest": "XTwpuNcfNiGtjAaWpDPfMSflzS7JYxJNd6FYk1TAfeA",
+                    "exp_val": {
+                        "_type": "CustomWeaveType",
+                        "weave_type": {"type": "Op"},
+                        "files": {
+                            "obj.py": "ReUEgimaLvoco8RMDnTr4tTo26SXYwVz61tJHoDJ1CI"
+                        },
+                    },
+                }
+            ],
+            exp_files=[
+                {
                     "digest": "ReUEgimaLvoco8RMDnTr4tTo26SXYwVz61tJHoDJ1CI",
                     "exp_content": b'import weave\nfrom weave.trace.serialization.mem_artifact import MemTraceFilesArtifact\nfrom weave.utils.iterators import first\nimport PIL.Image as Image\n\n@weave.op()\ndef load(artifact: MemTraceFilesArtifact, name: str) -> Image.Image:\n    # Today, we assume there can only be 1 image in the artifact.\n    filename = first(artifact.path_contents)\n    if not filename.startswith("image."):\n        raise ValueError(f"Expected filename to start with \'image.\', got {filename}")\n\n    path = artifact.path(filename)\n    return Image.open(path)\n',
-                }, {
+                },
+                {
                     "digest": "eIObd4Xf1Od75ekC8UuDfJMb7nk0VSF5WPzyohXn5eQ",
-                    "exp_content": b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\n\x00\x00\x00\n\x08\x02\x00\x00\x00\x02PX\xea\x00\x00\x00\x13IDATx\x9cc\xfc\xcf\x80\x0f0\xe1\x95e\x18\xa9\xd2\x00A,\x01\x13y\xed\xba&\x00\x00\x00\x00IEND\xaeB`\x82',
-                }],
+                    "exp_content": b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\n\x00\x00\x00\n\x08\x02\x00\x00\x00\x02PX\xea\x00\x00\x00\x13IDATx\x9cc\xfc\xcf\x80\x0f0\xe1\x95e\x18\xa9\xd2\x00A,\x01\x13y\xed\xba&\x00\x00\x00\x00IEND\xaeB`\x82",
+                },
+            ],
             equality_check=lambda a, b: a.tobytes() == b.tobytes(),
         ),
     ],
@@ -271,9 +270,7 @@ def test_serialization_compatability(client, case):
                     "digest": digest,
                     "exp_val": possible_val,
                 }
-                print(
-                    f"Possible object:\n{json.dumps(exp_obj_dict, indent=2)}"
-                )
+                print(f"Possible object:\n{json.dumps(exp_obj_dict, indent=2)}")
                 raise ValueError(
                     f"Ref {found_ref} was not found in the expected objects, please add it to the expected objects"
                 )
