@@ -68,6 +68,7 @@ from weave.trace_server.trace_server_interface import (
 [] Monitor
 """
 
+
 def default_equality_check(a, b):
     return a == b
 
@@ -132,6 +133,8 @@ be deserialized by newer clients.
 This methodology allows us to lock in the legacy serialization formats as a contact,
 independent of the actual code that is used to serialize the data.
 """
+
+
 @pytest.mark.parametrize(
     "case",
     [
