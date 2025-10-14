@@ -17,6 +17,56 @@ from weave.trace_server.trace_server_interface import (
     ObjReadReq,
 )
 
+"""
+# Data Type Directory (Test Checklist)
+
+## Primitives:
+[x] int
+[x] float
+[x] str
+[x] bool
+[x] None
+
+## Primitive Containers:
+[x] list
+[x] dict
+[] tuple
+[] set
+
+## Media Types:
+[] Audio
+[] Content
+[x] Datetime
+[] File
+[x] Image
+[x] Markdown
+[] Video
+
+## Container Types:
+[] Dataclass
+[] Pydantic BaseModel
+
+## Weave Core Types:
+[] Op
+[] Object
+
+## Weave Library Objects:
+[] Model
+[] Scorer
+[] Evaluation
+[] Dataset
+[] Prompt
+
+### Weave Library Specialized Objects:
+[] LLMStructuredCompletionModel
+[] LLMAsAJudgeScorer
+
+## Weave Config Objects:
+[] AnnotationSpec
+[] Leaderboard
+[] SavedView
+[] Monitor
+"""
 
 def default_equality_check(a, b):
     return a == b
@@ -82,8 +132,6 @@ be deserialized by newer clients.
 This methodology allows us to lock in the legacy serialization formats as a contact,
 independent of the actual code that is used to serialize the data.
 """
-
-
 @pytest.mark.parametrize(
     "case",
     [
