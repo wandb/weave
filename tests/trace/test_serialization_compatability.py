@@ -1,4 +1,6 @@
 import json
+import os
+import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Callable, Optional, TypedDict, Union
@@ -15,6 +17,10 @@ from weave.trace_server.trace_server_interface import (
     ObjCreateReq,
     ObjReadReq,
 )
+
+
+def get_this_file_dir():
+    return os.path.dirname(os.path.abspath(__file__))
 
 
 def default_equality_check(a, b):
@@ -181,7 +187,9 @@ independent of the actual code that is used to serialize the data.
         # Image (PIL.Image.Image)
         SerializationTestCase(
             id="image",
-            runtime_object_factory=lambda: Image.new("RGB", (10, 10), "red"),
+            runtime_object_factory=lambda: Image.open(
+                os.path.join(get_this_file_dir(), "red.png")
+            ),
             inline_call_param=True,
             is_legacy=False,
             exp_json={
@@ -219,6 +227,11 @@ independent of the actual code that is used to serialize the data.
     ids=lambda case: case.id,
 )
 def test_serialization_compatability(client, case):
+    if sys.version_info.major <= 3 and sys.version_info.minor <= 9:
+        pytest.skip(
+            "Skipping test for Python 3.9 and below due to inconsistent op code"
+        )
+
     project_id = client._project_id()
 
     def verify_test_case():
