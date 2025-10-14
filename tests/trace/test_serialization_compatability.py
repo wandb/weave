@@ -172,7 +172,7 @@ independent of the actual code that is used to serialize the data.
             equality_check=lambda a, b: a.markup == b.markup
             and a.code_theme == b.code_theme,
         ),
-        # Image
+        # Image (PIL.Image.Image)
         SerializationTestCase(
             runtime_object_factory=lambda: Image.new("RGB", (10, 10), "red"),
             inline_call_param=True,
