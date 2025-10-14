@@ -34,6 +34,9 @@ class ExpObjectSpec(TypedDict):
 
 @dataclass
 class SerializationTestCase:
+    # A unique identifier for the test case
+    id: str
+
     # Returns a python object to be serialized
     runtime_object_factory: Callable[[], Any]
 
@@ -45,11 +48,11 @@ class SerializationTestCase:
     # The expected json representation of the object
     exp_json: dict
 
-    # The published objects that are exptected to have been created
+    # The published objects that are expected to have been created
     # and used to support the serialization
     exp_objects: list[ExpObjectSpec]
 
-    # The associated files that are exptected to have been created
+    # The associated files that are expected to have been created
     # and used to support the serialization
     exp_files: list[ExpFileSpec]
 
@@ -61,13 +64,13 @@ class SerializationTestCase:
 
     # A function that checks if two objects are equal. If None, then
     # the objects are expected to be equal using `==`
-    equality_check: Optional[Callable[[Any, Any], bool]] = None
+    equality_check: Optional[Callable[[Any, Any], bool]] = default_equality_check
 
 
 """
 IMPORTANT RULES: Once a SerializationTestCase is created, it should never be modified.
 As the code base evolves, it is expected that some of these test cases will break (since
-the serialization format changes). In such cases:
+the serialization format changes, op code changes, etc...). In such cases:
 1. Copy the failing test case to a new test case.
 2. Set the is_legacy flag to True on the new test case.
 3. Rerun the test: this should PASS. If it does not, then it means you have made a
@@ -85,6 +88,7 @@ independent of the actual code that is used to serialize the data.
     [
         # Primitives
         SerializationTestCase(
+            id="primitives",
             runtime_object_factory=lambda: {
                 "int": 1,
                 "float": 1.0,
@@ -108,6 +112,7 @@ independent of the actual code that is used to serialize the data.
         ),
         # Datetime
         SerializationTestCase(
+            id="datetime",
             runtime_object_factory=lambda: datetime(
                 2025, 1, 1, 0, 0, 0, tzinfo=timezone.utc
             ),
@@ -141,6 +146,7 @@ independent of the actual code that is used to serialize the data.
         ),
         # Markdown:
         SerializationTestCase(
+            id="markdown",
             runtime_object_factory=lambda: weave.Markdown("# Hello, world!"),
             inline_call_param=True,
             is_legacy=False,
@@ -174,6 +180,7 @@ independent of the actual code that is used to serialize the data.
         ),
         # Image (PIL.Image.Image)
         SerializationTestCase(
+            id="image",
             runtime_object_factory=lambda: Image.new("RGB", (10, 10), "red"),
             inline_call_param=True,
             is_legacy=False,
@@ -209,11 +216,10 @@ independent of the actual code that is used to serialize the data.
             equality_check=lambda a, b: a.tobytes() == b.tobytes(),
         ),
     ],
+    ids=lambda case: case.id,
 )
 def test_serialization_compatability(client, case):
     project_id = client._project_id()
-
-    equality_check = case.equality_check or default_equality_check
 
     def verify_test_case():
         # Verify that all refs in json and objects are in objects.
@@ -338,13 +344,13 @@ def test_serialization_compatability(client, case):
         runtime_object = case.runtime_object_factory()
 
         # If we are in legacy mode, then we just publish the expected json directly.
-        if not case.is_legacy:
-            published_obj = weave.publish(runtime_object)
-        else:
+        if case.is_legacy:
             published_obj = weave.publish(case.exp_json)
+        else:
+            published_obj = weave.publish(runtime_object)
         digest = published_obj.digest
-        gotten_obj = weave.ref(published_obj.uri()).get()
-        assert equality_check(gotten_obj, runtime_object)
+        gotten_obj = weave.get(published_obj.uri())
+        assert case.equality_check(gotten_obj, runtime_object)
 
         # Verify the correct JSON is stored in the database.
         res = client.server.obj_read(
@@ -393,10 +399,10 @@ def test_serialization_compatability(client, case):
 
         # Similarly to the publish flow, if we are in legacy mode, then we just
         # use the expected json directly.
-        if not case.is_legacy:
-            val = runtime_object
-        else:
+        if case.is_legacy:
             val = case.exp_json
+        else:
+            val = runtime_object
 
         func(val)
         client.flush()
@@ -406,7 +412,7 @@ def test_serialization_compatability(client, case):
         call_id = calls_0.id
         gotten_obj = calls_0.inputs["val"]
 
-        assert equality_check(gotten_obj, runtime_object)
+        assert case.equality_check(gotten_obj, runtime_object)
 
         # Verify the correct JSON is stored in the database
         res = client.server.call_read(
