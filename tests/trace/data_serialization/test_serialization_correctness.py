@@ -3,8 +3,8 @@ import sys
 from typing import Any, Callable, Union
 
 import pytest
-from cases import cases
 from spec import SerializationTestCase
+from test_cases import cases
 
 import weave
 from weave.trace.refs import ObjectRef
