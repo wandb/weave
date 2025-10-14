@@ -145,11 +145,12 @@ def _decode_custom_obj(
     if type_ in KNOWN_TYPES:
         serializer = get_serializer_by_id(type_)
         if serializer is not None:
-            found_serializer = True
             load_instance_op = serializer.load
 
             try:
-                return _load_custom_obj(encoded_path_contents, val, load_instance_op)
+                res = _load_custom_obj(encoded_path_contents, val, load_instance_op)
+                found_serializer = True
+                return res
             except Exception as e:
                 pass
 

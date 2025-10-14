@@ -297,7 +297,10 @@ def from_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
                 {k: from_json(v, project_id, server) for k, v in obj.items()}
             )
         elif val_type == "CustomWeaveType":
-            files = _load_custom_obj_files(project_id, server, obj["files"])
+            files = None
+            file_spec = obj.get("files")
+            if file_spec:
+                files = _load_custom_obj_files(project_id, server, file_spec)
             encoded = {
                 "weave_type": obj["weave_type"],
                 "files": files,
