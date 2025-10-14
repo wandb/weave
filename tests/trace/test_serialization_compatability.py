@@ -1,5 +1,4 @@
 import json
-import os
 import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -17,10 +16,6 @@ from weave.trace_server.trace_server_interface import (
     ObjCreateReq,
     ObjReadReq,
 )
-
-
-def get_this_file_dir():
-    return os.path.dirname(os.path.abspath(__file__))
 
 
 def default_equality_check(a, b):
@@ -187,15 +182,13 @@ independent of the actual code that is used to serialize the data.
         # Image (PIL.Image.Image)
         SerializationTestCase(
             id="image",
-            runtime_object_factory=lambda: Image.open(
-                os.path.join(get_this_file_dir(), "red.png")
-            ),
+            runtime_object_factory=lambda: Image.new("RGB", (10, 10), "red"),
             inline_call_param=True,
             is_legacy=False,
             exp_json={
                 "_type": "CustomWeaveType",
                 "weave_type": {"type": "PIL.Image.Image"},
-                "files": {"image.png": "eIObd4Xf1Od75ekC8UuDfJMb7nk0VSF5WPzyohXn5eQ"},
+                "files": {"image.png": "Ac3YO5daeesZTxBfXf7DAKaQZ5IZysk2HvclN8sfwxQ"},
                 "load_op": "weave:///shawn/test-project/op/load_PIL.Image.Image:XTwpuNcfNiGtjAaWpDPfMSflzS7JYxJNd6FYk1TAfeA",
             },
             exp_objects=[
@@ -218,7 +211,7 @@ independent of the actual code that is used to serialize the data.
                 },
                 {
                     "digest": "eIObd4Xf1Od75ekC8UuDfJMb7nk0VSF5WPzyohXn5eQ",
-                    "exp_content": b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\n\x00\x00\x00\n\x08\x02\x00\x00\x00\x02PX\xea\x00\x00\x00\x13IDATx\x9cc\xfc\xcf\x80\x0f0\xe1\x95e\x18\xa9\xd2\x00A,\x01\x13y\xed\xba&\x00\x00\x00\x00IEND\xaeB`\x82",
+                    "exp_content": b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\n\x00\x00\x00\n\x08\x02\x00\x00\x00\x02PX\xea\x00\x00\x00\x12IDATx\x9cc\xfc\xcf\x80\x0f0\xe1\x95\x1d\xb1\xd2\x00A,\x01\x13\xb1\ns\x13\x00\x00\x00\x00IEND\xaeB`\x82",
                 },
             ],
             equality_check=lambda a, b: a.tobytes() == b.tobytes(),
