@@ -17,63 +17,6 @@ from weave.trace_server.trace_server_interface import (
 )
 
 """
-# Data Type Directory (Test Checklist)
-
-## Primitives:
-[x] int
-[x] float
-[x] str
-[x] bool
-[x] None
-
-## Primitive Containers:
-[x] list
-[x] dict
-[] tuple
-[] set
-
-## Media Types:
-[X] Audio
-[] Content
-[x] Datetime
-[] File
-[x] Image
-[x] Markdown
-[] Video
-
-## Container Types:
-[] Dataclass
-[] Pydantic BaseModel
-
-## Weave Core Types:
-[] Op
-[] Object
-
-## Weave Library Objects:
-[] Model
-[] Scorer
-[] Evaluation
-[] Dataset
-[] Prompt
-
-### Weave Library Specialized Objects:
-[] LLMStructuredCompletionModel
-[] LLMAsAJudgeScorer
-
-## Weave Config Objects:
-[] AnnotationSpec
-[] Leaderboard
-[] SavedView
-[] Monitor
-"""
-
-
-audio_file_path = os.path.join(
-    os.path.dirname(__file__), "..", "type_handlers", "Audio", "examples", "audio.wav"
-)
-AUDIO_BYTES = open(audio_file_path, "rb").read()
-
-"""
 IMPORTANT RULES: Once a SerializationTestCase is created, it should never be modified.
 As the code base evolves, it is expected that some of these test cases will break (since
 the serialization format changes, op code changes, etc...). In such cases:
