@@ -1,0 +1,328 @@
+from dataclasses import dataclass
+from typing import Any, Callable, Optional, TypedDict
+
+import pytest
+
+import weave
+from weave.trace.refs import ObjectRef
+from weave.trace_server.trace_server_interface import (
+    CallReadReq,
+    FileContentReadReq,
+    FileCreateReq,
+    ObjCreateReq,
+    ObjReadReq,
+)
+
+
+class ExpFileSpec(TypedDict):
+    digest: str
+    exp_content: str
+
+
+class ExpObjectSpec(TypedDict):
+    object_id: str
+    digest: str
+    exp_val: dict
+
+
+@dataclass
+class SerializationTestCase:
+    # Returns a python object to be serialized
+    runtime_object_factory: Callable[[], Any]
+
+    # If true, then then used in a paramter/return value of a call,
+    # will be directly stored in the call's inputs/outputs (as opposed
+    # to being published and stored as a Ref)
+    inline_call_param: bool
+
+    # The expected json representation of the object
+    exp_json: dict
+
+    # The published objects that are exptected to have been created
+    # and used to support the serialization
+    exp_objects: list[ExpObjectSpec]
+
+    # The associated files that are exptected to have been created
+    # and used to support the serialization
+    exp_files: list[ExpFileSpec]
+
+    # If true, then the current library code is not expected to PRODUCE
+    # this JSON, but should still be able to deserialize it. When True,
+    # we will bootstrap the expected objects and files and assert that
+    # deserialization still works.
+    is_legacy: bool
+
+    # A function that checks if two objects are equal. If None, then
+    # the objects are expected to be equal using `==`
+    equality_check: Optional[Callable[[Any, Any], bool]] = None
+
+
+"""
+IMPORTANT RULES: Once a SerializationTestCase is created, it should never be modified.
+As the code base evolves, it is expected that some of these test cases will break (since
+the serialization format changes). In such cases:
+1. Copy the failing test case to a new test case.
+2. Set the is_legacy flag to True on the new test case.
+3. Rerun the test: this should PASS. If it does not, then it means you have made a
+backwards incompatible change and data written by older clients will not be able to
+be deserialized by newer clients.
+4. Now you can modify the original test case to pass.
+
+This methodology allows us to lock in the legacy serialization formats as a contact,
+independent of the actual code that is used to serialize the data.
+"""
+
+
+@pytest.mark.parametrize(
+    "case",
+    [
+        SerializationTestCase(
+            runtime_object_factory=lambda: weave.Markdown("# Hello, world!"),
+            inline_call_param=True,
+            is_legacy=False,
+            exp_json={
+                "_type": "CustomWeaveType",
+                "load_op": "weave:///shawn/test-project/op/load_rich.markdown.Markdown:ZJrNtY2McTqdAZdfBmciQV1TyCouPS8ED400FQFE4JE",
+                "val": {"code_theme": "monokai", "markup": "# Hello, world!"},
+                "weave_type": {"type": "rich.markdown.Markdown"},
+            },
+            exp_objects=[
+                {
+                    "object_id": "load_rich.markdown.Markdown",
+                    "digest": "ZJrNtY2McTqdAZdfBmciQV1TyCouPS8ED400FQFE4JE",
+                    "exp_val": {
+                        "_type": "CustomWeaveType",
+                        "weave_type": {"type": "Op"},
+                        "files": {
+                            "obj.py": "zunYz3rpUk5IkwbglUHXBJFszhSKvtLIftOGvMp4xFo"
+                        },
+                    },
+                }
+            ],
+            exp_files=[
+                {
+                    "digest": "zunYz3rpUk5IkwbglUHXBJFszhSKvtLIftOGvMp4xFo",
+                    "exp_content": b"import weave\nfrom typing import TypedDict\nfrom typing import NotRequired\nfrom rich.markdown import Markdown\n\nclass SerializedMarkdown(TypedDict):\n    markup: str\n    code_theme: NotRequired[str]\n\n@weave.op()\ndef load(encoded: SerializedMarkdown) -> Markdown:\n    return Markdown(**encoded)\n",
+                }
+            ],
+            equality_check=lambda a, b: a.markup == b.markup
+            and a.code_theme == b.code_theme,
+        ),
+    ],
+)
+def test_serialization_compatability(client, case):
+    project_id = client._project_id()
+
+    def verify_test_case():
+        # Verify that all refs in json and objects are in objects.
+        # verify that all files in json and objects are in files.
+        found_refs = set()
+        found_files = set()
+
+        def ref_visitor(path: list[str | int], obj: Any):
+            if isinstance(obj, str):
+                try:
+                    ref = ObjectRef.parse_uri(obj)
+                    found_refs.add(obj)
+                except ValueError:
+                    pass
+
+        def file_visitor(path: list[str | int], obj: Any):
+            if isinstance(obj, dict) and "files" in obj:
+                files = obj["files"]
+                if isinstance(files, dict):
+                    for file_digest in files.values():
+                        found_files.add(file_digest)
+
+        json_visitor(case.exp_json, ref_visitor)
+        json_visitor(case.exp_json, file_visitor)
+
+        for found_ref in found_refs:
+            ref = ObjectRef.parse_uri(found_ref)
+            entity = ref.entity
+            project = ref.project
+            name = ref.name
+            digest = ref.digest
+            found_project_id = f"{entity}/{project}"
+            assert project_id == found_project_id
+
+            for obj in case.exp_objects:
+                if obj["object_id"] == name and obj["digest"] == digest:
+                    break
+            else:
+                raise ValueError(
+                    f"Ref {found_ref} was not found in the expected objects, please add it to the expected objects."
+                )
+
+        for found_file in found_files:
+            for exp_file in case.exp_files:
+                if exp_file["digest"] == found_file:
+                    break
+            else:
+                raise ValueError(
+                    f"File {found_file} was not found in the expected files, please add it to the expected files."
+                )
+
+    def seed_legacy_data():
+        # This method will seed the database with the expected objects and files
+        # It should only be called if is_legacy is True.
+
+        if not case.is_legacy:
+            raise ValueError("is_legacy is False")
+
+        if case.exp_objects:
+            for obj in case.exp_objects:
+                obj_res = client.server.obj_create(
+                    ObjCreateReq(
+                        obj={
+                            "project_id": project_id,
+                            "object_id": obj["object_id"],
+                            "digest": obj["digest"],
+                            "val": obj["exp_val"],
+                        }
+                    )
+                )
+                assert obj_res.digest == obj["digest"]
+
+        if case.exp_files:
+            for file in case.exp_files:
+                file_res = client.server.file_create(
+                    FileCreateReq(
+                        project_id=project_id,
+                        name="name",
+                        content=file["exp_content"],
+                    )
+                )
+                assert file_res.digest == file["digest"]
+
+    def test_publish_flow():
+        # This method will assert that the publish flow works as expected.
+        # Specifically, we will publish the object, assert that it can be
+        # deserialized using the ref-get pattern, and finally, assert that
+        # the expected objects and files are created in the database.
+
+        runtime_object = case.runtime_object_factory()
+
+        # If we are in legacy mode, then we just publish the expected json directly.
+        if not case.is_legacy:
+            published_obj = weave.publish(runtime_object)
+        else:
+            published_obj = weave.publish(case.exp_json)
+        digest = published_obj.digest
+        gotten_obj = weave.ref(published_obj.uri()).get()
+        assert case.equality_check(gotten_obj, runtime_object)
+
+        # Verify the correct JSON is stored in the database.
+        res = client.server.obj_read(
+            ObjReadReq(
+                project_id=project_id,
+                object_id=published_obj.name,
+                digest=published_obj.digest,
+            )
+        )
+        val = res.obj.val
+        assert val == case.exp_json
+
+        # Check expected support objects and files
+        if case.exp_objects:
+            for obj in case.exp_objects:
+                obj_res = client.server.obj_read(
+                    ObjReadReq(
+                        project_id=project_id,
+                        object_id=obj["object_id"],
+                        digest=obj["digest"],
+                    )
+                )
+                assert obj_res.obj.val == obj["exp_val"]
+
+        if case.exp_files:
+            for file in case.exp_files:
+                file_res = client.server.file_content_read(
+                    FileContentReadReq(
+                        project_id=project_id,
+                        digest=file["digest"],
+                    )
+                )
+                assert file_res.content == file["exp_content"]
+
+    def test_input_flow():
+        # This method will assert that the input flow works as expected.
+        # Specifically, when the value is used as an input, does it get
+        # correctly serialized and deserialized by the client reader.
+
+        runtime_object = case.runtime_object_factory()
+
+        @weave.op
+        def func(val):
+            return val
+
+        # Similarly to the publish flow, if we are in legacy mode, then we just
+        # use the expected json directly.
+        if not case.is_legacy:
+            val = runtime_object
+        else:
+            val = case.exp_json
+
+        func(val)
+        client.flush()
+        calls = func.calls()
+        assert len(calls) == 1
+        calls_0 = calls[0]
+        call_id = calls_0.id
+        gotten_obj = calls_0.inputs["val"]
+
+        assert case.equality_check(gotten_obj, runtime_object)
+
+        # Verify the correct JSON is stored in the database
+        res = client.server.call_read(
+            CallReadReq(
+                project_id=project_id,
+                id=call_id,
+            )
+        )
+
+        # If we are not inline, then the value is expected to be a Ref
+        # and we need to read it from the database.
+        if not case.inline_call_param:
+            ref = ObjectRef.parse_uri(res.call.inputs["val"])
+            res = client.server.obj_read(
+                ObjReadReq(
+                    project_id=project_id,
+                    object_id=ref.name,
+                    digest=ref.digest,
+                )
+            )
+            val = res.obj.val
+        else:
+            val = res.call.inputs["val"]
+
+        assert val == case.exp_json
+
+    verify_test_case()
+
+    if case.is_legacy:
+        seed_legacy_data()
+
+    test_publish_flow()
+    test_input_flow()
+
+
+def json_visitor(
+    obj: Any,
+    visitor: Callable[[list[str | int], Any], None],
+):
+    def _json_visitor(
+        obj: Any,
+        visitor: Callable[[list[str | int], Any], None],
+        path: list[str | int],
+    ):
+        if isinstance(obj, dict):
+            for k, v in obj.items():
+                _json_visitor(v, visitor, path + [k])
+        elif isinstance(obj, list):
+            for ndx, v in enumerate(obj):
+                _json_visitor(v, visitor, path + [ndx])
+        else:
+            visitor(path, obj)
+
+    _json_visitor(obj, visitor, [])
