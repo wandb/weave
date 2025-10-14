@@ -1,10 +1,10 @@
 import json
-import os
 import sys
 from typing import Any, Callable, Union
 
 import pytest
-from spec import cases
+from cases import cases
+from spec import SerializationTestCase
 
 import weave
 from weave.trace.refs import ObjectRef
@@ -37,7 +37,7 @@ independent of the actual code that is used to serialize the data.
     cases,
     ids=lambda case: case.id,
 )
-def test_serialization_correctness(client, case):
+def test_serialization_correctness(client, case: SerializationTestCase):
     if sys.version_info.major <= 3 and sys.version_info.minor <= 9:
         pytest.skip(
             "Skipping test for Python 3.9 and below due to inconsistent op code"
