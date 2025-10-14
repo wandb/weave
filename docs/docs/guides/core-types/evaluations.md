@@ -212,7 +212,7 @@ def function_to_evaluate(question: str):
     # here's where you would add your LLM call and return the output
     return  {'generated_text': 'some response' + question}
 
-asyncio.run(evaluation.evaluate(function_to_evaluate("What is the capitol of France?")))
+asyncio.run(evaluation.evaluate(function_to_evaluate))
 ```
 
 ![Evals hero](../../../static/img/evals-hero.png)
