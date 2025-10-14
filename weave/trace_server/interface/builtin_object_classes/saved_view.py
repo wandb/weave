@@ -53,6 +53,13 @@ class SavedViewDefinition(BaseModel):
     page_size: Optional[int] = Field(default=None)
     charts: Optional[list[ChartConfig]] = Field(default=None)
 
+    # For evaluation based saved views, we can filter by the dataset
+    # or evaluation object in the call inputs. This ref takes the form
+    # of "weave://<entity>/<project>/<name>:<digest>" where "*" for
+    # digest means all digests of that object.
+    dataset_ref: Optional[str] = Field(default=None)
+    evaluation_ref: Optional[str] = Field(default=None)
+
 
 class SavedView(base_object_def.BaseObject):
     # "traces" or "evaluations", type is str for extensibility

@@ -940,12 +940,12 @@ class SavedView:
             ):
                 default_column_paths.append(key)
         pin: Pin = self.base.definition.pin or DEFAULT_PIN
-        for pin_right in pin["right"]:
+        for pin_right in pin.right:
             # If a column is pinned to the right, move it to the end of the list
             if pin_right in default_column_paths:
                 default_column_paths.remove(pin_right)
                 default_column_paths.append(pin_right)
-        for pin_left in pin["left"]:
+        for pin_left in pin.left:
             # If a column is pinned to the left, move it to the start of the list
             if pin_left in default_column_paths:
                 default_column_paths.remove(pin_left)
