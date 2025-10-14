@@ -2,6 +2,7 @@ import os
 import wave
 from datetime import datetime, timezone
 
+from moviepy.editor import VideoFileClip
 from PIL import Image
 
 import weave
@@ -17,6 +18,17 @@ audio_file_path = os.path.join(
     "audio.wav",
 )
 AUDIO_BYTES = open(audio_file_path, "rb").read()
+
+video_file_path = os.path.join(
+    os.path.dirname(__file__),
+    "..",
+    "..",
+    "type_handlers",
+    "Video",
+    "test_video.mp4",
+)
+VIDEO_BYTES = open(video_file_path, "rb").read()
+
 
 media_cases = [
     # Datetime
@@ -159,5 +171,41 @@ media_cases = [
         ],
         equality_check=lambda a, b: a.markup == b.markup
         and a.code_theme == b.code_theme,
+    ),
+    # Video
+    SerializationTestCase(
+        id="video",
+        runtime_object_factory=lambda: VideoFileClip(video_file_path),
+        inline_call_param=True,
+        is_legacy=False,
+        exp_json={
+            "_type": "CustomWeaveType",
+            "weave_type": {"type": "moviepy.video.VideoClip.VideoClip"},
+            "files": {"video.mp4": "Aoxws9QUryX0YiZ8ScTAyi4YzX2SO5QHTsLsYABBMjc"},
+            "load_op": "weave:///shawn/test-project/op/load_moviepy.video.VideoClip.VideoClip:U48cPFFoRK1dIvZ8NzCfg6qWfYY2ZocZwmd022hV5NQ",
+        },
+        exp_objects=[
+            {
+                "object_id": "load_moviepy.video.VideoClip.VideoClip",
+                "digest": "U48cPFFoRK1dIvZ8NzCfg6qWfYY2ZocZwmd022hV5NQ",
+                "exp_val": {
+                    "_type": "CustomWeaveType",
+                    "weave_type": {"type": "Op"},
+                    "files": {"obj.py": "LpKktDfKTalASYSNX6BPidz8QNBijW3cdsfKxXrYyNA"},
+                },
+            }
+        ],
+        exp_files=[
+            {
+                "digest": "LpKktDfKTalASYSNX6BPidz8QNBijW3cdsfKxXrYyNA",
+                "exp_content": b'from weave.trace.serialization.mem_artifact import MemTraceFilesArtifact\nimport importlib\nimport weave.trace.serialization.serializer as serializer\nfrom enum import Enum\nfrom typing import Any\nimport shutil\nfrom typing_extensions import TypeIs\n\n_registered = true\n\ndef _dependencies_met() -> bool:\n    """Check if the dependencies are met.  This import is deferred to avoid\n    an expensive module import at the top level.\n    """\n    import sys\n\n    # First check if already imported\n    if "moviepy" in sys.modules:\n        return True\n    # Otherwise check if it can be imported\n    try:\n        return importlib.util.find_spec("moviepy") is not None\n    except (ValueError, ImportError):\n        return False\n\nclass VideoFormat(str, Enum):\n    """These are NOT the list of formats we accept from the user\n    Rather, these are the list of formats we can save to weave servers\n    If we detect that the file is in these formats, we copy it over directly\n    Otherwise, we encode it to one of these formats using ffmpeg (mp4 by default).\n    """\n\n    GIF = "gif"\n    MP4 = "mp4"\n    WEBM = "webm"\n    UNSUPPORTED = "unsupported"\n\n    def __str__(self) -> str:\n        return self.value\n\n    @classmethod\n    def _missing_(cls, value: Any) -> VideoFormat:\n        return cls.UNSUPPORTED\n\ndef get_format_from_filename(filename: str) -> VideoFormat:\n    """Get the file format from a filename.\n\n    Args:\n        filename: The filename to extract the format from\n\n    Returns:\n        The format string or None if no extension is found\n    """\n    # Get last dot position\n    last_dot = filename.rfind(".")\n\n    # If there\'s no dot or it\'s the last character, return None\n    if last_dot == -1 or last_dot == len(filename) - 1:\n        return VideoFormat.UNSUPPORTED\n\n    # Get the extension without the dot\n    return VideoFormat(filename[last_dot + 1 :])\n\nDEFAULT_VIDEO_FORMAT = "mp4"\n\ndef write_video(fp: str, clip: VideoClip) -> None:\n    """Takes a filepath and a VideoClip and writes the video to the file.\n    errors if the file does not end in a supported video extension.\n    """\n    try:\n        fps = clip.fps or 24\n    except Exception as _:\n        fps = 24\n\n    audio = clip.audio\n    fmt_str = get_format_from_filename(fp)\n    fmt = VideoFormat(fmt_str)\n\n    if fmt == VideoFormat.UNSUPPORTED:\n        raise ValueError(f"Unsupported video format: {fmt_str}")\n\n    if fmt == VideoFormat.GIF:\n        clip.write_gif(fp, fps=fps)\n        return\n    if fmt == VideoFormat.WEBM:\n        codec = "libvpx"\n    else:\n        codec = "libx264"\n\n    clip.write_videofile(\n        fp,\n        fps=fps,\n        codec=codec,\n        audio=audio,\n        verbose=False,\n        logger=None,\n    )\n\ndef _save_video_file_clip(obj: VideoFileClip, artifact: MemTraceFilesArtifact) -> None:\n    """Save a VideoFileClip to the artifact.\n\n    Args:\n        obj: The VideoFileClip\n        artifact: The artifact to save to\n        name: Ignored, see comment below\n    """\n    video_format = get_format_from_filename(obj.filename)\n\n    # Check if the format is known/supported. If not, set to unsupported\n    fmt = VideoFormat(video_format)\n    ext = fmt.value\n\n    if fmt == VideoFormat.UNSUPPORTED:\n        ext = DEFAULT_VIDEO_FORMAT.value\n\n    with artifact.writeable_file_path(f"video.{ext}") as fp:\n        if fmt == VideoFormat.UNSUPPORTED:\n            # If the format is unsupported, we need to convert it\n            write_video(fp, obj)\n        else:\n            # Copy the file directly if it\'s a supported format\n            shutil.copy(obj.filename, fp)\n\nDEFAULT_VIDEO_FORMAT = "mp4"\n\ndef _save_non_file_clip(obj: VideoClip, artifact: MemTraceFilesArtifact) -> None:\n    ext = DEFAULT_VIDEO_FORMAT.value\n    with artifact.writeable_file_path(f"video.{ext}") as fp:\n        # If the format is unsupported, we need to convert it\n        write_video(fp, obj)\n\ndef save(\n    obj: VideoClip,\n    artifact: MemTraceFilesArtifact,\n    name: str,\n) -> None:\n    """Save a VideoClip to the artifact.\n\n    Args:\n        obj: The VideoClip or VideoWithPreview to save\n        artifact: The artifact to save to\n        name: Ignored, see comment below\n    """\n    _ensure_registered()\n    from moviepy.editor import VideoFileClip\n\n    is_video_file = isinstance(obj, VideoFileClip)\n\n    try:\n        if is_video_file:\n            _save_video_file_clip(obj, artifact)\n        else:\n            _save_non_file_clip(obj, artifact)\n    except Exception as e:\n        raise ValueError(f"Failed to write video file with error: {e}") from e\n\ndef load(artifact: MemTraceFilesArtifact, name: str) -> VideoClip:\n    """Load a VideoClip from the artifact.\n\n    Args:\n        artifact: The artifact to load from\n        name: Ignored, consistent with save method\n\n    Returns:\n        The loaded VideoClip\n    """\n    _ensure_registered()\n    from moviepy.editor import VideoFileClip\n\n    # Assume there can only be 1 video in the artifact\n    for filename in artifact.path_contents:\n        path = artifact.path(filename)\n        if filename.startswith("video."):\n            return VideoFileClip(path)\n\n    raise ValueError("No video or found for artifact")\n\ndef is_video_clip_instance(obj: Any) -> TypeIs[VideoClip]:\n    """Check if the object is any subclass of VideoClip."""\n    _ensure_registered()\n    from moviepy.editor import VideoClip\n\n    return isinstance(obj, VideoClip)\n\ndef _ensure_registered() -> None:\n    """Ensure the video type handler is registered if MoviePy is available."""\n    global _registered\n    if not _registered and _dependencies_met():\n        from moviepy.editor import VideoClip\n\n        serializer.register_serializer(VideoClip, save, load, is_video_clip_instance)\n        _registered = True\n\n@serializer.op()\ndef load(artifact: MemTraceFilesArtifact, name: str) -> VideoClip:\n    """Load a VideoClip from the artifact.\n\n    Args:\n        artifact: The artifact to load from\n        name: Ignored, consistent with save method\n\n    Returns:\n        The loaded VideoClip\n    """\n    _ensure_registered()\n    from moviepy.editor import VideoFileClip\n\n    # Assume there can only be 1 video in the artifact\n    for filename in artifact.path_contents:\n        path = artifact.path(filename)\n        if filename.startswith("video."):\n            return VideoFileClip(path)\n\n    raise ValueError("No video or found for artifact")\n',
+            },
+            {
+                "digest": "Aoxws9QUryX0YiZ8ScTAyi4YzX2SO5QHTsLsYABBMjc",
+                "exp_content": VIDEO_BYTES,
+            },
+        ],
+        equality_check=lambda a, b: a.duration
+        == b.duration,  # could do better, but this is a good start
     ),
 ]
