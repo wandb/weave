@@ -76,11 +76,9 @@ class TestWeaveContent:
         assert content is not None
         assert content.extension == extension
         assert content.mimetype == mimetype
-        # assert content.filename == file_path.name
-        assert content.filename == f"file-{content.digest[:4]}{extension}"
+        assert content.filename == file_path.name
         assert content.size > 0
         assert isinstance(content.data, bytes)
-        # assert content.path == str(file_path.resolve())
         assert content.input_type == "str"
         assert content.content_type == "file"
 
@@ -145,9 +143,7 @@ class TestWeaveContent:
         assert content is not None
         assert content.extension == extension
         assert content.mimetype == mimetype
-        # assert content.filename == file_path.name
-        assert content.filename == f"file-{content.digest[:4]}{extension}"
-        # assert content.path == str(file_path.resolve())
+        assert content.filename == file_path.name
         assert content.content_type == "file"
 
     def test_content_save_method(self, image_file):
@@ -167,9 +163,7 @@ class TestWeaveContent:
             # Test save to directory (should use original filename)
             content_with_filename = Content.from_path(image_file)
             content_with_filename.save(tmpdir)
-            # filename = image_file.name
-            filename = f"file-{content_with_filename.digest[:4]}.png"
-            expected_path = Path(tmpdir) / filename
+            expected_path = Path(tmpdir) / image_file.name
             assert expected_path.exists()
 
     @pytest.mark.parametrize(
@@ -325,12 +319,10 @@ class TestWeaveContent:
 
         # Check other fields are accessible
         assert content.size > 0
-        # assert content.filename == "file.png"
-        assert content.filename == f"file-{content.digest[:4]}.png"
+        assert content.filename == "file.png"
         assert content.extension == ".png"
         assert content.mimetype == "image/png"
         assert content.encoding == "utf-8"
-        # assert content.path == str(image_file.resolve())
 
     def test_content_type_hint_variations(self, image_file):
         """Test different type hint formats."""
@@ -501,9 +493,7 @@ class TestWeaveContent:
             assert content_file.extension == ""
             assert content_file.mimetype == "application/octet-stream"
             assert content_file.size == 0
-            # assert content_file.filename == Path(tmp_path).name
-            assert content_file.filename == f"file-{content_file.digest[:4]}"
-
+            assert content_file.filename == Path(tmp_path).name
         finally:
             # Clean up
             Path(tmp_path).unlink()
