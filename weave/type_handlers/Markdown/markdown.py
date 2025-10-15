@@ -1,6 +1,9 @@
-from typing import Any, TypedDict
+from __future__ import annotations
 
-from typing_extensions import NotRequired
+from typing import TYPE_CHECKING, Any, TypedDict
+
+if TYPE_CHECKING:
+    from typing_extensions import NotRequired
 
 from weave.trace.serialization import serializer
 
