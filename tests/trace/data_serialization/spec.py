@@ -50,3 +50,7 @@ class SerializationTestCase:
     # A function that checks if two objects are equal. If None, then
     # the objects are expected to be equal using `==`
     equality_check: Optional[Callable[[Any, Any], bool]] = default_equality_check
+
+    # The python version that was used to write the ops (different versions
+    # result in different code captures!)
+    python_version_code_capture: Optional[tuple[int, int]] = None
