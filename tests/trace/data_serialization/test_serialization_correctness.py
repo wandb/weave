@@ -40,9 +40,12 @@ independent of the actual code that is used to serialize the data.
 def test_serialization_correctness(client, case: SerializationTestCase):
     # Since code serialization changes pretty significantly between versions, we will assume
     # legacy for anything other than the latest python version
-    is_legacy = case.is_legacy or (
-        sys.version_info.major != 3 or sys.version_info.minor != 13
-    )
+    is_legacy = case.is_legacy
+    if case.python_version_code_capture:
+        is_legacy = is_legacy or (
+            sys.version_info.major != case.python_version_code_capture[0]
+            or sys.version_info.minor != case.python_version_code_capture[1]
+        )
 
     project_id = client._project_id()
 
@@ -249,7 +252,7 @@ def test_serialization_correctness(client, case: SerializationTestCase):
 
         # If we are not inline, then the value is expected to be a Ref
         # and we need to read it from the database.
-        if not case.inline_call_param:
+        if not case.inline_call_param and not is_legacy:
             ref = ObjectRef.parse_uri(res.call.inputs["val"])
             res = client.server.obj_read(
                 ObjReadReq(
