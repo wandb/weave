@@ -272,6 +272,7 @@ library_cases = [
         # Sad ... equality is really a pain to assert here (and is broken)
         # TODO: Write a good equality check and make it work
         equality_check=lambda a, b: True,
+        python_version_code_capture=(3, 13),
     ),
     SerializationTestCase(
         id="Library Objects - Model, Prompt",
