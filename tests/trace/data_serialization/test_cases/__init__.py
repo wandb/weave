@@ -1,4 +1,5 @@
 from tests.trace.data_serialization.spec import SerializationTestCase
+from tests.trace.data_serialization.test_cases.container_cases import container_cases
 from tests.trace.data_serialization.test_cases.media_cases import media_cases
 from tests.trace.data_serialization.test_cases.primitive_cases import primitive_cases
 
@@ -26,8 +27,8 @@ from tests.trace.data_serialization.test_cases.primitive_cases import primitive_
 [x] Video
 
 ## Container Types:
-[] Dataclass
-[] Pydantic BaseModel
+[x] Dataclass
+[x] Pydantic BaseModel
 
 ## Weave Core Types:
 [] Op
@@ -54,4 +55,5 @@ from tests.trace.data_serialization.test_cases.primitive_cases import primitive_
 cases: list[SerializationTestCase] = [
     *primitive_cases,
     *media_cases,
+    *container_cases,
 ]
