@@ -31,6 +31,10 @@ video_file_path = os.path.join(
 VIDEO_BYTES = open(video_file_path, "rb").read()
 
 
+def markdown_equality_check(a, b):
+    return a.markup == b.markup and a.code_theme == b.code_theme
+
+
 media_cases = [
     # Datetime
     SerializationTestCase(
@@ -143,49 +147,30 @@ media_cases = [
         python_version_code_capture=(3, 13),
     ),
     # Markdown
+    # Here, we put both inline and file cases together so that the ref on Markdown
+    # doesn't screw up parallel tests.
     SerializationTestCase(
-        id="markdown - inline",
-        runtime_object_factory=lambda: weave.Markdown("# Hello, world!"),
-        inline_call_param=True,
-        is_legacy=False,
-        exp_json={
-            "_type": "CustomWeaveType",
-            "weave_type": {"type": "rich.markdown.Markdown"},
-            "val": {"code_theme": "monokai", "markup": "# Hello, world!"},
-            "load_op": "weave:///shawn/test-project/op/load_rich.markdown.Markdown:c3wm9zZXbUKJB0FG5IYJfsmZ20zvQyMhcT0q30XgX84",
+        id="markdown",
+        runtime_object_factory=lambda: {
+            "inline": weave.Markdown("a" * 1024),
+            "file": weave.Markdown("# Hello, world!"),
         },
-        exp_objects=[
-            {
-                "object_id": "load_rich.markdown.Markdown",
-                "digest": "c3wm9zZXbUKJB0FG5IYJfsmZ20zvQyMhcT0q30XgX84",
-                "exp_val": {
-                    "_type": "CustomWeaveType",
-                    "weave_type": {"type": "Op"},
-                    "files": {"obj.py": "ZlYsZB0XaBa8O0kLSbW6sMAnaoJmztqBevEAxxERDLc"},
-                },
-            }
-        ],
-        exp_files=[
-            {
-                "digest": "ZlYsZB0XaBa8O0kLSbW6sMAnaoJmztqBevEAxxERDLc",
-                "exp_content": b'import weave\nfrom typing import Any\nfrom rich.markdown import Markdown\n\n@weave.op()\ndef load(artifact: "MemTraceFilesArtifact", name: str, val: Any) -> Markdown:\n    """Load markdown from file and metadata."""\n    if "markup" in val:\n        markup = val["markup"]\n    else:\n        with artifact.open("markup.md", binary=False) as f:\n            markup = f.read()\n\n    kwargs = {}\n    if val and isinstance(val, dict) and "code_theme" in val:\n        kwargs["code_theme"] = val["code_theme"]\n\n    return Markdown(markup=markup, **kwargs)\n',
-            }
-        ],
-        equality_check=lambda a, b: a.markup == b.markup
-        and a.code_theme == b.code_theme,
-        python_version_code_capture=(3, 13),
-    ),
-    SerializationTestCase(
-        id="markdown - file",
-        runtime_object_factory=lambda: weave.Markdown("a" * 1024),
         inline_call_param=True,
         is_legacy=False,
         exp_json={
-            "_type": "CustomWeaveType",
-            "weave_type": {"type": "rich.markdown.Markdown"},
-            "files": {"markup.md": "LtyYaEfiCbQBbhQabchxbTIHNQ9BaWk4LUMVOb8pLko"},
-            "val": {"code_theme": "monokai"},
-            "load_op": "weave:///shawn/test-project/op/load_rich.markdown.Markdown:c3wm9zZXbUKJB0FG5IYJfsmZ20zvQyMhcT0q30XgX84",
+            "inline": {
+                "_type": "CustomWeaveType",
+                "weave_type": {"type": "rich.markdown.Markdown"},
+                "files": {"markup.md": "LtyYaEfiCbQBbhQabchxbTIHNQ9BaWk4LUMVOb8pLko"},
+                "val": {"code_theme": "monokai"},
+                "load_op": "weave:///shawn/test-project/op/load_rich.markdown.Markdown:c3wm9zZXbUKJB0FG5IYJfsmZ20zvQyMhcT0q30XgX84",
+            },
+            "file": {
+                "_type": "CustomWeaveType",
+                "weave_type": {"type": "rich.markdown.Markdown"},
+                "val": {"markup": "# Hello, world!", "code_theme": "monokai"},
+                "load_op": "weave:///shawn/test-project/op/load_rich.markdown.Markdown:c3wm9zZXbUKJB0FG5IYJfsmZ20zvQyMhcT0q30XgX84",
+            },
         },
         exp_objects=[
             {
@@ -208,8 +193,8 @@ media_cases = [
                 "exp_content": b'import weave\nfrom typing import Any\nfrom rich.markdown import Markdown\n\n@weave.op()\ndef load(artifact: "MemTraceFilesArtifact", name: str, val: Any) -> Markdown:\n    """Load markdown from file and metadata."""\n    if "markup" in val:\n        markup = val["markup"]\n    else:\n        with artifact.open("markup.md", binary=False) as f:\n            markup = f.read()\n\n    kwargs = {}\n    if val and isinstance(val, dict) and "code_theme" in val:\n        kwargs["code_theme"] = val["code_theme"]\n\n    return Markdown(markup=markup, **kwargs)\n',
             },
         ],
-        equality_check=lambda a, b: a.markup == b.markup
-        and a.code_theme == b.code_theme,
+        equality_check=lambda a, b: markdown_equality_check(a["inline"], b["inline"])
+        and markdown_equality_check(a["file"], b["file"]),
         python_version_code_capture=(3, 13),
     ),
     # Video
@@ -428,8 +413,7 @@ media_cases = [
                 "exp_content": b"import weave\nfrom typing import TypedDict\nfrom typing import NotRequired\nfrom rich.markdown import Markdown\n\nclass SerializedMarkdown(TypedDict):\n    markup: str\n    code_theme: NotRequired[str]\n\n@weave.op()\ndef load(encoded: SerializedMarkdown) -> Markdown:\n    return Markdown(**encoded)\n",
             }
         ],
-        equality_check=lambda a, b: a.markup == b.markup
-        and a.code_theme == b.code_theme,
+        equality_check=markdown_equality_check,
         python_version_code_capture=(3, 13),
     ),
     SerializationTestCase(
