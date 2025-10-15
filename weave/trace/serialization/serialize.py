@@ -309,10 +309,10 @@ def from_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
             )
         elif val_type == "CustomWeaveType":
             encoded: custom_objs.EncodedCustomObjDict = {
-                "weave_type": obj["weave_type"]
+                "_type": "CustomWeaveType",
+                "weave_type": obj["weave_type"],
+                "load_op": obj.get("load_op"),
             }
-            if "load_op" in obj:
-                encoded["load_op"] = obj["load_op"]
             if "val" in obj:
                 encoded["val"] = obj["val"]
             if "files" in obj:

@@ -28,12 +28,21 @@ class WeaveTypeDict(TypedDict):
     type: str
 
 
-class EncodedCustomObjDict(TypedDict, total=False):
+class _EncodedCustomObjDictRequired(TypedDict):
     _type: Literal["CustomWeaveType"]
     weave_type: WeaveTypeDict
     load_op: str | None
+
+
+class _EncodedCustomObjDictOptional(TypedDict, total=False):
     val: Any
     files: Mapping[str, str | bytes]
+
+
+class EncodedCustomObjDict(
+    _EncodedCustomObjDictRequired, _EncodedCustomObjDictOptional
+):
+    pass
 
 
 class DecodeCustomObjectError(Exception):
