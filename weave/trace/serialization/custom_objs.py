@@ -114,6 +114,18 @@ def _load_custom_obj_files(
     return loaded_files
 
 
+def maybe_attach_art(res: Any, art: MemTraceFilesArtifact) -> None:
+    """Attach the artifact to the result if possible.
+    This is a best-effort approach to attach the artifact to the result.
+
+    I am pretty sure this is just used in a legacy code capture case
+    """
+    try:
+        res.art = art
+    except Exception:
+        pass
+
+
 def _load_custom_obj(
     encoded_path_contents: Mapping[str, str | bytes],
     val: Any | None,
@@ -129,7 +141,8 @@ def _load_custom_obj(
     else:
         # Modern, current path
         res = load_instance_op(art, "obj", val)
-    # res.art = art
+
+    maybe_attach_art(res, art)
     return res
 
 
