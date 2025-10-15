@@ -789,6 +789,52 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             cursor.execute("BEGIN TRANSACTION")
             self._mark_existing_objects_as_not_latest(cursor, project_id, object_id)
             version_index = self._get_obj_version_index(cursor, project_id, object_id)
+            print(f"""
+            Executing SQLite Query:
+            INSERT OR IGNORE INTO objects (
+                    project_id,
+                    object_id,
+                    created_at,
+                    kind,
+                    base_object_class,
+                    leaf_object_class,
+                    refs,
+                    val_dump,
+                    digest,
+                    version_index,
+                    is_latest,
+                    deleted_at,
+                    wb_user_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(project_id, kind, object_id, digest) DO UPDATE SET
+                    created_at = excluded.created_at,
+                    kind = excluded.kind,
+                    base_object_class = excluded.base_object_class,
+                    leaf_object_class = excluded.leaf_object_class,
+                    refs = excluded.refs,
+                    val_dump = excluded.val_dump,
+                    version_index = excluded.version_index,
+                    is_latest = excluded.is_latest,
+                    deleted_at = excluded.deleted_at
+            PARAMS:
+            {
+                (
+                    project_id,
+                    object_id,
+                    datetime.datetime.now().isoformat(),
+                    get_kind(processed_val),
+                    processed_result["base_object_class"],
+                    processed_result["leaf_object_class"],
+                    json.dumps([]),
+                    json_val,
+                    digest,
+                    version_index,
+                    1,
+                    None,
+                    wb_user_id,
+                )
+            }
+            """)
             cursor.execute(
                 """INSERT OR IGNORE INTO objects (
                     project_id,
@@ -1435,6 +1481,17 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         conn, cursor = get_conn_cursor(self.db_path)
         digest = bytes_digest(req.content)
         with self.lock:
+            print(f"""
+            Executing SQLite Query:
+            INSERT OR IGNORE INTO files (project_id, digest, val) VALUES (?, ?, ?)
+            PARAMS: {
+                (
+                    req.project_id,
+                    digest,
+                    req.content,
+                )
+            }
+            """)
             cursor.execute(
                 "INSERT OR IGNORE INTO files (project_id, digest, val) VALUES (?, ?, ?)",
                 (
