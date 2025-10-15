@@ -771,6 +771,9 @@ class ImperativeEvaluationLogger(EvaluationLogger):
         super().__init__(*args, **kwargs)
 
 
+
+
+
 class LiteEvaluationLogger(EvaluationLogger):
     """Simplified interface for logging evaluations with Weave.
 
@@ -805,6 +808,27 @@ class LiteEvaluationLogger(EvaluationLogger):
     """
 
     _done: bool = PrivateAttr(default=False)
+
+    def model_post_init(self, __context: Any) -> None:
+        """Initialize and register custom atexit handler."""
+        # Call parent initialization
+        super().model_post_init(__context)
+
+        # Remove from parent's global registry - we'll handle our own cleanup
+        if self in _active_evaluation_loggers:
+            _active_evaluation_loggers.remove(self)
+
+        # Register our own atexit handler
+        atexit.register(self._finalize_at_exit)
+
+    def _finalize_at_exit(self) -> None:
+        """Called automatically at program exit to finalize the evaluation."""
+        if self._done or self._is_finalized:
+            return
+        try:
+            self.log_summary()
+        except Exception:
+            logger.error("Error during automatic finalization at exit", exc_info=True)
 
     def log_example(
         self,
@@ -936,30 +960,15 @@ class LiteEvaluationLogger(EvaluationLogger):
         super().log_summary(summary=summary, auto_summarize=auto_summarize)
 
     def finish(self, exception: BaseException | None = None) -> None:
-        """Clean up evaluation resources.
+        """Clean up the evaluation resources explicitly without logging a summary.
 
-        Automatically calls log_summary() if not already called.
-        Called automatically at program exit via atexit.
+        This behaves the same as the base class - it will finalize the evaluation
+        WITHOUT automatically calling log_summary(). If you want a summary, you must
+        call log_summary() explicitly before calling finish().
+
+        The automatic log_summary() behavior only happens via atexit, not via finish().
 
         Args:
             exception: Optional exception to attach to the evaluation.
         """
-        if not self._done and not self._is_finalized:
-            # Automatically call log_summary if not done yet
-            try:
-                self.log_summary()
-            except Exception as e:
-                # If log_summary fails, still try to finalize
-                logger.error("Error during automatic log_summary in finish()", exc_info=True)
-                if not self._is_finalized:
-                    super().finish(exception=exception or e)
-        elif not self._is_finalized:
-            # Already called log_summary manually, just do parent cleanup
-            super().finish(exception=exception)
-
-
-
-
-
-
-
+        super().finish(exception=exception)
