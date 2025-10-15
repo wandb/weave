@@ -87,7 +87,7 @@ library_cases = [
             "trials": 1,
             "metadata": None,
             "evaluation_name": None,
-            "evaluate": "weave:///shawn/test-project/op/Evaluation.evaluate:ZQ2X360ll0FmGXmDDU1fUii6MKgimqYYJQOKFwyXkuU",
+            "evaluate": "weave:///shawn/test-project/op/Evaluation.evaluate:tzMxrHuEsNuso7PcAjAeE6XIv38jYsWKeH0MS5wHUqM",
             "predict_and_score": "weave:///shawn/test-project/op/Evaluation.predict_and_score:NbvZTtBp9EjaNqvaUHIhY0JwtlXanwJRjGThby0Fa1k",
             "summarize": "weave:///shawn/test-project/op/Evaluation.summarize:i5dmmojYMQYCNbCKXLbbp9hHgIw6wMwbExEonnPYia8",
             "_class_name": "Evaluation",
@@ -108,11 +108,11 @@ library_cases = [
             },
             {
                 "object_id": "Evaluation.evaluate",
-                "digest": "ZQ2X360ll0FmGXmDDU1fUii6MKgimqYYJQOKFwyXkuU",
+                "digest": "tzMxrHuEsNuso7PcAjAeE6XIv38jYsWKeH0MS5wHUqM",
                 "exp_val": {
                     "_type": "CustomWeaveType",
                     "weave_type": {"type": "Op"},
-                    "files": {"obj.py": "pn6E2Yw1tujS7r1KAKKKwyCKLL2PxZkitEUVes7Y7zM"},
+                    "files": {"obj.py": "9T5aYwcL70PW6Js2DMzGtiZeVlQPol8doLjFpKy8HZo"},
                 },
             },
             {
@@ -241,8 +241,8 @@ library_cases = [
         ],
         exp_files=[
             {
-                "digest": "pn6E2Yw1tujS7r1KAKKKwyCKLL2PxZkitEUVes7Y7zM",
-                "exp_content": b'import weave\nfrom typing import Union\nfrom weave.trace.op_protocol import Op\nfrom weave.flow.model import Model\nimport json\nfrom weave.trace.op import op\nfrom weave.trace.call import Call\nfrom datetime import datetime\nfrom weave.flow.util import make_memorable_name\n\ndef _safe_summarize_to_str(summary: dict) -> str:\n    summary_str = ""\n    try:\n        summary_str = json.dumps(summary, indent=2)\n    except Exception:\n        try:\n            summary_str = str(summary)\n        except Exception:\n            pass\n    return summary_str\n\nlogger = "<Logger weave.evaluation.eval (ERROR)>"\n\ndef default_evaluation_display_name(call: Call) -> str:\n    date = datetime.now().strftime("%Y-%m-%d")\n    unique_name = make_memorable_name()\n    return f"eval-{date}-{unique_name}"\n\n@weave.op()\n@op(call_display_name=default_evaluation_display_name)\nasync def evaluate(self, model: Union[Op, Model]) -> dict:\n    eval_results = await self.get_eval_results(model)\n    summary = await self.summarize(eval_results)\n\n    summary_str = _safe_summarize_to_str(summary)\n    if summary_str:\n        logger.info(f"Evaluation summary {summary_str}")\n\n    return summary\n',
+                "digest": "9T5aYwcL70PW6Js2DMzGtiZeVlQPol8doLjFpKy8HZo",
+                "exp_content": b'import weave\nfrom typing import Union\nfrom weave.trace.op_protocol import Op\nfrom weave.flow.model import Model\nimport json\nfrom weave.trace.op import op\nfrom weave.trace.call import Call\nfrom datetime import datetime\nfrom weave.flow.util import make_memorable_name\n\ndef _safe_summarize_to_str(summary: dict) -> str:\n    summary_str = ""\n    try:\n        summary_str = json.dumps(summary, indent=2)\n    except Exception:\n        try:\n            summary_str = str(summary)\n        except Exception:\n            pass\n    return summary_str\n\nlogger = "<Logger weave.evaluation.eval (DEBUG)>"\n\ndef default_evaluation_display_name(call: Call) -> str:\n    date = datetime.now().strftime("%Y-%m-%d")\n    unique_name = make_memorable_name()\n    return f"eval-{date}-{unique_name}"\n\n@weave.op()\n@op(call_display_name=default_evaluation_display_name)\nasync def evaluate(self, model: Union[Op, Model]) -> dict:\n    eval_results = await self.get_eval_results(model)\n    summary = await self.summarize(eval_results)\n\n    summary_str = _safe_summarize_to_str(summary)\n    if summary_str:\n        logger.info(f"Evaluation summary {summary_str}")\n\n    return summary\n',
             },
             {
                 "digest": "Q5mId9WksFCNbY86SM7wcXW0VombvaYvWszyMr87lA8",

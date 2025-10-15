@@ -1,4 +1,5 @@
 import json
+import logging
 import sys
 from typing import Any, Callable, Union
 
@@ -38,6 +39,10 @@ independent of the actual code that is used to serialize the data.
     ids=lambda case: case.id,
 )
 def test_serialization_correctness(client, case: SerializationTestCase):
+    # Ensures consistency of code capture.
+    logger = logging.getLogger("weave")
+    logger.setLevel(logging.DEBUG)
+
     # Since code serialization changes pretty significantly between versions, we will assume
     # legacy for anything other than the latest python version
     is_legacy = case.is_legacy
