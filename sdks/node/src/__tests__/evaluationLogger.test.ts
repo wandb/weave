@@ -28,22 +28,71 @@ describe('EvaluationLogger - Basic Functionality', () => {
     initWithCustomTraceServer(projectId, traceServer);
   });
 
-  // Test: Basic flow - logPrediction → logScore → finish → logSummary
+  // Test: Basic flow - logPredictionAsync → logScore → finish → logSummary (awaitable API)
   test('complete evaluation lifecycle', async () => {
     const evalLogger = new EvaluationLogger({name: 'test-eval'});
 
-    const scoreLogger = await evalLogger.logPrediction(
+    const scoreLogger = await evalLogger.logPredictionAsync(
       {input: 'test'},
       'output'
     );
 
-    scoreLogger.logScore('accuracy', 0.95);
-    scoreLogger.logScore('f1', 0.88);
+    await scoreLogger.logScore('accuracy', 0.95);
+    await scoreLogger.logScore('f1', 0.88);
     await scoreLogger.finish();
     await evalLogger.logSummary();
 
     const calls = await getCalls(traceServer, projectId);
     expect(calls.length).toBeGreaterThan(0);
+  });
+
+  // Test: Fire-and-forget with chained calls - true synchronous API
+  test('fire-and-forget with chained calls', async () => {
+    const evalLogger = new EvaluationLogger({name: 'test-eval'});
+
+    // True fire-and-forget: synchronous, no await needed!
+    const scoreLogger = evalLogger.logPrediction({input: 'test'}, 'output');
+
+    // Fire-and-forget: call methods without awaiting
+    scoreLogger.logScore('accuracy', 0.95);
+    scoreLogger.logScore('f1', 0.88);
+    scoreLogger.finish();
+
+    // logSummary waits for everything to complete internally
+    await evalLogger.logSummary();
+
+    const calls = await getCalls(traceServer, projectId);
+    expect(calls.length).toBeGreaterThan(0);
+
+    // Verify scores were logged
+    const predictAndScoreCall = calls.find(c =>
+      c.op_name?.includes('predict_and_score')
+    );
+    expect(predictAndScoreCall?.output?.scores?.accuracy).toBe(0.95);
+    expect(predictAndScoreCall?.output?.scores?.f1).toBe(0.88);
+  });
+
+  // Test: Auto-finish when logSummary is called without explicit finish()
+  test('auto-finishes predictions when logSummary is called', async () => {
+    const evalLogger = new EvaluationLogger({name: 'test-eval'});
+
+    const scoreLogger = await evalLogger.logPredictionAsync(
+      {input: 'test'},
+      'output'
+    );
+    await scoreLogger.logScore('accuracy', 0.95);
+    // Intentionally don't call finish()
+
+    // logSummary should auto-finish and complete successfully
+    await evalLogger.logSummary();
+
+    const calls = await getCalls(traceServer, projectId);
+    const predictAndScoreCall = calls.find(c =>
+      c.op_name?.includes('predict_and_score')
+    );
+
+    // Verify the prediction was properly finished
+    expect(predictAndScoreCall?.output?.scores?.accuracy).toBe(0.95);
   });
 
   // Test: EvaluationLogger accepts all configuration options
@@ -59,7 +108,10 @@ describe('EvaluationLogger - Basic Functionality', () => {
       attributes: {trial_id: 'abc123'},
     });
 
-    const scoreLogger = await evalLogger.logPrediction({input: 'test'}, 'out');
+    const scoreLogger = await evalLogger.logPredictionAsync(
+      {input: 'test'},
+      'out'
+    );
     await scoreLogger.finish();
     await evalLogger.logSummary();
 
@@ -82,7 +134,7 @@ describe('EvaluationLogger - Call Hierarchy', () => {
   // Test: Verify complete call tree structure
   test('creates correct parent-child relationships', async () => {
     const evalLogger = new EvaluationLogger({name: 'test-eval'});
-    const scoreLogger = await evalLogger.logPrediction(
+    const scoreLogger = await evalLogger.logPredictionAsync(
       {input: 'test'},
       'output'
     );
@@ -125,7 +177,11 @@ describe('EvaluationLogger - Attribute Markers', () => {
   // Test: IMPERATIVE_EVAL_MARKER on eval calls
   test('adds IMPERATIVE_EVAL_MARKER to evaluation calls', async () => {
     const evalLogger = new EvaluationLogger({name: 'test-eval'});
-    await evalLogger.logPrediction({input: 'test'}, 'output');
+    const scoreLogger = await evalLogger.logPredictionAsync(
+      {input: 'test'},
+      'output'
+    );
+    await scoreLogger.finish();
     await evalLogger.logSummary();
 
     const calls = await getCalls(traceServer, projectId);
@@ -143,7 +199,7 @@ describe('EvaluationLogger - Attribute Markers', () => {
   // Test: IMPERATIVE_SCORE_MARKER on scorer calls
   test('adds IMPERATIVE_SCORE_MARKER to scorer calls', async () => {
     const evalLogger = new EvaluationLogger({name: 'test-eval'});
-    const scoreLogger = await evalLogger.logPrediction(
+    const scoreLogger = await evalLogger.logPredictionAsync(
       {input: 'test'},
       'output'
     );
@@ -172,7 +228,7 @@ describe('EvaluationLogger - Summary Generation', () => {
     const evalLogger = new EvaluationLogger({name: 'test-eval'});
 
     for (let i = 0; i < 3; i++) {
-      const scoreLogger = await evalLogger.logPrediction(
+      const scoreLogger = await evalLogger.logPredictionAsync(
         {input: `test${i}`},
         `output${i}`
       );
@@ -192,15 +248,24 @@ describe('EvaluationLogger - Summary Generation', () => {
   test('auto-summary calculates true_fraction for boolean scores', async () => {
     const evalLogger = new EvaluationLogger({name: 'test-eval'});
 
-    const scoreLogger1 = await evalLogger.logPrediction({input: '1'}, 'out1');
+    const scoreLogger1 = await evalLogger.logPredictionAsync(
+      {input: '1'},
+      'out1'
+    );
     scoreLogger1.logScore('passed', true);
     await scoreLogger1.finish();
 
-    const scoreLogger2 = await evalLogger.logPrediction({input: '2'}, 'out2');
+    const scoreLogger2 = await evalLogger.logPredictionAsync(
+      {input: '2'},
+      'out2'
+    );
     scoreLogger2.logScore('passed', false);
     await scoreLogger2.finish();
 
-    const scoreLogger3 = await evalLogger.logPrediction({input: '3'}, 'out3');
+    const scoreLogger3 = await evalLogger.logPredictionAsync(
+      {input: '3'},
+      'out3'
+    );
     scoreLogger3.logScore('passed', true);
     await scoreLogger3.finish();
 
@@ -217,7 +282,7 @@ describe('EvaluationLogger - Summary Generation', () => {
   test('custom summary overrides auto-summary', async () => {
     const evalLogger = new EvaluationLogger({name: 'test-eval'});
 
-    const scoreLogger = await evalLogger.logPrediction(
+    const scoreLogger = await evalLogger.logPredictionAsync(
       {input: 'test'},
       'output'
     );
@@ -249,7 +314,7 @@ describe('EvaluationLogger - Edge Cases', () => {
   test('handles prediction with no scores', async () => {
     const evalLogger = new EvaluationLogger({name: 'test-eval'});
 
-    const scoreLogger = await evalLogger.logPrediction(
+    const scoreLogger = await evalLogger.logPredictionAsync(
       {input: 'test'},
       'output'
     );
@@ -283,7 +348,7 @@ describe('EvaluationLogger - Edge Cases', () => {
     const evalLogger = new EvaluationLogger({name: 'test-eval'});
 
     for (let i = 0; i < 5; i++) {
-      const scoreLogger = await evalLogger.logPrediction(
+      const scoreLogger = await evalLogger.logPredictionAsync(
         {input: `test${i}`},
         `output${i}`
       );

@@ -271,7 +271,6 @@ class PredictAndScoreCallMetadata {
   predictCallId: string; // ID of the finished predict call (for attaching feedback)
   scores: Record<string, any> = {};
   output: any;
-  isFinished: boolean = false;
 
   constructor(options: PredictAndScoreCallMetadataOptions) {
     this.predictAndScoreCall = options.predictAndScoreCall;
@@ -310,16 +309,45 @@ interface ScoreAggregate {
  * await pred.finish(); // Finalizes the prediction
  */
 export class ScoreLogger {
-  private predMeta: PredictAndScoreCallMetadata;
-  private _scoringProcesses: Array<Promise<void>> = [];
+  private predMeta?: PredictAndScoreCallMetadata;
   private evalLogger: EvaluationLogger;
+  private operationChain: Promise<void> = Promise.resolve();
+  private initPromise: Promise<void>;
+  private initResolve?: () => void;
+  private finishCalled: boolean = false;
 
-  constructor(
-    predMeta: PredictAndScoreCallMetadata,
-    evalLogger: EvaluationLogger
-  ) {
-    this.predMeta = predMeta;
+  constructor(evalLogger: EvaluationLogger) {
     this.evalLogger = evalLogger;
+    this.initPromise = new Promise<void>(resolve => {
+      this.initResolve = resolve;
+    });
+  }
+
+  /**
+   * Initialize the ScoreLogger with metadata.
+   * Called by EvaluationLogger after async initialization completes.
+   * @internal
+   */
+  initialize(predMeta: PredictAndScoreCallMetadata): void {
+    this.predMeta = predMeta;
+    this.initResolve?.();
+  }
+
+  /**
+   * Wait for all operations in this ScoreLogger to complete.
+   * Used by EvaluationLogger to ensure all async operations finish before finalizing.
+   * @internal
+   */
+  async waitForCompletion(): Promise<void> {
+    await this.operationChain;
+  }
+
+  /**
+   * Check if finish() has been called.
+   * Used by EvaluationLogger to detect unfinished predictions.
+   */
+  get isFinishCalled(): boolean {
+    return this.finishCalled;
   }
 
   /**
@@ -329,77 +357,90 @@ export class ScoreLogger {
    * @param scorerName - Name of the scorer (e.g., "accuracy", "f1_score")
    * @param score - The score value
    */
-  async logScore(scorerName: string, score: any): Promise<void> {
-    // Collect this logScore call in a promise so that we can await it later in finish()
-    const asyncProcess = (async () => {
-      if (this.predMeta.isFinished) {
-        throw new Error('Cannot log score after prediction is finished');
-      }
+  logScore(scorerName: string, score: any): Promise<void> {
+    // Add operation to the chain
+    const operation = this.operationChain
+      .then(async () => {
+        // Wait for initialization to complete
+        await this.initPromise;
 
-      const client = requireGlobalClient();
-
-      // Dynamically create a Scorer class with the scorer name
-      // Override the class name so constructor.name === scorerName for proper serialization
-      class DynamicScorer extends Scorer {
-        constructor(parameters: ScorerParameters) {
-          super({
-            ...parameters,
-            name: scorerName,
-            scorerName: scorerName,
-          });
+        if (!this.predMeta) {
+          // ScoreLogger was not properly initialized, skip
+          return;
         }
-      }
 
-      // Override the constructor name to be the scorer name
-      Object.defineProperty(DynamicScorer, 'name', {
-        value: scorerName,
-        writable: false,
-        configurable: true,
+        const client = requireGlobalClient();
+
+        // Dynamically create a Scorer class with the scorer name
+        // Override the class name so constructor.name === scorerName for proper serialization
+        class DynamicScorer extends Scorer {
+          constructor(parameters: ScorerParameters) {
+            super({
+              ...parameters,
+              name: scorerName,
+              scorerName: scorerName,
+            });
+          }
+        }
+
+        // Override the constructor name to be the scorer name
+        Object.defineProperty(DynamicScorer, 'name', {
+          value: scorerName,
+          writable: false,
+          configurable: true,
+        });
+
+        // Create an instance of the dynamic scorer class
+        const scorer = new DynamicScorer({});
+
+        // Save the scorer to get its URI for feedback attachment
+        const scorerRef = await client.publish(scorer);
+        const scorerRefUri = scorerRef.uri();
+
+        // Create and finish scorer call (already have the score)
+        const scorerCall = new InternalCall();
+        const scorerEntry: CallStackEntry = {
+          callId: uuidv7(),
+          traceId: this.predMeta.predictAndScoreEntry.traceId,
+          childSummary: {},
+        };
+
+        await createAndFinishCall(
+          client,
+          scorerCall,
+          scorerScoreFactory(scorerName),
+          [{self: scorer, output: this.predMeta.output}],
+          'useParam0Object',
+          scorer,
+          scorerEntry,
+          this.predMeta.predictAndScoreEntry,
+          new Date(),
+          score,
+          `${scorerName}.score`,
+          IMPERATIVE_SCORE_MARKER
+        );
+
+        // Attach the score as feedback to the predict call
+        await client.addScore(
+          this.predMeta.predictCallId,
+          scorerEntry.callId,
+          scorerRefUri,
+          score
+        );
+
+        // Store score in metadata
+        this.predMeta.scores[scorerName] = score;
+      })
+      .catch(err => {
+        // Log error but don't break the chain for other operations
+        console.error(`Failed to log score ${scorerName}:`, err);
       });
 
-      // Create an instance of the dynamic scorer class
-      const scorer = new DynamicScorer({});
+    // Update the chain
+    this.operationChain = operation;
 
-      // Save the scorer to get its URI for feedback attachment
-      const scorerRef = await client.publish(scorer);
-      const scorerRefUri = scorerRef.uri();
-
-      // Create and finish scorer call (already have the score)
-      const scorerCall = new InternalCall();
-      const scorerEntry: CallStackEntry = {
-        callId: uuidv7(),
-        traceId: this.predMeta.predictAndScoreEntry.traceId,
-        childSummary: {},
-      };
-
-      await createAndFinishCall(
-        client,
-        scorerCall,
-        scorerScoreFactory(scorerName),
-        [{self: scorer, output: this.predMeta.output}],
-        'useParam0Object',
-        scorer,
-        scorerEntry,
-        this.predMeta.predictAndScoreEntry,
-        new Date(),
-        score,
-        `${scorerName}.score`,
-        IMPERATIVE_SCORE_MARKER
-      );
-
-      // Attach the score as feedback to the predict call
-      await client.addScore(
-        this.predMeta.predictCallId,
-        scorerEntry.callId,
-        scorerRefUri,
-        score
-      );
-
-      // Store score in metadata
-      this.predMeta.scores[scorerName] = score;
-    })();
-    this._scoringProcesses.push(asyncProcess);
-    await asyncProcess;
+    // Return the operation promise so caller can await if desired
+    return operation;
   }
 
   /**
@@ -407,38 +448,49 @@ export class ScoreLogger {
    * Finalizes the predict_and_score call with accumulated scores.
    * Updates incremental aggregates and frees memory.
    */
-  async finish(): Promise<void> {
-    if (this.predMeta.isFinished) {
-      return; // Already finished
+  finish(): Promise<void> {
+    if (this.finishCalled) {
+      return Promise.resolve(); // Already finished
     }
 
-    const client = requireGlobalClient();
+    this.finishCalled = true;
 
-    await Promise.all(this._scoringProcesses);
+    // Add finish operation to the chain
+    const operation = this.operationChain.then(async () => {
+      // Wait for initialization to complete
+      await this.initPromise;
 
-    const endTime = new Date();
+      if (!this.predMeta) {
+        // ScoreLogger was not properly initialized, skip
+        return;
+      }
 
-    // Finish predict_and_score call with output and scores
-    await client.finishCall(
-      this.predMeta.predictAndScoreCall,
-      {
-        output: this.predMeta.output,
-        scores: this.predMeta.scores,
-      },
-      this.predMeta.predictAndScoreEntry,
-      this.predMeta.evaluateEntry, // Parent = evaluate
-      undefined,
-      endTime,
-      this.predMeta.predictAndScoreStartPromise // Use saved startPromise
-    );
+      const client = requireGlobalClient();
+      const endTime = new Date();
 
-    this.predMeta.isFinished = true;
+      // Finish predict_and_score call with output and scores
+      await client.finishCall(
+        this.predMeta.predictAndScoreCall,
+        {
+          output: this.predMeta.output,
+          scores: this.predMeta.scores,
+        },
+        this.predMeta.predictAndScoreEntry,
+        this.predMeta.evaluateEntry, // Parent = evaluate
+        undefined,
+        endTime,
+        this.predMeta.predictAndScoreStartPromise // Use saved startPromise
+      );
 
-    // Update incremental aggregates for summary calculation
-    this.evalLogger.updateScoreAggregates(this.predMeta.scores);
+      // Update incremental aggregates for summary calculation
+      this.evalLogger.updateScoreAggregates(this.predMeta.scores);
+    });
 
-    // Remove from unfinished set to free memory
-    this.evalLogger.markPredictionFinished(this.predMeta);
+    // Update the chain
+    this.operationChain = operation;
+
+    // Return the operation promise so caller can await if desired
+    return operation;
   }
 }
 
@@ -494,8 +546,8 @@ export class EvaluationLogger {
   // Incremental summary aggregates (O(K) memory where K = # scorers)
   private scoreAggregates: Map<string, ScoreAggregate> = new Map();
 
-  // Track unfinished predictions for warning (lightweight - only references)
-  private unfinishedPredictions: Set<PredictAndScoreCallMetadata> = new Set();
+  // Track all ScoreLogger instances for coordination
+  private scoreLoggers: Set<ScoreLogger> = new Set();
 
   private isFinalized: boolean = false;
 
@@ -572,30 +624,75 @@ export class EvaluationLogger {
   }
 
   /**
-   * Log a prediction with its input and output.
+   * Log a prediction with its input and output (synchronous version).
    * Creates a predict_and_score call (with child predict call).
-   * Returns a ScoreLogger for adding scores.
+   * Returns a ScoreLogger immediately for adding scores.
+   *
+   * This method returns the ScoreLogger synchronously. Operations on the
+   * ScoreLogger (logScore, finish) will be queued and executed when initialization completes.
+   *
+   * @example
+   * // Fire-and-forget style
+   * const scoreLogger = evalLogger.logPrediction({input: 'test'}, 'output');
+   * scoreLogger.logScore('accuracy', 0.95);
+   * scoreLogger.finish();
+   * await evalLogger.logSummary(); // Waits for everything
    */
-  async logPrediction(
+  logPrediction(inputs: Record<string, any>, output: any): ScoreLogger {
+    // Create ScoreLogger immediately (synchronously)
+    const scoreLogger = new ScoreLogger(this);
+    this.scoreLoggers.add(scoreLogger);
+
+    // Start async initialization in the background
+    this.logPredictionImpl(inputs, output, scoreLogger);
+
+    // Return scoreLogger immediately
+    return scoreLogger;
+  }
+
+  /**
+   * Log a prediction with its input and output (async version).
+   * Like logPrediction() but returns a Promise that resolves when
+   * the prediction call is fully initialized.
+   *
+   * Use this if you need to await the initialization before proceeding.
+   *
+   * @example
+   * // Awaitable style
+   * const scoreLogger = await evalLogger.logPredictionAsync({input: 'test'}, 'output');
+   * await scoreLogger.logScore('accuracy', 0.95);
+   * await scoreLogger.finish();
+   */
+  async logPredictionAsync(
     inputs: Record<string, any>,
     output: any
   ): Promise<ScoreLogger> {
+    // Create ScoreLogger immediately (synchronously)
+    const scoreLogger = new ScoreLogger(this);
+    this.scoreLoggers.add(scoreLogger);
+
+    // Wait for async initialization to complete
+    await this.logPredictionImpl(inputs, output, scoreLogger);
+
+    // Return initialized scoreLogger
+    return scoreLogger;
+  }
+
+  /**
+   * Internal implementation of logPrediction.
+   * Performs async initialization and sets up the prediction call tree.
+   */
+  private async logPredictionImpl(
+    inputs: Record<string, any>,
+    output: any,
+    scoreLogger: ScoreLogger
+  ): Promise<void> {
     await this.initPromise;
     const client = requireGlobalClient();
     if (!client || !this.evaluateEntry) {
       console.warn('Weave not initialized or evaluate not started');
-      // Return a no-op ScoreLogger
-      return new ScoreLogger(
-        new PredictAndScoreCallMetadata({
-          predictAndScoreCall: new InternalCall(),
-          predictAndScoreEntry: {callId: '', traceId: '', childSummary: {}},
-          evaluateEntry: {callId: '', traceId: '', childSummary: {}},
-          predictAndScoreStartPromise: Promise.resolve(),
-          predictCallId: '',
-          output,
-        }),
-        this
-      );
+      // ScoreLogger will remain uninitialized and operations will be no-ops
+      return;
     }
 
     // Create predict_and_score call
@@ -656,15 +753,16 @@ export class EvaluationLogger {
       output,
     });
 
-    // Track as unfinished for warning purposes
-    this.unfinishedPredictions.add(predMeta);
-
-    return new ScoreLogger(predMeta, this);
+    // Initialize the scoreLogger with metadata
+    scoreLogger.initialize(predMeta);
   }
 
   /**
    * Log a summary and finalize the evaluation.
    * Creates a summarize call and finishes the evaluate call.
+   *
+   * This method can be called without await (fire-and-forget), but internally
+   * it will wait for all pending operations to complete.
    */
   async logSummary(summary?: Record<string, any>): Promise<void> {
     await this.initPromise;
@@ -678,14 +776,24 @@ export class EvaluationLogger {
       return; // Already finalized
     }
 
-    // Warn if there are unfinished predictions
-    const unfinishedCount = this.unfinishedPredictions.size;
-    if (unfinishedCount > 0) {
+    // Check for unfinished predictions and auto-finish them
+    const unfinishedScoreLoggers = Array.from(this.scoreLoggers).filter(
+      sl => !sl.isFinishCalled
+    );
+
+    if (unfinishedScoreLoggers.length > 0) {
       console.warn(
-        `logSummary() called with ${unfinishedCount} unfinished prediction(s). ` +
-          `Make sure to call finish() on all ScoreLoggers before calling logSummary().`
+        `logSummary() called with ${unfinishedScoreLoggers.length} unfinished prediction(s). ` +
+          `Auto-finishing them now...`
       );
+      // Auto-finish all unfinished score loggers
+      unfinishedScoreLoggers.forEach(sl => sl.finish());
     }
+
+    // Wait for all score loggers to complete their operations
+    await Promise.all(
+      Array.from(this.scoreLoggers).map(sl => sl.waitForCompletion())
+    );
 
     // Auto-generate summary if not provided
     if (!summary) {
@@ -765,15 +873,6 @@ export class EvaluationLogger {
         agg.type = 'mixed';
       }
     }
-  }
-
-  /**
-   * Mark a prediction as finished.
-   * Removes from unfinished set to free memory.
-   * @internal
-   */
-  markPredictionFinished(predMeta: PredictAndScoreCallMetadata): void {
-    this.unfinishedPredictions.delete(predMeta);
   }
 
   /**
