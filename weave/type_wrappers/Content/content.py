@@ -309,17 +309,12 @@ class Content(BaseModel, Generic[T]):
             raise FileNotFoundError(f"File not found at path: {path_obj}")
 
         data = path_obj.read_bytes()
+        file_name = path_obj.name
         file_size = path_obj.stat().st_size
         digest = hashlib.sha256(data).hexdigest()
 
         if file_size == 0:
             logger.warning("Content.from_path received empty file")
-
-        # Use a deterministic filename, not local path
-        # file_name = path_obj.name
-        file_name = default_filename(
-            extension=path_obj.suffix, mimetype=mimetype, digest=digest
-        )
 
         mimetype, extension = get_mime_and_extension(
             mimetype=mimetype,
