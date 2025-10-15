@@ -173,6 +173,7 @@ media_cases = [
         ],
         equality_check=lambda a, b: a.markup == b.markup
         and a.code_theme == b.code_theme,
+        python_version_code_capture=(3, 13),
     ),
     # Video
     SerializationTestCase(
