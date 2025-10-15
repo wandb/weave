@@ -318,23 +318,23 @@ media_cases = [
             "_type": "CustomWeaveType",
             "weave_type": {"type": "PIL.Image.Image"},
             "files": {"image.png": "Ac3YO5daeesZTxBfXf7DAKaQZ5IZysk2HvclN8sfwxQ"},
-            "load_op": "weave:///shawn/test-project/op/load_PIL.Image.Image:XTwpuNcfNiGtjAaWpDPfMSflzS7JYxJNd6FYk1TAfeA",
+            "load_op": "weave:///shawn/test-project/op/load_PIL.Image.Image:jhxXm8LUXTL8B8nfSGFXQdOLhpuzJYtbW59ZxhUFgoI",
         },
         exp_objects=[
             {
                 "object_id": "load_PIL.Image.Image",
-                "digest": "XTwpuNcfNiGtjAaWpDPfMSflzS7JYxJNd6FYk1TAfeA",
+                "digest": "jhxXm8LUXTL8B8nfSGFXQdOLhpuzJYtbW59ZxhUFgoI",
                 "exp_val": {
                     "_type": "CustomWeaveType",
                     "weave_type": {"type": "Op"},
-                    "files": {"obj.py": "ReUEgimaLvoco8RMDnTr4tTo26SXYwVz61tJHoDJ1CI"},
+                    "files": {"obj.py": "oxqbCLXF1PsVGFKXZgXHGIuFqlgDG69IwQFUQsGzfHw"},
                 },
             }
         ],
         exp_files=[
             {
-                "digest": "ReUEgimaLvoco8RMDnTr4tTo26SXYwVz61tJHoDJ1CI",
-                "exp_content": b'import weave\nfrom weave.trace.serialization.mem_artifact import MemTraceFilesArtifact\nfrom weave.utils.iterators import first\nimport PIL.Image as Image\n\n@weave.op()\ndef load(artifact: MemTraceFilesArtifact, name: str) -> Image.Image:\n    # Today, we assume there can only be 1 image in the artifact.\n    filename = first(artifact.path_contents)\n    if not filename.startswith("image."):\n        raise ValueError(f"Expected filename to start with \'image.\', got {filename}")\n\n    path = artifact.path(filename)\n    return Image.open(path)\n',
+                "digest": "oxqbCLXF1PsVGFKXZgXHGIuFqlgDG69IwQFUQsGzfHw",
+                "exp_content": b'import weave\nfrom weave.trace.serialization.mem_artifact import MemTraceFilesArtifact\nfrom typing import Any\nfrom weave.utils.iterators import first\nimport PIL.Image as Image\n\n@weave.op()\ndef load(artifact: MemTraceFilesArtifact, name: str, val: Any) -> Image.Image:\n    # Today, we assume there can only be 1 image in the artifact.\n    filename = first(artifact.path_contents)\n    if not filename.startswith("image."):\n        raise ValueError(f"Expected filename to start with \'image.\', got {filename}")\n\n    path = artifact.path(filename)\n    return Image.open(path)\n',
             },
             {
                 "digest": "Ac3YO5daeesZTxBfXf7DAKaQZ5IZysk2HvclN8sfwxQ",
