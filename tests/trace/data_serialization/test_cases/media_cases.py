@@ -101,7 +101,9 @@ media_cases = [
                 "digest": "eIObd4Xf1Od75ekC8UuDfJMb7nk0VSF5WPzyohXn5eQ"
                 if sys.platform == "win32"
                 else "Ac3YO5daeesZTxBfXf7DAKaQZ5IZysk2HvclN8sfwxQ",
-                "exp_content": b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\n\x00\x00\x00\n\x08\x02\x00\x00\x00\x02PX\xea\x00\x00\x00\x12IDATx\x9cc\xfc\xcf\x80\x0f0\xe1\x95\x1d\xb1\xd2\x00A,\x01\x13\xb1\ns\x13\x00\x00\x00\x00IEND\xaeB`\x82",
+                "exp_content": b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\n\x00\x00\x00\n\x08\x02\x00\x00\x00\x02PX\xea\x00\x00\x00\x13IDATx\x9cc\xfc\xcf\x80\x0f0\xe1\x95e\x18\xa9\xd2\x00A,\x01\x13y\xed\xba&\x00\x00\x00\x00IEND\xaeB`\x82"
+                if sys.platform == "win32"
+                else b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\n\x00\x00\x00\n\x08\x02\x00\x00\x00\x02PX\xea\x00\x00\x00\x12IDATx\x9cc\xfc\xcf\x80\x0f0\xe1\x95\x1d\xb1\xd2\x00A,\x01\x13\xb1\ns\x13\x00\x00\x00\x00IEND\xaeB`\x82",
             },
         ],
         equality_check=lambda a, b: a.tobytes() == b.tobytes(),
@@ -253,7 +255,9 @@ media_cases = [
                 "digest": "v5gYkptifYVGd0JYbW3U0jYQPSKkLzEI3eamc0cnCG8"
                 if sys.platform == "win32"
                 else "0tY4LYkQE9BXzCQDItzaUoFLd3lesQ0RkuHNMuXQJIk",
-                "exp_content": b'{"size": 88244, "mimetype": "audio/x-wav", "digest": "c5f3a19cd7e043147381667a0c2d50106b7dbeb25671ab61ca628f3d9426988c", "filename": "audio.wav", "content_type": "file", "input_type": "str", "encoding": "utf-8", "metadata": null, "extension": ".wav"}',
+                "exp_content": b'{"size": 88244, "mimetype": "audio/wav", "digest": "c5f3a19cd7e043147381667a0c2d50106b7dbeb25671ab61ca628f3d9426988c", "filename": "audio.wav", "content_type": "file", "input_type": "str", "encoding": "utf-8", "metadata": null, "extension": ".wav"}'
+                if sys.platform == "win32"
+                else b'{"size": 88244, "mimetype": "audio/x-wav", "digest": "c5f3a19cd7e043147381667a0c2d50106b7dbeb25671ab61ca628f3d9426988c", "filename": "audio.wav", "content_type": "file", "input_type": "str", "encoding": "utf-8", "metadata": null, "extension": ".wav"}',
             },
             {
                 "digest": "xfOhnNfgQxRzgWZ6DC1QEGt9vrJWcathymKPPZQmmIw",
