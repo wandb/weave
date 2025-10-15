@@ -80,7 +80,6 @@ class TestWeaveContent:
         assert content.filename == f"file-{content.digest[:4]}{extension}"
         assert content.size > 0
         assert isinstance(content.data, bytes)
-        # assert content.path == str(file_path.resolve())
         assert content.input_type == "str"
         assert content.content_type == "file"
 
@@ -145,9 +144,7 @@ class TestWeaveContent:
         assert content is not None
         assert content.extension == extension
         assert content.mimetype == mimetype
-        # assert content.filename == file_path.name
-        assert content.filename == f"file-{content.digest[:4]}{extension}"
-        # assert content.path == str(file_path.resolve())
+        assert content.filename == file_path.name
         assert content.content_type == "file"
 
     def test_content_save_method(self, image_file):
@@ -330,7 +327,6 @@ class TestWeaveContent:
         assert content.extension == ".png"
         assert content.mimetype == "image/png"
         assert content.encoding == "utf-8"
-        # assert content.path == str(image_file.resolve())
 
     def test_content_type_hint_variations(self, image_file):
         """Test different type hint formats."""
