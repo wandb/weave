@@ -110,6 +110,9 @@ class Evaluation(Object):
     # Custom evaluation name for display in the UI.  This is the same API as passing a
     # custom `call_display_name` to `weave.op` (see that for more details).
     evaluation_name: Optional[Union[str, CallDisplayNameFunc]] = None
+    
+    # Metadata to attach to the evaluation for tracking parameters and configuration
+    metadata: Optional[dict[str, Any]] = None
 
     # internal attr to track whether to use the new `output` or old `model_output` key for outputs
     _output_key: Literal["output", "model_output"] = PrivateAttr("output")
@@ -277,8 +280,14 @@ class Evaluation(Object):
 
     @op(call_display_name=default_evaluation_display_name)
     async def evaluate(self, model: Union[Op, Model]) -> dict:
-        eval_results = await self.get_eval_results(model)
-        summary = await self.summarize(eval_results)
+        # If we have metadata, run the evaluation with those attributes
+        if self.metadata:
+            with weave.attributes(self.metadata):
+                eval_results = await self.get_eval_results(model)
+                summary = await self.summarize(eval_results)
+        else:
+            eval_results = await self.get_eval_results(model)
+            summary = await self.summarize(eval_results)
 
         summary_str = _safe_summarize_to_str(summary)
         if summary_str:
@@ -424,9 +433,13 @@ def evaluate(
     model: Union[Op, Model],
     scorers: Optional[list[Union[Callable, Scorer]]] = None,
     preprocess_model_input: Optional[PreprocessModelInput] = None,
+    metadata: Optional[dict[str, Any]] = None,
 ) -> dict:
     eval = Evaluation(
-        dataset=dataset, scorers=scorers, preprocess_model_input=preprocess_model_input
+        dataset=dataset, 
+        scorers=scorers, 
+        preprocess_model_input=preprocess_model_input,
+        metadata=metadata
     )
     return asyncio.run(eval.evaluate(model))
 
