@@ -313,7 +313,7 @@ media_cases = [
         id="image (legacy)",
         runtime_object_factory=lambda: Image.new("RGB", (10, 10), "red"),
         inline_call_param=False,
-        is_legacy=False,
+        is_legacy=True,
         exp_json={
             "_type": "CustomWeaveType",
             "weave_type": {"type": "PIL.Image.Image"},
