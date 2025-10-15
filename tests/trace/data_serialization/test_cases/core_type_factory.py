@@ -1,5 +1,6 @@
 import weave
 from weave.trace.objectify import register_object
+from weave.trace.vals import WeaveObject
 
 
 def make_op():
@@ -19,5 +20,5 @@ class CustomObject(weave.Object):
         return "hello " + self.my_name
 
     @classmethod
-    def from_obj(cls, obj: weave.Object):
+    def from_obj(cls, obj: WeaveObject):
         return cls(my_name=obj.my_name)
