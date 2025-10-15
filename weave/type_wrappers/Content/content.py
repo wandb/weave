@@ -54,7 +54,6 @@ class Content(BaseModel, Generic[T]):
 
     # This is required due to some attribute setting done by our serialization layer
     # Without it, it is hard to know if it was processed properly
-    # id: str
     data: bytes
     size: int
     mimetype: str
@@ -74,7 +73,6 @@ class Content(BaseModel, Generic[T]):
             examples=[{"number of cats": 1}],
         ),
     ] = None
-    # path: str | None = None
     extension: str | None = None
 
     _last_saved_path: Annotated[
@@ -109,7 +107,6 @@ class Content(BaseModel, Generic[T]):
         if isinstance(obj, dict):
             # Check if this is a full Content dict (from deserialization)
             required_fields = {
-                "id",
                 "data",
                 "size",
                 "mimetype",
@@ -180,7 +177,6 @@ class Content(BaseModel, Generic[T]):
         )
 
         resolved_args: ResolvedContentArgs = {
-            # "id": uuid.uuid4().hex,
             "data": data,
             "size": size,
             "mimetype": mimetype,
@@ -230,7 +226,6 @@ class Content(BaseModel, Generic[T]):
         )
 
         resolved_args: ResolvedContentArgs = {
-            # "id": uuid.uuid4().hex,
             "data": data,
             "size": size,
             "mimetype": mimetype,
@@ -282,7 +277,6 @@ class Content(BaseModel, Generic[T]):
         )
 
         resolved_args: ResolvedContentArgs = {
-            # "id": uuid.uuid4().hex,
             "data": data,
             "size": size,
             "mimetype": mimetype,
@@ -336,7 +330,6 @@ class Content(BaseModel, Generic[T]):
 
         # We gather all the resolved arguments...
         resolved_args: ResolvedContentArgs = {
-            # "id": uuid.uuid4().hex,
             "data": data,
             "size": file_size,
             "mimetype": mimetype,
@@ -344,7 +337,6 @@ class Content(BaseModel, Generic[T]):
             "filename": file_name,
             "content_type": "file",
             "input_type": full_name(path),
-            "_last_saved_path": str(path_obj.resolve()),
             "extension": extension,
             "encoding": encoding,
         }
@@ -380,7 +372,6 @@ class Content(BaseModel, Generic[T]):
         )
 
         resolved_args: ResolvedContentArgs = {
-            # "id": uuid.uuid4().hex,
             "data": data,
             "size": size,
             "mimetype": mimetype,
@@ -456,7 +447,6 @@ class Content(BaseModel, Generic[T]):
         )
 
         resolved_args: ResolvedContentArgs = {
-            # "id": uuid.uuid4().hex,
             "data": data,
             "size": size,
             "mimetype": mimetype,
@@ -562,7 +552,7 @@ class Content(BaseModel, Generic[T]):
         Returns:
             bool: True if the file was successfully opened, False otherwise.
         """
-        path = self._last_saved_path  # or self.path
+        path = self._last_saved_path
 
         if not path:
             logger.exception(
