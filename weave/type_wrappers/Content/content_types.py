@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import Any, Literal, TypedDict, Union
 
 from pydantic import BaseModel, Field
-from typing_extensions import NotRequired, deprecated
+from typing_extensions import NotRequired
 
 DataUrlContentType = Literal[
     "data_url", "data_url:base64", "data_url:encoding", "data_url:encoding:base64"
@@ -28,6 +28,7 @@ class ResolvedContentArgsWithoutData(TypedDict):
     # Optional fields - can be omitted
     metadata: NotRequired[dict[str, Any]]
     extension: NotRequired[str]
+
 
 class ResolvedContentArgs(ResolvedContentArgsWithoutData):
     # Required Fields
