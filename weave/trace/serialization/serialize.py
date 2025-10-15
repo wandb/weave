@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from types import CoroutineType
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal, TypedDict
 
 from pydantic import BaseModel
 
@@ -106,9 +106,17 @@ def to_json(
     return result
 
 
+class EncodedCustomObjDictWithFilesAsDigests(TypedDict, total=False):
+    _type: Literal["CustomWeaveType"]
+    weave_type: custom_objs.WeaveTypeDict
+    load_op: str | None
+    val: Any
+    files: Mapping[str, str]
+
+
 def _build_result_from_encoded(
-    encoded: dict, project_id: str, client: WeaveClient
-) -> Any:
+    encoded: custom_objs.EncodedCustomObjDict, project_id: str, client: WeaveClient
+) -> EncodedCustomObjDictWithFilesAsDigests:
     file_digests = {}
     for name, val in encoded.get("files", {}).items():
         # Instead of waiting for the file to be created, we
@@ -125,7 +133,7 @@ def _build_result_from_encoded(
         digest = bytes_digest(contents_as_bytes)
         file_digests[name] = digest
 
-    result = {
+    result: EncodedCustomObjDictWithFilesAsDigests = {
         "_type": encoded["_type"],
         "weave_type": encoded["weave_type"],
     }
@@ -300,7 +308,9 @@ def from_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
                 {k: from_json(v, project_id, server) for k, v in obj.items()}
             )
         elif val_type == "CustomWeaveType":
-            encoded = {"weave_type": obj["weave_type"]}
+            encoded: custom_objs.EncodedCustomObjDict = {
+                "weave_type": obj["weave_type"]
+            }
             if "load_op" in obj:
                 encoded["load_op"] = obj["load_op"]
             if "val" in obj:

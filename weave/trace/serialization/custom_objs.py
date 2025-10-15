@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, Literal, TypedDict
 
 from weave.trace.context.weave_client_context import require_weave_client
 from weave.trace.op import op
@@ -24,6 +24,18 @@ from weave.trace_server.trace_server_interface import (
 )
 
 
+class WeaveTypeDict(TypedDict):
+    type: str
+
+
+class EncodedCustomObjDict(TypedDict, total=False):
+    _type: Literal["CustomWeaveType"]
+    weave_type: WeaveTypeDict
+    load_op: str | None
+    val: Any
+    files: Mapping[str, str | bytes]
+
+
 class DecodeCustomObjectError(Exception):
     """An error that occurs while decoding a custom object."""
 
@@ -42,7 +54,7 @@ KNOWN_TYPES = {
 }
 
 
-def encode_custom_obj(obj: Any) -> dict | None:
+def encode_custom_obj(obj: Any) -> EncodedCustomObjDict | None:
     serializer = get_serializer_for_obj(obj)
     if serializer is None:
         # We silently return None right now. We could warn here. This object
@@ -73,7 +85,7 @@ def encode_custom_obj(obj: Any) -> dict | None:
             )  # type: ignore
             load_op_uri = load_instance_op_ref.uri()
 
-    encoded = {
+    encoded: EncodedCustomObjDict = {
         "_type": "CustomWeaveType",
         "weave_type": {"type": serializer.id()},
         "load_op": load_op_uri,
@@ -91,15 +103,6 @@ def encode_custom_obj(obj: Any) -> dict | None:
         encoded["val"] = val
 
     return encoded
-
-
-def decode_custom_obj(encoded: dict) -> Any:
-    return _decode_custom_obj(
-        encoded["weave_type"],
-        encoded.get("files", {}),
-        encoded.get("val"),
-        encoded.get("load_op"),
-    )
 
 
 def _load_custom_obj_files(
@@ -146,8 +149,17 @@ def _load_custom_obj(
     return res
 
 
+def decode_custom_obj(encoded: EncodedCustomObjDict) -> Any:
+    return _decode_custom_obj(
+        encoded["weave_type"],
+        encoded.get("files", {}),
+        encoded.get("val"),
+        encoded.get("load_op"),
+    )
+
+
 def _decode_custom_obj(
-    weave_type: dict,
+    weave_type: WeaveTypeDict,
     encoded_path_contents: Mapping[str, str | bytes],
     val: Any | None,
     load_instance_op_uri: str | None = None,
