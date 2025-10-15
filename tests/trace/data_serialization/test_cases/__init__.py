@@ -44,8 +44,8 @@ from tests.trace.data_serialization.test_cases.primitive_cases import primitive_
 [x] Prompt
 
 ### Weave Evaluation Library Specialized Objects:
-[] LLMStructuredCompletionModel
-[] LLMAsAJudgeScorer
+[x] LLMStructuredCompletionModel
+[x] LLMAsAJudgeScorer
 
 ## Weave Config Objects:
 [] AnnotationSpec

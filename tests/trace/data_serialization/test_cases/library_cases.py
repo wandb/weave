@@ -1,5 +1,12 @@
 import weave
 from tests.trace.data_serialization.spec import SerializationTestCase
+from weave.scorers import LLMAsAJudgeScorer
+from weave.trace_server.interface.builtin_object_classes.builtin_object_registry import (
+    LLMStructuredCompletionModel,
+)
+from weave.trace_server.interface.builtin_object_classes.llm_structured_model import (
+    LLMStructuredCompletionModelDefaultParams,
+)
 
 
 class MyModel(weave.Model):
@@ -18,7 +25,27 @@ class MyScorer(weave.Scorer):
 
 def make_evaluation():
     dataset = [{"user_input": "Tim"}, {"user_input": "Sweeney"}]
-    return weave.Evaluation(dataset=dataset, scorers=[MyScorer()])
+    return weave.Evaluation(
+        dataset=dataset,
+        scorers=[
+            MyScorer(),
+            LLMAsAJudgeScorer(
+                model=LLMStructuredCompletionModel(
+                    llm_model_id="gpt-4o-mini",
+                    default_params=LLMStructuredCompletionModelDefaultParams(
+                        messages_template=[
+                            {
+                                "role": "system",
+                                "content": "You are a judge, respond with json. 'score' (0-1), 'reasoning' (string)",
+                            }
+                        ],
+                        response_format="json_object",
+                    ),
+                ),
+                scoring_prompt="Here are the inputs: {inputs}. Here is the output: {output}. Is the output correct?",
+            ),
+        ],
+    )
 
 
 def make_model():
@@ -43,7 +70,7 @@ def evaluation_equality_check(a, b):
 
 library_cases = [
     SerializationTestCase(
-        id="Library Objects - Scorer, Evaluation, Dataset",
+        id="Library Objects - Scorer, Evaluation, Dataset, LLMAsAJudgeScorer, LLMStructuredCompletionModel",
         runtime_object_factory=lambda: make_evaluation(),
         inline_call_param=False,
         is_legacy=False,
@@ -53,7 +80,8 @@ library_cases = [
             "description": None,
             "dataset": "weave:///shawn/test-project/object/Dataset:N0VKaX8wr9kF9QQzM7mSQz3yKrJJjTiJi4c9Bt7RSTA",
             "scorers": [
-                "weave:///shawn/test-project/object/MyScorer:K1OwZ5OGLRYNboUzGHPhnyR0W6PqWj431ieXWISYiyA"
+                "weave:///shawn/test-project/object/MyScorer:K1OwZ5OGLRYNboUzGHPhnyR0W6PqWj431ieXWISYiyA",
+                "weave:///shawn/test-project/object/LLMAsAJudgeScorer:uCyQ5g10zJ2wLecCEYNAfm45MbWH1823FJ6ZGv9Gpco",
             ],
             "preprocess_model_input": None,
             "trials": 1,
@@ -111,6 +139,79 @@ library_cases = [
                 },
             },
             {
+                "object_id": "LLMAsAJudgeScorer",
+                "digest": "uCyQ5g10zJ2wLecCEYNAfm45MbWH1823FJ6ZGv9Gpco",
+                "exp_val": {
+                    "_type": "LLMAsAJudgeScorer",
+                    "name": None,
+                    "description": None,
+                    "column_map": None,
+                    "model": "weave:///shawn/test-project/object/LLMStructuredCompletionModel:eZuAYazYqoSTeGwAR6G4e5RMQ1XEDo0AADq60hKTn9o",
+                    "scoring_prompt": "Here are the inputs: {inputs}. Here is the output: {output}. Is the output correct?",
+                    "score": "weave:///shawn/test-project/op/LLMAsAJudgeScorer.score:3DXMPEFwP04oJ362x6sxQIqQmVYYX2jB4Kg5EF2SF60",
+                    "summarize": "weave:///shawn/test-project/op/Scorer.summarize:lMo39TTtMo50nRj7gWzUJUXXbuX3D3VXkRRMuOTdCHU",
+                    "_class_name": "LLMAsAJudgeScorer",
+                    "_bases": ["Scorer", "Object", "BaseModel"],
+                },
+            },
+            {
+                "object_id": "LLMAsAJudgeScorer.score",
+                "digest": "3DXMPEFwP04oJ362x6sxQIqQmVYYX2jB4Kg5EF2SF60",
+                "exp_val": {
+                    "_type": "CustomWeaveType",
+                    "weave_type": {"type": "Op"},
+                    "files": {"obj.py": "4oOflcautfbAjJY1FJD3ogkSBuuhrh01tWaiAAl54Xw"},
+                },
+            },
+            {
+                "object_id": "LLMStructuredCompletionModel",
+                "digest": "eZuAYazYqoSTeGwAR6G4e5RMQ1XEDo0AADq60hKTn9o",
+                "exp_val": {
+                    "_type": "LLMStructuredCompletionModel",
+                    "name": None,
+                    "description": None,
+                    "llm_model_id": "gpt-4o-mini",
+                    "default_params": {
+                        "_type": "LLMStructuredCompletionModelDefaultParams",
+                        "messages_template": [
+                            {
+                                "_type": "Message",
+                                "role": "system",
+                                "content": "You are a judge, respond with json. 'score' (0-1), 'reasoning' (string)",
+                                "name": None,
+                                "function_call": None,
+                                "tool_call_id": None,
+                                "_class_name": "Message",
+                                "_bases": ["BaseModel"],
+                            }
+                        ],
+                        "temperature": None,
+                        "top_p": None,
+                        "max_tokens": None,
+                        "presence_penalty": None,
+                        "frequency_penalty": None,
+                        "stop": None,
+                        "n_times": None,
+                        "functions": None,
+                        "response_format": "json_object",
+                        "_class_name": "LLMStructuredCompletionModelDefaultParams",
+                        "_bases": ["BaseModel"],
+                    },
+                    "predict": "weave:///shawn/test-project/op/LLMStructuredCompletionModel.predict:o7NF4oxiEF54Oo0bHxcxsypXFeRgklbtW4MyE2mrigM",
+                    "_class_name": "LLMStructuredCompletionModel",
+                    "_bases": ["Model", "Object", "BaseModel"],
+                },
+            },
+            {
+                "object_id": "LLMStructuredCompletionModel.predict",
+                "digest": "o7NF4oxiEF54Oo0bHxcxsypXFeRgklbtW4MyE2mrigM",
+                "exp_val": {
+                    "_type": "CustomWeaveType",
+                    "weave_type": {"type": "Op"},
+                    "files": {"obj.py": "NA9y2U07pXxXLQqRcdJreY2pviJlAJWbllvH7cjSDjY"},
+                },
+            },
+            {
                 "object_id": "Evaluation.summarize",
                 "digest": "i5dmmojYMQYCNbCKXLbbp9hHgIw6wMwbExEonnPYia8",
                 "exp_val": {
@@ -158,6 +259,14 @@ library_cases = [
             {
                 "digest": "8UQV2iinJaY1psOCPnDf3YGBFdnZKY9pYY8zYieGNNI",
                 "exp_content": b'import weave\nfrom weave.object.obj import Object\nfrom weave.trace.table import Table\nfrom weave.flow.util import transpose\nfrom weave.flow.scorer import get_scorer_attributes\nfrom weave.flow.scorer import auto_summarize\nfrom weave.trace.op import op\n\nclass EvaluationResults(Object):\n    rows: Table\n\n@weave.op()\n@op\nasync def summarize(self, eval_table: EvaluationResults) -> dict:\n    eval_table_rows = list(eval_table.rows)\n    cols = transpose(eval_table_rows)\n    summary = {}\n\n    for name, vals in cols.items():\n        if name == "scores":\n            if scorers := self.scorers:\n                for scorer in scorers:\n                    scorer_attributes = get_scorer_attributes(scorer)\n                    scorer_name = scorer_attributes.scorer_name\n                    summarize_fn = scorer_attributes.summarize_fn\n                    scorer_stats = transpose(vals)\n                    score_table = scorer_stats[scorer_name]\n                    scored = summarize_fn(score_table)\n                    summary[scorer_name] = scored\n        else:\n            model_output_summary = auto_summarize(vals)\n            if model_output_summary:\n                summary[name] = model_output_summary\n    return summary\n',
+            },
+            {
+                "digest": "4oOflcautfbAjJY1FJD3ogkSBuuhrh01tWaiAAl54Xw",
+                "exp_content": b'import weave\nfrom typing import Any\nfrom weave.trace.op import op\n\n@weave.op()\n@op\ndef score(self, *, output: str, **kwargs: Any) -> Any:\n    scoring_prompt = self.scoring_prompt.format(output=output, **kwargs)\n    model_input = [\n        {"role": "user", "content": scoring_prompt},\n    ]\n    return self.model.predict(model_input)\n',
+            },
+            {
+                "digest": "NA9y2U07pXxXLQqRcdJreY2pviJlAJWbllvH7cjSDjY",
+                "exp_content": b'import weave\nfrom typing import Optional\nfrom typing import Annotated as MessageListLike\nfrom typing import Annotated as LLMStructuredModelParamsLike\nfrom typing import Any\nfrom weave.trace.context.weave_client_context import get_weave_client\nfrom weave.trace.context.weave_client_context import WeaveInitError\nfrom typing import Literal as ResponseFormat\nimport json\nfrom typing import Union\nfrom pydantic.main import BaseModel\nfrom weave.trace.op import op\n\nclass Message(BaseModel):\n    """A message in a conversation with an LLM.\n\n    Attributes:\n        role: The role of the message\'s author. Can be: system, user, assistant, function or tool.\n        content: The contents of the message. Required for all messages, but may be null for assistant messages with function calls.\n        name: The name of the author of the message. Required if role is "function". Must match the name of the function represented in content.\n              Can contain characters (a-z, A-Z, 0-9), and underscores, with a maximum length of 64 characters.\n        function_call: The name and arguments of a function that should be called, as generated by the model.\n        tool_call_id: Tool call that this message is responding to.\n    """\n\n    role: str\n    content: Optional[Union[str, list[dict]]] = None\n    name: Optional[str] = None\n    function_call: Optional[dict] = None\n    tool_call_id: Optional[str] = None\n\ndef parse_response(\n    response_payload: dict, response_format: Optional[ResponseFormat]\n) -> Union[Message, str, dict[str, Any]]:\n    if response_payload.get("error"):\n        # Or handle more gracefully depending on desired behavior\n        raise RuntimeError(f"LLM API returned an error: {response_payload[\'error\']}")\n\n    # Assuming OpenAI-like structure: a list of choices, first choice has the message\n    output_message_dict = response_payload["choices"][0]["message"]\n\n    if response_format == "text":\n        return output_message_dict["content"]\n    elif response_format == "json_object":\n        return json.loads(output_message_dict["content"])\n    else:\n        raise ValueError(f"Invalid response_format: {response_format}")\n\n@weave.op()\n@op\ndef predict(\n    self,\n    user_input: Optional[MessageListLike] = None,\n    config: Optional[LLMStructuredModelParamsLike] = None,\n    **template_vars: Any,\n) -> Union[Message, str, dict[str, Any]]:\n    """Generates a prediction by preparing messages (template + user_input)\n    and calling the LLM completions endpoint with overridden config, using the provided client.\n\n    Args:\n        user_input: The user input messages\n        config: Optional configuration to override default parameters\n        **template_vars: Variables to substitute in the messages template using {variable_name} syntax\n    """\n    if user_input is None:\n        user_input = []\n\n    current_client = get_weave_client()\n    if current_client is None:\n        raise WeaveInitError(\n            "You must call `weave.init(<project_name>)` first, to predict with a LLMStructuredCompletionModel"\n        )\n\n    req = self.prepare_completion_request(\n        project_id=f"{current_client.entity}/{current_client.project}",\n        user_input=user_input,\n        config=config,\n        **template_vars,\n    )\n\n    # 5. Call the LLM API\n    try:\n        api_response = current_client.server.completions_create(req=req)\n    except Exception as e:\n        raise RuntimeError("Failed to call LLM completions endpoint.") from e\n\n    # 6. Extract the message from the API response\n    try:\n        # The \'response\' attribute of CompletionsCreateRes is a dict\n        response_payload = api_response.response\n        response_format = (\n            req.inputs.response_format.get("type")\n            if req.inputs.response_format is not None\n            else None\n        )\n        return parse_response(response_payload, response_format)\n    except (\n        KeyError,\n        IndexError,\n        TypeError,\n        AttributeError,\n        json.JSONDecodeError,\n    ) as e:\n        raise RuntimeError(\n            f"Failed to extract message from LLM response payload. Response: {api_response.response}"\n        ) from e\n',
             },
         ],
         # Sad ... equality is really a pain to assert here (and is broken)
