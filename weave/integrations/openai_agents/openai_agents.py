@@ -8,40 +8,39 @@ from __future__ import annotations
 
 from typing import Any, TypedDict
 
-import weave.trace.call
+from agents.tracing import (
+    AgentSpanData,
+    CustomSpanData,
+    FunctionSpanData,
+    GuardrailSpanData,
+    HandoffSpanData,
+    ResponseSpanData,
+    Span,
+    Trace,
+    TracingProcessor,
+)
+
 from weave.integrations.patcher import NoOpPatcher, Patcher
 from weave.trace.autopatch import IntegrationSettings
 from weave.trace.call import Call
 from weave.trace.context import call_context
-from weave.trace.context.weave_client_context import (
-    get_weave_client,
-)
+from weave.trace.context.weave_client_context import get_weave_client
 
 _openai_agents_patcher: OpenAIAgentsPatcher | None = None
 
 
-try:
-    from agents import tracing
-    from agents.tracing import TracingProcessor
-except ImportError:
-
-    class TracingProcessor: ...  # type: ignore[no-redef]
-
-
-def _call_type(span: tracing.Span[Any]) -> str:
+def _call_type(span: Span) -> str:
     """Determine the appropriate call type for a given OpenAI Agent span."""
     return span.span_data.type or "task"
 
 
-def _call_name(span: tracing.Span[Any]) -> str:
+def _call_name(span: Span) -> str:
     """Determine the name for a given OpenAI Agent span."""
     if name := getattr(span.span_data, "name", None):
         return name
-    elif isinstance(span.span_data, tracing.GenerationSpanData):
-        return "Generation"
-    elif isinstance(span.span_data, tracing.ResponseSpanData):
+    elif isinstance(span.span_data, ResponseSpanData):
         return "Response"
-    elif isinstance(span.span_data, tracing.HandoffSpanData):
+    elif isinstance(span.span_data, HandoffSpanData):
         return "Handoff"
     else:
         return "Unknown"
@@ -65,12 +64,12 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
 
     def __init__(self) -> None:
         self._trace_data: dict[str, dict[str, Any]] = {}
-        self._trace_calls: dict[str, weave.trace.call.Call] = {}
-        self._span_calls: dict[str, weave.trace.call.Call] = {}
+        self._trace_calls: dict[str, Call] = {}
+        self._span_calls: dict[str, Call] = {}
         self._ended_traces: set[str] = set()
         self._span_parents: dict[str, str] = {}
 
-    def on_trace_start(self, trace: tracing.Trace) -> None:
+    def on_trace_start(self, trace: Trace) -> None:
         """Called when a trace starts."""
         if (wc := get_weave_client()) is None:
             return
@@ -93,7 +92,7 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
         )
         self._trace_calls[trace.trace_id] = trace_call
 
-    def on_trace_end(self, trace: tracing.Trace) -> None:
+    def on_trace_end(self, trace: Trace) -> None:
         """Called when a trace ends."""
         if (wc := get_weave_client()) is None:
             return
@@ -115,9 +114,7 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
         }
         wc.finish_call(self._trace_calls[tid], output=output)
 
-    def _agent_log_data(
-        self, span: tracing.Span[tracing.AgentSpanData]
-    ) -> WeaveDataDict:
+    def _agent_log_data(self, span: Span[AgentSpanData]) -> WeaveDataDict:
         """Extract log data from an agent span."""
         return WeaveDataDict(
             inputs={},
@@ -131,9 +128,7 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
             error=None,
         )
 
-    def _response_log_data(
-        self, span: tracing.Span[tracing.ResponseSpanData]
-    ) -> WeaveDataDict:
+    def _response_log_data(self, span: Span[ResponseSpanData]) -> WeaveDataDict:
         """Extract log data from a response span."""
         inputs = {}
         outputs = {}
@@ -175,9 +170,7 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
             error=None,
         )
 
-    def _function_log_data(
-        self, span: tracing.Span[tracing.FunctionSpanData]
-    ) -> WeaveDataDict:
+    def _function_log_data(self, span: Span[FunctionSpanData]) -> WeaveDataDict:
         """Extract log data from a function span."""
         return WeaveDataDict(
             inputs={"input": span.span_data.input},
@@ -187,9 +180,7 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
             error=None,
         )
 
-    def _handoff_log_data(
-        self, span: tracing.Span[tracing.HandoffSpanData]
-    ) -> WeaveDataDict:
+    def _handoff_log_data(self, span: Span[HandoffSpanData]) -> WeaveDataDict:
         """Extract log data from a handoff span."""
         return WeaveDataDict(
             inputs={},
@@ -202,9 +193,7 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
             error=None,
         )
 
-    def _guardrail_log_data(
-        self, span: tracing.Span[tracing.GuardrailSpanData]
-    ) -> WeaveDataDict:
+    def _guardrail_log_data(self, span: Span[GuardrailSpanData]) -> WeaveDataDict:
         """Extract log data from a guardrail span."""
         return WeaveDataDict(
             inputs={},
@@ -214,28 +203,7 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
             error=None,
         )
 
-    def _generation_log_data(
-        self, span: tracing.Span[tracing.GenerationSpanData]
-    ) -> WeaveDataDict:
-        """Extract log data from a generation span."""
-        return WeaveDataDict(
-            inputs={"input": span.span_data.input},
-            outputs={"output": span.span_data.output},
-            metadata={
-                "model": span.span_data.model,
-                "model_config": span.span_data.model_config,
-            },
-            metrics={
-                "tokens": span.span_data.usage.get("total_tokens"),
-                "prompt_tokens": span.span_data.usage.get("prompt_tokens"),
-                "completion_tokens": span.span_data.usage.get("completion_tokens"),
-            },
-            error=None,
-        )
-
-    def _custom_log_data(
-        self, span: tracing.Span[tracing.CustomSpanData]
-    ) -> WeaveDataDict:
+    def _custom_log_data(self, span: Span[CustomSpanData]) -> WeaveDataDict:
         """Extract log data from a custom span."""
         # Prepare fields
         inputs = {}
@@ -272,21 +240,19 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
             error=None,
         )
 
-    def _log_data(self, span: tracing.Span[Any]) -> WeaveDataDict:
+    def _log_data(self, span: Span) -> WeaveDataDict:
         """Extract the appropriate log data based on the span type."""
-        if isinstance(span.span_data, tracing.AgentSpanData):
+        if isinstance(span.span_data, AgentSpanData):
             return self._agent_log_data(span)
-        elif isinstance(span.span_data, tracing.ResponseSpanData):
+        elif isinstance(span.span_data, ResponseSpanData):
             return self._response_log_data(span)
-        elif isinstance(span.span_data, tracing.FunctionSpanData):
+        elif isinstance(span.span_data, FunctionSpanData):
             return self._function_log_data(span)
-        elif isinstance(span.span_data, tracing.HandoffSpanData):
+        elif isinstance(span.span_data, HandoffSpanData):
             return self._handoff_log_data(span)
-        elif isinstance(span.span_data, tracing.GuardrailSpanData):
+        elif isinstance(span.span_data, GuardrailSpanData):
             return self._guardrail_log_data(span)
-        elif isinstance(span.span_data, tracing.GenerationSpanData):
-            return self._generation_log_data(span)
-        elif isinstance(span.span_data, tracing.CustomSpanData):
+        elif isinstance(span.span_data, CustomSpanData):
             return self._custom_log_data(span)
         else:
             return WeaveDataDict(
@@ -297,7 +263,7 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
                 error=None,
             )
 
-    def _get_parent_call(self, span: tracing.Span[Any]) -> Call | None:
+    def _get_parent_call(self, span: Span) -> Call | None:
         """Helper method to determine the parent call for a span."""
         trace_id = span.trace_id
         parent_span_id = getattr(span, "parent_id", None)
@@ -315,13 +281,13 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
         # Should not reach here, but kept for completeness
         return None
 
-    def on_span_start(self, span: tracing.Span[Any]) -> None:
+    def on_span_start(self, span: Span) -> None:
         """Called when a span starts."""
         if (wc := get_weave_client()) is None:
             return
 
         # For Response spans, we'll defer call creation until on_span_end when we have input data
-        if isinstance(span.span_data, tracing.ResponseSpanData):
+        if isinstance(span.span_data, ResponseSpanData):
             return
 
         # Spans must have a parent (either another span or the trace root)
@@ -351,7 +317,7 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
         )
         self._span_calls[span.span_id] = span_call
 
-    def on_span_end(self, span: tracing.Span[Any]) -> None:
+    def on_span_end(self, span: Span) -> None:
         """Called when a span ends."""
         if (wc := get_weave_client()) is None:
             return
@@ -363,7 +329,7 @@ class WeaveTracingProcessor(TracingProcessor):  # pyright: ignore[reportGeneralT
 
         # For Response spans, create the call here so we can include input data
         if (
-            isinstance(span.span_data, tracing.ResponseSpanData)
+            isinstance(span.span_data, ResponseSpanData)
             and span.span_id not in self._span_calls
             and trace_id in self._trace_data
             and (parent_call := self._get_parent_call(span))

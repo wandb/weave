@@ -294,7 +294,7 @@ INTEGRATION_MODULE_MAPPING: dict[str, Callable[[], None]] = {
     "mcp": patch_mcp,
     "langchain_nvidia_ai_endpoints": patch_nvidia,
     "smolagents": patch_smolagents,
-    "openai_agents": patch_openai_agents,
+    "agents": patch_openai_agents,
     "verdict": patch_verdict,
     "verifiers": patch_verifiers,
     "autogen": patch_autogen,
