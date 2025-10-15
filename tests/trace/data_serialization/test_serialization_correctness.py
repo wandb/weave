@@ -1,4 +1,5 @@
 import json
+import logging
 import sys
 from typing import Any, Callable, Union
 
@@ -32,12 +33,25 @@ independent of the actual code that is used to serialize the data.
 """
 
 
+@pytest.fixture
+def set_weave_logger_to_debug():
+    logger = logging.getLogger("weave")
+    current_level = logger.level
+    logger.setLevel(logging.DEBUG)
+    try:
+        yield
+    finally:
+        logger.setLevel(current_level)
+
+
 @pytest.mark.parametrize(
     "case",
     cases,
     ids=lambda case: case.id,
 )
-def test_serialization_correctness(client, case: SerializationTestCase):
+def test_serialization_correctness(
+    client, case: SerializationTestCase, set_weave_logger_to_debug
+):
     # Since code serialization changes pretty significantly between versions, we will assume
     # legacy for anything other than the latest python version
     is_legacy = case.is_legacy
