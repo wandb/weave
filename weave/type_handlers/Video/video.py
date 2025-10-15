@@ -7,12 +7,13 @@ import shutil
 from enum import Enum
 from typing import TYPE_CHECKING, Any
 
+from typing_extensions import TypeIs
+
 from weave.trace.serialization import serializer
 from weave.trace.serialization.custom_objs import MemTraceFilesArtifact
 
 if TYPE_CHECKING:
     from moviepy.editor import VideoClip, VideoFileClip
-    from typing_extensions import TypeIs
 
 
 _registered = False
