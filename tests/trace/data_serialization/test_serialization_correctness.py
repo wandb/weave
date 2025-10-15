@@ -1,11 +1,10 @@
 import json
 import sys
-from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Any, Callable, Optional, TypedDict, Union
+from typing import Any, Callable, Union
 
 import pytest
-from PIL import Image
+from spec import SerializationTestCase
+from test_cases import cases
 
 import weave
 from weave.trace.refs import ObjectRef
@@ -16,57 +15,6 @@ from weave.trace_server.trace_server_interface import (
     ObjCreateReq,
     ObjReadReq,
 )
-
-
-def default_equality_check(a, b):
-    return a == b
-
-
-class ExpFileSpec(TypedDict):
-    digest: str
-    exp_content: str
-
-
-class ExpObjectSpec(TypedDict):
-    object_id: str
-    digest: str
-    exp_val: dict
-
-
-@dataclass
-class SerializationTestCase:
-    # A unique identifier for the test case
-    id: str
-
-    # Returns a python object to be serialized
-    runtime_object_factory: Callable[[], Any]
-
-    # If true, then then used in a paramter/return value of a call,
-    # will be directly stored in the call's inputs/outputs (as opposed
-    # to being published and stored as a Ref)
-    inline_call_param: bool
-
-    # The expected json representation of the object
-    exp_json: dict
-
-    # The published objects that are expected to have been created
-    # and used to support the serialization
-    exp_objects: list[ExpObjectSpec]
-
-    # The associated files that are expected to have been created
-    # and used to support the serialization
-    exp_files: list[ExpFileSpec]
-
-    # If true, then the current library code is not expected to PRODUCE
-    # this JSON, but should still be able to deserialize it. When True,
-    # we will bootstrap the expected objects and files and assert that
-    # deserialization still works.
-    is_legacy: bool
-
-    # A function that checks if two objects are equal. If None, then
-    # the objects are expected to be equal using `==`
-    equality_check: Optional[Callable[[Any, Any], bool]] = default_equality_check
-
 
 """
 IMPORTANT RULES: Once a SerializationTestCase is created, it should never be modified.
@@ -86,144 +34,15 @@ independent of the actual code that is used to serialize the data.
 
 @pytest.mark.parametrize(
     "case",
-    [
-        # Primitives
-        SerializationTestCase(
-            id="primitives",
-            runtime_object_factory=lambda: {
-                "int": 1,
-                "float": 1.0,
-                "str": "hello",
-                "bool": True,
-                "none": None,
-                "list": [1, 2, 3],
-            },
-            inline_call_param=True,
-            is_legacy=False,
-            exp_json={
-                "int": 1,
-                "float": 1.0,
-                "str": "hello",
-                "bool": True,
-                "none": None,
-                "list": [1, 2, 3],
-            },
-            exp_objects=[],
-            exp_files=[],
-        ),
-        # Datetime
-        SerializationTestCase(
-            id="datetime",
-            runtime_object_factory=lambda: datetime(
-                2025, 1, 1, 0, 0, 0, tzinfo=timezone.utc
-            ),
-            inline_call_param=True,
-            is_legacy=False,
-            exp_json={
-                "_type": "CustomWeaveType",
-                "load_op": "weave:///shawn/test-project/op/load_datetime.datetime:vBlX1uTKCGWJCbt7bmYHsvnse0lidjCeSGVQjE44Evc",
-                "val": "2025-01-01T00:00:00+00:00",
-                "weave_type": {"type": "datetime.datetime"},
-            },
-            exp_objects=[
-                {
-                    "object_id": "load_datetime.datetime",
-                    "digest": "vBlX1uTKCGWJCbt7bmYHsvnse0lidjCeSGVQjE44Evc",
-                    "exp_val": {
-                        "_type": "CustomWeaveType",
-                        "weave_type": {"type": "Op"},
-                        "files": {
-                            "obj.py": "ncV0DfMpJ6gN2ls9iSpQwSiYplvhm8CO2ZDNqjPbdBg"
-                        },
-                    },
-                }
-            ],
-            exp_files=[
-                {
-                    "digest": "ncV0DfMpJ6gN2ls9iSpQwSiYplvhm8CO2ZDNqjPbdBg",
-                    "exp_content": b'import weave\nimport datetime\n\n@weave.op()\ndef load(encoded: str) -> datetime.datetime:\n    """Deserialize an ISO format string back to a datetime object with timezone."""\n    return datetime.datetime.fromisoformat(encoded)\n',
-                }
-            ],
-        ),
-        # Markdown:
-        SerializationTestCase(
-            id="markdown",
-            runtime_object_factory=lambda: weave.Markdown("# Hello, world!"),
-            inline_call_param=True,
-            is_legacy=False,
-            exp_json={
-                "_type": "CustomWeaveType",
-                "load_op": "weave:///shawn/test-project/op/load_rich.markdown.Markdown:ZJrNtY2McTqdAZdfBmciQV1TyCouPS8ED400FQFE4JE",
-                "val": {"code_theme": "monokai", "markup": "# Hello, world!"},
-                "weave_type": {"type": "rich.markdown.Markdown"},
-            },
-            exp_objects=[
-                {
-                    "object_id": "load_rich.markdown.Markdown",
-                    "digest": "ZJrNtY2McTqdAZdfBmciQV1TyCouPS8ED400FQFE4JE",
-                    "exp_val": {
-                        "_type": "CustomWeaveType",
-                        "weave_type": {"type": "Op"},
-                        "files": {
-                            "obj.py": "zunYz3rpUk5IkwbglUHXBJFszhSKvtLIftOGvMp4xFo"
-                        },
-                    },
-                }
-            ],
-            exp_files=[
-                {
-                    "digest": "zunYz3rpUk5IkwbglUHXBJFszhSKvtLIftOGvMp4xFo",
-                    "exp_content": b"import weave\nfrom typing import TypedDict\nfrom typing import NotRequired\nfrom rich.markdown import Markdown\n\nclass SerializedMarkdown(TypedDict):\n    markup: str\n    code_theme: NotRequired[str]\n\n@weave.op()\ndef load(encoded: SerializedMarkdown) -> Markdown:\n    return Markdown(**encoded)\n",
-                }
-            ],
-            equality_check=lambda a, b: a.markup == b.markup
-            and a.code_theme == b.code_theme,
-        ),
-        # Image (PIL.Image.Image)
-        SerializationTestCase(
-            id="image",
-            runtime_object_factory=lambda: Image.new("RGB", (10, 10), "red"),
-            inline_call_param=True,
-            is_legacy=False,
-            exp_json={
-                "_type": "CustomWeaveType",
-                "weave_type": {"type": "PIL.Image.Image"},
-                "files": {"image.png": "Ac3YO5daeesZTxBfXf7DAKaQZ5IZysk2HvclN8sfwxQ"},
-                "load_op": "weave:///shawn/test-project/op/load_PIL.Image.Image:XTwpuNcfNiGtjAaWpDPfMSflzS7JYxJNd6FYk1TAfeA",
-            },
-            exp_objects=[
-                {
-                    "object_id": "load_PIL.Image.Image",
-                    "digest": "XTwpuNcfNiGtjAaWpDPfMSflzS7JYxJNd6FYk1TAfeA",
-                    "exp_val": {
-                        "_type": "CustomWeaveType",
-                        "weave_type": {"type": "Op"},
-                        "files": {
-                            "obj.py": "ReUEgimaLvoco8RMDnTr4tTo26SXYwVz61tJHoDJ1CI"
-                        },
-                    },
-                }
-            ],
-            exp_files=[
-                {
-                    "digest": "ReUEgimaLvoco8RMDnTr4tTo26SXYwVz61tJHoDJ1CI",
-                    "exp_content": b'import weave\nfrom weave.trace.serialization.mem_artifact import MemTraceFilesArtifact\nfrom weave.utils.iterators import first\nimport PIL.Image as Image\n\n@weave.op()\ndef load(artifact: MemTraceFilesArtifact, name: str) -> Image.Image:\n    # Today, we assume there can only be 1 image in the artifact.\n    filename = first(artifact.path_contents)\n    if not filename.startswith("image."):\n        raise ValueError(f"Expected filename to start with \'image.\', got {filename}")\n\n    path = artifact.path(filename)\n    return Image.open(path)\n',
-                },
-                {
-                    "digest": "Ac3YO5daeesZTxBfXf7DAKaQZ5IZysk2HvclN8sfwxQ",
-                    "exp_content": b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\n\x00\x00\x00\n\x08\x02\x00\x00\x00\x02PX\xea\x00\x00\x00\x12IDATx\x9cc\xfc\xcf\x80\x0f0\xe1\x95\x1d\xb1\xd2\x00A,\x01\x13\xb1\ns\x13\x00\x00\x00\x00IEND\xaeB`\x82",
-                },
-            ],
-            equality_check=lambda a, b: a.tobytes() == b.tobytes(),
-        ),
-    ],
+    cases,
     ids=lambda case: case.id,
 )
-def test_serialization_compatability(client, case):
-    if sys.version_info.major <= 3 and sys.version_info.minor <= 9:
-        pytest.skip(
-            "Skipping test for Python 3.9 and below due to inconsistent op code"
-        )
+def test_serialization_correctness(client, case: SerializationTestCase):
+    # Since code serialization changes pretty significantly between versions, we will assume
+    # legacy for anything other than the latest python version
+    is_legacy = case.is_legacy or (
+        sys.version_info.major != 3 or sys.version_info.minor != 13
+    )
 
     project_id = client._project_id()
 
@@ -313,7 +132,7 @@ def test_serialization_compatability(client, case):
         # This method will seed the database with the expected objects and files
         # It should only be called if is_legacy is True.
 
-        if not case.is_legacy:
+        if not is_legacy:
             raise ValueError("is_legacy is False")
 
         if case.exp_objects:
@@ -350,7 +169,7 @@ def test_serialization_compatability(client, case):
         runtime_object = case.runtime_object_factory()
 
         # If we are in legacy mode, then we just publish the expected json directly.
-        if case.is_legacy:
+        if is_legacy:
             published_obj = weave.publish(case.exp_json)
         else:
             published_obj = weave.publish(runtime_object)
@@ -405,7 +224,7 @@ def test_serialization_compatability(client, case):
 
         # Similarly to the publish flow, if we are in legacy mode, then we just
         # use the expected json directly.
-        if case.is_legacy:
+        if is_legacy:
             val = case.exp_json
         else:
             val = runtime_object
@@ -445,7 +264,7 @@ def test_serialization_compatability(client, case):
 
         assert val == case.exp_json
 
-    if case.is_legacy:
+    if is_legacy:
         seed_legacy_data()
 
     test_publish_flow()
