@@ -38,10 +38,11 @@ independent of the actual code that is used to serialize the data.
     ids=lambda case: case.id,
 )
 def test_serialization_correctness(client, case: SerializationTestCase):
-    if sys.version_info.major <= 3 and sys.version_info.minor <= 9:
-        pytest.skip(
-            "Skipping test for Python 3.9 and below due to inconsistent op code"
-        )
+    # Since code serialization changes pretty significantly between versions, we will assume
+    # legacy for anything other than the latest python version
+    is_legacy = case.is_legacy or (
+        sys.version_info.major != 3 or sys.version_info.minor != 13
+    )
 
     project_id = client._project_id()
 
@@ -131,7 +132,7 @@ def test_serialization_correctness(client, case: SerializationTestCase):
         # This method will seed the database with the expected objects and files
         # It should only be called if is_legacy is True.
 
-        if not case.is_legacy:
+        if not is_legacy:
             raise ValueError("is_legacy is False")
 
         if case.exp_objects:
@@ -168,7 +169,7 @@ def test_serialization_correctness(client, case: SerializationTestCase):
         runtime_object = case.runtime_object_factory()
 
         # If we are in legacy mode, then we just publish the expected json directly.
-        if case.is_legacy:
+        if is_legacy:
             published_obj = weave.publish(case.exp_json)
         else:
             published_obj = weave.publish(runtime_object)
@@ -223,7 +224,7 @@ def test_serialization_correctness(client, case: SerializationTestCase):
 
         # Similarly to the publish flow, if we are in legacy mode, then we just
         # use the expected json directly.
-        if case.is_legacy:
+        if is_legacy:
             val = case.exp_json
         else:
             val = runtime_object
@@ -263,7 +264,7 @@ def test_serialization_correctness(client, case: SerializationTestCase):
 
         assert val == case.exp_json
 
-    if case.is_legacy:
+    if is_legacy:
         seed_legacy_data()
 
     test_publish_flow()
