@@ -243,6 +243,7 @@ class ScoreLogger(BaseModel):
 
     _captured_scores: dict[str, ScoreType] = PrivateAttr(default_factory=dict)
     _has_finished: bool = PrivateAttr(False)
+    _predict_output: Any = PrivateAttr(None)
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -258,14 +259,14 @@ class ScoreLogger(BaseModel):
         # First, finish the predict_call to compute its summary (including child costs)
         wc.finish_call(
             self.predict_call,
-            output=self.predict_call.output,
+            output=self._predict_output,
         )
 
         # Then finish the predict_and_score_call with the scores
         wc.finish_call(
             self.predict_and_score_call,
             output={
-                "output": self.predict_call.output,
+                "output": self._predict_output,
                 "scores": scores,
                 "model_latency": None,
             },
@@ -625,12 +626,17 @@ class EvaluationLogger(BaseModel):
         if predict_call is None:
             raise ValueError("predict_call should not be None")
 
+        # Set the output on the predict_call now so it's available for apply_scorer
+        predict_call.output = output
+
         pred = ScoreLogger(
             predict_and_score_call=predict_and_score_call,
             evaluate_call=self._evaluate_call,
             predict_call=predict_call,
             predefined_scorers=self.scorers,
         )
+        # Store the output so we can use it when finishing the predict_call
+        pred._predict_output = output
         self._accumulated_predictions.append(pred)
         return pred
 
