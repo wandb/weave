@@ -27,7 +27,6 @@ class ResolvedContentArgsWithoutData(TypedDict):
 
     # Optional fields - can be omitted
     metadata: NotRequired[dict[str, Any]]
-    _last_saved_path: NotRequired[str]
     extension: NotRequired[str]
 
 
