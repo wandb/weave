@@ -17,7 +17,7 @@ ValidContentInputs = Union[bytes, str, Path]
 # It is used to 'restore' an existing content object
 class ResolvedContentArgsWithoutData(TypedDict):
     # Required Fields
-    id: str
+    # id: str
     size: int
     mimetype: str
     digest: str

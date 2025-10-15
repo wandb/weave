@@ -8,7 +8,6 @@ import os
 import re
 import subprocess
 import sys
-import uuid
 from pathlib import Path
 from typing import Annotated, Any, Generic
 from urllib.parse import quote_from_bytes, urlparse
@@ -55,7 +54,7 @@ class Content(BaseModel, Generic[T]):
 
     # This is required due to some attribute setting done by our serialization layer
     # Without it, it is hard to know if it was processed properly
-    id: str
+    # id: str
     data: bytes
     size: int
     mimetype: str
@@ -181,7 +180,7 @@ class Content(BaseModel, Generic[T]):
         )
 
         resolved_args: ResolvedContentArgs = {
-            "id": uuid.uuid4().hex,
+            # "id": uuid.uuid4().hex,
             "data": data,
             "size": size,
             "mimetype": mimetype,
@@ -231,7 +230,7 @@ class Content(BaseModel, Generic[T]):
         )
 
         resolved_args: ResolvedContentArgs = {
-            "id": uuid.uuid4().hex,
+            # "id": uuid.uuid4().hex,
             "data": data,
             "size": size,
             "mimetype": mimetype,
@@ -283,7 +282,7 @@ class Content(BaseModel, Generic[T]):
         )
 
         resolved_args: ResolvedContentArgs = {
-            "id": uuid.uuid4().hex,
+            # "id": uuid.uuid4().hex,
             "data": data,
             "size": size,
             "mimetype": mimetype,
@@ -332,7 +331,7 @@ class Content(BaseModel, Generic[T]):
 
         # We gather all the resolved arguments...
         resolved_args: ResolvedContentArgs = {
-            "id": uuid.uuid4().hex,
+            # "id": uuid.uuid4().hex,
             "data": data,
             "size": file_size,
             "mimetype": mimetype,
@@ -376,7 +375,7 @@ class Content(BaseModel, Generic[T]):
         )
 
         resolved_args: ResolvedContentArgs = {
-            "id": uuid.uuid4().hex,
+            # "id": uuid.uuid4().hex,
             "data": data,
             "size": size,
             "mimetype": mimetype,
@@ -452,7 +451,7 @@ class Content(BaseModel, Generic[T]):
         )
 
         resolved_args: ResolvedContentArgs = {
-            "id": uuid.uuid4().hex,
+            # "id": uuid.uuid4().hex,
             "data": data,
             "size": size,
             "mimetype": mimetype,

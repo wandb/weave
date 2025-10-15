@@ -13,17 +13,17 @@ from tests.trace.data_serialization.test_cases.primitive_cases import primitive_
 [x] None
 [x] list
 [x] dict
-[] tuple
-[] set
+[] tuple (skipping)
+[] set (skipping)
 
 ## Media Types:
-[X] Audio
-[] Content
+[x] Audio
+[x] Content
 [x] Datetime
-[] File
+[] File (deprecated)
 [x] Image
 [x] Markdown
-[X] Video
+[x] Video
 
 ## Container Types:
 [] Dataclass
