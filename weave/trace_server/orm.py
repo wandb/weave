@@ -660,10 +660,21 @@ def _process_query_to_conditions(
         elif isinstance(operation, tsi_query.ContainsOperation):
             lhs_part = process_operand(operation.contains_.input)
             rhs_part = process_operand(operation.contains_.substr)
-            position_operation = "position"
-            if operation.contains_.case_insensitive:
-                position_operation = "positionCaseInsensitive"
-            cond = f"{position_operation}({lhs_part}, {rhs_part}) > 0"
+            is_sqlite = pb._database_type == "sqlite"
+
+            if is_sqlite:
+                # SQLite uses INSTR function and doesn't have case-insensitive variant
+                if operation.contains_.case_insensitive:
+                    # For case-insensitive, convert both to lowercase
+                    cond = f"INSTR(LOWER({lhs_part}), LOWER({rhs_part})) > 0"
+                else:
+                    cond = f"INSTR({lhs_part}, {rhs_part}) > 0"
+            else:
+                # ClickHouse uses position/positionCaseInsensitive
+                position_operation = "position"
+                if operation.contains_.case_insensitive:
+                    position_operation = "positionCaseInsensitive"
+                cond = f"{position_operation}({lhs_part}, {rhs_part}) > 0"
         else:
             raise TypeError(f"Unknown operation type: {operation}")
 

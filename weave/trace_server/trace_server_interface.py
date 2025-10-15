@@ -580,6 +580,11 @@ class ObjectVersionFilter(BaseModelStrict):
         description="Filter objects by their base classes",
         examples=[["Model"], ["Dataset"]],
     )
+    exclude_base_object_classes: Optional[list[str]] = Field(
+        default=None,
+        description="Exclude objects by their base classes",
+        examples=[["Model"], ["Dataset"]],
+    )
     leaf_object_classes: Optional[list[str]] = Field(
         default=None,
         description="Filter objects by their leaf classes",

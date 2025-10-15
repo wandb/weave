@@ -9,6 +9,7 @@ from weave.trace_server.interface.builtin_object_classes.builtin_object_registry
 
 OUTPUT_DIR = (
     Path(__file__).parent.parent
+    / "weave"
     / "trace_server"
     / "interface"
     / "builtin_object_classes"

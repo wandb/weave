@@ -37,7 +37,7 @@ dynamic = ["version"]
 dependencies = [
   "wandb>=0.17.1",
   "sentry-sdk>=2.0.0,<3.0.0",
-  "pydantic>=2.0.0",
+  "pydantic>=2.0.0,<2.12.0",
   "packaging>=21.0",          # For version parsing in integrations
   "tenacity>=8.3.0,!=8.4.0",  # Excluding 8.4.0 because it had a bug on import of AsyncRetrying
   "click",                    # Used for terminal/stdio printing
@@ -391,7 +391,7 @@ module = "weave_query.*"
 ignore_errors = true
 
 [tool.bumpversion]
-current_version = "0.52.9-dev0"
+current_version = "0.52.10-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.
