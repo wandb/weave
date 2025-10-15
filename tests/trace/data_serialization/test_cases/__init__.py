@@ -1,6 +1,7 @@
 from tests.trace.data_serialization.spec import SerializationTestCase
 from tests.trace.data_serialization.test_cases.container_cases import container_cases
 from tests.trace.data_serialization.test_cases.core_types import core_cases
+from tests.trace.data_serialization.test_cases.library_cases import library_cases
 from tests.trace.data_serialization.test_cases.media_cases import media_cases
 from tests.trace.data_serialization.test_cases.primitive_cases import primitive_cases
 
@@ -35,14 +36,14 @@ from tests.trace.data_serialization.test_cases.primitive_cases import primitive_
 [x] Op
 [x] Object
 
-## Weave Library Objects:
-[] Model
-[] Scorer
-[] Evaluation
-[] Dataset
-[] Prompt
+## Weave Evaluation Library Objects:
+[x] Model
+[x] Scorer
+[x] Evaluation
+[x] Dataset
+[x] Prompt
 
-### Weave Library Specialized Objects:
+### Weave Evaluation Library Specialized Objects:
 [] LLMStructuredCompletionModel
 [] LLMAsAJudgeScorer
 
@@ -58,4 +59,5 @@ cases: list[SerializationTestCase] = [
     *media_cases,
     *container_cases,
     *core_cases,
+    *library_cases,
 ]

@@ -57,7 +57,7 @@ def test_serialization_correctness(client, case: SerializationTestCase):
                 try:
                     ref = ObjectRef.parse_uri(obj)
                     found_refs.add(obj)
-                except ValueError:
+                except (ValueError, TypeError):
                     pass
 
         def file_visitor(path: list[Union[str, int]], obj: Any):
