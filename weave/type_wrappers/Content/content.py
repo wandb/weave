@@ -74,7 +74,7 @@ class Content(BaseModel, Generic[T]):
             examples=[{"number of cats": 1}],
         ),
     ] = None
-    path: str | None = None
+    # path: str | None = None
     extension: str | None = None
 
     _last_saved_path: Annotated[
@@ -315,12 +315,17 @@ class Content(BaseModel, Generic[T]):
             raise FileNotFoundError(f"File not found at path: {path_obj}")
 
         data = path_obj.read_bytes()
-        file_name = path_obj.name
         file_size = path_obj.stat().st_size
         digest = hashlib.sha256(data).hexdigest()
 
         if file_size == 0:
             logger.warning("Content.from_path received empty file")
+
+        # Use a deterministic filename, not local path
+        # file_name = path_obj.name
+        file_name = default_filename(
+            extension=path_obj.suffix, mimetype=mimetype, digest=digest
+        )
 
         mimetype, extension = get_mime_and_extension(
             mimetype=mimetype,
@@ -339,7 +344,7 @@ class Content(BaseModel, Generic[T]):
             "filename": file_name,
             "content_type": "file",
             "input_type": full_name(path),
-            "path": str(path_obj.resolve()),
+            "_last_saved_path": str(path_obj.resolve()),
             "extension": extension,
             "encoding": encoding,
         }
@@ -557,7 +562,7 @@ class Content(BaseModel, Generic[T]):
         Returns:
             bool: True if the file was successfully opened, False otherwise.
         """
-        path = self._last_saved_path or self.path
+        path = self._last_saved_path  # or self.path
 
         if not path:
             logger.exception(
@@ -574,7 +579,7 @@ class Content(BaseModel, Generic[T]):
             else:  # linux variants
                 subprocess.call(("xdg-open", str(path)))
         except Exception as e:
-            logger.exception("Failed to open file %s", self.path)
+            logger.exception("Failed to open file %s", path)
             return False
         return True
 

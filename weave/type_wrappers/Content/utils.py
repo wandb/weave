@@ -93,10 +93,10 @@ def is_valid_path(input: str | Path) -> bool:
 
 def default_filename(
     extension: str | None,
-    mimetype: str,
+    mimetype: str | None,
     digest: str,
 ) -> str:
-    type_name, _ = mimetype.split("/")
+    type_name, _ = mimetype.split("/") if mimetype else ("file", None)
     if type_name == "application":
         # This seems a bit more 'presentable'
         type_name = "file"

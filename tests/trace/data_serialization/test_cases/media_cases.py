@@ -221,7 +221,7 @@ media_cases = [
             "weave_type": {"type": "weave.type_wrappers.Content.content.Content"},
             "files": {
                 "content": "xfOhnNfgQxRzgWZ6DC1QEGt9vrJWcathymKPPZQmmIw",
-                "metadata.json": "AUeXzbHeCwr8ugaaTMfMYTmQGFLMXFqkqTSpwhsxywE",
+                "metadata.json": "5G0s5f53CdX1LbhCwq3i3ue5M7SOXcKlv7YFTdz6Lho",
             },
             "load_op": "weave:///shawn/test-project/op/load_weave.type_wrappers.Content.content.Content:pHK80K8ec7lRHbNwjR2LjWQXRxAV8n5BmkixcTamz2k",
         },
@@ -238,16 +238,16 @@ media_cases = [
         ],
         exp_files=[
             {
-                "digest": "ymHqYyPKBxJIc6lBglJ0h5BWXEou6NAWQY97YHkhqyM",
-                "exp_content": b'import weave\nfrom weave.trace.serialization.mem_artifact import MemTraceFilesArtifact\nimport json\n\n@weave.op()\ndef load(artifact: MemTraceFilesArtifact, name: str) -> Content:\n    from weave.type_wrappers.Content.content import Content\n    from weave.type_wrappers.Content.content_types import (\n        ResolvedContentArgs,\n        ResolvedContentArgsWithoutData,\n    )\n\n    metadata_path = artifact.path("metadata.json")\n\n    with open(metadata_path) as f:\n        metadata: ResolvedContentArgsWithoutData = json.load(f)\n\n    with open(artifact.path("content"), "rb") as f:\n        data = f.read()\n\n    resolved_args: ResolvedContentArgs = {"data": data, **metadata}\n\n    return Content._from_resolved_args(resolved_args)\n',
+                "digest": "5G0s5f53CdX1LbhCwq3i3ue5M7SOXcKlv7YFTdz6Lho",
+                "exp_content": b'{"size": 88244, "mimetype": "audio/x-wav", "digest": "c5f3a19cd7e043147381667a0c2d50106b7dbeb25671ab61ca628f3d9426988c", "filename": "file-c5f3.wav", "content_type": "file", "input_type": "str", "encoding": "utf-8", "metadata": null, "extension": ".wav"}',
             },
             {
                 "digest": "xfOhnNfgQxRzgWZ6DC1QEGt9vrJWcathymKPPZQmmIw",
                 "exp_content": AUDIO_BYTES,
             },
             {
-                "digest": "AUeXzbHeCwr8ugaaTMfMYTmQGFLMXFqkqTSpwhsxywE",
-                "exp_content": b'{"size": 88244, "mimetype": "audio/x-wav", "digest": "c5f3a19cd7e043147381667a0c2d50106b7dbeb25671ab61ca628f3d9426988c", "filename": "audio.wav", "content_type": "file", "input_type": "str", "encoding": "utf-8", "metadata": null, "path": "/Users/timothysweeney/Workspace/github/wandb/core/services/weave-python/weave-public/tests/trace/type_handlers/Audio/examples/audio.wav", "extension": ".wav"}',
+                "digest": "ymHqYyPKBxJIc6lBglJ0h5BWXEou6NAWQY97YHkhqyM",
+                "exp_content": b'import weave\nfrom weave.trace.serialization.mem_artifact import MemTraceFilesArtifact\nimport json\n\n@weave.op()\ndef load(artifact: MemTraceFilesArtifact, name: str) -> Content:\n    from weave.type_wrappers.Content.content import Content\n    from weave.type_wrappers.Content.content_types import (\n        ResolvedContentArgs,\n        ResolvedContentArgsWithoutData,\n    )\n\n    metadata_path = artifact.path("metadata.json")\n\n    with open(metadata_path) as f:\n        metadata: ResolvedContentArgsWithoutData = json.load(f)\n\n    with open(artifact.path("content"), "rb") as f:\n        data = f.read()\n\n    resolved_args: ResolvedContentArgs = {"data": data, **metadata}\n\n    return Content._from_resolved_args(resolved_args)\n',
             },
         ],
         equality_check=lambda a, b: a.digest == b.digest,
