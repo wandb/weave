@@ -2,6 +2,8 @@ from typing import TYPE_CHECKING, Any, Optional
 
 from weave.trace.serialization import serializer
 
+INLINE_MARKDOWN_THRESHOLD = 1024
+
 if TYPE_CHECKING:
     from weave.trace.serialization.mem_artifact import MemTraceFilesArtifact
 
@@ -24,19 +26,31 @@ def save(
     obj: Markdown, artifact: "MemTraceFilesArtifact", name: str
 ) -> Optional[dict[str, Any]]:
     """Save markdown content as file, return metadata."""
-    with artifact.new_file("content.md", binary=False) as f:
-        f.write(obj.markup)
+    use_file = len(obj.markup) >= INLINE_MARKDOWN_THRESHOLD
+    result = {}
+
+    if use_file:
+        with artifact.new_file("markup.md", binary=False) as f:
+            f.write(obj.markup)
+    else:
+        result["markup"] = obj.markup
 
     # Return metadata if present
     if obj.code_theme:
-        return {"code_theme": obj.code_theme}
+        result["code_theme"] = obj.code_theme
+
+    if result:
+        return result
     return None
 
 
 def load(artifact: "MemTraceFilesArtifact", name: str, val: Any) -> Markdown:
     """Load markdown from file and metadata."""
-    with artifact.open("content.md", binary=False) as f:
-        markup = f.read()
+    if "markup" in val:
+        markup = val["markup"]
+    else:
+        with artifact.open("markup.md", binary=False) as f:
+            markup = f.read()
 
     kwargs = {}
     if val and isinstance(val, dict) and "code_theme" in val:

@@ -124,12 +124,15 @@ def _build_result_from_encoded(
             contents_as_bytes = contents_as_bytes.encode("utf-8")
         digest = bytes_digest(contents_as_bytes)
         file_digests[name] = digest
+
     result = {
         "_type": encoded["_type"],
         "weave_type": encoded["weave_type"],
-        "files": file_digests,
-        "val": encoded.get("val"),
     }
+    if file_digests:
+        result["files"] = file_digests
+    if "val" in encoded:
+        result["val"] = encoded["val"]
     load_op_uri = encoded.get("load_op")
     if load_op_uri:
         result["load_op"] = load_op_uri
@@ -297,16 +300,17 @@ def from_json(obj: Any, project_id: str, server: TraceServerInterface) -> Any:
                 {k: from_json(v, project_id, server) for k, v in obj.items()}
             )
         elif val_type == "CustomWeaveType":
-            files = None
-            file_spec = obj.get("files")
-            if file_spec:
-                files = _load_custom_obj_files(project_id, server, file_spec)
-            encoded = {
-                "weave_type": obj["weave_type"],
-                "files": files,
-                "val": obj.get("val"),
-                "load_op": obj.get("load_op"),
-            }
+            encoded = {"weave_type": obj["weave_type"]}
+            if "load_op" in obj:
+                encoded["load_op"] = obj["load_op"]
+            if "val" in obj:
+                encoded["val"] = obj["val"]
+            if "files" in obj:
+                file_spec = obj.get("files")
+                if file_spec:
+                    files = _load_custom_obj_files(project_id, server, file_spec)
+                    encoded["files"] = files
+
             return custom_objs.decode_custom_obj(encoded)
         elif isinstance(val_type, str) and obj.get("_class_name") == val_type:
             from weave.trace_server.interface.builtin_object_classes.builtin_object_registry import (

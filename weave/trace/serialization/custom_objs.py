@@ -87,7 +87,8 @@ def encode_custom_obj(obj: Any) -> dict | None:
             for k, v in art.path_contents.items()
         }
         encoded["files"] = encoded_path_contents
-    encoded["val"] = val
+    if val is not None:
+        encoded["val"] = val
 
     return encoded
 
