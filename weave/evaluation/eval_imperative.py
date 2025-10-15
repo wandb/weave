@@ -254,6 +254,14 @@ class ScoreLogger(BaseModel):
         scores = self._captured_scores
 
         wc = require_weave_client()
+
+        # First, finish the predict_call to compute its summary (including child costs)
+        wc.finish_call(
+            self.predict_call,
+            output=self.predict_call.output,
+        )
+
+        # Then finish the predict_and_score_call with the scores
         wc.finish_call(
             self.predict_and_score_call,
             output={
@@ -496,7 +504,9 @@ class EvaluationLogger(BaseModel):
         def predict_and_score(self: Evaluation, model: Model, example: dict) -> dict:
             predict_method = cast(Op, model.get_infer_method())
             with attributes(IMPERATIVE_EVAL_MARKER):
-                output, predict_call = predict_method.call(model, example)
+                output, predict_call = predict_method.call(
+                    model, example, __require_explicit_finish=True
+                )
                 current_predict_call.set(predict_call)
 
             # This data is just a placeholder to give a sense of the data shape.

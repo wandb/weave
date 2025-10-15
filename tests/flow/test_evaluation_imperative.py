@@ -740,3 +740,58 @@ def test_evaluation_logger_set_view_string(client):
     assert stored["_type"] == "CustomWeaveType"
     assert stored["weave_type"]["type"] == "weave.type_wrappers.Content.content.Content"
     assert stored["files"]["content"]
+
+
+def test_cost_propagation_with_child_calls(client):
+    """Test that cost data from child calls propagates to parent predict_and_score call."""
+    ev = EvaluationLogger()
+
+    # Log a prediction
+    pred = ev.log_prediction(inputs={"question": "Hello"}, output="Hi there!")
+
+    # Add a child call with usage/cost data to the predict_call
+    # This simulates calling an LLM within the prediction
+    with call_context.set_call_stack([pred.predict_call]):
+        # Create a mock op that returns usage data
+        @weave.op
+        def mock_llm_call(prompt: str) -> dict:
+            return {
+                "model": "gpt-4",
+                "usage": {
+                    "prompt_tokens": 10,
+                    "completion_tokens": 20,
+                    "total_tokens": 30,
+                },
+                "content": "response",
+            }
+
+        mock_llm_call("test prompt")
+
+    # Finish the prediction
+    pred.finish()
+
+    # Log summary to finalize the evaluation
+    ev.log_summary({"test": "complete"})
+
+    client.flush()
+
+    # Get all calls and verify cost propagation
+    calls = client.get_calls()
+
+    # Find the predict_and_score_call
+    predict_and_score_call = None
+    for call in calls:
+        if op_name_from_call(call) == "Evaluation.predict_and_score":
+            predict_and_score_call = call
+            break
+
+    assert predict_and_score_call is not None, "predict_and_score_call should exist"
+
+    # Verify that the usage data propagated to the predict_and_score_call
+    assert predict_and_score_call.summary is not None
+    assert "usage" in predict_and_score_call.summary
+    assert "gpt-4" in predict_and_score_call.summary["usage"]
+    assert predict_and_score_call.summary["usage"]["gpt-4"]["prompt_tokens"] == 10
+    assert predict_and_score_call.summary["usage"]["gpt-4"]["completion_tokens"] == 20
+    assert predict_and_score_call.summary["usage"]["gpt-4"]["total_tokens"] == 30
+    assert predict_and_score_call.summary["usage"]["gpt-4"]["requests"] == 1
