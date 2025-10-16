@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING, Any, Optional
 
+from weave.trace.env import is_mtsaas
 from weave.trace.serialization import serializer
 
 INLINE_MARKDOWN_THRESHOLD = 1024
@@ -27,6 +28,10 @@ def save(
 ) -> Optional[dict[str, Any]]:
     """Save markdown content as file, return metadata."""
     use_file = len(obj.markup) >= INLINE_MARKDOWN_THRESHOLD
+
+    # We only use files for markdown on MTSAAS for now (until the new UI is rolled out to all customers)
+    use_file = use_file and is_mtsaas()
+
     result = {}
 
     if use_file:
