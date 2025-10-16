@@ -171,7 +171,7 @@ def save(
         raise ValueError(f"Failed to write video file with error: {e}") from e
 
 
-def load(artifact: MemTraceFilesArtifact, name: str) -> VideoClip:
+def load(artifact: MemTraceFilesArtifact, name: str, val: Any) -> VideoClip:
     """Load a VideoClip from the artifact.
 
     Args:
