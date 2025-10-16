@@ -22,6 +22,7 @@ COMPLETIONS_TAG_NAME = "Completions"
 ACTIONS_TAG_NAME = "Actions"
 OTEL_TAG_NAME = "OpenTelemetry"
 THREADS_TAG_NAME = "Threads"
+V2_OPS_TAG_NAME = "V2 -- Ops"
 
 
 class AuthParams(NamedTuple):
@@ -39,7 +40,7 @@ class AuthParams(NamedTuple):
         )
 
 
-class NoopTraceServer(tsi.TraceServerInterface): ...
+class NoopTraceServer(tsi.FullTraceServerInterface): ...
 
 
 class NoopTraceService:
@@ -47,7 +48,7 @@ class NoopTraceService:
         # This type-ignore is safe, it's just used to instantiate a stub implementation
         # without having to redefine all of the methods (which would be pointless because
         # this is a stub that does nothing).
-        self.trace_server_interface: tsi.TraceServerInterface = NoopTraceServer()  # type: ignore
+        self.trace_server_interface: tsi.FullTraceServerInterface = NoopTraceServer()  # type: ignore
 
     def server_info(self) -> weave.trace_server.trace_service.ServerInfoRes:
         return weave.trace_server.trace_service.ServerInfoRes(
@@ -94,6 +95,105 @@ class ServiceDependency:
             return self.service_factory(auth_params)
 
         return _get_server
+
+
+def generate_routes_v2(
+    router: APIRouter, service_dependency: ServiceDependency
+) -> APIRouter:
+    """Generate v2 ops routes for the FastAPI app.
+
+    Args:
+        router: The router to add routes to
+        service_dependency: The factory function to create a ServiceDependency.
+
+    Returns:
+        The router with v2 ops routes implemented
+    """
+    get_service = service_dependency.get_service()
+
+    @router.post(
+        "{entity}/{project}/ops",
+        tags=[V2_OPS_TAG_NAME],
+    )
+    def op_create_v2(
+        entity: str,
+        project: str,
+        body: tsi.OpCreateV2Body,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.OpCreateV2Res:
+        """Create an op object."""
+        project_id = f"{entity}/{project}"
+        req = tsi.OpCreateV2Req(project_id=project_id, **body.model_dump())
+        return service.trace_server_interface.op_create_v2(req)
+
+    @router.get(
+        "{entity}/{project}/ops/{object_id}/versions/{digest}",
+        tags=[V2_OPS_TAG_NAME],
+    )
+    def op_read_v2(
+        entity: str,
+        project: str,
+        object_id: str,
+        digest: str,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.OpReadV2Res:
+        """Get an op object."""
+        project_id = f"{entity}/{project}"
+        req = tsi.OpReadV2Req(project_id=project_id, object_id=object_id, digest=digest)
+        return service.trace_server_interface.op_read_v2(req)
+
+    @router.get(
+        "{entity}/{project}/ops",
+        tags=[V2_OPS_TAG_NAME],
+        response_class=StreamingResponse,
+        responses={
+            200: {
+                "description": "Stream of data in JSONL format",
+                "content": {
+                    "application/jsonl": {
+                        "schema": {
+                            "type": "array",
+                            "items": {"$ref": "#/components/schemas/Schema"},
+                        }
+                    }
+                },
+            }
+        },
+    )
+    def op_list_v2(
+        entity: str,
+        project: str,
+        limit: int | None = None,
+        offset: int | None = None,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> StreamingResponse:
+        """List op objects."""
+        project_id = f"{entity}/{project}"
+        req = tsi.OpListV2Req(project_id=project_id, limit=limit, offset=offset)
+        return StreamingResponse(
+            service.trace_server_interface.op_list_v2(req),
+            media_type="application/jsonl",
+        )
+
+    @router.delete(
+        "{entity}/{project}/ops/{object_id}",
+        tags=[V2_OPS_TAG_NAME],
+    )
+    def op_delete_v2(
+        entity: str,
+        project: str,
+        object_id: str,
+        digests: list[str] | None = None,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.OpDeleteV2Res:
+        """Delete an op object. If digests are provided, only those versions are deleted. Otherwise, all versions are deleted."""
+        project_id = f"{entity}/{project}"
+        req = tsi.OpDeleteV2Req(
+            project_id=project_id, object_id=object_id, digests=digests
+        )
+        return service.trace_server_interface.op_delete_v2(req)
+
+    return router
 
 
 def generate_routes(
