@@ -1,4 +1,5 @@
 import asyncio
+import os
 import random
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
@@ -9,7 +10,9 @@ import pytest
 
 def get_image():
     # Create a temporary file that will be automatically cleaned up
-    with tempfile.NamedTemporaryFile(suffix=".png") as temp_file:
+    # On Windows, we need delete=False to allow PIL to open the file
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as temp_file:
+        temp_file_path = temp_file.name
         image = PIL.Image.new("RGB", (1024, 1024))
         image.putdata(
             [
@@ -22,14 +25,21 @@ def get_image():
             ]
         )
 
-        # 2. Save the image to a file
-        image.save(temp_file.name)
+        # Save the image to a file
+        image.save(temp_file_path)
 
-        # 3. Open the image in multiple threads and load it
+    try:
+        # Open the image in multiple threads and load it
         # This simulates what can happen when users are working
         # with images across threads.
-        image = PIL.Image.open(temp_file.name)
-    return image
+        image = PIL.Image.open(temp_file_path)
+        return image
+    finally:
+        # Clean up the temp file
+        try:
+            os.unlink(temp_file_path)
+        except (OSError, PermissionError):
+            pass  # File might already be deleted or locked
 
 
 def test_multiple_loads():
