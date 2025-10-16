@@ -16,6 +16,7 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Any, Callable, TypedDict, cast
 
 import pydantic
+from cachetools import TTLCache
 from requests import HTTPError
 
 from weave import version
@@ -95,11 +96,14 @@ from weave.trace_server.interface.feedback_types import (
 )
 from weave.trace_server.trace_server_interface import (
     CallEndReq,
+    CallsCompleteBatchReq,
     CallsDeleteReq,
     CallsFilter,
     CallsQueryReq,
+    CallsStartBatchReq,
     CallStartReq,
     CallUpdateReq,
+    CompleteCallSchemaForInsert,
     CostCreateInput,
     CostCreateReq,
     CostCreateRes,
@@ -345,6 +349,12 @@ class WeaveClient:
         if hasattr(self.server, "get_feedback_processor"):
             self._server_feedback_processor = self.server.get_feedback_processor()
         self.send_file_cache = WeaveClientSendFileCache()
+
+        # Track futures for call start requests - used to ensure call ends
+        # are sent after call starts are built, and to send them together
+        self._call_start_futures: TTLCache[str, Future[CallStartReq]] = TTLCache(
+            maxsize=10000, ttl=60 * 60 * 24
+        )
 
     ################ High Level Convenience Methods ################
 
@@ -772,7 +782,8 @@ class WeaveClient:
         should_print_call_link_ = should_print_call_link()
         current_call = call_context.get_current_call()
 
-        def send_start_call() -> bool:
+        def send_start_call() -> CallStartReq:
+            """Build and send the CallStartReq immediately, return it for caching."""
             maybe_redacted_inputs_with_refs = inputs_with_refs
             if should_redact_pii():
                 from weave.utils.pii_redaction import redact_pii
@@ -807,19 +818,28 @@ class WeaveClient:
                     "Inputs may be dropped."
                 )
 
-            self.server.call_start(call_start_req)
-            return True
+            # Send the start immediately using the new V1 batch endpoint
+            self.server.v1_calls_start_batch(
+                CallsStartBatchReq(project_id=project_id, items=[call_start_req.start])
+            )
 
-        def on_complete(f: Future) -> None:
+            # Return the request for caching
+            return call_start_req
+
+        def on_start_sent(f: Future) -> None:
+            """Print call link for root calls after start is sent."""
             try:
-                root_call_did_not_error = f.result() and not current_call
-                if root_call_did_not_error and should_print_call_link_:
+                f.result()
+                if not current_call and should_print_call_link_:
                     print_call_link(call)
             except Exception:
                 pass
 
-        fut = self.future_executor.defer(send_start_call)
-        fut.add_done_callback(on_complete)
+        # Send the start request asynchronously and cache the future
+        # The cached request will be used to send the complete call when it finishes
+        start_fut = self.future_executor.defer(send_start_call)
+        self._call_start_futures[call_id] = start_fut
+        start_fut.add_done_callback(on_start_sent)
 
         if use_stack:
             call_context.push_call(call)
@@ -934,7 +954,8 @@ class WeaveClient:
         if op is not None and op._on_finish_handler:
             op._on_finish_handler(call, original_output, exception)
 
-        def send_end_call() -> None:
+        def send_complete_call() -> None:
+            """Send the complete call (start + end) together using the batch endpoint."""
             maybe_redacted_output_as_refs = output_as_refs
             if should_redact_pii():
                 from weave.utils.pii_redaction import redact_pii
@@ -948,13 +969,14 @@ class WeaveClient:
             # Capture wb_run_step_end at call end time
             current_wb_run_step_end = safe_current_wb_run_step()
 
+            assert call.id is not None, "Call ID must be set at this point"
             call_end_req = CallEndReq(
                 end=EndedCallSchemaForInsert(
                     project_id=project_id,
                     id=call.id,
                     ended_at=ended_at,
                     output=output_json,
-                    summary=merged_summary,
+                    summary=merged_summary,  # type: ignore[arg-type]
                     exception=exception_str,
                     wb_run_step_end=current_wb_run_step_end,
                 )
@@ -965,9 +987,84 @@ class WeaveClient:
                     f"Trace output size ({bytes_size} bytes) exceeds the maximum allowed size of {MAX_TRACE_PAYLOAD_SIZE} bytes. "
                     "Output may be dropped."
                 )
-            self.server.call_end(call_end_req)
 
-        self.future_executor.defer(send_end_call)
+            # Get the cached start request
+            start_future = self._call_start_futures.get(call.id)
+            if start_future is not None:
+                # Wait for the start to be cached
+                call_start_req = start_future.result()
+
+                # Combine start and end into a complete call
+                complete_call = CompleteCallSchemaForInsert(
+                    project_id=call_start_req.start.project_id,
+                    id=call_start_req.start.id,
+                    op_name=call_start_req.start.op_name,
+                    display_name=call_start_req.start.display_name,
+                    trace_id=call_start_req.start.trace_id,
+                    parent_id=call_start_req.start.parent_id,
+                    thread_id=call_start_req.start.thread_id,
+                    turn_id=call_start_req.start.turn_id,
+                    started_at=call_start_req.start.started_at,
+                    attributes=call_start_req.start.attributes,
+                    inputs=call_start_req.start.inputs,
+                    ended_at=call_end_req.end.ended_at,
+                    exception=call_end_req.end.exception,
+                    output=call_end_req.end.output,
+                    summary=call_end_req.end.summary,
+                    wb_user_id=call_start_req.start.wb_user_id,
+                    wb_run_id=call_start_req.start.wb_run_id,
+                    wb_run_step=call_start_req.start.wb_run_step,
+                    wb_run_step_end=call_end_req.end.wb_run_step_end,
+                )
+
+                # Send the complete call using the new V1 batch endpoint
+                self.server.v1_calls_complete_batch(
+                    CallsCompleteBatchReq(project_id=project_id, items=[complete_call])
+                )
+
+                # Clean up the future tracking
+                self._call_start_futures.pop(call.id, None)
+            else:
+                # No start future found - this shouldn't happen in normal operation
+                # Fall back to sending just the end
+                logger.warning(
+                    f"No cached start request found for call {call.id}, sending end only"
+                )
+                self.server.call_end(call_end_req)
+
+        # Check if there's a pending start future for this call
+        start_future = self._call_start_futures.get(call.id)
+        if start_future is not None:
+            # Wait for the start to be sent before sending the complete call
+            # This ensures ordering: start is sent first, then the complete record
+            self.future_executor.then([start_future], lambda _: send_complete_call())
+        else:
+            # No start future found - this shouldn't happen in normal operation
+            # but handle it gracefully by just sending the end
+            def send_end_only() -> None:
+                maybe_redacted_output_as_refs = output_as_refs
+                if should_redact_pii():
+                    from weave.utils.pii_redaction import redact_pii
+
+                    maybe_redacted_output_as_refs = redact_pii(output_as_refs)
+
+                output_json = to_json(
+                    maybe_redacted_output_as_refs, project_id, self, use_dictify=False
+                )
+                assert call.id is not None
+                call_end_req = CallEndReq(
+                    end=EndedCallSchemaForInsert(
+                        project_id=project_id,
+                        id=call.id,
+                        ended_at=ended_at,
+                        output=output_json,
+                        summary=merged_summary,  # type: ignore[arg-type]
+                        exception=exception_str,
+                    )
+                )
+                self.server.call_end(call_end_req)
+
+            self.future_executor.defer(send_end_only)
 
         # If a turn call is finishing, reset turn context for next sibling
         if call.turn_id == call.id and call.thread_id:

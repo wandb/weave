@@ -9,12 +9,13 @@ from weave.trace_server.project_version.clickhouse_provider import (
 from weave.trace_server.project_version.gorilla_provider import (
     GorillaProjectVersionProvider,
 )
-from weave.trace_server.project_version.redis_provider import RedisProjectVersionProvider
+from weave.trace_server.project_version.redis_provider import (
+    RedisProjectVersionProvider,
+)
 
 
 class ProjectVersionResolver:
-    """
-    Resolves project versions by trying providers in explicit order.
+    """Resolves project versions by trying providers in explicit order.
 
     Provider order (fastest to slowest):
         1. In-memory cache (5 min TTL)
@@ -49,8 +50,12 @@ class ProjectVersionResolver:
         cache_ttl_seconds: float = 300,
     ):
         # Initialize providers (no chaining, just independent instances)
-        self._clickhouse_provider = ClickHouseProjectVersionProvider(ch_client=ch_client)
-        self._gorilla_provider = GorillaProjectVersionProvider(gorilla_client=gorilla_client)
+        self._clickhouse_provider = ClickHouseProjectVersionProvider(
+            ch_client=ch_client
+        )
+        self._gorilla_provider = GorillaProjectVersionProvider(
+            gorilla_client=gorilla_client
+        )
         self._redis_provider = RedisProjectVersionProvider(
             redis_client=redis_client, enabled=redis_enabled
         )
@@ -60,8 +65,7 @@ class ProjectVersionResolver:
         self._cache: dict[str, tuple[int, float]] = {}
 
     async def get_project_version(self, project_id: str) -> int:
-        """
-        Resolve project version through explicit provider checks.
+        """Resolve project version through explicit provider checks.
 
         Returns:
             0 for legacy schema (calls_merged), 1 for new schema (calls_complete).
@@ -77,21 +81,22 @@ class ProjectVersionResolver:
         # 2. Try Redis cache if enabled
         try:
             version = await self._redis_provider.get_project_version(project_id)
-            self._cache[project_id] = (version, now + self._cache_ttl)
-            return version
         except Exception:
             pass  # Fall through to next provider
+        else:
+            self._cache[project_id] = (version, now + self._cache_ttl)
+            return version
 
         # 3. Try Gorilla config if available
         try:
             version = await self._gorilla_provider.get_project_version(project_id)
-            self._cache[project_id] = (version, now + self._cache_ttl)
-            return version
         except Exception:
             pass  # Fall through to ClickHouse
+        else:
+            self._cache[project_id] = (version, now + self._cache_ttl)
+            return version
 
         # 4. Finally, check ClickHouse (always succeeds, returns 0 or 1)
         version = await self._clickhouse_provider.get_project_version(project_id)
         self._cache[project_id] = (version, now + self._cache_ttl)
         return version
-

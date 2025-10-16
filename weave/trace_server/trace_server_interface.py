@@ -208,8 +208,7 @@ class EndedCallSchemaForInsert(BaseModel):
 
 
 class CompleteCallSchemaForInsert(BaseModel):
-    """
-    Complete call with both start and end data (for V1 batch complete endpoint).
+    """Complete call with both start and end data (for V1 batch complete endpoint).
 
     This combines all fields from StartedCallSchemaForInsert and EndedCallSchemaForInsert.
     """
@@ -260,6 +259,48 @@ class CompleteCallSchemaForInsert(BaseModel):
     @field_serializer("summary")
     def serialize_typed_dicts(self, v: dict[str, Any]) -> dict[str, Any]:
         return dict(v)
+
+
+class CallsStartBatchReq(BaseModelStrict):
+    """Request for V1 batch call start endpoint.
+
+    Args:
+        project_id (str): The project ID for all calls in the batch.
+        items (list[StartedCallSchemaForInsert]): List of calls to start.
+    """
+
+    project_id: str
+    items: list[StartedCallSchemaForInsert]
+
+
+class CallsStartBatchRes(BaseModel):
+    """Response for V1 batch call start endpoint.
+
+    Args:
+        ids (list[str]): List of call IDs for started calls.
+        trace_ids (list[str]): List of trace IDs for started calls.
+    """
+
+    ids: list[str]
+    trace_ids: list[str]
+
+
+class CallsCompleteBatchReq(BaseModelStrict):
+    """Request for V1 batch call complete endpoint.
+
+    Args:
+        project_id (str): The project ID for all calls in the batch.
+        items (list[CompleteCallSchemaForInsert]): List of complete calls (with both start and end data).
+    """
+
+    project_id: str
+    items: list[CompleteCallSchemaForInsert]
+
+
+class CallsCompleteBatchRes(BaseModel):
+    """Response for V1 batch call complete endpoint."""
+
+    pass
 
 
 class ObjSchema(BaseModel):
@@ -1324,9 +1365,12 @@ class TraceServerInterface(Protocol):
     def call_start_batch(self, req: CallCreateBatchReq) -> CallCreateBatchRes: ...
 
     # V1 Call Batch API (for calls_complete table)
-    # Note: DTOs are defined in trace_server.py (CallsStartBatchReq/Res, CallsCompleteBatchReq/Res)
-    def v1_calls_start_batch(self, req: Any) -> Any: ...
-    def v1_calls_complete_batch(self, req: Any) -> Any: ...
+    def v1_calls_start_batch(
+        self, req: CallsStartBatchReq
+    ) -> CallsStartBatchRes: ...
+    def v1_calls_complete_batch(
+        self, req: CallsCompleteBatchReq
+    ) -> CallsCompleteBatchRes: ...
 
     # Op API
     def op_create(self, req: OpCreateReq) -> OpCreateRes: ...

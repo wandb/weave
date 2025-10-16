@@ -4,8 +4,7 @@ from typing import Any, Optional
 
 
 class RedisProjectVersionProvider:
-    """
-    Reads project version from Redis cache.
+    """Reads project version from Redis cache.
 
     Args:
         redis_client: Async Redis client instance.
@@ -31,8 +30,7 @@ class RedisProjectVersionProvider:
         self._redis = redis_client
 
     async def get_project_version(self, project_id: str) -> int:
-        """
-        Get project version from Redis cache.
+        """Get project version from Redis cache.
 
         Raises:
             Exception: If Redis is disabled, unavailable, or key not found.
@@ -46,4 +44,3 @@ class RedisProjectVersionProvider:
             raise ValueError(f"Project {project_id} not found in Redis")
 
         return int(cached)
-

@@ -7,8 +7,7 @@ if TYPE_CHECKING:
 
 
 def get_calls_table(project_id: str, version_service: "ProjectVersionService") -> str:
-    """
-    Return the appropriate calls table name based on project version.
+    """Return the appropriate calls table name based on project version.
 
     Args:
         project_id: The project ID to look up.
@@ -35,4 +34,3 @@ def get_calls_table(project_id: str, version_service: "ProjectVersionService") -
         version = asyncio.run(version_service.get_project_version(project_id))
 
     return "calls_complete" if version == 1 else "calls_merged"
-

@@ -2,15 +2,14 @@
 
 import pytest
 
-from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 from weave.trace_server.calls_query_builder.calls_query_builder import (
     CallsQuery,
     build_calls_stats_query,
 )
+from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
 from weave.trace_server.orm import ParamBuilder
-from weave.trace_server.threads_query_builder import make_threads_query
 from weave.trace_server.project_query_builder import make_project_stats_query
-from weave.trace_server.project_version.base import ProjectVersionService
+from weave.trace_server.threads_query_builder import make_threads_query
 
 
 class MockProjectVersionService:
@@ -50,7 +49,7 @@ class TestCallsQueryRouting:
     def test_v1_project_raises_not_implemented(self):
         """V1 projects should raise NotImplementedError until Stage 4."""
         from weave.trace_server import trace_server_interface as tsi
-        
+
         pvs = MockProjectVersionService(version=1)
         server = ClickHouseTraceServer(
             host="localhost",
@@ -58,7 +57,7 @@ class TestCallsQueryRouting:
         )
 
         req = tsi.CallsQueryReq(project_id="test-project")
-        
+
         with pytest.raises(NotImplementedError, match="V1 projects"):
             # This should raise NotImplementedError in calls_query_stream
             server.calls_query(req)
@@ -121,7 +120,7 @@ class TestCallsStatsQueryRouting:
         pb = ParamBuilder()
 
         table_name = server._get_calls_table("test-project")
-        
+
         with pytest.raises(NotImplementedError, match="Stats queries on V1 projects"):
             build_calls_stats_query(req, pb, table_alias=table_name)
 
@@ -223,6 +222,7 @@ class TestEndToEndTableRouting:
 
     def test_multiple_projects_different_versions(self):
         """Different projects can have different versions simultaneously."""
+
         # Simulate mixed environment: some V0, some V1
         class MultiVersionService:
             async def get_project_version(self, project_id: str) -> int:
@@ -255,4 +255,3 @@ class TestEndToEndTableRouting:
 
         stats_table = server._get_calls_stats_table("any-project")
         assert stats_table == "calls_merged_stats"
-

@@ -1,13 +1,10 @@
 import json
 import logging
-from typing import TYPE_CHECKING, Any, Callable, Optional, TypeVar, Union
+from typing import Any, Callable, Optional, TypeVar
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.utils import http_requests as requests
-
-if TYPE_CHECKING:
-    from weave.trace_server_bindings.models import EndBatchItem, StartBatchItem
 
 logger = logging.getLogger(__name__)
 
@@ -25,33 +22,6 @@ T = TypeVar("T")
 BatchProcessor = AsyncBatchProcessor
 
 
-def log_dropped_call_batch(
-    batch: list[Union["StartBatchItem", "EndBatchItem"]], e: Exception
-) -> None:
-    """Log details about a dropped call batch for debugging purposes."""
-    logger.error(f"Error sending batch of {len(batch)} call events to server")
-    dropped_start_ids = []
-    dropped_end_ids = []
-    for item in batch:
-        # Use string comparison to avoid circular imports
-        if hasattr(item, "req") and hasattr(item.req, "start"):
-            # For start items, access the start request
-            dropped_start_ids.append(item.req.start.id)
-        elif hasattr(item, "req") and hasattr(item.req, "end"):
-            # For end items, access the end request
-            dropped_end_ids.append(item.req.end.id)
-    if dropped_start_ids:
-        logger.error(f"dropped call start ids: {dropped_start_ids}")
-    if dropped_end_ids:
-        logger.error(f"dropped call end ids: {dropped_end_ids}")
-    if isinstance(e, requests.HTTPError) and e.response is not None:
-        logger.error(f"status code: {e.response.status_code}")
-        logger.error(f"reason: {e.response.reason}")
-        logger.error(f"text: {e.response.text}")
-    else:
-        logger.error(f"error: {e}")
-
-
 def log_dropped_feedback_batch(
     batch: list[tsi.FeedbackCreateReq], e: Exception
 ) -> None:
@@ -64,6 +34,36 @@ def log_dropped_feedback_batch(
         dropped_feedback_types.append(item.feedback_type)
     if dropped_feedback_types:
         logger.error(f"dropped feedback types: {dropped_feedback_types}")
+    if isinstance(e, requests.HTTPError) and e.response is not None:
+        logger.error(f"status code: {e.response.status_code}")
+        logger.error(f"reason: {e.response.reason}")
+        logger.error(f"text: {e.response.text}")
+    else:
+        logger.error(f"error: {e}")
+
+
+def log_dropped_start_batch(
+    batch: list[tsi.StartedCallSchemaForInsert], e: Exception
+) -> None:
+    """Log details about a dropped call start batch for debugging purposes."""
+    logger.error(f"Error sending batch of {len(batch)} call start events to server")
+    dropped_ids = [item.id for item in batch]
+    logger.error(f"dropped call start ids: {dropped_ids}")
+    if isinstance(e, requests.HTTPError) and e.response is not None:
+        logger.error(f"status code: {e.response.status_code}")
+        logger.error(f"reason: {e.response.reason}")
+        logger.error(f"text: {e.response.text}")
+    else:
+        logger.error(f"error: {e}")
+
+
+def log_dropped_complete_batch(
+    batch: list[tsi.CompleteCallSchemaForInsert], e: Exception
+) -> None:
+    """Log details about a dropped complete call batch for debugging purposes."""
+    logger.error(f"Error sending batch of {len(batch)} complete call events to server")
+    dropped_ids = [item.id for item in batch]
+    logger.error(f"dropped complete call ids: {dropped_ids}")
     if isinstance(e, requests.HTTPError) and e.response is not None:
         logger.error(f"status code: {e.response.status_code}")
         logger.error(f"reason: {e.response.reason}")
@@ -239,7 +239,7 @@ def handle_response_error(response: requests.Response, url: str) -> None:
 
 
 def check_endpoint_exists(
-    func: Callable, test_req: Any, cache_key: Union[str, None] = None
+    func: Callable, test_req: Any, cache_key: str | None = None
 ) -> bool:
     """Check if a function/endpoint exists and works by calling it with a test request.
 

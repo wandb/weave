@@ -1,12 +1,12 @@
 # Clickhouse Trace Server
 
+import asyncio
 import dataclasses
 import datetime
 import hashlib
 import json
 import logging
 import threading
-import asyncio
 from collections import defaultdict
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
@@ -29,7 +29,6 @@ from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server import environment as wf_env
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
-from weave.trace_server.project_version.base import ProjectVersionService
 from weave.trace_server.actions_worker.dispatcher import execute_batch
 from weave.trace_server.base64_content_conversion import (
     process_call_req_to_content,
@@ -52,8 +51,6 @@ from weave.trace_server.clickhouse_schema import (
     V1_CALL_STARTS_INSERT_COLUMNS,
     V1_CALLS_COMPLETE_INSERT_COLUMNS,
     CallCHInsertable,
-    V1CallStartCHInsertable,
-    V1CallCompleteCHInsertable,
     CallDeleteCHInsertable,
     CallEndCHInsertable,
     CallStartCHInsertable,
@@ -63,6 +60,8 @@ from weave.trace_server.clickhouse_schema import (
     ObjDeleteCHInsertable,
     ObjRefListType,
     SelectableCHObjSchema,
+    V1CallCompleteCHInsertable,
+    V1CallStartCHInsertable,
 )
 from weave.trace_server.constants import (
     COMPLETIONS_CREATE_OP_NAME,
@@ -118,6 +117,7 @@ from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
 from weave.trace_server.orm import ParamBuilder, Row
 from weave.trace_server.project_query_builder import make_project_stats_query
+from weave.trace_server.project_version.base import ProjectVersionService
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 from weave.trace_server.table_query_builder import (
     ROW_ORDER_COLUMN_NAME,
@@ -164,7 +164,6 @@ _CH_POOL_MANAGER = get_pool_manager(maxsize=50, num_pools=2)
 
 
 class ClickHouseTraceServer(tsi.TraceServerInterface):
-
     def __init__(
         self,
         *,
@@ -195,8 +194,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._project_version_service = project_version_service
 
     def _get_calls_table(self, project_id: str) -> str:
-        """
-        Get the appropriate calls table name for a project.
+        """Get the appropriate calls table name for a project.
 
         Args:
             project_id: The project identifier.
@@ -218,8 +216,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return "calls_complete" if version == 1 else "calls_merged"
 
     def _get_calls_stats_table(self, project_id: str) -> str:
-        """
-        Get the appropriate calls stats table name for a project.
+        """Get the appropriate calls stats table name for a project.
 
         Args:
             project_id: The project identifier.
@@ -401,8 +398,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return tsi.CallEndRes()
 
     def v1_calls_start_batch(self, req: Any) -> Any:
-        """
-        Batch start calls for V1 projects (writes to call_starts table).
+        """Batch start calls for V1 projects (writes to call_starts table).
 
         This method enforces that the project is V1 before writing.
         Inserts incomplete calls into the call_starts table.
@@ -466,8 +462,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         return CallsStartBatchRes(ids=ids, trace_ids=trace_ids)
 
     def v1_calls_complete_batch(self, req: Any) -> Any:
-        """
-        Batch complete calls for V1 projects (writes to calls_complete table).
+        """Batch complete calls for V1 projects (writes to calls_complete table).
 
         This method enforces that the project is V1 before writing.
         Inserts complete calls directly into calls_complete table.
@@ -2715,8 +2710,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def _v1_insert_call_starts_batch(
         self, ch_calls: list[V1CallStartCHInsertable]
     ) -> None:
-        """
-        Batch insert calls into call_starts table (V1 projects).
+        """Batch insert calls into call_starts table (V1 projects).
 
         Args:
             ch_calls: List of V1CallStartCHInsertable to insert.
@@ -2745,8 +2739,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def _v1_insert_calls_complete_batch(
         self, ch_calls: list[V1CallCompleteCHInsertable]
     ) -> None:
-        """
-        Batch insert calls into calls_complete table (V1 projects).
+        """Batch insert calls into calls_complete table (V1 projects).
 
         Args:
             ch_calls: List of V1CallCompleteCHInsertable to insert.
@@ -3041,8 +3034,7 @@ def _start_call_to_v1_ch_insertable(
     start_call: tsi.StartedCallSchemaForInsert,
     trace_server: Optional[tsi.TraceServerInterface] = None,
 ) -> V1CallStartCHInsertable:
-    """
-    Convert StartedCallSchemaForInsert to V1CallStartCHInsertable for call_starts table.
+    """Convert StartedCallSchemaForInsert to V1CallStartCHInsertable for call_starts table.
 
     Args:
         start_call: API schema for call start.
@@ -3081,8 +3073,7 @@ def _complete_call_to_v1_ch_insertable(
     complete_call: tsi.CompleteCallSchemaForInsert,
     trace_server: Optional[tsi.TraceServerInterface] = None,
 ) -> V1CallCompleteCHInsertable:
-    """
-    Convert CompleteCallSchemaForInsert to V1CallCompleteCHInsertable for calls_complete table.
+    """Convert CompleteCallSchemaForInsert to V1CallCompleteCHInsertable for calls_complete table.
 
     Args:
         complete_call: API schema for complete call (with both start and end data).

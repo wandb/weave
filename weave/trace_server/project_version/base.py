@@ -4,8 +4,7 @@ from typing import Protocol
 
 
 class ProjectVersionService(Protocol):
-    """
-    Resolves the schema version for a given project.
+    """Resolves the schema version for a given project.
 
     Returns:
         int: 0 for legacy schema (calls_merged), 1 for new schema (calls_complete).
@@ -19,4 +18,3 @@ class ProjectVersionService(Protocol):
     async def get_project_version(self, project_id: str) -> int:
         """Get the project version for routing decisions."""
         ...
-

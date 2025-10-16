@@ -1672,8 +1672,8 @@ def build_calls_stats_query(
     # For now, only V0 projects can use the fallback general query path
     if table_alias != "calls_merged":
         raise NotImplementedError(
-            f"Stats queries on V1 projects that require complex filtering are not yet supported. "
-            f"Simple existence checks work, but complex queries need the new /v1/calls/* endpoints (Stage 4)."
+            "Stats queries on V1 projects that require complex filtering are not yet supported. "
+            "Simple existence checks work, but complex queries need the new /v1/calls/* endpoints (Stage 4)."
         )
 
     inner_query = cq.as_sql(param_builder)

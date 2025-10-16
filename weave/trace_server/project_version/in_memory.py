@@ -1,14 +1,12 @@
 """In-memory LRU cache with TTL for project version lookups."""
 
 import time
-from typing import Optional
 
 from weave.trace_server.project_version.base import ProjectVersionService
 
 
 class InMemoryProjectVersionCache:
-    """
-    Fast in-process cache with TTL expiration.
+    """Fast in-process cache with TTL expiration.
 
     Args:
         upstream: Fallback provider to query on cache miss.
@@ -41,4 +39,3 @@ class InMemoryProjectVersionCache:
         version = await self._upstream.get_project_version(project_id)
         self._cache[project_id] = (version, now + self._ttl)
         return version
-

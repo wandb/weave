@@ -1,9 +1,6 @@
 """Tests for table routing via ClickHouseTraceServer._get_calls_table()."""
 
-import pytest
-
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
-from weave.trace_server.project_version.base import ProjectVersionService
 
 
 class MockProjectVersionService:
@@ -62,10 +59,10 @@ def test_get_calls_table_handles_different_projects():
         host="localhost",
         project_version_service=pvs,
     )
-    
+
     table1 = server._get_calls_table("project-a")
     table2 = server._get_calls_table("project-b")
-    
+
     assert table1 == "calls_complete"
     assert table2 == "calls_complete"
     assert pvs.call_count == 2
@@ -79,4 +76,3 @@ def test_get_calls_table_returns_calls_merged_when_no_service():
     )
     table = server._get_calls_table("test-project")
     assert table == "calls_merged"
-

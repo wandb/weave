@@ -7,8 +7,7 @@ from weave.trace_server.orm import ParamBuilder
 
 
 class ClickHouseProjectVersionProvider:
-    """
-    Determines project version by checking for calls_complete table rows.
+    """Determines project version by checking for calls_complete table rows.
 
     Args:
         ch_client: ClickHouse client for querying.
@@ -33,7 +32,7 @@ class ClickHouseProjectVersionProvider:
         """
         try:
             result = self._ch.query(query, parameters=pb.get_params())
-            return 1 if result.result_rows else 0
         except Exception:
             return 0
-
+        else:
+            return 1 if result.result_rows else 0

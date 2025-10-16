@@ -1,5 +1,4 @@
-"""
-Tests for Stage 2: Trace server injection + header negotiation.
+"""Tests for Stage 2: Trace server injection + header negotiation.
 
 This module tests that:
 1. Trace server accepts ProjectVersionService injection
@@ -8,14 +7,11 @@ This module tests that:
 """
 
 import datetime
-import pytest
 import uuid
-from unittest.mock import AsyncMock, Mock
 from typing import Optional
 
-from weave.trace_server.project_version.base import ProjectVersionService
-from weave.trace_server import clickhouse_trace_server_batched
-from weave.trace_server import trace_server_interface as tsi
+import pytest
+
 from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     DummyIdConverter,
     TestOnlyUserInjectingExternalTraceServer,
@@ -24,7 +20,9 @@ from tests.trace_server.conftest_lib.trace_server_external_adapter import (
 from tests.trace_server.workers.evaluate_model_test_worker import (
     EvaluateModelTestDispatcher,
 )
-
+from weave.trace_server import clickhouse_trace_server_batched
+from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.project_version.base import ProjectVersionService
 
 TEST_ENTITY = "test_entity"
 
@@ -45,15 +43,17 @@ class MockProjectVersionService(ProjectVersionService):
 def get_ch_trace_server_with_pvs(
     ensure_clickhouse_db,
 ):
-    """
-    Fixture to create a ClickHouse trace server with a mock ProjectVersionService.
-    
+    """Fixture to create a ClickHouse trace server with a mock ProjectVersionService.
+
     Returns a factory function that accepts a ProjectVersionService.
     """
 
     def ch_trace_server_with_pvs_inner(
         project_version_service: Optional[ProjectVersionService] = None,
-    ) -> tuple[TestOnlyUserInjectingExternalTraceServer, clickhouse_trace_server_batched.ClickHouseTraceServer]:
+    ) -> tuple[
+        TestOnlyUserInjectingExternalTraceServer,
+        clickhouse_trace_server_batched.ClickHouseTraceServer,
+    ]:
         host, port = next(ensure_clickhouse_db())
         id_converter = DummyIdConverter()
         ch_server = clickhouse_trace_server_batched.ClickHouseTraceServer(
@@ -82,13 +82,10 @@ def get_ch_trace_server_with_pvs(
 async def test_trace_server_caches_project_version_per_project(
     get_ch_trace_server_with_pvs,
 ):
-    """
-    Test that the trace server calls get_project_version once per project
+    """Test that the trace server calls get_project_version once per project
     and caches the result for subsequent operations.
     """
-    mock_pvs = MockProjectVersionService(
-        {"test-project-1": 0, "test-project-2": 1}
-    )
+    mock_pvs = MockProjectVersionService({"test-project-1": 0, "test-project-2": 1})
     external_server, ch_server = get_ch_trace_server_with_pvs(mock_pvs)
 
     # Verify the service is injected
@@ -99,7 +96,7 @@ async def test_trace_server_caches_project_version_per_project(
     call_id_1 = str(uuid.uuid4())
     call_id_2 = str(uuid.uuid4())
     trace_id_1 = str(uuid.uuid4())
-    
+
     req1 = tsi.CallStartReq(
         start=tsi.StartedCallSchemaForInsert(
             project_id="test-project-1",
@@ -129,7 +126,7 @@ async def test_trace_server_caches_project_version_per_project(
     # Call operations on project-2
     call_id_3 = str(uuid.uuid4())
     trace_id_2 = str(uuid.uuid4())
-    
+
     req3 = tsi.CallStartReq(
         start=tsi.StartedCallSchemaForInsert(
             project_id="test-project-2",
@@ -146,8 +143,12 @@ async def test_trace_server_caches_project_version_per_project(
     # Verify that get_project_version was called exactly once per project
     # Note: This test passes if caching is implemented in the trace server.
     # For now, we just verify injection works and the service is callable.
-    assert "test-project-1" in mock_pvs.call_counts or True  # Placeholder until caching is implemented
-    assert "test-project-2" in mock_pvs.call_counts or True  # Placeholder until caching is implemented
+    assert (
+        "test-project-1" in mock_pvs.call_counts or True
+    )  # Placeholder until caching is implemented
+    assert (
+        "test-project-2" in mock_pvs.call_counts or True
+    )  # Placeholder until caching is implemented
 
 
 # ===== Test 7 & 8: Old /call/start endpoint version enforcement =====
@@ -157,9 +158,7 @@ async def test_trace_server_caches_project_version_per_project(
 def test_trace_server_accepts_project_version_service_injection(
     get_ch_trace_server_with_pvs,
 ):
-    """
-    Smoke test: Verify that ProjectVersionService can be injected into ClickHouseTraceServer.
-    """
+    """Smoke test: Verify that ProjectVersionService can be injected into ClickHouseTraceServer."""
     mock_pvs = MockProjectVersionService({"test-project": 1})
     external_server, ch_server = get_ch_trace_server_with_pvs(mock_pvs)
 
@@ -170,9 +169,7 @@ def test_trace_server_accepts_project_version_service_injection(
 def test_trace_server_defaults_to_none_when_no_service_provided(
     get_ch_trace_server_with_pvs,
 ):
-    """
-    Test that trace server can be created without a ProjectVersionService (backwards compatibility).
-    """
+    """Test that trace server can be created without a ProjectVersionService (backwards compatibility)."""
     external_server, ch_server = get_ch_trace_server_with_pvs(None)
 
     assert ch_server._project_version_service is None
@@ -184,9 +181,8 @@ def test_trace_server_defaults_to_none_when_no_service_provided(
 
 @pytest.mark.skip(reason="Header negotiation to be implemented at FastAPI layer")
 def test_call_start_with_version_header():
-    """
-    Test that /call/start accepts X-Weave-Project-Version header.
-    
+    """Test that /call/start accepts X-Weave-Project-Version header.
+
     This test will be implemented once we wire the header through the FastAPI layer.
     The header should be available in the request context for version checking.
     """
@@ -195,9 +191,8 @@ def test_call_start_with_version_header():
 
 @pytest.mark.skip(reason="Version enforcement to be implemented")
 def test_call_start_rejects_v1_project_without_header():
-    """
-    Test that /call/start rejects V1 projects when header is not present.
-    
+    """Test that /call/start rejects V1 projects when header is not present.
+
     Expected behavior:
     - V1 project + no header -> 400 error (old SDK shouldn't write to V1)
     - V1 project + header=1 -> success (new SDK can write to V1)
@@ -208,8 +203,5 @@ def test_call_start_rejects_v1_project_without_header():
 
 @pytest.mark.skip(reason="Version enforcement to be implemented")
 def test_call_start_accepts_v1_project_with_header():
-    """
-    Test that /call/start accepts V1 projects when X-Weave-Project-Version: 1 is present.
-    """
+    """Test that /call/start accepts V1 projects when X-Weave-Project-Version: 1 is present."""
     pass
-

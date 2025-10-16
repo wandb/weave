@@ -4,8 +4,7 @@ from typing import Any, Optional
 
 
 class GorillaProjectVersionProvider:
-    """
-    Reads project version from Gorilla MySQL config via gRPC/HTTP.
+    """Reads project version from Gorilla MySQL config via gRPC/HTTP.
 
     Args:
         gorilla_client: Client for querying Gorilla project config.
@@ -27,8 +26,7 @@ class GorillaProjectVersionProvider:
         self._gorilla = gorilla_client
 
     async def get_project_version(self, project_id: str) -> int:
-        """
-        Query Gorilla config for project version.
+        """Query Gorilla config for project version.
 
         Raises:
             Exception: If Gorilla is unavailable or config not found.
@@ -38,4 +36,3 @@ class GorillaProjectVersionProvider:
 
         config = self._gorilla.get_project_config(project_id)
         return config.get("weaveProjectVersion", 0)
-
