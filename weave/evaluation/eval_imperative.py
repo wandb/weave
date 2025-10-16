@@ -247,26 +247,35 @@ class ScoreLogger(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    def finish(self) -> None:
+    def finish(self, output: Any | None = None) -> None:
+        """Finish the prediction and log all scores.
+
+        Args:
+            output: Optional output to override the prediction output. If not provided,
+                uses the output passed to log_prediction.
+        """
         if self._has_finished:
             logger.warning("(NO-OP): Already called finish, returning.")
             return
 
         scores = self._captured_scores
 
+        # Use the provided output or fall back to the stored output
+        final_output = output if output is not None else self._predict_output
+
         wc = require_weave_client()
 
         # First, finish the predict_call to compute its summary (including child costs)
         wc.finish_call(
             self.predict_call,
-            output=self._predict_output,
+            output=final_output,
         )
 
         # Then finish the predict_and_score_call with the scores
         wc.finish_call(
             self.predict_and_score_call,
             output={
-                "output": self._predict_output,
+                "output": final_output,
                 "scores": scores,
                 "model_latency": None,
             },
@@ -587,7 +596,7 @@ class EvaluationLogger(BaseModel):
 
         self._is_finalized = True
 
-    def log_prediction(self, inputs: dict, output: Any) -> ScoreLogger:
+    def log_prediction(self, inputs: dict, output: Any | None = None) -> ScoreLogger:
         """Log a prediction to the Evaluation, and return a reference.
 
         The reference can be used to log scores which are attached to the specific

@@ -795,3 +795,46 @@ def test_cost_propagation_with_child_calls(client):
     assert predict_and_score_call.summary["usage"]["gpt-4"]["completion_tokens"] == 20
     assert predict_and_score_call.summary["usage"]["gpt-4"]["total_tokens"] == 30
     assert predict_and_score_call.summary["usage"]["gpt-4"]["requests"] == 1
+
+
+def test_finish_with_output_override(client):
+    """Test that passing output to finish() overrides the initial output."""
+    ev = EvaluationLogger()
+
+    # Log a prediction with placeholder output
+    pred = ev.log_prediction(inputs={"question": "Hello"}, output="placeholder")
+
+    # Add a child call that generates the real output
+    with call_context.set_call_stack([pred.predict_call]):
+
+        @weave.op
+        def generate_response(prompt: str) -> str:
+            return "This is the real response!"
+
+        actual_output = generate_response("Hello")
+
+    # Finish with the actual output
+    pred.finish(output=actual_output)
+
+    # Log summary
+    ev.log_summary({"test": "complete"})
+
+    client.flush()
+
+    # Verify the output was overridden
+    calls = client.get_calls()
+
+    predict_call = None
+    predict_and_score_call = None
+    for call in calls:
+        if op_name_from_call(call) == "Model.predict":
+            predict_call = call
+        elif op_name_from_call(call) == "Evaluation.predict_and_score":
+            predict_and_score_call = call
+
+    assert predict_call is not None
+    assert predict_and_score_call is not None
+
+    # Both should have the actual output, not the placeholder
+    assert predict_call.output == "This is the real response!"
+    assert predict_and_score_call.output["output"] == "This is the real response!"
