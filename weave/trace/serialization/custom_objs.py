@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping
 from typing import Any, Literal, TypedDict
 
@@ -22,6 +23,8 @@ from weave.trace_server.trace_server_interface import (
     FileContentReadReq,
     TraceServerInterface,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class WeaveTypeDict(TypedDict):
@@ -135,6 +138,7 @@ def maybe_attach_art(res: Any, art: MemTraceFilesArtifact) -> None:
     try:
         res.art = art
     except Exception:
+        logger.debug("Failed to attach artifact to result", exc_info=True)
         pass
 
 
