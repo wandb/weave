@@ -573,7 +573,7 @@ class CallsQuery(BaseModel):
         self.expand_columns = expand_columns
         return self
 
-    def as_sql(self, pb: ParamBuilder, table_alias: str = "calls_merged") -> str:
+    def as_sql(self, pb: ParamBuilder) -> str:
         """This is the main entry point for building the query. This method will
         determine the optimal query to build based on the fields and conditions
         that have been set.
@@ -704,7 +704,7 @@ class CallsQuery(BaseModel):
 
         # If we should not optimize, then just build the base query
         if not should_optimize and not self.include_costs and not object_ref_conditions:
-            return self._as_sql_base_format(pb, table_alias)
+            return self._as_sql_base_format(pb, "calls_merged")
 
         # Build two queries, first filter query CTE, then select the columns
         filter_query = CallsQuery(project_id=self.project_id)
@@ -743,7 +743,7 @@ class CallsQuery(BaseModel):
         raw_sql += f"""filtered_calls AS ({
             filter_query._as_sql_base_format(
                 pb,
-                table_alias,
+                "calls_merged",
                 field_to_object_join_alias_map=field_to_object_join_alias_map,
                 expand_columns=self.expand_columns,
             )
@@ -764,14 +764,14 @@ class CallsQuery(BaseModel):
                 pb, "all_calls", self.project_id, select_fields, order_by_fields
             )
             raw_sql += f""",
-            all_calls AS ({select_query._as_sql_base_format(pb, table_alias, id_subquery_name="filtered_calls", field_to_object_join_alias_map=field_to_object_join_alias_map, expand_columns=self.expand_columns)}),
+            all_calls AS ({select_query._as_sql_base_format(pb, "calls_merged", id_subquery_name="filtered_calls", field_to_object_join_alias_map=field_to_object_join_alias_map, expand_columns=self.expand_columns)}),
             {inner_sql}
             """
 
         else:
             base_sql = select_query._as_sql_base_format(
                 pb,
-                table_alias,
+                "calls_merged",
                 id_subquery_name="filtered_calls",
                 field_to_object_join_alias_map=field_to_object_join_alias_map,
                 expand_columns=self.expand_columns,
@@ -1625,6 +1625,7 @@ def process_calls_filter_to_conditions(
 def build_calls_stats_query(
     req: tsi.CallsQueryStatsReq,
     param_builder: ParamBuilder,
+    table_alias: str = "calls_merged",
 ) -> tuple[str, KeysView[str]]:
     """Build a stats query for calls, automatically using optimized queries when possible.
 
@@ -1634,6 +1635,7 @@ def build_calls_stats_query(
     Args:
         req: The stats query request
         param_builder: Parameter builder for query parameterization
+        table_alias: The table name to query from (e.g., "calls_merged" or "calls_complete")
 
     Returns:
         Tuple of (SQL query string, column names in the result)
@@ -1641,7 +1643,7 @@ def build_calls_stats_query(
     aggregated_columns = {"count": "count()"}
 
     # Try optimized special case queries first
-    if opt_query := _try_optimized_stats_query(req, param_builder):
+    if opt_query := _try_optimized_stats_query(req, param_builder, table_alias):
         return (opt_query, aggregated_columns.keys())
 
     # Fall back to general query builder
@@ -1666,6 +1668,14 @@ def build_calls_stats_query(
         )
         cq.add_field("total_storage_size_bytes")
 
+    # TODO(Stage 4): CallsQuery.as_sql() doesn't support table routing yet
+    # For now, only V0 projects can use the fallback general query path
+    if table_alias != "calls_merged":
+        raise NotImplementedError(
+            f"Stats queries on V1 projects that require complex filtering are not yet supported. "
+            f"Simple existence checks work, but complex queries need the new /v1/calls/* endpoints (Stage 4)."
+        )
+
     inner_query = cq.as_sql(param_builder)
     calls_query_sql = f"SELECT {', '.join(aggregated_columns[k] for k in aggregated_columns)} FROM ({inner_query})"
 
@@ -1673,7 +1683,9 @@ def build_calls_stats_query(
 
 
 def _try_optimized_stats_query(
-    req: tsi.CallsQueryStatsReq, param_builder: ParamBuilder
+    req: tsi.CallsQueryStatsReq,
+    param_builder: ParamBuilder,
+    table_alias: str = "calls_merged",
 ) -> Optional[str]:
     """Try to match request to an optimized special-case query.
 
@@ -1687,7 +1699,9 @@ def _try_optimized_stats_query(
         and req.query is None
         and not req.include_total_storage_size
     ):
-        return _optimized_project_contains_call_query(req.project_id, param_builder)
+        return _optimized_project_contains_call_query(
+            req.project_id, param_builder, table_alias
+        )
 
     # Pattern 2: Query with wb_run_id check (limit=1, query present, minimal filter)
     # Covers common case: checking for runs with wb_run_id not null
@@ -1697,7 +1711,9 @@ def _try_optimized_stats_query(
         and not req.include_total_storage_size
         and _is_minimal_filter(req.filter)
     ):
-        return _optimized_wb_run_id_not_null_query(req.project_id, param_builder)
+        return _optimized_wb_run_id_not_null_query(
+            req.project_id, param_builder, table_alias
+        )
 
     return None
 
@@ -1705,6 +1721,7 @@ def _try_optimized_stats_query(
 def _optimized_project_contains_call_query(
     project_id: str,
     param_builder: ParamBuilder,
+    table_alias: str = "calls_merged",
 ) -> str:
     """Returns a query that checks if the project contains any calls."""
     return safely_format_sql(
@@ -1713,7 +1730,7 @@ def _optimized_project_contains_call_query(
     FROM
     (
         SELECT 1
-        FROM calls_merged
+        FROM {table_alias}
         WHERE project_id = {param_slot(param_builder.add_param(project_id), "String")}
         LIMIT 1
     )
@@ -1725,6 +1742,7 @@ def _optimized_project_contains_call_query(
 def _optimized_wb_run_id_not_null_query(
     project_id: str,
     param_builder: ParamBuilder,
+    table_alias: str = "calls_merged",
 ) -> str:
     """Optimized query for checking existence of calls with wb_run_id not null.
 
@@ -1733,11 +1751,11 @@ def _optimized_wb_run_id_not_null_query(
     project_id_param = param_builder.add_param(project_id)
     return f"""
         SELECT count() FROM (
-            SELECT calls_merged.id AS id
-            FROM calls_merged
-            WHERE calls_merged.project_id = {param_slot(project_id_param, "String")}
-                AND calls_merged.wb_run_id IS NOT NULL
-                AND calls_merged.deleted_at IS NULL
+            SELECT {table_alias}.id AS id
+            FROM {table_alias}
+            WHERE {table_alias}.project_id = {param_slot(project_id_param, "String")}
+                AND {table_alias}.wb_run_id IS NOT NULL
+                AND {table_alias}.deleted_at IS NULL
             LIMIT 1
         )
     """

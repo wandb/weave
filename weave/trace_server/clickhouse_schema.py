@@ -181,6 +181,95 @@ CallCHInsertable = Union[
     CallUpdateCHInsertable,
 ]
 
+
+# V1 Schema for call_starts table (incomplete calls)
+class V1CallStartCHInsertable(BaseModel):
+    """
+    Schema for inserting into call_starts table (V1 projects).
+    
+    This table holds incomplete calls that haven't been completed yet.
+    When a call completes, it moves to calls_complete and is deleted from here.
+    """
+    project_id: str
+    id: str
+    trace_id: str
+    op_name: str
+    started_at: datetime.datetime
+    
+    parent_id: Optional[str] = None
+    display_name: Optional[str] = None
+    thread_id: Optional[str] = None
+    turn_id: Optional[str] = None
+    
+    attributes_dump: str
+    inputs_dump: str
+    input_refs: list[str]
+    
+    wb_user_id: Optional[str] = None
+    wb_run_id: Optional[str] = None
+    wb_run_step: Optional[int] = None
+    wb_run_step_end: Optional[int] = None  # For compatibility
+    
+    _project_id_v = field_validator("project_id")(validation.project_id_validator)
+    _id_v = field_validator("id")(validation.call_id_validator)
+    _trace_id_v = field_validator("trace_id")(validation.trace_id_validator)
+    _parent_id_v = field_validator("parent_id")(validation.parent_id_validator)
+    _op_name_v = field_validator("op_name")(validation.op_name_validator)
+    _input_refs_v = field_validator("input_refs")(validation.refs_list_validator)
+    _display_name_v = field_validator("display_name")(validation.display_name_validator)
+    _wb_user_id_v = field_validator("wb_user_id")(validation.wb_user_id_validator)
+    _wb_run_id_v = field_validator("wb_run_id")(validation.wb_run_id_validator)
+    _wb_run_step_v = field_validator("wb_run_step")(validation.wb_run_step_validator)
+
+
+# V1 Schema for calls_complete table (complete calls)
+class V1CallCompleteCHInsertable(BaseModel):
+    """
+    Schema for inserting into calls_complete table (V1 projects).
+    
+    This table holds complete calls with both start and end data.
+    """
+    project_id: str
+    id: str
+    trace_id: str
+    op_name: str
+    started_at: datetime.datetime
+    ended_at: datetime.datetime
+    
+    parent_id: Optional[str] = None
+    display_name: Optional[str] = None
+    thread_id: Optional[str] = None
+    turn_id: Optional[str] = None
+    
+    attributes_dump: str
+    inputs_dump: str
+    input_refs: list[str]
+    output_dump: str
+    output_refs: list[str]
+    summary_dump: str
+    exception: Optional[str] = None
+    
+    wb_user_id: Optional[str] = None
+    wb_run_id: Optional[str] = None
+    wb_run_step: Optional[int] = None
+    wb_run_step_end: Optional[int] = None
+    
+    _project_id_v = field_validator("project_id")(validation.project_id_validator)
+    _id_v = field_validator("id")(validation.call_id_validator)
+    _trace_id_v = field_validator("trace_id")(validation.trace_id_validator)
+    _parent_id_v = field_validator("parent_id")(validation.parent_id_validator)
+    _op_name_v = field_validator("op_name")(validation.op_name_validator)
+    _input_refs_v = field_validator("input_refs")(validation.refs_list_validator)
+    _output_refs_v = field_validator("output_refs")(validation.refs_list_validator)
+    _display_name_v = field_validator("display_name")(validation.display_name_validator)
+    _wb_user_id_v = field_validator("wb_user_id")(validation.wb_user_id_validator)
+    _wb_run_id_v = field_validator("wb_run_id")(validation.wb_run_id_validator)
+    _wb_run_step_v = field_validator("wb_run_step")(validation.wb_run_step_validator)
+
+
+V1_CALL_STARTS_INSERT_COLUMNS = sorted(V1CallStartCHInsertable.model_fields.keys())
+V1_CALLS_COMPLETE_INSERT_COLUMNS = sorted(V1CallCompleteCHInsertable.model_fields.keys())
+
 ObjRefListType = list[ri.InternalObjectRef]
 
 

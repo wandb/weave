@@ -6,6 +6,7 @@ import hashlib
 import json
 import logging
 import threading
+import asyncio
 from collections import defaultdict
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
@@ -28,6 +29,7 @@ from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server import environment as wf_env
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.project_version.base import ProjectVersionService
 from weave.trace_server.actions_worker.dispatcher import execute_batch
 from weave.trace_server.base64_content_conversion import (
     process_call_req_to_content,
@@ -47,7 +49,11 @@ from weave.trace_server.clickhouse_schema import (
     ALL_CALL_SELECT_COLUMNS,
     ALL_FILE_CHUNK_INSERT_COLUMNS,
     REQUIRED_CALL_COLUMNS,
+    V1_CALL_STARTS_INSERT_COLUMNS,
+    V1_CALLS_COMPLETE_INSERT_COLUMNS,
     CallCHInsertable,
+    V1CallStartCHInsertable,
+    V1CallCompleteCHInsertable,
     CallDeleteCHInsertable,
     CallEndCHInsertable,
     CallStartCHInsertable,
@@ -158,6 +164,7 @@ _CH_POOL_MANAGER = get_pool_manager(maxsize=50, num_pools=2)
 
 
 class ClickHouseTraceServer(tsi.TraceServerInterface):
+
     def __init__(
         self,
         *,
@@ -168,6 +175,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         database: str = "default",
         use_async_insert: bool = False,
         evaluate_model_dispatcher: Optional[EvaluateModelDispatcher] = None,
+        project_version_service: Optional[ProjectVersionService] = None,
     ):
         super().__init__()
         self._thread_local = threading.local()
@@ -184,10 +192,55 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._file_storage_client: Optional[FileStorageClient] = None
         self._kafka_producer: Optional[KafkaProducer] = None
         self._evaluate_model_dispatcher = evaluate_model_dispatcher
+        self._project_version_service = project_version_service
+
+    def _get_calls_table(self, project_id: str) -> str:
+        """
+        Get the appropriate calls table name for a project.
+
+        Args:
+            project_id: The project identifier.
+
+        Returns:
+            str: "calls_complete" for V1 projects, "calls_merged" for V0 projects.
+
+        Examples:
+            >>> server = ClickHouseTraceServer(...)
+            >>> table = server._get_calls_table("my-project")
+            >>> assert table in ("calls_merged", "calls_complete")
+        """
+        if self._project_version_service is None:
+            return "calls_merged"
+
+        version = asyncio.get_event_loop().run_until_complete(
+            self._project_version_service.get_project_version(project_id)
+        )
+        return "calls_complete" if version == 1 else "calls_merged"
+
+    def _get_calls_stats_table(self, project_id: str) -> str:
+        """
+        Get the appropriate calls stats table name for a project.
+
+        Args:
+            project_id: The project identifier.
+
+        Returns:
+            str: "calls_complete_stats" for V1 projects, "calls_merged_stats" for V0 projects.
+
+        Examples:
+            >>> server = ClickHouseTraceServer(...)
+            >>> table = server._get_calls_stats_table("my-project")
+            >>> assert table in ("calls_merged_stats", "calls_complete_stats")
+        """
+        calls_table = self._get_calls_table(project_id)
+        return f"{calls_table}_stats"
 
     @classmethod
     def from_env(
-        cls, use_async_insert: bool = False, **kwargs: Any
+        cls,
+        use_async_insert: bool = False,
+        project_version_service: Optional[ProjectVersionService] = None,
+        **kwargs: Any,
     ) -> "ClickHouseTraceServer":
         # Explicitly calling `RemoteHTTPTraceServer` constructor here to ensure
         # that type checking is applied to the constructor.
@@ -198,6 +251,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             password=wf_env.wf_clickhouse_pass(),
             database=wf_env.wf_clickhouse_database(),
             use_async_insert=use_async_insert,
+            project_version_service=project_version_service,
             **kwargs,
         )
 
@@ -346,6 +400,133 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # Returns the id of the newly created call
         return tsi.CallEndRes()
 
+    def v1_calls_start_batch(self, req: Any) -> Any:
+        """
+        Batch start calls for V1 projects (writes to call_starts table).
+
+        This method enforces that the project is V1 before writing.
+        Inserts incomplete calls into the call_starts table.
+
+        Args:
+            req: CallsStartBatchReq with project_id and list of call starts.
+
+        Returns:
+            CallsStartBatchRes with call IDs and trace IDs.
+
+        Raises:
+            HTTPException: If project is not V1.
+
+        Examples:
+            >>> # In test code:
+            >>> req = CallsStartBatchReq(project_id="project1", items=[...])
+            >>> res = server.v1_calls_start_batch(req)
+        """
+        from fastapi import HTTPException
+
+        # Check project version
+        if self._project_version_service is None:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "code": "missing_project_version_service",
+                    "message": "Project version service not configured",
+                },
+            )
+
+        version = self._project_version_service.get_project_version(req.project_id)
+
+        if version != 1:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "code": "invalid_project_version",
+                    "message": "This endpoint requires a V1 project",
+                    "project_version": version,
+                    "required_version": 1,
+                },
+            )
+
+        # Convert API schema to CH insertable schema
+        ch_calls = []
+        ids = []
+        trace_ids = []
+
+        for item in req.items:
+            ch_call = _start_call_to_v1_ch_insertable(item, self)
+            ch_calls.append(ch_call)
+            ids.append(ch_call.id)
+            trace_ids.append(ch_call.trace_id)
+
+        # Batch insert to call_starts table
+        self._v1_insert_call_starts_batch(ch_calls)
+
+        # Import the response type
+        from src.trace_server import CallsStartBatchRes
+
+        return CallsStartBatchRes(ids=ids, trace_ids=trace_ids)
+
+    def v1_calls_complete_batch(self, req: Any) -> Any:
+        """
+        Batch complete calls for V1 projects (writes to calls_complete table).
+
+        This method enforces that the project is V1 before writing.
+        Inserts complete calls directly into calls_complete table.
+
+        Note: The client sends complete call data (both start and end) together.
+
+        Args:
+            req: CallsCompleteBatchReq with project_id and list of complete calls.
+
+        Returns:
+            CallsCompleteBatchRes (empty on success).
+
+        Raises:
+            HTTPException: If project is not V1.
+
+        Examples:
+            >>> # In test code:
+            >>> req = CallsCompleteBatchReq(project_id="project1", items=[...])
+            >>> res = server.v1_calls_complete_batch(req)
+        """
+        from fastapi import HTTPException
+
+        # Check project version
+        if self._project_version_service is None:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "code": "missing_project_version_service",
+                    "message": "Project version service not configured",
+                },
+            )
+
+        version = self._project_version_service.get_project_version(req.project_id)
+
+        if version != 1:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "code": "invalid_project_version",
+                    "message": "This endpoint requires a V1 project",
+                    "project_version": version,
+                    "required_version": 1,
+                },
+            )
+
+        # Convert complete call items to CH insertables
+        ch_calls = []
+        for item in req.items:
+            ch_call = _complete_call_to_v1_ch_insertable(item, self)
+            ch_calls.append(ch_call)
+
+        # Batch insert to calls_complete table
+        self._v1_insert_calls_complete_batch(ch_calls)
+
+        # Import the response type
+        from src.trace_server import CallsCompleteBatchRes
+
+        return CallsCompleteBatchRes()
+
     def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
         res = self.calls_query_stream(
             tsi.CallsQueryReq(
@@ -374,7 +555,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         aggregate statistics that are not directly queryable from the calls themselves.
         """
         pb = ParamBuilder()
-        query, columns = build_calls_stats_query(req, pb)
+        table_name = self._get_calls_table(req.project_id)
+        query, columns = build_calls_stats_query(req, pb, table_alias=table_name)
         raw_res = self._query(query, pb.get_params())
 
         res_dict = (
@@ -453,6 +635,22 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             cq.set_limit(req.limit)
         if req.offset is not None:
             cq.set_offset(req.offset)
+
+        # TODO(Stage 4): Implement V1 query path with calls_complete table
+        # The CallsQuery.as_sql() method has many hardcoded "calls_merged" references
+        # and needs a comprehensive refactor to support dynamic table routing.
+        # For now, V1 projects will use the new batch endpoints (Stage 4).
+        if self._project_version_service is not None:
+            import asyncio
+
+            version = asyncio.get_event_loop().run_until_complete(
+                self._project_version_service.get_project_version(req.project_id)
+            )
+            if version == 1:
+                raise NotImplementedError(
+                    "Query operations on V1 projects are not yet supported via this endpoint. "
+                    "V1 projects should use the new /v1/calls/* endpoints (coming in Stage 4)."
+                )
 
         pb = ParamBuilder()
         raw_res = self._query_stream(cq.as_sql(pb), pb.get_params())
@@ -1189,6 +1387,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             return True if val is None else val
 
         pb = ParamBuilder()
+        calls_stats_table = self._get_calls_stats_table(req.project_id)
         query, columns = make_project_stats_query(
             req.project_id,
             pb,
@@ -1196,6 +1395,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             include_objects_storage_size=_default_true(req.include_object_storage_size),
             include_tables_storage_size=_default_true(req.include_table_storage_size),
             include_files_storage_size=_default_true(req.include_file_storage_size),
+            calls_stats_table=calls_stats_table,
         )
         query_result = self.ch_client.query(query, parameters=pb.get_params())
 
@@ -1220,6 +1420,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             thread_ids = req.filter.thread_ids
 
         # Use the dedicated query builder
+        table_name = self._get_calls_table(req.project_id)
         query = make_threads_query(
             project_id=req.project_id,
             pb=pb,
@@ -1229,6 +1430,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             sortable_datetime_after=after_datetime,
             sortable_datetime_before=before_datetime,
             thread_ids=thread_ids,
+            table_name=table_name,
         )
 
         # Stream the results using _query_stream
@@ -2508,6 +2710,68 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         if self._flush_immediately:
             self._flush_calls()
 
+    # V1 Write Methods
+
+    def _v1_insert_call_starts_batch(
+        self, ch_calls: list[V1CallStartCHInsertable]
+    ) -> None:
+        """
+        Batch insert calls into call_starts table (V1 projects).
+
+        Args:
+            ch_calls: List of V1CallStartCHInsertable to insert.
+        """
+        if not ch_calls:
+            return
+
+        batch_data = []
+        for ch_call in ch_calls:
+            call_dict = ch_call.model_dump()
+            values = [call_dict.get(col) for col in V1_CALL_STARTS_INSERT_COLUMNS]
+            batch_data.append(values)
+
+        settings = {}
+        if self._use_async_insert:
+            settings["async_insert"] = 1
+            settings["wait_for_async_insert"] = 1
+
+        self._insert(
+            "call_starts",
+            data=batch_data,
+            column_names=V1_CALL_STARTS_INSERT_COLUMNS,
+            settings=settings,
+        )
+
+    def _v1_insert_calls_complete_batch(
+        self, ch_calls: list[V1CallCompleteCHInsertable]
+    ) -> None:
+        """
+        Batch insert calls into calls_complete table (V1 projects).
+
+        Args:
+            ch_calls: List of V1CallCompleteCHInsertable to insert.
+        """
+        if not ch_calls:
+            return
+
+        batch_data = []
+        for ch_call in ch_calls:
+            call_dict = ch_call.model_dump()
+            values = [call_dict.get(col) for col in V1_CALLS_COMPLETE_INSERT_COLUMNS]
+            batch_data.append(values)
+
+        settings = {}
+        if self._use_async_insert:
+            settings["async_insert"] = 1
+            settings["wait_for_async_insert"] = 1
+
+        self._insert(
+            "calls_complete",
+            data=batch_data,
+            column_names=V1_CALLS_COMPLETE_INSERT_COLUMNS,
+            settings=settings,
+        )
+
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._flush_calls")
     def _flush_calls(self) -> None:
         try:
@@ -2767,6 +3031,97 @@ def _end_call_for_insert_to_ch_insertable_end_call(
         output_dump=_any_value_to_dump(output),
         output_refs=output_refs,
         wb_run_step_end=end_call.wb_run_step_end,
+    )
+
+
+# V1 Conversion Functions
+
+
+def _start_call_to_v1_ch_insertable(
+    start_call: tsi.StartedCallSchemaForInsert,
+    trace_server: Optional[tsi.TraceServerInterface] = None,
+) -> V1CallStartCHInsertable:
+    """
+    Convert StartedCallSchemaForInsert to V1CallStartCHInsertable for call_starts table.
+
+    Args:
+        start_call: API schema for call start.
+        trace_server: Optional trace server for context.
+
+    Returns:
+        V1CallStartCHInsertable ready for insertion.
+    """
+    call_id = start_call.id or generate_id()
+    trace_id = start_call.trace_id or generate_id()
+
+    inputs = start_call.inputs
+    input_refs = extract_refs_from_values(inputs)
+
+    return V1CallStartCHInsertable(
+        project_id=start_call.project_id,
+        id=call_id,
+        trace_id=trace_id,
+        op_name=start_call.op_name,
+        started_at=start_call.started_at,
+        parent_id=start_call.parent_id,
+        display_name=start_call.display_name,
+        thread_id=start_call.thread_id,
+        turn_id=start_call.turn_id,
+        attributes_dump=_dict_value_to_dump(start_call.attributes),
+        inputs_dump=_dict_value_to_dump(inputs),
+        input_refs=input_refs,
+        wb_user_id=start_call.wb_user_id,
+        wb_run_id=start_call.wb_run_id,
+        wb_run_step=start_call.wb_run_step,
+        wb_run_step_end=None,  # Not set on start
+    )
+
+
+def _complete_call_to_v1_ch_insertable(
+    complete_call: tsi.CompleteCallSchemaForInsert,
+    trace_server: Optional[tsi.TraceServerInterface] = None,
+) -> V1CallCompleteCHInsertable:
+    """
+    Convert CompleteCallSchemaForInsert to V1CallCompleteCHInsertable for calls_complete table.
+
+    Args:
+        complete_call: API schema for complete call (with both start and end data).
+        trace_server: Optional trace server for context.
+
+    Returns:
+        V1CallCompleteCHInsertable ready for insertion.
+    """
+    call_id = complete_call.id or generate_id()
+    trace_id = complete_call.trace_id or generate_id()
+
+    inputs = complete_call.inputs
+    input_refs = extract_refs_from_values(inputs)
+
+    output = complete_call.output
+    output_refs = extract_refs_from_values(output)
+
+    return V1CallCompleteCHInsertable(
+        project_id=complete_call.project_id,
+        id=call_id,
+        trace_id=trace_id,
+        op_name=complete_call.op_name,
+        started_at=complete_call.started_at,
+        ended_at=complete_call.ended_at,
+        parent_id=complete_call.parent_id,
+        display_name=complete_call.display_name,
+        thread_id=complete_call.thread_id,
+        turn_id=complete_call.turn_id,
+        attributes_dump=_dict_value_to_dump(complete_call.attributes),
+        inputs_dump=_dict_value_to_dump(inputs),
+        input_refs=input_refs,
+        output_dump=_any_value_to_dump(output),
+        output_refs=output_refs,
+        summary_dump=_dict_value_to_dump(dict(complete_call.summary)),
+        exception=complete_call.exception,
+        wb_user_id=complete_call.wb_user_id,
+        wb_run_id=complete_call.wb_run_id,
+        wb_run_step=complete_call.wb_run_step,
+        wb_run_step_end=complete_call.wb_run_step_end,
     )
 
 

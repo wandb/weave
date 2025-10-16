@@ -15,6 +15,7 @@ def make_threads_query(
     sortable_datetime_after: Optional[datetime.datetime] = None,
     sortable_datetime_before: Optional[datetime.datetime] = None,
     thread_ids: Optional[list[str]] = None,
+    table_name: str = "calls_merged",
 ) -> str:
     """Generate a query to fetch threads with aggregated statistics from turn calls only.
 
@@ -51,6 +52,7 @@ def make_threads_query(
         sortable_datetime_before: Only include calls with sortable_datetime before this timestamp.
                                  Uses sortable_datetime column for efficient granule filtering.
         thread_ids: Only include threads with thread_ids in this list
+        table_name: The calls table to query from (e.g., "calls_merged" or "calls_complete")
 
     Returns:
         SQL query string for threads aggregation
@@ -155,7 +157,7 @@ def make_threads_query(
                 THEN dateDiff('millisecond', call_start_time, call_end_time)
                 ELSE NULL
             END AS call_duration
-        FROM calls_merged
+        FROM {table_name}
         WHERE project_id = {{{project_id_param}: String}}
             {sortable_datetime_filter_clause}
             {where_thread_filter_clause}

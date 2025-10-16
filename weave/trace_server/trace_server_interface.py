@@ -207,6 +207,61 @@ class EndedCallSchemaForInsert(BaseModel):
         return dict(v)
 
 
+class CompleteCallSchemaForInsert(BaseModel):
+    """
+    Complete call with both start and end data (for V1 batch complete endpoint).
+
+    This combines all fields from StartedCallSchemaForInsert and EndedCallSchemaForInsert.
+    """
+
+    project_id: str
+    id: Optional[str] = None  # Will be generated if not provided
+
+    # Name of the calling function (op)
+    op_name: str
+    # Optional display name of the call
+    display_name: Optional[str] = None
+
+    # Trace ID
+    trace_id: Optional[str] = None  # Will be generated if not provided
+    # Parent ID is optional because the call may be a root
+    parent_id: Optional[str] = None
+    # Thread ID is optional
+    thread_id: Optional[str] = None
+    # Turn ID is optional
+    turn_id: Optional[str] = None
+
+    # Start time is required
+    started_at: datetime.datetime
+    # Attributes: properties of the call
+    attributes: dict[str, Any]
+
+    # Inputs
+    inputs: dict[str, Any]
+
+    # End time is required for complete calls
+    ended_at: datetime.datetime
+
+    # Exception is present if the call failed
+    exception: Optional[str] = None
+
+    # Outputs
+    output: Optional[Any] = None
+
+    # Summary: a summary of the call
+    summary: SummaryInsertMap
+
+    # WB Metadata
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+    wb_run_id: Optional[str] = None
+    wb_run_step: Optional[int] = None
+    wb_run_step_end: Optional[int] = None
+
+    @field_serializer("summary")
+    def serialize_typed_dicts(self, v: dict[str, Any]) -> dict[str, Any]:
+        return dict(v)
+
+
 class ObjSchema(BaseModel):
     project_id: str
     object_id: str
@@ -1267,6 +1322,11 @@ class TraceServerInterface(Protocol):
     def calls_query_stats(self, req: CallsQueryStatsReq) -> CallsQueryStatsRes: ...
     def call_update(self, req: CallUpdateReq) -> CallUpdateRes: ...
     def call_start_batch(self, req: CallCreateBatchReq) -> CallCreateBatchRes: ...
+
+    # V1 Call Batch API (for calls_complete table)
+    # Note: DTOs are defined in trace_server.py (CallsStartBatchReq/Res, CallsCompleteBatchReq/Res)
+    def v1_calls_start_batch(self, req: Any) -> Any: ...
+    def v1_calls_complete_batch(self, req: Any) -> Any: ...
 
     # Op API
     def op_create(self, req: OpCreateReq) -> OpCreateRes: ...
