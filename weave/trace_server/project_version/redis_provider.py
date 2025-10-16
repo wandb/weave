@@ -1,6 +1,8 @@
 """Redis-backed project version provider."""
 
-from typing import Any, Optional
+from typing import Any, Optional, Union
+
+from weave.trace_server.project_version.types import ProjectVersion
 
 
 class RedisProjectVersionProvider:
@@ -29,8 +31,11 @@ class RedisProjectVersionProvider:
         self._enabled = enabled
         self._redis = redis_client
 
-    async def get_project_version(self, project_id: str) -> int:
+    async def get_project_version(self, project_id: str) -> Union[ProjectVersion, int]:
         """Get project version from Redis cache.
+
+        Returns:
+            Union[ProjectVersion, int]: The cached version (0, 1, or -1).
 
         Raises:
             Exception: If Redis is disabled, unavailable, or key not found.

@@ -1,6 +1,6 @@
 """Concrete project version resolver with explicit provider order."""
 
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 from cachetools import TTLCache
 
@@ -13,6 +13,7 @@ from weave.trace_server.project_version.gorilla_provider import (
 from weave.trace_server.project_version.redis_provider import (
     RedisProjectVersionProvider,
 )
+from weave.trace_server.project_version.types import ProjectVersion
 
 
 class ProjectVersionResolver:
@@ -47,26 +48,27 @@ class ProjectVersionResolver:
         ch_client: Any,
         redis_client: Optional[Any] = None,
         redis_enabled: bool = False,
-        gorilla_client: Optional[Any] = None,
+        auth_params: Optional[Any] = None,
         cache_ttl_seconds: float = 60 * 60,  # 1 hour
     ):
         # Initialize providers (no chaining, just independent instances)
         self._clickhouse_provider = ClickHouseProjectVersionProvider(
             ch_client=ch_client
         )
-        self._gorilla_provider = GorillaProjectVersionProvider(
-            gorilla_client=gorilla_client
-        )
+        self._gorilla_provider = GorillaProjectVersionProvider(auth_params=auth_params)
         self._redis_provider = RedisProjectVersionProvider(
             redis_client=redis_client, enabled=redis_enabled
         )
         self._cache: TTLCache = TTLCache(maxsize=10000, ttl=cache_ttl_seconds)
 
-    async def get_project_version(self, project_id: str) -> int:
+    async def get_project_version(self, project_id: str) -> Union[ProjectVersion, int]:
         """Resolve project version through explicit provider checks.
 
         Returns:
-            0 for legacy schema (calls_merged), 1 for new schema (calls_complete).
+            ProjectVersion enum (or int for backwards compatibility):
+                - OLD_VERSION (0): Legacy schema (calls_merged)
+                - NEW_VERSION (1): New schema (calls_complete)
+                - EMPTY_PROJECT (-1): No calls in either table
         """
         # 1. Check in-memory cache first (fastest)
         cached = self._cache.get(project_id)
@@ -84,18 +86,25 @@ class ProjectVersionResolver:
 
         # 3. Try Gorilla config if available
         try:
-            version = await self._gorilla_provider.get_project_version(project_id)
+            gorilla_version = await self._gorilla_provider.get_project_version(
+                project_id
+            )
+            # Gorilla only stores 0 or 1, never -1
+            # If it returns None, fall through to ClickHouse
+            if gorilla_version is not None:
+                self._cache[project_id] = gorilla_version
+                return gorilla_version
         except Exception:
             pass  # Fall through to ClickHouse
-        else:
-            self._cache[project_id] = version
-            return version
 
-        # 4. Finally, check ClickHouse (always succeeds, returns 0 or 1)
+        # 4. Finally, check ClickHouse (always succeeds, returns 0, 1, or -1)
         version = await self._clickhouse_provider.get_project_version(project_id)
         self._cache[project_id] = version
 
-        # 5. Set in gorilla!
-        await self._gorilla_provider.set_project_version(project_id, version)
+        # 5. Set in gorilla if it's not empty project!
+        # We only persist OLD_VERSION (0) or NEW_VERSION (1) to Gorilla
+        # EMPTY_PROJECT (-1) shouldn't be persisted until the first write
+        if version != ProjectVersion.EMPTY_PROJECT:
+            await self._gorilla_provider.set_project_version(project_id, int(version))
 
         return version

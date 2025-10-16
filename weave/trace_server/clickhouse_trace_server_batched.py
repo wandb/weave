@@ -200,7 +200,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             project_id: The project identifier.
 
         Returns:
-            str: "calls_complete" for V1 projects, "calls_merged" for V0 projects.
+            str: "calls_complete" for V1 projects or empty projects,
+                 "calls_merged" for V0 projects.
 
         Examples:
             >>> server = ClickHouseTraceServer(...)
@@ -402,7 +403,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     ) -> tsi.CallsStartBatchRes:
         """Batch start calls for V1 projects (writes to call_starts table).
 
-        This method enforces that the project is V1 before writing.
+        This method enforces that the project is V1 or empty before writing.
         Inserts incomplete calls into the call_starts table.
 
         Args:
@@ -411,16 +412,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         Returns:
             CallsStartBatchRes with call IDs and trace IDs.
 
-        Raises:
-            HTTPException: If project is not V1.
-
         Examples:
             >>> # In test code:
             >>> req = CallsStartBatchReq(project_id="project1", items=[...])
             >>> res = server.v1_calls_start_batch(req)
         """
         # Check project version
-        project_version: int = 0
+        project_version: int = -1
         if self._project_version_service:
             project_version = self._project_version_service.get_project_version_sync(
                 req.project_id
@@ -459,7 +457,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     ) -> tsi.CallsCompleteBatchRes:
         """Batch complete calls for V1 projects (writes to calls_complete table).
 
-        This method enforces that the project is V1 before writing.
+        This method enforces that the project is V1 or empty before writing.
         Inserts complete calls directly into calls_complete table.
 
         Note: The client sends complete call data (both start and end) together.
@@ -477,7 +475,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             >>> res = server.v1_calls_complete_batch(req)
         """
         # Check project version
-        project_version: int = 0
+        project_version: int = -1
         if self._project_version_service:
             project_version = self._project_version_service.get_project_version_sync(
                 req.project_id
@@ -621,6 +619,8 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             project_version = self._project_version_service.get_project_version_sync(
                 req.project_id
             )
+            # EMPTY_PROJECT (-1) can use the new endpoints (will write to calls_complete)
+            # NEW_VERSION (1) should use new endpoints
             if project_version == 1:
                 raise NotImplementedError(
                     "Query operations on V1 projects are not yet supported via this endpoint. "
