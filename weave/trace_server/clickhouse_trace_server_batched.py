@@ -13,6 +13,7 @@ from contextlib import contextmanager
 from re import sub
 from typing import Any, Callable, Optional, Union, cast
 from zoneinfo import ZoneInfo
+from fastapi import HTTPException
 
 import clickhouse_connect
 import ddtrace
@@ -397,7 +398,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # Returns the id of the newly created call
         return tsi.CallEndRes()
 
-    def v1_calls_start_batch(self, req: Any) -> Any:
+    def v1_calls_start_batch(
+        self, req: tsi.CallsStartBatchReq
+    ) -> tsi.CallsStartBatchRes:
         """Batch start calls for V1 projects (writes to call_starts table).
 
         This method enforces that the project is V1 before writing.
@@ -417,38 +420,32 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             >>> req = CallsStartBatchReq(project_id="project1", items=[...])
             >>> res = server.v1_calls_start_batch(req)
         """
-        from fastapi import HTTPException
-
         # Check project version
-        if self._project_version_service is None:
-            raise HTTPException(
-                status_code=400,
-                detail={
-                    "code": "missing_project_version_service",
-                    "message": "Project version service not configured",
-                },
+        project_version: int = 0
+        if self._project_version_service:
+            project_version = self._project_version_service.get_project_version_sync(
+                req.project_id
             )
 
-        version = self._project_version_service.get_project_version(req.project_id)
-
-        if version != 1:
-            raise HTTPException(
-                status_code=400,
-                detail={
-                    "code": "invalid_project_version",
-                    "message": "This endpoint requires a V1 project",
-                    "project_version": version,
-                    "required_version": 1,
-                },
-            )
-
-        # Convert API schema to CH insertable schema
-        ch_calls = []
         ids = []
         trace_ids = []
+        if project_version == 0:
+            # New sdk writing to old project
+            batch_data = []
+            for call in req.items:
+                assert call.id is not None
+                assert call.trace_id is not None
+                ids.append(call.id)
+                trace_ids.append(call.trace_id)
+                call_dict = call.model_dump()
+                values = [call_dict.get(col) for col in ALL_CALL_INSERT_COLUMNS]
+                batch_data.append(values)
+            self._insert_call_batch(batch_data)
+            return tsi.CallsStartBatchRes(ids=ids, trace_ids=trace_ids)
 
+        ch_calls: list[V1CallStartCHInsertable] = []
         for item in req.items:
-            ch_call = _start_call_to_v1_ch_insertable(item, self)
+            ch_call = _start_call_to_v1_ch_insertable(item)
             ch_calls.append(ch_call)
             ids.append(ch_call.id)
             trace_ids.append(ch_call.trace_id)
@@ -456,12 +453,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # Batch insert to call_starts table
         self._v1_insert_call_starts_batch(ch_calls)
 
-        # Import the response type
-        from src.trace_server import CallsStartBatchRes
+        return tsi.CallsStartBatchRes(ids=ids, trace_ids=trace_ids)
 
-        return CallsStartBatchRes(ids=ids, trace_ids=trace_ids)
-
-    def v1_calls_complete_batch(self, req: Any) -> Any:
+    def v1_calls_complete_batch(
+        self, req: tsi.CallsCompleteBatchReq
+    ) -> tsi.CallsCompleteBatchRes:
         """Batch complete calls for V1 projects (writes to calls_complete table).
 
         This method enforces that the project is V1 before writing.
@@ -475,38 +471,28 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         Returns:
             CallsCompleteBatchRes (empty on success).
 
-        Raises:
-            HTTPException: If project is not V1.
 
         Examples:
             >>> # In test code:
             >>> req = CallsCompleteBatchReq(project_id="project1", items=[...])
             >>> res = server.v1_calls_complete_batch(req)
         """
-        from fastapi import HTTPException
-
         # Check project version
-        if self._project_version_service is None:
-            raise HTTPException(
-                status_code=400,
-                detail={
-                    "code": "missing_project_version_service",
-                    "message": "Project version service not configured",
-                },
+        project_version: int = 0
+        if self._project_version_service:
+            project_version = self._project_version_service.get_project_version_sync(
+                req.project_id
             )
 
-        version = self._project_version_service.get_project_version(req.project_id)
-
-        if version != 1:
-            raise HTTPException(
-                status_code=400,
-                detail={
-                    "code": "invalid_project_version",
-                    "message": "This endpoint requires a V1 project",
-                    "project_version": version,
-                    "required_version": 1,
-                },
-            )
+        if project_version == 0:
+            # New sdk writing to old project
+            batch_data = []
+            for call in req.items:
+                call_dict = call.model_dump()
+                values = [call_dict.get(col) for col in ALL_CALL_INSERT_COLUMNS]
+                batch_data.append(values)
+            self._insert_call_batch(batch_data)
+            return tsi.CallsCompleteBatchRes()
 
         # Convert complete call items to CH insertables
         ch_calls = []
@@ -517,10 +503,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # Batch insert to calls_complete table
         self._v1_insert_calls_complete_batch(ch_calls)
 
-        # Import the response type
-        from src.trace_server import CallsCompleteBatchRes
-
-        return CallsCompleteBatchRes()
+        return tsi.CallsCompleteBatchRes()
 
     def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
         res = self.calls_query_stream(
@@ -636,12 +619,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # and needs a comprehensive refactor to support dynamic table routing.
         # For now, V1 projects will use the new batch endpoints (Stage 4).
         if self._project_version_service is not None:
-            import asyncio
-
-            version = asyncio.get_event_loop().run_until_complete(
-                self._project_version_service.get_project_version(req.project_id)
+            project_version = self._project_version_service.get_project_version_sync(
+                req.project_id
             )
-            if version == 1:
+            if project_version == 1:
                 raise NotImplementedError(
                     "Query operations on V1 projects are not yet supported via this endpoint. "
                     "V1 projects should use the new /v1/calls/* endpoints (coming in Stage 4)."
@@ -3032,7 +3013,6 @@ def _end_call_for_insert_to_ch_insertable_end_call(
 
 def _start_call_to_v1_ch_insertable(
     start_call: tsi.StartedCallSchemaForInsert,
-    trace_server: Optional[tsi.TraceServerInterface] = None,
 ) -> V1CallStartCHInsertable:
     """Convert StartedCallSchemaForInsert to V1CallStartCHInsertable for call_starts table.
 

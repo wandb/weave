@@ -1033,6 +1033,7 @@ class WeaveClient:
                 self.server.call_end(call_end_req)
 
         # Check if there's a pending start future for this call
+        assert call.id is not None, "Call ID must be set at this point"
         start_future = self._call_start_futures.get(call.id)
         if start_future is not None:
             # Wait for the start to be sent before sending the complete call

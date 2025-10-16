@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Any, Callable, Optional, TypeVar
+from typing import Any, Callable, Optional, TypeVar, Union
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
@@ -239,7 +239,7 @@ def handle_response_error(response: requests.Response, url: str) -> None:
 
 
 def check_endpoint_exists(
-    func: Callable, test_req: Any, cache_key: str | None = None
+    func: Callable, test_req: Any, cache_key: Union[str, None] = None
 ) -> bool:
     """Check if a function/endpoint exists and works by calling it with a test request.
 
