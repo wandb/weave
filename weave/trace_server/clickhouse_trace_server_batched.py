@@ -13,7 +13,6 @@ from contextlib import contextmanager
 from re import sub
 from typing import Any, Callable, Optional, Union, cast
 from zoneinfo import ZoneInfo
-from fastapi import HTTPException
 
 import clickhouse_connect
 import ddtrace
