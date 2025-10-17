@@ -286,11 +286,23 @@ class _LogScoreContext:
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """Exit context, restore call stack, and finish the score call."""
         try:
-            # Finish the score call with the value
             # scorer is guaranteed to be a Scorer instance here because it was prepared in _create_score_call
-            self.score_logger._finish_score_call(
-                self.score_call, cast(Scorer, self.scorer), self._score_value
-            )
+            if self._score_value is not None:
+                # Finish the score call with the value
+                self.score_logger._finish_score_call(
+                    self.score_call, cast(Scorer, self.scorer), self._score_value
+                )
+            elif exc_type is not None:
+                # If there was an exception and no value was set, finish with the exception
+                self.score_logger._finish_score_call(
+                    self.score_call, cast(Scorer, self.scorer), exception=exc_val
+                )
+            else:
+                # If no exception occurred but no value was set, raise an error
+                raise ValueError(
+                    f"Score value was not set for scorer '{cast(Scorer, self.scorer).name}'. "
+                    "Please set score_ctx.value within the context manager."
+                )
         finally:
             # Restore call stack - always happens even if finish fails
             if self._call_stack_context is not None:
@@ -433,12 +445,17 @@ class ScoreLogger(BaseModel):
         return score_call, scorer
 
     def _finish_score_call(
-        self, score_call: Call, scorer: Scorer, score_value: ScoreType
+        self,
+        score_call: Call,
+        scorer: Scorer,
+        score_value: ScoreType | None = None,
+        exception: BaseException | None = None,
     ) -> None:
         """Finish a score call and record the score."""
         wc = require_weave_client()
-        wc.finish_call(score_call, output=score_value)
-        self._captured_scores[cast(str, scorer.name)] = score_value
+        wc.finish_call(score_call, output=score_value, exception=exception)
+        if exception is None and score_value is not None:
+            self._captured_scores[cast(str, scorer.name)] = score_value
 
     @overload
     def log_score(
