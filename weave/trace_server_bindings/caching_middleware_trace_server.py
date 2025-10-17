@@ -549,6 +549,24 @@ class CachingMiddlewareTraceServer(tsi.FullTraceServerInterface):
     def op_delete_v2(self, req: tsi.OpDeleteV2Req) -> tsi.OpDeleteV2Res:
         return self._next_trace_server.op_delete_v2(req)
 
+    def dataset_create_v2(self, req: tsi.DatasetCreateV2Req) -> tsi.DatasetCreateV2Res:
+        return self._next_trace_server.dataset_create_v2(req)
+
+    def dataset_read_v2(self, req: tsi.DatasetReadV2Req) -> tsi.DatasetReadV2Res:
+        if not digest_is_cacheable(req.digest):
+            return self._next_trace_server.dataset_read_v2(req)
+        return self._with_cache_pydantic(
+            self._next_trace_server.dataset_read_v2, req, tsi.DatasetReadV2Res
+        )
+
+    def dataset_list_v2(
+        self, req: tsi.DatasetListV2Req
+    ) -> Iterator[tsi.DatasetReadV2Res]:
+        return self._next_trace_server.dataset_list_v2(req)
+
+    def dataset_delete_v2(self, req: tsi.DatasetDeleteV2Req) -> tsi.DatasetDeleteV2Res:
+        return self._next_trace_server.dataset_delete_v2(req)
+
 
 def pydantic_bytes_safe_dump(obj: BaseModel) -> str:
     raw_dict = obj.model_dump()
