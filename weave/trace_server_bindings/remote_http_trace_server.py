@@ -2,6 +2,7 @@ import datetime
 import io
 import logging
 from collections.abc import Iterator
+from threading import Lock
 from typing import Any, Optional, Union, cast
 from zoneinfo import ZoneInfo
 
@@ -16,16 +17,12 @@ from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcesso
 from weave.trace_server_bindings.http_utils import (
     REMOTE_REQUEST_BYTES_LIMIT,
     handle_response_error,
-    log_dropped_call_batch,
+    log_dropped_complete_batch,
     log_dropped_feedback_batch,
+    log_dropped_start_batch,
     process_batch_with_retry,
 )
-from weave.trace_server_bindings.models import (
-    Batch,
-    EndBatchItem,
-    ServerInfoRes,
-    StartBatchItem,
-)
+from weave.trace_server_bindings.models import ServerInfoRes
 from weave.utils import http_requests as requests
 from weave.utils.retry import get_current_retry_id, with_retry
 from weave.wandb_interface import project_creator
@@ -54,11 +51,24 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         super().__init__()
         self.trace_server_url = trace_server_url
         self.should_batch = should_batch
-        self.call_processor = None
+
+        # Separate processors for starts and completes
+        self.start_processor = None
+        self.complete_processor = None
         self.feedback_processor = None
+
+        # Thread-safe tracking of pending complete call IDs for deduplication
+        self._pending_complete_ids: set[str] = set()
+        self._pending_complete_ids_lock = Lock()
+
         if self.should_batch:
-            self.call_processor = AsyncBatchProcessor(
-                self._flush_calls,
+            self.start_processor = AsyncBatchProcessor(
+                self._flush_starts,
+                max_queue_size=max_calls_queue_size(),
+                enable_disk_fallback=should_enable_disk_fallback(),
+            )
+            self.complete_processor = AsyncBatchProcessor(
+                self._flush_completes,
                 max_queue_size=max_calls_queue_size(),
                 enable_disk_fallback=should_enable_disk_fallback(),
             )
@@ -118,61 +128,126 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         )
 
     @with_retry
-    def _send_batch_to_server(self, encoded_data: bytes) -> None:
-        """Send a batch of data to the server with retry logic.
-
-        This method is separated from _flush_calls to avoid recursive retries.
-        """
+    def _send_start_batch_to_server(self, encoded_data: bytes) -> None:
+        """Send a batch of call starts to the server with retry logic."""
         r = self.post(
-            "/call/upsert_batch",
+            "/v1/calls/start/batch",
             data=encoded_data,  # type: ignore
         )
-        handle_response_error(r, "/call/upsert_batch")
+        handle_response_error(r, "/v1/calls/start/batch")
 
-    def _flush_calls(
+    def _flush_starts(
         self,
-        batch: list[Union[StartBatchItem, EndBatchItem]],
+        batch: list[tsi.StartedCallSchemaForInsert],
         *,
         _should_update_batch_size: bool = True,
     ) -> None:
-        """Process a batch of calls, splitting if necessary and sending to the server.
+        """Process a batch of call starts, splitting if necessary and sending to the server.
 
-        This method handles the logic of splitting batches that are too large,
-        but delegates the actual server communication (with retries) to _send_batch_to_server.
+        This method handles batching of call start events, sending them to the
+        /v1/calls/start/batch endpoint.
         """
-        # Call processor must be defined for this method
-        assert self.call_processor is not None
+        assert self.start_processor is not None
         if len(batch) == 0:
             return
 
-        def get_item_id(item: Union[StartBatchItem, EndBatchItem]) -> str:
-            if isinstance(item, StartBatchItem):
-                return f"{item.req.start.id}-start"
-            elif isinstance(item, EndBatchItem):
-                return f"{item.req.end.id}-end"
-            return "unknown"
+        def get_item_id(item: tsi.StartedCallSchemaForInsert) -> str:
+            return f"{item.id}-start"
 
-        def encode_batch(batch: list[Union[StartBatchItem, EndBatchItem]]) -> bytes:
-            data = Batch(batch=batch).model_dump_json()
+        def encode_batch(batch: list[tsi.StartedCallSchemaForInsert]) -> bytes:
+            # Get project_id from first item (all items in a batch should have same project)
+            project_id = batch[0].project_id
+            req = tsi.CallsStartBatchReq(project_id=project_id, items=batch)
+            data = req.model_dump_json()
             return data.encode("utf-8")
 
         process_batch_with_retry(
-            batch_name="calls",
+            batch_name="call_starts",
             batch=batch,
             remote_request_bytes_limit=self.remote_request_bytes_limit,
-            send_batch_fn=self._send_batch_to_server,
-            processor_obj=self.call_processor,
+            send_batch_fn=self._send_start_batch_to_server,
+            processor_obj=self.start_processor,
             should_update_batch_size=_should_update_batch_size,
             get_item_id_fn=get_item_id,
-            log_dropped_fn=log_dropped_call_batch,
+            log_dropped_fn=log_dropped_start_batch,
+            encode_batch_fn=encode_batch,
+        )
+
+    @with_retry
+    def _send_complete_batch_to_server(
+        self, encoded_data: bytes, call_ids: list[str]
+    ) -> None:
+        """Send a batch of complete calls to the server with retry logic."""
+        r = self.post(
+            "/v1/calls/complete/batch",
+            data=encoded_data,  # type: ignore
+        )
+        handle_response_error(r, "/v1/calls/complete/batch")
+
+        # After successful send, remove call IDs from pending set
+        with self._pending_complete_ids_lock:
+            for call_id in call_ids:
+                self._pending_complete_ids.discard(call_id)
+
+    def _flush_completes(
+        self,
+        batch: list[tsi.CompleteCallSchemaForInsert],
+        *,
+        _should_update_batch_size: bool = True,
+    ) -> None:
+        """Process a batch of complete calls, splitting if necessary and sending to the server.
+
+        This method handles batching of complete call events (start + end combined),
+        sending them to the /v1/calls/complete/batch endpoint.
+        """
+        assert self.complete_processor is not None
+        if len(batch) == 0:
+            return
+
+        def get_item_id(item: tsi.CompleteCallSchemaForInsert) -> str:
+            return f"{item.id}-complete"
+
+        def encode_batch(batch: list[tsi.CompleteCallSchemaForInsert]) -> bytes:
+            # Get project_id from first item (all items in a batch should have same project)
+            project_id = batch[0].project_id
+            req = tsi.CallsCompleteBatchReq(project_id=project_id, items=batch)
+            data = req.model_dump_json()
+            return data.encode("utf-8")
+
+        # Extract call IDs for cleanup after successful send
+        call_ids = [item.id for item in batch]
+
+        def send_batch_fn(encoded_data: bytes) -> None:
+            self._send_complete_batch_to_server(encoded_data, call_ids)
+
+        process_batch_with_retry(
+            batch_name="call_completes",
+            batch=batch,
+            remote_request_bytes_limit=self.remote_request_bytes_limit,
+            send_batch_fn=send_batch_fn,
+            processor_obj=self.complete_processor,
+            should_update_batch_size=_should_update_batch_size,
+            get_item_id_fn=get_item_id,
+            log_dropped_fn=log_dropped_complete_batch,
             encode_batch_fn=encode_batch,
         )
 
     def get_call_processor(self) -> Union[AsyncBatchProcessor, None]:
         """Custom method not defined on the formal TraceServerInterface to expose
         the underlying call processor. Should be formalized in a client-side interface.
+
+        Deprecated: Use get_start_processor() or get_complete_processor() instead.
         """
-        return self.call_processor
+        # For backwards compatibility, return start_processor
+        return self.start_processor
+
+    def get_start_processor(self) -> Union[AsyncBatchProcessor, None]:
+        """Get the processor for call starts."""
+        return self.start_processor
+
+    def get_complete_processor(self) -> Union[AsyncBatchProcessor, None]:
+        """Get the processor for complete calls."""
+        return self.complete_processor
 
     def _send_feedback_batch_to_server(self, encoded_data: bytes) -> None:
         """Send a batch of feedback data to the server with retry logic.
@@ -318,47 +393,17 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         # TODO: Add docs link (DOCS-1390)
         raise NotImplementedError("Sending otel traces directly is not yet supported.")
 
-    # Call API
+    # Call API (V0 - deprecated, use v1_calls_start_batch instead)
     def call_start(
         self, req: Union[tsi.CallStartReq, dict[str, Any]]
     ) -> tsi.CallStartRes:
-        if self.should_batch:
-            assert self.call_processor is not None
-
-            req_as_obj: tsi.CallStartReq
-            if isinstance(req, dict):
-                req_as_obj = tsi.CallStartReq.model_validate(req)
-            else:
-                req_as_obj = req
-            if req_as_obj.start.id is None or req_as_obj.start.trace_id is None:
-                raise ValueError(
-                    "CallStartReq must have id and trace_id when batching."
-                )
-            self.call_processor.enqueue([StartBatchItem(req=req_as_obj)])
-            return tsi.CallStartRes(
-                id=req_as_obj.start.id, trace_id=req_as_obj.start.trace_id
-            )
-        return self._generic_request(
-            "/call/start", req, tsi.CallStartReq, tsi.CallStartRes
-        )
+        raise NotImplementedError("Call start is not supported.")
 
     def call_start_batch(self, req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
-        return self._generic_request(
-            "/call/upsert_batch", req, tsi.CallCreateBatchReq, tsi.CallCreateBatchRes
-        )
+        raise NotImplementedError("Call start batch is not supported.")
 
     def call_end(self, req: Union[tsi.CallEndReq, dict[str, Any]]) -> tsi.CallEndRes:
-        if self.should_batch:
-            assert self.call_processor is not None
-
-            req_as_obj: tsi.CallEndReq
-            if isinstance(req, dict):
-                req_as_obj = tsi.CallEndReq.model_validate(req)
-            else:
-                req_as_obj = req
-            self.call_processor.enqueue([EndBatchItem(req=req_as_obj)])
-            return tsi.CallEndRes()
-        return self._generic_request("/call/end", req, tsi.CallEndReq, tsi.CallEndRes)
+        raise NotImplementedError("Call end is not supported.")
 
     def call_read(self, req: Union[tsi.CallReadReq, dict[str, Any]]) -> tsi.CallReadRes:
         return self._generic_request(
@@ -693,6 +738,71 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         self, req: tsi.EvaluationStatusReq
     ) -> tsi.EvaluationStatusRes:
         raise NotImplementedError("evaluation_status is not implemented")
+
+    def v1_calls_start_batch(
+        self, req: tsi.CallsStartBatchReq
+    ) -> tsi.CallsStartBatchRes:
+        """V1 batch call start endpoint for calls_complete table.
+
+        Optimization: Before enqueueing a start, check if a complete for the same
+        call ID is already pending. If so, skip the start since the complete has
+        all the data.
+        """
+        if self.should_batch:
+            assert self.start_processor is not None
+
+            # Filter out starts that have completes already pending
+            items_to_enqueue = []
+            with self._pending_complete_ids_lock:
+                for item in req.items:
+                    if item.id not in self._pending_complete_ids:
+                        items_to_enqueue.append(item)
+
+            # Enqueue the filtered starts
+            if items_to_enqueue:
+                self.start_processor.enqueue(items_to_enqueue)
+
+            # Return response with IDs and trace_ids for all items (even skipped ones)
+            return tsi.CallsStartBatchRes(
+                ids=[item.id or generate_id() for item in req.items],
+                trace_ids=[item.trace_id or generate_id() for item in req.items],
+            )
+
+        return self._generic_request(
+            "/v1/calls/start/batch",
+            req,
+            tsi.CallsStartBatchReq,
+            tsi.CallsStartBatchRes,
+        )
+
+    def v1_calls_complete_batch(
+        self, req: tsi.CallsCompleteBatchReq
+    ) -> tsi.CallsCompleteBatchRes:
+        """V1 batch call complete endpoint for calls_complete table.
+
+        Complete calls contain both start and end data. When enqueueing, we track
+        the call IDs so that if a start arrives later, we can skip it.
+        """
+        if self.should_batch:
+            assert self.complete_processor is not None
+
+            # Track these call IDs as pending completes for deduplication
+            with self._pending_complete_ids_lock:
+                for item in req.items:
+                    if item.id is not None:
+                        self._pending_complete_ids.add(item.id)
+
+            # Enqueue the complete calls directly
+            self.complete_processor.enqueue(req.items)
+
+            return tsi.CallsCompleteBatchRes()
+
+        return self._generic_request(
+            "/v1/calls/complete/batch",
+            req,
+            tsi.CallsCompleteBatchReq,
+            tsi.CallsCompleteBatchRes,
+        )
 
 
 __docspec__ = [
