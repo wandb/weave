@@ -1325,6 +1325,82 @@ class OpDeleteV2Res(BaseModel):
     )
 
 
+class DatasetCreateV2Body(BaseModel):
+    name: Optional[str] = Field(
+        None,
+        description="The name of this dataset.  Datasets with the same name will be versioned together.",
+    )
+    description: Optional[str] = Field(
+        None,
+        description="A description of this dataset",
+    )
+    rows: list[dict[str, Any]] = Field(..., description="Dataset rows")
+
+
+class DatasetCreateV2Req(DatasetCreateV2Body):
+    project_id: str = Field(
+        ..., description="The `entity/project` where this dataset will be saved"
+    )
+
+
+class DatasetCreateV2Res(BaseModel):
+    digest: str = Field(..., description="The digest of the created dataset")
+    object_id: str = Field(..., description="The ID of the created dataset")
+    version_index: int = Field(
+        ..., description="The version index of the created dataset"
+    )
+
+
+class DatasetReadV2Req(BaseModel):
+    project_id: str = Field(
+        ..., description="The `entity/project` where this dataset is saved"
+    )
+    object_id: str = Field(..., description="The dataset ID")
+    digest: str = Field(..., description="The digest of the dataset object")
+
+
+class DatasetReadV2Res(BaseModel):
+    object_id: str = Field(..., description="The dataset ID")
+    digest: str = Field(..., description="The digest of the dataset object")
+    version_index: int = Field(..., description="The version index of the object")
+    created_at: datetime.datetime = Field(
+        ..., description="When the object was created"
+    )
+    name: str = Field(..., description="The name of the dataset")
+    description: Optional[str] = Field(None, description="Description of the dataset")
+    rows: str = Field(
+        ...,
+        description="Reference to the dataset rows data",
+    )
+
+
+class DatasetListV2Req(BaseModel):
+    project_id: str = Field(
+        ..., description="The `entity/project` where these datasets are saved"
+    )
+    limit: Optional[int] = Field(
+        default=None, description="Maximum number of datasets to return"
+    )
+    offset: Optional[int] = Field(
+        default=None, description="Number of datasets to skip"
+    )
+
+
+class DatasetDeleteV2Req(BaseModelStrict):
+    project_id: str = Field(
+        ..., description="The `entity/project` where this dataset is saved"
+    )
+    object_id: str = Field(..., description="The dataset ID")
+    digests: Optional[list[str]] = Field(
+        default=None,
+        description="List of digests to delete. If not provided, all digests for the dataset will be deleted.",
+    )
+
+
+class DatasetDeleteV2Res(BaseModel):
+    num_deleted: int = Field(..., description="Number of d  ataset versions deleted")
+
+
 class TraceServerInterface(Protocol):
     def ensure_project_exists(
         self, entity: str, project: str
@@ -1438,6 +1514,12 @@ class TraceServerInterfaceV2(Protocol):
     def op_read_v2(self, req: OpReadV2Req) -> OpReadV2Res: ...
     def op_list_v2(self, req: OpListV2Req) -> Iterator[OpReadV2Res]: ...
     def op_delete_v2(self, req: OpDeleteV2Req) -> OpDeleteV2Res: ...
+
+    # Datasets
+    def dataset_create_v2(self, req: DatasetCreateV2Req) -> DatasetCreateV2Res: ...
+    def dataset_read_v2(self, req: DatasetReadV2Req) -> DatasetReadV2Res: ...
+    def dataset_list_v2(self, req: DatasetListV2Req) -> Iterator[DatasetReadV2Res]: ...
+    def dataset_delete_v2(self, req: DatasetDeleteV2Req) -> DatasetDeleteV2Res: ...
 
 
 class FullTraceServerInterface(TraceServerInterface, TraceServerInterfaceV2, Protocol):
