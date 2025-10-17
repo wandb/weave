@@ -195,7 +195,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._project_version_service = project_version_service
 
     def _get_calls_table(
-        self, project_id: str, default_table: str = "calls_complete"
+        self, project_id: str, default_table: Optional[str] = None
     ) -> Optional[str]:
         """Get the appropriate calls table name for a project.
 
@@ -225,7 +225,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         else:
             raise ValueError(f"Invalid project version: {version}")
 
-    def _get_calls_stats_table(self, project_id: str) -> Optional[str]:
+    def _get_calls_stats_table(
+        self, project_id: str, default_table: Optional[str] = None
+    ) -> Optional[str]:
         """Get the appropriate calls stats table name for a project.
 
         Args:
@@ -242,7 +244,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             >>> table = server._get_calls_stats_table("my-project")
             >>> assert table in ("calls_merged_stats", "calls_complete_stats")
         """
-        calls_table = self._get_calls_table(project_id)
+        calls_table = self._get_calls_table(project_id, default_table) or default_table
+        if calls_table is None:
+            return None
         return f"{calls_table}_stats"
 
     @classmethod
@@ -1374,7 +1378,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             return True if val is None else val
 
         pb = ParamBuilder()
-        calls_stats_table = self._get_calls_stats_table(req.project_id)
+        calls_stats_table = self._get_calls_stats_table(
+            req.project_id, default_table="calls_complete"
+        )
+        if calls_stats_table is None:
+            raise ValueError("No calls stats table found")
         query, columns = make_project_stats_query(
             req.project_id,
             pb,
@@ -1407,7 +1415,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             thread_ids = req.filter.thread_ids
 
         # Use the dedicated query builder
-        table_name = self._get_calls_table(req.project_id)
+        table_name = self._get_calls_table(req.project_id, default_table="calls_complete")
+        if table_name is None:
+            raise ValueError("No calls table found")
         query = make_threads_query(
             project_id=req.project_id,
             pb=pb,

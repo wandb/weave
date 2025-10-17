@@ -12,6 +12,10 @@ from weave.trace_server.project_version.redis_provider import (
 )
 from weave.trace_server.project_version.types import ProjectVersion
 
+# We only set the cache after getting the source of truth, its okay if this
+# stays around forever.
+PER_REPLICA_CACHE_SIZE = 10_000
+
 
 class ProjectVersionResolver:
     """Resolves project versions by trying providers in explicit order.
@@ -54,7 +58,7 @@ class ProjectVersionResolver:
         self._redis_provider = RedisProjectVersionProvider(
             redis_client=redis_client, enabled=redis_enabled
         )
-        self._cache = LRUCache(maxsize=10000)
+        self._cache = LRUCache(maxsize=PER_REPLICA_CACHE_SIZE)
 
     async def get_project_version(self, project_id: str) -> Union[ProjectVersion, int]:
         """Resolve project version through explicit provider checks.
@@ -81,6 +85,9 @@ class ProjectVersionResolver:
 
         # 3. Finally, check ClickHouse (always succeeds, returns 0, 1, or -1)
         version = await self._clickhouse_provider.get_project_version(project_id)
-        self._cache[project_id] = version
+        if version != ProjectVersion.EMPTY_PROJECT:
+            # only set cache when we know what sdk is writing to it, if empty
+            # it can be either new or old
+            self._cache[project_id] = version
 
         return version

@@ -1625,7 +1625,7 @@ def process_calls_filter_to_conditions(
 def build_calls_stats_query(
     req: tsi.CallsQueryStatsReq,
     param_builder: ParamBuilder,
-    table_alias: str = "calls_merged",
+    table_alias: Optional[str] = None,
 ) -> tuple[str, KeysView[str]]:
     """Build a stats query for calls, automatically using optimized queries when possible.
 
@@ -1685,7 +1685,7 @@ def build_calls_stats_query(
 def _try_optimized_stats_query(
     req: tsi.CallsQueryStatsReq,
     param_builder: ParamBuilder,
-    table_alias: str = "calls_merged",
+    table_alias: Optional[str] = None,
 ) -> Optional[str]:
     """Try to match request to an optimized special-case query.
 
@@ -1721,17 +1721,45 @@ def _try_optimized_stats_query(
 def _optimized_project_contains_call_query(
     project_id: str,
     param_builder: ParamBuilder,
-    table_alias: str = "calls_merged",
+    table_alias: Optional[str] = None,
 ) -> str:
-    """Returns a query that checks if the project contains any calls."""
+    """Returns a query that checks if the project contains any calls.
+    
+    If table_alias is None, queries both calls_merged and calls_complete tables.
+    If table_alias is provided, queries only the specified table.
+    """
+    project_id_param = param_builder.add_param(project_id)
+    param_slot_project_id = param_slot(project_id_param, "String")
+    
+    if table_alias:
+        return safely_format_sql(
+            f"""SELECT
+    toUInt8(count()) AS has_any
+    FROM
+    (
+        SELECT 1
+        FROM {table_alias}
+        WHERE project_id = {param_slot_project_id}
+        LIMIT 1
+    )
+    """,
+            logger,
+        )
+
+    # Query both tables
     return safely_format_sql(
         f"""SELECT
     toUInt8(count()) AS has_any
     FROM
     (
         SELECT 1
-        FROM {table_alias}
-        WHERE project_id = {param_slot(param_builder.add_param(project_id), "String")}
+        FROM calls_merged
+        WHERE project_id = {param_slot_project_id}
+        LIMIT 1
+        UNION ALL
+        SELECT 1
+        FROM calls_complete
+        WHERE project_id = {param_slot_project_id}
         LIMIT 1
     )
     """,
@@ -1742,23 +1770,51 @@ def _optimized_project_contains_call_query(
 def _optimized_wb_run_id_not_null_query(
     project_id: str,
     param_builder: ParamBuilder,
-    table_alias: str = "calls_merged",
+    table_alias: Optional[str] = None,
 ) -> str:
     """Optimized query for checking existence of calls with wb_run_id not null.
 
     Uses WHERE clause instead of HAVING to avoid expensive aggregation.
+    If table_alias is None, queries both calls_merged and calls_complete tables.
+    If table_alias is provided, queries only the specified table.
     """
     project_id_param = param_builder.add_param(project_id)
-    return f"""
+    param_slot_project_id = param_slot(project_id_param, "String")
+    
+    if table_alias:
+        return safely_format_sql(f"""
         SELECT count() FROM (
             SELECT {table_alias}.id AS id
             FROM {table_alias}
-            WHERE {table_alias}.project_id = {param_slot(project_id_param, "String")}
+            WHERE {table_alias}.project_id = {param_slot_project_id}
                 AND {table_alias}.wb_run_id IS NOT NULL
                 AND {table_alias}.deleted_at IS NULL
             LIMIT 1
         )
-    """
+        """, logger)
+
+    # Query both tables
+    return safely_format_sql(f"""
+    SELECT count() FROM (
+        SELECT id
+        FROM (
+            SELECT id
+            FROM calls_merged
+            WHERE project_id = {param_slot_project_id}
+                AND wb_run_id IS NOT NULL
+                AND deleted_at IS NULL
+            LIMIT 1
+            UNION ALL
+            SELECT id
+            FROM calls_complete
+            WHERE project_id = {param_slot_project_id}
+                AND wb_run_id IS NOT NULL
+                AND deleted_at IS NULL
+            LIMIT 1
+        )
+        LIMIT 1
+    )
+    """, logger)
 
 
 def _is_minimal_filter(filter: Optional[tsi.CallsFilter]) -> bool:

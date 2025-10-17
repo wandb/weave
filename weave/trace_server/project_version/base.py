@@ -16,7 +16,7 @@ class ProjectVersionService(Protocol):
             - EMPTY_PROJECT (-1): No calls in either table
 
     Examples:
-        >>> service = InMemoryProjectVersionCache(...)
+        >>> service = ClickHouseProjectVersionProvider(...)
         >>> version = await service.get_project_version("my-project")
         >>> assert version in (ProjectVersion.OLD_VERSION, ProjectVersion.NEW_VERSION, ProjectVersion.EMPTY_PROJECT)
     """
@@ -35,6 +35,7 @@ class ProjectVersionService(Protocol):
         Returns:
             Union[ProjectVersion, int]: ProjectVersion enum or int for backwards compatibility.
         """
+        # TODO: might need to be smarter here
         return asyncio.get_event_loop().run_until_complete(
             self.get_project_version(project_id)
         )
