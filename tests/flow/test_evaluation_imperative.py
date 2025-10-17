@@ -932,3 +932,65 @@ def test_none_as_valid_score_value(client):
     # Verify None score was recorded
     assert predict_and_score_call.output["scores"]["correctness"] is None
     assert predict_and_score_call.output["scores"]["quality"] == 0.5
+
+
+def test_log_score_context_manager_with_nested_ops(client):
+    """Test that log_score context manager works with nested operations and pred.output."""
+
+    @weave.op
+    def mock_completions_create(model: str, messages: list[dict[str, str]]):
+        return {"choices": [{"message": {"content": "I'm a mock response"}}]}
+
+    ev = EvaluationLogger()
+
+    user_prompt = "Tell me a joke"
+    with ev.log_prediction(inputs={"user_prompt": user_prompt}) as pred:
+        result = mock_completions_create(
+            model="gpt-5-mini",
+            messages=[{"role": "user", "content": user_prompt}],
+        )
+
+        # Set the output of the "predict" call
+        pred.output = result["choices"][0]["message"]["content"]
+
+        # Log scores using immediate syntax
+        pred.log_score("correctness", 1.0)
+        pred.log_score("ambiguity", 0.3)
+
+        # Test using .value property for score context
+        with pred.log_score("llm_judge") as score:
+            result = mock_completions_create(
+                model="gpt-4o-mini",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "Rate how funny the joke is from 1-5",
+                    },
+                    {"role": "user", "content": pred.output},
+                ],
+            )
+            score.value = result["choices"][0]["message"]["content"]
+
+        # Test another score using .value property
+        with pred.log_score("length_check") as score:
+            score.value = len(pred.output) > 10
+
+    ev.log_summary({"avg_score": 1.0})
+    client.flush()
+
+    # Verify everything was logged correctly
+    calls = client.get_calls()
+
+    predict_and_score_call = None
+    for call in calls:
+        if op_name_from_call(call) == "Evaluation.predict_and_score":
+            predict_and_score_call = call
+            break
+
+    assert predict_and_score_call is not None
+
+    # Verify all scores were logged
+    assert predict_and_score_call.output["scores"]["correctness"] == 1.0
+    assert predict_and_score_call.output["scores"]["ambiguity"] == 0.3
+    assert predict_and_score_call.output["scores"]["llm_judge"] == "I'm a mock response"
+    assert predict_and_score_call.output["scores"]["length_check"] is True
