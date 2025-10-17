@@ -1,7 +1,6 @@
 """Helper for selecting the correct calls table based on project version."""
 
-import asyncio
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from weave.trace_server.project_version.types import ProjectVersion
 
@@ -9,7 +8,7 @@ if TYPE_CHECKING:
     from weave.trace_server.project_version.base import ProjectVersionService
 
 
-def get_calls_table(project_id: str, version_service: "ProjectVersionService") -> str:
+def get_calls_table(project_id: str, version_service: "ProjectVersionService", error_if_empty: bool = False) -> Optional[str]:
     """Return the appropriate calls table name based on project version.
 
     Args:
@@ -27,18 +26,9 @@ def get_calls_table(project_id: str, version_service: "ProjectVersionService") -
         >>> table = get_calls_table("my-project", version_service)
         >>> assert table in ("calls_merged", "calls_complete")
     """
-    # Note: This is a synchronous helper that calls async code
-    # In practice, this should be called from async context or
-    # the version should be pre-fetched
-    try:
-        version = asyncio.get_event_loop().run_until_complete(
-            version_service.get_project_version(project_id)
-        )
-    except RuntimeError:
-        # If no event loop is running, create a new one
-        version = asyncio.run(version_service.get_project_version(project_id))
+    version = version_service.get_project_version_sync(project_id)
 
-    # For EMPTY_PROJECT, default to the new table (calls_complete)
+    # For EMPTY_PROJECT, return None
     # For NEW_VERSION, use calls_complete
     # For OLD_VERSION, use calls_merged
     if version == ProjectVersion.OLD_VERSION:

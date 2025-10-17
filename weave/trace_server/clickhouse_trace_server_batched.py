@@ -118,6 +118,7 @@ from weave.trace_server.opentelemetry.python_spans import Resource, Span
 from weave.trace_server.orm import ParamBuilder, Row
 from weave.trace_server.project_query_builder import make_project_stats_query
 from weave.trace_server.project_version.base import ProjectVersionService
+from weave.trace_server.project_version.types import ProjectVersion
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 from weave.trace_server.table_query_builder import (
     ROW_ORDER_COLUMN_NAME,
@@ -193,7 +194,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._evaluate_model_dispatcher = evaluate_model_dispatcher
         self._project_version_service = project_version_service
 
-    def _get_calls_table(self, project_id: str) -> str:
+    def _get_calls_table(
+        self, project_id: str, default_table: str = "calls_complete"
+    ) -> Optional[str]:
         """Get the appropriate calls table name for a project.
 
         Args:
@@ -209,14 +212,20 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             >>> assert table in ("calls_merged", "calls_complete")
         """
         if self._project_version_service is None:
+            # TODO: probably should raise here, return old table
             return "calls_merged"
 
-        version = asyncio.get_event_loop().run_until_complete(
-            self._project_version_service.get_project_version(project_id)
-        )
-        return "calls_complete" if version == 1 else "calls_merged"
+        version = self._project_version_service.get_project_version_sync(project_id)
+        if version == ProjectVersion.EMPTY_PROJECT:
+            return default_table
+        elif version == ProjectVersion.OLD_VERSION:
+            return "calls_merged"
+        elif version == ProjectVersion.NEW_VERSION:
+            return "calls_complete"
+        else:
+            raise ValueError(f"Invalid project version: {version}")
 
-    def _get_calls_stats_table(self, project_id: str) -> str:
+    def _get_calls_stats_table(self, project_id: str) -> Optional[str]:
         """Get the appropriate calls stats table name for a project.
 
         Args:
@@ -224,6 +233,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         Returns:
             str: "calls_complete_stats" for V1 projects, "calls_merged_stats" for V0 projects.
+            default to "calls_complete_stats" if the project version is not set, which only happens
+            if there are zero calls in the project, so it should be rare and won't affect the
+            results of the stats query (either table we KNOW will return 0 rows)
 
         Examples:
             >>> server = ClickHouseTraceServer(...)
@@ -2471,15 +2483,25 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             client.close()
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_call_batch")
-    def _insert_call_batch(self, batch: list) -> None:
-        if root_span := ddtrace.tracer.current_span():
-            root_span.set_tags(
-                {
-                    "clickhouse_trace_server_batched._insert_call_batch.count": str(
-                        len(batch)
-                    )
-                }
-            )
+    def _insert_call_batch(
+        self,
+        batch: list,
+        table_name: str = "call_parts",
+        column_names: list[str] = ALL_CALL_INSERT_COLUMNS,
+    ) -> None:
+        """Generic batch insert for call tables.
+
+        Args:
+            batch: List of rows to insert (each row is a list of values).
+            table_name: Name of the table to insert into.
+            column_names: List of column names for the insert.
+        """
+        set_root_span_dd_tags(
+            {
+                "clickhouse_trace_server_batched._insert_call_batch.table": table_name,
+                "clickhouse_trace_server_batched._insert_call_batch.count": len(batch),
+            }
+        )
         if batch:
             settings = {}
             if self._use_async_insert:
@@ -2489,9 +2511,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 # are caught, reverting to default behavior.
                 settings["wait_for_async_insert"] = 1
             self._insert(
-                "call_parts",
+                table_name,
                 data=batch,
-                column_names=ALL_CALL_INSERT_COLUMNS,
+                column_names=column_names,
                 settings=settings,
             )
 
@@ -2687,13 +2709,20 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     # V1 Write Methods
 
-    def _v1_insert_call_starts_batch(
-        self, ch_calls: list[V1CallStartCHInsertable]
+    def _v1_insert_call_batch(
+        self,
+        table_name: str,
+        ch_calls: list,
+        column_names: list[str],
     ) -> None:
-        """Batch insert calls into call_starts table (V1 projects).
+        """Generic batch insert for V1 call tables.
+
+        Converts insertable objects to rows and delegates to _insert_call_batch.
 
         Args:
-            ch_calls: List of V1CallStartCHInsertable to insert.
+            table_name: Name of the table to insert into (e.g., "call_starts", "calls_complete").
+            ch_calls: List of call insertables to insert.
+            column_names: List of column names for the insert.
         """
         if not ch_calls:
             return
@@ -2701,48 +2730,25 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         batch_data = []
         for ch_call in ch_calls:
             call_dict = ch_call.model_dump()
-            values = [call_dict.get(col) for col in V1_CALL_STARTS_INSERT_COLUMNS]
+            values = [call_dict.get(col) for col in column_names]
             batch_data.append(values)
 
-        settings = {}
-        if self._use_async_insert:
-            settings["async_insert"] = 1
-            settings["wait_for_async_insert"] = 1
+        self._insert_call_batch(batch_data, table_name, column_names)
 
-        self._insert(
-            "call_starts",
-            data=batch_data,
-            column_names=V1_CALL_STARTS_INSERT_COLUMNS,
-            settings=settings,
+    def _v1_insert_call_starts_batch(
+        self, ch_calls: list[V1CallStartCHInsertable]
+    ) -> None:
+        """Batch insert calls into call_starts table (V1 projects)."""
+        self._v1_insert_call_batch(
+            "call_starts", ch_calls, V1_CALL_STARTS_INSERT_COLUMNS
         )
 
     def _v1_insert_calls_complete_batch(
         self, ch_calls: list[V1CallCompleteCHInsertable]
     ) -> None:
-        """Batch insert calls into calls_complete table (V1 projects).
-
-        Args:
-            ch_calls: List of V1CallCompleteCHInsertable to insert.
-        """
-        if not ch_calls:
-            return
-
-        batch_data = []
-        for ch_call in ch_calls:
-            call_dict = ch_call.model_dump()
-            values = [call_dict.get(col) for col in V1_CALLS_COMPLETE_INSERT_COLUMNS]
-            batch_data.append(values)
-
-        settings = {}
-        if self._use_async_insert:
-            settings["async_insert"] = 1
-            settings["wait_for_async_insert"] = 1
-
-        self._insert(
-            "calls_complete",
-            data=batch_data,
-            column_names=V1_CALLS_COMPLETE_INSERT_COLUMNS,
-            settings=settings,
+        """Batch insert calls into calls_complete table (V1 projects)"""
+        self._v1_insert_call_batch(
+            "calls_complete", ch_calls, V1_CALLS_COMPLETE_INSERT_COLUMNS
         )
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._flush_calls")
