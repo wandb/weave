@@ -830,16 +830,14 @@ class EvaluationLogger(BaseModel):
 
         self._is_finalized = True
 
-    def log_prediction(
-        self, inputs: dict[str, Any], output: Any | _NotSetType = NOT_SET
-    ) -> ScoreLogger:
+    def log_prediction(self, inputs: dict[str, Any], output: Any = None) -> ScoreLogger:
         """Log a prediction to the Evaluation.
 
         Returns a ScoreLogger that can be used directly or as a context manager.
 
         Args:
             inputs: The input data for the prediction
-            output: The output value. If not provided, use as context manager to set later.
+            output: The output value. Defaults to None. Can be set later using pred.output.
 
         Returns:
             ScoreLogger for logging scores and optionally finishing the prediction.
@@ -889,11 +887,8 @@ class EvaluationLogger(BaseModel):
         if predict_call is None:
             raise ValueError("predict_call should not be None")
 
-        # If unset, default to None.
-        actual_output = None if output is NOT_SET else output
-
         # Set the output on the predict_call now so it's available for apply_scorer
-        predict_call.output = actual_output
+        predict_call.output = output
 
         pred = ScoreLogger(
             predict_and_score_call=predict_and_score_call,
@@ -902,7 +897,7 @@ class EvaluationLogger(BaseModel):
             predefined_scorers=self.scorers,
         )
         # Store the output so we can use it when finishing the predict_call
-        pred._predict_output = actual_output
+        pred._predict_output = output
         self._accumulated_predictions.append(pred)
 
         return pred
