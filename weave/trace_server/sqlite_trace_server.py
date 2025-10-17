@@ -13,6 +13,7 @@ from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
     ExportTraceServiceRequest,
 )
 
+from weave.trace_server import object_creation_utils
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import (
@@ -77,7 +78,7 @@ def get_conn_cursor(db_path: str) -> tuple[sqlite3.Connection, sqlite3.Cursor]:
     return conn_cursor
 
 
-class SqliteTraceServer(tsi.TraceServerInterface):
+class SqliteTraceServer(tsi.FullTraceServerInterface):
     def __init__(
         self,
         db_path: str,
@@ -1645,6 +1646,153 @@ class SqliteTraceServer(tsi.TraceServerInterface):
     ) -> tsi.EvaluationStatusRes:
         return evaluation_status(self, req)
 
+    def op_create_v2(self, req: tsi.OpCreateV2Req) -> tsi.OpCreateV2Res:
+        """Create an op object by delegating to obj_create.
+
+        Args:
+            req: OpCreateReq containing project_id, name, description, and source_code
+
+        Returns:
+            OpCreateV2Res with digest, object_id, version_index, and op_ref
+        """
+        # Store source code as a file (use placeholder if not provided)
+        source_code = req.source_code or object_creation_utils.PLACEHOLDER_OP_SOURCE
+        source_file_req = tsi.FileCreateReq(
+            project_id=req.project_id,
+            name=object_creation_utils.OP_SOURCE_FILE_NAME,
+            content=source_code.encode("utf-8"),
+        )
+        source_file_res = self.file_create(source_file_req)
+
+        # Build the op object value structure with the file digest
+        # Note: We store just the digest string, matching SDK's to_json output
+        op_val = object_creation_utils.build_op_val(source_file_res.digest)
+
+        # Create the object
+        obj_req = tsi.ObjCreateReq(
+            obj=tsi.ObjSchemaForInsert(
+                project_id=req.project_id,
+                object_id=req.name,
+                val=op_val,
+            )
+        )
+        obj_result = self.obj_create(obj_req)
+
+        # Query back to get version_index
+        obj_read_req = tsi.ObjReadReq(
+            project_id=req.project_id,
+            object_id=req.name,
+            digest=obj_result.digest,
+        )
+        obj_read_res = self.obj_read(obj_read_req)
+
+        return tsi.OpCreateV2Res(
+            digest=obj_result.digest,
+            object_id=req.name,
+            version_index=obj_read_res.obj.version_index,
+        )
+
+    def op_read_v2(self, req: tsi.OpReadV2Req) -> tsi.OpReadV2Res:
+        """Get a specific op object by delegating to obj_read with op filtering.
+
+        Returns the actual source code of the op.
+        """
+        obj_req = tsi.ObjReadReq(
+            project_id=req.project_id,
+            object_id=req.object_id,
+            digest=req.digest,
+            metadata_only=False,  # We need the full val to extract file references
+        )
+        result = self.obj_read(obj_req)
+
+        # Extract code from the file storage
+        val = result.obj.val
+        code = ""
+
+        # Check if this is a file-based op
+        if isinstance(val, dict) and val.get("_type") == "CustomWeaveType":
+            files = val.get("files", {})
+            if object_creation_utils.OP_SOURCE_FILE_NAME in files:
+                # Files dict maps filename to digest string
+                file_digest = files[object_creation_utils.OP_SOURCE_FILE_NAME]
+
+                # Load the actual source code
+                try:
+                    file_content_res = self.file_content_read(
+                        tsi.FileContentReadReq(
+                            project_id=req.project_id, digest=file_digest
+                        )
+                    )
+                    code = file_content_res.content.decode("utf-8")
+                except Exception:
+                    # If we can't read the file, leave code empty
+                    pass
+
+        return tsi.OpReadV2Res(
+            object_id=result.obj.object_id,
+            digest=result.obj.digest,
+            version_index=result.obj.version_index,
+            created_at=result.obj.created_at,
+            code=code,
+        )
+
+    def op_list_v2(self, req: tsi.OpListV2Req) -> Iterator[tsi.OpReadV2Res]:
+        """List op objects by delegating to objs_query with op filtering."""
+        obj_query_req = tsi.ObjQueryReq(
+            project_id=req.project_id,
+            filter=tsi.ObjectVersionFilter(
+                is_op=True,
+                latest_only=True,
+            ),
+            limit=req.limit,
+            offset=req.offset,
+            metadata_only=False,
+        )
+        result = self.objs_query(obj_query_req)
+
+        for obj in result.objs:
+            code = ""
+
+            # Extract file reference from the val if it's a file-based op
+            try:
+                val = obj.val
+                if isinstance(val, dict) and val.get("_type") == "CustomWeaveType":
+                    files = val.get("files", {})
+                    if object_creation_utils.OP_SOURCE_FILE_NAME in files:
+                        file_digest = files[object_creation_utils.OP_SOURCE_FILE_NAME]
+
+                        # Load the actual source code
+                        try:
+                            file_content_res = self.file_content_read(
+                                tsi.FileContentReadReq(
+                                    project_id=req.project_id, digest=file_digest
+                                )
+                            )
+                            code = file_content_res.content.decode("utf-8")
+                        except Exception:
+                            # If we can't read the file, leave code empty
+                            pass
+            except Exception:
+                pass  # If parsing fails, leave code empty
+
+            yield tsi.OpReadV2Res(
+                object_id=obj.object_id,
+                digest=obj.digest,
+                version_index=obj.version_index,
+                created_at=obj.created_at,
+                code=code,
+            )
+
+    def op_delete_v2(self, req: tsi.OpDeleteV2Req) -> tsi.OpDeleteV2Res:
+        """Delete op objects by delegating to obj_delete."""
+        obj_delete_req = tsi.ObjDeleteReq(
+            project_id=req.project_id,
+            object_id=req.object_id,
+            digests=req.digests,
+        )
+        result = self.obj_delete(obj_delete_req)
+        return tsi.OpDeleteV2Res(num_deleted=result.num_deleted)
+
     def _table_row_read(self, project_id: str, row_digest: str) -> tsi.TableRowSchema:
         conn, cursor = get_conn_cursor(self.db_path)
         # Now get the rows
@@ -1715,6 +1863,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
 
         if limit is not None:
             query += f" LIMIT {limit}"
+        elif offset is not None:
+            # SQLite requires LIMIT when using OFFSET
+            query += " LIMIT -1"
         if offset is not None:
             query += f" OFFSET {offset}"
 

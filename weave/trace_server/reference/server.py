@@ -8,6 +8,7 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from weave.trace_server.reference.generate import (
     ServiceDependency,
     generate_routes,
+    generate_routes_v2,
     noop_trace_server_factory,
 )
 
@@ -25,8 +26,10 @@ def authenticate(
 
 server_dependency = ServiceDependency(service_factory=noop_trace_server_factory)
 trace_service_router = generate_routes(APIRouter(), server_dependency)
+v2_router = generate_routes_v2(APIRouter(prefix="/v2"), server_dependency)
 app = FastAPI()
 app.include_router(trace_service_router, dependencies=[Depends(authenticate)])
+app.include_router(v2_router, dependencies=[Depends(authenticate)])
 
 if __name__ == "__main__":
     import uvicorn

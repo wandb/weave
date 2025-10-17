@@ -3,12 +3,7 @@ from collections.abc import Iterator
 from enum import Enum
 from typing import Any, Literal, Optional, Protocol, Union
 
-from pydantic import (
-    BaseModel,
-    ConfigDict,
-    Field,
-    field_serializer,
-)
+from pydantic import BaseModel, ConfigDict, Field, field_serializer
 from typing_extensions import TypedDict
 
 from weave.trace_server.interface.query import Query
@@ -1248,6 +1243,88 @@ class EvaluationStatusRes(BaseModel):
     ]
 
 
+class OpCreateV2Body(BaseModel):
+    """Request body for creating an Op object via REST API.
+
+    This model excludes project_id since it comes from the URL path in RESTful endpoints.
+    """
+
+    name: Optional[str] = Field(
+        None,
+        description="The name of this op. Ops with the same name will be versioned together.",
+    )
+    source_code: Optional[str] = Field(
+        None, description="Complete source code for this op, including imports"
+    )
+
+
+class OpCreateV2Req(OpCreateV2Body):
+    """Request model for creating an Op object.
+
+    Extends OpCreateV2Body by adding project_id for internal API usage.
+    """
+
+    project_id: str = Field(
+        ..., description="The project where this object will be saved"
+    )
+
+
+class OpCreateV2Res(BaseModel):
+    """Response model for creating an Op object."""
+
+    digest: str = Field(..., description="The digest of the created op")
+    object_id: str = Field(..., description="The ID of the created op")
+    version_index: int = Field(..., description="The version index of the created op")
+
+
+class OpReadV2Req(BaseModel):
+    project_id: str = Field(
+        ..., description="The `entity/project` where this op is saved"
+    )
+    object_id: str = Field(..., description="The op ID")
+    digest: str = Field(..., description="The digest of the op object")
+
+
+class OpReadV2Res(BaseModel):
+    """Response model for reading an Op object.
+
+    The code field contains the actual source code of the op.
+    """
+
+    object_id: str = Field(..., description="The op ID")
+    digest: str = Field(..., description="The digest of the op")
+    version_index: int = Field(..., description="The version index of this op")
+    created_at: datetime.datetime = Field(..., description="When this op was created")
+    code: str = Field(..., description="The actual op source code")
+
+
+class OpListV2Req(BaseModel):
+    project_id: str = Field(
+        ..., description="The `entity/project` where these ops are saved"
+    )
+    limit: Optional[int] = Field(
+        default=None, description="Maximum number of ops to return"
+    )
+    offset: Optional[int] = Field(default=None, description="Number of ops to skip")
+
+
+class OpDeleteV2Req(BaseModel):
+    project_id: str = Field(
+        ..., description="The `entity/project` where this op is saved"
+    )
+    object_id: str = Field(..., description="The op ID")
+    digests: Optional[list[str]] = Field(
+        default=None,
+        description="List of digests to delete. If not provided, all digests for the op will be deleted.",
+    )
+
+
+class OpDeleteV2Res(BaseModel):
+    num_deleted: int = Field(
+        ..., description="Number of op versions deleted from this op"
+    )
+
+
 class TraceServerInterface(Protocol):
     def ensure_project_exists(
         self, entity: str, project: str
@@ -1346,3 +1423,29 @@ class TraceServerInterface(Protocol):
     # Evaluation API
     def evaluate_model(self, req: EvaluateModelReq) -> EvaluateModelRes: ...
     def evaluation_status(self, req: EvaluationStatusReq) -> EvaluationStatusRes: ...
+
+
+class TraceServerInterfaceV2(Protocol):
+    """V2 API endpoints for Trace Server.
+
+    This protocol contains the next generation of trace server APIs that
+    provide cleaner, more RESTful interfaces. Implementations should support
+    both this protocol and TraceServerInterface to maintain backward compatibility.
+    """
+
+    # Ops
+    def op_create_v2(self, req: OpCreateV2Req) -> OpCreateV2Res: ...
+    def op_read_v2(self, req: OpReadV2Req) -> OpReadV2Res: ...
+    def op_list_v2(self, req: OpListV2Req) -> Iterator[OpReadV2Res]: ...
+    def op_delete_v2(self, req: OpDeleteV2Req) -> OpDeleteV2Res: ...
+
+
+class FullTraceServerInterface(TraceServerInterface, TraceServerInterfaceV2, Protocol):
+    """Complete trace server interface supporting both V1 and V2 APIs.
+
+    This protocol represents a trace server implementation that supports the full
+    set of APIs - both legacy V1 endpoints and modern V2 endpoints. Use this type
+    for implementations that need to support both API versions.
+    """
+
+    pass
