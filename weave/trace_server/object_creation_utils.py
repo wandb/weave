@@ -8,6 +8,11 @@ OP_SOURCE_FILE_NAME = "obj.py"
 PLACEHOLDER_OP_SOURCE = """def func(*args, **kwargs):
     ... # Code-capture unavailable for this op
 """
+PLACEHOLDER_SCORER_SUMMARIZE_OP_SOURCE = """def summarize(score_rows: list) -> dict | None:
+    '''Default summarize implementation that auto-summarizes score rows.'''
+    from weave.flow.scorer import auto_summarize
+    return auto_summarize(score_rows)
+"""
 
 
 def make_safe_name(name: str | None) -> str:
@@ -86,3 +91,47 @@ def build_dataset_val(
 
 def build_table_ref(entity: str, project: str, digest: str) -> str:
     return f"weave:///{entity}/{project}/table/{digest}"
+
+
+def build_object_ref(entity: str, project: str, object_id: str, digest: str) -> str:
+    return f"weave:///{entity}/{project}/object/{object_id}:{digest}"
+
+
+def build_scorer_val(
+    name: str,
+    description: str | None,
+    score_op_ref: str,
+    summarize_op_ref: str,
+    column_map: dict[str, str] | None = None,
+    class_name: str = "Scorer",
+) -> dict[str, Any]:
+    """Build the value dictionary for a Scorer object.
+
+    Args:
+        name: The scorer name
+        description: Optional description (defaults to "Scorer: {name}")
+        score_op_ref: Reference to the op implementing the scoring logic
+        summarize_op_ref: Reference to the op implementing the summarize method
+        column_map: Optional mapping from dataset columns to scorer argument names
+        class_name: The class name (defaults to "Scorer" for base scorers, or a custom name for subclasses)
+
+    Returns:
+        Dictionary representing the scorer object value
+    """
+    # Base Scorer has bases ["Object", "BaseModel"]
+    # Custom subclasses have bases ["Scorer", "Object", "BaseModel"]
+    if class_name == "Scorer":
+        bases = ["Object", "BaseModel"]
+    else:
+        bases = ["Scorer", "Object", "BaseModel"]
+
+    return {
+        "_type": class_name,
+        "_class_name": class_name,
+        "_bases": bases,
+        "name": name,
+        "description": description,
+        "score": score_op_ref,
+        "summarize": summarize_op_ref,
+        "column_map": column_map,
+    }

@@ -24,6 +24,7 @@ OTEL_TAG_NAME = "OpenTelemetry"
 THREADS_TAG_NAME = "Threads"
 V2_OPS_TAG_NAME = "V2 -- Ops"
 V2_DATASETS_TAG_NAME = "V2 -- Datasets"
+V2_SCORERS_TAG_NAME = "V2 -- Scorers"
 
 
 class AuthParams(NamedTuple):
@@ -277,6 +278,90 @@ def generate_routes_v2(
             project_id=project_id, object_id=object_id, digests=digests
         )
         return service.trace_server_interface.dataset_delete_v2(req)
+
+    @router.post(
+        "{entity}/{project}/scorers",
+        tags=[V2_SCORERS_TAG_NAME],
+    )
+    def scorer_create_v2(
+        entity: str,
+        project: str,
+        body: tsi.ScorerCreateV2Body,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.ScorerCreateV2Res:
+        """Create a scorer object."""
+        project_id = f"{entity}/{project}"
+        req = tsi.ScorerCreateV2Req(project_id=project_id, **body.model_dump())
+        return service.trace_server_interface.scorer_create_v2(req)
+
+    @router.get(
+        "{entity}/{project}/scorers/{object_id}/versions/{digest}",
+        tags=[V2_SCORERS_TAG_NAME],
+    )
+    def scorer_read_v2(
+        entity: str,
+        project: str,
+        object_id: str,
+        digest: str,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.ScorerReadV2Res:
+        """Get a scorer object."""
+        project_id = f"{entity}/{project}"
+        req = tsi.ScorerReadV2Req(
+            project_id=project_id, object_id=object_id, digest=digest
+        )
+        return service.trace_server_interface.scorer_read_v2(req)
+
+    @router.get(
+        "{entity}/{project}/scorers",
+        tags=[V2_SCORERS_TAG_NAME],
+        response_class=StreamingResponse,
+        responses={
+            200: {
+                "description": "Stream of data in JSONL format",
+                "content": {
+                    "application/jsonl": {
+                        "schema": {
+                            "type": "array",
+                            "items": {"$ref": "#/components/schemas/Schema"},
+                        }
+                    }
+                },
+            }
+        },
+    )
+    def scorer_list_v2(
+        entity: str,
+        project: str,
+        limit: int | None = None,
+        offset: int | None = None,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> StreamingResponse:
+        """List scorer objects."""
+        project_id = f"{entity}/{project}"
+        req = tsi.ScorerListV2Req(project_id=project_id, limit=limit, offset=offset)
+        return StreamingResponse(
+            service.trace_server_interface.scorer_list_v2(req),
+            media_type="application/jsonl",
+        )
+
+    @router.delete(
+        "{entity}/{project}/scorers/{object_id}",
+        tags=[V2_SCORERS_TAG_NAME],
+    )
+    def scorer_delete_v2(
+        entity: str,
+        project: str,
+        object_id: str,
+        digests: list[str] | None = None,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.ScorerDeleteV2Res:
+        """Delete a scorer object."""
+        project_id = f"{entity}/{project}"
+        req = tsi.ScorerDeleteV2Req(
+            project_id=project_id, object_id=object_id, digests=digests
+        )
+        return service.trace_server_interface.scorer_delete_v2(req)
 
     return router
 
