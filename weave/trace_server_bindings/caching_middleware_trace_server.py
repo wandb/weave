@@ -567,6 +567,18 @@ class CachingMiddlewareTraceServer(tsi.FullTraceServerInterface):
     def dataset_delete_v2(self, req: tsi.DatasetDeleteV2Req) -> tsi.DatasetDeleteV2Res:
         return self._next_trace_server.dataset_delete_v2(req)
 
+    def scorer_create_v2(self, req: tsi.ScorerCreateV2Req) -> tsi.ScorerCreateV2Res:
+        return self._next_trace_server.scorer_create_v2(req)
+
+    def scorer_read_v2(self, req: tsi.ScorerReadV2Req) -> tsi.ScorerReadV2Res:
+        return self._next_trace_server.scorer_read_v2(req)
+
+    def scorer_list_v2(self, req: tsi.ScorerListV2Req) -> Iterator[tsi.ScorerReadV2Res]:
+        return self._next_trace_server.scorer_list_v2(req)
+
+    def scorer_delete_v2(self, req: tsi.ScorerDeleteV2Req) -> tsi.ScorerDeleteV2Res:
+        return self._next_trace_server.scorer_delete_v2(req)
+
 
 def pydantic_bytes_safe_dump(obj: BaseModel) -> str:
     raw_dict = obj.model_dump()
