@@ -217,6 +217,93 @@ def wf_file_storage_project_ramp_pct() -> Optional[int]:
     return pct
 
 
+# Trace Server Settings
+
+
+def weave_trace_server_file_chunk_size() -> Optional[int]:
+    """The chunk size for file operations."""
+    size = os.environ.get("WEAVE_TRACE_SERVER_FILE_CHUNK_SIZE")
+    if size is None:
+        return None
+    try:
+        return int(size)
+    except ValueError:
+        logger.exception(
+            f"WEAVE_TRACE_SERVER_FILE_CHUNK_SIZE value '{size}' is not valid"
+        )
+        return None
+
+
+def weave_trace_server_max_delete_calls_count() -> Optional[int]:
+    """The maximum number of calls to delete in a single operation."""
+    count = os.environ.get("WEAVE_TRACE_SERVER_MAX_DELETE_CALLS_COUNT")
+    if count is None:
+        return None
+    try:
+        return int(count)
+    except ValueError:
+        logger.exception(
+            f"WEAVE_TRACE_SERVER_MAX_DELETE_CALLS_COUNT value '{count}' is not valid"
+        )
+        return None
+
+
+def weave_trace_server_initial_calls_stream_batch_size() -> Optional[int]:
+    """The initial batch size for streaming calls."""
+    size = os.environ.get("WEAVE_TRACE_SERVER_INITIAL_CALLS_STREAM_BATCH_SIZE")
+    if size is None:
+        return None
+    try:
+        return int(size)
+    except ValueError:
+        logger.exception(
+            f"WEAVE_TRACE_SERVER_INITIAL_CALLS_STREAM_BATCH_SIZE value '{size}' is not valid"
+        )
+        return None
+
+
+def weave_trace_server_max_calls_stream_batch_size() -> Optional[int]:
+    """The maximum batch size for streaming calls."""
+    size = os.environ.get("WEAVE_TRACE_SERVER_MAX_CALLS_STREAM_BATCH_SIZE")
+    if size is None:
+        return None
+    try:
+        return int(size)
+    except ValueError:
+        logger.exception(
+            f"WEAVE_TRACE_SERVER_MAX_CALLS_STREAM_BATCH_SIZE value '{size}' is not valid"
+        )
+        return None
+
+
+def weave_trace_server_clickhouse_single_row_insert_bytes_limit() -> Optional[float]:
+    """The maximum size in bytes for a single row insert in ClickHouse."""
+    size = os.environ.get("WEAVE_TRACE_SERVER_CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT")
+    if size is None:
+        return None
+    try:
+        return float(size)
+    except ValueError:
+        logger.exception(
+            f"WEAVE_TRACE_SERVER_CLICKHOUSE_SINGLE_ROW_INSERT_BYTES_LIMIT value '{size}' is not valid"
+        )
+        return None
+
+
+def weave_trace_server_clickhouse_max_feedback_payload_size() -> Optional[float]:
+    """The maximum size in bytes for feedback payload in ClickHouse."""
+    size = os.environ.get("WEAVE_TRACE_SERVER_CLICKHOUSE_MAX_FEEDBACK_PAYLOAD_SIZE")
+    if size is None:
+        return None
+    try:
+        return float(size)
+    except ValueError:
+        logger.exception(
+            f"WEAVE_TRACE_SERVER_CLICKHOUSE_MAX_FEEDBACK_PAYLOAD_SIZE value '{size}' is not valid"
+        )
+        return None
+
+
 # Inference Service Settings
 
 
