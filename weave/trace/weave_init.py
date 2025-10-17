@@ -8,6 +8,7 @@ from weave.compat import wandb
 from weave.telemetry import trace_sentry
 from weave.trace import (
     env,
+    env_monitor,
     init_message,
     weave_client,
 )
@@ -149,6 +150,11 @@ def init_weave(
     project_name = client.project
 
     weave_client_context.set_weave_client_global(client)
+
+    # Install environment variable monitor and mark as initialized
+    # This will warn users if they try to set WEAVE_* env vars after init
+    env_monitor.install_env_monitor()
+    env_monitor.mark_weave_initialized()
 
     # Implicit patching:
     # 1. Check sys.modules and automatically patch any already-imported integrations
