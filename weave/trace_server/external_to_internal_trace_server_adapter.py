@@ -218,7 +218,7 @@ class ExternalTraceServer(tsi.TraceServerInterface):
         return self._ref_apply(self._internal_trace_server.call_update, req)
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
-        req.op_obj.project_id = self._idc.ext_to_int_project_id(req.op_obj.project_id)
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(self._internal_trace_server.op_create, req)
 
     def op_read(self, req: tsi.OpReadReq) -> tsi.OpReadRes:
@@ -460,3 +460,124 @@ class ExternalTraceServer(tsi.TraceServerInterface):
     ) -> tsi.EvaluationStatusRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(self._internal_trace_server.evaluation_status, req)
+
+    def op_read_v2(self, req: tsi.OpReadV2Req) -> tsi.OpReadV2Res:
+        original_project_id = req.project_id
+        req.project_id = self._idc.ext_to_int_project_id(original_project_id)
+        return self._ref_apply(self._internal_trace_server.op_read_v2, req)
+
+    def op_list(self, req: tsi.OpListReq) -> Iterator[tsi.OpItemMetadata]:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._stream_ref_apply(self._internal_trace_server.op_list, req)
+
+    def op_delete(self, req: tsi.OpDeleteReq) -> tsi.OpDeleteRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.op_delete, req)
+
+    def evaluation_create(
+        self, req: tsi.EvaluationCreateReq
+    ) -> tsi.EvaluationCreateRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.evaluation_create, req)
+
+    def evaluation_read(self, req: tsi.EvaluationReadReq) -> tsi.EvaluationReadRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.evaluation_read, req)
+
+    def evaluation_list(
+        self, req: tsi.EvaluationListReq
+    ) -> Iterator[tsi.EvaluationItemMetadata]:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._stream_ref_apply(self._internal_trace_server.evaluation_list, req)
+
+    def evaluation_delete(
+        self, req: tsi.EvaluationDeleteReq
+    ) -> tsi.EvaluationDeleteRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.evaluation_delete, req)
+
+    def evaluation_log_start(
+        self, req: tsi.EvaluationRunStartReq
+    ) -> tsi.EvaluationRunStartRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.evaluation_run_start, req)
+
+    def evaluation_run_start(
+        self, req: tsi.EvaluationRunStartReq
+    ) -> tsi.EvaluationRunStartRes:
+        """Alias for evaluation_log_start to match endpoint naming."""
+        return self.evaluation_log_start(req)
+
+    def evaluation_log_prediction(
+        self, req: tsi.EvaluationRunLogPredictionReq
+    ) -> tsi.EvaluationRunLogPredictionRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(
+            self._internal_trace_server.evaluation_run_log_prediction, req
+        )
+
+    def evaluation_run_log_prediction(
+        self, req: tsi.EvaluationRunLogPredictionReq
+    ) -> tsi.EvaluationRunLogPredictionRes:
+        """Alias for evaluation_log_prediction to match endpoint naming."""
+        return self.evaluation_log_prediction(req)
+
+    def evaluation_log_score(
+        self, req: tsi.EvaluationRunLogScoreReq
+    ) -> tsi.EvaluationRunLogScoreRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(
+            self._internal_trace_server.evaluation_run_log_score, req
+        )
+
+    def evaluation_run_log_score(
+        self, req: tsi.EvaluationRunLogScoreReq
+    ) -> tsi.EvaluationRunLogScoreRes:
+        """Alias for evaluation_log_score to match endpoint naming."""
+        return self.evaluation_log_score(req)
+
+    def evaluation_log_finish(
+        self, req: tsi.EvaluationRunFinishReq
+    ) -> tsi.EvaluationRunFinishRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.evaluation_run_finish, req)
+
+    def evaluation_run_finish(
+        self, req: tsi.EvaluationRunFinishReq
+    ) -> tsi.EvaluationRunFinishRes:
+        """Alias for evaluation_log_finish to match endpoint naming."""
+        return self.evaluation_log_finish(req)
+
+    def dataset_create(self, req: tsi.DatasetCreateReq) -> tsi.DatasetCreateRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.dataset_create, req)
+
+    def dataset_read(self, req: tsi.DatasetReadReq) -> tsi.DatasetReadRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.dataset_read, req)
+
+    def dataset_list(
+        self, req: tsi.DatasetListReq
+    ) -> Iterator[tsi.DatasetItemMetadata]:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._stream_ref_apply(self._internal_trace_server.dataset_list, req)
+
+    def dataset_delete(self, req: tsi.DatasetDeleteReq) -> tsi.DatasetDeleteRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.dataset_delete, req)
+
+    def scorer_create(self, req: tsi.ScorerCreateReq) -> tsi.ScorerCreateRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.scorer_create, req)
+
+    def scorer_read(self, req: tsi.ScorerReadReq) -> tsi.ScorerReadRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.scorer_read, req)
+
+    def scorer_list(self, req: tsi.ScorerListReq) -> Iterator[tsi.ScorerItemMetadata]:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._stream_ref_apply(self._internal_trace_server.scorer_list, req)
+
+    def scorer_delete(self, req: tsi.ScorerDeleteReq) -> tsi.ScorerDeleteRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.scorer_delete, req)

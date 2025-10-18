@@ -412,6 +412,25 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     def ops_query(self, req: Union[tsi.OpQueryReq, dict[str, Any]]) -> tsi.OpQueryRes:
         return self._generic_request("/ops/query", req, tsi.OpQueryReq, tsi.OpQueryRes)
 
+    def op_read_v2(
+        self, req: Union[tsi.OpReadV2Req, dict[str, Any]]
+    ) -> tsi.OpReadV2Res:
+        return self._generic_request(
+            "/op/read_v2", req, tsi.OpReadV2Req, tsi.OpReadV2Res
+        )
+
+    def op_list(
+        self, req: Union[tsi.OpListReq, dict[str, Any]]
+    ) -> Iterator[tsi.OpItemMetadata]:
+        return self._generic_stream_request(
+            "/op/list", req, tsi.OpListReq, tsi.OpItemMetadata
+        )
+
+    def op_delete(self, req: Union[tsi.OpDeleteReq, dict[str, Any]]) -> tsi.OpDeleteRes:
+        return self._generic_request(
+            "/op/delete", req, tsi.OpDeleteReq, tsi.OpDeleteRes
+        )
+
     # Obj API
 
     def obj_create(
@@ -693,6 +712,130 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         self, req: tsi.EvaluationStatusReq
     ) -> tsi.EvaluationStatusRes:
         raise NotImplementedError("evaluation_status is not implemented")
+
+    def evaluation_create(
+        self, req: Union[tsi.EvaluationCreateReq, dict[str, Any]]
+    ) -> tsi.EvaluationCreateRes:
+        return self._generic_request(
+            "/evaluation/create", req, tsi.EvaluationCreateReq, tsi.EvaluationCreateRes
+        )
+
+    def evaluation_read(
+        self, req: Union[tsi.EvaluationReadReq, dict[str, Any]]
+    ) -> tsi.EvaluationReadRes:
+        return self._generic_request(
+            "/evaluation/read", req, tsi.EvaluationReadReq, tsi.EvaluationReadRes
+        )
+
+    def evaluation_list(
+        self, req: Union[tsi.EvaluationListReq, dict[str, Any]]
+    ) -> Iterator[tsi.EvaluationItemMetadata]:
+        return self._generic_stream_request(
+            "/evaluation/list", req, tsi.EvaluationListReq, tsi.EvaluationItemMetadata
+        )
+
+    def evaluation_delete(
+        self, req: Union[tsi.EvaluationDeleteReq, dict[str, Any]]
+    ) -> tsi.EvaluationDeleteRes:
+        return self._generic_request(
+            "/evaluation/delete", req, tsi.EvaluationDeleteReq, tsi.EvaluationDeleteRes
+        )
+
+    def evaluation_run_start(
+        self, req: Union[tsi.EvaluationRunStartReq, dict[str, Any]]
+    ) -> tsi.EvaluationRunStartRes:
+        return self._generic_request(
+            "/evaluation/run/start",
+            req,
+            tsi.EvaluationRunStartReq,
+            tsi.EvaluationRunStartRes,
+        )
+
+    def evaluation_run_log_prediction(
+        self, req: Union[tsi.EvaluationRunLogPredictionReq, dict[str, Any]]
+    ) -> tsi.EvaluationRunLogPredictionRes:
+        return self._generic_request(
+            "/evaluation/run/log_prediction",
+            req,
+            tsi.EvaluationRunLogPredictionReq,
+            tsi.EvaluationRunLogPredictionRes,
+        )
+
+    def evaluation_run_log_score(
+        self, req: Union[tsi.EvaluationRunLogScoreReq, dict[str, Any]]
+    ) -> tsi.EvaluationRunLogScoreRes:
+        return self._generic_request(
+            "/evaluation/run/log_score",
+            req,
+            tsi.EvaluationRunLogScoreReq,
+            tsi.EvaluationRunLogScoreRes,
+        )
+
+    def evaluation_run_finish(
+        self, req: Union[tsi.EvaluationRunFinishReq, dict[str, Any]]
+    ) -> tsi.EvaluationRunFinishRes:
+        return self._generic_request(
+            "/evaluation/run/finish",
+            req,
+            tsi.EvaluationRunFinishReq,
+            tsi.EvaluationRunFinishRes,
+        )
+
+    def dataset_create(
+        self, req: Union[tsi.DatasetCreateReq, dict[str, Any]]
+    ) -> tsi.DatasetCreateRes:
+        return self._generic_request(
+            "/dataset/create", req, tsi.DatasetCreateReq, tsi.DatasetCreateRes
+        )
+
+    def dataset_read(
+        self, req: Union[tsi.DatasetReadReq, dict[str, Any]]
+    ) -> tsi.DatasetReadRes:
+        return self._generic_request(
+            "/dataset/read", req, tsi.DatasetReadReq, tsi.DatasetReadRes
+        )
+
+    def dataset_list(
+        self, req: Union[tsi.DatasetListReq, dict[str, Any]]
+    ) -> Iterator[tsi.DatasetItemMetadata]:
+        return self._generic_stream_request(
+            "/dataset/list", req, tsi.DatasetListReq, tsi.DatasetItemMetadata
+        )
+
+    def dataset_delete(
+        self, req: Union[tsi.DatasetDeleteReq, dict[str, Any]]
+    ) -> tsi.DatasetDeleteRes:
+        return self._generic_request(
+            "/dataset/delete", req, tsi.DatasetDeleteReq, tsi.DatasetDeleteRes
+        )
+
+    def scorer_create(
+        self, req: Union[tsi.ScorerCreateReq, dict[str, Any]]
+    ) -> tsi.ScorerCreateRes:
+        return self._generic_request(
+            "/scorer/create", req, tsi.ScorerCreateReq, tsi.ScorerCreateRes
+        )
+
+    def scorer_read(
+        self, req: Union[tsi.ScorerReadReq, dict[str, Any]]
+    ) -> tsi.ScorerReadRes:
+        return self._generic_request(
+            "/scorer/read", req, tsi.ScorerReadReq, tsi.ScorerReadRes
+        )
+
+    def scorer_list(
+        self, req: Union[tsi.ScorerListReq, dict[str, Any]]
+    ) -> Iterator[tsi.ScorerItemMetadata]:
+        return self._generic_stream_request(
+            "/scorer/list", req, tsi.ScorerListReq, tsi.ScorerItemMetadata
+        )
+
+    def scorer_delete(
+        self, req: Union[tsi.ScorerDeleteReq, dict[str, Any]]
+    ) -> tsi.ScorerDeleteRes:
+        return self._generic_request(
+            "/scorer/delete", req, tsi.ScorerDeleteReq, tsi.ScorerDeleteRes
+        )
 
 
 __docspec__ = [
