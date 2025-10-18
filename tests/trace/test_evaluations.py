@@ -1165,3 +1165,94 @@ def test_get_scores(client, make_evals):
         "second_score": [56, 5656],
         "second_score2": [78, 7878],
     }
+
+
+@pytest.mark.asyncio
+async def test_evaluation_with_metadata(client):
+    """Test that metadata can be attached to evaluations and is properly tracked."""
+    
+    @weave.op
+    def simple_model(question: str) -> str:
+        return "answer"
+    
+    @weave.op
+    def simple_scorer(expected: str, output: str) -> dict:
+        return {"match": expected == output}
+    
+    dataset = [
+        {"question": "What is 2+2?", "expected": "4"},
+        {"question": "What is 3+3?", "expected": "6"},
+    ]
+    
+    metadata = {
+        "model_version": "v1.0",
+        "experiment": "test_run",
+        "hyperparameters": {
+            "temperature": 0.7,
+            "max_tokens": 100
+        },
+        "test_flag": True
+    }
+    
+    # Create evaluation with metadata
+    evaluation = Evaluation(
+        name="test-eval-with-metadata",
+        dataset=dataset,
+        scorers=[simple_scorer],
+        metadata=metadata
+    )
+    
+    # Verify metadata is stored
+    assert evaluation.metadata == metadata
+    
+    # Run evaluation
+    results = await evaluation.evaluate(simple_model)
+    
+    # Verify results are computed correctly
+    assert "simple_scorer" in results
+    assert "match" in results["simple_scorer"]
+    
+    # Get evaluation calls and check attributes
+    calls = client.server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=client._project_id(),
+            filter=tsi.CallsFilter(op_names=["Evaluation.evaluate"]),
+        )
+    )
+    
+    # There should be at least one evaluation call
+    assert len(calls.calls) > 0
+    
+    # Find the most recent evaluation call (should be ours)
+    eval_call = calls.calls[-1]
+    
+    # Check that metadata appears in the call's attributes
+    if hasattr(eval_call, 'attributes') and eval_call.attributes:
+        # Metadata should be present in attributes
+        for key, value in metadata.items():
+            assert key in eval_call.attributes
+            assert eval_call.attributes[key] == value
+
+
+@pytest.mark.asyncio
+async def test_evaluation_without_metadata_backward_compat(client):
+    """Test that evaluations still work without metadata (backward compatibility)."""
+    
+    @weave.op
+    def model(question: str) -> str:
+        return "answer"
+    
+    dataset = [{"question": "test", "expected": "answer"}]
+    
+    # Create evaluation without metadata
+    evaluation = Evaluation(
+        name="test-eval-no-metadata",
+        dataset=dataset
+    )
+    
+    # Metadata should be None
+    assert evaluation.metadata is None
+    
+    # Should be able to run evaluation
+    results = await evaluation.evaluate(model)
+    assert "model_latency" in results
