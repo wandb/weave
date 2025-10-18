@@ -29,6 +29,15 @@ from weave.trace_server import environment as wf_env
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.actions_worker.dispatcher import execute_batch
+from weave.trace_server.alert_metrics.alert_metrics_query_builder import (
+    build_alert_metrics_query_conditions,
+)
+from weave.trace_server.alert_metrics.schema import (
+    ALERT_METRICS_CREATE_COLUMNS,
+    ALERT_METRICS_QUERY_COLUMNS,
+    TABLE_ALERT_METRICS,
+    format_row_to_alert_metric_schema,
+)
 from weave.trace_server.base64_content_conversion import (
     process_call_req_to_content,
 )
@@ -2245,6 +2254,79 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self, req: tsi.EvaluationStatusReq
     ) -> tsi.EvaluationStatusRes:
         return evaluation_status(self, req)
+
+    # Alert API
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched.alert_metrics_create")
+    def alert_metrics_create(
+        self, req: tsi.AlertMetricsCreateReq
+    ) -> tsi.AlertMetricsCreateRes:
+        """Create multiple alert metric entries in batch."""
+        if not req.metrics:
+            return tsi.AlertMetricsCreateRes(ids=[])
+
+        metric_ids = []
+        data_to_insert = []
+
+        for metric in req.metrics:
+            metric_id = generate_id()
+            metric_ids.append(metric_id)
+            data_to_insert.append(
+                (
+                    req.project_id,
+                    metric_id,
+                    metric.alert_ids,
+                    metric.created_at,
+                    metric.metric_key,
+                    metric.metric_value,
+                    metric.metric_type,
+                    metric.call_id,
+                    metric.wb_user_id,
+                )
+            )
+
+        self._insert(
+            "alert_metrics",
+            data=data_to_insert,
+            column_names=ALERT_METRICS_CREATE_COLUMNS,
+        )
+
+        return tsi.AlertMetricsCreateRes(ids=metric_ids)
+
+    def alert_metrics_query_stream(
+        self, req: tsi.AlertMetricsQueryReq
+    ) -> Iterator[tsi.AlertMetricSchema]:
+        """Stream alert metrics with optional filters using ORM."""
+        # Create a select query using the ORM
+        select = (
+            TABLE_ALERT_METRICS.select()
+            .project_id(req.project_id)
+            .fields(ALERT_METRICS_QUERY_COLUMNS)
+            .order_by([tsi.SortBy(field="created_at", direction="asc")])
+        )
+
+        # Build query conditions using helper function
+        combined_query = build_alert_metrics_query_conditions(req)
+        if combined_query:
+            select = select.where(combined_query)
+
+        if req.limit:
+            select = select.limit(req.limit)
+
+        if req.offset:
+            select = select.offset(req.offset)
+
+        # Execute the prepared query
+        prepared = select.prepare("clickhouse")
+        result = self._query(prepared.sql, prepared.parameters)
+
+        # Stream the results
+        for row in result.result_rows:
+            row_dict = TABLE_ALERT_METRICS.tuple_to_row(row, prepared.fields)
+            created_at = row_dict.get("created_at")
+            if created_at and isinstance(created_at, datetime.datetime):
+                row_dict["created_at"] = _ensure_datetimes_have_tz(created_at)
+
+            yield format_row_to_alert_metric_schema(row_dict)
 
     # Private Methods
     @property

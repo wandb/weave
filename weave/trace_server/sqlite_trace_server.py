@@ -8,6 +8,7 @@ import sqlite3
 import threading
 from collections.abc import Iterator
 from typing import Any, Optional, cast
+from zoneinfo import ZoneInfo
 
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
     ExportTraceServiceRequest,
@@ -15,6 +16,7 @@ from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
 
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.alert_metrics.schema import ALERT_METRICS_QUERY_COLUMNS
 from weave.trace_server.errors import (
     InvalidRequest,
     NotFoundError,
@@ -174,6 +176,19 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             """
         )
         cursor.execute(TABLE_FEEDBACK.create_sql())
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS alert_metrics (
+                project_id TEXT,
+                id TEXT PRIMARY KEY,
+                call_id TEXT,
+                alert_ids TEXT,  -- JSON array of alert ids
+                created_at TEXT,
+                metric_key TEXT,
+                metric_value REAL
+            )
+            """
+        )
 
     def call_start_batch(self, req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
         res = []
@@ -1644,6 +1659,142 @@ class SqliteTraceServer(tsi.TraceServerInterface):
         self, req: tsi.EvaluationStatusReq
     ) -> tsi.EvaluationStatusRes:
         return evaluation_status(self, req)
+
+    def alert_metrics_create(
+        self, req: tsi.AlertMetricsCreateReq
+    ) -> tsi.AlertMetricsCreateRes:
+        """Create multiple alert metric entries in batch.
+
+        Args:
+            req: Request containing batch of metric details.
+
+        Returns:
+            Response containing the created metric IDs.
+        """
+        conn, cursor = get_conn_cursor(self.db_path)
+        metric_ids = []
+        rows_to_insert = []
+
+        for metric in req.metrics:
+            metric_id = generate_id()
+            metric_ids.append(metric_id)
+            rows_to_insert.append(
+                (
+                    req.project_id,
+                    metric_id,
+                    metric.call_id,
+                    json.dumps(metric.alert_ids),  # Store as JSON string
+                    metric.created_at.isoformat(),
+                    metric.metric_key,
+                    metric.metric_value,
+                )
+            )
+
+        if rows_to_insert:
+            with self.lock:
+                cursor.executemany(
+                    """INSERT INTO alert_metrics (
+                        project_id,
+                        id,
+                        call_id,
+                        alert_ids,
+                        created_at,
+                        metric_key,
+                        metric_value
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                    rows_to_insert,
+                )
+                conn.commit()
+
+        return tsi.AlertMetricsCreateRes(ids=metric_ids)
+
+    def alert_metrics_query_stream(
+        self, req: tsi.AlertMetricsQueryReq
+    ) -> Iterator[tsi.AlertMetricSchema]:
+        """Stream alert metrics with optional filters.
+
+        Args:
+            req: Request containing query filters.
+
+        Yields:
+            AlertMetricSchema: Individual alert metric records.
+
+        Examples:
+            >>> req = AlertMetricsQueryReq(project_id="test")
+            >>> for metric in server.alert_metrics_query_stream(req):
+            ...     print(metric.metric_key)
+        """
+        conn, cursor = get_conn_cursor(self.db_path)
+
+        # Build query conditions
+        conditions = ["project_id = ?"]
+        parameters = [req.project_id]
+
+        if req.metric_keys:
+            placeholders = ",".join(["?" for _ in req.metric_keys])
+            conditions.append(f"metric_key IN ({placeholders})")
+            parameters.extend(req.metric_keys)
+
+        if req.alert_ids:
+            # For SQLite, we need to check if any alert_id is in the JSON array
+            alert_conditions = []
+            for alert_id in req.alert_ids:
+                alert_conditions.append("json_extract(alert_ids, '$') LIKE ?")
+                parameters.append(f'%"{alert_id}"%')
+            if alert_conditions:
+                conditions.append(f"({' OR '.join(alert_conditions)})")
+
+        if req.end_time:
+            conditions.append("datetime(created_at) <= datetime(?)")
+            parameters.append(req.end_time.isoformat())
+
+        # Build the query
+        query = f"""
+            SELECT {", ".join(ALERT_METRICS_QUERY_COLUMNS)}
+            FROM alert_metrics
+            WHERE {" AND ".join(conditions)}
+            ORDER BY created_at DESC
+        """
+
+        if req.limit:
+            query += " LIMIT ?"
+            parameters.append(str(req.limit))
+
+        if req.offset:
+            query += " OFFSET ?"
+            parameters.append(str(req.offset))
+
+        cursor.execute(query, parameters)
+
+        # Stream results one by one
+        while True:
+            row = cursor.fetchone()
+            if row is None:
+                break
+
+            # Parse alert_ids JSON
+            alert_ids_json = row[2]
+            if alert_ids_json:
+                alert_ids = json.loads(alert_ids_json)
+            else:
+                alert_ids = []
+
+            # Parse created_at
+            created_at_str = row[3]
+            created_at = datetime.datetime.fromisoformat(created_at_str).replace(
+                tzinfo=ZoneInfo("UTC")
+            )
+
+            yield tsi.AlertMetricSchema(
+                id=row[0],
+                project_id=row[1],
+                alert_ids=alert_ids,
+                created_at=created_at,
+                metric_key=row[4],
+                metric_value=row[5],
+            )
+
+        conn.close()
 
     def _table_row_read(self, project_id: str, row_digest: str) -> tsi.TableRowSchema:
         conn, cursor = get_conn_cursor(self.db_path)

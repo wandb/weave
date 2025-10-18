@@ -5922,3 +5922,108 @@ def test_calls_query_filter_contains_in_message_array(client):
     #     )
     # )
     # assert len(calls) == 1
+
+
+def test_alert_metrics_create_query(client):
+    res = client.server.alert_metrics_create(
+        tsi.AlertMetricsCreateReq(
+            project_id=client._project_id(),
+            metrics=[
+                tsi.AlertMetricInsertItem(
+                    alert_ids=["alert-1"],
+                    metric_key="accuracy",
+                    metric_value=0.95,
+                    call_id="call-123",
+                    created_at=datetime.datetime.now(tz=datetime.timezone.utc),
+                )
+            ],
+        )
+    )
+    assert res is not None, "Response should not be None"
+    assert len(res.ids) == 1
+    assert res.ids[0] is not None
+
+    # Create batch of metrics
+    created_at = datetime.datetime.now(tz=datetime.timezone.utc)
+    res = client.server.alert_metrics_create(
+        tsi.AlertMetricsCreateReq(
+            project_id=client._project_id(),
+            metrics=[
+                tsi.AlertMetricInsertItem(
+                    alert_ids=["alert-1", "alert-2"],
+                    metric_key="loss",
+                    metric_value=0.123,
+                    call_id="call-456",
+                    created_at=created_at,
+                ),
+                tsi.AlertMetricInsertItem(
+                    alert_ids=["alert-2"],
+                    metric_key="f1_score",
+                    metric_value=0.89,
+                    metric_type="float",
+                    call_id="call-789",
+                    created_at=created_at + datetime.timedelta(seconds=1),
+                ),
+            ],
+        )
+    )
+    assert len(res.ids) == 2
+
+    # Query all metrics
+    query_res = client.server.alert_metrics_query(
+        tsi.AlertMetricsQueryReq(project_id=client._project_id())
+    )
+    assert len(query_res.metrics) >= 3
+
+    # Query by metric key
+    query_res = client.server.alert_metrics_query(
+        tsi.AlertMetricsQueryReq(
+            project_id=client._project_id(), metric_keys=["accuracy"]
+        )
+    )
+    assert len(query_res.metrics) == 1
+    assert query_res.metrics[0].metric_key == "accuracy"
+    assert query_res.metrics[0].metric_value == 0.95
+
+    # Query by alert ID
+    query_res = client.server.alert_metrics_query(
+        tsi.AlertMetricsQueryReq(project_id=client._project_id(), alert_ids=["alert-2"])
+    )
+    assert len(query_res.metrics) == 2
+    assert all("alert-2" in m.alert_ids for m in query_res.metrics)
+
+    # Query by metric key, alert ID, and time range
+    query_res = client.server.alert_metrics_query(
+        tsi.AlertMetricsQueryReq(
+            project_id=client._project_id(),
+            metric_keys=["f1_score"],
+            alert_ids=["alert-2"],
+            end_time=created_at + datetime.timedelta(minutes=2),
+        )
+    )
+    assert len(query_res.metrics) == 1
+    assert query_res.metrics[0].metric_key == "f1_score"
+    assert query_res.metrics[0].metric_value == 0.89
+    assert "alert-2" in query_res.metrics[0].alert_ids
+
+    # Query with time range
+    query_res = client.server.alert_metrics_query(
+        tsi.AlertMetricsQueryReq(
+            project_id=client._project_id(),
+            start_time=created_at - datetime.timedelta(minutes=1),
+            end_time=created_at + datetime.timedelta(minutes=2),
+        )
+    )
+    assert len(query_res.metrics) >= 2
+
+    # Query with pagination
+    query_res = client.server.alert_metrics_query(
+        tsi.AlertMetricsQueryReq(project_id=client._project_id(), limit=2, offset=0)
+    )
+    assert len(query_res.metrics) <= 2
+
+    # Empty batch
+    res = client.server.alert_metrics_create(
+        tsi.AlertMetricsCreateReq(project_id=client._project_id(), metrics=[])
+    )
+    assert len(res.ids) == 0
