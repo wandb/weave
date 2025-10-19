@@ -499,3 +499,19 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
     def dataset_delete_v2(self, req: tsi.DatasetDeleteV2Req) -> tsi.DatasetDeleteV2Res:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(self._internal_trace_server.dataset_delete_v2, req)
+
+    def scorer_create_v2(self, req: tsi.ScorerCreateV2Req) -> tsi.ScorerCreateV2Res:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.scorer_create_v2, req)
+
+    def scorer_read_v2(self, req: tsi.ScorerReadV2Req) -> tsi.ScorerReadV2Res:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.scorer_read_v2, req)
+
+    def scorer_list_v2(self, req: tsi.ScorerListV2Req) -> Iterator[tsi.ScorerReadV2Res]:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._stream_ref_apply(self._internal_trace_server.scorer_list_v2, req)
+
+    def scorer_delete_v2(self, req: tsi.ScorerDeleteV2Req) -> tsi.ScorerDeleteV2Res:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.scorer_delete_v2, req)
