@@ -25,6 +25,7 @@ THREADS_TAG_NAME = "Threads"
 V2_OPS_TAG_NAME = "V2 -- Ops"
 V2_DATASETS_TAG_NAME = "V2 -- Datasets"
 V2_SCORERS_TAG_NAME = "V2 -- Scorers"
+V2_EVALUATIONS_TAG_NAME = "V2 -- Evaluations"
 
 
 class AuthParams(NamedTuple):
@@ -362,6 +363,85 @@ def generate_routes_v2(
             project_id=project_id, object_id=object_id, digests=digests
         )
         return service.trace_server_interface.scorer_delete_v2(req)
+
+    @router.post(
+        "{entity}/{project}/evaluations",
+        tags=[V2_EVALUATIONS_TAG_NAME],
+    )
+    def evaluation_create_v2(
+        req: tsi.EvaluationCreateV2Req,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.EvaluationCreateV2Res:
+        """Create an evaluation object."""
+        return service.trace_server_interface.evaluation_create_v2(req)
+
+    @router.get(
+        "{entity}/{project}/evaluations/{object_id}/versions/{digest}",
+        tags=[V2_EVALUATIONS_TAG_NAME],
+    )
+    def evaluation_read_v2(
+        entity: str,
+        project: str,
+        object_id: str,
+        digest: str,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.EvaluationReadV2Res:
+        """Get an evaluation object."""
+        project_id = f"{entity}/{project}"
+        req = tsi.EvaluationReadV2Req(
+            project_id=project_id, object_id=object_id, digest=digest
+        )
+        return service.trace_server_interface.evaluation_read_v2(req)
+
+    @router.get(
+        "{entity}/{project}/evaluations",
+        tags=[V2_EVALUATIONS_TAG_NAME],
+        response_class=StreamingResponse,
+        responses={
+            200: {
+                "description": "Stream of data in JSONL format",
+                "content": {
+                    "application/jsonl": {
+                        "schema": {
+                            "type": "array",
+                            "items": {"$ref": "#/components/schemas/Schema"},
+                        }
+                    }
+                },
+            }
+        },
+    )
+    def evaluation_list_v2(
+        entity: str,
+        project: str,
+        limit: int | None = None,
+        offset: int | None = None,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> StreamingResponse:
+        """List evaluation objects."""
+        project_id = f"{entity}/{project}"
+        req = tsi.EvaluationListV2Req(project_id=project_id, limit=limit, offset=offset)
+        return StreamingResponse(
+            service.trace_server_interface.evaluation_list_v2(req),
+            media_type="application/jsonl",
+        )
+
+    @router.delete(
+        "{entity}/{project}/evaluations/{object_id}", tags=[V2_EVALUATIONS_TAG_NAME]
+    )
+    def evaluation_delete_v2(
+        entity: str,
+        project: str,
+        object_id: str,
+        digests: list[str] | None = None,
+        service: weave.trace_server.trace_service.TraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.EvaluationDeleteV2Res:
+        """Delete an evaluation object."""
+        project_id = f"{entity}/{project}"
+        req = tsi.EvaluationDeleteV2Req(
+            project_id=project_id, object_id=object_id, digests=digests
+        )
+        return service.trace_server_interface.evaluation_delete_v2(req)
 
     return router
 

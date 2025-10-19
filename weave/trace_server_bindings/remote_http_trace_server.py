@@ -933,6 +933,72 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
         r = self._delete_request_executor(url, params)
         return tsi.ScorerDeleteV2Res.model_validate(r.json())
 
+    def evaluation_create_v2(
+        self, req: Union[tsi.EvaluationCreateV2Req, dict[str, Any]]
+    ) -> tsi.EvaluationCreateV2Res:
+        if isinstance(req, dict):
+            req = tsi.EvaluationCreateV2Req.model_validate(req)
+        req = cast(tsi.EvaluationCreateV2Req, req)
+        entity, project = req.project_id.split("/", 1)
+        url = f"/v2/{entity}/{project}/evaluations"
+        # For create, we need to send the body without project_id (EvaluationCreateV2Body)
+        body_data = req.model_dump(exclude={"project_id"})
+        body = tsi.EvaluationCreateV2Body.model_validate(body_data)
+        return self._generic_request(
+            url,
+            body,
+            tsi.EvaluationCreateV2Body,
+            tsi.EvaluationCreateV2Res,
+            method="POST",
+        )
+
+    def evaluation_read_v2(
+        self, req: Union[tsi.EvaluationReadV2Req, dict[str, Any]]
+    ) -> tsi.EvaluationReadV2Res:
+        if isinstance(req, dict):
+            req = tsi.EvaluationReadV2Req.model_validate(req)
+        req = cast(tsi.EvaluationReadV2Req, req)
+        entity, project = req.project_id.split("/", 1)
+        url = (
+            f"/v2/{entity}/{project}/evaluations/{req.object_id}/versions/{req.digest}"
+        )
+        r = self._get_request_executor(url)
+        return tsi.EvaluationReadV2Res.model_validate(r.json())
+
+    def evaluation_list_v2(
+        self, req: Union[tsi.EvaluationListV2Req, dict[str, Any]]
+    ) -> Iterator[tsi.EvaluationReadV2Res]:
+        if isinstance(req, dict):
+            req = tsi.EvaluationListV2Req.model_validate(req)
+        req = cast(tsi.EvaluationListV2Req, req)
+        entity, project = req.project_id.split("/", 1)
+        url = f"/v2/{entity}/{project}/evaluations"
+        # Build query params
+        params = {}
+        if req.limit is not None:
+            params["limit"] = req.limit
+        if req.offset is not None:
+            params["offset"] = req.offset
+        r = self._get_request_executor(url, params, stream=True)
+        for line in r.iter_lines():
+            if line:
+                yield tsi.EvaluationReadV2Res.model_validate_json(line)
+
+    def evaluation_delete_v2(
+        self, req: Union[tsi.EvaluationDeleteV2Req, dict[str, Any]]
+    ) -> tsi.EvaluationDeleteV2Res:
+        if isinstance(req, dict):
+            req = tsi.EvaluationDeleteV2Req.model_validate(req)
+        req = cast(tsi.EvaluationDeleteV2Req, req)
+        entity, project = req.project_id.split("/", 1)
+        url = f"/v2/{entity}/{project}/evaluations/{req.object_id}"
+        # Build query params
+        params = {}
+        if req.digests:
+            params["digests"] = req.digests
+        r = self._delete_request_executor(url, params)
+        return tsi.EvaluationDeleteV2Res.model_validate(r.json())
+
 
 __docspec__ = [
     RemoteHTTPTraceServer,
