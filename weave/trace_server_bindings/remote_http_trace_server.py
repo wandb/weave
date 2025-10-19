@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 # DEFAULT_TIMEOUT = (DEFAULT_CONNECT_TIMEOUT, DEFAULT_READ_TIMEOUT)
 
 
-class RemoteHTTPTraceServer(tsi.TraceServerInterface):
+class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
     trace_server_url: str
 
     # My current batching is not safe in notebooks, disable it for now
@@ -102,6 +102,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         return requests.get(
             self.trace_server_url + url,
             *args,
+            auth=self._auth,
             headers=headers,
             **kwargs,
         )
@@ -110,6 +111,17 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         headers = self._build_dynamic_request_headers()
 
         return requests.post(
+            self.trace_server_url + url,
+            *args,
+            auth=self._auth,
+            headers=headers,
+            **kwargs,
+        )
+
+    def delete(self, url: str, *args: Any, **kwargs: Any) -> requests.Response:
+        headers = self._build_dynamic_request_headers()
+
+        return requests.delete(
             self.trace_server_url + url,
             *args,
             auth=self._auth,
@@ -261,7 +273,7 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         return self.feedback_processor
 
     @with_retry
-    def _generic_request_executor(
+    def _post_request_executor(
         self,
         url: str,
         req: BaseModel,
@@ -277,7 +289,28 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             stream=stream,
         )
         handle_response_error(r, url)
+        return r
 
+    @with_retry
+    def _get_request_executor(
+        self,
+        url: str,
+        params: Optional[dict[str, Any]] = None,
+        stream: bool = False,
+    ) -> requests.Response:
+        r = self.get(url, params=params or {}, stream=stream)
+        handle_response_error(r, url)
+        return r
+
+    @with_retry
+    def _delete_request_executor(
+        self,
+        url: str,
+        params: Optional[dict[str, Any]] = None,
+        stream: bool = False,
+    ) -> requests.Response:
+        r = self.delete(url, params=params or {}, stream=stream)
+        handle_response_error(r, url)
         return r
 
     def _generic_request(
@@ -286,10 +319,21 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         req: BaseModel,
         req_model: type[BaseModel],
         res_model: type[BaseModel],
+        method: str = "POST",
+        params: Optional[dict[str, Any]] = None,
     ) -> BaseModel:
         if isinstance(req, dict):
             req = req_model.model_validate(req)
-        r = self._generic_request_executor(url, req)
+
+        if method == "POST":
+            r = self._post_request_executor(url, req)
+        elif method == "GET":
+            r = self._get_request_executor(url, params)
+        elif method == "DELETE":
+            r = self._delete_request_executor(url, params)
+        else:
+            raise ValueError(f"Unsupported HTTP method: {method}")
+
         return res_model.model_validate(r.json())
 
     def _generic_stream_request(
@@ -298,10 +342,21 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         req: BaseModel,
         req_model: type[BaseModel],
         res_model: type[BaseModel],
+        method: str = "POST",
+        params: Optional[dict[str, Any]] = None,
     ) -> Iterator[BaseModel]:
         if isinstance(req, dict):
             req = req_model.model_validate(req)
-        r = self._generic_request_executor(url, req, stream=True)
+
+        if method == "POST":
+            r = self._post_request_executor(url, req, stream=True)
+        elif method == "GET":
+            r = self._get_request_executor(url, params, stream=True)
+        elif method == "DELETE":
+            r = self._delete_request_executor(url, params, stream=True)
+        else:
+            raise ValueError(f"Unsupported HTTP method: {method}")
+
         for line in r.iter_lines():
             if line:
                 yield res_model.model_validate_json(line)
@@ -693,6 +748,68 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         self, req: tsi.EvaluationStatusReq
     ) -> tsi.EvaluationStatusRes:
         raise NotImplementedError("evaluation_status is not implemented")
+
+    # === V2 APIs ===
+
+    def op_create_v2(
+        self, req: Union[tsi.OpCreateV2Req, dict[str, Any]]
+    ) -> tsi.OpCreateV2Res:
+        if isinstance(req, dict):
+            req = tsi.OpCreateV2Req.model_validate(req)
+        req = cast(tsi.OpCreateV2Req, req)
+        entity, project = req.project_id.split("/", 1)
+        url = f"/v2/{entity}/{project}/ops"
+        # For create, we need to send the body without project_id (OpCreateV2Body)
+        body_data = req.model_dump(exclude={"project_id"})
+        body = tsi.OpCreateV2Body.model_validate(body_data)
+        return self._generic_request(
+            url, body, tsi.OpCreateV2Body, tsi.OpCreateV2Res, method="POST"
+        )
+
+    def op_read_v2(
+        self, req: Union[tsi.OpReadV2Req, dict[str, Any]]
+    ) -> tsi.OpReadV2Res:
+        if isinstance(req, dict):
+            req = tsi.OpReadV2Req.model_validate(req)
+        req = cast(tsi.OpReadV2Req, req)
+        entity, project = req.project_id.split("/", 1)
+        url = f"/v2/{entity}/{project}/ops/{req.object_id}/versions/{req.digest}"
+        r = self._get_request_executor(url, {})
+        return tsi.OpReadV2Res.model_validate(r.json())
+
+    def op_list_v2(
+        self, req: Union[tsi.OpListV2Req, dict[str, Any]]
+    ) -> Iterator[tsi.OpReadV2Res]:
+        if isinstance(req, dict):
+            req = tsi.OpListV2Req.model_validate(req)
+        req = cast(tsi.OpListV2Req, req)
+        entity, project = req.project_id.split("/", 1)
+        url = f"/v2/{entity}/{project}/ops"
+        # Build query params
+        params = {}
+        if req.limit is not None:
+            params["limit"] = req.limit
+        if req.offset is not None:
+            params["offset"] = req.offset
+        r = self._get_request_executor(url, params, stream=True)
+        for line in r.iter_lines():
+            if line:
+                yield tsi.OpReadV2Res.model_validate_json(line)
+
+    def op_delete_v2(
+        self, req: Union[tsi.OpDeleteV2Req, dict[str, Any]]
+    ) -> tsi.OpDeleteV2Res:
+        if isinstance(req, dict):
+            req = tsi.OpDeleteV2Req.model_validate(req)
+        req = cast(tsi.OpDeleteV2Req, req)
+        entity, project = req.project_id.split("/", 1)
+        url = f"/v2/{entity}/{project}/ops/{req.object_id}"
+        # Build query params
+        params = {}
+        if req.digests:
+            params["digests"] = req.digests
+        r = self._delete_request_executor(url, params)
+        return tsi.OpDeleteV2Res.model_validate(r.json())
 
 
 __docspec__ = [
