@@ -1,5 +1,7 @@
 # Amazon Bedrock
 
+import DefaultEntityNote from '../../../src/components/DefaultEntityNote.mdx';
+
 Weave automatically tracks and logs LLM calls made via Amazon Bedrock, AWS's fully managed service that offers foundation models from leading AI companies through a unified API.
 
 There are multiple ways to log LLM calls to Weave from Amazon Bedrock. You can use `weave.op` to create reusable operations for tracking any calls to a Bedrock model. Optionally, if you're using Anthropic models, you can use Weave’s built-in integration with Anthropic. 
@@ -10,7 +12,9 @@ For the latest tutorials, visit [Weights & Biases on Amazon Web Services](https:
 
 ## Traces
 
-Weave will automatically capture traces for Bedrock API calls. You can use the Bedrock client as usual after initializing Weave and patching the client:
+Weave will automatically capture traces for Bedrock API calls after you initialize Weave and patch the client.
+
+To use the Bedrock API:
 
 ```python
 import weave
@@ -41,7 +45,9 @@ response_dict = json.loads(response.get('body').read())
 print(response_dict["content"][0]["text"])
 ```
 
-of using the `converse` API:
+<DefaultEntityNote />
+
+To use the `converse` API:
 
 ```python
 messages = [{"role": "user", "content": [{"text": "What is the capital of France?"}]}]

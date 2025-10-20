@@ -63,7 +63,7 @@ LLM providers are the vendors that offer access to large language models for gen
 - **[MistralAI](/guides/integrations/mistral)**
 - **[NVIDIA NIM](/guides/integrations/nvidia_nim)**
 - **[OpenAI](/guides/integrations/openai)**
-- **[Open Router](/guides/integrations/openrouter)**
+- **[OpenRouter](/guides/integrations/openrouter)**
 - **[Together AI](/guides/integrations/together_ai)**
 
 **[Local Models](/guides/integrations/local_models)**: For when you're running models on your own infrastructure.

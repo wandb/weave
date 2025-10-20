@@ -1,5 +1,6 @@
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
+import DefaultEntityNote from '../../../src/components/DefaultEntityNote.mdx';
 
 # NVIDIA NIM
 
@@ -17,7 +18,7 @@ It’s important to store traces of LLM applications in a central database, both
   <TabItem value="python" label="Python" default>
     Weave can automatically capture traces for the [ChatNVIDIA python library](https://python.langchain.com/docs/integrations/chat/nvidia_ai_endpoints/).
 
-    Start capturing by calling `weave.init(<project-name>)` with a project name your choice.
+    Start capturing by calling `weave.init(<project-name>)` with a project name of your choice. <DefaultEntityNote />
 
     ```python
     from langchain_nvidia_ai_endpoints import ChatNVIDIA

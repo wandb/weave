@@ -9,6 +9,7 @@ import weave
 from weave.evaluation.eval_imperative import EvaluationLogger, Model, Scorer
 from weave.integrations.integration_utilities import op_name_from_call
 from weave.trace.context import call_context
+from weave.trace.serialization.serialize import to_json
 from weave.trace_server.trace_server_interface import ObjectVersionFilter
 
 
@@ -271,10 +272,7 @@ def test_evaluation_version_reuse(
 
         for row in user_dataset:
             output = user_model(row["a"], row["b"])
-            # Convert TypedDict to dict to avoid type errors
-            inputs_dict = dict(row)
-            pred = ev.log_prediction(inputs=inputs_dict, output=output)
-
+            pred = ev.log_prediction(inputs=row, output=output)
             score_result = output > 2
             pred.log_score(scorer="greater_than_2_scorer", score=score_result)
             pred.finish()
@@ -655,3 +653,282 @@ def test_evaluation_invalid_model_name_fixable(model_name):
 def test_evaluation_invalid_model_name_not_fixable(model_name):
     with pytest.raises(ValueError):
         weave.EvaluationLogger(model=model_name)
+
+
+def test_evaluation_logger_with_predefined_scorers(client, caplog):
+    """Test that EvaluationLogger can track predefined scorers and warn when using unlisted ones."""
+    import logging
+
+    # Create evaluation with predefined scorer names
+    ev = EvaluationLogger(
+        model="test_model",
+        dataset=[{"input": 1}],
+        scorers=["accuracy", "precision"],  # List of allowed scorer names
+    )
+
+    with caplog.at_level(logging.WARNING):
+        pred = ev.log_prediction({"input": 1}, 1)
+
+        # These should not warn (in the predefined list)
+        pred.log_score("accuracy", 0.9)
+        pred.log_score("precision", 0.85)
+
+        # This should warn (not in the predefined list)
+        pred.log_score("recall", 0.8)
+
+        pred.finish()
+
+    # Verify warning was issued for unlisted scorer
+    warning_messages = [r.message for r in caplog.records]
+    assert any(
+        "recall" in msg and "not in the predefined scorers list" in msg
+        for msg in warning_messages
+    )
+    assert any(
+        "Expected one of: ['accuracy', 'precision']" in msg for msg in warning_messages
+    )
+
+    ev.finish()
+    client.flush()
+
+    # Verify scorers are stored in evaluation attributes
+    calls = client.get_calls()
+    eval_call = next(c for c in calls if op_name_from_call(c) == "Evaluation.evaluate")
+    assert eval_call.inputs["self"].metadata["scorers"] == ["accuracy", "precision"]
+
+    # verify we can get the eval object separately by ref and see metadata
+    eval_object = ev._pseudo_evaluation.ref.get()
+    assert eval_object.metadata["scorers"] == ["accuracy", "precision"]
+
+
+def test_evaluation_logger_set_view(client):
+    """Ensure set_view stores content metadata on evaluation summary."""
+    ev = weave.EvaluationLogger()
+    content = weave.Content.from_text("# hello", mimetype="text/markdown")
+    content2 = weave.Content.from_text("<h1>hello world</h1>", mimetype="text/html")
+
+    ev.set_view("report", content)
+    ev.set_view("report2", content2)
+    ev.finish()
+    client.flush()
+
+    evaluate_call = client.get_calls()[0]
+    assert evaluate_call.summary["weave"] is not None
+    assert "views" in evaluate_call.summary["weave"]
+    views = evaluate_call.summary["weave"]["views"]
+    assert len(views) == 2
+    assert views["report"] == to_json(content, client._project_id(), client)
+    assert views["report2"] == to_json(content2, client._project_id(), client)
+
+
+def test_evaluation_logger_set_view_string(client):
+    """Ensure string inputs are accepted for evaluation views."""
+    ev = weave.EvaluationLogger()
+    ev.set_view("view", "<h1>Eval</h1>", extension="html")
+    ev.finish()
+    client.flush()
+
+    evaluate_call = client.get_calls()[0]
+    assert evaluate_call.summary
+    assert evaluate_call.summary["weave"] is not None
+    views = evaluate_call.summary["weave"]["views"]
+    stored = dict(views["view"])
+
+    assert stored["_type"] == "CustomWeaveType"
+    assert stored["weave_type"]["type"] == "weave.type_wrappers.Content.content.Content"
+    assert stored["files"]["content"]
+
+
+def test_cost_propagation_with_child_calls(client):
+    """Test that cost data from child calls propagates to parent predict_and_score call."""
+
+    @weave.op
+    def mock_llm_call(prompt: str) -> dict:
+        return {
+            "model": "gpt-4",
+            "usage": {
+                "prompt_tokens": 10,
+                "completion_tokens": 20,
+                "total_tokens": 30,
+            },
+            "content": "response",
+        }
+
+    ev = EvaluationLogger()
+    pred = ev.log_prediction(inputs={"question": "Hello"}, output="Hi there!")
+
+    # Add a child call with usage/cost data to the predict_call
+    # This simulates calling an LLM within the prediction
+    with call_context.set_call_stack([pred.predict_call]):
+        mock_llm_call("test prompt")
+
+    pred.finish()
+    ev.log_summary({"test": "complete"})
+
+    client.flush()
+
+    # Get all calls and verify cost propagation
+    calls = client.get_calls()
+    predict_and_score_call = None
+    for call in calls:
+        if op_name_from_call(call) == "Evaluation.predict_and_score":
+            predict_and_score_call = call
+            break
+
+    assert predict_and_score_call is not None, "predict_and_score_call should exist"
+
+    # Verify that the usage data propagated to the predict_and_score_call
+    assert predict_and_score_call.summary is not None
+    assert "usage" in predict_and_score_call.summary
+    assert "gpt-4" in predict_and_score_call.summary["usage"]
+    assert predict_and_score_call.summary["usage"]["gpt-4"]["prompt_tokens"] == 10
+    assert predict_and_score_call.summary["usage"]["gpt-4"]["completion_tokens"] == 20
+    assert predict_and_score_call.summary["usage"]["gpt-4"]["total_tokens"] == 30
+    assert predict_and_score_call.summary["usage"]["gpt-4"]["requests"] == 1
+
+
+def test_log_prediction_context_manager(client):
+    """Test using PredictionContext as a context manager with automatic call stack management."""
+
+    @weave.op
+    def calculate_answer(question: str) -> dict:
+        return {
+            "model": "gpt-4",
+            "usage": {
+                "prompt_tokens": 5,
+                "completion_tokens": 3,
+                "total_tokens": 8,
+            },
+            "answer": 4,
+        }
+
+    ev = EvaluationLogger()
+
+    # When output is None, log_prediction returns PredictionContext
+    with ev.log_prediction(inputs={"question": "What is 2+2?"}) as pred:
+        # Operations here automatically become children of pred.predict_call
+        result = calculate_answer("What is 2+2?")
+
+        # Set the output
+        pred.output = result["answer"]
+
+        # Log scores
+        pred.log_score("correctness", 1.0)
+
+        # finish() is called automatically on exit and call stack is restored
+
+    ev.log_summary({"avg_score": 1.0})
+
+    # Verify everything was logged correctly
+    client.flush()
+    calls = client.get_calls()
+
+    predict_call = None
+    predict_and_score_call = None
+    for call in calls:
+        if op_name_from_call(call) == "Model.predict":
+            predict_call = call
+        elif op_name_from_call(call) == "Evaluation.predict_and_score":
+            predict_and_score_call = call
+
+    assert predict_call is not None
+    assert predict_and_score_call is not None
+
+    # Verify the output was set correctly
+    assert predict_call.output == 4
+    assert predict_and_score_call.output["output"] == 4
+
+    # Verify scores were logged
+    assert predict_and_score_call.output["scores"]["correctness"] == 1.0
+
+    # Verify cost data propagated
+    assert predict_and_score_call.summary is not None
+    assert "usage" in predict_and_score_call.summary
+    assert "gpt-4" in predict_and_score_call.summary["usage"]
+    assert predict_and_score_call.summary["usage"]["gpt-4"]["total_tokens"] == 8
+
+
+def test_log_score_context_manager(client):
+    """Test using log_score as a context manager for complex scoring."""
+
+    @weave.op
+    def analyze_quality(text: str) -> float:
+        """Mock quality analysis that returns a score."""
+        return 0.95
+
+    ev = EvaluationLogger()
+
+    with ev.log_prediction(inputs={"question": "What is AI?"}) as pred:
+        pred.output = "AI is artificial intelligence"
+
+        # Direct score logging
+        pred.log_score("correctness", 1.0)
+
+        # Context manager score logging
+        with pred.log_score("quality") as score:
+            # Operations here become children of the score call
+            quality_result = analyze_quality(pred.output)
+            score.value = quality_result
+
+    ev.log_summary({"avg_score": 0.975})
+    client.flush()
+
+    # Verify everything was logged correctly
+    calls = client.get_calls()
+
+    # Find the predict_and_score_call
+    predict_and_score_call = None
+    quality_scorer_call = None
+    for call in calls:
+        if op_name_from_call(call) == "Evaluation.predict_and_score":
+            predict_and_score_call = call
+        elif op_name_from_call(call) == "quality":
+            quality_scorer_call = call
+
+    assert predict_and_score_call is not None
+    assert quality_scorer_call is not None
+
+    # Verify both scores were logged
+    assert predict_and_score_call.output["scores"]["correctness"] == 1.0
+    assert predict_and_score_call.output["scores"]["quality"] == 0.95
+
+    # Verify the analyze_quality op was called
+    analyze_calls = [c for c in calls if op_name_from_call(c) == "analyze_quality"]
+    assert len(analyze_calls) == 1, (
+        f"Should have exactly one analyze_quality call, found {len(analyze_calls)}"
+    )
+    analyze_call = analyze_calls[0]
+
+    # The analyze_quality call's parent should be the quality scorer call
+    assert analyze_call.parent_id == quality_scorer_call.id, (
+        f"analyze_quality parent should be quality scorer, but got {analyze_call.parent_id}"
+    )
+
+
+def test_none_as_valid_score_value(client):
+    """Test that None can be used as a valid score value."""
+    ev = EvaluationLogger()
+
+    # Log prediction with None as output
+    pred = ev.log_prediction(inputs={"q": "test"}, output=None)
+
+    # Log a None score (e.g., scoring failed)
+    pred.log_score("correctness", None)
+    pred.log_score("quality", 0.5)
+
+    pred.finish()
+    ev.log_summary({})
+
+    client.flush()
+    calls = client.get_calls()
+
+    predict_and_score_call = None
+    for call in calls:
+        if op_name_from_call(call) == "Evaluation.predict_and_score":
+            predict_and_score_call = call
+            break
+
+    assert predict_and_score_call is not None
+    # Verify None score was recorded
+    assert predict_and_score_call.output["scores"]["correctness"] is None
+    assert predict_and_score_call.output["scores"]["quality"] == 0.5

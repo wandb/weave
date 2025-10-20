@@ -1,4 +1,7 @@
 # AutoGen
+
+import DefaultEntityNote from '../../../src/components/DefaultEntityNote.mdx';
+
 <!-- TODO: Add a Colab notebook for this guide with a badge link here. -->
 
 AutoGen is a framework from Microsoft for building AI agents and applications. It simplifies the creation of complex multi-agent systems, offering components for conversational AI (`AgentChat`), core multi-agent functionalities (`Core`), and integrations with external services (`Extensions`). AutoGen also provides a `Studio` for no-code agent prototyping. For more details, visit the [official AutoGen documentation](https://microsoft.github.io/autogen/stable//index.html).
@@ -37,6 +40,8 @@ import weave
 # highlight-next-line
 weave.init("autogen-demo")
 ```
+
+<DefaultEntityNote />
 
 ## Tracing a Simple Model Client
 
