@@ -31,7 +31,7 @@ class RedisProjectVersionProvider:
         self._enabled = enabled
         self._redis = redis_client
 
-    async def get_project_version(self, project_id: str) -> Union[ProjectVersion, int]:
+    async def get_project_version(self, project_id: str) -> ProjectVersion:
         """Get project version from Redis cache.
 
         Returns:
@@ -48,4 +48,4 @@ class RedisProjectVersionProvider:
         if cached is None:
             raise ValueError(f"Project {project_id} not found in Redis")
 
-        return int(cached)
+        return ProjectVersion(int(cached))

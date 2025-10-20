@@ -58,9 +58,11 @@ class ProjectVersionResolver:
         self._redis_provider = RedisProjectVersionProvider(
             redis_client=redis_client, enabled=redis_enabled
         )
-        self._cache = LRUCache(maxsize=PER_REPLICA_CACHE_SIZE)
+        self._cache: LRUCache[str, ProjectVersion] = LRUCache(
+            maxsize=PER_REPLICA_CACHE_SIZE
+        )
 
-    async def get_project_version(self, project_id: str) -> Union[ProjectVersion, int]:
+    async def get_project_version(self, project_id: str) -> ProjectVersion:
         """Resolve project version through explicit provider checks.
 
         Returns:

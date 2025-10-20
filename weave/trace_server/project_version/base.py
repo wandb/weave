@@ -21,7 +21,7 @@ class ProjectVersionService(Protocol):
         >>> assert version in (ProjectVersion.OLD_VERSION, ProjectVersion.NEW_VERSION, ProjectVersion.EMPTY_PROJECT)
     """
 
-    async def get_project_version(self, project_id: str) -> Union[ProjectVersion, int]:
+    async def get_project_version(self, project_id: str) -> ProjectVersion:
         """Get the project version for routing decisions.
 
         Returns:
@@ -29,7 +29,7 @@ class ProjectVersionService(Protocol):
         """
         ...
 
-    def get_project_version_sync(self, project_id: str) -> Union[ProjectVersion, int]:
+    def get_project_version_sync(self, project_id: str) -> ProjectVersion:
         """Get the project version for routing decisions.
 
         Returns:

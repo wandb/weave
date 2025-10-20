@@ -1,6 +1,5 @@
 # Clickhouse Trace Server
 
-import asyncio
 import dataclasses
 import datetime
 import hashlib
@@ -561,8 +560,17 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
     def calls_query_stream(self, req: tsi.CallsQueryReq) -> Iterator[tsi.CallSchema]:
         """Returns a stream of calls that match the given query."""
+        project_version = ProjectVersion.EMPTY_PROJECT
+        if self._project_version_service is not None:
+            project_version = self._project_version_service.get_project_version_sync(
+                req.project_id
+            )
+            if project_version == ProjectVersion.EMPTY_PROJECT:
+                return
+
         cq = CallsQuery(
             project_id=req.project_id,
+            project_version=project_version,
             include_costs=req.include_costs or False,
             include_storage_size=req.include_storage_size or False,
             include_total_storage_size=req.include_total_storage_size or False,
@@ -626,22 +634,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             cq.set_limit(req.limit)
         if req.offset is not None:
             cq.set_offset(req.offset)
-
-        # TODO(Stage 4): Implement V1 query path with calls_complete table
-        # The CallsQuery.as_sql() method has many hardcoded "calls_merged" references
-        # and needs a comprehensive refactor to support dynamic table routing.
-        # For now, V1 projects will use the new batch endpoints (Stage 4).
-        if self._project_version_service is not None:
-            project_version = self._project_version_service.get_project_version_sync(
-                req.project_id
-            )
-            # EMPTY_PROJECT (-1) can use the new endpoints (will write to calls_complete)
-            # NEW_VERSION (1) should use new endpoints
-            if project_version == 1:
-                raise NotImplementedError(
-                    "Query operations on V1 projects are not yet supported via this endpoint. "
-                    "V1 projects should use the new /v1/calls/* endpoints (coming in Stage 4)."
-                )
 
         pb = ParamBuilder()
         raw_res = self._query_stream(cq.as_sql(pb), pb.get_params())
@@ -1415,7 +1407,9 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             thread_ids = req.filter.thread_ids
 
         # Use the dedicated query builder
-        table_name = self._get_calls_table(req.project_id, default_table="calls_complete")
+        table_name = self._get_calls_table(
+            req.project_id, default_table="calls_complete"
+        )
         if table_name is None:
             raise ValueError("No calls table found")
         query = make_threads_query(
