@@ -81,7 +81,7 @@ library_cases = [
             "dataset": "weave:///shawn/test-project/object/Dataset:N0VKaX8wr9kF9QQzM7mSQz3yKrJJjTiJi4c9Bt7RSTA",
             "scorers": [
                 "weave:///shawn/test-project/object/MyScorer:K1OwZ5OGLRYNboUzGHPhnyR0W6PqWj431ieXWISYiyA",
-                "weave:///shawn/test-project/object/LLMAsAJudgeScorer:uCyQ5g10zJ2wLecCEYNAfm45MbWH1823FJ6ZGv9Gpco",
+                "weave:///shawn/test-project/object/LLMAsAJudgeScorer:MSQK8lv8o63D3en3XvEkkTZqFXmFTc7usQ02zlKUWcE",
             ],
             "preprocess_model_input": None,
             "trials": 1,
