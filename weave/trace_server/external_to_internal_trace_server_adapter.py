@@ -460,3 +460,31 @@ class ExternalTraceServer(tsi.TraceServerInterface):
     ) -> tsi.EvaluationStatusRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(self._internal_trace_server.evaluation_status, req)
+
+    def v1_calls_start_batch(
+        self, req: tsi.CallsStartBatchReq
+    ) -> tsi.CallsStartBatchRes:
+        original_project_id = req.project_id
+        req.project_id = self._idc.ext_to_int_project_id(original_project_id)
+        # Convert IDs in all items
+        for item in req.items:
+            item.project_id = req.project_id
+            if item.wb_run_id is not None:
+                item.wb_run_id = self._idc.ext_to_int_run_id(item.wb_run_id)
+            if item.wb_user_id is not None:
+                item.wb_user_id = self._idc.ext_to_int_user_id(item.wb_user_id)
+        return self._ref_apply(self._internal_trace_server.v1_calls_start_batch, req)
+
+    def v1_calls_complete_batch(
+        self, req: tsi.CallsCompleteBatchReq
+    ) -> tsi.CallsCompleteBatchRes:
+        original_project_id = req.project_id
+        req.project_id = self._idc.ext_to_int_project_id(original_project_id)
+        # Convert IDs in all items
+        for item in req.items:
+            item.project_id = req.project_id
+            if item.wb_run_id is not None:
+                item.wb_run_id = self._idc.ext_to_int_run_id(item.wb_run_id)
+            if item.wb_user_id is not None:
+                item.wb_user_id = self._idc.ext_to_int_user_id(item.wb_user_id)
+        return self._ref_apply(self._internal_trace_server.v1_calls_complete_batch, req)
