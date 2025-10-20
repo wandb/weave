@@ -140,13 +140,14 @@ library_cases = [
             },
             {
                 "object_id": "LLMAsAJudgeScorer",
-                "digest": "uCyQ5g10zJ2wLecCEYNAfm45MbWH1823FJ6ZGv9Gpco",
+                "digest": "MSQK8lv8o63D3en3XvEkkTZqFXmFTc7usQ02zlKUWcE",
                 "exp_val": {
                     "_type": "LLMAsAJudgeScorer",
                     "name": None,
                     "description": None,
                     "column_map": None,
                     "model": "weave:///shawn/test-project/object/LLMStructuredCompletionModel:eZuAYazYqoSTeGwAR6G4e5RMQ1XEDo0AADq60hKTn9o",
+                    "include_audio_output": False,
                     "scoring_prompt": "Here are the inputs: {inputs}. Here is the output: {output}. Is the output correct?",
                     "score": "weave:///shawn/test-project/op/LLMAsAJudgeScorer.score:3DXMPEFwP04oJ362x6sxQIqQmVYYX2jB4Kg5EF2SF60",
                     "summarize": "weave:///shawn/test-project/op/Scorer.summarize:lMo39TTtMo50nRj7gWzUJUXXbuX3D3VXkRRMuOTdCHU",
