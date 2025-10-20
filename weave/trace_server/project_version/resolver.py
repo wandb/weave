@@ -1,9 +1,12 @@
 """Concrete project version resolver with explicit provider order."""
 
+import asyncio
+import logging
 from typing import Any, Optional, Union
 
 from cachetools import LRUCache
 
+from weave.trace_server.project_version.base import ProjectVersionService
 from weave.trace_server.project_version.clickhouse_provider import (
     ClickHouseProjectVersionProvider,
 )
@@ -17,7 +20,10 @@ from weave.trace_server.project_version.types import ProjectVersion
 PER_REPLICA_CACHE_SIZE = 10_000
 
 
-class ProjectVersionResolver:
+logger = logging.getLogger(__name__)
+
+
+class ProjectVersionResolver(ProjectVersionService):
     """Resolves project versions by trying providers in explicit order.
 
     Provider order (fastest to slowest):
@@ -30,16 +36,12 @@ class ProjectVersionResolver:
         ch_client: ClickHouse client.
         redis_client: Optional Redis client.
         redis_enabled: Whether to use Redis cache.
-        gorilla_client: Optional Gorilla client.
-        cache_ttl_seconds: TTL for in-memory cache (default: 300s).
 
     Examples:
         >>> resolver = ProjectVersionResolver(
         ...     ch_client=clickhouse_client,
         ...     redis_client=redis_client,
         ...     redis_enabled=True,
-        ...     gorilla_client=gorilla_client,
-        ...     cache_ttl_seconds=300,
         ... )
         >>> version = await resolver.get_project_version("my-project")
     """
@@ -49,7 +51,6 @@ class ProjectVersionResolver:
         ch_client: Any,
         redis_client: Optional[Any] = None,
         redis_enabled: bool = False,
-        auth_params: Optional[Any] = None,
     ):
         # Initialize providers (no chaining, just independent instances)
         self._clickhouse_provider = ClickHouseProjectVersionProvider(
@@ -74,6 +75,9 @@ class ProjectVersionResolver:
         # 1. Check in-memory cache first (fastest)
         cached = self._cache.get(project_id)
         if cached is not None:
+            print(
+                f"...... Project version cache hit for project {project_id}: {cached}"
+            )
             return cached
 
         # 2. Try Redis cache if enabled
@@ -83,13 +87,38 @@ class ProjectVersionResolver:
             pass  # Fall through to next provider
         else:
             self._cache[project_id] = version
+            print(
+                f"...... Project version cache set for project {project_id}: {version}"
+            )
             return version
 
         # 3. Finally, check ClickHouse (always succeeds, returns 0, 1, or -1)
         version = await self._clickhouse_provider.get_project_version(project_id)
+        print(
+            f"...... Project version clickhouse hit for project {project_id}: {version}"
+        )
         if version != ProjectVersion.EMPTY_PROJECT:
             # only set cache when we know what sdk is writing to it, if empty
             # it can be either new or old
             self._cache[project_id] = version
 
         return version
+
+    def get_project_version_sync(self, project_id: str) -> ProjectVersion:
+        """Get the project version for routing decisions.
+
+        Returns:
+            Union[ProjectVersion, int]: ProjectVersion enum or int for backwards compatibility.
+        """
+        try:
+            loop = asyncio.get_running_loop()
+            # If we're already in an async context, we can't use run_until_complete or asyncio.run
+            raise RuntimeError(
+                "get_project_version_sync cannot be called from an async context. "
+                "Use await get_project_version() instead."
+            )
+        except RuntimeError:
+            # No running loop in this thread, we can safely use asyncio.run
+            pass
+
+        return asyncio.run(self.get_project_version(project_id))

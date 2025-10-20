@@ -1,11 +1,13 @@
 """ClickHouse-based project version fallback provider."""
 
+import logging
 from typing import Any
 
 from weave.trace_server.calls_query_builder.utils import param_slot
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.project_version.types import ProjectVersion
 
+logger = logging.getLogger(__name__)
 
 class ClickHouseProjectVersionProvider:
     """Determines project version by checking calls_complete and calls_merged tables.
@@ -49,9 +51,11 @@ class ClickHouseProjectVersionProvider:
         """
         try:
             result = self._ch.query(query_complete, parameters=pb.get_params())
+            print(f"---------- Clickhouse result complete: {result.result_rows}")
             if result.result_rows:
                 return ProjectVersion.NEW_VERSION
-        except Exception:
+        except Exception as e:
+            raise e
             # If calls_complete doesn't exist or query fails, fall through to check calls_merged
             pass
 
@@ -64,9 +68,11 @@ class ClickHouseProjectVersionProvider:
         """
         try:
             result = self._ch.query(query_merged, parameters=pb.get_params())
+            print(f"---------- Clickhouse result merged: {result.result_rows}")
             if result.result_rows:
                 return ProjectVersion.OLD_VERSION
-        except Exception:
+        except Exception as e:
+            raise e
             # If calls_merged doesn't exist or query fails, treat as empty
             pass
 

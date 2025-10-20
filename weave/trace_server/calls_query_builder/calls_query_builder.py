@@ -288,7 +288,7 @@ class CallsCompleteField(QueryBuilderField):
     ) -> str:
         assert table_alias in ["calls_complete", "calls_start"]
         if table_alias == "calls_complete":
-            return super().as_sql(pb, "calls_merged", cast)
+            return super().as_sql(pb, "calls_complete", cast)
         elif table_alias == "calls_start":
             return super().as_sql(pb, "calls_start", cast)
         else:
@@ -437,10 +437,15 @@ class Condition(BaseModel):
                 )
             return sql
 
+        use_agg = table_alias == "calls_merged"
+        logger.info(
+            f"Condition.as_sql: table_alias={table_alias}, use_agg_fn={use_agg}"
+        )
         conditions = process_query_to_conditions(
             tsi_query.Query.model_validate({"$expr": {"$and": [self.operand]}}),
             pb,
             table_alias,
+            use_agg_fn=use_agg,
         )
         if self._consumed_fields is None:
             self._consumed_fields = []
@@ -530,7 +535,11 @@ class CallsQuery(BaseModel):
     include_total_storage_size: bool = False
 
     def add_field(self, field: str) -> "CallsQuery":
-        name = get_field_by_name(field)
+        # TODO: fix hack
+        table_alias = "calls_merged"
+        if self.project_version == ProjectVersion.NEW_VERSION:
+            table_alias = "calls_complete"
+        name = get_field_by_name(field, table_alias)
         if name in self.select_fields:
             return self
         self.select_fields.append(name)
@@ -558,8 +567,12 @@ class CallsQuery(BaseModel):
         if direction not in ("ASC", "DESC"):
             raise ValueError(f"Direction {direction} is not allowed")
         direction = cast(Literal["ASC", "DESC"], direction)
+        # Determine the correct table alias based on project version
+        table_alias = "calls_merged"
+        if self.project_version == ProjectVersion.NEW_VERSION:
+            table_alias = "calls_complete"
         self.order_fields.append(
-            OrderField(field=get_field_by_name(field), direction=direction)
+            OrderField(field=get_field_by_name(field, table_alias), direction=direction)
         )
         return self
 
@@ -680,13 +693,18 @@ class CallsQuery(BaseModel):
             pb, self.project_id, object_ref_conditions
         )
 
+        logger.info(
+            f"---------- Building calls query with project version: {self.project_version}"
+        )
         if self.project_version == ProjectVersion.NEW_VERSION:
             # TODO: check if we are hitting the call_start table or the complete table
-            return self._as_sql_base_format_calls_complete(
+            qry = self._as_sql_base_format_calls_complete(
                 pb,
                 "calls_complete",
                 field_to_object_join_alias_map=field_to_object_join_alias_map,
             )
+            logger.info(f"---------- Calls complete query: {qry}")
+            return qry
 
         # Determine if the query `has_heavy_fields` by checking
         has_heavy_select = any(field.is_heavy() for field in self.select_fields)
@@ -1078,14 +1096,19 @@ class CallsQuery(BaseModel):
                     expand_columns=expand_columns,
                     field_to_object_join_alias_map=field_to_object_join_alias_map,
                 )
+                print("Adding query_condition_sql", query_condition_sql)
                 conditions_sql.append(query_condition_sql)
                 if query_condition.is_feedback():
                     needs_feedback = True
         if self.hardcoded_filter is not None:
-            conditions_sql.append(self.hardcoded_filter.as_sql(pb, table_alias))
+            hardcoded_filter_sql = self.hardcoded_filter.as_sql(pb, table_alias)
+            print(">>>>>>hardcoded_filter_sql:", hardcoded_filter_sql)
+            conditions_sql.append(hardcoded_filter_sql)
 
         if len(conditions_sql) > 0:
-            filter_sql = "WHERE " + combine_conditions(conditions_sql, "AND")
+            combined = combine_conditions(conditions_sql, "AND")
+            if combined:
+                filter_sql = " AND " + combined
 
         order_by_sql = ""
         if len(self.order_fields) > 0:
@@ -1244,7 +1267,6 @@ ALLOWED_CALLS_COMPLETE_FIELDS = {
     "wb_run_id": CallsCompleteField(field="wb_run_id"),
     "wb_run_step": CallsCompleteField(field="wb_run_step"),
     "wb_run_step_end": CallsCompleteField(field="wb_run_step_end"),
-    "deleted_at": CallsCompleteField(field="deleted_at"),
     "display_name": CallsCompleteField(field="display_name"),
     "storage_size_bytes": AggFieldWithTableOverrides(
         field="storage_size_bytes",
@@ -1293,11 +1315,11 @@ def _handle_status_summary_field(pb: ParamBuilder, table_alias: str) -> str:
     # - If exception is not null -> ERROR
     # - Else if ended_at is null -> RUNNING
     # - Else -> SUCCESS
-    exception_sql = get_field_by_name("exception").as_sql(pb, table_alias)
-    ended_to_sql = get_field_by_name("ended_at").as_sql(pb, table_alias)
-    status_counts_sql = get_field_by_name("summary.status_counts.error").as_sql(
-        pb, table_alias, cast="int"
-    )
+    exception_sql = get_field_by_name("exception", table_alias).as_sql(pb, table_alias)
+    ended_to_sql = get_field_by_name("ended_at", table_alias).as_sql(pb, table_alias)
+    status_counts_sql = get_field_by_name(
+        "summary.status_counts.error", table_alias
+    ).as_sql(pb, table_alias, cast="int")
 
     error_param = pb.add_param(tsi.TraceStatus.ERROR.value)
     running_param = pb.add_param(tsi.TraceStatus.RUNNING.value)
@@ -1317,8 +1339,10 @@ def _handle_latency_ms_summary_field(pb: ParamBuilder, table_alias: str) -> str:
     # Latency_ms logic:
     # - If ended_at is null or there's an exception, return null
     # - Otherwise calculate milliseconds between started_at and ended_at
-    started_at_sql = get_field_by_name("started_at").as_sql(pb, table_alias)
-    ended_at_sql = get_field_by_name("ended_at").as_sql(pb, table_alias)
+    started_at_sql = get_field_by_name("started_at", table_alias).as_sql(
+        pb, table_alias
+    )
+    ended_at_sql = get_field_by_name("ended_at", table_alias).as_sql(pb, table_alias)
 
     # Convert time difference to milliseconds
     # Use toUnixTimestamp64Milli for direct and precise millisecond difference
@@ -1337,8 +1361,10 @@ def _handle_trace_name_summary_field(pb: ParamBuilder, table_alias: str) -> str:
     # - Else if op_name starts with 'weave-trace-internal:///', extract the name using regex
     # - Otherwise, just use op_name directly
 
-    display_name_sql = get_field_by_name("display_name").as_sql(pb, table_alias)
-    op_name_sql = get_field_by_name("op_name").as_sql(pb, table_alias)
+    display_name_sql = get_field_by_name("display_name", table_alias).as_sql(
+        pb, table_alias
+    )
+    op_name_sql = get_field_by_name("op_name", table_alias).as_sql(pb, table_alias)
 
     return f"""CASE
         WHEN {display_name_sql} IS NOT NULL AND {display_name_sql} != '' THEN {display_name_sql}
@@ -1446,7 +1472,8 @@ def process_query_to_conditions(
 
             structured_field = get_field_by_name(operand.get_field_)
 
-            if isinstance(structured_field, CallsMergedDynamicField):
+            # Pass use_agg_fn to all field types that support it (CallsMergedAggField and subclasses)
+            if isinstance(structured_field, CallsMergedAggField):
                 field = structured_field.as_sql(
                     param_builder, table_alias, use_agg_fn=use_agg_fn
                 )
@@ -1838,6 +1865,7 @@ def build_calls_stats_query(
     req: tsi.CallsQueryStatsReq,
     param_builder: ParamBuilder,
     table_alias: Optional[str] = None,
+    project_version: ProjectVersion = ProjectVersion.EMPTY_PROJECT,
 ) -> tuple[str, KeysView[str]]:
     """Build a stats query for calls, automatically using optimized queries when possible.
 
@@ -1862,6 +1890,7 @@ def build_calls_stats_query(
     cq = CallsQuery(
         project_id=req.project_id,
         include_total_storage_size=req.include_total_storage_size or False,
+        project_version=project_version,
     )
 
     cq.add_field("id")
@@ -1879,14 +1908,6 @@ def build_calls_stats_query(
             "sum(coalesce(total_storage_size_bytes, 0))"
         )
         cq.add_field("total_storage_size_bytes")
-
-    # TODO(Stage 4): CallsQuery.as_sql() doesn't support table routing yet
-    # For now, only V0 projects can use the fallback general query path
-    if table_alias != "calls_merged":
-        raise NotImplementedError(
-            "Stats queries on V1 projects that require complex filtering are not yet supported. "
-            "Simple existence checks work, but complex queries need the new /v1/calls/* endpoints (Stage 4)."
-        )
 
     inner_query = cq.as_sql(param_builder)
     calls_query_sql = f"SELECT {', '.join(aggregated_columns[k] for k in aggregated_columns)} FROM ({inner_query})"
@@ -1993,6 +2014,10 @@ def _optimized_wb_run_id_not_null_query(
     project_id_param = param_builder.add_param(project_id)
     param_slot_project_id = param_slot(project_id_param, "String")
 
+    deleted_at_condition = ""
+    if table_alias == "calls_merged":
+        deleted_at_condition = "AND deleted_at IS NULL"
+
     if table_alias:
         return safely_format_sql(
             f"""
@@ -2001,7 +2026,7 @@ def _optimized_wb_run_id_not_null_query(
             FROM {table_alias}
             WHERE {table_alias}.project_id = {param_slot_project_id}
                 AND {table_alias}.wb_run_id IS NOT NULL
-                AND {table_alias}.deleted_at IS NULL
+                {deleted_at_condition}
             LIMIT 1
         )
         """,
@@ -2018,14 +2043,13 @@ def _optimized_wb_run_id_not_null_query(
             FROM calls_merged
             WHERE project_id = {param_slot_project_id}
                 AND wb_run_id IS NOT NULL
-                AND deleted_at IS NULL
+                {deleted_at_condition}
             LIMIT 1
             UNION ALL
             SELECT id
             FROM calls_complete
             WHERE project_id = {param_slot_project_id}
                 AND wb_run_id IS NOT NULL
-                AND deleted_at IS NULL
             LIMIT 1
         )
         LIMIT 1

@@ -116,7 +116,7 @@ from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
 from weave.trace_server.opentelemetry.python_spans import Resource, Span
 from weave.trace_server.orm import ParamBuilder, Row
 from weave.trace_server.project_query_builder import make_project_stats_query
-from weave.trace_server.project_version.base import ProjectVersionService
+from weave.trace_server.project_version.resolver import ProjectVersionResolver
 from weave.trace_server.project_version.types import ProjectVersion
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 from weave.trace_server.table_query_builder import (
@@ -174,7 +174,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         database: str = "default",
         use_async_insert: bool = False,
         evaluate_model_dispatcher: Optional[EvaluateModelDispatcher] = None,
-        project_version_service: Optional[ProjectVersionService] = None,
     ):
         super().__init__()
         self._thread_local = threading.local()
@@ -191,7 +190,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._file_storage_client: Optional[FileStorageClient] = None
         self._kafka_producer: Optional[KafkaProducer] = None
         self._evaluate_model_dispatcher = evaluate_model_dispatcher
-        self._project_version_service = project_version_service
+        self._project_version_service = ProjectVersionResolver(ch_client=self.ch_client)
 
     def _get_calls_table(
         self, project_id: str, default_table: Optional[str] = None
@@ -212,9 +211,13 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         """
         if self._project_version_service is None:
             # TODO: probably should raise here, return old table
+            logger.warning("Project version service is not set, returning old table")
             return "calls_merged"
 
         version = self._project_version_service.get_project_version_sync(project_id)
+        logger.info(
+            f"Project version service is set, returning table version: {version}"
+        )
         if version == ProjectVersion.EMPTY_PROJECT:
             return default_table
         elif version == ProjectVersion.OLD_VERSION:
@@ -252,7 +255,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
     def from_env(
         cls,
         use_async_insert: bool = False,
-        project_version_service: Optional[ProjectVersionService] = None,
         **kwargs: Any,
     ) -> "ClickHouseTraceServer":
         # Explicitly calling `RemoteHTTPTraceServer` constructor here to ensure
@@ -264,7 +266,6 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             password=wf_env.wf_clickhouse_pass(),
             database=wf_env.wf_clickhouse_database(),
             use_async_insert=use_async_insert,
-            project_version_service=project_version_service,
             **kwargs,
         )
 
@@ -546,7 +547,17 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         """
         pb = ParamBuilder()
         table_name = self._get_calls_table(req.project_id)
-        query, columns = build_calls_stats_query(req, pb, table_alias=table_name)
+        project_version = ProjectVersion.EMPTY_PROJECT
+        if self._project_version_service is not None:
+            project_version = self._project_version_service.get_project_version_sync(
+                req.project_id
+            )
+            logger.info(
+                f"---------- [calls_query_stats] Project version: {project_version}"
+            )
+        query, columns = build_calls_stats_query(
+            req, pb, table_alias=table_name, project_version=project_version
+        )
         raw_res = self._query(query, pb.get_params())
 
         res_dict = (
@@ -575,7 +586,11 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             include_storage_size=req.include_storage_size or False,
             include_total_storage_size=req.include_total_storage_size or False,
         )
-        columns = ALL_CALL_SELECT_COLUMNS
+        columns = ALL_CALL_SELECT_COLUMNS 
+        # TODO: fix me
+        if project_version == ProjectVersion.NEW_VERSION:
+            columns = [col for col in columns if col != "deleted_at"]
+
         if req.columns:
             # TODO: add support for json extract fields
             # Split out any nested column requests
@@ -2599,14 +2614,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             ) as stream:
                 if isinstance(stream.source, QueryResult):
                     summary = stream.source.summary
-                logger.info(
-                    "clickhouse_stream_query",
-                    extra={
-                        "query": query,
-                        "parameters": parameters,
-                        "summary": summary,
-                    },
-                )
+                # logger.info(
+                #     "clickhouse_stream_query",
+                #     extra={
+                #         "query": query,
+                #         "parameters": parameters,
+                #         "summary": summary,
+                #     },
+                # )
                 yield from stream
         except Exception as e:
             logger.exception(

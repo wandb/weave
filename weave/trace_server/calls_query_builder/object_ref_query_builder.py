@@ -501,6 +501,7 @@ class ObjectRefQueryProcessor:
                 tsi_query.Query.model_validate({"$expr": {"$and": [operand]}}),
                 self.pb,
                 self.table_alias,
+                use_agg_fn=(self.table_alias == "calls_merged"),
             )
             self.fields_used.update(f.field for f in filter_conditions.fields_used)
             return combine_conditions(filter_conditions.conditions, "AND")

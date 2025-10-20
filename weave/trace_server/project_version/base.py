@@ -35,7 +35,4 @@ class ProjectVersionService(Protocol):
         Returns:
             Union[ProjectVersion, int]: ProjectVersion enum or int for backwards compatibility.
         """
-        # TODO: might need to be smarter here
-        return asyncio.get_event_loop().run_until_complete(
-            self.get_project_version(project_id)
-        )
+        ...
