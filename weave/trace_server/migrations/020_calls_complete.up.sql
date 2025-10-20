@@ -26,11 +26,15 @@ CREATE TABLE calls_complete (
 
     thread_id       Nullable(String) DEFAULT NULL,
     turn_id         Nullable(String) DEFAULT NULL,
+    
 
     INDEX idx_wb_run_id wb_run_id TYPE set(100) GRANULARITY 1,
+    INDEX idx_thread_id thread_id TYPE set(100) GRANULARITY 1,
+    INDEX idx_trace_id trace_id TYPE set(100) GRANULARITY 1,
+    INDEX idx_op_name op_name TYPE set(100) GRANULARITY 1,
     INDEX idx_ended_at ended_at TYPE minmax GRANULARITY 1
 ) ENGINE = MergeTree
-ORDER BY (project_id, started_at, trace_id, op_name, id);
+ORDER BY (project_id, started_at, id);
 
 CREATE TABLE call_starts (
     id              String,
@@ -56,9 +60,12 @@ CREATE TABLE call_starts (
     thread_id       Nullable(String) DEFAULT NULL,
     turn_id         Nullable(String) DEFAULT NULL,
 
-    INDEX idx_wb_run_id wb_run_id TYPE set(100) GRANULARITY 1
+    INDEX idx_wb_run_id wb_run_id TYPE set(100) GRANULARITY 1,
+    INDEX idx_thread_id thread_id TYPE set(100) GRANULARITY 1,
+    INDEX idx_trace_id trace_id TYPE set(100) GRANULARITY 1,
+    INDEX idx_op_name op_name TYPE set(100) GRANULARITY 1
 ) ENGINE = MergeTree
-ORDER BY (project_id, started_at, trace_id, op_name, id);
+ORDER BY (project_id, started_at, id);
 
 -- Drop the existing materialized view if it exists
 DROP VIEW IF EXISTS calls_merged_view;
