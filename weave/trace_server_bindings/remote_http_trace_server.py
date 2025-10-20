@@ -16,6 +16,8 @@ from weave.trace_server.ids import generate_id
 from weave.trace_server_bindings.async_batch_processor import AsyncBatchProcessor
 from weave.trace_server_bindings.http_utils import (
     REMOTE_REQUEST_BYTES_LIMIT,
+    convert_complete_to_legacy_batch,
+    convert_start_to_legacy_batch,
     handle_response_error,
     log_dropped_complete_batch,
     log_dropped_feedback_batch,
@@ -127,14 +129,35 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
             **kwargs,
         )
 
-    @with_retry
     def _send_start_batch_to_server(self, encoded_data: bytes) -> None:
-        """Send a batch of call starts to the server with retry logic."""
-        r = self.post(
-            "/v1/calls/start/batch",
-            data=encoded_data,  # type: ignore
-        )
-        handle_response_error(r, "/v1/calls/start/batch")
+        """Send a batch of call starts to the server with retry logic.
+
+        Falls back to /call/upsert_batch if the v1 endpoint is not available (404).
+        """
+        try:
+            r = self.post(
+                "/v1/calls/start/batch",
+                data=encoded_data,  # type: ignore
+            )
+            handle_response_error(r, "/v1/calls/start/batch")
+        except requests.HTTPError as e:
+            # If v1 endpoint doesn't exist (404), fall back to legacy upsert_batch
+            if e.response.status_code == 404:
+                logger.debug(
+                    "V1 start batch endpoint not available, falling back to legacy upsert_batch"
+                )
+
+                # Decode the v1 request and convert to legacy format
+                req = tsi.CallsStartBatchReq.model_validate_json(encoded_data)
+                legacy_req = convert_start_to_legacy_batch(req.items)
+                r = self.post(
+                    "/call/upsert_batch",
+                    data=legacy_req.model_dump_json().encode("utf-8"),  # type: ignore
+                )
+                handle_response_error(r, "/call/upsert_batch")
+            else:
+                # Re-raise server errors (5xx) as they're not client compatibility issues
+                raise
 
     def _flush_starts(
         self,
@@ -177,12 +200,35 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
     def _send_complete_batch_to_server(
         self, encoded_data: bytes, call_ids: list[str]
     ) -> None:
-        """Send a batch of complete calls to the server with retry logic."""
-        r = self.post(
-            "/v1/calls/complete/batch",
-            data=encoded_data,  # type: ignore
-        )
-        handle_response_error(r, "/v1/calls/complete/batch")
+        """Send a batch of complete calls to the server with retry logic.
+
+        Falls back to /call/upsert_batch if the v1 endpoint is not available (404).
+        """
+        try:
+            r = self.post(
+                "/v1/calls/complete/batch",
+                data=encoded_data,  # type: ignore
+            )
+            handle_response_error(r, "/v1/calls/complete/batch")
+        except requests.HTTPError as e:
+            # If v1 endpoint doesn't exist (new sdk, old server), fall back to legacy upsert_batch
+            # This should be very rare!
+            if e.response.status_code == 404:
+                logger.debug(
+                    "V1 complete batch endpoint not available, falling back to legacy upsert_batch"
+                )
+
+                # Decode the v1 request and convert to legacy format
+                req = tsi.CallsCompleteBatchReq.model_validate_json(encoded_data)
+                legacy_req = convert_complete_to_legacy_batch(req.items)
+                r = self.post(
+                    "/call/upsert_batch",
+                    data=legacy_req.model_dump_json().encode("utf-8"),  # type: ignore
+                )
+                handle_response_error(r, "/call/upsert_batch")
+            else:
+                # Re-raise server errors (5xx) as they're not client compatibility issues
+                raise
 
         # After successful send, remove call IDs from pending set
         with self._pending_complete_ids_lock:
@@ -768,12 +814,36 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
                 trace_ids=[item.trace_id or generate_id() for item in req.items],
             )
 
-        return self._generic_request(
-            "/v1/calls/start/batch",
-            req,
-            tsi.CallsStartBatchReq,
-            tsi.CallsStartBatchRes,
-        )
+        # Try v1 endpoint first, fall back to legacy upsert_batch on 404
+        try:
+            return self._generic_request(
+                "/v1/calls/start/batch",
+                req,
+                tsi.CallsStartBatchReq,
+                tsi.CallsStartBatchRes,
+            )
+        except requests.HTTPError as e:
+            if e.response.status_code == 404:
+                logger.debug(
+                    "V1 start batch endpoint not available, falling back to legacy upsert_batch"
+                )
+
+                # Convert to legacy batch format and send
+                legacy_req = convert_start_to_legacy_batch(req.items)
+                self._generic_request(
+                    "/call/upsert_batch",
+                    legacy_req,
+                    tsi.CallCreateBatchReq,
+                    tsi.CallCreateBatchRes,
+                )
+
+                # Convert legacy response to v1 response format
+                ids = [item.id or generate_id() for item in req.items]
+                trace_ids = [item.trace_id or generate_id() for item in req.items]
+
+                return tsi.CallsStartBatchRes(ids=ids, trace_ids=trace_ids)
+            else:
+                raise
 
     def v1_calls_complete_batch(
         self, req: tsi.CallsCompleteBatchReq
@@ -797,12 +867,32 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
 
             return tsi.CallsCompleteBatchRes()
 
-        return self._generic_request(
-            "/v1/calls/complete/batch",
-            req,
-            tsi.CallsCompleteBatchReq,
-            tsi.CallsCompleteBatchRes,
-        )
+        # Try v1 endpoint first, fall back to legacy upsert_batch on 404
+        try:
+            return self._generic_request(
+                "/v1/calls/complete/batch",
+                req,
+                tsi.CallsCompleteBatchReq,
+                tsi.CallsCompleteBatchRes,
+            )
+        except requests.HTTPError as e:
+            if e.response.status_code == 404:
+                logger.debug(
+                    "V1 complete batch endpoint not available, falling back to legacy upsert_batch"
+                )
+
+                # Convert to legacy batch format
+                legacy_req = convert_complete_to_legacy_batch(req.items)
+                self._generic_request(
+                    "/call/upsert_batch",
+                    legacy_req,
+                    tsi.CallCreateBatchReq,
+                    tsi.CallCreateBatchRes,
+                )
+
+                return tsi.CallsCompleteBatchRes()
+            else:
+                raise
 
 
 __docspec__ = [

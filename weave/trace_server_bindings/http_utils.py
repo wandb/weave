@@ -72,6 +72,87 @@ def log_dropped_complete_batch(
         logger.error(f"error: {e}")
 
 
+def convert_start_to_legacy_batch(
+    items: list[tsi.StartedCallSchemaForInsert],
+) -> tsi.CallCreateBatchReq:
+    """Convert v1 start batch items to legacy upsert_batch format.
+
+    Args:
+        items: List of started call schemas to convert.
+
+    Returns:
+        CallCreateBatchReq: Legacy batch request format.
+
+    Examples:
+        Convert a list of start items to legacy format:
+        >>> items = [StartedCallSchemaForInsert(...)]
+        >>> legacy_req = convert_start_to_legacy_batch(items)
+    """
+    batch: list[Union[tsi.CallBatchStartMode, tsi.CallBatchEndMode]] = [
+        tsi.CallBatchStartMode(mode="start", req=tsi.CallStartReq(start=item))
+        for item in items
+    ]
+    return tsi.CallCreateBatchReq(batch=batch)
+
+
+def convert_complete_to_legacy_batch(
+    items: list[tsi.CompleteCallSchemaForInsert],
+) -> tsi.CallCreateBatchReq:
+    """Convert v1 complete batch items to legacy upsert_batch format.
+
+    Complete calls contain both start and end data, so this creates both
+    a start and end request for each complete call.
+
+    Args:
+        items: List of complete call schemas to convert.
+
+    Returns:
+        CallCreateBatchReq: Legacy batch request format with start and end requests.
+
+    Examples:
+        Convert a list of complete items to legacy format:
+        >>> items = [CompleteCallSchemaForInsert(...)]
+        >>> legacy_req = convert_complete_to_legacy_batch(items)
+    """
+    batch: list[Union[tsi.CallBatchStartMode, tsi.CallBatchEndMode]] = []
+    for item in items:
+        # Add start request
+        start_data = tsi.StartedCallSchemaForInsert(
+            project_id=item.project_id,
+            id=item.id,
+            op_name=item.op_name,
+            display_name=item.display_name,
+            trace_id=item.trace_id,
+            parent_id=item.parent_id,
+            thread_id=item.thread_id,
+            turn_id=item.turn_id,
+            started_at=item.started_at,
+            attributes=item.attributes,
+            inputs=item.inputs,
+            wb_user_id=item.wb_user_id,
+            wb_run_id=item.wb_run_id,
+            wb_run_step=item.wb_run_step,
+        )
+        batch.append(
+            tsi.CallBatchStartMode(mode="start", req=tsi.CallStartReq(start=start_data))
+        )
+
+        # Add end request
+        assert item.id is not None, "Complete call must have an id"
+        end_data = tsi.EndedCallSchemaForInsert(
+            project_id=item.project_id,
+            id=item.id,
+            ended_at=item.ended_at,
+            exception=item.exception,
+            output=item.output,
+            summary=item.summary,
+            wb_run_step_end=item.wb_run_step_end,
+        )
+        batch.append(tsi.CallBatchEndMode(mode="end", req=tsi.CallEndReq(end=end_data)))
+
+    return tsi.CallCreateBatchReq(batch=batch)
+
+
 def process_batch_with_retry(
     batch: list[T],
     *,
