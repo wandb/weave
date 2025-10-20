@@ -16,7 +16,7 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Any, Callable, TypedDict, cast
 
 import pydantic
-from cachetools import TTLCache
+from cachetools import LRUCache, TTLCache
 from requests import HTTPError
 
 from weave import version
@@ -352,8 +352,8 @@ class WeaveClient:
 
         # Track futures for call start requests - used to ensure call ends
         # are sent after call starts are built, and to send them together
-        self._call_start_futures: TTLCache[str, Future[CallStartReq]] = TTLCache(
-            maxsize=10000, ttl=60 * 60 * 24
+        self._call_start_futures: LRUCache[str, Future[CallStartReq]] = LRUCache(
+            maxsize=10000
         )
 
     ################ High Level Convenience Methods ################
@@ -1027,10 +1027,7 @@ class WeaveClient:
             else:
                 # No start future found - this shouldn't happen in normal operation
                 # Fall back to sending just the end
-                logger.warning(
-                    f"No cached start request found for call {call.id}, sending end only"
-                )
-                self.server.call_end(call_end_req)
+                raise ValueError(f"No cached start request found for call {call.id}")
 
         # Check if there's a pending start future for this call
         assert call.id is not None, "Call ID must be set at this point"
