@@ -1700,9 +1700,9 @@ class WeaveClient:
                 if hasattr(server, "_next_trace_server"):
                     server = server._next_trace_server
 
-                assert hasattr(server, "_generic_request_executor")
-                assert hasattr(server._generic_request_executor, "__wrapped__")
-                return server._generic_request_executor.__wrapped__(
+                assert hasattr(server, "_post_request_executor")
+                assert hasattr(server._post_request_executor, "__wrapped__")
+                return server._post_request_executor.__wrapped__(
                     server, "/table/create_from_digests", req
                 )
 
