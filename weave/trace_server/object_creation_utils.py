@@ -13,6 +13,27 @@ PLACEHOLDER_SCORER_SUMMARIZE_OP_SOURCE = """def summarize(score_rows: list) -> d
     from weave.flow.scorer import auto_summarize
     return auto_summarize(score_rows)
 """
+PLACEHOLDER_EVALUATE_OP_SOURCE = """import weave
+@weave.op()
+def evaluate(evaluation, model):
+    \"\"\"Placeholder evaluate function.\"\"\"
+    # TODO: Implement actual evaluation logic
+    return {"status": "not_implemented"}
+"""
+PLACEHOLDER_PREDICT_AND_SCORE_OP_SOURCE = """import weave
+@weave.op()
+def predict_and_score(evaluation, example):
+    \"\"\"Placeholder predict_and_score function.\"\"\"
+    # TODO: Implement actual predict and score logic
+    return {"prediction": None, "scores": {}}
+"""
+PLACEHOLDER_EVALUATION_SUMMARIZE_OP_SOURCE = """import weave
+@weave.op()
+def summarize(evaluation_results):
+    \"\"\"Placeholder summarize function.\"\"\"
+    # TODO: Implement actual summarization logic
+    return {"summary": "not_implemented"}
+"""
 
 
 def make_safe_name(name: str | None) -> str:
@@ -135,3 +156,66 @@ def build_scorer_val(
         "summarize": summarize_op_ref,
         "column_map": column_map,
     }
+
+
+def build_evaluation_val(
+    name: str,
+    dataset_ref: str,
+    trials: int,
+    description: str | None,
+    scorer_refs: list[str] | None,
+    evaluation_name: str | None,
+    metadata: dict[str, Any] | None,
+    preprocess_model_input: str | None,
+    evaluate_ref: str,
+    predict_and_score_ref: str,
+    summarize_ref: str,
+    class_name: str = "Evaluation",
+    eval_attributes: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Build the value dictionary for an Evaluation object.
+
+    Args:
+        name: The evaluation name
+        dataset_ref: Reference to the dataset (weave:// URI)
+        trials: Number of trials to run
+        description: Optional description of the evaluation
+        scorer_refs: Optional list of scorer references (weave:// URIs)
+        evaluation_name: Optional name for the evaluation run
+        metadata: Optional metadata for the evaluation
+        preprocess_model_input: Optional reference to a function that preprocesses model inputs
+        evaluate_ref: Reference to the op implementing the evaluate method
+        predict_and_score_ref: Reference to the op implementing the predict_and_score method
+        summarize_ref: Reference to the op implementing the summarize method
+        class_name: The class name (defaults to "Evaluation" for base evaluations, or a custom name for subclasses)
+        eval_attributes: Optional attributes for the evaluation
+
+    Returns:
+        Dictionary representing the evaluation object value
+    """
+    if class_name == "Evaluation":
+        bases = ["Object", "BaseModel"]
+    else:
+        bases = ["Evaluation", "Object", "BaseModel"]
+
+    result = {
+        "_type": class_name,
+        "_class_name": class_name,
+        "_bases": bases,
+        "name": name,
+        "description": description,
+        "dataset": dataset_ref,
+        "scorers": scorer_refs or [],
+        "trials": trials,
+        "evaluation_name": evaluation_name,
+        "metadata": metadata,
+        "preprocess_model_input": preprocess_model_input,
+        "evaluate": evaluate_ref,
+        "predict_and_score": predict_and_score_ref,
+        "summarize": summarize_ref,
+    }
+
+    if eval_attributes is not None:
+        result.update(eval_attributes)
+
+    return result
