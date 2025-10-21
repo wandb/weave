@@ -11,7 +11,7 @@ from weave.utils.pii_redaction import redact_pii
 
 def test_redact_custom_keys_in_dict() -> None:
     """Test that custom keys added via add_redact_key are redacted in dictionaries.
-    
+
     This is a regression test for https://github.com/wandb/weave/issues/5570
     """
     # Store original keys to restore later
@@ -33,10 +33,10 @@ def test_redact_custom_keys_in_dict() -> None:
 
         # The custom_secret value should be redacted
         assert redacted["custom_secret"] == sanitize.REDACTED_VALUE
-        
+
         # The email should be redacted by PII detection
         assert redacted["email"] != "test@example.com"
-        
+
         # Normal field should not be affected
         assert redacted["normal_field"] == "normal_value"
 
@@ -60,7 +60,7 @@ def test_redact_custom_keys_nested_dict() -> None:
                 "config": {
                     "secret_value": "super-secret",
                     "public_value": "visible",
-                }
+                },
             }
         }
 
