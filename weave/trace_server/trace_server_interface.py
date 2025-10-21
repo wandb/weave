@@ -3,12 +3,7 @@ from collections.abc import Iterator
 from enum import Enum
 from typing import Any, Literal, Optional, Protocol, Union
 
-from pydantic import (
-    BaseModel,
-    ConfigDict,
-    Field,
-    field_serializer,
-)
+from pydantic import BaseModel, ConfigDict, Field, field_serializer
 from typing_extensions import TypedDict
 
 from weave.trace_server.interface.query import Query
@@ -1248,6 +1243,351 @@ class EvaluationStatusRes(BaseModel):
     ]
 
 
+class OpCreateV2Body(BaseModel):
+    """Request body for creating an Op object via REST API.
+
+    This model excludes project_id since it comes from the URL path in RESTful endpoints.
+    """
+
+    name: Optional[str] = Field(
+        None,
+        description="The name of this op. Ops with the same name will be versioned together.",
+    )
+    source_code: Optional[str] = Field(
+        None, description="Complete source code for this op, including imports"
+    )
+
+
+class OpCreateV2Req(OpCreateV2Body):
+    """Request model for creating an Op object.
+
+    Extends OpCreateV2Body by adding project_id for internal API usage.
+    """
+
+    project_id: str = Field(
+        ..., description="The project where this object will be saved"
+    )
+
+
+class OpCreateV2Res(BaseModel):
+    """Response model for creating an Op object."""
+
+    digest: str = Field(..., description="The digest of the created op")
+    object_id: str = Field(..., description="The ID of the created op")
+    version_index: int = Field(..., description="The version index of the created op")
+
+
+class OpReadV2Req(BaseModel):
+    project_id: str = Field(
+        ..., description="The `entity/project` where this op is saved"
+    )
+    object_id: str = Field(..., description="The op ID")
+    digest: str = Field(..., description="The digest of the op object")
+
+
+class OpReadV2Res(BaseModel):
+    """Response model for reading an Op object.
+
+    The code field contains the actual source code of the op.
+    """
+
+    object_id: str = Field(..., description="The op ID")
+    digest: str = Field(..., description="The digest of the op")
+    version_index: int = Field(..., description="The version index of this op")
+    created_at: datetime.datetime = Field(..., description="When this op was created")
+    code: str = Field(..., description="The actual op source code")
+
+
+class OpListV2Req(BaseModel):
+    project_id: str = Field(
+        ..., description="The `entity/project` where these ops are saved"
+    )
+    limit: Optional[int] = Field(
+        default=None, description="Maximum number of ops to return"
+    )
+    offset: Optional[int] = Field(default=None, description="Number of ops to skip")
+
+
+class OpDeleteV2Req(BaseModel):
+    project_id: str = Field(
+        ..., description="The `entity/project` where this op is saved"
+    )
+    object_id: str = Field(..., description="The op ID")
+    digests: Optional[list[str]] = Field(
+        default=None,
+        description="List of digests to delete. If not provided, all digests for the op will be deleted.",
+    )
+
+
+class OpDeleteV2Res(BaseModel):
+    num_deleted: int = Field(
+        ..., description="Number of op versions deleted from this op"
+    )
+
+
+class DatasetCreateV2Body(BaseModel):
+    name: Optional[str] = Field(
+        None,
+        description="The name of this dataset.  Datasets with the same name will be versioned together.",
+    )
+    description: Optional[str] = Field(
+        None,
+        description="A description of this dataset",
+    )
+    rows: list[dict[str, Any]] = Field(..., description="Dataset rows")
+
+
+class DatasetCreateV2Req(DatasetCreateV2Body):
+    project_id: str = Field(
+        ..., description="The `entity/project` where this dataset will be saved"
+    )
+
+
+class DatasetCreateV2Res(BaseModel):
+    digest: str = Field(..., description="The digest of the created dataset")
+    object_id: str = Field(..., description="The ID of the created dataset")
+    version_index: int = Field(
+        ..., description="The version index of the created dataset"
+    )
+
+
+class DatasetReadV2Req(BaseModel):
+    project_id: str = Field(
+        ..., description="The `entity/project` where this dataset is saved"
+    )
+    object_id: str = Field(..., description="The dataset ID")
+    digest: str = Field(..., description="The digest of the dataset object")
+
+
+class DatasetReadV2Res(BaseModel):
+    object_id: str = Field(..., description="The dataset ID")
+    digest: str = Field(..., description="The digest of the dataset object")
+    version_index: int = Field(..., description="The version index of the object")
+    created_at: datetime.datetime = Field(
+        ..., description="When the object was created"
+    )
+    name: str = Field(..., description="The name of the dataset")
+    description: Optional[str] = Field(None, description="Description of the dataset")
+    rows: str = Field(
+        ...,
+        description="Reference to the dataset rows data",
+    )
+
+
+class DatasetListV2Req(BaseModel):
+    project_id: str = Field(
+        ..., description="The `entity/project` where these datasets are saved"
+    )
+    limit: Optional[int] = Field(
+        default=None, description="Maximum number of datasets to return"
+    )
+    offset: Optional[int] = Field(
+        default=None, description="Number of datasets to skip"
+    )
+
+
+class DatasetDeleteV2Req(BaseModelStrict):
+    project_id: str = Field(
+        ..., description="The `entity/project` where this dataset is saved"
+    )
+    object_id: str = Field(..., description="The dataset ID")
+    digests: Optional[list[str]] = Field(
+        default=None,
+        description="List of digests to delete. If not provided, all digests for the dataset will be deleted.",
+    )
+
+
+class DatasetDeleteV2Res(BaseModel):
+    num_deleted: int = Field(..., description="Number of d  ataset versions deleted")
+
+
+class ScorerCreateV2Body(BaseModel):
+    name: str = Field(
+        ...,
+        description="The name of this scorer.  Scorers with the same name will be versioned together.",
+    )
+    description: Optional[str] = Field(
+        None,
+        description="A description of this scorer",
+    )
+    op_source_code: str = Field(
+        ...,
+        description="Complete source code for the Scorer.score op including imports",
+    )
+
+
+class ScorerCreateV2Req(ScorerCreateV2Body):
+    project_id: str = Field(
+        ..., description="The `entity/project` where this scorer will be saved"
+    )
+
+
+class ScorerCreateV2Res(BaseModel):
+    digest: str = Field(..., description="The digest of the created scorer")
+    object_id: str = Field(..., description="The ID of the created scorer")
+    version_index: int = Field(
+        ..., description="The version index of the created scorer"
+    )
+    scorer: str = Field(
+        ...,
+        description="Full reference to the created scorer",
+    )
+
+
+class ScorerReadV2Req(BaseModel):
+    project_id: str = Field(
+        ..., description="The `entity/project` where this scorer is saved"
+    )
+    object_id: str = Field(..., description="The scorer ID")
+    digest: str = Field(..., description="The digest of the scorer")
+
+
+class ScorerReadV2Res(BaseModel):
+    object_id: str = Field(..., description="The scorer ID")
+    digest: str = Field(..., description="The digest of the scorer")
+    version_index: int = Field(..., description="The version index of the object")
+    created_at: datetime.datetime = Field(
+        ..., description="When the scorer was created"
+    )
+    name: str = Field(..., description="The name of the scorer")
+    description: Optional[str] = Field(None, description="Description of the scorer")
+    score_op: str = Field(
+        ...,
+        description="The Scorer.score op reference",
+    )
+
+
+class ScorerListV2Req(BaseModel):
+    project_id: str = Field(
+        ..., description="The `entity/project` where these scorers are saved"
+    )
+    limit: Optional[int] = Field(
+        default=None, description="Maximum number of scorers to return"
+    )
+    offset: Optional[int] = Field(default=None, description="Number of scorers to skip")
+
+
+class ScorerDeleteV2Req(BaseModelStrict):
+    project_id: str = Field(
+        ..., description="The `entity/project` where this scorer is saved"
+    )
+    object_id: str = Field(..., description="The scorer ID")
+    digests: Optional[list[str]] = Field(
+        default=None,
+        description="List of digests to delete. If not provided, all digests for the scorer will be deleted",
+    )
+
+
+class ScorerDeleteV2Res(BaseModel):
+    num_deleted: int = Field(..., description="Number of scorer versions deleted")
+
+
+class EvaluationCreateV2Body(BaseModel):
+    name: str = Field(
+        ...,
+        description="The name of this evaluation.  Evaluations with the same name will be versioned together.",
+    )
+    description: Optional[str] = Field(
+        None,
+        description="A description of this evaluation",
+    )
+
+    dataset: str = Field(..., description="Reference to the dataset (weave:// URI)")
+    scorers: Optional[list[str]] = Field(
+        None, description="List of scorer references (weave:// URIs)"
+    )
+
+    trials: int = Field(default=1, description="Number of trials to run")
+    evaluation_name: Optional[str] = Field(
+        None, description="Name for the evaluation run"
+    )
+    eval_attributes: Optional[dict[str, Any]] = Field(
+        None, description="Optional attributes for the evaluation"
+    )
+
+
+class EvaluationCreateV2Req(EvaluationCreateV2Body):
+    project_id: str = Field(
+        ..., description="The `entity/project` where this evaluation will be saved"
+    )
+
+
+class EvaluationCreateV2Res(BaseModel):
+    digest: str = Field(..., description="The digest of the created evaluation")
+    object_id: str = Field(..., description="The ID of the created evaluation")
+    version_index: int = Field(
+        ..., description="The version index of the created evaluation"
+    )
+    evaluation_ref: str = Field(
+        ..., description="Full reference to the created evaluation"
+    )
+
+
+class EvaluationReadV2Req(BaseModel):
+    project_id: str = Field(
+        ..., description="The `entity/project` where this evaluation is saved"
+    )
+    object_id: str = Field(..., description="The evaluation ID")
+    digest: str = Field(..., description="The digest of the evaluation")
+
+
+class EvaluationReadV2Res(BaseModel):
+    object_id: str = Field(..., description="The evaluation ID")
+    digest: str = Field(..., description="The digest of the evaluation")
+    version_index: int = Field(..., description="The version index of the evaluation")
+    created_at: datetime.datetime = Field(
+        ..., description="When the evaluation was created"
+    )
+    name: str = Field(..., description="The name of the evaluation")
+    description: Optional[str] = Field(
+        None, description="A description of the evaluation"
+    )
+    dataset: str = Field(..., description="Dataset reference (weave:// URI)")
+    scorers: list[str] = Field(
+        ..., description="List of scorer references (weave:// URIs)"
+    )
+    trials: int = Field(..., description="Number of trials")
+    evaluation_name: Optional[str] = Field(
+        None, description="Name for the evaluation run"
+    )
+    evaluate_op: Optional[str] = Field(
+        None, description="Evaluate op reference (weave:// URI)"
+    )
+    predict_and_score_op: Optional[str] = Field(
+        None, description="Predict and score op reference (weave:// URI)"
+    )
+    summarize_op: Optional[str] = Field(
+        None, description="Summarize op reference (weave:// URI)"
+    )
+
+
+class EvaluationListV2Req(BaseModel):
+    project_id: str = Field(
+        ..., description="The `entity/project` where these evaluations are saved"
+    )
+    limit: Optional[int] = Field(
+        default=None, description="Maximum number of evaluations to return"
+    )
+    offset: Optional[int] = Field(
+        default=None, description="Number of evaluations to skip"
+    )
+
+
+class EvaluationDeleteV2Req(BaseModel):
+    project_id: str = Field(
+        ..., description="The `entity/project` where this evaluation is saved"
+    )
+    object_id: str = Field(..., description="The evaluation ID")
+    digests: Optional[list[str]] = Field(
+        default=None,
+        description="List of digests to delete. If not provided, all digests for the evaluation will be deleted.",
+    )
+
+
+class EvaluationDeleteV2Res(BaseModel):
+    num_deleted: int = Field(..., description="Number of evaluation versions deleted")
+
+
 class TraceServerInterface(Protocol):
     def ensure_project_exists(
         self, entity: str, project: str
@@ -1346,3 +1686,53 @@ class TraceServerInterface(Protocol):
     # Evaluation API
     def evaluate_model(self, req: EvaluateModelReq) -> EvaluateModelRes: ...
     def evaluation_status(self, req: EvaluationStatusReq) -> EvaluationStatusRes: ...
+
+
+class TraceServerInterfaceV2(Protocol):
+    """V2 API endpoints for Trace Server.
+
+    This protocol contains the next generation of trace server APIs that
+    provide cleaner, more RESTful interfaces. Implementations should support
+    both this protocol and TraceServerInterface to maintain backward compatibility.
+    """
+
+    # Ops
+    def op_create_v2(self, req: OpCreateV2Req) -> OpCreateV2Res: ...
+    def op_read_v2(self, req: OpReadV2Req) -> OpReadV2Res: ...
+    def op_list_v2(self, req: OpListV2Req) -> Iterator[OpReadV2Res]: ...
+    def op_delete_v2(self, req: OpDeleteV2Req) -> OpDeleteV2Res: ...
+
+    # Datasets
+    def dataset_create_v2(self, req: DatasetCreateV2Req) -> DatasetCreateV2Res: ...
+    def dataset_read_v2(self, req: DatasetReadV2Req) -> DatasetReadV2Res: ...
+    def dataset_list_v2(self, req: DatasetListV2Req) -> Iterator[DatasetReadV2Res]: ...
+    def dataset_delete_v2(self, req: DatasetDeleteV2Req) -> DatasetDeleteV2Res: ...
+
+    # Scorers
+    def scorer_create_v2(self, req: ScorerCreateV2Req) -> ScorerCreateV2Res: ...
+    def scorer_read_v2(self, req: ScorerReadV2Req) -> ScorerReadV2Res: ...
+    def scorer_list_v2(self, req: ScorerListV2Req) -> Iterator[ScorerReadV2Res]: ...
+    def scorer_delete_v2(self, req: ScorerDeleteV2Req) -> ScorerDeleteV2Res: ...
+
+    # Evaluations
+    def evaluation_create_v2(
+        self, req: EvaluationCreateV2Req
+    ) -> EvaluationCreateV2Res: ...
+    def evaluation_read_v2(self, req: EvaluationReadV2Req) -> EvaluationReadV2Res: ...
+    def evaluation_list_v2(
+        self, req: EvaluationListV2Req
+    ) -> Iterator[EvaluationReadV2Res]: ...
+    def evaluation_delete_v2(
+        self, req: EvaluationDeleteV2Req
+    ) -> EvaluationDeleteV2Res: ...
+
+
+class FullTraceServerInterface(TraceServerInterface, TraceServerInterfaceV2, Protocol):
+    """Complete trace server interface supporting both V1 and V2 APIs.
+
+    This protocol represents a trace server implementation that supports the full
+    set of APIs - both legacy V1 endpoints and modern V2 endpoints. Use this type
+    for implementations that need to support both API versions.
+    """
+
+    pass

@@ -38,12 +38,13 @@ dependencies = [
   "wandb>=0.17.1",
   "sentry-sdk>=2.0.0,<3.0.0",
   "pydantic>=2.0.0,<2.12.0",
-  "packaging>=21.0",               # For version parsing in integrations
-  "tenacity>=8.3.0,!=8.4.0",       # Excluding 8.4.0 because it had a bug on import of AsyncRetrying
-  "click",                         # Used for terminal/stdio printing
-  "gql[aiohttp,requests]>=3.0.0",  # Used exclusively in wandb_api.py
-  "jsonschema>=4.23.0",            # Used by scorers for field validation
-  "diskcache==5.6.3",              # Used for data caching
+  "packaging>=21.0",                      # For version parsing in integrations
+  "tenacity>=8.3.0,!=8.4.0",              # Excluding 8.4.0 because it had a bug on import of AsyncRetrying
+  "click",                                # Used for terminal/stdio printing
+  "gql[aiohttp,requests]>=3.0.0",         # Used exclusively in wandb_api.py
+  "jsonschema>=4.23.0",                   # Used by scorers for field validation
+  "diskcache==5.6.3",                     # Used for data caching
+  "tzdata; platform_system == 'Windows'", # Required for timezone support on Windows
 
   # Used for content type detection
   # Remove once license content filtering is upstreamed
@@ -137,7 +138,7 @@ langchain = [
   "langchain-cohere>=0.4.5",
   "langchain-litellm>=0.2.2",
   "chromadb>=0.5.0",
-  "pysqlite3",
+  "pysqlite3; platform_system != 'Windows'",
   "opentelemetry-exporter-otlp",
   "openai>=1.99.9,<1.100.0",
 ]
@@ -195,7 +196,6 @@ test = [
   "pytest-rerunfailures>=12.0",
   "pytest-rerunfailures>=14.0",
   "pytest-shard==0.1.2",
-  "pytest-memray~=1.8",
   "clickhouse_connect==0.7.0",
   "fastapi>=0.110.0",
   "sqlparse==0.5.0",

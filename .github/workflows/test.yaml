@@ -387,3 +387,137 @@ jobs:
         uses: re-actors/alls-green@release/v1
         with:
           jobs: ${{ toJSON(needs) }}
+
+  # ==== Windows Jobs ====
+  windows_trace_no_server:
+    name: Windows Trace non-trace server tests
+    timeout-minutes: 15
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        python-version-major: ["3"]
+        python-version-minor: [
+            "9",
+            "11",
+            "13",
+            #
+          ]
+        nox-shard: ["trace_no_server"]
+      fail-fast: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Set up Python ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install nox uv==0.8.6
+      - name: Run nox (Non Trace Server)
+        run: |
+          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- -m "not trace_server"
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./tests/coverage.xml
+          flags: windows-trace-no-server
+          name: windows-trace-no-server-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+  windows_trace_tests:
+    name: Windows Trace nox tests
+    timeout-minutes: 45
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        python-version-major: ["3"]
+        python-version-minor: [
+            "9",
+            "11",
+            "13",
+            #
+          ]
+        nox-shard:
+          [
+            "trace1",
+            "trace2",
+            "trace3",
+            "trace4",
+            "flow",
+            "trace_server",
+            "trace_server_bindings",
+            "anthropic",
+            "bedrock",
+            "cerebras",
+            "cohere",
+            "crewai",
+            "dspy",
+            "groq",
+            "google_genai",
+            "instructor",
+            "langchain",
+            "litellm",
+            "llamaindex",
+            "mistral",
+            "notdiamond",
+            "openai",
+            "verifiers_test",
+            "vertexai",
+            "pandas-test",
+            "mcp",
+            "smolagents",
+            "autogen_tests",
+          ]
+      fail-fast: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Set up Python ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install nox uv==0.8.6
+      - name: Run nox (Sqlite Trace Server)
+        env:
+          WEAVE_SENTRY_ENV: ci
+          CI: 1
+          WB_SERVER_HOST: http://localhost
+          WF_CLICKHOUSE_HOST: localhost
+          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
+          WANDB_API_KEY: ${{ secrets.WANDB_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          DD_TRACE_ENABLED: false
+        run: |
+          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.nox-shard }}')" -- -m "trace_server" --trace-server=sqlite
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./tests/coverage.xml
+          flags: windows-trace-tests
+          name: windows-trace-tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}-${{ matrix.nox-shard }}
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+  windows-trace-tests-matrix-check: # This job does nothing and is only used for the branch protection
+    if: always()
+
+    needs:
+      - windows_trace_tests
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Passes if all windows-trace-tests jobs succeeded
+        uses: re-actors/alls-green@release/v1
+        with:
+          jobs: ${{ toJSON(needs) }}

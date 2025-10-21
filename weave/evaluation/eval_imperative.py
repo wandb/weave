@@ -237,74 +237,6 @@ class ScorerCache:
 global_scorer_cache = ScorerCache()
 
 
-class _LogPredictionContext:
-    """Context manager for logging predictions with automatic call stack management."""
-
-    def __init__(self, score_logger: ScoreLogger):
-        self.score_logger = score_logger
-        self._call_stack_context: (
-            contextlib.AbstractContextManager[list[Call]] | None
-        ) = None
-
-    @property
-    def output(self) -> Any:
-        """Get the current output value."""
-        return self.score_logger._predict_output
-
-    @output.setter
-    def output(self, value: Any) -> None:
-        """Set the output value that will be used when finishing."""
-        self.score_logger._predict_output = value
-
-    # @property
-    # def predict_call(self) -> Call:
-    #     """Get the predict call for manual call stack management."""
-    #     return self.score_logger.predict_call
-
-    # def finish(self, output: Any | None = None) -> None:
-    #     """Finish the prediction - delegates to ScoreLogger."""
-    #     return self.score_logger.finish(output)
-
-    @overload
-    def log_score(
-        self,
-        scorer: Scorer | dict | str,
-        score: ScoreType,
-    ) -> None: ...
-
-    @overload
-    def log_score(
-        self,
-        scorer: Scorer | dict | str,
-        score: _NotSetType = NOT_SET,
-    ) -> _LogScoreContext: ...
-
-    def log_score(
-        self,
-        scorer: Scorer | dict | str,
-        score: ScoreType | _NotSetType = NOT_SET,
-    ) -> _LogScoreContext | None:
-        """Log a score - delegates to ScoreLogger."""
-        return self.score_logger.log_score(scorer, score)
-
-    def __enter__(self) -> _LogPredictionContext:
-        """Enter context and set call stack to predict_call."""
-        self._call_stack_context = call_context.set_call_stack(
-            [self.score_logger.predict_call]
-        )
-        self._call_stack_context.__enter__()
-        return self
-
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
-        """Exit context, restore call stack, and automatically finish."""
-        try:
-            if not self.score_logger._has_finished:
-                self.score_logger.finish()
-        finally:
-            if self._call_stack_context is not None:
-                self._call_stack_context.__exit__(exc_type, exc_val, exc_tb)
-
-
 class _LogScoreContext:
     """Context manager for logging scores with automatic call stack management.
 
@@ -323,13 +255,13 @@ class _LogScoreContext:
         self.score_logger = score_logger
         self.scorer = scorer
         self.score_call = score_call
-        self._score_value: ScoreType
+        self._score_value: ScoreType | None = None
         self._call_stack_context: (
             contextlib.AbstractContextManager[list[Call]] | None
         ) = None
 
     @property
-    def value(self) -> ScoreType:
+    def value(self) -> ScoreType | None:
         """Get the current score value."""
         return self._score_value
 
@@ -354,11 +286,23 @@ class _LogScoreContext:
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         """Exit context, restore call stack, and finish the score call."""
         try:
-            # Finish the score call with the value
             # scorer is guaranteed to be a Scorer instance here because it was prepared in _create_score_call
-            self.score_logger._finish_score_call(
-                self.score_call, cast(Scorer, self.scorer), self._score_value
-            )
+            if self._score_value is not None:
+                # Finish the score call with the value
+                self.score_logger._finish_score_call(
+                    self.score_call, cast(Scorer, self.scorer), self._score_value
+                )
+            elif exc_type is not None:
+                # If there was an exception and no value was set, finish with the exception
+                self.score_logger._finish_score_call(
+                    self.score_call, cast(Scorer, self.scorer), exception=exc_val
+                )
+            else:
+                # If no exception occurred but no value was set, raise an error
+                raise ValueError(
+                    f"Score value was not set for scorer '{cast(Scorer, self.scorer).name}'. "
+                    "Please set score_ctx.value within the context manager."
+                )
         finally:
             # Restore call stack - always happens even if finish fails
             if self._call_stack_context is not None:
@@ -366,40 +310,38 @@ class _LogScoreContext:
 
 
 class ScoreLogger(BaseModel):
-    """This class provides an imperative interface for logging scores.
+    """Interface for logging scores and managing prediction outputs.
 
-    Basic usage - log predictions with inputs and outputs directly:
+    This class is returned by `EvaluationLogger.log_prediction()` and can be used
+    either directly or as a context manager.
+
+    Direct usage - when output is known upfront:
 
     ```python
     ev = EvaluationLogger()
-
-    # Simple case: pass inputs and outputs directly
-    pred = ev.log_prediction(inputs={'q': 'Hello'}, outputs={'a': 'Hi there!'})
+    pred = ev.log_prediction(inputs={'q': 'Hello'}, output='Hi there!')
     pred.log_score("correctness", 0.9)
+    pred.finish()
     ```
 
-    Advanced usage - use as a context manager to automatically finish the prediction
-    and set the call stack so all operations inside the context are children
-    of the predict call:
+    Context manager usage - for dynamic outputs and automatic call stack management:
 
     ```python
     ev = EvaluationLogger()
 
+    # Works whether output is provided or not
     with ev.log_prediction(inputs={'q': 'Hello'}) as pred:
-        # Any operations here (like LLM calls) automatically become
-        # children of pred.predict_call - no need to manually set call stack!
+        # Operations here automatically become children of the predict call
         response = your_llm_call(...)
-
-        # Set the output
         pred.output = response.content
 
         # Log scores directly
         pred.log_score("correctness", 0.9)
 
         # Or use log_score as a context manager for complex scoring
-        with pred.log_score("reasoning_quality") as score_ctx:
+        with pred.log_score("reasoning_quality") as score:
             analysis = analyze_response(...)
-            score_ctx.value = analysis.score
+            score.value = analysis.score
     # Automatically calls finish() on exit and restores call stack
     ```
     """
@@ -413,6 +355,9 @@ class ScoreLogger(BaseModel):
     _captured_scores: dict[str, ScoreType] = PrivateAttr(default_factory=dict)
     _has_finished: bool = PrivateAttr(False)
     _predict_output: Any = PrivateAttr(None)
+    _call_stack_context: contextlib.AbstractContextManager[list[Call]] | None = (
+        PrivateAttr(None)
+    )
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -500,12 +445,17 @@ class ScoreLogger(BaseModel):
         return score_call, scorer
 
     def _finish_score_call(
-        self, score_call: Call, scorer: Scorer, score_value: ScoreType
+        self,
+        score_call: Call,
+        scorer: Scorer,
+        score_value: ScoreType | None = None,
+        exception: BaseException | None = None,
     ) -> None:
         """Finish a score call and record the score."""
         wc = require_weave_client()
-        wc.finish_call(score_call, output=score_value)
-        self._captured_scores[cast(str, scorer.name)] = score_value
+        wc.finish_call(score_call, output=score_value, exception=exception)
+        if exception is None and score_value is not None:
+            self._captured_scores[cast(str, scorer.name)] = score_value
 
     @overload
     def log_score(
@@ -628,6 +578,31 @@ class ScoreLogger(BaseModel):
         # this is always true because of how the scorer is created in the validator
         scorer_name = cast(str, scorer.name)
         self._captured_scores[scorer_name] = score
+
+    @property
+    def output(self) -> Any:
+        """Get the current output value."""
+        return self._predict_output
+
+    @output.setter
+    def output(self, value: Any) -> None:
+        """Set the output value that will be used when finishing."""
+        self._predict_output = value
+
+    def __enter__(self) -> ScoreLogger:
+        """Enter context manager and set call stack to predict_call."""
+        self._call_stack_context = call_context.set_call_stack([self.predict_call])
+        self._call_stack_context.__enter__()
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        """Exit context manager, restore call stack, and automatically finish."""
+        try:
+            if not self._has_finished:
+                self.finish()
+        finally:
+            if self._call_stack_context is not None:
+                self._call_stack_context.__exit__(exc_type, exc_val, exc_tb)
 
 
 class EvaluationLogger(BaseModel):
@@ -872,28 +847,17 @@ class EvaluationLogger(BaseModel):
 
         self._is_finalized = True
 
-    @overload
-    def log_prediction(self, inputs: dict[str, Any], output: Any) -> ScoreLogger: ...
-
-    @overload
-    def log_prediction(
-        self, inputs: dict[str, Any], output: _NotSetType = NOT_SET
-    ) -> _LogPredictionContext: ...
-
-    def log_prediction(
-        self, inputs: dict[str, Any], output: Any | _NotSetType = NOT_SET
-    ) -> ScoreLogger | _LogPredictionContext:
+    def log_prediction(self, inputs: dict[str, Any], output: Any = None) -> ScoreLogger:
         """Log a prediction to the Evaluation.
 
-        If output is provided, returns a ScoreLogger for direct use.
-        If output is not provided, returns a PredictionContext for use as a context manager.
+        Returns a ScoreLogger that can be used directly or as a context manager.
 
         Args:
             inputs: The input data for the prediction
-            output: The output value. If not provided, use as context manager to set later.
+            output: The output value. Defaults to None. Can be set later using pred.output.
 
         Returns:
-            ScoreLogger if output provided, PredictionContext if not.
+            ScoreLogger for logging scores and optionally finishing the prediction.
 
         Example (direct):
             pred = ev.log_prediction({'q': '...'}, output="answer")
@@ -905,6 +869,7 @@ class EvaluationLogger(BaseModel):
                 response = model(...)
                 pred.output = response
                 pred.log_score("correctness", 0.9)
+            # Automatically calls finish() on exit
         """
         # Use set_call_stack to temporarily set the evaluation as the parent
         assert self._evaluate_call is not None
@@ -939,11 +904,8 @@ class EvaluationLogger(BaseModel):
         if predict_call is None:
             raise ValueError("predict_call should not be None")
 
-        # If unset, default to None.
-        actual_output = None if output is NOT_SET else output
-
         # Set the output on the predict_call now so it's available for apply_scorer
-        predict_call.output = actual_output
+        predict_call.output = output
 
         pred = ScoreLogger(
             predict_and_score_call=predict_and_score_call,
@@ -952,12 +914,8 @@ class EvaluationLogger(BaseModel):
             predefined_scorers=self.scorers,
         )
         # Store the output so we can use it when finishing the predict_call
-        pred._predict_output = actual_output
+        pred._predict_output = output
         self._accumulated_predictions.append(pred)
-
-        # If output is NOT_SET, return PredictionContext for use as context manager
-        if output is NOT_SET:
-            return _LogPredictionContext(pred)
 
         return pred
 
