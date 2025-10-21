@@ -3471,6 +3471,17 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._v1_insert_call_batch(
             "calls_complete", ch_calls, V1_CALLS_COMPLETE_INSERT_COLUMNS
         )
+        # Now we need to delete the inserted ids from the call_starts if they exist
+        call_ids = [ch_call.id for ch_call in ch_calls]
+        self._delete_call_starts(call_ids)
+
+    def _delete_call_starts(self, call_ids: list[str]) -> None:
+        """Delete call_starts rows for the given call ids."""
+        # TODO: fix this
+        self._query(
+            "DELETE FROM call_starts WHERE id IN (:call_ids)",
+            {"call_ids": call_ids},
+        )
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._flush_calls")
     def _flush_calls(self) -> None:

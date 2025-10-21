@@ -180,10 +180,23 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
         """Process a batch of call starts, splitting if necessary and sending to the server.
 
         This method handles batching of call start events, sending them to the
-        /v1/calls/start/batch endpoint.
+        /v1/calls/start/batch endpoint. Filters out any starts that have pending
+        completes before sending.
         """
         assert self.start_processor is not None
         if len(batch) == 0:
+            return
+
+        # Filter out starts that have pending completes, we don't need to send both if 
+        # we already have the complete (start + end)
+        filtered_batch: list[tsi.StartedCallSchemaForInsert] = []
+        with self._pending_complete_ids_lock:
+            for item in batch:
+                if item.id not in self._pending_complete_ids:
+                    filtered_batch.append(item)
+
+        # If all starts were filtered out, nothing to send
+        if len(filtered_batch) == 0:
             return
 
         def get_item_id(item: tsi.StartedCallSchemaForInsert) -> str:
@@ -198,7 +211,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
 
         process_batch_with_retry(
             batch_name="call_starts",
-            batch=batch,
+            batch=filtered_batch,
             remote_request_bytes_limit=self.remote_request_bytes_limit,
             send_batch_fn=self._send_start_batch_to_server,
             processor_obj=self.start_processor,
@@ -847,25 +860,16 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
     ) -> tsi.CallsStartBatchRes:
         """V1 batch call start endpoint for calls_complete table.
 
-        Optimization: Before enqueueing a start, check if a complete for the same
-        call ID is already pending. If so, skip the start since the complete has
-        all the data.
+        Starts are enqueued to the processor. Deduplication with pending completes
+        happens at flush time, not enqueue time.
         """
         if self.should_batch:
             assert self.start_processor is not None
 
-            # Filter out starts that have completes already pending
-            items_to_enqueue = []
-            with self._pending_complete_ids_lock:
-                for item in req.items:
-                    if item.id not in self._pending_complete_ids:
-                        items_to_enqueue.append(item)
+            # Enqueue all starts - filtering happens at flush time
+            self.start_processor.enqueue(req.items)
 
-            # Enqueue the filtered starts
-            if items_to_enqueue:
-                self.start_processor.enqueue(items_to_enqueue)
-
-            # Return response with IDs and trace_ids for all items (even skipped ones)
+            # Return response with IDs and trace_ids for all items
             return tsi.CallsStartBatchRes(
                 ids=[item.id or generate_id() for item in req.items],
                 trace_ids=[item.trace_id or generate_id() for item in req.items],
@@ -950,6 +954,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
                 return tsi.CallsCompleteBatchRes()
             else:
                 raise
+
     # === V2 APIs ===
 
     def op_create_v2(
