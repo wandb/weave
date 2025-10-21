@@ -274,7 +274,9 @@ media_cases = [
         ],
         exp_files=[
             {
-                "digest": "v5gYkptifYVGd0JYbW3U0jYQPSKkLzEI3eamc0cnCG8",
+                "digest": "v5gYkptifYVGd0JYbW3U0jYQPSKkLzEI3eamc0cnCG8"
+                if sys.platform == "win32"
+                else "0tY4LYkQE9BXzCQDItzaUoFLd3lesQ0RkuHNMuXQJIk",
                 "exp_content": b'{"size": 88244, "mimetype": "audio/wav", "digest": "c5f3a19cd7e043147381667a0c2d50106b7dbeb25671ab61ca628f3d9426988c", "filename": "audio.wav", "content_type": "file", "input_type": "str", "encoding": "utf-8", "metadata": null, "extension": ".wav"}'
                 if sys.platform == "win32"
                 else b'{"size": 88244, "mimetype": "audio/x-wav", "digest": "c5f3a19cd7e043147381667a0c2d50106b7dbeb25671ab61ca628f3d9426988c", "filename": "audio.wav", "content_type": "file", "input_type": "str", "encoding": "utf-8", "metadata": null, "extension": ".wav"}',
