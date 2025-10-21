@@ -873,6 +873,66 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
         r = self._delete_request_executor(url, params)
         return tsi.DatasetDeleteV2Res.model_validate(r.json())
 
+    def scorer_create_v2(
+        self, req: Union[tsi.ScorerCreateV2Req, dict[str, Any]]
+    ) -> tsi.ScorerCreateV2Res:
+        if isinstance(req, dict):
+            req = tsi.ScorerCreateV2Req.model_validate(req)
+        req = cast(tsi.ScorerCreateV2Req, req)
+        entity, project = req.project_id.split("/", 1)
+        url = f"/v2/{entity}/{project}/scorers"
+        # For create, we need to send the body without project_id (ScorerCreateV2Body)
+        body_data = req.model_dump(exclude={"project_id"})
+        body = tsi.ScorerCreateV2Body.model_validate(body_data)
+        return self._generic_request(
+            url, body, tsi.ScorerCreateV2Body, tsi.ScorerCreateV2Res, method="POST"
+        )
+
+    def scorer_read_v2(
+        self, req: Union[tsi.ScorerReadV2Req, dict[str, Any]]
+    ) -> tsi.ScorerReadV2Res:
+        if isinstance(req, dict):
+            req = tsi.ScorerReadV2Req.model_validate(req)
+        req = cast(tsi.ScorerReadV2Req, req)
+        entity, project = req.project_id.split("/", 1)
+        url = f"/v2/{entity}/{project}/scorers/{req.object_id}/versions/{req.digest}"
+        r = self._get_request_executor(url)
+        return tsi.ScorerReadV2Res.model_validate(r.json())
+
+    def scorer_list_v2(
+        self, req: Union[tsi.ScorerListV2Req, dict[str, Any]]
+    ) -> Iterator[tsi.ScorerReadV2Res]:
+        if isinstance(req, dict):
+            req = tsi.ScorerListV2Req.model_validate(req)
+        req = cast(tsi.ScorerListV2Req, req)
+        entity, project = req.project_id.split("/", 1)
+        url = f"/v2/{entity}/{project}/scorers"
+        # Build query params
+        params = {}
+        if req.limit is not None:
+            params["limit"] = req.limit
+        if req.offset is not None:
+            params["offset"] = req.offset
+        r = self._get_request_executor(url, params, stream=True)
+        for line in r.iter_lines():
+            if line:
+                yield tsi.ScorerReadV2Res.model_validate_json(line)
+
+    def scorer_delete_v2(
+        self, req: Union[tsi.ScorerDeleteV2Req, dict[str, Any]]
+    ) -> tsi.ScorerDeleteV2Res:
+        if isinstance(req, dict):
+            req = tsi.ScorerDeleteV2Req.model_validate(req)
+        req = cast(tsi.ScorerDeleteV2Req, req)
+        entity, project = req.project_id.split("/", 1)
+        url = f"/v2/{entity}/{project}/scorers/{req.object_id}"
+        # Build query params
+        params = {}
+        if req.digests:
+            params["digests"] = req.digests
+        r = self._delete_request_executor(url, params)
+        return tsi.ScorerDeleteV2Res.model_validate(r.json())
+
 
 __docspec__ = [
     RemoteHTTPTraceServer,

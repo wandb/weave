@@ -1401,6 +1401,87 @@ class DatasetDeleteV2Res(BaseModel):
     num_deleted: int = Field(..., description="Number of d  ataset versions deleted")
 
 
+class ScorerCreateV2Body(BaseModel):
+    name: str = Field(
+        ...,
+        description="The name of this scorer.  Scorers with the same name will be versioned together.",
+    )
+    description: Optional[str] = Field(
+        None,
+        description="A description of this scorer",
+    )
+    op_source_code: str = Field(
+        ...,
+        description="Complete source code for the Scorer.score op including imports",
+    )
+
+
+class ScorerCreateV2Req(ScorerCreateV2Body):
+    project_id: str = Field(
+        ..., description="The `entity/project` where this scorer will be saved"
+    )
+
+
+class ScorerCreateV2Res(BaseModel):
+    digest: str = Field(..., description="The digest of the created scorer")
+    object_id: str = Field(..., description="The ID of the created scorer")
+    version_index: int = Field(
+        ..., description="The version index of the created scorer"
+    )
+    scorer: str = Field(
+        ...,
+        description="Full reference to the created scorer",
+    )
+
+
+class ScorerReadV2Req(BaseModel):
+    project_id: str = Field(
+        ..., description="The `entity/project` where this scorer is saved"
+    )
+    object_id: str = Field(..., description="The scorer ID")
+    digest: str = Field(..., description="The digest of the scorer")
+
+
+class ScorerReadV2Res(BaseModel):
+    object_id: str = Field(..., description="The scorer ID")
+    digest: str = Field(..., description="The digest of the scorer")
+    version_index: int = Field(..., description="The version index of the object")
+    created_at: datetime.datetime = Field(
+        ..., description="When the scorer was created"
+    )
+    name: str = Field(..., description="The name of the scorer")
+    description: Optional[str] = Field(None, description="Description of the scorer")
+    score_op: str = Field(
+        ...,
+        description="The Scorer.score op reference",
+    )
+
+
+class ScorerListV2Req(BaseModel):
+    project_id: str = Field(
+        ..., description="The `entity/project` where these scorers are saved"
+    )
+    limit: Optional[int] = Field(
+        default=None, description="Maximum number of scorers to return"
+    )
+    offset: Optional[int] = Field(default=None, description="Number of scorers to skip")
+
+
+class ScorerDeleteV2Req(BaseModelStrict):
+    project_id: str = Field(
+        ..., description="The `entity/project` where this scorer is saved"
+    )
+    object_id: str = Field(..., description="The scorer ID")
+    digests: Optional[list[str]] = Field(
+        default=None,
+        description="List of digests to delete. If not provided, all digests for the scorer will be deleted",
+    )
+
+
+class ScorerDeleteV2Res(BaseModel):
+    num_deleted: int = Field(..., description="Number of scorer versions deleted")
+
+
 class TraceServerInterface(Protocol):
     def ensure_project_exists(
         self, entity: str, project: str
@@ -1520,6 +1601,12 @@ class TraceServerInterfaceV2(Protocol):
     def dataset_read_v2(self, req: DatasetReadV2Req) -> DatasetReadV2Res: ...
     def dataset_list_v2(self, req: DatasetListV2Req) -> Iterator[DatasetReadV2Res]: ...
     def dataset_delete_v2(self, req: DatasetDeleteV2Req) -> DatasetDeleteV2Res: ...
+
+    # Scorers
+    def scorer_create_v2(self, req: ScorerCreateV2Req) -> ScorerCreateV2Res: ...
+    def scorer_read_v2(self, req: ScorerReadV2Req) -> ScorerReadV2Res: ...
+    def scorer_list_v2(self, req: ScorerListV2Req) -> Iterator[ScorerReadV2Res]: ...
+    def scorer_delete_v2(self, req: ScorerDeleteV2Req) -> ScorerDeleteV2Res: ...
 
 
 class FullTraceServerInterface(TraceServerInterface, TraceServerInterfaceV2, Protocol):
