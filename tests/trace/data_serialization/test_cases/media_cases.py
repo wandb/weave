@@ -477,7 +477,7 @@ media_cases = [
             "weave_type": {"type": "weave.type_wrappers.Content.content.Content"},
             "files": {
                 "content": "xfOhnNfgQxRzgWZ6DC1QEGt9vrJWcathymKPPZQmmIw",
-                "metadata.json": "0tY4LYkQE9BXzCQDItzaUoFLd3lesQ0RkuHNMuXQJIk"
+                "metadata.json": "v5gYkptifYVGd0JYbW3U0jYQPSKkLzEI3eamc0cnCG8"
                 if sys.platform == "win32"
                 else "0tY4LYkQE9BXzCQDItzaUoFLd3lesQ0RkuHNMuXQJIk",
             },
