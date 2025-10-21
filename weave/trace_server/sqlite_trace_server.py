@@ -69,7 +69,10 @@ def get_conn_cursor(db_path: str) -> tuple[sqlite3.Connection, sqlite3.Cursor]:
     # conn_cursor = _conn_cursor.get()
     conn_cursor = None
     if conn_cursor is None:
-        conn = sqlite3.connect(db_path)
+        # Use uri=True for URIs like "file::memory:?cache=shared"
+        # This is required on Windows to properly handle URI paths
+        is_uri = db_path.startswith("file:")
+        conn = sqlite3.connect(db_path, uri=is_uri)
         # Create an array reverse function.
         conn.create_function("reverse", 1, lambda x: x[::-1])
         cursor = conn.cursor()
