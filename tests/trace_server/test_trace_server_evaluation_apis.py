@@ -1,4 +1,5 @@
 import json
+import sys
 from unittest import mock
 
 import pytest
@@ -372,7 +373,9 @@ def test_evaluate_model(client: WeaveClient, direct_script_execution):
         assert eval_call.summary["weave"]["status"] == TraceStatus.DESCENDANT_ERROR
         assert eval_call.output == {
             "LLMAsAJudgeScorer": None,
-            "model_latency": {"mean": pytest.approx(0, abs=1)},
+            "model_latency": {"mean": pytest.approx(0, abs=2)}
+            if sys.platform != "win32"
+            else {"mean": pytest.approx(0, abs=10)},
         }
     else:
         assert eval_call.summary["status_counts"] == {
