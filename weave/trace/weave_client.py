@@ -829,8 +829,6 @@ class WeaveClient:
                 CallsStartBatchReq(project_id=project_id, items=[call_start_req.start])
             )
 
-            print("enqueued:", self.server.get_start_processor().num_outstanding_jobs)
-
             # Return the request for caching
             return call_start_req
 

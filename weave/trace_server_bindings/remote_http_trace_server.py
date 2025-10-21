@@ -174,8 +174,6 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
         if len(batch) == 0:
             return
 
-        print("---------- Flushing starts:", len(batch))
-
         def get_item_id(item: tsi.StartedCallSchemaForInsert) -> str:
             return f"{item.id}-start"
 
@@ -827,7 +825,6 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
                 tsi.CallsStartBatchRes,
             )
         except requests.HTTPError as e:
-            print("---------- Error:", e)
             if e.response.status_code == 404:
                 logger.debug(
                     "V1 start batch endpoint not available, falling back to legacy upsert_batch"
@@ -881,7 +878,6 @@ class RemoteHTTPTraceServer(tsi.TraceServerInterface):
                 tsi.CallsCompleteBatchRes,
             )
         except requests.HTTPError as e:
-            print("---------- Error:", e)
             if e.response.status_code == 404:
                 logger.debug(
                     "V1 complete batch endpoint not available, falling back to legacy upsert_batch"

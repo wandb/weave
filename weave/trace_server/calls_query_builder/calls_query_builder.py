@@ -711,7 +711,6 @@ class CallsQuery(BaseModel):
                 "calls_complete",
                 field_to_object_join_alias_map=field_to_object_join_alias_map,
             )
-            logger.info(f"---------- Calls complete query: {qry}")
             return qry
 
         # Determine if the query `has_heavy_fields` by checking
@@ -2005,8 +2004,7 @@ def _is_minimal_filter(filter: Optional[tsi.CallsFilter]) -> bool:
 def build_feedback_join_sql(
     needs_feedback: bool, project_param_slot: str, table_alias: str
 ) -> str:
-    """
-    Build the feedback join SQL for a given table alias.
+    """Build the feedback join SQL for a given table alias.
 
     Args:
         needs_feedback (bool): Whether feedback join is needed.
@@ -2029,8 +2027,7 @@ def build_feedback_join_sql(
 def build_storage_size_join_sql(
     include_storage_size: bool, project_param_slot: str, table_alias: str
 ) -> str:
-    """
-    Build the storage size join SQL for a given table alias.
+    """Build the storage size join SQL for a given table alias.
 
     Args:
         include_storage_size (bool): Whether to include storage size.
@@ -2059,8 +2056,7 @@ def build_storage_size_join_sql(
 def build_total_storage_size_join_sql(
     include_total_storage_size: bool, project_param_slot: str, table_alias: str
 ) -> str:
-    """
-    Build the total storage size join SQL for a given table alias.
+    """Build the total storage size join SQL for a given table alias.
 
     Args:
         include_total_storage_size (bool): Whether to include total storage size.
@@ -2093,8 +2089,7 @@ def build_object_ref_joins_sql(
     field_to_object_join_alias_map: Optional[dict[str, str]],
     table_alias: str,
 ) -> str:
-    """
-    Build the object reference join SQL for ordering.
+    """Build the object reference join SQL for ordering.
 
     Args:
         pb (ParamBuilder): The parameter builder for query parameterization.
