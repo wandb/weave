@@ -268,10 +268,18 @@ class AggregatedDataSizeField(CallsMergedField):
     def as_select_sql(self, pb: ParamBuilder, table_alias: str) -> str:
         # It doesn't make sense for a non-root call to have a total storage size,
         # even if a value could be computed.
+        parent_id_sql = f"{table_alias}.parent_id"
+        if table_alias == "calls_merged":
+            parent_id_sql = f"any({parent_id_sql})"
+
+        total_storage_size_sql = f"{self.join_table_name}.total_storage_size_bytes"
+        if table_alias == "calls_merged":
+            total_storage_size_sql = f"any({total_storage_size_sql})"
+
         conditional_field = f"""
         CASE
-            WHEN any({table_alias}.parent_id) IS NULL
-            THEN any({self.join_table_name}.total_storage_size_bytes)
+            WHEN {parent_id_sql} IS NULL
+            THEN {total_storage_size_sql}
             ELSE NULL
         END
         """
@@ -980,6 +988,7 @@ class CallsQuery(BaseModel):
             id_subquery_sql = f"AND (calls_merged.id IN {id_subquery_name})"
 
         project_param = pb.add_param(self.project_id)
+        project_param_slot = param_slot(project_param, "String")
 
         # Special Optimization
         id_mask_sql = ""
@@ -987,62 +996,22 @@ class CallsQuery(BaseModel):
             id_mask_sql = f"AND (calls_merged.id IN {param_slot(pb.add_param(self.hardcoded_filter.filter.call_ids), 'Array(String)')})"
         # TODO: We should also pull out id-masks from the dynamic query
 
-        feedback_join_sql = ""
-        if needs_feedback:
-            feedback_join_sql = f"""
-            LEFT JOIN (
-                SELECT * FROM feedback WHERE feedback.project_id = {param_slot(project_param, "String")}
-            ) AS feedback ON (
-                feedback.weave_ref = concat('weave-trace-internal:///', {param_slot(project_param, "String")}, '/call/', calls_merged.id))
-            """
-
-        storage_size_sql = ""
-        if self.include_storage_size:
-            storage_size_sql = f"""
-            LEFT JOIN (
-                SELECT
-                    id,
-                    sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) AS storage_size_bytes
-                FROM calls_merged_stats
-                WHERE project_id = {param_slot(project_param, "String")}
-                GROUP BY id
-            ) AS {STORAGE_SIZE_TABLE_NAME}
-            ON calls_merged.id = {STORAGE_SIZE_TABLE_NAME}.id
-            """
-
-        total_storage_size_sql = ""
-        if self.include_total_storage_size:
-            total_storage_size_sql = f"""
-            LEFT JOIN (
-                SELECT
-                    trace_id,
-                    sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) AS total_storage_size_bytes
-                FROM calls_merged_stats
-                WHERE project_id = {param_slot(project_param, "String")}
-                GROUP BY trace_id
-            ) AS {ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME}
-            ON calls_merged.trace_id = {ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME}.trace_id
-            """
-
-        # Add JOINs for object reference ordering
-        object_ref_joins_sql = ""
-        if expand_columns and field_to_object_join_alias_map:
-            for order_field in self.order_fields:
-                field_path = order_field.raw_field_path
-                if not has_object_ref_field(field_path, expand_columns):
-                    continue
-                order_condition = ObjectRefOrderCondition(
-                    field_path=field_path,
-                    expand_columns=expand_columns,
-                )
-                join_condition_sql = order_condition.as_sql_condition(
-                    pb,
-                    table_alias,
-                    field_to_object_join_alias_map,
-                    is_order_join=True,
-                    use_agg_fn=False,
-                )
-                object_ref_joins_sql += join_condition_sql
+        feedback_join_sql = build_feedback_join_sql(
+            needs_feedback, project_param_slot, table_alias
+        )
+        storage_size_sql = build_storage_size_join_sql(
+            self.include_storage_size, project_param_slot, table_alias
+        )
+        total_storage_size_sql = build_total_storage_size_join_sql(
+            self.include_total_storage_size, project_param_slot, table_alias
+        )
+        object_ref_joins_sql = build_object_ref_joins_sql(
+            pb,
+            self.order_fields,
+            expand_columns,
+            field_to_object_join_alias_map,
+            table_alias,
+        )
 
         raw_sql = f"""
         SELECT {select_fields_sql}
@@ -1051,7 +1020,7 @@ class CallsQuery(BaseModel):
         {storage_size_sql}
         {total_storage_size_sql}
         {object_ref_joins_sql}
-        WHERE calls_merged.project_id = {param_slot(project_param, "String")}
+        WHERE calls_merged.project_id = {project_param_slot}
         {id_mask_sql}
         {id_subquery_sql}
         {sortable_datetime_sql}
@@ -1096,13 +1065,11 @@ class CallsQuery(BaseModel):
                     expand_columns=expand_columns,
                     field_to_object_join_alias_map=field_to_object_join_alias_map,
                 )
-                print("Adding query_condition_sql", query_condition_sql)
                 conditions_sql.append(query_condition_sql)
                 if query_condition.is_feedback():
                     needs_feedback = True
         if self.hardcoded_filter is not None:
             hardcoded_filter_sql = self.hardcoded_filter.as_sql(pb, table_alias)
-            print(">>>>>>hardcoded_filter_sql:", hardcoded_filter_sql)
             conditions_sql.append(hardcoded_filter_sql)
 
         if len(conditions_sql) > 0:
@@ -1134,62 +1101,22 @@ class CallsQuery(BaseModel):
         project_param = pb.add_param(self.project_id)
         project_param_slot = param_slot(project_param, "String")
 
-        feedback_join_sql = ""
-        if needs_feedback:
-            feedback_join_sql = f"""
-            LEFT JOIN (
-                SELECT * FROM feedback WHERE feedback.project_id = {project_param_slot}
-            ) AS feedback ON (
-                feedback.weave_ref = concat('weave-trace-internal:///', {project_param_slot}, '/call/', calls_merged.id))
-            """
-
-        storage_size_sql = ""
-        if self.include_storage_size:
-            storage_size_sql = f"""
-            LEFT JOIN (
-                SELECT
-                    id,
-                    sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) AS storage_size_bytes
-                FROM calls_merged_stats
-                WHERE project_id = {project_param_slot}
-                GROUP BY id
-            ) AS {STORAGE_SIZE_TABLE_NAME}
-            ON calls_merged.id = {STORAGE_SIZE_TABLE_NAME}.id
-            """
-
-        total_storage_size_sql = ""
-        if self.include_total_storage_size:
-            total_storage_size_sql = f"""
-            LEFT JOIN (
-                SELECT
-                    trace_id,
-                    sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) AS total_storage_size_bytes
-                FROM calls_merged_stats
-                WHERE project_id = {project_param_slot}
-                GROUP BY trace_id
-            ) AS {ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME}
-            ON calls_merged.trace_id = {ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME}.trace_id
-            """
-
-        # Add JOINs for object reference ordering
-        object_ref_joins_sql = ""
-        if expand_columns and field_to_object_join_alias_map:
-            for order_field in self.order_fields:
-                field_path = order_field.raw_field_path
-                if not has_object_ref_field(field_path, expand_columns):
-                    continue
-                order_condition = ObjectRefOrderCondition(
-                    field_path=field_path,
-                    expand_columns=expand_columns,
-                )
-                join_condition_sql = order_condition.as_sql_condition(
-                    pb,
-                    table_alias,
-                    field_to_object_join_alias_map,
-                    is_order_join=True,
-                    use_agg_fn=False,
-                )
-                object_ref_joins_sql += join_condition_sql
+        feedback_join_sql = build_feedback_join_sql(
+            needs_feedback, project_param_slot, table_alias
+        )
+        storage_size_sql = build_storage_size_join_sql(
+            self.include_storage_size, project_param_slot, table_alias
+        )
+        total_storage_size_sql = build_total_storage_size_join_sql(
+            self.include_total_storage_size, project_param_slot, table_alias
+        )
+        object_ref_joins_sql = build_object_ref_joins_sql(
+            pb,
+            self.order_fields,
+            expand_columns,
+            field_to_object_join_alias_map,
+            table_alias,
+        )
 
         raw_sql = f"""
         SELECT {select_fields_sql}
@@ -1850,7 +1777,7 @@ def process_calls_filter_to_conditions(
             f"{get_field_by_name('wb_run_id', table_alias).as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.wb_run_ids), 'Array(String)')}"
         )
 
-    if table_alias in ["calls_merged", "calls_start"] and filter.op_names:
+    if table_alias in ["calls_complete", "call_starts"] and filter.op_names:
         conditions.append(
             f"{get_field_by_name('op_name', table_alias).as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.op_names), 'Array(String)')}"
         )
@@ -2073,3 +2000,130 @@ def _is_minimal_filter(filter: Optional[tsi.CallsFilter]) -> bool:
         and filter.input_refs is None
         and filter.output_refs is None
     )
+
+
+def build_feedback_join_sql(
+    needs_feedback: bool, project_param_slot: str, table_alias: str
+) -> str:
+    """
+    Build the feedback join SQL for a given table alias.
+
+    Args:
+        needs_feedback (bool): Whether feedback join is needed.
+        project_param_slot (str): The parameterized project ID slot.
+        table_alias (str): The table alias to join with (e.g., 'calls_merged' or 'calls_complete').
+
+    Returns:
+        str: The feedback join SQL string, or empty string if not needed.
+    """
+    if not needs_feedback:
+        return ""
+    return f"""
+    LEFT JOIN (
+        SELECT * FROM feedback WHERE feedback.project_id = {project_param_slot}
+    ) AS feedback ON (
+        feedback.weave_ref = concat('weave-trace-internal:///', {project_param_slot}, '/call/', {table_alias}.id))
+    """
+
+
+def build_storage_size_join_sql(
+    include_storage_size: bool, project_param_slot: str, table_alias: str
+) -> str:
+    """
+    Build the storage size join SQL for a given table alias.
+
+    Args:
+        include_storage_size (bool): Whether to include storage size.
+        project_param_slot (str): The parameterized project ID slot.
+        table_alias (str): The table alias to use (e.g., 'calls_merged' or 'calls_complete').
+
+    Returns:
+        str: The storage size join SQL string, or empty string if not needed.
+    """
+    if not include_storage_size:
+        return ""
+    stats_table = f"{table_alias}_stats"
+    return f"""
+    LEFT JOIN (
+        SELECT
+            id,
+            sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) AS storage_size_bytes
+        FROM {stats_table}
+        WHERE project_id = {project_param_slot}
+        GROUP BY id
+    ) AS {STORAGE_SIZE_TABLE_NAME}
+    ON {table_alias}.id = {STORAGE_SIZE_TABLE_NAME}.id
+    """
+
+
+def build_total_storage_size_join_sql(
+    include_total_storage_size: bool, project_param_slot: str, table_alias: str
+) -> str:
+    """
+    Build the total storage size join SQL for a given table alias.
+
+    Args:
+        include_total_storage_size (bool): Whether to include total storage size.
+        project_param_slot (str): The parameterized project ID slot.
+        table_alias (str): The table alias to use (e.g., 'calls_merged' or 'calls_complete').
+
+    Returns:
+        str: The total storage size join SQL string, or empty string if not needed.
+    """
+    if not include_total_storage_size:
+        return ""
+    stats_table = f"{table_alias}_stats"
+    return f"""
+    LEFT JOIN (
+        SELECT
+            trace_id,
+            sum(COALESCE(attributes_size_bytes,0) + COALESCE(inputs_size_bytes,0) + COALESCE(output_size_bytes,0) + COALESCE(summary_size_bytes,0)) AS total_storage_size_bytes
+        FROM {stats_table}
+        WHERE project_id = {project_param_slot}
+        GROUP BY trace_id
+    ) AS {ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME}
+    ON {table_alias}.trace_id = {ROLLED_UP_CALL_MERGED_STATS_TABLE_NAME}.trace_id
+    """
+
+
+def build_object_ref_joins_sql(
+    pb: ParamBuilder,
+    order_fields: list[OrderField],
+    expand_columns: Optional[list[str]],
+    field_to_object_join_alias_map: Optional[dict[str, str]],
+    table_alias: str,
+) -> str:
+    """
+    Build the object reference join SQL for ordering.
+
+    Args:
+        pb (ParamBuilder): The parameter builder for query parameterization.
+        order_fields (list[OrderField]): The list of order fields.
+        expand_columns (Optional[list[str]]): Columns to expand for object references.
+        field_to_object_join_alias_map (Optional[dict[str, str]]): Mapping of fields to join aliases.
+        table_alias (str): The table alias to use (e.g., 'calls_merged' or 'calls_complete').
+
+    Returns:
+        str: The object reference join SQL string, or empty string if not needed.
+    """
+    if not expand_columns or not field_to_object_join_alias_map:
+        return ""
+
+    object_ref_joins_sql = ""
+    for order_field in order_fields:
+        field_path = order_field.raw_field_path
+        if not has_object_ref_field(field_path, expand_columns):
+            continue
+        order_condition = ObjectRefOrderCondition(
+            field_path=field_path,
+            expand_columns=expand_columns,
+        )
+        join_condition_sql = order_condition.as_sql_condition(
+            pb,
+            table_alias,
+            field_to_object_join_alias_map,
+            is_order_join=True,
+            use_agg_fn=False,
+        )
+        object_ref_joins_sql += join_condition_sql
+    return object_ref_joins_sql

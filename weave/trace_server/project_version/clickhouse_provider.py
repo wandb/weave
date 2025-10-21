@@ -9,6 +9,7 @@ from weave.trace_server.project_version.types import ProjectVersion
 
 logger = logging.getLogger(__name__)
 
+
 class ClickHouseProjectVersionProvider:
     """Determines project version by checking calls_complete and calls_merged tables.
 

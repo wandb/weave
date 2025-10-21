@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from typing import Any, Optional, Union
+from typing import Any, Optional
 
 from cachetools import LRUCache
 

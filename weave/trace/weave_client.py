@@ -16,7 +16,7 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Any, Callable, TypedDict, cast
 
 import pydantic
-from cachetools import LRUCache, TTLCache
+from cachetools import LRUCache
 from requests import HTTPError
 
 from weave import version
@@ -829,7 +829,7 @@ class WeaveClient:
                 CallsStartBatchReq(project_id=project_id, items=[call_start_req.start])
             )
 
-            print('enqueued:', self.server.get_start_processor().num_outstanding_jobs)
+            print("enqueued:", self.server.get_start_processor().num_outstanding_jobs)
 
             # Return the request for caching
             return call_start_req

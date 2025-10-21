@@ -586,7 +586,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             include_storage_size=req.include_storage_size or False,
             include_total_storage_size=req.include_total_storage_size or False,
         )
-        columns = ALL_CALL_SELECT_COLUMNS 
+        columns = ALL_CALL_SELECT_COLUMNS
         # TODO: fix me
         if project_version == ProjectVersion.NEW_VERSION:
             columns = [col for col in columns if col != "deleted_at"]

@@ -1,7 +1,6 @@
 """Base interface and composition for project version resolution."""
 
-import asyncio
-from typing import Protocol, Union
+from typing import Protocol
 
 from weave.trace_server.project_version.types import ProjectVersion
 

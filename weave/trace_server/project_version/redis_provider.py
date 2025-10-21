@@ -1,6 +1,6 @@
 """Redis-backed project version provider."""
 
-from typing import Any, Optional, Union
+from typing import Any, Optional
 
 from weave.trace_server.project_version.types import ProjectVersion
 
