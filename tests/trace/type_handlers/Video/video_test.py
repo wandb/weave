@@ -1,6 +1,7 @@
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -386,6 +387,10 @@ def test_video_format_from_filename():
     assert get_format_from_filename("test.something.mp4") == VideoFormat.MP4
 
 
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="moviepy library uses /dev/null on Windows which doesn't exist",
+)
 def test_multiple_video_formats(
     client: WeaveClient, tmp_path: Path, test_video: VideoClip
 ):

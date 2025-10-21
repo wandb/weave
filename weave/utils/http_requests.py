@@ -173,6 +173,15 @@ def post(
     return client.post(url, data=data, json=json, **kwargs)
 
 
+def delete(
+    url: str,
+    params: Optional[dict[str, Any]] = None,
+    **kwargs: Any,
+) -> Response:
+    """Send a DELETE request with optional logging."""
+    return session.delete(url, params=params, **kwargs)
+
+
 # Export these for compatibility with code expecting requests module
 __all__ = [
     "HTTPError",
@@ -185,3 +194,4 @@ __all__ = [
 ]
 # For backward compatibility, alias client as session
 session = client
+

@@ -52,7 +52,7 @@ The entrypoint for custom object serialization is `weave/trace/serialization/cus
 
 1. `encode_custom_obj()`, which encodes custom objects using registered serializers (both inline and file-based)
 2. `decode_custom_inline_obj()`, which decodes custom inline objects using the appropriate serializer
-3. `decode_custom_files_obj()`, which decodes custom file-based objects using the appropriate serializer
+3. `decode_custom_obj()`, which decodes custom file-based objects using the appropriate serializer
 
 #### Custom Object Serialization Flow
 
@@ -68,7 +68,7 @@ flowchart TD
         Serializer -->|Write to files| MemArtifact["MemTraceFilesArtifact"]
 
         MemArtifact -->|Read from files| Deserializer["Registered Serializer (load method)"]
-        Deserializer --> DecodeCustomObj["decode_custom_files_obj()"]
+        Deserializer --> DecodeCustomObj["decode_custom_obj()"]
     end
 
     DecodeCustomObj --> FromJson["from_json()"]

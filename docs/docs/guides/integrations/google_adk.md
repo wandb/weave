@@ -12,15 +12,15 @@ For more information on OTEL tracing in Weave, see [Send OTEL Traces to Weave](.
 
 1. Install the required dependencies:
 
-    ```bash
-    pip install google-adk opentelemetry-sdk opentelemetry-exporter-otlp-proto-http
-    ```
+   ```bash
+   pip install google-adk opentelemetry-sdk opentelemetry-exporter-otlp-proto-http
+   ```
 
 2. Set your [Google API key](https://cloud.google.com/docs/authentication/api-keys) as an environment variable:
 
-    ```bash
-    export GOOGLE_API_KEY=your_api_key_here
-    ```
+   ```bash
+   export GOOGLE_API_KEY=your_api_key_here
+   ```
 
 3. [Configure OTEL tracing in Weave](#configure-otel-tracing-in-weave).
 
@@ -28,13 +28,13 @@ For more information on OTEL tracing in Weave, see [Send OTEL Traces to Weave](.
 
 To send traces from ADK to Weave, configure OTEL with a `TracerProvider` and an `OTLPSpanExporter`. Set the exporter to the [correct endpoint and HTTP headers for authentication and project identification](#required-configuration).
 
-:::important 
+:::important
 It is recommended that you store sensitive environment variables like your API key and project info in an environment file (e.g., `.env`), and load them using `os.environ`. This keeps your credentials secure and out of your codebase.
 :::
 
 ### Required configuration
 
-- **Endpoint:** `https://trace.wandb.ai/otel/v1/traces`
+- **Endpoint:** `https://trace.wandb.ai/otel/v1/traces`. If you are using a dedicated Weave instance, the URL follows this pattern instead: `{YOUR_WEAVE_HOST}/traces/otel/v1/traces`
 - **Headers:**
   - `Authorization`: Basic auth using your W&B API key
   - `project_id`: Your W&B entity/project name (e.g., `myteam/myproject`)
@@ -58,9 +58,9 @@ from opentelemetry import trace
 # Load sensitive values from environment variables
 WANDB_BASE_URL = "https://trace.wandb.ai"
 # Your W&B entity/project name e.g. "myteam/myproject"
-PROJECT_ID = os.environ.get("WANDB_PROJECT_ID")  
+PROJECT_ID = os.environ.get("WANDB_PROJECT_ID")
 # Your W&B API key (found at https://wandb.ai/authorize)
-WANDB_API_KEY = os.environ.get("WANDB_API_KEY")  
+WANDB_API_KEY = os.environ.get("WANDB_API_KEY")
 
 OTEL_EXPORTER_OTLP_ENDPOINT = f"{WANDB_BASE_URL}/otel/v1/traces"
 AUTH = base64.b64encode(f"api:{WANDB_API_KEY}".encode()).decode()
@@ -129,7 +129,7 @@ async def run_agent():
     # Create a session
     user_id = "example_user"
     session_id = "example_session"
-    session_service.create_session(
+    await session_service.create_session(
         app_name="math_assistant",
         user_id=user_id,
         session_id=session_id,
@@ -170,11 +170,11 @@ import asyncio
 # Define multiple tools
 def add(a: float, b: float) -> str:
     """Add two numbers.
-    
+
     Args:
         a: First number
         b: Second number
-        
+
     Returns:
         The sum of a and b
     """
@@ -182,11 +182,11 @@ def add(a: float, b: float) -> str:
 
 def multiply(a: float, b: float) -> str:
     """Multiply two numbers.
-    
+
     Args:
         a: First number
         b: Second number
-        
+
     Returns:
         The product of a and b
     """
@@ -216,7 +216,7 @@ async def run_agent():
     # Create a session
     user_id = "example_user"
     session_id = "example_session"
-    session_service.create_session(
+    await session_service.create_session(
         app_name="math_assistant",
         user_id=user_id,
         session_id=session_id,
@@ -258,7 +258,7 @@ async def run_workflow():
         description="Summarizes text in one sentence",
         output_key="summary"  # Store output in state['summary']
     )
-    
+
     analyzer = LlmAgent(
         name="Analyzer",
         model="gemini-2.0-flash",
@@ -266,33 +266,33 @@ async def run_workflow():
         description="Analyzes sentiment of text",
         output_key="sentiment"  # Store output in state['sentiment']
     )
-    
+
     # Create a sequential workflow
     workflow = SequentialAgent(
         name="TextProcessor",
         sub_agents=[summarizer, analyzer],
         description="Executes a sequence of summarization followed by sentiment analysis.",
     )
-    
+
     # Set up runner
     runner = InMemoryRunner(agent=workflow, app_name="text_processor")
     session_service = runner.session_service
-    
+
     # Create a session
     user_id = "example_user"
     session_id = "example_session"
-    session_service.create_session(
+    await session_service.create_session(
         app_name="text_processor",
         user_id=user_id,
         session_id=session_id,
     )
-    
+
     # Run the workflow
     async for event in runner.run_async(
         user_id=user_id,
         session_id=session_id,
         new_message=types.Content(
-            role="user", 
+            role="user",
             parts=[types.Part(text="The product exceeded my expectations. It worked perfectly right out of the box, and the customer service was excellent when I had questions about setup.")]
         ),
     ):

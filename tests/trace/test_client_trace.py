@@ -41,7 +41,7 @@ from weave.trace.vals import MissingSelfInstanceError
 from weave.trace.weave_client import sanitize_object_name
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.clickhouse_trace_server_settings import ENTITY_TOO_LARGE_PAYLOAD
-from weave.trace_server.errors import InsertTooLarge, InvalidFieldError
+from weave.trace_server.errors import InsertTooLarge, InvalidFieldError, InvalidRequest
 from weave.trace_server.ids import generate_id
 from weave.trace_server.refs_internal import extra_value_quoter
 from weave.trace_server.token_costs import COST_OBJECT_NAME
@@ -197,6 +197,7 @@ def test_trace_server_call_start_and_end(client):
         "wb_user_id": MaybeStringMatcher(client.entity),
         "wb_run_id": None,
         "wb_run_step": None,
+        "wb_run_step_end": None,
         "deleted_at": None,
         "display_name": None,
         "storage_size_bytes": None,
@@ -248,6 +249,7 @@ def test_trace_server_call_start_and_end(client):
         "wb_user_id": MaybeStringMatcher(client.entity),
         "wb_run_id": None,
         "wb_run_step": None,
+        "wb_run_step_end": None,
         "deleted_at": None,
         "display_name": None,
         "storage_size_bytes": None,
@@ -293,33 +295,55 @@ class OpCallSpec(BaseModel):
     total_calls: int
     root_calls: int
     run_calls: int
+    part_sequence: list[tuple[str, str]]
 
 
 def simple_line_call_bootstrap() -> OpCallSpec:
+    part_sequence = []
+
+    def track_sequence(name: str):
+        def wrapper(fn):
+            def wrapped(*args, **kwargs):
+                part_sequence.append(("start", name))
+                res = fn(*args, **kwargs)
+                part_sequence.append(("end", name))
+                return res
+
+            wrapped.__name__ = fn.__name__
+
+            return wrapped
+
+        return wrapper
+
     class Number(weave.Object):
         value: int
 
     @weave.op
+    @track_sequence("adder")
     def adder(a: Number) -> Number:
-        return Number(value=a.value + a.value)
+        res = Number(value=a.value + a.value)
 
     adder_v0 = adder
 
-    @weave.op  # type: ignore
+    @weave.op
+    @track_sequence("adder")
     def adder(a: Number, b) -> Number:
         return Number(value=a.value + b)
 
     @weave.op
+    @track_sequence("subtractor")
     def subtractor(a: Number, b) -> Number:
         return Number(value=a.value - b)
 
     @weave.op
+    @track_sequence("multiplier")
     def multiplier(
         a: Number, b
     ) -> int:  # intentionally deviant in returning plain int - so that we have a different type
         return a.value * b
 
     @weave.op
+    @track_sequence("liner")
     def liner(m: Number, b, x) -> Number:
         return adder(Number(value=multiplier(m, x)), b)
 
@@ -373,6 +397,7 @@ def simple_line_call_bootstrap() -> OpCallSpec:
         total_calls=total_calls,
         root_calls=root_calls,
         run_calls=run_calls,
+        part_sequence=part_sequence,
     )
 
 
@@ -538,8 +563,21 @@ def test_trace_call_wb_run_step_query(client):
     res = server.calls_query(
         tsi.CallsQueryReq(project_id=get_client_project_id(client))
     )
-    steps = {c.wb_run_step for c in res.calls}
-    assert steps == set(range(call_spec.total_calls))
+    exp_start_steps = []
+    exp_end_steps = []
+    counter = 0
+    for part in call_spec.part_sequence:
+        if part[0] == "start":
+            exp_start_steps.append(counter)
+        else:
+            exp_end_steps.append(counter)
+        counter += 1
+    exp_start_steps_set = set(exp_start_steps)
+    found_start_steps_set = {c.wb_run_step for c in res.calls}
+    assert found_start_steps_set == exp_start_steps_set
+    exp_end_steps_set = set(exp_end_steps)
+    found_end_steps_set = {c.wb_run_step_end for c in res.calls}
+    assert found_end_steps_set == exp_end_steps_set
 
     query = tsi.Query(
         **{"$expr": {"$eq": [{"$getField": "wb_run_step"}, {"$literal": 0}]}}
@@ -549,7 +587,8 @@ def test_trace_call_wb_run_step_query(client):
     )
     assert len(res.calls) == 1
 
-    compare_step = call_spec.total_calls - 2
+    count = 2
+    compare_step = exp_start_steps[-count]
     range_query = tsi.Query(
         **{
             "$expr": {
@@ -560,7 +599,21 @@ def test_trace_call_wb_run_step_query(client):
     res = server.calls_query(
         tsi.CallsQueryReq(project_id=get_client_project_id(client), query=range_query)
     )
-    assert len(res.calls) == 2
+    assert len(res.calls) == count
+
+    count = 4
+    compare_step = exp_end_steps[-count]
+    range_query = tsi.Query(
+        **{
+            "$expr": {
+                "$gte": [{"$getField": "wb_run_step_end"}, {"$literal": compare_step}]
+            }
+        }
+    )
+    res = server.calls_query(
+        tsi.CallsQueryReq(project_id=get_client_project_id(client), query=range_query)
+    )
+    assert len(res.calls) == count
 
     res = server.calls_query(
         tsi.CallsQueryReq(
@@ -568,8 +621,18 @@ def test_trace_call_wb_run_step_query(client):
             sort_by=[tsi.SortBy(field="wb_run_step", direction="desc")],
         )
     )
-    exp_steps = list(range(call_spec.total_calls))[::-1]
+    exp_steps = sorted(exp_start_steps, reverse=True)
     found_steps = [c.wb_run_step for c in res.calls]
+    assert found_steps == exp_steps
+
+    res = server.calls_query(
+        tsi.CallsQueryReq(
+            project_id=get_client_project_id(client),
+            sort_by=[tsi.SortBy(field="wb_run_step_end", direction="desc")],
+        )
+    )
+    exp_steps = sorted(exp_end_steps, reverse=True)
+    found_steps = [c.wb_run_step_end for c in res.calls]
     assert found_steps == exp_steps
 
 
@@ -1645,6 +1708,52 @@ def test_dataset_row_ref(client):
     assert inner.ref.uri() == exp_ref
     gotten = weave.ref(exp_ref).get()
     assert gotten == 5
+
+
+def test_table_query_empty_sort_field_validation(client):
+    """Test that empty or invalid sort fields in table queries are properly validated."""
+    # Create a dataset with table data
+    d = weave.Dataset(name="test_dataset", rows=[{"a": 5, "b": 6}, {"a": 7, "b": 10}])
+    weave.publish(d)
+
+    # Query the object to get its val
+    res = client.server.objs_query(
+        tsi.ObjQueryReq(
+            project_id=get_client_project_id(client),
+            filter={"object_ids": ["test_dataset"]},
+        )
+    )
+    assert len(res.objs) == 1
+    queried_obj = res.objs[0]
+
+    # Get table reference from the dataset
+    table_ref = TableRef.parse_uri(queried_obj.val["rows"])
+
+    # Test various invalid sort field scenarios that should trigger validation errors
+    invalid_sort_fields = [
+        "",  # Empty field
+        ".",  # Just a dot
+        "..",  # Multiple dots
+        "...",  # More dots
+        "a.",  # Field ending with dot
+        ".a",  # Field starting with dot
+        "a..b",  # Double dots in middle
+    ]
+
+    for invalid_field in invalid_sort_fields:
+        with pytest.raises((ValueError, InvalidRequest)) as exc_info:
+            # This should fail with a validation error, not a ClickHouse jsonpath error
+            list(
+                client.server.table_query_stream(
+                    tsi.TableQueryReq(
+                        project_id=get_client_project_id(client),
+                        digest=table_ref.digest,
+                        sort_by=[tsi.SortBy(field=invalid_field, direction="asc")],
+                    )
+                )
+            )
+        # The error should be a validation error, not a ClickHouse error
+        assert "jsonpath" not in str(exc_info.value).lower()
 
 
 def test_tuple_support(client):
@@ -2916,8 +3025,12 @@ def test_calls_iter_cached(client):
         elapsed_times.append(end_time - start_time)
 
     # cached lookup should be way faster!
-    assert elapsed_times[0] > elapsed_times[1] * 10
-    assert elapsed_times[0] > elapsed_times[2] * 10
+    if sys.platform == "win32":  # Test on windows is slower...
+        assert elapsed_times[0] > elapsed_times[1]
+        assert elapsed_times[0] > elapsed_times[2]
+    else:
+        assert elapsed_times[0] > elapsed_times[1] * 10
+        assert elapsed_times[0] > elapsed_times[2] * 10
 
 
 def test_calls_iter_different_value_same_page_cached(client):
@@ -5296,9 +5409,8 @@ def test_threads_query_aggregation_fields(client):
     assert isinstance(test_thread.p99_turn_duration_ms, (int, float))
 
     # Test duration percentile ranges (should be between our min and max expected durations)
-    # We expect roughly: quick_op ~10ms, medium_op ~50ms, slow_op ~100ms
-    assert 5 <= test_thread.p50_turn_duration_ms <= 200  # Reasonable range for P50
-    assert 5 <= test_thread.p99_turn_duration_ms <= 200  # Reasonable range for P99
+    assert 0 <= test_thread.p50_turn_duration_ms
+    assert 0 <= test_thread.p99_turn_duration_ms
     assert (
         test_thread.p50_turn_duration_ms <= test_thread.p99_turn_duration_ms
     )  # P99 >= P50

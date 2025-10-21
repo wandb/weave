@@ -35,6 +35,18 @@ class QueryNoCommonTypeError(Error):
     pass
 
 
+class QueryIllegalTypeofArgumentError(Error):
+    """Raised when a query has an illegal type of argument."""
+
+    pass
+
+
+class BadQueryParameterError(Error):
+    """Raised when a query parameter is invalid."""
+
+    pass
+
+
 class QueryTimeoutExceededError(Error):
     """Raised when a query timeout is exceeded."""
 
@@ -85,6 +97,14 @@ class InvalidExternalRef(Error):
 class ProjectNotFound(Error):
     """Raised when a project is not found."""
 
+    pass
+
+
+class InvalidIdFormat(Exception):
+    pass
+
+
+class RunNotFound(Exception):
     pass
 
 
@@ -172,17 +192,32 @@ class ErrorRegistry:
     def _setup_common_errors(self) -> None:
         """Register common/standard library errors that don't depend on domain-specific modules."""
         # Our own error types
+        # 400
         self.register(InvalidRequest, 400)
         self.register(InvalidExternalRef, 400)
         self.register(QueryNoCommonTypeError, 400)
         self.register(MissingLLMApiKeyError, 400, _format_missing_llm_api_key)
+        self.register(InvalidIdFormat, 400)
+
+        # 403
         self.register(InvalidFieldError, 403)
+        self.register(QueryIllegalTypeofArgumentError, 403)
+        self.register(BadQueryParameterError, 403)
+
+        # 404
         self.register(NotFoundError, 404)
         self.register(ProjectNotFound, 404)
+        self.register(RunNotFound, 404)
         self.register(ObjectDeletedError, 404, _format_object_deleted_error)
+
+        # 413
         self.register(InsertTooLarge, 413)
         self.register(RequestTooLarge, 413, lambda exc: {"reason": "Request too large"})
+
+        # 502
         self.register(QueryMemoryLimitExceededError, 502)
+
+        # 504
         self.register(QueryTimeoutExceededError, 504)
 
         # Standard library exceptions
@@ -263,6 +298,10 @@ def handle_clickhouse_query_error(e: Exception) -> None:
         raise QueryMemoryLimitExceededError(
             "Query memory limit exceeded. " + limit_scope_message
         ) from e
+    if "TIMEOUT_EXCEEDED" in error_str:
+        raise QueryTimeoutExceededError(
+            "Query timeout exceeded. " + limit_scope_message
+        ) from e
     if "NO_COMMON_TYPE" in error_str:
         raise QueryNoCommonTypeError(
             "No common type between data types in query. "
@@ -270,9 +309,19 @@ def handle_clickhouse_query_error(e: Exception) -> None:
             "Example: filtering calls by inputs.integer_value = 1 without using $convert -> "
             "Correct: {$expr: {$eq: [{$convert: {input: {$getField: 'inputs.integer_value'}, to: 'double'}}, {$literal: 1}]}}"
         ) from e
-    if "TIMEOUT_EXCEEDED" in error_str:
-        raise QueryTimeoutExceededError(
-            "Query timeout exceeded. " + limit_scope_message
+    if "ILLEGAL_TYPE_OF_ARGUMENT" in error_str:
+        raise QueryIllegalTypeofArgumentError(
+            "Illegal type of argument in query. "
+            "This can occur when using a numeric literal in a query. "
+            "Example: filtering calls by inputs.integer_value = 1 without using $convert -> "
+            "Correct: {$expr: {$eq: [{$convert: {input: {$getField: 'inputs.integer_value'}, to: 'double'}}, {$literal: 1}]}}"
+        ) from e
+    if "BAD_QUERY_PARAMETER" in error_str:
+        raise BadQueryParameterError(
+            "Bad query parameter. "
+            "Example: A query like inputs.integer_value = -10000000000, when the parameter "
+            "expects a UInt64, will fail: Value -10000000000 cannot be parsed as UInt64. "
+            "To resolve, ensure all query parameters are of the correct type and within valid ranges."
         ) from e
 
     # Re-raise the original exception if no known pattern matches
