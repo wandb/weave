@@ -329,7 +329,7 @@ def check_endpoint_exists(
 
     Args:
         func: The function to test (e.g., server.table_create_from_digests or
-              server._generic_request_executor.__wrapped__)
+              server._post_request_executor.__wrapped__)
         test_req: A test request to use for checking the function
         cache_key: Optional cache key. If not provided, uses id(func)
 
