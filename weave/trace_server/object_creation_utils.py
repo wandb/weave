@@ -10,6 +10,26 @@ PLACEHOLDER_OP_SOURCE = """def func(*args, **kwargs):
 """
 
 
+def make_safe_name(name: str | None) -> str:
+    """Convert a name to a safe identifier format.
+
+    Args:
+        name: The name to sanitize
+
+    Returns:
+        A safe identifier with spaces and slashes replaced by underscores, lowercased
+
+    Examples:
+        >>> make_safe_name("My Dataset")
+        'my_dataset'
+        >>> make_safe_name("user/model")
+        'user_model'
+    """
+    if name is None:
+        name = "unknown"
+    return name.replace(" ", "_").replace("/", "_").lower()
+
+
 def build_op_val(file_digest: str, load_op: str | None = None) -> dict[str, Any]:
     """Build the op value structure with a file digest (post-file-upload).
 
@@ -36,3 +56,33 @@ def build_op_val(file_digest: str, load_op: str | None = None) -> dict[str, Any]
     if load_op is not None:
         result["load_op"] = load_op
     return result
+
+
+def build_dataset_val(
+    table_ref: str, name: str | None = None, description: str | None = None
+) -> dict[str, Any]:
+    """Build the value dictionary for a Dataset object.
+
+    Args:
+        name: The dataset name
+        description: Optional description
+        table_ref: Reference to the table containing the dataset rows
+
+    Returns:
+        Dictionary representing the dataset object value
+    """
+    if name is None:
+        name = "Dataset"
+
+    return {
+        "_type": "Dataset",
+        "_class_name": "Dataset",
+        "_bases": ["Object", "BaseModel"],
+        "name": name,
+        "description": description,
+        "rows": table_ref,
+    }
+
+
+def build_table_ref(entity: str, project: str, digest: str) -> str:
+    return f"weave:///{entity}/{project}/table/{digest}"

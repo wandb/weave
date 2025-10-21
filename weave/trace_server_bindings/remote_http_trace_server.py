@@ -786,11 +786,13 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
         entity, project = req.project_id.split("/", 1)
         url = f"/v2/{entity}/{project}/ops"
         # Build query params
-        params = {}
+        params: dict[str, Any] = {}
         if req.limit is not None:
             params["limit"] = req.limit
         if req.offset is not None:
             params["offset"] = req.offset
+        if req.eager:
+            params["eager"] = "true"
         r = self._get_request_executor(url, params, stream=True)
         for line in r.iter_lines():
             if line:
@@ -810,6 +812,66 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
             params["digests"] = req.digests
         r = self._delete_request_executor(url, params)
         return tsi.OpDeleteV2Res.model_validate(r.json())
+
+    def dataset_create_v2(
+        self, req: Union[tsi.DatasetCreateV2Req, dict[str, Any]]
+    ) -> tsi.DatasetCreateV2Res:
+        if isinstance(req, dict):
+            req = tsi.DatasetCreateV2Req.model_validate(req)
+        req = cast(tsi.DatasetCreateV2Req, req)
+        entity, project = req.project_id.split("/", 1)
+        url = f"/v2/{entity}/{project}/datasets"
+        # For create, we need to send the body without project_id (DatasetCreateV2Body)
+        body_data = req.model_dump(exclude={"project_id"})
+        body = tsi.DatasetCreateV2Body.model_validate(body_data)
+        return self._generic_request(
+            url, body, tsi.DatasetCreateV2Body, tsi.DatasetCreateV2Res, method="POST"
+        )
+
+    def dataset_read_v2(
+        self, req: Union[tsi.DatasetReadV2Req, dict[str, Any]]
+    ) -> tsi.DatasetReadV2Res:
+        if isinstance(req, dict):
+            req = tsi.DatasetReadV2Req.model_validate(req)
+        req = cast(tsi.DatasetReadV2Req, req)
+        entity, project = req.project_id.split("/", 1)
+        url = f"/v2/{entity}/{project}/datasets/{req.object_id}/versions/{req.digest}"
+        r = self._get_request_executor(url, {})
+        return tsi.DatasetReadV2Res.model_validate(r.json())
+
+    def dataset_list_v2(
+        self, req: Union[tsi.DatasetListV2Req, dict[str, Any]]
+    ) -> Iterator[tsi.DatasetReadV2Res]:
+        if isinstance(req, dict):
+            req = tsi.DatasetListV2Req.model_validate(req)
+        req = cast(tsi.DatasetListV2Req, req)
+        entity, project = req.project_id.split("/", 1)
+        url = f"/v2/{entity}/{project}/datasets"
+        # Build query params
+        params: dict[str, Any] = {}
+        if req.limit is not None:
+            params["limit"] = req.limit
+        if req.offset is not None:
+            params["offset"] = req.offset
+        r = self._get_request_executor(url, params, stream=True)
+        for line in r.iter_lines():
+            if line:
+                yield tsi.DatasetReadV2Res.model_validate_json(line)
+
+    def dataset_delete_v2(
+        self, req: Union[tsi.DatasetDeleteV2Req, dict[str, Any]]
+    ) -> tsi.DatasetDeleteV2Res:
+        if isinstance(req, dict):
+            req = tsi.DatasetDeleteV2Req.model_validate(req)
+        req = cast(tsi.DatasetDeleteV2Req, req)
+        entity, project = req.project_id.split("/", 1)
+        url = f"/v2/{entity}/{project}/datasets/{req.object_id}"
+        # Build query params
+        params = {}
+        if req.digests:
+            params["digests"] = req.digests
+        r = self._delete_request_executor(url, params)
+        return tsi.DatasetDeleteV2Res.model_validate(r.json())
 
 
 __docspec__ = [
