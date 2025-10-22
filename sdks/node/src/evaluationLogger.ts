@@ -522,12 +522,12 @@ export interface EvaluationLoggerOptions {
  *
  * for (const example of streamingData) {
  *   const output = await myModel.predict(example);
- *   const pred = await ev.logPrediction(example, output);
+ *   const pred = ev.logPrediction(example, output);
  *
  *   if (shouldScore(output)) {
- *     await pred.logScore("accuracy", calculateAccuracy(output));
+ *     pred.logScore("accuracy", calculateAccuracy(output));
  *   }
- *   await pred.finish();
+ *   pred.finish();
  * }
  *
  * await ev.logSummary();

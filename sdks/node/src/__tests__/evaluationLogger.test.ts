@@ -72,6 +72,45 @@ describe('EvaluationLogger - Basic Functionality', () => {
     expect(predictAndScoreCall?.output?.scores?.f1).toBe(0.88);
   });
 
+  // Test: Fire-and-forget with chained calls - true synchronous API
+  test.only('fire-and-forget usage with multple threads', async () => {
+    const evalLogger = new EvaluationLogger({name: 'test-eval'});
+
+    // True fire-and-forget: synchronous, no await needed!
+    const scoreLogger = evalLogger.logPrediction({input: 'test'}, 'output');
+
+    // Fire-and-forget: call methods without awaiting
+    scoreLogger.logScore('accuracy', 0.3);
+    scoreLogger.logScore('f1', 0.9);
+    scoreLogger.finish();
+
+    const scoreLogger2 = evalLogger.logPrediction({input: 'test'}, 'output');
+
+    // Fire-and-forget: call methods without awaiting
+    scoreLogger2.logScore('accuracy', 0.4);
+    scoreLogger2.logScore('f1', 0.7);
+    scoreLogger2.finish();
+
+    const scoreLogger3 = evalLogger.logPrediction({input: 'test'}, 'output');
+
+    // Fire-and-forget: call methods without awaiting
+    scoreLogger3.logScore('accuracy', 0.5);
+    scoreLogger3.logScore('f1', 0.8);
+    scoreLogger3.finish();
+
+    // logSummary waits for everything to complete internally
+    await evalLogger.logSummary();
+
+    const calls = await getCalls(traceServer, projectId);
+    expect(calls.length).toBeGreaterThan(0);
+
+    // Verify scores were logged
+    const summarizeCall = calls.find(c => c.op_name?.includes('summarize'));
+    const output = summarizeCall?.output;
+    expect(output?.accuracy?.mean).toBeCloseTo(0.4, 2);
+    expect(output?.f1?.mean).toBeCloseTo(0.8, 2);
+  });
+
   // Test: Auto-finish when logSummary is called without explicit finish()
   test('auto-finishes predictions when logSummary is called', async () => {
     const evalLogger = new EvaluationLogger({name: 'test-eval'});
