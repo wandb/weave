@@ -194,4 +194,3 @@ __all__ = [
 ]
 # For backward compatibility, alias client as session
 session = client
-
