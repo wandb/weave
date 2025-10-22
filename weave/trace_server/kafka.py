@@ -6,9 +6,9 @@ from typing import Any, Optional
 import ddtrace
 from confluent_kafka import Consumer as ConfluentKafkaConsumer
 from confluent_kafka import Producer as ConfluentKafkaProducer
-from ddtrace import tracer
 
 from weave.trace_server import trace_server_interface as tsi
+from weave.trace_server.datadog import emit_gauge, get_base_tags
 from weave.trace_server.environment import (
     kafka_broker_host,
     kafka_broker_port,
@@ -184,15 +184,15 @@ def _producer_stats_callback(stats_json_str: str) -> None:
     """
     try:
         stats = json.loads(stats_json_str)
-        statsd = tracer.dogstatsd
+        base_tags = get_base_tags()
 
         # Producer-level metrics
         client_name = stats.get("name", "unknown")
-        tags = [f"client_name:{client_name}"]
+        client_tags = [f"client_name:{client_name}"]
 
         # Emit topic-level metrics
         for topic_name, topic_stats in stats.get("topics", {}).items():
-            topic_tags = tags + [f"topic:{topic_name}"]
+            topic_tags = client_tags + [f"topic:{topic_name}"]
 
             # Messages produced - librdkafka tracks cumulative txmsgs per partition
             total_msgs = 0
@@ -201,19 +201,21 @@ def _producer_stats_callback(stats_json_str: str) -> None:
                     total_msgs += partition_stats.get("txmsgs", 0)
 
             if total_msgs > 0:
-                statsd.gauge(
+                emit_gauge(
                     "bufstream.kafka.produce.record.count",
                     value=total_msgs,
-                    tags=topic_tags,
+                    tags=base_tags + topic_tags,
+                    include_base_tags=False,
                 )
 
             # Track producer queue size (messages waiting to be sent)
             msg_cnt = topic_stats.get("msgq_cnt", 0)
             if msg_cnt >= 0:
-                statsd.gauge(
+                emit_gauge(
                     "bufstream.kafka.producer.queue.size",
                     value=msg_cnt,
-                    tags=topic_tags,
+                    tags=base_tags + topic_tags,
+                    include_base_tags=False,
                 )
 
     except Exception as e:
@@ -232,16 +234,19 @@ def _consumer_stats_callback(stats_json_str: str) -> None:
     """
     try:
         stats = json.loads(stats_json_str)
-        statsd = tracer.dogstatsd
+        base_tags = get_base_tags()
 
         # Consumer-level metrics
         client_name = stats.get("name", "unknown")
         consumer_group = stats.get("rebalance", {}).get("group_id", "unknown")
-        tags = [f"client_name:{client_name}", f"consumer_group:{consumer_group}"]
+        client_tags = [
+            f"client_name:{client_name}",
+            f"consumer_group:{consumer_group}",
+        ]
 
         # Emit topic-level consumer metrics
         for topic_name, topic_stats in stats.get("topics", {}).items():
-            topic_tags = tags + [f"topic:{topic_name}"]
+            topic_tags = client_tags + [f"topic:{topic_name}"]
 
             # Consumer lag per partition
             total_lag = 0
@@ -257,10 +262,11 @@ def _consumer_stats_callback(stats_json_str: str) -> None:
                     lag = partition_stats.get("consumer_lag", -1)
                     if lag >= 0:
                         total_lag += lag
-                        statsd.gauge(
+                        emit_gauge(
                             "bufstream.kafka.consumer.lag",
                             value=lag,
-                            tags=partition_tags,
+                            tags=base_tags + partition_tags,
+                            include_base_tags=False,
                         )
 
                     # Messages consumed
@@ -269,17 +275,19 @@ def _consumer_stats_callback(stats_json_str: str) -> None:
 
             # Emit topic-level aggregated metrics
             if total_lag >= 0:
-                statsd.gauge(
+                emit_gauge(
                     "bufstream.kafka.consumer.lag.total",
                     value=total_lag,
-                    tags=topic_tags,
+                    tags=base_tags + topic_tags,
+                    include_base_tags=False,
                 )
 
             if total_msgs_consumed > 0:
-                statsd.gauge(
+                emit_gauge(
                     "bufstream.kafka.consumer.messages.total",
                     value=total_msgs_consumed,
-                    tags=topic_tags,
+                    tags=base_tags + topic_tags,
+                    include_base_tags=False,
                 )
 
     except Exception as e:
