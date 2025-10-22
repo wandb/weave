@@ -41,7 +41,8 @@ dependencies = [
   "packaging>=21.0",                      # For version parsing in integrations
   "tenacity>=8.3.0,!=8.4.0",              # Excluding 8.4.0 because it had a bug on import of AsyncRetrying
   "click",                                # Used for terminal/stdio printing
-  "gql[aiohttp,requests]>=3.0.0",         # Used exclusively in wandb_api.py
+  "httpx",                                # Used for HTTP requests throughout the codebase
+  "gql[httpx]>=3.0.0",                    # Used exclusively in wandb_api.py
   "jsonschema>=4.23.0",                   # Used by scorers for field validation
   "diskcache==5.6.3",                     # Used for data caching
   "tzdata; platform_system == 'Windows'", # Required for timezone support on Windows
