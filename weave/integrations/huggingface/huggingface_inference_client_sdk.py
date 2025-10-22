@@ -14,6 +14,13 @@ if TYPE_CHECKING:
         ChatCompletionStreamOutput,
     )
 
+from huggingface_hub.inference._generated.types.chat_completion import (
+    ChatCompletionOutput as ChatCompletionOutputRuntime,
+    ChatCompletionOutputComplete,
+    ChatCompletionOutputMessage,
+    ChatCompletionOutputUsage,
+)
+
 _huggingface_patcher: Optional[MultiPatcher] = None
 
 
@@ -27,13 +34,6 @@ def huggingface_accumulator(
     acc: Optional[Union["ChatCompletionStreamOutput", "ChatCompletionOutput"]],
     value: "ChatCompletionStreamOutput",
 ) -> "ChatCompletionOutput":
-    from huggingface_hub.inference._generated.types.chat_completion import (
-        ChatCompletionOutput,
-        ChatCompletionOutputComplete,
-        ChatCompletionOutputMessage,
-        ChatCompletionOutputUsage,
-    )
-
     if acc is None:
         acc = ChatCompletionOutput(
             choices=[

@@ -3,6 +3,9 @@ from __future__ import annotations
 import importlib
 from typing import TYPE_CHECKING, Any, Callable
 
+import pydantic
+from litellm.utils import Choices, Message, ModelResponse, Usage
+
 import weave
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
@@ -19,9 +22,6 @@ def litellm_accumulator(
     acc: ModelResponse | None,
     value: ModelResponse,
 ) -> ModelResponse:
-    # This import should be safe at this point
-    from litellm.utils import Choices, Message, ModelResponse, Usage
-
     if acc is None:
         acc = ModelResponse(
             id=value.id,
@@ -73,8 +73,6 @@ def litellm_accumulator(
 # LiteLLM does so odd stuff with pydantic objects which result in our auto
 # serialization not working correctly. Here we just blindly dump to a dict instead.
 def litellm_on_finish_post_processor(value: Any) -> Any:
-    import pydantic
-
     value_to_finish = value
     if isinstance(value, pydantic.BaseModel):
         value_to_finish = value.model_dump()

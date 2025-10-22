@@ -397,8 +397,6 @@ class StateExporter(BaseModel):
         if session:
             inputs.update(session.model_dump())
 
-        from weave.trace.context.weave_client_context import require_weave_client
-
         client = require_weave_client()
 
         session_call = None

@@ -31,6 +31,7 @@ This approach allows for more flexible runtime configuration while still respect
 import datetime
 import json
 import logging
+import os
 from contextlib import contextmanager
 from contextvars import ContextVar
 from uuid import UUID
@@ -404,8 +405,6 @@ class LangchainPatcher(Patcher):
         if import_failed:
             return False
         try:
-            import os
-
             self.original_trace_state = os.environ.get("WEAVE_TRACE_LANGCHAIN")
             if self.original_trace_state is None:
                 os.environ["WEAVE_TRACE_LANGCHAIN"] = "true"
@@ -423,8 +422,6 @@ class LangchainPatcher(Patcher):
         if not hasattr(self, "original_trace_state"):
             return False
         try:
-            import os
-
             if self.original_trace_state is None:
                 del os.environ["WEAVE_TRACE_LANGCHAIN"]
             else:

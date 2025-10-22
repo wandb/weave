@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import importlib
+import importlib.util
 import inspect
 import logging
+import pkgutil
 from collections.abc import Sequence
 from functools import wraps
 from typing import Any, Callable, TypeVar
@@ -504,9 +506,6 @@ def _preload_autogen_extensions() -> None:
     This is important because patching relies on the Python class hierarchy.
     """
     try:
-        import importlib.util
-        import pkgutil
-
         if importlib.util.find_spec("autogen_ext") is None:
             logger.info("autogen-ext package not found, skipping extension preloading")
             return

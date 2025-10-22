@@ -1,4 +1,6 @@
 from typing import Any, Optional, Union
+import random
+import string
 
 import pandas as pd
 from notdiamond.toolkit.custom_router import CustomRouter
@@ -6,6 +8,11 @@ from notdiamond.toolkit.custom_router import CustomRouter
 import weave
 from weave.evaluation.eval import EvaluationResults
 from weave.utils.iterators import first
+
+try:
+    from IPython import get_ipython
+except ImportError:
+    get_ipython = None
 
 
 @weave.op(
@@ -155,21 +162,17 @@ def _build_dataframe(
 
 
 def _placeholder_model_name() -> str:
-    import random
-    import string
-
     alphabet = string.ascii_lowercase + string.digits
     return "".join(random.choices(alphabet, k=8))
 
 
 def _in_notebook() -> bool:
-    try:
-        from IPython import get_ipython
-
-        if "IPKernelApp" not in get_ipython().config:  # pragma: no cover
-            return False
-    except ImportError:
+    if get_ipython is None:
         return False
+    try:
+        ipy = get_ipython()
+        if ipy is None or "IPKernelApp" not in ipy.config:  # pragma: no cover
+            return False
     except AttributeError:
         return False
     return True

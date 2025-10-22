@@ -13,6 +13,7 @@ from weave.trace.util import log_once
 from weave.trace.weave_client import WeaveClient
 
 _import_failed = False
+instrument: Any = None
 
 try:
     from llama_index.core.instrumentation.event_handlers.base import BaseEventHandler
@@ -20,6 +21,7 @@ try:
     from llama_index.core.instrumentation.span_handlers.base import BaseSpanHandler
     from llama_index.core.workflow.errors import WorkflowDone
     from llama_index.core.workflow.events import StopEvent
+    import llama_index.core.instrumentation as instrument
 except ImportError:
     _import_failed = True
 except Exception:
@@ -493,8 +495,6 @@ class LLamaIndexPatcher(Patcher):  # pyright: ignore[reportRedeclaration]
             return False
 
         try:
-            import llama_index.core.instrumentation as instrument
-
             self.dispatcher = instrument.get_dispatcher()
             self._original_event_handlers = list(self.dispatcher.event_handlers)
             self._original_span_handlers = list(self.dispatcher.span_handlers)

@@ -1,6 +1,9 @@
 import logging
 from functools import wraps
+from io import BytesIO
 from typing import Any, Callable, Optional
+
+from PIL import Image  # type: ignore
 
 import weave
 from weave.integrations.google_genai.gemini_utils import (
@@ -15,10 +18,6 @@ logger = logging.getLogger(__name__)
 def google_genai_gemini_postprocess_outputs(
     outputs: dict[str, Any],
 ) -> list[dict[str, Any]]:
-    from io import BytesIO
-
-    from PIL import Image  # type: ignore
-
     modified_outputs = []
     if hasattr(outputs, "generated_images"):
         for image_data in outputs.generated_images:

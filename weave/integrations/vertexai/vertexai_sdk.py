@@ -14,6 +14,11 @@ from weave.trace.serialization.serialize import dictify
 if TYPE_CHECKING:
     from vertexai.generative_models import GenerationResponse
 
+from google.cloud.aiplatform_v1beta1.types import content as gapic_content_types
+from google.cloud.aiplatform_v1beta1.types import (
+    prediction_service as gapic_prediction_service_types,
+)
+from vertexai.generative_models import GenerationResponse as GenerationResponseRuntime
 
 _vertexai_patcher: MultiPatcher | None = None
 
@@ -33,12 +38,6 @@ def vertexai_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
 def vertexai_accumulator(
     acc: GenerationResponse | None, value: GenerationResponse
 ) -> GenerationResponse:
-    from google.cloud.aiplatform_v1beta1.types import content as gapic_content_types
-    from google.cloud.aiplatform_v1beta1.types import (
-        prediction_service as gapic_prediction_service_types,
-    )
-    from vertexai.generative_models import GenerationResponse
-
     if acc is None:
         return value
 

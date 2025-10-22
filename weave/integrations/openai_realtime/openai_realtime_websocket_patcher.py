@@ -91,13 +91,10 @@ def get_openai_realtime_websocket_patcher(
 
     # Configure connection-level graceful-exit behavior
     try:
-        # Import late to avoid circulars at module import time
-        from weave.integrations.openai_realtime import connection as _conn
-
         if isinstance(settings, OpenAIRealtimeSettings):
-            _conn.configure_realtime_finish_timeout(settings.finish_timeout)
+            connection.configure_realtime_finish_timeout(settings.finish_timeout)
         else:
-            _conn.configure_realtime_finish_timeout(3.0)
+            connection.configure_realtime_finish_timeout(3.0)
     except Exception:
         logger.exception("Failed to configure realtime finish timeout; using default")
 

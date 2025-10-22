@@ -5,6 +5,9 @@ import os
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, Callable
 
+import numpy as np
+from dspy import Adapter, Evaluate, Example, Module, Predict
+from litellm import ModelResponse
 from pydantic import BaseModel
 
 import weave
@@ -39,8 +42,6 @@ def get_symbol_patcher(
 
 
 def dspy_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
-    from dspy import Adapter, Evaluate, Predict
-
     if "self" in inputs:
         dictified_inputs_self = dictify(inputs["self"])
         if dictified_inputs_self["__class__"]["module"] == "__main__":
@@ -89,10 +90,6 @@ def dspy_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
 def dspy_postprocess_outputs(
     outputs: Any | Example,
 ) -> list[Any] | dict[str, Any] | Any:
-    import numpy as np
-    from dspy import Example, Module
-    from litellm import ModelResponse
-
     if isinstance(outputs, Module):
         outputs = outputs.dump_state()
 

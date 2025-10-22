@@ -2,10 +2,18 @@ from __future__ import annotations
 
 import functools
 import logging
+import types
 from collections.abc import Sequence
 from typing import Any, Callable
 
+import dspy
+from dspy.evaluate import Evaluate
+from dspy.evaluate.evaluate import EvaluationResult
+from dspy.utils.callback import with_callbacks
+from dspy.utils.parallelizer import ParallelExecutor
+
 from weave.evaluation.eval_imperative import EvaluationLogger
+from weave.integrations.dspy.dspy_callback import WeaveCallback
 from weave.integrations.dspy.dspy_utils import dictify, get_symbol_patcher
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, Patcher
 from weave.trace.autopatch import IntegrationSettings
@@ -21,10 +29,6 @@ class DSPyPatcher(MultiPatcher):
     def __init__(self, patchers: Sequence[Patcher]) -> None:
         super().__init__(patchers)
         try:
-            import dspy
-
-            from weave.integrations.dspy.dspy_callback import WeaveCallback
-
             is_callback_present = False
             for callback in dspy.settings.callbacks:
                 if isinstance(callback, WeaveCallback):
@@ -47,12 +51,6 @@ class DSPyPatcher(MultiPatcher):
         if _evaluate_patched:
             return
         try:
-            import dspy
-            from dspy.evaluate import Evaluate
-            from dspy.evaluate.evaluate import EvaluationResult
-            from dspy.utils.callback import with_callbacks
-            from dspy.utils.parallelizer import ParallelExecutor
-
             orig_call = Evaluate.__call__
 
             @functools.wraps(orig_call)
@@ -66,8 +64,6 @@ class DSPyPatcher(MultiPatcher):
                 display_table: bool | int | None = None,
                 callback_metadata: dict[str, Any] | None = None,
             ) -> EvaluationResult:
-                import types
-
                 # Create model metadata for EvaluationLogger
                 model_name = getattr(program, "__class__", type(program)).__name__
                 metric = metric if metric is not None else self.metric

@@ -14,6 +14,13 @@ if TYPE_CHECKING:
         CompletionEvent,
     )
 
+from mistralai.models import (
+    AssistantMessage,
+    ChatCompletionChoice,
+    ChatCompletionResponse as ChatCompletionResponseRuntime,
+    UsageInfo,
+)
+
 _mistral_patcher: MultiPatcher | None = None
 
 
@@ -21,14 +28,6 @@ def mistral_accumulator(
     acc: ChatCompletionResponse | None,
     value: CompletionEvent,
 ) -> ChatCompletionResponse:
-    # This import should be safe at this point
-    from mistralai.models import (
-        AssistantMessage,
-        ChatCompletionChoice,
-        ChatCompletionResponse,
-        UsageInfo,
-    )
-
     value = value.data
     if acc is None:
         acc = ChatCompletionResponse(
