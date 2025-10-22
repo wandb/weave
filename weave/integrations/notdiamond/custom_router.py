@@ -1,6 +1,6 @@
-from typing import Any, Optional, Union
 import random
 import string
+from typing import Any, Optional, Union
 
 import pandas as pd
 from notdiamond.toolkit.custom_router import CustomRouter

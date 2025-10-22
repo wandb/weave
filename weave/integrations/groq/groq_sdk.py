@@ -11,7 +11,7 @@ from weave.trace.op import _add_accumulator
 if TYPE_CHECKING:
     from groq.types.chat import ChatCompletion, ChatCompletionChunk
 
-from groq.types.chat import ChatCompletion as ChatCompletionRuntime, ChatCompletionMessage
+from groq.types.chat import ChatCompletionMessage
 from groq.types.chat.chat_completion import Choice
 from groq.types.chat.chat_completion_chunk import Choice as ChoiceChunk
 from groq.types.completion_usage import CompletionUsage

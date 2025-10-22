@@ -17,7 +17,6 @@ if TYPE_CHECKING:
 from mistralai.models import (
     AssistantMessage,
     ChatCompletionChoice,
-    ChatCompletionResponse as ChatCompletionResponseRuntime,
     UsageInfo,
 )
 

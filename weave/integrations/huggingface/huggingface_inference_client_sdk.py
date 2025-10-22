@@ -15,7 +15,6 @@ if TYPE_CHECKING:
     )
 
 from huggingface_hub.inference._generated.types.chat_completion import (
-    ChatCompletionOutput as ChatCompletionOutputRuntime,
     ChatCompletionOutputComplete,
     ChatCompletionOutputMessage,
     ChatCompletionOutputUsage,

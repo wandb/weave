@@ -18,8 +18,6 @@ from cohere.types.assistant_message_response_content_item import (
     TextAssistantMessageResponseContentItem,
 )
 from cohere.types.usage import Usage
-from cohere.v2.types.v2chat_response import V2ChatResponse as V2ChatResponseRuntime
-
 
 _cohere_patcher: MultiPatcher | None = None
 

@@ -16,12 +16,12 @@ _import_failed = False
 instrument: Any = None
 
 try:
+    import llama_index.core.instrumentation as instrument  # type: ignore[no-redef]
     from llama_index.core.instrumentation.event_handlers.base import BaseEventHandler
     from llama_index.core.instrumentation.events.base import BaseEvent
     from llama_index.core.instrumentation.span_handlers.base import BaseSpanHandler
     from llama_index.core.workflow.errors import WorkflowDone
     from llama_index.core.workflow.events import StopEvent
-    import llama_index.core.instrumentation as instrument
 except ImportError:
     _import_failed = True
 except Exception:
