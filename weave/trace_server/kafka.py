@@ -1,3 +1,4 @@
+import json
 import logging
 import socket
 from typing import Any, Optional
@@ -5,6 +6,7 @@ from typing import Any, Optional
 import ddtrace
 from confluent_kafka import Consumer as ConfluentKafkaConsumer
 from confluent_kafka import Producer as ConfluentKafkaProducer
+from ddtrace import tracer
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.environment import (
@@ -60,6 +62,8 @@ class KafkaProducer(ConfluentKafkaProducer):
             "message.timeout.ms": total_timeout_ms,
             "retries": 1,
             "retry.backoff.ms": request_retry_backoff_ms,
+            "stats_cb": _producer_stats_callback,
+            "statistics.interval.ms": 60000,  # Emit stats every 60 seconds
             **_make_auth_config(),
             **additional_kafka_config,
         }
@@ -141,6 +145,8 @@ class KafkaConsumer(ConfluentKafkaConsumer):
             "group.id": group_id,
             "auto.offset.reset": "earliest",
             "enable.auto.commit": False,
+            "stats_cb": _consumer_stats_callback,
+            "statistics.interval.ms": 60000,  # Emit stats every 60 seconds
             **_make_auth_config(),
             **additional_kafka_config,
         }
@@ -164,3 +170,117 @@ def _make_auth_config() -> dict[str, Optional[str]]:
         "security.protocol": "SASL_PLAINTEXT",
         "sasl.mechanisms": "PLAIN",
     }
+
+
+def _producer_stats_callback(stats_json_str: str) -> None:
+    """Callback to handle Kafka producer statistics and emit metrics to Datadog.
+
+    Args:
+        stats_json_str (str): JSON string containing Kafka producer statistics from librdkafka.
+
+    Examples:
+        This callback is automatically invoked by librdkafka every statistics.interval.ms.
+        It extracts producer metrics and sends them to Datadog
+    """
+    try:
+        stats = json.loads(stats_json_str)
+        statsd = tracer.dogstatsd
+
+        # Producer-level metrics
+        client_name = stats.get("name", "unknown")
+        tags = [f"client_name:{client_name}"]
+
+        # Emit topic-level metrics
+        for topic_name, topic_stats in stats.get("topics", {}).items():
+            topic_tags = tags + [f"topic:{topic_name}"]
+
+            # Messages produced - librdkafka tracks cumulative txmsgs per partition
+            total_msgs = 0
+            for partition_stats in topic_stats.get("partitions", {}).values():
+                if isinstance(partition_stats, dict):
+                    total_msgs += partition_stats.get("txmsgs", 0)
+
+            if total_msgs > 0:
+                statsd.gauge(
+                    "bufstream.kafka.produce.record.count",
+                    value=total_msgs,
+                    tags=topic_tags,
+                )
+
+            # Track producer queue size (messages waiting to be sent)
+            msg_cnt = topic_stats.get("msgq_cnt", 0)
+            if msg_cnt >= 0:
+                statsd.gauge(
+                    "bufstream.kafka.producer.queue.size",
+                    value=msg_cnt,
+                    tags=topic_tags,
+                )
+
+    except Exception as e:
+        logger.warning(f"Failed to process Kafka producer stats: {e}")
+
+
+def _consumer_stats_callback(stats_json_str: str) -> None:
+    """Callback to handle Kafka consumer statistics and emit metrics to Datadog.
+
+    Args:
+        stats_json_str (str): JSON string containing Kafka consumer statistics from librdkafka.
+
+    Examples:
+        This callback is automatically invoked by librdkafka every statistics.interval.ms.
+        It extracts consumer metrics like lag and messages consumed.
+    """
+    try:
+        stats = json.loads(stats_json_str)
+        statsd = tracer.dogstatsd
+
+        # Consumer-level metrics
+        client_name = stats.get("name", "unknown")
+        consumer_group = stats.get("rebalance", {}).get("group_id", "unknown")
+        tags = [f"client_name:{client_name}", f"consumer_group:{consumer_group}"]
+
+        # Emit topic-level consumer metrics
+        for topic_name, topic_stats in stats.get("topics", {}).items():
+            topic_tags = tags + [f"topic:{topic_name}"]
+
+            # Consumer lag per partition
+            total_lag = 0
+            total_msgs_consumed = 0
+
+            for partition_id, partition_stats in topic_stats.get(
+                "partitions", {}
+            ).items():
+                if isinstance(partition_stats, dict) and partition_id != "-1":
+                    partition_tags = topic_tags + [f"partition:{partition_id}"]
+
+                    # Consumer lag (how far behind the consumer is)
+                    lag = partition_stats.get("consumer_lag", -1)
+                    if lag >= 0:
+                        total_lag += lag
+                        statsd.gauge(
+                            "bufstream.kafka.consumer.lag",
+                            value=lag,
+                            tags=partition_tags,
+                        )
+
+                    # Messages consumed
+                    msgs_consumed = partition_stats.get("rxmsgs", 0)
+                    total_msgs_consumed += msgs_consumed
+
+            # Emit topic-level aggregated metrics
+            if total_lag >= 0:
+                statsd.gauge(
+                    "bufstream.kafka.consumer.lag.total",
+                    value=total_lag,
+                    tags=topic_tags,
+                )
+
+            if total_msgs_consumed > 0:
+                statsd.gauge(
+                    "bufstream.kafka.consumer.messages.total",
+                    value=total_msgs_consumed,
+                    tags=topic_tags,
+                )
+
+    except Exception as e:
+        logger.warning(f"Failed to process Kafka consumer stats: {e}")
