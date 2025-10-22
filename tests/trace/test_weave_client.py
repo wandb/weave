@@ -635,6 +635,38 @@ def test_get_calls_page_size_with_offset(client):
     assert all_values == list(range(20))
 
 
+def test_get_calls_require_feedback(client):
+    """Test that require_feedback parameter only returns calls with feedback."""
+    # Create some calls
+    call1 = client.create_call("test_op", {"value": 1})
+    call2 = client.create_call("test_op", {"value": 2})
+    call3 = client.create_call("test_op", {"value": 3})
+
+    # Add feedback only to call1 and call3
+    call1.feedback.add_reaction("👍")
+    call3.feedback.add_note("Test note")
+
+    # Without require_feedback, should get all calls
+    all_calls = list(client.get_calls())
+    assert len(all_calls) >= 3
+
+    # With require_feedback, should only get calls with feedback
+    # Note: include_feedback is automatically set to True
+    calls_with_feedback = list(client.get_calls(require_feedback=True))
+    call_ids_with_feedback = {call.id for call in calls_with_feedback}
+
+    # Should include call1 and call3
+    assert call1.id in call_ids_with_feedback
+    assert call3.id in call_ids_with_feedback
+    # Should not include call2
+    assert call2.id not in call_ids_with_feedback
+
+    # Verify feedback is automatically included (due to require_feedback=True)
+    for call in calls_with_feedback:
+        feedback_items = call.summary.get("weave", {}).get("feedback", [])
+        assert len(feedback_items) > 0, f"Call {call.id} should have feedback"
+
+
 def test_calls_delete(client):
     call0 = client.create_call("x", {"a": 5, "b": 10})
     call0_child1 = client.create_call("x", {"a": 5, "b": 11}, call0)

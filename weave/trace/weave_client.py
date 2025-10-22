@@ -529,6 +529,7 @@ class WeaveClient:
         expand_columns: list[str] | None = None,
         return_expanded_column_values: bool = True,
         scored_by: str | list[str] | None = None,
+        require_feedback: bool = False,
         page_size: int = DEFAULT_CALLS_PAGE_SIZE,
     ) -> CallsIter:
         """Retrieve a list of traced calls (operations) for this project.
@@ -550,6 +551,8 @@ class WeaveClient:
             `columns`: List of fields to return per call. Reducing this can significantly improve performance.
                     (Some fields like `id`, `trace_id`, `op_name`, and `started_at` are always included.)
             `scored_by`: Filter by one or more scorers (name or ref URI). Multiple scorers are AND-ed.
+            `require_feedback`: If True, only return calls that have feedback attached.
+                    Automatically sets `include_feedback=True` to ensure feedback is included in results.
             `page_size`: Number of calls fetched per page. Tune this for performance in large queries.
 
         Returns:
@@ -568,6 +571,47 @@ class WeaveClient:
         """
         if filter is None:
             filter = CallsFilter()
+
+        # If require_feedback is True, automatically enable include_feedback
+        if require_feedback:
+            if not include_feedback:
+                logger.warning(
+                    "require_feedback=True automatically sets include_feedback=True. "
+                    "Setting include_feedback=False with require_feedback=True has no effect."
+                )
+            include_feedback = True
+
+        # If require_feedback is True, first get all feedback to find call IDs
+        if require_feedback:
+            # Query all feedback for this project
+            feedback_req = FeedbackQueryReq(
+                project_id=self._project_id(),
+                fields=["weave_ref"],
+            )
+            feedback_res = self.server.feedback_query(feedback_req)
+
+            # Extract unique call IDs from feedback refs
+            call_ids_with_feedback = set()
+            for feedback_item in feedback_res.result:
+                ref_uri = feedback_item.get("weave_ref", "")
+                # Parse the call ID from the ref URI (format: weave:///.../calls/CALL_ID)
+                if "/calls/" in ref_uri:
+                    call_id = ref_uri.split("/calls/")[-1]
+                    call_ids_with_feedback.add(call_id)
+
+            # If no feedback found, return empty iterator
+            if not call_ids_with_feedback:
+                # Create an empty filter that will return no results
+                filter = CallsFilter(call_ids=[])
+            else:
+                # Add call_ids to the filter
+                if filter.call_ids is None:
+                    filter.call_ids = list(call_ids_with_feedback)
+                else:
+                    # Intersect with existing call_ids filter if present
+                    filter.call_ids = list(
+                        set(filter.call_ids) & call_ids_with_feedback
+                    )
 
         query = _add_scored_by_to_calls_query(scored_by, query)
 
