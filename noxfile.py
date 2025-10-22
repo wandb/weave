@@ -94,6 +94,7 @@ def lint(session):
         "notdiamond",
         "openai",
         "openai_agents",
+        "openai_realtime",
         "vertexai",
         "bedrock",
         "scorers",
@@ -187,16 +188,6 @@ def tests(session, shard):
         "--cov-report=xml",
         "--cov-branch",
     ]
-
-    # Memray profiling is optional and controlled via environment variable
-    # (not working with trace_server shard atm)
-    if os.getenv("WEAVE_USE_MEMRAY") == "1" and shard != "trace_server":
-        pytest_args.extend(
-            [
-                "--memray",
-                "--most-allocations=5",
-            ]
-        )
 
     # # Handle trace sharding: run every 3rd test starting at different offsets
     # if shard in trace_server_shards:

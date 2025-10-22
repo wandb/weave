@@ -1,5 +1,7 @@
 # Smolagents
 
+import DefaultEntityNote from '../../../src/components/DefaultEntityNote.mdx';
+
 :::important
 All code samples shown on this page are in Python.
 :::
@@ -62,6 +64,8 @@ answer = agent.run(
     "Get me just the title of the page at url 'https://wandb.ai/geekyrakshit/story-illustration/reports/Building-a-GenAI-assisted-automatic-story-illustrator--Vmlldzo5MTYxNTkw'?"
 )
 ```
+
+<DefaultEntityNote />
 
 Once you run the code sample, navigate to your Weave project dashboard to view the traces.
 

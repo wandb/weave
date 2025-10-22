@@ -11,7 +11,7 @@ from weave.trace.op import _add_accumulator
 
 if TYPE_CHECKING:
     from cohere.types.non_streamed_chat_response import NonStreamedChatResponse
-    from cohere.v2.types.non_streamed_chat_response2 import NonStreamedChatResponse2
+    from cohere.v2.types.v2chat_response import V2ChatResponse
 
 
 _cohere_patcher: MultiPatcher | None = None
@@ -37,29 +37,24 @@ def cohere_accumulator(acc: dict | None, value: Any) -> NonStreamedChatResponse:
     return acc
 
 
-def cohere_accumulator_v2(acc: dict | None, value: Any) -> NonStreamedChatResponse2:
-    from cohere.v2.types.assistant_message_response import AssistantMessageResponse
-    from cohere.v2.types.non_streamed_chat_response2 import NonStreamedChatResponse2
-
-    def _accumulate_content(
-        prev: str,
-        content: str,
-    ) -> str:
-        if isinstance(prev, str) and isinstance(content, str):
-            prev += content
-        return prev
+def cohere_accumulator_v2(acc: V2ChatResponse | None, value: Any) -> V2ChatResponse:
+    from cohere.types.assistant_message_response import AssistantMessageResponse
+    from cohere.types.assistant_message_response_content_item import (
+        TextAssistantMessageResponseContentItem,
+    )
+    from cohere.v2.types.v2chat_response import V2ChatResponse
 
     if acc is None:
-        acc = NonStreamedChatResponse2(
-            id=value.id,
+        # Initialize accumulator with basic structure
+        acc = V2ChatResponse(
+            id=value.id if hasattr(value, "id") else "",
             finish_reason=None,
-            prompt=None,
             message=AssistantMessageResponse(
-                role=value.delta.message.role,
-                tool_calls=value.delta.message.tool_calls,
-                tool_plan=value.delta.message.tool_plan,
-                content=value.delta.message.content,
-                citations=value.delta.message.citations,
+                role="assistant",
+                tool_calls=None,
+                tool_plan=None,
+                content=[],
+                citations=None,
             ),
             usage=None,
         )
@@ -67,27 +62,49 @@ def cohere_accumulator_v2(acc: dict | None, value: Any) -> NonStreamedChatRespon
     if value is None:
         return acc
 
-    if (
-        value.type == "content-start"
-        and value.delta.message.content.type == "text"
-        and len(acc.message.content) == value.index  # type: ignore
-    ):
-        acc.message.content.append(value.delta.message.content.text)  # type: ignore
+    if value.type == "message-start":
+        if hasattr(value, "id"):
+            acc.id = value.id
+        if (
+            hasattr(value, "delta")
+            and hasattr(value.delta, "message")
+            and hasattr(value.delta.message, "role")
+        ):
+            acc.message.role = value.delta.message.role
 
-    if value.type == "content-delta":
-        content = _accumulate_content(
-            acc.message.content[value.index],  # type: ignore
-            value.delta.message.content.text,  # type: ignore
-        )
-        acc.message.content[value.index] = content  # type: ignore
+    elif value.type == "content-start":
+        if (
+            hasattr(value, "delta")
+            and hasattr(value.delta, "message")
+            and hasattr(value.delta.message, "content")
+            and hasattr(value.delta.message.content, "type")
+            and value.delta.message.content.type == "text"
+        ):
+            # Add new text content item
+            text_item = TextAssistantMessageResponseContentItem(
+                type="text",
+                text=value.delta.message.content.text or "",
+            )
+            acc.message.content.append(text_item)  # type: ignore
 
-    if value.type == "message-end":
-        acc = acc.copy(  # type: ignore
-            update={
-                "finish_reason": value.delta.finish_reason,
-                "usage": value.delta.usage,
-            }
-        )
+    elif value.type == "content-delta":
+        if (
+            hasattr(value, "index")
+            and hasattr(value, "delta")
+            and hasattr(value.delta, "message")
+            and hasattr(value.delta.message, "content")
+            and hasattr(value.delta.message.content, "text")
+            and value.index < len(acc.message.content)  # type: ignore
+        ):
+            current_item = acc.message.content[value.index]  # type: ignore
+            if hasattr(current_item, "text"):
+                current_item.text += value.delta.message.content.text
+
+    elif value.type == "message-end":
+        if hasattr(value, "delta") and hasattr(value.delta, "finish_reason"):
+            acc.finish_reason = value.delta.finish_reason
+        if hasattr(value, "delta") and hasattr(value.delta, "usage"):
+            acc.usage = value.delta.usage
 
     return acc
 
@@ -109,20 +126,16 @@ def cohere_wrapper_v2(settings: OpSettings) -> Callable:
                 response = fn(*args, **kwargs)
 
                 try:
-                    from cohere.v2.types.non_streamed_chat_response2 import (
-                        NonStreamedChatResponse2,
-                    )
-                    from cohere.v2.types.usage import Usage
+                    from cohere.types.usage import Usage
 
-                    # Create a new instance with modified `usage`
-                    response_dict = response.dict()
-                    response_dict["usage"] = Usage(
-                        billed_units=response.model_extra["meta"]["billed_units"],
-                        tokens=response.model_extra["meta"]["tokens"],
-                    )
-                    response = NonStreamedChatResponse2(**response_dict)
-                except:
-                    pass  # prompt to upgrade cohere sdk
+                    # Extract usage information from meta and populate the usage field
+                    if hasattr(response, "meta") and response.meta:
+                        response.usage = Usage(
+                            billed_units=response.meta.get("billed_units"),
+                            tokens=response.meta.get("tokens"),
+                        )
+                except Exception:
+                    pass  # If extraction fails, continue without usage info
 
                 return response
 
@@ -143,20 +156,16 @@ def cohere_wrapper_async_v2(settings: OpSettings) -> Callable:
                 response = await fn(*args, **kwargs)
 
                 try:
-                    from cohere.v2.types.non_streamed_chat_response2 import (
-                        NonStreamedChatResponse2,
-                    )
-                    from cohere.v2.types.usage import Usage
+                    from cohere.types.usage import Usage
 
-                    # Create a new instance with modified `usage`
-                    response_dict = response.dict()
-                    response_dict["usage"] = Usage(
-                        billed_units=response.model_extra["meta"]["billed_units"],
-                        tokens=response.model_extra["meta"]["tokens"],
-                    )
-                    response = NonStreamedChatResponse2(**response_dict)
-                except:
-                    pass  # prompt to upgrade cohere sdk
+                    # Extract usage information from meta and populate the usage field
+                    if hasattr(response, "meta") and response.meta:
+                        response.usage = Usage(
+                            billed_units=response.meta.get("billed_units"),
+                            tokens=response.meta.get("tokens"),
+                        )
+                except Exception:
+                    pass  # If extraction fails, continue without usage info
 
                 return response
 

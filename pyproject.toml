@@ -37,14 +37,14 @@ dynamic = ["version"]
 dependencies = [
   "wandb>=0.17.1",
   "sentry-sdk>=2.0.0,<3.0.0",
-  "pydantic>=2.0.0",
-  "packaging>=21.0",          # For version parsing in integrations
-  "tenacity>=8.3.0,!=8.4.0",  # Excluding 8.4.0 because it had a bug on import of AsyncRetrying
-  "click",                    # Used for terminal/stdio printing
-  "gql[aiohttp,requests]",    # Used exclusively in wandb_api.py
-  "jsonschema>=4.23.0",       # Used by scorers for field validation
-  "diskcache==5.6.3",         # Used for data caching
-  "nest-asyncio==1.6.0",      # Used to support nested event loops in asyncio
+  "pydantic>=2.0.0,<2.12.0",
+  "packaging>=21.0",                      # For version parsing in integrations
+  "tenacity>=8.3.0,!=8.4.0",              # Excluding 8.4.0 because it had a bug on import of AsyncRetrying
+  "click",                                # Used for terminal/stdio printing
+  "gql[aiohttp,requests]>=3.0.0",         # Used exclusively in wandb_api.py
+  "jsonschema>=4.23.0",                   # Used by scorers for field validation
+  "diskcache==5.6.3",                     # Used for data caching
+  "tzdata; platform_system == 'Windows'", # Required for timezone support on Windows
 
   # Used for content type detection
   # Remove once license content filtering is upstreamed
@@ -104,7 +104,7 @@ docs = [
 video_support = ["moviepy<=1.0.3"]
 anthropic = ["anthropic>=0.18.0"]
 cerebras = ["cerebras-cloud-sdk"]
-cohere = ["cohere>=5.9.1,<5.9.3"]
+cohere = ["cohere>=5.13.5"]
 # Pin until https://github.com/crewAIInc/crewAI/pull/2553 is released
 crewai = [
   "crewai>=0.100.1,<=0.108.0",
@@ -138,7 +138,7 @@ langchain = [
   "langchain-cohere>=0.4.5",
   "langchain-litellm>=0.2.2",
   "chromadb>=0.5.0",
-  "pysqlite3",
+  "pysqlite3; platform_system != 'Windows'",
   "opentelemetry-exporter-otlp",
   "openai>=1.99.9,<1.100.0",
 ]
@@ -148,10 +148,7 @@ langchain_nvidia_ai_endpoints = [
 ]
 litellm = ["litellm>=1.36.1", "openai>=1.99.9,<1.100.0"]
 # temporary max pin b/c 0.12.50 changes call structure and therefor tests
-llamaindex = [
-  "llama-index>=0.10.35",
-  "openai>=1.99.9,<1.100.0",
-]
+llamaindex = ["llama-index>=0.10.35", "openai>=1.99.9,<1.100.0"]
 mistral = ["mistralai>=1.0.0"]
 scorers = [
   "numpy>1.21.0",
@@ -183,11 +180,11 @@ autogen_tests = [
   "autogen-ext[openai]>=0.5.7",
   "openai>=1.99.9,<1.100.0",
 ]
-verifiers = ["verifiers>=0.1.3.post0"]
+verifiers = ["verifiers>=0.1.3.post0,<0.1.4"]
 verifiers_test = [
-  "verifiers>=0.1.3.post0",
+  "verifiers>=0.1.3.post0,<0.1.4",
   "huggingface_hub>=0.34.6",
-  "datasets>=4.1.0"
+  "datasets>=4.1.0",
 ]
 
 test = [
@@ -199,7 +196,6 @@ test = [
   "pytest-rerunfailures>=12.0",
   "pytest-rerunfailures>=14.0",
   "pytest-shard==0.1.2",
-  "pytest-memray~=1.8",
   "clickhouse_connect==0.7.0",
   "fastapi>=0.110.0",
   "sqlparse==0.5.0",
@@ -395,7 +391,7 @@ module = "weave_query.*"
 ignore_errors = true
 
 [tool.bumpversion]
-current_version = "0.52.9-dev0"
+current_version = "0.52.11-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.

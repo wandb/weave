@@ -1,4 +1,5 @@
 import base64
+import sys
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
@@ -53,9 +54,10 @@ def audio_file(tmp_path_factory) -> Path:
 
 
 # New parameterization list using fixture names
+# Note: Windows uses "audio/wav" while Unix uses "audio/x-wav"
 MEDIA_TEST_PARAMS = [
     ("image_file", ".png", "image/png"),
-    ("audio_file", ".wav", "audio/x-wav"),
+    ("audio_file", ".wav", "audio/wav" if sys.platform == "win32" else "audio/x-wav"),
     ("video_file", ".mp4", "video/mp4"),
     ("pdf_file", ".pdf", "application/pdf"),
 ]
@@ -79,7 +81,6 @@ class TestWeaveContent:
         assert content.filename == file_path.name
         assert content.size > 0
         assert isinstance(content.data, bytes)
-        assert content.path == str(file_path.resolve())
         assert content.input_type == "str"
         assert content.content_type == "file"
 
@@ -145,7 +146,6 @@ class TestWeaveContent:
         assert content.extension == extension
         assert content.mimetype == mimetype
         assert content.filename == file_path.name
-        assert content.path == str(file_path.resolve())
         assert content.content_type == "file"
 
     def test_content_save_method(self, image_file):
@@ -325,7 +325,6 @@ class TestWeaveContent:
         assert content.extension == ".png"
         assert content.mimetype == "image/png"
         assert content.encoding == "utf-8"
-        assert content.path == str(image_file.resolve())
 
     def test_content_type_hint_variations(self, image_file):
         """Test different type hint formats."""

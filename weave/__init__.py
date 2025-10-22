@@ -94,5 +94,6 @@ __all__ = [
     "publish",
     "ref",
     "require_current_call",
+    "set_view",
     "thread",
 ]
