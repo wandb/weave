@@ -936,12 +936,14 @@ class EvaluationLogger(BaseModel):
             ScoreLogger: The score logger for the prediction
 
         Example:
-            ev = EvaluationLogger()
-            ev.log_example(
-                inputs={'q': 'What is 2+2?'},
-                output='4',
-                scores={'correctness': 1.0, 'fluency': 0.9}
-            )
+        ```python
+        ev = EvaluationLogger()
+        ev.log_example(
+            inputs={'q': 'What is 2+2?'},
+            output='4',
+            scores={'correctness': 1.0, 'fluency': 0.9}
+        )
+        ```
         """
         if self._is_finalized:
             raise ValueError(
