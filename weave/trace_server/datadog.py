@@ -32,10 +32,13 @@ try:
     # If not set, defaults to localhost:8125
     initialize()
     DATADOG_AVAILABLE = True
-except ImportError:
+except ImportError as e:
     DATADOG_AVAILABLE = False
     tracer = None  # type: ignore
     statsd = None  # type: ignore
+    logger.warning(
+        f"Failed to import datadog library, Datadog metrics will not be emitted: {e}",
+    )
 
 
 def _is_datadog_enabled() -> bool:

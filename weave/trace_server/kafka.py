@@ -184,7 +184,6 @@ def _producer_stats_callback(stats_json_str: str) -> None:
     """
     try:
         stats = json.loads(stats_json_str)
-        base_tags = get_base_tags()
 
         # Producer-level metrics
         client_name = stats.get("name", "unknown")
@@ -204,8 +203,7 @@ def _producer_stats_callback(stats_json_str: str) -> None:
                 emit_gauge(
                     "bufstream.kafka.produce.record.count",
                     value=total_msgs,
-                    tags=base_tags + topic_tags,
-                    include_base_tags=False,
+                    tags=topic_tags,
                 )
 
             # Track producer queue size (messages waiting to be sent)
@@ -214,8 +212,7 @@ def _producer_stats_callback(stats_json_str: str) -> None:
                 emit_gauge(
                     "bufstream.kafka.producer.queue.size",
                     value=msg_cnt,
-                    tags=base_tags + topic_tags,
-                    include_base_tags=False,
+                    tags=topic_tags,
                 )
 
     except Exception as e:
@@ -234,7 +231,6 @@ def _consumer_stats_callback(stats_json_str: str) -> None:
     """
     try:
         stats = json.loads(stats_json_str)
-        base_tags = get_base_tags()
 
         # Consumer-level metrics
         client_name = stats.get("name", "unknown")
@@ -265,8 +261,7 @@ def _consumer_stats_callback(stats_json_str: str) -> None:
                         emit_gauge(
                             "bufstream.kafka.consumer.lag",
                             value=lag,
-                            tags=base_tags + partition_tags,
-                            include_base_tags=False,
+                            tags=partition_tags,
                         )
 
                     # Messages consumed
@@ -278,16 +273,14 @@ def _consumer_stats_callback(stats_json_str: str) -> None:
                 emit_gauge(
                     "bufstream.kafka.consumer.lag.total",
                     value=total_lag,
-                    tags=base_tags + topic_tags,
-                    include_base_tags=False,
+                    tags=topic_tags,
                 )
 
             if total_msgs_consumed > 0:
                 emit_gauge(
                     "bufstream.kafka.consumer.messages.total",
                     value=total_msgs_consumed,
-                    tags=base_tags + topic_tags,
-                    include_base_tags=False,
+                    tags=topic_tags,
                 )
 
     except Exception as e:
