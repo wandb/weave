@@ -18,22 +18,29 @@ Examples:
 
 import logging
 import os
-from typing import Optional
-
-from datadog import initialize, statsd
-from ddtrace import tracer
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
-# Initialize DogStatsD client at module import time
-# The datadog library reads DD_DOGSTATSD_HOST and DD_DOGSTATSD_PORT from environment
-# If not set, defaults to localhost:8125
-initialize()
+# Try to import datadog - it may not be available in test/dev environments
+try:
+    from datadog import initialize, statsd
+    from ddtrace import tracer
+
+    # Initialize DogStatsD client at module import time
+    # The datadog library reads DD_DOGSTATSD_HOST and DD_DOGSTATSD_PORT from environment
+    # If not set, defaults to localhost:8125
+    initialize()
+    DATADOG_AVAILABLE = True
+except ImportError:
+    DATADOG_AVAILABLE = False
+    tracer = None  # type: ignore
+    statsd = None  # type: ignore
 
 
 def _is_datadog_enabled() -> bool:
     """Check if Datadog monitoring is enabled via environment variables."""
-    return bool(os.getenv("DD_ENV"))
+    return DATADOG_AVAILABLE and bool(os.getenv("DD_ENV"))
 
 
 def get_base_tags() -> list[str]:
@@ -56,7 +63,7 @@ def get_base_tags() -> list[str]:
 
     tags = []
     # Get global tags from tracer if available
-    if hasattr(tracer, "tags") and tracer.tags:
+    if tracer and hasattr(tracer, "tags") and tracer.tags:
         tags.extend([f"{k}:{v}" for k, v in tracer.tags.items()])
 
     return tags
@@ -88,7 +95,7 @@ def emit_gauge(
         >>> # Gauge without base tags
         >>> emit_gauge("queue.size", 42, include_base_tags=False)
     """
-    if not _is_datadog_enabled():
+    if not _is_datadog_enabled() or not statsd:
         return
 
     try:
@@ -127,7 +134,7 @@ def emit_increment(
         >>> # Increment with custom tags
         >>> emit_increment("errors", tags=["error_type:timeout"])
     """
-    if not _is_datadog_enabled():
+    if not _is_datadog_enabled() or not statsd:
         return
 
     try:
@@ -164,7 +171,7 @@ def emit_histogram(
         >>> # Track with custom tags
         >>> emit_histogram("request.duration", 0.234, tags=["endpoint:/api/v1"])
     """
-    if not _is_datadog_enabled():
+    if not _is_datadog_enabled() or not statsd:
         return
 
     try:
