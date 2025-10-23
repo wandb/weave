@@ -554,7 +554,7 @@ class WeaveClient:
             `scored_by`: Filter by one or more scorers (name or ref URI). Multiple scorers are AND-ed.
             `require_feedback`: If True, only return calls that have feedback attached.
                     Automatically sets `include_feedback=True` to ensure feedback is included in results.
-                    Uses efficient SQL-level filtering with a subquery on the feedback table.
+                    Queries only feedback refs (minimal data) then filters calls by call_ids.
             `page_size`: Number of calls fetched per page. Tune this for performance in large queries.
 
         Returns:
@@ -582,8 +582,30 @@ class WeaveClient:
                     "Setting include_feedback=False with require_feedback=True has no effect."
                 )
             include_feedback = True
-            # Set the require_feedback flag on the filter for SQL-level filtering
-            filter.require_feedback = True
+
+            # Query feedback table for call IDs (only fetch weave_ref field - minimal data transfer)
+            feedback_req = FeedbackQueryReq(
+                project_id=self._project_id(),
+                fields=["weave_ref"],  # Only the ref, not payloads
+            )
+            feedback_res = self.server.feedback_query(feedback_req)
+
+            # Extract unique call IDs from refs
+            call_ids_with_feedback = set()
+            for item in feedback_res.result:
+                ref = item.get("weave_ref", "")
+                if "/call/" in ref:
+                    call_id = ref.split("/call/")[-1]
+                    call_ids_with_feedback.add(call_id)
+
+            # Filter by call_ids
+            if not call_ids_with_feedback:
+                filter.call_ids = []  # No feedback, return empty
+            elif filter.call_ids is None:
+                filter.call_ids = list(call_ids_with_feedback)
+            else:
+                # Intersect with existing filter
+                filter.call_ids = list(set(filter.call_ids) & call_ids_with_feedback)
 
         query = _add_scored_by_to_calls_query(scored_by, query)
 

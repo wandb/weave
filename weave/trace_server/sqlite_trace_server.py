@@ -356,13 +356,6 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             if filter.wb_user_ids:
                 in_expr = ", ".join(f"'{x}'" for x in filter.wb_user_ids)
                 conds += [f"wb_user_id IN ({in_expr})"]
-            if filter.require_feedback:
-                # Use a subquery to filter calls that have feedback
-                conds += [
-                    f"id IN (SELECT DISTINCT substr(weave_ref, instr(weave_ref, '/call/') + 6) "
-                    f"FROM feedback WHERE project_id = '{req.project_id}' "
-                    f"AND weave_ref LIKE 'weave-trace-internal:///{req.project_id}/call/%')"
-                ]
 
         if req.query:
             # This is the mongo-style query
