@@ -999,6 +999,128 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
         r = self._delete_request_executor(url, params)
         return tsi.EvaluationDeleteV2Res.model_validate(r.json())
 
+    def evaluation_run_create_v2(
+        self, req: Union[tsi.EvaluationRunCreateV2Req, dict[str, Any]]
+    ) -> tsi.EvaluationRunCreateV2Res:
+        if isinstance(req, dict):
+            req = tsi.EvaluationRunCreateV2Req.model_validate(req)
+        req = cast(tsi.EvaluationRunCreateV2Req, req)
+        entity, project = req.project_id.split("/", 1)
+        url = f"/v2/{entity}/{project}/evaluation_runs"
+        # For create, we need to send the body without project_id (EvaluationRunCreateV2Body)
+        body_data = req.model_dump(exclude={"project_id"})
+        body = tsi.EvaluationRunCreateV2Body.model_validate(body_data)
+        return self._generic_request(
+            url,
+            body,
+            tsi.EvaluationRunCreateV2Body,
+            tsi.EvaluationRunCreateV2Res,
+        )
+
+    def evaluation_run_read_v2(
+        self, req: Union[tsi.EvaluationRunReadV2Req, dict[str, Any]]
+    ) -> tsi.EvaluationRunReadV2Res:
+        if isinstance(req, dict):
+            req = tsi.EvaluationRunReadV2Req.model_validate(req)
+        req = cast(tsi.EvaluationRunReadV2Req, req)
+        entity, project = req.project_id.split("/", 1)
+        url = f"/v2/{entity}/{project}/evaluation_runs/{req.evaluation_run_id}"
+        r = self._get_request_executor(url)
+        return tsi.EvaluationRunReadV2Res.model_validate(r.json())
+
+    def evaluation_run_list_v2(
+        self, req: Union[tsi.EvaluationRunListV2Req, dict[str, Any]]
+    ) -> Iterator[tsi.EvaluationRunReadV2Res]:
+        if isinstance(req, dict):
+            req = tsi.EvaluationRunListV2Req.model_validate(req)
+        req = cast(tsi.EvaluationRunListV2Req, req)
+        entity, project = req.project_id.split("/", 1)
+        url = f"/v2/{entity}/{project}/evaluation_runs"
+        # Build query params
+        params = {}
+        if req.limit is not None:
+            params["limit"] = req.limit
+        if req.offset is not None:
+            params["offset"] = req.offset
+        if req.filter:
+            if req.filter.evaluations:
+                params["evaluation_refs"] = ",".join(req.filter.evaluations)
+            if req.filter.models:
+                params["model_refs"] = ",".join(req.filter.models)
+            if req.filter.evaluation_run_ids:
+                params["evaluation_run_ids"] = ",".join(req.filter.evaluation_run_ids)
+        r = self._get_request_executor(url, params, stream=True)
+        for line in r.iter_lines():
+            if line:
+                yield tsi.EvaluationRunReadV2Res.model_validate_json(line)
+
+    def evaluation_run_delete_v2(
+        self, req: Union[tsi.EvaluationRunDeleteV2Req, dict[str, Any]]
+    ) -> tsi.EvaluationRunDeleteV2Res:
+        if isinstance(req, dict):
+            req = tsi.EvaluationRunDeleteV2Req.model_validate(req)
+        req = cast(tsi.EvaluationRunDeleteV2Req, req)
+        entity, project = req.project_id.split("/", 1)
+        url = f"/v2/{entity}/{project}/evaluation_runs"
+        # Build query params - evaluation_run_ids are passed as a query param
+        params = {"evaluation_run_ids": req.evaluation_run_ids}
+        r = self._delete_request_executor(url, params)
+        return tsi.EvaluationRunDeleteV2Res.model_validate(r.json())
+
+    def evaluation_run_log_prediction_v2(
+        self, req: Union[tsi.EvaluationRunLogPredictionV2Req, dict[str, Any]]
+    ) -> tsi.EvaluationRunLogPredictionV2Res:
+        if isinstance(req, dict):
+            req = tsi.EvaluationRunLogPredictionV2Req.model_validate(req)
+        req = cast(tsi.EvaluationRunLogPredictionV2Req, req)
+        entity, project = req.project_id.split("/", 1)
+        url = f"/v2/{entity}/{project}/evaluation_runs/{req.evaluation_run_id}/log_prediction"
+        # For this, we need to send the body without project_id and evaluation_run_id
+        body_data = req.model_dump(exclude={"project_id", "evaluation_run_id"})
+        body = tsi.EvaluationRunLogPredictionV2Body.model_validate(body_data)
+        return self._generic_request(
+            url,
+            body,
+            tsi.EvaluationRunLogPredictionV2Body,
+            tsi.EvaluationRunLogPredictionV2Res,
+        )
+
+    def evaluation_run_log_score_v2(
+        self, req: Union[tsi.EvaluationRunLogScoreV2Req, dict[str, Any]]
+    ) -> tsi.EvaluationRunLogScoreV2Res:
+        if isinstance(req, dict):
+            req = tsi.EvaluationRunLogScoreV2Req.model_validate(req)
+        req = cast(tsi.EvaluationRunLogScoreV2Req, req)
+        entity, project = req.project_id.split("/", 1)
+        url = f"/v2/{entity}/{project}/evaluation_runs/{req.evaluation_run_id}/log_score"
+        # For this, we need to send the body without project_id and evaluation_run_id
+        body_data = req.model_dump(exclude={"project_id", "evaluation_run_id"})
+        body = tsi.EvaluationRunLogScoreV2Body.model_validate(body_data)
+        return self._generic_request(
+            url,
+            body,
+            tsi.EvaluationRunLogScoreV2Body,
+            tsi.EvaluationRunLogScoreV2Res,
+        )
+
+    def evaluation_run_finish_v2(
+        self, req: Union[tsi.EvaluationRunFinishV2Req, dict[str, Any]]
+    ) -> tsi.EvaluationRunFinishV2Res:
+        if isinstance(req, dict):
+            req = tsi.EvaluationRunFinishV2Req.model_validate(req)
+        req = cast(tsi.EvaluationRunFinishV2Req, req)
+        entity, project = req.project_id.split("/", 1)
+        url = f"/v2/{entity}/{project}/evaluation_runs/{req.evaluation_run_id}/finish"
+        # For this, we need to send the body without project_id and evaluation_run_id
+        body_data = req.model_dump(exclude={"project_id", "evaluation_run_id"})
+        body = tsi.EvaluationRunFinishV2Body.model_validate(body_data)
+        return self._generic_request(
+            url,
+            body,
+            tsi.EvaluationRunFinishV2Body,
+            tsi.EvaluationRunFinishV2Res,
+        )
+
 
 __docspec__ = [
     RemoteHTTPTraceServer,
