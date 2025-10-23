@@ -120,6 +120,16 @@ class ThrowingServer(tsi.TraceServerInterface):
     def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
         raise DummyTestException("FAILURE - call_update, req:", req)
 
+    def calls_start_batch_v2(
+        self, req: tsi.CallsStartBatchReq
+    ) -> tsi.CallsStartBatchRes:
+        raise DummyTestException("FAILURE - calls_start_batch_v2, req:", req)
+
+    def calls_complete_batch_v2(
+        self, req: tsi.CallsCompleteBatchReq
+    ) -> tsi.CallsCompleteBatchRes:
+        raise DummyTestException("FAILURE - calls_complete_batch_v2, req:", req)
+
     # Op API
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
         raise DummyTestException("FAILURE - op_create, req:", req)

@@ -196,8 +196,9 @@ async def test_evaluation_resilience(
     # For some reason with high parallelism, some logs are not captured,
     # so instead of exact counts, we just check that the number of unique
     # logs is <= the expected number of logs.
-    assert len(ag_res) == 4
-    assert ag_res["Job failed during flush: ('FAILURE - call_end"] <= 14
+    # Note: With the batch v2 API, we no longer see call_end errors,
+    # so we expect 3 types of errors instead of 4.
+    assert len(ag_res) == 3
     assert ag_res["Job failed during flush: ('FAILURE - obj_create"] <= 6
     assert ag_res["Job failed during flush: ('FAILURE - file_create"] <= 6
     assert ag_res["Job failed during flush: ('FAILURE - table_create"] <= 1

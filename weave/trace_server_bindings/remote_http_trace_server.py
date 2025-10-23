@@ -148,10 +148,10 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
         """
         try:
             r = self.post(
-                "/v1/calls/start/batch",
+                "/v2/calls/start/batch",
                 data=encoded_data,  # type: ignore
             )
-            handle_response_error(r, "/v1/calls/start/batch")
+            handle_response_error(r, "/v2/calls/start/batch")
         except requests.HTTPError as e:
             # If v1 endpoint doesn't exist (404), fall back to legacy upsert_batch
             if e.response.status_code == 404:
@@ -180,7 +180,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
         """Process a batch of call starts, splitting if necessary and sending to the server.
 
         This method handles batching of call start events, sending them to the
-        /v1/calls/start/batch endpoint. Filters out any starts that have pending
+        /v2/calls/start/batch endpoint. Filters out any starts that have pending
         completes before sending.
         """
         assert self.start_processor is not None
@@ -231,10 +231,10 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
         try:
             try:
                 r = self.post(
-                    "/v1/calls/complete/batch",
+                    "/v2/calls/complete/batch",
                     data=encoded_data,  # type: ignore
                 )
-                handle_response_error(r, "/v1/calls/complete/batch")
+                handle_response_error(r, "/v2/calls/complete/batch")
             except requests.HTTPError as e:
                 # If v1 endpoint doesn't exist (new sdk, old server), fall back to legacy upsert_batch
                 # This should be very rare!
@@ -270,7 +270,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
         """Process a batch of complete calls, splitting if necessary and sending to the server.
 
         This method handles batching of complete call events (start + end combined),
-        sending them to the /v1/calls/complete/batch endpoint.
+        sending them to the /v2/calls/complete/batch endpoint.
         """
         assert self.complete_processor is not None
         if len(batch) == 0:
