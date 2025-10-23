@@ -1,5 +1,7 @@
 # MistralAI
 
+import DefaultEntityNote from '../../../src/components/DefaultEntityNote.mdx';
+
 <a target="_blank" href="https://colab.research.google.com/github/wandb/examples/blob/master/weave/docs/quickstart_mistral.ipynb">
   <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
 </a>
@@ -12,7 +14,7 @@ Weave automatically tracks and logs LLM calls made via the [MistralAI Python lib
 
 It’s important to store traces of LLM applications in a central database, both during development and in production. You’ll use these traces for debugging, and as a dataset that will help you improve your application.
 
-Weave will automatically capture traces for [mistralai](https://github.com/mistralai/client-python). You can use the library as usual, start by calling `weave.init()`:
+Weave will automatically capture traces for [mistralai](https://github.com/mistralai/client-python). Call `weave.init()`, then use the library as usual:
 
 ```python
 import weave
@@ -39,6 +41,8 @@ chat_response = client.chat.complete(
     messages=messages,
 )
 ```
+
+<DefaultEntityNote />
 
 Weave will now track and log all LLM calls made through the MistralAI library. You can view the traces in the Weave web interface.
 

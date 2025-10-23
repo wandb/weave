@@ -35,8 +35,7 @@ class TableChunkManager:
         return len(str(row).encode("utf-8"))
 
     def create_chunks(self, rows: Sequence[RowItemType]) -> list[list[RowItemType]]:
-        """
-        Split rows into chunks based on target byte size.
+        """Split rows into chunks based on target byte size.
 
         Args:
             rows: List of rows to chunk

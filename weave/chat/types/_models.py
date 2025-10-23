@@ -7,8 +7,7 @@ from typing_extensions import override
 
 
 class NotGiven:
-    """
-    A sentinel singleton class used to distinguish omitted keyword arguments
+    """A sentinel singleton class used to distinguish omitted keyword arguments
     from those passed in with the value None (which may have different behavior).
 
     For example:

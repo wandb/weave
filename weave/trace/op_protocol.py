@@ -23,8 +23,7 @@ R = TypeVar("R")
 
 @runtime_checkable
 class Op(Protocol[P, R]):
-    """
-    The interface for Op-ified functions and methods.
+    """The interface for Op-ified functions and methods.
 
     Op was previously a class, and has been converted to a Protocol to allow
     functions to pass for Op.  This is needed because many popular packages are

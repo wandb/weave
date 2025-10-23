@@ -17,8 +17,7 @@ from weave.trace_server import trace_server_interface as tsi
 def flatten_calls(
     calls: list[tsi.CallSchema], parent_id: Optional[str] = None, depth: int = 0
 ) -> list[tuple[tsi.CallSchema, int]]:
-    """
-    Flatten calls is a technique we use in the integration tests to assert the correct
+    """Flatten calls is a technique we use in the integration tests to assert the correct
     ordering of calls. This is used to assert that the calls are in the correct order
     as well as nested in the correct way. The returned list is the ordered list of calls
     with the depth of each call.
@@ -68,7 +67,7 @@ class MyModel(Model):
 
 
 async def do_quickstart():
-    """This is the basic example from the README/quickstart/docs"""
+    """This is the basic example from the README/quickstart/docs."""
     examples = [
         {"question": "What is the capital of France?", "expected": "Paris"},
         {"question": "Who wrote 'To Kill a Mockingbird'?", "expected": "Harper Lee"},

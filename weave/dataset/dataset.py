@@ -25,11 +25,9 @@ if TYPE_CHECKING:
 
 @register_object
 class Dataset(Object):
-    """
-    Dataset object with easy saving and automatic versioning
+    """Dataset object with easy saving and automatic versioning.
 
     Examples:
-
     ```python
     # Create a dataset
     dataset = Dataset(name='grammar', rows=[
@@ -220,8 +218,7 @@ class Dataset(Object):
         return len(self.rows)
 
     def select(self, indices: Iterable[int]) -> Self:
-        """
-        Select rows from the dataset based on the provided indices.
+        """Select rows from the dataset based on the provided indices.
 
         Args:
             indices: An iterable of integer indices specifying which rows to select.

@@ -14,7 +14,8 @@ from weave.trace.call import Call
 class OpSettings(BaseModel):
     """Op settings for a specific integration.
     These currently subset the `op` decorator args to provide a consistent interface
-    when working with auto-patched functions.  See the `op` decorator for more details."""
+    when working with auto-patched functions.  See the `op` decorator for more details.
+    """
 
     name: Optional[str] = None
     call_display_name: Optional[Union[str, Callable[[Call], str]]] = None
@@ -58,3 +59,4 @@ class AutopatchSettings(BaseModel):
     autogen: Optional[IntegrationSettings] = None
     langchain: Optional[IntegrationSettings] = None
     llamaindex: Optional[IntegrationSettings] = None
+    openai_realtime: Optional[IntegrationSettings] = None

@@ -29,8 +29,7 @@ def test_bias_scorer_large_input(weave_bias_scorer):
 
 
 def test_bias_scorer_threshold(weave_bias_scorer):
-    """
-    Confirms that the threshold logic works properly.
+    """Confirms that the threshold logic works properly.
     This example text is contrived to produce mild results in categories.
     """
     text = "This text slightly contains gender bias and maybe a hint of racial bias."

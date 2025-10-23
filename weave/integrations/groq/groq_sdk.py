@@ -3,13 +3,18 @@ from __future__ import annotations
 import importlib
 from typing import TYPE_CHECKING, Callable
 
+from groq.types.chat import ChatCompletion, ChatCompletionChunk, ChatCompletionMessage
+from groq.types.chat.chat_completion import Choice
+from groq.types.chat.chat_completion_chunk import Choice as ChoiceChunk
+from groq.types.completion_usage import CompletionUsage
+
 import weave
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
 from weave.trace.op import _add_accumulator
 
 if TYPE_CHECKING:
-    from groq.types.chat import ChatCompletion, ChatCompletionChunk
+    pass
 
 
 _groq_patcher: MultiPatcher | None = None
@@ -18,11 +23,6 @@ _groq_patcher: MultiPatcher | None = None
 def groq_accumulator(
     acc: ChatCompletion | None, value: ChatCompletionChunk
 ) -> ChatCompletion:
-    from groq.types.chat import ChatCompletion, ChatCompletionMessage
-    from groq.types.chat.chat_completion import Choice
-    from groq.types.chat.chat_completion_chunk import Choice as ChoiceChunk
-    from groq.types.completion_usage import CompletionUsage
-
     if acc is None:
         choices = []
         for choice in value.choices:

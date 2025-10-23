@@ -18,8 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 class PresidioScorer(weave.Scorer):
-    """
-    The `PresidioScorer` class is a guardrail for entity recognition and anonymization
+    """The `PresidioScorer` class is a guardrail for entity recognition and anonymization
     by leveraging Presidio's AnalyzerEngine and AnonymizerEngine to perform these tasks.
 
     Attributes:
@@ -89,7 +88,7 @@ class PresidioScorer(weave.Scorer):
     def group_analyzer_results_by_entity_type(
         self, output: str, analyzer_results: list["RecognizerResult"]
     ) -> dict[str, list[str]]:
-        """Group results by entity type"""
+        """Group results by entity type."""
         detected_entities: dict[str, list[str]] = {}
         for result in analyzer_results:
             entity_type = result.entity_type
@@ -101,7 +100,7 @@ class PresidioScorer(weave.Scorer):
 
     @weave.op
     def create_reason(self, detected_entities: dict[str, list[str]]) -> str:
-        """Create explanation for why the text was flagged"""
+        """Create explanation for why the text was flagged."""
         explanation_parts = []
         if detected_entities:
             explanation_parts.append("Found the following entities in the text:")

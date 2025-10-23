@@ -68,8 +68,7 @@ class SummarizationEvaluationResponse(BaseModel):
 
 
 class SummarizationScorer(LLMScorer):
-    """
-    A Scorer that evaluates the quality of summaries in two ways:
+    """A Scorer that evaluates the quality of summaries in two ways:
       - It uses an LLM to calculate the entity density of the summary, which is a rough measure of how
         information-dense the summary is. This method evaluates whether the summary contains a sufficient
         number of key entities relative to its length.
@@ -171,8 +170,7 @@ class SummarizationScorer(LLMScorer):
 
     @weave.op
     async def score(self, *, input: str, output: str, **kwargs: Any) -> dict:
-        """
-        Evaluate a summary by combining entity density and LLM quality evaluation.
+        """Evaluate a summary by combining entity density and LLM quality evaluation.
 
         This method performs two assessments:
           1. Entity Density Evaluation: Extracts entities from the summary and calculates the ratio of extracted entities

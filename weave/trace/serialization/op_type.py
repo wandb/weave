@@ -161,7 +161,7 @@ def resolve_var(fn: Callable, var_name: str) -> Any:
 
 
 class RefJSONEncoder(json.JSONEncoder):
-    """Json encoder used for convert storage.to_json_with_refs result to python code"""
+    """Json encoder used for convert storage.to_json_with_refs result to python code."""
 
     SPECIAL_REF_TOKEN = "__WEAVE_REF__"
 
@@ -478,7 +478,7 @@ def _has_memory_address(obj: Any) -> bool:
 
 
 def _replace_memory_address(json_val: str) -> str:
-    """Turn <Function object at 0x10c349010> into <Function object at 0x000000000>"""
+    """Turn <Function object at 0x10c349010> into <Function object at 0x000000000>."""
 
     def _replacement_with_same_length(match: re.Match[str]) -> str:
         # Get matched text and replace with 0s of the same length
@@ -603,6 +603,7 @@ def save_instance(obj: Op, artifact: MemTraceFilesArtifact, name: str) -> None:
 def load_instance(
     artifact: MemTraceFilesArtifact,
     name: str,
+    val: Any,
 ) -> Op | None:
     file_name = f"{name}.py"
     module_path = artifact.path(file_name)
@@ -612,11 +613,11 @@ def load_instance(
     # the version in the module name to avoid this. Since version names
     # are content hashes, this is correct.
     #
-    art_and_version_dir = module_path[: -(1 + len(file_name))]
-    art_dir, version_subdir = art_and_version_dir.rsplit("/", 1)
+    art_and_version_dir = os.path.dirname(module_path)
+    art_dir, version_subdir = os.path.split(art_and_version_dir)
     module_dir = art_dir
     import_name = (
-        version_subdir + "." + ".".join(os.path.splitext(file_name)[0].split("/"))
+        version_subdir + "." + ".".join(os.path.splitext(file_name)[0].split(os.sep))
     )
 
     sys.path.insert(0, os.path.abspath(module_dir))

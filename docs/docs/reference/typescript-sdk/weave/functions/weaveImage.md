@@ -1,4 +1,4 @@
-[**weave**](../README.md) • **Docs**
+[**weave**](../README.md)
 
 ***
 
@@ -6,13 +6,17 @@
 
 # Function: weaveImage()
 
-> **weaveImage**(`options`): `WeaveImage`
+> **weaveImage**(`options`): [`WeaveImage`](../interfaces/WeaveImage.md)
+
+Defined in: [media.ts:28](https://github.com/wandb/weave/blob/69f1caabebc727846756574d549b7e7dda458b63/sdks/node/src/media.ts#L28)
 
 Create a new WeaveImage object
 
 ## Parameters
 
-• **options**: `WeaveImageInput`
+### options
+
+`WeaveImageInput`
 
 The options for this media type
    - data: The raw image data as a Buffer
@@ -20,7 +24,7 @@ The options for this media type
 
 ## Returns
 
-`WeaveImage`
+[`WeaveImage`](../interfaces/WeaveImage.md)
 
 ## Example
 
@@ -28,7 +32,3 @@ The options for this media type
 const imageBuffer = fs.readFileSync('path/to/image.png');
 const weaveImage = weaveImage({ data: imageBuffer });
 ```
-
-## Defined in
-
-[media.ts:28](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/media.ts#L28)

@@ -9,7 +9,8 @@ from weave.trace_server import environment
 
 class AWSCredentials(TypedDict):
     """AWS authentication credentials for S3 access.
-    The session_token is optional and only required for temporary credentials."""
+    The session_token is optional and only required for temporary credentials.
+    """
 
     access_key_id: NotRequired[Optional[str]]
     secret_access_key: NotRequired[Optional[str]]

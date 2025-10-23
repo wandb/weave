@@ -163,7 +163,7 @@ print('PII data first sample: "' + pii_data[0]["text"] + '"')
 
 ## Redaction methods overview
 
-Once you've completed the [setup](#setup), you can
+Once you've completed the [prerequisites](#prerequisites), you can
 
 To detect and protect our PII data, we'll identify and redact PII data and optionally anonymize it using the following methods:
 
@@ -411,39 +411,43 @@ print(f"Raw text:\n\t{text_to_anonymize}")
 print(f"Anonymized text:\n\t{anonymized_text}")
 ```
 
-### Method 4: Use `autopatch_settings`
+### Method 4: Use patch function settings
 
-You can use `autopatch_settings` to configure PII handling directly during initialization for one or more of the supported LLM integrations. The advantages of this method are:
+:::warning[Deprecation Notice]
+The `autopatch_settings` argument is deprecated. Use specific patch functions like `patch_openai(settings={...})` instead.
+:::
 
-1. PII handling logic is centralized and scoped at initialization, reducing the need for scattered custom logic.
-2. PII processing workflows can be customized or disabled entirely for specific intergations.
+You can configure PII handling directly on specific integration patch functions. The advantages of this method are:
 
-To use `autopatch_settings` to configure PII handling, define `postprocess_inputs` and/or `postprocess_output` in `op_settings` for any one of the supported LLM integrations.
+1. PII handling logic is centralized and scoped at the integration level, reducing the need for scattered custom logic.
+2. PII processing workflows can be customized or disabled entirely for specific integrations.
+
+To configure PII handling for an integration, define `postprocess_inputs` and/or `postprocess_output` in the `op_settings` when calling the patch function:
 
 ```python
+import weave.integrations
 
 def postprocess(inputs: dict) -> dict:
     if "SENSITIVE_KEY" in inputs:
         inputs["SENSITIVE_KEY"] = "REDACTED"
     return inputs
 
-client = weave.init(
-    ...,
-    autopatch_settings={
-        "openai": {
-            "op_settings": {
-                "postprocess_inputs": postprocess,
-                "postprocess_output": ...,
-            }
-        },
-        "anthropic": {
-            "op_settings": {
-                "postprocess_inputs": ...,
-                "postprocess_output": ...,
-            }
-        }
-    },
-)
+client = weave.init(...)
+
+# Configure settings per integration
+weave.integrations.patch_openai(settings={
+    "op_settings": {
+        "postprocess_inputs": postprocess,
+        "postprocess_output": ...,
+    }
+})
+
+weave.integrations.patch_anthropic(settings={
+    "op_settings": {
+        "postprocess_inputs": ...,
+        "postprocess_output": ...,
+    }
+})
 ```
 
 
@@ -649,9 +653,13 @@ for entry in pii_data:
     await model.predict(entry["text"])
 ```
 
-### `autopatch_settings` method
+### Patch function settings method
 
-In the following example, we set `postprocess_inputs` for `anthropic` to the `postprocess_inputs_regex()` function () at initialization. The `postprocess_inputs_regex` function applies the`redact_with_regex` method defined in [Method 1: Regular Expression Filtering](#method-1-regular-expression-filtering). Now, `redact_with_regex` will be applied to all inputs to any `anthropic` models.
+:::warning[Deprecation Notice]
+The `autopatch_settings` argument is deprecated. Use specific patch functions as shown below.
+:::
+
+In the following example, we configure `postprocess_inputs` for the `anthropic` integration by calling `patch_anthropic()` with settings. The `postprocess_inputs_regex` function applies the `redact_with_regex` method defined in [Method 1: Filter using regular expressions](#method-1-filter-using-regular-expressions). Now, `redact_with_regex` will be applied to all inputs to any `anthropic` models.
 
 
 
@@ -659,23 +667,22 @@ In the following example, we set `postprocess_inputs` for `anthropic` to the `po
 from typing import Any
 
 import weave
-
-client = weave.init(
-    ...,
-    autopatch_settings={
-        "anthropic": {
-            "op_settings": {
-                "postprocess_inputs": postprocess_inputs_regex,
-            }
-        }
-    },
-)
-
+import weave.integrations
 
 # Define an input postprocessing function that applies our regex redaction for the model prediction Weave Op
 def postprocess_inputs_regex(inputs: dict[str, Any]) -> dict:
     inputs["text_block"] = redact_with_regex(inputs["text_block"])
     return inputs
+
+# Initialize weave
+client = weave.init(...)
+
+# Configure the anthropic integration with PII handling
+weave.integrations.patch_anthropic(settings={
+    "op_settings": {
+        "postprocess_inputs": postprocess_inputs_regex,
+    }
+})
 
 
 # Weave model / predict function

@@ -85,8 +85,7 @@ class FutureExecutor:
             return len(self._active_futures)
 
     def defer(self, f: Callable[..., T], *args: Any, **kwargs: Any) -> Future[T]:
-        """
-        Defer a function to be executed in a thread pool.
+        """Defer a function to be executed in a thread pool.
 
         This is useful for long-running or I/O-bound functions where the result is not needed immediately.
 
@@ -101,8 +100,7 @@ class FutureExecutor:
         return self._safe_submit(f, *args, **kwargs)
 
     def then(self, futures: list[Future[T]], g: Callable[[list[T]], U]) -> Future[U]:
-        """
-        Execute a function on the results of a list of futures.
+        """Execute a function on the results of a list of futures.
 
         This is useful when the results of one or more futures are needed for further processing.
 
@@ -146,8 +144,7 @@ class FutureExecutor:
         return result_future
 
     def flush(self, timeout: float | None = None) -> bool:
-        """
-        Block until all currently submitted items are complete or timeout is reached.
+        """Block until all currently submitted items are complete or timeout is reached.
 
         This method allows new submissions while waiting, ensuring that
         submitted jobs can enqueue more items if needed to complete.
@@ -192,8 +189,7 @@ class FutureExecutor:
             self._executor.shutdown(wait=True)
 
     def _make_deadlock_safe(self, f: Callable[..., T]) -> Callable[..., T]:
-        """
-        Allows any function to be called from a thread without deadlocking.
+        """Allows any function to be called from a thread without deadlocking.
 
         Anytime a function is submitted to the threadpool (e.g., submit or add_done_callback),
         it should be wrapped in this function so that it can be executed in the threadpool.
@@ -215,8 +211,7 @@ class FutureExecutor:
         future.add_done_callback(self._make_deadlock_safe(callback))
 
     def _safe_submit(self, f: Callable[..., T], *args: Any, **kwargs: Any) -> Future[T]:
-        """
-        Submit a function to the thread pool.
+        """Submit a function to the thread pool.
 
         If there is an error submitting to the thread pool,
         or if max_workers is 0, execute the function directly in the current thread.

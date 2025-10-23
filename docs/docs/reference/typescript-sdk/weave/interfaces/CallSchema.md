@@ -1,10 +1,12 @@
-[**weave**](../README.md) • **Docs**
+[**weave**](../README.md)
 
 ***
 
 [weave](../README.md) / CallSchema
 
 # Interface: CallSchema
+
+Defined in: [generated/traceServerApi.ts:99](https://github.com/wandb/weave/blob/69f1caabebc727846756574d549b7e7dda458b63/sdks/node/src/generated/traceServerApi.ts#L99)
 
 CallSchema
 
@@ -14,11 +16,9 @@ CallSchema
 
 > **attributes**: `object`
 
+Defined in: [generated/traceServerApi.ts:118](https://github.com/wandb/weave/blob/69f1caabebc727846756574d549b7e7dda458b63/sdks/node/src/generated/traceServerApi.ts#L118)
+
 Attributes
-
-#### Defined in
-
-[generated/traceServerApi.ts:119](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L119)
 
 ***
 
@@ -26,11 +26,9 @@ Attributes
 
 > `optional` **deleted\_at**: `null` \| `string`
 
+Defined in: [generated/traceServerApi.ts:133](https://github.com/wandb/weave/blob/69f1caabebc727846756574d549b7e7dda458b63/sdks/node/src/generated/traceServerApi.ts#L133)
+
 Deleted At
-
-#### Defined in
-
-[generated/traceServerApi.ts:134](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L134)
 
 ***
 
@@ -38,11 +36,9 @@ Deleted At
 
 > `optional` **display\_name**: `null` \| `string`
 
+Defined in: [generated/traceServerApi.ts:107](https://github.com/wandb/weave/blob/69f1caabebc727846756574d549b7e7dda458b63/sdks/node/src/generated/traceServerApi.ts#L107)
+
 Display Name
-
-#### Defined in
-
-[generated/traceServerApi.ts:108](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L108)
 
 ***
 
@@ -50,11 +46,9 @@ Display Name
 
 > `optional` **ended\_at**: `null` \| `string`
 
+Defined in: [generated/traceServerApi.ts:122](https://github.com/wandb/weave/blob/69f1caabebc727846756574d549b7e7dda458b63/sdks/node/src/generated/traceServerApi.ts#L122)
+
 Ended At
-
-#### Defined in
-
-[generated/traceServerApi.ts:123](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L123)
 
 ***
 
@@ -62,11 +56,9 @@ Ended At
 
 > `optional` **exception**: `null` \| `string`
 
+Defined in: [generated/traceServerApi.ts:124](https://github.com/wandb/weave/blob/69f1caabebc727846756574d549b7e7dda458b63/sdks/node/src/generated/traceServerApi.ts#L124)
+
 Exception
-
-#### Defined in
-
-[generated/traceServerApi.ts:125](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L125)
 
 ***
 
@@ -74,11 +66,9 @@ Exception
 
 > **id**: `string`
 
+Defined in: [generated/traceServerApi.ts:101](https://github.com/wandb/weave/blob/69f1caabebc727846756574d549b7e7dda458b63/sdks/node/src/generated/traceServerApi.ts#L101)
+
 Id
-
-#### Defined in
-
-[generated/traceServerApi.ts:102](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L102)
 
 ***
 
@@ -86,11 +76,9 @@ Id
 
 > **inputs**: `object`
 
+Defined in: [generated/traceServerApi.ts:120](https://github.com/wandb/weave/blob/69f1caabebc727846756574d549b7e7dda458b63/sdks/node/src/generated/traceServerApi.ts#L120)
+
 Inputs
-
-#### Defined in
-
-[generated/traceServerApi.ts:121](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L121)
 
 ***
 
@@ -98,11 +86,9 @@ Inputs
 
 > **op\_name**: `string`
 
+Defined in: [generated/traceServerApi.ts:105](https://github.com/wandb/weave/blob/69f1caabebc727846756574d549b7e7dda458b63/sdks/node/src/generated/traceServerApi.ts#L105)
+
 Op Name
-
-#### Defined in
-
-[generated/traceServerApi.ts:106](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L106)
 
 ***
 
@@ -110,11 +96,9 @@ Op Name
 
 > `optional` **output**: `null`
 
+Defined in: [generated/traceServerApi.ts:126](https://github.com/wandb/weave/blob/69f1caabebc727846756574d549b7e7dda458b63/sdks/node/src/generated/traceServerApi.ts#L126)
+
 Output
-
-#### Defined in
-
-[generated/traceServerApi.ts:127](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L127)
 
 ***
 
@@ -122,11 +106,9 @@ Output
 
 > `optional` **parent\_id**: `null` \| `string`
 
+Defined in: [generated/traceServerApi.ts:111](https://github.com/wandb/weave/blob/69f1caabebc727846756574d549b7e7dda458b63/sdks/node/src/generated/traceServerApi.ts#L111)
+
 Parent Id
-
-#### Defined in
-
-[generated/traceServerApi.ts:112](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L112)
 
 ***
 
@@ -134,11 +116,9 @@ Parent Id
 
 > **project\_id**: `string`
 
+Defined in: [generated/traceServerApi.ts:103](https://github.com/wandb/weave/blob/69f1caabebc727846756574d549b7e7dda458b63/sdks/node/src/generated/traceServerApi.ts#L103)
+
 Project Id
-
-#### Defined in
-
-[generated/traceServerApi.ts:104](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L104)
 
 ***
 
@@ -146,15 +126,13 @@ Project Id
 
 > **started\_at**: `string`
 
+Defined in: [generated/traceServerApi.ts:116](https://github.com/wandb/weave/blob/69f1caabebc727846756574d549b7e7dda458b63/sdks/node/src/generated/traceServerApi.ts#L116)
+
 Started At
 
 #### Format
 
 date-time
-
-#### Defined in
-
-[generated/traceServerApi.ts:117](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L117)
 
 ***
 
@@ -162,9 +140,7 @@ date-time
 
 > `optional` **summary**: `object`
 
-#### Defined in
-
-[generated/traceServerApi.ts:128](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L128)
+Defined in: [generated/traceServerApi.ts:127](https://github.com/wandb/weave/blob/69f1caabebc727846756574d549b7e7dda458b63/sdks/node/src/generated/traceServerApi.ts#L127)
 
 ***
 
@@ -172,11 +148,9 @@ date-time
 
 > **trace\_id**: `string`
 
+Defined in: [generated/traceServerApi.ts:109](https://github.com/wandb/weave/blob/69f1caabebc727846756574d549b7e7dda458b63/sdks/node/src/generated/traceServerApi.ts#L109)
+
 Trace Id
-
-#### Defined in
-
-[generated/traceServerApi.ts:110](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L110)
 
 ***
 
@@ -184,11 +158,9 @@ Trace Id
 
 > `optional` **wb\_run\_id**: `null` \| `string`
 
+Defined in: [generated/traceServerApi.ts:131](https://github.com/wandb/weave/blob/69f1caabebc727846756574d549b7e7dda458b63/sdks/node/src/generated/traceServerApi.ts#L131)
+
 Wb Run Id
-
-#### Defined in
-
-[generated/traceServerApi.ts:132](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L132)
 
 ***
 
@@ -196,8 +168,6 @@ Wb Run Id
 
 > `optional` **wb\_user\_id**: `null` \| `string`
 
+Defined in: [generated/traceServerApi.ts:129](https://github.com/wandb/weave/blob/69f1caabebc727846756574d549b7e7dda458b63/sdks/node/src/generated/traceServerApi.ts#L129)
+
 Wb User Id
-
-#### Defined in
-
-[generated/traceServerApi.ts:130](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/generated/traceServerApi.ts#L130)

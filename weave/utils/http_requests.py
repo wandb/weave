@@ -171,3 +171,12 @@ def post(
 ) -> Response:
     """Send a POST request with optional logging."""
     return session.post(url, data=data, json=json, **kwargs)
+
+
+def delete(
+    url: str,
+    params: Optional[dict[str, Any]] = None,
+    **kwargs: Any,
+) -> Response:
+    """Send a DELETE request with optional logging."""
+    return session.delete(url, params=params, **kwargs)

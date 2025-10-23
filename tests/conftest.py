@@ -31,8 +31,7 @@ os.environ["WANDB_ERROR_REPORTING"] = "false"
 
 @pytest.fixture(autouse=True)
 def patch_kafka_producer():
-    """
-    Patch the Kafka producer. Without this, attempt to connect to the brokers will fail.
+    """Patch the Kafka producer. Without this, attempt to connect to the brokers will fail.
     This is ok but this introduces a `message.timeout.ms` (500ms) delay in each test.
 
     If a test needs to test the Kafka producer, they should orride this patch explicitly.
@@ -46,8 +45,7 @@ def patch_kafka_producer():
 
 @pytest.fixture(autouse=True)
 def disable_datadog():
-    """
-    Disables Datadog logging and tracing for tests.
+    """Disables Datadog logging and tracing for tests.
 
     This prevents Datadog from polluting test logs with messages like
     'failed to send, dropping 1 traces to intake at...'
@@ -276,8 +274,7 @@ def logging_error_check(request, log_collector):
 
 
 class TestOnlyFlushingWeaveClient(weave_client.WeaveClient):
-    """
-    A WeaveClient that automatically flushes after every method call.
+    """A WeaveClient that automatically flushes after every method call.
 
     This subclass overrides the behavior of the standard WeaveClient to ensure
     that all write operations are immediately flushed to the underlying storage
@@ -395,7 +392,8 @@ def zero_stack():
 @pytest.fixture
 def client(zero_stack, request, trace_server):
     """This is the standard fixture used everywhere in tests to test end to end
-    client functionality"""
+    client functionality.
+    """
     client = create_client(request, trace_server)
     try:
         yield client
@@ -405,7 +403,7 @@ def client(zero_stack, request, trace_server):
 
 @pytest.fixture
 def client_creator(zero_stack, request, trace_server):
-    """This fixture is useful for delaying the creation of the client (ex. when you want to set settings first)"""
+    """This fixture is useful for delaying the creation of the client (ex. when you want to set settings first)."""
 
     @contextlib.contextmanager
     def client(
@@ -429,8 +427,7 @@ def client_creator(zero_stack, request, trace_server):
 
 @pytest.fixture
 def network_proxy_client(client):
-    """
-    This fixture is used to test the `RemoteHTTPTraceServer` class. There is
+    """This fixture is used to test the `RemoteHTTPTraceServer` class. There is
     almost no logic in this class, other than a little batching, so we typically
     skip it for simplicity. However, we can use this fixture to test such logic.
     It initializes a mini FastAPI app that proxies requests from the
@@ -559,9 +556,13 @@ def network_proxy_client(client):
 @pytest.fixture(autouse=True)
 def caching_client_isolation(monkeypatch, tmp_path):
     """Isolate cache directories for each test to prevent cross-test contamination."""
-    test_specific_cache_dir = (
-        tmp_path / f"weave_cache_{get_test_name().replace('/', '_').replace('::', '_')}"
-    )
+    # Replace characters that are invalid in Windows paths
+    # Windows disallows: < > : " / \ | ? *
+    test_name = get_test_name()
+    for char in ["/", "\\", ":", "*", "?", '"', "<", ">", "|"]:
+        test_name = test_name.replace(char, "_")
+    test_name = test_name.replace("::", "_")
+    test_specific_cache_dir = tmp_path / f"weave_cache_{test_name}"
     test_specific_cache_dir.mkdir(parents=True, exist_ok=True)
 
     monkeypatch.setenv("WEAVE_SERVER_CACHE_DIR", str(test_specific_cache_dir))

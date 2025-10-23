@@ -8,8 +8,7 @@ from weave.scorers.default_models import MODEL_PATHS
 
 @pytest.fixture
 def weave_context_relevance_scorer():
-    """
-    Fixture that returns a WeaveContextRelevanceScorerV1 instance,
+    """Fixture that returns a WeaveContextRelevanceScorerV1 instance,
     referencing the 'relevance_scorer' checkpoint.
     """
     scorer = WeaveContextRelevanceScorerV1(

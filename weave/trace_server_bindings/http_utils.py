@@ -84,8 +84,7 @@ def process_batch_with_retry(
     log_dropped_fn: Optional[Callable[[list[T], Exception], None]] = None,
     encode_batch_fn: Callable[[list[T]], bytes],
 ) -> None:
-    """
-    Process a batch with common retry and error handling logic.
+    """Process a batch with common retry and error handling logic.
 
     This function handles the common pattern of:
     - Dynamic batch size adjustment
@@ -193,8 +192,7 @@ def process_batch_with_retry(
 
 
 def handle_response_error(response: requests.Response, url: str) -> None:
-    """
-    Handle HTTP response errors with user-friendly messages.
+    """Handle HTTP response errors with user-friendly messages.
 
     Args:
         response: The HTTP response object
@@ -243,15 +241,14 @@ def handle_response_error(response: requests.Response, url: str) -> None:
 def check_endpoint_exists(
     func: Callable, test_req: Any, cache_key: Union[str, None] = None
 ) -> bool:
-    """
-    Check if a function/endpoint exists and works by calling it with a test request.
+    """Check if a function/endpoint exists and works by calling it with a test request.
 
     This allows bypassing retry logic by passing the unwrapped function directly,
     or testing any callable with consistent caching and error handling.
 
     Args:
         func: The function to test (e.g., server.table_create_from_digests or
-              server._generic_request_executor.__wrapped__)
+              server._post_request_executor.__wrapped__)
         test_req: A test request to use for checking the function
         cache_key: Optional cache key. If not provided, uses id(func)
 

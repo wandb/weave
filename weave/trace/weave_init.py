@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+from json import JSONDecodeError
 
 from weave.compat import wandb
 from weave.telemetry import trace_sentry
@@ -12,7 +13,9 @@ from weave.trace import (
 )
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.settings import should_redact_pii, use_server_cache
-from weave.trace_server.trace_server_interface import TraceServerInterface
+from weave.trace_server.trace_server_interface import (
+    FullTraceServerInterface,
+)
 from weave.trace_server_bindings import remote_http_trace_server
 from weave.trace_server_bindings.caching_middleware_trace_server import (
     CachingMiddlewareTraceServer,
@@ -73,6 +76,19 @@ Args:
 """
 
 
+def _weave_is_available(server: remote_http_trace_server.RemoteHTTPTraceServer) -> bool:
+    try:
+        server.server_info()
+    except JSONDecodeError:
+        return False
+    except Exception:
+        logger.warning(
+            "Unexpected error when checking if Weave is available on the server.  Please contact support."
+        )
+        return False
+    return True
+
+
 def init_weave(
     project_name: str,
     ensure_project_exists: bool = True,
@@ -119,7 +135,11 @@ def init_weave(
         api_key = wandb_context.api_key
 
     remote_server = init_weave_get_server(api_key)
-    server: TraceServerInterface = remote_server
+    if not _weave_is_available(remote_server):
+        raise RuntimeError(
+            "Weave is not available on the server.  Please contact support."
+        )
+    server: FullTraceServerInterface = remote_server
     if use_server_cache():
         server = CachingMiddlewareTraceServer.from_env(server)
 
@@ -209,16 +229,6 @@ def init_weave_get_server(
     if api_key is not None:
         res.set_auth(("api", api_key))
     return res
-
-
-def init_local() -> weave_client.WeaveClient:
-    from weave.trace_server import sqlite_trace_server
-
-    server = sqlite_trace_server.SqliteTraceServer("weave.db")
-    server.setup_tables()
-    client = weave_client.WeaveClient("none", "none", server)
-    weave_client_context.set_weave_client_global(client)
-    return client
 
 
 def finish() -> None:

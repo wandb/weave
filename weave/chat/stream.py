@@ -7,8 +7,7 @@ from weave.chat.types.chat_completion_chunk import ChatCompletionChunk
 
 
 class ChatCompletionChunkStream:
-    """
-    A stream wrapper for ChatCompletionChunk objects from a requests response.
+    """A stream wrapper for ChatCompletionChunk objects from a requests response.
 
     This class takes a requests response object and yields ChatCompletionChunk
     objects by parsing the server-sent events stream.

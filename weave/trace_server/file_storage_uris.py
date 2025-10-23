@@ -1,5 +1,4 @@
-"""
-This module contains the classes and utilities for working with file storage URIs.
+"""This module contains the classes and utilities for working with file storage URIs.
 
 A URI has specific form and structure and therefore we need to parse and validate them.
 Each storage type (S3, GCS, Azure) has its own URI format and validation rules.

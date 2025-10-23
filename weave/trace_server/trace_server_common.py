@@ -77,8 +77,7 @@ def make_derived_summary_fields(
     exception: Optional[str] = None,
     display_name: Optional[str] = None,
 ) -> tsi.SummaryMap:
-    """
-    Make derived summary fields for a call.
+    """Make derived summary fields for a call.
 
     Summary is controlled by the user, but the `weave` summary key is
     used to store derived fields, adhering to the tsi.SummaryMap type.
@@ -121,8 +120,7 @@ def empty_str_to_none(val: Optional[str]) -> Optional[str]:
 
 
 def get_nested_key(d: dict[str, Any], col: str) -> Optional[Any]:
-    """
-    Get a nested key from a dict. None if not found.
+    """Get a nested key from a dict. None if not found.
 
     Example:
     get_nested_key({"a": {"b": {"c": "d"}}}, "a.b.c") -> "d"
@@ -143,8 +141,7 @@ def get_nested_key(d: dict[str, Any], col: str) -> Optional[Any]:
 
 
 def set_nested_key(d: dict[str, Any], col: str, val: Any) -> None:
-    """
-    Set a nested key in a dict.
+    """Set a nested key in a dict.
 
     Example:
     set_nested_key({"a": {"b": "c"}}, "a.b", "e") -> {"a": {"b": "e"}}
@@ -202,8 +199,7 @@ class DynamicBatchProcessor:
 
 
 def digest_is_version_like(digest: str) -> tuple[bool, int]:
-    """
-    Check if a digest is a version like string.
+    """Check if a digest is a version like string.
 
     Examples:
     - v1 -> True, 1

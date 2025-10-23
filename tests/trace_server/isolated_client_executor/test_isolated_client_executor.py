@@ -1,5 +1,4 @@
-"""
-Tests for the IsolatedClientExecutor class.
+"""Tests for the IsolatedClientExecutor class.
 
 This module tests the process isolation, security validation, and error handling
 of the IsolatedClientExecutor class using the new callback-based API.
@@ -12,6 +11,7 @@ ensuring the system can handle stuck processes.
 import os
 import time
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from typing import Optional
 
 import pytest
@@ -53,23 +53,12 @@ class TestRequest(BaseModel):
     arg_c: Optional[str] = "default"
 
 
+@dataclass
 class WeaveClientFactoryConfig:
     entity: str
     project: str
     server: TraceServerInterface
     ensure_project_exists: bool = False
-
-    def __init__(
-        self,
-        entity: str,
-        project: str,
-        server: TraceServerInterface,
-        ensure_project_exists: bool = False,
-    ):
-        self.entity = entity
-        self.project = project
-        self.server = server
-        self.ensure_project_exists = ensure_project_exists
 
 
 def weave_client_factory(config: WeaveClientFactoryConfig):
@@ -87,8 +76,7 @@ def create_test_client_factory_and_cleanup(
     entity: str = "test_entity",
     project: str = "test_project",
 ):
-    """
-    Create a client factory function and cleanup function for testing.
+    """Create a client factory function and cleanup function for testing.
 
     This function sets up cross-process trace server communication where the main process
     has the actual trace server and the child process communicates via queues.
@@ -128,8 +116,7 @@ async def runner_with_cleanup(
     project: str = "test_project",
     **runner_kwargs,
 ):
-    """
-    Async context manager that provides a IsolatedClientExecutor instance with automatic cleanup.
+    """Async context manager that provides a IsolatedClientExecutor instance with automatic cleanup.
 
     This eliminates the repetitive setup/teardown code in tests.
 

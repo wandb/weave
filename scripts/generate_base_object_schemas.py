@@ -9,6 +9,7 @@ from weave.trace_server.interface.builtin_object_classes.builtin_object_registry
 
 OUTPUT_DIR = (
     Path(__file__).parent.parent
+    / "weave"
     / "trace_server"
     / "interface"
     / "builtin_object_classes"
@@ -18,8 +19,7 @@ OUTPUT_PATH = OUTPUT_DIR / "generated_builtin_object_class_schemas.json"
 
 
 def generate_schemas() -> None:
-    """
-    Generate JSON schemas for all registered base objects in BUILTIN_OBJECT_REGISTRY.
+    """Generate JSON schemas for all registered base objects in BUILTIN_OBJECT_REGISTRY.
     Creates a top-level schema that includes all registered objects and writes it
     to 'generated_builtin_object_class_schemas.json'.
     """

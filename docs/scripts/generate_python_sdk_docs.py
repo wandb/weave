@@ -97,8 +97,7 @@ def remove_empty_overview_sections(overview):
 
 
 def fix_code_fence_indentation(doc_string):
-    """
-    Fix code fence indentation in markdown documentation.
+    """Fix code fence indentation in markdown documentation.
 
     The docgen produces code fences that are not indented correctly.
     This function fixes that by de-indenting code fences to match the

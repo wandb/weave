@@ -7,6 +7,21 @@ from functools import wraps
 from typing import TYPE_CHECKING, Any, Callable
 from urllib.parse import urlparse
 
+# Do not import this module directly, it should only be invoked
+from openai._legacy_response import LegacyAPIResponse
+from openai._response import APIResponse
+from openai.types.chat import ChatCompletion, ChatCompletionChunk
+from openai.types.chat.chat_completion_chunk import (
+    ChoiceDeltaFunctionCall,
+    ChoiceDeltaToolCall,
+    ChoiceDeltaToolCallFunction,
+)
+from openai.types.chat.chat_completion_message import FunctionCall
+from openai.types.chat.chat_completion_message_tool_call import (
+    ChatCompletionMessageToolCall,
+    Function,
+)
+
 import weave
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
 from weave.trace.autopatch import IntegrationSettings, OpSettings
@@ -24,7 +39,6 @@ from weave.utils.stream_metrics import (
 )
 
 if TYPE_CHECKING:
-    from openai.types.chat import ChatCompletionChunk
     from openai.types.responses import Response, ResponseStreamEvent
 
 _openai_patcher: MultiPatcher | None = None
@@ -37,45 +51,20 @@ def maybe_unwrap_api_response(value: Any) -> Any:
     We take a very conservative approach to only unwrap the types we know about.
     """
     maybe_value: Any = None
-    try:
-        from openai._legacy_response import LegacyAPIResponse
 
-        if isinstance(value, LegacyAPIResponse):
-            maybe_value = value.parse()
-    except:
-        pass
+    if isinstance(value, LegacyAPIResponse):
+        maybe_value = value.parse()
 
-    try:
-        from openai._response import APIResponse
+    if isinstance(value, APIResponse):
+        maybe_value = value.parse()
 
-        if isinstance(value, APIResponse):
-            maybe_value = value.parse()
-    except:
-        pass
-
-    try:
-        from openai.types.chat import ChatCompletion, ChatCompletionChunk
-
-        if isinstance(maybe_value, (ChatCompletion, ChatCompletionChunk)):
-            return maybe_value
-    except:
-        pass
+    if isinstance(maybe_value, (ChatCompletion, ChatCompletionChunk)):
+        return maybe_value
 
     return value
 
 
 def openai_on_finish_post_processor(value: ChatCompletionChunk | None) -> dict | None:
-    from openai.types.chat import ChatCompletion, ChatCompletionChunk
-    from openai.types.chat.chat_completion_chunk import (
-        ChoiceDeltaFunctionCall,
-        ChoiceDeltaToolCall,
-    )
-    from openai.types.chat.chat_completion_message import FunctionCall
-    from openai.types.chat.chat_completion_message_tool_call import (
-        ChatCompletionMessageToolCall,
-        Function,
-    )
-
     value = maybe_unwrap_api_response(value)
 
     def _get_function_call(
@@ -151,8 +140,7 @@ def openai_on_finish_post_processor(value: ChatCompletionChunk | None) -> dict |
 
 
 def _openai_chunk_has_content(chunk: ChatCompletionChunk) -> bool:
-    """
-    Detect if an OpenAI chunk contains actual content (first token).
+    """Detect if an OpenAI chunk contains actual content (first token).
 
     Args:
         chunk: The OpenAI ChatCompletionChunk to check.
@@ -172,13 +160,6 @@ def openai_accumulator(
     skip_last: bool = False,
     stream_start_time: float | None = None,
 ) -> ChatCompletionChunk:
-    from openai.types.chat import ChatCompletionChunk
-    from openai.types.chat.chat_completion_chunk import (
-        ChoiceDeltaFunctionCall,
-        ChoiceDeltaToolCall,
-        ChoiceDeltaToolCallFunction,
-    )
-
     def _process_chunk(
         chunk: ChatCompletionChunk, acc_choices: list[dict] | None = None
     ) -> list[dict]:
@@ -406,7 +387,7 @@ def openai_on_input_handler(
 
 def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
-        "We need to do this so we can check if `stream` is used"
+        """We need to do this so we can check if `stream` is used."""
 
         def _add_stream_options(fn: Callable) -> Callable:
             @wraps(fn)
@@ -451,7 +432,7 @@ def create_wrapper_sync(settings: OpSettings) -> Callable[[Callable], Callable]:
 # it manually here...
 def create_wrapper_async(settings: OpSettings) -> Callable[[Callable], Callable]:
     def wrapper(fn: Callable) -> Callable:
-        "We need to do this so we can check if `stream` is used"
+        """We need to do this so we can check if `stream` is used."""
 
         def _add_stream_options(fn: Callable) -> Callable:
             @wraps(fn)
@@ -746,10 +727,14 @@ def get_openai_patcher(
     base = settings.op_settings
 
     completions_create_settings = base.model_copy(
-        update={"name": base.name or "openai.chat.completions.create"}
+        update={
+            "name": base.name or "openai.chat.completions.create",
+        }
     )
     async_completions_create_settings = base.model_copy(
-        update={"name": base.name or "openai.chat.completions.create"}
+        update={
+            "name": base.name or "openai.chat.completions.create",
+        }
     )
     completions_parse_settings = base.model_copy(
         update={"name": base.name or "openai.chat.completions.parse"}

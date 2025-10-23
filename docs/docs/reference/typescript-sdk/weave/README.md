@@ -1,4 +1,4 @@
-**weave** • **Docs**
+**weave**
 
 ***
 
@@ -8,6 +8,8 @@
 
 - [Dataset](classes/Dataset.md)
 - [Evaluation](classes/Evaluation.md)
+- [MessagesPrompt](classes/MessagesPrompt.md)
+- [StringPrompt](classes/StringPrompt.md)
 - [WeaveClient](classes/WeaveClient.md)
 - [WeaveObject](classes/WeaveObject.md)
 
@@ -15,10 +17,13 @@
 
 - [CallSchema](interfaces/CallSchema.md)
 - [CallsFilter](interfaces/CallsFilter.md)
+- [WeaveAudio](interfaces/WeaveAudio.md)
+- [WeaveImage](interfaces/WeaveImage.md)
 
 ## Type Aliases
 
 - [Op](type-aliases/Op.md)
+- [OpDecorator](type-aliases/OpDecorator.md)
 
 ## Functions
 

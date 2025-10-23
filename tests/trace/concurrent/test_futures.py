@@ -118,7 +118,8 @@ def test_concurrent_execution() -> None:
 
     start_time: float = time.time()
     futures: list[Future[int]] = [
-        executor.defer(lambda: slow_task(i)) for i in range(1, 4)
+        executor.defer(lambda: slow_task(i))  # noqa: B023
+        for i in range(1, 4)
     ]
     results: list[int] = [f.result() for f in futures]
     end_time: float = time.time()

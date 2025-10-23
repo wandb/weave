@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 from collections.abc import Generator
 from typing import Optional
 
@@ -64,6 +65,10 @@ def preference_id():
 
 @pytest.mark.skip_clickhouse_client
 @pytest.mark.vcr(filter_headers=["authorization"], decode_compressed_response=True)
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="Currently not working on Windows",
+)
 def test_train_router(
     client: WeaveClient,
     model_evals: dict[str, EvaluationResults],

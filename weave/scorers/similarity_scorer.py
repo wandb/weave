@@ -10,8 +10,7 @@ from weave.scorers.scorer_types import LLMScorer
 
 
 class EmbeddingSimilarityScorer(LLMScorer):
-    """
-    Computes the cosine similarity between the embeddings of a model output and a target text.
+    """Computes the cosine similarity between the embeddings of a model output and a target text.
 
     This scorer leverages the LLM's embedding capabilities (via litellm.aembedding) to generate vector
     representations for both the provided output and target. It then calculates the cosine similarity between

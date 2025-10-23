@@ -17,8 +17,7 @@ class EntityExtractionResponse(BaseModel):
 
 
 class ContextEntityRecallScorer(LLMScorer):
-    """
-    A Scorer that estimates context recall by extracting entities from both the model output
+    """A Scorer that estimates context recall by extracting entities from both the model output
     and the context, then computing the recall score between them.
 
     Note:
@@ -94,8 +93,7 @@ class RelevancyResponse(BaseModel):
 
 
 class ContextRelevancyScorer(LLMScorer):
-    """
-    A Scorer that evaluates the relevancy of the provided context to the model output using an LLM.
+    """A Scorer that evaluates the relevancy of the provided context to the model output using an LLM.
 
     Note:
         - This Scorer uses the LLM via litellm.acompletion to generate structured responses.

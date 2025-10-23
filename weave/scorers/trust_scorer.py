@@ -1,5 +1,4 @@
-"""
-W&B Trust Score implementation.
+"""W&B Trust Score implementation.
 
 This scorer combines multiple scorers to provide a comprehensive trust evaluation.
 """
@@ -364,8 +363,7 @@ class WeaveTrustScorerV1(weave.Scorer):
         output: str,  # Pass the output of a LLM to this parameter for example
         **kwargs: Any,
     ) -> WeaveScorerResult:
-        """
-        Score the query, context and output against 5 different scorers.
+        """Score the query, context and output against 5 different scorers.
 
         Args:
             query: str, The query to score the context against

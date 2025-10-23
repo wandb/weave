@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from weave.trace.serialization import serializer
 from weave.trace.serialization.custom_objs import MemTraceFilesArtifact
 from weave.utils.invertable_dict import InvertableDict
+from weave.utils.iterators import first
 
 try:
     from PIL import Image
@@ -55,9 +57,9 @@ def save(obj: Image.Image, artifact: MemTraceFilesArtifact, name: str) -> None:
         obj.save(f, format=ext_to_pil_format[ext])  # type: ignore
 
 
-def load(artifact: MemTraceFilesArtifact, name: str) -> Image.Image:
+def load(artifact: MemTraceFilesArtifact, name: str, val: Any) -> Image.Image:
     # Today, we assume there can only be 1 image in the artifact.
-    filename = next(iter(artifact.path_contents))
+    filename = first(artifact.path_contents)
     if not filename.startswith("image."):
         raise ValueError(f"Expected filename to start with 'image.', got {filename}")
 

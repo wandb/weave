@@ -1,4 +1,4 @@
-[**weave**](../README.md) • **Docs**
+[**weave**](../README.md)
 
 ***
 
@@ -6,13 +6,17 @@
 
 # Function: weaveAudio()
 
-> **weaveAudio**(`options`): `WeaveAudio`
+> **weaveAudio**(`options`): [`WeaveAudio`](../interfaces/WeaveAudio.md)
+
+Defined in: [media.ts:62](https://github.com/wandb/weave/blob/69f1caabebc727846756574d549b7e7dda458b63/sdks/node/src/media.ts#L62)
 
 Create a new WeaveAudio object
 
 ## Parameters
 
-• **options**: `WeaveAudioInput`
+### options
+
+`WeaveAudioInput`
 
 The options for this media type
    - data: The raw audio data as a Buffer
@@ -20,7 +24,7 @@ The options for this media type
 
 ## Returns
 
-`WeaveAudio`
+[`WeaveAudio`](../interfaces/WeaveAudio.md)
 
 ## Example
 
@@ -28,7 +32,3 @@ The options for this media type
 const audioBuffer = fs.readFileSync('path/to/audio.wav');
 const weaveAudio = weaveAudio({ data: audioBuffer });
 ```
-
-## Defined in
-
-[media.ts:62](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/media.ts#L62)

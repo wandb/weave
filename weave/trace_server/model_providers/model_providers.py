@@ -1,7 +1,7 @@
 import json
 import logging
 import os
-from typing import TypedDict
+from typing import Literal, Optional, TypedDict
 
 import requests
 
@@ -48,6 +48,63 @@ def read_model_to_provider_info_map(
         logger.exception(
             f"Failed to read model to provider info file at: {full_path}", exc_info=e
         )
+        return {}
+
+
+Quantization = Literal[
+    "int4",
+    "int8",
+    "fp4",
+    "fp6",
+    "fp8",
+    "fp16",
+    "bf16",
+    "fp32",
+]
+
+
+class LLMModelDetails(TypedDict):
+    # Field names are matching cross-language JSON, intentionally using camel case
+    provider: str
+    id: str
+    idPlayground: str
+    idHuggingFace: str
+    label: str
+    labelOpenRouter: Optional[str]
+    status: str
+    descriptionShort: str
+    descriptionMedium: str
+    launchDate: str
+    featureReasoning: bool
+    featureJsonMode: bool
+    featureStructuredOutput: bool
+    featureToolCalling: bool
+    parameterCountTotal: int
+    parameterCountActive: int
+    contextWindow: int
+    quantization: Quantization
+    priceCentsPerBillionTokensInput: int
+    priceCentsPerBillionTokensOutput: int
+    isAvailableOpenRouter: bool
+    apiStyle: str
+    modalities: list[str]
+    modalitiesInput: list[str]
+    modalitiesOutput: list[str]
+    likesHuggingFace: int
+    downloadsHuggingFace: int
+    license: str
+
+
+def read_model_id_to_details_map(
+    file_name: str = HOSTED_MODEL_INFO_FILE,
+) -> dict[str, LLMModelDetails]:
+    full_path = os.path.join(os.path.dirname(__file__), file_name)
+    try:
+        with open(full_path) as f:
+            loaded = json.load(f)
+            return {model["id"]: model for model in loaded["models"]}
+    except Exception as e:
+        logger.exception(f"Failed to read model info file at: {full_path}", exc_info=e)
         return {}
 
 

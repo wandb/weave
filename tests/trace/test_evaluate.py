@@ -365,8 +365,7 @@ def test_evaluation_from_weaveobject_missing_evaluation_name(client):
 
 
 def test_evaluate_table_lazy_iter(client, monkeypatch):
-    """
-    The intention of this test is to show that an evaluation harness
+    """The intention of this test is to show that an evaluation harness
     lazily fetches rows from a table rather than eagerly fetching all
     rows up front.
     """
@@ -435,8 +434,7 @@ def test_evaluate_table_lazy_iter(client, monkeypatch):
 
 
 def test_evaluate_table_order(client):
-    """
-    Test that evaluation results maintain the original order of the dataset
+    """Test that evaluation results maintain the original order of the dataset
     when using a published dataset with images.
     """
     import random

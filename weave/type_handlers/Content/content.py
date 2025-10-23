@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from weave.type_wrappers.Content.content import Content
@@ -21,7 +21,7 @@ def save(obj: Content, artifact: MemTraceFilesArtifact, name: str) -> None:
         json.dump(metadata, f)
 
 
-def load(artifact: MemTraceFilesArtifact, name: str) -> Content:
+def load(artifact: MemTraceFilesArtifact, name: str, val: Any) -> Content:
     from weave.type_wrappers.Content.content import Content
     from weave.type_wrappers.Content.content_types import (
         ResolvedContentArgs,

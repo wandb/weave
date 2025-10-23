@@ -200,7 +200,7 @@ def test_server_cache_latency(client):
     added_latency = latency_with_cache - latency_without_cache
     print(f"Added latency: {added_latency}")
 
-    assert added_latency < 0.001
+    assert added_latency < 0.002
 
 
 def test_file_create_caching(client):

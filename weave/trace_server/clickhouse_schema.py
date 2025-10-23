@@ -48,11 +48,15 @@ class CallEndCHInsertable(BaseModel):
     output_dump: str
     input_refs: list[str] = Field(default_factory=list)  # sadly, this is required
     output_refs: list[str]
+    wb_run_step_end: Optional[int] = None
 
     _project_id_v = field_validator("project_id")(validation.project_id_validator)
     _id_v = field_validator("id")(validation.call_id_validator)
     _input_refs_v = field_validator("input_refs")(validation.refs_list_validator)
     _output_refs_v = field_validator("output_refs")(validation.refs_list_validator)
+    _wb_run_step_end_v = field_validator("wb_run_step_end")(
+        validation.wb_run_step_validator
+    )
 
 
 class CallDeleteCHInsertable(BaseModel):
@@ -126,6 +130,7 @@ class SelectableCHCallSchema(BaseModel):
     wb_user_id: Optional[str] = None
     wb_run_id: Optional[str] = None
     wb_run_step: Optional[int] = None
+    wb_run_step_end: Optional[int] = None
 
     deleted_at: Optional[datetime.datetime] = None
 
@@ -201,3 +206,18 @@ ALL_OBJ_INSERT_COLUMNS = list(ObjCHInsertable.model_fields.keys())
 
 # Let's just make everything required for now ... can optimize when we implement column selection
 REQUIRED_OBJ_SELECT_COLUMNS = list(set(ALL_OBJ_SELECT_COLUMNS))
+
+
+# Files
+class FileChunkCreateCHInsertable(BaseModel):
+    project_id: str
+    digest: str
+    chunk_index: int
+    n_chunks: int
+    name: str
+    val_bytes: bytes
+    bytes_stored: int
+    file_storage_uri: Optional[str]
+
+
+ALL_FILE_CHUNK_INSERT_COLUMNS = sorted(FileChunkCreateCHInsertable.model_fields.keys())

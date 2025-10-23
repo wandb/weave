@@ -1,4 +1,4 @@
-[**weave**](../README.md) • **Docs**
+[**weave**](../README.md)
 
 ***
 
@@ -6,103 +6,124 @@
 
 # Function: op()
 
-## op(fn, options)
+## Call Signature
 
-> **op**\<`T`\>(`fn`, `options`?): [`Op`](../type-aliases/Op.md)\<(...`args`) => `Promise`\<`Awaited`\<`ReturnType`\<`T`\>\>\>\>
+> **op**\<`T`\>(`fn`, `options?`): [`Op`](../type-aliases/Op.md)\<`T`\>
 
-A wrapper to weave op-ify a function or method that works on sync and async functions.
-
-Wrapped functions:
- 1. Take the same inputs and return the same outputs as the original function.
- 2. Will automatically track calls in the Weave UI.
-
-If you don't call `weave.init` then the function will behave as if it were not wrapped.
+Defined in: [op.ts:369](https://github.com/wandb/weave/blob/69f1caabebc727846756574d549b7e7dda458b63/sdks/node/src/op.ts#L369)
 
 ### Type Parameters
 
-• **T** *extends* (...`args`) => `any`
+#### T
+
+`T` *extends* (...`args`) => `any`
 
 ### Parameters
 
-• **fn**: `T`
+#### fn
 
-The function to wrap
+`T`
 
-• **options?**: `OpOptions`\<`T`\>
+#### options?
 
-Optional configs like call and param naming
+`OpOptions`\<`T`\>
 
 ### Returns
 
-[`Op`](../type-aliases/Op.md)\<(...`args`) => `Promise`\<`Awaited`\<`ReturnType`\<`T`\>\>\>\>
+[`Op`](../type-aliases/Op.md)\<`T`\>
 
-The wrapped function
+## Call Signature
 
-### Example
+> **op**\<`T`\>(`thisArg`, `fn`, `options?`): [`Op`](../type-aliases/Op.md)\<`T`\>
 
-```ts
-// Basic usage
-import OpenAI from 'openai';
-import * as weave from 'weave';
-
-const client = await weave.init({ project: 'my-project' });
-const oaiClient = new OpenAI();
-
-const extract = weave.op(async function extract() {
-  return await oaiClient.chat.completions.create({
-    model: 'gpt-4-turbo',
-    messages: [{ role: 'user', content: 'Create a user as JSON' }],
-  });
-});
-
-await extract();
-
-// You can also wrap methods by passing the object as the first argument.
-// This will bind the method to the object and wrap it with op.
-class MyModel {
-  private oaiClient: OpenAI;
-
-  constructor() {
-    this.oaiClient = new OpenAI();
-    this.invoke = weave.op(this, this.invoke);
-  }
-
-  async invoke() {
-    return await this.oaiClient.chat.completions.create({
-      model: 'gpt-4-turbo',
-      messages: [{ role: 'user', content: 'Create a user as JSON' }],
-    });
-  }
-}
-
-const model = new MyModel();
-const res = await model.invoke();
-```
-
-### Defined in
-
-[op.ts:58](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/op.ts#L58)
-
-## op(thisArg, fn, options)
-
-> **op**\<`T`\>(`thisArg`, `fn`, `options`?): [`Op`](../type-aliases/Op.md)\<(...`args`) => `Promise`\<`Awaited`\<`ReturnType`\<`T`\>\>\>\>
+Defined in: [op.ts:374](https://github.com/wandb/weave/blob/69f1caabebc727846756574d549b7e7dda458b63/sdks/node/src/op.ts#L374)
 
 ### Type Parameters
 
-• **T** *extends* (...`args`) => `any`
+#### T
+
+`T` *extends* (...`args`) => `any`
 
 ### Parameters
 
-• **thisArg**: `any`
+#### thisArg
 
-• **fn**: `T`
+`any`
 
-• **options?**: `OpOptions`\<`T`\>
+#### fn
+
+`T`
+
+#### options?
+
+`OpOptions`\<`T`\>
 
 ### Returns
 
-[`Op`](../type-aliases/Op.md)\<(...`args`) => `Promise`\<`Awaited`\<`ReturnType`\<`T`\>\>\>\>
+[`Op`](../type-aliases/Op.md)\<`T`\>
 
-### Defined in
+## Call Signature
 
-[op.ts:62](https://github.com/wandb/weave/blob/e2313369cb35bc1b6f97c70539926dd951ead21e/sdks/node/src/op.ts#L62)
+> **op**(`target`, `propertyKey`, `descriptor`): `TypedPropertyDescriptor`\<`any`\>
+
+Defined in: [op.ts:380](https://github.com/wandb/weave/blob/69f1caabebc727846756574d549b7e7dda458b63/sdks/node/src/op.ts#L380)
+
+### Parameters
+
+#### target
+
+`Object`
+
+#### propertyKey
+
+`string` | `symbol`
+
+#### descriptor
+
+`TypedPropertyDescriptor`\<`any`\>
+
+### Returns
+
+`TypedPropertyDescriptor`\<`any`\>
+
+## Call Signature
+
+> **op**\<`T`\>(`value`, `context`): [`Op`](../type-aliases/Op.md)\<`T`\>
+
+Defined in: [op.ts:386](https://github.com/wandb/weave/blob/69f1caabebc727846756574d549b7e7dda458b63/sdks/node/src/op.ts#L386)
+
+### Type Parameters
+
+#### T
+
+`T` *extends* (...`args`) => `any`
+
+### Parameters
+
+#### value
+
+`T`
+
+#### context
+
+`MethodDecoratorContext`
+
+### Returns
+
+[`Op`](../type-aliases/Op.md)\<`T`\>
+
+## Call Signature
+
+> **op**(`options`): `MethodDecorator`
+
+Defined in: [op.ts:391](https://github.com/wandb/weave/blob/69f1caabebc727846756574d549b7e7dda458b63/sdks/node/src/op.ts#L391)
+
+### Parameters
+
+#### options
+
+`Partial`\<`OpOptions`\<`any`\>\>
+
+### Returns
+
+`MethodDecorator`

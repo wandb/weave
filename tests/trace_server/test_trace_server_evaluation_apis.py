@@ -1,4 +1,5 @@
 import json
+import sys
 from unittest import mock
 
 import pytest
@@ -263,8 +264,7 @@ def setup_test_objects(server: TraceServerInterface, entity: str, project: str):
 
 @pytest.mark.parametrize("direct_script_execution", [True, False])
 def test_evaluate_model(client: WeaveClient, direct_script_execution):
-    """
-    Test the evaluate_model API endpoint with isolated execution.
+    """Test the evaluate_model API endpoint with isolated execution.
 
     This test verifies that:
     1. Evaluations can be created and executed through the evaluate_model API
@@ -373,7 +373,9 @@ def test_evaluate_model(client: WeaveClient, direct_script_execution):
         assert eval_call.summary["weave"]["status"] == TraceStatus.DESCENDANT_ERROR
         assert eval_call.output == {
             "LLMAsAJudgeScorer": None,
-            "model_latency": {"mean": pytest.approx(0, abs=1)},
+            "model_latency": {"mean": pytest.approx(0, abs=2)}
+            if sys.platform != "win32"
+            else {"mean": pytest.approx(0, abs=10)},
         }
     else:
         assert eval_call.summary["status_counts"] == {

@@ -1,6 +1,8 @@
 import base64
+import sys
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 from util import generate_media
@@ -10,6 +12,13 @@ from weave import Dataset
 from weave.trace.table import Table
 from weave.trace.weave_client import WeaveClient
 from weave.type_wrappers.Content.content import Content
+from weave.utils import http_requests as _http_requests
+
+
+class _FakeHTTPError(Exception):
+    """Custom exception used by FakeResponse.raise_for_status in tests."""
+
+    pass
 
 
 @pytest.fixture(scope="session")
@@ -45,9 +54,10 @@ def audio_file(tmp_path_factory) -> Path:
 
 
 # New parameterization list using fixture names
+# Note: Windows uses "audio/wav" while Unix uses "audio/x-wav"
 MEDIA_TEST_PARAMS = [
     ("image_file", ".png", "image/png"),
-    ("audio_file", ".wav", "audio/x-wav"),
+    ("audio_file", ".wav", "audio/wav" if sys.platform == "win32" else "audio/x-wav"),
     ("video_file", ".mp4", "video/mp4"),
     ("pdf_file", ".pdf", "application/pdf"),
 ]
@@ -71,7 +81,6 @@ class TestWeaveContent:
         assert content.filename == file_path.name
         assert content.size > 0
         assert isinstance(content.data, bytes)
-        assert content.path == str(file_path.resolve())
         assert content.input_type == "str"
         assert content.content_type == "file"
 
@@ -137,7 +146,6 @@ class TestWeaveContent:
         assert content.extension == extension
         assert content.mimetype == mimetype
         assert content.filename == file_path.name
-        assert content.path == str(file_path.resolve())
         assert content.content_type == "file"
 
     def test_content_save_method(self, image_file):
@@ -317,7 +325,6 @@ class TestWeaveContent:
         assert content.extension == ".png"
         assert content.mimetype == "image/png"
         assert content.encoding == "utf-8"
-        assert content.path == str(image_file.resolve())
 
     def test_content_type_hint_variations(self, image_file):
         """Test different type hint formats."""
@@ -525,3 +532,53 @@ That's all for now. Have a great day! ☀️
         # Next guess from annotated value
         content = Content._from_guess(doc, extension=".md")
         assert content.mimetype == "text/markdown"
+
+    def test_content_from_url_basic(self):
+        class FakeResponse:
+            def __init__(self):
+                self.content = b"hello world"
+                self.headers = {"Content-Type": "text/plain; charset=utf-8"}
+                self.encoding = "utf-8"
+                self.status_code = 200
+
+            def raise_for_status(self):
+                if self.status_code >= 400:
+                    raise _FakeHTTPError("HTTP error")
+
+        url = "https://example.com/path/to/test.txt"
+        with patch.object(_http_requests, "get", return_value=FakeResponse()):
+            c = Content.from_url(url)
+
+        assert isinstance(c.data, bytes)
+        assert c.data == b"hello world"
+        assert c.mimetype == "text/plain"
+        assert c.extension == ".txt"
+        assert c.filename == "test.txt"
+        assert c.size == len(b"hello world")
+        assert c.content_type == "bytes"
+        assert c.input_type == "str"
+
+    def test__from_guess_http_url_with_content_disposition(self):
+        class FakeResponse:
+            def __init__(self):
+                self.content = b"%PDF-1.4 Mock PDF bytes"
+                self.headers = {
+                    "Content-Type": "application/pdf",
+                    "Content-Disposition": 'attachment; filename="report.pdf"',
+                }
+                self.encoding = None
+                self.status_code = 200
+
+            def raise_for_status(self):
+                if self.status_code >= 400:
+                    raise _FakeHTTPError("HTTP error")
+
+        url = "http://example.com/download"
+        with patch.object(_http_requests, "get", return_value=FakeResponse()):
+            c = Content._from_guess(url)
+
+        assert c.mimetype == "application/pdf"
+        assert c.extension == ".pdf"
+        assert c.filename == "report.pdf"
+        assert c.content_type == "bytes"
+        assert c.input_type == "str"

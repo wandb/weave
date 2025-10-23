@@ -6,6 +6,7 @@ export {
 } from './clientApi';
 export {Dataset} from './dataset';
 export {Evaluation} from './evaluation';
+export {EvaluationLogger, ScoreLogger} from './evaluationLogger';
 export {CallSchema, CallsFilter} from './generated/traceServerApi';
 export {wrapOpenAI} from './integrations';
 export {weaveAudio, weaveImage, WeaveAudio, WeaveImage} from './media';

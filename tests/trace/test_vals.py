@@ -28,7 +28,7 @@ def test_dict_iter(client):
     d_orig = client.save({"a": 1, "b": 2, "c": 3}, name="d")
     d = dict(d_orig)
     with pytest.raises(AttributeError):
-        d.ref
+        _ = d.ref
 
     assert d["a"] == 1
     assert isinstance(d["a"].ref, ObjectRef)
@@ -59,7 +59,7 @@ def test_list_iter(client):
     l_orig = client.save([1, 2], name="l")
     l = list(l_orig)
     with pytest.raises(AttributeError):
-        l.ref
+        _ = l.ref
 
     assert l[0] == 1
     assert l[0].ref.is_descended_from(l_orig.ref)

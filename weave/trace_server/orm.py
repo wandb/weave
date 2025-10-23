@@ -1,11 +1,11 @@
-"""
-A lightweight ORM layer for ClickHouse/SQLite.
+"""A lightweight ORM layer for ClickHouse/SQLite.
 Abstracts away some of their differences and allows building up SQL queries in a safe way.
 """
 
 import datetime
 import json
 import typing
+from dataclasses import dataclass
 
 from pydantic import BaseModel
 from typing_extensions import TypeAlias
@@ -208,17 +208,11 @@ class PreparedSelect(BaseModel):
     fields: list[str]
 
 
+@dataclass
 class Join:
-    join_type: typing.Optional[str]
     table: Table
     query: tsi.Query
-
-    def __init__(
-        self, table: Table, query: tsi.Query, join_type: typing.Optional[str] = None
-    ):
-        self.join_type = join_type
-        self.table = table
-        self.query = query
+    join_type: typing.Optional[str]
 
 
 class Select:
@@ -229,7 +223,11 @@ class Select:
     action: Action
 
     _project_id: typing.Optional[str]
+    # Fields from the user that must be transformed to internal field names
+    # like "inputs.my_field" or "payload.value"
     _fields: typing.Optional[list[str]]
+    # Fields that we have constructed internally, like cost query fields
+    _raw_sql_fields: typing.Optional[list[str]]
     _query: typing.Optional[tsi.Query]
     _order_by: typing.Optional[list[tsi.SortBy]]
     _limit: typing.Optional[int]
@@ -244,6 +242,7 @@ class Select:
 
         self._project_id = None
         self._fields = []
+        self._raw_sql_fields = []
         self._query = None
         self._order_by = None
         self._limit = None
@@ -264,6 +263,17 @@ class Select:
 
     def fields(self, fields: typing.Optional[list[str]]) -> "Select":
         self._fields = fields
+        return self
+
+    def raw_sql_fields(self, raw_fields: typing.Optional[list[str]]) -> "Select":
+        """Add raw SQL expressions that don't need external-to-internal field transformation.
+
+        Example: fields like cost query fields that are aggregations and custom-defined
+
+        Using raw_sql_fields cirucumvents some basic field validation, do not use
+           user-controlled fields without handling validation before adding.
+        """
+        self._raw_sql_fields = raw_fields or []
         return self
 
     def where(self, query: typing.Optional[tsi.Query]) -> "Select":
@@ -318,6 +328,9 @@ class Select:
                 )[0]
                 for f in fieldnames
             ]
+            # Add raw SQL fields without transformation
+            if self._raw_sql_fields:
+                internal_fields.extend(self._raw_sql_fields)
             joined_fields = ", ".join(internal_fields)
             sql = f"SELECT {joined_fields}\n"
         elif self.action == "DELETE":
@@ -518,7 +531,7 @@ def clickhouse_cast(
 def quote_json_path(path: str) -> str:
     """Helper function to quote a json path for use in a clickhouse query. Moreover,
     this converts index operations from dot notation (conforms to Mongo) to bracket
-    notation (required by clickhouse)
+    notation (required by clickhouse).
 
     See comments on `GetFieldOperator` for current limitations
     """
@@ -568,11 +581,14 @@ def _transform_external_field_to_internal_field(
         and field != "*"
         and field.lower() != "count(*)"
         and not any(
-            # Checks that a column is in the field, allows prefixed columns to be used
-            substr in unprefixed_field.lower()
-            for substr in all_columns
+            # Check if field starts with a valid column name as prefix
+            unprefixed_field.lower().startswith(col_name.lower() + ".")
+            for col_name in all_columns
         )
     ):
+        # add back table prefix when erroring
+        if table_prefix:
+            field = f"{table_prefix}.{field}"
         raise ValueError(f"Unknown field: {field}")
 
     raw_fields_used.add(unprefixed_field)
@@ -644,10 +660,21 @@ def _process_query_to_conditions(
         elif isinstance(operation, tsi_query.ContainsOperation):
             lhs_part = process_operand(operation.contains_.input)
             rhs_part = process_operand(operation.contains_.substr)
-            position_operation = "position"
-            if operation.contains_.case_insensitive:
-                position_operation = "positionCaseInsensitive"
-            cond = f"{position_operation}({lhs_part}, {rhs_part}) > 0"
+            is_sqlite = pb._database_type == "sqlite"
+
+            if is_sqlite:
+                # SQLite uses INSTR function and doesn't have case-insensitive variant
+                if operation.contains_.case_insensitive:
+                    # For case-insensitive, convert both to lowercase
+                    cond = f"INSTR(LOWER({lhs_part}), LOWER({rhs_part})) > 0"
+                else:
+                    cond = f"INSTR({lhs_part}, {rhs_part}) > 0"
+            else:
+                # ClickHouse uses position/positionCaseInsensitive
+                position_operation = "position"
+                if operation.contains_.case_insensitive:
+                    position_operation = "positionCaseInsensitive"
+                cond = f"{position_operation}({lhs_part}, {rhs_part}) > 0"
         else:
             raise TypeError(f"Unknown operation type: {operation}")
 

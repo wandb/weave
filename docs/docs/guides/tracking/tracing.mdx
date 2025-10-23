@@ -40,8 +40,8 @@ There are three main ways to create Calls in Weave:
   <TabItem value="python" label="Python" default>
     W&B Weave automatically tracks [calls to common LLM libraries](../integrations/index.md) like `openai`, `anthropic`, `cohere`, and `mistral`. Simply call [`weave.init('project_name')`](../../reference/python-sdk/weave/index.md#function-init) at the start of your program:
 
-    :::tip 
-    You can control Weave's default tracking behavior [using the `autopatch_settings` argument in `weave.init`](#configure-autopatching).
+    :::tip
+    You can control Weave's default tracking behavior. See [Configure autopatching](#configure-autopatching) for details.
     :::
 
     ```python showLineNumbers
@@ -610,14 +610,42 @@ You can also track class and object methods.
 
     print(call)
     ```
-    
-    ### Customize rendered traces with `weave.Markdown`
 
-    Weave makes it easy to tailor how your traced operations are displayed without losing the original data. 
-    With `weave.Markdown`, you can render inputs and outputs as clean, readable blocks of formatted content while preserving the underlying structured data for programmatic access.
-    Use `postprocess_inputs` and `postprocess_output` in your `@weave.op` decorator to enhance trace readability.
+    </TabItem>
+    <TabItem value="typescript" label="TypeScript">
+    ```typescript showLineNumbers
+    import * as weave from 'weave'
 
-    The following code sample uses postprocessors to render a call in Weave to with emojis and nicer formatting:
+    // Initialize the client
+    const client = await weave.init('intro-example')
+
+    // Get a specific call by its ID
+    const call = await client.getCall('call-uuid-here')
+
+    console.log(call)
+    ```
+    </TabItem>
+
+    <TabItem value="service_api" label="HTTP API">
+    To view a call using the Service API, you can make a request to the [`/call/read`](../../reference/service-api/call-read-call-read-post.api.mdx) endpoint.
+
+    ```bash
+    curl -L 'https://trace.wandb.ai/call/read' \
+    -H 'Content-Type: application/json' \
+    -H 'Accept: application/json' \
+    -d '{
+        "project_id": "string",
+        "id": "string",
+    }'
+    ```
+    </TabItem>
+</Tabs>
+
+### Customize rendered traces with `weave.Markdown`
+
+You can use `weave.Markdown` to customize how your trace information is displayed without losing the original data. This allows you to render your inputs and outputs as readable blocks of formatted content while preserving the underlying data structure.
+
+Use `postprocess_inputs` and `postprocess_output` functions in your `@weave.op` decorator to format your trace data. The following code sample uses postprocessors to render a call in Weave with emojis and more readable formatting:
     
     <pre>
     ```python
@@ -678,38 +706,9 @@ You can also track class and object methods.
     ```
     </pre>
 
+In the following screenshot, you can view the difference between the unformatted and formatted outputs, respectively.
+
     ![A call rendered in the Weave UI using the code sample.](imgs/md-call-render.png)
-
-    </TabItem>
-    <TabItem value="typescript" label="TypeScript">
-    ```typescript showLineNumbers
-    import * as weave from 'weave'
-
-    // Initialize the client
-    const client = await weave.init('intro-example')
-
-    // Get a specific call by its ID
-    const call = await client.getCall('call-uuid-here')
-
-    console.log(call)
-    ```
-    </TabItem>
-
-    <TabItem value="service_api" label="HTTP API">
-    To view a call using the Service API, you can make a request to the [`/call/read`](../../reference/service-api/call-read-call-read-post.api.mdx) endpoint.
-
-    ```bash
-    curl -L 'https://trace.wandb.ai/call/read' \
-    -H 'Content-Type: application/json' \
-    -H 'Accept: application/json' \
-    -d '{
-        "project_id": "string",
-        "id": "string",
-    }'
-    ```
-    </TabItem>
-</Tabs>
-
 
 ## Updating Calls
 
@@ -1085,38 +1084,45 @@ To use the code sample:
 ## Configure autopatching
 
 By default, Weave automatically patches and tracks calls to common LLM libraries like `openai`, `anthropic`, `cohere`, and `mistral`.
-You can control this behavior using the `autopatch_settings` argument in `weave.init`.
+
+:::warning[Deprecation Notice]
+The `autopatch_settings` argument is deprecated. Use `implicitly_patch_integrations=False` to disable implicit patching, or call specific patch functions like `patch_openai(settings={...})` to configure settings per integration.
+:::
 
 ### Disable all autopatching
 
 ```python showLineNumbers
-weave.init(..., autopatch_settings={"disable_autopatch": True})
+weave.init(..., implicitly_patch_integrations=False)
 ```
 
 ### Disable a specific integration
 
 ```python showLineNumbers
-weave.init(..., autopatch_settings={"openai": {"enabled": False}})
+import weave
+
+weave.init(..., implicitly_patch_integrations=False)
+
+# Then manually patch only the integrations you want
+weave.integrations.patch_anthropic()
+weave.integrations.patch_cohere()
 ```
 
-### Post-process inputs and outputs 
+### Post-process inputs and outputs
 
-You can also customize how post-process inputs and outputs (e.g. for PII data) are handled during autopatching:
+You can customize how inputs and outputs (such as for PII data) are handled by passing settings to the patch function:
 
 ```python showLineNumbers
+import weave.integrations
+
 def redact_inputs(inputs: dict) -> dict:
     if "email" in inputs:
         inputs["email"] = "[REDACTED]"
     return inputs
 
-weave.init(
-    ...,
-    autopatch_settings={
-        "openai": {
-            "op_settings": {
-                "postprocess_inputs": redact_inputs,
-            }
-        }
+weave.init(...)
+weave.integrations.patch_openai(
+    settings={
+        "op_settings": {"postprocess_inputs": redact_inputs}
     }
 )
 ```

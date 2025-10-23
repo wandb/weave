@@ -30,8 +30,7 @@ class AsyncBatchProcessor(Generic[T]):
         enable_disk_fallback: bool = False,
         disk_fallback_path: str = ".weave_client_dropped_items_log.jsonl",
     ) -> None:
-        """
-        Initializes an instance of AsyncBatchProcessor.
+        """Initializes an instance of AsyncBatchProcessor.
 
         Args:
             processor_fn (Callable[[list[T]], None]): The function to process the batches of items.
@@ -49,6 +48,7 @@ class AsyncBatchProcessor(Generic[T]):
         self.queue: Queue[T] = Queue(maxsize=max_queue_size)
         self.lock = Lock()
         self.stop_accepting_work_event = Event()
+        self._dropped_item_count = 0
 
         # Processing Thread
         self.processing_thread = start_thread(self._process_batches)
@@ -69,8 +69,7 @@ class AsyncBatchProcessor(Generic[T]):
             return self.queue.qsize()
 
     def enqueue(self, items: list[T]) -> None:
-        """
-        Enqueues a list of items to be processed.
+        """Enqueues a list of items to be processed.
 
         Args:
             items (list[T]): The items to be processed.
@@ -84,17 +83,28 @@ class AsyncBatchProcessor(Generic[T]):
                     self._ensure_health_check_alive()
 
                     # TODO: This is probably not what you want, but it will prevent OOM for now.
+                    self._dropped_item_count += 1
                     item_id = id(item)
                     error_message = f"Queue is full. Dropping item. Item ID: {item_id}. Max queue size: {self.queue.maxsize}"
-                    logger.warning(error_message)
-                    if SENTRY_AVAILABLE:
-                        sentry_sdk.capture_message(error_message, level="warning")
+
+                    # Only log every 1000th dropped item
+                    if self._dropped_item_count % 1000 == 0:
+                        logger.warning(
+                            f"{error_message}. Total dropped items: {self._dropped_item_count}"
+                        )
+                        if SENTRY_AVAILABLE:
+                            sentry_sdk.capture_message(
+                                f"Queue full - dropped {self._dropped_item_count} items total",
+                                level="warning",
+                            )
+
                     self._write_item_to_disk(item, error_message)
 
     def stop_accepting_new_work_and_flush_queue(self) -> None:
         """Stops accepting new work and begins gracefully shutting down.
 
-        Any new items enqueued after this call will not be processed!"""
+        Any new items enqueued after this call will not be processed!
+        """
         self.stop_accepting_work_event.set()
         self.processing_thread.join()
         self.health_check_thread.join()
@@ -149,8 +159,7 @@ class AsyncBatchProcessor(Generic[T]):
                 time.sleep(self.min_batch_interval)
 
     def _handle_item_failure(self, item: T, error: Exception) -> None:
-        """
-        Handle a failed item by treating it as a poison pill and dropping it.
+        """Handle a failed item by treating it as a poison pill and dropping it.
 
         Args:
             item: The failed item
@@ -180,8 +189,7 @@ class AsyncBatchProcessor(Generic[T]):
                 self.queue.task_done()
 
     def _rotate_log_file_if_needed(self) -> None:
-        """
-        Rotate the log file if it exceeds the maximum size limit.
+        """Rotate the log file if it exceeds the maximum size limit.
 
         This creates backup files with numbered suffixes (.1, .2, etc.) and removes
         old backups beyond the max_backup_files limit.
@@ -216,8 +224,7 @@ class AsyncBatchProcessor(Generic[T]):
                 sentry_sdk.capture_message(error_message, level="error")
 
     def _write_item_to_disk(self, item: T, error_message: str) -> None:
-        """
-        Write a dropped item to disk in JSON Lines format.
+        """Write a dropped item to disk in JSON Lines format.
 
         Args:
             item: The item to write to disk

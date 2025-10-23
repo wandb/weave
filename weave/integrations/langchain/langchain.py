@@ -1,5 +1,4 @@
-"""
-Technical Note:
+"""Technical Note:
 This LangChain integration patching differs from other integrations in how tracing is enabled:
 
 1. Environment Variable:

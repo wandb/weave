@@ -13,10 +13,9 @@ CONTEXT_RELEVANCE_SCORER_THRESHOLD = 0.55
 
 
 class WeaveContextRelevanceScorerV1(HuggingFaceScorer):
-    """
-    A scorer that evaluates the relevance of model outputs relative to input queries and context.
+    """A scorer that evaluates the relevance of model outputs relative to input queries and context.
     The scorer uses a fine-tuned deberta-small-long-nli model from tasksource;
-    https://huggingface.co/tasksource/deberta-small-long-nli
+    https://huggingface.co/tasksource/deberta-small-long-nli.
 
     This scorer uses a fine-tuned model to analyze whether outputs are semantically relevant to their
     input queries and context. It processes text in chunks and returns both binary relevance flags

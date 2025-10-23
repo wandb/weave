@@ -1,5 +1,4 @@
-"""
-This test file ensures the base_object_classes behavior is as expected. Specifically:
+"""This test file ensures the base_object_classes behavior is as expected. Specifically:
 1. We ensure that pythonic publishing and getting of objects:
     a. Results in the correct base_object_class filter in the query.
     b. Produces identical results.
@@ -32,8 +31,7 @@ def with_base_object_class_annotations(
     class_name: str,
     base_object_name: Optional[Literal["Object", "BaseObject"]] = None,
 ):
-    """
-    When serializing pydantic objects, add additional fields to indicate the class information. This is
+    """When serializing pydantic objects, add additional fields to indicate the class information. This is
     a utlity to perform that mapping for the purposes of testing. We want to ensure that both the client
     and server agree on this structure, therefore I am adding this utility here.
     """
@@ -914,3 +912,159 @@ def test_inherited_builtin_object_class_hierarchy(client: WeaveClient):
         "TestOnlyNestedBaseObject",
         "TestOnlyInheritedBaseObject",
     }
+
+
+def test_exclude_base_object_classes(client: WeaveClient):
+    """Test that exclude_base_object_classes filter correctly excludes objects by their base classes."""
+    # Create several objects with different base classes
+    nested_obj = base_objects.TestOnlyNestedBaseObject(b=100)
+    nested_ref = weave.publish(nested_obj)
+
+    top_obj = base_objects.TestOnlyExample(
+        primitive=200,
+        nested_base_model=TestOnlyNestedBaseModel(a=300, aliased_property_alias=400),
+        nested_base_object=nested_ref.uri(),
+    )
+    top_ref = weave.publish(top_obj)
+
+    inherited_obj = base_objects.TestOnlyInheritedBaseObject(
+        b=500, c=600, additional_field="test_exclude"
+    )
+    inherited_ref = weave.publish(inherited_obj)
+
+    # Test excluding TestOnlyExample - should get nested and inherited objects
+    exclude_example_res = client.server.objs_query(
+        tsi.ObjQueryReq.model_validate(
+            {
+                "project_id": client._project_id(),
+                "filter": {"exclude_base_object_classes": ["TestOnlyExample"]},
+            }
+        )
+    )
+
+    # Should exclude only TestOnlyExample, include TestOnlyNestedBaseObject and inherited
+    base_classes = {obj.base_object_class for obj in exclude_example_res.objs}
+    assert "TestOnlyExample" not in base_classes
+    assert "TestOnlyNestedBaseObject" in base_classes
+
+    # Test excluding TestOnlyNestedBaseObject - should get only TestOnlyExample
+    exclude_nested_res = client.server.objs_query(
+        tsi.ObjQueryReq.model_validate(
+            {
+                "project_id": client._project_id(),
+                "filter": {"exclude_base_object_classes": ["TestOnlyNestedBaseObject"]},
+            }
+        )
+    )
+
+    base_classes_excluded = {obj.base_object_class for obj in exclude_nested_res.objs}
+    assert "TestOnlyNestedBaseObject" not in base_classes_excluded
+    assert "TestOnlyExample" in base_classes_excluded
+
+    # Test excluding multiple base classes
+    exclude_multiple_res = client.server.objs_query(
+        tsi.ObjQueryReq.model_validate(
+            {
+                "project_id": client._project_id(),
+                "filter": {
+                    "exclude_base_object_classes": [
+                        "TestOnlyExample",
+                        "TestOnlyNestedBaseObject",
+                    ]
+                },
+            }
+        )
+    )
+
+    # Should exclude both, so result should be empty or only non-test objects
+    base_classes_multi = {obj.base_object_class for obj in exclude_multiple_res.objs}
+    assert "TestOnlyExample" not in base_classes_multi
+    assert "TestOnlyNestedBaseObject" not in base_classes_multi
+
+    # Test excluding non-existent class - should return all objects
+    exclude_nonexistent_res = client.server.objs_query(
+        tsi.ObjQueryReq.model_validate(
+            {
+                "project_id": client._project_id(),
+                "filter": {"exclude_base_object_classes": ["NonExistentClass"]},
+            }
+        )
+    )
+
+    # Should return all objects since we're not excluding anything that exists
+    assert len(exclude_nonexistent_res.objs) >= 3
+
+
+def test_exclude_base_object_classes_with_include_filter(client: WeaveClient):
+    """Test that exclude_base_object_classes works correctly when combined with base_object_classes."""
+    # Create objects with different base classes
+    nested_obj1 = base_objects.TestOnlyNestedBaseObject(b=111)
+    nested_ref1 = weave.publish(nested_obj1)
+
+    nested_obj2 = base_objects.TestOnlyNestedBaseObject(b=222)
+    nested_ref2 = weave.publish(nested_obj2)
+
+    top_obj = base_objects.TestOnlyExample(
+        primitive=333,
+        nested_base_model=TestOnlyNestedBaseModel(a=444, aliased_property_alias=555),
+        nested_base_object=nested_ref1.uri(),
+    )
+    top_ref = weave.publish(top_obj)
+
+    inherited_obj = base_objects.TestOnlyInheritedBaseObject(
+        b=666, c=777, additional_field="test_combined"
+    )
+    inherited_ref = weave.publish(inherited_obj)
+
+    # Test combining include and exclude (should be treated as AND logic)
+    # Include TestOnlyNestedBaseObject but exclude nothing -> should get TestOnlyNestedBaseObject objects
+    combined_res = client.server.objs_query(
+        tsi.ObjQueryReq.model_validate(
+            {
+                "project_id": client._project_id(),
+                "filter": {
+                    "base_object_classes": ["TestOnlyNestedBaseObject"],
+                    "exclude_base_object_classes": ["TestOnlyExample"],
+                },
+            }
+        )
+    )
+
+    # Should get TestOnlyNestedBaseObject objects (base and inherited), not TestOnlyExample
+    base_classes = {obj.base_object_class for obj in combined_res.objs}
+    assert base_classes == {"TestOnlyNestedBaseObject"}
+    assert len(combined_res.objs) >= 3  # nested_obj1, nested_obj2, inherited_obj
+
+
+def test_exclude_base_object_classes_with_inherited_objects(client: WeaveClient):
+    """Test that exclude_base_object_classes correctly handles inherited objects."""
+    # Create base and inherited objects
+    base_obj = base_objects.TestOnlyNestedBaseObject(b=1000)
+    base_ref = weave.publish(base_obj)
+
+    inherited_obj = base_objects.TestOnlyInheritedBaseObject(
+        b=2000, c=3000, additional_field="test_inheritance_exclude"
+    )
+    inherited_ref = weave.publish(inherited_obj)
+
+    # Exclude the base class - should exclude both base and inherited objects
+    exclude_base_res = client.server.objs_query(
+        tsi.ObjQueryReq.model_validate(
+            {
+                "project_id": client._project_id(),
+                "filter": {"exclude_base_object_classes": ["TestOnlyNestedBaseObject"]},
+            }
+        )
+    )
+
+    # Should not include objects with base_object_class == TestOnlyNestedBaseObject
+    base_classes = {obj.base_object_class for obj in exclude_base_res.objs}
+    assert "TestOnlyNestedBaseObject" not in base_classes
+
+    # Verify the inherited object is also excluded (since its base class is TestOnlyNestedBaseObject)
+    object_ids = {obj.object_id for obj in exclude_base_res.objs}
+    # The inherited object should be excluded since it has base_object_class = TestOnlyNestedBaseObject
+    assert all(
+        obj.base_object_class != "TestOnlyNestedBaseObject"
+        for obj in exclude_base_res.objs
+    )

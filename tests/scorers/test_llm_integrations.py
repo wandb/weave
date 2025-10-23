@@ -37,8 +37,7 @@ PROVIDERS = {
     ids=lambda p: f"{p[0]}:{p[1]}",
 )
 def summarization_scorer(request):
-    """
-    Fixture that returns an instance of SummarizationScorer.
+    """Fixture that returns an instance of SummarizationScorer.
     It checks if the required API key is available, and if not, skips the test.
     """
     provider, model = request.param
