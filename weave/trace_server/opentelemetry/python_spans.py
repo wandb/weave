@@ -281,9 +281,29 @@ class Span:
             }
         )
 
-    def to_call(
-        self, project_id: str, wb_user_id: Optional[str] = None
-    ) -> tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]:
+    def _extract_call_data(
+        self,
+    ) -> tuple[
+        dict[str, Any],  # inputs
+        Any,  # outputs (can be dict, str, int, bytes)
+        dict[str, Any],  # attributes
+        str,  # op_name
+        Optional[str],  # display_name
+        datetime.datetime,  # start_time
+        datetime.datetime,  # end_time
+        tsi.SummaryMap,  # summary_map
+        Optional[str],  # exception_msg
+        Optional[str],  # turn_id
+        Optional[str],  # thread_id
+    ]:
+        """Extract common data from span for call conversion.
+
+        This is a helper method to avoid duplication between to_call() and
+        to_complete_call() methods.
+
+        Returns:
+            Tuple containing all the processed data needed to create call schemas.
+        """
         events = [SpanEvent(e.as_dict()) for e in self.events]
         usage = get_weave_usage(self.attributes) or {}
 
@@ -352,9 +372,6 @@ class Span:
         else:
             turn_id = None
 
-        if display_name and len(display_name) >= MAX_DISPLAY_NAME_LENGTH:
-            display_name = shorten_name(display_name, MAX_DISPLAY_NAME_LENGTH)
-
         if len(op_name) >= MAX_OP_NAME_LENGTH:
             # Since op_name will typically be what is displayed, we don't want to just truncate
             # Create an identifier abbreviation so similar long names can be distinguished
@@ -375,6 +392,42 @@ class Span:
         usage_key = model or "usage"
 
         summary_map = tsi.SummaryMap(weave=weave_summary, usage={usage_key: llm_usage})
+
+        exception_msg = (
+            self.status.message if self.status.code == StatusCode.ERROR else None
+        )
+
+        return (
+            inputs,
+            outputs,
+            attributes,
+            op_name,
+            display_name,
+            start_time,
+            end_time,
+            summary_map,
+            exception_msg,
+            turn_id,
+            thread_id,
+        )
+
+    def to_call(
+        self, project_id: str, wb_user_id: Optional[str] = None
+    ) -> tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]:
+        (
+            inputs,
+            outputs,
+            attributes,
+            op_name,
+            display_name,
+            start_time,
+            end_time,
+            summary_map,
+            exception_msg,
+            turn_id,
+            thread_id,
+        ) = self._extract_call_data()
+
         start_call = tsi.StartedCallSchemaForInsert(
             project_id=project_id,
             id=self.span_id,
@@ -391,10 +444,6 @@ class Span:
             thread_id=thread_id,
         )
 
-        exception_msg = (
-            self.status.message if self.status.code == StatusCode.ERROR else None
-        )
-
         end_call = tsi.EndedCallSchemaForInsert(
             project_id=project_id,
             id=self.span_id,
@@ -404,6 +453,60 @@ class Span:
             summary=summary_map,
         )
         return (start_call, end_call)
+
+    def to_complete_call(
+        self, project_id: str, wb_user_id: Optional[str] = None
+    ) -> tsi.CompleteCallSchemaForInsert:
+        """Convert the span to a CompleteCallSchemaForInsert.
+
+        This is a convenience method that creates a complete call object directly,
+        rather than separate start and end objects. It's primarily used for OTEL
+        span ingestion where we always have both start and end data.
+
+        Args:
+            project_id (str): The project ID for the call.
+            wb_user_id (Optional[str]): The W&B user ID.
+
+        Returns:
+            tsi.CompleteCallSchemaForInsert: A complete call schema ready for insertion.
+
+        Examples:
+            >>> span = Span.from_proto(proto_span, resource)
+            >>> complete_call = span.to_complete_call("project_123")
+        """
+        (
+            inputs,
+            outputs,
+            attributes,
+            op_name,
+            display_name,
+            start_time,
+            end_time,
+            summary_map,
+            exception_msg,
+            turn_id,
+            thread_id,
+        ) = self._extract_call_data()
+
+        return tsi.CompleteCallSchemaForInsert(
+            project_id=project_id,
+            id=self.span_id,
+            op_name=op_name,
+            trace_id=self.trace_id,
+            parent_id=self.parent_id,
+            started_at=start_time,
+            ended_at=end_time,
+            attributes=attributes,
+            inputs=inputs,
+            output=outputs,
+            exception=exception_msg,
+            summary=summary_map,
+            display_name=display_name,
+            wb_user_id=wb_user_id,
+            wb_run_id=None,
+            turn_id=turn_id,
+            thread_id=thread_id,
+        )
 
 
 @dataclass

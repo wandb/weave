@@ -295,7 +295,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             raise TypeError(
                 "Expected traces as ExportTraceServiceRequest, got {type(req.traces)}"
             )
-        calls: list[dict[str, object]] = []
+        calls: list[tsi.CompleteCallSchemaForInsert] = []
         rejected_spans = 0
         error_messages: list[str] = []
         for proto_resource_spans in req.traces.resource_spans:
@@ -322,18 +322,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         error_messages.append(f"Rejected span ({span_ident}): {e!s}")
                         continue
 
-                    start_call, end_call = span.to_call(req.project_id)
-                    calls.extend(
-                        [
-                            {
-                                "mode": "start",
-                                "req": tsi.CallStartReq(start=start_call),
-                            },
-                            {"mode": "end", "req": tsi.CallEndReq(end=end_call)},
-                        ]
-                    )
+                    complete_call = span.to_complete_call(req.project_id)
+                    calls.append(complete_call)
+
         # TODO: Actually populate the error fields if call_start_batch fails
-        self.call_start_batch(tsi.CallCreateBatchReq(batch=calls))
+        self.calls_complete_batch_v2(
+            tsi.CallsCompleteBatchReq(project_id=req.project_id, items=calls)
+        )
         if rejected_spans > 0:
             # Join the first 20 errors and return them delimited by ';'
             joined_errors = "; ".join(error_messages[:20]) + (
@@ -521,7 +516,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             ch_calls.append(ch_call)
 
         # Batch insert to calls_complete table
-        self._v1_insert_calls_complete_batch(ch_calls)
+        self._v1_insert_calls_complete_batch(req.project_id, ch_calls)
 
         return tsi.CallsCompleteBatchRes()
 
@@ -822,6 +817,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             all_calls=all_calls,
         )
 
+        # get project version
+        project_version = self._project_version_service.get_project_version_sync(
+            req.project_id
+        )
+        if project_version == ProjectVersion.CALLS_COMPLETE_VERSION:
+            call_ids = [call.id for call in all_descendants]
+            self._hard_delete_calls(req.project_id, call_ids)
+            return tsi.CallsDeleteRes()
+
         deleted_at = datetime.datetime.now()
         insertables = [
             CallDeleteCHInsertable(
@@ -839,6 +843,28 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return tsi.CallsDeleteRes()
 
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._hard_delete_calls")
+    def _hard_delete_calls(self, project_id: str, call_ids: list[str]) -> None:
+        for table in ["calls_complete", "call_starts"]:
+            delete_sql = """
+                DELETE FROM {table_name:String}
+                WHERE project_id = {project_id:String}
+                    AND id IN {call_ids:Array(String)}
+            """
+
+            # if we don't find ids, try again in the next table
+            # TODO(gst): do we need settings to make sure this works even if some ids are not found?
+            res = self.ch_client.query(
+                delete_sql,
+                parameters={
+                    "table_name": table,
+                    "project_id": project_id,
+                    "call_ids": call_ids,
+                },
+            )
+            if res.error_code == 0:
+                return
+
     def _ensure_valid_update_field(self, req: tsi.CallUpdateReq) -> None:
         valid_update_fields = ["display_name"]
         for field in valid_update_fields:
@@ -852,6 +878,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
         assert_non_null_wb_user_id(req)
         self._ensure_valid_update_field(req)
+
+        project_version = self._project_version_service.get_project_version_sync(
+            req.project_id
+        )
+        if project_version == ProjectVersion.CALLS_COMPLETE_VERSION:
+            # try to update calls_complete first, then if not found hit call_starts
+            self._alter_table_update_call(req.project_id, req.call_id, req.display_name)
+
         renamed_insertable = CallUpdateCHInsertable(
             project_id=req.project_id,
             id=req.call_id,
@@ -861,6 +895,48 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._insert_call(renamed_insertable)
 
         return tsi.CallUpdateRes()
+
+    @ddtrace.tracer.wrap(
+        name="clickhouse_trace_server_batched._alter_table_update_call"
+    )
+    def _alter_table_update_call(
+        self, project_id: str, call_id: str, display_name: str
+    ) -> None:
+        def _make_update_sql(table_name: str) -> str:
+            return f"""
+                ALTER TABLE {table_name}
+                UPDATE display_name = {{display_name:String}}
+                WHERE project_id = {{project_id:String}}
+                    AND id = {{call_id:String}}
+            """
+
+        update_sql = _make_update_sql("calls_complete")
+        self.ch_client.query(
+            update_sql,
+            parameters={
+                "project_id": project_id,
+                "call_id": call_id,
+                "display_name": display_name,
+            },
+        )
+        if self.ch_client.error_code == 0:
+            return
+
+        update_sql = _make_update_sql("call_starts")
+        self.ch_client.query(
+            update_sql,
+            parameters={
+                "project_id": project_id,
+                "call_id": call_id,
+                "display_name": display_name,
+            },
+        )
+        if self.ch_client.error_code == 0:
+            return
+
+        raise ValueError(
+            f"Failed to update call {call_id} in calls_complete or call_starts"
+        )
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
         raise NotImplementedError()
@@ -2908,43 +2984,37 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if not req.track_llm_call:
             return tsi.CompletionsCreateRes(response=res.response)
 
-        start = tsi.StartedCallSchemaForInsert(
+        # Generate call ID
+        call_id = generate_id()
+
+        # Build summary with usage
+        summary: tsi.SummaryInsertMap = {}
+        if "usage" in res.response:
+            summary["usage"] = {model_name: res.response["usage"]}
+
+        # Handle exception
+        exception = res.response.get("error") if "error" in res.response else None
+
+        # Create complete call
+        complete_call = tsi.CompleteCallSchemaForInsert(
             project_id=req.project_id,
+            id=call_id,
             wb_user_id=req.wb_user_id,
             op_name=COMPLETIONS_CREATE_OP_NAME,
             started_at=start_time,
-            inputs={**req.inputs.model_dump(exclude_none=True)},
-            attributes={},
-        )
-        start_call = _start_call_for_insert_to_ch_insertable_start_call(start, self)
-        end = tsi.EndedCallSchemaForInsert(
-            project_id=req.project_id,
-            id=start_call.id,
             ended_at=end_time,
+            inputs={**req.inputs.model_dump(exclude_none=True)},
             output=res.response,
-            summary={},
+            attributes={},
+            summary=summary,
+            exception=exception,
         )
-        if "usage" in res.response:
-            end.summary["usage"] = {model_name: res.response["usage"]}
 
-        if "error" in res.response:
-            end.exception = res.response["error"]
-        end_call = _end_call_for_insert_to_ch_insertable_end_call(end, self)
-        calls: list[Union[CallStartCHInsertable, CallEndCHInsertable]] = [
-            start_call,
-            end_call,
-        ]
-        batch_data = []
-        for call in calls:
-            call_dict = call.model_dump()
-            values = [call_dict.get(col) for col in ALL_CALL_INSERT_COLUMNS]
-            batch_data.append(values)
-
-        self._insert_call_batch(batch_data)
-
-        return tsi.CompletionsCreateRes(
-            response=res.response, weave_call_id=start_call.id
+        self.calls_complete_batch_v2(
+            tsi.CallsCompleteBatchReq(project_id=req.project_id, items=[complete_call])
         )
+
+        return tsi.CompletionsCreateRes(response=res.response, weave_call_id=call_id)
 
     # -------------------------------------------------------------------
     # Streaming variant
@@ -2977,11 +3047,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             return _single_error_iter(e)
 
         # Track start call if requested
-        start_call: Optional[CallStartCHInsertable] = None
+        start_call_schema: Optional[tsi.StartedCallSchemaForInsert] = None
         if req.track_llm_call:
             inputs = req.inputs.model_dump(exclude_none=True)
             inputs["model"] = model_name
-            start = tsi.StartedCallSchemaForInsert(
+            start_call_schema = tsi.StartedCallSchemaForInsert(
                 project_id=req.project_id,
                 wb_user_id=req.wb_user_id,
                 op_name=COMPLETIONS_CREATE_OP_NAME,
@@ -2989,9 +3059,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 inputs={**inputs},
                 attributes={},
             )
-            start_call = _start_call_for_insert_to_ch_insertable_start_call(start, self)
             # Insert immediately so that callers can see the call in progress
-            self._insert_call(start_call)
+            self.calls_start_batch_v2(
+                tsi.CallsStartBatchReq(
+                    project_id=req.project_id, items=[start_call_schema]
+                )
+            )
 
         # --- Build the underlying chunk iterator
         chunk_iter = lite_llm_completion_stream(
@@ -3004,14 +3077,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
 
         # If tracking not requested just return chunks directly
-        if not req.track_llm_call or start_call is None:
+        if not req.track_llm_call or start_call_schema is None:
             return chunk_iter
 
         # Otherwise, wrap the iterator with tracking
         return _create_tracked_stream_wrapper(
-            self._insert_call,
+            self,
             chunk_iter,
-            start_call,
+            start_call_schema,
             model_name,
             req.project_id,
         )
@@ -3465,7 +3538,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
 
     def _v1_insert_calls_complete_batch(
-        self, ch_calls: list[V1CallCompleteCHInsertable]
+        self, project_id: str, ch_calls: list[V1CallCompleteCHInsertable]
     ) -> None:
         """Batch insert calls into calls_complete table (V1 projects)"""
         self._v1_insert_call_batch(
@@ -3473,15 +3546,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         # Now we need to delete the inserted ids from the call_starts if they exist
         call_ids = [ch_call.id for ch_call in ch_calls]
-        self._delete_call_starts(call_ids)
-
-    def _delete_call_starts(self, call_ids: list[str]) -> None:
-        """Delete call_starts rows for the given call ids."""
-        # TODO: fix this
-        self._query(
-            "DELETE FROM call_starts WHERE id IN (:call_ids)",
-            {"call_ids": call_ids},
-        )
+        self._hard_delete_calls(project_id=project_id, call_ids=call_ids)
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._flush_calls")
     def _flush_calls(self) -> None:
@@ -4063,9 +4128,9 @@ def _build_aggregated_output(
 
 
 def _create_tracked_stream_wrapper(
-    insert_call: Callable[[CallEndCHInsertable], None],
+    trace_server: "ClickHouseTraceServer",
     chunk_iter: Iterator[dict[str, Any]],
-    start_call: CallStartCHInsertable,
+    start_call_schema: tsi.StartedCallSchemaForInsert,
     model_name: str,
     project_id: str,
 ) -> Iterator[dict[str, Any]]:
@@ -4073,7 +4138,7 @@ def _create_tracked_stream_wrapper(
 
     def _stream_wrapper() -> Iterator[dict[str, Any]]:
         # (1) send meta chunk first so clients can associate stream
-        yield {"_meta": {"weave_call_id": start_call.id}}
+        yield {"_meta": {"weave_call_id": start_call_schema.id}}
 
         # Initialize accumulation variables
         aggregated_output: Optional[dict[str, Any]] = None
@@ -4150,25 +4215,36 @@ def _create_tracked_stream_wrapper(
                     ]
                 }
 
-            # Prepare summary and end call
-            summary: dict[str, Any] = {}
+            # Prepare summary and complete call
+            summary: tsi.SummaryInsertMap = {}
             if aggregated_output is not None and model_name is not None:
                 aggregated_output["model"] = model_name
 
                 if "usage" in aggregated_output:
                     summary["usage"] = {model_name: aggregated_output["usage"]}
 
-            end = tsi.EndedCallSchemaForInsert(
+            # Create complete call with both start and end data
+            complete_call = tsi.CompleteCallSchemaForInsert(
                 project_id=project_id,
-                id=start_call.id,
+                id=start_call_schema.id,
+                op_name=start_call_schema.op_name,
+                trace_id=start_call_schema.trace_id,
+                parent_id=start_call_schema.parent_id,
+                thread_id=start_call_schema.thread_id,
+                turn_id=start_call_schema.turn_id,
+                started_at=start_call_schema.started_at,
                 ended_at=datetime.datetime.now(),
+                attributes=start_call_schema.attributes,
+                inputs=start_call_schema.inputs,
                 output=aggregated_output,
                 summary=summary,
+                display_name=start_call_schema.display_name,
+                wb_user_id=start_call_schema.wb_user_id,
+                wb_run_id=start_call_schema.wb_run_id,
             )
-            end_call = _end_call_for_insert_to_ch_insertable_end_call(
-                end, None
-            )  # No trace_server in stream wrapper
-            insert_call(end_call)
+            trace_server.calls_complete_batch_v2(
+                tsi.CallsCompleteBatchReq(project_id=project_id, items=[complete_call])
+            )
 
     return _stream_wrapper()
 
