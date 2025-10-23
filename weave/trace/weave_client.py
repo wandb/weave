@@ -581,7 +581,10 @@ class WeaveClient:
             # Query feedback table with both weave_ref AND payload to filter out empty feedback
             feedback_req = FeedbackQueryReq(
                 project_id=self._project_id(),
-                fields=["weave_ref", "payload"],  # Fetch payload to check if it's populated
+                fields=[
+                    "weave_ref",
+                    "payload",  # Fetch payload to check if it's populated
+                ],
             )
             feedback_res = self.server.feedback_query(feedback_req)
 
@@ -591,10 +594,10 @@ class WeaveClient:
                 payload = item.get("payload")
                 # Only include feedback that has a non-null, non-empty payload
                 if payload is not None and payload != {}:
-                    ref = item.get("weave_ref", "")
-                    if "/call/" in ref:
-                        call_id = ref.split("/call/")[-1]
-                        call_ids_with_feedback.add(call_id)
+                    ref_str = item.get("weave_ref", "")
+                    ref = Ref.maybe_parse_uri(ref_str)
+                    if isinstance(ref, CallRef):
+                        call_ids_with_feedback.add(ref.id)
 
             # Filter by call_ids
             if not call_ids_with_feedback:
