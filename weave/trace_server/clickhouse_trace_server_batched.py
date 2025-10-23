@@ -844,7 +844,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return tsi.CallsDeleteRes()
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._hard_delete_calls")
-    def _hard_delete_calls(self, project_id: str, call_ids: list[str], tables: list[str]) -> None:
+    def _hard_delete_calls(
+        self, project_id: str, call_ids: list[str], tables: list[str]
+    ) -> None:
         total_deleted = 0
         target_count = len(call_ids)
         tables = tables or ["calls_complete", "call_starts"]
@@ -878,7 +880,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     return
 
             except Exception as e:
-                logger.error(f"Error deleting calls from {table}: {e}")
+                logger.exception(f"Error deleting calls from {table}: {e}")
                 continue
 
         if total_deleted < target_count:
@@ -3580,7 +3582,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         # Now we need to delete the inserted ids from the call_starts if they exist
         call_ids = [ch_call.id for ch_call in ch_calls]
-        self._hard_delete_calls(project_id=project_id, call_ids=call_ids, tables=["call_starts"])
+        self._hard_delete_calls(
+            project_id=project_id, call_ids=call_ids, tables=["call_starts"]
+        )
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._flush_calls")
     def _flush_calls(self) -> None:
