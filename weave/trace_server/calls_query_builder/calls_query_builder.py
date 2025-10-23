@@ -479,6 +479,7 @@ class HardCodedFilter(BaseModel):
                 self.filter.wb_user_ids,
                 self.filter.wb_run_ids,
                 self.filter.turn_ids,
+                self.filter.require_feedback,
             ]
         )
 
@@ -1614,6 +1615,17 @@ def process_calls_filter_to_conditions(
     if filter.wb_run_ids:
         conditions.append(
             f"{get_field_by_name('wb_run_id').as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.wb_run_ids), 'Array(String)')}"
+        )
+
+    if filter.require_feedback:
+        # Use a subquery to filter calls that have feedback
+        # This is efficient as it only checks for existence in the feedback table at the SQL level
+        conditions.append(
+            f"{get_field_by_name('id').as_sql(param_builder, table_alias)} IN "
+            f"(SELECT DISTINCT substring(weave_ref, position(weave_ref, '/call/') + 6) "
+            f"FROM feedback "
+            f"WHERE feedback.project_id = {table_alias}.project_id "
+            f"AND weave_ref LIKE concat('weave-trace-internal:///', {table_alias}.project_id, '/call/%'))"
         )
 
     return conditions

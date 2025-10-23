@@ -553,6 +553,7 @@ class WeaveClient:
             `scored_by`: Filter by one or more scorers (name or ref URI). Multiple scorers are AND-ed.
             `require_feedback`: If True, only return calls that have feedback attached.
                     Automatically sets `include_feedback=True` to ensure feedback is included in results.
+                    Uses efficient SQL-level filtering with a subquery on the feedback table.
             `page_size`: Number of calls fetched per page. Tune this for performance in large queries.
 
         Returns:
@@ -580,38 +581,8 @@ class WeaveClient:
                     "Setting include_feedback=False with require_feedback=True has no effect."
                 )
             include_feedback = True
-
-        # If require_feedback is True, first get all feedback to find call IDs
-        if require_feedback:
-            # Query all feedback for this project
-            feedback_req = FeedbackQueryReq(
-                project_id=self._project_id(),
-                fields=["weave_ref"],
-            )
-            feedback_res = self.server.feedback_query(feedback_req)
-
-            # Extract unique call IDs from feedback refs
-            call_ids_with_feedback = set()
-            for feedback_item in feedback_res.result:
-                ref_uri = feedback_item.get("weave_ref", "")
-                # Parse the call ID from the ref URI (format: weave:///.../calls/CALL_ID)
-                if "/calls/" in ref_uri:
-                    call_id = ref_uri.split("/calls/")[-1]
-                    call_ids_with_feedback.add(call_id)
-
-            # If no feedback found, return empty iterator
-            if not call_ids_with_feedback:
-                # Create an empty filter that will return no results
-                filter = CallsFilter(call_ids=[])
-            else:
-                # Add call_ids to the filter
-                if filter.call_ids is None:
-                    filter.call_ids = list(call_ids_with_feedback)
-                else:
-                    # Intersect with existing call_ids filter if present
-                    filter.call_ids = list(
-                        set(filter.call_ids) & call_ids_with_feedback
-                    )
+            # Set the require_feedback flag on the filter for SQL-level filtering
+            filter.require_feedback = True
 
         query = _add_scored_by_to_calls_query(scored_by, query)
 

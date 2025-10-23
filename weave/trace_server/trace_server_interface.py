@@ -401,6 +401,7 @@ class CallsFilter(BaseModelStrict):
     trace_roots_only: Optional[bool] = None
     wb_user_ids: Optional[list[str]] = None
     wb_run_ids: Optional[list[str]] = None
+    require_feedback: Optional[bool] = None
 
 
 class SortBy(BaseModelStrict):
