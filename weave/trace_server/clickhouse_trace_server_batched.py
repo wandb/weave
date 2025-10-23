@@ -844,26 +844,47 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return tsi.CallsDeleteRes()
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._hard_delete_calls")
-    def _hard_delete_calls(self, project_id: str, call_ids: list[str]) -> None:
-        for table in ["calls_complete", "call_starts"]:
-            delete_sql = """
-                DELETE FROM {table_name:String}
-                WHERE project_id = {project_id:String}
-                    AND id IN {call_ids:Array(String)}
+    def _hard_delete_calls(self, project_id: str, call_ids: list[str], tables: list[str]) -> None:
+        total_deleted = 0
+        target_count = len(call_ids)
+        tables = tables or ["calls_complete", "call_starts"]
+
+        for table in tables:
+            delete_sql = f"""
+                DELETE FROM {table}
+                WHERE project_id = {{project_id:String}}
+                    AND id IN {{call_ids:Array(String)}}
             """
 
             # if we don't find ids, try again in the next table
-            # TODO(gst): do we need settings to make sure this works even if some ids are not found?
-            res = self.ch_client.query(
-                delete_sql,
-                parameters={
-                    "table_name": table,
-                    "project_id": project_id,
-                    "call_ids": call_ids,
-                },
+            try:
+                res: QueryResult = self.ch_client.query(
+                    delete_sql,
+                    parameters={
+                        "project_id": project_id,
+                        "call_ids": call_ids,
+                    },
+                )
+                deleted_rows = res.summary.get("written_rows", 0)
+                total_deleted += deleted_rows
+                logger.info(
+                    f"Deleted {deleted_rows} rows from {table}. "
+                    f"Total deleted: {total_deleted}/{target_count}"
+                )
+
+                # If we've deleted all the calls, return early
+                if total_deleted >= target_count:
+                    logger.info(f"Successfully deleted all {target_count} call(s)")
+                    return
+
+            except Exception as e:
+                logger.error(f"Error deleting calls from {table}: {e}")
+                continue
+
+        if total_deleted < target_count:
+            logger.warning(
+                f"Failed to delete all calls. Deleted {total_deleted}/{target_count} calls. "
             )
-            if res.error_code == 0:
-                return
 
     def _ensure_valid_update_field(self, req: tsi.CallUpdateReq) -> None:
         valid_update_fields = ["display_name"]
@@ -910,8 +931,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     AND id = {{call_id:String}}
             """
 
+        # Try calls_complete first
         update_sql = _make_update_sql("calls_complete")
-        self.ch_client.query(
+        res: QueryResult = self.ch_client.query(
             update_sql,
             parameters={
                 "project_id": project_id,
@@ -919,11 +941,17 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 "display_name": display_name,
             },
         )
-        if self.ch_client.error_code == 0:
+        updated_rows = res.summary.get("written_rows", 0)
+        logger.info(f"calls_complete update: {updated_rows} row(s) updated")
+
+        # If we updated something, return early
+        if updated_rows > 0:
+            logger.info(f"Successfully updated call {call_id} in calls_complete")
             return
 
+        # Try call_starts if calls_complete didn't have the row
         update_sql = _make_update_sql("call_starts")
-        self.ch_client.query(
+        res = self.ch_client.query(
             update_sql,
             parameters={
                 "project_id": project_id,
@@ -931,11 +959,17 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 "display_name": display_name,
             },
         )
-        if self.ch_client.error_code == 0:
+        updated_rows = res.summary.get("written_rows", 0)
+        logger.info(f"call_starts update: {updated_rows} row(s) updated")
+
+        if updated_rows > 0:
+            logger.info(f"Successfully updated call {call_id} in call_starts")
             return
 
+        # If we get here, we didn't find the call in either table
         raise ValueError(
-            f"Failed to update call {call_id} in calls_complete or call_starts"
+            f"Failed to update call {call_id} in calls_complete or call_starts - "
+            f"call not found in either table"
         )
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
@@ -3546,7 +3580,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         # Now we need to delete the inserted ids from the call_starts if they exist
         call_ids = [ch_call.id for ch_call in ch_calls]
-        self._hard_delete_calls(project_id=project_id, call_ids=call_ids)
+        self._hard_delete_calls(project_id=project_id, call_ids=call_ids, tables=["call_starts"])
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._flush_calls")
     def _flush_calls(self) -> None:

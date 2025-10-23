@@ -3707,8 +3707,8 @@ def test_op_sampling(client):
         always_traced(i)
     assert always_traced_calls == 10  # Function was called
     assert len(list(always_traced.calls())) == 10  # And traced
-    # Sanity check that the call_start was logged, unlike in the never_traced case.
-    assert "call_start" in client.server.attribute_access_log
+    # Sanity check that the batch call start was logged, unlike in the never_traced case.
+    assert "calls_start_batch_v2" in client.server.attribute_access_log
 
     # Sometimes traced should execute always but only be traced sometimes
     num_runs = 100
@@ -3758,7 +3758,7 @@ def test_op_sampling_async(client):
         asyncio.run(always_traced(i))
     assert always_traced_calls == 10  # Function was called
     assert len(list(always_traced.calls())) == 10  # And traced
-    assert "call_start" in client.server.attribute_access_log
+    assert "calls_start_batch_v2" in client.server.attribute_access_log
 
     # Sometimes traced should execute always but only be traced sometimes
     num_runs = 100

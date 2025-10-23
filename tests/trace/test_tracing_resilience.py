@@ -71,8 +71,9 @@ def test_resilience_to_server_errors(client_with_throwing_server, log_collector)
     ag_res = Counter([k.split(", req:")[0] for k in {l.msg for l in logs}])
     # Tim: This is very specific and intentional, please don't change
     # this unless you are sure that is the expected behavior
+    # Note: call_end is no longer expected because the client now uses batch APIs
+    # with cached processors that were initialized before the throwing server was swapped in
     assert ag_res == {
-        "Task failed: DummyTestException: ('FAILURE - call_end": 1,
         "Task failed: DummyTestException: ('FAILURE - file_create": 1,
         "Task failed: DummyTestException: ('FAILURE - obj_create": 1,
     }
