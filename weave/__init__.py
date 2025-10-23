@@ -46,6 +46,7 @@ __docspec__ = [
     op,
     attributes,
     thread,
+    WeaveSerializable,
     # Re-exported from flow module
     Object,
     Dataset,
@@ -85,6 +86,7 @@ __all__ = [
     "SavedView",
     "Scorer",
     "StringPrompt",
+    "WeaveSerializable",
     "attributes",
     "finish",
     "get",

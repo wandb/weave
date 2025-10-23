@@ -21,6 +21,7 @@ from weave.trace.context.call_context import get_current_call, require_current_c
 from weave.trace.display.term import configure_logger
 from weave.trace.op import PostprocessInputsFunc, PostprocessOutputFunc, as_op, op
 from weave.trace.refs import ObjectRef, Ref
+from weave.trace.serialization.dictifiable import WeaveSerializable
 from weave.trace.settings import (
     UserSettings,
     parse_and_apply_settings,
@@ -403,6 +404,7 @@ __all__ = [
     "ObjectRef",
     "Table",
     "ThreadContext",
+    "WeaveSerializable",
     "as_op",
     "attributes",
     "finish",

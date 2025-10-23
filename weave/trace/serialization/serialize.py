@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from weave.trace.object_record import ObjectRecord
 from weave.trace.refs import ObjectRef, Ref, TableRef
 from weave.trace.serialization import custom_objs
-from weave.trace.serialization.dictifiable import try_to_dict
+from weave.trace.serialization.dictifiable import try_to_dict, try_weave_serialize
 from weave.trace_server.trace_server_interface import (
     FileContentReadReq,
     FileCreateReq,
@@ -208,7 +208,23 @@ def dictify(
                 dict_result[k] = dictify(v, maxdepth, depth + 1, seen)
         return dict_result
 
-    if hasattr(obj, "to_dict"):
+    # Try new WeaveSerializable protocol first, then fall back to to_dict
+    if hasattr(obj, "__weave_serialize__"):
+        try:
+            as_dict = obj.__weave_serialize__()
+            if isinstance(as_dict, dict):
+                to_dict_result = {}
+                for k, v in as_dict.items():
+                    if isinstance(k, str) and should_redact(k):
+                        to_dict_result[k] = REDACTED_VALUE
+                    elif maxdepth == 0 or depth < maxdepth:
+                        to_dict_result[k] = dictify(v, maxdepth, depth + 1)
+                    else:
+                        to_dict_result[k] = stringify(v)
+                return to_dict_result
+        except Exception:
+            raise ValueError("__weave_serialize__ failed") from None
+    elif hasattr(obj, "to_dict"):
         try:
             as_dict = obj.to_dict()
             if isinstance(as_dict, dict):
