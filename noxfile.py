@@ -189,6 +189,11 @@ def tests(session, shard):
         "--cov-branch",
     ]
 
+    # In CI, use record-mode=none to prevent VCR from making real HTTP requests
+    # This ensures tests only replay existing cassettes and fail if cassettes are missing
+    if env.get("CI"):
+        pytest_args.append("--record-mode=none")
+
     # Handle trace sharding: run every 3rd test starting at different offsets
     if shard in trace_server_shards:
         shard_id = int(shard[-1]) - 1
