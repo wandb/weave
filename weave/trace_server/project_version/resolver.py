@@ -1,7 +1,8 @@
 """Concrete project version resolver with explicit provider order."""
-
+import threading
 import asyncio
 import logging
+from concurrent.futures import Future
 from typing import Any, Optional
 
 from cachetools import LRUCache
@@ -75,9 +76,6 @@ class ProjectVersionResolver(ProjectVersionService):
         # 1. Check in-memory cache first (fastest)
         cached = self._cache.get(project_id)
         if cached is not None:
-            print(
-                f"...... Project version cache hit for project {project_id}: {cached}"
-            )
             return cached
 
         # 2. Try Redis cache if enabled
@@ -87,16 +85,10 @@ class ProjectVersionResolver(ProjectVersionService):
             pass  # Fall through to next provider
         else:
             self._cache[project_id] = version
-            print(
-                f"...... Project version cache set for project {project_id}: {version}"
-            )
             return version
 
         # 3. Finally, check ClickHouse (always succeeds, returns 0, 1, or -1)
         version = await self._clickhouse_provider.get_project_version(project_id)
-        print(
-            f"...... Project version clickhouse hit for project {project_id}: {version}"
-        )
         if version != ProjectVersion.EMPTY_PROJECT:
             # only set cache when we know what sdk is writing to it, if empty
             # it can be either new or old
@@ -105,20 +97,55 @@ class ProjectVersionResolver(ProjectVersionService):
         return version
 
     def get_project_version_sync(self, project_id: str) -> ProjectVersion:
-        """Get the project version for routing decisions.
+        """Get the project version synchronously.
+
+        First checks the in-memory cache (always safe). If not cached and an event
+        loop is running, falls back to ClickHouse provider directly to avoid
+        deadlock issues with nested sync/async contexts.
 
         Returns:
-            Union[ProjectVersion, int]: ProjectVersion enum or int for backwards compatibility.
+            ProjectVersion: ProjectVersion enum or int for backwards compatibility.
         """
+        # Check cache first (always sync-safe)
+        cached = self._cache.get(project_id)
+        if cached is not None:
+            return cached
+
+        # Check if there's a running loop
+        running_loop = None
         try:
-            loop = asyncio.get_running_loop()
-            # If we're already in an async context, we can't use run_until_complete or asyncio.run
-            raise RuntimeError(
-                "get_project_version_sync cannot be called from an async context. "
-                "Use await get_project_version() instead."
-            )
+            running_loop = asyncio.get_running_loop()
         except RuntimeError:
-            # No running loop in this thread, we can safely use asyncio.run
+            # No loop running - this is the common/expected case
             pass
 
-        return asyncio.run(self.get_project_version(project_id))
+        # Normal case: no event loop running, safe to create one
+        if running_loop is None:
+            return asyncio.run(self.get_project_version(project_id))
+
+        # Edge case: event loop is running (sync parent called from async grandparent).
+        # We can't use asyncio.run() or run_until_complete() as they would deadlock.
+        # Spawn a new thread with its own event loop.
+        logger.debug(
+            f"get_project_version_sync called with running loop for {project_id}, "
+            "delegating to new thread"
+        )
+        import threading
+
+        result: list[ProjectVersion] = []
+        exception: list[Exception] = []
+
+        def run_in_new_loop() -> None:
+            try:
+                result.append(asyncio.run(self.get_project_version(project_id)))
+            except Exception as e:
+                exception.append(e)
+
+        thread = threading.Thread(target=run_in_new_loop)
+        thread.start()
+        thread.join()
+
+        if exception:
+            raise exception[0]
+
+        return result[0]
