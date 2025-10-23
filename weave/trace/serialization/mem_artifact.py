@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import contextlib
 import os
+import shutil
+import sys
 import tempfile
 from collections.abc import Generator, Iterator, Mapping
 from io import BytesIO, StringIO
@@ -14,6 +16,34 @@ from weave.trace.serialization import (
 # This uses the older weave query_service's Artifact interface. We could
 # probably simplify a lot at this point by removing the internal requirement
 # to use this interface.
+
+
+def _windows_safe_rmtree(path: str, retries: int = 3) -> None:
+    """Remove a directory tree with Windows-safe error handling.
+
+    On Windows, file handles may not be released immediately even after
+    closing files. This function retries the removal operation to handle
+    transient permission errors that occur on Windows.
+
+    Args:
+        path: Path to directory to remove
+        retries: Number of times to retry on permission errors
+    """
+    import time
+
+    for attempt in range(retries):
+        try:
+            shutil.rmtree(path)
+            return
+        except (PermissionError, OSError) as e:
+            if attempt == retries - 1:
+                # On the final attempt, ignore the error on Windows
+                # since these are finalization warnings, not critical failures
+                if sys.platform == "win32":
+                    return
+                raise
+            # Wait briefly before retrying to allow file handles to be released
+            time.sleep(0.1)
 
 
 class MemTraceFilesArtifact:
@@ -32,6 +62,19 @@ class MemTraceFilesArtifact:
             metadata = {}
         self._metadata = metadata
         self.temp_read_dir = None
+
+    def __del__(self) -> None:
+        """Clean up temporary directory with Windows-safe error handling."""
+        if self.temp_read_dir is not None:
+            try:
+                # Use our Windows-safe cleanup instead of relying on
+                # TemporaryDirectory's finalizer
+                _windows_safe_rmtree(self.temp_read_dir.name)
+                # Prevent TemporaryDirectory from trying to clean up again
+                self.temp_read_dir._finalizer.detach()  # type: ignore
+            except Exception:
+                # Ignore all errors during finalization
+                pass
 
     @overload
     @contextlib.contextmanager
@@ -85,8 +128,11 @@ class MemTraceFilesArtifact:
         write_path = os.path.join(self.temp_read_dir.name, filename or path)
         with open(write_path, "wb") as f:
             f.write(self.path_contents[path])
+            # Explicitly flush and sync before closing to ensure
+            # Windows releases the file handle properly
             f.flush()
             os.fsync(f.fileno())
+        # File is now closed due to exiting the context manager
         return write_path
 
     # @property
