@@ -542,7 +542,7 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(self._internal_trace_server.evaluation_delete_v2, req)
 
-    def v1_calls_start_batch(
+    def calls_start_batch_v2(
         self, req: tsi.CallsStartBatchReq
     ) -> tsi.CallsStartBatchRes:
         original_project_id = req.project_id
@@ -554,9 +554,9 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
                 item.wb_run_id = self._idc.ext_to_int_run_id(item.wb_run_id)
             if item.wb_user_id is not None:
                 item.wb_user_id = self._idc.ext_to_int_user_id(item.wb_user_id)
-        return self._ref_apply(self._internal_trace_server.v1_calls_start_batch, req)
+        return self._ref_apply(self._internal_trace_server.calls_start_batch_v2, req)
 
-    def v1_calls_complete_batch(
+    def calls_complete_batch_v2(
         self, req: tsi.CallsCompleteBatchReq
     ) -> tsi.CallsCompleteBatchRes:
         original_project_id = req.project_id
@@ -568,4 +568,4 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
                 item.wb_run_id = self._idc.ext_to_int_run_id(item.wb_run_id)
             if item.wb_user_id is not None:
                 item.wb_user_id = self._idc.ext_to_int_user_id(item.wb_user_id)
-        return self._ref_apply(self._internal_trace_server.v1_calls_complete_batch, req)
+        return self._ref_apply(self._internal_trace_server.calls_complete_batch_v2, req)

@@ -15,9 +15,9 @@ class ClickHouseProjectVersionProvider:
 
     This provider implements the following logic:
     1. Check calls_complete table for rows
-    2. If rows found, return NEW_VERSION (1)
+    2. If rows found, return CALLS_COMPLETE_VERSION (1)
     3. If no rows, check calls_merged table
-    4. If calls_merged has rows, return OLD_VERSION (0)
+    4. If calls_merged has rows, return CALLS_MERGED_VERSION (0)
     5. If neither table has rows, return EMPTY_PROJECT (-1)
 
     Args:
@@ -26,7 +26,7 @@ class ClickHouseProjectVersionProvider:
     Examples:
         >>> ch_provider = ClickHouseProjectVersionProvider(ch_client=clickhouse_client)
         >>> version = await ch_provider.get_project_version("proj-123")
-        >>> assert version in (ProjectVersion.OLD_VERSION, ProjectVersion.NEW_VERSION, ProjectVersion.EMPTY_PROJECT)
+        >>> assert version in (ProjectVersion.CALLS_MERGED_VERSION, ProjectVersion.CALLS_COMPLETE_VERSION, ProjectVersion.EMPTY_PROJECT)
     """
 
     def __init__(self, ch_client: Any):
@@ -36,8 +36,8 @@ class ClickHouseProjectVersionProvider:
         """Determine project version by checking both tables.
 
         Returns:
-            ProjectVersion.NEW_VERSION (1): If calls_complete has rows
-            ProjectVersion.OLD_VERSION (0): If calls_merged has rows but calls_complete doesn't
+            ProjectVersion.CALLS_COMPLETE_VERSION (1): If calls_complete has rows
+            ProjectVersion.CALLS_MERGED_VERSION (0): If calls_merged has rows but calls_complete doesn't
             ProjectVersion.EMPTY_PROJECT (-1): If neither table has rows
         """
         pb = ParamBuilder()
@@ -54,7 +54,7 @@ class ClickHouseProjectVersionProvider:
             result = self._ch.query(query_complete, parameters=pb.get_params())
             print(f"---------- Clickhouse result complete: {result.result_rows}")
             if result.result_rows:
-                return ProjectVersion.NEW_VERSION
+                return ProjectVersion.CALLS_COMPLETE_VERSION
         except Exception as e:
             raise e
             # If calls_complete doesn't exist or query fails, fall through to check calls_merged
@@ -71,7 +71,7 @@ class ClickHouseProjectVersionProvider:
             result = self._ch.query(query_merged, parameters=pb.get_params())
             print(f"---------- Clickhouse result merged: {result.result_rows}")
             if result.result_rows:
-                return ProjectVersion.OLD_VERSION
+                return ProjectVersion.CALLS_MERGED_VERSION
         except Exception as e:
             raise e
             # If calls_merged doesn't exist or query fails, treat as empty

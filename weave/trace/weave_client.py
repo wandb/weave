@@ -825,8 +825,8 @@ class WeaveClient:
                     "Inputs may be dropped."
                 )
 
-            # Send the start immediately using the new V1 batch endpoint
-            self.server.v1_calls_start_batch(
+            # Send the start immediately using the new V2 batch endpoint
+            self.server.calls_start_batch_v2(
                 CallsStartBatchReq(project_id=project_id, items=[call_start_req.start])
             )
 
@@ -1032,8 +1032,8 @@ class WeaveClient:
                 wb_run_step_end=call_end_req.end.wb_run_step_end,
             )
 
-            # Send the complete call using the new V1 batch endpoint
-            self.server.v1_calls_complete_batch(
+            # Send the complete call using the new V2 batch endpoint
+            self.server.calls_complete_batch_v2(
                 CallsCompleteBatchReq(project_id=project_id, items=[complete_call])
             )
 

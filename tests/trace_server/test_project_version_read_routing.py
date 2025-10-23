@@ -29,18 +29,22 @@ def test_threads_query_routes_to_correct_table(monkeypatch):
     server = ClickHouseTraceServer(host="localhost")
     pb = ParamBuilder()
 
-    # Test OLD_VERSION -> calls_merged
+    # Test CALLS_MERGED_VERSION -> calls_merged
     monkeypatch.setattr(
-        server, "_project_version_service", MockResolver(ProjectVersion.OLD_VERSION)
+        server,
+        "_project_version_service",
+        MockResolver(ProjectVersion.CALLS_MERGED_VERSION),
     )
     table_name = server._get_calls_table("test-project")
     sql = make_threads_query(project_id="test-project", pb=pb, table_name=table_name)
     assert "calls_merged" in sql
     assert "calls_complete" not in sql
 
-    # Test NEW_VERSION -> calls_complete
+    # Test CALLS_COMPLETE_VERSION -> calls_complete
     monkeypatch.setattr(
-        server, "_project_version_service", MockResolver(ProjectVersion.NEW_VERSION)
+        server,
+        "_project_version_service",
+        MockResolver(ProjectVersion.CALLS_COMPLETE_VERSION),
     )
     table_name = server._get_calls_table("test-project")
     sql = make_threads_query(project_id="test-project", pb=pb, table_name=table_name)
@@ -68,9 +72,11 @@ def test_project_stats_query_routes_to_correct_stats_table(monkeypatch):
     server = ClickHouseTraceServer(host="localhost")
     pb = ParamBuilder()
 
-    # Test OLD_VERSION -> calls_merged_stats
+    # Test CALLS_MERGED_VERSION -> calls_merged_stats
     monkeypatch.setattr(
-        server, "_project_version_service", MockResolver(ProjectVersion.OLD_VERSION)
+        server,
+        "_project_version_service",
+        MockResolver(ProjectVersion.CALLS_MERGED_VERSION),
     )
     calls_stats_table = server._get_calls_stats_table("test-project")
     sql, _ = make_project_stats_query(
@@ -85,9 +91,11 @@ def test_project_stats_query_routes_to_correct_stats_table(monkeypatch):
     assert "calls_merged_stats" in sql
     assert "calls_complete_stats" not in sql
 
-    # Test NEW_VERSION -> calls_complete_stats
+    # Test CALLS_COMPLETE_VERSION -> calls_complete_stats
     monkeypatch.setattr(
-        server, "_project_version_service", MockResolver(ProjectVersion.NEW_VERSION)
+        server,
+        "_project_version_service",
+        MockResolver(ProjectVersion.CALLS_COMPLETE_VERSION),
     )
     calls_stats_table = server._get_calls_stats_table("test-project")
     sql, _ = make_project_stats_query(

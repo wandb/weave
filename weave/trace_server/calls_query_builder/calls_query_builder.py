@@ -545,7 +545,7 @@ class CallsQuery(BaseModel):
     def add_field(self, field: str) -> "CallsQuery":
         # TODO: fix hack
         table_alias = "calls_merged"
-        if self.project_version == ProjectVersion.NEW_VERSION:
+        if self.project_version == ProjectVersion.CALLS_COMPLETE_VERSION:
             table_alias = "calls_complete"
         name = get_field_by_name(field, table_alias)
         if name in self.select_fields:
@@ -577,7 +577,7 @@ class CallsQuery(BaseModel):
         direction = cast(Literal["ASC", "DESC"], direction)
         # Determine the correct table alias based on project version
         table_alias = "calls_merged"
-        if self.project_version == ProjectVersion.NEW_VERSION:
+        if self.project_version == ProjectVersion.CALLS_COMPLETE_VERSION:
             table_alias = "calls_complete"
         self.order_fields.append(
             OrderField(field=get_field_by_name(field, table_alias), direction=direction)
@@ -704,7 +704,7 @@ class CallsQuery(BaseModel):
         logger.info(
             f"---------- Building calls query with project version: {self.project_version}"
         )
-        if self.project_version == ProjectVersion.NEW_VERSION:
+        if self.project_version == ProjectVersion.CALLS_COMPLETE_VERSION:
             # TODO: check if we are hitting the call_start table or the complete table
             qry = self._as_sql_base_format_calls_complete(
                 pb,

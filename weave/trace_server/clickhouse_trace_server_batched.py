@@ -227,9 +227,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         if version == ProjectVersion.EMPTY_PROJECT:
             return default_table
-        elif version == ProjectVersion.OLD_VERSION:
+        elif version == ProjectVersion.CALLS_MERGED_VERSION:
             return "calls_merged"
-        elif version == ProjectVersion.NEW_VERSION:
+        elif version == ProjectVersion.CALLS_COMPLETE_VERSION:
             return "calls_complete"
         else:
             raise ValueError(f"Invalid project version: {version}")
@@ -421,12 +421,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # Returns the id of the newly created call
         return tsi.CallEndRes()
 
-    def v1_calls_start_batch(
+    def calls_start_batch_v2(
         self, req: tsi.CallsStartBatchReq
     ) -> tsi.CallsStartBatchRes:
-        """Batch start calls for V1 projects (writes to call_starts table).
+        """Batch start calls for V2 projects (writes to call_starts table).
 
-        This method enforces that the project is V1 or empty before writing.
+        This method enforces that the project is V2 or empty before writing.
         Inserts incomplete calls into the call_starts table.
 
         Args:
@@ -438,7 +438,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         Examples:
             >>> # In test code:
             >>> req = CallsStartBatchReq(project_id="project1", items=[...])
-            >>> res = server.v1_calls_start_batch(req)
+            >>> res = server.calls_start_batch_v2(req)
         """
         # Check project version
         project_version: int = -1
@@ -475,12 +475,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return tsi.CallsStartBatchRes(ids=ids, trace_ids=trace_ids)
 
-    def v1_calls_complete_batch(
+    def calls_complete_batch_v2(
         self, req: tsi.CallsCompleteBatchReq
     ) -> tsi.CallsCompleteBatchRes:
-        """Batch complete calls for V1 projects (writes to calls_complete table).
+        """Batch complete calls for V2 projects (writes to calls_complete table).
 
-        This method enforces that the project is V1 or empty before writing.
+        This method enforces that the project is V2 or empty before writing.
         Inserts complete calls directly into calls_complete table.
 
         Note: The client sends complete call data (both start and end) together.
@@ -495,7 +495,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         Examples:
             >>> # In test code:
             >>> req = CallsCompleteBatchReq(project_id="project1", items=[...])
-            >>> res = server.v1_calls_complete_batch(req)
+            >>> res = server.calls_complete_batch_v2(req)
         """
         # Check project version
         project_version: int = -1
@@ -595,7 +595,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         columns = ALL_CALL_SELECT_COLUMNS
         # TODO: fix me
-        if project_version == ProjectVersion.NEW_VERSION:
+        if project_version == ProjectVersion.CALLS_COMPLETE_VERSION:
             columns = [col for col in columns if col != "deleted_at"]
 
         if req.columns:

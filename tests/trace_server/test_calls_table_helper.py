@@ -25,15 +25,19 @@ def test_get_calls_table_routing(monkeypatch):
 
     server = ClickHouseTraceServer(host="localhost")
 
-    # Test OLD_VERSION (0) -> calls_merged
+    # Test CALLS_MERGED_VERSION (0) -> calls_merged
     monkeypatch.setattr(
-        server, "_project_version_service", MockResolver(ProjectVersion.OLD_VERSION)
+        server,
+        "_project_version_service",
+        MockResolver(ProjectVersion.CALLS_MERGED_VERSION),
     )
     assert server._get_calls_table("test-project") == "calls_merged"
 
-    # Test NEW_VERSION (1) -> calls_complete
+    # Test CALLS_COMPLETE_VERSION (1) -> calls_complete
     monkeypatch.setattr(
-        server, "_project_version_service", MockResolver(ProjectVersion.NEW_VERSION)
+        server,
+        "_project_version_service",
+        MockResolver(ProjectVersion.CALLS_COMPLETE_VERSION),
     )
     assert server._get_calls_table("test-project") == "calls_complete"
 
@@ -74,15 +78,19 @@ def test_get_calls_stats_table_routing(monkeypatch):
 
     server = ClickHouseTraceServer(host="localhost")
 
-    # Test OLD_VERSION -> calls_merged_stats
+    # Test CALLS_MERGED_VERSION -> calls_merged_stats
     monkeypatch.setattr(
-        server, "_project_version_service", MockResolver(ProjectVersion.OLD_VERSION)
+        server,
+        "_project_version_service",
+        MockResolver(ProjectVersion.CALLS_MERGED_VERSION),
     )
     assert server._get_calls_stats_table("test-project") == "calls_merged_stats"
 
-    # Test NEW_VERSION -> calls_complete_stats
+    # Test CALLS_COMPLETE_VERSION -> calls_complete_stats
     monkeypatch.setattr(
-        server, "_project_version_service", MockResolver(ProjectVersion.NEW_VERSION)
+        server,
+        "_project_version_service",
+        MockResolver(ProjectVersion.CALLS_COMPLETE_VERSION),
     )
     assert server._get_calls_stats_table("test-project") == "calls_complete_stats"
 

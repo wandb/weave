@@ -68,9 +68,9 @@ class ProjectVersionResolver(ProjectVersionService):
 
         Returns:
             ProjectVersion enum (or int for backwards compatibility):
-                - OLD_VERSION (0): Legacy schema (calls_merged)
-                - NEW_VERSION (1): New schema (calls_complete)
                 - EMPTY_PROJECT (-1): No calls in either table
+                - CALLS_MERGED_VERSION (0): Legacy schema (calls_merged)
+                - CALLS_COMPLETE_VERSION (1): New schema (calls_complete)
         """
         # 1. Check in-memory cache first (fastest)
         cached = self._cache.get(project_id)

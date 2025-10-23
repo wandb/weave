@@ -10,14 +10,14 @@ class ProjectVersionService(Protocol):
 
     Returns:
         ProjectVersion: Enum value indicating which table to use:
-            - OLD_VERSION (0): Legacy schema (calls_merged)
-            - NEW_VERSION (1): New schema (calls_complete)
             - EMPTY_PROJECT (-1): No calls in either table
+            - CALLS_MERGED_VERSION (0): Legacy schema (calls_merged)
+            - CALLS_COMPLETE_VERSION (1): New schema (calls_complete)
 
     Examples:
         >>> service = ClickHouseProjectVersionProvider(...)
         >>> version = await service.get_project_version("my-project")
-        >>> assert version in (ProjectVersion.OLD_VERSION, ProjectVersion.NEW_VERSION, ProjectVersion.EMPTY_PROJECT)
+        >>> assert version in (ProjectVersion.CALLS_MERGED_VERSION, ProjectVersion.CALLS_COMPLETE_VERSION, ProjectVersion.EMPTY_PROJECT)
     """
 
     async def get_project_version(self, project_id: str) -> ProjectVersion:
