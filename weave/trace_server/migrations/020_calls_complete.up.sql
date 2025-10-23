@@ -34,7 +34,7 @@ CREATE TABLE calls_complete (
     INDEX idx_thread_id thread_id TYPE set(100) GRANULARITY 1,
     INDEX idx_trace_id trace_id TYPE set(100) GRANULARITY 1,
     -- Use ngram so that we can take prefixes of the op_name
-    INDEX idx_op_name TYPE ngrambf_v1(3, 10000, 3, 7) GRANULARITY 1,
+    INDEX idx_op_name op_name TYPE ngrambf_v1(3, 10000, 3, 7) GRANULARITY 1,
     -- Minmax for range searches
     INDEX idx_ended_at ended_at TYPE minmax GRANULARITY 1
 ) ENGINE = MergeTree
@@ -67,7 +67,7 @@ CREATE TABLE call_starts (
     -- Only minimal indexes, we really shouldn't be doing many filter operations
     -- on this table, so keep the indexes to the essentials
     INDEX idx_id id TYPE bloom_filter GRANULARITY 1,
-    INDEX idx_op_name TYPE ngrambf_v1(3, 10000, 3, 7) GRANULARITY 1
+    INDEX idx_op_name op_name TYPE ngrambf_v1(3, 10000, 3, 7) GRANULARITY 1
 ) ENGINE = MergeTree
 ORDER BY (project_id, started_at, id);
 
