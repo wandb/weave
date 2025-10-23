@@ -28,7 +28,7 @@ Outstanding Optimizations/Work:
 import logging
 import re
 from collections.abc import KeysView
-from typing import Callable, Literal, Optional, cast
+from typing import Callable, Literal, Optional, Union, cast
 
 from pydantic import BaseModel, Field
 
@@ -529,7 +529,7 @@ class CallsQuery(BaseModel):
 
     project_id: str
     project_version: ProjectVersion = ProjectVersion.EMPTY_PROJECT
-    select_fields: list[CallsMergedField | CallsCompleteField] = Field(
+    select_fields: list[Union[CallsMergedField, CallsCompleteField]] = Field(
         default_factory=list
     )
     query_conditions: list[Condition] = Field(default_factory=list)
@@ -1210,7 +1210,7 @@ DISALLOWED_FILTERING_FIELDS = {"storage_size_bytes", "total_storage_size_bytes"}
 
 def get_field_by_name(
     name: str, table_alias: str = "calls_merged"
-) -> CallsMergedField | CallsCompleteField:
+) -> Union[CallsMergedField, CallsCompleteField]:
     if name not in ALLOWED_CALL_FIELDS:
         if name.startswith("feedback."):
             return CallsMergedFeedbackPayloadField.from_path(name[len("feedback.") :])

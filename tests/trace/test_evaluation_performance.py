@@ -115,6 +115,10 @@ async def test_evaluation_performance(client: WeaveClient):
         "ensure_project_exists",
         "get_call_processor",
         "get_call_processor",
+        "get_start_processor",
+        "get_start_processor",
+        "get_complete_processor",
+        "get_complete_processor",
         "get_feedback_processor",
         "get_feedback_processor",
     ]
@@ -137,12 +141,14 @@ async def test_evaluation_performance(client: WeaveClient):
         == {
             "ensure_project_exists": 1,
             "get_call_processor": 2,
+            "get_start_processor": 2,
+            "get_complete_processor": 2,
             "get_feedback_processor": 2,
             "table_create": 2,  # dataset and score results
             "obj_create": 9,  # Evaluate Op, Score Op, Predict and Score Op, Summarize Op, predict Op, PIL Image Serializer, Eval Results DS, MainDS, Evaluation Object
             "file_create": 10,  # 4 images, 6 ops
-            "call_start": 14,  # Eval, summary, 4 predict and score sequences of 3 calls each
-            "call_end": 14,  # Eval, summary, 4 predict and score sequences of 3 calls each
+            "calls_start_batch_v2": 14,  # Eval, summary, 4 predict and score sequences of 3 calls each
+            "calls_complete_batch_v2": 14,  # Eval, summary, 4 predict and score sequences of 3 calls each
             "feedback_create": 4,  # 4 predict feedbacks
         }
     )
