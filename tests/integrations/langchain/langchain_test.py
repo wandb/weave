@@ -1,4 +1,5 @@
 import os
+import sys
 from collections.abc import Generator
 from unittest.mock import patch
 
@@ -232,6 +233,7 @@ def assert_correct_calls_for_chain_batch(calls: list[Call]) -> None:
     filter_headers=["authorization"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
     before_record_request=filter_body,
+    allow_playback_repeats=True,
 )
 def test_simple_chain_batch(client: WeaveClient) -> None:
     from langchain_core.prompts import PromptTemplate
