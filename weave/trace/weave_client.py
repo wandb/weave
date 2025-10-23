@@ -576,11 +576,6 @@ class WeaveClient:
 
         # If require_feedback is True, automatically enable include_feedback
         if require_feedback:
-            if not include_feedback:
-                logger.warning(
-                    "require_feedback=True automatically sets include_feedback=True. "
-                    "Setting include_feedback=False with require_feedback=True has no effect."
-                )
             include_feedback = True
 
             # Query feedback table for call IDs (only fetch weave_ref field - minimal data transfer)
