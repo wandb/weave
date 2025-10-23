@@ -52,6 +52,10 @@ def test_dataset_laziness(client):
         "ensure_project_exists",
         "get_call_processor",
         "get_call_processor",
+        "get_start_processor",
+        "get_start_processor",
+        "get_complete_processor",
+        "get_complete_processor",
         "get_feedback_processor",
         "get_feedback_processor",
     ]
@@ -84,6 +88,10 @@ def test_published_dataset_laziness(client):
         "ensure_project_exists",
         "get_call_processor",
         "get_call_processor",
+        "get_start_processor",
+        "get_start_processor",
+        "get_complete_processor",
+        "get_complete_processor",
         "get_feedback_processor",
         "get_feedback_processor",
     ]

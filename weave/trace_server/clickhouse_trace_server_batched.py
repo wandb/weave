@@ -880,7 +880,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     return
 
             except Exception as e:
-                logger.exception(f"Error deleting calls from {table}: {e}")
+                logger.exception(f"Error deleting calls from {table}")
                 continue
 
         if total_deleted < target_count:

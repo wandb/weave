@@ -24,7 +24,9 @@ from weave.trace_server_bindings.http_utils import (
     log_dropped_start_batch,
     process_batch_with_retry,
 )
-from weave.trace_server_bindings.models import ServerInfoRes, StartBatchItem
+from weave.trace_server_bindings.models import (
+    ServerInfoRes,
+)
 from weave.utils import http_requests as requests
 from weave.utils.retry import get_current_retry_id, with_retry
 from weave.wandb_interface import project_creator
@@ -513,45 +515,15 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
     def call_start(
         self, req: Union[tsi.CallStartReq, dict[str, Any]]
     ) -> tsi.CallStartRes:
-        if self.should_batch:
-            assert self.call_processor is not None
-
-            req_as_obj: tsi.CallStartReq
-            if isinstance(req, dict):
-                req_as_obj = tsi.CallStartReq.model_validate(req)
-            else:
-                req_as_obj = req
-            if req_as_obj.start.id is None or req_as_obj.start.trace_id is None:
-                raise ValueError(
-                    "CallStartReq must have id and trace_id when batching."
-                )
-            self.call_processor.enqueue([StartBatchItem(req=req_as_obj)])
-            return tsi.CallStartRes(
-                id=req_as_obj.start.id, trace_id=req_as_obj.start.trace_id
-            )
-        return self._generic_request(
-            "/call/start", req, tsi.CallStartReq, tsi.CallStartRes
-        )
+        raise NotImplementedError("Call start is not supported.")
 
     # TODO(gst): Deprecate
     def call_start_batch(self, req: tsi.CallCreateBatchReq) -> tsi.CallCreateBatchRes:
-        return self._generic_request(
-            "/call/upsert_batch", req, tsi.CallCreateBatchReq, tsi.CallCreateBatchRes
-        )
-    
+        raise NotImplementedError("Call start batch is not supported.")
+
     # TODO(gst): Deprecate
     def call_end(self, req: Union[tsi.CallEndReq, dict[str, Any]]) -> tsi.CallEndRes:
-        if self.should_batch:
-            assert self.call_processor is not None
-
-            req_as_obj: tsi.CallEndReq
-            if isinstance(req, dict):
-                req_as_obj = tsi.CallEndReq.model_validate(req)
-            else:
-                req_as_obj = req
-            self.call_processor.enqueue([EndBatchItem(req=req_as_obj)])
-            return tsi.CallEndRes()
-        return self._generic_request("/call/end", req, tsi.CallEndReq, tsi.CallEndRes)
+        raise NotImplementedError("Call end is not supported.")
 
     def call_read(self, req: Union[tsi.CallReadReq, dict[str, Any]]) -> tsi.CallReadRes:
         return self._generic_request(

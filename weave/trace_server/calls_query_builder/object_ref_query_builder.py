@@ -489,7 +489,10 @@ class ObjectRefQueryProcessor:
             condition = object_ref_conditions[0]
             self.fields_used.add(condition.field_path)
             return condition.as_sql_condition(
-                self.pb, self.table_alias, self.field_to_object_join_alias_map
+                self.pb,
+                self.table_alias,
+                self.field_to_object_join_alias_map,
+                use_agg_fn=(self.table_alias == "calls_merged"),
             )
         else:
             # Handle as normal condition

@@ -3803,7 +3803,9 @@ def test_op_sampling_inheritance(client):
 
     assert child_calls == 10  # Child function executed
     assert len(list(child_op.calls())) == 10  # And was traced
-    assert "call_start" in client.server.attribute_access_log  # Verify tracing occurred
+    assert (
+        "calls_start_batch_v2" in client.server.attribute_access_log
+    )  # Verify tracing occurred
 
 
 def test_op_sampling_inheritance_async(client):
@@ -3842,7 +3844,9 @@ def test_op_sampling_inheritance_async(client):
 
     assert child_calls == 10  # Child function executed
     assert len(list(child_op.calls())) == 10  # And was traced
-    assert "call_start" in client.server.attribute_access_log  # Verify tracing occurred
+    assert (
+        "calls_start_batch_v2" in client.server.attribute_access_log
+    )  # Verify tracing occurred
 
 
 def test_op_sampling_invalid_rates(client):
