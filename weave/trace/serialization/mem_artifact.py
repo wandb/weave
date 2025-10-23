@@ -67,11 +67,8 @@ class MemTraceFilesArtifact:
         """Clean up temporary directory with Windows-safe error handling."""
         if self.temp_read_dir is not None:
             try:
-                # Use our Windows-safe cleanup instead of relying on
-                # TemporaryDirectory's finalizer
+                # Since we used delete=False, we need to manually clean up
                 _windows_safe_rmtree(self.temp_read_dir.name)
-                # Prevent TemporaryDirectory from trying to clean up again
-                self.temp_read_dir._finalizer.detach()  # type: ignore
             except Exception:
                 # Ignore all errors during finalization
                 pass
@@ -124,15 +121,14 @@ class MemTraceFilesArtifact:
         if path not in self.path_contents:
             raise FileNotFoundError(path)
 
-        self.temp_read_dir = tempfile.TemporaryDirectory()
+        # Use delete=False to prevent automatic cleanup that fails on Windows
+        # We handle cleanup manually in __del__ with proper error handling
+        self.temp_read_dir = tempfile.TemporaryDirectory(delete=False)
         write_path = os.path.join(self.temp_read_dir.name, filename or path)
         with open(write_path, "wb") as f:
             f.write(self.path_contents[path])
-            # Explicitly flush and sync before closing to ensure
-            # Windows releases the file handle properly
             f.flush()
             os.fsync(f.fileno())
-        # File is now closed due to exiting the context manager
         return write_path
 
     # @property
