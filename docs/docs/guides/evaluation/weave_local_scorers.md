@@ -44,6 +44,8 @@ While local scorers can be run on CPUs and GPUs, use GPUs for best performance.
     | [WeaveFluencyScorerV1](#weavefluencyscorerv1)                    | Measure whether the AI system's output is fluent.                                                                                                                  |
     | [WeaveTrustScorerV1](#weavetrustscorerv1)                        | An aggregate scorer that leverages the toxicity, hallucination, context relevance, fluency, and coherence scorers.                                                |
     | [PresidioScorer](#presidioscorer)                                | Detect Personally Identifiable Information (PII) in your AI system's inputs and outputs using the Presidio library from Microsoft.                                |
+    | [LangfairToxicityScorer](#langfairtoxicityscorer)                | Identify toxic or harmful content in LLM responses using the LangFair library from CVS Health.                                |
+    | [LangfairCounterfactualScorer](#langfaircounterfactualscorer)    | Detect Counterfactual Bias in LLM responses using the LangFair library from CVS Health.                                 |
 
     ## `WeaveBiasScorerV1`
 
@@ -317,6 +319,67 @@ While local scorers can be run on CPUs and GPUs, use GPUs for best performance.
     )
 
     print(f"Output contains PII: {not result.passed}")
+    print(result)
+    ```
+    ---
+
+    ## `LangfairToxicityScorer`
+
+    This scorer uses the [LangFair library](https://github.com/cvs-health/langfair) to identify toxic or harmful content in LLM responses.
+
+    ### Usage notes
+
+    - The `score` method expects a string to be passed to the `output` parameter. 
+    - The default value of `threshold` parameter is 0.3, this can be modified while calling `score` method.
+    - Returns toxicity score from `0` to `1` and classify responses as toxic if toxicity score is more than the `threshold`.
+
+    ### Usage example
+
+    ```python
+    import weave
+    from weave.scorers import LangfairToxicityScorer
+
+    toxicity_scorer = LangfairToxicityScorer()
+
+    result = toxicity_scorer.score(
+        output="This is not an acceptable behavior.",
+        thershold = 0.6
+    )
+
+    print(f"Output contains toxic or harmful content: {not result.passed}")
+    print(result)
+    ```
+    ---
+
+    ## `LangfairCounterfactualScorer`
+
+    This scorer uses the [LangFair library](https://github.com/cvs-health/langfair) to detect Counterfactual Bias in LLM responses. This class identifies protected/sensitive words in query and implement following steps if at least one proteceted word is present:
+      
+    - Creates counterfactual prompts.
+    - Generates counterfactual responses.
+    - Computes counterfactual metrics ("Cosine", "Rougel", "Bleu", and "Sentiment Bias") to assess bias in responses To get more details on the counterfactual metrics, refer to this [research paper](https://arxiv.org/abs/2407.10853).
+
+    ### Usage notes
+
+    - The `score` method expects a string to be passed to the `query` parameter. 
+    - The default value of `metric_name` parameter is "Cosine". As per requirement, switch to other metrics i.e. "Rougel", "Bleu", and "Sentiment Bias".
+    - The default value of `threshold` parameter is 0.5, this can be modified while calling `score` method.
+    - Returns counterfactual metric score from `0` to `1` and classify LLM responses as bias if counterfactual metric value for any group combination is more than the `threshold`.
+
+    ### Usage example
+
+    ```python
+    import weave
+    from weave.scorers import LangfairCounterfactualScorer
+
+    counterfactual_scorer = LangfairCounterfactualScorer()
+
+    result = counterfactual_scorer.score(
+        query="Are white men better with managing finances?",
+        thershold = 0.6
+    )
+
+    print(f"Does Query leads to counterfactual bias responses: {not result.passed}")
     print(result)
     ```
 
