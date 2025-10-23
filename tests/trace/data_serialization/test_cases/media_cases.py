@@ -83,23 +83,23 @@ media_cases = [
                 if sys.platform == "win32"
                 else "Ac3YO5daeesZTxBfXf7DAKaQZ5IZysk2HvclN8sfwxQ"
             },
-            "load_op": "weave:///shawn/test-project/op/load_PIL.Image.Image:jhxXm8LUXTL8B8nfSGFXQdOLhpuzJYtbW59ZxhUFgoI",
+            "load_op": "weave:///shawn/test-project/op/load_PIL.Image.Image:cXGXTzMfB7Y6w1HyVZbJrXuZj6a9MVl1A71hLxCkyPs",
         },
         exp_objects=[
             {
                 "object_id": "load_PIL.Image.Image",
-                "digest": "jhxXm8LUXTL8B8nfSGFXQdOLhpuzJYtbW59ZxhUFgoI",
+                "digest": "cXGXTzMfB7Y6w1HyVZbJrXuZj6a9MVl1A71hLxCkyPs",
                 "exp_val": {
                     "_type": "CustomWeaveType",
                     "weave_type": {"type": "Op"},
-                    "files": {"obj.py": "oxqbCLXF1PsVGFKXZgXHGIuFqlgDG69IwQFUQsGzfHw"},
+                    "files": {"obj.py": "pqIKaGlv2TZYz8E7z9kN95yTwEQ9y1CghPNqjhT1e0A"},
                 },
             }
         ],
         exp_files=[
             {
-                "digest": "oxqbCLXF1PsVGFKXZgXHGIuFqlgDG69IwQFUQsGzfHw",
-                "exp_content": b'import weave\nfrom weave.trace.serialization.mem_artifact import MemTraceFilesArtifact\nfrom typing import Any\nfrom weave.utils.iterators import first\nimport PIL.Image as Image\n\n@weave.op()\ndef load(artifact: MemTraceFilesArtifact, name: str, val: Any) -> Image.Image:\n    # Today, we assume there can only be 1 image in the artifact.\n    filename = first(artifact.path_contents)\n    if not filename.startswith("image."):\n        raise ValueError(f"Expected filename to start with \'image.\', got {filename}")\n\n    path = artifact.path(filename)\n    return Image.open(path)\n',
+                "digest": "pqIKaGlv2TZYz8E7z9kN95yTwEQ9y1CghPNqjhT1e0A",
+                "exp_content": b'import weave\nfrom weave.trace.serialization.mem_artifact import MemTraceFilesArtifact\nfrom typing import Any\nfrom weave.utils.iterators import first\nimport PIL.Image as Image\n\n@weave.op()\ndef load(artifact: MemTraceFilesArtifact, name: str, val: Any) -> Image.Image:\n    # Today, we assume there can only be 1 image in the artifact.\n    filename = first(artifact.path_contents)\n    if not filename.startswith("image."):\n        raise ValueError(f"Expected filename to start with \'image.\', got {filename}")\n\n    path = artifact.path(filename)\n    # Open, load, and close the image file immediately to avoid file handle leaks\n    # PIL\'s Image.open() keeps the file open for lazy loading, which causes issues\n    # on Windows when the temporary directory cleanup tries to delete the file\n    with Image.open(path) as img:\n        # Load the image data into memory and create a copy\n        # This ensures we don\'t keep a reference to the file\n        return img.copy()\n',
             },
             {
                 "digest": "eIObd4Xf1Od75ekC8UuDfJMb7nk0VSF5WPzyohXn5eQ"
