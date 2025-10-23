@@ -285,6 +285,7 @@ def test_video_as_file(client: WeaveClient, tmp_path: Path) -> None:
         clip.write_videofile(
             str(fp), codec="libx264", audio=False, verbose=False, logger=None
         )
+        clip.close()
 
     @weave.op
     def return_video_mp4(path: str):
@@ -293,6 +294,7 @@ def test_video_as_file(client: WeaveClient, tmp_path: Path) -> None:
     @weave.op
     def accept_video_mp4(val):
         width, height = val.size
+        val.close()
         return f"Video size: {width}x{height}"
 
     res = accept_video_mp4(return_video_mp4(str(fp)))
