@@ -157,6 +157,9 @@ def tests(session, shard):
     if shard == "openai_agents":
         env["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY", "MISSING")
 
+    if shard == "langchain":
+        env["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY", "MISSING")
+
     default_test_dirs = [f"integrations/{shard}/"]
     test_dirs_dict = {
         "custom": [],
