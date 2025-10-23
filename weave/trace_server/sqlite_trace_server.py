@@ -867,12 +867,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
     def _get_obj_version_index(
         self, cursor: sqlite3.Cursor, project_id: str, object_id: str
     ) -> int:
-        """Get the version index for a new object with such id.
-
-        Note: version_index equals COUNT(*) of all versions (including soft-deleted ones)
-        since deleted objects retain their version_index. The IMMEDIATE transaction mode
-        prevents race conditions where concurrent inserts could get the same count.
-        """
+        """Get the version index for a new object with such id."""
         cursor.execute(
             "SELECT COUNT(*) FROM objects WHERE project_id = ? AND object_id = ?",
             (project_id, object_id),
