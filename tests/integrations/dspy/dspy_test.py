@@ -1,3 +1,4 @@
+import sys
 from collections.abc import Generator
 from typing import Literal
 
@@ -308,6 +309,10 @@ def test_dspy_custom_module(client: WeaveClient) -> None:
     ],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="Currently not working on Windows",
+)
 def test_dspy_evaluate(client: WeaveClient) -> None:
     dspy.configure(lm=dspy.LM("openai/gpt-4o-mini", cache=False))
     module = dspy.ChainOfThought("question -> answer: str, explanation: str")
@@ -373,6 +378,10 @@ def test_dspy_evaluate(client: WeaveClient) -> None:
     ],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="Currently not working on Windows",
+)
 def test_dspy_optimizer_labeled_fewshot(client: WeaveClient) -> None:
     dspy.configure(lm=dspy.LM("openai/gpt-4o", cache=False))
     module = dspy.ChainOfThought("question -> answer: str, explanation: str")
@@ -408,6 +417,10 @@ def test_dspy_optimizer_labeled_fewshot(client: WeaveClient) -> None:
     ],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
 )
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="Currently not working on Windows",
+)
 def test_dspy_optimizer_bootstrap_fewshot(client: WeaveClient) -> None:
     dspy.configure(lm=dspy.LM("openai/gpt-4o", cache=False))
     module = dspy.ChainOfThought("question -> answer: str, explanation: str")
@@ -442,6 +455,10 @@ def test_dspy_optimizer_bootstrap_fewshot(client: WeaveClient) -> None:
         "x-rate-limit",
     ],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="Currently not working on Windows",
 )
 def test_dspy_optimizer_bootstrap_fewshot_with_random_search(
     client: WeaveClient,

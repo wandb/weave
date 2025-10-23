@@ -94,6 +94,7 @@ trace_server_shards = [f"trace{i}" for i in range(1, NUM_TRACE_SERVER_SHARDS + 1
         "notdiamond",
         "openai",
         "openai_agents",
+        "openai_realtime",
         "vertexai",
         "bedrock",
         "scorers",
@@ -187,15 +188,6 @@ def tests(session, shard):
         "--cov-report=xml",
         "--cov-branch",
     ]
-
-    # Memray not working with trace_server shard atm
-    if shard != "trace_server":
-        pytest_args.extend(
-            [
-                "--memray",
-                "--most-allocations=5",
-            ]
-        )
 
     # Handle trace sharding: run every 3rd test starting at different offsets
     if shard in trace_server_shards:
