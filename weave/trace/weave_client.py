@@ -552,9 +552,9 @@ class WeaveClient:
             `columns`: List of fields to return per call. Reducing this can significantly improve performance.
                     (Some fields like `id`, `trace_id`, `op_name`, and `started_at` are always included.)
             `scored_by`: Filter by one or more scorers (name or ref URI). Multiple scorers are AND-ed.
-            `require_feedback`: If True, only return calls that have feedback attached.
+            `require_feedback`: If True, only return calls that have populated feedback attached.
                     Automatically sets `include_feedback=True` to ensure feedback is included in results.
-                    Queries only feedback refs (minimal data) then filters calls by call_ids.
+                    Efficiently queries only feedback refs with non-null payloads, then filters calls by call_ids.
             `page_size`: Number of calls fetched per page. Tune this for performance in large queries.
 
         Returns:
@@ -579,9 +579,34 @@ class WeaveClient:
             include_feedback = True
 
             # Query feedback table for call IDs (only fetch weave_ref field - minimal data transfer)
+            # Filter for feedback with non-null/non-empty payloads to avoid counting placeholder feedback
+            from weave.trace_server.interface.query import (
+                Query,
+                NotOperation,
+                EqOperation,
+                GetFieldOperator,
+                LiteralOperation,
+            )
+
+            feedback_query = Query(
+                **{
+                    "$expr": {
+                        "$not": [
+                            {
+                                "$eq": [
+                                    {"$getField": "payload"},
+                                    {"$literal": None},
+                                ]
+                            }
+                        ]
+                    }
+                }
+            )
+
             feedback_req = FeedbackQueryReq(
                 project_id=self._project_id(),
                 fields=["weave_ref"],  # Only the ref, not payloads
+                query=feedback_query,  # Filter for non-null payloads
             )
             feedback_res = self.server.feedback_query(feedback_req)
 
