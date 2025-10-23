@@ -29,7 +29,7 @@ def create_failure_comment(message: str) -> None:
 
     comment_body = (
         f"❌ Documentation Reference Check Failed\n\n{message}\n\n"
-        "This check is required for all PRs that start with \"feat\". "
+        "This check is required for all PRs except those that start with \"chore(weave)\" or explicitly state \"docs are not required\". "
         "Please update your PR description and this check will run again automatically."
     )
 
@@ -118,9 +118,14 @@ def main() -> None:
     pr_title = os.environ.get("PR_TITLE", "")
     pr_body = os.environ.get("PR_BODY", "")
 
-    # Check if PR title starts with "feat"
-    if not pr_title.startswith("feat"):
-        print('PR title does not start with "feat". Skipping documentation check.')
+    # Check if PR title starts with "chore(weave)" - skip check if it does
+    if pr_title.startswith("chore(weave)"):
+        print('PR title starts with "chore(weave)". Skipping documentation check.')
+        return
+
+    # Check if PR body explicitly states "docs are not required" (case insensitive)
+    if re.search(r"docs are not required", pr_body, re.IGNORECASE):
+        print('PR body states "docs are not required". Skipping documentation check.')
         return
 
     # Cleanup any previous comments
