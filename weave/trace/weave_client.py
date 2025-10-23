@@ -1038,7 +1038,7 @@ class WeaveClient:
             )
 
             # Clean up the future tracking
-            self._call_start_futures.pop(call.id, None)                
+            self._call_start_futures.pop(call.id, None)
 
         # The send_complete_call() function will block on start_future.result(),
         # ensuring the start is enqueued before the complete. Ensures ordering: start -> complete.

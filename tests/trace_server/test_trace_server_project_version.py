@@ -3,8 +3,6 @@
 import datetime
 import uuid
 
-import pytest
-
 from tests.trace_server.conftest_lib.trace_server_external_adapter import (
     DummyIdConverter,
     externalize_trace_server,
