@@ -1,78 +1,96 @@
 """Tests for table routing via ClickHouseTraceServer._get_calls_table()."""
 
+from unittest.mock import MagicMock
+
 from weave.trace_server.clickhouse_trace_server_batched import ClickHouseTraceServer
+from weave.trace_server.project_version.types import ProjectVersion
 
 
-class MockProjectVersionService:
-    """Test double for ProjectVersionService."""
+def test_get_calls_table_routing(monkeypatch):
+    """Test _get_calls_table routes to correct table based on project version."""
 
-    def __init__(self, version: int = 0):
-        self.version = version
-        self.call_count = 0
+    class MockResolver:
+        def __init__(self, version):
+            self.version = version
 
-    async def get_project_version(self, project_id: str) -> int:
-        """Return pre-configured version."""
-        self.call_count += 1
-        return self.version
+        def get_project_version_sync(self, project_id):
+            return self.version
 
-
-def test_get_calls_table_returns_calls_merged_for_v0():
-    """V0 projects should route to calls_merged table."""
-    pvs = MockProjectVersionService(version=0)
-    server = ClickHouseTraceServer(
-        host="localhost",
-        project_version_service=pvs,
-    )
-    table = server._get_calls_table("test-project")
-    assert table == "calls_merged"
-    assert pvs.call_count == 1
-
-
-def test_get_calls_table_returns_calls_complete_for_v1():
-    """V1 projects should route to calls_complete table."""
-    pvs = MockProjectVersionService(version=1)
-    server = ClickHouseTraceServer(
-        host="localhost",
-        project_version_service=pvs,
-    )
-    table = server._get_calls_table("test-project")
-    assert table == "calls_complete"
-    assert pvs.call_count == 1
-
-
-def test_get_calls_table_defaults_to_calls_merged_for_unknown_version():
-    """Unknown versions should default to calls_merged for backwards compatibility."""
-    pvs = MockProjectVersionService(version=999)
-    server = ClickHouseTraceServer(
-        host="localhost",
-        project_version_service=pvs,
-    )
-    table = server._get_calls_table("test-project")
-    # Current behavior: only version=1 goes to calls_complete
-    assert table == "calls_merged"
-
-
-def test_get_calls_table_handles_different_projects():
-    """Helper should work with different project IDs."""
-    pvs = MockProjectVersionService(version=1)
-    server = ClickHouseTraceServer(
-        host="localhost",
-        project_version_service=pvs,
+    # Mock CH client to avoid needing real database
+    mock_client = MagicMock()
+    monkeypatch.setattr(
+        "weave.trace_server.clickhouse_trace_server_batched.clickhouse_connect.get_client",
+        lambda **kwargs: mock_client,
     )
 
-    table1 = server._get_calls_table("project-a")
-    table2 = server._get_calls_table("project-b")
+    server = ClickHouseTraceServer(host="localhost")
 
-    assert table1 == "calls_complete"
-    assert table2 == "calls_complete"
-    assert pvs.call_count == 2
-
-
-def test_get_calls_table_returns_calls_merged_when_no_service():
-    """When no ProjectVersionService is provided, should default to calls_merged."""
-    server = ClickHouseTraceServer(
-        host="localhost",
-        project_version_service=None,
+    # Test OLD_VERSION (0) -> calls_merged
+    monkeypatch.setattr(
+        server, "_project_version_service", MockResolver(ProjectVersion.OLD_VERSION)
     )
-    table = server._get_calls_table("test-project")
-    assert table == "calls_merged"
+    assert server._get_calls_table("test-project") == "calls_merged"
+
+    # Test NEW_VERSION (1) -> calls_complete
+    monkeypatch.setattr(
+        server, "_project_version_service", MockResolver(ProjectVersion.NEW_VERSION)
+    )
+    assert server._get_calls_table("test-project") == "calls_complete"
+
+    # Test EMPTY_PROJECT (-1) -> default_table
+    monkeypatch.setattr(
+        server, "_project_version_service", MockResolver(ProjectVersion.EMPTY_PROJECT)
+    )
+    assert (
+        server._get_calls_table("test-project", default_table="calls_complete")
+        == "calls_complete"
+    )
+    assert (
+        server._get_calls_table("test-project", default_table="calls_merged")
+        == "calls_merged"
+    )
+
+    # Test no service -> calls_merged (backwards compatibility)
+    server._project_version_service = None
+    assert server._get_calls_table("test-project") == "calls_merged"
+
+
+def test_get_calls_stats_table_routing(monkeypatch):
+    """Test _get_calls_stats_table returns correct stats table based on calls table."""
+
+    class MockResolver:
+        def __init__(self, version):
+            self.version = version
+
+        def get_project_version_sync(self, project_id):
+            return self.version
+
+    # Mock CH client to avoid needing real database
+    mock_client = MagicMock()
+    monkeypatch.setattr(
+        "weave.trace_server.clickhouse_trace_server_batched.clickhouse_connect.get_client",
+        lambda **kwargs: mock_client,
+    )
+
+    server = ClickHouseTraceServer(host="localhost")
+
+    # Test OLD_VERSION -> calls_merged_stats
+    monkeypatch.setattr(
+        server, "_project_version_service", MockResolver(ProjectVersion.OLD_VERSION)
+    )
+    assert server._get_calls_stats_table("test-project") == "calls_merged_stats"
+
+    # Test NEW_VERSION -> calls_complete_stats
+    monkeypatch.setattr(
+        server, "_project_version_service", MockResolver(ProjectVersion.NEW_VERSION)
+    )
+    assert server._get_calls_stats_table("test-project") == "calls_complete_stats"
+
+    # Test EMPTY -> default_table appends _stats
+    monkeypatch.setattr(
+        server, "_project_version_service", MockResolver(ProjectVersion.EMPTY_PROJECT)
+    )
+    assert (
+        server._get_calls_stats_table("test-project", default_table="calls_complete")
+        == "calls_complete_stats"
+    )

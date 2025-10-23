@@ -23,6 +23,7 @@ from weave import version
 from weave.chat.chat import Chat
 from weave.chat.inference_models import InferenceModels
 from weave.telemetry import trace_sentry
+from weave.telemetry.trace_sentry import SENTRY_AVAILABLE, sentry_sdk
 from weave.trace import settings
 from weave.trace.call import (
     DEFAULT_CALLS_PAGE_SIZE,
@@ -1032,8 +1033,14 @@ class WeaveClient:
                 self._call_start_futures.pop(call.id, None)
             else:
                 # No start future found - this shouldn't happen in normal operation
-                # Fall back to sending just the end
-                raise ValueError(f"No cached start request found for call {call.id}")
+                # log to sentry and show the 
+                if SENTRY_AVAILABLE:
+                    error_message = (
+                        f"No start request found for call {call.id} when uploading completed call,"
+                        "this can be caused by exceptionally high write volume or very long lived calls."
+                    )
+                    sentry_sdk.capture_message(error_message, level="error")
+                    logger.error(error_message)
 
         # Check if there's a pending start future for this call
         assert call.id is not None, "Call ID must be set at this point"

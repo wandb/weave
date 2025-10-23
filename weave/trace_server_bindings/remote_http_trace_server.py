@@ -187,7 +187,7 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
         if len(batch) == 0:
             return
 
-        # Filter out starts that have pending completes, we don't need to send both if 
+        # Filter out starts that have pending completes, we don't need to send both if
         # we already have the complete (start + end)
         filtered_batch: list[tsi.StartedCallSchemaForInsert] = []
         with self._pending_complete_ids_lock:
