@@ -655,6 +655,9 @@ def test_get_calls_require_feedback(client):
     calls_with_feedback = list(client.get_calls(require_feedback=True))
     call_ids_with_feedback = {call.id for call in calls_with_feedback}
 
+    # Should have exactly 2 calls (call1 and call3)
+    assert len(call_ids_with_feedback) == 2, f"Expected 2 calls with feedback, got {len(call_ids_with_feedback)}"
+
     # Should include call1 and call3
     assert call1.id in call_ids_with_feedback
     assert call3.id in call_ids_with_feedback
