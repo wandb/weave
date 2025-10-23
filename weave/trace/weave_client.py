@@ -554,7 +554,7 @@ class WeaveClient:
             `scored_by`: Filter by one or more scorers (name or ref URI). Multiple scorers are AND-ed.
             `require_feedback`: If True, only return calls that have populated feedback attached.
                     Automatically sets `include_feedback=True` to ensure feedback is included in results.
-                    Efficiently queries only feedback refs with non-null payloads, then filters calls by call_ids.
+                    Queries feedback refs and payloads, filters for non-empty payloads, then filters calls by call_ids.
             `page_size`: Number of calls fetched per page. Tune this for performance in large queries.
 
         Returns:
@@ -578,45 +578,23 @@ class WeaveClient:
         if require_feedback:
             include_feedback = True
 
-            # Query feedback table for call IDs (only fetch weave_ref field - minimal data transfer)
-            # Filter for feedback with non-null/non-empty payloads to avoid counting placeholder feedback
-            from weave.trace_server.interface.query import (
-                Query,
-                NotOperation,
-                EqOperation,
-                GetFieldOperator,
-                LiteralOperation,
-            )
-
-            feedback_query = Query(
-                **{
-                    "$expr": {
-                        "$not": [
-                            {
-                                "$eq": [
-                                    {"$getField": "payload"},
-                                    {"$literal": None},
-                                ]
-                            }
-                        ]
-                    }
-                }
-            )
-
+            # Query feedback table with both weave_ref AND payload to filter out empty feedback
             feedback_req = FeedbackQueryReq(
                 project_id=self._project_id(),
-                fields=["weave_ref"],  # Only the ref, not payloads
-                query=feedback_query,  # Filter for non-null payloads
+                fields=["weave_ref", "payload"],  # Fetch payload to check if it's populated
             )
             feedback_res = self.server.feedback_query(feedback_req)
 
-            # Extract unique call IDs from refs
+            # Extract unique call IDs, but only from feedback with non-empty payloads
             call_ids_with_feedback = set()
             for item in feedback_res.result:
-                ref = item.get("weave_ref", "")
-                if "/call/" in ref:
-                    call_id = ref.split("/call/")[-1]
-                    call_ids_with_feedback.add(call_id)
+                payload = item.get("payload")
+                # Only include feedback that has a non-null, non-empty payload
+                if payload is not None and payload != {}:
+                    ref = item.get("weave_ref", "")
+                    if "/call/" in ref:
+                        call_id = ref.split("/call/")[-1]
+                        call_ids_with_feedback.add(call_id)
 
             # Filter by call_ids
             if not call_ids_with_feedback:
