@@ -2,6 +2,10 @@
 
 W&B Weave provides a set of environment variables to configure and optimize its behavior. You can set these variables in your shell or within scripts to control specific functionality.
 
+:::warning
+Environment variables must be set **before** calling `weave.init()`. Setting or modifying `WEAVE_*` environment variables after initialization may not have any effect, as most settings are read during initialization. Starting from the latest version, Weave will warn you if you attempt to set a `WEAVE_*` environment variable after initialization.
+:::
+
 ```bash
 # Example of setting environment variables in the shell
 export WEAVE_PARALLELISM=10  # Controls the number of parallel workers
@@ -10,10 +14,15 @@ export WEAVE_PRINT_CALL_LINK=false  # Disables call link output
 
 ```python
 # Example of setting environment variables in Python
+# IMPORTANT: Set these BEFORE calling weave.init()
 import os
 
 os.environ["WEAVE_PARALLELISM"] = "10"
 os.environ["WEAVE_PRINT_CALL_LINK"] = "false"
+
+# Now initialize Weave
+import weave
+weave.init("my-project")
 ```
 
 ## Available Environment Variables
