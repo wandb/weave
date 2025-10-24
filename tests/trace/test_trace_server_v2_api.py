@@ -704,3 +704,276 @@ class TestV2APIIntegration:
             read_res = client.server.op_read_v2(read_req)
             assert read_res.digest == version.digest
             assert read_res.version_index == version.version_index
+
+    def test_evaluation_run_finish_creates_summarize_call(self, client):
+        """Test that evaluation_run_finish_v2 creates an Evaluation.summarize call."""
+        project_id = client._project_id()
+        entity, project = project_id.split("/")
+
+        # Create dataset
+        dataset_req = tsi.DatasetCreateV2Req(
+            project_id=project_id,
+            name="test_dataset",
+            rows=[{"question": "What is 2+2?"}],
+        )
+        dataset_res = client.server.dataset_create_v2(dataset_req)
+        dataset_ref = f"weave:///{entity}/{project}/object/{dataset_res.object_id}:{dataset_res.digest}"
+
+        # Create evaluation
+        eval_req = tsi.EvaluationCreateV2Req(
+            project_id=project_id,
+            name="test_evaluation",
+            dataset=dataset_ref,
+            scorers=[],
+            trials=1,
+        )
+        eval_res = client.server.evaluation_create_v2(eval_req)
+        evaluation_ref = (
+            f"weave:///{entity}/{project}/object/{eval_res.object_id}:{eval_res.digest}"
+        )
+
+        # Create an evaluation run
+        eval_run_req = tsi.EvaluationRunCreateV2Req(
+            project_id=project_id,
+            evaluation=evaluation_ref,
+            model="test_model",
+        )
+        eval_run_res = client.server.evaluation_run_create_v2(eval_run_req)
+        eval_run_id = eval_run_res.evaluation_run_id
+
+        # Finish the evaluation run with summary
+        summary_data = {"accuracy": 0.95, "total_examples": 100}
+        finish_req = tsi.EvaluationRunFinishV2Req(
+            project_id=project_id,
+            evaluation_run_id=eval_run_id,
+            summary=summary_data,
+        )
+        client.server.evaluation_run_finish_v2(finish_req)
+
+        # Get all calls for this project
+        calls = client.get_calls()
+
+        # Find the evaluation run call and its children
+        eval_run_call = None
+        summarize_call = None
+        for call in calls:
+            if call.id == eval_run_id:
+                eval_run_call = call
+            if call.parent_id == eval_run_id and "Evaluation.summarize" in (
+                call.op_name or ""
+            ):
+                summarize_call = call
+
+        # Verify the evaluation run call exists and is ended
+        assert eval_run_call is not None
+        assert eval_run_call.ended_at is not None
+        # Summary should contain the provided summary data (may have additional metadata)
+        assert summary_data.items() <= dict(eval_run_call.summary).items()
+        # Output should be the same as the summarize output
+        assert eval_run_call.output == summary_data
+
+        # Verify the Evaluation.summarize call was created
+        assert summarize_call is not None
+        assert summarize_call.parent_id == eval_run_id
+        assert summarize_call.ended_at is not None
+        assert summarize_call.output == summary_data
+
+        # Verify the summarize call has a self input pointing to the evaluation ref
+        assert summarize_call.inputs is not None
+        assert "self" in summarize_call.inputs
+        # The self input should be the evaluation ref (may be deserialized as WeaveObject)
+        # We can check if it's the evaluation by comparing the ref string or checking the object
+        self_input = summarize_call.inputs["self"]
+        # Handle both string ref and deserialized WeaveObject cases
+        if isinstance(self_input, str):
+            assert self_input == evaluation_ref
+        else:
+            # It's a deserialized object, verify it's the evaluation
+            assert hasattr(self_input, "_class_name")
+            assert self_input._class_name == "Evaluation"
+            assert self_input.name == "test_evaluation"
+
+    def test_evaluation_run_log_prediction_includes_self(self, client):
+        """Test that predict_and_score calls include self argument pointing to evaluation ref."""
+        project_id = client._project_id()
+        entity, project = project_id.split("/")
+
+        # Create dataset
+        dataset_req = tsi.DatasetCreateV2Req(
+            project_id=project_id,
+            name="test_dataset",
+            rows=[{"question": "What is 2+2?"}],
+        )
+        dataset_res = client.server.dataset_create_v2(dataset_req)
+        dataset_ref = f"weave:///{entity}/{project}/object/{dataset_res.object_id}:{dataset_res.digest}"
+
+        # Create evaluation
+        eval_req = tsi.EvaluationCreateV2Req(
+            project_id=project_id,
+            name="test_evaluation",
+            dataset=dataset_ref,
+            scorers=[],
+            trials=1,
+        )
+        eval_res = client.server.evaluation_create_v2(eval_req)
+        evaluation_ref = (
+            f"weave:///{entity}/{project}/object/{eval_res.object_id}:{eval_res.digest}"
+        )
+
+        # Create evaluation run
+        eval_run_req = tsi.EvaluationRunCreateV2Req(
+            project_id=project_id,
+            evaluation=evaluation_ref,
+            model="test_model",
+        )
+        eval_run_res = client.server.evaluation_run_create_v2(eval_run_req)
+        eval_run_id = eval_run_res.evaluation_run_id
+
+        # Log a prediction
+        prediction_req = tsi.EvaluationRunLogPredictionV2Req(
+            project_id=project_id,
+            evaluation_run_id=eval_run_id,
+            model="test_model",
+            inputs={"question": "What is 2+2?"},
+            output="4",
+        )
+        prediction_res = client.server.evaluation_run_log_prediction_v2(prediction_req)
+
+        # Read the model predict call
+        model_call_req = tsi.CallReadReq(
+            project_id=project_id,
+            id=prediction_res.predict_call_id,
+        )
+        model_call_res = client.server.call_read(model_call_req)
+        assert model_call_res.call is not None
+        assert model_call_res.call.parent_id is not None
+
+        # Verify the Model.predict call has the correct arguments
+        assert model_call_res.call.inputs is not None
+        assert "self" in model_call_res.call.inputs
+        assert model_call_res.call.inputs["self"] == "test_model"
+        assert "input" in model_call_res.call.inputs
+        assert model_call_res.call.inputs["input"] == {"question": "What is 2+2?"}
+
+        # Read the predict_and_score call (parent of model predict)
+        predict_and_score_req = tsi.CallReadReq(
+            project_id=project_id,
+            id=model_call_res.call.parent_id,
+        )
+        predict_and_score_res = client.server.call_read(predict_and_score_req)
+
+        # Verify the predict_and_score call has the correct arguments
+        assert predict_and_score_res.call is not None
+        assert predict_and_score_res.call.inputs is not None
+
+        # Check self argument points to evaluation ref
+        assert "self" in predict_and_score_res.call.inputs
+        assert predict_and_score_res.call.inputs["self"] == evaluation_ref
+
+        # Check model argument points to model ref
+        assert "model" in predict_and_score_res.call.inputs
+        assert predict_and_score_res.call.inputs["model"] == "test_model"
+
+        # Check example argument contains the input data
+        assert "example" in predict_and_score_res.call.inputs
+        assert predict_and_score_res.call.inputs["example"] == {
+            "question": "What is 2+2?"
+        }
+
+        # Verify the predict_and_score call has structured output
+        assert predict_and_score_res.call.output is not None
+        assert isinstance(predict_and_score_res.call.output, dict)
+        assert "output" in predict_and_score_res.call.output
+        assert predict_and_score_res.call.output["output"] == "4"
+        assert "scores" in predict_and_score_res.call.output
+        assert predict_and_score_res.call.output["scores"] == []
+        assert "model_latency" in predict_and_score_res.call.output
+        assert predict_and_score_res.call.output["model_latency"] == 0
+
+    def test_evaluation_run_scorer_call_includes_self(self, client):
+        """Test that Scorer.score calls include self argument pointing to scorer ref."""
+        project_id = client._project_id()
+        entity, project = project_id.split("/")
+
+        # Create dataset
+        dataset_req = tsi.DatasetCreateV2Req(
+            project_id=project_id,
+            name="test_dataset",
+            rows=[{"question": "What is 2+2?"}],
+        )
+        dataset_res = client.server.dataset_create_v2(dataset_req)
+        dataset_ref = f"weave:///{entity}/{project}/object/{dataset_res.object_id}:{dataset_res.digest}"
+
+        # Create scorer
+        scorer_req = tsi.ScorerCreateV2Req(
+            project_id=project_id,
+            name="test_scorer",
+            op_source_code="def score(output):\n    return len(output)",
+        )
+        scorer_res = client.server.scorer_create_v2(scorer_req)
+        scorer_ref = f"weave:///{entity}/{project}/object/{scorer_res.object_id}:{scorer_res.digest}"
+
+        # Create evaluation
+        eval_req = tsi.EvaluationCreateV2Req(
+            project_id=project_id,
+            name="test_evaluation",
+            dataset=dataset_ref,
+            scorers=[scorer_ref],
+            trials=1,
+        )
+        eval_res = client.server.evaluation_create_v2(eval_req)
+        evaluation_ref = (
+            f"weave:///{entity}/{project}/object/{eval_res.object_id}:{eval_res.digest}"
+        )
+
+        # Create evaluation run
+        eval_run_req = tsi.EvaluationRunCreateV2Req(
+            project_id=project_id,
+            evaluation=evaluation_ref,
+            model="test_model",
+        )
+        eval_run_res = client.server.evaluation_run_create_v2(eval_run_req)
+        eval_run_id = eval_run_res.evaluation_run_id
+
+        # Log a prediction
+        prediction_req = tsi.EvaluationRunLogPredictionV2Req(
+            project_id=project_id,
+            evaluation_run_id=eval_run_id,
+            model="test_model",
+            inputs={"question": "What is 2+2?"},
+            output="4",
+        )
+        prediction_res = client.server.evaluation_run_log_prediction_v2(prediction_req)
+
+        # Log a score for the prediction
+        score_req = tsi.EvaluationRunLogScoreV2Req(
+            project_id=project_id,
+            evaluation_run_id=eval_run_id,
+            predict_call_id=prediction_res.predict_call_id,
+            scorer=scorer_ref,
+            score={"value": 1},
+        )
+        score_res = client.server.evaluation_run_log_score_v2(score_req)
+
+        # Read the scorer call
+        score_call_req = tsi.CallReadReq(
+            project_id=project_id,
+            id=score_res.score_call_id,
+        )
+        score_call_res = client.server.call_read(score_call_req)
+
+        # Verify the Scorer.score call has the correct arguments
+        assert score_call_res.call is not None
+        assert score_call_res.call.inputs is not None
+
+        # Check self argument points to scorer ref
+        assert "self" in score_call_res.call.inputs
+        assert score_call_res.call.inputs["self"] == scorer_ref
+
+        # Check output argument contains the model output
+        assert "output" in score_call_res.call.inputs
+        assert score_call_res.call.inputs["output"] == "4"
+
+        # Check inputs argument contains the model inputs
+        assert "inputs" in score_call_res.call.inputs
+        assert score_call_res.call.inputs["inputs"] == {"question": "What is 2+2?"}

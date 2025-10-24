@@ -31,8 +31,8 @@ from tenacity import (
 
 from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
+from weave.trace_server import constants, object_creation_utils
 from weave.trace_server import environment as wf_env
-from weave.trace_server import object_creation_utils
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.actions_worker.dispatcher import execute_batch
@@ -1934,6 +1934,483 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         result = self.obj_delete(obj_delete_req)
         return tsi.EvaluationDeleteV2Res(num_deleted=result.num_deleted)
+
+    def evaluation_run_create_v2(
+        self, req: tsi.EvaluationRunCreateV2Req
+    ) -> tsi.EvaluationRunCreateV2Res:
+        """Create an evaluation run as a call with special attributes."""
+        evaluation_run_id = generate_id()
+
+        # Create the evaluation run op
+        op_create_req = tsi.OpCreateV2Req(
+            project_id=req.project_id,
+            name=constants.EVALUATION_RUN_OP_NAME,
+            source_code=object_creation_utils.PLACEHOLDER_EVALUATION_EVALUATE_OP_SOURCE,
+        )
+        op_create_res = self.op_create_v2(op_create_req)
+
+        # Build the op URI
+        op_uri = ri.InternalOpRef(
+            project_id=req.project_id,
+            name=constants.EVALUATION_RUN_OP_NAME,
+            version=op_create_res.digest,
+        ).uri()
+
+        # Start a call to represent the evaluation run
+        call_start_req = tsi.CallStartReq(
+            start=tsi.StartedCallSchemaForInsert(
+                project_id=req.project_id,
+                id=evaluation_run_id,
+                trace_id=evaluation_run_id,
+                op_name=op_uri,
+                started_at=datetime.datetime.now(datetime.timezone.utc),
+                attributes={
+                    constants.WEAVE_ATTRIBUTES_NAMESPACE: {
+                        constants.EVALUATION_RUN_ATTR_KEY: True,
+                        constants.EVALUATION_RUN_EVALUATION_ATTR_KEY: req.evaluation,
+                        constants.EVALUATION_RUN_MODEL_ATTR_KEY: req.model,
+                    }
+                },
+                inputs={
+                    constants.EVALUATION_RUN_EVALUATION_ATTR_KEY: req.evaluation,
+                    constants.EVALUATION_RUN_MODEL_ATTR_KEY: req.model,
+                },
+            )
+        )
+        self.call_start(call_start_req)
+
+        return tsi.EvaluationRunCreateV2Res(evaluation_run_id=evaluation_run_id)
+
+    def evaluation_run_read_v2(
+        self, req: tsi.EvaluationRunReadV2Req
+    ) -> tsi.EvaluationRunReadV2Res:
+        """Read an evaluation run by reading the underlying call."""
+        call_read_req = tsi.CallReadReq(
+            project_id=req.project_id,
+            id=req.evaluation_run_id,
+        )
+        call_res = self.call_read(call_read_req)
+
+        if call_res.call is None:
+            raise NotFoundError(f"Evaluation run {req.evaluation_run_id} not found")
+
+        call = call_res.call
+        attributes = call.attributes.get(constants.WEAVE_ATTRIBUTES_NAMESPACE, {})
+
+        # Determine status
+        status = None
+        if call.ended_at is not None:
+            if call.exception is not None:
+                status = "failed"
+            else:
+                status = "completed"
+        else:
+            status = "running"
+
+        return tsi.EvaluationRunReadV2Res(
+            evaluation_run_id=call.id,
+            evaluation=attributes.get(constants.EVALUATION_RUN_EVALUATION_ATTR_KEY, ""),
+            model=attributes.get(constants.EVALUATION_RUN_MODEL_ATTR_KEY, ""),
+            status=status,
+            started_at=call.started_at,
+            finished_at=call.ended_at,
+            summary=call.summary,
+        )
+
+    def evaluation_run_list_v2(
+        self, req: tsi.EvaluationRunListV2Req
+    ) -> Iterator[tsi.EvaluationRunReadV2Res]:
+        """List evaluation runs by querying calls with evaluation_run attribute."""
+        # Build the filter
+        calls_filter = tsi.CallsFilter()
+
+        # Query for calls that have the evaluation_run attribute
+        calls_query_req = tsi.CallsQueryReq(
+            project_id=req.project_id,
+            filter=calls_filter,
+            limit=req.limit,
+            offset=req.offset,
+        )
+
+        calls_res = self.calls_query(calls_query_req)
+
+        # Filter and yield evaluation runs
+        for call in calls_res.calls:
+            attributes = call.attributes.get(constants.WEAVE_ATTRIBUTES_NAMESPACE, {})
+            if not attributes.get(constants.EVALUATION_RUN_ATTR_KEY):
+                continue
+
+            # Apply additional filters if specified
+            if req.filter:
+                if (
+                    req.filter.evaluations
+                    and attributes.get(constants.EVALUATION_RUN_EVALUATION_ATTR_KEY)
+                    not in req.filter.evaluations
+                ):
+                    continue
+                if (
+                    req.filter.models
+                    and attributes.get(constants.EVALUATION_RUN_MODEL_ATTR_KEY)
+                    not in req.filter.models
+                ):
+                    continue
+                if (
+                    req.filter.evaluation_run_ids
+                    and call.id not in req.filter.evaluation_run_ids
+                ):
+                    continue
+
+            # Determine status
+            status = None
+            if call.ended_at is not None:
+                if call.exception is not None:
+                    status = "failed"
+                else:
+                    status = "completed"
+            else:
+                status = "running"
+
+            yield tsi.EvaluationRunReadV2Res(
+                evaluation_run_id=call.id,
+                evaluation=attributes.get(
+                    constants.EVALUATION_RUN_EVALUATION_ATTR_KEY, ""
+                ),
+                model=attributes.get(constants.EVALUATION_RUN_MODEL_ATTR_KEY, ""),
+                status=status,
+                started_at=call.started_at,
+                finished_at=call.ended_at,
+                summary=call.summary,
+            )
+
+    def evaluation_run_delete_v2(
+        self, req: tsi.EvaluationRunDeleteV2Req
+    ) -> tsi.EvaluationRunDeleteV2Res:
+        """Delete evaluation runs by deleting the underlying calls."""
+        calls_delete_req = tsi.CallsDeleteReq(
+            project_id=req.project_id,
+            call_ids=req.evaluation_run_ids,
+            wb_user_id=req.wb_user_id,
+        )
+        self.calls_delete(calls_delete_req)
+        return tsi.EvaluationRunDeleteV2Res(num_deleted=len(req.evaluation_run_ids))
+
+    def evaluation_run_log_prediction_v2(
+        self, req: tsi.EvaluationRunLogPredictionV2Req
+    ) -> tsi.EvaluationRunLogPredictionV2Res:
+        """Log a prediction within an evaluation run as two child calls:
+        1. Evaluation.predict_and_score (parent)
+        2. Model.predict (child of predict_and_score)
+        """
+        # The evaluation_run_id is both the call ID and trace ID of the root call
+        trace_id = req.evaluation_run_id
+        predict_and_score_call_id = generate_id()
+        model_predict_call_id = generate_id()
+
+        # Get the evaluation ref from the evaluation run call
+        call_read_req = tsi.CallReadReq(
+            project_id=req.project_id,
+            id=req.evaluation_run_id,
+        )
+        call_res = self.call_read(call_read_req)
+        evaluation_ref = ""
+        if call_res.call is not None:
+            attributes = call_res.call.attributes.get(
+                constants.WEAVE_ATTRIBUTES_NAMESPACE, {}
+            )
+            evaluation_ref = attributes.get(
+                constants.EVALUATION_RUN_EVALUATION_ATTR_KEY, ""
+            )
+
+        # Create the predict_and_score op
+        predict_and_score_op_req = tsi.OpCreateV2Req(
+            project_id=req.project_id,
+            name=constants.EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME,
+            source_code=object_creation_utils.PLACEHOLDER_EVALUATION_PREDICT_AND_SCORE_OP_SOURCE,
+        )
+        predict_and_score_op_res = self.op_create_v2(predict_and_score_op_req)
+        predict_and_score_op_uri = ri.InternalOpRef(
+            project_id=req.project_id,
+            name=constants.EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME,
+            version=predict_and_score_op_res.digest,
+        ).uri()
+
+        # Build inputs with self, model, and example arguments
+        predict_and_score_inputs = {
+            "self": evaluation_ref,
+            "model": req.model,
+            "example": req.inputs,
+        }
+
+        # Create the predict_and_score call
+        predict_and_score_start_req = tsi.CallStartReq(
+            start=tsi.StartedCallSchemaForInsert(
+                project_id=req.project_id,
+                id=predict_and_score_call_id,
+                trace_id=trace_id,
+                op_name=predict_and_score_op_uri,
+                parent_id=req.evaluation_run_id,
+                started_at=datetime.datetime.now(datetime.timezone.utc),
+                attributes={
+                    constants.WEAVE_ATTRIBUTES_NAMESPACE: {
+                        constants.EVALUATION_RUN_PREDICTION_ATTR_KEY: True,
+                        constants.EVALUATION_RUN_MODEL_ATTR_KEY: req.model,
+                    }
+                },
+                inputs=predict_and_score_inputs,
+            )
+        )
+        self.call_start(predict_and_score_start_req)
+
+        # Create the model predict op
+        model_predict_op_req = tsi.OpCreateV2Req(
+            project_id=req.project_id,
+            name=constants.MODEL_PREDICT_OP_NAME,
+            source_code=object_creation_utils.PLACEHOLDER_MODEL_PREDICT_OP_SOURCE,
+        )
+        model_predict_op_res = self.op_create_v2(model_predict_op_req)
+        model_predict_op_uri = ri.InternalOpRef(
+            project_id=req.project_id,
+            name=constants.MODEL_PREDICT_OP_NAME,
+            version=model_predict_op_res.digest,
+        ).uri()
+
+        # Build inputs for Model.predict with self and input arguments
+        model_predict_inputs = {
+            "self": req.model,
+            "input": req.inputs,
+        }
+
+        # Create the Model.predict call as a child of predict_and_score
+        model_predict_start_req = tsi.CallStartReq(
+            start=tsi.StartedCallSchemaForInsert(
+                project_id=req.project_id,
+                id=model_predict_call_id,
+                trace_id=trace_id,
+                op_name=model_predict_op_uri,
+                parent_id=predict_and_score_call_id,
+                started_at=datetime.datetime.now(datetime.timezone.utc),
+                attributes={
+                    constants.WEAVE_ATTRIBUTES_NAMESPACE: {
+                        constants.EVALUATION_RUN_MODEL_ATTR_KEY: req.model,
+                    }
+                },
+                inputs=model_predict_inputs,
+            )
+        )
+        self.call_start(model_predict_start_req)
+
+        # End the Model.predict call with the output
+        model_predict_end_req = tsi.CallEndReq(
+            end=tsi.EndedCallSchemaForInsert(
+                project_id=req.project_id,
+                id=model_predict_call_id,
+                ended_at=datetime.datetime.now(datetime.timezone.utc),
+                output=req.output,
+                summary={},
+            )
+        )
+        self.call_end(model_predict_end_req)
+
+        # Build predict_and_score output with structured data
+        predict_and_score_output = {
+            "output": req.output,
+            "scores": [],  # Will be populated by score calls
+            "model_latency": 0,  # Placeholder for now
+        }
+
+        # End the predict_and_score call with structured output
+        predict_and_score_end_req = tsi.CallEndReq(
+            end=tsi.EndedCallSchemaForInsert(
+                project_id=req.project_id,
+                id=predict_and_score_call_id,
+                ended_at=datetime.datetime.now(datetime.timezone.utc),
+                output=predict_and_score_output,
+                summary={},
+            )
+        )
+        self.call_end(predict_and_score_end_req)
+
+        return tsi.EvaluationRunLogPredictionV2Res(
+            predict_call_id=model_predict_call_id
+        )
+
+    def evaluation_run_log_score_v2(
+        self, req: tsi.EvaluationRunLogScoreV2Req
+    ) -> tsi.EvaluationRunLogScoreV2Res:
+        """Log a score for a prediction as a child call."""
+        # The evaluation_run_id is both the call ID and trace ID of the root call
+        trace_id = req.evaluation_run_id
+        score_call_id = generate_id()
+
+        # Look up the predict call to get its parent (the predict_and_score call)
+        predict_call_res = self.call_read(
+            tsi.CallReadReq(
+                project_id=req.project_id,
+                id=req.predict_call_id,
+            )
+        )
+        if predict_call_res.call is None:
+            raise ValueError(f"Predict call {req.predict_call_id} not found")
+
+        # The predict call's parent is the predict_and_score call
+        predict_and_score_call_id = predict_call_res.call.parent_id
+        if predict_and_score_call_id is None:
+            raise ValueError(
+                f"Predict call {req.predict_call_id} has no parent (expected predict_and_score call)"
+            )
+
+        # Extract output and inputs from the Model.predict call
+        predict_output = predict_call_res.call.output
+        # Model.predict inputs are structured as {"self": model_ref, "input": input_data}
+        # We want the "input" field which contains the actual inputs
+        predict_inputs = predict_call_res.call.inputs or {}
+        model_inputs = predict_inputs.get("input", {})
+
+        # Extract the scorer name from the scorer reference
+        # The ref is like weave:///entity/project/object/ScorerName:version
+        # We want to extract "ScorerName" and create "{ScorerName}.score"
+        scorer_name = req.scorer.split("/")[-1].split(":")[0]
+        score_op_name = f"{scorer_name}"
+
+        # Create the scorer score op
+        score_op_req = tsi.OpCreateV2Req(
+            project_id=req.project_id,
+            name=score_op_name,
+            source_code=object_creation_utils.PLACEHOLDER_SCORER_SCORE_OP_SOURCE,
+        )
+        score_op_res = self.op_create_v2(score_op_req)
+        score_op_uri = ri.InternalOpRef(
+            project_id=req.project_id,
+            name=score_op_name,
+            version=score_op_res.digest,
+        ).uri()
+
+        # Build inputs for Scorer.score with self, output, and inputs
+        score_inputs = {
+            "self": req.scorer,
+            "output": predict_output,
+            "inputs": model_inputs,
+        }
+
+        # Start a call to represent the score (as a sibling of the predict call)
+        call_start_req = tsi.CallStartReq(
+            start=tsi.StartedCallSchemaForInsert(
+                project_id=req.project_id,
+                id=score_call_id,
+                trace_id=trace_id,
+                op_name=score_op_uri,
+                parent_id=predict_and_score_call_id,
+                started_at=datetime.datetime.now(datetime.timezone.utc),
+                attributes={
+                    constants.WEAVE_ATTRIBUTES_NAMESPACE: {
+                        constants.EVALUATION_RUN_SCORE_ATTR_KEY: True,
+                        constants.EVALUATION_RUN_PREDICT_CALL_ID_ATTR_KEY: req.predict_call_id,
+                        constants.EVALUATION_RUN_SCORER_ATTR_KEY: req.scorer,
+                    }
+                },
+                inputs=score_inputs,
+            )
+        )
+        self.call_start(call_start_req)
+
+        # End the call immediately with the score
+        call_end_req = tsi.CallEndReq(
+            end=tsi.EndedCallSchemaForInsert(
+                project_id=req.project_id,
+                id=score_call_id,
+                ended_at=datetime.datetime.now(datetime.timezone.utc),
+                output=req.score,
+                summary={},
+            )
+        )
+        self.call_end(call_end_req)
+
+        return tsi.EvaluationRunLogScoreV2Res(score_call_id=score_call_id)
+
+    def evaluation_run_finish_v2(
+        self, req: tsi.EvaluationRunFinishV2Req
+    ) -> tsi.EvaluationRunFinishV2Res:
+        """Finish an evaluation run by ending the underlying call."""
+        # The evaluation_run_id is both the call ID and trace ID of the root call
+        trace_id = req.evaluation_run_id
+        summarize_call_id = generate_id()
+
+        # Get the evaluation ref from the evaluation run call
+        call_read_req = tsi.CallReadReq(
+            project_id=req.project_id,
+            id=req.evaluation_run_id,
+        )
+        call_res = self.call_read(call_read_req)
+        evaluation_ref = ""
+        if call_res.call is not None:
+            attributes = call_res.call.attributes.get(
+                constants.WEAVE_ATTRIBUTES_NAMESPACE, {}
+            )
+            evaluation_ref = attributes.get(
+                constants.EVALUATION_RUN_EVALUATION_ATTR_KEY, ""
+            )
+
+        # Create the Evaluation.summarize op
+        summarize_op_req = tsi.OpCreateV2Req(
+            project_id=req.project_id,
+            name=constants.EVALUATION_SUMMARIZE_OP_NAME,
+            source_code=object_creation_utils.PLACEHOLDER_EVALUATION_SUMMARIZE_OP_SOURCE,
+        )
+        summarize_op_res = self.op_create_v2(summarize_op_req)
+        summarize_op_uri = ri.InternalOpRef(
+            project_id=req.project_id,
+            name=constants.EVALUATION_SUMMARIZE_OP_NAME,
+            version=summarize_op_res.digest,
+        ).uri()
+
+        # Build inputs for Evaluation.summarize with self argument
+        summarize_inputs = {
+            "self": evaluation_ref,
+        }
+
+        # Create the Evaluation.summarize call as a child of the evaluation run
+        summarize_start_req = tsi.CallStartReq(
+            start=tsi.StartedCallSchemaForInsert(
+                project_id=req.project_id,
+                id=summarize_call_id,
+                trace_id=trace_id,
+                op_name=summarize_op_uri,
+                parent_id=req.evaluation_run_id,
+                started_at=datetime.datetime.now(datetime.timezone.utc),
+                attributes={},
+                inputs=summarize_inputs,
+            )
+        )
+        self.call_start(summarize_start_req)
+
+        # The summarize output is the summary data
+        summarize_output = req.summary or {}
+
+        # End the Evaluation.summarize call with the summary
+        summarize_end_req = tsi.CallEndReq(
+            end=tsi.EndedCallSchemaForInsert(
+                project_id=req.project_id,
+                id=summarize_call_id,
+                ended_at=datetime.datetime.now(datetime.timezone.utc),
+                output=summarize_output,
+                summary={},
+            )
+        )
+        self.call_end(summarize_end_req)
+
+        # End the evaluation run call with the same output as summarize
+        call_end_req = tsi.CallEndReq(
+            end=tsi.EndedCallSchemaForInsert(
+                project_id=req.project_id,
+                id=req.evaluation_run_id,
+                ended_at=datetime.datetime.now(datetime.timezone.utc),
+                output=summarize_output,
+                summary=req.summary or {},
+            )
+        )
+        self.call_end(call_end_req)
+
+        return tsi.EvaluationRunFinishV2Res()
 
     def _obj_read_with_retry(
         self, req: tsi.ObjReadReq, max_retries: int = 10, initial_delay: float = 0.05
