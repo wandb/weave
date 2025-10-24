@@ -60,6 +60,7 @@ class KafkaProducer(ConfluentKafkaProducer):
             "message.timeout.ms": total_timeout_ms,
             "retries": 1,
             "retry.backoff.ms": request_retry_backoff_ms,
+            "partitioner": "murmur2_random",  # Explicit round robin
             **_make_auth_config(),
             **additional_kafka_config,
         }
