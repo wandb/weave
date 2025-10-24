@@ -2,18 +2,37 @@ name: publish-pypi-release
 
 on:
   workflow_dispatch:
-    inputs:
-      is_test:
-        description: "Use Test Pypi"
-        required: true
-        type: boolean
-        default: true
 
 jobs:
-  build-release:
-    name: Build and publish to pypi
-    runs-on: ubuntu-8core
+  build-and-publish-test:
+    name: Build and publish to Test PyPI
+    runs-on: ubuntu-latest
     timeout-minutes: 10
+    environment:
+      name: test-release
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Install uv
+        run: |
+          pip install uv
+      - name: Build dist
+        run: |
+          uv build
+      - name: Upload test distribution
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          verbose: true
+
+  publish-production:
+    name: Publish to Production PyPI
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [build-and-publish-test]
     environment:
       name: release
     permissions:
@@ -28,23 +47,15 @@ jobs:
       - name: Build dist
         run: |
           uv build
-      - name: upload test distribution
+      - name: Upload distribution
         uses: pypa/gh-action-pypi-publish@release/v1
-        if: ${{ inputs.is_test }}
-        with:
-          repository-url: https://test.pypi.org/legacy/
-          verbose: true
-      - name: upload distribution
-        uses: pypa/gh-action-pypi-publish@release/v1
-        if: ${{ !inputs.is_test }}
 
   # this job exists so that there's some traceability between weave SDk releases
   # and potential build failures in core.
   notify-core:
     name: notify wandb/core of release
     runs-on: ubuntu-latest
-    if: "!inputs.is_test"
-    needs: [build-release]
+    needs: [publish-production]
 
     steps:
       - name: Create GitHub App Token
