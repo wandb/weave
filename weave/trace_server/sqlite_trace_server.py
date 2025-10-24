@@ -278,6 +278,128 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             conn.commit()
         return tsi.CallEndRes()
 
+    def calls_start_batch_v2(
+        self, req: tsi.CallsStartBatchReq
+    ) -> tsi.CallsStartBatchRes:
+        """Batch start calls (for V2 API).
+
+        For sqlite (testing), we simply write directly to the calls table.
+        This is simpler than clickhouse which needs to handle versioning.
+
+        Args:
+            req: CallsStartBatchReq with project_id and list of call starts.
+
+        Returns:
+            CallsStartBatchRes with call IDs and trace IDs.
+        """
+        conn, cursor = get_conn_cursor(self.db_path)
+        ids = []
+        trace_ids = []
+
+        with self.lock:
+            for item in req.items:
+                # Generate IDs if not provided
+                call_id = item.id or generate_id()
+                trace_id = item.trace_id or generate_id()
+                ids.append(call_id)
+                trace_ids.append(trace_id)
+
+                cursor.execute(
+                    """INSERT INTO calls (
+                        project_id,
+                        id,
+                        trace_id,
+                        parent_id,
+                        thread_id,
+                        turn_id,
+                        op_name,
+                        display_name,
+                        started_at,
+                        attributes,
+                        inputs,
+                        input_refs,
+                        wb_user_id,
+                        wb_run_id,
+                        wb_run_step
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (
+                        item.project_id,
+                        call_id,
+                        trace_id,
+                        item.parent_id,
+                        item.thread_id,
+                        item.turn_id,
+                        item.op_name,
+                        item.display_name,
+                        item.started_at.isoformat(),
+                        json.dumps(item.attributes),
+                        json.dumps(item.inputs),
+                        json.dumps(
+                            extract_refs_from_values(list(item.inputs.values()))
+                        ),
+                        item.wb_user_id,
+                        item.wb_run_id,
+                        item.wb_run_step,
+                    ),
+                )
+            conn.commit()
+
+        return tsi.CallsStartBatchRes(ids=ids, trace_ids=trace_ids)
+
+    def calls_complete_batch_v2(
+        self, req: tsi.CallsCompleteBatchReq
+    ) -> tsi.CallsCompleteBatchRes:
+        """Batch complete calls (for V2 API).
+
+        For sqlite (testing), complete calls UPDATE existing started calls.
+        The call was already created by calls_start_batch_v2.
+
+        Args:
+            req: CallsCompleteBatchReq with project_id and list of complete calls.
+
+        Returns:
+            CallsCompleteBatchRes (empty on success).
+        """
+        conn, cursor = get_conn_cursor(self.db_path)
+
+        with self.lock:
+            for item in req.items:
+                # These IDs should already be set by start
+                call_id = item.id
+                if call_id is None:
+                    raise ValueError("Complete call must have an ID")
+
+                parsable_output = item.output
+                if not isinstance(parsable_output, dict):
+                    parsable_output = {"output": parsable_output}
+                parsable_output = cast(dict, parsable_output)
+
+                # Update the existing call with complete data
+                cursor.execute(
+                    """UPDATE calls SET
+                        ended_at = ?,
+                        exception = ?,
+                        output = ?,
+                        output_refs = ?,
+                        summary = ?,
+                        wb_run_step_end = ?
+                    WHERE id = ?""",
+                    (
+                        item.ended_at.isoformat(),
+                        item.exception,
+                        json.dumps(item.output),
+                        json.dumps(
+                            extract_refs_from_values(list(parsable_output.values()))
+                        ),
+                        json.dumps(item.summary),
+                        item.wb_run_step_end,
+                        call_id,
+                    ),
+                )
+            conn.commit()
+
+        return tsi.CallsCompleteBatchRes()
+
     def call_read(self, req: tsi.CallReadReq) -> tsi.CallReadRes:
         calls = self.calls_query(
             tsi.CallsQueryReq(

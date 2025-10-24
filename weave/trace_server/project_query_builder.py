@@ -8,6 +8,7 @@ def make_project_stats_query(
     include_objects_storage_size: bool,
     include_tables_storage_size: bool,
     include_files_storage_size: bool,
+    calls_stats_table: str = "calls_merged_stats",
 ) -> tuple[str, list[str]]:
     if (
         not include_trace_storage_size
@@ -32,7 +33,7 @@ def make_project_stats_query(
                 COALESCE(output_size_bytes, 0) +
                 COALESCE(summary_size_bytes, 0)
                 )
-                FROM calls_merged_stats
+                FROM {calls_stats_table}
                 WHERE project_id = {{{project_id}: String}}
             ) AS {columns[-1]}
             """

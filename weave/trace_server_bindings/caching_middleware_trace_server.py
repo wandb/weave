@@ -111,6 +111,22 @@ class CachingMiddlewareTraceServer(tsi.FullTraceServerInterface):
             return self._next_trace_server.get_call_processor()
         return None
 
+    def get_start_processor(self) -> AsyncBatchProcessor | None:
+        """Custom method not defined on the formal TraceServerInterface to expose
+        the underlying start processor. Should be formalized in a client-side interface.
+        """
+        if hasattr(self._next_trace_server, "get_start_processor"):
+            return self._next_trace_server.get_start_processor()
+        return None
+
+    def get_complete_processor(self) -> AsyncBatchProcessor | None:
+        """Custom method not defined on the formal TraceServerInterface to expose
+        the underlying complete processor. Should be formalized in a client-side interface.
+        """
+        if hasattr(self._next_trace_server, "get_complete_processor"):
+            return self._next_trace_server.get_complete_processor()
+        return None
+
     def get_feedback_processor(self) -> AsyncBatchProcessor | None:
         """Custom method not defined on the formal TraceServerInterface to expose
         the underlying feedback processor. Should be formalized in a client-side interface.
@@ -446,6 +462,16 @@ class CachingMiddlewareTraceServer(tsi.FullTraceServerInterface):
 
     def call_update(self, req: tsi.CallUpdateReq) -> tsi.CallUpdateRes:
         return self._next_trace_server.call_update(req)
+
+    def calls_start_batch_v2(
+        self, req: tsi.CallsStartBatchReq
+    ) -> tsi.CallsStartBatchRes:
+        return self._next_trace_server.calls_start_batch_v2(req)
+
+    def calls_complete_batch_v2(
+        self, req: tsi.CallsCompleteBatchReq
+    ) -> tsi.CallsCompleteBatchRes:
+        return self._next_trace_server.calls_complete_batch_v2(req)
 
     # OTEL API
     def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
