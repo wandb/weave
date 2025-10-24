@@ -992,9 +992,15 @@ class FileCreateReq(BaseModelStrict):
     content: bytes
 
 
-class FileCreateRes(BaseModel):
+class FileCreateRes(BaseModelStrict):
     digest: str
 
+
+class FileCreateBatchReq(BaseModelStrict):
+    batch: list[FileCreateReq]
+
+class FileCreateBatchRes(BaseModelStrict):
+    res: list[FileCreateRes]
 
 class FileContentReadReq(BaseModelStrict):
     project_id: str
@@ -1659,6 +1665,7 @@ class TraceServerInterface(Protocol):
 
     # File API
     def file_create(self, req: FileCreateReq) -> FileCreateRes: ...
+    def file_create_batched(self, req: FileCreateBatchReq) -> FileCreateBatchRes: ...
     def file_content_read(self, req: FileContentReadReq) -> FileContentReadRes: ...
     def files_stats(self, req: FilesStatsReq) -> FilesStatsRes: ...
 

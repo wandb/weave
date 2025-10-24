@@ -42,7 +42,8 @@ There are two ways to authenticate with Azure Blob Storage:
 
 import logging
 from abc import abstractmethod
-from typing import Any, Callable, Optional, Union, cast
+from concurrent.futures import Future, ThreadPoolExecutor, wait
+from typing import Any, Callable, Iterable, List, Optional, Tuple, Union, cast
 
 import boto3
 from azure.core.exceptions import HttpResponseError
@@ -100,6 +101,8 @@ class FileStorageClient:
     def __init__(self, base_uri: FileStorageURI):
         assert isinstance(base_uri, FileStorageURI)
         self.base_uri = base_uri
+        # Shared executor for background batch uploads. Kept alive per-client.
+        self._executor: Optional[ThreadPoolExecutor] = None
 
     @abstractmethod
     def store(self, uri: FileStorageURI, data: bytes) -> None:
@@ -110,6 +113,72 @@ class FileStorageClient:
     def read(self, uri: FileStorageURI) -> bytes:
         """Read data from the specified URI location in cloud storage."""
         pass
+
+    def store_batch(
+        self,
+        items: Iterable[Tuple[FileStorageURI, bytes]],
+        *,
+        wait_for_completion: bool = False,
+        on_item_complete: Optional[Callable[[FileStorageURI], None]] = None,
+    ) -> None:
+        """Batch store multiple blobs concurrently.
+
+        - Fires off all uploads in the batch using a thread pool.
+        - If `wait_for_completion` is True, blocks until all uploads finish and
+          raises on the first encountered error.
+        - By default, returns immediately after scheduling uploads.
+
+        Args:
+            items: Iterable of (uri, data) pairs to upload.
+            wait_for_completion: Whether to block until completion.
+        """
+        # Lazily create a shared executor sized for typical I/O bound work.
+        if self._executor is None:
+            # Limit workers to a reasonable number to avoid overwhelming backends.
+            self._executor = ThreadPoolExecutor(max_workers=16, thread_name_prefix="fs-batch")
+
+        futures: List[Future[None]] = []
+
+        def _upload(u: FileStorageURI, d: bytes) -> None:
+            # Delegate to the concrete client's store() which already has retries.
+            self.store(u, d)
+
+        for uri, data in items:
+            # Each task will execute with its own retries via store().
+            f = self._executor.submit(_upload, uri, data)
+            # If running detached, ensure we log any failures to avoid silent errors.
+            def _log_result(
+                fut: Future,
+                u: FileStorageURI = uri,
+                uri_str: str = uri.to_uri_str(),
+            ) -> None:
+                try:
+                    fut.result()
+                    if on_item_complete is not None:
+                        try:
+                            on_item_complete(u)
+                        except Exception:
+                            logger.exception(
+                                "on_item_complete callback failed for %s", uri_str
+                            )
+                except Exception:
+                    logger.exception("Batch store failed for %s", uri_str)
+
+            f.add_done_callback(_log_result)
+            futures.append(f)
+
+        if wait_for_completion:
+            # Wait for all to complete and raise first error if any.
+            done, _ = wait(futures)
+            for fut in done:
+                try:
+                    fut.result()
+                except Exception as e:
+                    # Convert to FileStorageWriteError for consistency with single-store helper
+                    raise FileStorageWriteError(f"Batch store failed: {e!s}") from e
+            return None
+        # Not waiting; uploads continue in background.
+        return None
 
 
 class FileStorageWriteError(Exception):
@@ -135,6 +204,47 @@ def store_in_bucket(
         logger.exception("Failed to store file at %s", target_file_storage_uri)
         raise FileStorageWriteError(f"Failed to store file at {path}: {e!s}") from e
     return target_file_storage_uri
+
+
+def store_in_bucket_batched(
+    client: FileStorageClient,
+    items: Iterable[Tuple[str, bytes]],
+    *,
+    wait_for_completion: bool = False,
+    on_item_complete: Optional[Callable[[FileStorageURI], None]] = None,
+) -> list[FileStorageURI]:
+    """Store multiple files in the configured storage bucket concurrently.
+
+    - Computes target URIs from the client's base URI and provided paths.
+    - Schedules all uploads and returns immediately unless waiting is requested.
+    - If `wait_for_completion=True`, blocks until all uploads complete and raises on error.
+    - If `on_item_complete` is provided, it is called for each successful upload as it finishes.
+
+    Returns the list of target URIs corresponding to the items in input order.
+    """
+    # Materialize items to preserve order and compute URIs up front.
+    items_list: list[Tuple[str, bytes]] = list(items)
+    target_uris: list[FileStorageURI] = [
+        client.base_uri.with_path(path) for path, _ in items_list
+    ]
+
+    # Create iterable of (uri, data) for the storage layer.
+    to_store: Iterable[Tuple[FileStorageURI, bytes]] = (
+        (uri, data) for uri, (_, data) in zip(target_uris, items_list)
+    )
+
+    try:
+        client.store_batch(
+            to_store,
+            wait_for_completion=wait_for_completion,
+            on_item_complete=on_item_complete,
+        )
+    except Exception as e:
+        logger.exception("Failed to store batch of %d files", len(items_list))
+        # Maintain consistency with single write error surface
+        raise FileStorageWriteError(f"Failed to store batch: {e!s}") from e
+
+    return target_uris
 
 
 def read_from_bucket(
