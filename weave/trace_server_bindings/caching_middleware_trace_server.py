@@ -599,6 +599,41 @@ class CachingMiddlewareTraceServer(tsi.FullTraceServerInterface):
     ) -> tsi.EvaluationDeleteV2Res:
         return self._next_trace_server.evaluation_delete_v2(req)
 
+    def evaluation_run_create_v2(
+        self, req: tsi.EvaluationRunCreateV2Req
+    ) -> tsi.EvaluationRunCreateV2Res:
+        return self._next_trace_server.evaluation_run_create_v2(req)
+
+    def evaluation_run_read_v2(
+        self, req: tsi.EvaluationRunReadV2Req
+    ) -> tsi.EvaluationRunReadV2Res:
+        return self._next_trace_server.evaluation_run_read_v2(req)
+
+    def evaluation_run_list_v2(
+        self, req: tsi.EvaluationRunListV2Req
+    ) -> Iterator[tsi.EvaluationRunReadV2Res]:
+        return self._next_trace_server.evaluation_run_list_v2(req)
+
+    def evaluation_run_delete_v2(
+        self, req: tsi.EvaluationRunDeleteV2Req
+    ) -> tsi.EvaluationRunDeleteV2Res:
+        return self._next_trace_server.evaluation_run_delete_v2(req)
+
+    def evaluation_run_log_prediction_v2(
+        self, req: tsi.EvaluationRunLogPredictionV2Req
+    ) -> tsi.EvaluationRunLogPredictionV2Res:
+        return self._next_trace_server.evaluation_run_log_prediction_v2(req)
+
+    def evaluation_run_log_score_v2(
+        self, req: tsi.EvaluationRunLogScoreV2Req
+    ) -> tsi.EvaluationRunLogScoreV2Res:
+        return self._next_trace_server.evaluation_run_log_score_v2(req)
+
+    def evaluation_run_finish_v2(
+        self, req: tsi.EvaluationRunFinishV2Req
+    ) -> tsi.EvaluationRunFinishV2Res:
+        return self._next_trace_server.evaluation_run_finish_v2(req)
+
 
 def pydantic_bytes_safe_dump(obj: BaseModel) -> str:
     raw_dict = obj.model_dump()
