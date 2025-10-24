@@ -912,7 +912,9 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             if self._obj_exists(cursor, project_id, object_id, digest):
                 return tsi.ObjCreateRes(digest=digest)
 
-            cursor.execute("BEGIN TRANSACTION")
+            # Use IMMEDIATE transaction to acquire write lock immediately, preventing
+            # race conditions where concurrent transactions read stale version_index values
+            cursor.execute("BEGIN IMMEDIATE TRANSACTION")
             self._mark_existing_objects_as_not_latest(cursor, project_id, object_id)
             version_index = self._get_obj_version_index(cursor, project_id, object_id)
             cursor.execute(
@@ -2421,9 +2423,14 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 }:
                     sort_clauses.append(f"{sort.field} {sort.direction.upper()}")
             if sort_clauses:
-                query += f" ORDER BY {', '.join(sort_clauses)}"
+                # Add version_index as secondary sort to ensure deterministic ordering
+                # when primary sort fields have identical values (e.g., same timestamp on Windows)
+                query += f" ORDER BY {', '.join(sort_clauses)}, version_index ASC"
         else:
-            query += " ORDER BY created_at ASC"
+            # Default sort by created_at with version_index as tiebreaker
+            # On Windows, datetime.now() has lower resolution, causing multiple objects
+            # created in quick succession to share the same timestamp
+            query += " ORDER BY created_at ASC, version_index ASC"
 
         if limit is not None:
             query += f" LIMIT {limit}"

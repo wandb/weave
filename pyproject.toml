@@ -41,7 +41,7 @@ dependencies = [
   "packaging>=21.0",                      # For version parsing in integrations
   "tenacity>=8.3.0,!=8.4.0",              # Excluding 8.4.0 because it had a bug on import of AsyncRetrying
   "click",                                # Used for terminal/stdio printing
-  "gql[aiohttp,requests]",                # Used exclusively in wandb_api.py
+  "gql[aiohttp,requests]>=3.0.0",         # Used exclusively in wandb_api.py
   "jsonschema>=4.23.0",                   # Used by scorers for field validation
   "diskcache==5.6.3",                     # Used for data caching
   "tzdata; platform_system == 'Windows'", # Required for timezone support on Windows
@@ -93,13 +93,6 @@ trace_server_tests = [
   # BYOB - S3
   "moto[s3]>=5.0.0",
   "openai<1.100.0",
-]
-docs = [
-  "playwright",
-  "lazydocs",
-  "nbformat",
-  "nbconvert",
-  "weave[trace_server]",
 ]
 video_support = ["moviepy<=1.0.3"]
 anthropic = ["anthropic>=0.18.0"]
@@ -251,7 +244,6 @@ exclude = [
   "weave_query",
   "examples",
   "tests",
-  "docs",
   "dev_docs",
   "weave/clear_cache.py",
   "weave/trace_server/model_providers",
@@ -391,7 +383,7 @@ module = "weave_query.*"
 ignore_errors = true
 
 [tool.bumpversion]
-current_version = "0.52.11-dev0"
+current_version = "0.52.12-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.

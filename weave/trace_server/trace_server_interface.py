@@ -1363,6 +1363,7 @@ class OpCreateV2Req(OpCreateV2Body):
     project_id: str = Field(
         ..., description="The project where this object will be saved"
     )
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
 class OpCreateV2Res(BaseModel):
@@ -1379,6 +1380,7 @@ class OpReadV2Req(BaseModel):
     )
     object_id: str = Field(..., description="The op ID")
     digest: str = Field(..., description="The digest of the op object")
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
 class OpReadV2Res(BaseModel):
@@ -1402,6 +1404,7 @@ class OpListV2Req(BaseModel):
         default=None, description="Maximum number of ops to return"
     )
     offset: Optional[int] = Field(default=None, description="Number of ops to skip")
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
 class OpDeleteV2Req(BaseModel):
@@ -1413,6 +1416,7 @@ class OpDeleteV2Req(BaseModel):
         default=None,
         description="List of digests to delete. If not provided, all digests for the op will be deleted.",
     )
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
 class OpDeleteV2Res(BaseModel):
@@ -1437,6 +1441,7 @@ class DatasetCreateV2Req(DatasetCreateV2Body):
     project_id: str = Field(
         ..., description="The `entity/project` where this dataset will be saved"
     )
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
 class DatasetCreateV2Res(BaseModel):
@@ -1453,6 +1458,7 @@ class DatasetReadV2Req(BaseModel):
     )
     object_id: str = Field(..., description="The dataset ID")
     digest: str = Field(..., description="The digest of the dataset object")
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
 class DatasetReadV2Res(BaseModel):
@@ -1480,6 +1486,7 @@ class DatasetListV2Req(BaseModel):
     offset: Optional[int] = Field(
         default=None, description="Number of datasets to skip"
     )
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
 class DatasetDeleteV2Req(BaseModelStrict):
@@ -1491,6 +1498,7 @@ class DatasetDeleteV2Req(BaseModelStrict):
         default=None,
         description="List of digests to delete. If not provided, all digests for the dataset will be deleted.",
     )
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
 class DatasetDeleteV2Res(BaseModel):
@@ -1516,6 +1524,7 @@ class ScorerCreateV2Req(ScorerCreateV2Body):
     project_id: str = Field(
         ..., description="The `entity/project` where this scorer will be saved"
     )
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
 class ScorerCreateV2Res(BaseModel):
@@ -1536,6 +1545,7 @@ class ScorerReadV2Req(BaseModel):
     )
     object_id: str = Field(..., description="The scorer ID")
     digest: str = Field(..., description="The digest of the scorer")
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
 class ScorerReadV2Res(BaseModel):
@@ -1561,6 +1571,7 @@ class ScorerListV2Req(BaseModel):
         default=None, description="Maximum number of scorers to return"
     )
     offset: Optional[int] = Field(default=None, description="Number of scorers to skip")
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
 class ScorerDeleteV2Req(BaseModelStrict):
@@ -1572,6 +1583,7 @@ class ScorerDeleteV2Req(BaseModelStrict):
         default=None,
         description="List of digests to delete. If not provided, all digests for the scorer will be deleted",
     )
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
 class ScorerDeleteV2Res(BaseModel):
@@ -1606,6 +1618,7 @@ class EvaluationCreateV2Req(EvaluationCreateV2Body):
     project_id: str = Field(
         ..., description="The `entity/project` where this evaluation will be saved"
     )
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
 class EvaluationCreateV2Res(BaseModel):
@@ -1625,6 +1638,7 @@ class EvaluationReadV2Req(BaseModel):
     )
     object_id: str = Field(..., description="The evaluation ID")
     digest: str = Field(..., description="The digest of the evaluation")
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
 class EvaluationReadV2Res(BaseModel):
@@ -1667,6 +1681,7 @@ class EvaluationListV2Req(BaseModel):
     offset: Optional[int] = Field(
         default=None, description="Number of evaluations to skip"
     )
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
 class EvaluationDeleteV2Req(BaseModel):
@@ -1678,6 +1693,7 @@ class EvaluationDeleteV2Req(BaseModel):
         default=None,
         description="List of digests to delete. If not provided, all digests for the evaluation will be deleted.",
     )
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
 class EvaluationDeleteV2Res(BaseModel):

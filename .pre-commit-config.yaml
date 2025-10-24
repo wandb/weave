@@ -59,7 +59,7 @@ repos:
     hooks:
       - id: typos
         # Excluding extra things to make initial reviews easier, starting with `examples``
-        exclude: "(weave_query|cassettes|examples|tests|tools|docs)"
+        exclude: "(weave_query|cassettes|examples|tests|tools)"
   - repo: https://github.com/oxipng/oxipng
     rev: v9.1.5
     hooks:

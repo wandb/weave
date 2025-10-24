@@ -61,14 +61,6 @@ updates:
           - "confluent-kafka*"
           - "moto*"
 
-      # Documentation dependencies
-      docs:
-        patterns:
-          - "playwright*"
-          - "lazydocs*"
-          - "nbformat*"
-          - "nbconvert*"
-
       # Media support
       video_support:
         patterns:
