@@ -1984,19 +1984,17 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
         obj_read_res = self._obj_read_with_retry(obj_read_req)
 
-        # Build model reference
-        entity, project = req.project_id.split("/")
-        model_ref = object_creation_utils.build_object_ref(
-            entity=entity,
-            project=project,
-            object_id=object_id,
-            digest=obj_result.digest,
-        )
+        # Build model reference - external adapter will convert to external format
+        model_ref = ri.InternalObjectRef(
+            project_id=req.project_id,
+            name=object_id,
+            version=obj_result.digest,
+        ).uri()
 
         return tsi.ModelCreateV2Res(
             digest=obj_result.digest,
             object_id=object_id,
-            version_index=obj_read_res.version_index,
+            version_index=obj_read_res.obj.version_index,
             model_ref=model_ref,
         )
 
@@ -2018,7 +2016,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         obj_read_res = self.obj_read(obj_read_req)
 
         # Extract model properties from the val dict
-        val = obj_read_res.val
+        val = obj_read_res.obj.val
         name = val.get("name", req.object_id)
         description = val.get("description")
 
@@ -2049,8 +2047,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return tsi.ModelReadV2Res(
             object_id=req.object_id,
             digest=req.digest,
-            version_index=obj_read_res.version_index,
-            created_at=obj_read_res.created_at,
+            version_index=obj_read_res.obj.version_index,
+            created_at=obj_read_res.obj.created_at,
             name=name,
             description=description,
             source_code=source_code,
