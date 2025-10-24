@@ -155,7 +155,10 @@ class LoggingHTTPTransport(httpx.HTTPTransport):
         return response
 
 
-client = httpx.Client(transport=LoggingHTTPTransport())
+client = httpx.Client(transport=LoggingHTTPTransport(), timeout=30)
+
+# For backward compatibility, alias client as session
+session = client
 
 
 def get(url: str, params: Optional[dict[str, str]] = None, **kwargs: Any) -> Response:
@@ -179,7 +182,7 @@ def delete(
     **kwargs: Any,
 ) -> Response:
     """Send a DELETE request with optional logging."""
-    return session.delete(url, params=params, **kwargs)
+    return client.delete(url, params=params, **kwargs)
 
 
 # Export these for compatibility with code expecting requests module
@@ -192,5 +195,3 @@ __all__ = [
     "post",
     "session",
 ]
-# For backward compatibility, alias client as session
-session = client
