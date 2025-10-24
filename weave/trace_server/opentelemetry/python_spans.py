@@ -386,7 +386,7 @@ class Span:
             inputs=inputs,
             display_name=display_name,
             wb_user_id=wb_user_id,
-            wb_run_id=None,
+            wb_run_id=wandb_attributes.get("wb_run_id", None),
             turn_id=turn_id,
             thread_id=thread_id,
         )
