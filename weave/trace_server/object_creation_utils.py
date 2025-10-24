@@ -158,6 +158,45 @@ def build_scorer_val(
     }
 
 
+def build_model_val(
+    name: str,
+    description: str | None,
+    source_file_digest: str,
+    attributes: dict[str, Any] | None = None,
+    class_name: str = "Model",
+) -> dict[str, Any]:
+    """Build the value dictionary for a Model object.
+
+    Args:
+        name: The model name
+        description: Optional description of the model
+        source_file_digest: Digest of the uploaded source code file
+        attributes: Optional additional attributes for the model
+        class_name: The class name (defaults to "Model" for base models, or a custom name for subclasses)
+
+    Returns:
+        Dictionary representing the model object value
+    """
+    if class_name == "Model":
+        bases = ["Object", "BaseModel"]
+    else:
+        bases = ["Model", "Object", "BaseModel"]
+
+    result = {
+        "_type": class_name,
+        "_class_name": class_name,
+        "_bases": bases,
+        "name": name,
+        "description": description,
+        "files": {OP_SOURCE_FILE_NAME: source_file_digest},
+    }
+
+    if attributes is not None:
+        result.update(attributes)
+
+    return result
+
+
 def build_evaluation_val(
     name: str,
     dataset_ref: str,
