@@ -2058,18 +2058,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         )
 
     def model_list_v2(self, req: tsi.ModelListV2Req) -> Iterator[tsi.ModelReadV2Res]:
-        """List model objects in a project.
-
-        Args:
-            req: ModelListV2Req containing project_id and optional pagination
-
-        Yields:
-            ModelReadV2Res objects
-        """
-        # Query objects with Model base class
+        """List model objects by delegating to objs_query with Model filtering."""
         obj_query_req = tsi.ObjQueryReq(
             project_id=req.project_id,
-            filter={"base_object_classes": ["Model"]},
+            filter=tsi.ObjectVersionFilter(base_object_classes=["Model"]),
             limit=req.limit,
             offset=req.offset,
         )
