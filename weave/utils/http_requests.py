@@ -56,7 +56,7 @@ def guess_content_type(request: Request) -> str:
         return content_type
     # TODO: This is based on knowledge of our client.
     #       We should probably be sending a Content-Type header and also doing something more correct here
-    if request.body:
+    if request.content:
         return "application/json"
     return "text/plain"
 
@@ -155,7 +155,11 @@ class LoggingHTTPTransport(httpx.HTTPTransport):
         return response
 
 
-client = httpx.Client(transport=LoggingHTTPTransport(), timeout=30)
+client = httpx.Client(
+    transport=LoggingHTTPTransport(),
+    timeout=None,
+    limits=httpx.Limits(max_connections=None, max_keepalive_connections=None),
+)
 
 # For backward compatibility, alias client as session
 session = client
@@ -168,12 +172,12 @@ def get(url: str, params: Optional[dict[str, str]] = None, **kwargs: Any) -> Res
 
 def post(
     url: str,
-    data: Optional[Union[dict[str, Any], str]] = None,
+    data: Optional[Any] = None,
     json: Optional[dict[str, Any]] = None,
     **kwargs: Any,
 ) -> Response:
     """Send a POST request with optional logging."""
-    return client.post(url, data=data, json=json, **kwargs)
+    return client.post(url, data=data, json=json, **kwargs)  # type: ignore[arg-type]
 
 
 def delete(
