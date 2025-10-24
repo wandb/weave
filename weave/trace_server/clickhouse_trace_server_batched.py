@@ -1935,6 +1935,190 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         result = self.obj_delete(obj_delete_req)
         return tsi.EvaluationDeleteV2Res(num_deleted=result.num_deleted)
 
+    # Model V2 API
+
+    def model_create_v2(self, req: tsi.ModelCreateV2Req) -> tsi.ModelCreateV2Res:
+        """Create a model object.
+
+        Args:
+            req: ModelCreateV2Req containing project_id, name, description, source_code, and attributes
+
+        Returns:
+            ModelCreateV2Res with digest, object_id, version_index, and model_ref
+        """
+        # Store source code as a file
+        source_file_req = tsi.FileCreateReq(
+            project_id=req.project_id,
+            name=object_creation_utils.OP_SOURCE_FILE_NAME,
+            content=req.source_code.encode("utf-8"),
+        )
+        source_file_res = self.file_create(source_file_req)
+
+        # Build the model object value structure
+        model_val = object_creation_utils.build_model_val(
+            name=req.name,
+            description=req.description,
+            source_file_digest=source_file_res.digest,
+            attributes=req.attributes,
+        )
+
+        # Generate object_id based on name
+        safe_name = object_creation_utils.make_safe_name(req.name)
+        object_id = f"model_{safe_name}"
+
+        # Create the object
+        obj_req = tsi.ObjCreateReq(
+            obj=tsi.ObjSchemaForInsert(
+                project_id=req.project_id,
+                object_id=object_id,
+                val=model_val,
+            )
+        )
+        obj_result = self.obj_create(obj_req)
+
+        # Query back to get version_index with retry
+        obj_read_req = tsi.ObjReadReq(
+            project_id=req.project_id,
+            object_id=object_id,
+            digest=obj_result.digest,
+        )
+        obj_read_res = self._obj_read_with_retry(obj_read_req)
+
+        # Build model reference
+        entity, project = req.project_id.split("/")
+        model_ref = object_creation_utils.build_object_ref(
+            entity=entity,
+            project=project,
+            object_id=object_id,
+            digest=obj_result.digest,
+        )
+
+        return tsi.ModelCreateV2Res(
+            digest=obj_result.digest,
+            object_id=object_id,
+            version_index=obj_read_res.version_index,
+            model_ref=model_ref,
+        )
+
+    def model_read_v2(self, req: tsi.ModelReadV2Req) -> tsi.ModelReadV2Res:
+        """Read a model object.
+
+        Args:
+            req: ModelReadV2Req containing project_id, object_id, and digest
+
+        Returns:
+            ModelReadV2Res with all model details
+        """
+        # Read the object
+        obj_read_req = tsi.ObjReadReq(
+            project_id=req.project_id,
+            object_id=req.object_id,
+            digest=req.digest,
+        )
+        obj_read_res = self.obj_read(obj_read_req)
+
+        # Extract model properties from the val dict
+        val = obj_read_res.val
+        name = val.get("name", req.object_id)
+        description = val.get("description")
+
+        # Get source code from file
+        files = val.get("files", {})
+        source_file_digest = files.get(object_creation_utils.OP_SOURCE_FILE_NAME)
+        if not source_file_digest:
+            raise ValueError(f"Model {req.object_id} has no source file")
+
+        file_content_req = tsi.FileContentReadReq(
+            project_id=req.project_id,
+            digest=source_file_digest,
+        )
+        file_content_res = self.file_content_read(file_content_req)
+        source_code = file_content_res.content.decode("utf-8")
+
+        # Extract additional attributes (exclude system fields)
+        excluded_fields = {"_type", "_class_name", "_bases", "name", "description", "files"}
+        attributes = {k: v for k, v in val.items() if k not in excluded_fields}
+
+        return tsi.ModelReadV2Res(
+            object_id=req.object_id,
+            digest=req.digest,
+            version_index=obj_read_res.version_index,
+            created_at=obj_read_res.created_at,
+            name=name,
+            description=description,
+            source_code=source_code,
+            attributes=attributes if attributes else None,
+        )
+
+    def model_list_v2(self, req: tsi.ModelListV2Req) -> Iterator[tsi.ModelReadV2Res]:
+        """List model objects in a project.
+
+        Args:
+            req: ModelListV2Req containing project_id and optional pagination
+
+        Yields:
+            ModelReadV2Res objects
+        """
+        # Query objects with Model base class
+        obj_query_req = tsi.ObjQueryReq(
+            project_id=req.project_id,
+            filter={"base_object_classes": ["Model"]},
+            limit=req.limit,
+            offset=req.offset,
+        )
+        obj_query_res = self.objs_query(obj_query_req)
+
+        for obj in obj_query_res.objs:
+            # Build ModelReadV2Res from each object
+            val = obj.val
+            name = val.get("name", obj.object_id)
+            description = val.get("description")
+
+            # Get source code from file
+            files = val.get("files", {})
+            source_file_digest = files.get(object_creation_utils.OP_SOURCE_FILE_NAME)
+            if source_file_digest:
+                file_content_req = tsi.FileContentReadReq(
+                    project_id=req.project_id,
+                    digest=source_file_digest,
+                )
+                file_content_res = self.file_content_read(file_content_req)
+                source_code = file_content_res.content.decode("utf-8")
+            else:
+                source_code = ""
+
+            # Extract additional attributes
+            excluded_fields = {"_type", "_class_name", "_bases", "name", "description", "files"}
+            attributes = {k: v for k, v in val.items() if k not in excluded_fields}
+
+            yield tsi.ModelReadV2Res(
+                object_id=obj.object_id,
+                digest=obj.digest,
+                version_index=obj.version_index,
+                created_at=obj.created_at,
+                name=name,
+                description=description,
+                source_code=source_code,
+                attributes=attributes if attributes else None,
+            )
+
+    def model_delete_v2(self, req: tsi.ModelDeleteV2Req) -> tsi.ModelDeleteV2Res:
+        """Delete model objects by delegating to obj_delete.
+
+        Args:
+            req: ModelDeleteV2Req containing project_id, object_id, and optional digests
+
+        Returns:
+            ModelDeleteV2Res with the number of deleted versions
+        """
+        obj_delete_req = tsi.ObjDeleteReq(
+            project_id=req.project_id,
+            object_id=req.object_id,
+            digests=req.digests,
+        )
+        result = self.obj_delete(obj_delete_req)
+        return tsi.ModelDeleteV2Res(num_deleted=result.num_deleted)
+
     def _obj_read_with_retry(
         self, req: tsi.ObjReadReq, max_retries: int = 10, initial_delay: float = 0.05
     ) -> tsi.ObjReadRes:
