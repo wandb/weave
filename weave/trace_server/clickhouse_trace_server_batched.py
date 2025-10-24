@@ -2036,7 +2036,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         source_code = file_content_res.content.decode("utf-8")
 
         # Extract additional attributes (exclude system fields)
-        excluded_fields = {"_type", "_class_name", "_bases", "name", "description", "files"}
+        excluded_fields = {
+            "_type",
+            "_class_name",
+            "_bases",
+            "name",
+            "description",
+            "files",
+        }
         attributes = {k: v for k, v in val.items() if k not in excluded_fields}
 
         return tsi.ModelReadV2Res(
@@ -2088,7 +2095,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 source_code = ""
 
             # Extract additional attributes
-            excluded_fields = {"_type", "_class_name", "_bases", "name", "description", "files"}
+            excluded_fields = {
+                "_type",
+                "_class_name",
+                "_bases",
+                "name",
+                "description",
+                "files",
+            }
             attributes = {k: v for k, v in val.items() if k not in excluded_fields}
 
             yield tsi.ModelReadV2Res(

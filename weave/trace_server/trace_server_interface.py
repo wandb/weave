@@ -1657,9 +1657,7 @@ class ModelReadV2Res(BaseModel):
     object_id: str = Field(..., description="The model ID")
     digest: str = Field(..., description="The digest of the model")
     version_index: int = Field(..., description="The version index of the object")
-    created_at: datetime.datetime = Field(
-        ..., description="When the model was created"
-    )
+    created_at: datetime.datetime = Field(..., description="When the model was created")
     name: str = Field(..., description="The name of the model")
     description: Optional[str] = Field(None, description="Description of the model")
     source_code: str = Field(

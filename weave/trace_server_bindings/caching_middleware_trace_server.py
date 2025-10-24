@@ -607,9 +607,7 @@ class CachingMiddlewareTraceServer(tsi.FullTraceServerInterface):
     def model_read_v2(self, req: tsi.ModelReadV2Req) -> tsi.ModelReadV2Res:
         return self._next_trace_server.model_read_v2(req)
 
-    def model_list_v2(
-        self, req: tsi.ModelListV2Req
-    ) -> Iterator[tsi.ModelReadV2Res]:
+    def model_list_v2(self, req: tsi.ModelListV2Req) -> Iterator[tsi.ModelReadV2Res]:
         return self._next_trace_server.model_list_v2(req)
 
     def model_delete_v2(self, req: tsi.ModelDeleteV2Req) -> tsi.ModelDeleteV2Res:
