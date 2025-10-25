@@ -46,6 +46,7 @@ __docspec__ = [
     op,
     attributes,
     thread,
+    call,
     # Re-exported from flow module
     Object,
     Dataset,
@@ -86,6 +87,7 @@ __all__ = [
     "Scorer",
     "StringPrompt",
     "attributes",
+    "call",
     "finish",
     "get",
     "get_current_call",

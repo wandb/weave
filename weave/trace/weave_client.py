@@ -976,6 +976,47 @@ class WeaveClient:
         call_context.pop_call(call.id)
 
     @trace_sentry.global_trace_sentry.watch()
+    def call(
+        self,
+        inputs: dict[str, Any],
+        output: Any,
+        *,
+        op_name: str | None = None,
+        parent: Call | None = None,
+        attributes: dict[str, Any] | None = None,
+        display_name: str | Callable[[Call], str] | None = None,
+    ) -> Call:
+        """Log a completed call with inputs and output.
+
+        This is a convenience method that creates and immediately finishes a call.
+        Useful for logging calls that have already completed.
+
+        Args:
+            inputs: The inputs to the operation.
+            output: The output of the operation.
+            op_name: The name of the operation. If not provided, generates a name.
+            parent: The parent call. If not provided, the current call is used as the parent.
+            attributes: The attributes for the call. Defaults to None.
+            display_name: The display name for the call. Defaults to None.
+
+        Returns:
+            The created and finished Call object.
+        """
+        if op_name is None:
+            op_name = f"call_{generate_id()[:8]}"
+
+        call = self.create_call(
+            op_name,
+            inputs,
+            parent=parent,
+            attributes=attributes,
+            display_name=display_name,
+            use_stack=False,
+        )
+        self.finish_call(call, output)
+        return call
+
+    @trace_sentry.global_trace_sentry.watch()
     def fail_call(self, call: Call, exception: BaseException) -> None:
         """Fail a call with an exception. This is a convenience method for finish_call."""
         return self.finish_call(call, exception=exception)
