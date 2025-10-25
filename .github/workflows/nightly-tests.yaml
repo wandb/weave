@@ -21,11 +21,11 @@ jobs:
       matrix:
         python-version-major: ["3"]
         python-version-minor: [
-            "9",
             "10",
             "11",
             "12",
             "13",
+            "14",
             #
           ]
         shard:
@@ -38,7 +38,6 @@ jobs:
             "cohere",
             "crewai",
             "dspy",
-            "google_ai_studio",
             "google_genai",
             "groq",
             "instructor",
