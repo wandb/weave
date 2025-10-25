@@ -13,6 +13,7 @@ from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
     ExportTraceServiceRequest,
 )
 
+from weave.trace_server import object_creation_utils
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import (
@@ -68,7 +69,10 @@ def get_conn_cursor(db_path: str) -> tuple[sqlite3.Connection, sqlite3.Cursor]:
     # conn_cursor = _conn_cursor.get()
     conn_cursor = None
     if conn_cursor is None:
-        conn = sqlite3.connect(db_path)
+        # Use uri=True for URIs like "file::memory:?cache=shared"
+        # This is required on Windows to properly handle URI paths
+        is_uri = db_path.startswith("file:")
+        conn = sqlite3.connect(db_path, uri=is_uri)
         # Create an array reverse function.
         conn.create_function("reverse", 1, lambda x: x[::-1])
         cursor = conn.cursor()
@@ -77,7 +81,7 @@ def get_conn_cursor(db_path: str) -> tuple[sqlite3.Connection, sqlite3.Cursor]:
     return conn_cursor
 
 
-class SqliteTraceServer(tsi.TraceServerInterface):
+class SqliteTraceServer(tsi.FullTraceServerInterface):
     def __init__(
         self,
         db_path: str,
@@ -786,7 +790,9 @@ class SqliteTraceServer(tsi.TraceServerInterface):
             if self._obj_exists(cursor, project_id, object_id, digest):
                 return tsi.ObjCreateRes(digest=digest)
 
-            cursor.execute("BEGIN TRANSACTION")
+            # Use IMMEDIATE transaction to acquire write lock immediately, preventing
+            # race conditions where concurrent transactions read stale version_index values
+            cursor.execute("BEGIN IMMEDIATE TRANSACTION")
             self._mark_existing_objects_as_not_latest(cursor, project_id, object_id)
             version_index = self._get_obj_version_index(cursor, project_id, object_id)
             cursor.execute(
@@ -1645,6 +1651,592 @@ class SqliteTraceServer(tsi.TraceServerInterface):
     ) -> tsi.EvaluationStatusRes:
         return evaluation_status(self, req)
 
+    def op_create_v2(self, req: tsi.OpCreateV2Req) -> tsi.OpCreateV2Res:
+        """Create an op object by delegating to obj_create.
+
+        Args:
+            req: OpCreateReq containing project_id, name, description, and source_code
+
+        Returns:
+            OpCreateV2Res with digest, object_id, version_index, and op_ref
+        """
+        # Store source code as a file (use placeholder if not provided)
+        source_code = req.source_code or object_creation_utils.PLACEHOLDER_OP_SOURCE
+        source_file_req = tsi.FileCreateReq(
+            project_id=req.project_id,
+            name=object_creation_utils.OP_SOURCE_FILE_NAME,
+            content=source_code.encode("utf-8"),
+        )
+        source_file_res = self.file_create(source_file_req)
+
+        # Build the op object value structure with the file digest
+        # Note: We store just the digest string, matching SDK's to_json output
+        op_val = object_creation_utils.build_op_val(source_file_res.digest)
+
+        # Create the object
+        obj_req = tsi.ObjCreateReq(
+            obj=tsi.ObjSchemaForInsert(
+                project_id=req.project_id,
+                object_id=req.name,
+                val=op_val,
+            )
+        )
+        obj_result = self.obj_create(obj_req)
+
+        # Query back to get version_index
+        obj_read_req = tsi.ObjReadReq(
+            project_id=req.project_id,
+            object_id=req.name,
+            digest=obj_result.digest,
+        )
+        obj_read_res = self.obj_read(obj_read_req)
+
+        return tsi.OpCreateV2Res(
+            digest=obj_result.digest,
+            object_id=req.name,
+            version_index=obj_read_res.obj.version_index,
+        )
+
+    def op_read_v2(self, req: tsi.OpReadV2Req) -> tsi.OpReadV2Res:
+        """Get a specific op object by delegating to obj_read with op filtering.
+
+        Returns the actual source code of the op.
+        """
+        obj_req = tsi.ObjReadReq(
+            project_id=req.project_id,
+            object_id=req.object_id,
+            digest=req.digest,
+            metadata_only=False,  # We need the full val to extract file references
+        )
+        result = self.obj_read(obj_req)
+
+        # Extract code from the file storage
+        val = result.obj.val
+        code = ""
+
+        # Check if this is a file-based op
+        if isinstance(val, dict) and val.get("_type") == "CustomWeaveType":
+            files = val.get("files", {})
+            if object_creation_utils.OP_SOURCE_FILE_NAME in files:
+                # Files dict maps filename to digest string
+                file_digest = files[object_creation_utils.OP_SOURCE_FILE_NAME]
+
+                # Load the actual source code
+                try:
+                    file_content_res = self.file_content_read(
+                        tsi.FileContentReadReq(
+                            project_id=req.project_id, digest=file_digest
+                        )
+                    )
+                    code = file_content_res.content.decode("utf-8")
+                except Exception:
+                    # If we can't read the file, leave code empty
+                    pass
+
+        return tsi.OpReadV2Res(
+            object_id=result.obj.object_id,
+            digest=result.obj.digest,
+            version_index=result.obj.version_index,
+            created_at=result.obj.created_at,
+            code=code,
+        )
+
+    def op_list_v2(self, req: tsi.OpListV2Req) -> Iterator[tsi.OpReadV2Res]:
+        """List op objects by delegating to objs_query with op filtering."""
+        obj_query_req = tsi.ObjQueryReq(
+            project_id=req.project_id,
+            filter=tsi.ObjectVersionFilter(
+                is_op=True,
+                latest_only=True,
+            ),
+            limit=req.limit,
+            offset=req.offset,
+            metadata_only=False,
+        )
+        result = self.objs_query(obj_query_req)
+
+        for obj in result.objs:
+            code = ""
+
+            # Extract file reference from the val if it's a file-based op
+            try:
+                val = obj.val
+                if isinstance(val, dict) and val.get("_type") == "CustomWeaveType":
+                    files = val.get("files", {})
+                    if object_creation_utils.OP_SOURCE_FILE_NAME in files:
+                        file_digest = files[object_creation_utils.OP_SOURCE_FILE_NAME]
+
+                        # Load the actual source code
+                        try:
+                            file_content_res = self.file_content_read(
+                                tsi.FileContentReadReq(
+                                    project_id=req.project_id, digest=file_digest
+                                )
+                            )
+                            code = file_content_res.content.decode("utf-8")
+                        except Exception:
+                            # If we can't read the file, leave code empty
+                            pass
+            except Exception:
+                pass  # If parsing fails, leave code empty
+
+            yield tsi.OpReadV2Res(
+                object_id=obj.object_id,
+                digest=obj.digest,
+                version_index=obj.version_index,
+                created_at=obj.created_at,
+                code=code,
+            )
+
+    def op_delete_v2(self, req: tsi.OpDeleteV2Req) -> tsi.OpDeleteV2Res:
+        """Delete op objects by delegating to obj_delete."""
+        obj_delete_req = tsi.ObjDeleteReq(
+            project_id=req.project_id,
+            object_id=req.object_id,
+            digests=req.digests,
+        )
+        result = self.obj_delete(obj_delete_req)
+        return tsi.OpDeleteV2Res(num_deleted=result.num_deleted)
+
+    def dataset_create_v2(self, req: tsi.DatasetCreateV2Req) -> tsi.DatasetCreateV2Res:
+        """Create a dataset object by first creating a table for rows, then creating the dataset object.
+
+        The dataset object references the table containing the actual row data.
+        """
+        # Create a safe ID for the dataset
+        safe_name = object_creation_utils.make_safe_name(req.name)
+        dataset_id = f"dataset_{safe_name}"
+
+        # Create a table and get its ref
+        table_req = tsi.TableCreateReq(
+            table=tsi.TableSchemaForInsert(
+                project_id=req.project_id,
+                rows=req.rows,
+            )
+        )
+        table_res = self.table_create(table_req)
+        table_ref = ri.InternalTableRef(
+            project_id=req.project_id,
+            digest=table_res.digest,
+        ).uri()
+
+        # Create the dataset object
+        dataset_val = object_creation_utils.build_dataset_val(
+            name=req.name,
+            description=req.description,
+            table_ref=table_ref,
+        )
+        obj_req = tsi.ObjCreateReq(
+            obj=tsi.ObjSchemaForInsert(
+                project_id=req.project_id,
+                object_id=dataset_id,
+                val=dataset_val,
+                wb_user_id=None,
+            )
+        )
+        obj_result = self.obj_create(obj_req)
+
+        # Query the object back to get its version index
+        obj_read_req = tsi.ObjReadReq(
+            project_id=req.project_id,
+            object_id=dataset_id,
+            digest=obj_result.digest,
+        )
+        obj_read_res = self.obj_read(obj_read_req)
+
+        return tsi.DatasetCreateV2Res(
+            digest=obj_result.digest,
+            object_id=dataset_id,
+            version_index=obj_read_res.obj.version_index,
+        )
+
+    def dataset_read_v2(self, req: tsi.DatasetReadV2Req) -> tsi.DatasetReadV2Res:
+        """Get a dataset object by delegating to obj_read.
+
+        Returns the rows reference as a string.
+        """
+        obj_req = tsi.ObjReadReq(
+            project_id=req.project_id,
+            object_id=req.object_id,
+            digest=req.digest,
+        )
+        result = self.obj_read(obj_req)
+        val = result.obj.val
+
+        # Extract name, description, and rows ref from val data
+        name = val.get("name")
+        description = val.get("description")
+        rows_ref = val.get("rows", "")
+
+        # Create the response with all required fields
+        return tsi.DatasetReadV2Res(
+            object_id=result.obj.object_id,
+            digest=result.obj.digest,
+            version_index=result.obj.version_index,
+            created_at=result.obj.created_at,
+            name=name,
+            description=description,
+            rows=rows_ref,
+        )
+
+    def dataset_list_v2(
+        self, req: tsi.DatasetListV2Req
+    ) -> Iterator[tsi.DatasetReadV2Res]:
+        """List dataset objects by delegating to objs_query with Dataset filtering.
+
+        Returns the rows reference as a string.
+        """
+        # Query the objects
+        dataset_filter = tsi.ObjectVersionFilter(base_object_classes=["Dataset"])
+        obj_query_req = tsi.ObjQueryReq(
+            project_id=req.project_id,
+            filter=dataset_filter,
+            limit=req.limit,
+            offset=req.offset,
+        )
+        obj_res = self.objs_query(obj_query_req)
+
+        # Yield back a descriptive metadata object for each dataset
+        for obj in obj_res.objs:
+            if not hasattr(obj, "val") or not obj.val:
+                continue
+
+            val = obj.val
+            if not isinstance(val, dict):
+                continue
+
+            name = val.get("name")
+            description = val.get("description")
+            rows_ref = val.get("rows", "")
+
+            yield tsi.DatasetReadV2Res(
+                object_id=obj.object_id,
+                digest=obj.digest,
+                version_index=obj.version_index,
+                created_at=obj.created_at,
+                name=name,
+                description=description,
+                rows=rows_ref,
+            )
+
+    def dataset_delete_v2(self, req: tsi.DatasetDeleteV2Req) -> tsi.DatasetDeleteV2Res:
+        """Delete dataset objects by delegating to obj_delete."""
+        obj_delete_req = tsi.ObjDeleteReq(
+            project_id=req.project_id,
+            object_id=req.object_id,
+            digests=req.digests,
+        )
+        result = self.obj_delete(obj_delete_req)
+        return tsi.DatasetDeleteV2Res(num_deleted=result.num_deleted)
+
+    def scorer_create_v2(self, req: tsi.ScorerCreateV2Req) -> tsi.ScorerCreateV2Res:
+        """Create a scorer object by first creating its score op, then creating the scorer object.
+
+        The scorer object references the op that implements the scoring logic.
+        """
+        # Generate a safe ID for the scorer
+        safe_name = object_creation_utils.make_safe_name(req.name)
+        scorer_id = f"scorer_{safe_name}"
+
+        # Create the score op first
+        score_op_req = tsi.OpCreateV2Req(
+            project_id=req.project_id,
+            name=f"{scorer_id}_score",
+            source_code=req.op_source_code,
+        )
+        score_op_res = self.op_create_v2(score_op_req)
+        score_op_ref = score_op_res.digest
+
+        # Create the default summarize op
+        summarize_op_req = tsi.OpCreateV2Req(
+            project_id=req.project_id,
+            name=f"{scorer_id}_summarize",
+            source_code=object_creation_utils.PLACEHOLDER_SCORER_SUMMARIZE_OP_SOURCE,
+        )
+        summarize_op_res = self.op_create_v2(summarize_op_req)
+        summarize_op_ref = summarize_op_res.digest
+
+        # Create the scorer object using shared utility for val
+        scorer_val = object_creation_utils.build_scorer_val(
+            name=req.name,
+            description=req.description,
+            score_op_ref=score_op_ref,
+            summarize_op_ref=summarize_op_ref,
+        )
+
+        obj_req = tsi.ObjCreateReq(
+            obj=tsi.ObjSchemaForInsert(
+                project_id=req.project_id,
+                object_id=scorer_id,
+                val=scorer_val,
+                wb_user_id=None,
+            )
+        )
+        obj_result = self.obj_create(obj_req)
+
+        # Query back to get version_index
+        obj_read_req = tsi.ObjReadReq(
+            project_id=req.project_id,
+            object_id=scorer_id,
+            digest=obj_result.digest,
+        )
+        obj_read_res = self.obj_read(obj_read_req)
+
+        # Construct the scorer reference using InternalObjectRef
+        scorer_ref = ri.InternalObjectRef(
+            project_id=req.project_id,
+            name=scorer_id,
+            version=obj_result.digest,
+        ).uri()
+
+        return tsi.ScorerCreateV2Res(
+            digest=obj_result.digest,
+            object_id=scorer_id,
+            version_index=obj_read_res.obj.version_index,
+            scorer=scorer_ref,
+        )
+
+    def scorer_read_v2(self, req: tsi.ScorerReadV2Req) -> tsi.ScorerReadV2Res:
+        """Get scorer objects by delegating to obj_read."""
+        obj_req = tsi.ObjReadReq(
+            project_id=req.project_id,
+            object_id=req.object_id,
+            digest=req.digest,
+        )
+        result = self.obj_read(obj_req)
+        val = result.obj.val
+
+        # Extract name and description from val data
+        name = val.get("name", result.obj.object_id)
+        description = val.get("description")
+
+        # Create the response with all required fields
+        return tsi.ScorerReadV2Res(
+            object_id=result.obj.object_id,
+            digest=result.obj.digest,
+            version_index=result.obj.version_index,
+            created_at=result.obj.created_at,
+            name=name,
+            description=description,
+            score_op=val.get("score", ""),
+        )
+
+    def scorer_list_v2(self, req: tsi.ScorerListV2Req) -> Iterator[tsi.ScorerReadV2Res]:
+        """List scorer objects by delegating to objs_query with Scorer filtering."""
+        obj_query_req = tsi.ObjQueryReq(
+            project_id=req.project_id,
+            filter=tsi.ObjectVersionFilter(base_object_classes=["Scorer"]),
+            limit=req.limit,
+            offset=req.offset,
+        )
+        result = self.objs_query(obj_query_req)
+
+        for obj in result.objs:
+            # Extract name, description, and score_op from val data
+            name = obj.object_id  # fallback to object_id
+            description = None
+            score_op = ""
+
+            if hasattr(obj, "val") and obj.val:
+                val = obj.val
+                if isinstance(val, dict):
+                    name = val.get("name", obj.object_id)
+                    description = val.get("description")
+                    score_op = val.get("score", "")
+
+            yield tsi.ScorerReadV2Res(
+                object_id=obj.object_id,
+                digest=obj.digest,
+                version_index=obj.version_index,
+                created_at=obj.created_at,
+                name=name,
+                description=description,
+                score_op=score_op,
+            )
+
+    def scorer_delete_v2(self, req: tsi.ScorerDeleteV2Req) -> tsi.ScorerDeleteV2Res:
+        """Delete scorer objects by delegating to obj_delete."""
+        obj_delete_req = tsi.ObjDeleteReq(
+            project_id=req.project_id,
+            object_id=req.object_id,
+            digests=req.digests,
+        )
+        result = self.obj_delete(obj_delete_req)
+        return tsi.ScorerDeleteV2Res(num_deleted=result.num_deleted)
+
+    def evaluation_create_v2(
+        self, req: tsi.EvaluationCreateV2Req
+    ) -> tsi.EvaluationCreateV2Res:
+        """Create an evaluation object.
+
+        Creates placeholder ops for evaluate, predict_and_score, and summarize methods.
+        """
+        # Generate a safe ID for the evaluation
+        evaluation_id = object_creation_utils.make_safe_name(req.name)
+
+        # Create placeholder evaluate op
+        evaluate_op_req = tsi.OpCreateV2Req(
+            project_id=req.project_id,
+            name=f"{evaluation_id}.evaluate",
+            source_code=object_creation_utils.PLACEHOLDER_EVALUATE_OP_SOURCE,
+        )
+        evaluate_op_res = self.op_create_v2(evaluate_op_req)
+        evaluate_ref = evaluate_op_res.digest
+
+        # Create placeholder predict_and_score op
+        predict_and_score_op_req = tsi.OpCreateV2Req(
+            project_id=req.project_id,
+            name=f"{evaluation_id}.predict_and_score",
+            source_code=object_creation_utils.PLACEHOLDER_PREDICT_AND_SCORE_OP_SOURCE,
+        )
+        predict_and_score_op_res = self.op_create_v2(predict_and_score_op_req)
+        predict_and_score_ref = predict_and_score_op_res.digest
+
+        # Create placeholder summarize op
+        summarize_op_req = tsi.OpCreateV2Req(
+            project_id=req.project_id,
+            name=f"{evaluation_id}.summarize",
+            source_code=object_creation_utils.PLACEHOLDER_EVALUATION_SUMMARIZE_OP_SOURCE,
+        )
+        summarize_op_res = self.op_create_v2(summarize_op_req)
+        summarize_ref = summarize_op_res.digest
+
+        # Build the evaluation object using shared utility
+        evaluation_val = object_creation_utils.build_evaluation_val(
+            name=req.name,
+            dataset_ref=req.dataset,
+            trials=req.trials,
+            description=req.description,
+            scorer_refs=req.scorers,
+            evaluation_name=req.evaluation_name,
+            metadata=None,
+            preprocess_model_input=None,
+            eval_attributes=req.eval_attributes,
+            evaluate_ref=evaluate_ref,
+            predict_and_score_ref=predict_and_score_ref,
+            summarize_ref=summarize_ref,
+        )
+
+        obj_req = tsi.ObjCreateReq(
+            obj=tsi.ObjSchemaForInsert(
+                project_id=req.project_id,
+                object_id=evaluation_id,
+                val=evaluation_val,
+                wb_user_id=None,
+            )
+        )
+        obj_result = self.obj_create(obj_req)
+
+        # Query back to get version_index
+        obj_read_req = tsi.ObjReadReq(
+            project_id=req.project_id,
+            object_id=evaluation_id,
+            digest=obj_result.digest,
+        )
+        obj_read_res = self.obj_read(obj_read_req)
+
+        # Build evaluation reference - external adapter will convert to external format
+        evaluation_ref = ri.InternalObjectRef(
+            project_id=req.project_id,
+            name=evaluation_id,
+            version=obj_result.digest,
+        ).uri()
+
+        return tsi.EvaluationCreateV2Res(
+            digest=obj_result.digest,
+            object_id=evaluation_id,
+            version_index=obj_read_res.obj.version_index,
+            evaluation_ref=evaluation_ref,
+        )
+
+    def evaluation_read_v2(
+        self, req: tsi.EvaluationReadV2Req
+    ) -> tsi.EvaluationReadV2Res:
+        """Get evaluation objects by delegating to obj_read."""
+        obj_req = tsi.ObjReadReq(
+            project_id=req.project_id,
+            object_id=req.object_id,
+            digest=req.digest,
+        )
+        result = self.obj_read(obj_req)
+        val = result.obj.val
+
+        # Extract name and description from val data
+        name = val.get("name", result.obj.object_id)
+        description = val.get("description")
+
+        # Create the response with all required fields
+        return tsi.EvaluationReadV2Res(
+            object_id=result.obj.object_id,
+            digest=result.obj.digest,
+            version_index=result.obj.version_index,
+            created_at=result.obj.created_at,
+            name=name,
+            description=description,
+            dataset=val.get("dataset", ""),
+            scorers=val.get("scorers", []),
+            trials=val.get("trials", 1),
+            evaluation_name=val.get("evaluation_name"),
+            evaluate_op=val.get("evaluate", ""),
+            predict_and_score_op=val.get("predict_and_score", ""),
+            summarize_op=val.get("summarize", ""),
+        )
+
+    def evaluation_list_v2(
+        self, req: tsi.EvaluationListV2Req
+    ) -> Iterator[tsi.EvaluationReadV2Res]:
+        """List evaluation objects by delegating to objs_query."""
+        obj_query_req = tsi.ObjQueryReq(
+            project_id=req.project_id,
+            filter=tsi.ObjectVersionFilter(base_object_classes=["Evaluation"]),
+            limit=req.limit,
+            offset=req.offset,
+        )
+        result = self.objs_query(obj_query_req)
+
+        for obj in result.objs:
+            val = obj.val if hasattr(obj, "val") and obj.val else {}
+
+            # Extract name and description from val data
+            name = (
+                val.get("name", obj.object_id)
+                if isinstance(val, dict)
+                else obj.object_id
+            )
+            description = val.get("description") if isinstance(val, dict) else None
+
+            yield tsi.EvaluationReadV2Res(
+                object_id=obj.object_id,
+                digest=obj.digest,
+                version_index=obj.version_index,
+                created_at=obj.created_at,
+                name=name,
+                description=description,
+                dataset=val.get("dataset", "") if isinstance(val, dict) else "",
+                scorers=val.get("scorers", []) if isinstance(val, dict) else [],
+                trials=val.get("trials", 1) if isinstance(val, dict) else 1,
+                evaluation_name=val.get("evaluation_name")
+                if isinstance(val, dict)
+                else None,
+                evaluate_op=val.get("evaluate", "") if isinstance(val, dict) else "",
+                predict_and_score_op=val.get("predict_and_score", "")
+                if isinstance(val, dict)
+                else "",
+                summarize_op=val.get("summarize", "") if isinstance(val, dict) else "",
+            )
+
+    def evaluation_delete_v2(
+        self, req: tsi.EvaluationDeleteV2Req
+    ) -> tsi.EvaluationDeleteV2Res:
+        """Delete evaluation objects by delegating to obj_delete."""
+        obj_delete_req = tsi.ObjDeleteReq(
+            project_id=req.project_id,
+            object_id=req.object_id,
+            digests=req.digests,
+        )
+        result = self.obj_delete(obj_delete_req)
+        return tsi.EvaluationDeleteV2Res(num_deleted=result.num_deleted)
+
     def _table_row_read(self, project_id: str, row_digest: str) -> tsi.TableRowSchema:
         conn, cursor = get_conn_cursor(self.db_path)
         # Now get the rows
@@ -1709,12 +2301,20 @@ class SqliteTraceServer(tsi.TraceServerInterface):
                 }:
                     sort_clauses.append(f"{sort.field} {sort.direction.upper()}")
             if sort_clauses:
-                query += f" ORDER BY {', '.join(sort_clauses)}"
+                # Add version_index as secondary sort to ensure deterministic ordering
+                # when primary sort fields have identical values (e.g., same timestamp on Windows)
+                query += f" ORDER BY {', '.join(sort_clauses)}, version_index ASC"
         else:
-            query += " ORDER BY created_at ASC"
+            # Default sort by created_at with version_index as tiebreaker
+            # On Windows, datetime.now() has lower resolution, causing multiple objects
+            # created in quick succession to share the same timestamp
+            query += " ORDER BY created_at ASC, version_index ASC"
 
         if limit is not None:
             query += f" LIMIT {limit}"
+        elif offset is not None:
+            # SQLite requires LIMIT when using OFFSET
+            query += " LIMIT -1"
         if offset is not None:
             query += f" OFFSET {offset}"
 

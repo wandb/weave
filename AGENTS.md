@@ -24,7 +24,6 @@ _Important:_ For OpenAI Codex agents (most likely you!), your environment does n
 - `weave/` - Core implementation
   - `weave/` - Python package implementation
   - `weave/trace_server` - Backend server implementation
-- `docs/` - Documentation website
 
 ### Legacy Code
 
@@ -116,7 +115,6 @@ TODO: need to fill this out
 
 ### Documentation
 
-- Make sure to add end-user documentation inside the `docs` dir when creating new features.
 - Update relevant docstrings for Python code
 - Add JSDoc comments for TypeScript code
 - Update this file when introducing new patterns or concepts

@@ -1,4 +1,5 @@
 import os
+import sys
 import wave
 from datetime import datetime, timezone
 
@@ -77,7 +78,11 @@ media_cases = [
         exp_json={
             "_type": "CustomWeaveType",
             "weave_type": {"type": "PIL.Image.Image"},
-            "files": {"image.png": "Ac3YO5daeesZTxBfXf7DAKaQZ5IZysk2HvclN8sfwxQ"},
+            "files": {
+                "image.png": "eIObd4Xf1Od75ekC8UuDfJMb7nk0VSF5WPzyohXn5eQ"
+                if sys.platform == "win32"
+                else "Ac3YO5daeesZTxBfXf7DAKaQZ5IZysk2HvclN8sfwxQ"
+            },
             "load_op": "weave:///shawn/test-project/op/load_PIL.Image.Image:jhxXm8LUXTL8B8nfSGFXQdOLhpuzJYtbW59ZxhUFgoI",
         },
         exp_objects=[
@@ -97,8 +102,12 @@ media_cases = [
                 "exp_content": b'import weave\nfrom weave.trace.serialization.mem_artifact import MemTraceFilesArtifact\nfrom typing import Any\nfrom weave.utils.iterators import first\nimport PIL.Image as Image\n\n@weave.op()\ndef load(artifact: MemTraceFilesArtifact, name: str, val: Any) -> Image.Image:\n    # Today, we assume there can only be 1 image in the artifact.\n    filename = first(artifact.path_contents)\n    if not filename.startswith("image."):\n        raise ValueError(f"Expected filename to start with \'image.\', got {filename}")\n\n    path = artifact.path(filename)\n    return Image.open(path)\n',
             },
             {
-                "digest": "Ac3YO5daeesZTxBfXf7DAKaQZ5IZysk2HvclN8sfwxQ",
-                "exp_content": b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\n\x00\x00\x00\n\x08\x02\x00\x00\x00\x02PX\xea\x00\x00\x00\x12IDATx\x9cc\xfc\xcf\x80\x0f0\xe1\x95\x1d\xb1\xd2\x00A,\x01\x13\xb1\ns\x13\x00\x00\x00\x00IEND\xaeB`\x82",
+                "digest": "eIObd4Xf1Od75ekC8UuDfJMb7nk0VSF5WPzyohXn5eQ"
+                if sys.platform == "win32"
+                else "Ac3YO5daeesZTxBfXf7DAKaQZ5IZysk2HvclN8sfwxQ",
+                "exp_content": b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\n\x00\x00\x00\n\x08\x02\x00\x00\x00\x02PX\xea\x00\x00\x00\x13IDATx\x9cc\xfc\xcf\x80\x0f0\xe1\x95e\x18\xa9\xd2\x00A,\x01\x13y\xed\xba&\x00\x00\x00\x00IEND\xaeB`\x82"
+                if sys.platform == "win32"
+                else b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\n\x00\x00\x00\n\x08\x02\x00\x00\x00\x02PX\xea\x00\x00\x00\x12IDATx\x9cc\xfc\xcf\x80\x0f0\xe1\x95\x1d\xb1\xd2\x00A,\x01\x13\xb1\ns\x13\x00\x00\x00\x00IEND\xaeB`\x82",
             },
         ],
         equality_check=lambda a, b: a.tobytes() == b.tobytes(),
@@ -246,7 +255,9 @@ media_cases = [
             "weave_type": {"type": "weave.type_wrappers.Content.content.Content"},
             "files": {
                 "content": "xfOhnNfgQxRzgWZ6DC1QEGt9vrJWcathymKPPZQmmIw",
-                "metadata.json": "0tY4LYkQE9BXzCQDItzaUoFLd3lesQ0RkuHNMuXQJIk",
+                "metadata.json": "v5gYkptifYVGd0JYbW3U0jYQPSKkLzEI3eamc0cnCG8"
+                if sys.platform == "win32"
+                else "0tY4LYkQE9BXzCQDItzaUoFLd3lesQ0RkuHNMuXQJIk",
             },
             "load_op": "weave:///shawn/test-project/op/load_weave.type_wrappers.Content.content.Content:eZCocNGYXrXPrJMWO0MECHxVUOWlrWSma9iGydnlxE0",
         },
@@ -263,8 +274,12 @@ media_cases = [
         ],
         exp_files=[
             {
-                "digest": "0tY4LYkQE9BXzCQDItzaUoFLd3lesQ0RkuHNMuXQJIk",
-                "exp_content": b'{"size": 88244, "mimetype": "audio/x-wav", "digest": "c5f3a19cd7e043147381667a0c2d50106b7dbeb25671ab61ca628f3d9426988c", "filename": "audio.wav", "content_type": "file", "input_type": "str", "encoding": "utf-8", "metadata": null, "extension": ".wav"}',
+                "digest": "v5gYkptifYVGd0JYbW3U0jYQPSKkLzEI3eamc0cnCG8"
+                if sys.platform == "win32"
+                else "0tY4LYkQE9BXzCQDItzaUoFLd3lesQ0RkuHNMuXQJIk",
+                "exp_content": b'{"size": 88244, "mimetype": "audio/wav", "digest": "c5f3a19cd7e043147381667a0c2d50106b7dbeb25671ab61ca628f3d9426988c", "filename": "audio.wav", "content_type": "file", "input_type": "str", "encoding": "utf-8", "metadata": null, "extension": ".wav"}'
+                if sys.platform == "win32"
+                else b'{"size": 88244, "mimetype": "audio/x-wav", "digest": "c5f3a19cd7e043147381667a0c2d50106b7dbeb25671ab61ca628f3d9426988c", "filename": "audio.wav", "content_type": "file", "input_type": "str", "encoding": "utf-8", "metadata": null, "extension": ".wav"}',
             },
             {
                 "digest": "xfOhnNfgQxRzgWZ6DC1QEGt9vrJWcathymKPPZQmmIw",
@@ -462,7 +477,9 @@ media_cases = [
             "weave_type": {"type": "weave.type_wrappers.Content.content.Content"},
             "files": {
                 "content": "xfOhnNfgQxRzgWZ6DC1QEGt9vrJWcathymKPPZQmmIw",
-                "metadata.json": "0tY4LYkQE9BXzCQDItzaUoFLd3lesQ0RkuHNMuXQJIk",
+                "metadata.json": "v5gYkptifYVGd0JYbW3U0jYQPSKkLzEI3eamc0cnCG8"
+                if sys.platform == "win32"
+                else "0tY4LYkQE9BXzCQDItzaUoFLd3lesQ0RkuHNMuXQJIk",
             },
             "load_op": "weave:///shawn/test-project/op/load_weave.type_wrappers.Content.content.Content:pHK80K8ec7lRHbNwjR2LjWQXRxAV8n5BmkixcTamz2k",
         },
@@ -479,8 +496,12 @@ media_cases = [
         ],
         exp_files=[
             {
-                "digest": "0tY4LYkQE9BXzCQDItzaUoFLd3lesQ0RkuHNMuXQJIk",
-                "exp_content": b'{"size": 88244, "mimetype": "audio/x-wav", "digest": "c5f3a19cd7e043147381667a0c2d50106b7dbeb25671ab61ca628f3d9426988c", "filename": "audio.wav", "content_type": "file", "input_type": "str", "encoding": "utf-8", "metadata": null, "extension": ".wav"}',
+                "digest": "v5gYkptifYVGd0JYbW3U0jYQPSKkLzEI3eamc0cnCG8"
+                if sys.platform == "win32"
+                else "0tY4LYkQE9BXzCQDItzaUoFLd3lesQ0RkuHNMuXQJIk",
+                "exp_content": b'{"size": 88244, "mimetype": "audio/wav", "digest": "c5f3a19cd7e043147381667a0c2d50106b7dbeb25671ab61ca628f3d9426988c", "filename": "audio.wav", "content_type": "file", "input_type": "str", "encoding": "utf-8", "metadata": null, "extension": ".wav"}'
+                if sys.platform == "win32"
+                else b'{"size": 88244, "mimetype": "audio/x-wav", "digest": "c5f3a19cd7e043147381667a0c2d50106b7dbeb25671ab61ca628f3d9426988c", "filename": "audio.wav", "content_type": "file", "input_type": "str", "encoding": "utf-8", "metadata": null, "extension": ".wav"}',
             },
             {
                 "digest": "xfOhnNfgQxRzgWZ6DC1QEGt9vrJWcathymKPPZQmmIw",

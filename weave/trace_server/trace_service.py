@@ -2,7 +2,9 @@ from typing import Protocol
 
 from pydantic import BaseModel
 
-from weave.trace_server.trace_server_interface import TraceServerInterface
+from weave.trace_server.trace_server_interface import (
+    FullTraceServerInterface,
+)
 
 
 class ServerInfoRes(BaseModel):
@@ -21,7 +23,7 @@ class TraceService(Protocol):
     that consumes this interface and provides a convenient FastAPI router.
     """
 
-    trace_server_interface: TraceServerInterface
+    trace_server_interface: FullTraceServerInterface
 
     def server_info(self) -> ServerInfoRes: ...
     def read_root(self) -> dict[str, str]: ...
