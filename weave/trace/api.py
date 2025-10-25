@@ -381,7 +381,7 @@ def thread(thread_id: str | None | object = _AUTO_GENERATE) -> Iterator[ThreadCo
         yield context
 
 
-def call(
+def log_call(
     inputs: dict[str, Any],
     output: Any,
     *,
@@ -412,15 +412,15 @@ def call(
     Example:
     ```python
     weave.init("my-project")
-    call = weave.call({"x": 1, "y": 2}, {"result": 3}, op_name="my_operation")
+    call = weave.log_call({"x": 1, "y": 2}, {"result": 3}, op_name="my_operation")
     print(call.ui_url)
 
     # With explicit wandb run step
-    call = weave.call({"x": 1}, {"y": 2}, op_name="step_10", wb_run_step=10)
+    call = weave.log_call({"x": 1}, {"y": 2}, op_name="step_10", wb_run_step=10)
     ```
     """
     client = weave_client_context.require_weave_client()
-    return client.call(
+    return client.log_call(
         inputs,
         output,
         op_name=op_name,
@@ -455,12 +455,12 @@ __all__ = [
     "ThreadContext",
     "as_op",
     "attributes",
-    "call",
     "finish",
     "get",
     "get_client",
     "get_current_call",
     "init",
+    "log_call",
     "op",
     "publish",
     "ref",

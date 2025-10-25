@@ -769,8 +769,12 @@ class WeaveClient:
             parent._children.append(call)
 
         # Use provided wb_run_id/wb_run_step if available, otherwise get from context
-        current_wb_run_id = wb_run_id if wb_run_id is not None else safe_current_wb_run_id()
-        current_wb_run_step = wb_run_step if wb_run_step is not None else safe_current_wb_run_step()
+        current_wb_run_id = (
+            wb_run_id if wb_run_id is not None else safe_current_wb_run_id()
+        )
+        current_wb_run_step = (
+            wb_run_step if wb_run_step is not None else safe_current_wb_run_step()
+        )
         check_wandb_run_matches(current_wb_run_id, self.entity, self.project)
 
         started_at = datetime.datetime.now(tz=datetime.timezone.utc)
@@ -983,7 +987,7 @@ class WeaveClient:
         call_context.pop_call(call.id)
 
     @trace_sentry.global_trace_sentry.watch()
-    def call(
+    def log_call(
         self,
         inputs: dict[str, Any],
         output: Any,
