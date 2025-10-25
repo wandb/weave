@@ -89,10 +89,6 @@ updates:
         patterns:
           - "dspy*"
 
-      google_ai_studio:
-        patterns:
-          - "google-generativeai*"
-
       google_genai:
         patterns:
           - "google-genai*"
