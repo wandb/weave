@@ -865,6 +865,36 @@ class TestSemanticConventionParsing:
         assert extracted_turn_only["is_turn"] is True
         assert "thread_id" not in extracted_turn_only
 
+    def test_wandb_wb_run_id_extraction(self):
+        """Test extracting wb_run_id from both wb_run_id and wandb.wb_run_id attributes."""
+        # Case 1: Only top-level wb_run_id present
+        attributes_top_level = create_attributes(
+            {
+                "wb_run_id": "run_top_123",
+            }
+        )
+        extracted_top_level = get_wandb_attributes(attributes_top_level)
+        assert extracted_top_level["wb_run_id"] == "run_top_123"
+
+        # Case 2: Only namespaced wandb.wb_run_id present
+        attributes_namespaced = create_attributes(
+            {
+                "wandb.wb_run_id": "run_ns_456",
+            }
+        )
+        extracted_namespaced = get_wandb_attributes(attributes_namespaced)
+        assert extracted_namespaced["wb_run_id"] == "run_ns_456"
+
+        # Case 3: Both present, top-level should take precedence
+        attributes_both = create_attributes(
+            {
+                "wb_run_id": "preferred_top",
+                "wandb.wb_run_id": "fallback_ns",
+            }
+        )
+        extracted_both = get_wandb_attributes(attributes_both)
+        assert extracted_both["wb_run_id"] == "preferred_top"
+
     def test_openinference_inputs_extraction(self):
         """Test extracting inputs from OpenInference attributes."""
         from openinference.semconv.trace import SpanAttributes as OISpanAttr
