@@ -1693,7 +1693,7 @@ def _add_accumulator(
             return value
 
     op._set_on_output_handler(on_output)
-    op._on_finish_post_processor = on_finish_post_processor  # type: ignore
+    op._on_finish_post_processor = on_finish_post_processor
     return op
 
 
