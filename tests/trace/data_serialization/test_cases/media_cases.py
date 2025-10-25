@@ -92,14 +92,14 @@ media_cases = [
                 "exp_val": {
                     "_type": "CustomWeaveType",
                     "weave_type": {"type": "Op"},
-                    "files": {"obj.py": "pqIKaGlv2TZYz8E7z9kN95yTwEQ9y1CghPNqjhT1e0A"},
+                    "files": {"obj.py": "pvZOIuTtZ0aU0qg68kMYKdHSSZKxXVnFgMHln0q2CL8"},
                 },
             }
         ],
         exp_files=[
             {
-                "digest": "pqIKaGlv2TZYz8E7z9kN95yTwEQ9y1CghPNqjhT1e0A",
-                "exp_content": b'import weave\nfrom weave.trace.serialization.mem_artifact import MemTraceFilesArtifact\nfrom typing import Any\nfrom weave.utils.iterators import first\nimport PIL.Image as Image\n\n@weave.op()\ndef load(artifact: MemTraceFilesArtifact, name: str, val: Any) -> Image.Image:\n    # Today, we assume there can only be 1 image in the artifact.\n    filename = first(artifact.path_contents)\n    if not filename.startswith("image."):\n        raise ValueError(f"Expected filename to start with \'image.\', got {filename}")\n\n    path = artifact.path(filename)\n    # Open, load, and close the image file immediately to avoid file handle leaks\n    # PIL\'s Image.open() keeps the file open for lazy loading, which causes issues\n    # on Windows when the temporary directory cleanup tries to delete the file\n    with Image.open(path) as img:\n        # Load the image data into memory and create a copy\n        # This ensures we don\'t keep a reference to the file\n        return img.copy()\n',
+                "digest": "pvZOIuTtZ0aU0qg68kMYKdHSSZKxXVnFgMHln0q2CL8",
+                "exp_content": b"import weave\nfrom weave.trace.serialization.mem_artifact import MemTraceFilesArtifact\nfrom typing import Any\nfrom weave.utils.iterators import first\nimport PIL.Image as Image\n\n@weave.op()\ndef load(artifact: MemTraceFilesArtifact, name: str, val: Any) -> Image.Image:\n    # Today, we assume there can only be 1 image in the artifact.\n    filename = first(artifact.path_contents)\n    if not filename.startswith(\"image.\"):\n        raise ValueError(f\"Expected filename to start with 'image.', got {filename}\")\n\n    path = artifact.path(filename)\n    # Open, load, and close the image file immediately to avoid file handle leaks\n    # PIL's Image.open() keeps the file open for lazy loading, which causes issues\n    # on Windows when the temporary directory cleanup tries to delete the file\n    with Image.open(path) as img:\n        # Load the image data into memory and create a copy\n        # This ensures we don't keep a reference to the file\n        return img.copy()\n",
             },
             {
                 "digest": "eIObd4Xf1Od75ekC8UuDfJMb7nk0VSF5WPzyohXn5eQ"
