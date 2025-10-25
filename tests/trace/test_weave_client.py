@@ -3983,8 +3983,8 @@ def test_get_ops(client):
     test_op_1(5)
     test_op_2(3)
 
-    # Get all ops
-    ops = client.get_ops()
+    # Get all ops (convert generator to list)
+    ops = list(client.get_ops())
 
     # Verify we got ops back
     assert isinstance(ops, list)
@@ -4032,8 +4032,8 @@ def test_get_ops_with_limit(client):
     limit_test_op_2(2)
     limit_test_op_3(3)
 
-    # Get ops with limit
-    ops = client.get_ops(limit=2)
+    # Get ops with limit (convert generator to list)
+    ops = list(client.get_ops(limit=2))
 
     # Verify we got at most 2 ops
     assert isinstance(ops, list)
@@ -4041,7 +4041,7 @@ def test_get_ops_with_limit(client):
 
 
 def test_get_op(client):
-    """Test the get_op client method."""
+    """Test the get_op client method with digest."""
     import weave
 
     # Define and save an op
@@ -4053,7 +4053,7 @@ def test_get_op(client):
     specific_test_op(3, 4)
 
     # Get all ops to find the one we just created
-    ops = client.get_ops()
+    ops = list(client.get_ops())
     target_op = None
     for op in ops:
         if "specific_test_op" in op["object_id"]:
@@ -4062,7 +4062,7 @@ def test_get_op(client):
 
     assert target_op is not None, "Could not find the specific_test_op"
 
-    # Get the specific op
+    # Get the specific op by digest
     op_details = client.get_op(
         object_id=target_op["object_id"],
         digest=target_op["digest"],
@@ -4077,3 +4077,42 @@ def test_get_op(client):
     assert "code" in op_details
     # The code should contain the function definition
     assert "def specific_test_op" in op_details["code"]
+
+
+def test_get_op_by_version(client):
+    """Test the get_op client method with version parameter."""
+    import weave
+
+    # Define and save an op
+    @weave.op
+    def version_test_op(x: int) -> int:
+        return x + 1
+
+    # Call the op to ensure it's saved
+    version_test_op(5)
+
+    # Get all ops to find the one we just created
+    ops = list(client.get_ops())
+    target_op = None
+    for op in ops:
+        if "version_test_op" in op["object_id"]:
+            target_op = op
+            break
+
+    assert target_op is not None, "Could not find the version_test_op"
+
+    # Get the specific op by version
+    op_details = client.get_op(
+        object_id=target_op["object_id"],
+        version=target_op["version_index"],
+    )
+
+    # Verify we got the op back with all details
+    assert isinstance(op_details, dict)
+    assert op_details["object_id"] == target_op["object_id"]
+    assert op_details["version_index"] == target_op["version_index"]
+    assert op_details["digest"] == target_op["digest"]
+    assert "created_at" in op_details
+    assert "code" in op_details
+    # The code should contain the function definition
+    assert "def version_test_op" in op_details["code"]

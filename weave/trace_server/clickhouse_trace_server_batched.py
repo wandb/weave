@@ -1323,15 +1323,27 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         Returns the actual source code of the op.
         """
+        # Ensure either digest or version_index is provided
+        if req.digest is None and req.version_index is None:
+            raise InvalidRequest("Either digest or version_index must be provided")
+
         # Query for the ops
         object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
         object_query_builder.add_is_op_condition(True)
         object_query_builder.add_object_ids_condition([req.object_id])
-        object_query_builder.add_digests_conditions(req.digest)
+
+        # Filter by digest or version_index
+        if req.digest is not None:
+            object_query_builder.add_digests_conditions(req.digest)
+        if req.version_index is not None:
+            object_query_builder.add_condition("version_index", "=", req.version_index)
+
         object_query_builder.set_include_deleted(include_deleted=True)
         objs = self._select_objs_query(object_query_builder)
+
+        identifier = f"{req.digest}" if req.digest else f"v{req.version_index}"
         if len(objs) == 0:
-            raise NotFoundError(f"Op {req.object_id}:{req.digest} not found")
+            raise NotFoundError(f"Op {req.object_id}:{identifier} not found")
 
         # There should not be multiple ops returned, but in case there are, just
         # return the first one.
@@ -1386,11 +1398,19 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # Query the objects
         op_filter = tsi.ObjectVersionFilter(is_op=True)
 
+        # Add object_id filter if specified
+        if req.object_id is not None:
+            op_filter.object_ids = [req.object_id]
+
         complex_query = req.limit is not None or req.offset is not None
         if complex_query:
             object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
             object_query_builder.add_is_op_condition(True)
             object_query_builder.set_include_deleted(include_deleted=False)
+
+            # Add object_id filter if specified
+            if req.object_id is not None:
+                object_query_builder.add_condition("object_id", "=", req.object_id)
 
             if req.limit is not None:
                 object_query_builder.set_limit(req.limit)

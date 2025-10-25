@@ -791,6 +791,8 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
             params["limit"] = req.limit
         if req.offset is not None:
             params["offset"] = req.offset
+        if req.object_id is not None:
+            params["object_id"] = req.object_id
         r = self._get_request_executor(url, params, stream=True)
         for line in r.iter_lines():
             if line:

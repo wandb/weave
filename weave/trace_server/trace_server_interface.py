@@ -1283,7 +1283,12 @@ class OpReadV2Req(BaseModel):
         ..., description="The `entity/project` where this op is saved"
     )
     object_id: str = Field(..., description="The op ID")
-    digest: str = Field(..., description="The digest of the op object")
+    digest: Optional[str] = Field(
+        default=None, description="The digest of the op object"
+    )
+    version_index: Optional[int] = Field(
+        default=None, description="The version index of the op"
+    )
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 
@@ -1308,6 +1313,9 @@ class OpListV2Req(BaseModel):
         default=None, description="Maximum number of ops to return"
     )
     offset: Optional[int] = Field(default=None, description="Number of ops to skip")
+    object_id: Optional[str] = Field(
+        default=None, description="Filter by specific op object_id"
+    )
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 

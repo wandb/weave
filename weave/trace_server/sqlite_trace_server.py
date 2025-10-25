@@ -1702,10 +1702,38 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
 
         Returns the actual source code of the op.
         """
+        # If version_index is provided instead of digest, look up the digest first
+        digest = req.digest
+        if digest is None and req.version_index is not None:
+            # Query to find the digest for this version_index
+            obj_query_req = tsi.ObjQueryReq(
+                project_id=req.project_id,
+                filter=tsi.ObjectVersionFilter(
+                    object_ids=[req.object_id],
+                    is_op=True,
+                ),
+            )
+            query_result = self.objs_query(obj_query_req)
+
+            # Find the object with the matching version_index
+            matching_obj = None
+            for obj in query_result.objs:
+                if obj.version_index == req.version_index:
+                    matching_obj = obj
+                    break
+
+            if matching_obj is None:
+                raise NotFoundError(
+                    f"Op {req.object_id} version {req.version_index} not found"
+                )
+            digest = matching_obj.digest
+        elif digest is None:
+            raise InvalidRequest("Either digest or version_index must be provided")
+
         obj_req = tsi.ObjReadReq(
             project_id=req.project_id,
             object_id=req.object_id,
-            digest=req.digest,
+            digest=digest,
             metadata_only=False,  # We need the full val to extract file references
         )
         result = self.obj_read(obj_req)
@@ -1743,12 +1771,21 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
 
     def op_list_v2(self, req: tsi.OpListV2Req) -> Iterator[tsi.OpReadV2Res]:
         """List op objects by delegating to objs_query with op filtering."""
+        # Build filter with optional object_id filtering
+        op_filter = tsi.ObjectVersionFilter(
+            is_op=True,
+            latest_only=True,
+        )
+
+        # Add object_id filter if specified
+        if req.object_id is not None:
+            op_filter.object_ids = [req.object_id]
+            # When filtering by specific object_id, show all versions
+            op_filter.latest_only = None
+
         obj_query_req = tsi.ObjQueryReq(
             project_id=req.project_id,
-            filter=tsi.ObjectVersionFilter(
-                is_op=True,
-                latest_only=True,
-            ),
+            filter=op_filter,
             limit=req.limit,
             offset=req.offset,
             metadata_only=False,
