@@ -104,9 +104,6 @@ def tests(session, shard):
         if session.python.startswith(ver) and shard in INCOMPATIBLE_SHARDS[ver]:
             session.skip(f"Skipping {shard=} as it is not compatible with Python {ver}")
 
-    if session.python.startswith("3.10") and shard in PY310_INCOMPATIBLE_SHARDS:
-        session.skip(f"Skipping {shard=} as it is not compatible with Python 3.10")
-
     session.install("-e", f".[{shard},test]")
     session.chdir("tests")
 
