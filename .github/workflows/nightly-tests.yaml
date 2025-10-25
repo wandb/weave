@@ -21,49 +21,43 @@ jobs:
       matrix:
         python-version-major: ["3"]
         python-version-minor: [
+            "9",
             "10",
             "11",
             "12",
             "13",
-            "14",
             #
           ]
         shard:
           [
+            "trace1",
+            "trace2",
+            "trace3",
+            "trace4",
             "flow",
             "trace_server",
             "trace_server_bindings",
             "anthropic",
+            "bedrock",
             "cerebras",
             "cohere",
             "crewai",
             "dspy",
-            "google_genai",
             "groq",
+            "google_genai",
             "instructor",
-            "langchain_nvidia_ai_endpoints",
             "langchain",
             "litellm",
             "llamaindex",
             "mistral",
             "notdiamond",
             "openai",
-            "openai_agents",
+            "verifiers_test",
             "vertexai",
-            "bedrock",
-            "scorers",
             "pandas-test",
-            "huggingface",
-            "smolagents",
             "mcp",
-            "verdict",
+            "smolagents",
             "autogen_tests",
-            "trace",
-            "trace1",
-            "trace2",
-            "trace3",
-            "trace4",
-            "trace_no_server",
           ]
       fail-fast: false
     services:
