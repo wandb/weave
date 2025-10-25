@@ -99,34 +99,43 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
     def get(self, url: str, *args: Any, **kwargs: Any) -> requests.Response:
         headers = self._build_dynamic_request_headers()
 
+        # Only pass auth if it's not None to allow requests to use .netrc
+        request_kwargs = {"headers": headers, **kwargs}
+        if self._auth is not None:
+            request_kwargs["auth"] = self._auth
+
         return requests.get(
             self.trace_server_url + url,
             *args,
-            auth=self._auth,
-            headers=headers,
-            **kwargs,
+            **request_kwargs,
         )
 
     def post(self, url: str, *args: Any, **kwargs: Any) -> requests.Response:
         headers = self._build_dynamic_request_headers()
 
+        # Only pass auth if it's not None to allow requests to use .netrc
+        request_kwargs = {"headers": headers, **kwargs}
+        if self._auth is not None:
+            request_kwargs["auth"] = self._auth
+
         return requests.post(
             self.trace_server_url + url,
             *args,
-            auth=self._auth,
-            headers=headers,
-            **kwargs,
+            **request_kwargs,
         )
 
     def delete(self, url: str, *args: Any, **kwargs: Any) -> requests.Response:
         headers = self._build_dynamic_request_headers()
 
+        # Only pass auth if it's not None to allow requests to use .netrc
+        request_kwargs = {"headers": headers, **kwargs}
+        if self._auth is not None:
+            request_kwargs["auth"] = self._auth
+
         return requests.delete(
             self.trace_server_url + url,
             *args,
-            auth=self._auth,
-            headers=headers,
-            **kwargs,
+            **request_kwargs,
         )
 
     @with_retry
