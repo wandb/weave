@@ -708,7 +708,17 @@ class EvaluationLogger(BaseModel):
         # at init time.
         if self._evaluate_call is None:
             return None
-        return self._evaluate_call.ui_url
+        if not self._evaluate_call.id:
+            return None
+
+        from weave.trace import urls
+
+        try:
+            entity, project = self._evaluate_call.project_id.split("/")
+        except ValueError:
+            return None
+
+        return urls.evaluation_call_url(entity, project, self._evaluate_call.id)
 
     @property
     def attributes(self) -> dict[str, Any]:
