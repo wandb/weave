@@ -20,7 +20,7 @@ jobs:
         run: pip install requests
 
       - name: Check PR title and documentation reference
-        run: python .github/scripts/validate-docs-coverage.py
+        run: python .github/scripts/validate_docs_coverage.py
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}

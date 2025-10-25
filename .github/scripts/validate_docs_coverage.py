@@ -29,7 +29,7 @@ def create_failure_comment(message: str) -> None:
 
     comment_body = (
         f"❌ Documentation Reference Check Failed\n\n{message}\n\n"
-        "This check is required for all PRs except those that start with \"chore(weave)\" or explicitly state \"docs are not required\". "
+        'This check is required for all PRs except those that start with "chore(weave)" or explicitly state "docs are not required". '
         "Please update your PR description and this check will run again automatically."
     )
 
@@ -72,7 +72,9 @@ def cleanup_previous_comments() -> None:
     # Delete previous failure comments
     for comment in comments:
         if comment["body"].startswith("❌ Documentation Reference Check Failed"):
-            delete_url = f"https://api.github.com/repos/{repo}/issues/comments/{comment['id']}"
+            delete_url = (
+                f"https://api.github.com/repos/{repo}/issues/comments/{comment['id']}"
+            )
             requests.delete(delete_url, headers=headers)
 
 
@@ -132,7 +134,7 @@ def main() -> None:
     cleanup_previous_comments()
 
     # Regular expressions to match either:
-    # - A link to a docs PR (format: wandb/docs#XXX or https://github.com/wandb/docs/pull/XXX)
+    # - A link to a docs PR (format: wandb/docs#XXX or https://github.com/wandb/docs/pull/XXX)  # noqa: FIX003
     # - A Jira ticket reference (format: DOCS-XXX or https://wandb.atlassian.net/browse/DOCS-XXX)
     docs_link_regex = r"(?:https://github\.com/wandb/docs/pull/|wandb/docs#)(\d+)"
     jira_link_regex = r"(?:https://wandb\.atlassian\.net/browse/)?DOCS-\d+"
