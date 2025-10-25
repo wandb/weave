@@ -7,25 +7,14 @@ nox.options.reuse_existing_virtualenvs = True
 nox.options.stop_on_first_error = True
 
 
-SUPPORTED_PYTHON_VERSIONS = ["3.9", "3.10", "3.11", "3.12", "3.13"]
-PY313_INCOMPATIBLE_SHARDS = [
-    "cohere",
-    "notdiamond",
-    "verifiers_test",
-]
-PY39_INCOMPATIBLE_SHARDS = [
-    "crewai",
-    "google_genai",
-    "mcp",
-    "smolagents",
-    "dspy",
-    "autogen_tests",
-    "langchain",
-    "verifiers_test",
-]
-PY310_INCOMPATIBLE_SHARDS = [
-    "verifiers_test",
-]
+SUPPORTED_PYTHON_VERSIONS = ["3.10", "3.11", "3.12", "3.13", "3.14"]
+INCOMPATIBLE_SHARDS = {
+    "3.10": ["verifiers_test"],
+    "3.11": [],
+    "3.12": [],
+    "3.13": ["cohere", "notdiamond", "verifiers_test"],
+    "3.14": [],
+}
 NUM_TRACE_SERVER_SHARDS = 4
 
 
@@ -111,14 +100,9 @@ trace_server_shards = [f"trace{i}" for i in range(1, NUM_TRACE_SERVER_SHARDS + 1
     ],
 )
 def tests(session, shard):
-    if session.python.startswith("3.13") and shard in PY313_INCOMPATIBLE_SHARDS:
-        session.skip(f"Skipping {shard=} as it is not compatible with Python 3.13")
-
-    if session.python.startswith("3.9") and shard in PY39_INCOMPATIBLE_SHARDS:
-        session.skip(f"Skipping {shard=} as it is not compatible with Python 3.9")
-
-    if session.python.startswith("3.10") and shard in PY310_INCOMPATIBLE_SHARDS:
-        session.skip(f"Skipping {shard=} as it is not compatible with Python 3.10")
+    for ver in SUPPORTED_PYTHON_VERSIONS:
+        if session.python.startswith(ver) and shard in INCOMPATIBLE_SHARDS[ver]:
+            session.skip(f"Skipping {shard=} as it is not compatible with Python {ver}")
 
     session.install("-e", f".[{shard},test]")
     session.chdir("tests")
