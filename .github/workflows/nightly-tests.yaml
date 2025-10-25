@@ -191,36 +191,51 @@ jobs:
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.shard }}')"
 
   slack-notification:
-    name: Slack Notification on Failure
+    name: Slack Notification
     needs:
       - nightly-tests
 
     runs-on: ubuntu-latest
-    if: failure()
+    if: always()
 
     steps:
-      - name: Determine Failed Jobs
-        id: failed-jobs
+      - name: Determine Result and Failed Jobs
+        id: result
         env:
           NEEDS: "${{ toJson(needs) }}"
         run: |
           jq -C . <<< "${NEEDS}" # debug
 
-          failed_jobs=$(
+          # Check if any job failed
+          has_failure=$(
             jq -r '
-              to_entries
-              | [
-                .[]
-                | select(.value.result == "failure")
-                | .key
-              ]
-              | join(", ")
-            ' <<< "${NEEDS}"
+              .[]
+              | select(.result == "failure")
+              | "true"
+            ' <<< "${NEEDS}" | head -n1
           )
 
-          echo "failed_jobs=$failed_jobs" | tee -a "${GITHUB_OUTPUT}"
+          if [ "$has_failure" = "true" ]; then
+            echo "status=failure" >> $GITHUB_OUTPUT
+            
+            failed_jobs=$(
+              jq -r '
+                to_entries
+                | [
+                  .[]
+                  | select(.value.result == "failure")
+                  | .key
+                ]
+                | join(", ")
+              ' <<< "${NEEDS}"
+            )
+            echo "failed_jobs=$failed_jobs" >> $GITHUB_OUTPUT
+          else
+            echo "status=success" >> $GITHUB_OUTPUT
+          fi
 
-      - name: Send Slack Notification
+      - name: Send Slack Notification on Failure
+        if: steps.result.outputs.status == 'failure'
         uses: slackapi/slack-github-action@v1.25.0
         with:
           channel-id: "C09CE03J867"
@@ -228,7 +243,20 @@ jobs:
             :x: Nightly Tests failed!
             *Repository:* ${{ github.repository }}
             *Commit:* ${{ github.sha }}
-            *Failed Jobs:* ${{ steps.failed-jobs.outputs.failed_jobs }}
+            *Failed Jobs:* ${{ steps.result.outputs.failed_jobs }}
+            *Build:* ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.WANDB_CI_SLACK_BOT_TOKEN }}
+
+      - name: Send Slack Notification on Success
+        if: steps.result.outputs.status == 'success'
+        uses: slackapi/slack-github-action@v1.25.0
+        with:
+          channel-id: "C09CE03J867"
+          slack-message: >-
+            :white_check_mark: Nightly Tests passed!
+            *Repository:* ${{ github.repository }}
+            *Commit:* ${{ github.sha }}
             *Build:* ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         env:
           SLACK_BOT_TOKEN: ${{ secrets.WANDB_CI_SLACK_BOT_TOKEN }}
