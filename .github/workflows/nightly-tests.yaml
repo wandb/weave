@@ -239,7 +239,7 @@ jobs:
         uses: slackapi/slack-github-action@v1.25.0
         with:
           channel-id: "C09CE03J867"
-          slack-message: >-
+          slack-message: |
             :x: Nightly Tests failed!
             *Repository:* ${{ github.repository }}
             *Commit:* ${{ github.sha }}
@@ -253,7 +253,7 @@ jobs:
         uses: slackapi/slack-github-action@v1.25.0
         with:
           channel-id: "C09CE03J867"
-          slack-message: >-
+          slack-message: |
             :white_check_mark: Nightly Tests passed!
             *Repository:* ${{ github.repository }}
             *Commit:* ${{ github.sha }}
