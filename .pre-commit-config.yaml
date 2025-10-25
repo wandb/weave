@@ -13,12 +13,14 @@ repos:
       - id: ruff-check
         types_or: [python, pyi, jupyter]
         args: [--fix, --exit-non-zero-on-fix, --config=pyproject.toml]
+        exclude: ".github/scripts/validate_docs_coverage.py"
         always_run: true
         pass_filenames: false
       # Run the formatter.
       - id: ruff-format
         args: [--config=pyproject.toml]
         types_or: [python, pyi, jupyter]
+        exclude: ".github/scripts/validate_docs_coverage.py"
         always_run: true
         pass_filenames: false
   - repo: https://github.com/RobertCraigie/pyright-python
@@ -26,6 +28,7 @@ repos:
     hooks:
       - id: pyright
         additional_dependencies: [".[tests]"]
+        exclude: ".github/scripts/validate_docs_coverage.py"
         always_run: true
         pass_filenames: false
   - repo: https://github.com/pre-commit/mirrors-mypy
@@ -36,7 +39,7 @@ repos:
           [types-pkg-resources==0.1.3, types-all, wandb>=0.15.5, wandb<0.19.0]
         # Note: You have to update pyproject.toml[tool.mypy] too!
         args: ["--config-file=pyproject.toml", "."]
-        exclude: (.*pyi$)|(weave_query)|(tests)|(examples)
+        exclude: (.*pyi$)|(weave_query)|(tests)|(examples)|(.github/scripts/validate_docs_coverage.py)
         always_run: true
         pass_filenames: false
   - repo: https://github.com/pre-commit/pre-commit-hooks
