@@ -651,6 +651,8 @@ class WeaveClient:
         *,
         use_stack: bool = True,
         _call_id_override: str | None = None,
+        wb_run_id: str | None = None,
+        wb_run_step: int | None = None,
     ) -> Call:
         """Create, log, and push a call onto the runtime stack.
 
@@ -661,6 +663,10 @@ class WeaveClient:
             display_name: The display name for the call. Defaults to None.
             attributes: The attributes for the call. Defaults to None.
             use_stack: Whether to push the call onto the runtime stack. Defaults to True.
+            wb_run_id: The wandb run ID to associate with this call. If not provided,
+                uses the current wandb run ID from context.
+            wb_run_step: The wandb run step to associate with this call. If not provided,
+                uses the current wandb run step from context.
 
         Returns:
             The created Call object.
@@ -762,8 +768,13 @@ class WeaveClient:
         if parent is not None:
             parent._children.append(call)
 
-        current_wb_run_id = safe_current_wb_run_id()
-        current_wb_run_step = safe_current_wb_run_step()
+        # Use provided wb_run_id/wb_run_step if available, otherwise get from context
+        current_wb_run_id = (
+            wb_run_id if wb_run_id is not None else safe_current_wb_run_id()
+        )
+        current_wb_run_step = (
+            wb_run_step if wb_run_step is not None else safe_current_wb_run_step()
+        )
         check_wandb_run_matches(current_wb_run_id, self.entity, self.project)
 
         started_at = datetime.datetime.now(tz=datetime.timezone.utc)
@@ -974,6 +985,52 @@ class WeaveClient:
             call_context.set_turn_id(None)
 
         call_context.pop_call(call.id)
+
+    @trace_sentry.global_trace_sentry.watch()
+    def log_call(
+        self,
+        inputs: dict[str, Any],
+        output: Any,
+        *,
+        op_name: str | None = None,
+        parent: Call | None = None,
+        attributes: dict[str, Any] | None = None,
+        display_name: str | Callable[[Call], str] | None = None,
+        wb_run_step: int | None = None,
+    ) -> Call:
+        """Log a completed call with inputs and output.
+
+        This is a convenience method that creates and immediately finishes a call.
+        Useful for logging calls that have already completed.
+
+        Args:
+            inputs: The inputs to the operation.
+            output: The output of the operation.
+            op_name: The name of the operation. If not provided, generates a name.
+            parent: The parent call. If not provided, the current call is used as the parent.
+            attributes: The attributes for the call. Defaults to None.
+            display_name: The display name for the call. Defaults to None.
+            wb_run_step: The wandb run step to associate with this call. If not provided,
+                uses the current wandb run step from context.
+
+        Returns:
+            The created and finished Call object.
+        """
+        if op_name is None:
+            op_name = f"call_{generate_id()[:8]}"
+
+        call = self.create_call(
+            op_name,
+            inputs,
+            parent=parent,
+            attributes=attributes,
+            display_name=display_name,
+            use_stack=False,
+            wb_run_step=wb_run_step,
+        )
+
+        self.finish_call(call, output)
+        return call
 
     @trace_sentry.global_trace_sentry.watch()
     def fail_call(self, call: Call, exception: BaseException) -> None:

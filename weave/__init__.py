@@ -46,6 +46,7 @@ __docspec__ = [
     op,
     attributes,
     thread,
+    log_call,
     # Re-exported from flow module
     Object,
     Dataset,
@@ -90,6 +91,7 @@ __all__ = [
     "get",
     "get_current_call",
     "init",
+    "log_call",
     "op",
     "publish",
     "ref",

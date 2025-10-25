@@ -381,6 +381,56 @@ def thread(thread_id: str | None | object = _AUTO_GENERATE) -> Iterator[ThreadCo
         yield context
 
 
+def log_call(
+    inputs: dict[str, Any],
+    output: Any,
+    *,
+    op_name: str | None = None,
+    parent: Any = None,
+    attributes: dict[str, Any] | None = None,
+    display_name: str | Any = None,
+    wb_run_step: int | None = None,
+) -> Any:
+    """Log a completed call with inputs and output.
+
+    This is a convenience function that creates and immediately finishes a call.
+    Useful for logging calls that have already completed.
+
+    Args:
+        inputs: The inputs to the operation.
+        output: The output of the operation.
+        op_name: The name of the operation. If not provided, generates a name.
+        parent: The parent call. If not provided, the current call is used as the parent.
+        attributes: The attributes for the call. Defaults to None.
+        display_name: The display name for the call. Defaults to None.
+        wb_run_step: The wandb run step to associate with this call. If not provided,
+            uses the current wandb run step from context.
+
+    Returns:
+        The created and finished Call object.
+
+    Example:
+    ```python
+    weave.init("my-project")
+    call = weave.log_call({"x": 1, "y": 2}, {"result": 3}, op_name="my_operation")
+    print(call.ui_url)
+
+    # With explicit wandb run step
+    call = weave.log_call({"x": 1}, {"y": 2}, op_name="step_10", wb_run_step=10)
+    ```
+    """
+    client = weave_client_context.require_weave_client()
+    return client.log_call(
+        inputs,
+        output,
+        op_name=op_name,
+        parent=parent,
+        attributes=attributes,
+        display_name=display_name,
+        wb_run_step=wb_run_step,
+    )
+
+
 def finish() -> None:
     """Stops logging to weave.
 
@@ -410,6 +460,7 @@ __all__ = [
     "get_client",
     "get_current_call",
     "init",
+    "log_call",
     "op",
     "publish",
     "ref",
