@@ -17,7 +17,7 @@ from weave.trace.serialization import (
 
 
 class MemTraceFilesArtifact:
-    temp_read_dir: tempfile.TemporaryDirectory | None
+    temp_read_dir: str | None
     path_contents: dict[str, bytes]
 
     def __init__(
@@ -81,8 +81,15 @@ class MemTraceFilesArtifact:
         if path not in self.path_contents:
             raise FileNotFoundError(path)
 
-        self.temp_read_dir = tempfile.TemporaryDirectory()
-        write_path = os.path.join(self.temp_read_dir.name, filename or path)
+        # Create a temporary directory that persists until process exit
+        # to avoid Windows file handle issues with media libraries.
+        # Use mkdtemp instead of TemporaryDirectory to avoid automatic
+        # cleanup that fails on Windows when files are still open.
+        if self.temp_read_dir is None:
+            self.temp_read_dir = tempfile.mkdtemp()
+        write_path = os.path.join(self.temp_read_dir, filename or path)
+        # Ensure parent directory exists
+        os.makedirs(os.path.dirname(write_path), exist_ok=True)
         with open(write_path, "wb") as f:
             f.write(self.path_contents[path])
             f.flush()
