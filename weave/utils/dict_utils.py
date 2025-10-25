@@ -109,7 +109,7 @@ def sum_dict_leaves(dicts: list[dict]) -> dict:
     for k in nested_dicts.keys():
         result[k] = sum_dict_leaves(nested_dicts[k])
 
-    return result
+    return convert_defaultdict_to_dict(result)
 
 
 def zip_dicts(base_dict: dict[str, Any], new_dict: dict[str, Any]) -> dict[str, Any]:
