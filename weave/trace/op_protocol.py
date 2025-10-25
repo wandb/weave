@@ -60,6 +60,7 @@ class Op(Protocol[P, R]):
 
     _set_on_finish_handler: Callable[[OnFinishHandlerType], None]
     _on_finish_handler: OnFinishHandlerType | None
+    _on_finish_post_processor: Callable[[Any], Any] | None
 
     # __call__: Callable[..., Any]
     @overload
