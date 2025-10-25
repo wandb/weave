@@ -1285,6 +1285,7 @@ def op(
 
             wrapper._set_on_finish_handler = partial(_set_on_finish_handler, wrapper)  # type: ignore
             wrapper._on_finish_handler = None  # type: ignore
+            wrapper._on_finish_post_processor = None  # type: ignore
 
             wrapper._tracing_enabled = True  # type: ignore
             wrapper.tracing_sample_rate = tracing_sample_rate  # type: ignore
@@ -1620,7 +1621,7 @@ class _Accumulator(Generic[S, V]):
 
 
 def _build_iterator_from_accumulator_for_op(
-    value: Iterator[V],
+    value: Iterator[V] | AsyncIterator[V],
     accumulator: Callable,
     on_finish: FinishCallbackType,
     iterator_wrapper: type[_IteratorWrapper] = _IteratorWrapper,
@@ -1674,27 +1675,25 @@ def _add_accumulator(
     """
 
     def on_output(
-        value: Iterator[V], on_finish: FinishCallbackType, inputs: dict
-    ) -> Iterator:
-        def wrapped_on_finish(value: Any, e: BaseException | None = None) -> None:
-            if on_finish_post_processor is not None:
-                value = on_finish_post_processor(value)
-            on_finish(value, e)
-
+        value: Iterator[V] | AsyncIterator[V],
+        on_finish: FinishCallbackType,
+        inputs: dict,
+    ) -> Iterator | AsyncIterator:
         if should_accumulate is None or should_accumulate(inputs):
             # we build the accumulator here dependent on the inputs (optional)
             accumulator = make_accumulator(inputs)
             return _build_iterator_from_accumulator_for_op(
                 value,
                 accumulator,
-                wrapped_on_finish,
+                on_finish,
                 iterator_wrapper,
             )
         else:
-            wrapped_on_finish(value)
+            on_finish(value, None)
             return value
 
     op._set_on_output_handler(on_output)
+    op._on_finish_post_processor = on_finish_post_processor  # type: ignore
     return op
 
 
