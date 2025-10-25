@@ -389,6 +389,7 @@ def call(
     parent: Any = None,
     attributes: dict[str, Any] | None = None,
     display_name: str | Any = None,
+    wb_run_step: int | None = None,
 ) -> Any:
     """Log a completed call with inputs and output.
 
@@ -402,6 +403,8 @@ def call(
         parent: The parent call. If not provided, the current call is used as the parent.
         attributes: The attributes for the call. Defaults to None.
         display_name: The display name for the call. Defaults to None.
+        wb_run_step: The wandb run step to associate with this call. If not provided,
+            uses the current wandb run step from context.
 
     Returns:
         The created and finished Call object.
@@ -411,6 +414,9 @@ def call(
     weave.init("my-project")
     call = weave.call({"x": 1, "y": 2}, {"result": 3}, op_name="my_operation")
     print(call.ui_url)
+
+    # With explicit wandb run step
+    call = weave.call({"x": 1}, {"y": 2}, op_name="step_10", wb_run_step=10)
     ```
     """
     client = weave_client_context.require_weave_client()
@@ -421,6 +427,7 @@ def call(
         parent=parent,
         attributes=attributes,
         display_name=display_name,
+        wb_run_step=wb_run_step,
     )
 
 
