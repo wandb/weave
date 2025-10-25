@@ -132,8 +132,19 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install nox uv==0.8.6
-      - name: Run nox (Sqlite Trace Server)
+      - name: Check if shard needs trace_server markers
+        id: check_trace_markers
         if: steps.filter_shards.outputs.skip != 'true'
+        run: |
+          # Shards that are in the regular test matrix and need trace_server markers
+          TRACE_SERVER_SHARDS="flow trace_server trace_server_bindings anthropic cerebras cohere crewai dspy groq google_genai google_ai_studio instructor langchain litellm llamaindex mistral notdiamond openai openai_agents vertexai bedrock scorers pandas-test huggingface smolagents mcp autogen_tests trace trace1 trace2 trace3 trace4 trace_no_server"
+          if [[ " $TRACE_SERVER_SHARDS " =~ " ${{ matrix.shard }} " ]]; then
+            echo "needs_markers=true" >> $GITHUB_OUTPUT
+          else
+            echo "needs_markers=false" >> $GITHUB_OUTPUT
+          fi
+      - name: Run nox (Sqlite Trace Server)
+        if: steps.filter_shards.outputs.skip != 'true' && steps.check_trace_markers.outputs.needs_markers == 'true'
         env:
           WEAVE_SENTRY_ENV: ci
           CI: 1
@@ -153,7 +164,7 @@ jobs:
             -m "trace_server" \
             --trace-server=sqlite
       - name: Run nox (Clickhouse Trace Server)
-        if: steps.filter_shards.outputs.skip != 'true'
+        if: steps.filter_shards.outputs.skip != 'true' && steps.check_trace_markers.outputs.needs_markers == 'true'
         env:
           WEAVE_SENTRY_ENV: ci
           CI: 1
@@ -166,6 +177,24 @@ jobs:
         run: |
           nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.shard }}')" -- \
             -m "trace_server and not skip_clickhouse_client"
+      - name: Run nox (No marker filters for integration-only shards)
+        if: steps.filter_shards.outputs.skip != 'true' && steps.check_trace_markers.outputs.needs_markers == 'false'
+        env:
+          WEAVE_SENTRY_ENV: ci
+          CI: 1
+          WEAVE_USE_MEMRAY: 1
+          WB_SERVER_HOST: http://wandbservice
+          WF_CLICKHOUSE_HOST: localhost
+          WEAVE_SERVER_DISABLE_ECOSYSTEM: 1
+          WANDB_API_KEY: ${{ secrets.WANDB_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          DD_TRACE_ENABLED: false
+        run: |
+          nox -e "tests-${{ matrix.python-version-major }}.${{ matrix.python-version-minor }}(shard='${{ matrix.shard }}')"
 
   slack-notification:
     name: Slack Notification on Failure
