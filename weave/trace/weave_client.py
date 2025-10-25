@@ -1083,6 +1083,74 @@ class WeaveClient:
         )
         return result.num_deleted
 
+    @trace_sentry.global_trace_sentry.watch()
+    def get_ops(
+        self,
+        *,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> list[dict[str, Any]]:
+        """Get all ops for this project using the v2 API.
+
+        Args:
+            limit: Maximum number of ops to return.
+            offset: Number of ops to skip before returning results.
+
+        Returns:
+            A list of op dictionaries containing metadata and code for each op version.
+
+        Example:
+            ```python
+            ops = client.get_ops(limit=10)
+            for op in ops:
+                print(f"Op: {op['object_id']} v{op['version_index']}")
+                print(f"Code: {op['code']}")
+            ```
+        """
+        from weave.trace_server.trace_server_interface import OpListV2Req
+
+        ops_iterator = self.server.op_list_v2(
+            OpListV2Req(
+                project_id=self._project_id(),
+                limit=limit,
+                offset=offset,
+            )
+        )
+        return [op.model_dump() for op in ops_iterator]
+
+    @trace_sentry.global_trace_sentry.watch()
+    def get_op(
+        self,
+        object_id: str,
+        digest: str,
+    ) -> dict[str, Any]:
+        """Get a specific op version using the v2 API.
+
+        Args:
+            object_id: The ID of the op object.
+            digest: The digest of the specific op version.
+
+        Returns:
+            A dictionary containing the op metadata and code.
+
+        Example:
+            ```python
+            op = client.get_op("my_op", "abc123...")
+            print(f"Op code: {op['code']}")
+            print(f"Created at: {op['created_at']}")
+            ```
+        """
+        from weave.trace_server.trace_server_interface import OpReadV2Req
+
+        op = self.server.op_read_v2(
+            OpReadV2Req(
+                project_id=self._project_id(),
+                object_id=object_id,
+                digest=digest,
+            )
+        )
+        return op.model_dump()
+
     def get_feedback(
         self,
         query: Query | str | None = None,

@@ -11,19 +11,10 @@ import uuid
 import pydantic
 import pytest
 import requests
-from pydantic import ValidationError
-
 import weave
 import weave.trace.call
 import weave.trace_server.trace_server_interface as tsi
-from tests.conftest import TestOnlyFlushingWeaveClient
-from tests.trace.testutil import ObjectRefStrMatcher
-from tests.trace.util import (
-    AnyIntMatcher,
-    DatetimeMatcher,
-    RegexStringMatcher,
-    client_is_sqlite,
-)
+from pydantic import ValidationError
 from weave import Evaluation
 from weave.integrations.integration_utilities import op_name_from_call
 from weave.trace import refs, settings, table_upload_chunking, weave_client
@@ -57,6 +48,15 @@ from weave.trace_server.trace_server_interface import (
     TableCreateReq,
     TableQueryReq,
     TableSchemaForInsert,
+)
+
+from tests.conftest import TestOnlyFlushingWeaveClient
+from tests.trace.testutil import ObjectRefStrMatcher
+from tests.trace.util import (
+    AnyIntMatcher,
+    DatetimeMatcher,
+    RegexStringMatcher,
+    client_is_sqlite,
 )
 
 
@@ -3964,3 +3964,116 @@ def test_calls_query_with_wb_run_id_not_null(client, monkeypatch):
 
     assert len(calls) == 1
     assert calls[0].wb_run_id == mock_run_id
+
+
+def test_get_ops(client):
+    """Test the get_ops client method."""
+    import weave
+
+    # Define and save some ops
+    @weave.op
+    def test_op_1(x: int) -> int:
+        return x + 1
+
+    @weave.op
+    def test_op_2(x: int) -> int:
+        return x * 2
+
+    # Call the ops to ensure they're saved
+    test_op_1(5)
+    test_op_2(3)
+
+    # Get all ops
+    ops = client.get_ops()
+
+    # Verify we got ops back
+    assert isinstance(ops, list)
+    assert len(ops) >= 2
+
+    # Verify the structure of returned ops
+    op_names = [op["object_id"] for op in ops]
+    assert (
+        "test_op_1" in op_names
+        or "TestWeaveClient.test_get_ops.<locals>.test_op_1" in op_names
+    )
+    assert (
+        "test_op_2" in op_names
+        or "TestWeaveClient.test_get_ops.<locals>.test_op_2" in op_names
+    )
+
+    # Verify each op has the expected fields
+    for op in ops:
+        assert "object_id" in op
+        assert "digest" in op
+        assert "version_index" in op
+        assert "created_at" in op
+        assert "code" in op
+
+
+def test_get_ops_with_limit(client):
+    """Test the get_ops client method with limit parameter."""
+    import weave
+
+    # Define and save some ops
+    @weave.op
+    def limit_test_op_1(x: int) -> int:
+        return x + 1
+
+    @weave.op
+    def limit_test_op_2(x: int) -> int:
+        return x * 2
+
+    @weave.op
+    def limit_test_op_3(x: int) -> int:
+        return x**2
+
+    # Call the ops to ensure they're saved
+    limit_test_op_1(1)
+    limit_test_op_2(2)
+    limit_test_op_3(3)
+
+    # Get ops with limit
+    ops = client.get_ops(limit=2)
+
+    # Verify we got at most 2 ops
+    assert isinstance(ops, list)
+    assert len(ops) <= 2
+
+
+def test_get_op(client):
+    """Test the get_op client method."""
+    import weave
+
+    # Define and save an op
+    @weave.op
+    def specific_test_op(x: int, y: int) -> int:
+        return x + y
+
+    # Call the op to ensure it's saved
+    specific_test_op(3, 4)
+
+    # Get all ops to find the one we just created
+    ops = client.get_ops()
+    target_op = None
+    for op in ops:
+        if "specific_test_op" in op["object_id"]:
+            target_op = op
+            break
+
+    assert target_op is not None, "Could not find the specific_test_op"
+
+    # Get the specific op
+    op_details = client.get_op(
+        object_id=target_op["object_id"],
+        digest=target_op["digest"],
+    )
+
+    # Verify we got the op back with all details
+    assert isinstance(op_details, dict)
+    assert op_details["object_id"] == target_op["object_id"]
+    assert op_details["digest"] == target_op["digest"]
+    assert "version_index" in op_details
+    assert "created_at" in op_details
+    assert "code" in op_details
+    # The code should contain the function definition
+    assert "def specific_test_op" in op_details["code"]
