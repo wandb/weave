@@ -8,8 +8,6 @@ jobs:
     name: Build and publish to Test PyPI
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    environment:
-      name: test-release
     permissions:
       id-token: write
     steps:
