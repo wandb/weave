@@ -2,6 +2,12 @@ name: publish-pypi-release
 
 on:
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run mode (skip actual publishing)"
+        required: false
+        type: boolean
+        default: true
 
 jobs:
   build-and-publish-test:
@@ -22,9 +28,13 @@ jobs:
           uv build
       - name: Upload test distribution
         uses: pypa/gh-action-pypi-publish@release/v1
+        if: ${{ !inputs.dry_run }}
         with:
           repository-url: https://test.pypi.org/legacy/
           verbose: true
+      - name: Dry run - skip test upload
+        if: ${{ inputs.dry_run }}
+        run: echo "Dry run mode - skipping Test PyPI upload"
 
   publish-production:
     name: Publish to Production PyPI
@@ -47,6 +57,10 @@ jobs:
           uv build
       - name: Upload distribution
         uses: pypa/gh-action-pypi-publish@release/v1
+        if: ${{ !inputs.dry_run }}
+      - name: Dry run - skip production upload
+        if: ${{ inputs.dry_run }}
+        run: echo "Dry run mode - skipping Production PyPI upload"
 
   # this job exists so that there's some traceability between weave SDk releases
   # and potential build failures in core.
