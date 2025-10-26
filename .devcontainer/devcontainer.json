@@ -42,7 +42,7 @@
         "ms-toolsai.jupyter",
         "ms-azuretools.vscode-docker",
         "GitHub.copilot",
-        "bungcip.better-toml"
+        "tamasfe.even-better-toml"
       ]
     }
   },

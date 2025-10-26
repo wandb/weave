@@ -32,6 +32,7 @@ pip install -e ".[test,dev]"
 
 # Install pre-commit hooks
 echo "🪝 Installing pre-commit hooks..."
+uv tool install pre-commit
 pre-commit install
 
 # Git configuration for pre-commit
