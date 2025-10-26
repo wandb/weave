@@ -595,3 +595,21 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         return self._ref_apply(
             self._internal_trace_server.evaluation_run_finish_v2, req
         )
+
+    def evaluation_run_get_prediction_v2(
+        self, req: tsi.EvaluationRunGetPredictionV2Req
+    ) -> tsi.EvaluationRunGetPredictionV2Res:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        res = self._internal_trace_server.evaluation_run_get_prediction_v2(req)
+        return self._ref_apply_to_prediction_schema(res)
+
+    def _ref_apply_to_prediction_schema(
+        self, res: tsi.EvaluationRunGetPredictionV2Res
+    ) -> tsi.EvaluationRunGetPredictionV2Res:
+        """Apply reference transformations to prediction schema fields."""
+        # Transform any references in the prediction inputs, output, and scores
+        prediction = res.prediction
+        prediction.inputs = self._ref_apply_to_val(prediction.inputs)
+        prediction.output = self._ref_apply_to_val(prediction.output)
+        prediction.scores = self._ref_apply_to_val(prediction.scores)
+        return res

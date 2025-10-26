@@ -1123,6 +1123,22 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
             tsi.EvaluationRunFinishV2Res,
         )
 
+    def evaluation_run_get_prediction_v2(
+        self, req: Union[tsi.EvaluationRunGetPredictionV2Req, dict[str, Any]]
+    ) -> tsi.EvaluationRunGetPredictionV2Res:
+        if isinstance(req, dict):
+            req = tsi.EvaluationRunGetPredictionV2Req.model_validate(req)
+        req = cast(tsi.EvaluationRunGetPredictionV2Req, req)
+        entity, project = req.project_id.split("/", 1)
+        url = f"/v2/{entity}/{project}/evaluation_runs/{req.evaluation_run_id}/predictions/{req.prediction_id}"
+        return self._generic_request(
+            url,
+            None,
+            None,
+            tsi.EvaluationRunGetPredictionV2Res,
+            method="GET",
+        )
+
 
 __docspec__ = [
     RemoteHTTPTraceServer,

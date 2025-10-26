@@ -1745,6 +1745,45 @@ class EvaluationRunFinishV2Res(BaseModel):
     pass
 
 
+class PredictionSchema(BaseModel):
+    """Schema for a Prediction in an evaluation run.
+
+    A Prediction consists of:
+    - The predict_and_score call that coordinates prediction and scoring
+    - The model.predict call with inputs and outputs
+    - Any associated scorer calls and their outputs
+    """
+
+    predict_call_id: str = Field(..., description="The ID of the Model.predict call")
+    predict_and_score_call_id: str = Field(
+        ..., description="The ID of the Evaluation.predict_and_score call"
+    )
+    inputs: dict[str, Any] = Field(..., description="The inputs to the model")
+    output: Any = Field(..., description="The output from the model")
+    scores: dict[str, Any] = Field(
+        default_factory=dict, description="Scores from scorers, keyed by scorer name"
+    )
+    model_latency_ms: Optional[float] = Field(
+        None, description="Latency of the model prediction in milliseconds"
+    )
+
+
+class EvaluationRunGetPredictionV2Req(BaseModel):
+    project_id: str = Field(
+        ..., description="The `entity/project` where this evaluation run exists"
+    )
+    evaluation_run_id: str = Field(..., description="The evaluation run ID")
+    prediction_id: str = Field(
+        ..., description="The prediction ID (predict call ID) to retrieve"
+    )
+
+
+class EvaluationRunGetPredictionV2Res(BaseModel):
+    prediction: PredictionSchema = Field(
+        ..., description="The prediction data including inputs, output, and scores"
+    )
+
+
 class TraceServerInterface(Protocol):
     def ensure_project_exists(
         self, entity: str, project: str
@@ -1905,6 +1944,9 @@ class TraceServerInterfaceV2(Protocol):
     def evaluation_run_finish_v2(
         self, req: EvaluationRunFinishV2Req
     ) -> EvaluationRunFinishV2Res: ...
+    def evaluation_run_get_prediction_v2(
+        self, req: EvaluationRunGetPredictionV2Req
+    ) -> EvaluationRunGetPredictionV2Res: ...
 
 
 class FullTraceServerInterface(TraceServerInterface, TraceServerInterfaceV2, Protocol):

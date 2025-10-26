@@ -634,6 +634,11 @@ class CachingMiddlewareTraceServer(tsi.FullTraceServerInterface):
     ) -> tsi.EvaluationRunFinishV2Res:
         return self._next_trace_server.evaluation_run_finish_v2(req)
 
+    def evaluation_run_get_prediction_v2(
+        self, req: tsi.EvaluationRunGetPredictionV2Req
+    ) -> tsi.EvaluationRunGetPredictionV2Res:
+        return self._next_trace_server.evaluation_run_get_prediction_v2(req)
+
 
 def pydantic_bytes_safe_dump(obj: BaseModel) -> str:
     raw_dict = obj.model_dump()

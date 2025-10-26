@@ -2412,6 +2412,95 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return tsi.EvaluationRunFinishV2Res()
 
+    def evaluation_run_get_prediction_v2(
+        self, req: tsi.EvaluationRunGetPredictionV2Req
+    ) -> tsi.EvaluationRunGetPredictionV2Res:
+        """Get a specific prediction from an evaluation run.
+
+        This retrieves the prediction by its prediction_id and returns
+        all associated data including inputs, output, and scores.
+        """
+        # Read the Model.predict call (prediction_id is the predict_call_id)
+        predict_call_res = self.call_read(
+            tsi.CallReadReq(
+                project_id=req.project_id,
+                id=req.prediction_id,
+            )
+        )
+        if predict_call_res.call is None:
+            raise NotFoundError(f"Prediction {req.prediction_id} not found")
+
+        predict_call = predict_call_res.call
+
+        # Verify this call belongs to the specified evaluation run
+        if predict_call.trace_id != req.evaluation_run_id:
+            raise InvalidRequest(
+                f"Prediction {req.prediction_id} does not belong to evaluation run {req.evaluation_run_id}"
+            )
+
+        # Get the predict_and_score call (parent of the predict call)
+        predict_and_score_call_id = predict_call.parent_id
+        if predict_and_score_call_id is None:
+            raise InvalidRequest(
+                f"Prediction {req.prediction_id} has no parent (expected predict_and_score call)"
+            )
+
+        # Extract inputs and output from the Model.predict call
+        # Model.predict inputs are structured as {"self": model_ref, "input": input_data}
+        predict_inputs = predict_call.inputs or {}
+        model_inputs = predict_inputs.get("input", {})
+        predict_output = predict_call.output
+
+        # Calculate model latency in milliseconds
+        model_latency_ms = None
+        if predict_call.started_at and predict_call.ended_at:
+            latency_seconds = (
+                predict_call.ended_at - predict_call.started_at
+            ).total_seconds()
+            model_latency_ms = latency_seconds * 1000
+
+        # Query for score calls that are children of the predict_and_score call
+        # and have the EVALUATION_RUN_SCORE_ATTR_KEY attribute
+        scores_dict: dict[str, Any] = {}
+        score_calls_req = tsi.CallsQueryReq(
+            project_id=req.project_id,
+            filter=tsi.CallsFilter(
+                parent_ids=[predict_and_score_call_id],
+            ),
+        )
+        score_calls_res = self.calls_query(score_calls_req)
+
+        # Filter for score calls and extract their outputs
+        for call in score_calls_res.calls:
+            # Check if this is a score call by looking for the score attribute
+            weave_attrs = call.attributes.get(constants.WEAVE_ATTRIBUTES_NAMESPACE, {})
+            is_score = weave_attrs.get(constants.EVALUATION_RUN_SCORE_ATTR_KEY, False)
+            if is_score:
+                # Extract scorer name from the op_name
+                # The op_name could be:
+                # 1. A full URI like weave:///entity/project/op/ScorerName:version
+                # 2. Just the scorer name like "ScorerName"
+                op_name = call.op_name
+                if "/" in op_name:
+                    # URI format - extract the last part
+                    scorer_name = op_name.split("/")[-1].split(":")[0]
+                else:
+                    # Plain name format
+                    scorer_name = op_name.split(":")[0]
+                scores_dict[scorer_name] = call.output
+
+        # Build the prediction schema
+        prediction = tsi.PredictionSchema(
+            predict_call_id=req.prediction_id,
+            predict_and_score_call_id=predict_and_score_call_id,
+            inputs=model_inputs,
+            output=predict_output,
+            scores=scores_dict,
+            model_latency_ms=model_latency_ms,
+        )
+
+        return tsi.EvaluationRunGetPredictionV2Res(prediction=prediction)
+
     def _obj_read_with_retry(
         self, req: tsi.ObjReadReq, max_retries: int = 10, initial_delay: float = 0.05
     ) -> tsi.ObjReadRes:

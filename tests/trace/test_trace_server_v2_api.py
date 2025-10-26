@@ -890,6 +890,153 @@ class TestV2APIIntegration:
         assert "model_latency" in predict_and_score_res.call.output
         assert predict_and_score_res.call.output["model_latency"] == 0
 
+    def test_evaluation_run_get_prediction_v2(self, client):
+        """Test getting a specific prediction from an evaluation run."""
+        project_id = client._project_id()
+        entity, project = project_id.split("/")
+
+        # Create dataset
+        dataset_req = tsi.DatasetCreateV2Req(
+            project_id=project_id,
+            name="test_dataset",
+            rows=[{"question": "What is 2+2?"}],
+        )
+        dataset_res = client.server.dataset_create_v2(dataset_req)
+        dataset_ref = f"weave:///{entity}/{project}/object/{dataset_res.object_id}:{dataset_res.digest}"
+
+        # Create scorer
+        scorer_req = tsi.ScorerCreateV2Req(
+            project_id=project_id,
+            name="test_scorer",
+            op_source_code="def score(output):\n    return len(output)",
+        )
+        scorer_res = client.server.scorer_create_v2(scorer_req)
+        scorer_ref = f"weave:///{entity}/{project}/object/{scorer_res.object_id}:{scorer_res.digest}"
+
+        # Create evaluation
+        eval_req = tsi.EvaluationCreateV2Req(
+            project_id=project_id,
+            name="test_evaluation",
+            dataset=dataset_ref,
+            scorers=[scorer_ref],
+            trials=1,
+        )
+        eval_res = client.server.evaluation_create_v2(eval_req)
+        evaluation_ref = (
+            f"weave:///{entity}/{project}/object/{eval_res.object_id}:{eval_res.digest}"
+        )
+
+        # Create evaluation run
+        eval_run_req = tsi.EvaluationRunCreateV2Req(
+            project_id=project_id,
+            evaluation=evaluation_ref,
+            model="test_model",
+        )
+        eval_run_res = client.server.evaluation_run_create_v2(eval_run_req)
+        eval_run_id = eval_run_res.evaluation_run_id
+
+        # Log a prediction
+        prediction_req = tsi.EvaluationRunLogPredictionV2Req(
+            project_id=project_id,
+            evaluation_run_id=eval_run_id,
+            model="test_model",
+            inputs={"question": "What is 2+2?"},
+            output="4",
+        )
+        prediction_res = client.server.evaluation_run_log_prediction_v2(prediction_req)
+
+        # Log a score for the prediction
+        score_req = tsi.EvaluationRunLogScoreV2Req(
+            project_id=project_id,
+            evaluation_run_id=eval_run_id,
+            predict_call_id=prediction_res.predict_call_id,
+            scorer=scorer_ref,
+            score={"value": 1},
+        )
+        client.server.evaluation_run_log_score_v2(score_req)
+
+        # Now get the prediction using the new API
+        get_pred_req = tsi.EvaluationRunGetPredictionV2Req(
+            project_id=project_id,
+            evaluation_run_id=eval_run_id,
+            prediction_id=prediction_res.predict_call_id,
+        )
+        get_pred_res = client.server.evaluation_run_get_prediction_v2(get_pred_req)
+
+        # Verify the prediction data
+        prediction = get_pred_res.prediction
+        assert prediction.predict_call_id == prediction_res.predict_call_id
+        assert prediction.predict_and_score_call_id is not None
+        assert prediction.inputs == {"question": "What is 2+2?"}
+        assert prediction.output == "4"
+        assert prediction.model_latency_ms is not None
+        assert prediction.model_latency_ms >= 0
+
+        # Verify scores
+        assert "test_scorer" in prediction.scores
+        assert prediction.scores["test_scorer"] == {"value": 1}
+
+    def test_evaluation_run_get_prediction_v2_without_scores(self, client):
+        """Test getting a prediction that has no scores."""
+        project_id = client._project_id()
+        entity, project = project_id.split("/")
+
+        # Create dataset
+        dataset_req = tsi.DatasetCreateV2Req(
+            project_id=project_id,
+            name="test_dataset",
+            rows=[{"question": "What is 2+2?"}],
+        )
+        dataset_res = client.server.dataset_create_v2(dataset_req)
+        dataset_ref = f"weave:///{entity}/{project}/object/{dataset_res.object_id}:{dataset_res.digest}"
+
+        # Create evaluation without scorers
+        eval_req = tsi.EvaluationCreateV2Req(
+            project_id=project_id,
+            name="test_evaluation",
+            dataset=dataset_ref,
+            scorers=[],
+            trials=1,
+        )
+        eval_res = client.server.evaluation_create_v2(eval_req)
+        evaluation_ref = (
+            f"weave:///{entity}/{project}/object/{eval_res.object_id}:{eval_res.digest}"
+        )
+
+        # Create evaluation run
+        eval_run_req = tsi.EvaluationRunCreateV2Req(
+            project_id=project_id,
+            evaluation=evaluation_ref,
+            model="test_model",
+        )
+        eval_run_res = client.server.evaluation_run_create_v2(eval_run_req)
+        eval_run_id = eval_run_res.evaluation_run_id
+
+        # Log a prediction
+        prediction_req = tsi.EvaluationRunLogPredictionV2Req(
+            project_id=project_id,
+            evaluation_run_id=eval_run_id,
+            model="test_model",
+            inputs={"question": "What is 2+2?"},
+            output="4",
+        )
+        prediction_res = client.server.evaluation_run_log_prediction_v2(prediction_req)
+
+        # Get the prediction
+        get_pred_req = tsi.EvaluationRunGetPredictionV2Req(
+            project_id=project_id,
+            evaluation_run_id=eval_run_id,
+            prediction_id=prediction_res.predict_call_id,
+        )
+        get_pred_res = client.server.evaluation_run_get_prediction_v2(get_pred_req)
+
+        # Verify the prediction data (no scores)
+        prediction = get_pred_res.prediction
+        assert prediction.predict_call_id == prediction_res.predict_call_id
+        assert prediction.inputs == {"question": "What is 2+2?"}
+        assert prediction.output == "4"
+        assert prediction.scores == {}
+
     def test_evaluation_run_scorer_call_includes_self(self, client):
         """Test that Scorer.score calls include self argument pointing to scorer ref."""
         project_id = client._project_id()

@@ -613,6 +613,25 @@ def generate_routes_v2(
         )
         return service.trace_server_interface.evaluation_run_finish_v2(req)
 
+    @router.get(
+        "{entity}/{project}/evaluation_runs/{evaluation_run_id}/predictions/{prediction_id}",
+        tags=[V2_EVALUATION_RUNS_TAG_NAME],
+    )
+    def evaluation_run_get_prediction_v2(
+        entity: str,
+        project: str,
+        evaluation_run_id: str,
+        prediction_id: str,
+        service: TraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.EvaluationRunGetPredictionV2Res:
+        """Get a specific prediction from an evaluation run."""
+        req = tsi.EvaluationRunGetPredictionV2Req(
+            project_id=f"{entity}/{project}",
+            evaluation_run_id=evaluation_run_id,
+            prediction_id=prediction_id,
+        )
+        return service.trace_server_interface.evaluation_run_get_prediction_v2(req)
+
     return router
 
 
