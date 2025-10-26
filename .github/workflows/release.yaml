@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: "Dry run mode (skip actual publishing)"
+        description: "Dry run mode"
         required: false
         type: boolean
         default: true
