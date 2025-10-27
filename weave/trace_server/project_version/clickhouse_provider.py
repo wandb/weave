@@ -32,8 +32,14 @@ class ClickHouseProjectVersionProvider:
     def __init__(self, ch_client: Any):
         self._ch = ch_client
 
-    async def get_project_version(self, project_id: str) -> ProjectVersion:
+    async def get_project_version(
+        self, project_id: str, is_write: bool = False
+    ) -> ProjectVersion:
         """Determine project version by checking both tables.
+
+        Args:
+            project_id: The project identifier.
+            is_write: Whether this is for a write operation (unused in this provider).
 
         Returns:
             ProjectVersion.CALLS_COMPLETE_VERSION (1): If calls_complete has rows
@@ -58,8 +64,10 @@ class ClickHouseProjectVersionProvider:
             has_complete = row[0]
             has_merged = row[1]
 
+            print(f"{has_complete=} {has_merged=}")
+
             if has_complete and has_merged:
-                raise ValueError(
+                logger.warning(
                     f"Project {project_id} has traces in both calls_complete and calls_merged!"
                 )
 

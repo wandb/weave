@@ -20,16 +20,28 @@ class ProjectVersionService(Protocol):
         >>> assert version in (ProjectVersion.CALLS_MERGED_VERSION, ProjectVersion.CALLS_COMPLETE_VERSION, ProjectVersion.EMPTY_PROJECT)
     """
 
-    async def get_project_version(self, project_id: str) -> ProjectVersion:
+    async def get_project_version(
+        self, project_id: str, is_write: bool = False
+    ) -> ProjectVersion:
         """Get the project version for routing decisions.
+
+        Args:
+            project_id: The project identifier.
+            is_write: Whether this is for a write operation (affects routing in some modes).
 
         Returns:
             Union[ProjectVersion, int]: ProjectVersion enum or int for backwards compatibility.
         """
         ...
 
-    def get_project_version_sync(self, project_id: str) -> ProjectVersion:
+    def get_project_version_sync(
+        self, project_id: str, is_write: bool = False
+    ) -> ProjectVersion:
         """Get the project version for routing decisions.
+
+        Args:
+            project_id: The project identifier.
+            is_write: Whether this is for a write operation (affects routing in some modes).
 
         Returns:
             Union[ProjectVersion, int]: ProjectVersion enum or int for backwards compatibility.

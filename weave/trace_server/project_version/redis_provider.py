@@ -31,8 +31,14 @@ class RedisProjectVersionProvider:
         self._enabled = enabled
         self._redis = redis_client
 
-    async def get_project_version(self, project_id: str) -> ProjectVersion:
+    async def get_project_version(
+        self, project_id: str, is_write: bool = False
+    ) -> ProjectVersion:
         """Get project version from Redis cache.
+
+        Args:
+            project_id: The project identifier.
+            is_write: Whether this is for a write operation (unused in this provider).
 
         Returns:
             Union[ProjectVersion, int]: The cached version (0, 1, or -1).

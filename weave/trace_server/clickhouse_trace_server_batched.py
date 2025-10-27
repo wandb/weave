@@ -436,15 +436,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             >>> res = server.calls_start_batch_v2(req)
         """
         # Check project version
-        project_version: int = -1
+        project_version = ProjectVersion.EMPTY_PROJECT
         if self._project_version_service:
             project_version = self._project_version_service.get_project_version_sync(
-                req.project_id
+                req.project_id, is_write=True
             )
 
         ids = []
         trace_ids = []
-        if project_version == 0:
+        if project_version == ProjectVersion.CALLS_MERGED_VERSION:
             # New sdk writing to old project
             batch_data = []
             for call in req.items:
@@ -453,7 +453,12 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 ids.append(call.id)
                 trace_ids.append(call.trace_id)
                 call_dict = call.model_dump()
-                values = [call_dict.get(col) for col in ALL_CALL_INSERT_COLUMNS]
+                values = [
+                    call_dict.get(
+                        col, [] if col in ("input_refs", "output_refs") else None
+                    )
+                    for col in ALL_CALL_INSERT_COLUMNS
+                ]
                 batch_data.append(values)
             self._insert_call_batch(batch_data)
             return tsi.CallsStartBatchRes(ids=ids, trace_ids=trace_ids)
@@ -493,18 +498,23 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             >>> res = server.calls_complete_batch_v2(req)
         """
         # Check project version
-        project_version: int = -1
+        project_version = ProjectVersion.EMPTY_PROJECT
         if self._project_version_service:
             project_version = self._project_version_service.get_project_version_sync(
-                req.project_id
+                req.project_id, is_write=True
             )
 
-        if project_version == 0:
+        if project_version == ProjectVersion.CALLS_MERGED_VERSION:
             # New sdk writing to old project
             batch_data = []
             for call in req.items:
                 call_dict = call.model_dump()
-                values = [call_dict.get(col) for col in ALL_CALL_INSERT_COLUMNS]
+                values = [
+                    call_dict.get(
+                        col, [] if col in ("input_refs", "output_refs") else None
+                    )
+                    for col in ALL_CALL_INSERT_COLUMNS
+                ]
                 batch_data.append(values)
             self._insert_call_batch(batch_data)
             return tsi.CallsCompleteBatchRes()
@@ -552,7 +562,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         project_version = ProjectVersion.EMPTY_PROJECT
         if self._project_version_service is not None:
             project_version = self._project_version_service.get_project_version_sync(
-                req.project_id
+                req.project_id, is_write=False
             )
             logger.info(
                 f"---------- [calls_query_stats] Project version: {project_version}"
@@ -576,7 +586,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         project_version = ProjectVersion.EMPTY_PROJECT
         if self._project_version_service is not None:
             project_version = self._project_version_service.get_project_version_sync(
-                req.project_id
+                req.project_id, is_write=False
             )
             if project_version == ProjectVersion.EMPTY_PROJECT:
                 return
@@ -819,7 +829,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         # get project version
         project_version = self._project_version_service.get_project_version_sync(
-            req.project_id
+            req.project_id, is_write=True
         )
         if project_version == ProjectVersion.CALLS_COMPLETE_VERSION:
             call_ids = [call.id for call in all_descendants]
@@ -903,7 +913,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         self._ensure_valid_update_field(req)
 
         project_version = self._project_version_service.get_project_version_sync(
-            req.project_id
+            req.project_id, is_write=True
         )
         if project_version == ProjectVersion.CALLS_COMPLETE_VERSION:
             # try to update calls_complete first, then if not found hit call_starts
