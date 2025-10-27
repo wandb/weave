@@ -52,7 +52,7 @@ def test_hf_api_model(client):
     from smolagents import HfApiModel
 
     os.environ["HUGGINGFACE_API_KEY"] = os.environ.get(
-        "HUGGINGFACE_API_KEY", "DUMMY_API_KEY"
+        "HUGGINGFACE_API_KEY", "hf_DUMMY_API_KEY"
     )
     engine = HfApiModel(
         model_id="Qwen/Qwen2.5-Coder-32B-Instruct",
