@@ -1,8 +1,8 @@
 """Concrete project version resolver with explicit provider order."""
-import threading
+
 import asyncio
 import logging
-from concurrent.futures import Future
+import threading
 from typing import Any, Optional
 
 from cachetools import LRUCache
@@ -130,7 +130,6 @@ class ProjectVersionResolver(ProjectVersionService):
             f"get_project_version_sync called with running loop for {project_id}, "
             "delegating to new thread"
         )
-        import threading
 
         result: list[ProjectVersion] = []
         exception: list[Exception] = []

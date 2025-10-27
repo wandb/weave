@@ -42,40 +42,31 @@ class ClickHouseProjectVersionProvider:
         """
         pb = ParamBuilder()
         project_param = pb.add_param(project_id)
+        project_slot = param_slot(project_param, "String")
 
-        # First check calls_complete (new table)
-        query_complete = f"""
-            SELECT 1
-            FROM calls_complete
-            WHERE project_id = {param_slot(project_param, "String")}
-            LIMIT 1
+        # Check both tables in a single query
+        query = f"""
+            SELECT
+                (SELECT 1 FROM calls_complete WHERE project_id = {project_slot} LIMIT 1) as has_complete,
+                (SELECT 1 FROM calls_merged WHERE project_id = {project_slot} LIMIT 1) as has_merged
         """
-        try:
-            result = self._ch.query(query_complete, parameters=pb.get_params())
-            print(f"---------- Clickhouse result complete: {result.result_rows}")
-            if result.result_rows:
+
+        result = self._ch.query(query, parameters=pb.get_params())
+
+        if result.result_rows:
+            row = result.result_rows[0]
+            has_complete = row[0]
+            has_merged = row[1]
+
+            if has_complete and has_merged:
+                raise ValueError(
+                    f"Project {project_id} has traces in both calls_complete and calls_merged!"
+                )
+
+            if has_complete:
                 return ProjectVersion.CALLS_COMPLETE_VERSION
-        except Exception as e:
-            raise e
-            # If calls_complete doesn't exist or query fails, fall through to check calls_merged
-            pass
-
-        # No rows in calls_complete, check calls_merged (old table)
-        query_merged = f"""
-            SELECT 1
-            FROM calls_merged
-            WHERE project_id = {param_slot(project_param, "String")}
-            LIMIT 1
-        """
-        try:
-            result = self._ch.query(query_merged, parameters=pb.get_params())
-            print(f"---------- Clickhouse result merged: {result.result_rows}")
-            if result.result_rows:
+            elif has_merged:
                 return ProjectVersion.CALLS_MERGED_VERSION
-        except Exception as e:
-            raise e
-            # If calls_merged doesn't exist or query fails, treat as empty
-            pass
 
         # No rows in either table - this is a new/empty project
         return ProjectVersion.EMPTY_PROJECT
