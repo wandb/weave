@@ -82,7 +82,6 @@ trace_server_shards = [f"trace{i}" for i in range(1, NUM_TRACE_SERVER_SHARDS + 1
         "cohere",
         "crewai",
         "dspy",
-        "google_ai_studio",
         "google_genai",
         "groq",
         "instructor",
@@ -94,6 +93,7 @@ trace_server_shards = [f"trace{i}" for i in range(1, NUM_TRACE_SERVER_SHARDS + 1
         "notdiamond",
         "openai",
         "openai_agents",
+        "openai_realtime",
         "vertexai",
         "bedrock",
         "scorers",
@@ -134,10 +134,7 @@ def tests(session, shard):
         ]
     }
     # Add the GOOGLE_API_KEY environment variable for the "google" shard
-    if shard in ["google_ai_studio", "google_genai"]:
-        env["GOOGLE_API_KEY"] = session.env.get("GOOGLE_API_KEY")
-
-    if shard == "google_ai_studio":
+    if shard == "google_genai":
         env["GOOGLE_API_KEY"] = os.getenv("GOOGLE_API_KEY", "MISSING")
 
     # Add the NVIDIA_API_KEY environment variable for the "langchain_nvidia_ai_endpoints" shard
@@ -187,16 +184,6 @@ def tests(session, shard):
         "--cov-report=xml",
         "--cov-branch",
     ]
-
-    # Memray profiling is optional and controlled via environment variable
-    # (not working with trace_server shard atm)
-    if os.getenv("WEAVE_USE_MEMRAY") == "1" and shard != "trace_server":
-        pytest_args.extend(
-            [
-                "--memray",
-                "--most-allocations=5",
-            ]
-        )
 
     # Handle trace sharding: run every 3rd test starting at different offsets
     if shard in trace_server_shards:

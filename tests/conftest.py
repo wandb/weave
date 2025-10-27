@@ -556,9 +556,13 @@ def network_proxy_client(client):
 @pytest.fixture(autouse=True)
 def caching_client_isolation(monkeypatch, tmp_path):
     """Isolate cache directories for each test to prevent cross-test contamination."""
-    test_specific_cache_dir = (
-        tmp_path / f"weave_cache_{get_test_name().replace('/', '_').replace('::', '_')}"
-    )
+    # Replace characters that are invalid in Windows paths
+    # Windows disallows: < > : " / \ | ? *
+    test_name = get_test_name()
+    for char in ["/", "\\", ":", "*", "?", '"', "<", ">", "|"]:
+        test_name = test_name.replace(char, "_")
+    test_name = test_name.replace("::", "_")
+    test_specific_cache_dir = tmp_path / f"weave_cache_{test_name}"
     test_specific_cache_dir.mkdir(parents=True, exist_ok=True)
 
     monkeypatch.setenv("WEAVE_SERVER_CACHE_DIR", str(test_specific_cache_dir))

@@ -132,6 +132,7 @@ WB_KEYS = {
     # Custom display name for the call in the UI
     "display_name": ["wandb.display_name"],
     "thread_id": ["gcp.vertex.agent.session_id", "wandb.thread_id"],
+    "wb_run_id": ["wb_run_id", "wandb.wb_run_id"],
     "is_turn": [
         "gcp.vertex.agent.session_id",
         "wandb.is_turn",

@@ -13,8 +13,8 @@ from weave.trace import (
 )
 from weave.trace.context import weave_client_context as weave_client_context
 from weave.trace.settings import should_redact_pii, use_server_cache
-from weave.trace_server.trace_server_interface import (  # noqa: TID251
-    TraceServerInterface,
+from weave.trace_server.trace_server_interface import (
+    FullTraceServerInterface,
 )
 from weave.trace_server_bindings import remote_http_trace_server
 from weave.trace_server_bindings.caching_middleware_trace_server import (
@@ -139,7 +139,7 @@ def init_weave(
         raise RuntimeError(
             "Weave is not available on the server.  Please contact support."
         )
-    server: TraceServerInterface = remote_server
+    server: FullTraceServerInterface = remote_server
     if use_server_cache():
         server = CachingMiddlewareTraceServer.from_env(server)
 
@@ -229,16 +229,6 @@ def init_weave_get_server(
     if api_key is not None:
         res.set_auth(("api", api_key))
     return res
-
-
-def init_local() -> weave_client.WeaveClient:
-    from weave.trace_server import sqlite_trace_server  # noqa: TID251
-
-    server = sqlite_trace_server.SqliteTraceServer("weave.db")
-    server.setup_tables()
-    client = weave_client.WeaveClient("none", "none", server)
-    weave_client_context.set_weave_client_global(client)
-    return client
 
 
 def finish() -> None:

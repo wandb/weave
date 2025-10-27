@@ -18,7 +18,6 @@ jobs:
           # Allowed types: See CONTRIBUTING.md
           types: |
             chore
-            docs
             feat
             fix
             perf

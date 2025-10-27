@@ -1,6 +1,7 @@
 import datetime
 
 import pytest
+from clickhouse_connect.driver.exceptions import DatabaseError
 
 import weave
 from tests.trace.util import client_is_sqlite
@@ -709,3 +710,103 @@ def test_get_feedback_with_dict_query(client) -> None:
 
     no_results = client.get_feedback(query=no_results_query)
     assert len(list(no_results)) == 0
+
+
+def test_feedback_query_bad_json_path(client) -> None:
+    """Test that querying for nonexistent JSON paths raises appropriate error."""
+    # Create some test feedback
+    project_id = client._project_id()
+
+    # Create a call to attach feedback to
+    call = client.create_call("test_op", {"input": "test"})
+    client.finish_call(call, {"output": "test"})
+
+    # Add feedback with a known structure
+    trace_object = client.get_call(call.id)
+    trace_object.feedback.add_note("test note")
+
+    # Try to query for a field that doesn't exist in the feedback table schema
+    # "inputs" is not a valid column or JSON field in the feedback table
+    with pytest.raises(ValueError, match="Unknown field: inputs.message_id"):
+        client.server.feedback_query(
+            FeedbackQueryReq(
+                project_id=project_id,
+                query=Query(
+                    **{
+                        "$expr": {
+                            "$contains": {
+                                "input": {"$getField": "inputs.message_id"},
+                                "substr": {"$literal": "test-id"},
+                            }
+                        }
+                    }
+                ),
+            )
+        )
+
+
+def test_feedback_query_contains_numeric_literal(client) -> None:
+    """Test that $contains works with numeric literals on JSON fields.
+
+    This test reproduces the ClickHouse error:
+    Illegal type UInt64 of argument of function position
+
+    The issue occurs when using $contains with a numeric literal on a JSON field.
+    The query builder should convert the numeric literal to a string for the
+    position function, not cast it to UInt64.
+    """
+    project_id = client._project_id()
+    call_ref_uri = f"weave:///{project_id}/call/call_id_456"
+
+    # Create feedback with a payload containing a dataset_id
+    feedback_req = FeedbackCreateReq(
+        project_id=project_id,
+        weave_ref=call_ref_uri,
+        feedback_type="custom.annotation",
+        payload={"dataset_id": 94, "dataset_id_str": "94"},
+    )
+    client.server.feedback_create(feedback_req)
+
+    # Query for feedback where dataset_id contains the numeric literal 94
+    # This should work but currently fails with:
+    # "Illegal type UInt64 of argument of function position"
+    if not client_is_sqlite(client):
+        with pytest.raises(
+            DatabaseError,
+            match="Illegal type UInt64 of argument of function position",
+        ):
+            client.server.feedback_query(
+                FeedbackQueryReq(
+                    project_id=project_id,
+                    query=Query(
+                        **{
+                            "$expr": {
+                                "$contains": {
+                                    "input": {"$getField": "payload.dataset_id"},
+                                    "substr": {
+                                        "$literal": 94
+                                    },  # Numeric literal, not string
+                                }
+                            }
+                        }
+                    ),
+                )
+            )
+
+    res = client.server.feedback_query(
+        FeedbackQueryReq(
+            project_id=project_id,
+            query=Query(
+                **{
+                    "$expr": {
+                        "$contains": {
+                            "input": {"$getField": "payload.dataset_id_str"},
+                            "substr": {"$literal": "9"},  # Numeric literal, not string
+                        }
+                    }
+                }
+            ),
+        )
+    )
+    assert len(res.result) == 1
+    assert res.result[0]["payload"]["dataset_id_str"] == "94"
