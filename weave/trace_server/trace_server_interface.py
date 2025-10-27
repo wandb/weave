@@ -1784,6 +1784,37 @@ class EvaluationRunGetPredictionV2Res(BaseModel):
     )
 
 
+class EvaluationRunListPredictionsV2Req(BaseModel):
+    project_id: str = Field(
+        ..., description="The `entity/project` where this evaluation run exists"
+    )
+    evaluation_run_id: str = Field(..., description="The evaluation run ID")
+    limit: Optional[int] = Field(
+        None, description="Maximum number of predictions to return"
+    )
+    offset: Optional[int] = Field(
+        None, description="Number of predictions to skip for pagination"
+    )
+
+
+class EvaluationRunListPredictionsV2Res(BaseModel):
+    predictions: list[PredictionSchema] = Field(
+        default_factory=list, description="List of predictions in this evaluation run"
+    )
+
+
+class EvaluationRunDeletePredictionV2Req(BaseModel):
+    project_id: str = Field(
+        ..., description="The `entity/project` where this evaluation run exists"
+    )
+    evaluation_run_id: str = Field(..., description="The evaluation run ID")
+    prediction_id: str = Field(..., description="The prediction ID to delete")
+
+
+class EvaluationRunDeletePredictionV2Res(BaseModel):
+    pass
+
+
 class TraceServerInterface(Protocol):
     def ensure_project_exists(
         self, entity: str, project: str
@@ -1947,6 +1978,12 @@ class TraceServerInterfaceV2(Protocol):
     def evaluation_run_get_prediction_v2(
         self, req: EvaluationRunGetPredictionV2Req
     ) -> EvaluationRunGetPredictionV2Res: ...
+    def evaluation_run_list_predictions_v2(
+        self, req: EvaluationRunListPredictionsV2Req
+    ) -> EvaluationRunListPredictionsV2Res: ...
+    def evaluation_run_delete_prediction_v2(
+        self, req: EvaluationRunDeletePredictionV2Req
+    ) -> EvaluationRunDeletePredictionV2Res: ...
 
 
 class FullTraceServerInterface(TraceServerInterface, TraceServerInterfaceV2, Protocol):

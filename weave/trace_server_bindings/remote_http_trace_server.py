@@ -1139,6 +1139,44 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
             method="GET",
         )
 
+    def evaluation_run_list_predictions_v2(
+        self, req: Union[tsi.EvaluationRunListPredictionsV2Req, dict[str, Any]]
+    ) -> tsi.EvaluationRunListPredictionsV2Res:
+        if isinstance(req, dict):
+            req = tsi.EvaluationRunListPredictionsV2Req.model_validate(req)
+        req = cast(tsi.EvaluationRunListPredictionsV2Req, req)
+        entity, project = req.project_id.split("/", 1)
+        url = f"/v2/{entity}/{project}/evaluation_runs/{req.evaluation_run_id}/predictions"
+        params = {}
+        if req.limit is not None:
+            params["limit"] = req.limit
+        if req.offset is not None:
+            params["offset"] = req.offset
+        return self._generic_request(
+            url,
+            None,
+            None,
+            tsi.EvaluationRunListPredictionsV2Res,
+            method="GET",
+            params=params,
+        )
+
+    def evaluation_run_delete_prediction_v2(
+        self, req: Union[tsi.EvaluationRunDeletePredictionV2Req, dict[str, Any]]
+    ) -> tsi.EvaluationRunDeletePredictionV2Res:
+        if isinstance(req, dict):
+            req = tsi.EvaluationRunDeletePredictionV2Req.model_validate(req)
+        req = cast(tsi.EvaluationRunDeletePredictionV2Req, req)
+        entity, project = req.project_id.split("/", 1)
+        url = f"/v2/{entity}/{project}/evaluation_runs/{req.evaluation_run_id}/predictions/{req.prediction_id}"
+        return self._generic_request(
+            url,
+            None,
+            None,
+            tsi.EvaluationRunDeletePredictionV2Res,
+            method="DELETE",
+        )
+
 
 __docspec__ = [
     RemoteHTTPTraceServer,

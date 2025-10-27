@@ -2501,6 +2501,138 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         return tsi.EvaluationRunGetPredictionV2Res(prediction=prediction)
 
+    def evaluation_run_list_predictions_v2(
+        self, req: tsi.EvaluationRunListPredictionsV2Req
+    ) -> tsi.EvaluationRunListPredictionsV2Res:
+        """List all predictions in an evaluation run.
+
+        Returns predictions with their inputs, outputs, scores, and latency metrics.
+        """
+        # Query for all predict_and_score calls in this evaluation run
+        # These are the parent calls that coordinate each prediction
+        calls_req = tsi.CallsQueryReq(
+            project_id=req.project_id,
+            filter=tsi.CallsFilter(
+                trace_ids=[req.evaluation_run_id],
+                op_names=[constants.EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME],
+            ),
+            limit=req.limit,
+            offset=req.offset,
+        )
+        calls_res = self.calls_query(calls_req)
+
+        predictions: list[tsi.PredictionSchema] = []
+
+        # For each predict_and_score call, find its Model.predict child and scores
+        for pas_call in calls_res.calls:
+            # Find the Model.predict child call
+            predict_calls_req = tsi.CallsQueryReq(
+                project_id=req.project_id,
+                filter=tsi.CallsFilter(
+                    parent_ids=[pas_call.id],
+                ),
+            )
+            predict_calls_res = self.calls_query(predict_calls_req)
+
+            # Find the predict call (not a score call)
+            predict_call = None
+            score_calls = []
+            for call in predict_calls_res.calls:
+                weave_attrs = call.attributes.get(
+                    constants.WEAVE_ATTRIBUTES_NAMESPACE, {}
+                )
+                is_score = weave_attrs.get(
+                    constants.EVALUATION_RUN_SCORE_ATTR_KEY, False
+                )
+                if is_score:
+                    score_calls.append(call)
+                else:
+                    predict_call = call
+
+            if predict_call is None:
+                # Skip if we can't find the predict call
+                continue
+
+            # Extract inputs and output
+            predict_inputs = predict_call.inputs or {}
+            model_inputs = predict_inputs.get("input", {})
+            predict_output = predict_call.output
+
+            # Calculate latency
+            model_latency_ms = None
+            if predict_call.started_at and predict_call.ended_at:
+                latency_seconds = (
+                    predict_call.ended_at - predict_call.started_at
+                ).total_seconds()
+                model_latency_ms = latency_seconds * 1000
+
+            # Extract scores
+            scores_dict: dict[str, Any] = {}
+            for score_call in score_calls:
+                op_name = score_call.op_name
+                if "/" in op_name:
+                    scorer_name = op_name.split("/")[-1].split(":")[0]
+                else:
+                    scorer_name = op_name.split(":")[0]
+                scores_dict[scorer_name] = score_call.output
+
+            # Build prediction schema
+            prediction = tsi.PredictionSchema(
+                predict_call_id=predict_call.id,
+                predict_and_score_call_id=pas_call.id,
+                inputs=model_inputs,
+                output=predict_output,
+                scores=scores_dict,
+                model_latency_ms=model_latency_ms,
+            )
+            predictions.append(prediction)
+
+        return tsi.EvaluationRunListPredictionsV2Res(predictions=predictions)
+
+    def evaluation_run_delete_prediction_v2(
+        self, req: tsi.EvaluationRunDeletePredictionV2Req
+    ) -> tsi.EvaluationRunDeletePredictionV2Res:
+        """Delete a prediction from an evaluation run.
+
+        This deletes the Model.predict call, its parent predict_and_score call,
+        and all associated score calls.
+        """
+        # First, get the prediction to find its predict_and_score parent
+        get_req = tsi.EvaluationRunGetPredictionV2Req(
+            project_id=req.project_id,
+            evaluation_run_id=req.evaluation_run_id,
+            prediction_id=req.prediction_id,
+        )
+        get_res = self.evaluation_run_get_prediction_v2(get_req)
+        predict_and_score_call_id = get_res.prediction.predict_and_score_call_id
+
+        # Query for all children of the predict_and_score call
+        # (this includes the predict call and all score calls)
+        children_req = tsi.CallsQueryReq(
+            project_id=req.project_id,
+            filter=tsi.CallsFilter(
+                parent_ids=[predict_and_score_call_id],
+            ),
+        )
+        children_res = self.calls_query(children_req)
+
+        # Delete all child calls (predict + scores)
+        for child_call in children_res.calls:
+            delete_req = tsi.CallDeleteReq(
+                project_id=req.project_id,
+                call_id=child_call.id,
+            )
+            self.call_delete(delete_req)
+
+        # Delete the predict_and_score call itself
+        delete_pas_req = tsi.CallDeleteReq(
+            project_id=req.project_id,
+            call_id=predict_and_score_call_id,
+        )
+        self.call_delete(delete_pas_req)
+
+        return tsi.EvaluationRunDeletePredictionV2Res()
+
     def _obj_read_with_retry(
         self, req: tsi.ObjReadReq, max_retries: int = 10, initial_delay: float = 0.05
     ) -> tsi.ObjReadRes:

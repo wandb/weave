@@ -632,6 +632,46 @@ def generate_routes_v2(
         )
         return service.trace_server_interface.evaluation_run_get_prediction_v2(req)
 
+    @router.get(
+        "{entity}/{project}/evaluation_runs/{evaluation_run_id}/predictions",
+        tags=[V2_EVALUATION_RUNS_TAG_NAME],
+    )
+    def evaluation_run_list_predictions_v2(
+        entity: str,
+        project: str,
+        evaluation_run_id: str,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+        service: TraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.EvaluationRunListPredictionsV2Res:
+        """List all predictions in an evaluation run."""
+        req = tsi.EvaluationRunListPredictionsV2Req(
+            project_id=f"{entity}/{project}",
+            evaluation_run_id=evaluation_run_id,
+            limit=limit,
+            offset=offset,
+        )
+        return service.trace_server_interface.evaluation_run_list_predictions_v2(req)
+
+    @router.delete(
+        "{entity}/{project}/evaluation_runs/{evaluation_run_id}/predictions/{prediction_id}",
+        tags=[V2_EVALUATION_RUNS_TAG_NAME],
+    )
+    def evaluation_run_delete_prediction_v2(
+        entity: str,
+        project: str,
+        evaluation_run_id: str,
+        prediction_id: str,
+        service: TraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.EvaluationRunDeletePredictionV2Res:
+        """Delete a specific prediction from an evaluation run."""
+        req = tsi.EvaluationRunDeletePredictionV2Req(
+            project_id=f"{entity}/{project}",
+            evaluation_run_id=evaluation_run_id,
+            prediction_id=prediction_id,
+        )
+        return service.trace_server_interface.evaluation_run_delete_prediction_v2(req)
+
     return router
 
 

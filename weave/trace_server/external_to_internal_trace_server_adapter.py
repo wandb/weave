@@ -603,6 +603,24 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
         res = self._internal_trace_server.evaluation_run_get_prediction_v2(req)
         return self._ref_apply_to_prediction_schema(res)
 
+    def evaluation_run_list_predictions_v2(
+        self, req: tsi.EvaluationRunListPredictionsV2Req
+    ) -> tsi.EvaluationRunListPredictionsV2Res:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        res = self._internal_trace_server.evaluation_run_list_predictions_v2(req)
+        # Apply reference transformations to each prediction
+        for prediction in res.predictions:
+            prediction.inputs = self._ref_apply_to_val(prediction.inputs)
+            prediction.output = self._ref_apply_to_val(prediction.output)
+            prediction.scores = self._ref_apply_to_val(prediction.scores)
+        return res
+
+    def evaluation_run_delete_prediction_v2(
+        self, req: tsi.EvaluationRunDeletePredictionV2Req
+    ) -> tsi.EvaluationRunDeletePredictionV2Res:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._internal_trace_server.evaluation_run_delete_prediction_v2(req)
+
     def _ref_apply_to_prediction_schema(
         self, res: tsi.EvaluationRunGetPredictionV2Res
     ) -> tsi.EvaluationRunGetPredictionV2Res:
