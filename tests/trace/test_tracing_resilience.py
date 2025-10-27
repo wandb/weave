@@ -416,7 +416,7 @@ def test_resilience_to_accumulator_on_finish_post_processor_errors(
     logs = log_collector.get_error_logs()
     assert len(logs) > 0
     for log in logs:
-        assert log.msg.startswith("Error closing iterator, call data may be incomplete")
+        assert log.msg.startswith("Error capturing call output")
 
 
 @pytest.mark.asyncio
@@ -464,7 +464,7 @@ async def test_resilience_to_accumulator_on_finish_post_processor_errors_async(
     logs = log_collector.get_error_logs()
     assert len(logs) > 0
     for log in logs:
-        assert log.msg.startswith("Error closing iterator, call data may be incomplete")
+        assert log.msg.startswith("Error capturing call output")
 
 
 def test_resilience_to_accumulator_internal_errors(client):

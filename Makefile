@@ -1,15 +1,4 @@
-.PHONY: docs build
-
-setup-docs-ci:
-	pip install -e .[docs]
-	playwright install
-
-	cd docs && \
-	npm install --global yarn && \
-	npm install
-
-docs: 
-	cd docs && make generate_all
+.PHONY: build
 
 build:
 	uv build
@@ -17,7 +6,7 @@ build:
 prerelease-dry-run:
 	uv run ./scripts/prerelease_dry_run.py
 
-prepare-release: docs build
+prepare-release: build
 
 synchronize-base-object-schemas:
 	cd weave && make generate_base_object_schemas && \
