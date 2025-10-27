@@ -26,6 +26,7 @@ V2_OPS_TAG_NAME = "V2 -- Ops"
 V2_DATASETS_TAG_NAME = "V2 -- Datasets"
 V2_SCORERS_TAG_NAME = "V2 -- Scorers"
 V2_EVALUATIONS_TAG_NAME = "V2 -- Evaluations"
+V2_MODELS_TAG_NAME = "V2 -- Models"
 
 
 class AuthParams(NamedTuple):
@@ -442,6 +443,90 @@ def generate_routes_v2(
             project_id=project_id, object_id=object_id, digests=digests
         )
         return service.trace_server_interface.evaluation_delete_v2(req)
+
+    @router.post(
+        "{entity}/{project}/models",
+        tags=[V2_MODELS_TAG_NAME],
+    )
+    def model_create_v2(
+        entity: str,
+        project: str,
+        body: tsi.ModelCreateV2Body,
+        service: TraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.ModelCreateV2Res:
+        """Create a model object."""
+        project_id = f"{entity}/{project}"
+        req = tsi.ModelCreateV2Req(project_id=project_id, **body.model_dump())
+        return service.trace_server_interface.model_create_v2(req)
+
+    @router.get(
+        "{entity}/{project}/models/{object_id}/versions/{digest}",
+        tags=[V2_MODELS_TAG_NAME],
+    )
+    def model_read_v2(
+        entity: str,
+        project: str,
+        object_id: str,
+        digest: str,
+        service: TraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.ModelReadV2Res:
+        """Get a model object."""
+        project_id = f"{entity}/{project}"
+        req = tsi.ModelReadV2Req(
+            project_id=project_id, object_id=object_id, digest=digest
+        )
+        return service.trace_server_interface.model_read_v2(req)
+
+    @router.get(
+        "{entity}/{project}/models",
+        tags=[V2_MODELS_TAG_NAME],
+        response_class=StreamingResponse,
+        responses={
+            200: {
+                "description": "Stream of data in JSONL format",
+                "content": {
+                    "application/jsonl": {
+                        "schema": {
+                            "type": "array",
+                            "items": {"$ref": "#/components/schemas/Schema"},
+                        }
+                    }
+                },
+            }
+        },
+    )
+    def model_list_v2(
+        entity: str,
+        project: str,
+        limit: int | None = None,
+        offset: int | None = None,
+        service: TraceService = Depends(get_service),  # noqa: B008
+    ) -> StreamingResponse:
+        """List model objects."""
+        project_id = f"{entity}/{project}"
+        req = tsi.ModelListV2Req(project_id=project_id, limit=limit, offset=offset)
+        return StreamingResponse(
+            service.trace_server_interface.model_list_v2(req),
+            media_type="application/jsonl",
+        )
+
+    @router.delete(
+        "{entity}/{project}/models/{object_id}",
+        tags=[V2_MODELS_TAG_NAME],
+    )
+    def model_delete_v2(
+        entity: str,
+        project: str,
+        object_id: str,
+        digests: list[str] | None = None,
+        service: TraceService = Depends(get_service),  # noqa: B008
+    ) -> tsi.ModelDeleteV2Res:
+        """Delete a model object. If digests are provided, only those versions are deleted. Otherwise, all versions are deleted."""
+        project_id = f"{entity}/{project}"
+        req = tsi.ModelDeleteV2Req(
+            project_id=project_id, object_id=object_id, digests=digests
+        )
+        return service.trace_server_interface.model_delete_v2(req)
 
     return router
 
