@@ -37,7 +37,7 @@ dynamic = ["version"]
 dependencies = [
   "wandb>=0.17.1",
   "sentry-sdk>=2.0.0,<3.0.0",
-  "pydantic>=2.0.0,<2.12.0",
+  "pydantic>=2.0.0",
   "packaging>=21.0",                      # For version parsing in integrations
   "tenacity>=8.3.0,!=8.4.0",              # Excluding 8.4.0 because it had a bug on import of AsyncRetrying
   "click",                                # Used for terminal/stdio printing
@@ -112,7 +112,7 @@ smolagents = [
   "openai>=1.99.9,<1.100.0",
   "litellm>=1.58",
   "smolagents>=1.17.0,<1.19.0",
-  "huggingface-hub>=0.28.1",
+  "huggingface-hub>=0.28.1,<1.0.0",
   "SQLAlchemy>=2.0.38",
 ]
 instructor = [
