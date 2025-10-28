@@ -929,6 +929,45 @@ class EvaluationLogger(BaseModel):
 
         return pred
 
+    def log_example(
+        self, inputs: dict[str, Any], output: Any, scores: dict[str, ScoreType]
+    ) -> None:
+        """Log a complete example with inputs, output, and scores.
+
+        This is a convenience method that combines log_prediction and log_score
+        for when you have all the data upfront.
+
+        Args:
+            inputs: The input data for the prediction
+            output: The output value
+            scores: Dictionary mapping scorer names to score values
+
+        Example:
+        ```python
+        ev = EvaluationLogger()
+        ev.log_example(
+            inputs={'q': 'What is 2+2?'},
+            output='4',
+            scores={'correctness': 1.0, 'fluency': 0.9}
+        )
+        ```
+        """
+        if self._is_finalized:
+            raise ValueError(
+                "Cannot log example after evaluation has been finalized. "
+                "Call log_example before calling finish() or log_summary()."
+            )
+
+        # Log the prediction with the output
+        pred = self.log_prediction(inputs=inputs, output=output)
+
+        # Log all the scores
+        for scorer_name, score_value in scores.items():
+            pred.log_score(scorer_name, score_value)
+
+        # Finish the prediction
+        pred.finish()
+
     def log_summary(
         self,
         summary: dict | None = None,
