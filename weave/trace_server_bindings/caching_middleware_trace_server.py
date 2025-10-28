@@ -537,7 +537,7 @@ class CachingMiddlewareTraceServer(tsi.FullTraceServerInterface):
         return self._next_trace_server.op_create_v2(req)
 
     def op_read_v2(self, req: tsi.OpReadV2Req) -> tsi.OpReadV2Res:
-        if not digest_is_cacheable(req.digest):
+        if req.digest and not digest_is_cacheable(req.digest):
             return self._next_trace_server.op_read_v2(req)
         return self._with_cache_pydantic(
             self._next_trace_server.op_read_v2, req, tsi.OpReadV2Res

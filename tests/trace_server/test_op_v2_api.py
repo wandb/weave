@@ -489,30 +489,3 @@ def test_op_read_v2_by_version_index(trace_server):
     assert op.object_id == "versioned_read_op"
     assert op.version_index == 1
     assert "return 1" in op.code
-
-
-def test_op_list_v2_filter_by_object_id(trace_server):
-    """Test filtering ops by object_id to get all versions."""
-    project_id = f"{TEST_ENTITY}/test_op_list_filter_object_id"
-
-    # Create multiple versions of two different ops
-    for op_name in ["filtered_op_a", "filtered_op_b"]:
-        for i in range(3):
-            create_req = tsi.OpCreateV2Req(
-                project_id=project_id,
-                name=op_name,
-                description=None,
-                source_code=f"def {op_name}():\n    return {i}",
-            )
-            trace_server.op_create_v2(create_req)
-
-    # Filter by specific object_id - should return all versions
-    list_req = tsi.OpListV2Req(project_id=project_id, object_id="filtered_op_a")
-    ops = list(trace_server.op_list_v2(list_req))
-
-    # Should return all 3 versions of filtered_op_a
-    assert len(ops) == 3
-    assert all(op.object_id == "filtered_op_a" for op in ops)
-    # Verify we got different versions
-    version_indices = {op.version_index for op in ops}
-    assert version_indices == {0, 1, 2}

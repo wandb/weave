@@ -11,10 +11,19 @@ import uuid
 import pydantic
 import pytest
 import requests
+from pydantic import ValidationError
+
 import weave
 import weave.trace.call
 import weave.trace_server.trace_server_interface as tsi
-from pydantic import ValidationError
+from tests.conftest import TestOnlyFlushingWeaveClient
+from tests.trace.testutil import ObjectRefStrMatcher
+from tests.trace.util import (
+    AnyIntMatcher,
+    DatetimeMatcher,
+    RegexStringMatcher,
+    client_is_sqlite,
+)
 from weave import Evaluation
 from weave.integrations.integration_utilities import op_name_from_call
 from weave.trace import refs, settings, table_upload_chunking, weave_client
@@ -48,15 +57,6 @@ from weave.trace_server.trace_server_interface import (
     TableCreateReq,
     TableQueryReq,
     TableSchemaForInsert,
-)
-
-from tests.conftest import TestOnlyFlushingWeaveClient
-from tests.trace.testutil import ObjectRefStrMatcher
-from tests.trace.util import (
-    AnyIntMatcher,
-    DatetimeMatcher,
-    RegexStringMatcher,
-    client_is_sqlite,
 )
 
 

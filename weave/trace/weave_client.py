@@ -10,7 +10,7 @@ import platform
 import re
 import sys
 import time
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from concurrent.futures import Future
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, Callable, TypedDict, cast
@@ -1089,7 +1089,7 @@ class WeaveClient:
         *,
         limit: int | None = None,
         offset: int | None = None,
-    ):
+    ) -> Iterator[dict[str, Any]]:
         """Get all ops for this project using the v2 API.
 
         Args:
@@ -1183,7 +1183,9 @@ class WeaveClient:
                 op = next(iter(ops_iterator))
                 digest = op.digest
             except StopIteration:
-                raise ValueError(f"Op {object_id} with version {version} not found")
+                raise ValueError(
+                    f"Op {object_id} with version {version} not found"
+                ) from None
 
         op = server.op_read_v2(
             OpReadV2Req(
