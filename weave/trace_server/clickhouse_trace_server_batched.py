@@ -1336,7 +1336,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if req.digest is not None:
             object_query_builder.add_digests_conditions(req.digest)
         if req.version_index is not None:
-            object_query_builder.add_condition("version_index", "=", req.version_index)
+            condition = object_query_builder._make_version_index_condition(
+                req.version_index, "version_index"
+            )
+            object_query_builder._conditions.append(condition)
 
         object_query_builder.set_include_deleted(include_deleted=True)
         objs = self._select_objs_query(object_query_builder)
@@ -1410,7 +1413,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
             # Add object_id filter if specified
             if req.object_id is not None:
-                object_query_builder.add_condition("object_id", "=", req.object_id)
+                object_query_builder.add_object_ids_condition([req.object_id])
 
             if req.limit is not None:
                 object_query_builder.set_limit(req.limit)
