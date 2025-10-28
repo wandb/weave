@@ -1612,6 +1612,97 @@ class EvaluationDeleteV2Res(BaseModel):
     num_deleted: int = Field(..., description="Number of evaluation versions deleted")
 
 
+# Model V2 API Models
+
+
+class ModelCreateV2Body(BaseModel):
+    name: str = Field(
+        ...,
+        description="The name of this model. Models with the same name will be versioned together.",
+    )
+    description: Optional[str] = Field(
+        None,
+        description="A description of this model",
+    )
+    source_code: str = Field(
+        ...,
+        description="Complete source code for the Model class including imports",
+    )
+    attributes: Optional[dict[str, Any]] = Field(
+        None,
+        description="Additional attributes to be stored with the model",
+    )
+
+
+class ModelCreateV2Req(ModelCreateV2Body):
+    project_id: str = Field(
+        ..., description="The `entity/project` where this model will be saved"
+    )
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class ModelCreateV2Res(BaseModel):
+    digest: str = Field(..., description="The digest of the created model")
+    object_id: str = Field(..., description="The ID of the created model")
+    version_index: int = Field(
+        ..., description="The version index of the created model"
+    )
+    model_ref: str = Field(
+        ...,
+        description="Full reference to the created model",
+    )
+
+
+class ModelReadV2Req(BaseModel):
+    project_id: str = Field(
+        ..., description="The `entity/project` where this model is saved"
+    )
+    object_id: str = Field(..., description="The model ID")
+    digest: str = Field(..., description="The digest of the model object")
+
+
+class ModelReadV2Res(BaseModel):
+    object_id: str = Field(..., description="The model ID")
+    digest: str = Field(..., description="The digest of the model")
+    version_index: int = Field(..., description="The version index of the object")
+    created_at: datetime.datetime = Field(..., description="When the model was created")
+    name: str = Field(..., description="The name of the model")
+    description: Optional[str] = Field(None, description="Description of the model")
+    source_code: str = Field(
+        ...,
+        description="The source code of the model",
+    )
+    attributes: Optional[dict[str, Any]] = Field(
+        None, description="Additional attributes stored with the model"
+    )
+
+
+class ModelListV2Req(BaseModel):
+    project_id: str = Field(
+        ..., description="The `entity/project` where these models are saved"
+    )
+    limit: Optional[int] = Field(
+        default=None, description="Maximum number of models to return"
+    )
+    offset: Optional[int] = Field(default=None, description="Number of models to skip")
+
+
+class ModelDeleteV2Req(BaseModel):
+    project_id: str = Field(
+        ..., description="The `entity/project` where this model is saved"
+    )
+    object_id: str = Field(..., description="The model ID")
+    digests: Optional[list[str]] = Field(
+        None,
+        description="List of model digests to delete. If None, deletes all versions.",
+    )
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class ModelDeleteV2Res(BaseModel):
+    num_deleted: int = Field(..., description="Number of model versions deleted")
+
+
 class TraceServerInterface(Protocol):
     def ensure_project_exists(
         self, entity: str, project: str
@@ -1749,6 +1840,12 @@ class TraceServerInterfaceV2(Protocol):
     def evaluation_delete_v2(
         self, req: EvaluationDeleteV2Req
     ) -> EvaluationDeleteV2Res: ...
+
+    # Models
+    def model_create_v2(self, req: ModelCreateV2Req) -> ModelCreateV2Res: ...
+    def model_read_v2(self, req: ModelReadV2Req) -> ModelReadV2Res: ...
+    def model_list_v2(self, req: ModelListV2Req) -> Iterator[ModelReadV2Res]: ...
+    def model_delete_v2(self, req: ModelDeleteV2Req) -> ModelDeleteV2Res: ...
 
 
 class FullTraceServerInterface(TraceServerInterface, TraceServerInterfaceV2, Protocol):
