@@ -52,6 +52,10 @@ def set_weave_logger_to_debug():
 def test_serialization_correctness(
     client, case: SerializationTestCase, set_weave_logger_to_debug
 ):
+    # Skip image test on macOS - PIL/Pillow produces different PNG encoding on macOS vs Linux
+    # resulting in different file digests. This is expected behavior, not a bug.
+    if sys.platform == "darwin" and case.id == "image":
+        pytest.skip("Image encoding differs on macOS vs Linux")
     # Since code serialization changes pretty significantly between versions, we will assume
     # legacy for anything other than the latest python version
     is_legacy = case.is_legacy
