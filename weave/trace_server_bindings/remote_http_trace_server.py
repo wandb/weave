@@ -999,6 +999,64 @@ class RemoteHTTPTraceServer(tsi.FullTraceServerInterface):
         r = self._delete_request_executor(url, params)
         return tsi.EvaluationDeleteV2Res.model_validate(r.json())
 
+    # Model V2 API
+
+    def model_create_v2(
+        self, req: Union[tsi.ModelCreateV2Req, dict[str, Any]]
+    ) -> tsi.ModelCreateV2Res:
+        if isinstance(req, dict):
+            req = tsi.ModelCreateV2Req.model_validate(req)
+        req = cast(tsi.ModelCreateV2Req, req)
+        entity, project = req.project_id.split("/", 1)
+        url = f"/v2/{entity}/{project}/models"
+        r = self._post_request_executor(url, req.model_dump(exclude={"project_id"}))
+        return tsi.ModelCreateV2Res.model_validate(r.json())
+
+    def model_read_v2(
+        self, req: Union[tsi.ModelReadV2Req, dict[str, Any]]
+    ) -> tsi.ModelReadV2Res:
+        if isinstance(req, dict):
+            req = tsi.ModelReadV2Req.model_validate(req)
+        req = cast(tsi.ModelReadV2Req, req)
+        entity, project = req.project_id.split("/", 1)
+        url = f"/v2/{entity}/{project}/models/{req.object_id}/versions/{req.digest}"
+        r = self._get_request_executor(url)
+        return tsi.ModelReadV2Res.model_validate(r.json())
+
+    def model_list_v2(
+        self, req: Union[tsi.ModelListV2Req, dict[str, Any]]
+    ) -> Iterator[tsi.ModelReadV2Res]:
+        if isinstance(req, dict):
+            req = tsi.ModelListV2Req.model_validate(req)
+        req = cast(tsi.ModelListV2Req, req)
+        entity, project = req.project_id.split("/", 1)
+        url = f"/v2/{entity}/{project}/models"
+        # Build query params
+        params = {}
+        if req.limit is not None:
+            params["limit"] = req.limit
+        if req.offset is not None:
+            params["offset"] = req.offset
+        r = self._get_request_executor(url, params, stream=True)
+        for line in r.iter_lines():
+            if line:
+                yield tsi.ModelReadV2Res.model_validate_json(line)
+
+    def model_delete_v2(
+        self, req: Union[tsi.ModelDeleteV2Req, dict[str, Any]]
+    ) -> tsi.ModelDeleteV2Res:
+        if isinstance(req, dict):
+            req = tsi.ModelDeleteV2Req.model_validate(req)
+        req = cast(tsi.ModelDeleteV2Req, req)
+        entity, project = req.project_id.split("/", 1)
+        url = f"/v2/{entity}/{project}/models/{req.object_id}"
+        # Build query params
+        params = {}
+        if req.digests:
+            params["digests"] = req.digests
+        r = self._delete_request_executor(url, params)
+        return tsi.ModelDeleteV2Res.model_validate(r.json())
+
 
 __docspec__ = [
     RemoteHTTPTraceServer,
