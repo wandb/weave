@@ -131,7 +131,7 @@ langchain = [
   "langchain-cohere>=0.4.5",
   "langchain-litellm>=0.2.2",
   "chromadb>=0.5.0",
-  "pysqlite3; platform_system != 'Windows'",
+  "pysqlite3; platform_system == 'Linux'",
   "opentelemetry-exporter-otlp",
   "openai>=1.99.9,<1.100.0",
 ]
