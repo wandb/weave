@@ -55,12 +55,19 @@ def wandb_frontend_base_url() -> str:
     return public_url if public_url != "" else wandb_base_url()
 
 
+MTSAAS_TRACE_URL = "https://trace.wandb.ai"
+
+
 def weave_trace_server_url() -> str:
     base_url = wandb_frontend_base_url()
-    default = "https://trace.wandb.ai"
+    default = MTSAAS_TRACE_URL
     if base_url != "https://api.wandb.ai":
         default = base_url + "/traces"
     return os.getenv("WF_TRACE_SERVER_URL", default)
+
+
+def is_mtsaas() -> bool:
+    return weave_trace_server_url() == MTSAAS_TRACE_URL
 
 
 def _wandb_api_key_via_env() -> str | None:

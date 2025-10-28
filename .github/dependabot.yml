@@ -61,14 +61,6 @@ updates:
           - "confluent-kafka*"
           - "moto*"
 
-      # Documentation dependencies
-      docs:
-        patterns:
-          - "playwright*"
-          - "lazydocs*"
-          - "nbformat*"
-          - "nbconvert*"
-
       # Media support
       video_support:
         patterns:
@@ -96,10 +88,6 @@ updates:
       dspy:
         patterns:
           - "dspy*"
-
-      google_ai_studio:
-        patterns:
-          - "google-generativeai*"
 
       google_genai:
         patterns:

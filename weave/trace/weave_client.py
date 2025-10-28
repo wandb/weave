@@ -952,6 +952,10 @@ class WeaveClient:
             output_json = to_json(
                 maybe_redacted_output_as_refs, project_id, self, use_dictify=False
             )
+
+            # Capture wb_run_step_end at call end time
+            current_wb_run_step_end = safe_current_wb_run_step()
+
             call_end_req = CallEndReq(
                 end=EndedCallSchemaForInsert(
                     project_id=project_id,
@@ -960,6 +964,7 @@ class WeaveClient:
                     output=output_json,
                     summary=merged_summary,
                     exception=exception_str,
+                    wb_run_step_end=current_wb_run_step_end,
                 )
             )
             bytes_size = len(call_end_req.model_dump_json())
@@ -1703,9 +1708,9 @@ class WeaveClient:
                 if hasattr(server, "_next_trace_server"):
                     server = server._next_trace_server
 
-                assert hasattr(server, "_generic_request_executor")
-                assert hasattr(server._generic_request_executor, "__wrapped__")
-                return server._generic_request_executor.__wrapped__(
+                assert hasattr(server, "_post_request_executor")
+                assert hasattr(server._post_request_executor, "__wrapped__")
+                return server._post_request_executor.__wrapped__(
                     server, "/table/create_from_digests", req
                 )
 

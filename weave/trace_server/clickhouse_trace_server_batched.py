@@ -9,6 +9,7 @@ import threading
 from collections import defaultdict
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
+from re import sub
 from typing import Any, Callable, Optional, Union, cast
 from zoneinfo import ZoneInfo
 
@@ -21,10 +22,17 @@ from clickhouse_connect.driver.summary import QuerySummary
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
     ExportTraceServiceRequest,
 )
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from weave.trace_server import clickhouse_trace_server_migrator as wf_migrator
 from weave.trace_server import clickhouse_trace_server_settings as ch_settings
 from weave.trace_server import environment as wf_env
+from weave.trace_server import object_creation_utils
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.actions_worker.dispatcher import execute_batch
@@ -37,26 +45,30 @@ from weave.trace_server.calls_query_builder.calls_query_builder import (
     OrderField,
     QueryBuilderDynamicField,
     QueryBuilderField,
-    build_calls_query_stats_query,
+    build_calls_stats_query,
     combine_conditions,
-    optimized_project_contains_call_query,
 )
 from weave.trace_server.clickhouse_schema import (
     ALL_CALL_INSERT_COLUMNS,
     ALL_CALL_JSON_COLUMNS,
     ALL_CALL_SELECT_COLUMNS,
+    ALL_FILE_CHUNK_INSERT_COLUMNS,
     REQUIRED_CALL_COLUMNS,
     CallCHInsertable,
     CallDeleteCHInsertable,
     CallEndCHInsertable,
     CallStartCHInsertable,
     CallUpdateCHInsertable,
+    FileChunkCreateCHInsertable,
     ObjCHInsertable,
     ObjDeleteCHInsertable,
     ObjRefListType,
     SelectableCHObjSchema,
 )
-from weave.trace_server.constants import COMPLETIONS_CREATE_OP_NAME
+from weave.trace_server.constants import (
+    COMPLETIONS_CREATE_OP_NAME,
+    IMAGE_GENERATION_CREATE_OP_NAME,
+)
 from weave.trace_server.errors import (
     InsertTooLarge,
     InvalidRequest,
@@ -85,6 +97,7 @@ from weave.trace_server.file_storage import (
 )
 from weave.trace_server.file_storage_uris import FileStorageURI
 from weave.trace_server.ids import generate_id
+from weave.trace_server.image_completion import lite_llm_image_generation
 from weave.trace_server.kafka import KafkaProducer
 from weave.trace_server.llm_completion import (
     get_custom_provider_info,
@@ -102,7 +115,8 @@ from weave.trace_server.objects_query_builder import (
     format_metadata_objects_from_query_result,
     make_objects_val_query_and_parameters,
 )
-from weave.trace_server.opentelemetry.python_spans import ResourceSpans
+from weave.trace_server.opentelemetry.helpers import AttributePathConflictError
+from weave.trace_server.opentelemetry.python_spans import Resource, Span
 from weave.trace_server.orm import ParamBuilder, Row
 from weave.trace_server.project_query_builder import make_project_stats_query
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
@@ -150,7 +164,7 @@ logger.setLevel(logging.INFO)
 _CH_POOL_MANAGER = get_pool_manager(maxsize=50, num_pools=2)
 
 
-class ClickHouseTraceServer(tsi.TraceServerInterface):
+class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def __init__(
         self,
         *,
@@ -171,6 +185,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._database = database
         self._flush_immediately = True
         self._call_batch: list[list[Any]] = []
+        self._file_batch: list[FileChunkCreateCHInsertable] = []
         self._use_async_insert = use_async_insert
         self._model_to_provider_info_map = read_model_to_provider_info_map()
         self._file_storage_client: Optional[FileStorageClient] = None
@@ -212,14 +227,33 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             raise TypeError(
                 "Expected traces as ExportTraceServiceRequest, got {type(req.traces)}"
             )
-        traces_data = [
-            ResourceSpans.from_proto(span) for span in req.traces.resource_spans
-        ]
+        calls: list[dict[str, object]] = []
+        rejected_spans = 0
+        error_messages: list[str] = []
+        for proto_resource_spans in req.traces.resource_spans:
+            resource = Resource.from_proto(proto_resource_spans.resource)
+            for proto_scope_spans in proto_resource_spans.scope_spans:
+                for proto_span in proto_scope_spans.spans:
+                    try:
+                        span = Span.from_proto(proto_span, resource)
+                    except AttributePathConflictError as e:
+                        # Record and skip malformed spans so we can partially accept the batch
+                        rejected_spans += 1
+                        # Use data available on the proto span for context
+                        try:
+                            trace_id = proto_span.trace_id.hex()
+                            span_id = proto_span.span_id.hex()
+                            name = getattr(proto_span, "name", "")
+                        except Exception:
+                            trace_id = ""
+                            span_id = ""
+                            name = ""
+                        span_ident = (
+                            f"name='{name}' trace_id='{trace_id}' span_id='{span_id}'"
+                        )
+                        error_messages.append(f"Rejected span ({span_ident}): {e!s}")
+                        continue
 
-        calls = []
-        for resource_spans in traces_data:
-            for scope_spans in resource_spans.scope_spans:
-                for span in scope_spans.spans:
                     start_call, end_call = span.to_call(req.project_id)
                     calls.extend(
                         [
@@ -232,6 +266,17 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                     )
         # TODO: Actually populate the error fields if call_start_batch fails
         self.call_start_batch(tsi.CallCreateBatchReq(batch=calls))
+        if rejected_spans > 0:
+            # Join the first 20 errors and return them delimited by ';'
+            joined_errors = "; ".join(error_messages[:20]) + (
+                "; ..." if len(error_messages) > 20 else ""
+            )
+            return tsi.OtelExportRes(
+                partial_success=tsi.ExportTracePartialSuccess(
+                    rejected_spans=rejected_spans,
+                    error_message=joined_errors,
+                )
+            )
         return tsi.OtelExportRes()
 
     @contextmanager
@@ -240,9 +285,12 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         self._flush_immediately = False
         try:
             yield
+            self._flush_immediately = True
+            self._flush_file_chunks()
             self._flush_calls()
             self.kafka_producer.flush()
         finally:
+            self._file_batch = []
             self._call_batch = []
             self._flush_immediately = True
 
@@ -333,26 +381,7 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         aggregate statistics that are not directly queryable from the calls themselves.
         """
         pb = ParamBuilder()
-
-        # Special case when limit=1 and there is no filter or query,
-        # construct highly optimized query that returns early
-        if (
-            req.limit == 1
-            and req.filter is None
-            and req.query is None
-            and not req.include_total_storage_size
-        ):
-            query = optimized_project_contains_call_query(req.project_id, pb)
-            raw_res = self._query(query, pb.get_params())
-            rows = raw_res.result_rows
-            count = rows[0][0]
-            return tsi.CallsQueryStatsRes(
-                count=count,
-                total_storage_size_bytes=None,
-            )
-
-        query, columns = build_calls_query_stats_query(req, pb)
-
+        query, columns = build_calls_stats_query(req, pb)
         raw_res = self._query(query, pb.get_params())
 
         res_dict = (
@@ -740,6 +769,10 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 object_query_builder.add_base_object_classes_condition(
                     req.filter.base_object_classes
                 )
+            if req.filter.exclude_base_object_classes:
+                object_query_builder.add_exclude_base_object_classes_condition(
+                    req.filter.exclude_base_object_classes
+                )
             if req.filter.leaf_object_classes:
                 object_query_builder.add_leaf_object_classes_condition(
                     req.filter.leaf_object_classes
@@ -985,8 +1018,29 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         sort_fields = []
         if req.sort_by:
             for sort in req.sort_by:
+                # Validate sort field to prevent empty JSON paths
+                if not sort.field or not sort.field.strip():
+                    raise InvalidRequest("Sort field cannot be empty")
+
+                # Check for invalid dot patterns that would create malformed JSON paths
+                if (
+                    sort.field.startswith(".")
+                    or sort.field.endswith(".")
+                    or ".." in sort.field
+                ):
+                    raise InvalidRequest(
+                        f"Invalid sort field '{sort.field}': field names cannot start/end with dots or contain consecutive dots"
+                    )
+
                 # TODO: better splitting of escaped dots (.) in field names
                 extra_path = sort.field.split(".")
+
+                # Additional validation: ensure no empty path components
+                if any(not component.strip() for component in extra_path):
+                    raise InvalidRequest(
+                        f"Invalid sort field '{sort.field}': field path components cannot be empty"
+                    )
+
                 field = OrderField(
                     field=QueryBuilderDynamicField(
                         field=VAL_DUMP_COLUMN_NAME, extra_path=extra_path
@@ -1217,6 +1271,889 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
                 p50_turn_duration_ms=p50_turn_duration_ms,
                 p99_turn_duration_ms=p99_turn_duration_ms,
             )
+
+    def op_create_v2(self, req: tsi.OpCreateV2Req) -> tsi.OpCreateV2Res:
+        """Create an op object by delegating to obj_create.
+
+        Args:
+            req: OpCreateV2Req containing project_id, name, description, and source_code
+
+        Returns:
+            OpCreateV2Res with digest, object_id, version_index, and op_ref
+        """
+        # Create the obj.py file that the SDK would have created
+        source_code = req.source_code or object_creation_utils.PLACEHOLDER_OP_SOURCE
+        source_file_req = tsi.FileCreateReq(
+            project_id=req.project_id,
+            name=object_creation_utils.OP_SOURCE_FILE_NAME,
+            content=source_code.encode("utf-8"),
+        )
+        source_file_res = self.file_create(source_file_req)
+
+        # Create the op "val" that the SDK would have created
+        # Note: We store just the digest string, matching SDK's to_json output
+        op_val = object_creation_utils.build_op_val(source_file_res.digest)
+        obj_req = tsi.ObjCreateReq(
+            obj=tsi.ObjSchemaForInsert(
+                project_id=req.project_id,
+                object_id=req.name,
+                val=op_val,
+                wb_user_id=None,
+            )
+        )
+        obj_result = self.obj_create(obj_req)
+
+        # Query the object back to get its version index (this may not be
+        # immediately available, so we retry a few times)
+        obj_read_req = tsi.ObjReadReq(
+            project_id=req.project_id,
+            object_id=req.name,
+            digest=obj_result.digest,
+        )
+        obj_read_res = self._obj_read_with_retry(obj_read_req)
+
+        return tsi.OpCreateV2Res(
+            digest=obj_result.digest,
+            object_id=req.name,
+            version_index=obj_read_res.obj.version_index,
+        )
+
+    def op_read_v2(self, req: tsi.OpReadV2Req) -> tsi.OpReadV2Res:
+        """Get a specific op object by delegating to obj_read with op filtering.
+
+        Returns the actual source code of the op.
+        """
+        # Query for the ops
+        object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
+        object_query_builder.add_is_op_condition(True)
+        object_query_builder.add_object_ids_condition([req.object_id])
+        object_query_builder.add_digests_conditions(req.digest)
+        object_query_builder.set_include_deleted(include_deleted=True)
+        objs = self._select_objs_query(object_query_builder)
+        if len(objs) == 0:
+            raise NotFoundError(f"Op {req.object_id}:{req.digest} not found")
+
+        # There should not be multiple ops returned, but in case there are, just
+        # return the first one.
+        obj = objs[0]
+        if obj.deleted_at is not None:
+            raise ObjectDeletedError(
+                f"Op {req.object_id}:v{obj.version_index} was deleted at {obj.deleted_at}",
+                deleted_at=obj.deleted_at,
+            )
+
+        # For ops, the object_id is the function name since ops don't have
+        # a "name" field in their val object. Ops are stored as CustomWeaveType
+        # objects with files containing source code.
+        code = ""
+
+        val = json.loads(obj.val_dump)
+
+        # Check if this is a file-based op
+        if not isinstance(val, dict):
+            raise TypeError(f"Op {req.object_id}:{req.digest} has invalid val: {val}")
+
+        if val.get("_type") != "CustomWeaveType":
+            raise TypeError(f"Op {req.object_id}:{req.digest} has invalid val: {val}")
+
+        files = val.get("files", {})
+        if object_creation_utils.OP_SOURCE_FILE_NAME in files:
+            # Files dict maps filename to digest string
+            file_digest = files[object_creation_utils.OP_SOURCE_FILE_NAME]
+
+            # Load the actual source code
+            try:
+                file_content_res = self.file_content_read(
+                    tsi.FileContentReadReq(
+                        project_id=req.project_id, digest=file_digest
+                    )
+                )
+                code = file_content_res.content.decode("utf-8")
+            except Exception:
+                # If we can't read the file, leave code empty
+                pass
+
+        return tsi.OpReadV2Res(
+            object_id=obj.object_id,
+            digest=obj.digest,
+            version_index=obj.version_index,
+            created_at=_ensure_datetimes_have_tz(obj.created_at),
+            code=code,
+        )
+
+    def op_list_v2(self, req: tsi.OpListV2Req) -> Iterator[tsi.OpReadV2Res]:
+        """List op objects in a project by delegating to objs_query with op filtering."""
+        # Query the objects
+        op_filter = tsi.ObjectVersionFilter(is_op=True)
+
+        complex_query = req.limit is not None or req.offset is not None
+        if complex_query:
+            object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
+            object_query_builder.add_is_op_condition(True)
+            object_query_builder.set_include_deleted(include_deleted=False)
+
+            if req.limit is not None:
+                object_query_builder.set_limit(req.limit)
+            if req.offset is not None:
+                object_query_builder.set_offset(req.offset)
+
+            # Sort by latest first (most recent version first)
+            object_query_builder.add_order("object_id", "asc")
+            object_query_builder.add_order("version_index", "desc")
+
+            objs = self._select_objs_query(object_query_builder, metadata_only=False)
+        else:
+            # Use objs_query for simpler cases without custom sorting
+            obj_query_req = tsi.ObjQueryReq(
+                project_id=req.project_id,
+                filter=op_filter,
+                metadata_only=False,
+            )
+            obj_res = self.objs_query(obj_query_req)
+            objs = obj_res.objs
+
+        # Yield back a descriptive metadata object for each op
+        for obj in objs:
+            code = ""
+
+            # Extract file reference from the val if it's a file-based op
+
+            try:
+                if complex_query:
+                    val = json.loads(obj.val_dump)
+                else:
+                    val = obj.val
+                if isinstance(val, dict) and val.get("_type") == "CustomWeaveType":
+                    files = val.get("files", {})
+                    if object_creation_utils.OP_SOURCE_FILE_NAME in files:
+                        file_digest = files[object_creation_utils.OP_SOURCE_FILE_NAME]
+
+                        # Load the actual source code
+                        try:
+                            file_content_res = self.file_content_read(
+                                tsi.FileContentReadReq(
+                                    project_id=req.project_id, digest=file_digest
+                                )
+                            )
+                            code = file_content_res.content.decode("utf-8")
+                        except Exception:
+                            # If we can't read the file, leave code empty
+                            pass
+            except Exception:
+                pass  # If parsing fails, leave code empty
+
+            yield tsi.OpReadV2Res(
+                object_id=obj.object_id,
+                digest=obj.digest,
+                version_index=obj.version_index,
+                created_at=_ensure_datetimes_have_tz(obj.created_at),
+                code=code,
+            )
+
+    def op_delete_v2(self, req: tsi.OpDeleteV2Req) -> tsi.OpDeleteV2Res:
+        """Delete op object versions by delegating to obj_delete with op filtering."""
+        # First verify that the objects are indeed ops by querying them
+        object_query_builder = ObjectMetadataQueryBuilder(req.project_id)
+        object_query_builder.add_is_op_condition(True)
+        object_query_builder.add_object_ids_condition([req.object_id])
+        metadata_only = True
+        if req.digests:
+            object_query_builder.add_digests_conditions(*req.digests)
+            metadata_only = False
+
+        object_versions = self._select_objs_query(object_query_builder, metadata_only)
+
+        # If no op objects found, raise NotFoundError
+        if len(object_versions) == 0:
+            raise NotFoundError(
+                f"Op object {req.object_id} ({req.digests}) not found when deleting."
+            )
+
+        # Verify we found all requested digests if they were specified
+        if req.digests:
+            given_digests = set(req.digests)
+            found_digests = {obj.digest for obj in object_versions}
+            if len(given_digests) != len(found_digests):
+                raise NotFoundError(
+                    f"Delete request contains {len(req.digests)} digests, but found {len(found_digests)} objects to delete. Diff digests: {given_digests - found_digests}"
+                )
+
+        # Now delegate to obj_delete to perform the actual deletion
+        obj_delete_req = tsi.ObjDeleteReq(
+            project_id=req.project_id,
+            object_id=req.object_id,
+            digests=req.digests,
+        )
+
+        obj_delete_res = self.obj_delete(obj_delete_req)
+
+        return tsi.OpDeleteV2Res(num_deleted=obj_delete_res.num_deleted)
+
+    def dataset_create_v2(self, req: tsi.DatasetCreateV2Req) -> tsi.DatasetCreateV2Res:
+        """Create a dataset object by first creating a table for rows, then creating the dataset object.
+
+        The dataset object references the table containing the actual row data.
+        """
+        # Create a safe ID for the dataset
+        safe_name = object_creation_utils.make_safe_name(req.name)
+        dataset_id = f"dataset_{safe_name}"
+
+        # Create a table and get its ref
+        table_req = tsi.TableCreateReq(
+            table=tsi.TableSchemaForInsert(
+                project_id=req.project_id,
+                rows=req.rows,
+            )
+        )
+        table_res = self.table_create(table_req)
+        table_ref = ri.InternalTableRef(
+            project_id=req.project_id,
+            digest=table_res.digest,
+        ).uri()
+
+        # Create the dataset object
+        dataset_val = object_creation_utils.build_dataset_val(
+            name=req.name,
+            description=req.description,
+            table_ref=table_ref,
+        )
+        obj_req = tsi.ObjCreateReq(
+            obj=tsi.ObjSchemaForInsert(
+                project_id=req.project_id,
+                object_id=dataset_id,
+                val=dataset_val,
+                wb_user_id=None,
+            )
+        )
+        obj_result = self.obj_create(obj_req)
+
+        # Query the object back to get its version index (this may not be
+        # immediately available, so we retry a few times)
+        obj_read_req = tsi.ObjReadReq(
+            project_id=req.project_id,
+            object_id=dataset_id,
+            digest=obj_result.digest,
+        )
+        obj_read_res = self._obj_read_with_retry(obj_read_req)
+
+        return tsi.DatasetCreateV2Res(
+            digest=obj_result.digest,
+            object_id=dataset_id,
+            version_index=obj_read_res.obj.version_index,
+        )
+
+    def dataset_read_v2(self, req: tsi.DatasetReadV2Req) -> tsi.DatasetReadV2Res:
+        """Get a dataset object by delegating to obj_read with retry logic.
+
+        Returns the rows reference as a string.
+        """
+        obj_req = tsi.ObjReadReq(
+            project_id=req.project_id,
+            object_id=req.object_id,
+            digest=req.digest,
+        )
+        result = self._obj_read_with_retry(obj_req)
+        val = result.obj.val
+
+        # Extract name, description, and rows ref from val data
+        name = val.get("name")
+        description = val.get("description")
+        rows_ref = val.get("rows", "")
+
+        # Create the response with all required fields
+        return tsi.DatasetReadV2Res(
+            object_id=result.obj.object_id,
+            digest=result.obj.digest,
+            version_index=result.obj.version_index,
+            created_at=result.obj.created_at,
+            name=name,
+            description=description,
+            rows=rows_ref,
+        )
+
+    def dataset_list_v2(
+        self, req: tsi.DatasetListV2Req
+    ) -> Iterator[tsi.DatasetReadV2Res]:
+        """List dataset objects by delegating to objs_query with Dataset filtering.
+
+        Returns the rows reference as a string.
+        """
+        # Query the objects
+        dataset_filter = tsi.ObjectVersionFilter(base_object_classes=["Dataset"])
+        obj_query_req = tsi.ObjQueryReq(
+            project_id=req.project_id,
+            filter=dataset_filter,
+            limit=req.limit,
+            offset=req.offset,
+        )
+        obj_res = self.objs_query(obj_query_req)
+
+        # Yield back a descriptive metadata object for each dataset
+        for obj in obj_res.objs:
+            if not hasattr(obj, "val") or not obj.val:
+                logger.warning(
+                    f"Skipping dataset object {obj.object_id} with digest {obj.digest}: missing or empty val"
+                )
+                continue
+
+            val = obj.val
+            if not isinstance(val, dict):
+                logger.warning(
+                    f"Skipping dataset object {obj.object_id} with digest {obj.digest}: val is not a dict"
+                )
+                continue
+
+            name = val.get("name")
+            description = val.get("description")
+            rows_ref = val.get("rows", "")
+
+            yield tsi.DatasetReadV2Res(
+                object_id=obj.object_id,
+                digest=obj.digest,
+                version_index=obj.version_index,
+                created_at=obj.created_at,
+                name=name,
+                description=description,
+                rows=rows_ref,
+            )
+
+    def dataset_delete_v2(self, req: tsi.DatasetDeleteV2Req) -> tsi.DatasetDeleteV2Res:
+        """Delete dataset objects by delegating to obj_delete."""
+        obj_delete_req = tsi.ObjDeleteReq(
+            project_id=req.project_id,
+            object_id=req.object_id,
+            digests=req.digests,
+        )
+        result = self.obj_delete(obj_delete_req)
+        return tsi.DatasetDeleteV2Res(num_deleted=result.num_deleted)
+
+    def scorer_create_v2(self, req: tsi.ScorerCreateV2Req) -> tsi.ScorerCreateV2Res:
+        """Create a scorer object by first creating its score op, then creating the scorer object.
+
+        The scorer object references the op that implements the scoring logic.
+        """
+        # Create a safe ID for the scorer
+        safe_name = object_creation_utils.make_safe_name(req.name)
+        scorer_id = f"scorer_{safe_name}"
+
+        # Create the score op
+        score_op_req = tsi.OpCreateV2Req(
+            project_id=req.project_id,
+            name=f"{scorer_id}_score",
+            source_code=req.op_source_code,
+        )
+        score_op_res = self.op_create_v2(score_op_req)
+        score_op_ref = score_op_res.digest
+
+        # Create the default summarize op
+        summarize_op_req = tsi.OpCreateV2Req(
+            project_id=req.project_id,
+            name=f"{scorer_id}_summarize",
+            source_code=object_creation_utils.PLACEHOLDER_SCORER_SUMMARIZE_OP_SOURCE,
+        )
+        summarize_op_res = self.op_create_v2(summarize_op_req)
+        summarize_op_ref = summarize_op_res.digest
+
+        # Create the scorer object
+        scorer_val = object_creation_utils.build_scorer_val(
+            name=req.name,
+            description=req.description,
+            score_op_ref=score_op_ref,
+            summarize_op_ref=summarize_op_ref,
+        )
+        obj_req = tsi.ObjCreateReq(
+            obj=tsi.ObjSchemaForInsert(
+                project_id=req.project_id,
+                object_id=scorer_id,
+                val=scorer_val,
+                wb_user_id=None,
+            )
+        )
+        obj_result = self.obj_create(obj_req)
+
+        # Query the object back to get its version index (this may not be
+        # immediately available, so we retry a few times)
+        obj_read_req = tsi.ObjReadReq(
+            project_id=req.project_id,
+            object_id=scorer_id,
+            digest=obj_result.digest,
+        )
+        obj_read_res = self._obj_read_with_retry(obj_read_req)
+
+        # Get the ref and return the create result
+        scorer_ref = ri.InternalObjectRef(
+            project_id=req.project_id,
+            name=scorer_id,
+            version=obj_result.digest,
+        ).uri()
+        return tsi.ScorerCreateV2Res(
+            digest=obj_result.digest,
+            object_id=scorer_id,
+            version_index=obj_read_res.obj.version_index,
+            scorer=scorer_ref,
+        )
+
+    def scorer_read_v2(self, req: tsi.ScorerReadV2Req) -> tsi.ScorerReadV2Res:
+        """Get a scorer object by delegating to obj_read with retry logic."""
+        obj_req = tsi.ObjReadReq(
+            project_id=req.project_id,
+            object_id=req.object_id,
+            digest=req.digest,
+        )
+        result = self._obj_read_with_retry(obj_req)
+        val = result.obj.val
+
+        # Extract name and description from val data
+        name = val.get("name")
+        description = val.get("description")
+
+        # Create the response with all required fields
+        return tsi.ScorerReadV2Res(
+            object_id=result.obj.object_id,
+            digest=result.obj.digest,
+            version_index=result.obj.version_index,
+            created_at=result.obj.created_at,
+            name=name,
+            description=description,
+            score_op=val.get("score", ""),
+        )
+
+    def scorer_list_v2(self, req: tsi.ScorerListV2Req) -> Iterator[tsi.ScorerReadV2Res]:
+        """List scorer objects by delegating to objs_query with Scorer filtering."""
+        # Query the objects
+        scorer_filter = tsi.ObjectVersionFilter(base_object_classes=["Scorer"])
+        obj_query_req = tsi.ObjQueryReq(
+            project_id=req.project_id,
+            filter=scorer_filter,
+            limit=req.limit,
+            offset=req.offset,
+        )
+        obj_res = self.objs_query(obj_query_req)
+
+        # Yield back the full ScorerReadV2Res for each scorer
+        for obj in obj_res.objs:
+            name = None
+            description = None
+            score_op = ""
+
+            if hasattr(obj, "val") and obj.val:
+                val = obj.val
+                if isinstance(val, dict):
+                    name = val.get("name")
+                    description = val.get("description")
+                    score_op = val.get("score", "")
+
+            yield tsi.ScorerReadV2Res(
+                object_id=obj.object_id,
+                digest=obj.digest,
+                version_index=obj.version_index,
+                created_at=obj.created_at,
+                name=name,
+                description=description,
+                score_op=score_op,
+            )
+
+    def scorer_delete_v2(self, req: tsi.ScorerDeleteV2Req) -> tsi.ScorerDeleteV2Res:
+        """Delete scorer objects by delegating to obj_delete."""
+        obj_delete_req = tsi.ObjDeleteReq(
+            project_id=req.project_id,
+            object_id=req.object_id,
+            digests=req.digests,
+        )
+        result = self.obj_delete(obj_delete_req)
+        return tsi.ScorerDeleteV2Res(num_deleted=result.num_deleted)
+
+    def evaluation_create_v2(
+        self, req: tsi.EvaluationCreateV2Req
+    ) -> tsi.EvaluationCreateV2Res:
+        """Create an evaluation object.
+
+        Creates placeholder ops for evaluate, predict_and_score, and summarize methods.
+        """
+        # Create a safe ID for the evaluation
+        if req.name is None:
+            evaluation_id = "Evaluation"
+        else:
+            evaluation_id = object_creation_utils.make_safe_name(req.name)
+
+        # Create placeholder evaluate op
+        evaluate_op_req = tsi.OpCreateV2Req(
+            project_id=req.project_id,
+            name=f"{evaluation_id}.evaluate",
+            source_code=object_creation_utils.PLACEHOLDER_EVALUATE_OP_SOURCE,
+        )
+        evaluate_op_res = self.op_create_v2(evaluate_op_req)
+        evaluate_ref = evaluate_op_res.digest
+
+        # Create placeholder predict_and_score op
+        predict_and_score_op_req = tsi.OpCreateV2Req(
+            project_id=req.project_id,
+            name=f"{evaluation_id}.predict_and_score",
+            source_code=object_creation_utils.PLACEHOLDER_PREDICT_AND_SCORE_OP_SOURCE,
+        )
+        predict_and_score_op_res = self.op_create_v2(predict_and_score_op_req)
+        predict_and_score_ref = predict_and_score_op_res.digest
+
+        # Create placeholder summarize op
+        summarize_op_req = tsi.OpCreateV2Req(
+            project_id=req.project_id,
+            name=f"{evaluation_id}.summarize",
+            source_code=object_creation_utils.PLACEHOLDER_EVALUATION_SUMMARIZE_OP_SOURCE,
+        )
+        summarize_op_res = self.op_create_v2(summarize_op_req)
+        summarize_ref = summarize_op_res.digest
+
+        # Create the evaluation object
+        evaluation_val = object_creation_utils.build_evaluation_val(
+            name=req.name,
+            dataset_ref=req.dataset,
+            trials=req.trials,
+            description=req.description,
+            scorer_refs=req.scorers,
+            evaluation_name=req.evaluation_name,
+            metadata=None,
+            preprocess_model_input=None,
+            eval_attributes=req.eval_attributes,
+            evaluate_ref=evaluate_ref,
+            predict_and_score_ref=predict_and_score_ref,
+            summarize_ref=summarize_ref,
+        )
+        obj_req = tsi.ObjCreateReq(
+            obj=tsi.ObjSchemaForInsert(
+                project_id=req.project_id,
+                object_id=evaluation_id,
+                val=evaluation_val,
+                wb_user_id=None,
+            )
+        )
+        obj_result = self.obj_create(obj_req)
+
+        # Query the object back to get its version index (this may not be
+        # immediately available, so we retry a few times)
+        obj_read_req = tsi.ObjReadReq(
+            project_id=req.project_id,
+            object_id=evaluation_id,
+            digest=obj_result.digest,
+        )
+        obj_read_res = self._obj_read_with_retry(obj_read_req)
+
+        # Get the ref and return the create result
+        evaluation_ref = ri.InternalObjectRef(
+            project_id=req.project_id,
+            name=evaluation_id,
+            version=obj_result.digest,
+        ).uri()
+        return tsi.EvaluationCreateV2Res(
+            digest=obj_result.digest,
+            object_id=evaluation_id,
+            version_index=obj_read_res.obj.version_index,
+            evaluation_ref=evaluation_ref,
+        )
+
+    def evaluation_read_v2(
+        self, req: tsi.EvaluationReadV2Req
+    ) -> tsi.EvaluationReadV2Res:
+        """Get an evaluation object by delegating to obj_read with retry logic."""
+        obj_req = tsi.ObjReadReq(
+            project_id=req.project_id,
+            object_id=req.object_id,
+            digest=req.digest,
+        )
+        result = self._obj_read_with_retry(obj_req)
+        val = result.obj.val
+
+        # Extract name and description from val data
+        name = val.get("name")
+        description = val.get("description")
+
+        # Create the response with all required fields
+        return tsi.EvaluationReadV2Res(
+            object_id=result.obj.object_id,
+            digest=result.obj.digest,
+            version_index=result.obj.version_index,
+            created_at=result.obj.created_at,
+            name=name,
+            description=description,
+            dataset=val.get("dataset", ""),
+            scorers=val.get("scorers", []),
+            trials=val.get("trials", 1),
+            evaluation_name=val.get("evaluation_name"),
+            evaluate_op=val.get("evaluate", ""),
+            predict_and_score_op=val.get("predict_and_score", ""),
+            summarize_op=val.get("summarize", ""),
+        )
+
+    def evaluation_list_v2(
+        self, req: tsi.EvaluationListV2Req
+    ) -> Iterator[tsi.EvaluationReadV2Res]:
+        """List evaluation objects by delegating to objs_query with Evaluation filtering."""
+        # Query the objects
+        obj_query_req = tsi.ObjQueryReq(
+            project_id=req.project_id,
+            filter=tsi.ObjectVersionFilter(base_object_classes=["Evaluation"]),
+            limit=req.limit,
+            offset=req.offset,
+        )
+        result = self.objs_query(obj_query_req)
+
+        # Yield back a descriptive metadata object for each evaluation
+        for obj in result.objs:
+            val = obj.val if hasattr(obj, "val") and obj.val else {}
+
+            name = val.get("name") if isinstance(val, dict) else None
+            description = val.get("description") if isinstance(val, dict) else None
+
+            yield tsi.EvaluationReadV2Res(
+                object_id=obj.object_id,
+                digest=obj.digest,
+                version_index=obj.version_index,
+                created_at=obj.created_at,
+                name=name,
+                description=description,
+                dataset=val.get("dataset", "") if isinstance(val, dict) else "",
+                scorers=val.get("scorers", []) if isinstance(val, dict) else [],
+                trials=val.get("trials", 1) if isinstance(val, dict) else 1,
+                evaluation_name=val.get("evaluation_name")
+                if isinstance(val, dict)
+                else None,
+                evaluate_op=val.get("evaluate", "") if isinstance(val, dict) else "",
+                predict_and_score_op=val.get("predict_and_score", "")
+                if isinstance(val, dict)
+                else "",
+                summarize_op=val.get("summarize", "") if isinstance(val, dict) else "",
+            )
+
+    def evaluation_delete_v2(
+        self, req: tsi.EvaluationDeleteV2Req
+    ) -> tsi.EvaluationDeleteV2Res:
+        """Delete evaluation objects by delegating to obj_delete."""
+        obj_delete_req = tsi.ObjDeleteReq(
+            project_id=req.project_id,
+            object_id=req.object_id,
+            digests=req.digests,
+        )
+        result = self.obj_delete(obj_delete_req)
+        return tsi.EvaluationDeleteV2Res(num_deleted=result.num_deleted)
+
+    # Model V2 API
+
+    def model_create_v2(self, req: tsi.ModelCreateV2Req) -> tsi.ModelCreateV2Res:
+        """Create a model object.
+
+        Args:
+            req: ModelCreateV2Req containing project_id, name, description, source_code, and attributes
+
+        Returns:
+            ModelCreateV2Res with digest, object_id, version_index, and model_ref
+        """
+        # Store source code as a file
+        source_file_req = tsi.FileCreateReq(
+            project_id=req.project_id,
+            name=object_creation_utils.OP_SOURCE_FILE_NAME,
+            content=req.source_code.encode("utf-8"),
+        )
+        source_file_res = self.file_create(source_file_req)
+
+        # Build the model object value structure
+        model_val = object_creation_utils.build_model_val(
+            name=req.name,
+            description=req.description,
+            source_file_digest=source_file_res.digest,
+            attributes=req.attributes,
+        )
+
+        # Generate object_id based on name
+        safe_name = object_creation_utils.make_safe_name(req.name)
+        object_id = f"model_{safe_name}"
+
+        # Create the object
+        obj_req = tsi.ObjCreateReq(
+            obj=tsi.ObjSchemaForInsert(
+                project_id=req.project_id,
+                object_id=object_id,
+                val=model_val,
+            )
+        )
+        obj_result = self.obj_create(obj_req)
+
+        # Query back to get version_index with retry
+        obj_read_req = tsi.ObjReadReq(
+            project_id=req.project_id,
+            object_id=object_id,
+            digest=obj_result.digest,
+        )
+        obj_read_res = self._obj_read_with_retry(obj_read_req)
+
+        # Build model reference - external adapter will convert to external format
+        model_ref = ri.InternalObjectRef(
+            project_id=req.project_id,
+            name=object_id,
+            version=obj_result.digest,
+        ).uri()
+
+        return tsi.ModelCreateV2Res(
+            digest=obj_result.digest,
+            object_id=object_id,
+            version_index=obj_read_res.obj.version_index,
+            model_ref=model_ref,
+        )
+
+    def model_read_v2(self, req: tsi.ModelReadV2Req) -> tsi.ModelReadV2Res:
+        """Read a model object.
+
+        Args:
+            req: ModelReadV2Req containing project_id, object_id, and digest
+
+        Returns:
+            ModelReadV2Res with all model details
+        """
+        # Read the object
+        obj_read_req = tsi.ObjReadReq(
+            project_id=req.project_id,
+            object_id=req.object_id,
+            digest=req.digest,
+        )
+        obj_read_res = self.obj_read(obj_read_req)
+
+        # Extract model properties from the val dict
+        val = obj_read_res.obj.val
+        name = val.get("name", req.object_id)
+        description = val.get("description")
+
+        # Get source code from file
+        files = val.get("files", {})
+        source_file_digest = files.get(object_creation_utils.OP_SOURCE_FILE_NAME)
+        if not source_file_digest:
+            raise ValueError(f"Model {req.object_id} has no source file")
+
+        file_content_req = tsi.FileContentReadReq(
+            project_id=req.project_id,
+            digest=source_file_digest,
+        )
+        file_content_res = self.file_content_read(file_content_req)
+        source_code = file_content_res.content.decode("utf-8")
+
+        # Extract additional attributes (exclude system fields)
+        excluded_fields = {
+            "_type",
+            "_class_name",
+            "_bases",
+            "name",
+            "description",
+            "files",
+        }
+        attributes = {k: v for k, v in val.items() if k not in excluded_fields}
+
+        return tsi.ModelReadV2Res(
+            object_id=req.object_id,
+            digest=req.digest,
+            version_index=obj_read_res.obj.version_index,
+            created_at=obj_read_res.obj.created_at,
+            name=name,
+            description=description,
+            source_code=source_code,
+            attributes=attributes if attributes else None,
+        )
+
+    def model_list_v2(self, req: tsi.ModelListV2Req) -> Iterator[tsi.ModelReadV2Res]:
+        """List model objects by delegating to objs_query with Model filtering."""
+        obj_query_req = tsi.ObjQueryReq(
+            project_id=req.project_id,
+            filter=tsi.ObjectVersionFilter(base_object_classes=["Model"]),
+            limit=req.limit,
+            offset=req.offset,
+        )
+        obj_query_res = self.objs_query(obj_query_req)
+
+        for obj in obj_query_res.objs:
+            # Build ModelReadV2Res from each object
+            val = obj.val
+            name = val.get("name", obj.object_id)
+            description = val.get("description")
+
+            # Get source code from file
+            files = val.get("files", {})
+            source_file_digest = files.get(object_creation_utils.OP_SOURCE_FILE_NAME)
+            if source_file_digest:
+                file_content_req = tsi.FileContentReadReq(
+                    project_id=req.project_id,
+                    digest=source_file_digest,
+                )
+                file_content_res = self.file_content_read(file_content_req)
+                source_code = file_content_res.content.decode("utf-8")
+            else:
+                source_code = ""
+
+            # Extract additional attributes
+            excluded_fields = {
+                "_type",
+                "_class_name",
+                "_bases",
+                "name",
+                "description",
+                "files",
+            }
+            attributes = {k: v for k, v in val.items() if k not in excluded_fields}
+
+            yield tsi.ModelReadV2Res(
+                object_id=obj.object_id,
+                digest=obj.digest,
+                version_index=obj.version_index,
+                created_at=obj.created_at,
+                name=name,
+                description=description,
+                source_code=source_code,
+                attributes=attributes if attributes else None,
+            )
+
+    def model_delete_v2(self, req: tsi.ModelDeleteV2Req) -> tsi.ModelDeleteV2Res:
+        """Delete model objects by delegating to obj_delete.
+
+        Args:
+            req: ModelDeleteV2Req containing project_id, object_id, and optional digests
+
+        Returns:
+            ModelDeleteV2Res with the number of deleted versions
+        """
+        obj_delete_req = tsi.ObjDeleteReq(
+            project_id=req.project_id,
+            object_id=req.object_id,
+            digests=req.digests,
+        )
+        result = self.obj_delete(obj_delete_req)
+        return tsi.ModelDeleteV2Res(num_deleted=result.num_deleted)
+
+    def _obj_read_with_retry(
+        self, req: tsi.ObjReadReq, max_retries: int = 10, initial_delay: float = 0.05
+    ) -> tsi.ObjReadRes:
+        """Read an object with retry logic to handle race conditions.
+
+        After creating an object, ClickHouse may not immediately make it available
+        for reading due to eventual consistency. This method retries with exponential
+        backoff to handle this race condition.
+
+        Args:
+            req: The object read request
+            max_retries: Maximum number of retry attempts (default 10)
+            initial_delay: Initial delay in seconds (default 0.05, i.e., 50ms)
+
+        Returns:
+            ObjReadRes with the object data
+
+        Raises:
+            NotFoundError: If the object is not found after all retries
+        """
+
+        @retry(
+            stop=stop_after_attempt(max_retries),
+            wait=wait_exponential(multiplier=1, min=initial_delay, max=1.0),
+            retry=retry_if_exception_type(NotFoundError),
+            reraise=True,
+        )
+        def _read() -> tsi.ObjReadRes:
+            return self.obj_read(req)
+
+        return _read()
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._parsed_refs_read_batch")
     def _parsed_refs_read_batch(
@@ -1515,31 +2452,20 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
             req.content[i : i + ch_settings.FILE_CHUNK_SIZE]
             for i in range(0, len(req.content), ch_settings.FILE_CHUNK_SIZE)
         ]
-        self._insert(
-            "files",
-            data=[
-                (
-                    req.project_id,
-                    digest,
-                    i,
-                    len(chunks),
-                    req.name,
-                    chunk,
-                    len(chunk),
-                    None,
+        self._insert_file_chunks(
+            [
+                FileChunkCreateCHInsertable(
+                    project_id=req.project_id,
+                    digest=digest,
+                    chunk_index=i,
+                    n_chunks=len(chunks),
+                    name=req.name,
+                    val_bytes=chunk,
+                    bytes_stored=len(chunk),
+                    file_storage_uri=None,
                 )
                 for i, chunk in enumerate(chunks)
-            ],
-            column_names=[
-                "project_id",
-                "digest",
-                "chunk_index",
-                "n_chunks",
-                "name",
-                "val_bytes",
-                "bytes_stored",
-                "file_storage_uri",
-            ],
+            ]
         )
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._file_create_bucket")
@@ -1550,31 +2476,50 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         target_file_storage_uri = store_in_bucket(
             client, key_for_project_digest(req.project_id, digest), req.content
         )
-        self._insert(
-            "files",
-            data=[
-                (
-                    req.project_id,
-                    digest,
-                    0,
-                    1,
-                    req.name,
-                    b"",
-                    len(req.content),
-                    target_file_storage_uri.to_uri_str(),
+        self._insert_file_chunks(
+            [
+                FileChunkCreateCHInsertable(
+                    project_id=req.project_id,
+                    digest=digest,
+                    chunk_index=0,
+                    n_chunks=1,
+                    name=req.name,
+                    val_bytes=b"",
+                    bytes_stored=len(req.content),
+                    file_storage_uri=target_file_storage_uri.to_uri_str(),
                 )
-            ],
-            column_names=[
-                "project_id",
-                "digest",
-                "chunk_index",
-                "n_chunks",
-                "name",
-                "val_bytes",
-                "bytes_stored",
-                "file_storage_uri",
-            ],
+            ]
         )
+
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._flush_file_chunks")
+    def _flush_file_chunks(self) -> None:
+        if not self._flush_immediately:
+            raise ValueError("File chunks must be flushed immediately")
+        self._insert_file_chunks(self._file_batch)
+        self._file_batch = []
+
+    @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._insert_file_chunks")
+    def _insert_file_chunks(
+        self, file_chunks: list[FileChunkCreateCHInsertable]
+    ) -> None:
+        if not self._flush_immediately:
+            self._file_batch.extend(file_chunks)
+            return
+
+        data = []
+        for chunk in file_chunks:
+            chunk_dump = chunk.model_dump()
+            row = []
+            for col in ALL_FILE_CHUNK_INSERT_COLUMNS:
+                row.append(chunk_dump.get(col, None))
+            data.append(row)
+
+        if data:
+            self._insert(
+                "files",
+                data=data,
+                column_names=ALL_FILE_CHUNK_INSERT_COLUMNS,
+            )
 
     def _should_use_file_storage_for_writes(self, project_id: str) -> bool:
         """Determine if we should use file storage for a project."""
@@ -1996,9 +2941,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # --- Shared setup logic (copy of completions_create up to litellm call)
         model_info = self._model_to_provider_info_map.get(req.inputs.model)
         try:
-            model_name, api_key, provider, base_url, extra_headers, return_type = (
-                _setup_completion_model_info(model_info, req, self.obj_read)
-            )
+            (
+                model_name,
+                api_key,
+                provider,
+                base_url,
+                extra_headers,
+                return_type,
+            ) = _setup_completion_model_info(model_info, req, self.obj_read)
         except Exception as e:
             # Yield error as single chunk then stop.
             def _single_error_iter(e: Exception) -> Iterator[dict[str, str]]:
@@ -2009,12 +2959,14 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
         # Track start call if requested
         start_call: Optional[CallStartCHInsertable] = None
         if req.track_llm_call:
+            inputs = req.inputs.model_dump(exclude_none=True)
+            inputs["model"] = model_name
             start = tsi.StartedCallSchemaForInsert(
                 project_id=req.project_id,
                 wb_user_id=req.wb_user_id,
                 op_name=COMPLETIONS_CREATE_OP_NAME,
                 started_at=datetime.datetime.now(),
-                inputs={**req.inputs.model_dump(exclude_none=True)},
+                inputs={**inputs},
                 attributes={},
             )
             start_call = _start_call_for_insert_to_ch_insertable_start_call(start, self)
@@ -2037,7 +2989,128 @@ class ClickHouseTraceServer(tsi.TraceServerInterface):
 
         # Otherwise, wrap the iterator with tracking
         return _create_tracked_stream_wrapper(
-            self._insert_call, chunk_iter, start_call, model_name, req.project_id
+            self._insert_call,
+            chunk_iter,
+            start_call,
+            model_name,
+            req.project_id,
+        )
+
+    def image_create(
+        self, req: tsi.ImageGenerationCreateReq
+    ) -> tsi.ImageGenerationCreateRes:
+        """Create images using LLM image generation.
+
+        Args:
+            req (tsi.ImageGenerationCreateReq): The image generation request.
+
+        Returns:
+            tsi.ImageGenerationCreateRes: The image generation response.
+        """
+        # Validate input parameters
+        if req.inputs.model is None:
+            return tsi.ImageGenerationCreateRes(
+                response={"error": "No model specified in request"}
+            )
+
+        if req.inputs.prompt is None:
+            return tsi.ImageGenerationCreateRes(
+                response={"error": "No prompt specified in request"}
+            )
+
+        # Get API key from secret fetcher
+        secret_fetcher = _secret_fetcher_context.get()
+        if secret_fetcher is None:
+            logger.error("No secret fetcher available for image generation request")
+            return tsi.ImageGenerationCreateRes(
+                response={
+                    "error": "Unable to access required credentials for image generation"
+                }
+            )
+
+        api_key = (
+            secret_fetcher.fetch("OPENAI_API_KEY")
+            .get("secrets", {})
+            .get("OPENAI_API_KEY")
+        )
+
+        if api_key is None:
+            return tsi.ImageGenerationCreateRes(
+                response={"error": "No OpenAI API key found"}
+            )
+
+        # Now that we have the API key, we can make the API call
+        start_time = datetime.datetime.now()
+
+        try:
+            res = lite_llm_image_generation(
+                api_key=api_key,
+                inputs=req.inputs.model_dump(exclude_none=True),
+                trace_server=self,
+                project_id=req.project_id,
+                wb_user_id=req.wb_user_id,
+            )
+            if "error" in res.response:
+                return tsi.ImageGenerationCreateRes(
+                    response={"error": res.response["error"]}
+                )
+        except Exception as e:
+            return tsi.ImageGenerationCreateRes(
+                response={"error": f"Image generation failed: {e!s}"}
+            )
+
+        end_time = datetime.datetime.now()
+
+        # Return response directly if not tracking calls
+        if req.track_llm_call is False:
+            return res
+
+        # Capture all input fields for call tracking
+        input_data = req.inputs.model_dump(exclude_none=False)
+
+        start = tsi.StartedCallSchemaForInsert(
+            project_id=req.project_id,
+            wb_user_id=req.wb_user_id,
+            op_name=IMAGE_GENERATION_CREATE_OP_NAME,
+            started_at=start_time,
+            inputs=input_data,
+            attributes={},
+        )
+        start_call = _start_call_for_insert_to_ch_insertable_start_call(start)
+
+        end = tsi.EndedCallSchemaForInsert(
+            project_id=req.project_id,
+            id=start_call.id,
+            ended_at=end_time,
+            output=res.response,
+            summary={},
+        )
+
+        if "usage" in res.response:
+            end.summary["usage"] = {req.inputs.model: res.response["usage"]}
+
+        if "error" in res.response:
+            end.exception = res.response["error"]
+
+        end_call = _end_call_for_insert_to_ch_insertable_end_call(end)
+        calls: list[Union[CallStartCHInsertable, CallEndCHInsertable]] = [
+            start_call,
+            end_call,
+        ]
+        batch_data = []
+        for call in calls:
+            call_dict = call.model_dump()
+            values = [call_dict.get(col) for col in ALL_CALL_INSERT_COLUMNS]
+            batch_data.append(values)
+
+        try:
+            self._insert_call_batch(batch_data)
+        except Exception as e:
+            # Log error but don't fail the response
+            print(f"Error inserting call batch for image generation: {e}", flush=True)
+
+        return tsi.ImageGenerationCreateRes(
+            response=res.response, weave_call_id=start_call.id
         )
 
     def evaluate_model(self, req: tsi.EvaluateModelReq) -> tsi.EvaluateModelRes:
@@ -2494,6 +3567,7 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: dict) -> dict:
         "exception": ch_call_dict.get("exception"),
         "wb_run_id": ch_call_dict.get("wb_run_id"),
         "wb_run_step": ch_call_dict.get("wb_run_step"),
+        "wb_run_step_end": ch_call_dict.get("wb_run_step_end"),
         "wb_user_id": ch_call_dict.get("wb_user_id"),
         "display_name": display_name,
         "storage_size_bytes": ch_call_dict.get("storage_size_bytes"),
@@ -2582,6 +3656,7 @@ def _end_call_for_insert_to_ch_insertable_end_call(
         summary_dump=_dict_value_to_dump(dict(end_call.summary)),
         output_dump=_any_value_to_dump(output),
         output_refs=output_refs,
+        wb_run_step_end=end_call.wb_run_step_end,
     )
 
 
@@ -2904,8 +3979,11 @@ def _create_tracked_stream_wrapper(
 
             # Prepare summary and end call
             summary: dict[str, Any] = {}
-            if aggregated_output and "usage" in aggregated_output:
-                summary["usage"] = {model_name: aggregated_output["usage"]}
+            if aggregated_output is not None and model_name is not None:
+                aggregated_output["model"] = model_name
+
+                if "usage" in aggregated_output:
+                    summary["usage"] = {model_name: aggregated_output["usage"]}
 
             end = tsi.EndedCallSchemaForInsert(
                 project_id=project_id,
@@ -2933,11 +4011,14 @@ def _setup_completion_model_info(
     Note: api_key can be None for bedrock providers since they use AWS credentials instead.
     """
     model_name = req.inputs.model
-    api_key = None
-    provider = None
+    api_key: Optional[str] = None
+    provider: str = "openai"  # Default provider
     base_url: Optional[str] = None
     extra_headers: dict[str, str] = {}
     return_type: Optional[str] = None
+
+    # Check for explicit custom provider prefix
+    is_explicit_custom = model_name.startswith("custom::")
 
     is_coreweave = (
         model_info and model_info.get("litellm_provider") == "coreweave"
@@ -2954,6 +4035,59 @@ def _setup_completion_model_info(
             extra_headers = req.inputs.extra_headers
             req.inputs.extra_headers = None
         return_type = "openai"
+    elif is_explicit_custom:
+        # Custom provider path - model_name format: custom::<provider>::<model>
+        # Parse provider and model names, create sanitized object_id for lookup
+        name_part = model_name.replace("custom::", "")
+
+        if "::" in name_part:
+            # Format: custom::<provider>::<model>
+            provider_name, model_name_part = name_part.split("::", 1)
+
+            # Create sanitized object_id to match what was created during provider setup
+
+            sanitized_provider = _sanitize_name_for_object_id(provider_name)
+            sanitized_model = _sanitize_name_for_object_id(model_name_part)
+            sanitized_object_id = f"{sanitized_provider}-{sanitized_model}"
+        else:
+            # Fallback: assume it's already in object_id format
+            # Extract names from object_id (this is a fallback case)
+            parts = name_part.split("-", 1) if "-" in name_part else [name_part, ""]
+            provider_name = parts[0]  # May be sanitized
+            model_name_part = parts[1] if len(parts) > 1 else ""
+            sanitized_provider = provider_name  # Already sanitized
+            sanitized_object_id = name_part
+
+        custom_provider_info = get_custom_provider_info(
+            project_id=req.project_id,
+            provider_name=sanitized_provider,
+            model_name=sanitized_object_id,
+            obj_read_func=obj_read,
+        )
+
+        base_url = custom_provider_info.base_url
+        final_model_name = custom_provider_info.actual_model_name
+        provider_model_name = (
+            f"{provider_name}/{final_model_name}"
+            if "::" in name_part
+            else final_model_name
+        )
+
+        # prefix the model name with "ollama/" if it is an ollama model else with openai/
+        req.inputs.model = (
+            "ollama/" + final_model_name
+            if "ollama" in provider_name.lower()
+            else "openai/" + final_model_name
+        )
+
+        return (
+            provider_model_name,
+            custom_provider_info.api_key,
+            "custom",  # return "custom" as provider
+            base_url,
+            custom_provider_info.extra_headers,
+            custom_provider_info.return_type,
+        )
     elif model_info:
         secret_name = model_info.get("api_key_name")
         if not secret_name:
@@ -2973,25 +4107,16 @@ def _setup_completion_model_info(
                 f"No API key {secret_name} found for model {model_name}",
                 api_key_name=secret_name,
             )
-    else:
-        # Custom provider path
-        custom_provider_info = get_custom_provider_info(
-            project_id=req.project_id,
-            model_name=model_name,
-            obj_read_func=obj_read,
-        )
 
-        base_url = custom_provider_info.base_url
-        api_key = custom_provider_info.api_key
-        extra_headers = custom_provider_info.extra_headers
-        return_type = custom_provider_info.return_type
-        actual_model_name = custom_provider_info.actual_model_name
+    return (
+        model_name,
+        api_key,
+        provider,
+        base_url,
+        extra_headers,
+        return_type,
+    )
 
-        provider = "custom"
-        req.inputs.model = (
-            "ollama/" + actual_model_name
-            if "ollama" in model_name
-            else actual_model_name
-        )
 
-    return model_name, api_key, provider, base_url, extra_headers, return_type
+def _sanitize_name_for_object_id(name: str) -> str:
+    return sub(r"[^a-zA-Z0-9_-]", "_", name)

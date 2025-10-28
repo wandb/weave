@@ -1,6 +1,7 @@
 INFERENCE_HOST = "api.inference.wandb.ai"
 
 COMPLETIONS_CREATE_OP_NAME = "weave.completions_create"
+IMAGE_GENERATION_CREATE_OP_NAME = "weave.image_generation_create"
 
 MAX_DISPLAY_NAME_LENGTH = 1024
 MAX_OP_NAME_LENGTH = 128

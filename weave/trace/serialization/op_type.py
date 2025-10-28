@@ -603,6 +603,7 @@ def save_instance(obj: Op, artifact: MemTraceFilesArtifact, name: str) -> None:
 def load_instance(
     artifact: MemTraceFilesArtifact,
     name: str,
+    val: Any,
 ) -> Op | None:
     file_name = f"{name}.py"
     module_path = artifact.path(file_name)
@@ -612,11 +613,11 @@ def load_instance(
     # the version in the module name to avoid this. Since version names
     # are content hashes, this is correct.
     #
-    art_and_version_dir = module_path[: -(1 + len(file_name))]
-    art_dir, version_subdir = art_and_version_dir.rsplit("/", 1)
+    art_and_version_dir = os.path.dirname(module_path)
+    art_dir, version_subdir = os.path.split(art_and_version_dir)
     module_dir = art_dir
     import_name = (
-        version_subdir + "." + ".".join(os.path.splitext(file_name)[0].split("/"))
+        version_subdir + "." + ".".join(os.path.splitext(file_name)[0].split(os.sep))
     )
 
     sys.path.insert(0, os.path.abspath(module_dir))
