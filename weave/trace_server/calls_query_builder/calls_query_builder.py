@@ -446,9 +446,6 @@ class Condition(BaseModel):
             return sql
 
         use_agg = table_alias == "calls_merged"
-        logger.info(
-            f"Condition.as_sql: table_alias={table_alias}, use_agg_fn={use_agg}"
-        )
         conditions = process_query_to_conditions(
             tsi_query.Query.model_validate({"$expr": {"$and": [self.operand]}}),
             pb,
@@ -701,9 +698,6 @@ class CallsQuery(BaseModel):
             pb, self.project_id, object_ref_conditions
         )
 
-        logger.info(
-            f"---------- Building calls query with project version: {self.project_version}"
-        )
         if self.project_version == ProjectVersion.CALLS_COMPLETE_VERSION:
             # TODO: check if we are hitting the call_start table or the complete table
             qry = self._as_sql_base_format_calls_complete(
@@ -1117,7 +1111,42 @@ class CallsQuery(BaseModel):
             table_alias,
         )
 
+        trace_id_sql = process_trace_id_filter_to_sql(
+            self.hardcoded_filter,
+            pb,
+            table_alias,
+        )
+        trace_roots_only_sql = process_trace_roots_only_filter_to_sql(
+            self.hardcoded_filter,
+            pb,
+            table_alias,
+        )
+
+        filtered_call_cte = f"""
+        WITH filtered_calls AS (
+            SELECT id FROM calls_complete
+            WHERE project_id = {project_param_slot}
+            {trace_id_sql}
+            {trace_roots_only_sql}
+            {filter_sql}
+            {order_by_sql}
+            {limit_sql}
+            {offset_sql}
+        )
+        """
+        if (
+            "inputs_dump" not in select_fields_sql
+            and "output_dump" not in select_fields_sql
+        ):
+            filtered_call_cte = ""
+            filter = filter_sql
+        else:
+            filter = f"AND {table_alias}.id IN (SELECT id FROM filtered_calls)"
+            limit_sql = ""
+            offset_sql = ""
+
         raw_sql = f"""
+        {filtered_call_cte}
         SELECT {select_fields_sql}
         FROM {table_alias}
         {feedback_join_sql}
@@ -1125,7 +1154,9 @@ class CallsQuery(BaseModel):
         {total_storage_size_sql}
         {object_ref_joins_sql}
         WHERE {table_alias}.project_id = {project_param_slot}
-        {filter_sql}
+            {trace_id_sql}
+            {trace_roots_only_sql}
+            {filter}
         {order_by_sql}
         {limit_sql}
         {offset_sql}

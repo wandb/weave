@@ -65,7 +65,7 @@ class ProjectVersionResolver(ProjectVersionService):
             maxsize=PER_REPLICA_CACHE_SIZE
         )
         self._mode = ProjectVersionMode.from_env()
-        logger.info(f"ProjectVersionResolver initialized with mode: {self._mode.value}")
+        # logger.info(f"ProjectVersionResolver initialized with mode: {self._mode.value}")
 
     async def get_project_version(
         self, project_id: str, is_write: bool = False

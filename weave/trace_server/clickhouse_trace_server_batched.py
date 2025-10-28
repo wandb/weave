@@ -446,13 +446,17 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         trace_ids = []
         if project_version == ProjectVersion.CALLS_MERGED_VERSION:
             # New sdk writing to old project
+            # Need to use the same conversion as call_starts to properly handle
+            # OTEL attributes and convert fields like inputs/attributes to _dump format
             batch_data = []
             for call in req.items:
-                assert call.id is not None
-                assert call.trace_id is not None
-                ids.append(call.id)
-                trace_ids.append(call.trace_id)
-                call_dict = call.model_dump()
+                # Convert to V1 insertable which properly transforms inputs/attributes to _dump format
+                ch_call = _start_call_to_v1_ch_insertable(call)
+                assert ch_call.id is not None
+                assert ch_call.trace_id is not None
+                ids.append(ch_call.id)
+                trace_ids.append(ch_call.trace_id)
+                call_dict = ch_call.model_dump()
                 values = [
                     call_dict.get(
                         col, [] if col in ("input_refs", "output_refs") else None
@@ -506,9 +510,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
 
         if project_version == ProjectVersion.CALLS_MERGED_VERSION:
             # New sdk writing to old project
+            # Need to use the same conversion as calls_complete to properly handle
+            # OTEL attributes and convert fields like inputs/attributes to _dump format
             batch_data = []
             for call in req.items:
-                call_dict = call.model_dump()
+                # Convert to V1 insertable which properly transforms inputs/attributes/output to _dump format
+                ch_call = _complete_call_to_v1_ch_insertable(call, self)
+                call_dict = ch_call.model_dump()
                 values = [
                     call_dict.get(
                         col, [] if col in ("input_refs", "output_refs") else None
@@ -563,9 +571,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if self._project_version_service is not None:
             project_version = self._project_version_service.get_project_version_sync(
                 req.project_id, is_write=False
-            )
-            logger.info(
-                f"---------- [calls_query_stats] Project version: {project_version}"
             )
         query, columns = build_calls_stats_query(
             req, pb, table_alias=table_name, project_version=project_version
@@ -879,10 +884,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 )
                 deleted_rows = res.summary.get("written_rows", 0)
                 total_deleted += deleted_rows
-                logger.info(
-                    f"Deleted {deleted_rows} rows from {table}. "
-                    f"Total deleted: {total_deleted}/{target_count}"
-                )
+                # logger.info(
+                #     f"Deleted {deleted_rows} rows from {table}. "
+                #     f"Total deleted: {total_deleted}/{target_count}"
+                # )
 
                 # If we've deleted all the calls, return early
                 if total_deleted >= target_count:
@@ -893,10 +898,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 logger.exception(f"Error deleting calls from {table}")
                 continue
 
-        if total_deleted < target_count:
-            logger.warning(
-                f"Failed to delete all calls. Deleted {total_deleted}/{target_count} calls. "
-            )
+        # if total_deleted < target_count:
+        # logger.warning(
+        #     f"Failed to delete all calls. Deleted {total_deleted}/{target_count} calls. "
+        # )
 
     def _ensure_valid_update_field(self, req: tsi.CallUpdateReq) -> None:
         valid_update_fields = ["display_name"]
@@ -3435,14 +3440,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             ) as stream:
                 if isinstance(stream.source, QueryResult):
                     summary = stream.source.summary
-                # logger.info(
-                #     "clickhouse_stream_query",
-                #     extra={
-                #         "query": query,
-                #         "parameters": parameters,
-                #         "summary": summary,
-                #     },
-                # )
+                logger.info(
+                    "clickhouse_stream_query",
+                    extra={
+                        "query": query,
+                        "parameters": parameters,
+                        "summary": summary,
+                    },
+                )
                 yield from stream
         except Exception as e:
             logger.exception(
@@ -3678,8 +3683,24 @@ def _num_bytes(data: Any) -> int:
 
 
 def _dict_value_to_dump(
-    value: dict,
+    value: Optional[dict],
 ) -> str:
+    """Convert a dict to a JSON string dump.
+
+    Args:
+        value: Dict to serialize, or None.
+
+    Returns:
+        str: JSON serialized string, or "{}" if value is None.
+
+    Examples:
+        >>> _dict_value_to_dump({"key": "value"})
+        '{"key": "value"}'
+        >>> _dict_value_to_dump(None)
+        '{}'
+    """
+    if value is None:
+        return "{}"
     if not isinstance(value, dict):
         raise TypeError(f"Value is not a dict: {value}")
     return json.dumps(value)
@@ -3751,8 +3772,10 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: dict) -> dict:
         "op_name": ch_call_dict.get("op_name"),
         "started_at": started_at,
         "ended_at": ended_at,
-        "attributes": _dict_dump_to_dict(ch_call_dict.get("attributes_dump", "{}")),
-        "inputs": _dict_dump_to_dict(ch_call_dict.get("inputs_dump", "{}")),
+        "attributes": _dict_dump_to_dict(
+            ch_call_dict.get("attributes_dump", "{}") or "{}"
+        ),
+        "inputs": _dict_dump_to_dict(ch_call_dict.get("inputs_dump", "{}") or "{}"),
         "output": _nullable_any_dump_to_any(ch_call_dict.get("output_dump")),
         "summary": make_derived_summary_fields(
             summary=summary or {},

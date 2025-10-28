@@ -3,6 +3,8 @@
 import logging
 from typing import Any
 
+import ddtrace
+
 from weave.trace_server.calls_query_builder.utils import param_slot
 from weave.trace_server.orm import ParamBuilder
 from weave.trace_server.project_version.types import ProjectVersion
@@ -32,6 +34,7 @@ class ClickHouseProjectVersionProvider:
     def __init__(self, ch_client: Any):
         self._ch = ch_client
 
+    @ddtrace.tracer.wrap(name="clickhouse_project_version_provider.get_project_version")
     async def get_project_version(
         self, project_id: str, is_write: bool = False
     ) -> ProjectVersion:
@@ -64,10 +67,16 @@ class ClickHouseProjectVersionProvider:
             has_complete = row[0]
             has_merged = row[1]
 
-            print(f"{has_complete=} {has_merged=}")
+            # print(f"{has_complete=} {has_merged=}")
+
+            root_span = ddtrace.tracer.current_root_span()
+            if root_span:
+                root_span.set_tags(
+                    {"has_complete": has_complete, "has_merged": has_merged}
+                )
 
             if has_complete and has_merged:
-                logger.warning(
+                raise ValueError(
                     f"Project {project_id} has traces in both calls_complete and calls_merged!"
                 )
 
