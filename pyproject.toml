@@ -37,7 +37,7 @@ dynamic = ["version"]
 dependencies = [
   "wandb>=0.17.1",
   "sentry-sdk>=2.0.0,<3.0.0",
-  "pydantic>=2.0.0,<2.12.0",
+  "pydantic>=2.0.0",
   "packaging>=21.0",                      # For version parsing in integrations
   "tenacity>=8.3.0,!=8.4.0",              # Excluding 8.4.0 because it had a bug on import of AsyncRetrying
   "click",                                # Used for terminal/stdio printing
@@ -94,13 +94,6 @@ trace_server_tests = [
   "moto[s3]>=5.0.0",
   "openai<1.100.0",
 ]
-docs = [
-  "playwright",
-  "lazydocs",
-  "nbformat",
-  "nbconvert",
-  "weave[trace_server]",
-]
 video_support = ["moviepy<=1.0.3"]
 anthropic = ["anthropic>=0.18.0"]
 cerebras = ["cerebras-cloud-sdk"]
@@ -119,7 +112,7 @@ smolagents = [
   "openai>=1.99.9,<1.100.0",
   "litellm>=1.58",
   "smolagents>=1.17.0,<1.19.0",
-  "huggingface-hub>=0.28.1",
+  "huggingface-hub>=0.28.1,<1.0.0",
   "SQLAlchemy>=2.0.38",
 ]
 instructor = [
@@ -138,7 +131,7 @@ langchain = [
   "langchain-cohere>=0.4.5",
   "langchain-litellm>=0.2.2",
   "chromadb>=0.5.0",
-  "pysqlite3; platform_system != 'Windows'",
+  "pysqlite3; platform_system == 'Linux'",
   "opentelemetry-exporter-otlp",
   "openai>=1.99.9,<1.100.0",
 ]
@@ -251,7 +244,6 @@ exclude = [
   "weave_query",
   "examples",
   "tests",
-  "docs",
   "dev_docs",
   "weave/clear_cache.py",
   "weave/trace_server/model_providers",
@@ -391,7 +383,7 @@ module = "weave_query.*"
 ignore_errors = true
 
 [tool.bumpversion]
-current_version = "0.52.11-dev0"
+current_version = "0.52.12-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.
