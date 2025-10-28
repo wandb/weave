@@ -1,0 +1,50 @@
+name: 🐛 Bug Report
+description: Use this template to report a bug in Weave.
+title: "[Bug]: "
+labels:
+  - "bug"
+
+body:
+  - type: markdown
+    attributes:
+      value: >
+        **Thanks :heart: for taking the time to fill out this bug report!** We kindly ask that you search to see if an
+        issue [already exists](https://github.com/wandb/weave/issues?q=is%3Aissue+sort%3Acreated-desc+) for the bug you
+        encountered.
+
+  - type: textarea
+    attributes:
+      label: Describe the bug
+      description: >
+        A clear and concise description of the issue you're experiencing. If relevant, add minimal code to reproduce
+        the bug, and any error messages you're seeing. Please include the following information:
+
+        - The version of the Weave package you are using.
+
+        - The version of Python you are using.
+
+        - The version of the operating system you are using.
+      value: |
+        <!--- Describe your issue here --->
+    validations:
+      required: true
+
+  - type: input
+    attributes:
+      label: Weave Project Link
+      description: >
+        If applicable, please provide a link to your Weave project (e.g., https://wandb.ai/your-entity/your-project/weave).
+        This helps us understand the context and investigate the issue more effectively.
+      placeholder: "https://wandb.ai/entity/project/weave"
+    validations:
+      required: false
+
+  - type: textarea
+    attributes:
+      label: Screenshots
+      description: >
+        If applicable, add screenshots to help explain your problem. You can drag and drop images here or paste them
+        directly into this field.
+      placeholder: "Drag and drop screenshots here or paste image URLs"
+    validations:
+      required: false
