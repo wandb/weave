@@ -921,7 +921,7 @@ class EvaluationLogger(BaseModel):
 
     def log_example(
         self, inputs: dict[str, Any], output: Any, scores: dict[str, ScoreType]
-    ) -> ScoreLogger:
+    ) -> None:
         """Log a complete example with inputs, output, and scores.
 
         This is a convenience method that combines log_prediction and log_score
@@ -931,9 +931,6 @@ class EvaluationLogger(BaseModel):
             inputs: The input data for the prediction
             output: The output value
             scores: Dictionary mapping scorer names to score values
-
-        Returns:
-            ScoreLogger: The score logger for the prediction
 
         Example:
         ```python
@@ -960,8 +957,6 @@ class EvaluationLogger(BaseModel):
 
         # Finish the prediction
         pred.finish()
-
-        return pred
 
     def log_summary(
         self,
