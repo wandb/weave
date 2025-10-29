@@ -129,7 +129,6 @@
           "title": "Description"
         },
         "field_schema": {
-          "additionalProperties": true,
           "default": {},
           "description": "Expected to be valid JSON Schema. Can be provided as a dict, a Pydantic model class, a tuple of a primitive type and a Pydantic Field, or primitive type",
           "examples": [
@@ -613,6 +612,9 @@
         "action_type": {
           "const": "contains_words",
           "default": "contains_words",
+          "enum": [
+            "contains_words"
+          ],
           "title": "Action Type",
           "type": "string"
         },
@@ -1141,6 +1143,7 @@
       "type": "object"
     },
     "LLMStructuredCompletionModelDefaultParams": {
+      "description": "Default parameters for LLMStructuredCompletionModel.\n\nAttributes:\n    messages_template: A list of Messages to use as a template. Messages can contain\n        template variables using {variable_name} syntax. These will be substituted\n        when predict() is called with template_vars.\n    prompt_ref: A reference string to a MessagesPrompt object. If provided, this takes\n        precedence over messages_template. The referenced prompt's format() method will\n        be used to generate messages with template variable substitution.\n        Example: \"weave:///entity/project/object/my_prompt:latest\"",
       "properties": {
         "messages_template": {
           "anyOf": [
@@ -1156,6 +1159,18 @@
           ],
           "default": null,
           "title": "Messages Template"
+        },
+        "prompt_ref": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Prompt Ref"
         },
         "temperature": {
           "anyOf": [
@@ -1248,7 +1263,6 @@
           "anyOf": [
             {
               "items": {
-                "additionalProperties": true,
                 "type": "object"
               },
               "type": "array"
@@ -1403,6 +1417,9 @@
         "action_type": {
           "const": "llm_judge",
           "default": "llm_judge",
+          "enum": [
+            "llm_judge"
+          ],
           "title": "Action Type",
           "type": "string"
         },
@@ -1419,7 +1436,6 @@
           "type": "string"
         },
         "response_schema": {
-          "additionalProperties": true,
           "title": "Response Schema",
           "type": "object"
         }
@@ -1446,7 +1462,6 @@
             },
             {
               "items": {
-                "additionalProperties": true,
                 "type": "object"
               },
               "type": "array"
@@ -1473,7 +1488,6 @@
         "function_call": {
           "anyOf": [
             {
-              "additionalProperties": true,
               "type": "object"
             },
             {
@@ -1572,7 +1586,7 @@
           "type": "string"
         },
         "_digest": {
-          "title": "Digest",
+          "title": " Digest",
           "type": "string"
         },
         "_extra": {
@@ -1580,7 +1594,7 @@
           "items": {
             "type": "string"
           },
-          "title": "Extra",
+          "title": " Extra",
           "type": "array"
         }
       },
@@ -1710,7 +1724,11 @@
           "type": "object"
         },
         "return_type": {
-          "$ref": "#/$defs/ProviderReturnType",
+          "allOf": [
+            {
+              "$ref": "#/$defs/ProviderReturnType"
+            }
+          ],
           "default": "openai"
         }
       },
@@ -1764,6 +1782,7 @@
       "type": "object"
     },
     "ProviderReturnType": {
+      "const": "openai",
       "enum": [
         "openai"
       ],

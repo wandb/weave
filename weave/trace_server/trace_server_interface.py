@@ -352,6 +352,8 @@ class CompletionsCreateRequestInputs(BaseModel):
     functions: Optional[list] = None
     function_call: Optional[str] = None
     api_version: Optional[str] = None
+    # Weave-specific params
+    prompt_ref: Optional[str] = None
 
 
 class CompletionsCreateReq(BaseModelStrict):

@@ -103,6 +103,7 @@ from weave.trace_server.llm_completion import (
     get_custom_provider_info,
     lite_llm_completion,
     lite_llm_completion_stream,
+    resolve_prompt_ref_messages,
 )
 from weave.trace_server.methods.evaluation_status import evaluation_status
 from weave.trace_server.model_providers.model_providers import (
@@ -1913,13 +1914,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 dataset=val.get("dataset", "") if isinstance(val, dict) else "",
                 scorers=val.get("scorers", []) if isinstance(val, dict) else [],
                 trials=val.get("trials", 1) if isinstance(val, dict) else 1,
-                evaluation_name=val.get("evaluation_name")
-                if isinstance(val, dict)
-                else None,
+                evaluation_name=(
+                    val.get("evaluation_name") if isinstance(val, dict) else None
+                ),
                 evaluate_op=val.get("evaluate", "") if isinstance(val, dict) else "",
-                predict_and_score_op=val.get("predict_and_score", "")
-                if isinstance(val, dict)
-                else "",
+                predict_and_score_op=(
+                    val.get("predict_and_score", "") if isinstance(val, dict) else ""
+                ),
                 summarize_op=val.get("summarize", "") if isinstance(val, dict) else "",
             )
 
@@ -2673,6 +2674,26 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def completions_create(
         self, req: tsi.CompletionsCreateReq
     ) -> tsi.CompletionsCreateRes:
+        # --- Resolve prompt_ref if provided and prepend messages
+        prompt_ref = getattr(req.inputs, "prompt_ref", None)
+        initial_messages = getattr(req.inputs, "messages", None)
+
+        if prompt_ref:
+            try:
+                prompt_messages = resolve_prompt_ref_messages(
+                    prompt_ref=prompt_ref,
+                    project_id=req.project_id,
+                    obj_read_func=self.obj_read,
+                )
+
+                # Prepend prompt messages to the existing messages
+                existing_messages = req.inputs.messages or []
+                req.inputs.messages = prompt_messages + existing_messages
+            except Exception as e:
+                return tsi.CompletionsCreateRes(
+                    response={"error": f"Failed to resolve prompt_ref: {e!s}"}
+                )
+
         # Use shared setup logic
         model_info = self._model_to_provider_info_map.get(req.inputs.model)
         try:
@@ -2685,10 +2706,15 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # Now that we have all the fields for both cases, we can make the API call
         start_time = datetime.datetime.now()
 
+        # Make a copy of inputs for the API call without prompt_ref
+        api_inputs = req.inputs.model_copy()
+        if hasattr(api_inputs, "prompt_ref"):
+            api_inputs.prompt_ref = None
+
         # Make the API call
         res = lite_llm_completion(
             api_key=api_key,
-            inputs=req.inputs,
+            inputs=api_inputs,
             provider=provider,
             base_url=base_url,
             extra_headers=extra_headers,
@@ -2700,6 +2726,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if not req.track_llm_call:
             return tsi.CompletionsCreateRes(response=res.response)
 
+        req.inputs.messages = initial_messages
         start = tsi.StartedCallSchemaForInsert(
             project_id=req.project_id,
             wb_user_id=req.wb_user_id,
@@ -2750,6 +2777,25 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         ``track_llm_call`` is True we emit a call_start record immediately and
         a call_end record once the stream finishes (successfully or not).
         """
+        # --- Resolve prompt_ref if provided and prepend messages
+        prompt_ref = getattr(req.inputs, "prompt_ref", None)
+        prompt_messages = []
+        initial_messages = getattr(req.inputs, "messages", None)
+
+        if prompt_ref:
+            try:
+                prompt_messages = resolve_prompt_ref_messages(
+                    prompt_ref=prompt_ref,
+                    project_id=req.project_id,
+                    obj_read_func=self.obj_read,
+                )
+            except Exception as e:
+                # Return an error iterator
+                def error_stream() -> Iterator[dict[str, str]]:
+                    yield {"error": f"Failed to resolve prompt_ref: {e!s}"}
+
+                return error_stream()
+
         # --- Shared setup logic (copy of completions_create up to litellm call)
         model_info = self._model_to_provider_info_map.get(req.inputs.model)
         try:
@@ -2762,17 +2808,18 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 return_type,
             ) = _setup_completion_model_info(model_info, req, self.obj_read)
         except Exception as e:
-            # Yield error as single chunk then stop.
-            def _single_error_iter(e: Exception) -> Iterator[dict[str, str]]:
+            # Return an error iterator
+            def error_stream() -> Iterator[dict[str, str]]:
                 yield {"error": str(e)}
 
-            return _single_error_iter(e)
+            return error_stream()
 
         # Track start call if requested
         start_call: Optional[CallStartCHInsertable] = None
         if req.track_llm_call:
             inputs = req.inputs.model_dump(exclude_none=True)
             inputs["model"] = model_name
+            inputs["messages"] = initial_messages
             start = tsi.StartedCallSchemaForInsert(
                 project_id=req.project_id,
                 wb_user_id=req.wb_user_id,
@@ -2785,10 +2832,18 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             # Insert immediately so that callers can see the call in progress
             self._insert_call(start_call)
 
+        # Prepare messages for LiteLLM (with prompt messages prepended)
+        req.inputs.messages = initial_messages + prompt_messages
+
+        # Make a copy for the API call without prompt_ref
+        api_inputs = req.inputs.model_copy()
+        if hasattr(api_inputs, "prompt_ref"):
+            api_inputs.prompt_ref = None
+
         # --- Build the underlying chunk iterator
         chunk_iter = lite_llm_completion_stream(
             api_key=api_key or "",
-            inputs=req.inputs,
+            inputs=api_inputs,
             provider=provider,
             base_url=base_url,
             extra_headers=extra_headers,

@@ -7,6 +7,7 @@ from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.errors import (
     InvalidRequest,
     MissingLLMApiKeyError,
+    NotFoundError,
 )
 from weave.trace_server.interface.builtin_object_classes.provider import (
     Provider,
@@ -15,6 +16,75 @@ from weave.trace_server.interface.builtin_object_classes.provider import (
 from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 
 NOVA_MODELS = ("nova-pro-v1", "nova-lite-v1", "nova-micro-v1")
+
+
+def resolve_prompt_ref_messages(
+    prompt_ref: str,
+    project_id: str,
+    obj_read_func: Callable[[tsi.ObjReadReq], tsi.ObjReadRes],
+) -> list[dict[str, Any]]:
+    """Resolve a prompt reference to its messages.
+
+    Args:
+        prompt_ref: The prompt reference (e.g., "prompt-name:v2")
+        project_id: The project ID
+        obj_read_func: Function to read objects from the database
+
+    Returns:
+        List of messages from the prompt
+    """
+    # Parse the prompt_ref to extract object_id and digest
+    # Format can be:
+    # 1. Full weave URI: "weave:///entity/project/object/name:digest"
+    # 2. Simple format: "object_id:digest" or "object_id:vN"
+
+    if prompt_ref.startswith("weave:///"):
+        # Parse weave URI: weave:///entity/project/object/name:digest
+        import re
+
+        match = re.match(r"weave:///[^/]+/[^/]+/object/([^:]+):(.+)", prompt_ref)
+        if match:
+            object_id = match.group(1)
+            version = match.group(2)  # This will be the digest
+        else:
+            raise InvalidRequest(f"Invalid weave URI format: {prompt_ref}")
+    elif ":" in prompt_ref:
+        object_id, version = prompt_ref.rsplit(":", 1)
+    else:
+        object_id = prompt_ref
+        version = "latest"
+
+    # Fetch the prompt object
+    try:
+        prompt_obj_req = tsi.ObjReadReq(
+            project_id=project_id,
+            object_id=object_id,
+            digest=version,
+            metadata_only=False,
+        )
+        prompt_obj_res = obj_read_func(prompt_obj_req)
+
+        if prompt_obj_res.obj is None:
+            raise NotFoundError(f"Could not find prompt with ref {prompt_ref}")
+
+        # Extract messages from the prompt object
+        prompt_val = prompt_obj_res.obj.val
+
+        if not isinstance(prompt_val, dict):
+            raise InvalidRequest(f"Prompt {prompt_ref} has invalid format")
+
+        messages = prompt_val.get("messages", [])
+
+        if not isinstance(messages, list):
+            raise InvalidRequest(f"Prompt {prompt_ref} messages field is not a list")
+
+        return messages
+    except NotFoundError:
+        raise
+    except Exception as e:
+        raise InvalidRequest(
+            f"Failed to resolve prompt reference {prompt_ref}: {e!s}"
+        ) from e
 
 
 def lite_llm_completion(
