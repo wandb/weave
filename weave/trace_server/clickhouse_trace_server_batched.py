@@ -227,11 +227,17 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         return self._kafka_producer
 
     def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
+        assert_non_null_wb_user_id(req)
+        user_id = req.wb_user_id
+
         if not isinstance(req.traces, ExportTraceServiceRequest):
             raise TypeError(
                 "Expected traces as ExportTraceServiceRequest, got {type(req.traces)}"
             )
         calls: list[Union[tsi.CallBatchStartMode, tsi.CallBatchEndMode]] = []
+        # Track unique op names seen in this batch so we can ensure
+        # an Op object exists for each OTEL-derived op.
+
         rejected_spans = 0
         error_messages: list[str] = []
         for proto_resource_spans in req.traces.resource_spans:
@@ -263,16 +269,39 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         wb_user_id=req.wb_user_id,
                         wb_run_id=req.wb_run_id,
                     )
+                    # Record op name for Op creation (uses shortened op_name)
+                    if start_call.op_name:
+                        self.op_create_v2(
+                            tsi.OpCreateV2Req(
+                                project_id=req.project_id,
+                                name=start_call.op_name,
+                                wb_user_id=user_id,
+                                source_code=None,
+                            )
+                        )
                     calls.extend(
                         [
-                            tsi.CallBatchStartMode(
-                                req=tsi.CallStartReq(start=start_call)
-                            ),
+                            tsi.CallBatchStartMode(req=tsi.CallStartReq(start=start_call)),
                             tsi.CallBatchEndMode(req=tsi.CallEndReq(end=end_call)),
                         ]
                     )
         # TODO: Actually populate the error fields if call_start_batch fails
         self.call_start_batch(tsi.CallCreateBatchReq(batch=calls))
+
+        # Ensure Ops exist for all OTEL span op names using a single query.
+        # if seen_op_names:
+        #     try:
+        #         existing_res = self.objs_query(
+        #             tsi.ObjQueryReq(
+        #                 project_id=req.project_id,
+        #                 filter=tsi.ObjectVersionFilter(
+        #                     object_ids=list(seen_op_names),
+        #                     is_op=True,
+        #                     latest_only=True,
+        #                 ),
+        #                 metadata_only=True,
+        #             )
+        #         )
         if rejected_spans > 0:
             # Join the first 20 errors and return them delimited by ';'
             joined_errors = "; ".join(error_messages[:20]) + (
