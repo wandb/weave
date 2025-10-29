@@ -269,16 +269,44 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         wb_user_id=req.wb_user_id,
                         wb_run_id=req.wb_run_id,
                     )
-                    # Record op name for Op creation (uses shortened op_name)
-                    if start_call.op_name:
-                        self.op_create_v2(
+
+                    # Create a deterministic Op version based on the full otel_span
+                    try:
+                        # TODO: Validate behavior when op name is not safe
+                        op_object_id = object_creation_utils.make_safe_name(start_call.op_name)
+                        op_create_res = self.op_create_v2(
                             tsi.OpCreateV2Req(
                                 project_id=req.project_id,
-                                name=start_call.op_name,
+                                name=op_object_id,
                                 wb_user_id=user_id,
                                 source_code=None,
                             )
                         )
+                        op_ref_uri = ri.InternalOpRef(
+                            project_id=req.project_id,
+                            name=op_object_id,
+                            version=op_create_res.digest,
+                        ).uri()
+                        start_call.op_name = op_ref_uri
+
+                    except Exception as e:
+                        # Record and skip malformed spans so we can partially accept the batch
+                        rejected_spans += 1
+                        # Use data available on the proto span for context
+                        try:
+                            trace_id = proto_span.trace_id.hex()
+                            span_id = proto_span.span_id.hex()
+                            name = getattr(proto_span, "name", "")
+                        except Exception:
+                            trace_id = ""
+                            span_id = ""
+                            name = ""
+                        span_ident = (
+                            f"name='{name}' trace_id='{trace_id}' span_id='{span_id}'"
+                        )
+                        error_messages.append(f"Rejected span ({span_ident}): {e!s}")
+                        continue
+
                     calls.extend(
                         [
                             tsi.CallBatchStartMode(req=tsi.CallStartReq(start=start_call)),
@@ -288,20 +316,6 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # TODO: Actually populate the error fields if call_start_batch fails
         self.call_start_batch(tsi.CallCreateBatchReq(batch=calls))
 
-        # Ensure Ops exist for all OTEL span op names using a single query.
-        # if seen_op_names:
-        #     try:
-        #         existing_res = self.objs_query(
-        #             tsi.ObjQueryReq(
-        #                 project_id=req.project_id,
-        #                 filter=tsi.ObjectVersionFilter(
-        #                     object_ids=list(seen_op_names),
-        #                     is_op=True,
-        #                     latest_only=True,
-        #                 ),
-        #                 metadata_only=True,
-        #             )
-        #         )
         if rejected_spans > 0:
             # Join the first 20 errors and return them delimited by ';'
             joined_errors = "; ".join(error_messages[:20]) + (
@@ -348,7 +362,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         # This does validation and conversion of the input data as well
         # as enforcing business rules and defaults
 
-        req = process_call_req_to_content(req, self)
+        # req = process_call_req_to_content(req, self)
         ch_call = _start_call_for_insert_to_ch_insertable_start_call(req.start, self)
 
         # Inserts the call into the clickhouse database, verifying that
