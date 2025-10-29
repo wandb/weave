@@ -16,18 +16,17 @@ class ComparisonViewDefinition(BaseModel):
 
     Args:
         evaluation_call_ids (List[str]): List of evaluation call IDs being compared.
-        selected_metrics (Optional[Dict[str, bool]]): Which metrics are visible in plots.
-            Keys are metric names, values indicate visibility (True=visible, False=hidden).
+        selected_metrics (Optional[List[str]]): List of metrics that are visible in plots.
 
     Examples:
         >>> definition = ComparisonViewDefinition(
         ...     evaluation_call_ids=["call_1", "call_2"],
-        ...     selected_metrics={"accuracy": True, "precision": False}
+        ...     selected_metrics=["accuracy", "f1_score"]
         ... )
     """
 
     evaluation_call_ids: list[str]
-    selected_metrics: Optional[dict[str, bool]] = None
+    selected_metrics: Optional[list[str]] = None
 
 
 class ComparisonView(base_object_def.BaseObject):
