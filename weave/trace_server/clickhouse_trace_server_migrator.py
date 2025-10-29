@@ -241,12 +241,12 @@ class ClickHouseTraceServerMigrator:
             logger.warning(
                 f"Automatically running down migrations is disabled and should be done manually. Current version ({current_version}) is greater than target version ({target_version})."
             )
-            # res = []
-            # for i in range(current_version, target_version, -1):
-            #     if migration_map[i]["down"] is None:
-            #         raise MigrationError(f"Missing down migration file for version {i}")
-            #     res.append((i - 1, f"{migration_map[i]['down']}"))
-            # return res
+            res = []
+            for i in range(current_version, target_version, -1):
+                if migration_map[i]["down"] is None:
+                    raise MigrationError(f"Missing down migration file for version {i}")
+                res.append((i - 1, f"{migration_map[i]['down']}"))
+            return res
 
         return []
 

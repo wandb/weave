@@ -38,7 +38,8 @@ CREATE TABLE calls_complete (
     -- Minmax for range searches
     INDEX idx_ended_at ended_at TYPE minmax GRANULARITY 1
 ) ENGINE = MergeTree
-ORDER BY (project_id, started_at DESC, id);
+ORDER BY (project_id, started_at DESC, id)
+SETTINGS allow_experimental_reverse_key=1;
 
 CREATE TABLE call_starts (
     id              String,
@@ -69,7 +70,9 @@ CREATE TABLE call_starts (
     INDEX idx_id id TYPE bloom_filter GRANULARITY 1,
     INDEX idx_op_name op_name TYPE ngrambf_v1(3, 10000, 3, 7) GRANULARITY 1
 ) ENGINE = MergeTree
-ORDER BY (project_id, started_at DESC, id);
+ORDER BY (project_id, started_at DESC, id)
+SETTINGS allow_experimental_reverse_key=1;
+
 
 CREATE TABLE calls_complete_stats
 (

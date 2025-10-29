@@ -17,10 +17,7 @@ from weave.trace_server.project_version.redis_provider import (
 )
 from weave.trace_server.project_version.types import ProjectVersion
 
-# We only set the cache after getting the source of truth, its okay if this
-# stays around forever.
 PER_REPLICA_CACHE_SIZE = 10_000
-
 
 logger = logging.getLogger(__name__)
 
@@ -29,10 +26,9 @@ class ProjectVersionResolver(ProjectVersionService):
     """Resolves project versions by trying providers in explicit order.
 
     Provider order (fastest to slowest):
-        1. In-memory cache (5 min TTL)
+        1. In-memory cache
         2. Redis cache (if enabled)
-        3. Gorilla MySQL config (if available)
-        4. ClickHouse fallback (checks for calls_complete rows)
+        3. ClickHouse fallback (checks for calls_complete rows)
 
     Args:
         ch_client: ClickHouse client.
@@ -54,18 +50,48 @@ class ProjectVersionResolver(ProjectVersionService):
         redis_client: Optional[Any] = None,
         redis_enabled: bool = False,
     ):
-        # Initialize providers (no chaining, just independent instances)
         self._clickhouse_provider = ClickHouseProjectVersionProvider(
             ch_client=ch_client
         )
         self._redis_provider = RedisProjectVersionProvider(
             redis_client=redis_client, enabled=redis_enabled
         )
-        self._cache: LRUCache[str, ProjectVersion] = LRUCache(
+        self._cache: LRUCache[str, ProjectVersion] = LRUCache[str, ProjectVersion](
             maxsize=PER_REPLICA_CACHE_SIZE
         )
         self._mode = ProjectVersionMode.from_env()
-        # logger.info(f"ProjectVersionResolver initialized with mode: {self._mode.value}")
+
+    def _apply_mode(
+        self, resolved_version: ProjectVersion, is_write: bool
+    ) -> ProjectVersion:
+        """Apply mode-specific overrides to resolved version.
+
+        Modes that skip DB queries return early in get_project_version.
+        This method only handles modes that override the resolved result.
+        """
+        if self._mode == ProjectVersionMode.CALLS_MERGED:
+            return ProjectVersion.CALLS_MERGED_VERSION
+        return resolved_version
+
+    async def _resolve_version(self, project_id: str) -> ProjectVersion:
+        """Resolve version through provider chain, without mode overrides."""
+        cached = self._cache.get(project_id)
+        if cached is not None:
+            return cached
+
+        try:
+            version = await self._redis_provider.get_project_version(project_id)
+        except Exception:
+            pass
+        else:
+            self._cache[project_id] = version
+            return version
+
+        version = await self._clickhouse_provider.get_project_version(project_id)
+        if version != ProjectVersion.EMPTY_PROJECT:
+            self._cache[project_id] = version
+
+        return version
 
     async def get_project_version(
         self, project_id: str, is_write: bool = False
@@ -74,106 +100,45 @@ class ProjectVersionResolver(ProjectVersionService):
 
         Args:
             project_id: The project identifier.
-            is_write: Whether this is for a write operation (affects routing in some modes).
+            is_write: Whether this is for a write operation.
 
         Returns:
-            ProjectVersion enum (or int for backwards compatibility):
-                - EMPTY_PROJECT (-1): No calls in either table
-                - CALLS_MERGED_VERSION (0): Legacy schema (calls_merged)
-                - CALLS_COMPLETE_VERSION (1): New schema (calls_complete)
+            ProjectVersion enum.
         """
-        # Handle non-auto modes
         if self._mode == ProjectVersionMode.OFF:
-            # Skip DB entirely
             return ProjectVersion.CALLS_MERGED_VERSION
 
         if self._mode == ProjectVersionMode.CALLS_MERGED_READ and not is_write:
-            # For reads in CALLS_MERGED_READ mode, skip resolution and use old table
             return ProjectVersion.CALLS_MERGED_VERSION
 
-        # 1. Check in-memory cache first (fastest)
-        cached = self._cache.get(project_id)
-        if cached is not None:
-            # Apply mode-specific overrides even for cached values
-            if self._mode == ProjectVersionMode.CALLS_MERGED:
-                return ProjectVersion.CALLS_MERGED_VERSION
-            return cached
-
-        # 2. Try Redis cache if enabled
-        try:
-            version = await self._redis_provider.get_project_version(project_id)
-        except Exception:
-            pass  # Fall through to next provider
-        else:
-            self._cache[project_id] = version
-            # Apply mode-specific override
-            if self._mode == ProjectVersionMode.CALLS_MERGED:
-                return ProjectVersion.CALLS_MERGED_VERSION
-            return version
-
-        # 3. Finally, check ClickHouse
-        version = await self._clickhouse_provider.get_project_version(project_id)
-        if version != ProjectVersion.EMPTY_PROJECT:
-            # only set cache when we know what sdk is writing to it, if empty
-            # it can be either new or old
-            self._cache[project_id] = version
-
-        # Apply mode-specific override AFTER querying (to measure perf impact)
-        if self._mode == ProjectVersionMode.CALLS_MERGED:
-            return ProjectVersion.CALLS_MERGED_VERSION
-
-        return version
+        version = await self._resolve_version(project_id)
+        return self._apply_mode(version, is_write)
 
     def get_project_version_sync(
         self, project_id: str, is_write: bool = False
     ) -> ProjectVersion:
         """Get the project version synchronously.
 
-        First checks the in-memory cache (always safe). If not cached and an event
-        loop is running, falls back to ClickHouse provider directly to avoid
-        deadlock issues with nested sync/async contexts.
-
         Args:
             project_id: The project identifier.
-            is_write: Whether this is for a write operation (affects routing in some modes).
+            is_write: Whether this is for a write operation.
 
         Returns:
-            ProjectVersion: ProjectVersion enum or int for backwards compatibility.
+            ProjectVersion enum.
         """
-        # Handle OFF mode early (skip DB entirely)
         if self._mode == ProjectVersionMode.OFF:
             return ProjectVersion.CALLS_MERGED_VERSION
 
-        # Handle CALLS_MERGED_READ mode for reads (skip DB for reads)
         if self._mode == ProjectVersionMode.CALLS_MERGED_READ and not is_write:
             return ProjectVersion.CALLS_MERGED_VERSION
 
-        # Check cache first (always sync-safe)
-        cached = self._cache.get(project_id)
-        if cached is not None:
-            # Apply mode-specific overrides even for cached values
-            if self._mode == ProjectVersionMode.CALLS_MERGED:
-                return ProjectVersion.CALLS_MERGED_VERSION
-            return cached
-
-        # Check if there's a running loop
-        running_loop = None
         try:
             running_loop = asyncio.get_running_loop()
         except RuntimeError:
-            # No loop running - this is the common/expected case
-            pass
+            running_loop = None
 
-        # Normal case: no event loop running, safe to create one
         if running_loop is None:
             return asyncio.run(self.get_project_version(project_id, is_write=is_write))
-
-        # Edge case: event loop is running (sync parent called from async grandparent).
-        # Spawn a new thread with its own event loop.
-        logger.debug(
-            f"get_project_version_sync called with running loop for {project_id}, "
-            "delegating to new thread"
-        )
 
         result: list[ProjectVersion] = []
         exception: list[Exception] = []

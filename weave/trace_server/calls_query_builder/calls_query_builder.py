@@ -698,117 +698,141 @@ class CallsQuery(BaseModel):
             pb, self.project_id, object_ref_conditions
         )
 
+        raw_sql = ""
+        if object_join_cte:
+            raw_sql += f"WITH {object_join_cte},\n"
+
+        select_query_sql = ""
+
         if self.project_version == ProjectVersion.CALLS_COMPLETE_VERSION:
             # TODO: check if we are hitting the call_start table or the complete table
-            qry = self._as_sql_base_format_calls_complete(
+            select_query_sql = self._as_sql_base_format_calls_complete(
                 pb,
                 "calls_complete",
                 field_to_object_join_alias_map=field_to_object_join_alias_map,
+                expand_columns=self.expand_columns,
+                first_cte=raw_sql == "",
             )
-            return qry
+        else:
 
-        # Determine if the query `has_heavy_fields` by checking
-        has_heavy_select = any(field.is_heavy() for field in self.select_fields)
-        has_heavy_filter = any(
-            condition.is_heavy() for condition in self.query_conditions
-        )
-        has_heavy_order = any(
-            order_field.field.is_heavy() for order_field in self.order_fields
-        )
-        has_heavy_fields = has_heavy_select or has_heavy_filter or has_heavy_order
-
-        # Determine if `predicate_pushdown_possible` which is
-        # if it `has_light_filter or has_light_query or has_light_order_filter`
-        has_light_filter = self.hardcoded_filter and self.hardcoded_filter.is_useful()
-
-        has_light_query = any(
-            not condition.is_heavy() for condition in self.query_conditions
-        )
-
-        has_light_order_filter = (
-            self.order_fields
-            and self.limit
-            and not has_heavy_filter
-            and not has_heavy_order
-        )
-
-        predicate_pushdown_possible = (
-            has_light_filter or has_light_query or has_light_order_filter
-        )
-
-        # Determine if we should optimize!
-        should_optimize = has_heavy_fields and predicate_pushdown_possible
-
-        # Important: Always inject deleted_at into the query.
-        # Note: it might be better to make this configurable.
-        self.add_condition(
-            tsi_query.EqOperation.model_validate(
-                {"$eq": [{"$getField": "deleted_at"}, {"$literal": None}]}
+            # Determine if the query `has_heavy_fields` by checking
+            has_heavy_select = any(field.is_heavy() for field in self.select_fields)
+            has_heavy_filter = any(
+                condition.is_heavy() for condition in self.query_conditions
             )
-        )
-
-        # Important: We must always filter out calls that have not been started
-        # This can occur when there is an out of order call part insertion or worse,
-        # when such occurrence happens and the client terminates early.
-        # Additionally: This condition is also REQUIRED for proper functioning
-        # when using pre-group by (WHERE) optimizations
-        self.add_condition(
-            tsi_query.NotOperation.model_validate(
-                {"$not": [{"$eq": [{"$getField": "started_at"}, {"$literal": None}]}]}
+            has_heavy_order = any(
+                order_field.field.is_heavy() for order_field in self.order_fields
             )
-        )
+            has_heavy_fields = has_heavy_select or has_heavy_filter or has_heavy_order
 
-        object_ref_conditions = get_all_object_ref_conditions(
-            self.query_conditions, self.order_fields, self.expand_columns
-        )
+            # Determine if `predicate_pushdown_possible` which is
+            # if it `has_light_filter or has_light_query or has_light_order_filter`
+            has_light_filter = (
+                self.hardcoded_filter and self.hardcoded_filter.is_useful()
+            )
 
-        # If we should not optimize, then just build the base query
-        if not should_optimize and not self.include_costs and not object_ref_conditions:
-            return self._as_sql_base_format(pb, "calls_merged")
+            has_light_query = any(
+                not condition.is_heavy() for condition in self.query_conditions
+            )
 
-        # Build two queries, first filter query CTE, then select the columns
-        filter_query = CallsQuery(project_id=self.project_id)
-        select_query = CallsQuery(
-            project_id=self.project_id,
-            include_storage_size=self.include_storage_size,
-            include_total_storage_size=self.include_total_storage_size,
-        )
+            has_light_order_filter = (
+                self.order_fields
+                and self.limit
+                and not has_heavy_filter
+                and not has_heavy_order
+            )
 
-        # Select Fields:
-        filter_query.add_field("id")
-        for field in self.select_fields:
-            select_query.select_fields.append(field)
+            predicate_pushdown_possible = (
+                has_light_filter or has_light_query or has_light_order_filter
+            )
 
-        # Build CTEs for object reference filtering and ordering
-        object_join_cte, field_to_object_join_alias_map = build_object_ref_ctes(
-            pb, self.project_id, object_ref_conditions
-        )
+            # Determine if we should optimize!
+            should_optimize = has_heavy_fields and predicate_pushdown_possible
 
-        # Query conditions and filter
-        for condition in self.query_conditions:
-            filter_query.query_conditions.append(condition)
+            # Important: Always inject deleted_at into the query.
+            # Note: it might be better to make this configurable.
+            self.add_condition(
+                tsi_query.EqOperation.model_validate(
+                    {"$eq": [{"$getField": "deleted_at"}, {"$literal": None}]}
+                )
+            )
 
-        filter_query.hardcoded_filter = self.hardcoded_filter
+            # Important: We must always filter out calls that have not been started
+            # This can occur when there is an out of order call part insertion or worse,
+            # when such occurrence happens and the client terminates early.
+            # Additionally: This condition is also REQUIRED for proper functioning
+            # when using pre-group by (WHERE) optimizations
+            self.add_condition(
+                tsi_query.NotOperation.model_validate(
+                    {
+                        "$not": [
+                            {"$eq": [{"$getField": "started_at"}, {"$literal": None}]}
+                        ]
+                    }
+                )
+            )
 
-        # Order Fields:
-        filter_query.order_fields = self.order_fields
-        filter_query.limit = self.limit
-        filter_query.offset = self.offset
-        # SUPER IMPORTANT: still need to re-sort the final query
-        select_query.order_fields = self.order_fields
+            object_ref_conditions = get_all_object_ref_conditions(
+                self.query_conditions, self.order_fields, self.expand_columns
+            )
 
-        raw_sql = "WITH "
-        if object_join_cte:
-            raw_sql += f"{object_join_cte},\n"
-        raw_sql += f"""filtered_calls AS ({
-            filter_query._as_sql_base_format(
+            # If we should not optimize, then just build the base query
+            if (
+                not should_optimize
+                and not self.include_costs
+                and not object_ref_conditions
+            ):
+                return self._as_sql_base_format(pb, "calls_merged")
+
+            # Build two queries, first filter query CTE, then select the columns
+            filter_query = CallsQuery(project_id=self.project_id)
+            select_query = CallsQuery(
+                project_id=self.project_id,
+                include_storage_size=self.include_storage_size,
+                include_total_storage_size=self.include_total_storage_size,
+            )
+
+            # Select Fields:
+            filter_query.add_field("id")
+            for field in self.select_fields:
+                select_query.select_fields.append(field)
+
+            # Build CTEs for object reference filtering and ordering
+            object_join_cte, field_to_object_join_alias_map = build_object_ref_ctes(
+                pb, self.project_id, object_ref_conditions
+            )
+
+            # Query conditions and filter
+            for condition in self.query_conditions:
+                filter_query.query_conditions.append(condition)
+
+            filter_query.hardcoded_filter = self.hardcoded_filter
+
+            # Order Fields:
+            filter_query.order_fields = self.order_fields
+            filter_query.limit = self.limit
+            filter_query.offset = self.offset
+            # SUPER IMPORTANT: still need to re-sort the final query
+            select_query.order_fields = self.order_fields
+
+            prefix = "WITH" if not object_join_cte else ""
+
+            raw_sql += f"""{prefix} filtered_calls AS ({
+                filter_query._as_sql_base_format(
+                    pb,
+                    "calls_merged",
+                    field_to_object_join_alias_map=field_to_object_join_alias_map,
+                    expand_columns=self.expand_columns,
+                )
+            })
+            """
+            select_query_sql = select_query._as_sql_base_format(
                 pb,
                 "calls_merged",
+                id_subquery_name="filtered_calls",
                 field_to_object_join_alias_map=field_to_object_join_alias_map,
                 expand_columns=self.expand_columns,
             )
-        })
-        """
 
         if self.include_costs:
             # TODO: We should unify the calls query order by fields to be orm sort by fields
@@ -824,19 +848,11 @@ class CallsQuery(BaseModel):
                 pb, "all_calls", self.project_id, select_fields, order_by_fields
             )
             raw_sql += f""",
-            all_calls AS ({select_query._as_sql_base_format(pb, "calls_merged", id_subquery_name="filtered_calls", field_to_object_join_alias_map=field_to_object_join_alias_map, expand_columns=self.expand_columns)}),
+            all_calls AS ({select_query_sql}),
             {inner_sql}
             """
-
         else:
-            base_sql = select_query._as_sql_base_format(
-                pb,
-                "calls_merged",
-                id_subquery_name="filtered_calls",
-                field_to_object_join_alias_map=field_to_object_join_alias_map,
-                expand_columns=self.expand_columns,
-            )
-            raw_sql += base_sql
+            raw_sql += select_query_sql
 
         return safely_format_sql(raw_sql, logger)
 
@@ -1042,6 +1058,7 @@ class CallsQuery(BaseModel):
         table_alias: str,
         expand_columns: Optional[list[str]] = None,
         field_to_object_join_alias_map: Optional[dict[str, str]] = None,
+        first_cte: bool = True,
     ) -> str:
         needs_feedback = False
         select_fields_sql = ", ".join(
@@ -1103,6 +1120,26 @@ class CallsQuery(BaseModel):
         total_storage_size_sql = build_total_storage_size_join_sql(
             self.include_total_storage_size, project_param_slot, table_alias
         )
+        # Filter out object ref conditions from optimization since they're handled via CTEs
+        non_object_ref_conditions = []
+        object_ref_fields_consumed: set[str] = set()
+        for condition in self.query_conditions:
+            if not (
+                expand_columns
+                and is_object_ref_operand(condition.operand, expand_columns)
+            ):
+                non_object_ref_conditions.append(condition)
+            else:
+                if condition._consumed_fields is not None:
+                    object_ref_fields_consumed.update(
+                        f.field for f in condition._consumed_fields
+                    )
+
+        object_refs_filter_opt_sql = process_object_refs_filter_to_opt_sql(
+            pb,
+            table_alias,
+            object_ref_fields_consumed,
+        )
         object_ref_joins_sql = build_object_ref_joins_sql(
             pb,
             self.order_fields,
@@ -1121,14 +1158,21 @@ class CallsQuery(BaseModel):
             pb,
             table_alias,
         )
-
+        op_name_sql = process_op_name_filter_to_sql(
+            self.hardcoded_filter,
+            pb,
+            table_alias,
+        )
+        cte_prefix = "WITH" if first_cte else ""
         filtered_call_cte = f"""
-        WITH filtered_calls AS (
+        {cte_prefix} filtered_calls AS (
             SELECT id FROM calls_complete
             WHERE project_id = {project_param_slot}
             {trace_id_sql}
             {trace_roots_only_sql}
+            {op_name_sql}
             {filter_sql}
+            {object_refs_filter_opt_sql}
             {order_by_sql}
             {limit_sql}
             {offset_sql}
@@ -1156,7 +1200,9 @@ class CallsQuery(BaseModel):
         WHERE {table_alias}.project_id = {project_param_slot}
             {trace_id_sql}
             {trace_roots_only_sql}
+            {op_name_sql}
             {filter}
+            {object_refs_filter_opt_sql}
         {order_by_sql}
         {limit_sql}
         {offset_sql}
@@ -1805,11 +1851,6 @@ def process_calls_filter_to_conditions(
     if filter.wb_run_ids:
         conditions.append(
             f"{get_field_by_name('wb_run_id', table_alias).as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.wb_run_ids), 'Array(String)')}"
-        )
-
-    if table_alias in ["calls_complete", "call_starts"] and filter.op_names:
-        conditions.append(
-            f"{get_field_by_name('op_name', table_alias).as_sql(param_builder, table_alias)} IN {param_slot(param_builder.add_param(filter.op_names), 'Array(String)')}"
         )
 
     return conditions
