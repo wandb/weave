@@ -715,7 +715,6 @@ class CallsQuery(BaseModel):
                 first_cte=raw_sql == "",
             )
         else:
-
             # Determine if the query `has_heavy_fields` by checking
             has_heavy_select = any(field.is_heavy() for field in self.select_fields)
             has_heavy_filter = any(
@@ -1023,6 +1022,9 @@ class CallsQuery(BaseModel):
             table_alias,
         )
 
+        if self.include_running is False:
+            running_filter_sql = "AND any(calls_merged.ended_at) IS NULL"
+
         raw_sql = f"""
         SELECT {select_fields_sql}
         FROM calls_merged
@@ -1044,6 +1046,7 @@ class CallsQuery(BaseModel):
         {heavy_filter_opt_sql}
         {ref_filter_opt_sql}
         {object_refs_filter_opt_sql}
+        {running_filter_sql}
         GROUP BY (calls_merged.project_id, calls_merged.id)
         {having_filter_sql}
         {order_by_sql}
@@ -1215,8 +1218,7 @@ class CallsQuery(BaseModel):
 
         cte_prefix = "WITH" if first_cte else ""
 
-        # If include_running is True and we're querying calls_complete, include running calls
-        if self.include_running and table_alias == "calls_complete":
+        if self.include_running :
             # Build CTEs for complete and running calls
             complete_cte = f"""
             {cte_prefix} complete AS (
