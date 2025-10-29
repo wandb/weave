@@ -247,6 +247,7 @@ class OtelExportReq(BaseModel):
     project_id: str
     # traces must be ExportTraceServiceRequest payload but allowing Any removes the proto package as a requirement.
     traces: Any
+    wb_run_id: Optional[str] = None
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
 
 

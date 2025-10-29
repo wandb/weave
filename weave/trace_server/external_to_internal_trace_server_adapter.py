@@ -103,6 +103,8 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
 
     def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        if req.wb_run_id is not None:
+            req.wb_run_id = self._idc.ext_to_int_run_id(req.wb_run_id)
         if req.wb_user_id is not None:
             req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
         return self._ref_apply(self._internal_trace_server.otel_export, req)

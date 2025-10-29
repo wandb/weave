@@ -227,7 +227,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             raise TypeError(
                 "Expected traces as ExportTraceServiceRequest, got {type(req.traces)}"
             )
-        calls: list[dict[str, object]] = []
+        calls: list[tsi.CallBatchStartMode | tsi.CallBatchEndMode] = []
         rejected_spans = 0
         error_messages: list[str] = []
         for proto_resource_spans in req.traces.resource_spans:
@@ -254,14 +254,17 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         error_messages.append(f"Rejected span ({span_ident}): {e!s}")
                         continue
 
-                    start_call, end_call = span.to_call(req.project_id)
+                    start_call, end_call = span.to_call(
+                        req.project_id,
+                        wb_user_id=req.wb_user_id,
+                        wb_run_id=req.wb_run_id,
+                    )
                     calls.extend(
                         [
-                            {
-                                "mode": "start",
-                                "req": tsi.CallStartReq(start=start_call),
-                            },
-                            {"mode": "end", "req": tsi.CallEndReq(end=end_call)},
+                            tsi.CallBatchStartMode(
+                                req=tsi.CallStartReq(start=start_call)
+                            ),
+                            tsi.CallBatchEndMode(req=tsi.CallEndReq(end=end_call)),
                         ]
                     )
         # TODO: Actually populate the error fields if call_start_batch fails

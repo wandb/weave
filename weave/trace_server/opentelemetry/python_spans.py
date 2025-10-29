@@ -282,7 +282,10 @@ class Span:
         )
 
     def to_call(
-        self, project_id: str, wb_user_id: Optional[str] = None
+        self,
+        project_id: str,
+        wb_user_id: Optional[str] = None,
+        wb_run_id: Optional[str] = None,
     ) -> tuple[tsi.StartedCallSchemaForInsert, tsi.EndedCallSchemaForInsert]:
         events = [SpanEvent(e.as_dict()) for e in self.events]
         usage = get_weave_usage(self.attributes) or {}
@@ -352,7 +355,16 @@ class Span:
         else:
             turn_id = None
 
-        wb_run_id = wandb_attributes.get("wb_run_id") or None
+        wb_run_id = wb_run_id or wandb_attributes.get("wb_run_id") or None
+
+        if wb_run_id:
+            if wb_run_id.find(":") == -1:
+                wb_run_id = f"{project_id}:{wb_run_id}"
+            wb_run_step = wandb_attributes.get("wb_run_step") or None
+            wb_run_step_end = wandb_attributes.get("wb_run_step_end") or None
+        else:
+            wb_run_step = None
+            wb_run_step_end = None
 
         if display_name and len(display_name) >= MAX_DISPLAY_NAME_LENGTH:
             display_name = shorten_name(display_name, MAX_DISPLAY_NAME_LENGTH)
@@ -389,6 +401,7 @@ class Span:
             display_name=display_name,
             wb_user_id=wb_user_id,
             wb_run_id=wb_run_id,
+            wb_run_step=wb_run_step,
             turn_id=turn_id,
             thread_id=thread_id,
         )
@@ -404,6 +417,7 @@ class Span:
             exception=exception_msg,
             output=outputs,
             summary=summary_map,
+            wb_run_step_end=wb_run_step_end,
         )
         return (start_call, end_call)
 
