@@ -538,6 +538,7 @@ class CallsQuery(BaseModel):
     include_costs: bool = False
     include_storage_size: bool = False
     include_total_storage_size: bool = False
+    include_running: bool = True
 
     def add_field(self, field: str) -> "CallsQuery":
         # TODO: fix hack
@@ -1163,50 +1164,240 @@ class CallsQuery(BaseModel):
             pb,
             table_alias,
         )
+        # Build SQL for filtering call_starts (used when include_running=True)
+        # Note: call_starts doesn't have all the same filters available (e.g., no ended_at)
+        trace_id_sql_starts = process_trace_id_filter_to_sql(
+            self.hardcoded_filter,
+            pb,
+            "call_starts",
+        )
+        trace_roots_only_sql_starts = process_trace_roots_only_filter_to_sql(
+            self.hardcoded_filter,
+            pb,
+            "call_starts",
+        )
+        op_name_sql_starts = process_op_name_filter_to_sql(
+            self.hardcoded_filter,
+            pb,
+            "call_starts",
+        )
+        # Build filter SQL for call_starts - need to handle conditions that reference
+        # fields that don't exist in call_starts (like ended_at)
+        filter_sql_starts = ""
+        conditions_sql_starts: list[str] = []
+        if len(self.query_conditions) > 0:
+            for query_condition in self.query_conditions:
+                # Skip conditions that reference fields not in call_starts (e.g., ended_at)
+                # For now, we'll include all conditions and let ClickHouse handle it
+                query_condition_sql = query_condition.as_sql(
+                    pb,
+                    "call_starts",
+                    expand_columns=expand_columns,
+                    field_to_object_join_alias_map=field_to_object_join_alias_map,
+                )
+                if query_condition_sql:
+                    conditions_sql_starts.append(query_condition_sql)
+        if self.hardcoded_filter is not None:
+            hardcoded_filter_sql = self.hardcoded_filter.as_sql(pb, "call_starts")
+            if hardcoded_filter_sql:
+                conditions_sql_starts.append(hardcoded_filter_sql)
+
+        if len(conditions_sql_starts) > 0:
+            combined = combine_conditions(conditions_sql_starts, "AND")
+            if combined:
+                filter_sql_starts = " AND " + combined
+
+        object_refs_filter_opt_sql_starts = process_object_refs_filter_to_opt_sql(
+            pb,
+            "call_starts",
+            object_ref_fields_consumed,
+        )
+
         cte_prefix = "WITH" if first_cte else ""
-        filtered_call_cte = f"""
-        {cte_prefix} filtered_calls AS (
-            SELECT id FROM calls_complete
-            WHERE project_id = {project_param_slot}
-            {trace_id_sql}
-            {trace_roots_only_sql}
-            {op_name_sql}
-            {filter_sql}
-            {object_refs_filter_opt_sql}
+
+        # If include_running is True and we're querying calls_complete, include running calls
+        if self.include_running and table_alias == "calls_complete":
+            # Build CTEs for complete and running calls
+            complete_cte = f"""
+            {cte_prefix} complete AS (
+                SELECT id
+                FROM calls_complete
+                WHERE project_id = {project_param_slot}
+                    {trace_id_sql}
+                    {trace_roots_only_sql}
+                    {op_name_sql}
+                    {filter_sql}
+                    {object_refs_filter_opt_sql}
+                ORDER BY started_at DESC
+                LIMIT {self.limit if self.limit is not None else 50}
+            ),
+            parts_only AS (
+                SELECT id
+                FROM call_starts
+                WHERE project_id = {project_param_slot}
+                    {trace_id_sql_starts}
+                    {trace_roots_only_sql_starts}
+                    {op_name_sql_starts}
+                    {filter_sql_starts}
+                    {object_refs_filter_opt_sql_starts}
+                    AND id NOT IN (SELECT id FROM complete)
+                ORDER BY started_at DESC
+                LIMIT {self.limit if self.limit is not None else 50}
+            )
+            """
+
+            # Build field selections - need to handle call_starts which doesn't have all fields
+            # For call_starts, we need to map fields and add NULLs for missing ones
+            # Fields that don't exist in call_starts table (based on migration 020_calls_complete.up.sql)
+            missing_fields_in_call_starts = {
+                "ended_at",
+                "output_dump",
+                "summary_dump",
+                "exception",
+                "output_refs",
+            }
+
+            select_fields_sql_starts_list = []
+            for field in self.select_fields:
+                if isinstance(field, CallsCompleteField):
+                    field_name = field.field
+                    if field_name in missing_fields_in_call_starts:
+                        # These fields don't exist in call_starts, use NULL
+                        select_fields_sql_starts_list.append(f"NULL AS {field_name}")
+                    else:
+                        # Field exists in call_starts, use direct field access
+                        # Note: call_starts table name (plural) vs calls_start alias (singular) in field class
+                        select_fields_sql_starts_list.append(
+                            f"call_starts.{field_name} AS {field_name}"
+                        )
+                else:
+                    # For other field types, we'll need to handle them case by case
+                    # For now, try to get the field name and use call_starts if it exists
+                    if hasattr(field, "field"):
+                        field_name = field.field
+                        if field_name in missing_fields_in_call_starts:
+                            select_fields_sql_starts_list.append(
+                                f"NULL AS {field_name}"
+                            )
+                        else:
+                            # Try to construct SQL, but fallback to NULL if it fails
+                            try:
+                                # Use calls_start alias (what CallsCompleteField expects)
+                                field_sql_expr = (
+                                    field.as_sql(pb, "calls_start")
+                                    if hasattr(field, "as_sql")
+                                    else None
+                                )
+                                if field_sql_expr:
+                                    # Replace table alias with call_starts
+                                    field_sql_expr = field_sql_expr.replace(
+                                        "calls_start.", "call_starts."
+                                    )
+                                    select_fields_sql_starts_list.append(
+                                        f"{field_sql_expr} AS {field_name}"
+                                    )
+                                else:
+                                    select_fields_sql_starts_list.append(
+                                        f"call_starts.{field_name} AS {field_name}"
+                                    )
+                            except (
+                                ValueError,
+                                AssertionError,
+                                NotImplementedError,
+                                AttributeError,
+                            ):
+                                # Fallback to direct field access or NULL
+                                select_fields_sql_starts_list.append(
+                                    f"call_starts.{field_name} AS {field_name}"
+                                )
+                    else:
+                        # Skip fields we can't handle
+                        continue
+
+            select_fields_sql_starts = (
+                ", ".join(select_fields_sql_starts_list)
+                if select_fields_sql_starts_list
+                else select_fields_sql
+            )
+
+            # Build the final query with UNION ALL
+            # Apply ORDER BY and LIMIT/OFFSET to the final result
+            final_order_by = (
+                order_by_sql if order_by_sql else "ORDER BY started_at DESC"
+            )
+            final_limit = limit_sql if limit_sql else ""
+            final_offset = offset_sql if offset_sql else ""
+
+            raw_sql = f"""
+            {complete_cte}
+            SELECT {select_fields_sql}
+            FROM calls_complete
+            {feedback_join_sql}
+            {storage_size_sql}
+            {total_storage_size_sql}
+            {object_ref_joins_sql}
+            WHERE calls_complete.project_id = {project_param_slot}
+                {trace_id_sql}
+                {trace_roots_only_sql}
+                {op_name_sql}
+                AND calls_complete.id IN (SELECT id FROM complete)
+            UNION ALL
+            SELECT {select_fields_sql_starts}
+            FROM call_starts
+            WHERE call_starts.project_id = {project_param_slot}
+                {trace_id_sql_starts}
+                {trace_roots_only_sql_starts}
+                {op_name_sql_starts}
+                AND call_starts.id IN (SELECT id FROM parts_only)
+            {final_order_by}
+            {final_limit}
+            {final_offset}
+            """
+        else:
+            # Original logic when include_running is False or table is not calls_complete
+            filtered_call_cte = f"""
+            {cte_prefix} filtered_calls AS (
+                SELECT id FROM calls_complete
+                WHERE project_id = {project_param_slot}
+                    {trace_id_sql}
+                    {trace_roots_only_sql}
+                    {op_name_sql}
+                    {filter_sql}
+                    {object_refs_filter_opt_sql}
+                    {order_by_sql}
+                    {limit_sql}
+                    {offset_sql}
+            )
+            """
+            if (
+                "inputs_dump" not in select_fields_sql
+                and "output_dump" not in select_fields_sql
+            ):
+                filtered_call_cte = ""
+                filter = filter_sql
+            else:
+                filter = f"AND {table_alias}.id IN (SELECT id FROM filtered_calls)"
+                limit_sql = ""
+                offset_sql = ""
+
+            raw_sql = f"""
+            {filtered_call_cte}
+            SELECT {select_fields_sql}
+            FROM {table_alias}
+            {feedback_join_sql}
+            {storage_size_sql}
+            {total_storage_size_sql}
+            {object_ref_joins_sql}
+            WHERE {table_alias}.project_id = {project_param_slot}
+                {trace_id_sql}
+                {trace_roots_only_sql}
+                {op_name_sql}
+                {filter}
+                {object_refs_filter_opt_sql}
             {order_by_sql}
             {limit_sql}
             {offset_sql}
-        )
-        """
-        if (
-            "inputs_dump" not in select_fields_sql
-            and "output_dump" not in select_fields_sql
-        ):
-            filtered_call_cte = ""
-            filter = filter_sql
-        else:
-            filter = f"AND {table_alias}.id IN (SELECT id FROM filtered_calls)"
-            limit_sql = ""
-            offset_sql = ""
-
-        raw_sql = f"""
-        {filtered_call_cte}
-        SELECT {select_fields_sql}
-        FROM {table_alias}
-        {feedback_join_sql}
-        {storage_size_sql}
-        {total_storage_size_sql}
-        {object_ref_joins_sql}
-        WHERE {table_alias}.project_id = {project_param_slot}
-            {trace_id_sql}
-            {trace_roots_only_sql}
-            {op_name_sql}
-            {filter}
-            {object_refs_filter_opt_sql}
-        {order_by_sql}
-        {limit_sql}
-        {offset_sql}
-        """
+            """
 
         return safely_format_sql(raw_sql, logger)
 

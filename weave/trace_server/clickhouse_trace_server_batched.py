@@ -602,6 +602,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             include_costs=req.include_costs or False,
             include_storage_size=req.include_storage_size or False,
             include_total_storage_size=req.include_total_storage_size or False,
+            include_running=req.include_running if req.include_running is not None else True,
         )
         columns = ALL_CALL_SELECT_COLUMNS
         # TODO: fix me
