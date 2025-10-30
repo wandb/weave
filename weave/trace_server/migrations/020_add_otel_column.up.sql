@@ -1,7 +1,12 @@
-ALTER TABLE calls_merged ADD COLUMN otel_dump Nullable(String) DEFAULT NULL;
-ALTER TABLE call_parts ADD COLUMN otel_dump Nullable(String) DEFAULT NULL;
+-- Add otel_dump to raw call parts table
+ALTER TABLE call_parts
+    ADD COLUMN otel_dump Nullable(String);
 
--- Update materialized view to include wb_run_step_end
+-- Add otel_dump to aggregated calls table
+ALTER TABLE calls_merged
+    ADD COLUMN otel_dump SimpleAggregateFunction(any, Nullable(String));
+
+-- Update materialized view to include otel_dump
 ALTER TABLE calls_merged_view MODIFY QUERY
     SELECT project_id,
         id,
@@ -26,13 +31,12 @@ ALTER TABLE calls_merged_view MODIFY QUERY
         anySimpleState(deleted_at) as deleted_at,
         argMaxState(display_name, call_parts.created_at) as display_name,
         anySimpleState(coalesce(call_parts.started_at, call_parts.ended_at, call_parts.created_at)) as sortable_datetime,
-        -- New otel column
         anySimpleState(otel_dump) as otel_dump
     FROM call_parts
     GROUP BY project_id,
         id;
 
--- Add wb_run_step_end to stats table
+-- Add otel_dump to stats table
 ALTER TABLE calls_merged_stats
     ADD COLUMN otel_dump SimpleAggregateFunction(any, Nullable(String));
 
@@ -60,7 +64,6 @@ SELECT
     anySimpleState(call_parts.deleted_at) as deleted_at,
     maxSimpleState(call_parts.created_at) as updated_at,
     argMaxState(call_parts.display_name, call_parts.created_at) as display_name,
-    -- New otel column
     anySimpleState(call_parts.otel_dump) as otel_dump
 FROM call_parts
 GROUP BY
