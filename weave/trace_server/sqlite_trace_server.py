@@ -2926,13 +2926,10 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         Yields:
             PredictionReadV2Res for each prediction found
         """
-        # Build query conditions to filter at database level
-        conditions: list[tsi_query.Operand] = []
-
-        # Filter for calls with prediction attribute set to true
+        # Build query to filter for calls with prediction attribute set to true
         # Note: Use string "true" for ClickHouse compatibility (JSON booleans are extracted as strings)
-        conditions.append(
-            tsi_query.EqOperation(
+        query = tsi.Query(
+            expr_=tsi_query.EqOperation(
                 eq_=[
                     tsi_query.GetFieldOperator(
                         get_field_=f"attributes.{constants.WEAVE_ATTRIBUTES_NAMESPACE}.{constants.PREDICTION_ATTR_KEY}"
@@ -2941,12 +2938,6 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 ]
             )
         )
-
-        # Combine all conditions with AND (or use single condition if only one)
-        if len(conditions) == 1:
-            query = tsi.Query(expr_=conditions[0])
-        else:
-            query = tsi.Query(expr_=tsi_query.AndOperation(and_=conditions))
 
         # Query for calls that have the prediction attribute
         calls_query_req = tsi.CallsQueryReq(
