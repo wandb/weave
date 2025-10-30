@@ -360,9 +360,9 @@ class Span:
         # If it contains a '/' then it is a malformed conversion in adapting layer
         # If it doesn't contain a ':' while this is defined from headers it is a malformed conversion in adapting layer
         # If it does contain a ':' while this is not defined and the attribute field is defined, again we have a malformed value
-        if not wb_run_id: # headers not defined
+        if not wb_run_id:  # headers not defined
             attr_wb_run_id = wandb_attributes.get("wb_run_id") or None
-            if attr_wb_run_id and not ('/' in attr_wb_run_id or ":" in attr_wb_run_id):
+            if attr_wb_run_id and not ("/" in attr_wb_run_id or ":" in attr_wb_run_id):
                 wb_run_id = f"{project_id}:{attr_wb_run_id}"
         ### END HACK
 
