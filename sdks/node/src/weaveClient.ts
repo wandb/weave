@@ -344,12 +344,18 @@ export class WeaveClient {
 
       obj.__savedRef = ref;
 
-      // TODO: The table row refs are not correct
+      // Load table rows if they are a ref
+      await obj.rows.load();
+
       return obj;
     } else if (t == 'Table') {
       const {rows} = val;
       let obj = new Table(rows);
       obj.__savedRef = ref;
+
+      // Load table rows if they are a ref
+      await obj.load();
+
       return obj;
     } else if (t == 'CustomWeaveType') {
       const typeName = val.weave_type.type;

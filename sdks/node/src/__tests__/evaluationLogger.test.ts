@@ -73,7 +73,7 @@ describe('EvaluationLogger - Basic Functionality', () => {
   });
 
   // Test: Fire-and-forget with chained calls - true synchronous API
-  test.only('fire-and-forget usage with multple threads', async () => {
+  test('fire-and-forget usage with multple threads', async () => {
     const evalLogger = new EvaluationLogger({name: 'test-eval'});
 
     // True fire-and-forget: synchronous, no await needed!
