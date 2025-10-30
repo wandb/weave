@@ -227,7 +227,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             raise TypeError(
                 "Expected traces as ExportTraceServiceRequest, got {type(req.traces)}"
             )
-        calls: list[tsi.CallBatchStartMode | tsi.CallBatchEndMode] = []
+        calls: list[Union[tsi.CallBatchStartMode, tsi.CallBatchEndMode]] = []
         rejected_spans = 0
         error_messages: list[str] = []
         for proto_resource_spans in req.traces.resource_spans:
