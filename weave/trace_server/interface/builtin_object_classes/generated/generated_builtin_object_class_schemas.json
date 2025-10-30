@@ -496,6 +496,80 @@
       "title": "Column",
       "type": "object"
     },
+    "ComparisonView": {
+      "description": "A saved comparison view configuration.\n\nArgs:\n    label (str): Human-readable name for the comparison view.\n    definition (ComparisonViewDefinition): The view's configuration.\n\nExamples:\n    >>> view = ComparisonView(\n    ...     label=\"My Comparison\",\n    ...     definition=ComparisonViewDefinition(\n    ...         evaluation_call_ids=[\"call_1\", \"call_2\"]\n    ...     )\n    ... )",
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "definition": {
+          "$ref": "#/$defs/ComparisonViewDefinition"
+        }
+      },
+      "required": [
+        "label",
+        "definition"
+      ],
+      "title": "ComparisonView",
+      "type": "object"
+    },
+    "ComparisonViewDefinition": {
+      "description": "Definition of a comparison view's configuration.\n\nArgs:\n    evaluation_call_ids (List[str]): List of evaluation call IDs being compared.\n    selected_metrics (Optional[List[str]]): List of metrics that are visible in plots.\n\nExamples:\n    >>> definition = ComparisonViewDefinition(\n    ...     evaluation_call_ids=[\"call_1\", \"call_2\"],\n    ...     selected_metrics=[\"accuracy\", \"f1_score\"]\n    ... )",
+      "properties": {
+        "evaluation_call_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evaluation Call Ids",
+          "type": "array"
+        },
+        "selected_metrics": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Selected Metrics"
+        }
+      },
+      "required": [
+        "evaluation_call_ids"
+      ],
+      "title": "ComparisonViewDefinition",
+      "type": "object"
+    },
     "ContainsOperation": {
       "description": "Case-insensitive substring match.\n\nNot part of MongoDB. Weave-specific addition.\n\nExample:\n    ```\n    {\n        \"$contains\": {\n            \"input\": {\"$getField\": \"display_name\"},\n            \"substr\": {\"$literal\": \"llm\"},\n            \"case_insensitive\": true\n        }\n    }\n    ```",
       "properties": {
@@ -2203,6 +2277,9 @@
     "SavedView": {
       "$ref": "#/$defs/SavedView"
     },
+    "ComparisonView": {
+      "$ref": "#/$defs/ComparisonView"
+    },
     "LLMStructuredCompletionModel": {
       "$ref": "#/$defs/LLMStructuredCompletionModel"
     },
@@ -2220,6 +2297,7 @@
     "Provider",
     "ProviderModel",
     "SavedView",
+    "ComparisonView",
     "LLMStructuredCompletionModel",
     "ChartConfig"
   ],
