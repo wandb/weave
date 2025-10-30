@@ -126,6 +126,7 @@ ATTRIBUTE_KEYS = {
     ],
     # Model generation parameters (temperature, max_tokens, etc.)
     "model_parameters": ["gen_ai.request", "llm.invocation_parameters"],
+    "wandb.attributes": ["wandb.attributes"],
 }
 
 # WB_KEYS: Wandb/Weave specific attributes for enhanced visualization and reporting

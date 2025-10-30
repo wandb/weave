@@ -60,6 +60,9 @@ ALTER TABLE calls_merged_view MODIFY QUERY
     GROUP BY project_id,
         id;
 
+-- Remove otel_dump from aggregated calls table
+ALTER TABLE calls_merged DROP COLUMN otel_dump;
+
 -- Remove otel_dump from raw call parts table
 ALTER TABLE call_parts
     DROP COLUMN otel_dump;
