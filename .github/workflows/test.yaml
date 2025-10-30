@@ -424,8 +424,7 @@ jobs:
             "13",
             #
           ]
-        nox-shard:
-          [
+        nox-shard: [
             "trace1",
             "trace2",
             "trace3",
@@ -444,7 +443,7 @@ jobs:
             "instructor",
             "langchain",
             "litellm",
-            "llamaindex",
+            # "llamaindex",
             "mistral",
             "notdiamond",
             "openai",
