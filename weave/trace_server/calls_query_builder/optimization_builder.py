@@ -71,7 +71,10 @@ class QueryOptimizationProcessor(ABC):
     specific strategies for different types of data or operations.
     """
 
-    def __init__(self, pb: "ParamBuilder", table_alias: str):
+    pb: "ParamBuilder"
+    table_alias: Optional[str]
+
+    def __init__(self, pb: "ParamBuilder", table_alias: Optional[str]):
         self.pb = pb
         self.table_alias = table_alias
 
@@ -426,9 +429,12 @@ def _extract_field_and_literal(
 def _create_like_optimized_eq_condition(
     operation: tsi_query.EqOperation,
     pb: "ParamBuilder",
-    table_alias: str,
+    table_alias: Optional[str],
 ) -> Optional[str]:
     """Creates a LIKE-optimized condition for equality operations."""
+    if table_alias is None:
+        return None
+
     field_operand, literal_operand = _extract_field_and_literal(operation)
     if field_operand is None or literal_operand is None:
         return None
@@ -462,9 +468,12 @@ def _create_like_optimized_eq_condition(
 def _create_like_optimized_contains_condition(
     operation: tsi_query.ContainsOperation,
     pb: "ParamBuilder",
-    table_alias: str,
+    table_alias: Optional[str],
 ) -> Optional[str]:
     """Creates a LIKE-optimized condition for contains operations."""
+    if table_alias is None:
+        return None
+
     # Check if the input is a GetField operation on a JSON field
     if not isinstance(operation.contains_.input, tsi_query.GetFieldOperator):
         return None
@@ -501,9 +510,12 @@ def _create_like_optimized_contains_condition(
 def _create_like_optimized_in_condition(
     operation: tsi_query.InOperation,
     pb: "ParamBuilder",
-    table_alias: str,
+    table_alias: Optional[str],
 ) -> Optional[str]:
     """Creates a LIKE-optimized condition for in operations."""
+    if table_alias is None:
+        return None
+
     # Check if the left side is a GetField operation on a JSON field
     if not isinstance(operation.in_[0], tsi_query.GetFieldOperator):
         return None
@@ -557,7 +569,7 @@ def _timestamp_to_datetime_str(timestamp: int) -> str:
 def _create_datetime_optimization_sql(
     operation: Union[tsi_query.GtOperation, tsi_query.GteOperation],
     pb: "ParamBuilder",
-    table_alias: str,
+    table_alias: Optional[str],
     op_str: str,
 ) -> Optional[str]:
     """Creates SQL for datetime optimization using indexed sortable_datetime column.

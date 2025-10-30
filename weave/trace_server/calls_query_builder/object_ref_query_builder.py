@@ -233,7 +233,7 @@ class ObjectRefCondition(BaseModel):
     def as_sql_condition(
         self,
         pb: "ParamBuilder",
-        table_alias: str,
+        table_alias: Optional[str],
         field_to_object_join_alias_map: dict[str, str],
         use_agg_fn: bool = True,
         is_order_join: bool = False,
@@ -439,7 +439,7 @@ class ObjectRefQueryProcessor:
     def __init__(
         self,
         pb: "ParamBuilder",
-        table_alias: str,
+        table_alias: Optional[str],
         expand_columns: list[str],
         field_to_object_join_alias_map: dict[str, str],
     ):
@@ -513,12 +513,20 @@ class ObjectRefQueryProcessor:
 class ObjectRefFilterToCTEProcessor(QueryOptimizationProcessor):
     """Processes a calls query to identify and transform object reference conditions."""
 
-    def __init__(self, pb: "ParamBuilder", table_alias: str, expand_columns: list[str]):
+    pb: "ParamBuilder"
+    table_alias: Optional[str]
+    expand_columns: list[str]
+    object_ref_conditions: list[ObjectRefCondition]
+    field_to_cte_map: dict[str, str]
+
+    def __init__(
+        self, pb: "ParamBuilder", table_alias: Optional[str], expand_columns: list[str]
+    ):
         self.pb = pb
         self.table_alias = table_alias
         self.expand_columns = expand_columns
-        self.object_ref_conditions: list[ObjectRefCondition] = []
-        self.field_to_cte_map: dict[str, str] = {}  # Maps field paths to CTE names
+        self.object_ref_conditions = []
+        self.field_to_cte_map = {}  # Maps field paths to CTE names
 
     def _is_object_ref_field(self, field_path: str) -> bool:
         """Check if this field path is an object ref based on expand_columns."""
@@ -910,7 +918,7 @@ def is_object_ref_operand(
 def process_query_for_object_refs(
     query: tsi_query.Query,
     pb: "ParamBuilder",
-    table_alias: str,
+    table_alias: Optional[str],
     expand_columns: list[str],
 ) -> list[ObjectRefCondition]:
     """Process a query to identify and extract object reference conditions.

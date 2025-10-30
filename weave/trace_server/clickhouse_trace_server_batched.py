@@ -884,13 +884,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                         "project_id": project_id,
                         "call_ids": call_ids,
                     },
+                    settings={
+                        # Try new minimal impact delete using UPDATE path not ALTER TABLE
+                        "lightweight_delete_mode": "lightweight_update"
+                    },
                 )
                 deleted_rows = res.summary.get("written_rows", 0)
                 total_deleted += deleted_rows
-                # logger.info(
-                #     f"Deleted {deleted_rows} rows from {table}. "
-                #     f"Total deleted: {total_deleted}/{target_count}"
-                # )
 
                 # If we've deleted all the calls, return early
                 if total_deleted >= target_count:
@@ -945,8 +945,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     ) -> None:
         def _make_update_sql(table_name: str) -> str:
             return f"""
-                ALTER TABLE {table_name}
-                UPDATE display_name = {{display_name:String}}
+                UPDATE {table_name}
+                SET display_name = {{display_name:String}}
                 WHERE project_id = {{project_id:String}}
                     AND id = {{call_id:String}}
             """

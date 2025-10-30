@@ -58,7 +58,7 @@ class NotContext:
 
 def json_dump_field_as_sql(
     pb: ParamBuilder,
-    table_alias: str,
+    table_alias: Optional[str],
     root_field_sanitized: str,
     extra_path: Optional[list[str]] = None,
     cast: Optional[tsi_query.CastTo] = None,
@@ -68,7 +68,7 @@ def json_dump_field_as_sql(
 
     Args:
         pb: Parameter builder for SQL parameters
-        table_alias: Table alias for the query
+        table_alias: Table alias for the query (optional, unused in current implementation)
         root_field_sanitized: The root field name (already sanitized)
         extra_path: Optional list of JSON path components
         cast: Optional type to cast the result to
