@@ -4578,7 +4578,7 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: dict) -> dict:
     attributes = _dict_dump_to_dict(ch_call_dict.get("attributes_dump", "{}"))
 
     # For backwards compatibility: inject otel_dump into attributes if present
-    # This allows existing code that expects otel_span in attributes to continue working
+    # Legacy trace servers stored all otel info in attributes, clients expect it
     otel_dump = ch_call_dict.get("otel_dump")
     if otel_dump:
         otel_data = _dict_dump_to_dict(otel_dump)
@@ -4661,7 +4661,6 @@ def _start_call_for_insert_to_ch_insertable_start_call(
     inputs = start_call.inputs
     input_refs = extract_refs_from_values(inputs)
 
-    # Serialize OTEL dump if present
     otel_dump_str = None
     if start_call.otel_dump is not None:
         otel_dump_str = _dict_value_to_dump(start_call.otel_dump)
@@ -4678,7 +4677,7 @@ def _start_call_for_insert_to_ch_insertable_start_call(
         attributes_dump=_dict_value_to_dump(start_call.attributes),
         inputs_dump=_dict_value_to_dump(inputs),
         input_refs=input_refs,
-        otel_dump=otel_dump_str,  # Store serialized OTEL span
+        otel_dump=otel_dump_str,
         wb_run_id=start_call.wb_run_id,
         wb_run_step=start_call.wb_run_step,
         wb_user_id=start_call.wb_user_id,

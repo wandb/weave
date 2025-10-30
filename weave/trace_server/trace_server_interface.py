@@ -172,7 +172,7 @@ class StartedCallSchemaForInsert(BaseModel):
     # Inputs
     inputs: dict[str, Any]
 
-    # OTEL span data (stored separately from attributes for OTEL imports)
+    # OTEL span data source of truth
     otel_dump: Optional[dict[str, Any]] = None
 
     # WB Metadata
