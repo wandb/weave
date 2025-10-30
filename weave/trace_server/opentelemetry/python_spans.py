@@ -355,16 +355,19 @@ class Span:
         else:
             turn_id = None
 
-        wb_run_id = wb_run_id or wandb_attributes.get("wb_run_id") or None
+        ### START HACK
+        # If wb_run_id is defined here - then it came in from the headers
+        # If it contains a '/' then it is a malformed conversion in adapting layer
+        # If it doesn't contain a ':' while this is defined from headers it is a malformed conversion in adapting layer
+        # If it does contain a ':' while this is not defined and the attribute field is defined, again we have a malformed value
+        if not wb_run_id: # headers not defined
+            attr_wb_run_id = wandb_attributes.get("wb_run_id") or None
+            if attr_wb_run_id and not ('/' in attr_wb_run_id or ":" in attr_wb_run_id):
+                wb_run_id = f"{project_id}:{attr_wb_run_id}"
+        ### END HACK
 
-        if wb_run_id:
-            if wb_run_id.find(":") == -1:
-                wb_run_id = f"{project_id}:{wb_run_id}"
-            wb_run_step = wandb_attributes.get("wb_run_step") or None
-            wb_run_step_end = wandb_attributes.get("wb_run_step_end") or None
-        else:
-            wb_run_step = None
-            wb_run_step_end = None
+        wb_run_step = wandb_attributes.get("wb_run_step") or None
+        wb_run_step_end = wandb_attributes.get("wb_run_step_end") or None
 
         if display_name and len(display_name) >= MAX_DISPLAY_NAME_LENGTH:
             display_name = shorten_name(display_name, MAX_DISPLAY_NAME_LENGTH)
