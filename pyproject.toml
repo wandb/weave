@@ -104,7 +104,7 @@ crewai = [
   "crewai-tools>=0.38.0",
   "openai>=1.99.9,<1.100.0",
 ]
-dspy = ["dspy>=2.6.27", "litellm[proxy]", "openai>=1.99.9,<1.100.0"]
+dspy = ["dspy>=3.0.1", "litellm[proxy]", "openai>=1.99.9,<1.100.0"]
 google_genai = ["google-genai>=1.0.0,<=1.23.0", "pillow>=11.1.0"]
 groq = ["groq>=0.13.0"]
 huggingface = ["huggingface-hub>=0.28.1"]
