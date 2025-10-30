@@ -2,10 +2,12 @@ import copy
 import datetime
 from collections import OrderedDict, defaultdict
 from collections.abc import Iterator
-from typing import Any, Optional, cast
+from typing import Any, Literal, Optional, cast
 
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
+
+CallStatus = Literal["running", "completed", "failed"]
 
 
 def make_feedback_query_req(
@@ -223,3 +225,45 @@ def assert_parameter_length_less_than_max(
         raise ValueError(
             f"Parameter: '{param_name}' request length is greater than max length ({max_length}). Actual length: {arr_len}"
         )
+
+
+def determine_call_status(call: tsi.CallSchema) -> CallStatus:
+    """Determine the status of a call based on its state.
+
+    Args:
+        call: The call schema to determine status for.
+
+    Returns:
+        The status of the call: "running", "completed", or "failed".
+    """
+    if call.ended_at is None:
+        return "running"
+    if call.exception is None:
+        return "completed"
+    return "failed"
+
+
+def op_name_matches(op_name: Optional[str], expected_name: str) -> bool:
+    """Check if an op_name URI matches the expected op name.
+
+    Args:
+        op_name: The op_name from a call, which may be a URI or a plain name
+        expected_name: The expected op name to match against
+
+    Returns:
+        True if the op_name matches the expected name
+    """
+    if not op_name:
+        return False
+
+    # If it's a URI, parse it to get the name
+    if op_name.startswith(ri.WEAVE_INTERNAL_SCHEME):
+        try:
+            parsed = ri.parse_internal_uri(op_name)
+            if isinstance(parsed, ri.InternalOpRef):
+                return parsed.name == expected_name
+        except ri.InvalidInternalRef:
+            pass
+
+    # Fallback to direct string comparison for non-URI op names
+    return op_name == expected_name

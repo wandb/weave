@@ -136,6 +136,28 @@ class TestOnlyUserInjectingExternalTraceServer(
         req.wb_user_id = self._user_id
         return super().evaluate_model(req)
 
+    def evaluation_run_delete_v2(
+        self, req: tsi.EvaluationRunDeleteV2Req
+    ) -> tsi.EvaluationRunDeleteV2Res:
+        req.wb_user_id = self._user_id
+        return super().evaluation_run_delete_v2(req)
+
+    def evaluation_run_finish_v2(
+        self, req: tsi.EvaluationRunFinishV2Req
+    ) -> tsi.EvaluationRunFinishV2Res:
+        req.wb_user_id = self._user_id
+        return super().evaluation_run_finish_v2(req)
+
+    def prediction_delete_v2(
+        self, req: tsi.PredictionDeleteV2Req
+    ) -> tsi.PredictionDeleteV2Res:
+        req.wb_user_id = self._user_id
+        return super().prediction_delete_v2(req)
+
+    def score_delete_v2(self, req: tsi.ScoreDeleteV2Req) -> tsi.ScoreDeleteV2Res:
+        req.wb_user_id = self._user_id
+        return super().score_delete_v2(req)
+
 
 def externalize_trace_server(
     trace_server: tsi.TraceServerInterface,

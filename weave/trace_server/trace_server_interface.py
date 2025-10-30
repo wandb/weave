@@ -320,7 +320,7 @@ class CallsDeleteReq(BaseModelStrict):
 
 
 class CallsDeleteRes(BaseModel):
-    pass
+    num_deleted: int = Field(..., description="The number of calls deleted")
 
 
 class CompletionsCreateRequestInputs(BaseModel):
@@ -1695,6 +1695,291 @@ class ModelDeleteV2Res(BaseModel):
     num_deleted: int = Field(..., description="Number of model versions deleted")
 
 
+# Evaluation Run V2 API
+
+
+class EvaluationRunCreateV2Body(BaseModel):
+    evaluation: str = Field(
+        ..., description="Reference to the evaluation (weave:// URI)"
+    )
+    model: str = Field(..., description="Reference to the model (weave:// URI)")
+
+
+class EvaluationRunCreateV2Req(EvaluationRunCreateV2Body):
+    project_id: str = Field(
+        ..., description="The `entity/project` where this evaluation run will be saved"
+    )
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class EvaluationRunCreateV2Res(BaseModel):
+    evaluation_run_id: str = Field(
+        ..., description="The ID of the created evaluation run"
+    )
+
+
+class EvaluationRunReadV2Req(BaseModel):
+    project_id: str = Field(
+        ..., description="The `entity/project` where this evaluation run is saved"
+    )
+    evaluation_run_id: str = Field(..., description="The evaluation run ID")
+
+
+class EvaluationRunReadV2Res(BaseModel):
+    evaluation_run_id: str = Field(..., description="The evaluation run ID")
+    evaluation: str = Field(
+        ..., description="Reference to the evaluation (weave:// URI)"
+    )
+    model: str = Field(..., description="Reference to the model (weave:// URI)")
+    status: Optional[str] = Field(None, description="Status of the evaluation run")
+    started_at: Optional[datetime.datetime] = Field(
+        None, description="When the evaluation run started"
+    )
+    finished_at: Optional[datetime.datetime] = Field(
+        None, description="When the evaluation run finished"
+    )
+    summary: Optional[dict[str, Any]] = Field(
+        None, description="Summary data for the evaluation run"
+    )
+
+
+class EvaluationRunFilterV2(BaseModel):
+    evaluations: Optional[list[str]] = Field(
+        None, description="Filter by evaluation references"
+    )
+    models: Optional[list[str]] = Field(None, description="Filter by model references")
+    evaluation_run_ids: Optional[list[str]] = Field(
+        None, description="Filter by evaluation run IDs"
+    )
+
+
+class EvaluationRunListV2Req(BaseModel):
+    project_id: str = Field(
+        ..., description="The `entity/project` where these evaluation runs are saved"
+    )
+    filter: Optional[EvaluationRunFilterV2] = Field(
+        None, description="Filter criteria for evaluation runs"
+    )
+    limit: Optional[int] = Field(
+        default=None, description="Maximum number of evaluation runs to return"
+    )
+    offset: Optional[int] = Field(
+        default=None, description="Number of evaluation runs to skip"
+    )
+
+
+class EvaluationRunDeleteV2Req(BaseModel):
+    project_id: str = Field(
+        ..., description="The `entity/project` where these evaluation runs exist"
+    )
+    evaluation_run_ids: list[str] = Field(
+        ..., description="List of evaluation run IDs to delete"
+    )
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class EvaluationRunDeleteV2Res(BaseModel):
+    num_deleted: int = Field(..., description="Number of evaluation runs deleted")
+
+
+class EvaluationRunFinishV2Body(BaseModel):
+    """Request body for finishing an evaluation run via REST API.
+
+    This model excludes project_id and evaluation_run_id since they come from the URL path in RESTful endpoints.
+    """
+
+    summary: Optional[dict[str, Any]] = Field(
+        None, description="Optional summary dictionary for the evaluation run"
+    )
+
+
+class EvaluationRunFinishV2Req(EvaluationRunFinishV2Body):
+    project_id: str = Field(
+        ..., description="The `entity/project` where these evaluation runs exist"
+    )
+    evaluation_run_id: str = Field(..., description="The evaluation run ID to finish")
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class EvaluationRunFinishV2Res(BaseModel):
+    success: bool = Field(
+        ..., description="Whether the evaluation run was finished successfully"
+    )
+
+
+class PredictionCreateV2Body(BaseModel):
+    """Request body for creating a Prediction via REST API.
+
+    This model excludes project_id since it comes from the URL path in RESTful endpoints.
+    """
+
+    model: str = Field(..., description="The model reference (weave:// URI)")
+    inputs: dict[str, Any] = Field(..., description="The inputs to the prediction")
+    output: Any = Field(..., description="The output of the prediction")
+    evaluation_run_id: Optional[str] = Field(
+        None,
+        description="Optional evaluation run ID to link this prediction as a child call",
+    )
+
+
+class PredictionCreateV2Req(PredictionCreateV2Body):
+    """Request model for creating a Prediction.
+
+    Extends PredictionCreateV2Body by adding project_id for internal API usage.
+    """
+
+    project_id: str = Field(
+        ..., description="The `entity/project` where this prediction is saved"
+    )
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class PredictionCreateV2Res(BaseModel):
+    prediction_id: str = Field(..., description="The prediction ID")
+
+
+class PredictionReadV2Req(BaseModel):
+    project_id: str = Field(
+        ..., description="The `entity/project` where this prediction is saved"
+    )
+    prediction_id: str = Field(..., description="The prediction ID")
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class PredictionReadV2Res(BaseModel):
+    prediction_id: str = Field(..., description="The prediction ID")
+    model: str = Field(..., description="The model reference (weave:// URI)")
+    inputs: dict[str, Any] = Field(..., description="The inputs to the prediction")
+    output: Any = Field(..., description="The output of the prediction")
+    evaluation_run_id: Optional[str] = Field(
+        None, description="Evaluation run ID if this prediction is linked to one"
+    )
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class PredictionListV2Req(BaseModel):
+    project_id: str = Field(
+        ..., description="The `entity/project` where these predictions are saved"
+    )
+    evaluation_run_id: Optional[str] = Field(
+        None,
+        description="Optional evaluation run ID to filter predictions linked to this run",
+    )
+    limit: Optional[int] = Field(
+        default=None, description="Maximum number of predictions to return"
+    )
+    offset: Optional[int] = Field(
+        default=None, description="Number of predictions to skip"
+    )
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class PredictionListV2Res(BaseModel):
+    predictions: list[PredictionReadV2Res] = Field(..., description="The predictions")
+
+
+class PredictionDeleteV2Req(BaseModel):
+    project_id: str = Field(
+        ..., description="The `entity/project` where these predictions are saved"
+    )
+    prediction_ids: list[str] = Field(..., description="The prediction IDs to delete")
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class PredictionDeleteV2Res(BaseModel):
+    num_deleted: int = Field(..., description="Number of predictions deleted")
+
+
+class PredictionFinishV2Req(BaseModel):
+    project_id: str = Field(
+        ..., description="The `entity/project` where this prediction is saved"
+    )
+    prediction_id: str = Field(..., description="The prediction ID to finish")
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class PredictionFinishV2Res(BaseModel):
+    success: bool = Field(
+        ..., description="Whether the prediction was finished successfully"
+    )
+
+
+class ScoreCreateV2Body(BaseModel):
+    """Request body for creating a Score via REST API.
+
+    This model excludes project_id since it comes from the URL path in RESTful endpoints.
+    """
+
+    prediction_id: str = Field(..., description="The prediction ID")
+    scorer: str = Field(..., description="The scorer reference (weave:// URI)")
+    value: float = Field(..., description="The value of the score")
+    evaluation_run_id: Optional[str] = Field(
+        None,
+        description="Optional evaluation run ID to link this score as a child call",
+    )
+
+
+class ScoreCreateV2Req(ScoreCreateV2Body):
+    """Request model for creating a Score.
+
+    Extends ScoreCreateV2Body by adding project_id for internal API usage.
+    """
+
+    project_id: str = Field(
+        ..., description="The `entity/project` where this score is saved"
+    )
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class ScoreCreateV2Res(BaseModel):
+    score_id: str = Field(..., description="The score ID")
+
+
+class ScoreReadV2Req(BaseModel):
+    project_id: str = Field(
+        ..., description="The `entity/project` where this score is saved"
+    )
+    score_id: str = Field(..., description="The score ID")
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class ScoreReadV2Res(BaseModel):
+    score_id: str = Field(..., description="The score ID")
+    scorer: str = Field(..., description="The scorer reference (weave:// URI)")
+    value: float = Field(..., description="The value of the score")
+    evaluation_run_id: Optional[str] = Field(
+        None, description="Evaluation run ID if this score is linked to one"
+    )
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class ScoreListV2Req(BaseModel):
+    project_id: str = Field(
+        ..., description="The `entity/project` where these scores are saved"
+    )
+    evaluation_run_id: Optional[str] = Field(
+        None,
+        description="Optional evaluation run ID to filter scores linked to this run",
+    )
+    limit: Optional[int] = Field(
+        default=None, description="Maximum number of scores to return"
+    )
+    offset: Optional[int] = Field(default=None, description="Number of scores to skip")
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class ScoreDeleteV2Req(BaseModel):
+    project_id: str = Field(
+        ..., description="The `entity/project` where these scores are saved"
+    )
+    score_ids: list[str] = Field(..., description="The score IDs to delete")
+    wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
+
+
+class ScoreDeleteV2Res(BaseModel):
+    num_deleted: int = Field(..., description="Number of scores deleted")
+
+
 class TraceServerInterface(Protocol):
     def ensure_project_exists(
         self, entity: str, project: str
@@ -1838,6 +2123,44 @@ class TraceServerInterfaceV2(Protocol):
     def model_read_v2(self, req: ModelReadV2Req) -> ModelReadV2Res: ...
     def model_list_v2(self, req: ModelListV2Req) -> Iterator[ModelReadV2Res]: ...
     def model_delete_v2(self, req: ModelDeleteV2Req) -> ModelDeleteV2Res: ...
+
+    # Evaluation Runs
+    def evaluation_run_create_v2(
+        self, req: EvaluationRunCreateV2Req
+    ) -> EvaluationRunCreateV2Res: ...
+    def evaluation_run_read_v2(
+        self, req: EvaluationRunReadV2Req
+    ) -> EvaluationRunReadV2Res: ...
+    def evaluation_run_list_v2(
+        self, req: EvaluationRunListV2Req
+    ) -> Iterator[EvaluationRunReadV2Res]: ...
+    def evaluation_run_delete_v2(
+        self, req: EvaluationRunDeleteV2Req
+    ) -> EvaluationRunDeleteV2Res: ...
+    def evaluation_run_finish_v2(
+        self, req: EvaluationRunFinishV2Req
+    ) -> EvaluationRunFinishV2Res: ...
+
+    # Predictions
+    def prediction_create_v2(
+        self, req: PredictionCreateV2Req
+    ) -> PredictionCreateV2Res: ...
+    def prediction_read_v2(self, req: PredictionReadV2Req) -> PredictionReadV2Res: ...
+    def prediction_list_v2(
+        self, req: PredictionListV2Req
+    ) -> Iterator[PredictionReadV2Res]: ...
+    def prediction_delete_v2(
+        self, req: PredictionDeleteV2Req
+    ) -> PredictionDeleteV2Res: ...
+    def prediction_finish_v2(
+        self, req: PredictionFinishV2Req
+    ) -> PredictionFinishV2Res: ...
+
+    # Scores
+    def score_create_v2(self, req: ScoreCreateV2Req) -> ScoreCreateV2Res: ...
+    def score_read_v2(self, req: ScoreReadV2Req) -> ScoreReadV2Res: ...
+    def score_list_v2(self, req: ScoreListV2Req) -> Iterator[ScoreReadV2Res]: ...
+    def score_delete_v2(self, req: ScoreDeleteV2Req) -> ScoreDeleteV2Res: ...
 
 
 class FullTraceServerInterface(TraceServerInterface, TraceServerInterfaceV2, Protocol):

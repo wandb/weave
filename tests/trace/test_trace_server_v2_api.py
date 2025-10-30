@@ -5,6 +5,10 @@ This module tests the V2 API endpoints for:
 - Datasets (create, read, list, delete)
 - Scorers (create, read, list, delete)
 - Evaluations (create, read, list, delete)
+- Models (create, read, list, delete)
+- Evaluation Runs (create, read, list, delete, finish)
+- Predictions (create, read, list, delete)
+- Scores (create, read, list, delete)
 
 The tests run against both SQLite and ClickHouse backends.
 """
@@ -871,3 +875,845 @@ class MultiVersionModel(weave.Model):
 
         # Verify all versions deleted
         assert delete_res.num_deleted == 3
+
+
+class TestEvaluationRunsV2API:
+    """Tests for Evaluation Runs V2 API endpoints."""
+
+    def test_evaluation_run_create_v2(self, client):
+        """Test creating an evaluation run via V2 API."""
+        project_id = client._project_id()
+        entity, project = project_id.split("/")
+
+        # Create dataset
+        dataset_req = tsi.DatasetCreateV2Req(
+            project_id=project_id,
+            name="eval_run_dataset",
+            rows=[{"input": "test", "output": "result"}],
+        )
+        dataset_res = client.server.dataset_create_v2(dataset_req)
+        dataset_ref = f"weave:///{entity}/{project}/object/{dataset_res.object_id}:{dataset_res.digest}"
+
+        # Create evaluation
+        eval_req = tsi.EvaluationCreateV2Req(
+            project_id=project_id,
+            name="eval_run_evaluation",
+            dataset=dataset_ref,
+            scorers=[],
+        )
+        eval_res = client.server.evaluation_create_v2(eval_req)
+
+        # Create model
+        model_req = tsi.ModelCreateV2Req(
+            project_id=project_id,
+            name="EvalRunModel",
+            source_code="""import weave
+
+class EvalRunModel(weave.Model):
+    @weave.op()
+    def predict(self, input: str) -> str:
+        return "prediction"
+""",
+        )
+        model_res = client.server.model_create_v2(model_req)
+
+        # Create evaluation run
+        run_req = tsi.EvaluationRunCreateV2Req(
+            project_id=project_id,
+            evaluation=eval_res.evaluation_ref,
+            model=model_res.model_ref,
+        )
+        run_res = client.server.evaluation_run_create_v2(run_req)
+
+        # Verify response
+        assert run_res.evaluation_run_id is not None
+
+    def test_evaluation_run_read_v2(self, client):
+        """Test reading an evaluation run via V2 API."""
+        project_id = client._project_id()
+        entity, project = project_id.split("/")
+
+        # Create necessary components
+        dataset_req = tsi.DatasetCreateV2Req(
+            project_id=project_id,
+            name="read_eval_run_dataset",
+            rows=[{"x": 1}],
+        )
+        dataset_res = client.server.dataset_create_v2(dataset_req)
+        dataset_ref = f"weave:///{entity}/{project}/object/{dataset_res.object_id}:{dataset_res.digest}"
+
+        eval_req = tsi.EvaluationCreateV2Req(
+            project_id=project_id,
+            name="read_eval_run_evaluation",
+            dataset=dataset_ref,
+            scorers=[],
+        )
+        eval_res = client.server.evaluation_create_v2(eval_req)
+
+        model_req = tsi.ModelCreateV2Req(
+            project_id=project_id,
+            name="ReadEvalRunModel",
+            source_code="""import weave
+
+class ReadEvalRunModel(weave.Model):
+    @weave.op()
+    def predict(self, input):
+        return "output"
+""",
+        )
+        model_res = client.server.model_create_v2(model_req)
+
+        # Create evaluation run
+        run_req = tsi.EvaluationRunCreateV2Req(
+            project_id=project_id,
+            evaluation=eval_res.evaluation_ref,
+            model=model_res.model_ref,
+        )
+        run_res = client.server.evaluation_run_create_v2(run_req)
+
+        # Read the evaluation run
+        read_req = tsi.EvaluationRunReadV2Req(
+            project_id=project_id,
+            evaluation_run_id=run_res.evaluation_run_id,
+        )
+        read_res = client.server.evaluation_run_read_v2(read_req)
+
+        # Verify response
+        assert read_res.evaluation_run_id == run_res.evaluation_run_id
+        assert read_res.evaluation == eval_res.evaluation_ref
+        assert read_res.model == model_res.model_ref
+
+    def test_evaluation_run_list_v2(self, client):
+        """Test listing evaluation runs via V2 API."""
+        project_id = client._project_id()
+        entity, project = project_id.split("/")
+
+        # Create dataset
+        dataset_req = tsi.DatasetCreateV2Req(
+            project_id=project_id,
+            name="list_eval_run_dataset",
+            rows=[{"data": "value"}],
+        )
+        dataset_res = client.server.dataset_create_v2(dataset_req)
+        dataset_ref = f"weave:///{entity}/{project}/object/{dataset_res.object_id}:{dataset_res.digest}"
+
+        # Create evaluation
+        eval_req = tsi.EvaluationCreateV2Req(
+            project_id=project_id,
+            name="list_eval_run_evaluation",
+            dataset=dataset_ref,
+            scorers=[],
+        )
+        eval_res = client.server.evaluation_create_v2(eval_req)
+
+        # Create models and runs
+        run_ids = []
+        for i in range(3):
+            model_req = tsi.ModelCreateV2Req(
+                project_id=project_id,
+                name=f"ListEvalRunModel{i}",
+                source_code=f"""import weave
+
+class ListEvalRunModel{i}(weave.Model):
+    @weave.op()
+    def predict(self, input):
+        return {i}
+""",
+            )
+            model_res = client.server.model_create_v2(model_req)
+
+            run_req = tsi.EvaluationRunCreateV2Req(
+                project_id=project_id,
+                evaluation=eval_res.evaluation_ref,
+                model=model_res.model_ref,
+            )
+            run_res = client.server.evaluation_run_create_v2(run_req)
+            run_ids.append(run_res.evaluation_run_id)
+
+        # List evaluation runs
+        list_req = tsi.EvaluationRunListV2Req(project_id=project_id)
+        runs = list(client.server.evaluation_run_list_v2(list_req))
+
+        # Verify we get at least our 3 runs
+        assert len(runs) >= 3
+        returned_ids = [r.evaluation_run_id for r in runs]
+        for run_id in run_ids:
+            assert run_id in returned_ids
+
+    def test_evaluation_run_delete_v2(self, client):
+        """Test deleting evaluation runs via V2 API."""
+        project_id = client._project_id()
+        entity, project = project_id.split("/")
+
+        # Create dataset
+        dataset_req = tsi.DatasetCreateV2Req(
+            project_id=project_id,
+            name="delete_eval_run_dataset",
+            rows=[{"data": "test"}],
+        )
+        dataset_res = client.server.dataset_create_v2(dataset_req)
+        dataset_ref = f"weave:///{entity}/{project}/object/{dataset_res.object_id}:{dataset_res.digest}"
+
+        # Create evaluation
+        eval_req = tsi.EvaluationCreateV2Req(
+            project_id=project_id,
+            name="delete_eval_run_evaluation",
+            dataset=dataset_ref,
+            scorers=[],
+        )
+        eval_res = client.server.evaluation_create_v2(eval_req)
+
+        # Create model
+        model_req = tsi.ModelCreateV2Req(
+            project_id=project_id,
+            name="DeleteEvalRunModel",
+            source_code="""import weave
+
+class DeleteEvalRunModel(weave.Model):
+    @weave.op()
+    def predict(self, input):
+        return "output"
+""",
+        )
+        model_res = client.server.model_create_v2(model_req)
+
+        # Create evaluation run
+        run_req = tsi.EvaluationRunCreateV2Req(
+            project_id=project_id,
+            evaluation=eval_res.evaluation_ref,
+            model=model_res.model_ref,
+        )
+        run_res = client.server.evaluation_run_create_v2(run_req)
+
+        # Delete the evaluation run
+        delete_req = tsi.EvaluationRunDeleteV2Req(
+            project_id=project_id,
+            evaluation_run_ids=[run_res.evaluation_run_id],
+        )
+        delete_res = client.server.evaluation_run_delete_v2(delete_req)
+
+        # Verify deletion
+        assert delete_res.num_deleted == 1
+
+    def test_evaluation_run_finish_v2(self, client):
+        """Test finishing an evaluation run via V2 API."""
+        project_id = client._project_id()
+        entity, project = project_id.split("/")
+
+        # Create dataset
+        dataset_req = tsi.DatasetCreateV2Req(
+            project_id=project_id,
+            name="finish_eval_run_dataset",
+            rows=[{"data": "test"}],
+        )
+        dataset_res = client.server.dataset_create_v2(dataset_req)
+        dataset_ref = f"weave:///{entity}/{project}/object/{dataset_res.object_id}:{dataset_res.digest}"
+
+        # Create evaluation
+        eval_req = tsi.EvaluationCreateV2Req(
+            project_id=project_id,
+            name="finish_eval_run_evaluation",
+            dataset=dataset_ref,
+            scorers=[],
+        )
+        eval_res = client.server.evaluation_create_v2(eval_req)
+
+        # Create model
+        model_req = tsi.ModelCreateV2Req(
+            project_id=project_id,
+            name="FinishEvalRunModel",
+            source_code="""import weave
+
+class FinishEvalRunModel(weave.Model):
+    @weave.op()
+    def predict(self, input):
+        return "output"
+""",
+        )
+        model_res = client.server.model_create_v2(model_req)
+
+        # Create evaluation run
+        run_req = tsi.EvaluationRunCreateV2Req(
+            project_id=project_id,
+            evaluation=eval_res.evaluation_ref,
+            model=model_res.model_ref,
+        )
+        run_res = client.server.evaluation_run_create_v2(run_req)
+
+        # Finish the evaluation run
+        finish_req = tsi.EvaluationRunFinishV2Req(
+            project_id=project_id,
+            evaluation_run_id=run_res.evaluation_run_id,
+            summary={"accuracy": 0.95, "total": 100},
+        )
+        finish_res = client.server.evaluation_run_finish_v2(finish_req)
+
+        # Verify finish response
+        assert finish_res.success is True
+
+
+class TestPredictionsV2API:
+    """Tests for Predictions V2 API endpoints."""
+
+    def test_prediction_create_v2(self, client):
+        """Test creating a prediction via V2 API."""
+        project_id = client._project_id()
+        entity, project = project_id.split("/")
+
+        # Create model
+        model_req = tsi.ModelCreateV2Req(
+            project_id=project_id,
+            name="PredictionTestModel",
+            source_code="""import weave
+
+class PredictionTestModel(weave.Model):
+    @weave.op()
+    def predict(self, input: str) -> str:
+        return f"prediction for {input}"
+""",
+        )
+        model_res = client.server.model_create_v2(model_req)
+
+        # Create prediction
+        pred_req = tsi.PredictionCreateV2Req(
+            project_id=project_id,
+            model=model_res.model_ref,
+            inputs={"input": "test query"},
+            output="prediction for test query",
+        )
+        pred_res = client.server.prediction_create_v2(pred_req)
+
+        # Verify response
+        assert pred_res.prediction_id is not None
+
+    def test_prediction_read_v2(self, client):
+        """Test reading a prediction via V2 API."""
+        project_id = client._project_id()
+        entity, project = project_id.split("/")
+
+        # Create model
+        model_req = tsi.ModelCreateV2Req(
+            project_id=project_id,
+            name="ReadPredictionModel",
+            source_code="""import weave
+
+class ReadPredictionModel(weave.Model):
+    @weave.op()
+    def predict(self, input: str) -> str:
+        return "result"
+""",
+        )
+        model_res = client.server.model_create_v2(model_req)
+
+        # Create prediction
+        pred_req = tsi.PredictionCreateV2Req(
+            project_id=project_id,
+            model=model_res.model_ref,
+            inputs={"question": "What is 2+2?"},
+            output="4",
+        )
+        pred_res = client.server.prediction_create_v2(pred_req)
+
+        # Read the prediction
+        read_req = tsi.PredictionReadV2Req(
+            project_id=project_id,
+            prediction_id=pred_res.prediction_id,
+        )
+        read_res = client.server.prediction_read_v2(read_req)
+
+        # Verify response
+        assert read_res.prediction_id == pred_res.prediction_id
+        assert read_res.model == model_res.model_ref
+        assert read_res.inputs == {"question": "What is 2+2?"}
+        assert read_res.output == "4"
+
+    def test_prediction_list_v2(self, client):
+        """Test listing predictions via V2 API."""
+        project_id = client._project_id()
+        entity, project = project_id.split("/")
+
+        # Create model
+        model_req = tsi.ModelCreateV2Req(
+            project_id=project_id,
+            name="ListPredictionModel",
+            source_code="""import weave
+
+class ListPredictionModel(weave.Model):
+    @weave.op()
+    def predict(self, input):
+        return "output"
+""",
+        )
+        model_res = client.server.model_create_v2(model_req)
+
+        # Create multiple predictions
+        pred_ids = []
+        for i in range(3):
+            pred_req = tsi.PredictionCreateV2Req(
+                project_id=project_id,
+                model=model_res.model_ref,
+                inputs={"value": i},
+                output=f"result_{i}",
+            )
+            pred_res = client.server.prediction_create_v2(pred_req)
+            pred_ids.append(pred_res.prediction_id)
+
+        # List predictions
+        list_req = tsi.PredictionListV2Req(project_id=project_id)
+        predictions = list(client.server.prediction_list_v2(list_req))
+
+        # Verify we get at least our 3 predictions
+        assert len(predictions) >= 3
+        returned_ids = [p.prediction_id for p in predictions]
+        for pred_id in pred_ids:
+            assert pred_id in returned_ids
+
+    def test_prediction_delete_v2(self, client):
+        """Test deleting predictions via V2 API."""
+        project_id = client._project_id()
+        entity, project = project_id.split("/")
+
+        # Create model
+        model_req = tsi.ModelCreateV2Req(
+            project_id=project_id,
+            name="DeletePredictionModel",
+            source_code="""import weave
+
+class DeletePredictionModel(weave.Model):
+    @weave.op()
+    def predict(self, input):
+        return "output"
+""",
+        )
+        model_res = client.server.model_create_v2(model_req)
+
+        # Create predictions
+        pred_ids = []
+        for i in range(2):
+            pred_req = tsi.PredictionCreateV2Req(
+                project_id=project_id,
+                model=model_res.model_ref,
+                inputs={"x": i},
+                output=i * 2,
+            )
+            pred_res = client.server.prediction_create_v2(pred_req)
+            pred_ids.append(pred_res.prediction_id)
+
+        # Delete the predictions
+        delete_req = tsi.PredictionDeleteV2Req(
+            project_id=project_id,
+            prediction_ids=pred_ids,
+        )
+        delete_res = client.server.prediction_delete_v2(delete_req)
+
+        # Verify deletion
+        assert delete_res.num_deleted == 2
+
+    def test_prediction_with_evaluation_run(self, client):
+        """Test creating a prediction linked to an evaluation run."""
+        project_id = client._project_id()
+        entity, project = project_id.split("/")
+
+        # Create dataset
+        dataset_req = tsi.DatasetCreateV2Req(
+            project_id=project_id,
+            name="pred_eval_run_dataset",
+            rows=[{"input": "test"}],
+        )
+        dataset_res = client.server.dataset_create_v2(dataset_req)
+        dataset_ref = f"weave:///{entity}/{project}/object/{dataset_res.object_id}:{dataset_res.digest}"
+
+        # Create evaluation
+        eval_req = tsi.EvaluationCreateV2Req(
+            project_id=project_id,
+            name="pred_eval_run_evaluation",
+            dataset=dataset_ref,
+            scorers=[],
+        )
+        eval_res = client.server.evaluation_create_v2(eval_req)
+
+        # Create model
+        model_req = tsi.ModelCreateV2Req(
+            project_id=project_id,
+            name="PredEvalRunModel",
+            source_code="""import weave
+
+class PredEvalRunModel(weave.Model):
+    @weave.op()
+    def predict(self, input):
+        return "output"
+""",
+        )
+        model_res = client.server.model_create_v2(model_req)
+
+        # Create evaluation run
+        run_req = tsi.EvaluationRunCreateV2Req(
+            project_id=project_id,
+            evaluation=eval_res.evaluation_ref,
+            model=model_res.model_ref,
+        )
+        run_res = client.server.evaluation_run_create_v2(run_req)
+
+        # Create prediction linked to evaluation run
+        pred_req = tsi.PredictionCreateV2Req(
+            project_id=project_id,
+            model=model_res.model_ref,
+            inputs={"input": "test"},
+            output="result",
+            evaluation_run_id=run_res.evaluation_run_id,
+        )
+        pred_res = client.server.prediction_create_v2(pred_req)
+
+        # Read and verify the link
+        read_req = tsi.PredictionReadV2Req(
+            project_id=project_id,
+            prediction_id=pred_res.prediction_id,
+        )
+        read_res = client.server.prediction_read_v2(read_req)
+
+        assert read_res.evaluation_run_id == run_res.evaluation_run_id
+
+        # Finish the prediction (which should end the predict_and_score call with model_latency)
+        finish_req = tsi.PredictionFinishV2Req(
+            project_id=project_id,
+            prediction_id=pred_res.prediction_id,
+        )
+        finish_res = client.server.prediction_finish_v2(finish_req)
+        assert finish_res.success is True
+
+        # Verify the predict_and_score call has model_latency in its output
+        prediction_call_req = tsi.CallReadReq(
+            project_id=project_id,
+            id=pred_res.prediction_id,
+        )
+        prediction_call_res = client.server.call_read(prediction_call_req)
+        assert prediction_call_res.call is not None
+        assert prediction_call_res.call.parent_id is not None
+
+        # Read the predict_and_score call (parent of prediction)
+        predict_and_score_req = tsi.CallReadReq(
+            project_id=project_id,
+            id=prediction_call_res.call.parent_id,
+        )
+        predict_and_score_res = client.server.call_read(predict_and_score_req)
+        assert predict_and_score_res.call is not None
+        assert predict_and_score_res.call.output is not None
+        assert "model_latency" in predict_and_score_res.call.output
+        assert isinstance(predict_and_score_res.call.output["model_latency"], dict)
+        assert "mean" in predict_and_score_res.call.output["model_latency"]
+        assert isinstance(
+            predict_and_score_res.call.output["model_latency"]["mean"], (int, float)
+        )
+        assert predict_and_score_res.call.output["model_latency"]["mean"] >= 0
+        assert "output" in predict_and_score_res.call.output
+        assert predict_and_score_res.call.output["output"] == "result"
+
+
+class TestScoresV2API:
+    """Tests for Scores V2 API endpoints."""
+
+    def test_score_create_v2(self, client):
+        """Test creating a score via V2 API."""
+        project_id = client._project_id()
+        entity, project = project_id.split("/")
+
+        # Create scorer
+        scorer_req = tsi.ScorerCreateV2Req(
+            project_id=project_id,
+            name="score_test_scorer",
+            op_source_code="def score(output, target):\n    return 1.0",
+        )
+        scorer_res = client.server.scorer_create_v2(scorer_req)
+        scorer_ref = f"weave:///{entity}/{project}/object/{scorer_res.object_id}:{scorer_res.digest}"
+
+        # Create model
+        model_req = tsi.ModelCreateV2Req(
+            project_id=project_id,
+            name="ScoreTestModel",
+            source_code="""import weave
+
+class ScoreTestModel(weave.Model):
+    @weave.op()
+    def predict(self, input):
+        return "output"
+""",
+        )
+        model_res = client.server.model_create_v2(model_req)
+
+        # Create prediction
+        pred_req = tsi.PredictionCreateV2Req(
+            project_id=project_id,
+            model=model_res.model_ref,
+            inputs={"input": "test"},
+            output="result",
+        )
+        pred_res = client.server.prediction_create_v2(pred_req)
+
+        # Create score
+        score_req = tsi.ScoreCreateV2Req(
+            project_id=project_id,
+            prediction_id=pred_res.prediction_id,
+            scorer=scorer_ref,
+            value=0.95,
+        )
+        score_res = client.server.score_create_v2(score_req)
+
+        # Verify response
+        assert score_res.score_id is not None
+
+    def test_score_read_v2(self, client):
+        """Test reading a score via V2 API."""
+        project_id = client._project_id()
+        entity, project = project_id.split("/")
+
+        # Create scorer
+        scorer_req = tsi.ScorerCreateV2Req(
+            project_id=project_id,
+            name="read_score_scorer",
+            op_source_code="def score(output):\n    return len(output)",
+        )
+        scorer_res = client.server.scorer_create_v2(scorer_req)
+        scorer_ref = f"weave:///{entity}/{project}/object/{scorer_res.object_id}:{scorer_res.digest}"
+
+        # Create model
+        model_req = tsi.ModelCreateV2Req(
+            project_id=project_id,
+            name="ReadScoreModel",
+            source_code="""import weave
+
+class ReadScoreModel(weave.Model):
+    @weave.op()
+    def predict(self, input):
+        return "output"
+""",
+        )
+        model_res = client.server.model_create_v2(model_req)
+
+        # Create prediction
+        pred_req = tsi.PredictionCreateV2Req(
+            project_id=project_id,
+            model=model_res.model_ref,
+            inputs={"input": "question"},
+            output="answer",
+        )
+        pred_res = client.server.prediction_create_v2(pred_req)
+
+        # Create score
+        score_req = tsi.ScoreCreateV2Req(
+            project_id=project_id,
+            prediction_id=pred_res.prediction_id,
+            scorer=scorer_ref,
+            value=0.85,
+        )
+        score_res = client.server.score_create_v2(score_req)
+
+        # Read the score
+        read_req = tsi.ScoreReadV2Req(
+            project_id=project_id,
+            score_id=score_res.score_id,
+        )
+        read_res = client.server.score_read_v2(read_req)
+
+        # Verify response
+        assert read_res.score_id == score_res.score_id
+        assert read_res.scorer == scorer_ref
+        assert read_res.value == 0.85
+
+    def test_score_list_v2(self, client):
+        """Test listing scores via V2 API."""
+        project_id = client._project_id()
+        entity, project = project_id.split("/")
+
+        # Create scorer
+        scorer_req = tsi.ScorerCreateV2Req(
+            project_id=project_id,
+            name="list_score_scorer",
+            op_source_code="def score(output):\n    return 1.0",
+        )
+        scorer_res = client.server.scorer_create_v2(scorer_req)
+        scorer_ref = f"weave:///{entity}/{project}/object/{scorer_res.object_id}:{scorer_res.digest}"
+
+        # Create model
+        model_req = tsi.ModelCreateV2Req(
+            project_id=project_id,
+            name="ListScoreModel",
+            source_code="""import weave
+
+class ListScoreModel(weave.Model):
+    @weave.op()
+    def predict(self, input):
+        return "output"
+""",
+        )
+        model_res = client.server.model_create_v2(model_req)
+
+        # Create predictions and scores
+        score_ids = []
+        for i in range(3):
+            pred_req = tsi.PredictionCreateV2Req(
+                project_id=project_id,
+                model=model_res.model_ref,
+                inputs={"value": i},
+                output=f"result_{i}",
+            )
+            pred_res = client.server.prediction_create_v2(pred_req)
+
+            score_req = tsi.ScoreCreateV2Req(
+                project_id=project_id,
+                prediction_id=pred_res.prediction_id,
+                scorer=scorer_ref,
+                value=float(i) / 10,
+            )
+            score_res = client.server.score_create_v2(score_req)
+            score_ids.append(score_res.score_id)
+
+        # List scores
+        list_req = tsi.ScoreListV2Req(project_id=project_id)
+        scores = list(client.server.score_list_v2(list_req))
+
+        # Verify we get at least our 3 scores
+        assert len(scores) >= 3
+        returned_ids = [s.score_id for s in scores]
+        for score_id in score_ids:
+            assert score_id in returned_ids
+
+    def test_score_delete_v2(self, client):
+        """Test deleting scores via V2 API."""
+        project_id = client._project_id()
+        entity, project = project_id.split("/")
+
+        # Create scorer
+        scorer_req = tsi.ScorerCreateV2Req(
+            project_id=project_id,
+            name="delete_score_scorer",
+            op_source_code="def score(output):\n    return 1.0",
+        )
+        scorer_res = client.server.scorer_create_v2(scorer_req)
+        scorer_ref = f"weave:///{entity}/{project}/object/{scorer_res.object_id}:{scorer_res.digest}"
+
+        # Create model
+        model_req = tsi.ModelCreateV2Req(
+            project_id=project_id,
+            name="DeleteScoreModel",
+            source_code="""import weave
+
+class DeleteScoreModel(weave.Model):
+    @weave.op()
+    def predict(self, input):
+        return "output"
+""",
+        )
+        model_res = client.server.model_create_v2(model_req)
+
+        # Create predictions and scores
+        score_ids = []
+        for i in range(2):
+            pred_req = tsi.PredictionCreateV2Req(
+                project_id=project_id,
+                model=model_res.model_ref,
+                inputs={"x": i},
+                output=i * 2,
+            )
+            pred_res = client.server.prediction_create_v2(pred_req)
+
+            score_req = tsi.ScoreCreateV2Req(
+                project_id=project_id,
+                prediction_id=pred_res.prediction_id,
+                scorer=scorer_ref,
+                value=0.5 * i,
+            )
+            score_res = client.server.score_create_v2(score_req)
+            score_ids.append(score_res.score_id)
+
+        # Delete the scores
+        delete_req = tsi.ScoreDeleteV2Req(
+            project_id=project_id,
+            score_ids=score_ids,
+        )
+        delete_res = client.server.score_delete_v2(delete_req)
+
+        # Verify deletion
+        assert delete_res.num_deleted == 2
+
+    def test_score_with_evaluation_run(self, client):
+        """Test creating a score linked to an evaluation run."""
+        project_id = client._project_id()
+        entity, project = project_id.split("/")
+
+        # Create dataset
+        dataset_req = tsi.DatasetCreateV2Req(
+            project_id=project_id,
+            name="score_eval_run_dataset",
+            rows=[{"input": "test"}],
+        )
+        dataset_res = client.server.dataset_create_v2(dataset_req)
+        dataset_ref = f"weave:///{entity}/{project}/object/{dataset_res.object_id}:{dataset_res.digest}"
+
+        # Create scorer
+        scorer_req = tsi.ScorerCreateV2Req(
+            project_id=project_id,
+            name="eval_run_scorer",
+            op_source_code="def score(output):\n    return 1.0",
+        )
+        scorer_res = client.server.scorer_create_v2(scorer_req)
+        scorer_ref = f"weave:///{entity}/{project}/object/{scorer_res.object_id}:{scorer_res.digest}"
+
+        # Create evaluation
+        eval_req = tsi.EvaluationCreateV2Req(
+            project_id=project_id,
+            name="score_eval_run_evaluation",
+            dataset=dataset_ref,
+            scorers=[scorer_ref],
+        )
+        eval_res = client.server.evaluation_create_v2(eval_req)
+
+        # Create model
+        model_req = tsi.ModelCreateV2Req(
+            project_id=project_id,
+            name="ScoreEvalRunModel",
+            source_code="""import weave
+
+class ScoreEvalRunModel(weave.Model):
+    @weave.op()
+    def predict(self, input):
+        return "output"
+""",
+        )
+        model_res = client.server.model_create_v2(model_req)
+
+        # Create evaluation run
+        run_req = tsi.EvaluationRunCreateV2Req(
+            project_id=project_id,
+            evaluation=eval_res.evaluation_ref,
+            model=model_res.model_ref,
+        )
+        run_res = client.server.evaluation_run_create_v2(run_req)
+
+        # Create prediction
+        pred_req = tsi.PredictionCreateV2Req(
+            project_id=project_id,
+            model=model_res.model_ref,
+            inputs={"input": "test"},
+            output="result",
+            evaluation_run_id=run_res.evaluation_run_id,
+        )
+        pred_res = client.server.prediction_create_v2(pred_req)
+
+        # Create score linked to evaluation run
+        score_req = tsi.ScoreCreateV2Req(
+            project_id=project_id,
+            prediction_id=pred_res.prediction_id,
+            scorer=scorer_ref,
+            value=0.9,
+            evaluation_run_id=run_res.evaluation_run_id,
+        )
+        score_res = client.server.score_create_v2(score_req)
+
+        # Read and verify the link
+        read_req = tsi.ScoreReadV2Req(
+            project_id=project_id,
+            score_id=score_res.score_id,
+        )
+        read_res = client.server.score_read_v2(read_req)
+
+        assert read_res.evaluation_run_id == run_res.evaluation_run_id
