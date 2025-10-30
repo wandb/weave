@@ -103,6 +103,8 @@ USAGE_KEYS = {
 
 # ATTRIBUTE_KEYS: Maps common LLM call metadata attributes to the types of attributes expected in weave traces
 # This is used to populate the `attributes_dump` column in clickhouse
+# Legacy: Prior to dumping, the full span is dumped under another key not listed here called `otel_span`
+# Now: we inject the otel_span key into attributes at runtime, data is dumped to a special `otel_dump` column
 ATTRIBUTE_KEYS = {
     # System prompt/instructions
     "system": [
