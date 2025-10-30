@@ -8,7 +8,6 @@ Orchestrators manage the entire query building process:
 """
 
 import logging
-import re
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Literal, Optional, cast
 
@@ -541,33 +540,21 @@ class CallsCompleteOrchestrator(BaseQueryOrchestrator):
     """Orchestrator for calls_complete table queries.
 
     Handles:
-    - include_running=True via UNION ALL with call_starts
+    - include_running via ended_at IS NULL filter
     - No aggregation (direct field access)
-    - complete and parts_only CTEs
+    - Simplified: no union logic needed
     """
 
     def _build_table_specific_ctes_phase(self) -> None:
-        """Build include_running CTEs if needed."""
-        if not self.query.include_running:
-            # Build optimization CTE for complete-only queries
-            if self._should_use_filter_cte():
-                filter_cte_sql = self._build_filtered_calls_cte()
-                self.cte_registry.add_cte("filtered_calls", filter_cte_sql)
-            return
-
-        # Build CTEs for complete and running calls
-        complete_cte_sql = self._build_complete_cte()
-        parts_only_cte_sql = self._build_parts_only_cte()
-
-        self.cte_registry.add_cte("complete", complete_cte_sql)
-        self.cte_registry.add_cte("parts_only", parts_only_cte_sql)
+        """Build optimization CTE if needed."""
+        # Build optimization CTE for queries with heavy fields
+        if self._should_use_filter_cte():
+            filter_cte_sql = self._build_filtered_calls_cte()
+            self.cte_registry.add_cte("filtered_calls", filter_cte_sql)
 
     def _build_main_query_phase(self) -> str:
-        """Build main query - UNION ALL if include_running, else simple SELECT."""
-        if self.query.include_running:
-            return self._build_union_all_query()
-        else:
-            return self._build_simple_query()
+        """Build main query - simple SELECT with optional ended_at filter."""
+        return self._build_simple_query()
 
     def _should_use_filter_cte(self) -> bool:
         """Determine if we should use a filter CTE for optimization."""
@@ -576,7 +563,7 @@ class CallsCompleteOrchestrator(BaseQueryOrchestrator):
         return "inputs_dump" in select_fields_str or "output_dump" in select_fields_str
 
     def _build_filtered_calls_cte(self) -> str:
-        """Build filtered_calls CTE for complete-only queries."""
+        """Build filtered_calls CTE for optimization."""
         table_alias = "calls_complete"
 
         # Build filter conditions
@@ -591,6 +578,11 @@ class CallsCompleteOrchestrator(BaseQueryOrchestrator):
 
         # Build WHERE conditions
         where_conditions = [f"project_id = {self.project_id_param_slot}"]
+
+        # Add ended_at filter based on include_running
+        if not self.query.include_running:
+            where_conditions.append(f"{table_alias}.ended_at IS NOT NULL")
+
         where_conditions.extend(filter_conditions)
         where_conditions.extend(self._build_optimization_filters(table_alias))
 
@@ -620,254 +612,8 @@ class CallsCompleteOrchestrator(BaseQueryOrchestrator):
             logger,
         )
 
-    def _build_complete_cte(self) -> str:
-        """Build CTE to get IDs of complete calls.
-
-        Note: We don't limit here because we need to combine with running calls
-        and deduplicate before limiting to ensure we get the most recent N calls overall.
-        """
-        table_alias = "calls_complete"
-
-        # Build filter conditions
-        filter_conditions = build_filter_conditions(
-            self.pb,
-            self.query.query_conditions,
-            self.query.hardcoded_filter,
-            table_alias,
-            self.query.expand_columns,
-            self._get_field_to_object_join_alias_map(),
-        )
-
-        # Build WHERE conditions
-        where_conditions = [f"project_id = {self.project_id_param_slot}"]
-        where_conditions.extend(filter_conditions)
-        where_conditions.extend(self._build_optimization_filters(table_alias))
-
-        where_sql = combine_conditions(where_conditions, "AND")
-
-        return safely_format_sql(
-            f"""
-            SELECT id
-            FROM {table_alias}
-            WHERE {where_sql}
-            """,
-            logger,
-        )
-
-    def _build_parts_only_cte(self) -> str:
-        """Build CTE to get IDs of running calls (not in complete).
-
-        Note: We don't limit here because we need to combine with complete calls
-        and deduplicate before limiting to ensure we get the most recent N calls overall.
-        """
-        table_alias = "call_starts"
-
-        # Build filter conditions compatible with call_starts
-        filter_conditions = self._build_call_starts_compatible_filters()
-
-        # Build WHERE conditions
-        where_conditions = [f"project_id = {self.project_id_param_slot}"]
-        where_conditions.extend(filter_conditions)
-        where_conditions.append("id NOT IN (SELECT id FROM complete)")
-        where_conditions.extend(self._build_optimization_filters(table_alias))
-
-        where_sql = combine_conditions(where_conditions, "AND")
-
-        return safely_format_sql(
-            f"""
-            SELECT id
-            FROM {table_alias}
-            WHERE {where_sql}
-            """,
-            logger,
-        )
-
-    def _build_union_all_query(self) -> str:
-        """Build UNION ALL query for complete + running calls.
-
-        Uses a subquery with deduplication to ensure:
-        1. No duplicates between complete and running calls
-        2. Complete calls are preferred over running calls (they have more data)
-        3. We get exactly the most recent N calls overall
-
-        Strategy: Add a priority field (1 for complete, 0 for running) and use
-        ROW_NUMBER() to deduplicate, keeping the highest priority version.
-        """
-        # Build complete calls SELECT with priority
-        complete_select = self._build_complete_select_with_priority(priority=1)
-
-        # Build running calls SELECT with priority (with NULL for missing fields)
-        running_select = self._build_running_select_with_priority(priority=0)
-
-        # Build ORDER BY that works on UNION ALL result
-        order_by_clause = build_order_by_clause(
-            self.pb,
-            self.query.order_fields,
-            "calls_complete",
-            self.query.expand_columns,
-            self._get_field_to_object_join_alias_map(),
-        )
-
-        # Strip table prefixes from ORDER BY (UNION ALL doesn't have table aliases)
-        if order_by_clause:
-            order_by_clause = re.sub(
-                r"\b(calls_complete|call_starts|j\d+)\.", "", order_by_clause
-            )
-        else:
-            order_by_clause = "ORDER BY started_at DESC"
-
-        limit_clause, offset_clause = build_limit_offset_clause(
-            self.query.limit, self.query.offset
-        )
-
-        # Get list of select fields for the outer SELECT
-        select_fields = ", ".join(
-            field.field if hasattr(field, "field") else str(field)
-            for field in self.query.select_fields
-        )
-
-        # Wrap in subquery with deduplication using ROW_NUMBER()
-        # Higher priority (complete = 1) will be selected over lower priority (running = 0)
-        return safely_format_sql(
-            f"""
-            SELECT {select_fields}
-            FROM (
-                SELECT
-                    {select_fields},
-                    ROW_NUMBER() OVER (PARTITION BY id ORDER BY _priority DESC) AS _rn
-                FROM (
-                    {complete_select}
-                    UNION ALL
-                    {running_select}
-                )
-            )
-            WHERE _rn = 1
-            {order_by_clause}
-            {limit_clause}
-            {offset_clause}
-            """,
-            logger,
-        )
-
-    def _build_complete_select(self) -> str:
-        """Build SELECT for complete calls."""
-        return self._build_complete_select_with_priority(priority=None)
-
-    def _build_complete_select_with_priority(self, priority: Optional[int]) -> str:
-        """Build SELECT for complete calls, optionally with a priority field."""
-        table_alias = "calls_complete"
-
-        select_fields_sql = ", ".join(
-            field.as_select_sql(self.pb, table_alias)
-            for field in self.query.select_fields
-        )
-
-        # Add priority field if specified
-        if priority is not None:
-            select_fields_sql = f"{select_fields_sql}, {priority} AS _priority"
-
-        joins = build_query_joins(
-            self.pb,
-            table_alias,
-            self.project_id_param_slot,
-            needs_feedback=self._determine_needs_feedback(),
-            include_storage_size=self.query.include_storage_size,
-            include_total_storage_size=self.query.include_total_storage_size,
-            order_fields=self.query.order_fields,
-            expand_columns=self.query.expand_columns,
-            field_to_object_join_alias_map=self._get_field_to_object_join_alias_map(),
-        )
-
-        joins_sql = "\n".join(joins)
-
-        where_conditions = [
-            f"{table_alias}.project_id = {self.project_id_param_slot}",
-            f"{table_alias}.id IN (SELECT id FROM complete)",
-        ]
-        where_conditions.extend(self._build_optimization_filters(table_alias))
-
-        where_sql = combine_conditions(where_conditions, "AND")
-
-        return safely_format_sql(
-            f"""
-            SELECT {select_fields_sql}
-            FROM {table_alias}
-            {joins_sql}
-            WHERE {where_sql}
-            """,
-            logger,
-        )
-
-    def _build_running_select(self) -> str:
-        """Build SELECT for running calls with NULL for missing fields."""
-        return self._build_running_select_with_priority(priority=None)
-
-    def _build_running_select_with_priority(self, priority: Optional[int]) -> str:
-        """Build SELECT for running calls with NULL for missing fields, optionally with a priority field."""
-        from weave.trace_server.calls_query_builder.calls_query_builder import (
-            CallsCompleteField,
-        )
-
-        table_alias = "call_starts"
-
-        # Fields not in call_starts with their proper types
-        # For dump fields, use empty JSON object instead of NULL
-        # For array fields, use empty array [] instead of NULL
-        missing_fields_with_types = {
-            "ended_at": "CAST(NULL AS Nullable(DateTime64(3)))",
-            "output_dump": "'{}'",  # Empty JSON object for dump fields
-            "summary_dump": "'{}'",  # Empty JSON object for dump fields
-            "exception": "CAST(NULL AS Nullable(String))",
-            "output_refs": "[]",  # Empty array instead of NULL
-        }
-
-        select_parts = []
-        for field in self.query.select_fields:
-            if isinstance(field, CallsCompleteField):
-                field_name = field.field
-                if field_name in missing_fields_with_types:
-                    select_parts.append(
-                        f"{missing_fields_with_types[field_name]} AS {field_name}"
-                    )
-                else:
-                    select_parts.append(f"{table_alias}.{field_name} AS {field_name}")
-            else:
-                # Handle other field types
-                field_name_attr: Optional[str] = getattr(field, "field", None)
-                if field_name_attr and field_name_attr in missing_fields_with_types:
-                    select_parts.append(
-                        f"{missing_fields_with_types[field_name_attr]} AS {field_name_attr}"
-                    )
-                elif field_name_attr:
-                    select_parts.append(
-                        f"{table_alias}.{field_name_attr} AS {field_name_attr}"
-                    )
-
-        # Add priority field if specified
-        if priority is not None:
-            select_parts.append(f"{priority} AS _priority")
-
-        select_fields_sql = ", ".join(select_parts)
-
-        where_conditions = [
-            f"{table_alias}.project_id = {self.project_id_param_slot}",
-            f"{table_alias}.id IN (SELECT id FROM parts_only)",
-        ]
-        where_conditions.extend(self._build_optimization_filters(table_alias))
-
-        where_sql = combine_conditions(where_conditions, "AND")
-
-        return safely_format_sql(
-            f"""
-            SELECT {select_fields_sql}
-            FROM {table_alias}
-            WHERE {where_sql}
-            """,
-            logger,
-        )
-
     def _build_simple_query(self) -> str:
-        """Build simple SELECT when include_running=False."""
+        """Build simple SELECT with optional ended_at filter for include_running."""
         table_alias = "calls_complete"
 
         select_fields_sql = ", ".join(
@@ -917,6 +663,10 @@ class CallsCompleteOrchestrator(BaseQueryOrchestrator):
         # Build WHERE conditions
         where_conditions = [f"{table_alias}.project_id = {self.project_id_param_slot}"]
 
+        # Add ended_at filter based on include_running
+        if not self.query.include_running:
+            where_conditions.append(f"{table_alias}.ended_at IS NOT NULL")
+
         # If filtered_calls CTE exists, use it
         if "filtered_calls" in self.cte_registry.get_cte_names():
             where_conditions.append(
@@ -941,45 +691,6 @@ class CallsCompleteOrchestrator(BaseQueryOrchestrator):
             """,
             logger,
         )
-
-    def _build_call_starts_compatible_filters(self) -> list[str]:
-        """Build filters compatible with call_starts table.
-
-        Filters out conditions that reference fields not in call_starts.
-        """
-        # Fields not available in call_starts
-        complete_only_fields = {
-            "ended_at",
-            "output_dump",
-            "summary_dump",
-            "exception",
-            "output_refs",
-        }
-
-        compatible_conditions = []
-
-        for condition in self.query.query_conditions:
-            # Check if condition references complete-only fields
-            if condition._consumed_fields:
-                has_complete_only = any(
-                    f.field in complete_only_fields for f in condition._consumed_fields
-                )
-                if not has_complete_only:
-                    condition_sql = condition.as_sql(
-                        self.pb,
-                        "call_starts",
-                        expand_columns=self.query.expand_columns,
-                        field_to_object_join_alias_map=self._get_field_to_object_join_alias_map(),
-                    )
-                    compatible_conditions.append(condition_sql)
-
-        # Add hardcoded filter if present
-        if self.query.hardcoded_filter:
-            hardcoded_sql = self.query.hardcoded_filter.as_sql(self.pb, "call_starts")
-            if hardcoded_sql:
-                compatible_conditions.append(hardcoded_sql)
-
-        return compatible_conditions
 
     def _build_optimization_filters(self, table_alias: str) -> list[str]:
         """Build optimization filters (trace_id, op_name, etc.)."""

@@ -54,7 +54,6 @@ from weave.trace_server.clickhouse_schema import (
     ALL_CALL_SELECT_COLUMNS,
     ALL_FILE_CHUNK_INSERT_COLUMNS,
     REQUIRED_CALL_COLUMNS,
-    V1_CALL_STARTS_INSERT_COLUMNS,
     V1_CALLS_COMPLETE_INSERT_COLUMNS,
     CallCHInsertable,
     CallDeleteCHInsertable,
@@ -419,10 +418,9 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     def calls_start_batch_v2(
         self, req: tsi.CallsStartBatchReq
     ) -> tsi.CallsStartBatchRes:
-        """Batch start calls for V2 projects (writes to call_starts table).
+        """Batch start calls (writes to calls_complete table with partial data).
 
-        This method enforces that the project is V2 or empty before writing.
-        Inserts incomplete calls into the call_starts table.
+        Inserts incomplete calls into calls_complete with NULL for end fields.
 
         Args:
             req: CallsStartBatchReq with project_id and list of call starts.
@@ -435,59 +433,31 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             >>> req = CallsStartBatchReq(project_id="project1", items=[...])
             >>> res = server.calls_start_batch_v2(req)
         """
-        # Check project version
-        project_version = ProjectVersion.EMPTY_PROJECT
-        if self._project_version_service:
-            project_version = self._project_version_service.get_project_version_sync(
-                req.project_id, is_write=True
-            )
-
         ids = []
         trace_ids = []
-        if project_version == ProjectVersion.CALLS_MERGED_VERSION:
-            # New sdk writing to old project
-            # Need to use the same conversion as call_starts to properly handle
-            # OTEL attributes and convert fields like inputs/attributes to _dump format
-            batch_data = []
-            for call in req.items:
-                # Convert to V1 insertable which properly transforms inputs/attributes to _dump format
-                ch_call = _start_call_to_v1_ch_insertable(call)
-                assert ch_call.id is not None
-                assert ch_call.trace_id is not None
-                ids.append(ch_call.id)
-                trace_ids.append(ch_call.trace_id)
-                call_dict = ch_call.model_dump()
-                values = [
-                    call_dict.get(
-                        col, [] if col in ("input_refs", "output_refs") else None
-                    )
-                    for col in ALL_CALL_INSERT_COLUMNS
-                ]
-                batch_data.append(values)
-            self._insert_call_batch(batch_data)
-            return tsi.CallsStartBatchRes(ids=ids, trace_ids=trace_ids)
-
         ch_calls: list[V1CallStartCHInsertable] = []
+
         for item in req.items:
-            ch_call = _start_call_to_v1_ch_insertable(item)
+            ch_call = _start_call_to_ch_insertable(item)
             ch_calls.append(ch_call)
             ids.append(ch_call.id)
             trace_ids.append(ch_call.trace_id)
 
-        # Batch insert to call_starts table
-        self._v1_insert_call_starts_batch(ch_calls)
+        # Insert into calls_complete with NULL for end fields
+        self._v2_insert_partial_calls_complete_batch(ch_calls)
 
         return tsi.CallsStartBatchRes(ids=ids, trace_ids=trace_ids)
 
     def calls_complete_batch_v2(
         self, req: tsi.CallsCompleteBatchReq
     ) -> tsi.CallsCompleteBatchRes:
-        """Batch complete calls for V2 projects (writes to calls_complete table).
+        """Batch end calls (UPDATEs calls_complete table).
 
-        This method enforces that the project is V2 or empty before writing.
-        Inserts complete calls directly into calls_complete table.
+        Updates existing calls in calls_complete with end data using ClickHouse UPDATE syntax.
+        Raises error if call doesn't exist.
 
-        Note: The client sends complete call data (both start and end) together.
+        Note: The client sends complete call data (both start and end) together,
+        but we only use the end data for the UPDATE.
 
         Args:
             req: CallsCompleteBatchReq with project_id and list of complete calls.
@@ -495,46 +465,19 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         Returns:
             CallsCompleteBatchRes (empty on success).
 
-
         Examples:
             >>> # In test code:
             >>> req = CallsCompleteBatchReq(project_id="project1", items=[...])
             >>> res = server.calls_complete_batch_v2(req)
         """
-        # Check project version
-        project_version = ProjectVersion.EMPTY_PROJECT
-        if self._project_version_service:
-            project_version = self._project_version_service.get_project_version_sync(
-                req.project_id, is_write=True
-            )
-
-        if project_version == ProjectVersion.CALLS_MERGED_VERSION:
-            # New sdk writing to old project
-            # Need to use the same conversion as calls_complete to properly handle
-            # OTEL attributes and convert fields like inputs/attributes to _dump format
-            batch_data = []
-            for call in req.items:
-                # Convert to V1 insertable which properly transforms inputs/attributes/output to _dump format
-                ch_call = _complete_call_to_v1_ch_insertable(call, self)
-                call_dict = ch_call.model_dump()
-                values = [
-                    call_dict.get(
-                        col, [] if col in ("input_refs", "output_refs") else None
-                    )
-                    for col in ALL_CALL_INSERT_COLUMNS
-                ]
-                batch_data.append(values)
-            self._insert_call_batch(batch_data)
-            return tsi.CallsCompleteBatchRes()
-
-        # Convert complete call items to CH insertables
+        # Convert complete calls to get end data
         ch_calls = []
         for item in req.items:
-            ch_call = _complete_call_to_v1_ch_insertable(item, self)
+            ch_call = _complete_call_to_ch_insertable(item, self)
             ch_calls.append(ch_call)
 
-        # Batch insert to calls_complete table
-        self._v1_insert_calls_complete_batch(req.project_id, ch_calls)
+        # Update calls_complete table with end data
+        self._v2_update_calls_complete_batch(req.project_id, ch_calls)
 
         return tsi.CallsCompleteBatchRes()
 
@@ -867,7 +810,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
     ) -> None:
         total_deleted = 0
         target_count = len(call_ids)
-        tables = tables or ["calls_complete", "call_starts"]
+        tables = tables or ["calls_complete"]
 
         for table in tables:
             delete_sql = f"""
@@ -924,8 +867,11 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             req.project_id, is_write=True
         )
         if project_version == ProjectVersion.CALLS_COMPLETE_VERSION:
-            # try to update calls_complete first, then if not found hit call_starts
-            self._alter_table_update_call(req.project_id, req.call_id, req.display_name)
+            # update calls_complete
+            self._alter_table_update_call(
+                req.project_id, req.call_id, req.display_name, req.wb_user_id
+            )
+            return tsi.CallUpdateRes()
 
         renamed_insertable = CallUpdateCHInsertable(
             project_id=req.project_id,
@@ -941,12 +887,14 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         name="clickhouse_trace_server_batched._alter_table_update_call"
     )
     def _alter_table_update_call(
-        self, project_id: str, call_id: str, display_name: str
+        self, project_id: str, call_id: str, display_name: str, wb_user_id: str
     ) -> None:
         def _make_update_sql(table_name: str) -> str:
             return f"""
                 UPDATE {table_name}
-                SET display_name = {{display_name:String}}
+                SET display_name = {{display_name:String}}, 
+                    updated_at = now64(3), 
+                    updated_by = {{updated_by:String}}
                 WHERE project_id = {{project_id:String}}
                     AND id = {{call_id:String}}
             """
@@ -959,6 +907,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 "project_id": project_id,
                 "call_id": call_id,
                 "display_name": display_name,
+                "updated_by": wb_user_id,
             },
         )
         updated_rows = res.summary.get("written_rows", 0)
@@ -969,27 +918,8 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             logger.info(f"Successfully updated call {call_id} in calls_complete")
             return
 
-        # Try call_starts if calls_complete didn't have the row
-        update_sql = _make_update_sql("call_starts")
-        res = self.ch_client.query(
-            update_sql,
-            parameters={
-                "project_id": project_id,
-                "call_id": call_id,
-                "display_name": display_name,
-            },
-        )
-        updated_rows = res.summary.get("written_rows", 0)
-        logger.info(f"call_starts update: {updated_rows} row(s) updated")
-
-        if updated_rows > 0:
-            logger.info(f"Successfully updated call {call_id} in call_starts")
-            return
-
-        # If we get here, we didn't find the call in either table
         raise ValueError(
-            f"Failed to update call {call_id} in calls_complete or call_starts - "
-            f"call not found in either table"
+            f"Failed to update call {call_id} in calls_complete - call not found"
         )
 
     def op_create(self, req: tsi.OpCreateReq) -> tsi.OpCreateRes:
@@ -3555,54 +3485,91 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
         if self._flush_immediately:
             self._flush_calls()
 
-    # V1 Write Methods
+    # V2 Write Methods (insert-then-update)
 
-    def _v1_insert_call_batch(
-        self,
-        table_name: str,
-        ch_calls: list,
-        column_names: list[str],
+    def _v2_insert_partial_calls_complete_batch(
+        self, ch_calls: list[V1CallStartCHInsertable]
     ) -> None:
-        """Generic batch insert for V1 call tables.
+        """Insert call starts into calls_complete with NULL for end fields.
 
-        Converts insertable objects to rows and delegates to _insert_call_batch.
-
-        Args:
-            table_name: Name of the table to insert into (e.g., "call_starts", "calls_complete").
-            ch_calls: List of call insertables to insert.
-            column_names: List of column names for the insert.
+        This is the first half of the insert-then-update flow where we INSERT partial data,
+        then later UPDATE with end data.
         """
         if not ch_calls:
             return
 
+        print(">>>>>>>>>>> _v2_insert_partial_calls_complete_batch")
+
+        # Prepare batch data with NULLs for end fields
         batch_data = []
         for ch_call in ch_calls:
             call_dict = ch_call.model_dump()
-            values = [call_dict.get(col) for col in column_names]
+            # Add NULL values for end fields that aren't in V1CallStartCHInsertable
+            call_dict["ended_at"] = None
+            call_dict["output_dump"] = None
+            call_dict["output_refs"] = []
+            call_dict["summary_dump"] = None
+            call_dict["exception"] = None
+
+            # Build values list in the order of V1_CALLS_COMPLETE_INSERT_COLUMNS
+            values = []
+            for col in V1_CALLS_COMPLETE_INSERT_COLUMNS:
+                values.append(call_dict.get(col))
             batch_data.append(values)
 
-        self._insert_call_batch(batch_data, table_name, column_names)
-
-    def _v1_insert_call_starts_batch(
-        self, ch_calls: list[V1CallStartCHInsertable]
-    ) -> None:
-        """Batch insert calls into call_starts table (V1 projects)."""
-        self._v1_insert_call_batch(
-            "call_starts", ch_calls, V1_CALL_STARTS_INSERT_COLUMNS
+        # Insert directly into calls_complete
+        self._insert_call_batch(
+            batch_data, "calls_complete", V1_CALLS_COMPLETE_INSERT_COLUMNS
         )
 
-    def _v1_insert_calls_complete_batch(
+    def _v2_update_calls_complete_batch(
         self, project_id: str, ch_calls: list[V1CallCompleteCHInsertable]
     ) -> None:
-        """Batch insert calls into calls_complete table (V1 projects)"""
-        self._v1_insert_call_batch(
-            "calls_complete", ch_calls, V1_CALLS_COMPLETE_INSERT_COLUMNS
-        )
-        # Now we need to delete the inserted ids from the call_starts if they exist
-        call_ids = [ch_call.id for ch_call in ch_calls]
-        self._hard_delete_calls(
-            project_id=project_id, call_ids=call_ids, tables=["call_starts"]
-        )
+        """Update calls_complete with end data using ClickHouse UPDATE.
+
+        This is the second half of the insert-then-update flow where we UPDATE existing rows
+        with end data. Raises error if call doesn't exist.
+        """
+        pb = ParamBuilder()
+        project_param = pb.add_param(project_id)
+
+        print(">>>>>>>>>>> _v2_update_calls_complete_batch")
+
+        for ch_call in ch_calls:
+            # Build UPDATE statement
+            call_id_param = pb.add_param(ch_call.id)
+            ended_at_param = pb.add_param(ch_call.ended_at)
+            output_dump_param = pb.add_param(ch_call.output_dump)
+            summary_dump_param = pb.add_param(ch_call.summary_dump)
+            exception_param = pb.add_param(ch_call.exception)
+            output_refs_param = pb.add_param(ch_call.output_refs)
+            wb_run_step_end_param = pb.add_param(ch_call.wb_run_step_end)
+            wb_user_id_param = pb.add_param(ch_call.wb_user_id)
+
+            # Use ClickHouse UPDATE syntax (requires ClickHouse 25.7+)
+            update_sql = f"""
+                UPDATE calls_complete
+                SET 
+                    ended_at = {{ended_at:{ended_at_param}}},
+                    output_dump = {{output_dump:{output_dump_param}}},
+                    summary_dump = {{summary_dump:{summary_dump_param}}},
+                    exception = {{exception:{exception_param}}},
+                    output_refs = {{output_refs:{output_refs_param}}},
+                    wb_run_step_end = {{wb_run_step_end:{wb_run_step_end_param}}},
+                    updated_at = now64(3),
+                    updated_by = {{updated_by:{wb_user_id_param}}}
+                WHERE project_id = {{project_id:{project_param}}}
+                    AND id = {{id:{call_id_param}}}
+            """
+
+            result = self._query(update_sql, pb.get_params())
+
+            # Check if any rows were updated
+            if result.summary and result.summary.get("written_rows", 0) == 0:
+                raise ValueError(
+                    f"Call {ch_call.id} not found in calls_complete. "
+                    "Must call calls_start_batch_v2 before calls_complete_batch_v2."
+                )
 
     @ddtrace.tracer.wrap(name="clickhouse_trace_server_batched._flush_calls")
     def _flush_calls(self) -> None:
@@ -3884,13 +3851,13 @@ def _end_call_for_insert_to_ch_insertable_end_call(
     )
 
 
-# V1 Conversion Functions
+# Conversion Functions
 
 
-def _start_call_to_v1_ch_insertable(
+def _start_call_to_ch_insertable(
     start_call: tsi.StartedCallSchemaForInsert,
 ) -> V1CallStartCHInsertable:
-    """Convert StartedCallSchemaForInsert to V1CallStartCHInsertable for call_starts table.
+    """Convert StartedCallSchemaForInsert to V1CallStartCHInsertable for calls_complete table.
 
     Args:
         start_call: API schema for call start.
@@ -3925,7 +3892,7 @@ def _start_call_to_v1_ch_insertable(
     )
 
 
-def _complete_call_to_v1_ch_insertable(
+def _complete_call_to_ch_insertable(
     complete_call: tsi.CompleteCallSchemaForInsert,
     trace_server: Optional[tsi.TraceServerInterface] = None,
 ) -> V1CallCompleteCHInsertable:

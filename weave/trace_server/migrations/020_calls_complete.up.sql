@@ -2,11 +2,13 @@ CREATE TABLE calls_complete (
     id              String,
     project_id      String,
     created_at      DateTime64(3) DEFAULT now64(3),
+    updated_at      DateTime64(3) DEFAULT now64(3),
+    updated_by      Nullable(String),
 
     trace_id        String,
     op_name         String,
     started_at      DateTime64(6),
-    ended_at        DateTime64(6),
+    ended_at        Nullable(DateTime64(6)),
 
     parent_id       Nullable(String),
     display_name    Nullable(String) DEFAULT NULL,
@@ -42,38 +44,6 @@ CREATE TABLE calls_complete (
 ORDER BY (project_id, started_at DESC, id)
 SETTINGS allow_experimental_reverse_key=1;
 
-CREATE TABLE call_starts (
-    id              String,
-    project_id      String,
-    created_at      DateTime64(3) DEFAULT now64(3),
-
-    trace_id        String,
-    op_name         String,
-    started_at      DateTime64(6),
-
-    parent_id       Nullable(String),
-    display_name    Nullable(String) DEFAULT NULL,
-    
-    attributes_dump Nullable(String),
-    inputs_dump     Nullable(String),
-    input_refs      Array(String),
-
-    wb_user_id      Nullable(String),
-    wb_run_id       Nullable(String),
-    wb_run_step     Nullable(UInt64) DEFAULT NULL,
-    wb_run_step_end Nullable(UInt64) DEFAULT NULL,
-
-    thread_id       Nullable(String) DEFAULT NULL,
-    turn_id         Nullable(String) DEFAULT NULL,
-
-    -- Only minimal indexes, we really shouldn't be doing many filter operations
-    -- on this table, so keep the indexes to the essentials
-    INDEX idx_op_name op_name TYPE ngrambf_v1(3, 10000, 3, 7) GRANULARITY 1
-) ENGINE = MergeTree
-ORDER BY (project_id, started_at DESC, id)
-SETTINGS allow_experimental_reverse_key=1;
-
-
 CREATE TABLE calls_complete_stats
 (
     project_id String,
@@ -82,7 +52,7 @@ CREATE TABLE calls_complete_stats
     parent_id SimpleAggregateFunction(any, Nullable(String)),
     op_name SimpleAggregateFunction(any, String),
     started_at SimpleAggregateFunction(any, DateTime64(6)),
-    ended_at SimpleAggregateFunction(any, DateTime64(6)),
+    ended_at SimpleAggregateFunction(any, Nullable(DateTime64(6))),
     attributes_size_bytes SimpleAggregateFunction(any, Nullable(UInt64)),
     inputs_size_bytes SimpleAggregateFunction(any, Nullable(UInt64)),
     output_size_bytes SimpleAggregateFunction(any, Nullable(UInt64)),

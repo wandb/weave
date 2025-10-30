@@ -16,7 +16,6 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Any, Callable, TypedDict, cast
 
 import pydantic
-from cachetools import LRUCache
 from requests import HTTPError
 
 from weave import version
@@ -96,7 +95,6 @@ from weave.trace_server.interface.feedback_types import (
     runnable_feedback_runnable_ref_selector,
 )
 from weave.trace_server.trace_server_interface import (
-    CallEndReq,
     CallsCompleteBatchReq,
     CallsDeleteReq,
     CallsFilter,
@@ -356,12 +354,6 @@ class WeaveClient:
         if hasattr(self.server, "get_feedback_processor"):
             self._server_feedback_processor = self.server.get_feedback_processor()
         self.send_file_cache = WeaveClientSendFileCache()
-
-        # Track futures for call start requests - used to ensure call ends
-        # are sent after call starts are built, and to send them together
-        self._call_start_futures: LRUCache[str, Future[CallStartReq]] = LRUCache(
-            maxsize=10_000
-        )
 
     ################ High Level Convenience Methods ################
 
@@ -787,13 +779,14 @@ class WeaveClient:
         check_wandb_run_matches(current_wb_run_id, self.entity, self.project)
 
         started_at = datetime.datetime.now(tz=datetime.timezone.utc)
+        call.started_at = started_at  # Set on call object for later use in finish_call
         project_id = self._project_id()
 
         should_print_call_link_ = should_print_call_link()
         current_call = call_context.get_current_call()
 
-        def send_start_call() -> CallStartReq:
-            """Build and send the CallStartReq immediately, return it for caching."""
+        def send_start_call() -> None:
+            """Build and send the CallStartReq immediately."""
             maybe_redacted_inputs_with_refs = inputs_with_refs
             if should_redact_pii():
                 from weave.utils.pii_redaction import redact_pii
@@ -833,9 +826,6 @@ class WeaveClient:
                 CallsStartBatchReq(project_id=project_id, items=[call_start_req.start])
             )
 
-            # Return the request for caching
-            return call_start_req
-
         def on_start_sent(f: Future) -> None:
             """Print call link for root calls after start is sent."""
             try:
@@ -845,10 +835,8 @@ class WeaveClient:
             except Exception:
                 pass
 
-        # Send the start request asynchronously and cache the future
-        # The cached request will be used to send the complete call when it finishes
+        # Send the start request asynchronously (no caching needed)
         start_fut = self.future_executor.defer(send_start_call)
-        self._call_start_futures[call_id] = start_fut
         start_fut.add_done_callback(on_start_sent)
 
         if use_stack:
@@ -964,8 +952,8 @@ class WeaveClient:
         if op is not None and op._on_finish_handler:
             op._on_finish_handler(call, original_output, exception)
 
-        def send_complete_call() -> None:
-            """Send the complete call (start + end) together using the batch endpoint."""
+        def send_end_call() -> None:
+            """Send the call end data using the batch endpoint (which UPDATEs in V2)."""
             maybe_redacted_output_as_refs = output_as_refs
             if should_redact_pii():
                 from weave.utils.pii_redaction import redact_pii
@@ -980,72 +968,43 @@ class WeaveClient:
             current_wb_run_step_end = safe_current_wb_run_step()
 
             assert call.id is not None, "Call ID must be set at this point"
-            call_end_req = CallEndReq(
-                end=EndedCallSchemaForInsert(
-                    project_id=project_id,
-                    id=call.id,
-                    ended_at=ended_at,
-                    output=output_json,
-                    summary=merged_summary,  # type: ignore[arg-type]
-                    exception=exception_str,
-                    wb_run_step_end=current_wb_run_step_end,
-                )
+            
+            # Build a CompleteCallSchemaForInsert with both start and end data
+            # The server will extract just the end fields for the UPDATE
+            # We need to provide start fields too for interface compatibility
+            complete_call = CompleteCallSchemaForInsert(
+                project_id=project_id,
+                id=call.id,
+                op_name=call._op_name if isinstance(call._op_name, str) else call._op_name.result(),
+                display_name=call.display_name,
+                trace_id=call.trace_id,
+                parent_id=call.parent_id,
+                thread_id=call.thread_id,
+                turn_id=call.turn_id,
+                started_at=call.started_at,
+                attributes=call.attributes.unwrap(),
+                inputs=call.inputs,
+                ended_at=ended_at,
+                exception=exception_str,
+                output=output_json,
+                summary=merged_summary,  # type: ignore[arg-type]
+                wb_run_step_end=current_wb_run_step_end,
             )
-            bytes_size = len(call_end_req.model_dump_json())
+            
+            bytes_size = len(complete_call.model_dump_json())
             if bytes_size > MAX_TRACE_PAYLOAD_SIZE:
                 logger.warning(
                     f"Trace output size ({bytes_size} bytes) exceeds the maximum allowed size of {MAX_TRACE_PAYLOAD_SIZE} bytes. "
                     "Output may be dropped."
                 )
 
-            # Get the cached start request
-            start_future = self._call_start_futures.get(call.id)
-            if not start_future:
-                if SENTRY_AVAILABLE:
-                    error_message = (
-                        f"No start request found for call {call.id} when uploading completed call,"
-                        "this can be caused by exceptionally high write volume or very long lived calls."
-                    )
-                    sentry_sdk.capture_message(error_message, level="error")
-                raise ValueError(error_message)
-
-            # Wait for the start to be cached
-            call_start_req = start_future.result()
-
-            # Combine start and end into a complete call
-            complete_call = CompleteCallSchemaForInsert(
-                project_id=call_start_req.start.project_id,
-                id=call_start_req.start.id,
-                op_name=call_start_req.start.op_name,
-                display_name=call_start_req.start.display_name,
-                trace_id=call_start_req.start.trace_id,
-                parent_id=call_start_req.start.parent_id,
-                thread_id=call_start_req.start.thread_id,
-                turn_id=call_start_req.start.turn_id,
-                started_at=call_start_req.start.started_at,
-                attributes=call_start_req.start.attributes,
-                inputs=call_start_req.start.inputs,
-                ended_at=call_end_req.end.ended_at,
-                exception=call_end_req.end.exception,
-                output=call_end_req.end.output,
-                summary=call_end_req.end.summary,
-                wb_user_id=call_start_req.start.wb_user_id,
-                wb_run_id=call_start_req.start.wb_run_id,
-                wb_run_step=call_start_req.start.wb_run_step,
-                wb_run_step_end=call_end_req.end.wb_run_step_end,
-            )
-
-            # Send the complete call using the new V2 batch endpoint
+            # Send the end using the V2 batch endpoint (server will UPDATE)
             self.server.calls_complete_batch_v2(
                 CallsCompleteBatchReq(project_id=project_id, items=[complete_call])
             )
 
-            # Clean up the future tracking
-            self._call_start_futures.pop(call.id, None)
-
-        # The send_complete_call() function will block on start_future.result(),
-        # ensuring the start is enqueued before the complete. Ensures ordering: start -> complete.
-        self.future_executor.defer(send_complete_call)
+        # Send the end request asynchronously (no coordination with start needed)
+        self.future_executor.defer(send_end_call)
 
         # If a turn call is finishing, reset turn context for next sibling
         if call.turn_id == call.id and call.thread_id:

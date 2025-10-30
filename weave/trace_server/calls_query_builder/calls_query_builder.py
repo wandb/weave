@@ -312,16 +312,8 @@ class CallsCompleteField(QueryBuilderField):
         table_alias: Optional[str] = None,
         cast: Optional[tsi_query.CastTo] = None,
     ) -> str:
-        if table_alias is None:
-            # If no table alias, use the field without prefix
-            return super().as_sql(pb, None, cast)
-        assert table_alias in ["calls_complete", "calls_start"]
-        if table_alias == "calls_complete":
-            return super().as_sql(pb, "calls_complete", cast)
-        elif table_alias == "calls_start":
-            return super().as_sql(pb, "calls_start", cast)
-        else:
-            raise ValueError(f"Invalid table alias: {table_alias}")
+        # Simplified: only calls_complete table now
+        return super().as_sql(pb, table_alias, cast)
 
 
 class QueryBuilderDynamicField(QueryBuilderField):
