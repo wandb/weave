@@ -67,15 +67,7 @@ def parse_weave_values(
                 if handler:
                     # Handler should never raise - Always use a try in handler and default to passed in value
                     value = handler(value)
-                # Special case: empty key means merge values directly into top level
-                if key == "":
-                    if isinstance(value, dict):
-                        result.update(value)
-                    else:
-                        # If value is not a dict, we can't merge it, so skip
-                        pass
-                else:
-                    result[key] = value
+                result[key] = value
                 break
 
     # Prevent empty dict from becoming empty list

@@ -124,9 +124,6 @@ ATTRIBUTE_KEYS = {
     ],
     # Model generation parameters (temperature, max_tokens, etc.)
     "model_parameters": ["gen_ai.request", "llm.invocation_parameters"],
-    # Custom weave attributes added by the user via span.set_attribute("weave.attributes.*", value)
-    # Extracts everything under the weave.attributes prefix and places at top level (empty key)
-    "": ["weave.attributes"],
 }
 
 # WB_KEYS: Wandb/Weave specific attributes for enhanced visualization and reporting
