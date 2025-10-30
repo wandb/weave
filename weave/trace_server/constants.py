@@ -32,6 +32,7 @@ PREDICTION_EVALUATION_RUN_ID_ATTR_KEY = "evaluation_run_id"
 SCORE_ATTR_KEY = "score"
 SCORE_PREDICTION_ID_ATTR_KEY = "prediction_id"
 SCORE_SCORER_ATTR_KEY = "scorer"
+SCORE_EVALUATION_RUN_ID_ATTR_KEY = "evaluation_run_id"
 
 # Weave attributes namespace
 WEAVE_ATTRIBUTES_NAMESPACE = "weave"
