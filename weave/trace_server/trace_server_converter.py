@@ -111,9 +111,13 @@ def universal_int_to_ext_ref_converter(
             if obj.startswith(weave_internal_prefix):
                 return cast(D, replace_ref(obj))
             elif obj.startswith(weave_prefix):
-                # Allow external weave URIs (like prompt_ref) to pass through unchanged
-                # They're already in the correct external format
-                return obj
+                # It is important to raise here as this would be the result of
+                # incorrectly storing an external ref at the database layer,
+                # rather than an internal ref. There is a possibility in the
+                # future that a programming error leads to this situation, in
+                # which case reading this object would consistently fail. We
+                # might want to instead return a private ref in this case.
+                raise InvalidInternalRef("Encountered unexpected ref format.")
         return obj
 
     return _map_values(obj, mapper)

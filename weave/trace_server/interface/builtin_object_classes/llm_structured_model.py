@@ -270,6 +270,14 @@ class LLMStructuredCompletionModel(Model):
 
         # 4. Create the completion inputs
         model_id_str = str(self.llm_model_id)
+
+        # Include prompt_ref and template_vars if they exist
+        if self.default_params and self.default_params.prompt_ref:
+            completion_params["prompt_ref"] = self.default_params.prompt_ref
+
+        if template_vars:
+            completion_params["template_vars"] = template_vars
+
         completion_inputs = CompletionsCreateRequestInputs(
             model=model_id_str, messages=prepared_messages_dicts, **completion_params
         )
@@ -344,8 +352,8 @@ def parse_params_to_litellm_params(
                 final_params["response_format"] = litellm_response_format_value
         elif key == "n_times":
             final_params["n"] = value
-        elif key == "messages_template" or key == "prompt_ref":
-            # Skip messages_template and prompt_ref as they're not LiteLLM params
+        elif key in ("messages_template", "prompt_ref", "template_vars"):
+            # Skip messages_template, prompt_ref, and template_vars as they're not LiteLLM params
             pass
         elif key == "functions" or key == "stop":
             if isinstance(value, list) and len(value) > 0:

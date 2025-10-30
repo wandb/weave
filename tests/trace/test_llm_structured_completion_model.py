@@ -4,7 +4,7 @@ from unittest.mock import Mock, patch
 import pytest
 from pydantic import ValidationError
 
-import weave
+from weave import publish
 from weave.prompt.prompt import MessagesPrompt
 from weave.trace.weave_client import WeaveClient
 from weave.trace_server import trace_server_interface as tsi
@@ -658,7 +658,7 @@ def test_llm_structured_completion_model_predict_with_prompt_ref(
             {"role": "user", "content": "Hello, my name is {user_name}"},
         ]
     )
-    prompt_ref = weave.publish(messages_prompt, name="test_messages_prompt")
+    prompt_ref = publish(messages_prompt, name="test_messages_prompt")
 
     # Setup mock client
     mock_client = Mock()
@@ -722,7 +722,7 @@ def test_llm_structured_completion_model_prompt_ref_takes_precedence(
             {"role": "system", "content": "Message from prompt_ref: {var}"},
         ]
     )
-    prompt_ref = weave.publish(messages_prompt, name="test_precedence_prompt")
+    prompt_ref = publish(messages_prompt, name="test_precedence_prompt")
 
     # Setup mock client
     mock_client = Mock()

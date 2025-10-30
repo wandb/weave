@@ -18,10 +18,50 @@ from weave.trace_server.secret_fetcher_context import _secret_fetcher_context
 NOVA_MODELS = ("nova-pro-v1", "nova-lite-v1", "nova-micro-v1")
 
 
+def replace_template_vars_in_messages(
+    messages: list[dict[str, Any]],
+    template_vars: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Replace template variables in messages using single bracket syntax {var}.
+
+    Args:
+        messages: List of message dictionaries
+        template_vars: Template variables to substitute
+
+    Returns:
+        List of messages with variables replaced
+    """
+    formatted_messages = []
+    for message in messages:
+        if not isinstance(message, dict):
+            formatted_messages.append(message)
+            continue
+
+        # Create a copy to avoid mutating the original
+        formatted_message = message.copy()
+
+        # Format the content if it's a string
+        if isinstance(formatted_message.get("content"), str):
+            try:
+                # Use .format() to replace {var} syntax
+                formatted_message["content"] = formatted_message["content"].format(
+                    **template_vars
+                )
+            except KeyError as e:
+                raise InvalidRequest(
+                    f"Template variable {e} not found in template_vars"
+                ) from e
+
+        formatted_messages.append(formatted_message)
+
+    return formatted_messages
+
+
 def resolve_prompt_ref_messages(
     prompt_ref: str,
     project_id: str,
     obj_read_func: Callable[[tsi.ObjReadReq], tsi.ObjReadRes],
+    template_vars: Optional[dict[str, Any]] = None,
 ) -> list[dict[str, Any]]:
     """Resolve a prompt reference to its messages.
 
@@ -29,25 +69,39 @@ def resolve_prompt_ref_messages(
         prompt_ref: The prompt reference (e.g., "prompt-name:v2")
         project_id: The project ID
         obj_read_func: Function to read objects from the database
+        template_vars: Optional template variables to substitute in messages
 
     Returns:
-        List of messages from the prompt
+        List of messages from the prompt (with template variables substituted if provided)
     """
     # Parse the prompt_ref to extract object_id and digest
     # Format can be:
-    # 1. Full weave URI: "weave:///entity/project/object/name:digest"
-    # 2. Simple format: "object_id:digest" or "object_id:vN"
+    # 1. Internal URI: "weave-trace-internal:///project_id/object/name:digest"
+    # 2. Full weave URI: "weave:///entity/project/object/name:digest"
+    # 3. Simple format: "object_id:digest" or "object_id:vN"
 
-    if prompt_ref.startswith("weave:///"):
-        # Parse weave URI: weave:///entity/project/object/name:digest
-        import re
+    if prompt_ref.startswith("weave-trace-internal:///") or prompt_ref.startswith(
+        "weave:///"
+    ):
+        # Parse using internal URI parser
+        from weave.trace_server import refs_internal as ri
 
-        match = re.match(r"weave:///[^/]+/[^/]+/object/([^:]+):(.+)", prompt_ref)
-        if match:
-            object_id = match.group(1)
-            version = match.group(2)  # This will be the digest
-        else:
-            raise InvalidRequest(f"Invalid weave URI format: {prompt_ref}")
+        try:
+            parsed_ref = ri.parse_internal_uri(prompt_ref)
+            if isinstance(parsed_ref, ri.InternalObjectRef):
+                object_id = parsed_ref.name
+                version = parsed_ref.version
+                # Override project_id from the URI if provided
+                if parsed_ref.project_id:
+                    project_id = parsed_ref.project_id
+            else:
+                raise InvalidRequest(
+                    f"Prompt reference must be an object reference, got: {type(parsed_ref)}"
+                )
+        except Exception as e:
+            raise InvalidRequest(
+                f"Failed to parse prompt reference {prompt_ref}: {e!s}"
+            ) from e
     elif ":" in prompt_ref:
         object_id, version = prompt_ref.rsplit(":", 1)
     else:
@@ -78,7 +132,11 @@ def resolve_prompt_ref_messages(
         if not isinstance(messages, list):
             raise InvalidRequest(f"Prompt {prompt_ref} messages field is not a list")
 
-        return messages
+        # Apply template variable substitution if provided
+        if template_vars:
+            return replace_template_vars_in_messages(messages, template_vars)
+        else:
+            return messages
     except NotFoundError:
         raise
     except Exception as e:
