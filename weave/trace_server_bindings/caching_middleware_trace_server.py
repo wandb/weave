@@ -613,6 +613,72 @@ class CachingMiddlewareTraceServer(tsi.FullTraceServerInterface):
     def model_delete_v2(self, req: tsi.ModelDeleteV2Req) -> tsi.ModelDeleteV2Res:
         return self._next_trace_server.model_delete_v2(req)
 
+    def evaluation_run_create_v2(
+        self, req: tsi.EvaluationRunCreateV2Req
+    ) -> tsi.EvaluationRunCreateV2Res:
+        return self._next_trace_server.evaluation_run_create_v2(req)
+
+    def evaluation_run_read_v2(
+        self, req: tsi.EvaluationRunReadV2Req
+    ) -> tsi.EvaluationRunReadV2Res:
+        return self._next_trace_server.evaluation_run_read_v2(req)
+
+    def evaluation_run_list_v2(
+        self, req: tsi.EvaluationRunListV2Req
+    ) -> Iterator[tsi.EvaluationRunReadV2Res]:
+        return self._next_trace_server.evaluation_run_list_v2(req)
+
+    def evaluation_run_delete_v2(
+        self, req: tsi.EvaluationRunDeleteV2Req
+    ) -> tsi.EvaluationRunDeleteV2Res:
+        return self._next_trace_server.evaluation_run_delete_v2(req)
+
+    def evaluation_run_finish_v2(
+        self, req: tsi.EvaluationRunFinishV2Req
+    ) -> tsi.EvaluationRunFinishV2Res:
+        return self._next_trace_server.evaluation_run_finish_v2(req)
+
+    # Prediction V2 API
+
+    def prediction_create_v2(
+        self, req: tsi.PredictionCreateV2Req
+    ) -> tsi.PredictionCreateV2Res:
+        return self._next_trace_server.prediction_create_v2(req)
+
+    def prediction_read_v2(
+        self, req: tsi.PredictionReadV2Req
+    ) -> tsi.PredictionReadV2Res:
+        return self._next_trace_server.prediction_read_v2(req)
+
+    def prediction_list_v2(
+        self, req: tsi.PredictionListV2Req
+    ) -> Iterator[tsi.PredictionReadV2Res]:
+        return self._next_trace_server.prediction_list_v2(req)
+
+    def prediction_delete_v2(
+        self, req: tsi.PredictionDeleteV2Req
+    ) -> tsi.PredictionDeleteV2Res:
+        return self._next_trace_server.prediction_delete_v2(req)
+
+    def prediction_finish_v2(
+        self, req: tsi.PredictionFinishV2Req
+    ) -> tsi.PredictionFinishV2Res:
+        return self._next_trace_server.prediction_finish_v2(req)
+
+    # Score V2 API
+
+    def score_create_v2(self, req: tsi.ScoreCreateV2Req) -> tsi.ScoreCreateV2Res:
+        return self._next_trace_server.score_create_v2(req)
+
+    def score_read_v2(self, req: tsi.ScoreReadV2Req) -> tsi.ScoreReadV2Res:
+        return self._next_trace_server.score_read_v2(req)
+
+    def score_list_v2(self, req: tsi.ScoreListV2Req) -> Iterator[tsi.ScoreReadV2Res]:
+        return self._next_trace_server.score_list_v2(req)
+
+    def score_delete_v2(self, req: tsi.ScoreDeleteV2Req) -> tsi.ScoreDeleteV2Res:
+        return self._next_trace_server.score_delete_v2(req)
+
 
 def pydantic_bytes_safe_dump(obj: BaseModel) -> str:
     raw_dict = obj.model_dump()
