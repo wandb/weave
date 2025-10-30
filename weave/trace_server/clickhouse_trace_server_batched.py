@@ -4573,6 +4573,18 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: dict) -> dict:
     started_at = _ensure_datetimes_have_tz(ch_call_dict.get("started_at"))
     ended_at = _ensure_datetimes_have_tz(ch_call_dict.get("ended_at"))
     display_name = empty_str_to_none(ch_call_dict.get("display_name"))
+
+    # Load attributes from attributes_dump
+    attributes = _dict_dump_to_dict(ch_call_dict.get("attributes_dump", "{}"))
+
+    # For backwards compatibility: inject otel_dump into attributes if present
+    # This allows existing code that expects otel_span in attributes to continue working
+    otel_dump = ch_call_dict.get("otel_dump")
+    if otel_dump:
+        otel_data = _dict_dump_to_dict(otel_dump)
+        if otel_data:
+            attributes["otel_span"] = otel_data
+
     return {
         "project_id": ch_call_dict.get("project_id"),
         "id": ch_call_dict.get("id"),
@@ -4583,7 +4595,7 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: dict) -> dict:
         "op_name": ch_call_dict.get("op_name"),
         "started_at": started_at,
         "ended_at": ended_at,
-        "attributes": _dict_dump_to_dict(ch_call_dict.get("attributes_dump", "{}")),
+        "attributes": attributes,
         "inputs": _dict_dump_to_dict(ch_call_dict.get("inputs_dump", "{}")),
         "output": _nullable_any_dump_to_any(ch_call_dict.get("output_dump")),
         "summary": make_derived_summary_fields(
@@ -4649,6 +4661,11 @@ def _start_call_for_insert_to_ch_insertable_start_call(
     inputs = start_call.inputs
     input_refs = extract_refs_from_values(inputs)
 
+    # Serialize OTEL dump if present
+    otel_dump_str = None
+    if start_call.otel_dump is not None:
+        otel_dump_str = _dict_value_to_dump(start_call.otel_dump)
+
     return CallStartCHInsertable(
         project_id=start_call.project_id,
         id=call_id,
@@ -4661,6 +4678,7 @@ def _start_call_for_insert_to_ch_insertable_start_call(
         attributes_dump=_dict_value_to_dump(start_call.attributes),
         inputs_dump=_dict_value_to_dump(inputs),
         input_refs=input_refs,
+        otel_dump=otel_dump_str,  # Store serialized OTEL span
         wb_run_id=start_call.wb_run_id,
         wb_run_step=start_call.wb_run_step,
         wb_user_id=start_call.wb_user_id,

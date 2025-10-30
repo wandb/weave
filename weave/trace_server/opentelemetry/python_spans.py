@@ -342,7 +342,8 @@ class Span:
         if not has_attributes and not has_inputs and not has_outputs and not has_usage:
             attributes = to_json_serializable(self.attributes)
 
-        attributes["otel_span"] = self.as_dict()
+        # Store the OTEL span separately instead of in attributes
+        otel_span_data = self.as_dict()
         op_name = self.name
 
         display_name = wandb_attributes.get("display_name")
@@ -401,6 +402,7 @@ class Span:
             started_at=start_time,
             attributes=attributes,
             inputs=inputs,
+            otel_dump=otel_span_data,  # Store OTEL span in dedicated field
             display_name=display_name,
             wb_user_id=wb_user_id,
             wb_run_id=wb_run_id,

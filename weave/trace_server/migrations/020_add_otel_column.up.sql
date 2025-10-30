@@ -1,5 +1,5 @@
-ALTER TABLE calls_merged ADD COLUMN otel_dump String DEFAULT NULL;
-ALTER TABLE call_parts ADD COLUMN otel_dump String DEFAULT NULL;
+ALTER TABLE calls_merged ADD COLUMN otel_dump Nullable(String) DEFAULT NULL;
+ALTER TABLE call_parts ADD COLUMN otel_dump Nullable(String) DEFAULT NULL;
 
 -- Update materialized view to include wb_run_step_end
 ALTER TABLE calls_merged_view MODIFY QUERY

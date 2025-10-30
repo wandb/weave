@@ -21,6 +21,7 @@ class CallStartCHInsertable(BaseModel):
     input_refs: list[str]
     output_refs: list[str] = Field(default_factory=list)  # sadly, this is required
     display_name: Optional[str] = None
+    otel_dump: Optional[str] = None  # OTEL span data stored separately
 
     wb_user_id: Optional[str] = None
     wb_run_id: Optional[str] = None
@@ -123,6 +124,7 @@ class SelectableCHCallSchema(BaseModel):
 
     output_dump: Optional[str] = None
     summary_dump: Optional[str] = None
+    otel_dump: Optional[str] = None  # OTEL span data stored separately
 
     input_refs: list[str]
     output_refs: list[str]
