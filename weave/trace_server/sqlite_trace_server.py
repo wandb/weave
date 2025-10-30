@@ -2829,6 +2829,18 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         )
 
         # Start a call to represent the prediction
+        prediction_attributes = {
+            constants.WEAVE_ATTRIBUTES_NAMESPACE: {
+                constants.PREDICTION_ATTR_KEY: "true",
+                constants.PREDICTION_MODEL_ATTR_KEY: req.model,
+            }
+        }
+        # Store evaluation_run_id as attribute if provided
+        if req.evaluation_run_id:
+            prediction_attributes[constants.WEAVE_ATTRIBUTES_NAMESPACE][
+                constants.PREDICTION_EVALUATION_RUN_ID_ATTR_KEY
+            ] = req.evaluation_run_id
+
         call_start_req = tsi.CallStartReq(
             start=tsi.StartedCallSchemaForInsert(
                 project_id=req.project_id,
@@ -2837,12 +2849,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 parent_id=parent_id,
                 op_name=predict_op_ref.uri(),
                 started_at=datetime.datetime.now(datetime.timezone.utc),
-                attributes={
-                    constants.WEAVE_ATTRIBUTES_NAMESPACE: {
-                        constants.PREDICTION_ATTR_KEY: "true",
-                        constants.PREDICTION_MODEL_ATTR_KEY: req.model,
-                    }
-                },
+                attributes=prediction_attributes,
                 inputs={
                     "self": req.model,
                     "inputs": req.inputs,
@@ -2892,9 +2899,12 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         call = call_res.call
         attributes = call.attributes.get(constants.WEAVE_ATTRIBUTES_NAMESPACE, {})
 
-        # If the parent is a predict_and_score call, get the evaluation_run_id from its parent
-        evaluation_run_id = None
-        if call.parent_id:
+        # Get evaluation_run_id from attributes (preferred), fallback to parent traversal for backwards compatibility
+        evaluation_run_id = attributes.get(
+            constants.PREDICTION_EVALUATION_RUN_ID_ATTR_KEY
+        )
+        if evaluation_run_id is None and call.parent_id:
+            # Fallback: If the parent is a predict_and_score call, get the evaluation_run_id from its parent
             parent_read_req = tsi.CallReadReq(
                 project_id=req.project_id,
                 id=call.parent_id,
@@ -2926,10 +2936,13 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         Yields:
             PredictionReadV2Res for each prediction found
         """
-        # Build query to filter for calls with prediction attribute set to true
+        # Build query conditions to filter at database level
+        conditions: list[tsi_query.Operand] = []
+
+        # Filter for calls with prediction attribute set to true
         # Note: Use string "true" for ClickHouse compatibility (JSON booleans are extracted as strings)
-        query = tsi.Query(
-            expr_=tsi_query.EqOperation(
+        conditions.append(
+            tsi_query.EqOperation(
                 eq_=[
                     tsi_query.GetFieldOperator(
                         get_field_=f"attributes.{constants.WEAVE_ATTRIBUTES_NAMESPACE}.{constants.PREDICTION_ATTR_KEY}"
@@ -2938,6 +2951,25 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 ]
             )
         )
+
+        # Filter by evaluation_run_id if provided
+        if req.evaluation_run_id:
+            conditions.append(
+                tsi_query.EqOperation(
+                    eq_=[
+                        tsi_query.GetFieldOperator(
+                            get_field_=f"attributes.{constants.WEAVE_ATTRIBUTES_NAMESPACE}.{constants.PREDICTION_EVALUATION_RUN_ID_ATTR_KEY}"
+                        ),
+                        tsi_query.LiteralOperation(literal_=req.evaluation_run_id),
+                    ]
+                )
+            )
+
+        # Combine all conditions with AND (or use single condition if only one)
+        if len(conditions) == 1:
+            query = tsi.Query(expr_=conditions[0])
+        else:
+            query = tsi.Query(expr_=tsi_query.AndOperation(and_=conditions))
 
         # Query for calls that have the prediction attribute
         calls_query_req = tsi.CallsQueryReq(
@@ -2951,9 +2983,12 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         for call in self.calls_query_stream(calls_query_req):
             attributes = call.attributes.get(constants.WEAVE_ATTRIBUTES_NAMESPACE, {})
 
-            # If the parent is a predict_and_score call, get the evaluation_run_id from its parent
-            evaluation_run_id = None
-            if call.parent_id:
+            # Get evaluation_run_id from attributes (preferred), fallback to parent traversal for backwards compatibility
+            evaluation_run_id = attributes.get(
+                constants.PREDICTION_EVALUATION_RUN_ID_ATTR_KEY
+            )
+            if evaluation_run_id is None and call.parent_id:
+                # Fallback: If the parent is a predict_and_score call, get the evaluation_run_id from its parent
                 parent_read_req = tsi.CallReadReq(
                     project_id=req.project_id,
                     id=call.parent_id,
@@ -2964,10 +2999,6 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                     constants.EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME,
                 ):
                     evaluation_run_id = parent_res.call.parent_id
-
-            # Skip if filtering by evaluation_run_id and this doesn't match
-            if req.evaluation_run_id and evaluation_run_id != req.evaluation_run_id:
-                continue
 
             yield tsi.PredictionReadV2Res(
                 prediction_id=call.id,

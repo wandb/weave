@@ -26,6 +26,7 @@ EVALUATION_RUN_SCORER_ATTR_KEY = "scorer"
 # Attribute keys for predictions
 PREDICTION_ATTR_KEY = "prediction"
 PREDICTION_MODEL_ATTR_KEY = "model"
+PREDICTION_EVALUATION_RUN_ID_ATTR_KEY = "evaluation_run_id"
 
 # Attribute keys for scores
 SCORE_ATTR_KEY = "score"
