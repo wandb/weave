@@ -347,7 +347,9 @@ def make_server_recorder(server: tsi.TraceServerInterface):  # type: ignore
                 return self_server
             if name == "attribute_access_log":
                 return access_log
-            attr = self_server.__getattribute__(name)
+            # Use getattr instead of __getattribute__ to properly trigger __getattr__
+            # on wrapped objects (like CachingMiddlewareTraceServer)
+            attr = getattr(self_server, name)
             if name != "attribute_access_log":
                 access_log.append(name)
             return attr
