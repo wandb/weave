@@ -687,6 +687,95 @@ class PlaceholderModel(Model):
 
         return self._create_score_logger(res.prediction_id, inputs, output)
 
+    def log_example(
+        self,
+        inputs: dict[str, Any],
+        output: Any,
+        scores: dict[str, ScoreType],
+    ) -> None:
+        """Log a complete example with inputs, output, and scores.
+
+        This is a convenience method that combines log_prediction and log_score
+        for when you have all the data upfront.
+
+        Args:
+            inputs: The input data for the prediction
+            output: The output value
+            scores: Dictionary mapping scorer names to score values
+
+        Example:
+            ```python
+            ev = EvaluationLoggerV2()
+            ev.log_example(
+                inputs={'q': 'What is 2+2?'},
+                output='4',
+                scores={'correctness': 1.0, 'fluency': 0.9}
+            )
+            ```
+        """
+        if self._is_finalized:
+            raise ValueError(
+                "Cannot log example after evaluation has been finalized. "
+                "Call log_example before calling finish() or log_summary()."
+            )
+
+        # Log the prediction with the output
+        pred = self.log_prediction(inputs=inputs, output=output)
+
+        # Log all the scores
+        for scorer_name, score_value in scores.items():
+            pred.log_score(scorer_name, score_value)
+
+        # Finish the prediction
+        pred.finish()
+
+    async def alog_example(
+        self,
+        inputs: dict[str, Any],
+        output: Any,
+        scores: dict[str, ScoreType],
+    ) -> None:
+        """Log a complete example with inputs, output, and scores (async version).
+
+        This is a convenience method that combines alog_prediction and alog_score
+        for when you have all the data upfront.
+
+        Args:
+            inputs: The input data for the prediction
+            output: The output value
+            scores: Dictionary mapping scorer names to score values
+
+        Example:
+            ```python
+            ev = EvaluationLoggerV2()
+            await ev.alog_example(
+                inputs={'q': 'What is 2+2?'},
+                output='4',
+                scores={'correctness': 1.0, 'fluency': 0.9}
+            )
+            ```
+        """
+        if self._is_finalized:
+            raise ValueError(
+                "Cannot log example after evaluation has been finalized. "
+                "Call alog_example before calling finish() or log_summary()."
+            )
+
+        # Log the prediction with the output
+        pred = await self.alog_prediction(inputs=inputs, output=output)
+
+        # Log all the scores in parallel
+        if scores:
+            await asyncio.gather(
+                *[
+                    pred.alog_score(scorer_name, score_value)
+                    for scorer_name, score_value in scores.items()
+                ]
+            )
+
+        # Finish the prediction
+        await pred.afinish()
+
     def _create_score_logger(
         self, prediction_id: str, inputs: dict[str, Any], output: Any
     ) -> ScoreLoggerV2:
