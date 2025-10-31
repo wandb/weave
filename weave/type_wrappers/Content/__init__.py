@@ -1,1 +1,1 @@
-from .content import Content
+from .content import Content as Content
