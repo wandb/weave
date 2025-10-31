@@ -1,5 +1,6 @@
 # Sqlite Trace Server
 
+import asyncio
 import contextvars
 import datetime
 import hashlib
@@ -1944,22 +1945,26 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         safe_name = object_creation_utils.make_safe_name(req.name)
         scorer_id = f"scorer_{safe_name}"
 
-        # Create the score op first
+        # Create the score and summarize ops concurrently using TaskGroup
         score_op_req = tsi.OpCreateV2Req(
             project_id=req.project_id,
             name=f"{scorer_id}_score",
             source_code=req.op_source_code,
         )
-        score_op_res = await self.op_create_v2(score_op_req)
-        score_op_ref = score_op_res.digest
-
-        # Create the default summarize op
         summarize_op_req = tsi.OpCreateV2Req(
             project_id=req.project_id,
             name=f"{scorer_id}_summarize",
             source_code=object_creation_utils.PLACEHOLDER_SCORER_SUMMARIZE_OP_SOURCE,
         )
-        summarize_op_res = await self.op_create_v2(summarize_op_req)
+
+        async with asyncio.TaskGroup() as tg:
+            score_task = tg.create_task(self.op_create_v2(score_op_req))
+            summarize_task = tg.create_task(self.op_create_v2(summarize_op_req))
+
+        score_op_res = score_task.result()
+        summarize_op_res = summarize_task.result()
+
+        score_op_ref = score_op_res.digest
         summarize_op_ref = summarize_op_res.digest
 
         # Create the scorer object using shared utility for val
@@ -2080,31 +2085,34 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         # Generate a safe ID for the evaluation
         evaluation_id = object_creation_utils.make_safe_name(req.name)
 
-        # Create placeholder evaluate op
+        # Create placeholder ops concurrently using TaskGroup
         evaluate_op_req = tsi.OpCreateV2Req(
             project_id=req.project_id,
             name=f"{evaluation_id}.evaluate",
             source_code=object_creation_utils.PLACEHOLDER_EVALUATE_OP_SOURCE,
         )
-        evaluate_op_res = await self.op_create_v2(evaluate_op_req)
-        evaluate_ref = evaluate_op_res.digest
-
-        # Create placeholder predict_and_score op
         predict_and_score_op_req = tsi.OpCreateV2Req(
             project_id=req.project_id,
             name=f"{evaluation_id}.predict_and_score",
             source_code=object_creation_utils.PLACEHOLDER_PREDICT_AND_SCORE_OP_SOURCE,
         )
-        predict_and_score_op_res = await self.op_create_v2(predict_and_score_op_req)
-        predict_and_score_ref = predict_and_score_op_res.digest
-
-        # Create placeholder summarize op
         summarize_op_req = tsi.OpCreateV2Req(
             project_id=req.project_id,
             name=f"{evaluation_id}.summarize",
             source_code=object_creation_utils.PLACEHOLDER_EVALUATION_SUMMARIZE_OP_SOURCE,
         )
-        summarize_op_res = await self.op_create_v2(summarize_op_req)
+
+        async with asyncio.TaskGroup() as tg:
+            evaluate_task = tg.create_task(self.op_create_v2(evaluate_op_req))
+            predict_and_score_task = tg.create_task(self.op_create_v2(predict_and_score_op_req))
+            summarize_task = tg.create_task(self.op_create_v2(summarize_op_req))
+
+        evaluate_op_res = evaluate_task.result()
+        predict_and_score_op_res = predict_and_score_task.result()
+        summarize_op_res = summarize_task.result()
+
+        evaluate_ref = evaluate_op_res.digest
+        predict_and_score_ref = predict_and_score_op_res.digest
         summarize_ref = summarize_op_res.digest
 
         # Build the evaluation object using shared utility
@@ -2736,6 +2744,18 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         """
         prediction_id = generate_id()
 
+        # Parse the model ref to get the model name (needed for predict op creation)
+        try:
+            model_ref = ri.parse_internal_uri(req.model)
+            if isinstance(model_ref, (ri.InternalObjectRef, ri.InternalOpRef)):
+                model_name = model_ref.name
+            else:
+                # Fallback to default if not an object/op ref
+                model_name = "Model"
+        except ri.InvalidInternalRef:
+            # Fallback to default if parsing fails
+            model_name = "Model"
+
         # Determine trace_id and parent_id based on evaluation_run_id
         if req.evaluation_run_id:
             # If evaluation_run_id is provided, create a predict_and_score parent call
@@ -2754,13 +2774,25 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 else None
             )
 
-            # Create the predict_and_score op
+            # Create the predict_and_score and predict ops concurrently using TaskGroup
             predict_and_score_op_req = tsi.OpCreateV2Req(
                 project_id=req.project_id,
                 name=constants.EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME,
                 source_code=object_creation_utils.PLACEHOLDER_EVALUATION_PREDICT_AND_SCORE_OP_SOURCE,
             )
-            predict_and_score_op_res = await self.op_create_v2(predict_and_score_op_req)
+            predict_op_name = f"{model_name}.predict"
+            predict_op_req = tsi.OpCreateV2Req(
+                project_id=req.project_id,
+                name=predict_op_name,
+                source_code=object_creation_utils.PLACEHOLDER_MODEL_PREDICT_OP_SOURCE,
+            )
+
+            async with asyncio.TaskGroup() as tg:
+                predict_and_score_task = tg.create_task(self.op_create_v2(predict_and_score_op_req))
+                predict_task = tg.create_task(self.op_create_v2(predict_op_req))
+
+            predict_and_score_op_res = predict_and_score_task.result()
+            predict_op_res = predict_task.result()
 
             # Build the predict_and_score op ref
             predict_and_score_op_ref = ri.InternalOpRef(
@@ -2800,26 +2832,14 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             trace_id = prediction_id
             parent_id = None
 
-        # Parse the model ref to get the model name
-        try:
-            model_ref = ri.parse_internal_uri(req.model)
-            if isinstance(model_ref, (ri.InternalObjectRef, ri.InternalOpRef)):
-                model_name = model_ref.name
-            else:
-                # Fallback to default if not an object/op ref
-                model_name = "Model"
-        except ri.InvalidInternalRef:
-            # Fallback to default if parsing fails
-            model_name = "Model"
-
-        # Create the predict op with the model-specific name
-        predict_op_name = f"{model_name}.predict"
-        predict_op_req = tsi.OpCreateV2Req(
-            project_id=req.project_id,
-            name=predict_op_name,
-            source_code=object_creation_utils.PLACEHOLDER_MODEL_PREDICT_OP_SOURCE,
-        )
-        predict_op_res = await self.op_create_v2(predict_op_req)
+            # Create the predict op with the model-specific name
+            predict_op_name = f"{model_name}.predict"
+            predict_op_req = tsi.OpCreateV2Req(
+                project_id=req.project_id,
+                name=predict_op_name,
+                source_code=object_creation_utils.PLACEHOLDER_MODEL_PREDICT_OP_SOURCE,
+            )
+            predict_op_res = await self.op_create_v2(predict_op_req)
 
         # Build the predict op ref
         predict_op_ref = ri.InternalOpRef(
