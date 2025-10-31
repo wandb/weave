@@ -6,7 +6,7 @@ import hashlib
 import json
 import sqlite3
 import threading
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
 from typing import Any, Optional, cast
 
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
@@ -1657,7 +1657,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
     ) -> tsi.EvaluationStatusRes:
         return evaluation_status(self, req)
 
-    def op_create_v2(self, req: tsi.OpCreateV2Req) -> tsi.OpCreateV2Res:
+    async def op_create_v2(self, req: tsi.OpCreateV2Req) -> tsi.OpCreateV2Res:
         """Create an op object by delegating to obj_create.
 
         Args:
@@ -1703,7 +1703,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             version_index=obj_read_res.obj.version_index,
         )
 
-    def op_read_v2(self, req: tsi.OpReadV2Req) -> tsi.OpReadV2Res:
+    async def op_read_v2(self, req: tsi.OpReadV2Req) -> tsi.OpReadV2Res:
         """Get a specific op object by delegating to obj_read with op filtering.
 
         Returns the actual source code of the op.
@@ -1747,7 +1747,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             code=code,
         )
 
-    def op_list_v2(self, req: tsi.OpListV2Req) -> Iterator[tsi.OpReadV2Res]:
+    async def op_list_v2(self, req: tsi.OpListV2Req) -> AsyncIterator[tsi.OpReadV2Res]:
         """List op objects by delegating to objs_query with op filtering."""
         obj_query_req = tsi.ObjQueryReq(
             project_id=req.project_id,
@@ -1794,7 +1794,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 code=code,
             )
 
-    def op_delete_v2(self, req: tsi.OpDeleteV2Req) -> tsi.OpDeleteV2Res:
+    async def op_delete_v2(self, req: tsi.OpDeleteV2Req) -> tsi.OpDeleteV2Res:
         """Delete op objects by delegating to obj_delete."""
         obj_delete_req = tsi.ObjDeleteReq(
             project_id=req.project_id,
@@ -1804,7 +1804,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         result = self.obj_delete(obj_delete_req)
         return tsi.OpDeleteV2Res(num_deleted=result.num_deleted)
 
-    def dataset_create_v2(self, req: tsi.DatasetCreateV2Req) -> tsi.DatasetCreateV2Res:
+    async def dataset_create_v2(self, req: tsi.DatasetCreateV2Req) -> tsi.DatasetCreateV2Res:
         """Create a dataset object by first creating a table for rows, then creating the dataset object.
 
         The dataset object references the table containing the actual row data.
@@ -1856,7 +1856,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             version_index=obj_read_res.obj.version_index,
         )
 
-    def dataset_read_v2(self, req: tsi.DatasetReadV2Req) -> tsi.DatasetReadV2Res:
+    async def dataset_read_v2(self, req: tsi.DatasetReadV2Req) -> tsi.DatasetReadV2Res:
         """Get a dataset object by delegating to obj_read.
 
         Returns the rows reference as a string.
@@ -1885,9 +1885,9 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             rows=rows_ref,
         )
 
-    def dataset_list_v2(
+    async def dataset_list_v2(
         self, req: tsi.DatasetListV2Req
-    ) -> Iterator[tsi.DatasetReadV2Res]:
+    ) -> AsyncIterator[tsi.DatasetReadV2Res]:
         """List dataset objects by delegating to objs_query with Dataset filtering.
 
         Returns the rows reference as a string.
@@ -1925,7 +1925,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 rows=rows_ref,
             )
 
-    def dataset_delete_v2(self, req: tsi.DatasetDeleteV2Req) -> tsi.DatasetDeleteV2Res:
+    async def dataset_delete_v2(self, req: tsi.DatasetDeleteV2Req) -> tsi.DatasetDeleteV2Res:
         """Delete dataset objects by delegating to obj_delete."""
         obj_delete_req = tsi.ObjDeleteReq(
             project_id=req.project_id,
@@ -1935,7 +1935,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         result = self.obj_delete(obj_delete_req)
         return tsi.DatasetDeleteV2Res(num_deleted=result.num_deleted)
 
-    def scorer_create_v2(self, req: tsi.ScorerCreateV2Req) -> tsi.ScorerCreateV2Res:
+    async def scorer_create_v2(self, req: tsi.ScorerCreateV2Req) -> tsi.ScorerCreateV2Res:
         """Create a scorer object by first creating its score op, then creating the scorer object.
 
         The scorer object references the op that implements the scoring logic.
@@ -1950,7 +1950,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             name=f"{scorer_id}_score",
             source_code=req.op_source_code,
         )
-        score_op_res = self.op_create_v2(score_op_req)
+        score_op_res = await self.op_create_v2(score_op_req)
         score_op_ref = score_op_res.digest
 
         # Create the default summarize op
@@ -1959,7 +1959,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             name=f"{scorer_id}_summarize",
             source_code=object_creation_utils.PLACEHOLDER_SCORER_SUMMARIZE_OP_SOURCE,
         )
-        summarize_op_res = self.op_create_v2(summarize_op_req)
+        summarize_op_res = await self.op_create_v2(summarize_op_req)
         summarize_op_ref = summarize_op_res.digest
 
         # Create the scorer object using shared utility for val
@@ -2002,7 +2002,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             scorer=scorer_ref,
         )
 
-    def scorer_read_v2(self, req: tsi.ScorerReadV2Req) -> tsi.ScorerReadV2Res:
+    async def scorer_read_v2(self, req: tsi.ScorerReadV2Req) -> tsi.ScorerReadV2Res:
         """Get scorer objects by delegating to obj_read."""
         obj_req = tsi.ObjReadReq(
             project_id=req.project_id,
@@ -2027,7 +2027,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             score_op=val.get("score", ""),
         )
 
-    def scorer_list_v2(self, req: tsi.ScorerListV2Req) -> Iterator[tsi.ScorerReadV2Res]:
+    async def scorer_list_v2(self, req: tsi.ScorerListV2Req) -> AsyncIterator[tsi.ScorerReadV2Res]:
         """List scorer objects by delegating to objs_query with Scorer filtering."""
         obj_query_req = tsi.ObjQueryReq(
             project_id=req.project_id,
@@ -2060,7 +2060,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 score_op=score_op,
             )
 
-    def scorer_delete_v2(self, req: tsi.ScorerDeleteV2Req) -> tsi.ScorerDeleteV2Res:
+    async def scorer_delete_v2(self, req: tsi.ScorerDeleteV2Req) -> tsi.ScorerDeleteV2Res:
         """Delete scorer objects by delegating to obj_delete."""
         obj_delete_req = tsi.ObjDeleteReq(
             project_id=req.project_id,
@@ -2070,7 +2070,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
         result = self.obj_delete(obj_delete_req)
         return tsi.ScorerDeleteV2Res(num_deleted=result.num_deleted)
 
-    def evaluation_create_v2(
+    async def evaluation_create_v2(
         self, req: tsi.EvaluationCreateV2Req
     ) -> tsi.EvaluationCreateV2Res:
         """Create an evaluation object.
@@ -2086,7 +2086,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             name=f"{evaluation_id}.evaluate",
             source_code=object_creation_utils.PLACEHOLDER_EVALUATE_OP_SOURCE,
         )
-        evaluate_op_res = self.op_create_v2(evaluate_op_req)
+        evaluate_op_res = await self.op_create_v2(evaluate_op_req)
         evaluate_ref = evaluate_op_res.digest
 
         # Create placeholder predict_and_score op
@@ -2095,7 +2095,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             name=f"{evaluation_id}.predict_and_score",
             source_code=object_creation_utils.PLACEHOLDER_PREDICT_AND_SCORE_OP_SOURCE,
         )
-        predict_and_score_op_res = self.op_create_v2(predict_and_score_op_req)
+        predict_and_score_op_res = await self.op_create_v2(predict_and_score_op_req)
         predict_and_score_ref = predict_and_score_op_res.digest
 
         # Create placeholder summarize op
@@ -2104,7 +2104,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             name=f"{evaluation_id}.summarize",
             source_code=object_creation_utils.PLACEHOLDER_EVALUATION_SUMMARIZE_OP_SOURCE,
         )
-        summarize_op_res = self.op_create_v2(summarize_op_req)
+        summarize_op_res = await self.op_create_v2(summarize_op_req)
         summarize_ref = summarize_op_res.digest
 
         # Build the evaluation object using shared utility
@@ -2155,7 +2155,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             evaluation_ref=evaluation_ref,
         )
 
-    def evaluation_read_v2(
+    async def evaluation_read_v2(
         self, req: tsi.EvaluationReadV2Req
     ) -> tsi.EvaluationReadV2Res:
         """Get evaluation objects by delegating to obj_read."""
@@ -2188,9 +2188,9 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             summarize_op=val.get("summarize", ""),
         )
 
-    def evaluation_list_v2(
+    async def evaluation_list_v2(
         self, req: tsi.EvaluationListV2Req
-    ) -> Iterator[tsi.EvaluationReadV2Res]:
+    ) -> AsyncIterator[tsi.EvaluationReadV2Res]:
         """List evaluation objects by delegating to objs_query."""
         obj_query_req = tsi.ObjQueryReq(
             project_id=req.project_id,
@@ -2231,7 +2231,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 summarize_op=val.get("summarize", "") if isinstance(val, dict) else "",
             )
 
-    def evaluation_delete_v2(
+    async def evaluation_delete_v2(
         self, req: tsi.EvaluationDeleteV2Req
     ) -> tsi.EvaluationDeleteV2Res:
         """Delete evaluation objects by delegating to obj_delete."""
@@ -2723,7 +2723,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
 
     # Prediction V2 API
 
-    def prediction_create_v2(
+    async def prediction_create_v2(
         self, req: tsi.PredictionCreateV2Req
     ) -> tsi.PredictionCreateV2Res:
         """Create a prediction as a call with special attributes.
@@ -2760,7 +2760,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 name=constants.EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME,
                 source_code=object_creation_utils.PLACEHOLDER_EVALUATION_PREDICT_AND_SCORE_OP_SOURCE,
             )
-            predict_and_score_op_res = self.op_create_v2(predict_and_score_op_req)
+            predict_and_score_op_res = await self.op_create_v2(predict_and_score_op_req)
 
             # Build the predict_and_score op ref
             predict_and_score_op_ref = ri.InternalOpRef(
@@ -2819,7 +2819,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             name=predict_op_name,
             source_code=object_creation_utils.PLACEHOLDER_MODEL_PREDICT_OP_SOURCE,
         )
-        predict_op_res = self.op_create_v2(predict_op_req)
+        predict_op_res = await self.op_create_v2(predict_op_req)
 
         # Build the predict op ref
         predict_op_ref = ri.InternalOpRef(
@@ -2873,7 +2873,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
 
         return tsi.PredictionCreateV2Res(prediction_id=prediction_id)
 
-    def prediction_read_v2(
+    async def prediction_read_v2(
         self, req: tsi.PredictionReadV2Req
     ) -> tsi.PredictionReadV2Res:
         """Read a prediction by reading the underlying call.
@@ -2925,9 +2925,9 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             wb_user_id=call.wb_user_id,
         )
 
-    def prediction_list_v2(
+    async def prediction_list_v2(
         self, req: tsi.PredictionListV2Req
-    ) -> Iterator[tsi.PredictionReadV2Res]:
+    ) -> AsyncIterator[tsi.PredictionReadV2Res]:
         """List predictions by querying calls with prediction attribute.
 
         Args:
@@ -3009,7 +3009,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 wb_user_id=call.wb_user_id,
             )
 
-    def prediction_delete_v2(
+    async def prediction_delete_v2(
         self, req: tsi.PredictionDeleteV2Req
     ) -> tsi.PredictionDeleteV2Res:
         """Delete predictions by deleting the underlying calls.
@@ -3158,7 +3158,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
 
     # Score V2 API
 
-    def score_create_v2(self, req: tsi.ScoreCreateV2Req) -> tsi.ScoreCreateV2Res:
+    async def score_create_v2(self, req: tsi.ScoreCreateV2Req) -> tsi.ScoreCreateV2Res:
         """Create a score as a call with special attributes.
 
         Args:
@@ -3216,7 +3216,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             name=score_op_name,
             source_code=object_creation_utils.PLACEHOLDER_SCORER_SCORE_OP_SOURCE,
         )
-        score_op_res = self.op_create_v2(score_op_req)
+        score_op_res = await self.op_create_v2(score_op_req)
 
         # Build the score op ref
         score_op_ref = ri.InternalOpRef(
@@ -3296,7 +3296,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
 
         return tsi.ScoreCreateV2Res(score_id=score_id)
 
-    def score_read_v2(self, req: tsi.ScoreReadV2Req) -> tsi.ScoreReadV2Res:
+    async def score_read_v2(self, req: tsi.ScoreReadV2Req) -> tsi.ScoreReadV2Res:
         """Read a score by reading the underlying call.
 
         Args:
@@ -3347,7 +3347,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             wb_user_id=call.wb_user_id,
         )
 
-    def score_list_v2(self, req: tsi.ScoreListV2Req) -> Iterator[tsi.ScoreReadV2Res]:
+    async def score_list_v2(self, req: tsi.ScoreListV2Req) -> AsyncIterator[tsi.ScoreReadV2Res]:
         """List scores by querying calls with score attribute.
 
         Args:
@@ -3431,7 +3431,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 wb_user_id=call.wb_user_id,
             )
 
-    def score_delete_v2(self, req: tsi.ScoreDeleteV2Req) -> tsi.ScoreDeleteV2Res:
+    async def score_delete_v2(self, req: tsi.ScoreDeleteV2Req) -> tsi.ScoreDeleteV2Res:
         """Delete scores by deleting the underlying calls.
 
         Args:
