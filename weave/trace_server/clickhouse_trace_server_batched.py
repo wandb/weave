@@ -2229,7 +2229,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                             tsi_query.GetFieldOperator(
                                 get_field_=f"attributes.{constants.WEAVE_ATTRIBUTES_NAMESPACE}.{constants.EVALUATION_RUN_EVALUATION_ATTR_KEY}"
                             ),
-                            tsi_query.LiteralOperation(literal_=req.filter.evaluations),
+                            [
+                                tsi_query.LiteralOperation(literal_=eval_ref)
+                                for eval_ref in req.filter.evaluations
+                            ],
                         ]
                     )
                 )
@@ -2240,7 +2243,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                             tsi_query.GetFieldOperator(
                                 get_field_=f"attributes.{constants.WEAVE_ATTRIBUTES_NAMESPACE}.{constants.EVALUATION_RUN_MODEL_ATTR_KEY}"
                             ),
-                            tsi_query.LiteralOperation(literal_=req.filter.models),
+                            [
+                                tsi_query.LiteralOperation(literal_=model_ref)
+                                for model_ref in req.filter.models
+                            ],
                         ]
                     )
                 )
@@ -2249,9 +2255,10 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                     tsi_query.InOperation(
                         in_=[
                             tsi_query.GetFieldOperator(get_field_="id"),
-                            tsi_query.LiteralOperation(
-                                literal_=req.filter.evaluation_run_ids
-                            ),
+                            [
+                                tsi_query.LiteralOperation(literal_=run_id)
+                                for run_id in req.filter.evaluation_run_ids
+                            ],
                         ]
                     )
                 )
