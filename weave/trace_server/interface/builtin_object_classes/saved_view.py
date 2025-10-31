@@ -46,6 +46,7 @@ class SavedViewDefinition(BaseModel):
     # columns is specifying exactly which columns to include
     # including order.
     columns: Optional[list[Column]] = Field(default=None)
+    header_depth: Optional[int] = Field(default=None)
 
     pin: Optional[Pin] = Field(default=None)
     sort_by: Optional[list[tsi.SortBy]] = Field(default=None)
