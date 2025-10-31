@@ -338,7 +338,11 @@ class Span:
         has_outputs = isinstance(outputs, int) or len(outputs) > 0
         has_usage = len(usage) > 0
 
-        # We failed to load any of the Weave attributes, dump all attributes
+        # Load user defined attributes - tagging system
+        if custom_attributes := wandb_attributes.get("attributes"):
+            attributes.update(custom_attributes)
+
+        # We failed to load any weave or user defined attributes, dump all attributes
         if not has_attributes and not has_inputs and not has_outputs and not has_usage:
             attributes = to_json_serializable(self.attributes)
 
