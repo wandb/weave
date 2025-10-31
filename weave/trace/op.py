@@ -392,7 +392,7 @@ def _call_sync_func(
     op: Op,
     *args: Any,
     __weave: WeaveKwargs | None = None,
-    __should_raise: bool = False,
+    __should_raise: bool = True,
     # When this param is True, calls do not automatically "finish" when the function
     # returns.  The user must explicitly call `finish` on the call object.  This is
     # included to support the imperative evaluation logging interface.
@@ -540,7 +540,7 @@ async def _call_async_func(
     op: Op,
     *args: Any,
     __weave: WeaveKwargs | None = None,
-    __should_raise: bool = False,
+    __should_raise: bool = True,
     __require_explicit_finish: bool = False,
     **kwargs: Any,
 ) -> tuple[Any, Call]:
@@ -671,7 +671,7 @@ def _call_sync_gen(
     op: Op,
     *args: Any,
     __weave: WeaveKwargs | None = None,
-    __should_raise: bool = False,
+    __should_raise: bool = True,
     __require_explicit_finish: bool = False,
     **kwargs: Any,
 ) -> tuple[Generator[Any], Call]:
@@ -881,7 +881,7 @@ async def _call_async_gen(
     op: Op,
     *args: Any,
     __weave: WeaveKwargs | None = None,
-    __should_raise: bool = False,
+    __should_raise: bool = True,
     __require_explicit_finish: bool = False,
     **kwargs: Any,
 ) -> tuple[AsyncIterator, Call]:
@@ -1097,7 +1097,7 @@ def call(
     op: Op,
     *args: Any,
     __weave: WeaveKwargs | None = None,
-    __should_raise: bool = False,
+    __should_raise: bool = True,
     # When this param is True, calls do not automatically "finish" when the function
     # returns.  The user must explicitly call `finish` on the call object.  This is
     # included to support the imperative evaluation logging interface.
@@ -1106,7 +1106,8 @@ def call(
 ) -> tuple[Any, Call] | Coroutine[Any, Any, tuple[Any, Call]]:
     """Executes the op and returns both the result and a Call representing the execution.
 
-    This function will never raise.  Any errors are captured in the Call object.
+    By default, this function will raise exceptions. To suppress exceptions and capture
+    them in the Call object instead, pass __should_raise=False.
 
     This method is automatically bound to any function decorated with `@weave.op`,
     allowing for usage like:
