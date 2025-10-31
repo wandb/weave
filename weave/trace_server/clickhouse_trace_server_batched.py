@@ -4577,13 +4577,11 @@ def _ch_call_dict_to_call_schema_dict(ch_call_dict: dict) -> dict:
     # Load attributes from attributes_dump
     attributes = _dict_dump_to_dict(ch_call_dict.get("attributes_dump", "{}"))
 
-    # For backwards compatibility: inject otel_dump into attributes if present
+    # For backwards/future compatibility: inject otel_dump into attributes if present
     # Legacy trace servers stored all otel info in attributes, clients expect it
-    otel_dump = ch_call_dict.get("otel_dump")
-    if otel_dump:
-        otel_data = _dict_dump_to_dict(otel_dump)
-        if otel_data:
-            attributes["otel_span"] = otel_data
+    # TODO(gst): consider returning the raw otel column and reconstructing client side
+    if (otel_dump := ch_call_dict.get("otel_dump")):  
+        attributes["otel_span"] = _dict_dump_to_dict(otel_dump)  
 
     return {
         "project_id": ch_call_dict.get("project_id"),
