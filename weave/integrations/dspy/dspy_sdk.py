@@ -117,7 +117,11 @@ class DSPyPatcher(MultiPatcher):
                 }
 
                 # prepare dataset for the evaluation logger
-                dataset = [dictify(ex.toDict()) for ex in devset] if devset is not None else []
+                dataset = (
+                    [dictify(ex.toDict()) for ex in devset]
+                    if devset is not None
+                    else []
+                )
 
                 ev = EvaluationLogger(
                     name=f"dspy_eval_{model_name}",
