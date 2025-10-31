@@ -1913,13 +1913,13 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 dataset=val.get("dataset", "") if isinstance(val, dict) else "",
                 scorers=val.get("scorers", []) if isinstance(val, dict) else [],
                 trials=val.get("trials", 1) if isinstance(val, dict) else 1,
-                evaluation_name=val.get("evaluation_name")
-                if isinstance(val, dict)
-                else None,
+                evaluation_name=(
+                    val.get("evaluation_name") if isinstance(val, dict) else None
+                ),
                 evaluate_op=val.get("evaluate", "") if isinstance(val, dict) else "",
-                predict_and_score_op=val.get("predict_and_score", "")
-                if isinstance(val, dict)
-                else "",
+                predict_and_score_op=(
+                    val.get("predict_and_score", "") if isinstance(val, dict) else ""
+                ),
                 summarize_op=val.get("summarize", "") if isinstance(val, dict) else "",
             )
 
@@ -1995,7 +1995,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             digest=obj_result.digest,
             object_id=object_id,
             version_index=obj_read_res.obj.version_index,
-            model_ref=model_ref,
+            ref=model_ref,
         )
 
     def model_read_v2(self, req: tsi.ModelReadV2Req) -> tsi.ModelReadV2Res:
