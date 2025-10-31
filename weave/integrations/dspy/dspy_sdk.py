@@ -4,6 +4,7 @@ import functools
 import logging
 from collections.abc import Sequence
 from typing import Any, Callable
+
 from pydantic import BaseModel
 
 from weave.evaluation.eval_imperative import EvaluationLogger
@@ -116,9 +117,7 @@ class DSPyPatcher(MultiPatcher):
                 }
 
                 # prepare dataset for the evaluation logger
-                dataset = [
-                    dict(ex.inputs()) for ex in devset if devset is not None
-                ]
+                dataset = [dictify(ex.inputs()) for ex in devset if devset is not None]
 
                 ev = EvaluationLogger(
                     name=f"dspy_eval_{model_name}",
@@ -141,7 +140,7 @@ class DSPyPatcher(MultiPatcher):
                         # DSPy expects the inputs to be wrapped in an Example object
                         with ev.log_prediction(
                             inputs=dictify(example.toDict())
-                        )  as pred:
+                        ) as pred:
                             prediction = program(**example.inputs())
                             score = metric(example, prediction)
 

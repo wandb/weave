@@ -325,7 +325,40 @@ def test_dspy_evaluate(client: WeaveClient) -> None:
     flattened_calls = flatten_calls(calls)
 
     assert len(flattened_calls) == 32
-    assert flattened_calls_to_names(flattened_calls) == [('Evaluation.evaluate', 0), ('Evaluation.predict_and_score', 1), ('Model.predict', 2), ('dspy.ChainOfThought', 3), ('dspy.Predict', 4), ('dspy.ChatAdapter', 5), ('dspy.LM', 6), ('dspy.LM.forward', 7), ('litellm.completion', 8), ('openai.chat.completions.create', 9), ('accuracy_metric', 2), ('Evaluation.predict_and_score', 1), ('Model.predict', 2), ('dspy.ChainOfThought', 3), ('dspy.Predict', 4), ('dspy.ChatAdapter', 5), ('dspy.LM', 6), ('dspy.LM.forward', 7), ('litellm.completion', 8), ('openai.chat.completions.create', 9), ('accuracy_metric', 2), ('Evaluation.predict_and_score', 1), ('Model.predict', 2), ('dspy.ChainOfThought', 3), ('dspy.Predict', 4), ('dspy.ChatAdapter', 5), ('dspy.LM', 6), ('dspy.LM.forward', 7), ('litellm.completion', 8), ('openai.chat.completions.create', 9), ('accuracy_metric', 2), ('Evaluation.summarize', 1)]
+    assert flattened_calls_to_names(flattened_calls) == [
+        ("Evaluation.evaluate", 0),
+        ("Evaluation.predict_and_score", 1),
+        ("Model.predict", 2),
+        ("dspy.ChainOfThought", 3),
+        ("dspy.Predict", 4),
+        ("dspy.ChatAdapter", 5),
+        ("dspy.LM", 6),
+        ("dspy.LM.forward", 7),
+        ("litellm.completion", 8),
+        ("openai.chat.completions.create", 9),
+        ("accuracy_metric", 2),
+        ("Evaluation.predict_and_score", 1),
+        ("Model.predict", 2),
+        ("dspy.ChainOfThought", 3),
+        ("dspy.Predict", 4),
+        ("dspy.ChatAdapter", 5),
+        ("dspy.LM", 6),
+        ("dspy.LM.forward", 7),
+        ("litellm.completion", 8),
+        ("openai.chat.completions.create", 9),
+        ("accuracy_metric", 2),
+        ("Evaluation.predict_and_score", 1),
+        ("Model.predict", 2),
+        ("dspy.ChainOfThought", 3),
+        ("dspy.Predict", 4),
+        ("dspy.ChatAdapter", 5),
+        ("dspy.LM", 6),
+        ("dspy.LM.forward", 7),
+        ("litellm.completion", 8),
+        ("openai.chat.completions.create", 9),
+        ("accuracy_metric", 2),
+        ("Evaluation.summarize", 1),
+    ]
 
     call = calls[0]
     assert call.started_at < call.ended_at
@@ -369,7 +402,11 @@ def test_dspy_evaluate_with_pydantic_prediction(client: WeaveClient) -> None:
             return PResult(question=question, answer=ans)
 
     def metric_fn(example: dspy.Example, prediction: PResult) -> float:
-        return 1.0 if str(example.answer).strip() == str(prediction.answer).strip() else 0.0
+        return (
+            1.0
+            if str(example.answer).strip() == str(prediction.answer).strip()
+            else 0.0
+        )
 
     devset = [
         dspy.Example(question="What is 1 + 1?", answer="2").with_inputs("question"),
