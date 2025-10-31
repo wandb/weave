@@ -148,6 +148,7 @@ def init(
 
     # At this point, project_name is guaranteed to be a non-empty string
     # (either from the parameter or constructed from entity/project)
+    project_name = cast(str, project_name)
 
     configure_logger()
 
@@ -184,9 +185,7 @@ def init(
     if should_disable_weave():
         return weave_init.init_weave_disabled()
 
-    return weave_init.init_weave(
-        project_name,
-    )
+    return weave_init.init_weave(project_name)
 
 
 def get_client() -> weave_client.WeaveClient | None:
