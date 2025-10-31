@@ -14,6 +14,7 @@ from weave.agent.agent import AgentState as AgentState
 from weave.dataset.dataset import Dataset
 from weave.evaluation.eval import Evaluation
 from weave.evaluation.eval_imperative import EvaluationLogger
+from weave.evaluation.eval_imperative_v2 import EvaluationLoggerV2
 from weave.flow.annotation_spec import AnnotationSpec
 from weave.flow.model import Model
 from weave.flow.monitor import Monitor
@@ -43,6 +44,7 @@ __all__ = [
     "EasyPrompt",
     "Evaluation",
     "EvaluationLogger",
+    "EvaluationLoggerV2",
     "File",
     "Markdown",
     "MessagesPrompt",
