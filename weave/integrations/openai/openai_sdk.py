@@ -3,8 +3,9 @@ from __future__ import annotations
 import importlib
 import logging
 import time
+from collections.abc import Callable
 from functools import wraps
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
 # Do not import this module directly, it should only be invoked

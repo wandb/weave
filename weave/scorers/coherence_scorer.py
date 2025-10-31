@@ -1,4 +1,4 @@
-from typing import Any, Optional, Union
+from typing import Any
 
 from pydantic import Field, validate_call
 
@@ -85,8 +85,8 @@ class WeaveCoherenceScorerV1(HuggingFacePipelineScorer):
         *,
         query: str,
         output: str,
-        chat_history: Optional[list[dict[str, str]]] = None,
-        context: Optional[Union[str, list[str]]] = None,
+        chat_history: list[dict[str, str]] | None = None,
+        context: str | list[str] | None = None,
         **kwargs: Any,
     ) -> WeaveScorerResult:
         """Score the Coherence of the query and output.

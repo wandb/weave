@@ -1,6 +1,7 @@
 import importlib
+from collections.abc import Callable
 from functools import wraps
-from typing import TYPE_CHECKING, Any, Callable, Optional, Union
+from typing import TYPE_CHECKING, Any, Union
 
 import weave
 from weave.integrations.patcher import MultiPatcher, NoOpPatcher, SymbolPatcher
@@ -14,7 +15,7 @@ if TYPE_CHECKING:
         ChatCompletionStreamOutput,
     )
 
-_huggingface_patcher: Optional[MultiPatcher] = None
+_huggingface_patcher: MultiPatcher | None = None
 
 
 def huggingface_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
@@ -24,7 +25,7 @@ def huggingface_postprocess_inputs(inputs: dict[str, Any]) -> dict[str, Any]:
 
 
 def huggingface_accumulator(
-    acc: Optional[Union["ChatCompletionStreamOutput", "ChatCompletionOutput"]],
+    acc: Union["ChatCompletionStreamOutput", "ChatCompletionOutput"] | None,
     value: "ChatCompletionStreamOutput",
 ) -> "ChatCompletionOutput":
     from huggingface_hub.inference._generated.types.chat_completion import (
@@ -114,8 +115,8 @@ def huggingface_wrapper_async(settings: OpSettings) -> Callable[[Callable], Call
 
 
 def get_huggingface_patcher(
-    settings: Optional[IntegrationSettings] = None,
-) -> Union[MultiPatcher, NoOpPatcher]:
+    settings: IntegrationSettings | None = None,
+) -> MultiPatcher | NoOpPatcher:
     if settings is None:
         settings = IntegrationSettings()
 

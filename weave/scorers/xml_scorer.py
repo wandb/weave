@@ -1,5 +1,5 @@
 import xml.etree.ElementTree as ET
-from typing import Any, Union
+from typing import Any
 
 import weave
 from weave.flow.scorer import Scorer
@@ -11,7 +11,7 @@ class ValidXMLScorer(Scorer):
     """Score an XML string."""
 
     @weave.op
-    def score(self, *, output: Union[str, dict], **kwargs: Any) -> dict:
+    def score(self, *, output: str | dict, **kwargs: Any) -> dict:
         if isinstance(output, dict):
             xml_string = output.get("output", "")
         else:

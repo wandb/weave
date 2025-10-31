@@ -6,7 +6,7 @@ This scorer combines multiple scorers to provide a comprehensive trust evaluatio
 import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from inspect import signature
-from typing import Any, Optional, Union
+from typing import Any
 
 from pydantic import Field, PrivateAttr, validate_call
 
@@ -31,7 +31,7 @@ from weave.scorers.moderation_scorer import (
 class WeaveTrustScorerError(Exception):
     """Error raised by the WeaveTrustScorerV1."""
 
-    def __init__(self, message: str, errors: Optional[Exception] = None):
+    def __init__(self, message: str, errors: Exception | None = None):
         super().__init__(message)
         self.errors = errors
 
@@ -248,7 +248,7 @@ class WeaveTrustScorerV1(weave.Scorer):
     def _score_all(
         self,
         output: str,
-        context: Union[str, list[str]],
+        context: str | list[str],
         query: str,
     ) -> dict[str, Any]:
         """Run all applicable scorers and return their raw results."""
@@ -302,7 +302,7 @@ class WeaveTrustScorerV1(weave.Scorer):
     def _score_with_logic(
         self,
         query: str,
-        context: Union[str, list[str]],
+        context: str | list[str],
         output: str,
     ) -> WeaveScorerResult:
         """Score with nuanced logic for trustworthiness."""
@@ -359,7 +359,7 @@ class WeaveTrustScorerV1(weave.Scorer):
         self,
         *,
         query: str,
-        context: Union[str, list[str]],
+        context: str | list[str],
         output: str,  # Pass the output of a LLM to this parameter for example
         **kwargs: Any,
     ) -> WeaveScorerResult:

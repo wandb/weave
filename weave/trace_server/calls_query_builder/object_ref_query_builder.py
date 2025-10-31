@@ -48,7 +48,7 @@ where brackets indicate that the data is stored in the table_rows table.
 """
 
 from abc import abstractmethod
-from typing import TYPE_CHECKING, Any, Optional, Union, get_args
+from typing import TYPE_CHECKING, Any, Optional, get_args
 
 from pydantic import BaseModel
 
@@ -87,9 +87,9 @@ class ObjectRefCondition(BaseModel):
     field_path: str
     expand_columns: list[str]
     case_insensitive: bool = False
-    conversion_type: Optional[tsi_query.CastTo] = None
+    conversion_type: tsi_query.CastTo | None = None
 
-    def get_expand_column_match(self, shortest: bool = True) -> Optional[str]:
+    def get_expand_column_match(self, shortest: bool = True) -> str | None:
         """Find the matching expand column for this field path.
 
         Args:
@@ -290,7 +290,7 @@ class ObjectRefFilterCondition(ObjectRefCondition):
     """Represents a condition that filters on object references."""
 
     operation_type: str
-    value: Union[str, int, float, bool, list, dict, None]
+    value: str | int | float | bool | list | dict | None
 
     @property
     def unique_key(self) -> str:
@@ -329,7 +329,7 @@ class ObjectRefConditionHandler:
         self.json_path_param = json_path_param
 
     def _create_json_extract_expression(
-        self, conversion_type: Optional[tsi_query.CastTo] = None
+        self, conversion_type: tsi_query.CastTo | None = None
     ) -> str:
         """Creates a JSON_VALUE expression with optional type conversion.
 
@@ -525,7 +525,7 @@ class ObjectRefFilterToCTEProcessor(QueryOptimizationProcessor):
 
     def _extract_field_operand(
         self, operand: "tsi_query.Operand"
-    ) -> tuple[Optional["tsi_query.GetFieldOperator"], Optional[str]]:
+    ) -> tuple[Optional["tsi_query.GetFieldOperator"], str | None]:
         """Extract field operand and conversion type from an operand.
 
         Returns:
@@ -547,7 +547,7 @@ class ObjectRefFilterToCTEProcessor(QueryOptimizationProcessor):
         operands: tuple["tsi_query.Operand", "tsi_query.Operand"],
         operation_type: str,
         **kwargs: Any,
-    ) -> Optional[str]:
+    ) -> str | None:
         """Process binary operations (eq, gt, gte) with common logic.
 
         Args:
@@ -582,7 +582,7 @@ class ObjectRefFilterToCTEProcessor(QueryOptimizationProcessor):
                 self.object_ref_conditions.append(obj_condition)
         return None
 
-    def process_or(self, operation: tsi_query.OrOperation) -> Optional[str]:
+    def process_or(self, operation: tsi_query.OrOperation) -> str | None:
         """Process OR operations to extract object reference conditions from all operands."""
         # Unlike the parent class, we need to process ALL operands to extract conditions,
         # regardless of whether they can be "optimized" or not
@@ -590,12 +590,12 @@ class ObjectRefFilterToCTEProcessor(QueryOptimizationProcessor):
             self.process_operand(op)
         return None
 
-    def process_eq(self, operation: tsi_query.EqOperation) -> Optional[str]:
+    def process_eq(self, operation: tsi_query.EqOperation) -> str | None:
         """Process equality operation for object refs."""
         self._process_binary_operation(operation.eq_, "eq")
         return None
 
-    def process_contains(self, operation: tsi_query.ContainsOperation) -> Optional[str]:
+    def process_contains(self, operation: tsi_query.ContainsOperation) -> str | None:
         """Process contains operation for object refs."""
         if isinstance(operation.contains_.input, tsi_query.GetFieldOperator):
             field_path = operation.contains_.input.get_field_
@@ -612,17 +612,17 @@ class ObjectRefFilterToCTEProcessor(QueryOptimizationProcessor):
                 self.object_ref_conditions.append(obj_condition)
         return None
 
-    def process_gt(self, operation: tsi_query.GtOperation) -> Optional[str]:
+    def process_gt(self, operation: tsi_query.GtOperation) -> str | None:
         """Process greater than operation for object refs."""
         self._process_binary_operation(operation.gt_, "gt")
         return None
 
-    def process_gte(self, operation: tsi_query.GteOperation) -> Optional[str]:
+    def process_gte(self, operation: tsi_query.GteOperation) -> str | None:
         """Process greater than or equal operation for object refs."""
         self._process_binary_operation(operation.gte_, "gte")
         return None
 
-    def process_in(self, operation: tsi_query.InOperation) -> Optional[str]:
+    def process_in(self, operation: tsi_query.InOperation) -> str | None:
         """Process in operation for object refs."""
         if isinstance(operation.in_[0], tsi_query.GetFieldOperator):
             field_path = operation.in_[0].get_field_
@@ -712,7 +712,7 @@ def build_object_ref_ctes(
 
         # For filters, don't select object value. Only needed when ordering
         val_dump_select = ""
-        val_condition: Optional[str] = None
+        val_condition: str | None = None
         if isinstance(condition, ObjectRefOrderCondition):
             # For ordering, select the actual leaf value that we want to order by
             # This value will be propagated through intermediate CTEs to the final result

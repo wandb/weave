@@ -1,7 +1,8 @@
 import json
 import logging
 import sys
-from typing import Any, Callable, Union
+from collections.abc import Callable
+from typing import Any
 
 import pytest
 from spec import SerializationTestCase
@@ -73,7 +74,7 @@ def test_serialization_correctness(
         found_refs = set()
         found_files = set()
 
-        def ref_visitor(path: list[Union[str, int]], obj: Any):
+        def ref_visitor(path: list[str | int], obj: Any):
             if isinstance(obj, str):
                 try:
                     ref = ObjectRef.parse_uri(obj)
@@ -81,7 +82,7 @@ def test_serialization_correctness(
                 except (ValueError, TypeError):
                     pass
 
-        def file_visitor(path: list[Union[str, int]], obj: Any):
+        def file_visitor(path: list[str | int], obj: Any):
             if isinstance(obj, dict) and "files" in obj:
                 files = obj["files"]
                 if isinstance(files, dict):
@@ -298,12 +299,12 @@ def test_serialization_correctness(
 
 def json_visitor(
     obj: Any,
-    visitor: Callable[[list[Union[str, int]], Any], None],
+    visitor: Callable[[list[str | int], Any], None],
 ):
     def _json_visitor(
         obj: Any,
-        visitor: Callable[[list[Union[str, int]], Any], None],
-        path: list[Union[str, int]],
+        visitor: Callable[[list[str | int], Any], None],
+        path: list[str | int],
     ):
         visitor(path, obj)
 

@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.base64_content_conversion import store_content_object
@@ -11,9 +11,9 @@ from weave.type_wrappers.Content.content import Content
 def _process_image_data_item(
     data_item: dict[str, Any],
     index: int,
-    trace_server: Optional[Any] = None,
-    project_id: Optional[str] = None,
-    wb_user_id: Optional[str] = None,
+    trace_server: Any | None = None,
+    project_id: str | None = None,
+    wb_user_id: str | None = None,
 ) -> dict[str, Any]:
     """Process a single image data item, creating Content objects from URLs or base64 data.
 
@@ -78,14 +78,14 @@ def _process_image_data_item(
 
 
 def lite_llm_image_generation(
-    api_key: Optional[str],
+    api_key: str | None,
     inputs: dict[str, Any],
-    provider: Optional[str] = None,
-    base_url: Optional[str] = None,
-    extra_headers: Optional[dict[str, str]] = None,
-    trace_server: Optional[Any] = None,
-    project_id: Optional[str] = None,
-    wb_user_id: Optional[str] = None,
+    provider: str | None = None,
+    base_url: str | None = None,
+    extra_headers: dict[str, str] | None = None,
+    trace_server: Any | None = None,
+    project_id: str | None = None,
+    wb_user_id: str | None = None,
 ) -> tsi.ImageGenerationCreateRes:
     """Generate images using LiteLLM image generation.
 

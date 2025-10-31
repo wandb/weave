@@ -58,7 +58,7 @@ except ImportError:
     import_failed = True
 
 from collections.abc import Generator
-from typing import Any, Optional
+from typing import Any
 
 RUNNABLE_SEQUENCE_NAME = "RunnableSequence"
 
@@ -109,7 +109,7 @@ if not import_failed:
                 )
 
             self._call_map: dict[str, Call] = {}
-            self.latest_run: Optional[Run] = None
+            self.latest_run: Run | None = None
             super().__init__()
 
         def _persist_run(self, run: Run) -> None:
@@ -162,7 +162,7 @@ if not import_failed:
             `RunnableSequence1` popped onto the stack. To solve for this, we need to send
             `False` as the `parent_id`, telling the system: "trust me, this is a root".
             """
-            parent_run: Optional[Call] = None
+            parent_run: Call | None = None
             lc_parent_run_id = (
                 str(run.parent_run_id) if run.parent_run_id is not None else None
             )
@@ -259,10 +259,10 @@ if not import_failed:
             messages: list[list[BaseMessage]],
             *,
             run_id: UUID,
-            tags: Optional[list[str]] = None,
-            parent_run_id: Optional[UUID] = None,
-            metadata: Optional[dict[str, Any]] = None,
-            name: Optional[str] = None,
+            tags: list[str] | None = None,
+            parent_run_id: UUID | None = None,
+            metadata: dict[str, Any] | None = None,
+            name: str | None = None,
             **kwargs: Any,
         ) -> Run:
             """Start a trace for an LLM run."""
@@ -368,7 +368,7 @@ else:
         pass
 
 
-weave_tracing_callback_var: ContextVar[Optional[WeaveTracer]] = ContextVar(
+weave_tracing_callback_var: ContextVar[WeaveTracer | None] = ContextVar(
     "tracing_weave_callback", default=None
 )
 

@@ -45,7 +45,7 @@ def compare_datasets(ds1: weave.Dataset, ds2: weave.Dataset):
     rows1 = ds1.rows.rows
     rows2 = ds2.rows.rows
     assert len(rows1) == len(rows2)
-    for row1, row2 in zip(rows1, rows2):
+    for row1, row2 in zip(rows1, rows2, strict=False):
         compare_images(row1["image"], row2["image"])
         assert row1["label"] == row2["label"]
 

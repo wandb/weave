@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Annotated, Any, Literal, Union
+from typing import Annotated, Any, Literal
 
 from pydantic import AfterValidator, AliasChoices, BaseModel, Field
 from pydantic_core import ValidationError
@@ -108,9 +108,7 @@ class ServerVAD(BaseModel):
     silence_duration_ms: int | None = None
 
 
-TurnDetection = Annotated[
-    Union[NoTurnDetection, ServerVAD], Field(discriminator="type")
-]
+TurnDetection = Annotated[NoTurnDetection | ServerVAD, Field(discriminator="type")]
 
 
 class FunctionToolChoice(BaseModel):
@@ -118,7 +116,7 @@ class FunctionToolChoice(BaseModel):
     function: str
 
 
-ToolChoice = Union[Literal["auto", "none", "required"], FunctionToolChoice]
+ToolChoice = Literal["auto", "none", "required"] | FunctionToolChoice
 
 MessageRole = Literal["system", "assistant", "user"]
 
@@ -204,10 +202,8 @@ class OutputTextContentPart(BaseModel):
 
 
 SystemContentPart = InputTextContentPart
-UserContentPart = Union[
-    Annotated[
-        Union[InputTextContentPart, InputAudioContentPart], Field(discriminator="type")
-    ]
+UserContentPart = Annotated[
+    InputTextContentPart | InputAudioContentPart, Field(discriminator="type")
 ]
 AssistantContentPart = OutputTextContentPart
 
@@ -320,20 +316,20 @@ class ServerFunctionCallOutputItem(BaseFunctionCallOutputItem):
 
 # Union types for client and server items
 ClientMessageItem = Annotated[
-    Union[ClientSystemMessageItem, ClientUserMessageItem, ClientAssistantMessageItem],
+    ClientSystemMessageItem | ClientUserMessageItem | ClientAssistantMessageItem,
     Field(discriminator="role"),
 ]
 ServerMessageItem = Annotated[
-    Union[ServerSystemMessageItem, ServerUserMessageItem, ServerAssistantMessageItem],
+    ServerSystemMessageItem | ServerUserMessageItem | ServerAssistantMessageItem,
     Field(discriminator="role"),
 ]
 ClientItem = Annotated[
-    Union[ClientMessageItem, ClientFunctionCallItem, ClientFunctionCallOutputItem],
+    ClientMessageItem | ClientFunctionCallItem | ClientFunctionCallOutputItem,
     Field(discriminator="type"),
 ]
 
 ServerItem = Annotated[
-    Union[ServerMessageItem, ServerFunctionCallItem, ServerFunctionCallOutputItem],
+    ServerMessageItem | ServerFunctionCallItem | ServerFunctionCallOutputItem,
     Field(discriminator="type"),
 ]
 
@@ -502,12 +498,10 @@ class ResponseItemAudioContentPart(BaseModel):
 
 
 ResponseItemContentPart = Annotated[
-    Union[
-        ResponseItemInputTextContentPart,
-        ResponseItemInputAudioContentPart,
-        ResponseItemTextContentPart,
-        ResponseItemAudioContentPart,
-    ],
+    ResponseItemInputTextContentPart
+    | ResponseItemInputAudioContentPart
+    | ResponseItemTextContentPart
+    | ResponseItemAudioContentPart,
     Field(discriminator="type"),
 ]
 
@@ -539,9 +533,7 @@ class ResponseFunctionCallOutputItem(ResponseItemBase):
 
 
 ResponseItem = Annotated[
-    Union[
-        ResponseMessageItem, ResponseFunctionCallItem, ResponseFunctionCallOutputItem
-    ],
+    ResponseMessageItem | ResponseFunctionCallItem | ResponseFunctionCallOutputItem,
     Field(discriminator="type"),
 ]
 
@@ -612,7 +604,7 @@ class ResponseFailedDetails(BaseModel):
 
 
 ResponseStatusDetails = Annotated[
-    Union[ResponseCancelledDetails, ResponseIncompleteDetails, ResponseFailedDetails],
+    ResponseCancelledDetails | ResponseIncompleteDetails | ResponseFailedDetails,
     Field(discriminator="type"),
 ]
 
@@ -782,53 +774,49 @@ class RateLimitsUpdatedMessage(ServerMessageBase):
 
 
 UserMessageType = Annotated[
-    Union[
-        SessionUpdateMessage,
-        InputAudioBufferAppendMessage,
-        InputAudioBufferCommitMessage,
-        InputAudioBufferClearMessage,
-        ItemCreateMessage,
-        ItemTruncateMessage,
-        ItemDeleteMessage,
-        ResponseCreateMessage,
-        ResponseCancelMessage,
-        UnknownClientMessage,
-    ],
+    SessionUpdateMessage
+    | InputAudioBufferAppendMessage
+    | InputAudioBufferCommitMessage
+    | InputAudioBufferClearMessage
+    | ItemCreateMessage
+    | ItemTruncateMessage
+    | ItemDeleteMessage
+    | ResponseCreateMessage
+    | ResponseCancelMessage
+    | UnknownClientMessage,
     Field(discriminator="type"),
 ]
 
 ServerMessageType = Annotated[
-    Union[
-        ErrorMessage,
-        SessionCreatedMessage,
-        SessionUpdatedMessage,
-        InputAudioBufferCommittedMessage,
-        InputAudioBufferClearedMessage,
-        InputAudioBufferSpeechStartedMessage,
-        InputAudioBufferSpeechStoppedMessage,
-        ItemCreatedMessage,
-        ItemTruncatedMessage,
-        ItemDeletedMessage,
-        ItemInputAudioTranscriptionCompletedMessage,
-        ItemInputAudioTranscriptionFailedMessage,
-        ItemInputAudioTranscriptionDeltaMessage,
-        ResponseCreatedMessage,
-        ResponseDoneMessage,
-        ResponseOutputItemAddedMessage,
-        ResponseOutputItemDoneMessage,
-        ResponseContentPartAddedMessage,
-        ResponseContentPartDoneMessage,
-        ResponseTextDeltaMessage,
-        ResponseTextDoneMessage,
-        ResponseAudioTranscriptDeltaMessage,
-        ResponseAudioTranscriptDoneMessage,
-        ResponseAudioDeltaMessage,
-        ResponseAudioDoneMessage,
-        ResponseFunctionCallArgumentsDeltaMessage,
-        ResponseFunctionCallArgumentsDoneMessage,
-        RateLimitsUpdatedMessage,
-        UnknownServerMessage,
-    ],
+    ErrorMessage
+    | SessionCreatedMessage
+    | SessionUpdatedMessage
+    | InputAudioBufferCommittedMessage
+    | InputAudioBufferClearedMessage
+    | InputAudioBufferSpeechStartedMessage
+    | InputAudioBufferSpeechStoppedMessage
+    | ItemCreatedMessage
+    | ItemTruncatedMessage
+    | ItemDeletedMessage
+    | ItemInputAudioTranscriptionCompletedMessage
+    | ItemInputAudioTranscriptionFailedMessage
+    | ItemInputAudioTranscriptionDeltaMessage
+    | ResponseCreatedMessage
+    | ResponseDoneMessage
+    | ResponseOutputItemAddedMessage
+    | ResponseOutputItemDoneMessage
+    | ResponseContentPartAddedMessage
+    | ResponseContentPartDoneMessage
+    | ResponseTextDeltaMessage
+    | ResponseTextDoneMessage
+    | ResponseAudioTranscriptDeltaMessage
+    | ResponseAudioTranscriptDoneMessage
+    | ResponseAudioDeltaMessage
+    | ResponseAudioDoneMessage
+    | ResponseFunctionCallArgumentsDeltaMessage
+    | ResponseFunctionCallArgumentsDoneMessage
+    | RateLimitsUpdatedMessage
+    | UnknownServerMessage,
     Field(discriminator="type"),
 ]
 
@@ -878,7 +866,7 @@ SERVER_MESSAGE_CLASSES: dict[str, type[ServerMessageType]] = {
     "rate_limits.updated": RateLimitsUpdatedMessage,
 }
 
-MessageType = Union[UserMessageType, ServerMessageType]
+MessageType = UserMessageType | ServerMessageType
 
 
 def create_user_message_from_dict(data: dict) -> UserMessageType | None:

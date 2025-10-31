@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import logging
 import threading
-from typing import Any, Callable, cast
+from collections.abc import Callable
+from typing import Any, cast
 
 from pydantic import BaseModel, Field
 from typing_extensions import Self

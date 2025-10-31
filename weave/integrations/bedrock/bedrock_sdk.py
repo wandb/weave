@@ -3,7 +3,8 @@ import io
 import json
 import os
 import re
-from typing import TYPE_CHECKING, Any, Callable, Optional
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 import boto3
 
@@ -16,7 +17,7 @@ if TYPE_CHECKING:
 
 
 def bedrock_on_finish_converse(
-    call: Call, output: Any, exception: Optional[BaseException]
+    call: Call, output: Any, exception: BaseException | None
 ) -> None:
     model_name = str(call.inputs["modelId"])  # get the ref
     usage = {model_name: {"requests": 1}}
@@ -33,7 +34,7 @@ def bedrock_on_finish_converse(
 
 
 def bedrock_on_finish_invoke(
-    call: Call, output: Any, exception: Optional[BaseException]
+    call: Call, output: Any, exception: BaseException | None
 ) -> None:
     model_name = str(call.inputs["modelId"])
     usage = {model_name: {"requests": 1}}
@@ -117,8 +118,8 @@ def postprocess_inputs_invoke(inputs: dict[str, Any]) -> dict[str, Any]:
 
 
 def postprocess_output_invoke(
-    outputs: Optional[dict[str, Any]],
-) -> Optional[dict[str, Any]]:
+    outputs: dict[str, Any] | None,
+) -> dict[str, Any] | None:
     """Process the outputs for logging without affecting the original response."""
     if outputs is None:
         return None
@@ -178,7 +179,7 @@ def _patch_apply_guardrail(bedrock_client: "BaseClient") -> None:
 
 
 def bedrock_stream_accumulator(
-    acc: Optional[dict],
+    acc: dict | None,
     value: dict,
 ) -> dict:
     """Accumulates streaming events into a final response dictionary."""

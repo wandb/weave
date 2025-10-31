@@ -2,7 +2,7 @@ import inspect
 import json
 import logging
 import types
-from typing import Any, Optional, Union
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -26,14 +26,14 @@ except Exception:
     _import_failed = True
 
 # Module-level shared state
-_weave_calls_map: dict[Union[str, tuple[Optional[str], str]], Call] = {}
-_weave_client_instance: Optional[WeaveClient] = None
+_weave_calls_map: dict[str | tuple[str | None, str], Call] = {}
+_weave_client_instance: WeaveClient | None = None
 _accumulators: dict[str, list[Any]] = {}
 
 logger = logging.getLogger(__name__)
 
 
-def get_weave_client() -> Optional[WeaveClient]:
+def get_weave_client() -> WeaveClient | None:
     """Get the weave client, returning None if weave hasn't been initialized."""
     global _weave_client_instance
     if _weave_client_instance is None:
@@ -188,9 +188,9 @@ if not _import_failed:
             self,
             id_: str,
             bound_args: Any,
-            instance: Optional[Any] = None,
-            parent_span_id: Optional[str] = None,
-            tags: Optional[dict[str, Any]] = None,
+            instance: Any | None = None,
+            parent_span_id: str | None = None,
+            tags: dict[str, Any] | None = None,
             **kwargs: Any,
         ) -> None:
             """Creates a Weave call when a LlamaIndex span starts."""
@@ -239,8 +239,8 @@ if not _import_failed:
         def _prepare_to_exit_or_drop(
             self,
             id_: str,
-            result: Optional[Any] = None,
-            err: Optional[BaseException] = None,
+            result: Any | None = None,
+            err: BaseException | None = None,
         ) -> None:
             """Common logic for finishing a Weave call for a LlamaIndex span."""
             gc = get_weave_client()
@@ -295,8 +295,8 @@ if not _import_failed:
             self,
             id_: str,
             bound_args: Any,
-            instance: Optional[Any] = None,
-            result: Optional[Any] = None,
+            instance: Any | None = None,
+            result: Any | None = None,
             **kwargs: Any,
         ) -> Any:
             """Finishes the Weave call when a LlamaIndex span exits successfully."""
@@ -307,8 +307,8 @@ if not _import_failed:
             self,
             id_: str,
             bound_args: Any,
-            instance: Optional[Any] = None,
-            err: Optional[BaseException] = None,
+            instance: Any | None = None,
+            err: BaseException | None = None,
             **kwargs: Any,
         ) -> Any:
             """Finishes the Weave call with an error when a LlamaIndex span is dropped."""
@@ -349,7 +349,7 @@ if not _import_failed:
             is_progress_event = event_class_name.endswith("InProgressEvent")
 
             # Key for pairing start and end events.
-            event_pairing_key: tuple[Optional[str], str] = (event.span_id, op_name)
+            event_pairing_key: tuple[str | None, str] = (event.span_id, op_name)
 
             try:
                 raw_event_payload = event.model_dump(exclude_none=True)
@@ -480,11 +480,11 @@ class LLamaIndexPatcher(Patcher):  # pyright: ignore[reportRedeclaration]
 
     def __init__(self) -> None:
         super().__init__()
-        self.dispatcher: Optional[Any] = None
-        self._original_event_handlers: Optional[list[BaseEventHandler]] = None
-        self._original_span_handlers: Optional[list[BaseSpanHandler[Any]]] = None
-        self.weave_event_handler: Optional[WeaveEventHandler] = None
-        self.weave_span_handler: Optional[WeaveSpanHandler] = None
+        self.dispatcher: Any | None = None
+        self._original_event_handlers: list[BaseEventHandler] | None = None
+        self._original_span_handlers: list[BaseSpanHandler[Any]] | None = None
+        self.weave_event_handler: WeaveEventHandler | None = None
+        self.weave_span_handler: WeaveSpanHandler | None = None
 
     def attempt_patch(self) -> bool:
         """Attempts to patch LlamaIndex instrumentation and set up Weave handlers."""

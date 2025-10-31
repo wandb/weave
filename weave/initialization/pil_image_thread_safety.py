@@ -17,8 +17,9 @@ We call `apply_threadsafe_patch_to_pil_image` in the `__init__.py` file to ensur
 
 import logging
 import threading
+from collections.abc import Callable
 from functools import wraps
-from typing import Any, Callable, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +29,7 @@ logger = logging.getLogger(__name__)
 # `_new_lock_lock` is a lock that is used to create a new lock for each ImageFile instance
 # `_fallback_load_lock` is a global lock that is used to ensure thread-safe image loading when per-instance locking fails
 _patched = False
-_original_methods: dict[str, Optional[Callable]] = {"load": None}
+_original_methods: dict[str, Callable | None] = {"load": None}
 _new_lock_lock = threading.RLock()
 _fallback_load_lock = threading.RLock()
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Annotated, Any, Union
+from typing import Annotated, Any
 
 from pydantic import BeforeValidator
 
@@ -55,4 +55,4 @@ def cast_to_scorer(obj: Any) -> Scorer | Op:
 
 
 DatasetLike = Annotated[Dataset, BeforeValidator(cast_to_dataset)]
-ScorerLike = Annotated[Union[Op, Scorer], BeforeValidator(cast_to_scorer)]
+ScorerLike = Annotated[Op | Scorer, BeforeValidator(cast_to_scorer)]

@@ -7,14 +7,14 @@ particularly useful when dealing with JSON-like data where keys might not exist 
 import json
 import numbers
 from collections import defaultdict
-from typing import Any, Optional, TypeVar, Union
+from typing import Any, TypeVar
 
 T = TypeVar("T")
 
 
 def safe_get(
-    obj: Optional[dict], path: list[str], default: Optional[T] = None
-) -> Union[Any, Optional[T]]:
+    obj: dict | None, path: list[str], default: T | None = None
+) -> Any | T | None:
     """Safely get a value from a nested dictionary using a list of keys.
 
     This function traverses a nested dictionary structure using a list of keys,
@@ -49,7 +49,7 @@ def safe_get(
     return safe_get(obj.get(path[0]), path[1:], default)
 
 
-def convert_defaultdict_to_dict(d: Union[dict, defaultdict]) -> dict:
+def convert_defaultdict_to_dict(d: dict | defaultdict) -> dict:
     if isinstance(d, defaultdict):
         return {k: convert_defaultdict_to_dict(v) for k, v in d.items()}
     return d
@@ -134,7 +134,7 @@ def zip_dicts(base_dict: dict[str, Any], new_dict: dict[str, Any]) -> dict[str, 
 
 
 def flatten_attributes(
-    data: dict[str, Any], json_attributes: Optional[list[str]] = None
+    data: dict[str, Any], json_attributes: list[str] | None = None
 ) -> dict[str, Any]:
     """Flatten a nested Python dictionary into a flat dictionary with dot-separated keys.
 
@@ -150,7 +150,7 @@ def flatten_attributes(
 
     result: dict[str, Any] = {}
 
-    def _flatten(obj: Union[dict[str, Any], list[Any]], prefix: str = "") -> None:
+    def _flatten(obj: dict[str, Any] | list[Any], prefix: str = "") -> None:
         # Check if the entire object should be stringified as JSON
         should_stringify_entire_obj = any(
             prefix.rstrip(".") == attr for attr in json_attributes

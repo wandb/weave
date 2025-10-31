@@ -113,7 +113,7 @@ def resolve_ref_futures(ref: RefWithExtra) -> RefWithExtra:
     """
     extras = ref._extra
     new_extras = []
-    for name, val in zip(extras[::2], extras[1::2]):
+    for name, val in zip(extras[::2], extras[1::2], strict=False):
         if isinstance(val, Future):
             val = val.result()
         new_extras.append(name)
@@ -133,13 +133,13 @@ def test_drill_down_dataset_refs_same_after_publishing(client):
     ds3 = ref2.get()
 
     assert resolve_ref_futures(ds.rows.ref) == ds2.rows.ref
-    for row, row2 in zip(ds.rows, ds2.rows):
+    for row, row2 in zip(ds.rows, ds2.rows, strict=False):
         assert resolve_ref_futures(row.ref) == row2.ref
         assert resolve_ref_futures(row["a"].ref) == row2["a"].ref
         assert resolve_ref_futures(row["a"]["b"].ref) == row2["a"]["b"].ref
 
     assert ds2.ref == ds3.ref
-    for row2, row3 in zip(ds2.rows, ds3.rows):
+    for row2, row3 in zip(ds2.rows, ds3.rows, strict=False):
         assert row2.ref == row3.ref
         assert row2["a"].ref == row3["a"].ref
         assert row2["a"]["b"].ref == row3["a"]["b"].ref

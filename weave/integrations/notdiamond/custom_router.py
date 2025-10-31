@@ -1,4 +1,4 @@
-from typing import Any, Optional, Union
+from typing import Any
 
 import pandas as pd
 from notdiamond.toolkit.custom_router import CustomRouter
@@ -12,13 +12,13 @@ from weave.utils.iterators import first
     name="notdiamond.custom_router.train_router",
 )
 def train_router(
-    model_evals: dict[Union[weave.Model, str], EvaluationResults],
+    model_evals: dict[weave.Model | str, EvaluationResults],
     prompt_column: str,
     response_column: str,
-    preference_id: Optional[str] = None,
-    language: Optional[str] = None,
-    maximize: Optional[bool] = None,
-    api_key: Optional[str] = None,
+    preference_id: str | None = None,
+    language: str | None = None,
+    maximize: bool | None = None,
+    api_key: str | None = None,
 ) -> CustomRouter:
     """Currently only supports EvaluationResults with a single score column."""
     router_dataset: dict[str, pd.DataFrame] = {}
@@ -45,11 +45,11 @@ def train_router(
     name="notdiamond.custom_router.evaluate_router",
 )
 def evaluate_router(
-    model_datasets: dict[Union[weave.Model, str], weave.Dataset],
+    model_datasets: dict[weave.Model | str, weave.Dataset],
     prompt_column: str,
     response_column: str,
     preference_id: str,
-    api_key: Optional[str] = None,
+    api_key: str | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     router_dataset: dict[str, pd.DataFrame] = {}
 
@@ -112,7 +112,7 @@ def evaluate_router(
 
 
 def _get_score_column(
-    model: str, scores: dict, score_col_name: Optional[str] = None
+    model: str, scores: dict, score_col_name: str | None = None
 ) -> tuple[str, float]:
     """Extract a single score from the nested `scores` column.
     - raise for multiple scores
@@ -135,7 +135,7 @@ def _get_score_column(
 
 
 def _build_dataframe(
-    model: str, dataset: Union[EvaluationResults, weave.Dataset]
+    model: str, dataset: EvaluationResults | weave.Dataset
 ) -> tuple[str, pd.DataFrame]:
     df_rows = []
     score_col_name = None

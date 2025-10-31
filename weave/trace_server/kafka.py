@@ -1,6 +1,6 @@
 import logging
 import socket
-from typing import Any, Optional
+from typing import Any
 
 import ddtrace
 from confluent_kafka import Consumer as ConfluentKafkaConsumer
@@ -39,7 +39,7 @@ class KafkaProducer(ConfluentKafkaProducer):
     @classmethod
     def from_env(
         cls,
-        additional_kafka_config: Optional[dict[str, Any]] = None,
+        additional_kafka_config: dict[str, Any] | None = None,
     ) -> "KafkaProducer":
         if additional_kafka_config is None:
             additional_kafka_config = {}
@@ -131,7 +131,7 @@ class KafkaConsumer(ConfluentKafkaConsumer):
 
     @classmethod
     def from_env(
-        cls, group_id: str, additional_kafka_config: Optional[dict[str, Any]] = None
+        cls, group_id: str, additional_kafka_config: dict[str, Any] | None = None
     ) -> "KafkaConsumer":
         if additional_kafka_config is None:
             additional_kafka_config = {}
@@ -153,7 +153,7 @@ def _make_broker_host() -> str:
     return f"{kafka_broker_host()}:{kafka_broker_port()}"
 
 
-def _make_auth_config() -> dict[str, Optional[str]]:
+def _make_auth_config() -> dict[str, str | None]:
     username = kafka_client_user()
 
     if username is None:

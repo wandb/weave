@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import importlib
+from collections.abc import Callable
 from functools import wraps
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 from google.cloud.aiplatform_v1beta1.types import content as gapic_content_types
 from google.cloud.aiplatform_v1beta1.types import (

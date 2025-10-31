@@ -1,6 +1,5 @@
 import os
 import random
-from typing import Optional, Union
 
 import torch
 from pydantic import BaseModel
@@ -31,8 +30,8 @@ TINY_HF_MODEL_PATHS = {
 
 class TokenizedText(BaseModel):
     model_config = {"arbitrary_types_allowed": True}
-    input_ids: Union[list[int], Tensor]
-    attention_mask: Union[list[int], Tensor]
+    input_ids: list[int] | Tensor
+    attention_mask: list[int] | Tensor
 
 
 class RandomTokenizer:
@@ -58,7 +57,7 @@ _default_pattern = (
 
 
 def generate_large_text(
-    tokens: int = 100_000, pattern: Optional[str] = _default_pattern
+    tokens: int = 100_000, pattern: str | None = _default_pattern
 ) -> str:
     words_per_pattern = len(pattern.split())
     tokens_per_pattern = words_per_pattern * 1.5

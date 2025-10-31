@@ -1,14 +1,14 @@
 import contextvars
 from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Optional, Protocol
+from typing import Protocol
 
 
 class SecretFetcher(Protocol):
     def fetch(self, secret_name: str) -> dict: ...
 
 
-_secret_fetcher_context: contextvars.ContextVar[Optional[SecretFetcher]] = (
+_secret_fetcher_context: contextvars.ContextVar[SecretFetcher | None] = (
     contextvars.ContextVar("secret_fetcher", default=None)
 )
 

@@ -6,11 +6,12 @@ import random
 import sys
 import time
 from collections import defaultdict, namedtuple
+from collections.abc import Callable
 from contextlib import contextmanager
 from contextvars import copy_context
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any, Callable, Optional
+from typing import Any
 from unittest import mock
 
 import pytest
@@ -5854,7 +5855,7 @@ def test_thread_api_with_auto_generation(client):
 
 def test_calls_query_filter_contains_in_message_array(client):
     @weave.op
-    def op1(extra_message: Optional[str] = None):
+    def op1(extra_message: str | None = None):
         messages = ["hello", "world"]
         if extra_message:
             messages.append(extra_message)

@@ -16,11 +16,11 @@ for VideoFileClip loading operations.
 import logging
 import sys
 import threading
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from functools import wraps
 from importlib.abc import MetaPathFinder
 from importlib.machinery import ModuleSpec
-from typing import Any, Callable, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 # `_new_lock_lock` is a lock that is used to create a new lock for each VideoFileClip instance
 # `_fallback_load_lock` is a global lock that is used to ensure thread-safe video loading when per-instance locking fails
 _patched = False
-_original_methods: dict[str, Optional[Callable]] = {"__init__": None}
+_original_methods: dict[str, Callable | None] = {"__init__": None}
 _new_lock_lock = threading.RLock()
 _fallback_load_lock = threading.RLock()
 
@@ -161,9 +161,9 @@ class MoviePyPatchHook(MetaPathFinder):
     def find_spec(
         self,
         fullname: str,
-        path: Optional[Sequence[str]],
-        target: Optional[object] = None,
-    ) -> Optional[ModuleSpec]:
+        path: Sequence[str] | None,
+        target: object | None = None,
+    ) -> ModuleSpec | None:
         """Check if MoviePy is being imported and apply patch."""
         if not (fullname == "moviepy" or fullname.startswith("moviepy.")):
             return None

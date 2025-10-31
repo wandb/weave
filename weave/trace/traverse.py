@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from collections.abc import Collection, Iterator
 from functools import cmp_to_key
-from typing import Any, Union, overload
+from typing import Any, overload
 
 # String indicates object key access, number indicates array index access
 # This structure allows us to handle corner cases like periods or brackets
 # in object keys.
 
-PathElement = Union[str, int]
+PathElement = str | int
 
 
 def escape_key(key: str) -> str:
@@ -182,7 +182,7 @@ def compare_paths(path1: ObjectPath, path2: ObjectPath) -> int:
         1 if path1 > path2
     """
     # Compare elements pairwise
-    for e1, e2 in zip(path1, path2):
+    for e1, e2 in zip(path1, path2, strict=False):
         # If elements are same type, compare directly
         if isinstance(e1, str) and isinstance(e2, str):
             if e1 < e2:

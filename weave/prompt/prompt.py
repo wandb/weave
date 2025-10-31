@@ -5,7 +5,7 @@ import re
 import textwrap
 from collections import UserList
 from pathlib import Path
-from typing import IO, Any, Optional, SupportsIndex, TypedDict, Union, cast, overload
+from typing import IO, Any, SupportsIndex, TypedDict, cast, overload
 
 from pydantic import Field
 from typing_extensions import Self
@@ -23,7 +23,7 @@ from weave.trace.vals import WeaveObject
 
 class Message(TypedDict):
     role: str
-    content: Union[str, list[dict]]
+    content: str | list[dict]
 
 
 def maybe_dedent(content: str, dedent: bool) -> str:
@@ -33,7 +33,7 @@ def maybe_dedent(content: str, dedent: bool) -> str:
 
 
 def str_to_message(
-    content: str, role: Optional[str] = None, dedent: bool = False
+    content: str, role: str | None = None, dedent: bool = False
 ) -> Message:
     if role is not None:
         return {"role": role, "content": maybe_dedent(content, dedent)}
@@ -140,9 +140,9 @@ class EasyPrompt(UserList, Prompt):
 
     def __init__(
         self,
-        content: Optional[Union[str, dict, list]] = None,
+        content: str | dict | list | None = None,
         *,
-        role: Optional[str] = None,
+        role: str | None = None,
         dedent: bool = False,
         **kwargs: Any,
     ) -> None:
@@ -171,7 +171,7 @@ class EasyPrompt(UserList, Prompt):
     def append(
         self,
         item: Any,
-        role: Optional[str] = None,
+        role: str | None = None,
         dedent: bool = False,
     ) -> None:
         if isinstance(item, str):
@@ -279,7 +279,7 @@ class EasyPrompt(UserList, Prompt):
         return list(prompt)
 
     # TODO: Any should be Dataset but there is a circular dependency issue
-    def bind_rows(self, dataset: Union[list[dict], Any]) -> list["Prompt"]:
+    def bind_rows(self, dataset: list[dict] | Any) -> list["Prompt"]:
         rows = dataset if isinstance(dataset, list) else dataset.rows
         bound: list[Prompt] = []
         for row in rows:
@@ -292,7 +292,7 @@ class EasyPrompt(UserList, Prompt):
     @overload
     def __getitem__(self, key: slice) -> "EasyPrompt": ...
 
-    def __getitem__(self, key: Union[SupportsIndex, slice]) -> Any:
+    def __getitem__(self, key: SupportsIndex | slice) -> Any:
         """Override getitem to return a Message, Prompt object, or config value."""
         if isinstance(key, SupportsIndex):
             int_index = key.__index__()
@@ -349,18 +349,18 @@ class EasyPrompt(UserList, Prompt):
         self.requirements[param_name] = kwargs
         return self
 
-    def configure(self, config: Optional[dict] = None, **kwargs: Any) -> "Prompt":
+    def configure(self, config: dict | None = None, **kwargs: Any) -> "Prompt":
         if config:
             self.config = config
         self.config.update(kwargs)
         return self
 
-    def publish(self, name: Optional[str] = None) -> ObjectRef:
+    def publish(self, name: str | None = None) -> ObjectRef:
         # TODO: This only works if we've called weave.init, but it seems like
         #       that shouldn't be necessary if we have loaded this from a ref.
         return weave_publish(self, name=name)
 
-    def messages_table(self, title: Optional[str] = None) -> display.Table:
+    def messages_table(self, title: str | None = None) -> display.Table:
         table = display.Table(title=title, title_justify="left", show_header=False)
         table.add_column("Role", justify="right")
         table.add_column("Content")
@@ -372,7 +372,7 @@ class EasyPrompt(UserList, Prompt):
             )
         return table
 
-    def values_table(self, title: Optional[str] = None) -> display.Table:
+    def values_table(self, title: str | None = None) -> display.Table:
         table = display.Table(title=title, title_justify="left", show_header=False)
         table.add_column("Parameter", justify="right")
         table.add_column("Value")
@@ -380,7 +380,7 @@ class EasyPrompt(UserList, Prompt):
             table.add_row(key, str(value))
         return table
 
-    def config_table(self, title: Optional[str] = None) -> display.Table:
+    def config_table(self, title: str | None = None) -> display.Table:
         table = display.Table(title=title, title_justify="left", show_header=False)
         table.add_column("Key", justify="right")
         table.add_column("Value")
@@ -455,7 +455,7 @@ class EasyPrompt(UserList, Prompt):
         return prompt
 
     @classmethod
-    def load_file(cls, filepath: Union[str, Path]) -> Self:
+    def load_file(cls, filepath: str | Path) -> Self:
         expanded_path = os.path.expanduser(str(filepath))
         with open(expanded_path) as f:
             return EasyPrompt.load(f)
@@ -463,7 +463,7 @@ class EasyPrompt(UserList, Prompt):
     def dump(self, fp: IO) -> None:
         json.dump(self.as_pydantic_dict(), fp, indent=2)
 
-    def dump_file(self, filepath: Union[str, Path]) -> None:
+    def dump_file(self, filepath: str | Path) -> None:
         expanded_path = os.path.expanduser(str(filepath))
         with open(expanded_path, "w") as f:
             self.dump(f)

@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import logging
 import threading
+from collections.abc import Callable
 from queue import Empty, Queue
 from threading import Lock
-from typing import Callable, TypeVar, cast
+from typing import TypeVar, cast
 
 logger = logging.getLogger(__name__)
 from weave.integrations.openai_realtime import models

@@ -1,5 +1,6 @@
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable, Optional, TypedDict
+from typing import Any, TypedDict
 
 
 def default_equality_check(a, b):
@@ -49,8 +50,8 @@ class SerializationTestCase:
 
     # A function that checks if two objects are equal. If None, then
     # the objects are expected to be equal using `==`
-    equality_check: Optional[Callable[[Any, Any], bool]] = default_equality_check
+    equality_check: Callable[[Any, Any], bool] | None = default_equality_check
 
     # The python version that was used to write the ops (different versions
     # result in different code captures!)
-    python_version_code_capture: Optional[tuple[int, int]] = None
+    python_version_code_capture: tuple[int, int] | None = None

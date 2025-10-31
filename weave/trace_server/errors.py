@@ -1,7 +1,8 @@
 import datetime
 import json
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable, Optional
+from typing import Any, Optional
 
 
 class Error(Exception):
@@ -109,7 +110,7 @@ class RunNotFound(Exception):
 
 
 def _format_error_to_json_with_extra(
-    exc: Exception, extra_fields: Optional[dict[str, Any]] = None
+    exc: Exception, extra_fields: dict[str, Any] | None = None
 ) -> dict[str, Any]:
     """Helper to format exception as JSON or fallback to reason, always adding extra fields."""
     exc_str = str(exc)
@@ -166,7 +167,7 @@ class ErrorRegistry:
             exception_class, status_code, formatter
         )
 
-    def get_definition(self, exception_class: type) -> Optional[ErrorDefinition]:
+    def get_definition(self, exception_class: type) -> ErrorDefinition | None:
         """Get error definition for an exception class."""
         return self._definitions.get(exception_class)
 

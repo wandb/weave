@@ -1,5 +1,6 @@
+from collections.abc import Callable
 from functools import wraps
-from typing import Any, Callable, Optional
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -9,7 +10,7 @@ from weave.trace.op import _add_accumulator
 
 
 def instructor_iterable_accumulator(
-    acc: Optional[list[BaseModel]], value: BaseModel
+    acc: list[BaseModel] | None, value: BaseModel
 ) -> list[BaseModel]:
     if acc is None:
         return [value]

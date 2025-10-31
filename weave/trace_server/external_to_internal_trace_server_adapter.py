@@ -1,7 +1,7 @@
 import abc
 import typing
-from collections.abc import Iterator
-from typing import Callable, TypeVar
+from collections.abc import Callable, Iterator
+from typing import TypeVar
 
 from weave.trace_server import trace_server_interface as tsi
 from weave.trace_server.trace_server_converter import (
@@ -16,7 +16,7 @@ class IdConverter:
         raise NotImplementedError()
 
     @abc.abstractmethod
-    def int_to_ext_project_id(self, project_id: str) -> typing.Optional[str]:
+    def int_to_ext_project_id(self, project_id: str) -> str | None:
         raise NotImplementedError()
 
     @abc.abstractmethod
@@ -85,7 +85,7 @@ class ExternalTraceServer(tsi.FullTraceServerInterface):
 
         int_to_ext_project_cache = {}
 
-        def cached_int_to_ext_project_id(project_id: str) -> typing.Optional[str]:
+        def cached_int_to_ext_project_id(project_id: str) -> str | None:
             if project_id not in int_to_ext_project_cache:
                 int_to_ext_project_cache[project_id] = self._idc.int_to_ext_project_id(
                     project_id
