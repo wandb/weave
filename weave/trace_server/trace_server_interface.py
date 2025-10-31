@@ -172,6 +172,9 @@ class StartedCallSchemaForInsert(BaseModel):
     # Inputs
     inputs: dict[str, Any]
 
+    # OTEL span data source of truth
+    otel_dump: Optional[dict[str, Any]] = None
+
     # WB Metadata
     wb_user_id: Optional[str] = Field(None, description=WB_USER_ID_DESCRIPTION)
     wb_run_id: Optional[str] = None
