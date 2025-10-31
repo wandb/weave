@@ -181,8 +181,8 @@ class ScoreLoggerV2(BaseModel):
 
         wc = require_weave_client()
         await asyncio.to_thread(wc.server.prediction_finish_v2, req)
+        # Use sync finish's post-processing logic
         self._has_finished = True
-
         logger.debug(f"Finished prediction with prediction_id={self.prediction_id}")
 
     def _prepare_score_logging(
@@ -215,6 +215,17 @@ class ScoreLoggerV2(BaseModel):
 
         return req
 
+    def _process_score_result(
+        self,
+        scorer: Scorer | str,
+        score: ScoreType,
+        res: Any,
+    ) -> None:
+        """Process score result (shared by sync and async)."""
+        scorer_name = self._get_scorer_name(scorer)
+        self._captured_scores[scorer_name] = score
+        logger.debug(f"Logged score {scorer_name}={score} with score_id={res.score_id}")
+
     def log_score(
         self,
         scorer: Scorer | str,
@@ -229,12 +240,7 @@ class ScoreLoggerV2(BaseModel):
         req = self._prepare_score_logging(scorer, score)
         wc = require_weave_client()
         res = wc.server.score_create_v2(req)
-
-        # Track the score locally
-        scorer_name = self._get_scorer_name(scorer)
-        self._captured_scores[scorer_name] = score
-
-        logger.debug(f"Logged score {scorer_name}={score} with score_id={res.score_id}")
+        self._process_score_result(scorer, score, res)
 
     async def alog_score(
         self,
@@ -250,12 +256,7 @@ class ScoreLoggerV2(BaseModel):
         req = self._prepare_score_logging(scorer, score)
         wc = require_weave_client()
         res = await asyncio.to_thread(wc.server.score_create_v2, req)
-
-        # Track the score locally
-        scorer_name = self._get_scorer_name(scorer)
-        self._captured_scores[scorer_name] = score
-
-        logger.debug(f"Logged score {scorer_name}={score} with score_id={res.score_id}")
+        self._process_score_result(scorer, score, res)
 
     def _get_scorer_name(self, scorer: Scorer | str) -> str:
         """Extract the scorer name from various input types."""
@@ -794,6 +795,46 @@ class PlaceholderModel(Model):
 
         return pred
 
+    def _prepare_log_summary(
+        self,
+        summary: dict | None = None,
+        auto_summarize: bool = True,
+    ) -> tuple[tsi.EvaluationRunFinishV2Req, list[ScoreLoggerV2]]:
+        """Prepare summary logging request and get unfinished predictions.
+
+        Args:
+            summary: Summary data to log. If None, will be auto-calculated.
+            auto_summarize: Whether to automatically calculate summary statistics.
+
+        Returns:
+            Tuple of (request, unfinished_predictions)
+        """
+        if self._is_finalized:
+            logger.warning("(NO-OP): Evaluation already finalized, cannot log summary.")
+            return None, []  # type: ignore
+
+        if self._eval_run_id is None:
+            raise RuntimeError("Evaluation run not initialized")
+
+        final_summary = self._calculate_summary(summary, auto_summarize)
+
+        wc = require_weave_client()
+        project_id = wc._project_id()
+
+        # Get unfinished predictions
+        unfinished_predictions = [
+            pred for pred in self._accumulated_predictions if not pred._has_finished
+        ]
+
+        # Finish the evaluation run via V2 API
+        req = tsi.EvaluationRunFinishV2Req(
+            project_id=project_id,
+            evaluation_run_id=self._eval_run_id,
+            summary=final_summary,
+        )
+
+        return req, unfinished_predictions
+
     def log_summary(
         self,
         summary: dict | None = None,
@@ -805,34 +846,18 @@ class PlaceholderModel(Model):
             summary: Summary data to log. If None, will be auto-calculated.
             auto_summarize: Whether to automatically calculate summary statistics.
         """
-        if self._is_finalized:
-            logger.warning("(NO-OP): Evaluation already finalized, cannot log summary.")
+        req, unfinished_predictions = self._prepare_log_summary(summary, auto_summarize)
+        if req is None:
             return
 
-        if self._eval_run_id is None:
-            raise RuntimeError("Evaluation run not initialized")
-
-        final_summary = self._calculate_summary(summary, auto_summarize)
+        # Finish any unfinished predictions before finalizing the evaluation run
+        for pred in unfinished_predictions:
+            pred.finish()
 
         wc = require_weave_client()
-        project_id = wc._project_id()
-
-        # Finish any unfinished predictions before finalizing the evaluation run
-        for pred in self._accumulated_predictions:
-            if not pred._has_finished:
-                pred.finish()
-
-        # Finish the evaluation run via V2 API
-        req = tsi.EvaluationRunFinishV2Req(
-            project_id=project_id,
-            evaluation_run_id=self._eval_run_id,
-            summary=final_summary,
-        )
-
         wc.server.evaluation_run_finish_v2(req)
 
         self._is_finalized = True
-
         logger.debug(f"Finished evaluation run: {self._eval_run_id}")
 
     async def alog_summary(
@@ -846,36 +871,18 @@ class PlaceholderModel(Model):
             summary: Summary data to log. If None, will be auto-calculated.
             auto_summarize: Whether to automatically calculate summary statistics.
         """
-        if self._is_finalized:
-            logger.warning("(NO-OP): Evaluation already finalized, cannot log summary.")
+        req, unfinished_predictions = self._prepare_log_summary(summary, auto_summarize)
+        if req is None:
             return
 
-        if self._eval_run_id is None:
-            raise RuntimeError("Evaluation run not initialized")
-
-        final_summary = self._calculate_summary(summary, auto_summarize)
-
-        wc = require_weave_client()
-        project_id = wc._project_id()
-
-        # Finish any unfinished predictions before finalizing the evaluation run
-        unfinished_predictions = [
-            pred for pred in self._accumulated_predictions if not pred._has_finished
-        ]
+        # Finish any unfinished predictions in parallel before finalizing
         if unfinished_predictions:
             await asyncio.gather(*[pred.afinish() for pred in unfinished_predictions])
 
-        # Finish the evaluation run via V2 API
-        req = tsi.EvaluationRunFinishV2Req(
-            project_id=project_id,
-            evaluation_run_id=self._eval_run_id,
-            summary=final_summary,
-        )
-
+        wc = require_weave_client()
         await asyncio.to_thread(wc.server.evaluation_run_finish_v2, req)
 
         self._is_finalized = True
-
         logger.debug(f"Finished evaluation run: {self._eval_run_id}")
 
     def _finish_evaluation_internal(
