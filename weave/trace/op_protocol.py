@@ -1,11 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
-    Optional,
     Protocol,
     overload,
     runtime_checkable,
@@ -101,10 +100,10 @@ class ProcessedInputs:
     inputs: dict[str, Any]
 
 
-OnInputHandlerType = Callable[["Op", tuple, dict], Optional[ProcessedInputs]]
-FinishCallbackType = Callable[[Any, Optional[BaseException]], None]
+OnInputHandlerType = Callable[["Op", tuple, dict], ProcessedInputs | None]
+FinishCallbackType = Callable[[Any, BaseException | None], None]
 OnOutputHandlerType = Callable[[Any, FinishCallbackType, dict], Any]
-OnFinishHandlerType = Callable[["Call", Any, Optional[BaseException]], None]
+OnFinishHandlerType = Callable[["Call", Any, BaseException | None], None]
 CallDisplayNameFunc = Callable[["Call"], str]
 PostprocessInputsFunc = Callable[[dict[str, Any]], dict[str, Any]]
 PostprocessOutputFunc = Callable[..., Any]

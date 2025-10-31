@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import time
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 WEAVE_STREAM_START_TIME = "_weave_stream_start_time"
 WEAVE_TTFT = "_weave_time_to_first_token"

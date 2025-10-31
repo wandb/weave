@@ -1,5 +1,5 @@
-from collections.abc import Iterator
-from typing import Any, Callable, Optional
+from collections.abc import Callable, Iterator
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -18,12 +18,12 @@ NOVA_MODELS = ("nova-pro-v1", "nova-lite-v1", "nova-micro-v1")
 
 
 def lite_llm_completion(
-    api_key: Optional[str],
+    api_key: str | None,
     inputs: tsi.CompletionsCreateRequestInputs,
-    provider: Optional[str] = None,
-    base_url: Optional[str] = None,
-    extra_headers: Optional[dict[str, str]] = None,
-    return_type: Optional[str] = None,
+    provider: str | None = None,
+    base_url: str | None = None,
+    extra_headers: dict[str, str] | None = None,
+    return_type: str | None = None,
 ) -> tsi.CompletionsCreateRes:
     # Setup provider-specific credentials and model modifications
     (
@@ -164,8 +164,8 @@ def get_azure_credentials(model_name: str) -> tuple[str, str]:
 
 def _setup_provider_credentials_and_model(
     inputs: tsi.CompletionsCreateRequestInputs,
-    provider: Optional[str] = None,
-) -> tuple[Optional[str], Optional[str], Optional[str], Optional[str], Optional[str]]:
+    provider: str | None = None,
+) -> tuple[str | None, str | None, str | None, str | None, str | None]:
     """Setup provider-specific credentials and model modifications.
 
     Returns: (aws_access_key_id, aws_secret_access_key, aws_region_name, azure_api_base, azure_api_version)
@@ -309,12 +309,12 @@ def get_custom_provider_info(
 
 
 def lite_llm_completion_stream(
-    api_key: Optional[str],
+    api_key: str | None,
     inputs: tsi.CompletionsCreateRequestInputs,
-    provider: Optional[str] = None,
-    base_url: Optional[str] = None,
-    extra_headers: Optional[dict[str, str]] = None,
-    return_type: Optional[str] = None,
+    provider: str | None = None,
+    base_url: str | None = None,
+    extra_headers: dict[str, str] | None = None,
+    return_type: str | None = None,
 ) -> Iterator[dict[str, Any]]:
     """Stream completion chunks from the underlying LLM provider using litellm.
 

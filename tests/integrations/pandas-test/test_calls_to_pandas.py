@@ -37,7 +37,7 @@ def test_calls_to_pandas_basic(logging_example, client):
     dictified = df.to_dict(orient="records")
     calls_as_dicts = [c.to_dict() for c in calls]
 
-    for d1, d2 in zip(dictified, calls_as_dicts):
+    for d1, d2 in zip(dictified, calls_as_dicts, strict=False):
         assert d1 == d2
 
 

@@ -8,7 +8,7 @@ import math
 import os
 import uuid
 from datetime import datetime, timezone
-from typing import Optional, TypedDict
+from typing import TypedDict
 
 from clickhouse_connect.driver.client import Client
 
@@ -185,7 +185,7 @@ def insert_costs(client: Client, target_db: str) -> None:
 # We only want to insert costs if the target db version is 5 or higher
 # because the costs table was added in migration 5
 def should_insert_costs(
-    db_curr_version: int, db_target_version: Optional[int] = None
+    db_curr_version: int, db_target_version: int | None = None
 ) -> bool:
     return db_target_version is None or (
         db_target_version >= 5 and db_curr_version < db_target_version

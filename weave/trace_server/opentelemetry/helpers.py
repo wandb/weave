@@ -6,7 +6,7 @@ from collections.abc import Iterable
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from enum import Enum
-from typing import Any, Optional, Union
+from typing import Any
 from uuid import UUID
 
 from opentelemetry.proto.common.v1.common_pb2 import AnyValue, KeyValue
@@ -130,7 +130,7 @@ class AttributePathConflictError(TypeError):
         parent_key: str,
         attempted_subkey: str,
         existing_type: type,
-        message: Optional[str] = None,
+        message: str | None = None,
     ) -> None:
         if message is None:
             message = (
@@ -236,7 +236,7 @@ def _set_value_in_nested_dict(d: dict[str, Any], key: str, value: Any) -> None:
 
 def convert_numeric_keys_to_list(
     obj: dict[str, Any],
-) -> Union[dict[str, Any], list[Any]]:
+) -> dict[str, Any] | list[Any]:
     """Convert dictionaries with numeric-only keys to lists.
 
     If all keys in a dictionary are numeric strings (0, 1, 2, ...),
@@ -295,7 +295,7 @@ def expand_attributes(kv: Iterable[tuple[str, Any]]) -> dict[str, Any]:
 
 
 def flatten_attributes(
-    data: dict[str, Any], json_attributes: Optional[list[str]] = None
+    data: dict[str, Any], json_attributes: list[str] | None = None
 ) -> dict[str, Any]:
     """Flatten a nested Python dictionary into a flat dictionary with dot-separated keys.
 
@@ -311,7 +311,7 @@ def flatten_attributes(
 
     result: dict[str, Any] = {}
 
-    def _flatten(obj: Union[dict[str, Any], list[Any]], prefix: str = "") -> None:
+    def _flatten(obj: dict[str, Any] | list[Any], prefix: str = "") -> None:
         # Check if the entire object should be stringified as JSON
         should_stringify_entire_obj = any(
             prefix.rstrip(".") == attr for attr in json_attributes
@@ -433,7 +433,7 @@ def try_convert_numeric_keys_to_list(value: Any) -> Any:
     return value
 
 
-def capture_parts(s: str, delimiters: Optional[list[str]] = None) -> list[str]:
+def capture_parts(s: str, delimiters: list[str] | None = None) -> list[str]:
     """Split a string on multiple delimiters while preserving the delimiters in the result.
 
     This function splits a string using the specified delimiters and includes those

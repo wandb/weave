@@ -58,9 +58,6 @@ class DataUrlBase64WithEncoding(DataUrlParamsBase):
 
 
 class DataUrl(BaseModel):
-    params: Union[
-        DataUrlSimple,
-        DataUrlBase64,
-        DataUrlWithEncoding,
-        DataUrlBase64WithEncoding,
-    ] = Field(discriminator="content_type")
+    params: (
+        DataUrlSimple | DataUrlBase64 | DataUrlWithEncoding | DataUrlBase64WithEncoding
+    ) = Field(discriminator="content_type")

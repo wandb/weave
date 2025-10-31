@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Annotated, Callable, NamedTuple
+from collections.abc import Callable
+from typing import Annotated, NamedTuple
 
 from fastapi import APIRouter, Depends, Form, UploadFile
 from fastapi.params import Header

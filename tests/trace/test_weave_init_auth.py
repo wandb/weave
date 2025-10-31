@@ -1,7 +1,6 @@
 """Tests for weave init authentication flow."""
 
 from dataclasses import dataclass
-from typing import Optional
 
 import pytest
 
@@ -24,7 +23,7 @@ class SuccessCase:
     """Test case for successful project name parsing."""
 
     project_name: str
-    mock_default_entity: Optional[str]
+    mock_default_entity: str | None
     expected_entity: str
     expected_project: str
 

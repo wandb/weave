@@ -3,8 +3,9 @@ import logging
 import textwrap
 import time
 import traceback
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable, Optional, Union
+from typing import Any, Union
 
 from weave.object.obj import Object
 from weave.trace.call import Call
@@ -87,9 +88,9 @@ PreprocessModelInput = Callable[[dict], dict]
 
 
 async def apply_model_async(
-    model: Union[Op, Model],
+    model: Op | Model,
     example: dict,
-    preprocess_model_input: Optional[PreprocessModelInput] = None,
+    preprocess_model_input: PreprocessModelInput | None = None,
 ) -> ApplyModelResult:
     """Asynchronously applies a model (class or operation) to a given example.
 

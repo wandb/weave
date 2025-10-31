@@ -6,7 +6,7 @@ import hashlib
 import threading
 from collections import OrderedDict
 from concurrent.futures import Future
-from typing import Generic, Optional, TypeVar
+from typing import Generic, TypeVar
 
 from weave.trace_server.trace_server_interface import FileCreateReq, FileCreateRes
 
@@ -51,7 +51,7 @@ class ThreadSafeLRUCache(Generic[K, V]):
             # Add new key-value pair (will be at the end - most recently used)
             self._cache[key] = value
 
-    def get(self, key: K) -> Optional[V]:
+    def get(self, key: K) -> V | None:
         """Thread-safe retrieval with LRU tracking.
 
         If the key exists, it will be moved to the end (most recently used position).
@@ -134,7 +134,7 @@ class WeaveClientSendFileCache:
         ) + req.content
         return hashlib.sha256(cache_key_bytes).hexdigest()
 
-    def get(self, req: FileCreateReq) -> Optional[Future[FileCreateRes]]:
+    def get(self, req: FileCreateReq) -> Future[FileCreateRes] | None:
         """Get a cached response for a file create request.
 
         Returns None if the request is not in the cache.

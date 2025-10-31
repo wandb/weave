@@ -42,7 +42,8 @@ There are two ways to authenticate with Azure Blob Storage:
 
 import logging
 from abc import abstractmethod
-from typing import Any, Callable, Optional, Union, cast
+from collections.abc import Callable
+from typing import Any, cast
 
 import boto3
 from azure.core.exceptions import HttpResponseError
@@ -157,7 +158,7 @@ def key_for_project_digest(project_id: str, digest: str) -> str:
     return f"weave/projects/{project_id}/files/{digest}"
 
 
-def _is_rate_limit_error(exception: Union[BaseException, None]) -> bool:
+def _is_rate_limit_error(exception: BaseException | None) -> bool:
     """Check if the exception is a rate limiting error (429) from any cloud provider.
 
     Based on official cloud provider documentation:
@@ -279,7 +280,7 @@ class GCSStorageClient(FileStorageClient):
     """Google Cloud Storage implementation with retry logic and configurable timeouts."""
 
     def __init__(
-        self, base_uri: FileStorageURI, credentials: Optional[GCPCredentials] = None
+        self, base_uri: FileStorageURI, credentials: GCPCredentials | None = None
     ):
         """Initialize GCS client with credentials and default timeout configuration."""
         assert isinstance(base_uri, GCSFileStorageURI)
@@ -315,7 +316,7 @@ class AzureStorageClient(FileStorageClient):
     def __init__(
         self,
         base_uri: FileStorageURI,
-        credentials: Union[AzureConnectionCredentials, AzureAccountCredentials],
+        credentials: AzureConnectionCredentials | AzureAccountCredentials,
     ):
         """Initialize Azure client with either connection string or account credentials."""
         assert isinstance(base_uri, AzureFileStorageURI)
@@ -366,7 +367,7 @@ class AzureStorageClient(FileStorageClient):
         return stream.readall()
 
 
-def maybe_get_storage_client_from_env() -> Optional[FileStorageClient]:
+def maybe_get_storage_client_from_env() -> FileStorageClient | None:
     """Factory method that returns appropriate storage client based on URI type.
     Supports S3, GCS, and Azure storage URIs.
     """
