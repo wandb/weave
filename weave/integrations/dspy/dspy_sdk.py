@@ -4,6 +4,7 @@ import functools
 import logging
 from collections.abc import Sequence
 from typing import Any, Callable
+from pydantic import BaseModel
 
 from weave.evaluation.eval_imperative import EvaluationLogger
 from weave.integrations.dspy.dspy_utils import dictify, get_symbol_patcher
@@ -147,12 +148,15 @@ class DSPyPatcher(MultiPatcher):
                         # DSPy expects the inputs to be wrapped in an Example object
                         serialized_inputs = dictify(example.toDict())
 
+                        serialized_pred = None
                         if isinstance(prediction, dspy.Prediction):
                             # Prediction is inherited from Example
                             serialized_pred = dictify(prediction.toDict())
                         if isinstance(prediction, dspy.Completions):
                             # Completions exposes the `items` method
                             serialized_pred = dictify(prediction.items())
+                        if isinstance(prediction, BaseModel):
+                            serialized_pred = dictify(prediction.model_dump())
 
                         pl = ev.log_prediction(
                             inputs=serialized_inputs, output=serialized_pred
