@@ -888,7 +888,8 @@ async def test_llamaindex_quick_start(client: WeaveClient) -> None:
     calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
     flattened_calls = flatten_calls(calls)
 
-    assert len(flattened_calls) == 50
+    # LlamaIndex 0.14.1+ no longer emits FunctionAgent-done span and SpanDrop event
+    assert len(flattened_calls) == 48
     assert flattened_calls_to_names(flattened_calls) == [
         ("llama_index.span.SentenceSplitter-parse_nodes", 0),
         ("llama_index.span.SentenceSplitter.split_text_metadata_aware", 1),
@@ -938,6 +939,4 @@ async def test_llamaindex_quick_start(client: WeaveClient) -> None:
         ("llama_index.event.LLMChatInProgress", 4),
         ("openai.chat.completions.create", 5),
         ("llama_index.span.FunctionAgent.parse_agent_output", 1),
-        ("llama_index.span.FunctionAgent-done", 1),
-        ("llama_index.event.SpanDrop", 2),
     ]
