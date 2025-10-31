@@ -47,8 +47,8 @@ def async_call_op(
     """
     is_async = inspect.iscoroutinefunction(func.resolve_fn)
     if is_async:
-        return func.call(*args, __should_raise=True, **kwargs)
+        return func.call(*args, raise_on_exception=True, **kwargs)
     else:
         return asyncio.to_thread(
-            lambda: func.call(*args, __should_raise=True, **kwargs)
+            lambda: func.call(*args, raise_on_exception=True, **kwargs)
         )

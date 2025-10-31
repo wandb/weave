@@ -169,7 +169,7 @@ def test_sync_with_exception(client):
 
     with pytest.raises(ValueError, match="test"):
         sync_with_exception()
-    res, call = sync_with_exception.call()
+    res, call = sync_with_exception.call(raise_on_exception=False)
     assert isinstance(call, Call)
     assert call.exception is not None
     assert res is None
@@ -184,7 +184,7 @@ def test_sync_with_exception_method(client):
     test_inst = TestClass()
     with pytest.raises(ValueError, match="test"):
         test_inst.sync_with_exception()
-    res, call = test_inst.sync_with_exception.call(test_inst)
+    res, call = test_inst.sync_with_exception.call(test_inst, raise_on_exception=False)
     assert isinstance(call, Call)
     assert call.exception is not None
     assert res is None
@@ -198,7 +198,7 @@ async def test_async_with_exception(client):
 
     with pytest.raises(ValueError, match="test"):
         await async_with_exception()
-    res, call = await async_with_exception.call()
+    res, call = await async_with_exception.call(raise_on_exception=False)
     assert isinstance(call, Call)
     assert call.exception is not None
     assert res is None
@@ -214,7 +214,9 @@ async def test_async_with_exception_method(client):
     test_inst = TestClass()
     with pytest.raises(ValueError, match="test"):
         await test_inst.async_with_exception()
-    res, call = await test_inst.async_with_exception.call(test_inst)
+    res, call = await test_inst.async_with_exception.call(
+        test_inst, raise_on_exception=False
+    )
     assert isinstance(call, Call)
     assert call.exception is not None
     assert res is None
