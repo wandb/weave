@@ -832,9 +832,11 @@ async def test_llamaindex_workflow(client: WeaveClient) -> None:
     # Check the captured calls
     calls = list(client.get_calls(filter=CallsFilter(trace_roots_only=True)))
     flattened_calls = flatten_calls(calls)
-    print(len(flattened_calls))
+    print(flattened_calls_to_names(flattened_calls))
 
-    assert len(flattened_calls) == 6
+    # LlamaIndex 0.14.1+ no longer emits TestWorkflow-done span and SpanDrop event
+    # Expected hierarchy: run -> step_one, step_two, step_three
+    assert len(flattened_calls) == 4
 
 
 @pytest.mark.skip_clickhouse_client
