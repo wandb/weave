@@ -5,7 +5,7 @@ import time
 import traceback
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Union
+from typing import Any
 
 from weave.object.obj import Object
 from weave.trace.call import Call
@@ -83,7 +83,7 @@ class ApplyModelError:
     model_latency: float
 
 
-ApplyModelResult = Union[ApplyModelSuccess, ApplyModelError]
+ApplyModelResult = ApplyModelSuccess | ApplyModelError
 PreprocessModelInput = Callable[[dict], dict]
 
 

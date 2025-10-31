@@ -40,7 +40,7 @@ from collections.abc import Awaitable, Callable, Coroutine, Generator
 from contextlib import contextmanager
 from multiprocessing.context import SpawnProcess
 from multiprocessing.queues import Queue
-from typing import TYPE_CHECKING, Any, TypeVar, Union, overload
+from typing import TYPE_CHECKING, Any, TypeVar, overload
 
 from pydantic import BaseModel
 
@@ -76,7 +76,7 @@ FC = TypeVar("FC")  # Client factory config type
 # Type aliases for better readability
 SyncCallable = Callable[[T], R]
 AsyncCallable = Callable[[T], Awaitable[R]]
-AnyCallable = Union[SyncCallable[T, R], AsyncCallable[T, R]]
+AnyCallable = SyncCallable[T, R] | AsyncCallable[T, R]
 
 # Queue type aliases for better readability
 ResponseTuple = tuple[Any, Exception | None]

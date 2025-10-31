@@ -1,5 +1,4 @@
 import datetime
-from typing import Union
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -176,12 +175,12 @@ class SelectableCHObjSchema(BaseModel):
     size_bytes: int | None = None
 
 
-CallCHInsertable = Union[
-    CallStartCHInsertable,
-    CallEndCHInsertable,
-    CallDeleteCHInsertable,
-    CallUpdateCHInsertable,
-]
+CallCHInsertable = (
+    CallStartCHInsertable
+    | CallEndCHInsertable
+    | CallDeleteCHInsertable
+    | CallUpdateCHInsertable
+)
 
 ObjRefListType = list[ri.InternalObjectRef]
 
