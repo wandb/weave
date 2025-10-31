@@ -2157,7 +2157,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             digest=obj_result.digest,
             object_id=object_id,
             version_index=obj_read_res.obj.version_index,
-            model_ref=model_ref,
+            ref=model_ref,
         )
 
     def model_read(self, req: tsi.ModelReadReq) -> tsi.ModelReadRes:
