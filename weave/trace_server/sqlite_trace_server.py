@@ -128,7 +128,8 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                 wb_run_step INTEGER,
                 wb_run_step_end INTEGER,
                 deleted_at TEXT,
-                display_name TEXT
+                display_name TEXT,
+                otel_dump TEXT
             )
         """
         )
@@ -204,6 +205,10 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
             # Converts the user-provided call details into a clickhouse schema.
             # This does validation and conversion of the input data as well
             # as enforcing business rules and defaults
+            otel_dump_str = None
+            if hasattr(req.start, "otel_dump") and req.start.otel_dump is not None:
+                otel_dump_str = json.dumps(req.start.otel_dump)
+
             cursor.execute(
                 """INSERT INTO calls (
                     project_id,
@@ -220,8 +225,9 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                     input_refs,
                     wb_user_id,
                     wb_run_id,
-                    wb_run_step
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    wb_run_step,
+                    otel_dump
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     req.start.project_id,
                     req.start.id,
@@ -240,6 +246,7 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                     req.start.wb_user_id,
                     req.start.wb_run_id,
                     req.start.wb_run_step,
+                    otel_dump_str,
                 ),
             )
             conn.commit()
@@ -479,6 +486,10 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
 
         select_columns_names = [*select_columns]
 
+        # Always select otel_dump for backwards compatibility (injected into attributes)
+        select_columns.append("otel_dump")
+        select_columns_names.append("otel_dump")
+
         if req.include_storage_size:
             select_columns.append(
                 "(COALESCE(length(attributes),0) + COALESCE(length(inputs),0) + COALESCE(length(output),0) + COALESCE(length(summary),0))"
@@ -624,6 +635,18 @@ class SqliteTraceServer(tsi.FullTraceServerInterface):
                             {json_field: data}, req.expand_columns
                         )[json_field]
                     call_dict[json_field] = data
+
+            # For backwards/future compatibility: inject otel_dump into attributes if present
+            # Legacy trace servers stored all otel info in attributes, clients expect it
+            if call_dict.get("otel_dump"):
+                otel_data = json.loads(call_dict["otel_dump"])
+                if "attributes" not in call_dict:
+                    call_dict["attributes"] = {}
+                call_dict["attributes"]["otel_span"] = otel_data
+
+            # Remove otel_dump from the result as it's not in CallSchema
+            call_dict.pop("otel_dump", None)
+
             # convert empty string display_names to None
             if "display_name" in call_dict:
                 call_dict["display_name"] = empty_str_to_none(call_dict["display_name"])
