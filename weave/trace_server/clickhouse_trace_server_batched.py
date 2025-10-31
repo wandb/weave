@@ -1649,7 +1649,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             name=f"{scorer_id}_score",
             source_code=req.op_source_code,
         )
-        score_op_res = self.op_create_v2(score_op_req)
+        score_op_res = await self.op_create_v2(score_op_req)
         score_op_ref = score_op_res.digest
 
         # Create the default summarize op
@@ -1658,7 +1658,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             name=f"{scorer_id}_summarize",
             source_code=object_creation_utils.PLACEHOLDER_SCORER_SUMMARIZE_OP_SOURCE,
         )
-        summarize_op_res = self.op_create_v2(summarize_op_req)
+        summarize_op_res = await self.op_create_v2(summarize_op_req)
         summarize_op_ref = summarize_op_res.digest
 
         # Create the scorer object
@@ -1789,7 +1789,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             name=f"{evaluation_id}.evaluate",
             source_code=object_creation_utils.PLACEHOLDER_EVALUATE_OP_SOURCE,
         )
-        evaluate_op_res = self.op_create_v2(evaluate_op_req)
+        evaluate_op_res = await self.op_create_v2(evaluate_op_req)
         evaluate_ref = evaluate_op_res.digest
 
         # Create placeholder predict_and_score op
@@ -1798,7 +1798,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             name=f"{evaluation_id}.predict_and_score",
             source_code=object_creation_utils.PLACEHOLDER_PREDICT_AND_SCORE_OP_SOURCE,
         )
-        predict_and_score_op_res = self.op_create_v2(predict_and_score_op_req)
+        predict_and_score_op_res = await self.op_create_v2(predict_and_score_op_req)
         predict_and_score_ref = predict_and_score_op_res.digest
 
         # Create placeholder summarize op
@@ -1807,7 +1807,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             name=f"{evaluation_id}.summarize",
             source_code=object_creation_utils.PLACEHOLDER_EVALUATION_SUMMARIZE_OP_SOURCE,
         )
-        summarize_op_res = self.op_create_v2(summarize_op_req)
+        summarize_op_res = await self.op_create_v2(summarize_op_req)
         summarize_ref = summarize_op_res.digest
 
         # Create the evaluation object
@@ -2142,7 +2142,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             name=constants.EVALUATION_RUN_OP_NAME,
             source_code=object_creation_utils.PLACEHOLDER_EVALUATION_EVALUATE_OP_SOURCE,
         )
-        op_create_res = self.op_create_v2(op_create_req)
+        op_create_res = await self.op_create_v2(op_create_req)
 
         # Build the op ref
         op_ref = ri.InternalOpRef(
@@ -2473,7 +2473,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
                 name=constants.EVALUATION_RUN_PREDICTION_AND_SCORE_OP_NAME,
                 source_code=object_creation_utils.PLACEHOLDER_EVALUATION_PREDICT_AND_SCORE_OP_SOURCE,
             )
-            predict_and_score_op_res = self.op_create_v2(predict_and_score_op_req)
+            predict_and_score_op_res = await self.op_create_v2(predict_and_score_op_req)
 
             # Build the predict_and_score op ref
             predict_and_score_op_ref = ri.InternalOpRef(
@@ -2532,7 +2532,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             name=predict_op_name,
             source_code=object_creation_utils.PLACEHOLDER_MODEL_PREDICT_OP_SOURCE,
         )
-        predict_op_res = self.op_create_v2(predict_op_req)
+        predict_op_res = await self.op_create_v2(predict_op_req)
 
         # Build the predict op ref
         predict_op_ref = ri.InternalOpRef(
@@ -2931,7 +2931,7 @@ class ClickHouseTraceServer(tsi.FullTraceServerInterface):
             name=score_op_name,
             source_code=object_creation_utils.PLACEHOLDER_SCORER_SCORE_OP_SOURCE,
         )
-        score_op_res = self.op_create_v2(score_op_req)
+        score_op_res = await self.op_create_v2(score_op_req)
 
         # Build the score op ref
         score_op_ref = ri.InternalOpRef(
