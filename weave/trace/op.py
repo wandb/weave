@@ -8,6 +8,7 @@ import logging
 import random
 import sys
 import traceback
+import warnings
 import weakref
 from collections import defaultdict
 from collections.abc import (
@@ -392,7 +393,7 @@ def _call_sync_func(
     op: Op,
     *args: Any,
     __weave: WeaveKwargs | None = None,
-    __should_raise: bool = False,
+    raise_on_exception: bool = True,
     # When this param is True, calls do not automatically "finish" when the function
     # returns.  The user must explicitly call `finish` on the call object.  This is
     # included to support the imperative evaluation logging interface.
@@ -510,7 +511,7 @@ def _call_sync_func(
         res = func(*args, **kwargs)
     except Exception as e:
         finish(exception=e)
-        if __should_raise:
+        if raise_on_exception:
             raise
         return None, call
     except (SystemExit, KeyboardInterrupt) as e:
@@ -540,7 +541,7 @@ async def _call_async_func(
     op: Op,
     *args: Any,
     __weave: WeaveKwargs | None = None,
-    __should_raise: bool = False,
+    raise_on_exception: bool = True,
     __require_explicit_finish: bool = False,
     **kwargs: Any,
 ) -> tuple[Any, Call]:
@@ -641,7 +642,7 @@ async def _call_async_func(
         res = await func(*args, **kwargs)
     except Exception as e:
         finish(exception=e)
-        if __should_raise:
+        if raise_on_exception:
             raise
         return None, call
     except (SystemExit, KeyboardInterrupt) as e:
@@ -671,7 +672,7 @@ def _call_sync_gen(
     op: Op,
     *args: Any,
     __weave: WeaveKwargs | None = None,
-    __should_raise: bool = False,
+    raise_on_exception: bool = True,
     __require_explicit_finish: bool = False,
     **kwargs: Any,
 ) -> tuple[Generator[Any], Call]:
@@ -862,11 +863,11 @@ def _call_sync_gen(
     except Exception as e:
         # Handle exceptions from initial generator creation
         finish(exception=e)
-        if __should_raise:
+        if raise_on_exception:
             raise
 
         def empty_sync_gen() -> Generator[Any]:
-            # Re-raise the original exception if __should_raise is False
+            # Re-raise the original exception if raise_on_exception is False
             # but we're evaluating the generator, to maintain expected behavior
             if not has_finished:
                 nonlocal e
@@ -881,7 +882,7 @@ async def _call_async_gen(
     op: Op,
     *args: Any,
     __weave: WeaveKwargs | None = None,
-    __should_raise: bool = False,
+    raise_on_exception: bool = True,
     __require_explicit_finish: bool = False,
     **kwargs: Any,
 ) -> tuple[AsyncIterator, Call]:
@@ -1077,11 +1078,11 @@ async def _call_async_gen(
     except Exception as e:
         # Handle exceptions from initial generator creation
         finish(exception=e)
-        if __should_raise:
+        if raise_on_exception:
             raise
 
         async def empty_async_gen() -> AsyncIterator[Any]:
-            # Re-raise the original exception if __should_raise is False
+            # Re-raise the original exception if raise_on_exception is False
             # but we're evaluating the generator, to maintain expected behavior
             if not has_finished:
                 nonlocal e
@@ -1097,16 +1098,25 @@ def call(
     op: Op,
     *args: Any,
     __weave: WeaveKwargs | None = None,
-    __should_raise: bool = False,
+    raise_on_exception: bool = True,
     # When this param is True, calls do not automatically "finish" when the function
     # returns.  The user must explicitly call `finish` on the call object.  This is
     # included to support the imperative evaluation logging interface.
     __require_explicit_finish: bool = False,
+    # Deprecated: Use raise_on_exception instead. Kept for backward compatibility.
+    __should_raise: bool | None = None,
     **kwargs: Any,
 ) -> tuple[Any, Call] | Coroutine[Any, Any, tuple[Any, Call]]:
     """Executes the op and returns both the result and a Call representing the execution.
 
-    This function will never raise.  Any errors are captured in the Call object.
+    By default, this function will raise exceptions. To suppress exceptions and capture
+    them in the Call object instead, pass raise_on_exception=False.
+
+    Args:
+        raise_on_exception: If True (default), exceptions will be raised. If False,
+            exceptions will be captured in the Call object instead.
+        __should_raise: Deprecated. Use raise_on_exception instead. Kept for backward
+            compatibility. If both are provided, raise_on_exception takes precedence.
 
     This method is automatically bound to any function decorated with `@weave.op`,
     allowing for usage like:
@@ -1119,12 +1129,30 @@ def call(
     result, call = add.call(1, 2)
     ```
     """
+    # Handle backward compatibility for __should_raise
+    if __should_raise is not None:
+        warnings.warn(
+            "The `__should_raise` parameter is deprecated and will be removed in a future version. "
+            "Use `raise_on_exception` instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        # If both are provided (they differ), raise_on_exception takes precedence
+        # If they're the same, we can't tell if both were provided or only __should_raise was provided
+        # In this case, use __should_raise for backward compatibility
+        if raise_on_exception != __should_raise:
+            # raise_on_exception was explicitly set differently - both provided, use raise_on_exception
+            pass  # keep raise_on_exception
+        else:
+            # They're the same - assume only __should_raise was provided for backward compat
+            raise_on_exception = __should_raise
+
     if inspect.iscoroutinefunction(op.resolve_fn):
         return _call_async_func(
             op,
             *args,
             __weave=__weave,
-            __should_raise=__should_raise,
+            raise_on_exception=raise_on_exception,
             __require_explicit_finish=__require_explicit_finish,
             **kwargs,
         )
@@ -1133,7 +1161,7 @@ def call(
             op,
             *args,
             __weave=__weave,
-            __should_raise=__should_raise,
+            raise_on_exception=raise_on_exception,
             __require_explicit_finish=__require_explicit_finish,
             **kwargs,
         )
@@ -1224,7 +1252,10 @@ def op(
                 @wraps(func)
                 async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:  # pyright: ignore[reportRedeclaration]
                     res, _ = await _call_async_func(
-                        cast(Op[P, R], wrapper), *args, __should_raise=True, **kwargs
+                        cast(Op[P, R], wrapper),
+                        *args,
+                        raise_on_exception=True,
+                        **kwargs,
                     )
                     return cast(R, res)
             elif is_sync_generator:
@@ -1232,7 +1263,10 @@ def op(
                 @wraps(func)
                 def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:  # pyright: ignore[reportRedeclaration]
                     res, _ = _call_sync_gen(
-                        cast(Op[P, R], wrapper), *args, __should_raise=True, **kwargs
+                        cast(Op[P, R], wrapper),
+                        *args,
+                        raise_on_exception=True,
+                        **kwargs,
                     )
                     return cast(R, res)
             elif is_async_generator:
@@ -1242,7 +1276,10 @@ def op(
                     *args: P.args, **kwargs: P.kwargs
                 ) -> AsyncGenerator[R]:
                     res, _ = await _call_async_gen(
-                        cast(Op[P, R], wrapper), *args, __should_raise=True, **kwargs
+                        cast(Op[P, R], wrapper),
+                        *args,
+                        raise_on_exception=True,
+                        **kwargs,
                     )
                     async for item in res:
                         yield item
@@ -1251,7 +1288,10 @@ def op(
                 @wraps(func)
                 def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
                     res, _ = _call_sync_func(
-                        cast(Op[P, R], wrapper), *args, __should_raise=True, **kwargs
+                        cast(Op[P, R], wrapper),
+                        *args,
+                        raise_on_exception=True,
+                        **kwargs,
                     )
                     return cast(R, res)
 
