@@ -49,8 +49,16 @@ class SavedViewDefinition(BaseModel):
 
     pin: Optional[Pin] = Field(default=None)
     sort_by: Optional[list[tsi.SortBy]] = Field(default=None)
+    page: Optional[int] = Field(default=None)
     page_size: Optional[int] = Field(default=None)
     charts: Optional[list[ChartConfig]] = Field(default=None)
+
+    # Evaluations calls table has dataset and evaluation object
+    # selectors that can be used to filter down evals to those using these objects.
+    # The selector is an object ref where the version can either be a digest or `*`
+    # to match all versions.
+    dataset_selector: Optional[str] = Field(default=None)
+    evaluation_selector: Optional[str] = Field(default=None)
 
 
 class SavedView(base_object_def.BaseObject):

@@ -25,7 +25,8 @@ SizeFunc = Callable[[], int]
 
 class PaginatedIterator(Generic[T, R]):
     """An iterator that fetches pages of items from a server and optionally transforms them
-    into a more user-friendly type."""
+    into a more user-friendly type.
+    """
 
     def __init__(
         self,
@@ -48,7 +49,7 @@ class PaginatedIterator(Generic[T, R]):
         if limit is not None and limit <= 0:
             raise ValueError("limit must be greater than 0")
 
-    @lru_cache
+    @lru_cache  # noqa: B019
     def _fetch_page(self, index: int) -> list[T]:
         return self.fetch_func(index * self.page_size, self.page_size)
 
@@ -130,7 +131,8 @@ class PaginatedIterator(Generic[T, R]):
 
     def __len__(self) -> int:
         """This method is included for convenience.  It includes a network call, which
-        is typically slower than most other len() operations!"""
+        is typically slower than most other len() operations!
+        """
         if not self.size_func:
             raise TypeError("This iterator does not support len()")
         return self.size_func()

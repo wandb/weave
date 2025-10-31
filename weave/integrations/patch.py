@@ -227,6 +227,16 @@ def patch_verdict(settings: Optional[IntegrationSettings] = None) -> None:
         _PATCHED_INTEGRATIONS.add("verdict")
 
 
+def patch_verifiers(settings: Optional[IntegrationSettings] = None) -> None:
+    """Enable Weave tracing for Verifiers."""
+    from weave.integrations.verifiers.verifiers import get_verifiers_patcher
+
+    if settings is None:
+        settings = IntegrationSettings()
+    if get_verifiers_patcher(settings).attempt_patch():
+        _PATCHED_INTEGRATIONS.add("verifiers")
+
+
 def patch_autogen(settings: Optional[IntegrationSettings] = None) -> None:
     """Enable Weave tracing for AutoGen."""
     from weave.integrations.autogen import get_autogen_patcher
@@ -253,6 +263,15 @@ def patch_llamaindex() -> None:
         _PATCHED_INTEGRATIONS.add("llama_index")
 
 
+def patch_openai_realtime(settings: Optional[IntegrationSettings] = None) -> None:
+    from weave.integrations.openai_realtime import get_openai_realtime_websocket_patcher
+
+    if settings is None:
+        settings = IntegrationSettings()
+    if get_openai_realtime_websocket_patcher(settings).attempt_patch():
+        _PATCHED_INTEGRATIONS.add("openai_realtime")
+
+
 # Mapping of module names to patch functions for implicit patching
 # When a module is already imported, we'll automatically call its patch function
 
@@ -275,11 +294,13 @@ INTEGRATION_MODULE_MAPPING: dict[str, Callable[[], None]] = {
     "mcp": patch_mcp,
     "langchain_nvidia_ai_endpoints": patch_nvidia,
     "smolagents": patch_smolagents,
-    "openai_agents": patch_openai_agents,
+    "agents": patch_openai_agents,
     "verdict": patch_verdict,
+    "verifiers": patch_verifiers,
     "autogen": patch_autogen,
     "langchain": patch_langchain,
     "llama_index": patch_llamaindex,
+    "openai_realtime": patch_openai_realtime,
 }
 
 

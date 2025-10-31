@@ -110,6 +110,10 @@ class Sentinel:
 
 _sentinels_to_check = [
     Sentinel(package="openai", path="openai._types", name="NOT_GIVEN"),
+    Sentinel(package="openai", path="openai._types", name="omit"),
+    Sentinel(
+        package="openai", path="openai._types", name="Omit"
+    ),  # Class, not instance
     Sentinel(package="cohere", path="cohere.base_client", name="COHERE_NOT_GIVEN"),
     Sentinel(package="anthropic", path="anthropic._types", name="NOT_GIVEN"),
     Sentinel(package="cerebras", path="cerebras.cloud.sdk._types", name="NOT_GIVEN"),
@@ -154,8 +158,13 @@ def _value_is_sentinel(param: inspect.Parameter) -> bool:
 
     # Check cached sentinels first
     for sentinel in _SENTINEL_CACHE.values():
-        if sentinel is not None and param.default is sentinel:
-            return True
+        if sentinel is not None:
+            # Check for identity (singleton instances)
+            if param.default is sentinel:
+                return True
+            # Check for isinstance (e.g., openai.Omit class instances)
+            if isinstance(sentinel, type) and isinstance(param.default, sentinel):
+                return True
 
     for sentinel in _sentinels_to_check:
         if _check_param_is_sentinel(param, sentinel):
@@ -216,7 +225,7 @@ def _set_on_finish_handler(func: Op, on_finish: OnFinishHandlerType) -> None:
 
 
 def _is_unbound_method(func: Callable) -> bool:
-    """Check if a function is a function defined on a class (an "unbound" method)
+    """Check if a function is a function defined on a class (an "unbound" method).
 
     In python3, the "unbound" method is just a function, but that distinction is
     not enough for our decorator because it needs to operate on both regular funcs
@@ -1095,8 +1104,7 @@ def call(
     __require_explicit_finish: bool = False,
     **kwargs: Any,
 ) -> tuple[Any, Call] | Coroutine[Any, Any, tuple[Any, Call]]:
-    """
-    Executes the op and returns both the result and a Call representing the execution.
+    """Executes the op and returns both the result and a Call representing the execution.
 
     This function will never raise.  Any errors are captured in the Call object.
 
@@ -1132,8 +1140,7 @@ def call(
 
 
 def calls(op: Op) -> CallsIter:
-    """
-    Get an iterator over all calls to this op.
+    """Get an iterator over all calls to this op.
 
     This method is automatically bound to any function decorated with `@weave.op`,
     allowing for usage like:
@@ -1195,8 +1202,7 @@ def op(
     enable_code_capture: bool = True,
     accumulator: Callable[[Any | None, Any], Any] | None = None,
 ) -> Callable[[Callable[P, R]], Op[P, R]] | Op[P, R]:
-    """
-    A decorator to weave op-ify a function or method. Works for both sync and async.
+    """A decorator to weave op-ify a function or method. Works for both sync and async.
     Automatically detects iterator functions and applies appropriate behavior.
     """
     if not isinstance(tracing_sample_rate, (int, float)):
@@ -1279,6 +1285,7 @@ def op(
 
             wrapper._set_on_finish_handler = partial(_set_on_finish_handler, wrapper)  # type: ignore
             wrapper._on_finish_handler = None  # type: ignore
+            wrapper._on_finish_post_processor = None  # type: ignore
 
             wrapper._tracing_enabled = True  # type: ignore
             wrapper.tracing_sample_rate = tracing_sample_rate  # type: ignore
@@ -1329,7 +1336,7 @@ def get_captured_code(op: Op) -> str:
 
 
 def maybe_bind_method(func: Callable, self: Any = None) -> Callable | MethodType:
-    """Bind a function to any object (even if it's not a class)
+    """Bind a function to any object (even if it's not a class).
 
     If self is None, return the function as is.
     """
@@ -1614,7 +1621,7 @@ class _Accumulator(Generic[S, V]):
 
 
 def _build_iterator_from_accumulator_for_op(
-    value: Iterator[V],
+    value: Iterator[V] | AsyncIterator[V],
     accumulator: Callable,
     on_finish: FinishCallbackType,
     iterator_wrapper: type[_IteratorWrapper] = _IteratorWrapper,
@@ -1668,27 +1675,25 @@ def _add_accumulator(
     """
 
     def on_output(
-        value: Iterator[V], on_finish: FinishCallbackType, inputs: dict
-    ) -> Iterator:
-        def wrapped_on_finish(value: Any, e: BaseException | None = None) -> None:
-            if on_finish_post_processor is not None:
-                value = on_finish_post_processor(value)
-            on_finish(value, e)
-
+        value: Iterator[V] | AsyncIterator[V],
+        on_finish: FinishCallbackType,
+        inputs: dict,
+    ) -> Iterator | AsyncIterator:
         if should_accumulate is None or should_accumulate(inputs):
             # we build the accumulator here dependent on the inputs (optional)
             accumulator = make_accumulator(inputs)
             return _build_iterator_from_accumulator_for_op(
                 value,
                 accumulator,
-                wrapped_on_finish,
+                on_finish,
                 iterator_wrapper,
             )
         else:
-            wrapped_on_finish(value)
+            on_finish(value, None)
             return value
 
     op._set_on_output_handler(on_output)
+    op._on_finish_post_processor = on_finish_post_processor
     return op
 
 

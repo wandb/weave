@@ -237,7 +237,7 @@ def map_to_refs(obj: Any) -> Any:
         # Here, we expect ref to be empty since it would have short circuited
         # above with `_get_direct_ref`
         return _remove_empty_ref(obj.map_values(map_to_refs))
-    elif isinstance(obj, (pydantic.BaseModel, pydantic.v1.BaseModel)):
+    elif isinstance(obj, pydantic.BaseModel):
         # Check if this object has a custom serializer registered
         from weave.trace.serialization.serializer import get_serializer_for_obj
 
@@ -440,8 +440,7 @@ class WeaveClient:
     ################ Query API ################
 
     def get_evaluation(self, uri: str) -> Evaluation:
-        """
-        Retrieve a specific Evaluation object by its URI.
+        """Retrieve a specific Evaluation object by its URI.
 
         Evaluation URIs typically follow the format:
         `weave:///entity/project/object/Evaluation:version`
@@ -476,8 +475,7 @@ class WeaveClient:
     # TODO: Make into EvaluationsIter
     # TODO: Add option to select a subset of evaluations
     def get_evaluations(self) -> list[Evaluation]:
-        """
-        Retrieve all Evaluation objects from the current project.
+        """Retrieve all Evaluation objects from the current project.
 
         Returns:
             list[Evaluation]: A list of all Evaluation objects in the current project.
@@ -533,8 +531,7 @@ class WeaveClient:
         scored_by: str | list[str] | None = None,
         page_size: int = DEFAULT_CALLS_PAGE_SIZE,
     ) -> CallsIter:
-        """
-        Retrieve a list of traced calls (operations) for this project.
+        """Retrieve a list of traced calls (operations) for this project.
 
         This method provides a powerful and flexible interface for querying trace data.
         It supports pagination, filtering, sorting, field projection, and scoring metadata,
@@ -606,8 +603,7 @@ class WeaveClient:
         include_feedback: bool = False,
         columns: list[str] | None = None,
     ) -> WeaveObject:
-        """
-        Get a single call by its ID.
+        """Get a single call by its ID.
 
         Args:
             call_id: The ID of the call to get.
@@ -948,6 +944,10 @@ class WeaveClient:
             output_json = to_json(
                 maybe_redacted_output_as_refs, project_id, self, use_dictify=False
             )
+
+            # Capture wb_run_step_end at call end time
+            current_wb_run_step_end = safe_current_wb_run_step()
+
             call_end_req = CallEndReq(
                 end=EndedCallSchemaForInsert(
                     project_id=project_id,
@@ -956,6 +956,7 @@ class WeaveClient:
                     output=output_json,
                     summary=merged_summary,
                     exception=exception_str,
+                    wb_run_step_end=current_wb_run_step_end,
                 )
             )
             bytes_size = len(call_end_req.model_dump_json())
@@ -1015,6 +1016,45 @@ class WeaveClient:
         )
 
     @trace_sentry.global_trace_sentry.watch()
+    def delete_all_object_versions(self, object_name: str) -> int:
+        """Delete all versions of an object.
+
+        Args:
+            object_name: The name of the object whose versions should be deleted.
+
+        Returns:
+            The number of versions deleted.
+        """
+        result = self.server.obj_delete(
+            ObjDeleteReq(
+                project_id=self._project_id(),
+                object_id=object_name,
+                digests=None,
+            )
+        )
+        return result.num_deleted
+
+    @trace_sentry.global_trace_sentry.watch()
+    def delete_object_versions(self, object_name: str, digests: list[str]) -> int:
+        """Delete specific versions of an object.
+
+        Args:
+            object_name: The name of the object whose versions should be deleted.
+            digests: List of digests to delete. Can include aliases like "latest" or "v0".
+
+        Returns:
+            The number of versions deleted.
+        """
+        result = self.server.obj_delete(
+            ObjDeleteReq(
+                project_id=self._project_id(),
+                object_id=object_name,
+                digests=digests,
+            )
+        )
+        return result.num_deleted
+
+    @trace_sentry.global_trace_sentry.watch()
     def delete_op_version(self, op: OpRef) -> None:
         self.server.obj_delete(
             ObjDeleteReq(
@@ -1023,6 +1063,25 @@ class WeaveClient:
                 digests=[op.digest],
             )
         )
+
+    @trace_sentry.global_trace_sentry.watch()
+    def delete_all_op_versions(self, op_name: str) -> int:
+        """Delete all versions of an op.
+
+        Args:
+            op_name: The name of the op whose versions should be deleted.
+
+        Returns:
+            The number of versions deleted.
+        """
+        result = self.server.obj_delete(
+            ObjDeleteReq(
+                project_id=self._project_id(),
+                object_id=op_name,
+                digests=None,
+            )
+        )
+        return result.num_deleted
 
     def get_feedback(
         self,
@@ -1141,7 +1200,6 @@ class WeaveClient:
         """Add a cost to the current project.
 
         Examples:
-
             ```python
             client.add_cost(llm_id="my_expensive_custom_model", prompt_token_cost=1, completion_token_cost=2)
             client.add_cost(llm_id="my_expensive_custom_model", prompt_token_cost=500, completion_token_cost=1000, effective_date=datetime(1998, 10, 3))
@@ -1179,7 +1237,6 @@ class WeaveClient:
         """Purge costs from the current project.
 
         Examples:
-
             ```python
             client.purge_costs([ids])
             client.purge_costs(ids)
@@ -1210,7 +1267,6 @@ class WeaveClient:
         """Query project for costs.
 
         Examples:
-
             ```python
             # Fetch a specific cost object.
             # Note that this still returns a collection, which is expected
@@ -1414,7 +1470,7 @@ class WeaveClient:
             - `_save_table` (for `weave.trace.Table` and `weave.trace.vals.WeaveTable` instances)
         3. Otherwise, traverse all values within `obj` recursively, applying the above logic to each value.
         Important notes to developers: This method does not return anything - it _mutates_ the
-        values that it traverses (specifically, it attaches `ref` values to them)
+        values that it traverses (specifically, it attaches `ref` values to them).
 
         Important: This method calls low level save methods directly - causing network events. Until
         these are backgrounded, they should not be invoked from inside a critical path.
@@ -1467,7 +1523,7 @@ class WeaveClient:
             self._save_nested_objects(obj.rows)
 
         # Recursive traversal of other pydantic objects
-        elif isinstance(obj, (pydantic.BaseModel, pydantic.v1.BaseModel)):
+        elif isinstance(obj, pydantic.BaseModel):
             obj_rec = pydantic_object_record(obj)
             for v in obj_rec.__dict__.values():
                 self._save_nested_objects(v)
@@ -1559,9 +1615,8 @@ class WeaveClient:
 
     @trace_sentry.global_trace_sentry.watch()
     def _save_op(self, op: Op, name: str | None = None) -> ObjectRef:
-        """
-        Saves an Op to the weave server and returns the Ref. This is the sister
-        function to _save_object_basic, but for Ops
+        """Saves an Op to the weave server and returns the Ref. This is the sister
+        function to _save_object_basic, but for Ops.
         """
         if name is None:
             name = op.name
@@ -1645,9 +1700,9 @@ class WeaveClient:
                 if hasattr(server, "_next_trace_server"):
                     server = server._next_trace_server
 
-                assert hasattr(server, "_generic_request_executor")
-                assert hasattr(server._generic_request_executor, "__wrapped__")
-                return server._generic_request_executor.__wrapped__(
+                assert hasattr(server, "_post_request_executor")
+                assert hasattr(server._post_request_executor, "__wrapped__")
+                return server._post_request_executor.__wrapped__(
                     server, "/table/create_from_digests", req
                 )
 
@@ -1846,8 +1901,7 @@ class WeaveClient:
 
     @property
     def num_outstanding_jobs(self) -> int:
-        """
-        Returns the total number of pending jobs across all executors and the server.
+        """Returns the total number of pending jobs across all executors and the server.
 
         This property can be used to check the progress of background tasks
         without blocking the main thread.
@@ -1872,8 +1926,7 @@ class WeaveClient:
         use_progress_bar: bool = True,
         callback: Callable[[FlushStatus], None] | None = None,
     ) -> None:
-        """
-        Flushes all background tasks to ensure they are processed.
+        """Flushes all background tasks to ensure they are processed.
 
         This method blocks until all currently enqueued jobs are processed,
         displaying a progress bar to show the status of the pending tasks.

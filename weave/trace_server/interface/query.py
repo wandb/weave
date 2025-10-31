@@ -1,5 +1,4 @@
-"""
-This file contains the interface definition for the Trace Server Query model. It
+"""This file contains the interface definition for the Trace Server Query model. It
 is heavily inspired by the MongoDB query language, but is a subset of the full
 MongoDB query language. In particular, we have made the following
 simplifications:
@@ -36,8 +35,7 @@ from pydantic import BaseModel, ConfigDict, Field
 # https://www.mongodb.com/docs/manual/reference/operator/aggregation/literal/
 # Can be any standard json-able value
 class LiteralOperation(BaseModel):
-    """
-    Represents a constant value in the query language.
+    """Represents a constant value in the query language.
 
     This can be any standard JSON-serializable value.
 
@@ -46,6 +44,8 @@ class LiteralOperation(BaseModel):
         {"$literal": "predict"}
         ```
     """
+
+    model_config = ConfigDict(populate_by_name=True)
 
     literal_: typing.Union[
         str,
@@ -75,8 +75,7 @@ class GetFieldOperator(BaseModel):
     #    - The field part name contains a double quote (will result in failed lookup - see `_quote_json_path` in `clickhouse_trace_server_batched.py`)
     #    These issues could be resolved by using an alternative syntax (perhaps backticks, square brackets, etc.). However
     #    this would diverge from the current Mongo syntax.
-    """
-    Access a field on the traced call.
+    """Access a field on the traced call.
 
     Supports dot notation for nested access, e.g. `summary.usage.tokens`.
 
@@ -90,13 +89,14 @@ class GetFieldOperator(BaseModel):
         ```
     """
 
+    model_config = ConfigDict(populate_by_name=True)
+
     get_field_: str = Field(alias="$getField")
 
 
 # https://www.mongodb.com/docs/manual/reference/operator/aggregation/convert/
 class ConvertOperation(BaseModel):
-    """
-    Convert the input value to a specific type (e.g., `int`, `bool`, `string`).
+    """Convert the input value to a specific type (e.g., `int`, `bool`, `string`).
 
     Example:
         ```
@@ -109,6 +109,8 @@ class ConvertOperation(BaseModel):
         ```
     """
 
+    model_config = ConfigDict(populate_by_name=True)
+
     convert_: "ConvertSpec" = Field(alias="$convert")
 
 
@@ -116,8 +118,7 @@ CastTo = typing.Literal["double", "string", "int", "bool", "exists"]
 
 
 class ConvertSpec(BaseModel):
-    """
-    Specifies conversion details for `$convert`.
+    """Specifies conversion details for `$convert`.
 
     - `input`: The operand to convert.
     - `to`: The type to convert to.
@@ -130,8 +131,7 @@ class ConvertSpec(BaseModel):
 
 # https://www.mongodb.com/docs/manual/reference/operator/aggregation/and/
 class AndOperation(BaseModel):
-    """
-    Logical AND. All conditions must evaluate to true.
+    """Logical AND. All conditions must evaluate to true.
 
     Example:
         ```
@@ -144,13 +144,14 @@ class AndOperation(BaseModel):
         ```
     """
 
+    model_config = ConfigDict(populate_by_name=True)
+
     and_: list["Operand"] = Field(alias="$and")
 
 
 # https://www.mongodb.com/docs/manual/reference/operator/aggregation/or/
 class OrOperation(BaseModel):
-    """
-    Logical OR. At least one condition must be true.
+    """Logical OR. At least one condition must be true.
 
     Example:
         ```
@@ -163,13 +164,14 @@ class OrOperation(BaseModel):
         ```
     """
 
+    model_config = ConfigDict(populate_by_name=True)
+
     or_: list["Operand"] = Field(alias="$or")
 
 
 # https://www.mongodb.com/docs/manual/reference/operator/aggregation/not/
 class NotOperation(BaseModel):
-    """
-    Logical NOT. Inverts the condition.
+    """Logical NOT. Inverts the condition.
 
     Example:
         ```
@@ -181,13 +183,14 @@ class NotOperation(BaseModel):
         ```
     """
 
+    model_config = ConfigDict(populate_by_name=True)
+
     not_: tuple["Operand"] = Field(alias="$not")
 
 
 # https://www.mongodb.com/docs/manual/reference/operator/aggregation/eq/
 class EqOperation(BaseModel):
-    """
-    Equality check between two operands.
+    """Equality check between two operands.
 
     Example:
         ```
@@ -197,13 +200,14 @@ class EqOperation(BaseModel):
         ```
     """
 
+    model_config = ConfigDict(populate_by_name=True)
+
     eq_: tuple["Operand", "Operand"] = Field(alias="$eq")
 
 
 # https://www.mongodb.com/docs/manual/reference/operator/aggregation/gt/
 class GtOperation(BaseModel):
-    """
-    Greater than comparison.
+    """Greater than comparison.
 
     Example:
         ```
@@ -213,13 +217,14 @@ class GtOperation(BaseModel):
         ```
     """
 
+    model_config = ConfigDict(populate_by_name=True)
+
     gt_: tuple["Operand", "Operand"] = Field(alias="$gt")
 
 
-# https://www.mongodb.com/docs/manual/reference/operator/aggregation/gte/
+# https://www.mongodb.com/docs/manual/reference/aggregation/gte/
 class GteOperation(BaseModel):
-    """
-    Greater than or equal comparison.
+    """Greater than or equal comparison.
 
     Example:
         ```
@@ -229,13 +234,14 @@ class GteOperation(BaseModel):
         ```
     """
 
+    model_config = ConfigDict(populate_by_name=True)
+
     gte_: tuple["Operand", "Operand"] = Field(alias="$gte")
 
 
 # https://www.mongodb.com/docs/manual/reference/operator/aggregation/in/
 class InOperation(BaseModel):
-    """
-    Membership check.
+    """Membership check.
 
     Returns true if the left operand is in the list provided as the second operand.
 
@@ -250,6 +256,8 @@ class InOperation(BaseModel):
         ```
     """
 
+    model_config = ConfigDict(populate_by_name=True)
+
     in_: tuple["Operand", list["Operand"]] = Field(alias="$in")
 
 
@@ -258,8 +266,7 @@ class InOperation(BaseModel):
 # however, rather than support a full regex match right now, we will
 # support a substring match. We can add regex support later if needed.
 class ContainsOperation(BaseModel):
-    """
-    Case-insensitive substring match.
+    """Case-insensitive substring match.
 
     Not part of MongoDB. Weave-specific addition.
 
@@ -275,12 +282,13 @@ class ContainsOperation(BaseModel):
         ```
     """
 
+    model_config = ConfigDict(populate_by_name=True)
+
     contains_: "ContainsSpec" = Field(alias="$contains")
 
 
 class ContainsSpec(BaseModel):
-    """
-    Specification for the `$contains` operation.
+    """Specification for the `$contains` operation.
 
     - `input`: The string to search.
     - `substr`: The substring to search for.
@@ -319,7 +327,7 @@ ContainsOperation.model_rebuild()
 
 
 class Query(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
     # Here, we use `expr_` to match the MongoDB query language's "aggregation" operator syntax.
     # This is certainly a subset of the full MongoDB query language, but it is a good starting point.

@@ -122,7 +122,7 @@ async def test_simple_client_create_stream(
         [UserMessage(content="Hello, how are you?", source="user")]
     )
     async for _ in response:
-        _
+        pass
 
     calls = list(client.get_calls())
     assert len(calls) == 2
@@ -225,11 +225,11 @@ async def test_simple_cached_client_create_stream(
     async for _ in cache_client.create_stream(
         [UserMessage(content="Hello, how are you?", source="user")]
     ):
-        _
+        pass
     async for _ in cache_client.create_stream(
         [UserMessage(content="Hello, how are you?", source="user")]
     ):
-        _
+        pass
     calls = list(client.get_calls())
     assert len(calls) == 9
     flattened = flatten_calls(calls)
@@ -363,7 +363,7 @@ async def test_agentchat_run_stream_with_tool(
     )
     # Simulate a chat task
     async for _ in agent.run_stream(task="What is the weather in New York?"):
-        _
+        pass
     calls = list(client.get_calls())
     assert len(calls) == 7
     call = calls[0]
@@ -454,7 +454,7 @@ async def test_agentchat_group_chat(
 
     # Run the team with a task and print the messages to the console.
     async for _ in team.run_stream(task="Increment the number 1 to 3."):
-        _
+        pass
     await model_client.close()
     calls = list(client.get_calls())
     call = calls[0]

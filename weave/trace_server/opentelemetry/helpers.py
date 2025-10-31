@@ -60,8 +60,7 @@ def to_json_serializable(value: Any) -> Any:
 
 
 def resolve_pb_any_value(value: AnyValue) -> Any:
-    """
-    Resolve the value field of an AnyValue protobuf message.
+    """Resolve the value field of an AnyValue protobuf message.
 
     Args:
         value: An AnyValue protobuf message
@@ -91,8 +90,7 @@ def resolve_pb_any_value(value: AnyValue) -> Any:
 
 
 def resolve_pb_key_value(key_value: KeyValue) -> tuple[str, Any]:
-    """
-    Resolve a KeyValue protobuf message into a tuple of key and value.
+    """Resolve a KeyValue protobuf message into a tuple of key and value.
 
     Args:
         key_value: A KeyValue protobuf message
@@ -125,26 +123,121 @@ def _get_value_from_nested_dict(d: dict[str, Any], key: str) -> Any:
     return current
 
 
+class AttributePathConflictError(TypeError):
+    def __init__(
+        self,
+        *,
+        parent_key: str,
+        attempted_subkey: str,
+        existing_type: type,
+        message: Optional[str] = None,
+    ) -> None:
+        if message is None:
+            message = (
+                "Invalid attribute structure: cannot set subkey '"
+                f"{attempted_subkey}' under parent key '{parent_key}' because it "
+                f"is already a {existing_type.__name__}. "
+                "Do not mix a primitive value and nested keys for the same path. "
+                "Either send only nested keys (e.g. '"
+                f"{parent_key}.…') or rename the parent (e.g. '{parent_key}_value')."
+            )
+        super().__init__(message)
+        self.parent_key = parent_key
+        self.attempted_subkey = attempted_subkey
+        self.existing_type = existing_type
+
+
+def _validate_structure(d: dict[str, Any], key: str, value: Any) -> None:
+    """Ensure setting `value` at dot-path `key` won't corrupt structure.
+
+    Validation rules:
+    - Disallow placing a primitive at a path that already contains a mapping
+      (dict or list).
+    - Disallow descending into a non-dict value for any parent segment.
+    - Disallow overwriting an existing mapping at the leaf with a primitive
+      when subkeys already exist for that path.
+    """
+    # Simple key (no nesting): prevent clobbering an existing mapping with a primitive
+    if "." not in key:
+        existing = d.get(key)
+        if isinstance(existing, (dict, list)) and not isinstance(value, (dict, list)):
+            raise AttributePathConflictError(
+                parent_key=key,
+                attempted_subkey="<root>",
+                existing_type=type(existing),
+                message=(
+                    f"Invalid attribute structure: key '{key}' already has nested values, "
+                    "but a non-object value was also provided. Do not send both '"
+                    f"{key}' and '{key}.*' keys. Either: (1) remove the primitive '"
+                    f"{key}', (2) move it under a different name (e.g. '{key}_value'), or "
+                    f"(3) represent it as a field, e.g. '{key}.value'."
+                ),
+            )
+        return
+
+    # Nested key: validate traversal and leaf overwrite rules
+    parts = key.split(".")
+    current: Any = d
+    for i, part in enumerate(parts[:-1]):
+        # Build the dotted path for the current parent segment.
+        # Example: key='a.b.c'
+        #  - i=0 -> parts[:1] = ['a']   -> parent_path='a'
+        #  - i=1 -> parts[:2] = ['a','b'] -> parent_path='a.b'
+        # This is used to reference the parent key in conflict messages when
+        # we detect that we must descend into a non-dict (primitive) value.
+        parent_path = ".".join(parts[: i + 1])
+        if part in current and not isinstance(current[part], dict):
+            # We must descend, but parent is a primitive -> conflict
+            raise AttributePathConflictError(
+                parent_key=parent_path,
+                attempted_subkey=parts[i + 1],
+                existing_type=type(current[part]),
+            )
+        # Safe to continue (either missing or a dict); creation happens in setter
+        if part in current:
+            current = current[part]
+        else:
+            current = {}  # placeholder to advance logic without mutating
+
+    # Leaf rule: prevent overwriting an existing mapping with a primitive
+    parent = _get_value_from_nested_dict(d, ".".join(parts[:-1])) or {}
+    if isinstance(parent, dict):
+        last = parts[-1]
+        existing_leaf = parent.get(last)
+        if isinstance(existing_leaf, (dict, list)) and not isinstance(
+            value, (dict, list)
+        ):
+            raise AttributePathConflictError(
+                parent_key=".".join(parts),
+                attempted_subkey="<root>",
+                existing_type=type(existing_leaf),
+                message=(
+                    f"Invalid attribute structure: received both nested subkeys for '{'.'.join(parts)}' "
+                    "and a non-object value for the same key. Do not send both '"
+                    f"{'.'.join(parts)}' and '{'.'.join(parts)}.*'. Either keep only nested keys or "
+                    f"use a different key for the primitive (e.g. '{'.'.join(parts)}_value')."
+                ),
+            )
+
+
 def _set_value_in_nested_dict(d: dict[str, Any], key: str, value: Any) -> None:
     """Set a value in a nested dictionary using a dot-separated key."""
+    _validate_structure(d, key, value)
     if "." not in key:
         d[key] = value
         return
 
     parts = key.split(".")
     current = d
-    for _, part in enumerate(parts[:-1]):
-        if part not in current:
-            current[part] = {}
-        current = current[part]
+    for part in parts[:-1]:
+        current = current.setdefault(part, {})
     current[parts[-1]] = value
 
 
 def convert_numeric_keys_to_list(
     obj: dict[str, Any],
 ) -> Union[dict[str, Any], list[Any]]:
-    """
-    Convert dictionaries with numeric-only keys to lists.
+    """Convert dictionaries with numeric-only keys to lists.
 
     If all keys in a dictionary are numeric strings (0, 1, 2, ...),
     convert it to a list. Recursively processes nested dictionaries.
@@ -170,8 +263,7 @@ def convert_numeric_keys_to_list(
 
 
 def expand_attributes(kv: Iterable[tuple[str, Any]]) -> dict[str, Any]:
-    """
-    Expand a flattened JSON attributes file into a nested Python dictionary.
+    """Expand a flattened JSON attributes file into a nested Python dictionary.
 
     Args:
         file_path: Path to the JSON file with flattened attributes
@@ -205,8 +297,7 @@ def expand_attributes(kv: Iterable[tuple[str, Any]]) -> dict[str, Any]:
 def flatten_attributes(
     data: dict[str, Any], json_attributes: Optional[list[str]] = None
 ) -> dict[str, Any]:
-    """
-    Flatten a nested Python dictionary into a flat dictionary with dot-separated keys.
+    """Flatten a nested Python dictionary into a flat dictionary with dot-separated keys.
 
     Args:
         data: Nested Python dictionary to flatten
@@ -275,8 +366,7 @@ def flatten_attributes(
 
 
 def get_attribute(data: dict[str, Any], key: str) -> Any:
-    """
-    Get the value of a nested attribute from either a nested or flattened dictionary.
+    """Get the value of a nested attribute from either a nested or flattened dictionary.
 
     Args:
         data: dictionary to get value from
@@ -296,8 +386,7 @@ def get_attribute(data: dict[str, Any], key: str) -> Any:
 def unflatten_key_values(
     key_values: Iterable[KeyValue],
 ) -> dict[str, Any]:
-    """
-    Transform a list of KeyValue pairs into a nested dictionary structure.
+    """Transform a list of KeyValue pairs into a nested dictionary structure.
 
     Args:
         key_values: An iterable of KeyValue protobuf messages
@@ -459,10 +548,11 @@ def shorten_name(
 
 
 def try_parse_timestamp(x: Any) -> Any:
-    """
-    Try to parse a timestamp from various formats.
+    """Try to parse a timestamp from various formats.
+
     Args:
         x: The input value to parse as a timestamp.
+
     Returns:
         A datetime object if parsing is successful, otherwise returns None.
     """

@@ -161,7 +161,7 @@ def resolve_var(fn: Callable, var_name: str) -> Any:
 
 
 class RefJSONEncoder(json.JSONEncoder):
-    """Json encoder used for convert storage.to_json_with_refs result to python code"""
+    """Json encoder used for convert storage.to_json_with_refs result to python code."""
 
     SPECIAL_REF_TOKEN = "__WEAVE_REF__"
 
@@ -478,7 +478,7 @@ def _has_memory_address(obj: Any) -> bool:
 
 
 def _replace_memory_address(json_val: str) -> str:
-    """Turn <Function object at 0x10c349010> into <Function object at 0x000000000>"""
+    """Turn <Function object at 0x10c349010> into <Function object at 0x000000000>."""
 
     def _replacement_with_same_length(match: re.Match[str]) -> str:
         # Get matched text and replace with 0s of the same length
@@ -548,18 +548,51 @@ def save_instance(obj: Op, artifact: MemTraceFilesArtifact, name: str) -> None:
 
         op_function_code = redact_pii_string(op_function_code)
 
-    if not WEAVE_OP_PATTERN.search(op_function_code):
-        op_function_code = "@weave.op()\n" + op_function_code
-    else:
-        op_function_code = WEAVE_OP_NO_PAREN_PATTERN.sub(
-            "@weave.op()", op_function_code
+    # Detect weave import and alias
+    has_weave_import = False
+    weave_alias = None
+    for imp in import_code:
+        if imp.strip().startswith("import weave"):
+            has_weave_import = True
+            if " as " in imp:
+                # Extract the alias (e.g., "wv" from "import weave as wv")
+                weave_alias = imp.strip().split()[-1]
+            break
+
+    # Determine the decorator pattern to use/check
+    decorator_prefix = weave_alias if weave_alias else "weave"
+    decorator_pattern = re.compile(rf"@{re.escape(decorator_prefix)}\.op(\(\))?")
+
+    # Check if the expected decorator exists
+    has_expected_decorator = decorator_pattern.search(op_function_code)
+
+    # Handle decorator normalization/addition
+    if has_expected_decorator:
+        # Normalize existing decorator to have parentheses
+        # Example: @weave.op -> @weave.op() or @wv.op -> @wv.op()
+        # (where decorator_prefix matches the actual import)
+        op_function_code = re.sub(
+            rf"@{re.escape(decorator_prefix)}\.op(?!\()",
+            f"@{decorator_prefix}.op()",
+            op_function_code,
         )
+    else:
+        # No decorator found, add one
+        # This happens when:
+        # - Op created programmatically: my_op = weave.op()(plain_func)
+        # - Anonymous ops: client.create_call("op_name", inputs)
+        # Example: plain function -> @weave.op() or @wv.op() prepended
+        op_function_code = f"@{decorator_prefix}.op()\n" + op_function_code
     code.append(op_function_code)
 
     with artifact.new_file(f"{name}.py") as f:
         assert isinstance(f, io.StringIO)
         import_block = "\n".join(import_code)
-        import_lines = ["import weave"] + import_block.split("\n")
+        # Only add "import weave" if it's not already present
+        if has_weave_import:
+            import_lines = import_block.splitlines()
+        else:
+            import_lines = ["import weave"] + import_block.splitlines()
         import_lines = dedupe_list(import_lines)
         import_lines = [l for l in import_lines if "weave.api" not in l]
         import_block = "\n".join(import_lines)
@@ -570,6 +603,7 @@ def save_instance(obj: Op, artifact: MemTraceFilesArtifact, name: str) -> None:
 def load_instance(
     artifact: MemTraceFilesArtifact,
     name: str,
+    val: Any,
 ) -> Op | None:
     file_name = f"{name}.py"
     module_path = artifact.path(file_name)
@@ -579,11 +613,11 @@ def load_instance(
     # the version in the module name to avoid this. Since version names
     # are content hashes, this is correct.
     #
-    art_and_version_dir = module_path[: -(1 + len(file_name))]
-    art_dir, version_subdir = art_and_version_dir.rsplit("/", 1)
+    art_and_version_dir = os.path.dirname(module_path)
+    art_dir, version_subdir = os.path.split(art_and_version_dir)
     module_dir = art_dir
     import_name = (
-        version_subdir + "." + ".".join(os.path.splitext(file_name)[0].split("/"))
+        version_subdir + "." + ".".join(os.path.splitext(file_name)[0].split(os.sep))
     )
 
     sys.path.insert(0, os.path.abspath(module_dir))

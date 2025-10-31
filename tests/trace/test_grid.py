@@ -81,7 +81,7 @@ def test_get_row_errors():
         row[1.5]  # Invalid key type
 
     with pytest.raises(AttributeError):
-        row.invalid  # Invalid attribute name
+        _ = row.invalid  # Invalid attribute name
 
 
 def test_get_column_values():

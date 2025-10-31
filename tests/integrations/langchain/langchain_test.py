@@ -388,13 +388,19 @@ def fix_chroma_ci() -> Generator[None, None, None]:
     # According to https://docs.trychroma.com/troubleshooting#sqlite
     # which references https://gist.github.com/defulmere/8b9695e415a44271061cc8e272f3c300,
     # on Linux machines (CI runners), we need to patch sqlite3 to pysqlite3 and ensure
-    # pysqlite3 is installed.
+    # pysqlite3 is installed. On Windows, pysqlite3 is not available, so we skip this.
     if not os.environ.get("CI"):
         yield None
         return
 
-    __import__("pysqlite3")
     import sys
+
+    # Try to import pysqlite3, but skip patching if not available (e.g., on Windows)
+    try:
+        __import__("pysqlite3")
+    except ImportError:
+        yield None
+        return
 
     old = sys.modules["sqlite3"]
     sys.modules["sqlite3"] = sys.modules.pop("pysqlite3")
@@ -496,12 +502,12 @@ def test_agent_run_with_tools(
     from langchain.agents import AgentExecutor
     from langchain.agents.format_scratchpad import format_to_openai_function_messages
     from langchain.agents.output_parsers import OpenAIFunctionsAgentOutputParser
-    from langchain.pydantic_v1 import BaseModel, Field
     from langchain.tools import StructuredTool
     from langchain_core.messages import AIMessage, HumanMessage
     from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
     from langchain_core.utils.function_calling import convert_to_openai_tool
     from langchain_openai import ChatOpenAI
+    from pydantic import BaseModel, Field
 
     class CalculatorInput(BaseModel):
         a: int = Field(description="first number")
@@ -612,12 +618,12 @@ def test_agent_run_with_function_call(
     from langchain.agents import AgentExecutor
     from langchain.agents.format_scratchpad import format_to_openai_function_messages
     from langchain.agents.output_parsers import OpenAIFunctionsAgentOutputParser
-    from langchain.pydantic_v1 import BaseModel, Field
     from langchain.tools import StructuredTool
     from langchain_core.messages import AIMessage, HumanMessage
     from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
     from langchain_core.utils.function_calling import convert_to_openai_function
     from langchain_openai import ChatOpenAI
+    from pydantic import BaseModel, Field
 
     class CalculatorInput(BaseModel):
         a: int = Field(description="first number")

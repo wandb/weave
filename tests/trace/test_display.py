@@ -380,9 +380,10 @@ def test_style_creation():
 
 
 def test_fallback_behavior_simulation():
-    """Test that auto viewer handles ImportError correctly when getting the viewer
+    """Test that auto viewer handles ImportError correctly when getting the viewer.
 
-    This is tested by using display.get_viewer with "auto" which internally calls _get_auto_viewer"""
+    This is tested by using display.get_viewer with "auto" which internally calls _get_auto_viewer
+    """
     from weave.trace.display.display import _get_auto_viewer
 
     with patch(

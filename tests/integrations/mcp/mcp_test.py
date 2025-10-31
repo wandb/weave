@@ -1,4 +1,5 @@
 import asyncio
+import sys
 from collections.abc import Generator
 
 import pytest
@@ -50,7 +51,7 @@ def mcp_server():
 
 
 async def run_client():
-    """Run the client and connect to the MCP server"""
+    """Run the client and connect to the MCP server."""
     # Configure the server parameters
     server_params = StdioServerParameters(
         command="python",
@@ -98,7 +99,7 @@ async def run_client():
 
 
 def main():
-    """Main entry point"""
+    """Main entry point."""
     asyncio.run(run_client())
 
 
@@ -156,6 +157,10 @@ def test_mcp_client(client: WeaveClient) -> None:
 @pytest.mark.vcr(
     filter_headers=["authorization"],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="Currently not working on Windows",
 )
 def test_mcp_server(client: WeaveClient) -> None:
     fastmcp = mcp_server()

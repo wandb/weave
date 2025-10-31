@@ -2,10 +2,12 @@ import copy
 import datetime
 from collections import OrderedDict, defaultdict
 from collections.abc import Iterator
-from typing import Any, Optional, cast
+from typing import Any, Literal, Optional, cast
 
 from weave.trace_server import refs_internal as ri
 from weave.trace_server import trace_server_interface as tsi
+
+CallStatus = Literal["running", "completed", "failed"]
 
 
 def make_feedback_query_req(
@@ -77,8 +79,7 @@ def make_derived_summary_fields(
     exception: Optional[str] = None,
     display_name: Optional[str] = None,
 ) -> tsi.SummaryMap:
-    """
-    Make derived summary fields for a call.
+    """Make derived summary fields for a call.
 
     Summary is controlled by the user, but the `weave` summary key is
     used to store derived fields, adhering to the tsi.SummaryMap type.
@@ -121,8 +122,7 @@ def empty_str_to_none(val: Optional[str]) -> Optional[str]:
 
 
 def get_nested_key(d: dict[str, Any], col: str) -> Optional[Any]:
-    """
-    Get a nested key from a dict. None if not found.
+    """Get a nested key from a dict. None if not found.
 
     Example:
     get_nested_key({"a": {"b": {"c": "d"}}}, "a.b.c") -> "d"
@@ -143,8 +143,7 @@ def get_nested_key(d: dict[str, Any], col: str) -> Optional[Any]:
 
 
 def set_nested_key(d: dict[str, Any], col: str, val: Any) -> None:
-    """
-    Set a nested key in a dict.
+    """Set a nested key in a dict.
 
     Example:
     set_nested_key({"a": {"b": "c"}}, "a.b", "e") -> {"a": {"b": "e"}}
@@ -202,8 +201,7 @@ class DynamicBatchProcessor:
 
 
 def digest_is_version_like(digest: str) -> tuple[bool, int]:
-    """
-    Check if a digest is a version like string.
+    """Check if a digest is a version like string.
 
     Examples:
     - v1 -> True, 1
@@ -227,3 +225,45 @@ def assert_parameter_length_less_than_max(
         raise ValueError(
             f"Parameter: '{param_name}' request length is greater than max length ({max_length}). Actual length: {arr_len}"
         )
+
+
+def determine_call_status(call: tsi.CallSchema) -> CallStatus:
+    """Determine the status of a call based on its state.
+
+    Args:
+        call: The call schema to determine status for.
+
+    Returns:
+        The status of the call: "running", "completed", or "failed".
+    """
+    if call.ended_at is None:
+        return "running"
+    if call.exception is None:
+        return "completed"
+    return "failed"
+
+
+def op_name_matches(op_name: Optional[str], expected_name: str) -> bool:
+    """Check if an op_name URI matches the expected op name.
+
+    Args:
+        op_name: The op_name from a call, which may be a URI or a plain name
+        expected_name: The expected op name to match against
+
+    Returns:
+        True if the op_name matches the expected name
+    """
+    if not op_name:
+        return False
+
+    # If it's a URI, parse it to get the name
+    if op_name.startswith(ri.WEAVE_INTERNAL_SCHEME):
+        try:
+            parsed = ri.parse_internal_uri(op_name)
+            if isinstance(parsed, ri.InternalOpRef):
+                return parsed.name == expected_name
+        except ri.InvalidInternalRef:
+            pass
+
+    # Fallback to direct string comparison for non-URI op names
+    return op_name == expected_name

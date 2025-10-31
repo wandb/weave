@@ -109,7 +109,7 @@ def sum_dict_leaves(dicts: list[dict]) -> dict:
     for k in nested_dicts.keys():
         result[k] = sum_dict_leaves(nested_dicts[k])
 
-    return result
+    return convert_defaultdict_to_dict(result)
 
 
 def zip_dicts(base_dict: dict[str, Any], new_dict: dict[str, Any]) -> dict[str, Any]:
@@ -136,8 +136,7 @@ def zip_dicts(base_dict: dict[str, Any], new_dict: dict[str, Any]) -> dict[str, 
 def flatten_attributes(
     data: dict[str, Any], json_attributes: Optional[list[str]] = None
 ) -> dict[str, Any]:
-    """
-    Flatten a nested Python dictionary into a flat dictionary with dot-separated keys.
+    """Flatten a nested Python dictionary into a flat dictionary with dot-separated keys.
 
     Args:
         data: Nested Python dictionary to flatten

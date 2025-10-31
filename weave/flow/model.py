@@ -22,8 +22,7 @@ class MissingInferenceMethodError(Exception): ...
 
 
 class Model(Object):
-    """
-    Intended to capture a combination of code and data the operates on an input.
+    """Intended to capture a combination of code and data the operates on an input.
     For example it might call an LLM with a prompt to make a prediction or generate
     text.
 
@@ -33,7 +32,6 @@ class Model(Object):
     prompts or to try the latest LLM and compare predictions across different settings
 
     Examples:
-
     ```python
     class YourModel(Model):
         attribute1: str

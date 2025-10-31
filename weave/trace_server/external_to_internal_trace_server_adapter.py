@@ -40,7 +40,7 @@ A = TypeVar("A")
 B = TypeVar("B")
 
 
-class ExternalTraceServer(tsi.TraceServerInterface):
+class ExternalTraceServer(tsi.FullTraceServerInterface):
     """Used to adapt the internal trace server to the external trace server.
     This is done by converting the project_id, run_id, and user_id to their
     internal representations before calling the internal trace server and
@@ -50,11 +50,13 @@ class ExternalTraceServer(tsi.TraceServerInterface):
     back to their external representations before returning them to the caller.
     """
 
-    _internal_trace_server: tsi.TraceServerInterface
+    _internal_trace_server: tsi.FullTraceServerInterface
     _idc: IdConverter
 
     def __init__(
-        self, internal_trace_server: tsi.TraceServerInterface, id_converter: IdConverter
+        self,
+        internal_trace_server: tsi.FullTraceServerInterface,
+        id_converter: IdConverter,
     ):
         super().__init__()
         self._internal_trace_server = internal_trace_server
@@ -101,6 +103,8 @@ class ExternalTraceServer(tsi.TraceServerInterface):
 
     def otel_export(self, req: tsi.OtelExportReq) -> tsi.OtelExportRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        if req.wb_run_id is not None:
+            req.wb_run_id = self._idc.ext_to_int_run_id(req.wb_run_id)
         if req.wb_user_id is not None:
             req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
         return self._ref_apply(self._internal_trace_server.otel_export, req)
@@ -430,6 +434,13 @@ class ExternalTraceServer(tsi.TraceServerInterface):
         # forward directly without additional ref conversion.
         return self._internal_trace_server.completions_create_stream(req)
 
+    def image_create(
+        self, req: tsi.ImageGenerationCreateReq
+    ) -> tsi.ImageGenerationCreateRes:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        res = self._ref_apply(self._internal_trace_server.image_create, req)
+        return res
+
     def project_stats(self, req: tsi.ProjectStatsReq) -> tsi.ProjectStatsRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(self._internal_trace_server.project_stats, req)
@@ -453,3 +464,216 @@ class ExternalTraceServer(tsi.TraceServerInterface):
     ) -> tsi.EvaluationStatusRes:
         req.project_id = self._idc.ext_to_int_project_id(req.project_id)
         return self._ref_apply(self._internal_trace_server.evaluation_status, req)
+
+    # === V2 APIs ===
+
+    def op_create_v2(self, req: tsi.OpCreateV2Req) -> tsi.OpCreateV2Res:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.op_create_v2, req)
+
+    def op_read_v2(self, req: tsi.OpReadV2Req) -> tsi.OpReadV2Res:
+        original_project_id = req.project_id
+        req.project_id = self._idc.ext_to_int_project_id(original_project_id)
+        return self._ref_apply(self._internal_trace_server.op_read_v2, req)
+
+    def op_list_v2(self, req: tsi.OpListV2Req) -> Iterator[tsi.OpReadV2Res]:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._stream_ref_apply(self._internal_trace_server.op_list_v2, req)
+
+    def op_delete_v2(self, req: tsi.OpDeleteV2Req) -> tsi.OpDeleteV2Res:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.op_delete_v2, req)
+
+    def dataset_create_v2(self, req: tsi.DatasetCreateV2Req) -> tsi.DatasetCreateV2Res:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.dataset_create_v2, req)
+
+    def dataset_read_v2(self, req: tsi.DatasetReadV2Req) -> tsi.DatasetReadV2Res:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.dataset_read_v2, req)
+
+    def dataset_list_v2(
+        self, req: tsi.DatasetListV2Req
+    ) -> Iterator[tsi.DatasetReadV2Res]:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._stream_ref_apply(self._internal_trace_server.dataset_list_v2, req)
+
+    def dataset_delete_v2(self, req: tsi.DatasetDeleteV2Req) -> tsi.DatasetDeleteV2Res:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.dataset_delete_v2, req)
+
+    def scorer_create_v2(self, req: tsi.ScorerCreateV2Req) -> tsi.ScorerCreateV2Res:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.scorer_create_v2, req)
+
+    def scorer_read_v2(self, req: tsi.ScorerReadV2Req) -> tsi.ScorerReadV2Res:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.scorer_read_v2, req)
+
+    def scorer_list_v2(self, req: tsi.ScorerListV2Req) -> Iterator[tsi.ScorerReadV2Res]:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._stream_ref_apply(self._internal_trace_server.scorer_list_v2, req)
+
+    def scorer_delete_v2(self, req: tsi.ScorerDeleteV2Req) -> tsi.ScorerDeleteV2Res:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.scorer_delete_v2, req)
+
+    def evaluation_create_v2(
+        self, req: tsi.EvaluationCreateV2Req
+    ) -> tsi.EvaluationCreateV2Res:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.evaluation_create_v2, req)
+
+    def evaluation_read_v2(
+        self, req: tsi.EvaluationReadV2Req
+    ) -> tsi.EvaluationReadV2Res:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.evaluation_read_v2, req)
+
+    def evaluation_list_v2(
+        self, req: tsi.EvaluationListV2Req
+    ) -> Iterator[tsi.EvaluationReadV2Res]:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._stream_ref_apply(
+            self._internal_trace_server.evaluation_list_v2, req
+        )
+
+    def evaluation_delete_v2(
+        self, req: tsi.EvaluationDeleteV2Req
+    ) -> tsi.EvaluationDeleteV2Res:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.evaluation_delete_v2, req)
+
+    # Model V2 API
+
+    def model_create_v2(self, req: tsi.ModelCreateV2Req) -> tsi.ModelCreateV2Res:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.model_create_v2, req)
+
+    def model_read_v2(self, req: tsi.ModelReadV2Req) -> tsi.ModelReadV2Res:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.model_read_v2, req)
+
+    def model_list_v2(self, req: tsi.ModelListV2Req) -> Iterator[tsi.ModelReadV2Res]:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._stream_ref_apply(self._internal_trace_server.model_list_v2, req)
+
+    def model_delete_v2(self, req: tsi.ModelDeleteV2Req) -> tsi.ModelDeleteV2Res:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.model_delete_v2, req)
+
+    def evaluation_run_create_v2(
+        self, req: tsi.EvaluationRunCreateV2Req
+    ) -> tsi.EvaluationRunCreateV2Res:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        if req.wb_user_id is not None:
+            req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
+        return self._ref_apply(
+            self._internal_trace_server.evaluation_run_create_v2, req
+        )
+
+    def evaluation_run_read_v2(
+        self, req: tsi.EvaluationRunReadV2Req
+    ) -> tsi.EvaluationRunReadV2Res:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.evaluation_run_read_v2, req)
+
+    def evaluation_run_list_v2(
+        self, req: tsi.EvaluationRunListV2Req
+    ) -> Iterator[tsi.EvaluationRunReadV2Res]:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._stream_ref_apply(
+            self._internal_trace_server.evaluation_run_list_v2, req
+        )
+
+    def evaluation_run_delete_v2(
+        self, req: tsi.EvaluationRunDeleteV2Req
+    ) -> tsi.EvaluationRunDeleteV2Res:
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        if req.wb_user_id is not None:
+            req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
+        return self._ref_apply(
+            self._internal_trace_server.evaluation_run_delete_v2, req
+        )
+
+    def evaluation_run_finish_v2(
+        self, req: tsi.EvaluationRunFinishV2Req
+    ) -> tsi.EvaluationRunFinishV2Res:
+        """Finish an evaluation run, converting project_id."""
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        if req.wb_user_id is not None:
+            req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
+        return self._ref_apply(
+            self._internal_trace_server.evaluation_run_finish_v2, req
+        )
+
+    # Prediction V2 API
+
+    def prediction_create_v2(
+        self, req: tsi.PredictionCreateV2Req
+    ) -> tsi.PredictionCreateV2Res:
+        """Create a prediction, converting project_id and model ref."""
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        if req.wb_user_id is not None:
+            req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
+        return self._ref_apply(self._internal_trace_server.prediction_create_v2, req)
+
+    def prediction_read_v2(
+        self, req: tsi.PredictionReadV2Req
+    ) -> tsi.PredictionReadV2Res:
+        """Read a prediction, converting project_id and model ref."""
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.prediction_read_v2, req)
+
+    def prediction_list_v2(
+        self, req: tsi.PredictionListV2Req
+    ) -> Iterator[tsi.PredictionReadV2Res]:
+        """List predictions, converting project_id and model refs."""
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._stream_ref_apply(
+            self._internal_trace_server.prediction_list_v2, req
+        )
+
+    def prediction_delete_v2(
+        self, req: tsi.PredictionDeleteV2Req
+    ) -> tsi.PredictionDeleteV2Res:
+        """Delete predictions, converting project_id."""
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        if req.wb_user_id is not None:
+            req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
+        return self._ref_apply(self._internal_trace_server.prediction_delete_v2, req)
+
+    def prediction_finish_v2(
+        self, req: tsi.PredictionFinishV2Req
+    ) -> tsi.PredictionFinishV2Res:
+        """Finish a prediction, converting project_id."""
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        if req.wb_user_id is not None:
+            req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
+        return self._ref_apply(self._internal_trace_server.prediction_finish_v2, req)
+
+    # Score V2 API
+
+    def score_create_v2(self, req: tsi.ScoreCreateV2Req) -> tsi.ScoreCreateV2Res:
+        """Create a score, converting project_id and scorer ref."""
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        if req.wb_user_id is not None:
+            req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
+        return self._ref_apply(self._internal_trace_server.score_create_v2, req)
+
+    def score_read_v2(self, req: tsi.ScoreReadV2Req) -> tsi.ScoreReadV2Res:
+        """Read a score, converting project_id and scorer ref."""
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._ref_apply(self._internal_trace_server.score_read_v2, req)
+
+    def score_list_v2(self, req: tsi.ScoreListV2Req) -> Iterator[tsi.ScoreReadV2Res]:
+        """List scores, converting project_id and scorer refs."""
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        return self._stream_ref_apply(self._internal_trace_server.score_list_v2, req)
+
+    def score_delete_v2(self, req: tsi.ScoreDeleteV2Req) -> tsi.ScoreDeleteV2Res:
+        """Delete a score, converting project_id."""
+        req.project_id = self._idc.ext_to_int_project_id(req.project_id)
+        if req.wb_user_id is not None:
+            req.wb_user_id = self._idc.ext_to_int_user_id(req.wb_user_id)
+        return self._ref_apply(self._internal_trace_server.score_delete_v2, req)

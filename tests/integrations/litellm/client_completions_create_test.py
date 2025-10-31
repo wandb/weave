@@ -20,8 +20,7 @@ def with_tracing_disabled():
 
 
 def test_completions_create(client):
-    """
-    This test is testing the backend implementation of completions_create. It relies on LiteLLM
+    """This test is testing the backend implementation of completions_create. It relies on LiteLLM
     and we don't want to jump through the hoops to add it to the integration sharding. So we are putting
     it here for now. Should be moved to a dedicated client tester that pins to a single python version.
     """

@@ -44,10 +44,17 @@ interface File {
   content: Blob;
 }
 
+interface Table {
+  project_id: string;
+  digest: string;
+  rows: Array<{digest: string; val: any}>;
+}
+
 export class InMemoryTraceServer {
   private _calls: Call[] = [];
   private _objs: Obj[] = [];
   private _files: File[] = [];
+  private _tables: Table[] = [];
   private _lastCallCount: number = 0;
   private _lastChangeTime: number = Date.now();
 
@@ -147,6 +154,80 @@ export class InMemoryTraceServer {
         },
       };
     },
+
+    objReadObjReadPost: async (req: {
+      project_id: string;
+      object_id: string;
+      digest?: string;
+    }) => {
+      const obj = this._objs.find(
+        o =>
+          o.project_id === req.project_id &&
+          o.object_id === req.object_id &&
+          (req.digest ? o.digest === req.digest : o.is_latest === 1)
+      );
+
+      if (!obj) {
+        throw new Error(
+          `Object not found: ${req.project_id}/${req.object_id}${req.digest ? ':' + req.digest : ''}`
+        );
+      }
+
+      return {
+        data: {
+          obj: obj,
+        },
+      };
+    },
+  };
+
+  table = {
+    tableCreateTableCreatePost: async (req: {
+      table: {project_id: string; rows: any[]};
+    }) => {
+      const digest = this.generateDigest(req.table.rows);
+
+      // Create row entries with individual digests
+      const rows = req.table.rows.map(rowVal => ({
+        digest: this.generateDigest(rowVal),
+        val: rowVal,
+      }));
+
+      const newTable: Table = {
+        project_id: req.table.project_id,
+        digest: digest,
+        rows: rows,
+      };
+
+      this._tables.push(newTable);
+
+      return {
+        data: {
+          digest: digest,
+        },
+      };
+    },
+
+    tableQueryTableQueryPost: async (req: {
+      project_id: string;
+      digest: string;
+    }) => {
+      const table = this._tables.find(
+        t => t.project_id === req.project_id && t.digest === req.digest
+      );
+
+      if (!table) {
+        throw new Error(
+          `Table not found: ${req.project_id}/table/${req.digest}`
+        );
+      }
+
+      return {
+        data: {
+          rows: table.rows,
+        },
+      };
+    },
   };
 
   file = {
@@ -166,6 +247,17 @@ export class InMemoryTraceServer {
 
       return {
         digest: digest,
+      };
+    },
+  };
+
+  feedback = {
+    feedbackCreateFeedbackCreatePost: async (req: any) => {
+      // Stub implementation for feedback API (used by scorer feedback attachment)
+      return {
+        data: {
+          id: uuidv7(),
+        },
       };
     },
   };

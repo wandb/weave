@@ -8,7 +8,6 @@ from copy import deepcopy
 from typing import Any, Literal, Optional, SupportsIndex, Union
 
 from pydantic import BaseModel
-from pydantic import v1 as pydantic_v1
 
 from weave.trace import box
 from weave.trace.context.tests_context import get_raise_on_captured_errors
@@ -413,10 +412,9 @@ class WeaveTable(Traceable):
         super()._mark_dirty()
 
     def _local_iter_with_remote_fallback(self) -> Generator[dict, None, None]:
-        """
-        This is the case where we:
+        """This is the case where we:
         1. Have all the rows in memory
-        2. Have all the row digests
+        2. Have all the row digests.
 
         In this case, we don't need to make any calls and can just return the rows
         """
@@ -884,7 +882,7 @@ def make_trace_obj(
         # val.call = partial(call, val, parent)
         val = maybe_bind_method(val, parent)
     box_val = box.box(val)
-    if isinstance(box_val, pydantic_v1.BaseModel) or is_op(val):
+    if is_op(val):
         box_val.__dict__["ref"] = new_ref
     elif box_val is None or isinstance(box_val, bool):
         # We intentionally don't box None and bools because it's impossible to
@@ -899,7 +897,7 @@ def make_trace_obj(
         pass
     else:
         if hasattr(box_val, "ref") and not isinstance(box_val, DeletedRef):
-            setattr(box_val, "ref", new_ref)
+            box_val.ref = new_ref
     return box_val
 
 

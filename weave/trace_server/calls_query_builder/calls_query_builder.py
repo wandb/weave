@@ -1,5 +1,4 @@
-"""
-This module builds on the orm.py module to provide a more hard-coded optimized
+"""This module builds on the orm.py module to provide a more hard-coded optimized
 query builder specifically for the "Calls" table (which is the `calls_merged`
 underlying table).
 
@@ -191,8 +190,7 @@ class CallsMergedFeedbackPayloadField(CallsMergedField):
 
     @classmethod
     def from_path(cls, path: str) -> "CallsMergedFeedbackPayloadField":
-        """
-        Expected format: `[feedback.type].dot.path`
+        """Expected format: `[feedback.type].dot.path`.
 
         feedback.type can be '*' to select all feedback types.
         """
@@ -375,11 +373,10 @@ class OrderField(BaseModel):
 
     @property
     def raw_field_path(self) -> str:
-        """
-        Returns the raw field path as a user would see it, i.e. the field path
+        """Returns the raw field path as a user would see it, i.e. the field path
         without the _dump suffix and includes the extra path dot separate.
 
-        example:
+        Example:
             OrderField(field=CallsMergedField(field="inputs_dump", extra_path=["model", "temperature"])).raw_field_path
                 -> inputs.model.temperature
         """
@@ -451,7 +448,7 @@ class Condition(BaseModel):
     def get_object_ref_conditions(
         self, expand_columns: Optional[list[str]] = None
     ) -> list[ObjectRefCondition]:
-        """Get any object ref conditions for CTE building"""
+        """Get any object ref conditions for CTE building."""
         expand_cols = expand_columns or []
         if not expand_cols or not is_object_ref_operand(self.operand, expand_cols):
             return []
@@ -577,8 +574,7 @@ class CallsQuery(BaseModel):
         return self
 
     def as_sql(self, pb: ParamBuilder, table_alias: str = "calls_merged") -> str:
-        """
-        This is the main entry point for building the query. This method will
+        """This is the main entry point for building the query. This method will
         determine the optimal query to build based on the fields and conditions
         that have been set.
 
@@ -818,9 +814,9 @@ class CallsQuery(BaseModel):
                 having_conditions_sql, "AND"
             )
 
-        # The op_name, trace_id, trace_roots conditions REQUIRE conditioning on the
-        # started_at field after grouping in the HAVING clause. These filters remove
-        # call starts before grouping, creating orphan call ends. By conditioning
+        # The op_name, trace_id, trace_roots, wb_run_id conditions REQUIRE conditioning
+        # on the started_at field after grouping in the HAVING clause. These filters
+        # remove call starts before grouping, creating orphan call ends. By conditioning
         # on `NOT any(started_at) is NULL`, we filter out orphaned call ends, ensuring
         # all rows returned at least have a call start.
         op_name_sql = process_op_name_filter_to_sql(
@@ -839,6 +835,11 @@ class CallsQuery(BaseModel):
             table_alias,
         )
         turn_id_sql = process_turn_id_filter_to_sql(
+            self.hardcoded_filter,
+            pb,
+            table_alias,
+        )
+        wb_run_id_sql = process_wb_run_ids_filter_to_sql(
             self.hardcoded_filter,
             pb,
             table_alias,
@@ -995,6 +996,7 @@ class CallsQuery(BaseModel):
         {id_mask_sql}
         {id_subquery_sql}
         {sortable_datetime_sql}
+        {wb_run_id_sql}
         {trace_roots_only_sql}
         {parent_ids_filter_sql}
         {op_name_sql}
@@ -1037,6 +1039,7 @@ ALLOWED_CALL_FIELDS = {
     "wb_user_id": CallsMergedAggField(field="wb_user_id", agg_fn="any"),
     "wb_run_id": CallsMergedAggField(field="wb_run_id", agg_fn="any"),
     "wb_run_step": CallsMergedAggField(field="wb_run_step", agg_fn="any"),
+    "wb_run_step_end": CallsMergedAggField(field="wb_run_step_end", agg_fn="any"),
     "deleted_at": CallsMergedAggField(field="deleted_at", agg_fn="any"),
     "display_name": CallsMergedAggField(field="display_name", agg_fn="argMaxMerge"),
     "storage_size_bytes": AggFieldWithTableOverrides(
@@ -1474,7 +1477,8 @@ def process_ref_filters_to_sql(
     To be used before group by. This filter is NOT guaranteed to return
     the correct results, as it can operate on call ends (output_refs) so it
     should be used in addition to the existing ref filters after group by
-    generated in process_calls_filter_to_conditions."""
+    generated in process_calls_filter_to_conditions.
+    """
     if hardcoded_filter is None or (
         not hardcoded_filter.filter.output_refs
         and not hardcoded_filter.filter.input_refs
@@ -1527,6 +1531,29 @@ def process_object_refs_filter_to_opt_sql(
         refs_filter_opt_sql += f"AND (length({table_alias}.output_refs) > 0 OR {table_alias}.ended_at IS NULL)"
 
     return refs_filter_opt_sql
+
+
+def process_wb_run_ids_filter_to_sql(
+    hardcoded_filter: Optional[HardCodedFilter],
+    param_builder: ParamBuilder,
+    table_alias: str,
+) -> str:
+    """Pulls out the wb_run_id and returns a sql string if there are any wb_run_ids."""
+    if hardcoded_filter is None or not hardcoded_filter.filter.wb_run_ids:
+        return ""
+
+    wb_run_ids = hardcoded_filter.filter.wb_run_ids
+    assert_parameter_length_less_than_max("wb_run_ids", len(wb_run_ids))
+    wb_run_id_field = get_field_by_name("wb_run_id")
+    if not isinstance(wb_run_id_field, CallsMergedAggField):
+        raise TypeError("wb_run_id is not an aggregate field")
+
+    wb_run_id_field_sql = wb_run_id_field.as_sql(
+        param_builder, table_alias, use_agg_fn=False
+    )
+    wb_run_id_filter_sql = f"{wb_run_id_field_sql} IN {param_slot(param_builder.add_param(wb_run_ids), 'Array(String)')}"
+
+    return f"AND ({wb_run_id_filter_sql} OR {wb_run_id_field_sql} IS NULL)"
 
 
 def process_calls_filter_to_conditions(
@@ -1592,7 +1619,90 @@ def process_calls_filter_to_conditions(
     return conditions
 
 
-def optimized_project_contains_call_query(
+######### STATS QUERY HANDLING ##########
+
+
+def build_calls_stats_query(
+    req: tsi.CallsQueryStatsReq,
+    param_builder: ParamBuilder,
+) -> tuple[str, KeysView[str]]:
+    """Build a stats query for calls, automatically using optimized queries when possible.
+
+    This function handles both optimized special-case queries and the general case.
+    Returns a tuple of (query_sql, column_names).
+
+    Args:
+        req: The stats query request
+        param_builder: Parameter builder for query parameterization
+
+    Returns:
+        Tuple of (SQL query string, column names in the result)
+    """
+    aggregated_columns = {"count": "count()"}
+
+    # Try optimized special case queries first
+    if opt_query := _try_optimized_stats_query(req, param_builder):
+        return (opt_query, aggregated_columns.keys())
+
+    # Fall back to general query builder
+    cq = CallsQuery(
+        project_id=req.project_id,
+        include_total_storage_size=req.include_total_storage_size or False,
+    )
+
+    cq.add_field("id")
+    if req.filter is not None:
+        cq.set_hardcoded_filter(HardCodedFilter(filter=req.filter))
+    if req.query is not None:
+        cq.add_condition(req.query.expr_)
+    if req.limit is not None:
+        cq.set_limit(req.limit)
+    if req.expand_columns is not None:
+        cq.set_expand_columns(req.expand_columns)
+
+    if req.include_total_storage_size:
+        aggregated_columns["total_storage_size_bytes"] = (
+            "sum(coalesce(total_storage_size_bytes, 0))"
+        )
+        cq.add_field("total_storage_size_bytes")
+
+    inner_query = cq.as_sql(param_builder)
+    calls_query_sql = f"SELECT {', '.join(aggregated_columns[k] for k in aggregated_columns)} FROM ({inner_query})"
+
+    return (calls_query_sql, aggregated_columns.keys())
+
+
+def _try_optimized_stats_query(
+    req: tsi.CallsQueryStatsReq, param_builder: ParamBuilder
+) -> Optional[str]:
+    """Try to match request to an optimized special-case query.
+
+    Returns optimized query string if a pattern matches, None otherwise.
+    Add new patterns here for common hot-path queries.
+    """
+    # Pattern 1: Simple existence check (limit=1, no filters)
+    if (
+        req.limit == 1
+        and req.filter is None
+        and req.query is None
+        and not req.include_total_storage_size
+    ):
+        return _optimized_project_contains_call_query(req.project_id, param_builder)
+
+    # Pattern 2: Query with wb_run_id check (limit=1, query present, minimal filter)
+    # Covers common case: checking for runs with wb_run_id not null
+    if (
+        req.limit == 1
+        and req.query is not None
+        and not req.include_total_storage_size
+        and _is_minimal_filter(req.filter)
+    ):
+        return _optimized_wb_run_id_not_null_query(req.project_id, param_builder)
+
+    return None
+
+
+def _optimized_project_contains_call_query(
     project_id: str,
     param_builder: ParamBuilder,
 ) -> str:
@@ -1612,33 +1722,38 @@ def optimized_project_contains_call_query(
     )
 
 
-def build_calls_query_stats_query(
-    req: tsi.CallsQueryStatsReq,
+def _optimized_wb_run_id_not_null_query(
+    project_id: str,
     param_builder: ParamBuilder,
-) -> tuple[str, KeysView[str]]:
-    cq = CallsQuery(
-        project_id=req.project_id,
-        include_total_storage_size=req.include_total_storage_size,
-    )
+) -> str:
+    """Optimized query for checking existence of calls with wb_run_id not null.
 
-    cq.add_field("id")
-    if req.filter is not None:
-        cq.set_hardcoded_filter(HardCodedFilter(filter=req.filter))
-    if req.query is not None:
-        cq.add_condition(req.query.expr_)
-    if req.limit is not None:
-        cq.set_limit(req.limit)
-    if req.expand_columns is not None:
-        cq.set_expand_columns(req.expand_columns)
-
-    aggregated_columns = {"count": "count()"}
-    if req.include_total_storage_size:
-        aggregated_columns["total_storage_size_bytes"] = (
-            "sum(coalesce(total_storage_size_bytes, 0))"
+    Uses WHERE clause instead of HAVING to avoid expensive aggregation.
+    """
+    project_id_param = param_builder.add_param(project_id)
+    return f"""
+        SELECT count() FROM (
+            SELECT calls_merged.id AS id
+            FROM calls_merged
+            WHERE calls_merged.project_id = {param_slot(project_id_param, "String")}
+                AND calls_merged.wb_run_id IS NOT NULL
+                AND calls_merged.deleted_at IS NULL
+            LIMIT 1
         )
-        cq.add_field("total_storage_size_bytes")
+    """
 
-    inner_query = cq.as_sql(param_builder)
-    calls_query_sql = f"SELECT {', '.join(aggregated_columns[k] for k in aggregated_columns)} FROM ({inner_query})"
 
-    return (calls_query_sql, aggregated_columns.keys())
+def _is_minimal_filter(filter: Optional[tsi.CallsFilter]) -> bool:
+    """Check if filter has no specific filtering criteria set."""
+    if filter is None:
+        return True
+    return (
+        filter.wb_run_ids is None
+        and filter.op_names is None
+        and filter.call_ids is None
+        and filter.trace_ids is None
+        and filter.parent_ids is None
+        and filter.trace_roots_only is None
+        and filter.input_refs is None
+        and filter.output_refs is None
+    )

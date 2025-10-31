@@ -1,5 +1,4 @@
-"""
-Tests for the netrc module.
+"""Tests for the netrc module.
 
 This module contains comprehensive tests for the netrc utilities including
 the Netrc class, helper functions, and edge cases.

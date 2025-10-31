@@ -1,12 +1,11 @@
-"""
-GitHub Activity Digest Generator
+"""GitHub Activity Digest Generator.
 
 This module generates comprehensive activity digests for GitHub repositories, with optional Slack integration.
 It tracks commits, pull requests, and categorizes changes across different areas of the codebase.
 
 Features:
 - Tracks recent commits and pull requests
-- Categorizes changes (docs, tests, server, UI, SDKs, etc.)
+- Categorizes changes (tests, server, UI, SDKs, etc.)
 - Formats output for both console and Slack
 - Handles GitHub API rate limiting
 - Supports parallel processing for better performance
@@ -92,8 +91,8 @@ class CategoryRule:
     """Rule for determining if a file belongs to a category.
 
     Attributes:
-        name: Display name (e.g., "Docs")
-        column_header: Short name for table header (e.g., "📚")
+        name: Display name (e.g., "Tests")
+        column_header: Short name for table header (e.g., "Tests")
         emoji: Emoji indicator for visual representation
         matcher: Rule can be either a regex pattern or a callback function
     """
@@ -106,12 +105,6 @@ class CategoryRule:
 
 # Define all categories with their rules
 CATEGORIES = [
-    CategoryRule(
-        name="Documentation",
-        column_header="Docs",
-        emoji="📚",
-        matcher=re.compile(r"^docs/"),
-    ),
     CategoryRule(
         name="Tests",
         column_header="Tests",
