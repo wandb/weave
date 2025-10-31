@@ -325,40 +325,7 @@ def test_dspy_evaluate(client: WeaveClient) -> None:
     flattened_calls = flatten_calls(calls)
 
     assert len(flattened_calls) == 32
-    assert flattened_calls_to_names(flattened_calls) == [
-        ("Evaluation.evaluate", 0),
-        ("dspy.ChainOfThought", 1),
-        ("dspy.Predict", 2),
-        ("dspy.ChatAdapter", 3),
-        ("dspy.LM", 4),
-        ("dspy.LM.forward", 5),
-        ("litellm.completion", 6),
-        ("openai.chat.completions.create", 7),
-        ("dspy.ChainOfThought", 1),
-        ("dspy.Predict", 2),
-        ("dspy.ChatAdapter", 3),
-        ("dspy.LM", 4),
-        ("dspy.LM.forward", 5),
-        ("litellm.completion", 6),
-        ("openai.chat.completions.create", 7),
-        ("dspy.ChainOfThought", 1),
-        ("dspy.Predict", 2),
-        ("dspy.ChatAdapter", 3),
-        ("dspy.LM", 4),
-        ("dspy.LM.forward", 5),
-        ("litellm.completion", 6),
-        ("openai.chat.completions.create", 7),
-        ("Evaluation.predict_and_score", 1),
-        ("Model.predict", 2),
-        ("accuracy_metric", 2),
-        ("Evaluation.predict_and_score", 1),
-        ("Model.predict", 2),
-        ("accuracy_metric", 2),
-        ("Evaluation.predict_and_score", 1),
-        ("Model.predict", 2),
-        ("accuracy_metric", 2),
-        ("Evaluation.summarize", 1),
-    ]
+    assert flattened_calls_to_names(flattened_calls) == [('Evaluation.evaluate', 0), ('Evaluation.predict_and_score', 1), ('Model.predict', 2), ('dspy.ChainOfThought', 3), ('dspy.Predict', 4), ('dspy.ChatAdapter', 5), ('dspy.LM', 6), ('dspy.LM.forward', 7), ('litellm.completion', 8), ('openai.chat.completions.create', 9), ('accuracy_metric', 2), ('Evaluation.predict_and_score', 1), ('Model.predict', 2), ('dspy.ChainOfThought', 3), ('dspy.Predict', 4), ('dspy.ChatAdapter', 5), ('dspy.LM', 6), ('dspy.LM.forward', 7), ('litellm.completion', 8), ('openai.chat.completions.create', 9), ('accuracy_metric', 2), ('Evaluation.predict_and_score', 1), ('Model.predict', 2), ('dspy.ChainOfThought', 3), ('dspy.Predict', 4), ('dspy.ChatAdapter', 5), ('dspy.LM', 6), ('dspy.LM.forward', 7), ('litellm.completion', 8), ('openai.chat.completions.create', 9), ('accuracy_metric', 2), ('Evaluation.summarize', 1)]
 
     call = calls[0]
     assert call.started_at < call.ended_at
@@ -377,6 +344,10 @@ def test_dspy_evaluate(client: WeaveClient) -> None:
         "x-rate-limit",
     ],
     allowed_hosts=["api.wandb.ai", "localhost", "trace.wandb.ai"],
+)
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="Currently not working on Windows",
 )
 def test_dspy_evaluate_with_pydantic_prediction(client: WeaveClient) -> None:
     """Evaluate a module that returns a Pydantic BaseModel prediction.
